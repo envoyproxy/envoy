@@ -105,6 +105,11 @@ struct SupportedCommands {
   }
 
   /**
+   * @return hello command
+   */
+  static const std::string& hello() { CONSTRUCT_ON_FIRST_USE(std::string, "hello"); }
+
+  /**
    * @return auth command
    */
   static const std::string& auth() { CONSTRUCT_ON_FIRST_USE(std::string, "auth"); }
@@ -182,7 +187,8 @@ struct SupportedCommands {
                            "randomkey", // RANDOMKEY
                            "quit",      // QUIT
                            "role",      // ROLE
-                           "info"       // INFO [section]
+                           "info",      // INFO [section]
+                           "hello"      // HELLO [version]
     );
   }
 

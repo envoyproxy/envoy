@@ -587,8 +587,9 @@ TEST_F(RedisSingleServerRequestTest, Hello) {
 
   Common::Redis::RespValue response;
   response.type(Common::Redis::RespType::Error);
-  response.asString() = "ERR unknown command 'hello', with args beginning with: 2";
+  response.asString() = "ERR HELLO options like AUTH and SETNAME are not supported";
 
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
   handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
   EXPECT_EQ(nullptr, handle_);
@@ -2054,6 +2055,331 @@ TEST_F(RandomShardRequestTest, NoShardsAvailable) {
 
   EXPECT_EQ(1UL, store_.counter("redis.foo.command.randomkey.total").value());
   EXPECT_EQ(1UL, store_.counter("redis.foo.command.randomkey.error").value());
+}
+
+// ===== HELLO COMMAND TESTS =====
+
+class HelloRequestTest : public FragmentedRequestCommandHandlerTest {
+public:
+  void setup(std::vector<std::string> request_strings,
+             const std::list<uint64_t>& null_handle_indexes = {}, bool mirrored = false) {
+    makeRequestToShard(1, request_strings, null_handle_indexes, mirrored);
+  }
+
+  Common::Redis::RespValuePtr helloResponse() {
+    // Create a typical HELLO response with id field
+    Common::Redis::RespValuePtr response = std::make_unique<Common::Redis::RespValue>();
+    response->type(Common::Redis::RespType::Array);
+
+    // Add response elements: server, redis, version, 6.2.14, proto, 2, id, 123, mode, cluster,
+    // role, master, modules, []
+    std::vector<std::string> keys = {"server", "version", "proto", "id", "mode", "role", "modules"};
+    std::vector<std::string> values = {"redis", "6.2.14", "", "", "cluster", "master", ""};
+
+    for (size_t i = 0; i < keys.size(); i++) {
+      Common::Redis::RespValue key;
+      key.type(Common::Redis::RespType::BulkString);
+      key.asString() = keys[i];
+      response->asArray().push_back(key);
+
+      if (keys[i] == "proto") {
+        Common::Redis::RespValue val;
+        val.type(Common::Redis::RespType::Integer);
+        val.asInteger() = 2;
+        response->asArray().push_back(val);
+      } else if (keys[i] == "id") {
+        Common::Redis::RespValue val;
+        val.type(Common::Redis::RespType::Integer);
+        val.asInteger() = 123;
+        response->asArray().push_back(val);
+      } else if (keys[i] == "modules") {
+        Common::Redis::RespValue val;
+        val.type(Common::Redis::RespType::Array);
+        response->asArray().push_back(val);
+      } else {
+        Common::Redis::RespValue val;
+        val.type(Common::Redis::RespType::BulkString);
+        val.asString() = values[i];
+        response->asArray().push_back(val);
+      }
+    }
+
+    return response;
+  }
+
+  Common::Redis::RespValuePtr errorResponse(const std::string& error_msg) {
+    return Common::Redis::Utility::makeError(error_msg);
+  }
+};
+
+TEST_F(HelloRequestTest, HelloWithProtocolVersion) {
+  InSequence s;
+
+  setup({"hello", "2"});
+  EXPECT_NE(nullptr, handle_);
+
+  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  EXPECT_CALL(store_, deliverHistogramToSinks(
+                          Property(&Stats::Metric::name, "redis.foo.command.hello.latency"), 10));
+
+  // Verify that the response has id field sanitized (replaced with null)
+  EXPECT_CALL(callbacks_, onResponse_(_))
+      .WillOnce(Invoke([](Common::Redis::RespValuePtr& response) {
+        EXPECT_EQ(Common::Redis::RespType::Array, response->type());
+        // Find the "id" field and verify the next element is Null
+        bool found_id = false;
+        for (size_t i = 0; i < response->asArray().size() - 1; i++) {
+          if (response->asArray()[i].type() == Common::Redis::RespType::BulkString &&
+              response->asArray()[i].asString() == "id") {
+            EXPECT_EQ(Common::Redis::RespType::Null, response->asArray()[i + 1].type());
+            found_id = true;
+            break;
+          }
+        }
+        EXPECT_TRUE(found_id) << "Expected to find 'id' field in HELLO response";
+      }));
+
+  pool_callbacks_[0]->onResponse(helloResponse());
+
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.hello.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.hello.success").value());
+}
+
+TEST_F(HelloRequestTest, HelloWithoutProtocolVersion) {
+  InSequence s;
+
+  setup({"hello"});
+  EXPECT_NE(nullptr, handle_);
+
+  time_system_.setMonotonicTime(std::chrono::milliseconds(15));
+  EXPECT_CALL(store_, deliverHistogramToSinks(
+                          Property(&Stats::Metric::name, "redis.foo.command.hello.latency"), 15));
+
+  // Verify response sanitization
+  EXPECT_CALL(callbacks_, onResponse_(_))
+      .WillOnce(Invoke([](Common::Redis::RespValuePtr& response) {
+        EXPECT_EQ(Common::Redis::RespType::Array, response->type());
+        // Verify id field is sanitized
+        for (size_t i = 0; i < response->asArray().size() - 1; i++) {
+          if (response->asArray()[i].type() == Common::Redis::RespType::BulkString &&
+              response->asArray()[i].asString() == "id") {
+            EXPECT_EQ(Common::Redis::RespType::Null, response->asArray()[i + 1].type());
+            return;
+          }
+        }
+      }));
+
+  pool_callbacks_[0]->onResponse(helloResponse());
+
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.hello.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.hello.success").value());
+}
+
+TEST_F(HelloRequestTest, HelloErrorResponse) {
+  InSequence s;
+
+  setup({"hello", "2"});
+  EXPECT_NE(nullptr, handle_);
+
+  time_system_.setMonotonicTime(std::chrono::milliseconds(20));
+  EXPECT_CALL(store_, deliverHistogramToSinks(
+                          Property(&Stats::Metric::name, "redis.foo.command.hello.latency"), 20));
+  EXPECT_CALL(callbacks_, onResponse_(_));
+  pool_callbacks_[0]->onResponse(errorResponse("ERR some error"));
+
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.hello.total").value());
+  EXPECT_EQ(0UL, store_.counter("redis.foo.command.hello.success").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.hello.error").value());
+}
+
+TEST_F(HelloRequestTest, HelloResponseWithoutIdField) {
+  // Test when Redis response doesn't contain "id" field (edge case)
+  InSequence s;
+
+  setup({"hello", "2"});
+  EXPECT_NE(nullptr, handle_);
+
+  time_system_.setMonotonicTime(std::chrono::milliseconds(12));
+  EXPECT_CALL(store_, deliverHistogramToSinks(
+                          Property(&Stats::Metric::name, "redis.foo.command.hello.latency"), 12));
+
+  // Create response without id field
+  Common::Redis::RespValuePtr response_without_id = std::make_unique<Common::Redis::RespValue>();
+  response_without_id->type(Common::Redis::RespType::Array);
+
+  Common::Redis::RespValue server_key;
+  server_key.type(Common::Redis::RespType::BulkString);
+  server_key.asString() = "server";
+  response_without_id->asArray().push_back(server_key);
+
+  Common::Redis::RespValue server_val;
+  server_val.type(Common::Redis::RespType::BulkString);
+  server_val.asString() = "redis";
+  response_without_id->asArray().push_back(server_val);
+
+  EXPECT_CALL(callbacks_, onResponse_(_))
+      .WillOnce(Invoke([](Common::Redis::RespValuePtr& response) {
+        EXPECT_EQ(Common::Redis::RespType::Array, response->type());
+        // Should not crash, just pass through without modification
+      }));
+
+  pool_callbacks_[0]->onResponse(std::move(response_without_id));
+
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.hello.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.hello.success").value());
+}
+
+TEST_F(HelloRequestTest, HelloEmptyArrayResponse) {
+  // Test edge case with empty array response
+  InSequence s;
+
+  setup({"hello"});
+  EXPECT_NE(nullptr, handle_);
+
+  time_system_.setMonotonicTime(std::chrono::milliseconds(8));
+  EXPECT_CALL(store_, deliverHistogramToSinks(
+                          Property(&Stats::Metric::name, "redis.foo.command.hello.latency"), 8));
+
+  Common::Redis::RespValuePtr empty_response = std::make_unique<Common::Redis::RespValue>();
+  empty_response->type(Common::Redis::RespType::Array);
+
+  EXPECT_CALL(callbacks_, onResponse_(_));
+  pool_callbacks_[0]->onResponse(std::move(empty_response));
+
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.hello.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.hello.success").value());
+}
+
+TEST_F(HelloRequestTest, HelloNonArrayResponse) {
+  // Test edge case with non-array response (shouldn't happen but test robustness)
+  InSequence s;
+
+  setup({"hello", "2"});
+  EXPECT_NE(nullptr, handle_);
+
+  time_system_.setMonotonicTime(std::chrono::milliseconds(5));
+  EXPECT_CALL(store_, deliverHistogramToSinks(
+                          Property(&Stats::Metric::name, "redis.foo.command.hello.latency"), 5));
+
+  Common::Redis::RespValuePtr simple_response = std::make_unique<Common::Redis::RespValue>();
+  simple_response->type(Common::Redis::RespType::BulkString);
+  simple_response->asString() = "OK";
+
+  EXPECT_CALL(callbacks_, onResponse_(_));
+  pool_callbacks_[0]->onResponse(std::move(simple_response));
+
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.hello.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.hello.success").value());
+}
+
+TEST_F(HelloRequestTest, HelloMakeRequestToShardReturnsNull) {
+  // Test case where makeFragmentedRequestToShard returns null
+  EXPECT_CALL(callbacks_, onResponse_(_));
+
+  setup({"hello", "2"}, {0}); // null_handle_indexes = {0}
+  EXPECT_NE(nullptr, handle_);
+
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.hello.total").value());
+}
+
+TEST_F(HelloRequestTest, HelloNoShardsAvailable) {
+  // Test HELLO command fails gracefully when no shards available
+  Common::Redis::RespValue expected_response;
+  expected_response.type(Common::Redis::RespType::Error);
+  expected_response.asString() = "no upstream host";
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"hello", "2"});
+
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+  EXPECT_CALL(*conn_pool_, shardSize_()).WillOnce(Return(0));
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
+
+  auto handle = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
+  EXPECT_EQ(nullptr, handle);
+
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.hello.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.hello.error").value());
+}
+
+TEST_F(HelloRequestTest, HelloWithOptionsNotSupported) {
+  // Test that HELLO with additional options (more than 2 args) is rejected
+  Common::Redis::RespValue expected_response;
+  expected_response.type(Common::Redis::RespType::Error);
+  expected_response.asString() = "ERR HELLO options like AUTH and SETNAME are not supported";
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"hello", "2", "auth", "user", "pass"});
+
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
+
+  auto handle = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
+  EXPECT_EQ(nullptr, handle);
+}
+
+TEST_F(HelloRequestTest, HelloInvalidProtocolVersion) {
+  // Test HELLO with non-numeric protocol version
+  Common::Redis::RespValue expected_response;
+  expected_response.type(Common::Redis::RespType::Error);
+  expected_response.asString() = "NOPROTO unsupported protocol version";
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"hello", "abc"});
+
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
+
+  auto handle = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
+  EXPECT_EQ(nullptr, handle);
+}
+
+TEST_F(HelloRequestTest, HelloUnsupportedProtocolVersion) {
+  // Test HELLO with protocol version other than 2 (e.g., RESP3)
+  Common::Redis::RespValue expected_response;
+  expected_response.type(Common::Redis::RespType::Error);
+  expected_response.asString() = "NOPROTO unsupported protocol version";
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"hello", "3"});
+
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
+
+  auto handle = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
+  EXPECT_EQ(nullptr, handle);
+}
+
+TEST_F(HelloRequestTest, HelloWithAuthOptionNotSupported) {
+  // Test HELLO 2 AUTH - should be rejected as AUTH option not supported
+  Common::Redis::RespValue expected_response;
+  expected_response.type(Common::Redis::RespType::Error);
+  expected_response.asString() = "ERR HELLO options like AUTH and SETNAME are not supported";
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"hello", "2", "auth", "myuser", "mypass"});
+
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
+
+  auto handle = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
+  EXPECT_EQ(nullptr, handle);
+}
+
+TEST_F(HelloRequestTest, HelloWithSetnameNotSupported) {
+  // Test HELLO 2 SETNAME - should be rejected as SETNAME option not supported
+  Common::Redis::RespValue expected_response;
+  expected_response.type(Common::Redis::RespType::Error);
+  expected_response.asString() = "ERR HELLO options like AUTH and SETNAME are not supported";
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"hello", "2", "setname", "myclient"});
+
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
+
+  auto handle = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
+  EXPECT_EQ(nullptr, handle);
 }
 
 // ===== CLUSTER SCOPE COMMAND TESTS =====

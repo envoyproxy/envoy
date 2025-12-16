@@ -32,6 +32,7 @@ struct ResponseValues {
   const std::string UpstreamFailure = "upstream failure";
   const std::string UpstreamProtocolError = "upstream protocol error";
   const std::string AuthRequiredError = "NOAUTH Authentication required.";
+  const std::string UnsupportedProtocol = "NOPROTO unsupported protocol version";
 };
 
 using Response = ConstSingleton<ResponseValues>;
@@ -349,6 +350,29 @@ private:
 };
 
 /**
+ * HelloRequest handles the Redis HELLO command by routing it to a single random shard.
+ * The response is sanitized to replace the "id" field value with null, since the proxy
+ * doesn't maintain individual client IDs.
+ * Supports HELLO and HELLO 2 (RESP2 protocol). Additional options like AUTH and SETNAME
+ * are not supported.
+ */
+class HelloRequest : public FragmentedRequest {
+public:
+  static SplitRequestPtr create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
+                                SplitCallbacks& callbacks, CommandStats& command_stats,
+                                TimeSource& time_source, bool delay_command_latency,
+                                const StreamInfo::StreamInfo& stream_info);
+
+private:
+  HelloRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source,
+               bool delay_command_latency)
+      : FragmentedRequest(callbacks, command_stats, time_source, delay_command_latency) {}
+
+  // RedisProxy::CommandSplitter::FragmentedRequest
+  void onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t index) override;
+};
+
+/**
  * ClusterScopeCmdRequest sends the command to all Redis servers, and the responses are handled
  * specifically to its type. This class uses the strategy pattern with response handlers defined in
  * cluster_response_handler.h
@@ -523,6 +547,7 @@ private:
   CommandHandlerFactory<ScanRequest> scan_handler_;
   CommandHandlerFactory<ShardInfoRequest> shard_info_handler_;
   CommandHandlerFactory<RandomShardRequest> random_shard_handler_;
+  CommandHandlerFactory<HelloRequest> hello_handler_;
   CommandHandlerFactory<SplitKeysSumResultRequest> split_keys_sum_result_handler_;
   CommandHandlerFactory<TransactionRequest> transaction_handler_;
   CommandHandlerFactory<ClusterScopeCmdRequest> cluster_scope_handler_;
