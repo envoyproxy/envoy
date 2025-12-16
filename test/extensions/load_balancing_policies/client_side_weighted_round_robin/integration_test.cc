@@ -199,14 +199,26 @@ public:
       : HttpIntegrationTest(Http::CodecType::HTTP1, std::get<0>(GetParam()), config()),
         deferred_cluster_creation_(std::get<1>(GetParam())) {
     use_lds_ = false;
+    create_xds_upstream_ = true;
+    tls_xds_upstream_ = false;
+    setUpstreamProtocol(Http::CodecType::HTTP2);
   }
 
   void TearDown() override { cleanUpXdsConnection(); }
 
   void initialize() override {
     use_lds_ = false;
-    setUpstreamCount(2);                         // the CDS cluster
-    setUpstreamProtocol(Http::CodecType::HTTP2); // CDS uses gRPC uses HTTP2.
+    autonomous_upstream_ = true;
+    setUpstreamCount(0);
+
+    // Wait for the Envoy server to stabilize, before continuing with the xDS
+    // connection establishment. This avoids a race where the Envoy's
+    // connection creation races with the xDS upstream thread, the initial connection
+    // is dropped, and the test fails.
+    absl::Notification server_initialized;
+    on_server_ready_function_ = [&server_initialized](IntegrationTestServer&) -> void {
+      server_initialized.Notify();
+    };
 
     defer_listener_finalization_ = true;
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -215,8 +227,27 @@ public:
     });
     HttpIntegrationTest::initialize();
 
-    addFakeUpstream(Http::CodecType::HTTP2);
-    addFakeUpstream(Http::CodecType::HTTP2);
+    // Let Envoy establish its connection to the CDS server.
+    if (xds_stream_ == nullptr) {
+      createXdsConnection();
+      AssertionResult result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
+      RELEASE_ASSERT(result, result.message());
+      xds_stream_->startGrpcStream();
+    }
+
+    fake_upstreams_count_ = 2;
+    createUpstreams();
+
+    /*
+    // Configure the autonomous upstreams to respond with 200 OK.
+    for (int i = FirstUpstreamIndex; i <= SecondUpstreamIndex; ++i) {
+      auto response_headers = std::make_unique<Http::TestResponseHeaderMapImpl>(
+          Http::TestResponseHeaderMapImpl{{":status", "200"}});
+      reinterpret_cast<AutonomousUpstream*>(fake_upstreams_[i].get())
+          ->setResponseHeaders(std::move(response_headers));
+    }
+    */
+
     cluster1_ = ConfigHelper::buildStaticCluster(
         FirstClusterName, fake_upstreams_[FirstUpstreamIndex]->localAddress()->ip()->port(),
         Network::Test::getLoopbackAddressString(version_));
@@ -227,14 +258,14 @@ public:
         Network::Test::getLoopbackAddressString(version_));
     configureClusterLoadBalancingPolicy(cluster2_);
 
-    // Let Envoy establish its connection to the CDS server.
-    acceptXdsConnection();
-
     // Do the initial compareDiscoveryRequest / sendDiscoveryResponse for
     // cluster_1.
     EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "", {}, {}, {}, true));
     sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TestTypeUrl::get().Cluster,
                                                                {cluster1_}, {cluster1_}, {}, "55");
+
+    // Wait for the server initialization to be done.
+    server_initialized.WaitForNotification();
 
     test_server_->waitForGaugeGe("cluster_manager.active_clusters", 2);
 
@@ -244,21 +275,11 @@ public:
     registerTestServerPorts({"http"});
   }
 
-  void acceptXdsConnection() {
-    // xds_connection_ is filled with the new FakeHttpConnection.
-    AssertionResult result =
-        fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, xds_connection_);
-    RELEASE_ASSERT(result, result.message());
-    result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
-    RELEASE_ASSERT(result, result.message());
-    xds_stream_->startGrpcStream();
-  }
-
   const char* FirstClusterName = "cluster_1";
   const char* SecondClusterName = "cluster_2";
   // Index in fake_upstreams_
-  const int FirstUpstreamIndex = 2;
-  const int SecondUpstreamIndex = 3;
+  const int FirstUpstreamIndex = 1;
+  const int SecondUpstreamIndex = 2;
 
   const std::string& config() {
     CONSTRUCT_ON_FIRST_USE(std::string, fmt::format(R"EOF(
@@ -320,10 +341,20 @@ static_resources:
               routes:
               - route:
                   cluster: cluster_1
+                  # Due to the flakiness of the integration test infrastrucutre some connections timeout. Retry them up to 3 times.
+                  retry_policy:
+                    per_try_timeout: 1s
+                    retry_on: connect-failure
+                    num_retries: 3
                 match:
                   prefix: "/cluster1"
               - route:
                   cluster: cluster_2
+                  # Due to the flakiness of the integration test infrastrucutre some connections timeout. Retry them up to 3 times.
+                  retry_policy:
+                    per_try_timeout: 1s
+                    retry_on: connect-failure
+                    num_retries: 3
                 match:
                   prefix: "/cluster2"
               domains: "*"
@@ -339,9 +370,13 @@ static_resources:
 TEST_P(ClientSideWeightedRoundRobinXdsIntegrationTest, ClusterUpDownUp) {
   // Calls our initialize(), which includes establishing a listener, route, and
   // cluster.
-  testRouterHeaderOnlyRequestAndResponse(nullptr, FirstUpstreamIndex, "/cluster1");
+  initialize();
+  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+      lookupPort("http"), "GET", "/cluster1", "", downstream_protocol_, version_, "foo.com");
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
   cleanupUpstreamAndDownstream();
-  ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   // Tell Envoy that cluster_1 is gone.
   EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "55", {}, {}, {}));
@@ -353,13 +388,12 @@ TEST_P(ClientSideWeightedRoundRobinXdsIntegrationTest, ClusterUpDownUp) {
 
   // Now that cluster_1 is gone, the listener (with its routing to cluster_1)
   // should 503.
-  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-      lookupPort("http"), "GET", "/cluster1", "", downstream_protocol_, version_, "foo.com");
+  response = IntegrationUtil::makeSingleRequest(lookupPort("http"), "GET", "/cluster1", "",
+                                                downstream_protocol_, version_, "foo.com");
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
 
   cleanupUpstreamAndDownstream();
-  ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   // Tell Envoy that cluster_1 is back.
   EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "42", {}, {}, {}));
@@ -367,7 +401,10 @@ TEST_P(ClientSideWeightedRoundRobinXdsIntegrationTest, ClusterUpDownUp) {
                                                              {cluster1_}, {cluster1_}, {}, "413");
 
   test_server_->waitForGaugeGe("cluster_manager.active_clusters", 2);
-  testRouterHeaderOnlyRequestAndResponse(nullptr, FirstUpstreamIndex, "/cluster1");
+  response = IntegrationUtil::makeSingleRequest(lookupPort("http"), "GET", "/cluster1", "",
+                                                downstream_protocol_, version_, "foo.com");
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 
   cleanupUpstreamAndDownstream();
 
@@ -378,9 +415,13 @@ TEST_P(ClientSideWeightedRoundRobinXdsIntegrationTest, ClusterUpDownUp) {
 TEST_P(ClientSideWeightedRoundRobinXdsIntegrationTest, TwoClusters) {
   // Calls our initialize(), which includes establishing a listener, route, and
   // cluster.
-  testRouterHeaderOnlyRequestAndResponse(nullptr, FirstUpstreamIndex, "/cluster1");
+  initialize();
+  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+      lookupPort("http"), "GET", "/cluster1", "", downstream_protocol_, version_, "foo.com");
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
   cleanupUpstreamAndDownstream();
-  ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   // Tell Envoy that cluster_2 is here.
   EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "55", {}, {}, {}));
@@ -391,9 +432,12 @@ TEST_P(ClientSideWeightedRoundRobinXdsIntegrationTest, TwoClusters) {
   test_server_->waitForGaugeGe("cluster_manager.active_clusters", 3);
 
   // A request for the second cluster should be fine.
-  testRouterHeaderOnlyRequestAndResponse(nullptr, SecondUpstreamIndex, "/cluster2");
+  response = IntegrationUtil::makeSingleRequest(lookupPort("http"), "GET", "/cluster2", "",
+                                                downstream_protocol_, version_, "foo.com");
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
   cleanupUpstreamAndDownstream();
-  ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   // Tell Envoy that cluster_1 is gone.
   EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "42", {}, {}, {}));
@@ -403,16 +447,23 @@ TEST_P(ClientSideWeightedRoundRobinXdsIntegrationTest, TwoClusters) {
   // made use of the DiscoveryResponse that says cluster_1 is gone.
   test_server_->waitForCounterGe("cluster_manager.cluster_removed", 1);
 
-  testRouterHeaderOnlyRequestAndResponse(nullptr, SecondUpstreamIndex, "/cluster2");
+  response = IntegrationUtil::makeSingleRequest(lookupPort("http"), "GET", "/cluster2", "",
+                                                downstream_protocol_, version_, "foo.com");
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
   cleanupUpstreamAndDownstream();
-  ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   // Tell Envoy that cluster_1 is back.
   EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "43", {}, {}, {}));
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
       Config::TestTypeUrl::get().Cluster, {cluster1_, cluster2_}, {cluster1_}, {}, "413");
   test_server_->waitForGaugeGe("cluster_manager.active_clusters", 3);
-  testRouterHeaderOnlyRequestAndResponse(nullptr, FirstUpstreamIndex, "/cluster1");
+  response = IntegrationUtil::makeSingleRequest(lookupPort("http"), "GET", "/cluster1", "",
+                                                downstream_protocol_, version_, "foo.com");
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
   cleanupUpstreamAndDownstream();
 }
 
