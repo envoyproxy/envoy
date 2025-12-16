@@ -24,6 +24,8 @@ public:
   Ssl::ConnectionInfoConstSharedPtr ssl() const override { return nullptr; }
   bool startSecureTransport() override { return false; }
   void configureInitialCongestionWindow(uint64_t, std::chrono::microseconds) override {}
+  // No-op for raw buffer socket as it does not do TLS.
+  void setTransportSocketDataChunkSendLimit(uint64_t) override {}
 
 protected:
   TransportSocketCallbacks* transportSocketCallbacks() const { return callbacks_; };

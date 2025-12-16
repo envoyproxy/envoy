@@ -7914,6 +7914,249 @@ TEST_P(SslSocketTest, RsaKeyUsageVerificationEnforcementOn) {
   testUtilV2(test_options);
 }
 
+// Test that setTransportSocketDataChunkSendLimit properly limits write chunk sizes.
+class SslDataChunkLimitTest : public SslSocketTest {
+protected:
+  void initialize(uint64_t data_chunk_limit) {
+    TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml_),
+                              downstream_tls_context_);
+    auto server_cfg =
+        *ServerContextConfigImpl::create(downstream_tls_context_, factory_context_, false);
+    manager_ = std::make_unique<ContextManagerImpl>(factory_context_.serverFactoryContext());
+    server_ssl_socket_factory_ = *ServerSslSocketFactory::create(std::move(server_cfg), *manager_,
+                                                                 *server_stats_store_.rootScope(),
+                                                                 std::vector<std::string>{});
+
+    socket_ = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
+        Network::Test::getCanonicalLoopbackAddress(version_));
+    NiceMock<Network::MockListenerConfig> listener_config;
+    Server::ThreadLocalOverloadStateOptRef overload_state;
+    listener_ = createListener(socket_, listener_callbacks_, runtime_, listener_config,
+                               overload_state, *dispatcher_);
+
+    TestUtility::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml_), upstream_tls_context_);
+    auto client_cfg = *ClientContextConfigImpl::create(upstream_tls_context_, factory_context_);
+
+    client_ssl_socket_factory_ = *ClientSslSocketFactory::create(std::move(client_cfg), *manager_,
+                                                                 *client_stats_store_.rootScope());
+    auto transport_socket = client_ssl_socket_factory_->createTransportSocket(nullptr, nullptr);
+    client_transport_socket_ = transport_socket.get();
+    // Set the data chunk limit on the client transport socket.
+    client_transport_socket_->setTransportSocketDataChunkSendLimit(data_chunk_limit);
+    client_connection_ = dispatcher_->createClientConnection(
+        socket_->connectionInfoProvider().localAddress(), source_address_,
+        std::move(transport_socket), nullptr, nullptr);
+    client_connection_->addConnectionCallbacks(client_callbacks_);
+    client_connection_->connect();
+    read_filter_ = std::make_shared<Network::MockReadFilter>();
+  }
+
+  void disconnect() {
+    EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
+    EXPECT_CALL(server_callbacks_, onEvent(Network::ConnectionEvent::RemoteClose))
+        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+
+    client_connection_->close(Network::ConnectionCloseType::NoFlush);
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
+  }
+
+  Stats::TestUtil::TestStore server_stats_store_;
+  Stats::TestUtil::TestStore client_stats_store_;
+  std::shared_ptr<Network::Test::TcpListenSocketImmediateListen> socket_;
+  Network::MockTcpListenerCallbacks listener_callbacks_;
+
+  const std::string server_ctx_yaml_ = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+)EOF";
+
+  const std::string client_ctx_yaml_ = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_key.pem"
+)EOF";
+
+  NiceMock<Runtime::MockLoader> runtime_;
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext downstream_tls_context_;
+  std::unique_ptr<ContextManagerImpl> manager_;
+  Network::DownstreamTransportSocketFactoryPtr server_ssl_socket_factory_;
+  Network::ListenerPtr listener_;
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext upstream_tls_context_;
+  Envoy::Ssl::ClientContextSharedPtr client_ctx_;
+  Network::UpstreamTransportSocketFactoryPtr client_ssl_socket_factory_;
+  Network::ClientConnectionPtr client_connection_;
+  Network::TransportSocket* client_transport_socket_{};
+  Network::ConnectionPtr server_connection_;
+  NiceMock<Network::MockConnectionCallbacks> server_callbacks_;
+  std::shared_ptr<Network::MockReadFilter> read_filter_;
+  StrictMock<Network::MockConnectionCallbacks> client_callbacks_;
+  Network::Address::InstanceConstSharedPtr source_address_;
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, SslDataChunkLimitTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+// Test that data can be sent with the default chunk limit (16KB).
+TEST_P(SslDataChunkLimitTest, DefaultChunkLimit) {
+  // Default 16KB limit - data should be sent successfully.
+  initialize(16384);
+
+  EXPECT_CALL(listener_callbacks_, onAccept_(_))
+      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
+        server_connection_ = dispatcher_->createServerConnection(
+            std::move(socket), server_ssl_socket_factory_->createDownstreamTransportSocket(),
+            stream_info_);
+        server_connection_->addConnectionCallbacks(server_callbacks_);
+        server_connection_->addReadFilter(read_filter_);
+      }));
+  EXPECT_CALL(listener_callbacks_, recordConnectionsAcceptedOnSocketEvent(_));
+
+  EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::Connected))
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  uint32_t bytes_received = 0;
+  const uint32_t write_size = 32 * 1024; // 32KB - larger than one TLS record.
+
+  EXPECT_CALL(*read_filter_, onNewConnection());
+  EXPECT_CALL(*read_filter_, onData(_, _))
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) -> Network::FilterStatus {
+        bytes_received += data.length();
+        data.drain(data.length());
+        if (bytes_received >= write_size) {
+          server_connection_->close(Network::ConnectionCloseType::FlushWrite);
+        }
+        return Network::FilterStatus::StopIteration;
+      }));
+
+  EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::RemoteClose))
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
+        EXPECT_EQ(write_size, bytes_received);
+        dispatcher_->exit();
+      }));
+
+  // Write data larger than 16KB to verify it gets chunked properly.
+  Buffer::OwnedImpl data(std::string(write_size, 'a'));
+  client_connection_->write(data, false);
+
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  EXPECT_EQ(0UL, server_stats_store_.counter("ssl.connection_error").value());
+  EXPECT_EQ(0UL, client_stats_store_.counter("ssl.connection_error").value());
+}
+
+// Test that data can be sent with a smaller chunk limit (8KB for libpq compatibility).
+TEST_P(SslDataChunkLimitTest, SmallChunkLimit) {
+  // 8KB limit, simulating libpq compatibility requirement.
+  initialize(8192);
+
+  EXPECT_CALL(listener_callbacks_, onAccept_(_))
+      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
+        server_connection_ = dispatcher_->createServerConnection(
+            std::move(socket), server_ssl_socket_factory_->createDownstreamTransportSocket(),
+            stream_info_);
+        server_connection_->addConnectionCallbacks(server_callbacks_);
+        server_connection_->addReadFilter(read_filter_);
+      }));
+  EXPECT_CALL(listener_callbacks_, recordConnectionsAcceptedOnSocketEvent(_));
+
+  EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::Connected))
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  uint32_t bytes_received = 0;
+  const uint32_t write_size = 32 * 1024; // 32KB - larger than chunk limit.
+
+  EXPECT_CALL(*read_filter_, onNewConnection());
+  EXPECT_CALL(*read_filter_, onData(_, _))
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) -> Network::FilterStatus {
+        bytes_received += data.length();
+        data.drain(data.length());
+        if (bytes_received >= write_size) {
+          server_connection_->close(Network::ConnectionCloseType::FlushWrite);
+        }
+        return Network::FilterStatus::StopIteration;
+      }));
+
+  EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::RemoteClose))
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
+        EXPECT_EQ(write_size, bytes_received);
+        dispatcher_->exit();
+      }));
+
+  // Write data larger than 8KB to verify it gets chunked properly with smaller limit.
+  Buffer::OwnedImpl data(std::string(write_size, 'b'));
+  client_connection_->write(data, false);
+
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  EXPECT_EQ(0UL, server_stats_store_.counter("ssl.connection_error").value());
+  EXPECT_EQ(0UL, client_stats_store_.counter("ssl.connection_error").value());
+}
+
+// Test that setTransportSocketDataChunkSendLimit can be called via Connection interface.
+TEST_P(SslDataChunkLimitTest, SetViaConnectionInterface) {
+  initialize(16384);
+
+  EXPECT_CALL(listener_callbacks_, onAccept_(_))
+      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
+        server_connection_ = dispatcher_->createServerConnection(
+            std::move(socket), server_ssl_socket_factory_->createDownstreamTransportSocket(),
+            stream_info_);
+        server_connection_->addConnectionCallbacks(server_callbacks_);
+        server_connection_->addReadFilter(read_filter_);
+      }));
+  EXPECT_CALL(listener_callbacks_, recordConnectionsAcceptedOnSocketEvent(_));
+
+  EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::Connected))
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
+        // Set the chunk limit via the connection interface after connection is established.
+        client_connection_->setTransportSocketDataChunkSendLimit(4096);
+        dispatcher_->exit();
+      }));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  uint32_t bytes_received = 0;
+  const uint32_t write_size = 16 * 1024; // 16KB.
+
+  EXPECT_CALL(*read_filter_, onNewConnection());
+  EXPECT_CALL(*read_filter_, onData(_, _))
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) -> Network::FilterStatus {
+        bytes_received += data.length();
+        data.drain(data.length());
+        if (bytes_received >= write_size) {
+          server_connection_->close(Network::ConnectionCloseType::FlushWrite);
+        }
+        return Network::FilterStatus::StopIteration;
+      }));
+
+  EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::RemoteClose))
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
+        EXPECT_EQ(write_size, bytes_received);
+        dispatcher_->exit();
+      }));
+
+  // Write data larger than 4KB to verify the new limit is applied.
+  Buffer::OwnedImpl data(std::string(write_size, 'c'));
+  client_connection_->write(data, false);
+
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  EXPECT_EQ(0UL, server_stats_store_.counter("ssl.connection_error").value());
+  EXPECT_EQ(0UL, client_stats_store_.counter("ssl.connection_error").value());
+}
+
 } // namespace Tls
 } // namespace TransportSockets
 } // namespace Extensions

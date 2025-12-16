@@ -74,6 +74,8 @@ public:
   void closeSocket(Network::ConnectionEvent event) override;
   Network::IoResult doRead(Buffer::Instance& buffer) override;
   void onConnected() override;
+  // No-op for ALTS socket as it uses its own framing protocol.
+  void setTransportSocketDataChunkSendLimit(uint64_t) override {}
 
   // TsiHandshakerCallbacks
   void onNextDone(NextResultPtr&& result) override;

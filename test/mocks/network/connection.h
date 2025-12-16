@@ -93,6 +93,7 @@ public:
   MOCK_METHOD(absl::string_view, transportFailureReason, (), (const));                             \
   MOCK_METHOD(absl::string_view, localCloseReason, (), (const));                                   \
   MOCK_METHOD(bool, startSecureTransport, ());                                                     \
+  MOCK_METHOD(void, setTransportSocketDataChunkSendLimit, (uint64_t data_chunk_size));             \
   MOCK_METHOD(absl::optional<std::chrono::milliseconds>, lastRoundTripTime, (), (const));          \
   MOCK_METHOD(void, configureInitialCongestionWindow,                                              \
               (uint64_t bandwidth_bits_per_sec, std::chrono::microseconds rtt), ());               \
