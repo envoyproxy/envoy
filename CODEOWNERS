@@ -46,7 +46,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 # proto_message_extraction http filter extension
 /*/extensions/filters/http/proto_message_extraction @dchakarwarti @taoxuy @shuoyang2016 @yanavlasov
 # proto_api_scrubber http filter extension
-/*/extensions/filters/http/proto_api_scrubber @sumitkmr2 @adisuissa
+/*/extensions/filters/http/proto_api_scrubber @sumitkmr2 @adisuissa @pranavrautgoogle
 # grpc_http1_reverse_bridge http filter extension
 /*/extensions/filters/http/grpc_http1_reverse_bridge @zuercher @mattklein123
 # alts transport socket extension
@@ -234,6 +234,8 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/filters/http/api_key_auth @wbpcode @sanposhiho
 # HTTP MCP filter
 /*/extensions/filters/http/mcp @botengyao @yanavlasov
+# MCP router filter
+/*/extensions/filters/http/mcp_router @botengyao @yanavlasov @wdauchy
 # Original IP detection
 /*/extensions/http/original_ip_detection/custom_header @ryantheoptimist @mattklein123
 /*/extensions/http/original_ip_detection/xff @yanavlasov @mattklein123
@@ -336,7 +338,7 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 # Header to metadata
 /*/extensions/filters/http/header_to_metadata @zuercher @JuniorHsu
 # Json to metadata
-/*/extensions/filters/http/json_to_metadata @JuniorHsu @kbaichoo
+/*/extensions/filters/http/json_to_metadata @cqi1217 @JuniorHsu @kbaichoo
 # zookeeper
 /*/extensions/filters/network/zookeeper_proxy @JuniorHsu @Winbobob @mattklein123
 # Custom response filter
@@ -391,6 +393,8 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 # Dynamic Modules
 /*/extensions/dynamic_modules @mattklein123 @mathetake @marc-barry
 /*/extensions/filters/http/dynamic_modules @mattklein123 @mathetake @marc-barry
+# Linux network namespace override
+/*/extensions/local_address_selectors/filter_state_override @tonya11en @kyessenov
 
 # HTTP credential injector
 /*/extensions/filters/http/credential_injector @zhaohuabing @kyessenov
@@ -437,6 +441,8 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /contrib/kafka/ @mattklein123 @adamkotwasinski
 /contrib/rocketmq_proxy/ @aaron-ai @lizhanhui
 /contrib/mysql_proxy/ @rshriram @venilnoronha
+/contrib/postgres/protocol/ @agrawroh @cpakulski @jarupatj
+/contrib/postgres_inspector/ @agrawroh @cpakulski @jarupatj
 /contrib/postgres_proxy/ @fabriziomello @cpakulski
 /contrib/sxg/ @cpapazian @UNOWNED
 /contrib/sip_proxy/ @durd07 @nearbyfly @dorisd0102
@@ -450,3 +456,4 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /contrib/tap_sinks/ @coolg92003 @yiyibaoguo
 /contrib/peak_ewma/filters/http/ @rroblak @UNOWNED
 /contrib/peak_ewma/load_balancing_policies/ @rroblak @UNOWNED
+/contrib/kae/ @Misakokoro @UNOWNED

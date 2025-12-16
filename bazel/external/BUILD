@@ -1,3 +1,5 @@
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+
 licenses(["notice"])  # Apache 2
 
 exports_files([
@@ -22,4 +24,21 @@ genrule(
     outs = ["empty.cc"],
     cmd = "touch \"$(@D)/empty.cc\"",
     visibility = ["//visibility:public"],
+)
+
+cc_library(
+    name = "gperftools",
+    tags = ["skip_on_windows"],
+    visibility = ["//visibility:public"],
+    deps = select({
+        "//bazel:debug_tcmalloc": [
+            "@gperftools//:stacktrace",
+            "@gperftools//:tcmalloc_debug",
+        ],
+        "//conditions:default": [
+            "@gperftools//:cpu_profiler",
+            "@gperftools//:stacktrace",
+            "@gperftools//:tcmalloc",
+        ],
+    }),
 )

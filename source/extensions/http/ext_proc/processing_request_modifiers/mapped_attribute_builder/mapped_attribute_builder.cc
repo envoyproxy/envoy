@@ -32,32 +32,45 @@ MappedAttributeBuilder::MappedAttributeBuilder(
     : config_(config),
       expression_manager_(expr_builder, context.localInfo(),
                           protoMapValuesToUniqueVector(config.mapped_request_attributes()),
-                          Protobuf::RepeatedPtrField<std::string>()) {}
+                          protoMapValuesToUniqueVector(config.mapped_response_attributes())) {}
 
 bool MappedAttributeBuilder::modifyRequest(
     const Params& params, envoy::service::ext_proc::v3::ProcessingRequest& request) {
-  if (params.traffic_direction != envoy::config::core::v3::TrafficDirection::INBOUND ||
-      config_.mapped_request_attributes().empty() || sent_request_attributes_) {
-    return false;
+  const bool is_inbound =
+      params.traffic_direction == envoy::config::core::v3::TrafficDirection::INBOUND;
+  const Protobuf::Map<std::string, std::string>* attributes_map = nullptr;
+  if (is_inbound) {
+    attributes_map = &config_.mapped_request_attributes();
+    if (attributes_map->empty() || sent_request_attributes_) {
+      return false;
+    }
+    sent_request_attributes_ = true;
+  } else {
+    attributes_map = &config_.mapped_response_attributes();
+    if (attributes_map->empty() || sent_response_attributes_) {
+      return false;
+    }
+    sent_response_attributes_ = true;
   }
-  sent_request_attributes_ = true;
 
   auto activation_ptr = Extensions::Filters::Common::Expr::createActivation(
       &expression_manager_.localInfo(), params.callbacks->streamInfo(), params.request_headers,
       dynamic_cast<const Http::ResponseHeaderMap*>(params.response_headers),
       dynamic_cast<const Http::ResponseTrailerMap*>(params.response_trailers));
 
-  const auto req_attributes = expression_manager_.evaluateRequestAttributes(*activation_ptr);
+  const auto evaled_attributes =
+      is_inbound ? expression_manager_.evaluateRequestAttributes(*activation_ptr)
+                 : expression_manager_.evaluateResponseAttributes(*activation_ptr);
 
   Protobuf::Struct& remapped_attributes =
       (*request.mutable_attributes())[Extensions::HttpFilters::HttpFilterNames::get()
                                           .ExternalProcessing];
   remapped_attributes.clear_fields();
-  for (const auto& pair : config_.mapped_request_attributes()) {
+  for (const auto& pair : *attributes_map) {
     const std::string& key = pair.first;
     const std::string& cel_expr_string = pair.second;
-    auto it = req_attributes.fields().find(cel_expr_string);
-    if (it != req_attributes.fields().end()) {
+    auto it = evaled_attributes.fields().find(cel_expr_string);
+    if (it != evaled_attributes.fields().end()) {
       (*remapped_attributes.mutable_fields())[key] = it->second;
     }
   }

@@ -88,10 +88,16 @@ response_rules:
   void initializeFilter(const std::string& yaml) {
     envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata config;
     TestUtility::loadFromYaml(yaml, config);
-    config_ = std::make_shared<FilterConfig>(config, *scope_.rootScope(), regex_engine_);
+    config_ = *FilterConfig::create(config, *scope_.rootScope(), regex_engine_, false);
     filter_ = std::make_shared<Filter>(config_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+  }
+
+  std::shared_ptr<FilterConfig> createConfig(const std::string& yaml, bool per_route = false) {
+    envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata config;
+    TestUtility::loadFromYaml(yaml, config);
+    return *FilterConfig::create(config, *scope_.rootScope(), regex_engine_, per_route);
   }
 
   void sendData(const std::vector<std::string>& data_vector) {
@@ -1812,6 +1818,159 @@ response_rules:
   EXPECT_EQ(getCounterValue("json_to_metadata.resp.mismatched_content_type"), 1);
   EXPECT_EQ(getCounterValue("json_to_metadata.resp.no_body"), 0);
   EXPECT_EQ(getCounterValue("json_to_metadata.resp.invalid_json_body"), 0);
+}
+
+// Test per-route override functionality
+TEST_F(FilterTest, PerRouteOverride) {
+  // Global config is empty (no rules)
+  initializeFilter("{}");
+
+  const std::string request_body = R"delimiter({"version":"2.0.0"})delimiter";
+  const std::map<std::string, std::string> expected = {{"version", "2.0.0"}};
+
+  // Setup per route config
+  const std::string per_route_config_yaml = R"EOF(
+request_rules:
+  rules:
+  - selectors:
+    - key: version
+    on_present:
+      metadata_namespace: envoy.lb
+      key: version
+)EOF";
+
+  std::shared_ptr<FilterConfig> per_route_config = createConfig(per_route_config_yaml, true);
+  EXPECT_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
+      .WillOnce(Return(per_route_config.get()));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(incoming_headers_, false));
+
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  testRequestWithBody(request_body);
+
+  EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
+}
+
+// Test that per-route config is cached
+TEST_F(FilterTest, PerRouteConfigIsCached) {
+  // Global config is empty
+  const std::string empty_config = R"EOF(
+request_rules:
+  rules: []
+response_rules:
+  rules: []
+)EOF";
+
+  initializeFilter(empty_config);
+
+  // Setup per route config
+  const std::string per_route_config_yaml = R"EOF(
+request_rules:
+  rules:
+  - selectors:
+    - key: version
+    on_present:
+      metadata_namespace: envoy.lb
+      key: version
+)EOF";
+
+  std::shared_ptr<FilterConfig> per_route_config = createConfig(per_route_config_yaml, true);
+
+  // mostSpecificPerFilterConfig should only be called once due to caching
+  EXPECT_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
+      .WillOnce(Return(per_route_config.get()));
+
+  // First call - fetches and caches the config
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(incoming_headers_, false));
+
+  // Subsequent operations should use cached config without additional lookups
+  const std::string request_body = R"delimiter({"version":"2.0.0"})delimiter";
+  const std::map<std::string, std::string> expected = {{"version", "2.0.0"}};
+
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  testRequestWithBody(request_body);
+}
+
+// Test per-route config with response rules
+TEST_F(FilterTest, PerRouteOverrideResponse) {
+  // Global config is empty
+  initializeFilter("{}");
+
+  const std::string response_body = R"delimiter({"version":"3.0.0"})delimiter";
+  const std::map<std::string, std::string> expected = {{"version", "3.0.0"}};
+
+  // Setup per route config with response rules
+  const std::string per_route_config_yaml = R"EOF(
+response_rules:
+  rules:
+  - selectors:
+    - key: version
+    on_present:
+      metadata_namespace: envoy.lb
+      key: version
+)EOF";
+
+  std::shared_ptr<FilterConfig> per_route_config = createConfig(per_route_config_yaml, true);
+  EXPECT_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
+      .WillOnce(Return(per_route_config.get()));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->encodeHeaders(response_headers_, false));
+
+  EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
+  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  testResponseWithBody(response_body);
+
+  EXPECT_EQ(getCounterValue("json_to_metadata.resp.success"), 1);
+}
+
+// Test that a route-level response rule is used when the global config only has a request rule.
+TEST_F(FilterTest, PerRouteOverridesGlobalConfig) {
+  // Global config has a request rule.
+  const std::string global_config = R"EOF(
+request_rules:
+  rules:
+  - selectors:
+    - key: old_key
+    on_present:
+      metadata_namespace: envoy.lb
+      key: old_value
+)EOF";
+
+  initializeFilter(global_config);
+
+  // Per-route config has a response rule.
+  const std::string per_route_config_yaml = R"EOF(
+response_rules:
+  rules:
+  - selectors:
+    - key: version
+    on_present:
+      metadata_namespace: envoy.lb
+      key: version
+)EOF";
+
+  const std::string response_body = R"delimiter({"version":"3.0.0"})delimiter";
+  const std::map<std::string, std::string> expected = {{"version", "3.0.0"}};
+
+  std::shared_ptr<FilterConfig> per_route_config = createConfig(per_route_config_yaml, true);
+  EXPECT_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
+      .WillOnce(Return(per_route_config.get()));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->encodeHeaders(response_headers_, false));
+
+  EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
+  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  testResponseWithBody(response_body);
+
+  EXPECT_EQ(getCounterValue("json_to_metadata.resp.success"), 1);
 }
 
 } // namespace JsonToMetadata

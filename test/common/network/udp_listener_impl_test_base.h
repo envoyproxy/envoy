@@ -1,29 +1,17 @@
 #pragma once
 
+#include <chrono>
 #include <cstddef>
 #include <memory>
-#include <string>
-#include <vector>
-
-#include "envoy/config/core/v3/base.pb.h"
 
 #include "source/common/network/address_impl.h"
 #include "source/common/network/socket_option_factory.h"
-#include "source/common/network/socket_option_impl.h"
 #include "source/common/network/udp_listener_impl.h"
-#include "source/common/network/udp_packet_writer_handler_impl.h"
-#include "source/common/network/utility.h"
 
 #include "test/common/network/listener_impl_test_base.h"
-#include "test/mocks/api/mocks.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/server/mocks.h"
-#include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
-#include "test/test_common/threadsafe_singleton_injector.h"
-#include "test/test_common/utility.h"
 
-#include "absl/time/time.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 

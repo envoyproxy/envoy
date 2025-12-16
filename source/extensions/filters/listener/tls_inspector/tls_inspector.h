@@ -54,8 +54,7 @@ enum class ParseState {
 class Config {
 public:
   Config(Stats::Scope& scope,
-         const envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector& proto_config,
-         uint32_t max_client_hello_size = TLS_MAX_CLIENT_HELLO);
+         const envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector& proto_config);
 
   const TlsInspectorStats& stats() const { return stats_; }
   bssl::UniquePtr<SSL> newSsl();
@@ -113,6 +112,7 @@ private:
   uint32_t maxConfigReadBytes() const { return config_->maxClientHelloSize(); }
   ParseState getParserState(int handshake_status);
   void setDynamicMetadata(absl::string_view failure_reason);
+  void setDownstreamTransportFailureReason();
 
   ConfigSharedPtr config_;
   Network::ListenerFilterCallbacks* cb_{};

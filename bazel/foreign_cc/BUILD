@@ -28,11 +28,10 @@ config_setting(
 configure_make(
     name = "liburing",
     configure_in_place = True,
-    env = select({
+    env = {"ENABLE_SHARED": "0"} | select({
         "//bazel:clang_build": {
             "AR": "$(AR)",
-            "LD": "$(LD)",
-            "RANLIB": "/opt/llvm/bin/llvm-ranlib",
+            "RANLIB": "$(AR) -s",
         },
         "//conditions:default": {},
     }),
@@ -41,10 +40,7 @@ configure_make(
         "nocompdb",
         "skip_on_windows",
     ],
-    targets = [
-        "library",
-        "install",
-    ],
+    targets = ["install"],
 )
 
 envoy_cc_library(
@@ -54,40 +50,6 @@ envoy_cc_library(
         "//bazel:linux": [":liburing"],
         "//conditions:default": [],
     }),
-)
-
-# autotools packages are unusable on Windows as-is
-# TODO: Consider our own gperftools.BUILD file as we do with many other packages
-configure_make(
-    name = "gperftools_build",
-    configure_options = [
-        "--enable-shared=no",
-        "--enable-frame-pointers",
-        "--disable-libunwind",
-    ] + select({
-        "//bazel:apple": ["AR=/usr/bin/ar"],
-        "//conditions:default": [],
-    }),
-    lib_source = "@com_github_gperftools_gperftools//:all",
-    linkopts = ["-lpthread"],
-    out_static_libs = select({
-        "//bazel:debug_tcmalloc": ["libtcmalloc_debug.a"],
-        "//conditions:default": ["libtcmalloc_and_profiler.a"],
-    }),
-    tags = ["skip_on_windows"],
-    targets = [
-        "install-libLTLIBRARIES install-perftoolsincludeHEADERS",
-    ],
-    alwayslink = True,
-)
-
-# Workaround for https://github.com/bazelbuild/rules_foreign_cc/issues/227
-cc_library(
-    name = "gperftools",
-    tags = ["skip_on_windows"],
-    deps = [
-        "gperftools_build",
-    ],
 )
 
 make(
@@ -226,12 +188,6 @@ configure_make(
         "//bazel/foreign_cc:parallel_builds_enabled": {
             "MAKEFLAGS": "-j ARFLAGS=r",
         },
-        "//bazel:engflow_rbe_x86_64": {
-            "MAKEFLAGS": "-j ARFLAGS=r",
-        },
-        "//bazel:engflow_rbe_aarch64": {
-            "MAKEFLAGS": "-j ARFLAGS=r",
-        },
         "//conditions:default": {
             "MAKEFLAGS": "-j1 ARFLAGS=r",
         },
@@ -267,8 +223,6 @@ envoy_cmake(
     name = "libsxg",
     build_args = select({
         "//bazel/foreign_cc:parallel_builds_enabled": ["-j"],
-        "//bazel:engflow_rbe_x86_64": ["-j"],
-        "//bazel:engflow_rbe_aarch64": ["-j"],
         "//conditions:default": ["-j1"],
     }),
     cache_entries = {
@@ -308,8 +262,6 @@ envoy_cmake(
     name = "ares",
     build_args = select({
         "//bazel/foreign_cc:parallel_builds_enabled": ["-j"],
-        "//bazel:engflow_rbe_x86_64": ["-j"],
-        "//bazel:engflow_rbe_aarch64": ["-j"],
         "//conditions:default": ["-j1"],
     }),
     cache_entries = {
@@ -352,8 +304,6 @@ envoy_cmake(
     name = "event",
     build_args = select({
         "//bazel/foreign_cc:parallel_builds_enabled": ["-j"],
-        "//bazel:engflow_rbe_x86_64": ["-j"],
-        "//bazel:engflow_rbe_aarch64": ["-j"],
         "//conditions:default": ["-j1"],
     }),
     cache_entries = {
@@ -409,8 +359,6 @@ envoy_cmake(
     name = "nghttp2",
     build_args = select({
         "//bazel/foreign_cc:parallel_builds_enabled": ["-j"],
-        "//bazel:engflow_rbe_x86_64": ["-j"],
-        "//bazel:engflow_rbe_aarch64": ["-j"],
         "//conditions:default": ["-j1"],
     }),
     cache_entries = {
@@ -447,8 +395,6 @@ envoy_cmake(
     name = "wamr",
     build_args = select({
         "//bazel/foreign_cc:parallel_builds_enabled": ["-j"],
-        "//bazel:engflow_rbe_x86_64": ["-j"],
-        "//bazel:engflow_rbe_aarch64": ["-j"],
         "//conditions:default": ["-j1"],
     }),
     cache_entries = {
@@ -501,98 +447,9 @@ envoy_cmake(
 )
 
 envoy_cmake(
-    name = "zlib",
-    cache_entries = {
-        "CMAKE_CXX_COMPILER_FORCED": "on",
-        "CMAKE_C_COMPILER_FORCED": "on",
-        "SKIP_BUILD_EXAMPLES": "on",
-        "BUILD_SHARED_LIBS": "off",
-
-        # The following entries are for zlib-ng. Since zlib and zlib-ng are compatible source
-        # codes and CMake ignores unknown cache entries, it is fine to combine it into one
-        # dictionary.
-        #
-        # Reference: https://github.com/zlib-ng/zlib-ng#build-options.
-        "ZLIB_COMPAT": "on",
-        "ZLIB_ENABLE_TESTS": "off",
-
-        # Warning: Turning WITH_OPTIM to "on" doesn't pass ZlibCompressorImplTest.CallingChecksum.
-        "WITH_OPTIM": "on",
-        # However turning off SSE4 fixes it.
-        "WITH_SSE4": "off",
-
-        # Warning: Turning WITH_NEW_STRATEGIES to "on" doesn't pass gzip compressor fuzz test.
-        # Turning this off means falling into NO_QUICK_STRATEGY route.
-        "WITH_NEW_STRATEGIES": "off",
-
-        # Only allow aligned address.
-        # Reference: https://github.com/zlib-ng/zlib-ng#advanced-build-options.
-        "UNALIGNED_OK": "off",
-    },
-    generate_args = [
-        "-G",
-        "Ninja",
-    ],
-    lib_source = select({
-        "//bazel:zlib_ng": "@com_github_zlib_ng_zlib_ng//:all",
-        "//conditions:default": "@net_zlib//:all",
-    }),
-    out_static_libs = select({
-        "//bazel:windows_x86_64": ["zlib.lib"],
-        "//conditions:default": ["libz.a"],
-    }),
-    postfix_script = select({
-        "@platforms//cpu:wasm32": """
-            if [[ -f libzlib.a ]]; then
-                cp libzlib.a $$INSTALLDIR/lib/libz.a
-            fi
-        """,
-        "//conditions:default": "",
-    }),
-)
-
-envoy_cmake(
-    name = "zstd",
-    build_args = select({
-        "//bazel/foreign_cc:parallel_builds_enabled": ["-j"],
-        "//bazel:engflow_rbe_x86_64": ["-j"],
-        "//bazel:engflow_rbe_aarch64": ["-j"],
-        "//conditions:default": ["-j1"],
-    }),
-    build_data = ["@com_github_facebook_zstd//:all"],
-    cache_entries = {
-        "CMAKE_BUILD_TYPE": "Release",
-        "CMAKE_INSTALL_LIBDIR": "lib",
-        "ZSTD_BUILD_SHARED": "off",
-        "ZSTD_BUILD_STATIC": "on",
-    },
-    exec_properties = select({
-        "//bazel:engflow_rbe_x86_64": {
-            "Pool": "linux_x64_large",
-        },
-        "//bazel:engflow_rbe_aarch64": {
-            "Pool": "linux_arm64_small",
-        },
-        "//conditions:default": {},
-    }),
-    generate_args = [
-        "-G",
-        "Ninja",
-    ],
-    lib_source = "@com_github_facebook_zstd//:all",
-    out_static_libs = select({
-        "//bazel:windows_x86_64": ["zstd_static.lib"],
-        "//conditions:default": ["libzstd.a"],
-    }),
-    working_directory = "build/cmake",
-)
-
-envoy_cmake(
     name = "maxmind",
     build_args = select({
         "//bazel/foreign_cc:parallel_builds_enabled": ["-j"],
-        "//bazel:engflow_rbe_x86_64": ["-j"],
-        "//bazel:engflow_rbe_aarch64": ["-j"],
         "//conditions:default": ["-j1"],
     }),
     cache_entries = {

@@ -5,13 +5,7 @@ permissions:
 
 on:
   workflow_call:
-    secrets:
-      gcs-cache-key:
-        required: true
     inputs:
-      gcs-cache-bucket:
-        type: string
-        required: true
       request:
         type: string
         required: true
@@ -31,20 +25,17 @@ concurrency:
 jobs:
   examples:
     permissions:
+      actions: read
       contents: read
       packages: read
     name: ${{ matrix.name || matrix.target }}
     uses: ./.github/workflows/_run.yml
     with:
-      bazel-extra: ${{ matrix.bazel-extra || '--config=remote-envoy-engflow' }}
-      bind-mounts: ${{ matrix.bind-mounts }}
+      bazel-extra: ${{ matrix.bazel-extra || '--config=rbe' }}
       cache-build-image: ${{ matrix.cache-build-image }}
       cache-build-image-key-suffix: ${{ matrix.arch == 'arm64' && format('-{0}', matrix.arch) || '' }}
       container-command: ${{ matrix.container-command }}
       concurrency-suffix: -${{ matrix.arch || 'x64' }}
-      diskspace-hack-paths: |
-        /opt/hostedtoolcache
-        /usr/local/.ghcup
       downloads: ${{ matrix.downloads }}
       rbe: ${{ matrix.rbe }}
       request: ${{ inputs.request }}
@@ -61,19 +52,6 @@ jobs:
           downloads: |
             oci.arm64: container/build_images
             oci.x64: container/build_images
-          bind-mounts: |
-            - src: /mnt/workspace
-              target: GITHUB_WORKSPACE
-              chown: "runner:runner"
-            - src: /mnt/runner
-              target: RUNNER_TEMP/container/bazel_root
-              chown: "runner:runner"
-            - src: /mnt/docker
-              target: /var/lib/docker
-              rm: true
-              command-pre: sudo systemctl stop docker
-              command-post: sudo systemctl start docker
-
           rbe: false
           source: |
             export NO_BUILD_SETUP=1
@@ -103,12 +81,13 @@ jobs:
 
   distroless:
     permissions:
+      actions: read
       contents: read
       packages: read
     name: ${{ matrix.name || matrix.target }}
     uses: ./.github/workflows/_run.yml
     with:
-      bazel-extra: ${{ matrix.bazel-extra || '--config=remote-envoy-engflow' }}
+      bazel-extra: ${{ matrix.bazel-extra || '--config=rbe' }}
       cache-build-image: ${{ matrix.cache-build-image }}
       cache-build-image-key-suffix: ${{ matrix.arch == 'arm64' && format('-{0}', matrix.arch) || '' }}
       container-command: ${{ matrix.container-command }}
@@ -148,26 +127,21 @@ jobs:
               shell: bash
 
   distro:
-    secrets:
-      gcs-cache-key: ${{ secrets.gcs-cache-key }}
     permissions:
+      actions: read
       contents: read
       packages: read
     name: ${{ matrix.name || matrix.target }}
     uses: ./.github/workflows/_run.yml
     with:
       arch: ${{ matrix.arch }}
-      bazel-extra: ${{ matrix.bazel-extra || '--config=remote-envoy-engflow' }}
+      bazel-extra: ${{ matrix.bazel-extra || '--config=rbe' }}
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       cache-build-image-key-suffix: ${{ matrix.arch == 'arm64' && format('-{0}', matrix.arch) || '' }}
       container-command: ./ci/run_envoy_docker.sh
       concurrency-suffix: -${{ matrix.arch || 'x64' }}
-      diskspace-hack-paths: |
-        /opt/hostedtoolcache
-        /usr/local/.ghcup
       downloads: |
         release.signed: container/release.signed
-      gcs-cache-bucket: ${{ inputs.gcs-cache-bucket }}
       rbe: ${{ matrix.rbe && matrix.rbe || false }}
       request: ${{ inputs.request }}
       runs-on: ${{ matrix.runs-on }}
@@ -209,5 +183,5 @@ jobs:
           target: verify_distro
           arch: arm64
           bazel-extra: >-
-            --config=remote-cache-envoy-engflow
+            --config=remote-cache
           runs-on: ${{ vars.ENVOY_ARM_VM || 'ubuntu-24.04-arm' }}

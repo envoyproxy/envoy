@@ -11,6 +11,8 @@
 #include "source/common/common/matchers.h"
 #include "source/common/config/datasource.h"
 #include "source/common/http/utility.h"
+#include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/router/retry_policy_impl.h"
 
 #include "absl/container/node_hash_map.h"
 #include "absl/strings/string_view.h"
@@ -35,27 +37,6 @@ public:
                CreateJwksFetcherCb fetcher_cb, JwtAuthnFilterStats& stats)
       : jwt_provider_(jwt_provider), time_source_(context.serverFactoryContext().timeSource()),
         tls_(context.serverFactoryContext().threadLocal()) {
-
-    if (jwt_provider_.has_remote_jwks()) {
-      // remote_jwks.retry_policy has an invalid case that could not be validated by the
-      // proto validation annotation. It has to be validated by the code.
-      if (jwt_provider_.remote_jwks().has_retry_policy()) {
-        THROW_IF_NOT_OK(
-            Http::Utility::validateCoreRetryPolicy(jwt_provider_.remote_jwks().retry_policy()));
-      }
-      if (jwt_provider_.remote_jwks().has_cache_duration()) {
-        // Use `durationToMilliseconds` as it has stricter max boundary to the `seconds` value to
-        // avoid overflow.
-        Protobuf::Duration duration_copy(jwt_provider_.remote_jwks().cache_duration());
-        (void)DurationUtil::durationToMilliseconds(duration_copy);
-
-        // remote_jwks.duration is used as: now + remote_jwks.duration.
-        // need to verify twice of its `seconds` value.
-        duration_copy.set_seconds(2 * duration_copy.seconds());
-        (void)DurationUtil::durationToMilliseconds(duration_copy);
-      }
-    }
-
     std::vector<std::string> audiences;
     for (const auto& aud : jwt_provider_.audiences()) {
       audiences.push_back(aud);
@@ -96,16 +77,49 @@ public:
         setJwksToAllThreads(std::move(jwks));
       }
     } else {
-      // create async_fetch for remote_jwks, if is no-op if async_fetch is not enabled.
-      if (jwt_provider_.has_remote_jwks()) {
-        async_fetcher_ = std::make_unique<JwksAsyncFetcher>(
-            jwt_provider_.remote_jwks(), context, fetcher_cb, stats,
-            [this](google::jwt_verify::JwksPtr&& jwks) { setJwksToAllThreads(std::move(jwks)); });
+      if (!jwt_provider_.has_remote_jwks()) {
+        return;
       }
+
+      // remote_jwks.retry_policy has an invalid case that could not be validated by the
+      // proto validation annotation. It has to be validated by the code.
+      if (jwt_provider_.remote_jwks().has_retry_policy()) {
+        THROW_IF_NOT_OK(
+            Http::Utility::validateCoreRetryPolicy(jwt_provider_.remote_jwks().retry_policy()));
+        envoy::config::route::v3::RetryPolicy route_retry_policy =
+            Http::Utility::convertCoreToRouteRetryPolicy(jwt_provider_.remote_jwks().retry_policy(),
+                                                         "5xx,gateway-error,connect-failure,reset");
+        // Use the null validation visitor because it was used by the async client in the previous
+        // implementation.
+        auto policy_or_error = Router::RetryPolicyImpl::create(
+            route_retry_policy, ProtobufMessage::getNullValidationVisitor(),
+            context.serverFactoryContext());
+        THROW_IF_NOT_OK_REF(policy_or_error.status());
+        retry_policy_ = std::move(policy_or_error.value());
+      }
+
+      if (jwt_provider_.remote_jwks().has_cache_duration()) {
+        // Use `durationToMilliseconds` as it has stricter max boundary to the `seconds` value to
+        // avoid overflow.
+        Protobuf::Duration duration_copy(jwt_provider_.remote_jwks().cache_duration());
+        (void)DurationUtil::durationToMilliseconds(duration_copy);
+
+        // remote_jwks.duration is used as: now + remote_jwks.duration.
+        // need to verify twice of its `seconds` value.
+        duration_copy.set_seconds(2 * duration_copy.seconds());
+        (void)DurationUtil::durationToMilliseconds(duration_copy);
+      }
+
+      // create async_fetch for remote_jwks, if is no-op if async_fetch is not enabled.
+      async_fetcher_ = std::make_unique<JwksAsyncFetcher>(
+          jwt_provider_.remote_jwks(), retry_policy_, context, fetcher_cb, stats,
+          [this](google::jwt_verify::JwksPtr&& jwks) { setJwksToAllThreads(std::move(jwks)); });
     }
   }
 
   const JwtProvider& getJwtProvider() const override { return jwt_provider_; }
+
+  const Router::RetryPolicyConstSharedPtr& retryPolicy() const override { return retry_policy_; }
 
   bool areAudiencesAllowed(const std::vector<std::string>& jwt_audiences) const override {
     return audiences_->areAudiencesAllowed(jwt_audiences);
@@ -181,6 +195,8 @@ private:
 
   // The jwt provider config.
   const JwtProvider& jwt_provider_;
+  // The retry policy for remote jwks fetcher.
+  Router::RetryPolicyConstSharedPtr retry_policy_;
   // Check audience object
   ::google::jwt_verify::CheckAudiencePtr audiences_;
   // the time source

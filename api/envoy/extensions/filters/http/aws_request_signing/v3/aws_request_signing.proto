@@ -22,7 +22,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.filters.http.aws_request_signing]
 
 // Top level configuration for the AWS request signing filter.
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message AwsRequestSigning {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.aws_request_signing.v2alpha.AwsRequestSigning";
@@ -58,14 +58,14 @@ message AwsRequestSigning {
   // When signing_algorithm is set to ``AWS_SIGV4`` the region is a standard AWS `region <https://docs.aws.amazon.com/general/latest/gr/rande.html>`_ string for the service
   // hosting the HTTP endpoint.
   //
-  // Example: us-west-2
+  // Example: ``us-west-2``
   //
   // When signing_algorithm is set to ``AWS_SIGV4A`` the region is used as a region set.
   //
   // A region set is a comma separated list of AWS regions, such as ``us-east-1,us-east-2`` or wildcard ``*``
   // or even region strings containing wildcards such as ``us-east-*``
   //
-  // Example: '*'
+  // Example: ``'*'``
   //
   // By configuring a region set, a SigV4A signed request can be sent to multiple regions, rather than being
   // valid for only a single region destination.
@@ -92,11 +92,15 @@ message AwsRequestSigning {
   // any patterns defined in the StringMatcher proto (e.g. exact string, prefix, regex, etc).
   //
   // Example:
-  // match_excluded_headers:
-  // - prefix: x-envoy
-  // - exact: foo
-  // - exact: bar
-  // When applied, all headers that start with "x-envoy" and headers "foo" and "bar" will not be signed.
+  //
+  // .. code-block:: yaml
+  //
+  //  match_excluded_headers:
+  //  - prefix: x-envoy
+  //  - exact: foo
+  //  - exact: bar
+  //
+  // When applied, all headers that start with ``x-envoy`` and headers ``foo`` and ``bar`` will not be signed.
   repeated type.matcher.v3.StringMatcher match_excluded_headers = 5;
 
   // Optional Signing algorithm specifier, either ``AWS_SIGV4`` or ``AWS_SIGV4A``, defaulting to ``AWS_SIGV4``.
@@ -113,6 +117,23 @@ message AwsRequestSigning {
   // The credential provider for signing the request. This is optional and if not set,
   // it will be retrieved using the procedure described in :ref:`config_http_filters_aws_request_signing`.
   common.aws.v3.AwsCredentialProvider credential_provider = 8;
+
+  // A list of request header string matchers that will be included during signing. The included header can be matched by
+  // any patterns defined in the StringMatcher proto (e.g. exact string, prefix, regex, etc).
+  // match_included_headers takes precedence over match_excluded_headers - if match_included_headers is set, only those headers will be signed and match_excluded_headers will be ignored.
+  // Required headers for signing such as ``host`` will always be signed regardless of this setting. The required headers are determined via ``CanonicalHeaders`` section in the AWS documentation `here <https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_sigv-create-signed-request.html#create-canonical-request>`_.
+  //
+  // Example:
+  //
+  // .. code-block:: yaml
+  //
+  //  match_included_headers:
+  //  - prefix: x-envoy
+  //  - exact: foo
+  //  - exact: bar
+  //
+  // When applied, all headers that start with ``x-envoy`` and headers ``foo`` and ``bar`` will be signed and all other headers will be excluded from signing except required headers.
+  repeated type.matcher.v3.StringMatcher match_included_headers = 9;
 }
 
 message AwsRequestSigningPerRoute {

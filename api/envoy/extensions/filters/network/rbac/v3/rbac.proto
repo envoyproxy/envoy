@@ -6,7 +6,6 @@ import "envoy/config/rbac/v3/rbac.proto";
 
 import "google/protobuf/duration.proto";
 
-import "xds/annotations/v3/status.proto";
 import "xds/type/matcher/v3/matcher.proto";
 
 import "udpa/annotations/migrate.proto";
@@ -55,10 +54,8 @@ message RBAC {
   // not match any matcher will be denied.
   // If absent, no enforcing RBAC matcher will be applied.
   // If present and empty, deny all connections.
-  xds.type.matcher.v3.Matcher matcher = 6 [
-    (udpa.annotations.field_migrate).oneof_promotion = "rules_specifier",
-    (xds.annotations.v3.field_status).work_in_progress = true
-  ];
+  xds.type.matcher.v3.Matcher matcher = 6
+      [(udpa.annotations.field_migrate).oneof_promotion = "rules_specifier"];
 
   // Shadow rules are not enforced by the filter but will emit stats and logs
   // and can be used for rule testing.
@@ -70,10 +67,8 @@ message RBAC {
   // The match tree to use for emitting stats and logs which can be used for rule testing for
   // incoming connections.
   // If absent, no shadow matcher will be applied.
-  xds.type.matcher.v3.Matcher shadow_matcher = 7 [
-    (udpa.annotations.field_migrate).oneof_promotion = "shadow_rules_specifier",
-    (xds.annotations.v3.field_status).work_in_progress = true
-  ];
+  xds.type.matcher.v3.Matcher shadow_matcher = 7
+      [(udpa.annotations.field_migrate).oneof_promotion = "shadow_rules_specifier"];
 
   // If specified, shadow rules will emit stats with the given prefix.
   // This is useful to distinguish the stat when there are more than 1 RBAC filter configured with

@@ -211,13 +211,17 @@ PostIoAction SslSocket::doHandshake() { return info_->doHandshake(); }
 void SslSocket::drainErrorQueue() {
   bool saw_error = false;
   bool saw_counted_error = false;
+  bool saw_cert_verify_failed = false;
+  bool saw_no_client_cert = false;
   while (uint64_t err = ERR_get_error()) {
     if (ERR_GET_LIB(err) == ERR_LIB_SSL) {
       if (ERR_GET_REASON(err) == SSL_R_PEER_DID_NOT_RETURN_A_CERTIFICATE) {
         ctx_->stats().fail_verify_no_cert_.inc();
         saw_counted_error = true;
+        saw_no_client_cert = true;
       } else if (ERR_GET_REASON(err) == SSL_R_CERTIFICATE_VERIFY_FAILED) {
         saw_counted_error = true;
+        saw_cert_verify_failed = true;
       }
     } else if (ERR_GET_LIB(err) == ERR_LIB_SYS) {
       // Any syscall errors that result in connection closure are already tracked in other
@@ -239,6 +243,23 @@ void SslSocket::drainErrorQueue() {
 
   if (!saw_error) {
     return;
+  }
+
+  // Append detailed error info for certificate-related failures.
+  bool added_detail = false;
+  if (saw_cert_verify_failed) {
+    auto* extended_socket_info = reinterpret_cast<Envoy::Ssl::SslExtendedSocketInfo*>(
+        SSL_get_ex_data(rawSsl(), ContextImpl::sslExtendedSocketInfoIndex()));
+    if (extended_socket_info != nullptr) {
+      absl::string_view cert_validation_error = extended_socket_info->certificateValidationError();
+      if (!cert_validation_error.empty()) {
+        absl::StrAppend(&failure_reason_, ":", cert_validation_error);
+        added_detail = true;
+      }
+    }
+  }
+  if (!added_detail && saw_no_client_cert) {
+    absl::StrAppend(&failure_reason_, ":peer did not provide required client certificate");
   }
 
   if (!failure_reason_.empty()) {

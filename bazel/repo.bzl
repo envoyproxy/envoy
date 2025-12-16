@@ -1,21 +1,26 @@
 # `@envoy_repo` repository rule for managing the repo and querying its metadata.
 
 CONTAINERS = """
-PREFIX_MOBILE = "mobile"
 
 REPO = "{repo}"
 REPO_GCR = "{repo_gcr}"
 SHA = "{sha}"
+SHA_GCC = "{sha_gcc}"
 SHA_MOBILE = "{sha_mobile}"
+SHA_WORKER = "{sha_worker}"
 TAG = "{tag}"
 
+def image_gcc():
+    return "%s@sha256:%s" % (
+        REPO_GCR, SHA_GCC)
+
 def image_mobile():
-    return "%s:%s-%s@sha256:%s" % (
-        REPO, PREFIX_MOBILE, TAG, SHA_MOBILE)
+    return "%s@sha256:%s" % (
+        REPO, SHA_MOBILE)
 
 def image_worker():
-    return "%s:%s@sha256:%s" % (
-        REPO_GCR, TAG, SHA)
+    return "%s@sha256:%s" % (
+        REPO_GCR, SHA_WORKER)
 
 """
 
@@ -74,21 +79,47 @@ def _envoy_repo_impl(repository_ctx):
         repo = config_data["build-image"]["repo"],
         repo_gcr = config_data["build-image"]["repo-gcr"],
         sha = config_data["build-image"]["sha"],
+        sha_gcc = config_data["build-image"]["sha-gcc"],
         sha_mobile = config_data["build-image"]["sha-mobile"],
+        sha_worker = config_data["build-image"]["sha-worker"],
         tag = config_data["build-image"]["tag"],
     ))
     repo_version_path = repository_ctx.path(repository_ctx.attr.envoy_version)
     api_version_path = repository_ctx.path(repository_ctx.attr.envoy_api_version)
     version = repository_ctx.read(repo_version_path).strip()
     api_version = repository_ctx.read(api_version_path).strip()
+
+    # Read BAZEL_LLVM_PATH environment variable for local LLVM installations
+    llvm_path = repository_ctx.os.environ.get("BAZEL_LLVM_PATH", "")
+    local_llvm = "True" if llvm_path else "False"
+
+    repository_ctx.file("compiler.bzl", "LLVM_PATH = '%s'" % (llvm_path))
     repository_ctx.file("version.bzl", "VERSION = '%s'\nAPI_VERSION = '%s'" % (version, api_version))
     repository_ctx.file("path.bzl", "PATH = '%s'" % repo_version_path.dirname)
     repository_ctx.file("envoy_repo.py", "PATH = '%s'\nVERSION = '%s'\nAPI_VERSION = '%s'" % (repo_version_path.dirname, version, api_version))
     repository_ctx.file("WORKSPACE", "")
     repository_ctx.file("BUILD", '''
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
 load("@rules_python//python:defs.bzl", "py_library")
 load("@rules_python//python/entry_points:py_console_script_binary.bzl", "py_console_script_binary")
 load("//:path.bzl", "PATH")
+
+bool_flag(
+    name = "use_local_llvm_flag",
+    build_setting_default = %s,
+    visibility = ["//visibility:public"],
+)
+
+config_setting(
+    name = "use_local_llvm",
+    flag_values = {
+        ":use_local_llvm_flag": "True",
+    },
+    constraint_values = [
+        "@platforms//os:linux",
+    ],
+    visibility = ["//visibility:public"],
+)
 
 py_library(
     name = "envoy_repo",
@@ -222,7 +253,7 @@ py_console_script_binary(
     data = [":envoy_repo.py"],
 )
 
-''')
+''' % local_llvm)
 
 _envoy_repo = repository_rule(
     implementation = _envoy_repo_impl,
@@ -232,6 +263,7 @@ _envoy_repo = repository_rule(
         "envoy_ci_config": attr.label(default = "@envoy//:.github/config.yml"),
         "yq": attr.label(default = "@yq"),
     },
+    environ = ["BAZEL_LLVM_PATH"],
 )
 
 def envoy_repo():
