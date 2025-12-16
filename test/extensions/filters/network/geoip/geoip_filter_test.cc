@@ -38,8 +38,8 @@ MATCHER_P(HasRemoteAddress, expected_address, "") {
   return true;
 }
 
-// Matcher to verify filter state has a geo field with the expected value.
-MATCHER_P2(HasGeoField, key, expected_value, "") {
+// Matcher to verify filter state has a geo field matching the given matcher.
+MATCHER_P2(HasGeoField, key, value_matcher, "") {
   if (!arg->template hasData<GeoipInfo>(std::string(GeoipFilterStateKey))) {
     *result_listener << "filter state does not contain GeoipInfo at key '" << GeoipFilterStateKey
                      << "'";
@@ -56,12 +56,9 @@ MATCHER_P2(HasGeoField, key, expected_value, "") {
     *result_listener << "geo field '" << key << "' not found";
     return false;
   }
-  if (field_value.value() != expected_value) {
-    *result_listener << "geo field '" << key << "' has value '" << field_value.value()
-                     << "', expected '" << expected_value << "'";
-    return false;
-  }
-  return true;
+  *result_listener << "geo field '" << key << "' has value '" << field_value.value() << "' ";
+  return testing::ExplainMatchResult(testing::Matcher<absl::string_view>(value_matcher),
+                                     field_value.value(), result_listener);
 }
 
 class GeoipFilterTest : public testing::Test {
