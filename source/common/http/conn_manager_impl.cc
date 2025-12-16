@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <functional>
 #include <iterator>
+#include <limits>
 #include <list>
 #include <memory>
 #include <string>
@@ -2314,6 +2315,7 @@ void ConnectionManagerImpl::ActiveStream::setVirtualHostRoute(
   refreshTracing();
   refreshDurationTimeout();
   refreshIdleAndFlushTimeouts();
+  refreshBufferLimit();
 }
 
 void ConnectionManagerImpl::ActiveStream::refreshIdleAndFlushTimeouts() {
@@ -2356,6 +2358,28 @@ void ConnectionManagerImpl::ActiveStream::refreshAccessLogFlushTimer() {
   if (connection_manager_.config_->accessLogFlushInterval().has_value()) {
     access_log_flush_timer_->enableTimer(
         connection_manager_.config_->accessLogFlushInterval().value(), this);
+  }
+}
+
+void ConnectionManagerImpl::ActiveStream::refreshBufferLimit() {
+  if (!hasCachedRoute()) {
+    return;
+  }
+  const Router::RouteEntry* route_entry = cached_route_.value()->routeEntry();
+  if (route_entry == nullptr) {
+    return;
+  }
+
+  const uint64_t buffer_limit = route_entry->requestBodyBufferLimit();
+  if (buffer_limit == std::numeric_limits<uint64_t>::max()) {
+    // Max uint64_t means no valid limit configured.
+    return;
+  }
+  // Only increase the buffer limit automatically. This is to ensure same
+  // behavior as previous logic in router filter.
+  if (buffer_limit > filter_manager_.bufferLimit()) {
+    ENVOY_STREAM_LOG(debug, "Setting new filter manager buffer limit: {}", *this, buffer_limit);
+    filter_manager_.setBufferLimit(buffer_limit);
   }
 }
 

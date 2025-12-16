@@ -120,6 +120,8 @@ MockRouteEntry::MockRouteEntry()
   ON_CALL(*this, pathMatcher()).WillByDefault(ReturnRef(path_matcher_));
   ON_CALL(*this, pathRewriter()).WillByDefault(ReturnRef(path_rewriter_));
   ON_CALL(*this, routeStatsContext()).WillByDefault(Return(RouteStatsContextOptRef()));
+  ON_CALL(*this, requestBodyBufferLimit())
+      .WillByDefault(Return(std::numeric_limits<uint64_t>::max()));
 }
 
 MockRouteEntry::~MockRouteEntry() = default;
@@ -191,6 +193,8 @@ MockRoute::MockRoute() {
   ON_CALL(*this, pathMatcher()).WillByDefault(ReturnRef(route_entry_.path_matcher_));
   ON_CALL(*this, pathRewriter()).WillByDefault(ReturnRef(route_entry_.path_rewriter_));
   ON_CALL(*this, routeStatsContext()).WillByDefault(Return(RouteStatsContextOptRef()));
+  ON_CALL(*this, requestBodyBufferLimit())
+      .WillByDefault(Return(std::numeric_limits<uint64_t>::max()));
 }
 MockRoute::~MockRoute() = default;
 

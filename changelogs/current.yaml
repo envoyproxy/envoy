@@ -92,6 +92,11 @@ minor_behavior_changes:
     <envoy_v3_api_msg_extensions.filters.http.ext_proc.v3.ExternalProcessor.ExtProcFilterStats>'.
 - area: http
   change: |
+    Now the :ref:`route level body buffer limit
+    <envoy_v3_api_field_config.route.v3.Route.request_body_buffer_limit>` will be applied to requests when
+    the route is matched. Previously, it will only be applied when the router filter is reached.
+- area: http
+  change: |
     Now the retrying of async HTTP client calls will respect the set buffer limits and the retry will be ignored
     if the buffer limit is exceeded. This behavior can be reverted by setting the runtime guard
     ``envoy.reloadable_features.http_async_client_retry_respect_buffer_limits`` to ``false``.
@@ -151,6 +156,12 @@ bug_fixes:
   change: |
     Fixed an upstream HTTP filter issue when a route retried on 5xx and the filter returned
     ``FilterHeadersStatus::StopIteration`` in ``encodeHeaders()``.
+- area: router
+  change: |
+    Fixed a bug where the :ref:`vhost per request buffer limit bytes
+    <envoy_v3_api_field_config.route.v3.VirtualHost.per_request_buffer_limit_bytes>`
+    will take precedence over the :ref:`route per request buffer limit bytes
+    <envoy_v3_api_field_config.route.v3.Route.per_request_buffer_limit_bytes>`.
 - area: ext_proc
   change: |
     Fixed missing attributes based on request headers (for example, ``request.host``) when ext_proc was configured to run
@@ -182,6 +193,9 @@ bug_fixes:
   change: |
     Fixed a remote ``jwt_auth`` token fetch crash when two or more auth headers were present and
     ``allow_missing_or_failed`` was set.
+- area: dynamic modules
+  change: |
+    Fixed a soundness bug in the Rust SDK by tightening bounds on the ``HttpFilterConfig`` trait.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -521,5 +535,10 @@ new_features:
     requests to more backend servers. The filter supports fanout to multiple backends for initialize and tools-list requests,
     single-backend routing for tools-call based on tool name prefix, session management with composite session IDs,
     and response aggregation.
+- area: ext_proc
+  change: |
+    Added per HTTP event :ref:'procesing effects <envoy.filters.http.ext_proc.ProcessingEffect' in the
+    ExtProcLoggingInfo in the FilterState. This new data will be automatically collected and can be accesses via
+    method processingEffects.
 
 deprecated:

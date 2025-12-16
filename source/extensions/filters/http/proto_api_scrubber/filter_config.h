@@ -221,16 +221,11 @@ private:
 class MatcherInputValidatorVisitor : public Matcher::MatchTreeValidationVisitor<HttpMatchingData> {
 public:
   // Validates whether the input type for the matcher is in the list of supported input types.
-  // Currently, only CEL input type (i.e., HttpAttributesCelMatchInput) is supported.
+  // ProtoApiScrubber filter supports all types of data inputs and hence, it returns
+  // `absl::OkStatus()` by default.
   absl::Status performDataInputValidation(const Matcher::DataInputFactory<HttpMatchingData>&,
-                                          absl::string_view type_url) override {
-    if (type_url == TypeUtil::descriptorFullNameToTypeUrl(
-                        HttpAttributesCelMatchInput::descriptor()->full_name())) {
-      return absl::OkStatus();
-    }
-
-    return absl::InvalidArgumentError(
-        fmt::format("ProtoApiScrubber filter does not support matching on '{}'", type_url));
+                                          absl::string_view) override {
+    return absl::OkStatus();
   }
 };
 

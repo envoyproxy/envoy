@@ -704,22 +704,6 @@ public:
   virtual bool includeIsTimeoutRetryHeader() const PURE;
 
   /**
-   * @return uint64_t the maximum bytes which should be buffered for request bodies. This enables
-   *         buffering larger request bodies beyond the connection buffer limit for use cases
-   *         with large payloads, shadowing, or retries.
-   *
-   *         This method consolidates the functionality of the previous
-   *         per_request_buffer_limit_bytes and request_body_buffer_limit fields. It supports both
-   *         legacy configurations using per_request_buffer_limit_bytes and new configurations using
-   *         request_body_buffer_limit.
-   *
-   *         If neither is set, falls back to connection buffer limits. Unlike some other buffer
-   *         limits, 0 here indicates buffering should not be performed rather than no limit
-   * applies.
-   */
-  virtual uint64_t requestBodyBufferLimit() const PURE;
-
-  /**
    * This is a helper to get the route's per-filter config if it exists, up along the config
    * hierarchy (Route --> VirtualHost --> RouteConfiguration). Or nullptr if none of them exist.
    */
