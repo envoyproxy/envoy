@@ -831,6 +831,7 @@ faceplant
 facto
 failover
 fallbacks
+fanout
 fastbuild
 favicon
 fbs
@@ -1601,6 +1602,7 @@ routable
 vhosts
 infos
 ElastiCache
+Parametrized
 pinterest
 callouts
 streamable

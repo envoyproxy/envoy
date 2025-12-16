@@ -22,8 +22,9 @@ class JwksFetcherImpl : public JwksFetcher,
                         public Logger::Loggable<Logger::Id::filter>,
                         public Http::AsyncClient::Callbacks {
 public:
-  JwksFetcherImpl(Upstream::ClusterManager& cm, const RemoteJwks& remote_jwks)
-      : cm_(cm), remote_jwks_(remote_jwks) {
+  JwksFetcherImpl(Upstream::ClusterManager& cm, Router::RetryPolicyConstSharedPtr retry_policy,
+                  const RemoteJwks& remote_jwks)
+      : cm_(cm), retry_policy_(retry_policy), remote_jwks_(remote_jwks) {
     ENVOY_LOG(trace, "{}", __func__);
   }
 
@@ -66,11 +67,8 @@ public:
                        .setParentSpan(parent_span)
                        .setChildSpanName("JWT Remote PubKey Fetch");
 
-    if (remote_jwks_.has_retry_policy()) {
-      envoy::config::route::v3::RetryPolicy route_retry_policy =
-          Http::Utility::convertCoreToRouteRetryPolicy(remote_jwks_.retry_policy(),
-                                                       "5xx,gateway-error,connect-failure,reset");
-      options.setRetryPolicy(route_retry_policy);
+    if (retry_policy_ != nullptr) {
+      options.setRetryPolicy(retry_policy_);
       options.setBufferBodyForRetry(true);
     }
 
@@ -121,6 +119,8 @@ public:
 
 private:
   Upstream::ClusterManager& cm_;
+  Router::RetryPolicyConstSharedPtr retry_policy_;
+
   bool complete_{};
   JwksFetcher::JwksReceiver* receiver_{};
   const RemoteJwks& remote_jwks_;
@@ -136,9 +136,9 @@ private:
 } // namespace
 
 JwksFetcherPtr JwksFetcher::create(
-    Upstream::ClusterManager& cm,
+    Upstream::ClusterManager& cm, Router::RetryPolicyConstSharedPtr retry_policy,
     const envoy::extensions::filters::http::jwt_authn::v3::RemoteJwks& remote_jwks) {
-  return std::make_unique<JwksFetcherImpl>(cm, remote_jwks);
+  return std::make_unique<JwksFetcherImpl>(cm, std::move(retry_policy), remote_jwks);
 }
 } // namespace Common
 } // namespace HttpFilters

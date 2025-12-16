@@ -36,13 +36,11 @@ directories:
   source/extensions/common/wasm/ext: 100.0
   source/extensions/filters/common: 97.1
   source/extensions/filters/common/fault: 94.5
-  source/extensions/filters/common/rbac: 95.4
   source/extensions/filters/common/lua: 95.6
   source/extensions/filters/http/cache: 95.9
   source/extensions/filters/http/dynamic_forward_proxy: 94.8
   source/extensions/filters/http/dynamic_modules: 95.6
   source/extensions/filters/http/decompressor: 95.9
-  source/extensions/filters/http/ext_proc: 96.4  # might be flaky: be careful adjusting
   source/extensions/filters/http/grpc_json_reverse_transcoder: 94.8
   source/extensions/filters/http/grpc_json_transcoder: 94.0  # TODO(#28232)
   source/extensions/filters/http/ip_tagging: 95.9
@@ -54,7 +52,7 @@ directories:
   source/extensions/filters/listener/tls_inspector: 94.4
   source/extensions/filters/network/dubbo_proxy: 96.2
   source/extensions/filters/network/mongo_proxy: 96.1
-  source/extensions/filters/network/reverse_tunnel: 91.0
+  source/extensions/filters/network/reverse_tunnel: 92.0
   source/extensions/filters/network/sni_cluster: 88.9
   source/extensions/formatter/cel: 100.0
   source/extensions/internal_redirect: 86.2

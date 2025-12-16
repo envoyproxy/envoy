@@ -21,10 +21,12 @@ envoy_cc_library(
     ],
     tags = ["skip_on_windows"],
     deps = [
+        ":allowed_override_modes_set_lib",
         ":client_lib",
         ":matching_utils_lib",
         ":mutation_utils_lib",
         ":on_processing_response_interface",
+        ":processing_effect_lib",
         ":processing_request_modifier_interface",
         "//envoy/event:timer_interface",
         "//envoy/http:filter_interface",
@@ -48,6 +50,16 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "allowed_override_modes_set_lib",
+    hdrs = ["allowed_override_modes_set.h"],
+    tags = ["skip_on_windows"],
+    deps = [
+        "@com_google_absl//absl/container:flat_hash_set",
+        "@envoy_api//envoy/extensions/filters/http/ext_proc/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "client_lib",
     srcs = ["client_impl.cc"],
     hdrs = ["client_impl.h"],
@@ -66,6 +78,7 @@ envoy_cc_extension(
     hdrs = ["config.h"],
     tags = ["skip_on_windows"],
     deps = [
+        ":allowed_override_modes_set_lib",
         ":client_lib",
         ":ext_proc",
         "//source/extensions/filters/http/common:factory_base_lib",
@@ -79,6 +92,7 @@ envoy_cc_library(
     srcs = ["mutation_utils.cc"],
     hdrs = ["mutation_utils.h"],
     deps = [
+        ":processing_effect_lib",
         "//envoy/buffer:buffer_interface",
         "//envoy/http:header_map_interface",
         "//envoy/stats:stats_interface",
@@ -139,4 +153,10 @@ envoy_cc_library(
         "//source/common/stats:symbol_table_lib",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
     ],
+)
+
+envoy_cc_library(
+    name = "processing_effect_lib",
+    hdrs = ["processing_effect.h"],
+    tags = ["skip_on_windows"],
 )
