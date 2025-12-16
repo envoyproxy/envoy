@@ -1099,7 +1099,7 @@ envoy_cc_library(
     deps = [
         ":http2_constants_lib",
         ":http2_hpack_hpack_constants_lib",
-	":http2_hpack_hpack_lib",
+        ":http2_hpack_hpack_lib",
         ":quiche_common_circular_deque_lib",
         ":quiche_common_platform",
     ],
@@ -5051,7 +5051,7 @@ envoy_cc_test_library(
         ":quiche_common_platform_googleurl",
         ":quiche_common_platform_iovec",
         ":quiche_common_platform_test",
-	"@com_google_absl//absl/status:status_matchers",
+        "@com_google_absl//absl/status:status_matchers",
         "@envoy//test/common/quic/platform:quiche_test_helpers_impl_lib",
         "@envoy//test/common/quic/platform:quiche_test_impl_lib",
     ],

@@ -30,9 +30,10 @@ EnvoyQuicTimeWaitListManager::EnvoyQuicTimeWaitListManager(quic::QuicPacketWrite
                                                            QuicDispatcherStats& stats)
     : quic::QuicTimeWaitListManager(writer, visitor, clock, alarm_factory), stats_(stats) {}
 
-void EnvoyQuicTimeWaitListManager::SendPublicReset(
-    const quic::QuicSocketAddress& self_address, const quic::QuicSocketAddress& peer_address,
-    quic::QuicConnectionId connection_id, bool ietf_quic, size_t received_packet_length) {
+void EnvoyQuicTimeWaitListManager::SendPublicReset(const quic::QuicSocketAddress& self_address,
+                                                   const quic::QuicSocketAddress& peer_address,
+                                                   quic::QuicConnectionId connection_id,
+                                                   bool ietf_quic, size_t received_packet_length) {
   ENVOY_LOG_EVERY_POW_2_MISC(info, "Sending Stateless Reset on connection {}",
                              connection_id.ToString());
   stats_.stateless_reset_packets_sent_.inc();
