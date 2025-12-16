@@ -541,5 +541,9 @@ new_features:
     Added per HTTP event :ref:'procesing effects <envoy.filters.http.ext_proc.ProcessingEffect' in the
     ExtProcLoggingInfo in the FilterState. This new data will be automatically collected and can be accesses via
     method processingEffects.
+- area: config
+  change: |
+    Added support for `:ref:`set_node_on_first_message_only
+    <envoy_api_field_core.ApiConfigSource.set_node_on_first_message_only>` to Delta-xDS
 
 deprecated:

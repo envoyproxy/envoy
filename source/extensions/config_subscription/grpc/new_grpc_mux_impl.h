@@ -103,9 +103,11 @@ public:
                       const bool use_namespace_matching, Event::Dispatcher& dispatcher,
                       CustomConfigValidators* config_validators,
                       XdsConfigTrackerOptRef xds_config_tracker,
-                      EdsResourcesCacheOptRef eds_resources_cache)
+                      EdsResourcesCacheOptRef eds_resources_cache,
+                      bool skip_subsequent_node)
         : watch_map_(use_namespace_matching, type_url, config_validators, eds_resources_cache),
-          sub_state_(type_url, watch_map_, local_info, dispatcher, xds_config_tracker) {
+          sub_state_(type_url, watch_map_, local_info, dispatcher, xds_config_tracker,
+                     skip_subsequent_node) {
       // If eds resources cache is provided, then the type must be ClusterLoadAssignment.
       ASSERT(
           !eds_resources_cache.has_value() ||
@@ -219,6 +221,7 @@ private:
   CustomConfigValidatorsPtr config_validators_;
   Common::CallbackHandlePtr dynamic_update_callback_handle_;
   XdsConfigTrackerOptRef xds_config_tracker_;
+  const bool skip_subsequent_node_;
   EdsResourcesCachePtr eds_resources_cache_;
 
   // Used to track whether initial_resource_versions should be populated on the

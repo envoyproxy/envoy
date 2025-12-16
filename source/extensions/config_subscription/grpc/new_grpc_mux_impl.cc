@@ -51,6 +51,7 @@ NewGrpcMuxImpl::NewGrpcMuxImpl(GrpcMuxContext& grpc_mux_context)
                 return absl::OkStatus();
               })),
       xds_config_tracker_(grpc_mux_context.xds_config_tracker_),
+      skip_subsequent_node_(grpc_mux_context.skip_subsequent_node_),
       eds_resources_cache_(std::move(grpc_mux_context.eds_resources_cache_)) {
   AllMuxes::get().insert(this);
 }
@@ -360,7 +361,8 @@ NewGrpcMuxImpl::addSubscription(const std::string& type_url, const bool use_name
   auto [it, success] = subscriptions_.emplace(
       type_url, std::make_unique<SubscriptionStuff>(type_url, local_info_, use_namespace_matching,
                                                     dispatcher_, config_validators_.get(),
-                                                    xds_config_tracker_, resources_cache));
+                                                    xds_config_tracker_, resources_cache,
+                                                    skip_subsequent_node_));
   // Insertion must succeed, as the addSubscription method is only called if
   // the map doesn't have the type_url.
   ASSERT(success);
