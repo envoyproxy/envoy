@@ -8,6 +8,7 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/fmt.h"
+#include "source/common/common/thread.h"
 #include "source/common/common/utility.h"
 #include "source/common/filesystem/watcher_impl.h"
 
@@ -116,20 +117,31 @@ absl::Status WatcherImpl::onKqueueEvent() {
 
     absl::StatusOr<PathSplitResult> pathname_or_error =
         file_system_.splitPathFromFilename(file->file_);
-    RETURN_IF_NOT_OK_REF(pathname_or_error.status());
+    if (!pathname_or_error.ok()) {
+      // Path split failure is permanent and we can't recover.
+      // We remove the broken watch to avoid repeated failures.
+      ENVOY_LOG(warn, "Failed to split path '{}', removing watch: {}", file->file_,
+                pathname_or_error.status().message());
+      removeWatch(file);
+      continue;
+    }
     PathSplitResult& pathname = pathname_or_error.value();
 
     if (file->watching_dir_) {
       if (event.fflags & NOTE_DELETE) {
-        // directory was deleted
+        // Directory was deleted.
         removeWatch(file);
         return absl::OkStatus();
       }
 
       if (event.fflags & NOTE_WRITE) {
-        // directory was written -- check if the file we're actually watching appeared
+        // Directory was written -- check if the file we're actually watching appeared.
         auto file_or_error = addWatch(file->file_, file->events_, file->callback_, true);
-        RETURN_IF_NOT_OK_REF(file_or_error.status());
+        if (!file_or_error.ok()) {
+          ENVOY_LOG_EVERY_POW_2(warn, "Failed to re-add watch for '{}': {}", file->file_,
+                                file_or_error.status().message());
+          continue;
+        }
         FileWatchPtr new_file = file_or_error.value();
         if (new_file != nullptr) {
           removeWatch(file);
@@ -150,7 +162,11 @@ absl::Status WatcherImpl::onKqueueEvent() {
         removeWatch(file);
 
         auto file_or_error = addWatch(file->file_, file->events_, file->callback_, true);
-        RETURN_IF_NOT_OK_REF(file_or_error.status());
+        if (!file_or_error.ok()) {
+          ENVOY_LOG_EVERY_POW_2(warn, "Failed to re-add watch for '{}': {}", file->file_,
+                                file_or_error.status().message());
+          continue;
+        }
         FileWatchPtr new_file = file_or_error.value();
         if (new_file == nullptr) {
           return absl::OkStatus();
@@ -173,10 +189,33 @@ absl::Status WatcherImpl::onKqueueEvent() {
 
     if (events & file->events_) {
       ENVOY_LOG(debug, "matched callback: file: {}", file->file_);
-      RETURN_IF_NOT_OK(file->callback_(events));
+      callAndLogOnError(file->callback_, events, file->file_);
     }
   }
   return absl::OkStatus();
+}
+
+void WatcherImpl::callAndLogOnError(Watcher::OnChangedCb& cb, uint32_t events,
+                                    const std::string& file) {
+  TRY_ASSERT_MAIN_THREAD {
+    const absl::Status status = cb(events);
+    if (!status.ok()) {
+      // Use ENVOY_LOG_EVERY_POW_2 to avoid log spam if a callback keeps failing.
+      ENVOY_LOG_EVERY_POW_2(warn, "Filesystem watch callback for '{}' returned error: {}", file,
+                            status.message());
+    }
+  }
+  END_TRY
+  MULTI_CATCH(
+      const std::exception& e,
+      {
+        ENVOY_LOG_EVERY_POW_2(warn, "Filesystem watch callback for '{}' threw exception: {}", file,
+                              e.what());
+      },
+      {
+        ENVOY_LOG_EVERY_POW_2(warn, "Filesystem watch callback for '{}' threw unknown exception",
+                              file);
+      });
 }
 
 } // namespace Filesystem

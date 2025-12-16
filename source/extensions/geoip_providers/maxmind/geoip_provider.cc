@@ -24,61 +24,57 @@ static constexpr absl::string_view ISP_DB_TYPE = "isp_db";
 static constexpr absl::string_view ANON_DB_TYPE = "anon_db";
 static constexpr absl::string_view ASN_DB_TYPE = "asn_db";
 static constexpr absl::string_view COUNTRY_DB_TYPE = "country_db";
+
+// Helper to get optional string from config field, returns nullopt if empty.
+absl::optional<std::string> getOptionalString(const std::string& value) {
+  return !value.empty() ? absl::make_optional(value) : absl::nullopt;
+}
 } // namespace
 
 GeoipProviderConfig::GeoipProviderConfig(
     const envoy::extensions::geoip_providers::maxmind::v3::MaxMindConfig& config,
     const std::string& stat_prefix, Stats::Scope& scope)
-    : city_db_path_(!config.city_db_path().empty() ? absl::make_optional(config.city_db_path())
-                                                   : absl::nullopt),
-      isp_db_path_(!config.isp_db_path().empty() ? absl::make_optional(config.isp_db_path())
-                                                 : absl::nullopt),
-      anon_db_path_(!config.anon_db_path().empty() ? absl::make_optional(config.anon_db_path())
-                                                   : absl::nullopt),
-      asn_db_path_(!config.asn_db_path().empty() ? absl::make_optional(config.asn_db_path())
-                                                 : absl::nullopt),
-      country_db_path_(!config.country_db_path().empty()
-                           ? absl::make_optional(config.country_db_path())
-                           : absl::nullopt),
+    : city_db_path_(getOptionalString(config.city_db_path())),
+      isp_db_path_(getOptionalString(config.isp_db_path())),
+      anon_db_path_(getOptionalString(config.anon_db_path())),
+      asn_db_path_(getOptionalString(config.asn_db_path())),
+      country_db_path_(getOptionalString(config.country_db_path())),
       stats_scope_(scope.createScope(absl::StrCat(stat_prefix, "maxmind."))),
       stat_name_set_(stats_scope_->symbolTable().makeSet("Maxmind")) {
-  auto geo_headers_to_add = config.common_provider_config().geo_headers_to_add();
-  country_header_ = !geo_headers_to_add.country().empty()
-                        ? absl::make_optional(geo_headers_to_add.country())
-                        : absl::nullopt;
-  city_header_ = !geo_headers_to_add.city().empty() ? absl::make_optional(geo_headers_to_add.city())
-                                                    : absl::nullopt;
-  region_header_ = !geo_headers_to_add.region().empty()
-                       ? absl::make_optional(geo_headers_to_add.region())
-                       : absl::nullopt;
-  asn_header_ = !geo_headers_to_add.asn().empty() ? absl::make_optional(geo_headers_to_add.asn())
-                                                  : absl::nullopt;
+  const auto& common_config = config.common_provider_config();
 
-  // TODO(barroca): When the is_anon field is fully deprecated, remove the part of the code that use
-  // it.
-  anon_header_ = !geo_headers_to_add.anon().empty()
-                     ? absl::make_optional(geo_headers_to_add.anon())
-                     : (!geo_headers_to_add.is_anon().empty()
-                            ? absl::make_optional(geo_headers_to_add.is_anon())
-                            : absl::nullopt);
+  if (common_config.has_geo_field_keys()) {
+    // Use geo_field_keys (preferred).
+    const auto& keys = common_config.geo_field_keys();
+    country_header_ = getOptionalString(keys.country());
+    city_header_ = getOptionalString(keys.city());
+    region_header_ = getOptionalString(keys.region());
+    asn_header_ = getOptionalString(keys.asn());
+    anon_header_ = getOptionalString(keys.anon());
+    anon_vpn_header_ = getOptionalString(keys.anon_vpn());
+    anon_hosting_header_ = getOptionalString(keys.anon_hosting());
+    anon_tor_header_ = getOptionalString(keys.anon_tor());
+    anon_proxy_header_ = getOptionalString(keys.anon_proxy());
+    isp_header_ = getOptionalString(keys.isp());
+    apple_private_relay_header_ = getOptionalString(keys.apple_private_relay());
+  } else if (common_config.has_geo_headers_to_add()) {
+    // Fall back to deprecated geo_headers_to_add for backward compatibility.
+    const auto& headers = common_config.geo_headers_to_add();
+    country_header_ = getOptionalString(headers.country());
+    city_header_ = getOptionalString(headers.city());
+    region_header_ = getOptionalString(headers.region());
+    asn_header_ = getOptionalString(headers.asn());
+    // TODO(barroca): When the is_anon field is fully deprecated, remove this fallback.
+    anon_header_ = !headers.anon().empty() ? absl::make_optional(headers.anon())
+                                           : getOptionalString(headers.is_anon());
+    anon_vpn_header_ = getOptionalString(headers.anon_vpn());
+    anon_hosting_header_ = getOptionalString(headers.anon_hosting());
+    anon_tor_header_ = getOptionalString(headers.anon_tor());
+    anon_proxy_header_ = getOptionalString(headers.anon_proxy());
+    isp_header_ = getOptionalString(headers.isp());
+    apple_private_relay_header_ = getOptionalString(headers.apple_private_relay());
+  }
 
-  anon_vpn_header_ = !geo_headers_to_add.anon_vpn().empty()
-                         ? absl::make_optional(geo_headers_to_add.anon_vpn())
-                         : absl::nullopt;
-  anon_hosting_header_ = !geo_headers_to_add.anon_hosting().empty()
-                             ? absl::make_optional(geo_headers_to_add.anon_hosting())
-                             : absl::nullopt;
-  anon_tor_header_ = !geo_headers_to_add.anon_tor().empty()
-                         ? absl::make_optional(geo_headers_to_add.anon_tor())
-                         : absl::nullopt;
-  anon_proxy_header_ = !geo_headers_to_add.anon_proxy().empty()
-                           ? absl::make_optional(geo_headers_to_add.anon_proxy())
-                           : absl::nullopt;
-  isp_header_ = !geo_headers_to_add.isp().empty() ? absl::make_optional(geo_headers_to_add.isp())
-                                                  : absl::nullopt;
-  apple_private_relay_header_ = !geo_headers_to_add.apple_private_relay().empty()
-                                    ? absl::make_optional(geo_headers_to_add.apple_private_relay())
-                                    : absl::nullopt;
   if (!city_db_path_ && !anon_db_path_ && !asn_db_path_ && !isp_db_path_ && !country_db_path_) {
     throw EnvoyException("At least one geolocation database path needs to be configured: "
                          "city_db_path, isp_db_path, asn_db_path, anon_db_path or country_db_path");

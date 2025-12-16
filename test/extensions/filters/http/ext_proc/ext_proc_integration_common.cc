@@ -933,6 +933,18 @@ void ExtProcIntegrationTest::initializeLogConfig(std::string& access_log_path) {
         "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:bytes_sent)%");
     (*json_format->mutable_fields())["field_bytes_received"].set_string_value(
         "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:bytes_received)%");
+    (*json_format->mutable_fields())["field_request_header_effect"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_header_processing_effect)%");
+    (*json_format->mutable_fields())["field_request_body_effect"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_body_processing_effect)%");
+    (*json_format->mutable_fields())["field_request_trailer_effect"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_trailer_processing_effect)%");
+    (*json_format->mutable_fields())["field_response_header_effect"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:response_header_processing_effect)%");
+    (*json_format->mutable_fields())["field_response_body_effect"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:response_body_processing_effect)%");
+    (*json_format->mutable_fields())["field_response_trailer_effect"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:response_trailer_processing_effect)%");
 
     // Test non-existent field for coverage
     (*json_format->mutable_fields())["field_non_existent"].set_string_value(

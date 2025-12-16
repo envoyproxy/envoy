@@ -311,7 +311,7 @@ using RequestFieldCheckerTest = FieldCheckerTest;
 // Tests CheckField() method for primitive and message type request fields.
 TEST_F(RequestFieldCheckerTest, PrimitiveAndMessageType) {
   ProtoApiScrubberConfig config;
-  std::string method = "/library.BookService/GetBook";
+  std::string method = "/apikeys.ApiKeys/CreateApiKey";
 
   addRestriction(config, method, "shelf", FieldType::Request, false);
   addRestriction(config, method, "filter_criteria.publication_details.original_release_info.year",
@@ -440,7 +440,7 @@ TEST_F(RequestFieldCheckerTest, PrimitiveAndMessageType) {
 // Tests CheckField() specifically for repeated fields (Arrays) in the request.
 TEST_F(RequestFieldCheckerTest, ArrayType) {
   ProtoApiScrubberConfig config;
-  std::string method = "/library.BookService/UpdateBook";
+  std::string method = "/apikeys.ApiKeys/CreateApiKey";
 
   // Top-level repeated primitive: "tags" -> Remove.
   addRestriction(config, method, "tags", FieldType::Request, true);
@@ -593,7 +593,7 @@ using ResponseFieldCheckerTest = FieldCheckerTest;
 // Tests CheckField() method for primitive and message type response fields.
 TEST_F(ResponseFieldCheckerTest, PrimitiveAndMessageType) {
   ProtoApiScrubberConfig config;
-  std::string method = "/library.BookService/GetBook";
+  std::string method = "/apikeys.ApiKeys/CreateApiKey";
 
   addRestriction(config, method, "publisher", FieldType::Response, false);
   addRestriction(config, method, "fulfillment.primary_location.exact_coordinates.aisle",
@@ -651,7 +651,7 @@ TEST_F(ResponseFieldCheckerTest, PrimitiveAndMessageType) {
     // The field `name` has a match tree configured which always evaluates to true and has a match
     // action configured of type
     // `envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction`
-    // and hence, CheckField returns kInclude.
+    // and hence, CheckField returns kExclude.
     Protobuf::Field field;
     field.set_name("name");
     field.set_kind(Protobuf::Field_Kind_TYPE_STRING);
@@ -695,7 +695,7 @@ TEST_F(ResponseFieldCheckerTest, PrimitiveAndMessageType) {
 // Tests CheckField() specifically for repeated fields (Arrays) in the response.
 TEST_F(ResponseFieldCheckerTest, ArrayType) {
   ProtoApiScrubberConfig config;
-  std::string method = "/library.BookService/GetBook";
+  std::string method = "/apikeys.ApiKeys/CreateApiKey";
 
   // Top-level repeated primitive: "comments" -> Remove.
   addRestriction(config, method, "comments", FieldType::Response, true);
@@ -828,7 +828,7 @@ TEST_F(FieldCheckerTest, UnsupportedScrubberContext) {
   field.set_kind(Protobuf::Field_Kind_TYPE_STRING);
 
   FieldChecker field_checker(ScrubberContext::kTestScrubbing, &mock_stream_info,
-                             "/library.BookService/GetBook", filter_config_.get());
+                             "/apikeys.ApiKeys/CreateApiKey", filter_config_.get());
 
   EXPECT_LOG_CONTAINS("warn", "Unsupported scrubber context enum value", {
     FieldCheckResults result = field_checker.CheckField({"user"}, &field);
@@ -842,7 +842,7 @@ TEST_F(FieldCheckerTest, IncludesType) {
 
   NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
   FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info,
-                             "/library.BookService/GetBook", filter_config_.get());
+                             "/apikeys.ApiKeys/CreateApiKey", filter_config_.get());
 
   Protobuf::Type type;
   type.set_name("type");
@@ -855,7 +855,7 @@ TEST_F(FieldCheckerTest, SupportAny) {
 
   NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
   FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info,
-                             "/library.BookService/GetBook", filter_config_.get());
+                             "/apikeys.ApiKeys/CreateApiKey", filter_config_.get());
 
   EXPECT_FALSE(field_checker.SupportAny());
 }
@@ -866,9 +866,23 @@ TEST_F(FieldCheckerTest, FilterName) {
 
   NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
   FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info,
-                             "/library.BookService/GetBook", filter_config_.get());
+                             "/apikeys.ApiKeys/CreateApiKey", filter_config_.get());
 
   EXPECT_EQ(field_checker.FilterName(), FieldFilters::FieldMaskFilter);
+}
+
+// Tests that when `field` is nullptr (indicating an unknown field), CheckField returns kInclude.
+TEST_F(FieldCheckerTest, UnknownFieldIsNull) {
+  ProtoApiScrubberConfig config;
+  initializeFilterConfig(config);
+
+  NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
+  FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info,
+                             "/library.BookService/GetBook", filter_config_.get());
+
+  // Pass nullptr to simulate an unknown field.
+  EXPECT_EQ(field_checker.CheckField({"some", "unknown", "field"}, nullptr),
+            FieldCheckResults::kInclude);
 }
 
 } // namespace
