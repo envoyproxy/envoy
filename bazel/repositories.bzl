@@ -171,6 +171,8 @@ def envoy_dependencies(skip_targets = []):
     _com_github_libevent_libevent()
     _com_github_luajit_luajit()
     _com_github_nghttp2_nghttp2()
+    _depend_on_what_you_use()
+    _dwyu_pcpp()
     _com_github_msgpack_cpp()
     _com_github_skyapm_cpp2sky()
     _com_github_alibaba_hessian2_codec()
@@ -551,6 +553,18 @@ def _com_github_nghttp2_nghttp2():
         # https://github.com/nghttp2/nghttp2/pull/1395
         # https://github.com/envoyproxy/envoy/pull/8572#discussion_r334067786
         patches = ["@envoy//bazel/foreign_cc:nghttp2.patch"],
+    )
+
+def _depend_on_what_you_use():
+    external_http_archive(
+        name = "depend_on_what_you_use",
+        build_file_content = BUILD_ALL_CONTENT,
+    )
+
+def _dwyu_pcpp():
+    external_http_archive(
+        name = "dwyu_pcpp",
+        build_file = "@envoy//bazel/external:dwyu_pcpp.BUILD",
     )
 
 def _com_github_msgpack_cpp():
