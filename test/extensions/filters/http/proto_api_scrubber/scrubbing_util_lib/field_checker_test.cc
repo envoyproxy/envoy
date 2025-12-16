@@ -651,7 +651,7 @@ TEST_F(ResponseFieldCheckerTest, PrimitiveAndMessageType) {
     // The field `name` has a match tree configured which always evaluates to true and has a match
     // action configured of type
     // `envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction`
-    // and hence, CheckField returns kInclude.
+    // and hence, CheckField returns kExclude.
     Protobuf::Field field;
     field.set_name("name");
     field.set_kind(Protobuf::Field_Kind_TYPE_STRING);
@@ -869,6 +869,20 @@ TEST_F(FieldCheckerTest, FilterName) {
                              "/library.BookService/GetBook", filter_config_.get());
 
   EXPECT_EQ(field_checker.FilterName(), FieldFilters::FieldMaskFilter);
+}
+
+// Tests that when `field` is nullptr (indicating an unknown field), CheckField returns kInclude.
+TEST_F(FieldCheckerTest, UnknownFieldIsNull) {
+  ProtoApiScrubberConfig config;
+  initializeFilterConfig(config);
+
+  NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
+  FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info,
+                             "/library.BookService/GetBook", filter_config_.get());
+
+  // Pass nullptr to simulate an unknown field.
+  EXPECT_EQ(field_checker.CheckField({"some", "unknown", "field"}, nullptr),
+            FieldCheckResults::kInclude);
 }
 
 } // namespace
