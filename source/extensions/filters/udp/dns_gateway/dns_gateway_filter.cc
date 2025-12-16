@@ -91,10 +91,11 @@ DnsGatewayFilter::DnsGatewayFilter(
     Network::UdpReadFilterCallbacks& callbacks, const DnsGatewayConfig& config,
     Common::SyntheticIp::SyntheticIpCacheManagerSharedPtr cache_manager, TimeSource& time_source,
     Random::RandomGenerator& random)
-    : UdpListenerReadFilter(callbacks), cache_manager_(cache_manager),
+    : UdpListenerReadFilter(callbacks), cache_manager_(cache_manager), stats_store_(),
       // Initialize DNS parser with recursion disabled (we don't forward queries)
-      // Pass nullptr for histogram since we don't need stats
-      message_parser_(false, time_source, 0, random, nullptr) {
+      message_parser_(
+          false, time_source, 0, random,
+          stats_store_.histogramFromString("latency", Stats::Histogram::Unit::Milliseconds)) {
 
   // Parse default TTL
   if (config.has_default_ttl()) {
@@ -117,10 +118,16 @@ DnsGatewayFilter::DnsGatewayFilter(
 }
 
 Network::FilterStatus DnsGatewayFilter::onData(Network::UdpRecvData& data) {
+  DnsFilter::DnsParserCounters parser_counters(
+      stats_store_.counterFromString("underflow"),
+      stats_store_.counterFromString("record_name_overflow"),
+      stats_store_.counterFromString("query_parsing_failure"),
+      stats_store_.counterFromString("queries_with_additional_rrs"),
+      stats_store_.counterFromString("queries_with_ans_or_authority_rrs"));
+
   // Use the safe DNS parser to parse the query
-  // Pass nullptr counters since we don't track stats
   DnsFilter::DnsQueryContextPtr query_context =
-      message_parser_.createQueryContext(data, nullptr);
+      message_parser_.createQueryContext(data, parser_counters);
 
   // If parsing failed, drop the packet silently
   // Don't send error responses to avoid potential loops
