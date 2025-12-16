@@ -12104,6 +12104,32 @@ virtual_hosts:
   EXPECT_EQ(4194304U, route->requestBodyBufferLimit());
 }
 
+// Test that route-level request_body_buffer_limit takes precedence over virtual_host
+// request_body_buffer_limit
+TEST_F(RouteConfigurationV2,
+       DEPRECATED_FEATURE_TEST(LegacyRequestBodyBufferLimitPrecedenceRouteOverridesVirtualHost)) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- domains: [test.example.com]
+  name: test_host
+  per_request_buffer_limit_bytes: 223
+  routes:
+  - match: {prefix: /test}
+    route:
+      cluster: backend
+    per_request_buffer_limit_bytes: 334
+)EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"backend"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+  EXPECT_TRUE(creation_status_.ok());
+
+  Http::TestRequestHeaderMapImpl headers = genHeaders("test.example.com", "/test", "GET");
+  const RouteEntry* route = config.route(headers, 0)->routeEntry();
+  EXPECT_EQ(334U, route->requestBodyBufferLimit());
+}
+
 } // namespace
 } // namespace Router
 } // namespace Envoy

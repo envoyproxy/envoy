@@ -147,6 +147,12 @@ bug_fixes:
   change: |
     Fixed an upstream HTTP filter issue when a route retried on 5xx and the filter returned
     ``FilterHeadersStatus::StopIteration`` in ``encodeHeaders()``.
+- area: router
+  change: |
+    Fixed a bug where the :ref:`vhost per request buffer limit bytes
+    <envoy_v3_api_field_config.route.v3.VirtualHost.per_request_buffer_limit_bytes>`
+    will take precedence over the :ref:`route per request buffer limit bytes
+    <envoy_v3_api_field_config.route.v3.Route.per_request_buffer_limit_bytes>`.
 - area: ext_proc
   change: |
     Fixed missing attributes based on request headers (for example, ``request.host``) when ext_proc was configured to run
