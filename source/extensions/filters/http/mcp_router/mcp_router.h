@@ -153,14 +153,10 @@ private:
   std::string encoded_session_id_;
   absl::flat_hash_map<std::string, std::string> backend_sessions_;
 
-  // MuxDemux for fanout operations (per-filter instance)
+  // MuxDemux for all backend operations (fanout and single-backend)
   std::shared_ptr<Http::MuxDemux> muxdemux_;
   std::unique_ptr<Http::MultiStream> multistream_;
   std::vector<std::shared_ptr<BackendStreamCallbacks>> stream_callbacks_;
-
-  // Single backend stream (for tools/call)
-  // TODO(botengyao): better to use MuxDemux, but this is simpler now.
-  Http::AsyncClient::Stream* single_stream_{};
 
   // Store headers to keep them alive for the duration of the stream
   // AsyncStreamImpl stores only a pointer to headers, so we must keep them alive
