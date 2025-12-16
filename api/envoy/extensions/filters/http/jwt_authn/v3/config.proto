@@ -619,8 +619,12 @@ message JwtRequirement {
     // * Validate the (issuer) claim
     // * Validate the (audience) claim
     // * Check not-before time (nbf claim)
-    google.protobuf.Empty extract_only = 7;
+    ExtractOnly extract_only = 7;
   }
+}
+
+message ExtractOnly {
+  // Reserved for future extensions (e.g., claim filtering, logging options)
 }
 
 // This message specifies a list of RequiredProvider.
