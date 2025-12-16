@@ -42,8 +42,8 @@ cargo_build_script(
         "@envoy_repo//:use_local_llvm": [],
         "@platforms//os:linux": [
             "@llvm_toolchain_llvm//:include",
-            "@llvm_toolchain_llvm//:lib_legacy",
             "@llvm_toolchain_llvm//:lib/libclang.so",
+            "@llvm_toolchain_llvm//:lib_legacy",
         ],
         "//conditions:default": [],
     }),
