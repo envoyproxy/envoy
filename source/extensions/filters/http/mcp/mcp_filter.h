@@ -108,14 +108,6 @@ public:
                                           bool end_stream) override;
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
 
-  // Http::StreamEncoderFilter
-  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap&, bool) override {
-    return Http::FilterHeadersStatus::Continue;
-  };
-  Http::FilterDataStatus encodeData(Buffer::Instance&, bool) override {
-    return Http::FilterDataStatus::Continue;
-  };
-
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
     decoder_callbacks_ = &callbacks;
   }
@@ -128,7 +120,6 @@ private:
 
   void handleParseError(absl::string_view error_msg);
   Http::FilterDataStatus completeParsing();
-  const ParserConfig& getParserConfig() const;
 
   McpFilterConfigSharedPtr config_;
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
@@ -137,7 +128,6 @@ private:
   std::unique_ptr<JsonPathParser> parser_;
   bool is_mcp_request_{false};
   bool is_json_post_request_{false};
-  std::unique_ptr<Protobuf::Struct> metadata_;
 };
 
 } // namespace Mcp
