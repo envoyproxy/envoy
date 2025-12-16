@@ -344,6 +344,13 @@ envoy.filters.http.geoip:
   status: wip
   type_urls:
   - envoy.extensions.filters.http.geoip.v3.Geoip
+envoy.filters.network.geoip:
+  categories:
+  - envoy.filters.network
+  security_posture: robust_to_untrusted_downstream
+  status: wip
+  type_urls:
+  - envoy.extensions.filters.network.geoip.v3.Geoip
 envoy.filters.http.upstream_codec:
   categories:
   - envoy.filters.http.upstream
