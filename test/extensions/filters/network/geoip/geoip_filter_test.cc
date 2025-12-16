@@ -4,7 +4,8 @@
 #include "source/common/stream_info/filter_state_impl.h"
 #include "source/extensions/filters/network/geoip/geoip_filter.h"
 
-#include "test/extensions/filters/network/geoip/mocks.h"
+#include "test/extensions/filters/http/geoip/mocks.h"
+#include "test/mocks/event/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/registry.h"
@@ -15,6 +16,11 @@
 
 using testing::_;
 using testing::Invoke;
+
+// Import the shared geoip mocks from the HTTP filter tests.
+using Envoy::Extensions::HttpFilters::Geoip::DummyGeoipProviderFactory;
+using Envoy::Extensions::HttpFilters::Geoip::MockDriver;
+using Envoy::Extensions::HttpFilters::Geoip::MockDriverSharedPtr;
 
 namespace Envoy {
 namespace Extensions {

@@ -53,9 +53,19 @@ Network::FilterStatus GeoipFilter::onNewConnection() {
   auto remote_address = read_callbacks_->connection().connectionInfoProvider().remoteAddress();
   ASSERT(driver_, "No driver is available to perform geolocation lookup.");
 
-  driver_->lookup(
-      Geolocation::LookupRequest{std::move(remote_address)},
-      [this](Geolocation::LookupResult&& result) { onLookupComplete(std::move(result)); });
+  // Capture weak_ptr to GeoipFilter so that filter can be safely accessed in the posted callback.
+  // This protects against the case when filter gets deleted before the callback is run
+  // (e.g., on LDS update).
+  GeoipFilterWeakPtr self = weak_from_this();
+  driver_->lookup(Geolocation::LookupRequest{std::move(remote_address)},
+                  [self, &dispatcher = read_callbacks_->connection().dispatcher()](
+                      Geolocation::LookupResult&& result) {
+                    dispatcher.post([self, result = std::move(result)]() mutable {
+                      if (GeoipFilterSharedPtr filter = self.lock()) {
+                        filter->onLookupComplete(std::move(result));
+                      }
+                    });
+                  });
 
   return Network::FilterStatus::Continue;
 }

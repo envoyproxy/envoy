@@ -1,5 +1,8 @@
 #pragma once
 
+#include <memory>
+
+#include "envoy/event/dispatcher.h"
 #include "envoy/extensions/filters/network/geoip/v3/geoip.pb.h"
 #include "envoy/geoip/geoip_provider_driver.h"
 #include "envoy/network/filter.h"
@@ -70,10 +73,17 @@ private:
 
 using GeoipFilterConfigSharedPtr = std::shared_ptr<GeoipFilterConfig>;
 
+// Forward declaration for weak_ptr/shared_ptr usage.
+class GeoipFilter;
+using GeoipFilterWeakPtr = std::weak_ptr<GeoipFilter>;
+using GeoipFilterSharedPtr = std::shared_ptr<GeoipFilter>;
+
 /**
  * Network filter that performs geolocation lookups and stores results in filter state.
  */
-class GeoipFilter : public Network::ReadFilter, public Logger::Loggable<Logger::Id::filter> {
+class GeoipFilter : public Network::ReadFilter,
+                    public Logger::Loggable<Logger::Id::filter>,
+                    public std::enable_shared_from_this<GeoipFilter> {
 public:
   GeoipFilter(GeoipFilterConfigSharedPtr config, Geolocation::DriverSharedPtr driver);
 
@@ -86,9 +96,10 @@ public:
     read_callbacks_ = &callbacks;
   }
 
-private:
+  // Callback for geolocation lookup completion.
   void onLookupComplete(Geolocation::LookupResult&& result);
 
+private:
   GeoipFilterConfigSharedPtr config_;
   Geolocation::DriverSharedPtr driver_;
   Network::ReadFilterCallbacks* read_callbacks_{};

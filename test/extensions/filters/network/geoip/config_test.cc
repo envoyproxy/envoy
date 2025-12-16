@@ -3,7 +3,7 @@
 
 #include "source/extensions/filters/network/geoip/config.h"
 
-#include "test/extensions/filters/network/geoip/mocks.h"
+#include "test/extensions/filters/http/geoip/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
@@ -11,6 +11,9 @@
 #include "absl/types/optional.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+
+// Import the shared geoip mocks from the HTTP filter tests.
+using Envoy::Extensions::HttpFilters::Geoip::DummyGeoipProviderFactory;
 
 namespace Envoy {
 namespace Extensions {
