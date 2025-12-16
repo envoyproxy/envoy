@@ -14,6 +14,8 @@ READFILTER_FUZZ_FILTERS = [
 
 # These are marked as robust to downstream, but not currently fuzzed
 READFILTER_NOFUZZ_FILTERS = [
+    # GeoIP filter performs IP lookups only, no complex parsing of untrusted data.
+    "envoy.filters.network.geoip",
     # TODO(asraa): Remove when fuzzer sets up connections for TcpProxy properly.
     "envoy.filters.network.tcp_proxy",
 ]

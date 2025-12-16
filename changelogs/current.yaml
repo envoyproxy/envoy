@@ -235,6 +235,11 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.router_filter_resetall_on_local_reply`` and legacy code paths.
 
 new_features:
+- area: network_filter
+  change: |
+    Added :ref:`geoip network filter <config_network_filters_geoip>` to perform geolocation lookups
+    at the network layer and store results in filter state. This enables geolocation data to be
+    used for access logging, routing, and other purposes without requiring HTTP traffic.
 - area: oauth2
   change: |
     Added support for configuring cookie path in the OAuth2 filter. The :ref:`path

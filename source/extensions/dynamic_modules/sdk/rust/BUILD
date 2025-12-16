@@ -27,7 +27,8 @@ cargo_build_script(
         "@platforms//os:linux": {
             "LIBCLANG_PATH": "$(location @llvm_toolchain_llvm//:lib/libclang.so)",
             "BINDGEN_EXTRA_CLANG_ARGS": " ".join([
-                "-isystem $${pwd}/external/llvm_toolchain_llvm/lib/clang/18/include",
+                "-resource-dir $${pwd}/external/llvm_toolchain_llvm/lib/clang/18",
+                "-isystem $${pwd}/external/llvm_toolchain_llvm/lib_legacy/clang/18/include",
                 "-isystem $${pwd}/external/llvm_toolchain_llvm/include/x86_64-unknown-linux-gnu/c++/v1/",
                 "-isystem $${pwd}/external/llvm_toolchain_llvm/include/aarch64-unknown-linux-gnu/c++/v1/",
             ]),
@@ -41,8 +42,8 @@ cargo_build_script(
         "@envoy_repo//:use_local_llvm": [],
         "@platforms//os:linux": [
             "@llvm_toolchain_llvm//:include",
-            "@llvm_toolchain_llvm//:lib",
             "@llvm_toolchain_llvm//:lib/libclang.so",
+            "@llvm_toolchain_llvm//:lib_legacy",
         ],
         "//conditions:default": [],
     }),

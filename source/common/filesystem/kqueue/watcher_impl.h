@@ -46,6 +46,7 @@ private:
   absl::StatusOr<FileWatchPtr> addWatch(absl::string_view path, uint32_t events,
                                         Watcher::OnChangedCb cb, bool pathMustExist);
   void removeWatch(FileWatchPtr& watch);
+  void callAndLogOnError(OnChangedCb& cb, uint32_t events, const std::string& file);
 
   Filesystem::Instance& file_system_;
   int queue_;
