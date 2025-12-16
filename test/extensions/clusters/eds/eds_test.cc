@@ -2959,9 +2959,7 @@ TEST_F(EdsTest, OnConfigUpdateLedsAndEndpoints) {
 
 class EdsCachedAssignmentTest : public testing::Test {
 public:
-  EdsCachedAssignmentTest() {
-    resetCluster();
-  }
+  EdsCachedAssignmentTest() { resetCluster(); }
 
   void resetCluster() {
     resetCluster(R"EOF(
