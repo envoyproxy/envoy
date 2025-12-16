@@ -337,6 +337,7 @@ envoy_cc_library(
     hdrs = ["cpu_info_handler.h"],
     deps = [
         ":handler_ctx_lib",
+        ":cpu_info_params_lib",
         ":utils_lib",
         "//envoy/http:codes_interface",
         "//envoy/server:admin_interface",
@@ -344,6 +345,18 @@ envoy_cc_library(
         "//source/common/buffer:buffer_lib",
         "//source/common/http:codes_lib",
         "//source/common/http:header_map_lib",
+        "@com_google_absl//absl/container:flat_hash_map",
+    ],
+)
+
+envoy_cc_library(
+    name = "cpu_info_params_lib",
+    srcs = ["cpu_info_params.cc"],
+    hdrs = ["cpu_info_params.h"],
+    deps = [
+        "//envoy/buffer:buffer_interface",
+        "//envoy/http:codes_interface",
+        "//source/common/http:utility_lib",
     ],
 )
 
