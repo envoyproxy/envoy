@@ -33,25 +33,24 @@ class FieldChecker : public FieldCheckerInterface, public Logger::Loggable<Logge
 public:
   FieldChecker(const ScrubberContext scrubber_context,
                const Envoy::StreamInfo::StreamInfo* stream_info,
-               const Http::RequestHeaderMap* request_headers,
-               const Http::ResponseHeaderMap* response_headers,
-               const Http::RequestTrailerMap* request_trailers,
-               const Http::ResponseTrailerMap* response_trailers, const std::string& method_name,
-               const ProtoApiScrubberFilterConfig* filter_config)
+               OptRef<const Http::RequestHeaderMap> request_headers,
+               OptRef<const Http::ResponseHeaderMap> response_headers,
+               OptRef<const Http::RequestTrailerMap> request_trailers,
+               OptRef<const Http::ResponseTrailerMap> response_trailers,
+               const std::string& method_name, const ProtoApiScrubberFilterConfig* filter_config)
       : scrubber_context_(scrubber_context), matching_data_(*stream_info),
         method_name_(method_name), filter_config_ptr_(filter_config) {
-    // Populate matching data with whatever is available.
-    if (request_headers != nullptr) {
-      matching_data_.onRequestHeaders(*request_headers);
+    if (request_headers.has_value()) {
+      matching_data_.onRequestHeaders(request_headers.ref());
     }
-    if (response_headers != nullptr) {
-      matching_data_.onResponseHeaders(*response_headers);
+    if (response_headers.has_value()) {
+      matching_data_.onResponseHeaders(response_headers.ref());
     }
-    if (request_trailers != nullptr) {
-      matching_data_.onRequestTrailers(*request_trailers);
+    if (request_trailers.has_value()) {
+      matching_data_.onRequestTrailers(request_trailers.ref());
     }
-    if (response_trailers != nullptr) {
-      matching_data_.onResponseTrailers(*response_trailers);
+    if (response_trailers.has_value()) {
+      matching_data_.onResponseTrailers(response_trailers.ref());
     }
   }
 

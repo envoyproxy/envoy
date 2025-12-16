@@ -1,3 +1,5 @@
+#include "envoy/common/optref.h"
+
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/http/proto_api_scrubber/filter_config.h"
@@ -254,9 +256,8 @@ TEST_F(FieldCheckerTest, IncompleteMatch) {
     EXPECT_CALL(mock_filter_config, getRequestFieldMatcher(method_name, field_name))
         .WillOnce(testing::Return(mock_match_tree));
 
-    FieldChecker request_field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info,
-                                       nullptr, nullptr, nullptr, nullptr, method_name,
-                                       &mock_filter_config);
+    FieldChecker request_field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info, {},
+                                       {}, {}, {}, method_name, &mock_filter_config);
 
     EXPECT_LOG_CONTAINS(
         "warn",
@@ -272,9 +273,8 @@ TEST_F(FieldCheckerTest, IncompleteMatch) {
     EXPECT_CALL(mock_filter_config, getResponseFieldMatcher(method_name, field_name))
         .WillOnce(testing::Return(mock_match_tree));
 
-    FieldChecker response_field_checker(ScrubberContext::kResponseScrubbing, &mock_stream_info,
-                                        nullptr, nullptr, nullptr, nullptr, method_name,
-                                        &mock_filter_config);
+    FieldChecker response_field_checker(ScrubberContext::kResponseScrubbing, &mock_stream_info, {},
+                                        {}, {}, {}, method_name, &mock_filter_config);
 
     EXPECT_LOG_CONTAINS(
         "warn",
@@ -312,8 +312,8 @@ TEST_F(FieldCheckerTest, CompleteMatchWithUnsupportedAction) {
     EXPECT_CALL(mock_filter_config, getRequestFieldMatcher(method_name, field_name))
         .WillOnce(testing::Return(mock_match_tree));
 
-    FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info, nullptr,
-                               nullptr, nullptr, nullptr, method_name, &mock_filter_config);
+    FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info, {}, {}, {},
+                               {}, method_name, &mock_filter_config);
 
     // Assert that kInclude is returned because standard matching behavior dictates that
     // if an action is unknown to this specific filter, it should default to preserving the field.
@@ -335,8 +335,8 @@ TEST_F(FieldCheckerTest, CompleteMatchWithUnsupportedAction) {
     EXPECT_CALL(mock_filter_config, getRequestFieldMatcher(method_name, field_name))
         .WillOnce(testing::Return(mock_match_tree));
 
-    FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info, nullptr,
-                               nullptr, nullptr, nullptr, method_name, &mock_filter_config);
+    FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info, {}, {}, {},
+                               {}, method_name, &mock_filter_config);
 
     // Assert that kInclude is returned because standard matching behavior dictates that
     // if an action is unknown to this specific filter, it should default to preserving the field.
@@ -363,8 +363,8 @@ TEST_F(RequestFieldCheckerTest, PrimitiveAndMessageType) {
   initializeFilterConfig(config);
 
   NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
-  FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info, nullptr,
-                             nullptr, nullptr, nullptr, method, filter_config_.get());
+  FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info, {}, {}, {}, {},
+                             method, filter_config_.get());
 
   {
     // The field `urn` doesn't have any match tree configured.
@@ -491,8 +491,8 @@ TEST_F(RequestFieldCheckerTest, ArrayType) {
   initializeFilterConfig(config);
 
   NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
-  FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info, nullptr,
-                             nullptr, nullptr, nullptr, method, filter_config_.get());
+  FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info, {}, {}, {}, {},
+                             method, filter_config_.get());
 
   {
     // Case 1: Top-level repeated primitive (e.g., repeated string tags).
@@ -570,8 +570,8 @@ TEST_F(RequestFieldCheckerTest, EnumType) {
   setupMockEnumRule(*mock_config, method, "config.status", "type.googleapis.com/pkg.Status", 0,
                     "OK", false);
 
-  FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info, nullptr,
-                             nullptr, nullptr, nullptr, method, mock_config.get());
+  FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info, {}, {}, {}, {},
+                             method, mock_config.get());
 
   {
     // Scenario 1: Field-Level Scrubbing.
@@ -643,8 +643,8 @@ TEST_F(ResponseFieldCheckerTest, PrimitiveAndMessageType) {
   initializeFilterConfig(config);
 
   NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
-  FieldChecker field_checker(ScrubberContext::kResponseScrubbing, &mock_stream_info, nullptr,
-                             nullptr, nullptr, nullptr, method, filter_config_.get());
+  FieldChecker field_checker(ScrubberContext::kResponseScrubbing, &mock_stream_info, {}, {}, {}, {},
+                             method, filter_config_.get());
 
   {
     // The field `author` doesn't have any match tree configured.
@@ -746,8 +746,8 @@ TEST_F(ResponseFieldCheckerTest, ArrayType) {
   initializeFilterConfig(config);
 
   NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
-  FieldChecker field_checker(ScrubberContext::kResponseScrubbing, &mock_stream_info, nullptr,
-                             nullptr, nullptr, nullptr, method, filter_config_.get());
+  FieldChecker field_checker(ScrubberContext::kResponseScrubbing, &mock_stream_info, {}, {}, {}, {},
+                             method, filter_config_.get());
 
   {
     // Case 1: Top-level repeated primitive.
@@ -815,8 +815,8 @@ TEST_F(ResponseFieldCheckerTest, EnumType) {
   setupMockEnumRule(*mock_config, method, "config.state", "type.googleapis.com/pkg.State", 2,
                     "DEPRECATED", true);
 
-  FieldChecker field_checker(ScrubberContext::kResponseScrubbing, &mock_stream_info, nullptr,
-                             nullptr, nullptr, nullptr, method, mock_config.get());
+  FieldChecker field_checker(ScrubberContext::kResponseScrubbing, &mock_stream_info, {}, {}, {}, {},
+                             method, mock_config.get());
 
   {
     // Scenario 1: Field-Level Scrubbing.
@@ -865,9 +865,8 @@ TEST_F(FieldCheckerTest, UnsupportedScrubberContext) {
   field.set_name("user");
   field.set_kind(Protobuf::Field_Kind_TYPE_STRING);
 
-  FieldChecker field_checker(ScrubberContext::kTestScrubbing, &mock_stream_info, nullptr, nullptr,
-                             nullptr, nullptr, "/library.BookService/GetBook",
-                             filter_config_.get());
+  FieldChecker field_checker(ScrubberContext::kTestScrubbing, &mock_stream_info, {}, {}, {}, {},
+                             "/library.BookService/GetBook", filter_config_.get());
 
   EXPECT_LOG_CONTAINS("warn", "Unsupported scrubber context enum value", {
     FieldCheckResults result = field_checker.CheckField({"user"}, &field);
@@ -902,9 +901,9 @@ TEST_F(FieldCheckerTest, ConstructorPropagatesHeadersAndTrailersToMatchTree) {
       .WillByDefault(testing::Return(mock_match_tree));
 
   // Instantiate FieldChecker.
-  FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info,
-                             &request_headers, &response_headers, &request_trailers,
-                             &response_trailers, method, &mock_config);
+  FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info, request_headers,
+                             response_headers, request_trailers, response_trailers, method,
+                             &mock_config);
 
   // Trigger the check. This calls tryMatch -> match_tree->match(matching_data_)
   Protobuf::Field field;
@@ -919,9 +918,8 @@ TEST_F(FieldCheckerTest, IncludesType) {
   initializeFilterConfig(config);
 
   NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
-  FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info, nullptr,
-                             nullptr, nullptr, nullptr, "/library.BookService/GetBook",
-                             filter_config_.get());
+  FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info, {}, {}, {}, {},
+                             "/library.BookService/GetBook", filter_config_.get());
 
   Protobuf::Type type;
   type.set_name("type");
@@ -933,9 +931,8 @@ TEST_F(FieldCheckerTest, SupportAny) {
   initializeFilterConfig(config);
 
   NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
-  FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info, nullptr,
-                             nullptr, nullptr, nullptr, "/library.BookService/GetBook",
-                             filter_config_.get());
+  FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info, {}, {}, {}, {},
+                             "/library.BookService/GetBook", filter_config_.get());
 
   EXPECT_FALSE(field_checker.SupportAny());
 }
@@ -945,9 +942,8 @@ TEST_F(FieldCheckerTest, FilterName) {
   initializeFilterConfig(config);
 
   NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
-  FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info, nullptr,
-                             nullptr, nullptr, nullptr, "/library.BookService/GetBook",
-                             filter_config_.get());
+  FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info, {}, {}, {}, {},
+                             "/library.BookService/GetBook", filter_config_.get());
 
   EXPECT_EQ(field_checker.FilterName(), FieldFilters::FieldMaskFilter);
 }
