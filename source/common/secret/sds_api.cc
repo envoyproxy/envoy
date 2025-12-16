@@ -101,11 +101,10 @@ absl::Status SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef
     validateConfig(secret);
     secret_hash_ = new_hash;
     setSecret(secret);
-    const auto files = loadFiles();
-    files_hash_ = getHashForFiles(files);
-    resolveSecret(files);
-    THROW_IF_NOT_OK(update_callback_manager_.runCallbacks());
 
+    // Set up the watch callback before loadFiles() call so that if the loadFiles() call fails
+    // (e.g., cert files don't exist yet), the callback already gets configured.
+    // This would enable automatic recovery when files get created later on.
     auto* watched_directory = getWatchedDirectory();
     // Either we have a watched path and can defer the watch monitoring to a
     // WatchedDirectory object, or we need to implement per-file watches in the else
@@ -116,12 +115,12 @@ absl::Status SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef
         return absl::OkStatus();
       });
     } else {
-      // List DataSources that refer to files
-      auto files = getDataSourceFilenames();
-      if (!files.empty()) {
+      // List DataSources that refer to files.
+      auto datasource_files = getDataSourceFilenames();
+      if (!datasource_files.empty()) {
         // Create new watch, also destroys the old watch if any.
         watcher_ = dispatcher_.createFilesystemWatcher();
-        for (auto const& filename : files) {
+        for (auto const& filename : datasource_files) {
           // Watch for directory instead of file. This allows users to do atomic renames
           // on directory level (e.g. Kubernetes secret update).
           const auto result_or_error = api_.fileSystem().splitPathFromFilename(filename);
@@ -137,6 +136,11 @@ absl::Status SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef
         watcher_.reset(); // Destroy the old watch if any
       }
     }
+
+    const auto files = loadFiles();
+    files_hash_ = getHashForFiles(files);
+    resolveSecret(files);
+    THROW_IF_NOT_OK(update_callback_manager_.runCallbacks());
   }
   secret_data_.last_updated_ = time_source_.systemTime();
   secret_data_.version_info_ = version_info;

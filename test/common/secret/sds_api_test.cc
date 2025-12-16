@@ -246,6 +246,9 @@ protected:
 
     auto* watcher = new Filesystem::MockWatcher();
     if (watched_directory_) {
+      // With watched_directory, the order is that the call to setSecret creates WatchedDirectory
+      // which adds watch, then the call to setCallback is called, then the call to loadFiles reads
+      // the files.
       EXPECT_CALL(mock_dispatcher_, createFilesystemWatcher_()).WillOnce(Return(watcher));
       EXPECT_CALL(*watcher, addWatch(trigger_path_ + "/", Filesystem::Watcher::Events::MovedTo, _))
           .WillOnce(
@@ -257,9 +260,8 @@ protected:
       EXPECT_CALL(filesystem_, fileReadToEnd(key_path_)).WillOnce(Return(key_value));
       EXPECT_CALL(secret_callback_, onAddOrUpdateSecret());
     } else {
-      EXPECT_CALL(filesystem_, fileReadToEnd(cert_path_)).WillOnce(Return(cert_value));
-      EXPECT_CALL(filesystem_, fileReadToEnd(key_path_)).WillOnce(Return(key_value));
-      EXPECT_CALL(secret_callback_, onAddOrUpdateSecret());
+      // Without watched_directory, per-file watchers are created before loadFiles() is called.
+      // This enables auto-recovery when files appear after initial load failure.
       EXPECT_CALL(mock_dispatcher_, createFilesystemWatcher_()).WillOnce(Return(watcher));
       EXPECT_CALL(*watcher, addWatch(expected_watch_path_, Filesystem::Watcher::Events::MovedTo, _))
           .Times(2)
@@ -268,6 +270,9 @@ protected:
                 watch_cbs_.push_back(cb);
                 return absl::OkStatus();
               }));
+      EXPECT_CALL(filesystem_, fileReadToEnd(cert_path_)).WillOnce(Return(cert_value));
+      EXPECT_CALL(filesystem_, fileReadToEnd(key_path_)).WillOnce(Return(key_value));
+      EXPECT_CALL(secret_callback_, onAddOrUpdateSecret());
     }
     EXPECT_TRUE(
         subscription_factory_.callbacks_->onConfigUpdate(decoded_resources.refvec_, "").ok());
@@ -317,9 +322,8 @@ protected:
     const auto decoded_resources = TestUtility::decodeResources({typed_secret});
 
     auto* watcher = new Filesystem::MockWatcher();
-    EXPECT_CALL(filesystem_, fileReadToEnd(trusted_ca_path)).WillOnce(Return(trusted_ca_value));
-    EXPECT_CALL(filesystem_, fileReadToEnd(crl_path)).WillOnce(Return(crl_value));
-    EXPECT_CALL(secret_callback_, onAddOrUpdateSecret());
+    // Per-file watchers are created before loadFiles() is called.
+    // This enables auto-recovery when files appear after initial load failure.
     EXPECT_CALL(mock_dispatcher_, createFilesystemWatcher_()).WillOnce(Return(watcher));
     EXPECT_CALL(*watcher, addWatch(watch_path, Filesystem::Watcher::Events::MovedTo, _))
         .WillOnce(Invoke([this](absl::string_view, uint32_t, Filesystem::Watcher::OnChangedCb cb) {
@@ -331,6 +335,9 @@ protected:
           watch_cbs_.push_back(cb);
           return absl::OkStatus();
         }));
+    EXPECT_CALL(filesystem_, fileReadToEnd(trusted_ca_path)).WillOnce(Return(trusted_ca_value));
+    EXPECT_CALL(filesystem_, fileReadToEnd(crl_path)).WillOnce(Return(crl_value));
+    EXPECT_CALL(secret_callback_, onAddOrUpdateSecret());
     EXPECT_TRUE(
         subscription_factory_.callbacks_->onConfigUpdate(decoded_resources.refvec_, "").ok());
   }
@@ -473,6 +480,160 @@ TEST_P(TlsCertificateSdsRotationApiTest, RotationConsistency) {
   const auto& secret = *sds_api_->secret();
   EXPECT_EQ("c", secret.certificate_chain().inline_bytes());
   EXPECT_EQ("d", secret.private_key().inline_bytes());
+}
+
+// Test that when initial loadFiles() fails due to the secrets not existing yet, the watch
+// callback is still set up, enabling auto-recovery when the secrets appear later.
+TEST_P(TlsCertificateSdsRotationApiTest, InitialLoadFailsAutoRecoveryWorks) {
+  InSequence s;
+
+  const std::string yaml = fmt::format(
+      R"EOF(
+  name: "abc.com"
+  tls_certificate:
+    certificate_chain:
+      filename: "{}"
+    private_key:
+      filename: "{}"
+    )EOF",
+      cert_path_, key_path_);
+  envoy::extensions::transport_sockets::tls::v3::Secret typed_secret;
+  TestUtility::loadFromYaml(yaml, typed_secret);
+  if (watched_directory_) {
+    typed_secret.mutable_tls_certificate()->mutable_watched_directory()->set_path(trigger_path_);
+  }
+  const auto decoded_resources = TestUtility::decodeResources({typed_secret});
+
+  auto* watcher = new Filesystem::MockWatcher();
+  if (watched_directory_) {
+    // Watch should be set up before loadFiles() is called.
+    EXPECT_CALL(mock_dispatcher_, createFilesystemWatcher_()).WillOnce(Return(watcher));
+    EXPECT_CALL(*watcher, addWatch(trigger_path_ + "/", Filesystem::Watcher::Events::MovedTo, _))
+        .WillOnce(Invoke([this](absl::string_view, uint32_t, Filesystem::Watcher::OnChangedCb cb) {
+          watch_cbs_.push_back(cb);
+          return absl::OkStatus();
+        }));
+    // Initial file read fails because the files don't exist yet.
+    EXPECT_CALL(filesystem_, fileReadToEnd(cert_path_))
+        .WillOnce(Throw(EnvoyException("file not found")));
+  } else {
+    // For non-watched-directory case, watch is set up before loadFiles().
+    EXPECT_CALL(mock_dispatcher_, createFilesystemWatcher_()).WillOnce(Return(watcher));
+    EXPECT_CALL(*watcher, addWatch(expected_watch_path_, Filesystem::Watcher::Events::MovedTo, _))
+        .Times(2)
+        .WillRepeatedly(
+            Invoke([this](absl::string_view, uint32_t, Filesystem::Watcher::OnChangedCb cb) {
+              watch_cbs_.push_back(cb);
+              return absl::OkStatus();
+            }));
+    // Initial file read fails because the files don't exist yet.
+    EXPECT_CALL(filesystem_, fileReadToEnd(cert_path_))
+        .WillOnce(Throw(EnvoyException("file not found")));
+  }
+
+  // onConfigUpdate should throw an exception because loadFiles() throws an exception.
+  EXPECT_THROW(
+      subscription_factory_.callbacks_->onConfigUpdate(decoded_resources.refvec_, "").IgnoreError(),
+      EnvoyException);
+
+  // The watch callback should have been captured despite the failure.
+  EXPECT_FALSE(watch_cbs_.empty());
+
+  // No secret should be available yet.
+  EXPECT_EQ(nullptr, sds_api_->secret());
+
+  // Now simulate files appearing and trigger the watch callback.
+  // This time file read should succeed.
+  EXPECT_CALL(filesystem_, fileReadToEnd(cert_path_)).WillOnce(Return("cert_content"));
+  EXPECT_CALL(filesystem_, fileReadToEnd(key_path_)).WillOnce(Return("key_content"));
+  EXPECT_CALL(filesystem_, fileReadToEnd(cert_path_)).WillOnce(Return("cert_content"));
+  EXPECT_CALL(filesystem_, fileReadToEnd(key_path_)).WillOnce(Return("key_content"));
+  EXPECT_CALL(secret_callback_, onAddOrUpdateSecret());
+
+  // Trigger the watch callback. This should invoke onWatchUpdate() and load the secrets
+  // successfully.
+  EXPECT_TRUE(watch_cbs_[0](Filesystem::Watcher::Events::MovedTo).ok());
+
+  // Now the secret should be available.
+  ASSERT_NE(nullptr, sds_api_->secret());
+  EXPECT_EQ("cert_content", sds_api_->secret()->certificate_chain().inline_bytes());
+  EXPECT_EQ("key_content", sds_api_->secret()->private_key().inline_bytes());
+}
+
+// Test that auto-recovery still works after multiple failed attempts.
+TEST_P(TlsCertificateSdsRotationApiTest, AutoRecoveryAfterMultipleFailures) {
+  InSequence s;
+
+  const std::string yaml = fmt::format(
+      R"EOF(
+  name: "abc.com"
+  tls_certificate:
+    certificate_chain:
+      filename: "{}"
+    private_key:
+      filename: "{}"
+    )EOF",
+      cert_path_, key_path_);
+  envoy::extensions::transport_sockets::tls::v3::Secret typed_secret;
+  TestUtility::loadFromYaml(yaml, typed_secret);
+  if (watched_directory_) {
+    typed_secret.mutable_tls_certificate()->mutable_watched_directory()->set_path(trigger_path_);
+  }
+  const auto decoded_resources = TestUtility::decodeResources({typed_secret});
+
+  auto* watcher = new Filesystem::MockWatcher();
+  if (watched_directory_) {
+    EXPECT_CALL(mock_dispatcher_, createFilesystemWatcher_()).WillOnce(Return(watcher));
+    EXPECT_CALL(*watcher, addWatch(trigger_path_ + "/", Filesystem::Watcher::Events::MovedTo, _))
+        .WillOnce(Invoke([this](absl::string_view, uint32_t, Filesystem::Watcher::OnChangedCb cb) {
+          watch_cbs_.push_back(cb);
+          return absl::OkStatus();
+        }));
+    EXPECT_CALL(filesystem_, fileReadToEnd(cert_path_))
+        .WillOnce(Throw(EnvoyException("file not found")));
+  } else {
+    EXPECT_CALL(mock_dispatcher_, createFilesystemWatcher_()).WillOnce(Return(watcher));
+    EXPECT_CALL(*watcher, addWatch(expected_watch_path_, Filesystem::Watcher::Events::MovedTo, _))
+        .Times(2)
+        .WillRepeatedly(
+            Invoke([this](absl::string_view, uint32_t, Filesystem::Watcher::OnChangedCb cb) {
+              watch_cbs_.push_back(cb);
+              return absl::OkStatus();
+            }));
+    EXPECT_CALL(filesystem_, fileReadToEnd(cert_path_))
+        .WillOnce(Throw(EnvoyException("file not found")));
+  }
+
+  // Initial load fails and throws an exception.
+  EXPECT_THROW(
+      subscription_factory_.callbacks_->onConfigUpdate(decoded_resources.refvec_, "").IgnoreError(),
+      EnvoyException);
+  EXPECT_FALSE(watch_cbs_.empty());
+  EXPECT_EQ(nullptr, sds_api_->secret());
+
+  // First watch trigger. Cert exists but key doesn't.
+  EXPECT_CALL(filesystem_, fileReadToEnd(cert_path_)).WillOnce(Return("cert_content"));
+  EXPECT_CALL(filesystem_, fileReadToEnd(key_path_))
+      .WillOnce(Throw(EnvoyException("key not found")));
+  EXPECT_LOG_CONTAINS("warn", "Failed to reload certificates: ",
+                      EXPECT_TRUE(watch_cbs_[0](Filesystem::Watcher::Events::MovedTo).ok()));
+  EXPECT_EQ(1U, stats_.counter("sds.abc.com.key_rotation_failed").value());
+
+  // Still no secret.
+  EXPECT_EQ(nullptr, sds_api_->secret());
+
+  // Second watch trigger. Both files now exist.
+  EXPECT_CALL(filesystem_, fileReadToEnd(cert_path_)).WillOnce(Return("cert_content"));
+  EXPECT_CALL(filesystem_, fileReadToEnd(key_path_)).WillOnce(Return("key_content"));
+  EXPECT_CALL(filesystem_, fileReadToEnd(cert_path_)).WillOnce(Return("cert_content"));
+  EXPECT_CALL(filesystem_, fileReadToEnd(key_path_)).WillOnce(Return("key_content"));
+  EXPECT_CALL(secret_callback_, onAddOrUpdateSecret());
+  EXPECT_TRUE(watch_cbs_[0](Filesystem::Watcher::Events::MovedTo).ok());
+
+  // Now secret should be available.
+  ASSERT_NE(nullptr, sds_api_->secret());
+  EXPECT_EQ("cert_content", sds_api_->secret()->certificate_chain().inline_bytes());
+  EXPECT_EQ("key_content", sds_api_->secret()->private_key().inline_bytes());
 }
 
 // Hash consistency verification failure, no callback.
