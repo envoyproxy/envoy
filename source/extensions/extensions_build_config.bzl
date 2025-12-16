@@ -254,12 +254,14 @@ EXTENSIONS = {
     "envoy.filters.network.wasm":                                 "//source/extensions/filters/network/wasm:config",
     "envoy.filters.network.zookeeper_proxy":                      "//source/extensions/filters/network/zookeeper_proxy:config",
     "envoy.filters.network.generic_proxy":                        "//source/extensions/filters/network/generic_proxy:config",
+    "envoy.filters.network.tunnel_hostname_lookup":               "//source/extensions/filters/network/tunnel_hostname_lookup:config",
 
     #
     # UDP filters
     #
 
     "envoy.filters.udp.dns_filter":                     "//source/extensions/filters/udp/dns_filter:config",
+    "envoy.filters.udp_listener.dns_gateway":           "//source/extensions/filters/udp/dns_gateway:config",
     "envoy.filters.udp_listener.udp_proxy":             "//source/extensions/filters/udp/udp_proxy:config",
 
     #

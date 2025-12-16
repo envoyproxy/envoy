@@ -861,6 +861,13 @@ envoy.filters.network.tcp_proxy:
   status: stable
   type_urls:
   - envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
+envoy.filters.network.tunnel_hostname_lookup:
+  categories:
+  - envoy.filters.network
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.network.tunnel_hostname_lookup.v3.TunnelHostnameLookup
 envoy.filters.network.thrift_proxy:
   categories:
   - envoy.filters.network
@@ -917,6 +924,13 @@ envoy.filters.udp.dns_filter:
   status: stable
   type_urls:
   - envoy.extensions.filters.udp.dns_filter.v3.DnsFilterConfig
+envoy.filters.udp_listener.dns_gateway:
+  categories:
+  - envoy.filters.udp_listener
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.udp.dns_gateway.v3.DnsGateway
 envoy.filters.udp_listener.udp_proxy:
   categories:
   - envoy.filters.udp_listener

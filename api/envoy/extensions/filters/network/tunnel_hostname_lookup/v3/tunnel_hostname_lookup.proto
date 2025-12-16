@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.network.tunnel_hostname_lookup.v3;
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.network.tunnel_hostname_lookup.v3";
+option java_outer_classname = "TunnelHostnameLookupProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/tunnel_hostname_lookup/v3;tunnel_hostname_lookupv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Tunnel Hostname Lookup]
+// Tunnel Hostname Lookup filter
+// [#extension: envoy.filters.network.tunnel_hostname_lookup]
+
+// Configuration for the Tunnel Hostname Lookup filter.
+//
+// This filter looks up the destination IP address in the synthetic IP cache
+// to retrieve the original hostname. It stores the hostname in filter state
+// with the key "tunnel_hostname" so that downstream filters (like HTTP CONNECT
+// tunneling) can use it.
+//
+// Example usage:
+//
+// .. code-block:: yaml
+//
+//   name: envoy.filters.network.tunnel_hostname_lookup
+//   typed_config:
+//     "@type": type.googleapis.com/envoy.extensions.filters.network.tunnel_hostname_lookup.v3.TunnelHostnameLookup
+//
+message TunnelHostnameLookup {
+  // The filter state key to store the hostname under.
+  // Default: "tunnel_hostname"
+  string filter_state_key = 1 [(validate.rules).string = {min_len: 1}];
+}

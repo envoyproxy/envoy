@@ -169,6 +169,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/filters/network/tcp_proxy @zuercher @ggreenway
 /*/extensions/filters/network/echo @yanavlasov @adisuissa
 /*/extensions/filters/udp/dns_filter @mattklein123 @yanjunxiang-google
+/*/extensions/filters/udp/dns_gateway @UNOWNED @UNOWNED
 /*/extensions/filters/network/direct_response @kyessenov @zuercher
 /*/extensions/filters/udp/udp_proxy @mattklein123 @danzh2010
 /*/extensions/clusters/aggregate @yxue @mattklein123
@@ -351,6 +352,7 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/path/rewrite/uri_template @ravenblackx @yanjunxiang-google
 # Dubbo codec
 /*/extensions/common/dubbo @wbpcode @UNOWNED
+/*/extensions/common/synthetic_ip @UNOWNED @UNOWNED
 # upstream load balancing policies
 /*/extensions/load_balancing_policies/common @wbpcode @tonya11en @nezdolik
 /*/extensions/load_balancing_policies/least_request @wbpcode @tonya11en @nezdolik
@@ -392,6 +394,7 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/filters/network/match_delegate @botengyao @yanavlasov
 # Generic proxy and related extensions
 /*/extensions/filters/network/generic_proxy/ @wbpcode @UNOWNED
+/*/extensions/filters/network/tunnel_hostname_lookup @UNOWNED @UNOWNED
 # Dynamic Modules
 /*/extensions/dynamic_modules @mattklein123 @mathetake @marc-barry
 /*/extensions/filters/http/dynamic_modules @mattklein123 @mathetake @marc-barry

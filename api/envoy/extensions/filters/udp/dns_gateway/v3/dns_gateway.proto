@@ -1,0 +1,53 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.udp.dns_gateway.v3;
+
+import "envoy/config/core/v3/address.proto";
+import "envoy/extensions/common/synthetic_ip/v3/cache.proto";
+
+import "google/protobuf/duration.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.udp.dns_gateway.v3";
+option java_outer_classname = "DnsGatewayProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/udp/dns_gateway/v3;dns_gatewayv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: DNS Gateway Filter]
+// DNS Gateway Filter.
+// [#extension: envoy.filters.udp_listener.dns_gateway]
+
+// Configuration for a DNS Gateway Filter policy.
+// Each policy defines a domain pattern and the CIDR block to allocate synthetic IPs from.
+message DnsGatewayPolicy {
+  // Domain pattern to match. Supports wildcards (e.g., "*.azure.com", "*.aws.com").
+  // The wildcard "*" can only appear at the beginning followed by a dot.
+  string domain_pattern = 1 [(validate.rules).string = {min_len: 1}];
+
+  // CIDR block to allocate synthetic IPs from for this policy.
+  // Each policy should have a unique, non-overlapping CIDR block.
+  // Example: "100.80.0.0/16" for Azure, "100.81.0.0/16" for AWS.
+  config.core.v3.CidrRange cidr_block = 2 [(validate.rules).message = {required: true}];
+
+  // TTL for DNS responses in seconds.
+  // This also determines how long the mapping stays in the synthetic IP cache.
+  // Default: 300 seconds (5 minutes).
+  google.protobuf.Duration ttl = 3;
+}
+
+// Configuration for the DNS Gateway Filter.
+message DnsGateway {
+  // List of policies defining domain patterns and their synthetic IP CIDR blocks.
+  repeated DnsGatewayPolicy policies = 1 [(validate.rules).repeated = {min_items: 1}];
+
+  // Configuration for the synthetic IP cache.
+  // If not specified, default cache settings will be used.
+  common.synthetic_ip.v3.SyntheticIpCacheConfig cache_config = 2;
+
+  // Default TTL for DNS responses when not specified in policy.
+  // Default: 300 seconds (5 minutes).
+  google.protobuf.Duration default_ttl = 3;
+}
