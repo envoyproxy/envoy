@@ -484,7 +484,8 @@ public:
         (use_eds_resources_cache &&
          Runtime::runtimeFeatureEnabled("envoy.restart_features.use_eds_cache_for_ads"))
             ? std::make_unique<EdsResourcesCacheImpl>(dispatcher)
-            : nullptr};
+            : nullptr,
+        /*skip_subsequent_node_=*/ads_config.set_node_on_first_message_only()};
     return std::make_shared<Config::NewGrpcMuxImpl>(grpc_mux_context);
   }
 };
