@@ -49,8 +49,8 @@ bool isApiNameValid(absl::string_view api_name) {
 
 // Creates and returns a CEL matcher.
 MatchTreeHttpMatchingDataSharedPtr
-getCelMatcher(Envoy::Server::Configuration::ServerFactoryContext& server_factory_context,
-              const xds::type::matcher::v3::Matcher& matcher) {
+getMatcher(Envoy::Server::Configuration::ServerFactoryContext& server_factory_context,
+           const xds::type::matcher::v3::Matcher& matcher) {
   ProtoApiScrubberRemoveFieldAction remove_field_action;
   MatcherInputValidatorVisitor validation_visitor;
   Matcher::MatchTreeFactory<HttpMatchingData, ProtoApiScrubberRemoveFieldAction> matcher_factory(
@@ -118,7 +118,7 @@ absl::Status ProtoApiScrubberFilterConfig::initializeMethodLevelRestrictions(
     Envoy::Server::Configuration::FactoryContext& context) {
   if (method_config.has_method_restriction()) {
     method_level_restrictions_[method_name] =
-        getCelMatcher(context.serverFactoryContext(), method_config.method_restriction().matcher());
+        getMatcher(context.serverFactoryContext(), method_config.method_restriction().matcher());
   }
   return absl::OkStatus();
 }
@@ -135,7 +135,7 @@ absl::Status ProtoApiScrubberFilterConfig::initializeMessageRestrictions(
     }
     if (message_config.has_config()) {
       message_level_restrictions_[message_name] =
-          getCelMatcher(context.serverFactoryContext(), message_config.config().matcher());
+          getMatcher(context.serverFactoryContext(), message_config.config().matcher());
     }
   }
   return absl::OkStatus();
@@ -222,6 +222,17 @@ absl::Status ProtoApiScrubberFilterConfig::validateMethodName(absl::string_view 
                     kConfigInitializationError, method_name));
   }
 
+  // Validate that the method exists in the descriptor pool.
+  // Note: descriptor_pool_ is initialized before this validation is called.
+  absl::StatusOr<const MethodDescriptor*> method_desc =
+      getMethodDescriptor(std::string(method_name));
+
+  if (!method_desc.ok()) {
+    return absl::InvalidArgumentError(
+        fmt::format("{} Invalid method name: '{}'. The method is not found in the descriptor pool.",
+                    kConfigInitializationError, method_name));
+  }
+
   return absl::OkStatus();
 }
 
@@ -264,7 +275,7 @@ absl::Status ProtoApiScrubberFilterConfig::initializeMethodFieldRestrictions(
     absl::string_view field_mask = restriction.first;
     RETURN_IF_ERROR(validateFieldMask(field_mask));
     field_restrictions[std::make_pair(std::string(method_name), std::string(field_mask))] =
-        getCelMatcher(context.serverFactoryContext(), restriction.second.matcher());
+        getMatcher(context.serverFactoryContext(), restriction.second.matcher());
   }
 
   return absl::OkStatus();

@@ -480,8 +480,8 @@ public:
         /*xds_config_tracker_=*/xds_config_tracker,
         /*backoff_strategy_=*/std::move(backoff_strategy),
         /*target_xds_authority_=*/"",
-        /*eds_resources_cache_=*/
-        std::make_unique<EdsResourcesCacheImpl>(dispatcher)};
+        /*eds_resources_cache_=*/std::make_unique<EdsResourcesCacheImpl>(dispatcher),
+        /*skip_subsequent_node_=*/ads_config.set_node_on_first_message_only()};
     return std::make_shared<Config::NewGrpcMuxImpl>(grpc_mux_context);
   }
 };
