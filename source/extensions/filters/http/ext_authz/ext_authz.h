@@ -486,6 +486,8 @@ private:
   Filters::Common::ExtAuthz::ClientPtr client_;
   // Per-route gRPC client that overrides the default client when specified.
   Filters::Common::ExtAuthz::ClientPtr per_route_client_;
+  // Client currently being used for the authorization check.
+  Filters::Common::ExtAuthz::Client* active_client_{nullptr};
   // Server context for creating per-route clients.
   Server::Configuration::ServerFactoryContext* server_context_{nullptr};
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};

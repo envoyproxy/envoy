@@ -385,6 +385,7 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
   filter_return_ = FilterReturn::StopDecoding; // Don't let the filter chain continue as we are
                                                // going to invoke check call.
   cluster_ = decoder_callbacks_->clusterInfo();
+  active_client_ = client_to_use;
   initiating_call_ = true;
   client_to_use->check(*this, check_request_, decoder_callbacks_->activeSpan(),
                        decoder_callbacks_->streamInfo());
@@ -609,7 +610,9 @@ void Filter::setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callb
 void Filter::onDestroy() {
   if (state_ == State::Calling) {
     state_ = State::Complete;
-    client_->cancel();
+    if (active_client_ != nullptr) {
+      active_client_->cancel();
+    }
   }
 }
 
@@ -626,6 +629,7 @@ CheckResult Filter::validateAndCheckDecoderHeaderMutation(
 
 void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   state_ = State::Complete;
+  active_client_ = nullptr;
   using Filters::Common::ExtAuthz::CheckStatus;
   Stats::StatName empty_stat_name;
 
