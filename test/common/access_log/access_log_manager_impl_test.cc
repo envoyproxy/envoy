@@ -188,7 +188,7 @@ TEST_F(AccessLogManagerImplTest, FlushToLogFileOnDemand) {
   log_file->write("test");
 
   {
-    absl::MutexLock lock(&file_->mutex_);
+    absl::MutexLock lock(file_->mutex_);
     EXPECT_EQ(expected_writes, file_->num_writes_);
   }
 
