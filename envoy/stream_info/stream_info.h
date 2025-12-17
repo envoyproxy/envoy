@@ -638,17 +638,6 @@ public:
   virtual const std::string& upstreamTransportFailureReason() const PURE;
 
   /**
-   * @param reason the upstream local close reason.
-   */
-  virtual void setUpstreamLocalCloseReason(absl::string_view reason) PURE;
-
-  /**
-   * @return absl::string_view the upstream local close reason, if no reason is
-   *         set, returns an empty string view.
-   */
-  virtual absl::string_view upstreamLocalCloseReason() const PURE;
-
-  /**
    * @param close_type the upstream detected close type.
    */
   virtual void setUpstreamDetectedCloseType(DetectedCloseType close_type) PURE;
@@ -1046,17 +1035,6 @@ public:
    * @param failure_reason the downstream transport failure reason.
    */
   virtual void setDownstreamTransportFailureReason(absl::string_view failure_reason) PURE;
-
-  /**
-   * @param reason the downstream local close reason.
-   */
-  virtual void setDownstreamLocalCloseReason(absl::string_view reason) PURE;
-
-  /**
-   * @return absl::string_view the downstream local close reason, if no reason is
-   *         set, returns an empty string view.
-   */
-  virtual absl::string_view downstreamLocalCloseReason() const PURE;
 
   /**
    * @param close_type the downstream detected close type.
