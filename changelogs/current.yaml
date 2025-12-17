@@ -230,6 +230,10 @@ bug_fixes:
   change: |
     Fixed a crash on listener removal with a process-level access log rate limiter
     :ref:`ProcessRateLimitFilter <envoy_v3_api_msg_extensions.access_loggers.filters.process_ratelimit.v3.ProcessRateLimitFilter>`.
+- area: json
+  change: |
+    Fixed an off-by-one write in ``JsonEscaper::escapeString()`` that could corrupt the string null terminator
+    when the input string ends with a control character.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
