@@ -192,19 +192,6 @@ public:
     }
   }
 
-  bool empty() const {
-    return (ipv4_trie_ == nullptr && ipv6_trie_ == nullptr) ||
-           (ipv4_trie_->empty() && ipv6_trie_->empty());
-  }
-
-  std::string asString() const {
-    std::string result;
-    if (ipv4_trie_ != nullptr && !ipv4_trie_->empty()) {
-      absl::StrAppend(&result, ipv4_trie_->asString());
-    }
-    return result;
-  }
-
 private:
   /**
    * Extract n bits from input starting at position p.
@@ -302,7 +289,7 @@ private:
               extractBits<IpType, address_size>(0, length_, address));
     }
 
-    std::string asString() { return fmt::format("{}/{}/{}", ip_, length_, data_); }
+    std::string asString() { return fmt::format("{}/{}", toString(ip_), length_); }
 
     // The address represented either in Ipv4(uint32_t) or Ipv6(absl::uint128).
     IpType ip_{0};
@@ -446,10 +433,6 @@ private:
      * An empty vector is returned if the LC Trie is empty.
      */
     std::vector<T> getData(const IpType& ip_address) const;
-
-    bool empty() const;
-
-    std::string asString() const;
 
   private:
     /**
@@ -722,24 +705,6 @@ LcTrie<T>::LcTrieInternal<IpType, address_size>::LcTrieInternal(std::vector<IpPr
                                                                 uint32_t root_branching_factor)
     : fill_factor_(fill_factor), root_branching_factor_(root_branching_factor) {
   build(data);
-}
-
-template <class T>
-template <class IpType, uint32_t address_size>
-bool LcTrie<T>::LcTrieInternal<IpType, address_size>::empty() const {
-  return trie_.empty();
-}
-
-template <class T>
-template <class IpType, uint32_t address_size>
-std::string LcTrie<T>::LcTrieInternal<IpType, address_size>::asString() const {
-  std::string result;
-  if (!ip_prefixes_.empty()) {
-    for (auto prefix : ip_prefixes_) {
-      absl::StrAppend(&result, prefix.asString());
-    }
-  }
-  return result;
 }
 
 template <class T>
