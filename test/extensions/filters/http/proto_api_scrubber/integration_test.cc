@@ -81,6 +81,12 @@ public:
   void SetUp() override { HttpProtocolIntegrationTest::SetUp(); }
 
   void TearDown() override {
+    if (codec_client_) {
+      // Close the client FIRST to prevent any "connection reset" callbacks
+      codec_client_->close();
+      codec_client_.reset();
+    }
+
     cleanupUpstreamAndDownstream();
     HttpProtocolIntegrationTest::TearDown();
   }
