@@ -322,7 +322,7 @@ void DlbBalancedConnectionHandlerImpl::onDlbEvents(uint32_t flags) {
       auto active_socket = std::make_unique<Envoy::Server::ActiveTcpSocket>(
           *listener, std::unique_ptr<Network::ConnectionSocket>(socket),
           listener->config_->handOffRestoredDestinationConnections(),
-          absl::make_optional<std::string>());
+          listener->listen_address_->networkNamespace());
       listener->onSocketAccepted(std::move(active_socket));
       listener->incNumConnections();
     }

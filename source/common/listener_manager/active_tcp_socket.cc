@@ -22,10 +22,10 @@ ActiveTcpSocket::ActiveTcpSocket(ActiveStreamListenerBase& listener,
   listener_.stats_.downstream_pre_cx_active_.inc();
 
   // Automatically populate network namespace from listener address if present.
-  if (network_namespace) {
+  if (network_namespace && !network_namespace->empty()) {
     stream_info_->filterState()->setData(
         Network::DownstreamNetworkNamespace::key(),
-        std::make_unique<Network::DownstreamNetworkNamespace>(network_namespace.value()),
+        std::make_unique<Network::DownstreamNetworkNamespace>(*network_namespace),
         StreamInfo::FilterState::StateType::ReadOnly,
         StreamInfo::FilterState::LifeSpan::Connection);
   }
