@@ -39,7 +39,12 @@ PolicyConfig::PolicyConfig(const std::string& pattern, const std::string& cidr_i
   }
 
   // Calculate maximum IPs available in CIDR block
-  max_ips_in_cidr = (1u << (32 - cidr_prefix_len)) - 2; // Exclude network and broadcast
+  // For /32, there's only one IP. For /31, traditionally no usable IPs (but we'll allow 2)
+  if (cidr_prefix_len >= 31) {
+    max_ips_in_cidr = (cidr_prefix_len == 32) ? 1 : 2;
+  } else {
+    max_ips_in_cidr = (1u << (32 - cidr_prefix_len)) - 2; // Exclude network and broadcast
+  }
 }
 
 bool PolicyConfig::matches(absl::string_view domain) const {
@@ -73,7 +78,18 @@ bool PolicyConfig::matches(absl::string_view domain) const {
 std::string PolicyConfig::allocateSyntheticIp(absl::string_view domain) const {
   // Deterministic hash-based allocation
   uint32_t hash = hashDomain(domain);
-  uint32_t ip_offset = (hash % max_ips_in_cidr) + 1; // +1 to skip network address
+  uint32_t ip_offset;
+
+  if (cidr_prefix_len == 32) {
+    // For /32, there's only one IP, no offset needed
+    ip_offset = 0;
+  } else if (cidr_prefix_len == 31) {
+    // For /31, use either .0 or .1
+    ip_offset = hash % 2;
+  } else {
+    // For other ranges, skip network address (add 1)
+    ip_offset = (hash % max_ips_in_cidr) + 1;
+  }
 
   // Calculate synthetic IP
   uint32_t synthetic_ip_int = cidr_base_ip + ip_offset;
