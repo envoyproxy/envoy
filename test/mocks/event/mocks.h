@@ -119,7 +119,7 @@ public:
               (const Server::WatchDogSharedPtr&, std::chrono::milliseconds));
   MOCK_METHOD(void, initializeStats, (Stats::Scope&, const absl::optional<std::string>&));
   MOCK_METHOD(void, clearDeferredDeleteList, ());
-  MOCK_METHOD(Network::ServerConnection*, createServerConnection_, (StreamInfo::StreamInfo& info));
+  MOCK_METHOD(Network::ServerConnection*, createServerConnection_, (StreamInfo::StreamInfo & info));
   MOCK_METHOD(Network::ClientConnection*, createClientConnection_,
               (Network::Address::InstanceConstSharedPtr address,
                Network::Address::InstanceConstSharedPtr source_address,

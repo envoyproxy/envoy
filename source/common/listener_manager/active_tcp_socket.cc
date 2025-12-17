@@ -23,11 +23,11 @@ ActiveTcpSocket::ActiveTcpSocket(ActiveStreamListenerBase& listener,
 
   // Automatically populate network namespace from listener address if present.
   if (network_namespace) {
-    stream_info_->filterState()->setData(Network::DownstreamNetworkNamespace::key(),
-                                         std::make_unique<Network::DownstreamNetworkNamespace>(
-                                             network_namespace.value()),
-                                         StreamInfo::FilterState::StateType::ReadOnly,
-                                         StreamInfo::FilterState::LifeSpan::Connection);
+    stream_info_->filterState()->setData(
+        Network::DownstreamNetworkNamespace::key(),
+        std::make_unique<Network::DownstreamNetworkNamespace>(network_namespace.value()),
+        StreamInfo::FilterState::StateType::ReadOnly,
+        StreamInfo::FilterState::LifeSpan::Connection);
   }
 }
 
@@ -220,7 +220,9 @@ void ActiveTcpSocket::newConnection() {
     // TODO(mattklein123): See note in ~ActiveTcpSocket() related to making this accounting better.
     listener_.decNumConnections();
     absl::optional<std::string> network_namespace;
-    if (const auto* obj = stream_info_->filterState()->getDataReadOnlyGeneric(Network::DownstreamNetworkNamespace::key()); obj) {
+    if (const auto* obj = stream_info_->filterState()->getDataReadOnlyGeneric(
+            Network::DownstreamNetworkNamespace::key());
+        obj) {
       network_namespace = obj->serializeAsString();
     }
     new_listener.value().get().onAcceptWorker(std::move(socket_), false, false, network_namespace);

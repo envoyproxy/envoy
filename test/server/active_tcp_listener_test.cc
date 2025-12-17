@@ -749,12 +749,14 @@ TEST_F(ActiveTcpListenerTest, RedirectedRebalancer) {
   EXPECT_CALL(*filter_chain_, transportSocketFactory)
       .WillOnce(testing::ReturnRef(*transport_socket_factory));
   auto* connection = new NiceMock<Network::MockServerConnection>();
-  EXPECT_CALL(dispatcher_, createServerConnection_(_)).WillOnce(Invoke([&](StreamInfo::StreamInfo& info) -> Network::ServerConnection* {
-      const auto* obj = info.filterState()->getDataReadOnlyGeneric("envoy.network.network_namespace");
-      EXPECT_NE(nullptr, obj);
-      EXPECT_EQ(netns, obj->serializeAsString());
+  EXPECT_CALL(dispatcher_, createServerConnection_(_))
+      .WillOnce(Invoke([&](StreamInfo::StreamInfo& info) -> Network::ServerConnection* {
+        const auto* obj =
+            info.filterState()->getDataReadOnlyGeneric("envoy.network.network_namespace");
+        EXPECT_NE(nullptr, obj);
+        EXPECT_EQ(netns, obj->serializeAsString());
         return connection;
-        }));
+      }));
   EXPECT_CALL(*filter_chain_, networkFilterFactories).WillOnce(ReturnRef(*filter_factory_callback));
   EXPECT_CALL(filter_chain_factory_, createNetworkFilterChain(_, _)).WillOnce(Return(true));
   EXPECT_CALL(conn_handler_, incNumConnections());

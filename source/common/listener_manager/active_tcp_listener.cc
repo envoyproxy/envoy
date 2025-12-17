@@ -87,7 +87,8 @@ void ActiveTcpListener::onAccept(Network::ConnectionSocketPtr&& socket) {
     return;
   }
 
-  onAcceptWorker(std::move(socket), config_->handOffRestoredDestinationConnections(), false, listen_address_->networkNamespace());
+  onAcceptWorker(std::move(socket), config_->handOffRestoredDestinationConnections(), false,
+                 listen_address_->networkNamespace());
 }
 
 void ActiveTcpListener::onReject(RejectCause cause) {
@@ -124,9 +125,8 @@ void ActiveTcpListener::onAcceptWorker(Network::ConnectionSocketPtr&& socket,
     }
   }
 
-  auto active_socket = std::make_unique<ActiveTcpSocket>(*this, std::move(socket),
-                                                         hand_off_restored_destination_connections,
-                                                         network_namespace);
+  auto active_socket = std::make_unique<ActiveTcpSocket>(
+      *this, std::move(socket), hand_off_restored_destination_connections, network_namespace);
 
   onSocketAccepted(std::move(active_socket));
 }
@@ -178,7 +178,8 @@ void ActiveTcpListener::post(Network::ConnectionSocketPtr&& socket) {
                      handoff = config_->handOffRestoredDestinationConnections()]() {
     auto balanced_handler = tcp_conn_handler.getBalancedHandlerByTag(tag, *address);
     if (balanced_handler.has_value()) {
-      balanced_handler->get().onAcceptWorker(std::move(socket_to_rebalance->socket), handoff, true, address->networkNamespace());
+      balanced_handler->get().onAcceptWorker(std::move(socket_to_rebalance->socket), handoff, true,
+                                             address->networkNamespace());
       return;
     }
   });
