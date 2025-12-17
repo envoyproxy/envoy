@@ -34,7 +34,8 @@ public:
   virtual void post(Network::ConnectionSocketPtr&& socket) PURE;
 
   virtual void onAcceptWorker(Network::ConnectionSocketPtr&& socket,
-                              bool hand_off_restored_destination_connections, bool rebalanced) PURE;
+                              bool hand_off_restored_destination_connections, bool rebalanced,
+                              const absl::optional<std::string>& network_namespace) PURE;
 };
 
 /**
