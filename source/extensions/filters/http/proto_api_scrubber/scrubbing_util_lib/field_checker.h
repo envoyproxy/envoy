@@ -46,14 +46,18 @@ public:
   // override doesn't hide the other signatures.
   using FieldCheckerInterface::CheckField;
 
+  FieldCheckResults CheckField(const std::vector<std::string>& path, const Protobuf::Field* field,
+                               const int field_depth,
+                               const Protobuf::Type* parent_type) const override;
+
   /**
    * Returns whether the `field` should be included (kInclude), excluded (kExclude)
    * or traversed further (kPartial).
-   * Currently, this method only checks the top level request/response fields. The logic for nested
-   * fields will be added in the future.
    */
   FieldCheckResults CheckField(const std::vector<std::string>& path,
-                               const Protobuf::Field* field) const override;
+                               const Protobuf::Field* field) const override {
+    return CheckField(path, field, 0, nullptr);
+  }
 
   /**
    * Returns false as it currently doesn't support `google.protobuf.Any` type.
@@ -86,10 +90,10 @@ private:
                                                     const Protobuf::Field* field) const;
 
   // Constructs the field mask, handling translations for different data types.
-  // Currently, it only handles enum data type. Support for protobuf maps and `Any` types will be
+  // Currently, it only handles enum and protobuf maps. Support for `Any` types will be
   // added in the future.
-  std::string constructFieldMask(const std::vector<std::string>& path,
-                                 const Protobuf::Field* field) const;
+  std::string constructFieldMask(const std::vector<std::string>& path, const Protobuf::Field* field,
+                                 const Protobuf::Type* parent_type) const;
 
   ScrubberContext scrubber_context_;
   Http::Matching::HttpMatchingDataImpl matching_data_;

@@ -10,11 +10,14 @@
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
 #include "proto_processing_lib/proto_scrubber/field_checker_interface.h"
+#include "proto_processing_lib/proto_scrubber/utility.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace ProtoApiScrubber {
+
+using proto_processing_lib::proto_scrubber::IsMapType;
 
 absl::StatusOr<absl::string_view>
 FieldChecker::resolveEnumName(absl::string_view value_str, const Protobuf::Field* field) const {
@@ -32,15 +35,27 @@ FieldChecker::resolveEnumName(absl::string_view value_str, const Protobuf::Field
 }
 
 std::string FieldChecker::constructFieldMask(const std::vector<std::string>& path,
-                                             const Protobuf::Field* field) const {
+                                             const Protobuf::Field* field,
+                                             const Protobuf::Type* parent_type) const {
   if (path.empty()) {
     return "";
   }
 
-  // Translate the last segment of the `path` wherever required.
+  // Determine the last segment of the path.
+  // By default, it's the last element in the vector.
   absl::string_view last_segment = path.back();
-  switch (field->kind()) {
-  case Protobuf::Field::TYPE_ENUM: {
+
+  // Map Value Normalization.
+  // If the parent is a Map Entry, the current path segment is the Key.
+  // We explicitly ignore the specific key (e.g., "123", "some_key") and replace it with "value".
+  // This allows the config "map_name.value" to match ALL entries in the map.
+  if (parent_type && IsMapType(*parent_type)) {
+    last_segment = "value";
+  }
+  // Enum Value Translation
+  // Only translate if we aren't in a Map Entry (Map Keys can be integers, but we don't translate
+  // them here).
+  else if (field->kind() == Protobuf::Field::TYPE_ENUM) {
     if (auto name_or_status = resolveEnumName(last_segment, field);
         name_or_status.ok() && !name_or_status.value().empty()) {
       last_segment = name_or_status.value();
@@ -48,29 +63,26 @@ std::string FieldChecker::constructFieldMask(const std::vector<std::string>& pat
       ENVOY_LOG(warn, "Enum translation skipped for value '{}': {}", last_segment,
                 name_or_status.status().ToString());
     }
-  } break;
-
-  default:
-    break;
   }
 
-  // If path has only 1 segment, just return it (translated or original).
+  // If path has only 1 segment, just return it (normalized/translated or original).
   if (path.size() == 1) {
     return std::string(last_segment);
   }
 
-  // Join all segments except the last one, then append the (potentially translated) last segment.
+  // Join all segments except the last one, then append the (potentially normalized) last segment.
   return absl::StrCat(absl::StrJoin(path.begin(), path.end() - 1, "."), ".", last_segment);
 }
 
 FieldCheckResults FieldChecker::CheckField(const std::vector<std::string>& path,
-                                           const Protobuf::Field* field) const {
+                                           const Protobuf::Field* field, const int /*field_depth*/,
+                                           const Protobuf::Type* parent_type) const {
   // If the field is unknown (i.e., not present in the descriptor), it should be preserved.
   if (field == nullptr) {
     return FieldCheckResults::kInclude;
   }
 
-  const std::string field_mask = constructFieldMask(path, field);
+  const std::string field_mask = constructFieldMask(path, field, parent_type);
 
   MatchTreeHttpMatchingDataSharedPtr match_tree;
 
