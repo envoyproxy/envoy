@@ -20,8 +20,20 @@ namespace {
 
 static const std::string DefaultUnspecifiedValueString = "-";
 
-const re2::RE2& getSystemTimeFormatNewlinePattern() {
-  CONSTRUCT_ON_FIRST_USE(re2::RE2, "%[-_0^#]*[1-9]*(E|O)?n");
+const RE2& getSystemTimeFormatNewlinePattern() {
+  CONSTRUCT_ON_FIRST_USE(RE2, "%[-_0^#]*[1-9]*(E|O)?n");
+}
+
+std::string detectedCloseTypeToString(StreamInfo::DetectedCloseType type) {
+  switch (type) {
+  case StreamInfo::DetectedCloseType::LocalReset:
+    return "LocalReset";
+  case StreamInfo::DetectedCloseType::RemoteReset:
+    return "RemoteReset";
+  case StreamInfo::DetectedCloseType::Normal:
+    return "Normal";
+  }
+  return "";
 }
 
 Network::Address::InstanceConstSharedPtr
@@ -1888,6 +1900,26 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                       std::replace(result->begin(), result->end(), ' ', '_');
                     }
                     return result;
+                  });
+            }}},
+          {"DOWNSTREAM_DETECTED_CLOSE_TYPE",
+           {CommandSyntaxChecker::COMMAND_ONLY,
+            [](absl::string_view, absl::optional<size_t>) {
+              return std::make_unique<StreamInfoStringFormatterProvider>(
+                  [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<std::string> {
+                    return detectedCloseTypeToString(stream_info.downstreamDetectedCloseType());
+                  });
+            }}},
+          {"UPSTREAM_DETECTED_CLOSE_TYPE",
+           {CommandSyntaxChecker::COMMAND_ONLY,
+            [](absl::string_view, absl::optional<size_t>) {
+              return std::make_unique<StreamInfoStringFormatterProvider>(
+                  [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<std::string> {
+                    if (stream_info.upstreamInfo().has_value()) {
+                      return detectedCloseTypeToString(
+                          stream_info.upstreamInfo()->upstreamDetectedCloseType());
+                    }
+                    return absl::nullopt;
                   });
             }}},
           {"HOSTNAME",

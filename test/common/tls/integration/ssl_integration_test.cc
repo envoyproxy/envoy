@@ -82,6 +82,37 @@ TEST_P(SslIntegrationTest, UnknownSslAlert) {
   connection->close(Network::ConnectionCloseType::NoFlush);
 }
 
+// Test that Envoy behaves correctly when receiving an SSLAlert for an unspecified code. The codes
+// are defined in the standard, and assigned codes have a string associated with them in BoringSSL,
+// which is included in logs. For an unknown code, verify that no crash occurs.
+TEST_P(SslIntegrationTest, FatalAlert) {
+  useListenerAccessLog("%DOWNSTREAM_DETECTED_CLOSE_TYPE%");
+  initialize();
+  Network::ClientConnectionPtr connection = makeSslClientConnection({});
+  ConnectionStatusCallbacks callbacks;
+  connection->addConnectionCallbacks(callbacks);
+  connection->connect();
+  while (!callbacks.connected()) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+
+  Ssl::ConnectionInfoConstSharedPtr ssl_info = connection->ssl();
+  SSL* ssl =
+      dynamic_cast<const Extensions::TransportSockets::Tls::SslHandshakerImpl*>(ssl_info.get())
+          ->ssl();
+  ASSERT_EQ(connection->state(), Network::Connection::State::Open);
+  ASSERT_NE(ssl, nullptr);
+  SSL_send_fatal_alert(ssl, 40);
+  while (!callbacks.closed()) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+  const std::string counter_name = listenerStatPrefix("ssl.connection_error");
+  Stats::CounterSharedPtr counter = test_server_->counter(counter_name);
+  test_server_->waitForCounterGe(counter_name, 1);
+  connection->close(Network::ConnectionCloseType::NoFlush);
+  EXPECT_EQ(waitForAccessLog(listener_access_log_name_), "Normal");
+}
+
 // Test that stats produced by the tls transport socket have correct tag extraction.
 TEST_P(SslIntegrationTest, StatsTagExtraction) {
   // Configure TLS to use specific parameters so the exact metrics the test expects are created.

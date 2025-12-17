@@ -66,6 +66,10 @@ public:
   MOCK_METHOD(const Network::Address::InstanceConstSharedPtr&, upstreamRemoteAddress, (), (const));
   MOCK_METHOD(void, setUpstreamTransportFailureReason, (absl::string_view failure_reason));
   MOCK_METHOD(const std::string&, upstreamTransportFailureReason, (), (const));
+  MOCK_METHOD(void, setUpstreamLocalCloseReason, (absl::string_view failure_reason));
+  MOCK_METHOD(absl::string_view, upstreamLocalCloseReason, (), (const));
+  MOCK_METHOD(void, setUpstreamDetectedCloseType, (DetectedCloseType close_type));
+  MOCK_METHOD(DetectedCloseType, upstreamDetectedCloseType, (), (const));
   MOCK_METHOD(void, setUpstreamHost, (Upstream::HostDescriptionConstSharedPtr host));
   MOCK_METHOD(Upstream::HostDescriptionConstSharedPtr, upstreamHost, (), (const));
   MOCK_METHOD(const FilterStateSharedPtr&, upstreamFilterState, (), (const));
@@ -169,6 +173,10 @@ public:
   MOCK_METHOD(bool, isShadow, (), (const, override));
   MOCK_METHOD(void, setDownstreamTransportFailureReason, (absl::string_view failure_reason));
   MOCK_METHOD(absl::string_view, downstreamTransportFailureReason, (), (const));
+  MOCK_METHOD(void, setDownstreamLocalCloseReason, (absl::string_view failure_reason));
+  MOCK_METHOD(absl::string_view, downstreamLocalCloseReason, (), (const));
+  MOCK_METHOD(void, setDownstreamDetectedCloseType, (DetectedCloseType close_type));
+  MOCK_METHOD(DetectedCloseType, downstreamDetectedCloseType, (), (const));
   MOCK_METHOD(bool, shouldSchemeMatchUpstream, (), (const));
   MOCK_METHOD(void, setShouldSchemeMatchUpstream, (bool));
   MOCK_METHOD(bool, shouldDrainConnectionUponCompletion, (), (const));
