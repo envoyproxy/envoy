@@ -115,14 +115,6 @@ void localResponse(SplitCallbacks& callbacks, std::string response) {
   res->asString() = response;
   callbacks.onResponse(std::move(res));
 }
-
-// Generic function to build an array with bulkstring
-void addBulkString(Common::Redis::RespValue& requestArray, const std::string& value) {
-  Common::Redis::RespValue element;
-  element.type(Common::Redis::RespType::BulkString);
-  element.asString() = value;
-  requestArray.asArray().emplace_back(std::move(element));
-}
 } // namespace
 
 void SplitRequestBase::onWrongNumberOfArguments(SplitCallbacks& callbacks,
@@ -661,91 +653,6 @@ void RandomShardRequest::onChildResponse(Common::Redis::RespValuePtr&& value, ui
   ASSERT(num_pending_responses_ > 0);
   // index is the shard_index that responded (can be any value 0 to shard_size-1)
   ENVOY_LOG(debug, "random shard response from shard {}: '{}'", index, value->toString());
-
-  updateStats(value->type() != Common::Redis::RespType::Error);
-  callbacks_.onResponse(std::move(value));
-}
-
-SplitRequestPtr HelloRequest::create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
-                                     SplitCallbacks& callbacks, CommandStats& command_stats,
-                                     TimeSource& time_source, bool delay_command_latency,
-                                     const StreamInfo::StreamInfo& stream_info) {
-
-  Common::Redis::RespValue requestArray;
-  requestArray.type(Common::Redis::RespType::Array);
-
-  addBulkString(requestArray, "hello");
-
-  // Extract and add protocol version if present (will be at index 1)
-  if (incoming_request->asArray().size() > 1 &&
-      incoming_request->asArray()[1].type() == Common::Redis::RespType::BulkString) {
-    addBulkString(requestArray, incoming_request->asArray()[1].asString());
-  }
-
-  ENVOY_LOG(debug, "HELLO command for upstream: '{}'", requestArray.toString());
-
-  const std::string command = "hello";
-  std::string empty_key = "";
-  const auto route = router.upstreamPool(empty_key, stream_info);
-  uint32_t shard_size = route ? route->upstream(command)->shardSize() : 0;
-
-  if (shard_size == 0) {
-    command_stats.error_.inc();
-    callbacks.onResponse(Common::Redis::Utility::makeError(Response::get().NoUpstreamHost));
-    return nullptr;
-  }
-
-  std::unique_ptr<HelloRequest> request_ptr{
-      new HelloRequest(callbacks, command_stats, time_source, delay_command_latency)};
-
-  request_ptr->num_pending_responses_ = 1;
-  request_ptr->pending_requests_.reserve(1);
-
-  auto now = std::chrono::duration_cast<std::chrono::microseconds>(
-                 time_source.systemTime().time_since_epoch())
-                 .count();
-  uint32_t random_shard_index = static_cast<uint32_t>(now) % shard_size;
-
-  request_ptr->pending_requests_.emplace_back(*request_ptr, random_shard_index);
-  PendingRequest& pending_request = request_ptr->pending_requests_.back();
-
-  pending_request.handle_ = makeFragmentedRequestToShard(
-      route, command, random_shard_index, requestArray, pending_request, callbacks.transaction());
-
-  if (!pending_request.handle_) {
-    pending_request.onResponse(Common::Redis::Utility::makeError(Response::get().NoUpstreamHost));
-  }
-
-  if (request_ptr->num_pending_responses_ > 0) {
-    return request_ptr;
-  }
-
-  return nullptr;
-}
-
-void HelloRequest::onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t index) {
-
-  pending_requests_[0].handle_ = nullptr;
-  ASSERT(num_pending_responses_ > 0);
-
-  ENVOY_LOG(debug, "hello response from shard {}: '{}'", index, value->toString());
-
-  // Sanitize the response: replace the "id" field value with null
-  // The client ID will be filled later when client command is implemented
-  if (value->type() == Common::Redis::RespType::Array && !value->asArray().empty()) {
-
-    for (size_t i = 0; i < value->asArray().size() - 1; i++) {
-
-      if (value->asArray()[i].type() == Common::Redis::RespType::BulkString &&
-          value->asArray()[i].asString() == "id") {
-        // Replace the next element (the id value) with null bulk string
-        // This will be fixed when we introduce a local client ID for downstream clients
-        value->asArray()[i + 1].type(Common::Redis::RespType::Null);
-        ENVOY_LOG(debug, "Sanitized HELLO response: replaced id field with null");
-        break;
-      }
-    }
-  }
 
   updateStats(value->type() != Common::Redis::RespType::Error);
   callbacks_.onResponse(std::move(value));
