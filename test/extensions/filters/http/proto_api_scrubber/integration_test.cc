@@ -69,12 +69,11 @@ public:
 };
 
 // Static Registration of the filter.
-static MetadataInjectorConfigFactory* metadata_injector_config_factory =
-    new MetadataInjectorConfigFactory();
+static MetadataInjectorConfigFactory metadata_injector_config_factory;
 
 static ::Envoy::Registry::InjectFactory<
     ::Envoy::Server::Configuration::NamedHttpFilterConfigFactory>
-    register_injector(*metadata_injector_config_factory);
+    register_injector(metadata_injector_config_factory);
 
 class ProtoApiScrubberIntegrationTest : public HttpProtocolIntegrationTest {
 public:
