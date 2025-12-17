@@ -22,10 +22,9 @@ struct TcpKeepaliveConfig {
 
 static inline Network::TcpKeepaliveConfig
 parseTcpKeepaliveConfig(const envoy::config::core::v3::TcpKeepalive& options) {
-  return Network::TcpKeepaliveConfig{
-      PROTOBUF_GET_OPTIONAL_WRAPPED(options, keepalive_probes),
-      PROTOBUF_GET_OPTIONAL_WRAPPED(options, keepalive_time),
-      PROTOBUF_GET_OPTIONAL_WRAPPED(options, keepalive_interval)};
+  return Network::TcpKeepaliveConfig{PROTOBUF_GET_OPTIONAL_WRAPPED(options, keepalive_probes),
+                                     PROTOBUF_GET_OPTIONAL_WRAPPED(options, keepalive_time),
+                                     PROTOBUF_GET_OPTIONAL_WRAPPED(options, keepalive_interval)};
 }
 
 static inline bool isTcpKeepaliveConfigDisabled(const Network::TcpKeepaliveConfig& config) {
