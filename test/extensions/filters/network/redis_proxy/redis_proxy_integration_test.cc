@@ -1311,10 +1311,10 @@ TEST_P(RedisProxyIntegrationTest, UnknownCommand) {
 TEST_P(RedisProxyIntegrationTest, UnknownCommandWithArgs) {
   std::stringstream error_response;
   error_response << "-"
-                 << "ERR unknown command 'hello', with args beginning with: world"
+                 << "ERR unknown command 'unknowncmd', with args beginning with: world"
                  << "\r\n";
   initialize();
-  simpleProxyResponse(makeBulkStringArray({"hello", "world"}), error_response.str());
+  simpleProxyResponse(makeBulkStringArray({"unknowncmd", "world"}), error_response.str());
 }
 
 // This test sends an invalid Redis command from a fake
