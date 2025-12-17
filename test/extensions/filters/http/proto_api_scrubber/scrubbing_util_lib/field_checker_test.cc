@@ -943,7 +943,7 @@ TEST_F(FieldCheckerTest, FilterName) {
 
   NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
   FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info, {}, {}, {}, {},
-                            "/apikeys.ApiKeys/CreateApiKey", filter_config_.get());
+                             "/apikeys.ApiKeys/CreateApiKey", filter_config_.get());
 
   EXPECT_EQ(field_checker.FilterName(), FieldFilters::FieldMaskFilter);
 }
@@ -954,8 +954,8 @@ TEST_F(FieldCheckerTest, UnknownFieldIsNull) {
   initializeFilterConfig(config);
 
   NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
-  FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info,
-                             "/library.BookService/GetBook", filter_config_.get());
+  FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info, {}, {}, {}, {},
+                             "/apikeys.ApiKeys/CreateApiKey", filter_config_.get());
 
   // Pass nullptr to simulate an unknown field.
   EXPECT_EQ(field_checker.CheckField({"some", "unknown", "field"}, nullptr),
