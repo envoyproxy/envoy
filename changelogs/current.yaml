@@ -440,6 +440,10 @@ new_features:
     See :ref:`CelExpressionConfig <envoy_v3_api_msg_config.core.v3.CelExpressionConfig>` for details.
 - area: formatter
   change: |
+    Added ``%DOWNSTREAM_DETECTED_CLOSE_TYPE%`` and ``%UPSTREAM_DETECTED_CLOSE_TYPE%`` to expose the detected close type of downstream and upstream connections.
+    The possible values are ``Normal``, ``LocalReset``, and ``RemoteReset``.
+- area: formatter
+  change: |
     Added support for the following new access log formatters:
 
     #. ``%REQUEST_HEADER(X?Y):Z%`` as full name version of ``%REQ(X?Y):Z%``.
