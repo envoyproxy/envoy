@@ -1088,6 +1088,22 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   }
 
   {
+    StreamInfoFormatter listener_format("DOWNSTREAM_LOCAL_CLOSE_REASON");
+    std::string downstream_local_close_reason = "transport_socket_timeout";
+    stream_info.setDownstreamLocalCloseReason(downstream_local_close_reason);
+    EXPECT_EQ("transport_socket_timeout", listener_format.format({}, stream_info));
+    EXPECT_THAT(listener_format.formatValue({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("transport_socket_timeout")));
+  }
+  {
+    StreamInfoFormatter listener_format("DOWNSTREAM_LOCAL_CLOSE_REASON");
+    std::string downstream_local_close_reason;
+    stream_info.setDownstreamLocalCloseReason(downstream_local_close_reason);
+    EXPECT_EQ(absl::nullopt, listener_format.format({}, stream_info));
+    EXPECT_THAT(listener_format.formatValue({}, stream_info), ProtoEq(ValueUtil::nullValue()));
+  }
+
+  {
     StreamInfoFormatter upstream_format("UPSTREAM_TRANSPORT_FAILURE_REASON");
     std::string upstream_transport_failure_reason = "SSL error";
     stream_info.upstreamInfo()->setUpstreamTransportFailureReason(
@@ -1104,6 +1120,23 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     EXPECT_EQ(absl::nullopt, upstream_format.format({}, stream_info));
     EXPECT_THAT(upstream_format.formatValue({}, stream_info), ProtoEq(ValueUtil::nullValue()));
   }
+
+  {
+    StreamInfoFormatter upstream_format("UPSTREAM_LOCAL_CLOSE_REASON");
+    std::string upstream_local_close_reason = "transport_socket_timeout";
+    stream_info.upstreamInfo()->setUpstreamLocalCloseReason(upstream_local_close_reason);
+    EXPECT_EQ("transport_socket_timeout", upstream_format.format({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValue({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("transport_socket_timeout")));
+  }
+  {
+    StreamInfoFormatter upstream_format("UPSTREAM_LOCAL_CLOSE_REASON");
+    std::string upstream_local_close_reason;
+    stream_info.upstreamInfo()->setUpstreamLocalCloseReason(upstream_local_close_reason);
+    EXPECT_EQ(absl::nullopt, upstream_format.format({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValue({}, stream_info), ProtoEq(ValueUtil::nullValue()));
+  }
+
   {
     StreamInfoFormatter upstream_connection_pool_callback_duration_format(
         "UPSTREAM_CONNECTION_POOL_READY_DURATION");
