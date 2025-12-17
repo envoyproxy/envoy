@@ -99,15 +99,12 @@ public:
   }
 
   struct SubscriptionStuff {
-    SubscriptionStuff(const std::string& type_url, const LocalInfo::LocalInfo& local_info,
-                      const bool use_namespace_matching, Event::Dispatcher& dispatcher,
-                      CustomConfigValidators* config_validators,
+    SubscriptionStuff(const std::string& type_url, const bool use_namespace_matching,
+                      Event::Dispatcher& dispatcher, CustomConfigValidators* config_validators,
                       XdsConfigTrackerOptRef xds_config_tracker,
-                      EdsResourcesCacheOptRef eds_resources_cache,
-                      bool skip_subsequent_node)
+                      EdsResourcesCacheOptRef eds_resources_cache)
         : watch_map_(use_namespace_matching, type_url, config_validators, eds_resources_cache),
-          sub_state_(type_url, watch_map_, local_info, dispatcher, xds_config_tracker,
-                     skip_subsequent_node) {
+          sub_state_(type_url, watch_map_, dispatcher, xds_config_tracker) {
       // If eds resources cache is provided, then the type must be ClusterLoadAssignment.
       ASSERT(
           !eds_resources_cache.has_value() ||
@@ -223,6 +220,7 @@ private:
   XdsConfigTrackerOptRef xds_config_tracker_;
   const bool skip_subsequent_node_;
   EdsResourcesCachePtr eds_resources_cache_;
+  bool node_sent_in_current_stream_{false};
 
   // Used to track whether initial_resource_versions should be populated on the
   // next reconnection.

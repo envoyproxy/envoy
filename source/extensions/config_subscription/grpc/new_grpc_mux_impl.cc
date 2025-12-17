@@ -129,7 +129,7 @@ void NewGrpcMuxImpl::onDynamicContextUpdate(absl::string_view resource_type_url)
   if (sub == subscriptions_.end()) {
     return;
   }
-  sub->second->sub_state_.setMustSendDiscoveryRequest();
+  sub->second->sub_state_.setDynamicContextChanged();
   trySendDiscoveryRequests();
 }
 
@@ -189,6 +189,7 @@ void NewGrpcMuxImpl::onDiscoveryResponse(
 }
 
 void NewGrpcMuxImpl::onStreamEstablished() {
+  node_sent_in_current_stream_ = false;
   for (auto& [type_url, subscription] : subscriptions_) {
     UNREFERENCED_PARAMETER(type_url);
     subscription->sub_state_.markStreamFresh(should_send_initial_resource_versions_);
@@ -359,10 +360,9 @@ NewGrpcMuxImpl::addSubscription(const std::string& type_url, const bool use_name
     resources_cache = makeOptRefFromPtr(eds_resources_cache_.get());
   }
   auto [it, success] = subscriptions_.emplace(
-      type_url, std::make_unique<SubscriptionStuff>(type_url, local_info_, use_namespace_matching,
-                                                    dispatcher_, config_validators_.get(),
-                                                    xds_config_tracker_, resources_cache,
-                                                    skip_subsequent_node_));
+      type_url, std::make_unique<SubscriptionStuff>(type_url, use_namespace_matching, dispatcher_,
+                                                    config_validators_.get(), xds_config_tracker_,
+                                                    resources_cache));
   // Insertion must succeed, as the addSubscription method is only called if
   // the map doesn't have the type_url.
   ASSERT(success);
@@ -401,6 +401,14 @@ void NewGrpcMuxImpl::trySendDiscoveryRequests() {
       request = sub->second->sub_state_.getNextRequestWithAck(pausable_ack_queue_.popFront());
     } else {
       request = sub->second->sub_state_.getNextRequestAckless();
+    }
+    if (sub->second->sub_state_.dynamicContextChanged() ||
+        !Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.legacy_delta_xds_skip_subsequent_node") ||
+        !skip_subsequent_node_ || !node_sent_in_current_stream_) {
+      request.mutable_node()->MergeFrom(local_info_.node());
+      node_sent_in_current_stream_ = true;
+      sub->second->sub_state_.clearDynamicContextChanged();
     }
     grpc_stream_->sendMessage(request);
   }

@@ -212,13 +212,15 @@ INSTANTIATE_TEST_SUITE_P(NewGrpcMuxImplTest, NewGrpcMuxImplTest,
 
 // Validate behavior when dynamic context parameters are updated.
 TEST_P(NewGrpcMuxImplTest, DynamicContextParameters) {
-  setup();
+  setup(true);
   InSequence s;
   auto foo_sub = grpc_mux_->addWatch("foo", {"x", "y"}, callbacks_, resource_decoder_, {});
   auto bar_sub = grpc_mux_->addWatch("bar", {}, callbacks_, resource_decoder_, {});
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
-  expectSendMessage("foo", {"x", "y"}, {});
-  expectSendMessage("bar", {}, {});
+  expectSendMessage("foo", {"x", "y"}, {}, "", Grpc::Status::WellKnownGrpcStatus::Ok, "", {},
+                    nullptr, true);
+  expectSendMessage("bar", {}, {}, "", Grpc::Status::WellKnownGrpcStatus::Ok, "", {}, nullptr,
+                    false);
   grpc_mux_->start();
   // Unknown type, shouldn't do anything.
   EXPECT_TRUE(local_info_.context_provider_.update_cb_handler_.runCallbacks("baz").ok());
@@ -229,7 +231,8 @@ TEST_P(NewGrpcMuxImplTest, DynamicContextParameters) {
   expectSendMessage("bar", {}, {});
   EXPECT_TRUE(local_info_.context_provider_.update_cb_handler_.runCallbacks("bar").ok());
 
-  expectSendMessage("foo", {}, {"x", "y"});
+  expectSendMessage("foo", {}, {"x", "y"}, "", Grpc::Status::WellKnownGrpcStatus::Ok, "", {},
+                    nullptr, false);
 }
 
 // Validate behavior when skip_subsequent_node is set to true.
@@ -250,6 +253,29 @@ TEST_P(NewGrpcMuxImplTest, SkipSubsequentNode) {
   // for teardown
   expectSendMessage("foo", {}, {"x", "y"}, "", Grpc::Status::WellKnownGrpcStatus::Ok, "", {},
                     nullptr, false);
+}
+
+// Validate behavior when skip_subsequent_node is set to true but runtime flag is disabled.
+// Note the flag only affects the legacy (non-unified) implementation.
+TEST_P(NewGrpcMuxImplTest, SkipSubsequentNodeFlagDisabled) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.legacy_delta_xds_skip_subsequent_node", "false"}});
+  setup(true);
+  InSequence s;
+  auto watch = grpc_mux_->addWatch("foo", {"x"}, callbacks_, resource_decoder_, {});
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  // first message
+  expectSendMessage("foo", {"x"}, {}, "", Grpc::Status::WellKnownGrpcStatus::Ok, "", {}, nullptr,
+                    true);
+  grpc_mux_->start();
+
+  // second message
+  expectSendMessage("foo", {"y"}, {}, "", Grpc::Status::WellKnownGrpcStatus::Ok, "", {}, nullptr,
+                    !isUnifiedMuxTest());
+  watch->update({"x", "y"});
+  // for teardown
+  expectSendMessage("foo", {}, {"x", "y"}, "", Grpc::Status::WellKnownGrpcStatus::Ok, "", {},
+                    nullptr, !isUnifiedMuxTest());
 }
 
 // Validate cached nonces are cleared on reconnection.

@@ -78,14 +78,18 @@ namespace Config {
 class DeltaSubscriptionState : public Logger::Loggable<Logger::Id::config> {
 public:
   DeltaSubscriptionState(std::string type_url, UntypedConfigUpdateCallbacks& watch_map,
-                         const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
-                         XdsConfigTrackerOptRef xds_config_tracker,
-                         bool skip_subsequent_node);
+                         Event::Dispatcher& dispatcher, XdsConfigTrackerOptRef xds_config_tracker);
 
   // Update which resources we're interested in subscribing to.
   void updateSubscriptionInterest(const absl::flat_hash_set<std::string>& cur_added,
                                   const absl::flat_hash_set<std::string>& cur_removed);
   void setMustSendDiscoveryRequest() { must_send_discovery_request_ = true; }
+  void setDynamicContextChanged() {
+    must_send_discovery_request_ = true;
+    dynamic_context_changed_ = true;
+  }
+  bool dynamicContextChanged() const { return dynamic_context_changed_; }
+  void clearDynamicContextChanged() { dynamic_context_changed_ = false; }
 
   // Whether there was a change in our subscription interest we have yet to inform the server of.
   bool subscriptionUpdatePending() const;
@@ -170,14 +174,13 @@ private:
 
   const std::string type_url_;
   UntypedConfigUpdateCallbacks& watch_map_;
-  const LocalInfo::LocalInfo& local_info_;
   XdsConfigTrackerOptRef xds_config_tracker_;
-  const bool skip_subsequent_node_;
 
   bool in_initial_legacy_wildcard_{true};
   bool any_request_sent_yet_in_current_stream_{};
   bool should_send_initial_resource_versions_{true};
   bool must_send_discovery_request_{};
+  bool dynamic_context_changed_{false};
 
   // Tracks changes in our subscription interest since the previous DeltaDiscoveryRequest we sent.
   // TODO: Can't use absl::flat_hash_set due to ordering issues in gTest expectation matching.
