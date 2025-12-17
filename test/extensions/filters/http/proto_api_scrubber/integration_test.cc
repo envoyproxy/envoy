@@ -68,12 +68,10 @@ public:
   std::string name() const override { return "test_injector"; }
 };
 
-// Static Registration of the filter.
-static MetadataInjectorConfigFactory metadata_injector_config_factory;
-
-static ::Envoy::Registry::InjectFactory<
-    ::Envoy::Server::Configuration::NamedHttpFilterConfigFactory>
-    register_injector(metadata_injector_config_factory);
+// RegisterFactory handles the singleton lifetime automatically and avoids the destruction crash.
+static ::Envoy::Registry::RegisterFactory<
+    MetadataInjectorConfigFactory, ::Envoy::Server::Configuration::NamedHttpFilterConfigFactory>
+    register_test_injector;
 
 class ProtoApiScrubberIntegrationTest : public HttpProtocolIntegrationTest {
 public:
