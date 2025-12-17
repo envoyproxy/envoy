@@ -546,9 +546,5 @@ new_features:
     Added per HTTP event :ref:'procesing effects <envoy.filters.http.ext_proc.ProcessingEffect' in the
     ExtProcLoggingInfo in the FilterState. This new data will be automatically collected and can be accesses via
     method processingEffects.
-- area: access_loggers
-  change: |
-    Adds a filter to the stats access logger, allowing conditional emission of stats based on access log properties.
-    Also renames `Stat` message to `Common` to better reflect its purpose as a common configuration for stats.
 
 deprecated:
