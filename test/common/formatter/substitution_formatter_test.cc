@@ -2586,14 +2586,23 @@ TEST(SubstitutionFormatterTest, requestedServerNameFormatter) {
   }
 
   {
-    auto providers = *SubstitutionFormatParser::parse(absl::StrCat("%REQUESTED_SERVER_NAME(NFA)%"));
+    auto providers = *SubstitutionFormatParser::parse(absl::StrCat("%REQUESTED_SERVER_NAME(SNI)%"));
     EXPECT_EQ(providers.size(), 1);
     EXPECT_EQ("outbound_.8080_._.example.com", providers[0]->format({}, stream_info));
     EXPECT_EQ(absl::nullopt, providers[0]->format({}, stream_info_no_requested_name));
   }
 
   {
-    auto providers = *SubstitutionFormatParser::parse(absl::StrCat("%REQUESTED_SERVER_NAME(FA)%"));
+    auto providers =
+        *SubstitutionFormatParser::parse(absl::StrCat("%REQUESTED_SERVER_NAME(SNI_FIRST)%"));
+    EXPECT_EQ(providers.size(), 1);
+    EXPECT_EQ("outbound_.8080_._.example.com", providers[0]->format({}, stream_info));
+    EXPECT_EQ("fake-original-host", providers[0]->format({}, stream_info_no_requested_name));
+  }
+
+  {
+    auto providers = *SubstitutionFormatParser::parse(
+        absl::StrCat("%REQUESTED_SERVER_NAME(SNI_FIRST:ORIG_OR_HOST)%"));
     EXPECT_EQ(providers.size(), 1);
     EXPECT_EQ("outbound_.8080_._.example.com", providers[0]->format({}, stream_info));
     EXPECT_EQ("fake-original-host", providers[0]->format({}, stream_info_no_requested_name));
@@ -2601,18 +2610,26 @@ TEST(SubstitutionFormatterTest, requestedServerNameFormatter) {
 
   {
     auto providers =
-        *SubstitutionFormatParser::parse(absl::StrCat("%REQUESTED_SERVER_NAME(FA:ORIG_OR_HOST)%"));
-    EXPECT_EQ(providers.size(), 1);
-    EXPECT_EQ("outbound_.8080_._.example.com", providers[0]->format({}, stream_info));
-    EXPECT_EQ("fake-original-host", providers[0]->format({}, stream_info_no_requested_name));
-  }
-
-  {
-    auto providers =
-        *SubstitutionFormatParser::parse(absl::StrCat("%REQUESTED_SERVER_NAME(FA:HOST)%"));
+        *SubstitutionFormatParser::parse(absl::StrCat("%REQUESTED_SERVER_NAME(SNI_FIRST:HOST)%"));
     EXPECT_EQ(providers.size(), 1);
     EXPECT_EQ("outbound_.8080_._.example.com", providers[0]->format({}, stream_info));
     EXPECT_EQ("fake-authority", providers[0]->format({}, stream_info_no_requested_name));
+  }
+
+  {
+    auto providers =
+        *SubstitutionFormatParser::parse(absl::StrCat("%REQUESTED_SERVER_NAME(HOST_FIRST:HOST)%"));
+    EXPECT_EQ(providers.size(), 1);
+    EXPECT_EQ("fake-authority", providers[0]->format({}, stream_info));
+    EXPECT_EQ("fake-authority", providers[0]->format({}, stream_info_no_requested_name));
+  }
+
+  {
+    auto providers =
+        *SubstitutionFormatParser::parse(absl::StrCat("%REQUESTED_SERVER_NAME(HOST_FIRST)%"));
+    EXPECT_EQ(providers.size(), 1);
+    EXPECT_EQ("fake-original-host", providers[0]->format({}, stream_info));
+    EXPECT_EQ("fake-original-host", providers[0]->format({}, stream_info_no_requested_name));
   }
 }
 

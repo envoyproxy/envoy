@@ -513,7 +513,7 @@ new_features:
     Dynatrace sampler parses and propagates trace capture reason in tracestate.
 - area: access_log
   change: |
-    Added support for the ``REQUESTED_SERVER_NAME`` access log formatter to fallback to request host when the SNI is not present.
+    Added support for the ``REQUESTED_SERVER_NAME`` access log formatter to return SNI and host with parameters
 - area: proxy_protocol
   change: |
     Added :ref:`tlv_location <envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.tlv_location>`

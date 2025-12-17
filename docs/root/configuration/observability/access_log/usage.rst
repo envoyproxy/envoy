@@ -1104,14 +1104,15 @@ UDP
 
 %REQUESTED_SERVER_NAME(X:Y)%
   HTTP/TCP/THRIFT
-    String value set on ssl connection socket for Server Name Indication (SNI) or host header. 
+    String value set on ssl connection socket for Server Name Indication (SNI) or host header.
     The parameter X is used to specify should the output fallback to get from host header when SNI is not set.
     The parameter Y is used to specify the source of the request host. Both X and Y are optional.
 
     The X parameter can be:
 
-    * ``FA``: The output will retrive from ``:authority`` or ``x-envoy-original-host`` header when SNI is not set.
-    * ``NFA``: The output will not retrive from ``:authority`` or ``x-envoy-original-host`` header when SNI is not set.
+    * ``SNI_ONLY``: String value set on ssl connection socket for Server Name Indication (SNI).
+    * ``SNI_FIRST``: The output will retrive from ``:authority`` or ``x-envoy-original-host`` header when SNI is not set.
+    * ``HOST_FIRST``: The output will retrive from ``:authority`` or ``x-envoy-original-host`` header.
 
     The Y parameter can be:
 

@@ -1,5 +1,7 @@
 #include "source/common/formatter/stream_info_formatter.h"
 
+#include <string_view>
+
 #include "source/common/common/random_generator.h"
 #include "source/common/config/metadata.h"
 #include "source/common/http/header_utility.h"
@@ -609,21 +611,24 @@ Protobuf::Value EnvironmentFormatter::formatValue(const StreamInfo::StreamInfo&)
   return str_;
 }
 
-RequestedServerNameFormatter::RequestedServerNameFormatter(absl::string_view fallback,
+RequestedServerNameFormatter::RequestedServerNameFormatter(absl::string_view source,
                                                            absl::string_view option) {
 
-  bool fallback_to_authority = false;
+  HostFormatterSource host_source = SNI;
   HostFormatterOption option_enum = OriginalHostOrHost;
 
-  if (fallback == "FA") {
-    fallback_to_authority = true;
-  } else if (fallback == "NFA") {
-    fallback_to_authority = false;
-  } else if (fallback.empty()) {
-    fallback_to_authority = false;
+  if (source == "SNI") {
+    host_source = SNI;
+  } else if (source == "SNI_FIRST") {
+    host_source = SNIFirst;
+  } else if (source == "HOST_FIRST") {
+    host_source = HostFirst;
+  } else if (source.empty()) {
+    host_source = SNI;
   } else {
-    throw EnvoyException(fmt::format(
-        "Invalid REQUESTED_SERVER_NAME option: '{}', only 'FA'/'NFA' are allowed", fallback));
+    throw EnvoyException(fmt::format("Invalid REQUESTED_SERVER_NAME option: '{}', only "
+                                     "'SNI'/'SNI_FIRST'/'HOST_FIRST' are allowed",
+                                     source));
   }
 
   if (option == "ORIG_OR_HOST") {
@@ -639,33 +644,60 @@ RequestedServerNameFormatter::RequestedServerNameFormatter(absl::string_view fal
                                      "'ORIG_OR_HOST'/'HOST'/'ORIG' are allowed",
                                      option));
   }
-  fallback_ = fallback_to_authority;
+  source_ = host_source;
   option_ = option_enum;
 }
 
 absl::optional<std::string>
 RequestedServerNameFormatter::format(const StreamInfo::StreamInfo& stream_info) const {
   absl::optional<std::string> result;
+  switch (source_) {
+  case SNI:
+    result = getSNIFromStreamInfo(stream_info);
+    break;
+  case SNIFirst:
+    result = getSNIFromStreamInfo(stream_info);
+    if (!result.has_value()) {
+      result = getHostFromHeaders(stream_info);
+    }
+    break;
+  case HostFirst:
+    result = getHostFromHeaders(stream_info);
+    if (!result.has_value()) {
+      result = getSNIFromStreamInfo(stream_info);
+    }
+    break;
+  }
+  return result;
+}
+
+absl::optional<std::string> RequestedServerNameFormatter::getSNIFromStreamInfo(
+    const StreamInfo::StreamInfo& stream_info) const {
+  absl::optional<std::string> result;
   if (!stream_info.downstreamAddressProvider().requestedServerName().empty()) {
     result = StringUtil::sanitizeInvalidHostname(
         stream_info.downstreamAddressProvider().requestedServerName());
   }
-  if (!result.has_value() && fallback_) {
-    const auto& headers = stream_info.getRequestHeaders();
-    if (headers != nullptr) {
-      switch (option_) {
-      case HostOnly:
-        result = headers->Host()->value().getStringView();
-        break;
-      case OriginalHostOnly:
-        result = headers->EnvoyOriginalHost()->value().getStringView();
-        break;
-      case OriginalHostOrHost:
-        result = headers->EnvoyOriginalHost() != nullptr
-                     ? headers->EnvoyOriginalHost()->value().getStringView()
-                     : headers->Host()->value().getStringView();
-        break;
-      }
+  return result;
+}
+
+absl::optional<std::string>
+RequestedServerNameFormatter::getHostFromHeaders(const StreamInfo::StreamInfo& stream_info) const {
+  absl::optional<std::string> result;
+  const auto& headers = stream_info.getRequestHeaders();
+  if (headers != nullptr) {
+    switch (option_) {
+    case HostOnly:
+      result = headers->Host()->value().getStringView();
+      break;
+    case OriginalHostOnly:
+      result = headers->EnvoyOriginalHost()->value().getStringView();
+      break;
+    case OriginalHostOrHost:
+      result = headers->EnvoyOriginalHost() != nullptr
+                   ? headers->EnvoyOriginalHost()->value().getStringView()
+                   : headers->Host()->value().getStringView();
+      break;
     }
   }
   return result;

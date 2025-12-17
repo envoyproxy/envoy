@@ -301,6 +301,11 @@ private:
  */
 class RequestedServerNameFormatter : public StreamInfoFormatterProvider {
 public:
+  enum HostFormatterSource {
+    SNI,
+    SNIFirst,
+    HostFirst,
+  };
   enum HostFormatterOption {
     OriginalHostOrHost,
     HostOnly,
@@ -316,8 +321,11 @@ public:
   absl::optional<std::string> format(const StreamInfo::StreamInfo&) const override;
   Protobuf::Value formatValue(const StreamInfo::StreamInfo&) const override;
 
+  absl::optional<std::string> getHostFromHeaders(const StreamInfo::StreamInfo& stream_info) const;
+  absl::optional<std::string> getSNIFromStreamInfo(const StreamInfo::StreamInfo& stream_info) const;
+
 private:
-  bool fallback_;
+  HostFormatterSource source_;
   HostFormatterOption option_;
 };
 
