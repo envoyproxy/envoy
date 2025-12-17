@@ -85,7 +85,7 @@ absl::Status ServerSslSocketFactory::onAddOrUpdateSecret() {
       manager_.createSslServerContext(stats_scope_, *config_, server_names_, nullptr);
   RETURN_IF_NOT_OK(ctx_or_error.status());
   {
-    absl::WriterMutexLock l(&ssl_ctx_mu_);
+    absl::WriterMutexLock l(ssl_ctx_mu_);
     std::swap(*ctx_or_error, ssl_ctx_);
   }
   manager_.removeContext(*ctx_or_error);
