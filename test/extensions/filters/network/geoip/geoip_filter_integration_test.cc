@@ -33,12 +33,6 @@ class GeoipFilterIntegrationTest : public testing::TestWithParam<Network::Addres
                                    public BaseIntegrationTest {
 public:
   GeoipFilterIntegrationTest() : BaseIntegrationTest(GetParam(), ConfigHelper::tcpProxyConfig()) {}
-
-  void SetUp() override {
-    config_helper_.renameListener("tcp");
-    config_helper_.addNetworkFilter(TestEnvironment::substitute(DefaultConfig));
-    BaseIntegrationTest::initialize();
-  }
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, GeoipFilterIntegrationTest,
@@ -46,6 +40,10 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, GeoipFilterIntegrationTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(GeoipFilterIntegrationTest, GeoipFilterProcessesConnection) {
+  config_helper_.renameListener("tcp");
+  config_helper_.addNetworkFilter(TestEnvironment::substitute(DefaultConfig));
+  initialize();
+
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp"));
   ASSERT_TRUE(tcp_client->connected());
 
@@ -53,6 +51,40 @@ TEST_P(GeoipFilterIntegrationTest, GeoipFilterProcessesConnection) {
   test_server_->waitForCounterEq("geoip.total", 1);
 
   tcp_client->close();
+}
+
+// Tests that the filter handles LDS updates correctly without crashing.
+TEST_P(GeoipFilterIntegrationTest, GeoipFilterNoCrashOnLdsUpdate) {
+  config_helper_.renameListener("tcp");
+  config_helper_.addNetworkFilter(TestEnvironment::substitute(DefaultConfig));
+  initialize();
+
+  // LDS update to modify the listener and trigger corresponding drain.
+  {
+    ConfigHelper new_config_helper(version_, config_helper_.bootstrap());
+    new_config_helper.addConfigModifier(
+        [](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+          auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+          listener->mutable_listener_filters_timeout()->set_seconds(10);
+        });
+    new_config_helper.setLds("1");
+    test_server_->waitForGaugeEq("listener_manager.total_listeners_active", 1);
+    test_server_->waitForCounterEq("listener_manager.lds.update_success", 2);
+    test_server_->waitForGaugeEq("listener_manager.total_listeners_draining", 0);
+  }
+
+  // Connection after LDS update to verify filter still works and no crash occurs.
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp"));
+  ASSERT_TRUE(tcp_client->connected());
+  test_server_->waitForCounterEq("geoip.total", 1);
+
+  // Second connection to verify continued operation.
+  IntegrationTcpClientPtr tcp_client2 = makeTcpConnection(lookupPort("tcp"));
+  ASSERT_TRUE(tcp_client2->connected());
+  test_server_->waitForCounterEq("geoip.total", 2);
+
+  tcp_client->close();
+  tcp_client2->close();
 }
 
 } // namespace
