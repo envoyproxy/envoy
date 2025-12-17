@@ -278,14 +278,14 @@ TEST_P(AdsIntegrationTest, DeltaSdsRemovals) {
   // The default AdsIntegrationTest bootstrap sets set_node_on_first_message_only to true, so we
   // don't expect a node in these requests.
   EXPECT_TRUE(compareDeltaDiscoveryRequest(sds_type_url, {"validation_context"}, {}, {}, {},
-                                          /*expect_node=*/false));
+                                           /*expect_node=*/false));
 
   // Cluster should start off warming as the secret is being requested.
   test_server_->waitForGaugeEq("cluster.cluster_0.warming_state", 1);
 
   // Ack the original CDS sub.
   EXPECT_TRUE(compareDeltaDiscoveryRequest(cds_type_url, {}, {}, {}, {},
-                                          /*expect_node=*/false));
+                                           /*expect_node=*/false));
 
   // Before we send the secret, we'll send a delta removal to make sure we don't get a NACK.
   sendDeltaDiscoveryResponse<envoy::extensions::transport_sockets::tls::v3::Secret>(
@@ -297,11 +297,11 @@ TEST_P(AdsIntegrationTest, DeltaSdsRemovals) {
 
   // Ack the original LDS subscription.
   EXPECT_TRUE(compareDeltaDiscoveryRequest(lds_type_url, {}, {}, {}, {},
-                                          /*expect_node=*/false));
+                                           /*expect_node=*/false));
 
   // Ack the removal itself.
   EXPECT_TRUE(compareDeltaDiscoveryRequest(sds_type_url, {}, {}, {}, {},
-                                          /*expect_node=*/false));
+                                           /*expect_node=*/false));
 
   envoy::extensions::transport_sockets::tls::v3::Secret validation_context;
   TestUtility::loadFromYaml(fmt::format(R"EOF(
@@ -320,7 +320,7 @@ TEST_P(AdsIntegrationTest, DeltaSdsRemovals) {
 
   // Ack the secret we just sent.
   EXPECT_TRUE(compareDeltaDiscoveryRequest(sds_type_url, {}, {}, {}, {},
-                                          /*expect_node=*/false));
+                                           /*expect_node=*/false));
 
   // Remove the cluster that owns the secret.
   sendDeltaDiscoveryResponse<envoy::config::cluster::v3::Cluster>(cds_type_url, {}, {"cluster_0"},
@@ -331,10 +331,10 @@ TEST_P(AdsIntegrationTest, DeltaSdsRemovals) {
   test_server_->waitForCounterEq("cluster_manager.cluster_removed", 1);
   // Ack the CDS removal.
   EXPECT_TRUE(compareDeltaDiscoveryRequest(cds_type_url, {}, {}, {}, {},
-                                          /*expect_node=*/false));
+                                           /*expect_node=*/false));
   // Should be an ACK, not a NACK since the SDS removal is ignored.
   EXPECT_TRUE(compareDeltaDiscoveryRequest(sds_type_url, {}, {}, {}, {},
-                                          /*expect_node=*/false));
+                                           /*expect_node=*/false));
 }
 
 // Make sure two clusters sharing same secret are both kept warming before secret
