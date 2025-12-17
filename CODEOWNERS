@@ -334,7 +334,7 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 # Thrift to metadata
 /*/extensions/filters/http/thrift_to_metadata @JuniorHsu @zuercher
 # IP tagging
-/*/extensions/filters/http/ip_tagging @zuercher @JuniorHsu
+/*/extensions/filters/http/ip_tagging @zuercher @JuniorHsu @nezdolik
 # Header to metadata
 /*/extensions/filters/http/header_to_metadata @zuercher @JuniorHsu
 # Json to metadata
