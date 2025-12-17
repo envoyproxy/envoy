@@ -1,5 +1,6 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/stats/isolated_store_impl.h"
 #include "source/extensions/filters/http/proto_api_scrubber/filter_config.h"
 #include "source/extensions/filters/http/proto_api_scrubber/scrubbing_util_lib/field_checker.h"
 
@@ -8,6 +9,7 @@
 #include "test/mocks/stream_info/mocks.h"
 #include "test/proto/apikeys.pb.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/substitute.h"
@@ -27,6 +29,11 @@ namespace ProtoApiScrubber {
 // mocked so that matching scenarios can be tested.
 class MockProtoApiScrubberFilterConfig : public ProtoApiScrubberFilterConfig {
 public:
+  // Update: Constructor accepts dependencies to allow base class initialization
+  MockProtoApiScrubberFilterConfig(Stats::Store& store, TimeSource& time_source)
+      : ProtoApiScrubberFilterConfig(ProtoApiScrubberStats(*store.rootScope(), "mock_prefix."),
+                                     time_source) {}
+
   MOCK_METHOD(MatchTreeHttpMatchingDataSharedPtr, getRequestFieldMatcher,
               (const std::string& method_name, const std::string& field_mask), (const, override));
 
@@ -100,6 +107,10 @@ protected:
     ON_CALL(server_factory_context_, api()).WillByDefault(testing::ReturnRef(*api_));
     ON_CALL(factory_context_, serverFactoryContext())
         .WillByDefault(testing::ReturnRef(server_factory_context_));
+
+    // Wire up dependencies for real config creation.
+    ON_CALL(factory_context_, scope()).WillByDefault(testing::ReturnRef(*stats_store_.rootScope()));
+    ON_CALL(server_factory_context_, timeSource()).WillByDefault(testing::ReturnRef(time_system_));
   }
 
   // Helper to load descriptors (shared by all configs).
@@ -196,6 +207,8 @@ protected:
   std::shared_ptr<const ProtoApiScrubberFilterConfig> filter_config_;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
+  Stats::IsolatedStoreImpl stats_store_;
+  Event::SimulatedTimeSystem time_system_;
 };
 
 // This tests the scenarios where the underlying match tree returns incomplete matches for request
@@ -207,7 +220,7 @@ TEST_F(FieldCheckerTest, IncompleteMatch) {
   Protobuf::Field field;
   field.set_name(field_name);
 
-  NiceMock<MockProtoApiScrubberFilterConfig> mock_filter_config;
+  NiceMock<MockProtoApiScrubberFilterConfig> mock_filter_config(stats_store_, time_system_);
   NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
   auto mock_match_tree = std::make_shared<NiceMock<MockMatchTree>>();
 
@@ -260,7 +273,7 @@ TEST_F(FieldCheckerTest, CompleteMatchWithUnsupportedAction) {
   Protobuf::Field field;
   field.set_name(field_name);
 
-  NiceMock<MockProtoApiScrubberFilterConfig> mock_filter_config;
+  NiceMock<MockProtoApiScrubberFilterConfig> mock_filter_config(stats_store_, time_system_);
   NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
 
   {
@@ -507,7 +520,8 @@ TEST_F(RequestFieldCheckerTest, ArrayType) {
 // Tests CheckField() specifically for enum fields in the request.
 TEST_F(RequestFieldCheckerTest, EnumType) {
   // Setup local mock config.
-  auto mock_config = std::make_shared<NiceMock<MockProtoApiScrubberFilterConfig>>();
+  auto mock_config =
+      std::make_shared<NiceMock<MockProtoApiScrubberFilterConfig>>(stats_store_, time_system_);
   NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
   const std::string method = "/pkg.Service/UpdateConfig";
 
@@ -757,7 +771,8 @@ TEST_F(ResponseFieldCheckerTest, ArrayType) {
 
 // Tests CheckField() specifically for enum fields in the response.
 TEST_F(ResponseFieldCheckerTest, EnumType) {
-  auto mock_config = std::make_shared<NiceMock<MockProtoApiScrubberFilterConfig>>();
+  auto mock_config =
+      std::make_shared<NiceMock<MockProtoApiScrubberFilterConfig>>(stats_store_, time_system_);
   NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
   const std::string method = "/pkg.Service/GetConfig";
 
