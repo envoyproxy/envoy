@@ -91,7 +91,7 @@ DefaultTlsCertificateSelector::selectTlsContext(const SSL_CLIENT_HELLO& ssl_clie
       absl::NullSafeStringView(SSL_get_servername(ssl_client_hello.ssl, TLSEXT_NAMETYPE_host_name));
   const Ssl::CurveNIDVector client_ecdsa_capabilities =
       server_ctx_.getClientEcdsaCapabilities(ssl_client_hello);
-  const bool client_ocsp_capable = server_ctx_.isClientOcspCapable(ssl_client_hello);
+  const bool client_ocsp_capable = isClientOcspCapable(ssl_client_hello);
 
   auto [selected_ctx, ocsp_staple_action] =
       findTlsContext(sni, client_ecdsa_capabilities, client_ocsp_capable, nullptr);
@@ -120,15 +120,16 @@ DefaultTlsCertificateSelector::selectTlsContext(const SSL_CLIENT_HELLO& ssl_clie
           ocsp_staple_action == Ssl::OcspStapleAction::Staple};
 }
 
-Ssl::OcspStapleAction DefaultTlsCertificateSelector::ocspStapleAction(const Ssl::TlsContext& ctx,
-                                                                      bool client_ocsp_capable) {
+Ssl::OcspStapleAction
+ocspStapleAction(const Ssl::TlsContext& ctx, bool client_ocsp_capable,
+                 Ssl::ServerContextConfig::OcspStaplePolicy ocsp_staple_policy) {
   if (!client_ocsp_capable) {
     return Ssl::OcspStapleAction::ClientNotCapable;
   }
 
   auto& response = ctx.ocsp_response_;
 
-  auto policy = ocsp_staple_policy_;
+  auto policy = ocsp_staple_policy;
   if (ctx.is_must_staple_) {
     // The certificate has the must-staple extension, so upgrade the policy to match.
     policy = Ssl::ServerContextConfig::OcspStaplePolicy::MustStaple;
@@ -182,7 +183,7 @@ DefaultTlsCertificateSelector::findTlsContext(absl::string_view sni,
   const bool client_ecdsa_capable = !client_ecdsa_capabilities.empty();
 
   auto selected = [&](const Ssl::TlsContext& ctx) -> bool {
-    auto action = ocspStapleAction(ctx, client_ocsp_capable);
+    auto action = ocspStapleAction(ctx, client_ocsp_capable, ocsp_staple_policy_);
     if (action == Ssl::OcspStapleAction::Fail) {
       // The selected ctx must adhere to OCSP policy
       return false;
@@ -238,7 +239,8 @@ DefaultTlsCertificateSelector::findTlsContext(absl::string_view sni,
 
     if (selected_ctx == nullptr && !go_to_next_phase) {
       selected_ctx = &tls_contexts_[0];
-      ocsp_staple_action = ocspStapleAction(*selected_ctx, client_ocsp_capable);
+      ocsp_staple_action =
+          ocspStapleAction(*selected_ctx, client_ocsp_capable, ocsp_staple_policy_);
     }
   };
 

@@ -57,6 +57,10 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/transport_sockets/tls @RyanTheOptimist @ggreenway @botengyao
 # tls SPIFFE certificate validator extension
 /*/extensions/transport_sockets/tls/cert_validator/spiffe @mathetake @botengyao @tyxia
+# On demand secret provider
+/*/extensions/transport_sockets/tls/cert_selectors/on_demand @kyessenov @tonya11en
+/*/extensions/transport_sockets/tls/cert_mappers/static_name @kyessenov @tonya11en
+/*/extensions/transport_sockets/tls/cert_mappers/sni @kyessenov @tonya11en
 # proxy protocol socket extension
 /*/extensions/transport_sockets/proxy_protocol @botengyao @wez470
 # common transport socket
