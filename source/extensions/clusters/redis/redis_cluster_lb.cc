@@ -68,7 +68,7 @@ bool RedisClusterLoadBalancerFactory::onClusterSlotUpdate(ClusterSlotsSharedPtr&
   }
 
   {
-    absl::WriterMutexLock lock(&mutex_);
+    absl::WriterMutexLock lock(mutex_);
     current_cluster_slot_ = std::move(slots);
     slot_array_ = std::move(updated_slots);
     shard_vector_ = std::move(shard_vector);
@@ -96,7 +96,7 @@ void RedisClusterLoadBalancerFactory::onHostHealthUpdate() {
   }
 
   {
-    absl::WriterMutexLock lock(&mutex_);
+    absl::WriterMutexLock lock(mutex_);
     shard_vector_ = std::move(shard_vector);
   }
 }

@@ -112,7 +112,7 @@ public:
   }
 
   ~GeoipProviderTestBase() {
-    absl::WriterMutexLock lock(&mutex_);
+    absl::WriterMutexLock lock(mutex_);
     on_changed_cbs_.clear();
   };
 
@@ -129,7 +129,7 @@ public:
               .WillRepeatedly(Invoke([this, &conditional](absl::string_view, uint32_t,
                                                           Filesystem::Watcher::OnChangedCb cb) {
                 {
-                  absl::WriterMutexLock lock(&mutex_);
+                  absl::WriterMutexLock lock(mutex_);
                   on_changed_cbs_.reserve(1);
                   on_changed_cbs_.emplace_back(std::move(cb));
                 }
