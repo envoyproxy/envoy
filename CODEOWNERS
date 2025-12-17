@@ -382,6 +382,8 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/health_check/event_sinks/file @botengyao @yanavlasov
 # IP Geolocation
 /*/extensions/filters/http/geoip @nezdolik @ravenblackx
+# IP Geolocation Network Filter
+/*/extensions/filters/network/geoip @agrawroh @nezdolik @ravenblackx @wbpcode
 /*/extensions/geoip_providers/common @nezdolik @ravenblackx
 # Maxmind geolocation provider
 /*/extensions/geoip_providers/maxmind @nezdolik @ravenblackx

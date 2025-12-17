@@ -128,9 +128,18 @@ def envoy_cmake(
         generate_args = ["-GNinja"],
         targets = ["", "install"],
         **kwargs):
-    cache_entries.update(default_cache_entries)
-    cache_entries_debug = dict(cache_entries)
-    cache_entries_debug.update(debug_cache_entries)
+    # If cache_entries is a dict, merge defaults and wrap for debug builds.
+    # If it's a select(), pass it through directly.
+    if hasattr(cache_entries, "update"):
+        cache_entries.update(default_cache_entries)
+        cache_entries_debug = dict(cache_entries)
+        cache_entries_debug.update(debug_cache_entries)
+        final_cache_entries = select({
+            "@envoy//bazel:dbg_build": cache_entries_debug,
+            "//conditions:default": cache_entries,
+        })
+    else:
+        final_cache_entries = cache_entries
 
     pf = ""
     if copy_pdb:
@@ -152,10 +161,7 @@ def envoy_cmake(
 
     cmake(
         name = name,
-        cache_entries = select({
-            "@envoy//bazel:dbg_build": cache_entries_debug,
-            "//conditions:default": cache_entries,
-        }),
+        cache_entries = final_cache_entries,
         generate_args = generate_args,
         targets = targets,
         # TODO: Remove install target and make this work

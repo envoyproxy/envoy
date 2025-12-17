@@ -251,6 +251,7 @@ proto_library(
         "//envoy/extensions/filters/network/generic_proxy/matcher/v3:pkg",
         "//envoy/extensions/filters/network/generic_proxy/router/v3:pkg",
         "//envoy/extensions/filters/network/generic_proxy/v3:pkg",
+        "//envoy/extensions/filters/network/geoip/v3:pkg",
         "//envoy/extensions/filters/network/http_connection_manager/v3:pkg",
         "//envoy/extensions/filters/network/local_ratelimit/v3:pkg",
         "//envoy/extensions/filters/network/mongo_proxy/v3:pkg",

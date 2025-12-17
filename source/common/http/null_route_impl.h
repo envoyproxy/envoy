@@ -63,7 +63,6 @@ struct NullVirtualHost : public Router::VirtualHost {
   bool includeAttemptCountInRequest() const override { return false; }
   bool includeAttemptCountInResponse() const override { return false; }
   bool includeIsTimeoutRetryHeader() const override { return false; }
-  uint64_t requestBodyBufferLimit() const override { return std::numeric_limits<uint64_t>::max(); }
   const Router::RouteSpecificFilterConfig*
   mostSpecificPerFilterConfig(absl::string_view) const override {
     return nullptr;

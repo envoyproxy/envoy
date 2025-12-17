@@ -53,7 +53,7 @@ struct BasicStreamLifecycleConfig {
 }
 
 impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for BasicStreamLifecycleConfig {
-  fn new_http_filter(&mut self, _envoy_filter_config: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+  fn new_http_filter(&self, _envoy_filter_config: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
     Box::new(BasicStreamLifecycleFilter {
       cluster_name: self.cluster_name.clone(),
       received_response: false,
@@ -151,7 +151,7 @@ struct BidirectionalStreamingConfig {
 }
 
 impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for BidirectionalStreamingConfig {
-  fn new_http_filter(&mut self, _envoy_filter_config: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+  fn new_http_filter(&self, _envoy_filter_config: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
     Box::new(BidirectionalStreamingFilter {
       cluster_name: self.cluster_name.clone(),
       stream_handle: std::ptr::null_mut(),
@@ -248,7 +248,7 @@ struct MultipleStreamsConfig {
 }
 
 impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for MultipleStreamsConfig {
-  fn new_http_filter(&mut self, _envoy_filter_config: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+  fn new_http_filter(&self, _envoy_filter_config: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
     Box::new(MultipleStreamsFilter {
       cluster_name: self.cluster_name.clone(),
       stream_handles: Vec::new(),
@@ -320,7 +320,7 @@ struct StreamResetConfig {
 }
 
 impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for StreamResetConfig {
-  fn new_http_filter(&mut self, _envoy_filter_config: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+  fn new_http_filter(&self, _envoy_filter_config: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
     Box::new(StreamResetFilter {
       cluster_name: self.cluster_name.clone(),
       stream_handle: std::ptr::null_mut(),
@@ -417,7 +417,7 @@ struct UpstreamResetConfig {
 }
 
 impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for UpstreamResetConfig {
-  fn new_http_filter(&mut self, _envoy_filter_config: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+  fn new_http_filter(&self, _envoy_filter_config: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
     Box::new(UpstreamResetFilter {
       cluster_name: self.cluster_name.clone(),
       stream_handle: std::ptr::null_mut(),

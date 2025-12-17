@@ -806,6 +806,11 @@ public:
   void setBufferLimit(uint64_t limit);
 
   /**
+   * @return uint64_t the current buffer limit.
+   */
+  uint64_t bufferLimit() const { return buffer_limit_; }
+
+  /**
    * @return bool whether any above high watermark triggers are currently active
    */
   bool aboveHighWatermark() { return high_watermark_count_ != 0; }
