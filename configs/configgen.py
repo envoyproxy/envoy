@@ -97,6 +97,7 @@ mongos_servers = {
 def generate_config(template_path, template, output_file, **context):
     """ Generate a final config file based on a template and some context. """
     env = jinja2.Environment(
+        autoescape=jinja2.select_autoescape(['html', 'xml']),
         loader=jinja2.FileSystemLoader(template_path, followlinks=True),
         undefined=jinja2.StrictUndefined)
     raw_output = env.get_template(template).render(**context)
