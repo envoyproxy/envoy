@@ -3,6 +3,7 @@
 #include "source/common/common/random_generator.h"
 #include "source/common/config/metadata.h"
 #include "source/common/http/header_utility.h"
+#include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 #include "source/common/json/json_utility.h"
 #include "source/common/runtime/runtime_features.h"
@@ -654,38 +655,20 @@ RequestedServerNameFormatter::format(const StreamInfo::StreamInfo& stream_info) 
     if (headers != nullptr) {
       switch (option_) {
       case HostOnly:
-        result = findHeader(":authority", "", headers);
+        result = headers->Host()->value().getStringView();
         break;
       case OriginalHostOnly:
-        result = findHeader("x-envoy-original-host", "", headers);
+        result = headers->EnvoyOriginalHost()->value().getStringView();
         break;
       case OriginalHostOrHost:
-        result = findHeader("x-envoy-original-host", ":authority", headers);
+        result = headers->EnvoyOriginalHost() != nullptr
+                     ? headers->EnvoyOriginalHost()->value().getStringView()
+                     : headers->Host()->value().getStringView();
         break;
       }
     }
   }
   return result;
-}
-
-absl::optional<std::string_view>
-RequestedServerNameFormatter::findHeader(std::string_view header_name,
-                                         std::string_view secondary_header_name,
-                                         const Http::RequestHeaderMap* headers) const {
-  if (headers != nullptr) {
-    const auto header_value = headers->get(Http::LowerCaseString(header_name));
-    if (!header_value.empty()) {
-      return header_value[0]->value().getStringView();
-    }
-    if (!secondary_header_name.empty()) {
-      const auto secondary_header_value =
-          headers->get(Http::LowerCaseString(secondary_header_name));
-      if (!secondary_header_value.empty()) {
-        return secondary_header_value[0]->value().getStringView();
-      }
-    }
-  }
-  return absl::nullopt;
 }
 
 Protobuf::Value

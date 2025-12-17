@@ -315,9 +315,6 @@ public:
   using StreamInfoFormatterProvider::formatValue;
   absl::optional<std::string> format(const StreamInfo::StreamInfo&) const override;
   Protobuf::Value formatValue(const StreamInfo::StreamInfo&) const override;
-  absl::optional<std::string_view> findHeader(std::string_view header_name,
-                                              std::string_view secondary_header_name,
-                                              const Http::RequestHeaderMap* headers) const;
 
 private:
   bool fallback_;
