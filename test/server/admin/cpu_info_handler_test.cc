@@ -15,7 +15,14 @@ TEST_P(AdminInstanceTest, CpuWorkers) {
 
   EXPECT_EQ(Http::Code::OK, getCallback("/cpu/workers", header_map, response));
   EXPECT_THAT(response.toString(),
-              HasSubstr("Each worker thread CPU utilization (similar to Linux top):"));
+              HasSubstr("wrk:worker_0:"));
+}
+#else
+TEST_P(AdminInstanceTest, CpuWorkers) {
+  Http::TestResponseHeaderMapImpl header_map;
+  Buffer::OwnedImpl response;
+
+  EXPECT_EQ(Http::Code::NotImplemented, getCallback("/cpu/workers", header_map, response));
 }
 #endif
 

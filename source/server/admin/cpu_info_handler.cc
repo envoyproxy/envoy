@@ -338,8 +338,7 @@ Http::Code CpuInfoHandler::handlerWorkersCpu(Http::ResponseHeaderMap& response_h
   return measureDeltaCpuUtilization(params.sampling_interval_ms_, params.format_, response_headers,
                                     response);
 #else
-  return returnError("Worker CPU utilization is only supported on Linux.", params.format_,
-                     response_headers, response);
+  return Http::Code::NotImplemented;
 #endif
 }
 

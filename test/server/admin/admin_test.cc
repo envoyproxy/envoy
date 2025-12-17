@@ -152,6 +152,9 @@ TEST_P(AdminInstanceTest, Help) {
       name_regex: Dump only the currently loaded configurations whose names match the specified regex. Can be used with both resource and mask query parameters.
       include_eds: Dump currently loaded configuration including EDS. See the response definition for more information
   /contention: dump current Envoy mutex contention stats (if enabled)
+  /cpu/workers: print CPU utilization for each worker thread in percentage
+      sampling_interval_ms: Sampling interval in ms (default: 1000)
+      format: Output format (default: text); one of (text, json)
   /cpuprofiler (POST): enable/disable the CPU profiler
       enable: enables the CPU profiler; One of (y, n)
   /drain_listeners (POST): drain listeners
