@@ -5,6 +5,7 @@
 #include <list>
 #include <regex>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "envoy/formatter/substitution_formatter.h"
@@ -293,6 +294,34 @@ public:
 
 private:
   Protobuf::Value str_;
+};
+
+/**
+ * FormatterProvider for requested server name from StreamInfo.
+ */
+class RequestedServerNameFormatter : public StreamInfoFormatterProvider {
+public:
+  enum HostFormatterOption {
+    OriginalHostOrHost,
+    HostOnly,
+    OriginalHostOnly,
+  };
+
+  RequestedServerNameFormatter(absl::string_view fallback, absl::string_view option);
+
+  // StreamInfoFormatterProvider
+  // Don't hide the other structure of format and formatValue.
+  using StreamInfoFormatterProvider::format;
+  using StreamInfoFormatterProvider::formatValue;
+  absl::optional<std::string> format(const StreamInfo::StreamInfo&) const override;
+  Protobuf::Value formatValue(const StreamInfo::StreamInfo&) const override;
+  absl::optional<std::string_view> findHeader(std::string_view header_name,
+                                              std::string_view secondary_header_name,
+                                              const Http::RequestHeaderMap* headers) const;
+
+private:
+  bool fallback_;
+  HostFormatterOption option_;
 };
 
 class DefaultBuiltInStreamInfoCommandParserFactory : public BuiltInCommandParserFactory {

@@ -1102,9 +1102,24 @@ UDP
 
     This command operator is only available for :ref:`upstream_log <envoy_v3_api_field_extensions.filters.http.router.v3.Router.upstream_log>`.
 
-%REQUESTED_SERVER_NAME%
+%REQUESTED_SERVER_NAME(X:Y)%
   HTTP/TCP/THRIFT
-    String value set on ssl connection socket for Server Name Indication (SNI)
+    String value set on ssl connection socket for Server Name Indication (SNI) or host header. 
+    The parameter X is used to specify should the output fallback to get from host header when SNI is not set.
+    The parameter Y is used to specify the source of the request host. Both X and Y are optional.
+
+    The X parameter can be:
+
+    * ``FA``: The output will retrive from ``:authority`` or ``x-envoy-original-host`` header when SNI is not set.
+    * ``NFA``: The output will not retrive from ``:authority`` or ``x-envoy-original-host`` header when SNI is not set.
+
+    The Y parameter can be:
+
+    * ``ORIG``: Get the request host from the ``x-envoy-original-host`` header.
+    * ``HOST``: Get the request host from the ``:authority`` header.
+    * ``ORIG_OR_HOST``: Get the request host from the ``x-envoy-original-host`` header if it is
+      present, otherwise get it from the ``:authority`` header. If the Y is not present, ``ORIG_OR_HOST``
+      will be used.
   UDP
     Not implemented ("-").
 
