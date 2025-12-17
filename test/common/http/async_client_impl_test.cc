@@ -2634,10 +2634,6 @@ TEST_F(AsyncClientImplUnitTest, NullConfig) {
   EXPECT_FALSE(config_.mostSpecificHeaderMutationsWins());
 }
 
-TEST_F(AsyncClientImplUnitTest, NullVirtualHost) {
-  EXPECT_EQ(std::numeric_limits<uint64_t>::max(), vhost_.requestBodyBufferLimit());
-}
-
 TEST_F(AsyncClientImplTest, UpstreamOverrideHost) {
   Buffer::InstancePtr body{new Buffer::OwnedImpl("test body")};
   Upstream::LoadBalancerContext::OverrideHost override_host{"192.168.1.100:8080", true};
