@@ -643,7 +643,7 @@ public:
   virtual void setUpstreamDetectedCloseType(DetectedCloseType close_type) PURE;
 
   /**
-   * @return Network::DetectedCloseType the upstream detected close type.
+   * @return StreamInfo::DetectedCloseType the upstream detected close type.
    */
   virtual DetectedCloseType upstreamDetectedCloseType() const PURE;
 
@@ -1042,7 +1042,7 @@ public:
   virtual void setDownstreamDetectedCloseType(DetectedCloseType close_type) PURE;
 
   /**
-   * @return Network::DetectedCloseType the downstream detected close type.
+   * @return StreamInfo::DetectedCloseType the downstream detected close type.
    */
   virtual DetectedCloseType downstreamDetectedCloseType() const PURE;
 
