@@ -9509,6 +9509,79 @@ virtual_hosts:
   }
 }
 
+TEST_F(RouteMatcherTest, CookieMatch) {
+
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: cookie
+    domains: ["*"]
+    routes:
+      - match:
+          prefix: "/"
+          cookies:
+            - name: session
+              string_match:
+                exact: foo
+            - name: version
+              present_match: false
+            - name: build
+              range_match:
+                start: 10
+                end: 20
+            - name: optional
+              string_match:
+                exact: ""
+              treat_missing_cookie_as_empty: true
+            - name: secret
+              string_match:
+                prefix: bar
+              invert_match: true
+        route: { cluster: cookie-cluster }
+      - match:
+          prefix: "/"
+        route: { cluster: default }
+  )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"cookie-cluster", "default"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+
+  {
+    auto headers = genHeaders("cookie.example.com", "/foo", "GET");
+    headers.addCopy("cookie", "session=foo; build=15; secret=baz");
+
+    EXPECT_EQ("cookie-cluster", config.route(headers, 0)->routeEntry()->clusterName());
+  }
+
+  {
+    auto headers = genHeaders("cookie.example.com", "/foo", "GET");
+    headers.addCopy("cookie", "session=foo; version=blue; build=15; secret=baz");
+
+    EXPECT_EQ("default", config.route(headers, 0)->routeEntry()->clusterName());
+  }
+
+  {
+    auto headers = genHeaders("cookie.example.com", "/foo", "GET");
+    headers.addCopy("cookie", "session=foo; build=5; secret=baz");
+
+    EXPECT_EQ("default", config.route(headers, 0)->routeEntry()->clusterName());
+  }
+
+  {
+    auto headers = genHeaders("cookie.example.com", "/foo", "GET");
+    headers.addCopy("cookie", "session=foo; build=15; secret=baz");
+
+    EXPECT_EQ("cookie-cluster", config.route(headers, 0)->routeEntry()->clusterName());
+  }
+
+  {
+    auto headers = genHeaders("cookie.example.com", "/foo", "GET");
+    headers.addCopy("cookie", "session=foo; build=15; secret=barista");
+
+    EXPECT_EQ("default", config.route(headers, 0)->routeEntry()->clusterName());
+  }
+}
+
 TEST_F(RouteConfigurationV2, RegexPrefixWithNoRewriteWorksWhenPathChanged) {
 
   // Setup regex route entry. the regex is trivial, that's ok as we only want to test that

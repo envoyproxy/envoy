@@ -318,6 +318,10 @@ new_features:
     Added :ref:`vhost_header <envoy_v3_api_field_config.route.v3.RouteConfiguration.vhost_header>` to
     :ref:`RouteConfiguration <envoy_v3_api_msg_config.route.v3.RouteConfiguration>` to allow using a different header
     for vhost matching.
+- area: http
+  change: |
+    Added :ref:`cookies <envoy_v3_api_field_config.route.v3.RouteMatch.cookies>` to route matches,
+    enabling structured matching against specific cookies without parsing the full ``Cookie`` header.
 - area: http2
   change: |
     Added a parameter to ``sendGoAwayAndClose`` to support graceful closure of HTTP/2 connections.

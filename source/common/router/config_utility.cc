@@ -12,6 +12,8 @@
 #include "source/common/config/datasource.h"
 #include "source/common/runtime/runtime_features.h"
 
+#include "absl/strings/numbers.h"
+
 namespace Envoy {
 namespace Router {
 namespace {
@@ -71,6 +73,59 @@ bool ConfigUtility::QueryParameterMatcher::matches(
   return matcher_.value().match(data.value());
 }
 
+ConfigUtility::CookieMatcher::CookieMatcher(const envoy::config::route::v3::CookieMatcher& config,
+                                            Server::Configuration::CommonFactoryContext& context)
+    : name_(config.name()), invert_match_(config.invert_match()),
+      treat_missing_as_empty_(config.treat_missing_cookie_as_empty()) {
+  switch (config.cookie_match_specifier_case()) {
+  case envoy::config::route::v3::CookieMatcher::CookieMatchSpecifierCase::kStringMatch:
+    string_match_.emplace(config.string_match(), context);
+    break;
+  case envoy::config::route::v3::CookieMatcher::CookieMatchSpecifierCase::kRangeMatch:
+    range_match_.emplace(RangeMatch{config.range_match().start(), config.range_match().end()});
+    break;
+  case envoy::config::route::v3::CookieMatcher::CookieMatchSpecifierCase::kPresentMatch:
+    present_match_ = config.present_match();
+    break;
+  case envoy::config::route::v3::CookieMatcher::CookieMatchSpecifierCase::
+      COOKIE_MATCH_SPECIFIER_NOT_SET:
+    present_match_ = true;
+    break;
+  }
+
+  if (!present_match_.has_value() && !string_match_.has_value() && !range_match_.has_value()) {
+    present_match_ = true;
+  }
+}
+
+bool ConfigUtility::CookieMatcher::matches(
+    const absl::optional<absl::string_view>& cookie_value) const {
+  if (string_match_.has_value()) {
+    if (!cookie_value.has_value() && !treat_missing_as_empty_) {
+      return false;
+    }
+    const absl::string_view value = cookie_value.value_or(EMPTY_STRING);
+    const bool matched = string_match_->match(value);
+    return matched != invert_match_;
+  }
+
+  if (range_match_.has_value()) {
+    if (!cookie_value.has_value() && !treat_missing_as_empty_) {
+      return false;
+    }
+    const absl::string_view value = cookie_value.value_or(EMPTY_STRING);
+    int64_t parsed_value = 0;
+    const bool matched = absl::SimpleAtoi(value, &parsed_value) &&
+                         parsed_value >= range_match_->start && parsed_value < range_match_->end;
+    return matched != invert_match_;
+  }
+
+  const bool has_cookie = cookie_value.has_value();
+  const bool expected_presence = present_match_.value_or(true);
+  const bool matched = has_cookie == expected_presence;
+  return matched != invert_match_;
+}
+
 Upstream::ResourcePriority
 ConfigUtility::parsePriority(const envoy::config::core::v3::RoutingPriority& priority) {
   switch (priority) {
@@ -88,6 +143,26 @@ bool ConfigUtility::matchQueryParams(
     const std::vector<QueryParameterMatcherPtr>& config_query_params) {
   for (const auto& config_query_param : config_query_params) {
     if (!config_query_param->matches(query_params)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+bool ConfigUtility::matchCookies(const absl::flat_hash_map<std::string, std::string>& cookies,
+                                 const std::vector<CookieMatcherPtr>& matchers) {
+  if (matchers.empty()) {
+    return true;
+  }
+
+  for (const auto& matcher : matchers) {
+    absl::optional<absl::string_view> cookie_value;
+    const auto it = cookies.find(matcher->name());
+    if (it != cookies.end()) {
+      cookie_value = it->second;
+    }
+    if (!matcher->matches(cookie_value)) {
       return false;
     }
   }
