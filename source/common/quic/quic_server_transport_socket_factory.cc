@@ -21,7 +21,7 @@ QuicServerTransportSocketConfigFactory::createTransportSocketFactory(
       config, context.messageValidationVisitor());
   absl::StatusOr<std::unique_ptr<Extensions::TransportSockets::Tls::ServerContextConfigImpl>>
       server_config_or_error = Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
-          quic_transport.downstream_tls_context(), context, true);
+          quic_transport.downstream_tls_context(), context, server_names, true);
   RETURN_IF_NOT_OK(server_config_or_error.status());
   auto server_config = std::move(server_config_or_error.value());
   // TODO(RyanTheOptimist): support TLS client authentication.
@@ -32,7 +32,7 @@ QuicServerTransportSocketConfigFactory::createTransportSocketFactory(
   auto factory_or_error = QuicServerTransportSocketFactory::create(
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(quic_transport, enable_early_data, true),
       context.statsScope(), std::move(server_config),
-      context.serverFactoryContext().sslContextManager(), server_names);
+      context.serverFactoryContext().sslContextManager());
   RETURN_IF_NOT_OK(factory_or_error.status());
   (*factory_or_error)->initialize();
   return std::move(*factory_or_error);
@@ -101,22 +101,19 @@ absl::Status initializeQuicCertAndKey(Ssl::TlsContext& context,
 absl::StatusOr<std::unique_ptr<QuicServerTransportSocketFactory>>
 QuicServerTransportSocketFactory::create(bool enable_early_data, Stats::Scope& store,
                                          Ssl::ServerContextConfigPtr config,
-                                         Envoy::Ssl::ContextManager& manager,
-                                         const std::vector<std::string>& server_names) {
+                                         Envoy::Ssl::ContextManager& manager) {
   absl::Status creation_status = absl::OkStatus();
   auto ret = std::unique_ptr<QuicServerTransportSocketFactory>(new QuicServerTransportSocketFactory(
-      enable_early_data, store, std::move(config), manager, server_names, creation_status));
+      enable_early_data, store, std::move(config), manager, creation_status));
   RETURN_IF_NOT_OK(creation_status);
   return ret;
 }
 
 QuicServerTransportSocketFactory::QuicServerTransportSocketFactory(
     bool enable_early_data, Stats::Scope& scope, Ssl::ServerContextConfigPtr config,
-    Envoy::Ssl::ContextManager& manager, const std::vector<std::string>& server_names,
-    absl::Status& creation_status)
+    Envoy::Ssl::ContextManager& manager, absl::Status& creation_status)
     : QuicTransportSocketFactoryBase(scope, "server"), manager_(manager), stats_scope_(scope),
-      config_(std::move(config)), server_names_(server_names),
-      enable_early_data_(enable_early_data) {
+      config_(std::move(config)), enable_early_data_(enable_early_data) {
   auto ctx_or_error = createSslServerContext();
   SET_AND_RETURN_IF_NOT_OK(ctx_or_error.status(), creation_status);
   ssl_ctx_ = *ctx_or_error;
@@ -128,8 +125,8 @@ QuicServerTransportSocketFactory::~QuicServerTransportSocketFactory() {
 
 absl::StatusOr<Envoy::Ssl::ServerContextSharedPtr>
 QuicServerTransportSocketFactory::createSslServerContext() const {
-  auto context_or_error = manager_.createSslServerContext(stats_scope_, *config_, server_names_,
-                                                          initializeQuicCertAndKey);
+  auto context_or_error =
+      manager_.createSslServerContext(stats_scope_, *config_, initializeQuicCertAndKey);
   RETURN_IF_NOT_OK(context_or_error.status());
   return *context_or_error;
 }

@@ -3679,6 +3679,72 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutRouteOverride) {
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
+// Test buffer limit and buffer limit refresh.
+TEST_F(HttpConnectionManagerImplTest, BufferLimitAndRefresh) {
+  // Set the initial buffer limit to 122 bytes.
+  initial_buffer_limit_ = 122;
+  stream_idle_timeout_ = std::chrono::milliseconds(10);
+  setup();
+  setupFilterChain(1, 0);
+  setUpBufferLimits();
+
+  // Route config mock
+  EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _, _)).Times(AnyNumber());
+
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+
+  // Create the stream.
+  EXPECT_CALL(*codec_, dispatch(_))
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
+        Event::MockTimer* idle_timer = setUpTimer();
+        EXPECT_CALL(*idle_timer, enableTimer(_, _));
+        RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);
+        EXPECT_CALL(*idle_timer, enableTimer(_, _));
+        EXPECT_CALL(*idle_timer, disableTimer());
+        RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
+            {":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
+        decoder->decodeHeaders(std::move(headers), false);
+
+        data.drain(4);
+        return Http::okStatus();
+      }));
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+
+  // The initial route buffer limit is not valid value and the limit from underlying stream
+  // will be used.
+  { EXPECT_EQ(122U, decoder_filters_[0]->callbacks_->decoderBufferLimit()); }
+
+  // Less buffer limit from route entry will not be applied.
+  {
+    EXPECT_CALL(route_config_provider_.route_config_->route_->route_entry_,
+                requestBodyBufferLimit())
+        .WillOnce(Return(100U));
+    // Clear and refresh the route cache (checking clusterInfo refreshes the route cache)
+    decoder_filters_[0]->callbacks_->downstreamCallbacks()->clearRouteCache();
+    decoder_filters_[0]->callbacks_->clusterInfo();
+  }
+
+  // Larger buffer limit from route entry will be applied.
+  {
+    EXPECT_CALL(route_config_provider_.route_config_->route_->route_entry_,
+                requestBodyBufferLimit())
+        .WillOnce(Return(150U));
+
+    // Clear and refresh the route cache (checking clusterInfo refreshes the route cache)
+    decoder_filters_[0]->callbacks_->downstreamCallbacks()->clearRouteCache();
+    decoder_filters_[0]->callbacks_->clusterInfo();
+
+    EXPECT_EQ(150U, decoder_filters_[0]->callbacks_->decoderBufferLimit());
+  }
+
+  // Cleanup.
+  EXPECT_CALL(*decoder_filters_[0], onStreamComplete());
+  EXPECT_CALL(*decoder_filters_[0], onDestroy());
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
 // Per-stream flush and idle timeouts have a somewhat complex precedence order, so here we test
 // every combination of global and per-route flush and idle timeouts. Note that global idle timeout
 // not being set or unset doesn't affect the behavior of the flush timeout since it's the same as

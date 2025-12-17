@@ -1,11 +1,15 @@
 #include "envoy/extensions/filters/http/proto_api_scrubber/v3/config.pb.h"
+#include "envoy/extensions/matching/common_inputs/network/v3/network_inputs.pb.h"
 #include "envoy/grpc/status.h"
+#include "envoy/type/matcher/v3/http_inputs.pb.h"
 
+#include "source/common/router/string_accessor_impl.h"
 #include "source/extensions/filters/http/proto_api_scrubber/scrubbing_util_lib/field_checker.h"
 
 #include "test/extensions/filters/http/grpc_field_extraction/message_converter/message_converter_test_lib.h"
 #include "test/integration/http_protocol_integration.h"
 #include "test/proto/apikeys.pb.h"
+#include "test/test_common/registry.h"
 
 #include "cel/expr/syntax.pb.h"
 #include "fmt/format.h"
@@ -29,17 +33,63 @@ std::string apikeysDescriptorPath() {
 }
 
 const std::string kCreateApiKeyMethod = "/apikeys.ApiKeys/CreateApiKey";
+const std::string kFilterStateLabelKey = "filter_state_label_key";
+const std::string kFilterStateLabelValue = "LABEL1,LABEL2,LABEL3";
+
+// This filter injects data into filter_state.
+class MetadataInjectorFilter : public ::Envoy::Http::PassThroughDecoderFilter {
+public:
+  ::Envoy::Http::FilterHeadersStatus decodeHeaders(::Envoy::Http::RequestHeaderMap&,
+                                                   bool) override {
+    const std::string key = kFilterStateLabelKey;
+    const std::string value = kFilterStateLabelValue;
+    decoder_callbacks_->streamInfo().filterState()->setData(
+        key, std::make_shared<::Envoy::Router::StringAccessorImpl>(value),
+        ::Envoy::StreamInfo::FilterState::StateType::ReadOnly);
+    return ::Envoy::Http::FilterHeadersStatus::Continue;
+  }
+};
+
+class MetadataInjectorConfigFactory
+    : public ::Envoy::Server::Configuration::NamedHttpFilterConfigFactory {
+public:
+  absl::StatusOr<::Envoy::Http::FilterFactoryCb>
+  createFilterFactoryFromProto(const ::Envoy::Protobuf::Message&, const std::string&,
+                               ::Envoy::Server::Configuration::FactoryContext&) override {
+    return [](::Envoy::Http::FilterChainFactoryCallbacks& callbacks) {
+      callbacks.addStreamDecoderFilter(std::make_shared<MetadataInjectorFilter>());
+    };
+  }
+
+  ::Envoy::ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<Protobuf::Struct>();
+  }
+
+  std::string name() const override { return "test_injector"; }
+};
+
+// RegisterFactory handles the singleton lifetime automatically and avoids the destruction crash.
+static ::Envoy::Registry::RegisterFactory<
+    MetadataInjectorConfigFactory, ::Envoy::Server::Configuration::NamedHttpFilterConfigFactory>
+    register_test_injector;
 
 class ProtoApiScrubberIntegrationTest : public HttpProtocolIntegrationTest {
 public:
   void SetUp() override { HttpProtocolIntegrationTest::SetUp(); }
 
   void TearDown() override {
+    if (codec_client_) {
+      // Close the client FIRST to prevent any "connection reset" callbacks.
+      codec_client_->close();
+      codec_client_.reset();
+    }
+
     cleanupUpstreamAndDownstream();
     HttpProtocolIntegrationTest::TearDown();
   }
 
   enum class RestrictionType { Request, Response };
+  enum class StringMatchType { Exact, Regex };
 
   static xds::type::matcher::v3::Matcher::MatcherList::Predicate
   buildCelPredicate(absl::string_view cel_expression) {
@@ -61,6 +111,30 @@ public:
     // Assign the parsed AST to the configuration and return the predicate.
     *cel_matcher.mutable_expr_match()->mutable_cel_expr_parsed() = ast;
     custom_match->mutable_typed_config()->PackFrom(cel_matcher);
+    return predicate;
+  }
+
+  static xds::type::matcher::v3::Matcher::MatcherList::Predicate
+  buildStringMatcherPredicate(const std::string& input_extension_name,
+                              const Protobuf::Message& input_config,
+                              const std::string& match_pattern, StringMatchType match_type) {
+    xds::type::matcher::v3::Matcher::MatcherList::Predicate predicate;
+    auto* single = predicate.mutable_single_predicate();
+
+    // Configure the Data Input (The source of the string to be matched)
+    single->mutable_input()->set_name(input_extension_name);
+    single->mutable_input()->mutable_typed_config()->PackFrom(input_config);
+
+    // Configure the String Matcher (The logic to apply)
+    auto* string_matcher = single->mutable_value_match();
+    if (match_type == StringMatchType::Regex) {
+      auto* regex = string_matcher->mutable_safe_regex();
+      regex->mutable_google_re2();
+      regex->set_regex(match_pattern);
+    } else {
+      string_matcher->set_exact(match_pattern);
+    }
+
     return predicate;
   }
 
@@ -133,15 +207,33 @@ public:
   }
 
   template <typename T>
-  IntegrationStreamDecoderPtr sendGrpcRequest(const T& request_msg,
-                                              const std::string& method_path) {
+  IntegrationStreamDecoderPtr
+  sendGrpcRequest(const T& request_msg, const std::string& method_path,
+                  const Http::TestRequestHeaderMapImpl& custom_headers = {}) {
+    // Close the existing connection in case it exists.
+    // This can happen if this method is called more than once from a single test.
+    if (codec_client_ != nullptr) {
+      codec_client_->close();
+    }
+
     codec_client_ = makeHttpConnection(lookupPort("http"));
     auto request_buf = Grpc::Common::serializeToGrpcFrame(request_msg);
+
+    // Default headers
     auto request_headers = Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                                           {":path", method_path},
                                                           {"content-type", "application/grpc"},
                                                           {":authority", "host"},
                                                           {":scheme", "http"}};
+
+    // Merge custom headers (overwriting defaults if keys match)
+    custom_headers.iterate(
+        [&request_headers](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+          request_headers.setCopy(Http::LowerCaseString(header.key().getStringView()),
+                                  header.value().getStringView());
+          return Http::HeaderMap::Iterate::Continue;
+        });
+
     return codec_client_->makeRequestWithBody(request_headers, request_buf->toString());
   }
 };
@@ -299,6 +391,137 @@ TEST_P(ProtoApiScrubberIntegrationTest, ScrubNestedField_MatcherFalse) {
   Buffer::OwnedImpl data;
   data.add(upstream_request_->body());
   checkSerializedData<apikeys::CreateApiKeyRequest>(data, {original_proto});
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+}
+
+// Tests scrubbing of nested fields in the request when a CEL matcher is configured to use request
+// headers.
+TEST_P(ProtoApiScrubberIntegrationTest, ScrubNestedField_CustomCelMatcher_RequestHeader) {
+  config_helper_.prependFilter(getFilterConfig(
+      apikeysDescriptorPath(), kCreateApiKeyMethod, "key.display_name", RestrictionType::Request,
+      buildCelPredicate("request.headers['api-version'] == '2025-v1'")));
+  initialize();
+
+  {
+    // Tests that the field `key.display_name` is removed from the request as the CEL expression
+    // ("request.headers['api-version'] == '2025_v1'") evaluates to true.
+    auto original_proto = makeCreateApiKeyRequest(R"pb(
+      parent: "public"
+      key { display_name: "should-be-removed" }
+    )pb");
+    auto custom_headers = Http::TestRequestHeaderMapImpl{{"api-version", "2025-v1"}};
+
+    auto response = sendGrpcRequest(original_proto, kCreateApiKeyMethod, custom_headers);
+    waitForNextUpstreamRequest();
+
+    apikeys::CreateApiKeyRequest expected = original_proto;
+    expected.mutable_key()->clear_display_name();
+
+    Buffer::OwnedImpl data;
+    data.add(upstream_request_->body());
+    checkSerializedData<apikeys::CreateApiKeyRequest>(data, {expected});
+
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+    ASSERT_TRUE(response->waitForEndStream());
+  }
+
+  {
+    // Tests that the field `key.display_name` is preserved in the request as the CEL expression
+    // ("request.headers['api-version'] == '2025_v1'") evaluates to false.
+    auto original_proto = makeCreateApiKeyRequest(R"pb(
+      parent: "public"
+      key { display_name: "should-stay" }
+    )pb");
+    auto custom_headers = Http::TestRequestHeaderMapImpl{{"api-version", "2025-v2"}};
+
+    auto response = sendGrpcRequest(original_proto, kCreateApiKeyMethod, custom_headers);
+    waitForNextUpstreamRequest();
+
+    Buffer::OwnedImpl data;
+    data.add(upstream_request_->body());
+    checkSerializedData<apikeys::CreateApiKeyRequest>(data, {original_proto});
+
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+    ASSERT_TRUE(response->waitForEndStream());
+  }
+}
+
+// Tests scrubbing of nested fields in the request when a String matcher is configured to use
+// request headers via exact match.
+TEST_P(ProtoApiScrubberIntegrationTest, ScrubNestedField_StringMatcher_RequestHeader_ExactMatch) {
+  envoy::type::matcher::v3::HttpRequestHeaderMatchInput header_input;
+  header_input.set_header_name("api-version");
+
+  auto predicate = buildStringMatcherPredicate("envoy.matching.inputs.request_headers",
+                                               header_input, "2025-v1", StringMatchType::Exact);
+
+  config_helper_.prependFilter(getFilterConfig(apikeysDescriptorPath(), kCreateApiKeyMethod,
+                                               "key.display_name", RestrictionType::Request,
+                                               predicate));
+
+  initialize();
+
+  auto original_proto = makeCreateApiKeyRequest(R"pb(
+      parent: "public"
+      key { display_name: "should-be-removed" }
+    )pb");
+  auto custom_headers = Http::TestRequestHeaderMapImpl{{"api-version", "2025-v1"}};
+
+  auto response = sendGrpcRequest(original_proto, kCreateApiKeyMethod, custom_headers);
+  waitForNextUpstreamRequest();
+
+  apikeys::CreateApiKeyRequest expected = original_proto;
+  expected.mutable_key()->clear_display_name();
+
+  Buffer::OwnedImpl data;
+  data.add(upstream_request_->body());
+  checkSerializedData<apikeys::CreateApiKeyRequest>(data, {expected});
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+}
+
+// Tests scrubbing of nested fields in the request when a String matcher is configured to use filter
+// state via regex match.
+TEST_P(ProtoApiScrubberIntegrationTest, ScrubNestedField_StringMatcher_FilterState_RegexMatch) {
+  envoy::extensions::matching::common_inputs::network::v3::FilterStateInput filter_state_input;
+  filter_state_input.set_key(kFilterStateLabelKey);
+
+  // The metadata injector filter (test_injector) sets the value to: "LABEL1,LABEL2,LABEL3"
+  // We use a regex to verify that "LABEL2" is present in the list.
+  auto predicate =
+      buildStringMatcherPredicate("envoy.matching.inputs.filter_state", filter_state_input,
+                                  ".*LABEL2.*", StringMatchType::Regex);
+
+  config_helper_.prependFilter(getFilterConfig(apikeysDescriptorPath(), kCreateApiKeyMethod,
+                                               "key.display_name", RestrictionType::Request,
+                                               predicate));
+
+  config_helper_.prependFilter(R"yaml(
+    name: test_injector
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.Struct
+  )yaml");
+
+  initialize();
+
+  auto original_proto = makeCreateApiKeyRequest(R"pb(
+    parent: "public"
+    key { display_name: "should-be-removed" }
+  )pb");
+
+  auto response = sendGrpcRequest(original_proto, kCreateApiKeyMethod);
+  waitForNextUpstreamRequest();
+
+  // Since "LABEL1,LABEL2,LABEL3" matches ".*LABEL2.*", the field should be removed.
+  apikeys::CreateApiKeyRequest expected = original_proto;
+  expected.mutable_key()->clear_display_name();
+
+  Buffer::OwnedImpl data;
+  data.add(upstream_request_->body());
+  checkSerializedData<apikeys::CreateApiKeyRequest>(data, {expected});
 
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   ASSERT_TRUE(response->waitForEndStream());
