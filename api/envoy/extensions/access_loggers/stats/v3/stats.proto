@@ -2,10 +2,10 @@ syntax = "proto3";
 
 package envoy.extensions.access_loggers.stats.v3;
 
+import "envoy/config/accesslog/v3/accesslog.proto";
+
 import "google/protobuf/wrappers.proto";
-
 import "xds/annotations/v3/status.proto";
-
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -39,13 +39,17 @@ message Config {
     string value_format = 2 [(validate.rules).string = {min_len: 1}];
   }
 
-  // Defines the name and tags of a stat.
-  message Stat {
+  // Defines the common configuration of a stat.
+  message Common {
     // The name of the stat.
     string name = 1 [(validate.rules).string = {min_len: 1}];
 
     // The tags for the stat.
     repeated Tag tags = 2;
+
+    // Filter which is used to determine if stats should be emitted for
+    // particular log calls.
+    config.accesslog.v3.AccessLogFilter filter = 3;
   }
 
   // Configuration for a histogram stat.
@@ -60,29 +64,32 @@ message Config {
 
       Milliseconds = 3;
 
-      // Values are scaled to range 0-1.0, indicating 0%-100%. Values can be outside this range,
-      // but must be positive. Values extremely far out of this range may overflow.
+      // Values are scaled to range 0-1.0, indicating 0%-100%. Values can be
+      // outside this range, but must be positive. Values extremely far out of
+      // this range may overflow.
       Percent = 4;
     }
 
     // The name and tags of this histogram.
-    Stat stat = 1 [(validate.rules).message = {required: true}];
+    Common stat = 1 [(validate.rules).message = {required: true}];
 
     // The units for this histogram.
     Unit unit = 2 [(validate.rules).enum = {defined_only: true}];
 
-    // The format string for the value of this histogram, using :ref:`command operators <config_access_log_command_operators>`.
-    // This must evaluate to a positive number.
+    // The format string for the value of this histogram, using :ref:`command
+    // operators <config_access_log_command_operators>`. This must evaluate to a
+    // positive number.
     string value_format = 3 [(validate.rules).string = {min_len: 1 prefix: "%" suffix: "%"}];
   }
 
   // Configuration for a counter stat.
   message Counter {
     // The name and tags of this counter.
-    Stat stat = 1 [(validate.rules).message = {required: true}];
+    Common stat = 1 [(validate.rules).message = {required: true}];
 
-    // The format string for the value to add to this counter, using :ref:`command operators <config_access_log_command_operators>`.
-    // One of ``value_format`` or ``value_fixed`` must be configured.
+    // The format string for the value to add to this counter, using
+    // :ref:`command operators <config_access_log_command_operators>`. One of
+    // ``value_format`` or ``value_fixed`` must be configured.
     string value_format = 2
         [(validate.rules).string = {prefix: "%" suffix: "%" ignore_empty: true}];
 

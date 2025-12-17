@@ -39,11 +39,11 @@ private:
     Formatter::FormatterPtr value_formatter_;
   };
 
-  class NameAndTags {
+  class Common {
   public:
-    NameAndTags(const envoy::extensions::access_loggers::stats::v3::Config::Stat& cfg,
-                Stats::StatNamePool& pool,
-                const std::vector<Formatter::CommandParserPtr>& commands);
+    Common(const envoy::extensions::access_loggers::stats::v3::Config::Common& cfg,
+           Stats::StatNamePool& pool, const std::vector<Formatter::CommandParserPtr>& commands,
+           Server::Configuration::GenericFactoryContext& context);
 
     std::pair<Stats::StatNameTagVector, std::vector<Stats::StatNameDynamicStorage>>
     tags(const Formatter::Context& context, const StreamInfo::StreamInfo& stream_info,
@@ -51,16 +51,17 @@ private:
 
     Stats::StatName name_;
     std::vector<DynamicTag> dynamic_tags_;
+    AccessLog::FilterPtr filter_;
   };
 
   struct Histogram {
-    NameAndTags stat_;
+    Common stat_;
     Stats::Histogram::Unit unit_;
     Formatter::FormatterProviderPtr value_formatter_;
   };
 
   struct Counter {
-    NameAndTags stat_;
+    Common stat_;
     Formatter::FormatterProviderPtr value_formatter_;
     uint64_t value_fixed_;
   };

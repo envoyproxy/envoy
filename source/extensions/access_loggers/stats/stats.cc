@@ -1,5 +1,7 @@
 #include "source/extensions/access_loggers/stats/stats.h"
 
+#include "envoy/data/accesslog/v3/accesslog.pb.h"
+
 #include "source/common/formatter/substitution_formatter.h"
 
 namespace Envoy {
@@ -45,12 +47,12 @@ StatsAccessLog::StatsAccessLog(const envoy::extensions::access_loggers::stats::v
                                Server::Configuration::GenericFactoryContext& context,
                                AccessLog::FilterPtr&& filter,
                                const std::vector<Formatter::CommandParserPtr>& commands)
-    : Common::ImplBase(std::move(filter)),
+    : AccessLoggers::Common::ImplBase(std::move(filter)),
       scope_(context.statsScope().createScope(config.stat_prefix(), true /* evictable */)),
       stat_name_pool_(scope_->symbolTable()), histograms_([&]() {
         std::vector<Histogram> histograms;
         for (const auto& hist_cfg : config.histograms()) {
-          histograms.emplace_back(NameAndTags(hist_cfg.stat(), stat_name_pool_, commands),
+          histograms.emplace_back(Common(hist_cfg.stat(), stat_name_pool_, commands, context),
                                   convertUnitEnum(hist_cfg.unit()),
                                   parseValueFormat(hist_cfg.value_format(), commands));
         }
@@ -60,7 +62,7 @@ StatsAccessLog::StatsAccessLog(const envoy::extensions::access_loggers::stats::v
         std::vector<Counter> counters;
         for (const auto& counter_cfg : config.counters()) {
           Counter& inserted = counters.emplace_back(
-              NameAndTags(counter_cfg.stat(), stat_name_pool_, commands), nullptr, 0);
+              Common(counter_cfg.stat(), stat_name_pool_, commands, context), nullptr, 0);
           if (!counter_cfg.value_format().empty() && counter_cfg.has_value_fixed()) {
             throw EnvoyException(
                 "Stats logger cannot have both `value_format` and `value_fixed` configured.");
@@ -78,12 +80,16 @@ StatsAccessLog::StatsAccessLog(const envoy::extensions::access_loggers::stats::v
         return counters;
       }()) {}
 
-StatsAccessLog::NameAndTags::NameAndTags(
-    const envoy::extensions::access_loggers::stats::v3::Config::Stat& cfg,
-    Stats::StatNamePool& pool, const std::vector<Formatter::CommandParserPtr>& commands) {
+StatsAccessLog::Common::Common(
+    const envoy::extensions::access_loggers::stats::v3::Config::Common& cfg,
+    Stats::StatNamePool& pool, const std::vector<Formatter::CommandParserPtr>& commands,
+    Server::Configuration::GenericFactoryContext& context) {
   name_ = pool.add(cfg.name());
   for (const auto& tag_cfg : cfg.tags()) {
     dynamic_tags_.emplace_back(tag_cfg, pool, commands);
+  }
+  if (cfg.has_filter()) {
+    filter_ = AccessLog::FilterFactory::fromProto(cfg.filter(), context);
   }
 }
 
@@ -96,9 +102,8 @@ StatsAccessLog::DynamicTag::DynamicTag(
           Formatter::FormatterPtr)) {}
 
 std::pair<Stats::StatNameTagVector, std::vector<Stats::StatNameDynamicStorage>>
-StatsAccessLog::NameAndTags::tags(const Formatter::Context& context,
-                                  const StreamInfo::StreamInfo& stream_info,
-                                  Stats::Scope& scope) const {
+StatsAccessLog::Common::tags(const Formatter::Context& context,
+                             const StreamInfo::StreamInfo& stream_info, Stats::Scope& scope) const {
   Stats::StatNameTagVector tags;
 
   std::vector<Stats::StatNameDynamicStorage> dynamic_storage;
@@ -149,6 +154,9 @@ void StatsAccessLog::emitLog(const Formatter::Context& context,
 void StatsAccessLog::emitLogConst(const Formatter::Context& context,
                                   const StreamInfo::StreamInfo& stream_info) const {
   for (const auto& histogram : histograms_) {
+    if (histogram.stat_.filter_ && !histogram.stat_.filter_->evaluate(context, stream_info)) {
+      continue;
+    }
     absl::optional<uint64_t> computed_value_opt =
         getFormatValue(*histogram.value_formatter_, context, stream_info,
                        histogram.unit_ == Stats::Histogram::Unit::Percent);
@@ -165,6 +173,9 @@ void StatsAccessLog::emitLogConst(const Formatter::Context& context,
   }
 
   for (const auto& counter : counters_) {
+    if (counter.stat_.filter_ && !counter.stat_.filter_->evaluate(context, stream_info)) {
+      continue;
+    }
     uint64_t value;
     if (counter.value_formatter_ != nullptr) {
       absl::optional<uint64_t> computed_value_opt =

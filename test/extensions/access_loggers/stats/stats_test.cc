@@ -297,6 +297,40 @@ TEST_F(StatsAccessLoggerTest, EmptyTagFormatter) {
   logger_->log(formatter_context_, stream_info_);
 }
 
+TEST_F(StatsAccessLoggerTest, StatFilter) {
+  const std::string yaml = R"EOF(
+    stat_prefix: test_stat_prefix
+    counters:
+      - stat:
+          name: counter
+          filter:
+            status_code_filter:
+              comparison:
+                op: EQ
+                value:
+                  default_value: 200
+        value_fixed: 1
+)EOF";
+
+  initialize(yaml);
+
+  // Case 1: Filter matches (200)
+  EXPECT_CALL(stream_info_, responseCode())
+      .WillRepeatedly(testing::Return(absl::optional<uint32_t>{200}));
+  EXPECT_CALL(store_, counter(_));
+  EXPECT_CALL(store_.counter_, add(1));
+  logger_->log(formatter_context_, stream_info_);
+
+  // Case 2: Filter does not match (404)
+  testing::Mock::VerifyAndClearExpectations(&store_);
+  testing::Mock::VerifyAndClearExpectations(&store_.counter_);
+
+  EXPECT_CALL(stream_info_, responseCode())
+      .WillRepeatedly(testing::Return(absl::optional<uint32_t>{404}));
+  EXPECT_CALL(store_, counter(_)).Times(0);
+  logger_->log(formatter_context_, stream_info_);
+}
+
 } // namespace StatsAccessLog
 } // namespace AccessLoggers
 } // namespace Extensions
