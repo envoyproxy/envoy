@@ -153,6 +153,7 @@ bool ProtoApiScrubberFilter::checkMethodLevelRestrictions(Envoy::Http::RequestHe
 Http::FilterHeadersStatus
 ProtoApiScrubberFilter::decodeHeaders(Envoy::Http::RequestHeaderMap& headers, bool) {
   ENVOY_STREAM_LOG(trace, "Called ProtoApiScrubber Filter : {}", *decoder_callbacks_, __func__);
+  filter_config_.stats().total_requests_.inc();
 
   if (!Envoy::Grpc::Common::isGrpcRequestHeaders(headers)) {
     ENVOY_STREAM_LOG(debug,
@@ -170,7 +171,6 @@ ProtoApiScrubberFilter::decodeHeaders(Envoy::Http::RequestHeaderMap& headers, bo
   // The :path pseudo-header is mandatory for HTTP/2 requests.
   // gRPC runs over HTTP/2, so this header should always be present for valid gRPC requests.
   if (path_header == nullptr) {
-    filter_config_.stats().path_header_missing_.inc();
     rejectRequest(Status::WellKnownGrpcStatus::InvalidArgument, kPathValidationError,
                   formatError(kRcDetailFilterProtoApiScrubber, kRcDetailErrorTypeBadRequest,
                               "PATH_HEADER_MISSING"));
@@ -286,10 +286,9 @@ Http::FilterDataStatus ProtoApiScrubberFilter::decodeData(Buffer::Instance& data
       continue;
     }
 
-    // Observability: Measure Latency
-    auto start_time = std::chrono::steady_clock::now();
+    auto start_time = filter_config_.timeSource().monotonicTime();
     auto status = request_scrubber_->Scrub(stream_message->message());
-    auto end_time = std::chrono::steady_clock::now();
+    auto end_time = filter_config_.timeSource().monotonicTime();
     auto latency_ms =
         std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
     filter_config_.stats().request_scrubbing_latency_.recordValue(latency_ms);
@@ -399,10 +398,9 @@ Http::FilterDataStatus ProtoApiScrubberFilter::encodeData(Buffer::Instance& data
       continue;
     }
 
-    // Observability: Measure Latency
-    auto start_time = std::chrono::steady_clock::now();
+    auto start_time = filter_config_.timeSource().monotonicTime();
     auto response_scrubber_or_status = response_scrubber_->Scrub(stream_message->message());
-    auto end_time = std::chrono::steady_clock::now();
+    auto end_time = filter_config_.timeSource().monotonicTime();
     auto latency_ms =
         std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
     filter_config_.stats().response_scrubbing_latency_.recordValue(latency_ms);

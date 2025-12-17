@@ -4,6 +4,7 @@
 #include <string>
 #include <utility>
 
+#include "envoy/common/time.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/http/proto_api_scrubber/v3/config.pb.h"
 #include "envoy/extensions/filters/http/proto_api_scrubber/v3/matcher_actions.pb.h"
@@ -58,7 +59,7 @@ using TypeFinder = std::function<const Envoy::Protobuf::Type*(const std::string&
   COUNTER(request_buffer_conversion_error)                                                         \
   COUNTER(response_buffer_conversion_error)                                                        \
   COUNTER(invalid_method_name)                                                                     \
-  COUNTER(path_header_missing)                                                                     \
+  COUNTER(total_requests)                                                                          \
   COUNTER(total_requests_checked)                                                                  \
   HISTOGRAM(request_scrubbing_latency, Milliseconds)                                               \
   HISTOGRAM(response_scrubbing_latency, Milliseconds)
@@ -78,7 +79,7 @@ struct ProtoApiScrubberStats {
         response_buffer_conversion_error_(
             makeCounter(scope, prefix, "response_buffer_conversion_error")),
         invalid_method_name_(makeCounter(scope, prefix, "invalid_method_name")),
-        path_header_missing_(makeCounter(scope, prefix, "path_header_missing")),
+        total_requests_(makeCounter(scope, prefix, "total_requests")),
         total_requests_checked_(makeCounter(scope, prefix, "total_requests_checked")),
         request_scrubbing_latency_(makeHistogram(scope, prefix, "request_scrubbing_latency",
                                                  Stats::Histogram::Unit::Milliseconds)),
@@ -189,9 +190,12 @@ public:
 
   const ProtoApiScrubberStats& stats() const { return stats_; }
 
+  TimeSource& timeSource() const { return time_source_; }
+
 protected:
-  // Constructor initializes stats.
-  ProtoApiScrubberFilterConfig(ProtoApiScrubberStats stats) : stats_(stats) {}
+  // Constructor initializes stats and time source.
+  ProtoApiScrubberFilterConfig(ProtoApiScrubberStats stats, TimeSource& time_source)
+      : stats_(stats), time_source_(time_source) {}
 
 private:
   friend class MockProtoApiScrubberFilterConfig;
@@ -273,6 +277,7 @@ private:
   std::unique_ptr<const TypeFinder> type_finder_;
 
   ProtoApiScrubberStats stats_;
+  TimeSource& time_source_;
 };
 
 // A class to validate the input type specified for the unified matcher in the config.
