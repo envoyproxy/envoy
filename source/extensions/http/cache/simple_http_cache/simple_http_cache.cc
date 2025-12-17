@@ -211,7 +211,7 @@ void SimpleHttpCache::updateHeaders(const LookupContext& lookup_context,
 }
 
 SimpleHttpCache::Entry SimpleHttpCache::lookup(const LookupRequest& request) {
-  absl::ReaderMutexLock lock(&mutex_);
+  absl::ReaderMutexLock lock(mutex_);
   auto iter = map_.find(request.key());
   if (iter == map_.end()) {
     return Entry{};
