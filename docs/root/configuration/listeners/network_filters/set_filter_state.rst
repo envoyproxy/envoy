@@ -16,19 +16,54 @@ extensions.
     significantly and indirectly altering the connection processing logic.
 
 
+Understanding Object and Factory Keys
+-------------------------------------
+
+The filter state system uses a factory pattern to create objects from string values.
+Each filter state entry consists of:
+
+* **object_key**: The name under which the data is stored and retrieved.
+* **factory_key**: The name of the factory that creates the object from the string value.
+
+When using :ref:`well-known filter state keys <well_known_filter_state>` (like
+``envoy.tcp_proxy.cluster`` or ``envoy.network.upstream_server_name``), each key has a
+factory registered with the same name. In this case, you only need to specify ``object_key``
+and the system will automatically use a factory with the same name.
+
+When using a **custom key name** which is not from the well-known list, no factory is registered
+with that name. You must specify ``factory_key`` to tell the system which factory should
+create the object. Use ``envoy.string`` as the factory for generic string values.
+
+
 Examples
 --------
 
 A sample filter configuration that propagates the downstream SNI as the upstream SNI:
 
 .. validated-code-block:: yaml
-  :type-name: envoy.extensions.filters.http.set_filter_state.v3.Config
+  :type-name: envoy.extensions.filters.network.set_filter_state.v3.Config
 
   on_new_connection:
   - object_key: envoy.network.upstream_server_name
     format_string:
       text_format_source:
         inline_string: "%REQUESTED_SERVER_NAME%"
+
+
+A sample filter configuration using a **custom key** with the generic string factory.
+Use this pattern when you want to store arbitrary connection data under a custom name:
+
+.. validated-code-block:: yaml
+  :type-name: envoy.extensions.filters.network.set_filter_state.v3.Config
+
+  on_new_connection:
+  - object_key: my.custom.client_sni
+    factory_key: envoy.string
+    format_string:
+      text_format_source:
+        inline_string: "%REQUESTED_SERVER_NAME%"
+
+The stored value can then be accessed in access logs using ``%FILTER_STATE(my.custom.client_sni)%``.
 
 
 Statistics
