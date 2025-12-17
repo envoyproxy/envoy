@@ -44,20 +44,19 @@ Network::FilterStatus TunnelHostnameLookupFilter::onNewConnection() {
   ENVOY_LOG(debug, "Looking up synthetic IP: {}", destination_ip);
 
   // Lookup the hostname in the cache
-  auto cache_entry = cache_manager_->lookup(destination_ip);
-  if (!cache_entry.has_value()) {
+  auto hostname = cache_manager_->lookup(destination_ip);
+  if (!hostname.has_value()) {
     ENVOY_LOG(debug, "No cache entry found for IP: {}", destination_ip);
     return Network::FilterStatus::Continue;
   }
 
-  const std::string& hostname = cache_entry->hostname;
-  ENVOY_LOG(info, "Found hostname {} for synthetic IP {}", hostname, destination_ip);
+  ENVOY_LOG(info, "Found hostname {} for synthetic IP {}", hostname.value(), destination_ip);
 
   // Store the hostname in filter state so downstream filters can use it
   // We use StreamInfo filter state which is accessible by all filters in the chain
   auto& filter_state = read_callbacks_->connection().streamInfo().filterState();
   filter_state->setData(
-      config_->filterStateKey(), std::make_shared<Router::StringAccessorImpl>(hostname),
+      config_->filterStateKey(), std::make_shared<Router::StringAccessorImpl>(hostname.value()),
       StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Connection);
 
   ENVOY_LOG(debug, "Stored hostname in filter state with key: {}", config_->filterStateKey());

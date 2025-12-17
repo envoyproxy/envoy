@@ -15,6 +15,9 @@
 
 #include "absl/container/flat_hash_map.h"
 
+#include <atomic>
+#include <memory>
+
 namespace Envoy {
 namespace Extensions {
 namespace UdpFilters {
@@ -27,6 +30,9 @@ using DnsGatewayPolicy = envoy::extensions::filters::udp::dns_gateway::v3::DnsGa
  * Policy configuration for domain pattern matching and synthetic IP allocation.
  */
 struct PolicyConfig {
+  // Allocation strategy enum
+  enum class AllocationStrategy { Hash, Linear, Random };
+
   std::string domain_pattern;
   uint32_t cidr_base_ip; // Base IP as uint32 in host byte order
   uint32_t cidr_prefix_len;
@@ -35,14 +41,22 @@ struct PolicyConfig {
   // For deterministic IP allocation from CIDR block
   uint32_t max_ips_in_cidr;
 
+  // Allocation strategy for this policy
+  AllocationStrategy strategy_;
+
+  // Shared counter for LINEAR strategy (shared across all workers)
+  std::shared_ptr<std::atomic<uint32_t>> shared_counter_;
+
   PolicyConfig(const std::string& pattern, const std::string& cidr_ip, uint32_t prefix_len,
-               std::chrono::seconds ttl_seconds);
+               std::chrono::seconds ttl_seconds, AllocationStrategy strategy,
+               std::shared_ptr<std::atomic<uint32_t>> shared_counter = nullptr);
 
   // Check if a domain matches this policy's pattern (supports wildcards)
   bool matches(absl::string_view domain) const;
 
-  // Allocate a synthetic IP from this policy's CIDR block (deterministic hash-based)
-  std::string allocateSyntheticIp(absl::string_view domain) const;
+  // Allocate a synthetic IP from this policy's CIDR block
+  std::string allocateSyntheticIp(absl::string_view domain,
+                                  Random::RandomGenerator* random = nullptr) const;
 };
 
 /**
@@ -52,9 +66,12 @@ struct PolicyConfig {
 class DnsGatewayFilter : public Network::UdpListenerReadFilter,
                          Logger::Loggable<Logger::Id::filter> {
 public:
-  DnsGatewayFilter(Network::UdpReadFilterCallbacks& callbacks, const DnsGatewayConfig& config,
-                   Common::SyntheticIp::SyntheticIpCacheManagerSharedPtr cache_manager,
-                   TimeSource& time_source, Random::RandomGenerator& random);
+  DnsGatewayFilter(
+      Network::UdpReadFilterCallbacks& callbacks, const DnsGatewayConfig& config,
+      Common::SyntheticIp::SyntheticIpCacheManagerSharedPtr cache_manager,
+      const absl::flat_hash_map<std::string, std::shared_ptr<std::atomic<uint32_t>>>&
+          shared_counters,
+      TimeSource& time_source, Random::RandomGenerator& random);
 
   // Network::UdpListenerReadFilter
   Network::FilterStatus onData(Network::UdpRecvData& data) override;
@@ -67,6 +84,7 @@ private:
   std::vector<PolicyConfig> policies_;
   std::chrono::seconds default_ttl_;
   Common::SyntheticIp::SyntheticIpCacheManagerSharedPtr cache_manager_;
+  Random::RandomGenerator& random_;
 
   // Temporary stats store for DNS parser (doesn't persist anything)
   Stats::IsolatedStoreImpl stats_store_;

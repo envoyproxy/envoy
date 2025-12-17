@@ -25,23 +25,21 @@ namespace SyntheticIp {
 class SyntheticIpCacheManager : public Singleton::Instance,
                                 Logger::Loggable<Logger::Id::connection> {
 public:
-  SyntheticIpCacheManager(ThreadLocal::SlotAllocator& tls, Event::Dispatcher& main_dispatcher,
-                          std::chrono::seconds eviction_interval, uint32_t max_entries);
+  SyntheticIpCacheManager(ThreadLocal::SlotAllocator& tls, Event::Dispatcher& main_dispatcher);
 
   /**
    * Store a mapping in the current worker's cache.
    * @param synthetic_ip the synthetic IP address (key)
    * @param hostname the original hostname
-   * @param ttl time-to-live for this entry
    */
-  void put(absl::string_view synthetic_ip, absl::string_view hostname, std::chrono::seconds ttl);
+  void put(absl::string_view synthetic_ip, absl::string_view hostname);
 
   /**
    * Lookup a mapping in the current worker's cache.
    * @param synthetic_ip the synthetic IP address to look up
-   * @return the cache entry if found and not expired, nullopt otherwise
+   * @return the hostname if found, nullopt otherwise
    */
-  absl::optional<CacheEntry> lookup(absl::string_view synthetic_ip);
+  absl::optional<std::string> lookup(absl::string_view synthetic_ip);
 
   /**
    * Replicate a mapping to all worker threads.
@@ -50,10 +48,8 @@ public:
    *
    * @param synthetic_ip the synthetic IP address (key)
    * @param hostname the original hostname
-   * @param ttl time-to-live for this entry
    */
-  void replicateToAllWorkers(absl::string_view synthetic_ip, absl::string_view hostname,
-                             std::chrono::seconds ttl);
+  void replicateToAllWorkers(absl::string_view synthetic_ip, absl::string_view hostname);
 
   /**
    * Remove an entry from all worker caches.
@@ -73,10 +69,8 @@ public:
    * Can be called from any thread.
    * @param synthetic_ip the synthetic IP address (key)
    * @param hostname the original hostname
-   * @param ttl time-to-live for this entry
    */
-  void replicateFromWorker(absl::string_view synthetic_ip, absl::string_view hostname,
-                           std::chrono::seconds ttl);
+  void replicateFromWorker(absl::string_view synthetic_ip, absl::string_view hostname);
 
 private:
   ThreadLocal::TypedSlot<SyntheticIpCache> tls_slot_;

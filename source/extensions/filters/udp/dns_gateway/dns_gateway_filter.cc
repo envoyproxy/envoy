@@ -25,11 +25,20 @@ uint32_t hashDomain(absl::string_view domain) {
   return hash;
 }
 
+// Helper to create a unique key for each policy
+std::string makePolicyKey(absl::string_view domain_pattern, absl::string_view cidr_prefix,
+                          uint32_t prefix_len) {
+  return absl::StrCat(domain_pattern, ":", cidr_prefix, "/", prefix_len);
+}
+
 } // namespace
 
 PolicyConfig::PolicyConfig(const std::string& pattern, const std::string& cidr_ip,
-                           uint32_t prefix_len, std::chrono::seconds ttl_seconds)
-    : domain_pattern(pattern), cidr_prefix_len(prefix_len), ttl(ttl_seconds) {
+                           uint32_t prefix_len, std::chrono::seconds ttl_seconds,
+                           AllocationStrategy strategy,
+                           std::shared_ptr<std::atomic<uint32_t>> shared_counter)
+    : domain_pattern(pattern), cidr_prefix_len(prefix_len), ttl(ttl_seconds), strategy_(strategy),
+      shared_counter_(shared_counter) {
   // Parse CIDR base IP
   struct in_addr addr;
   if (inet_pton(AF_INET, cidr_ip.c_str(), &addr) == 1) {
@@ -44,6 +53,12 @@ PolicyConfig::PolicyConfig(const std::string& pattern, const std::string& cidr_i
     max_ips_in_cidr = (cidr_prefix_len == 32) ? 1 : 2;
   } else {
     max_ips_in_cidr = (1u << (32 - cidr_prefix_len)) - 2; // Exclude network and broadcast
+  }
+
+  // Validate LINEAR strategy has a counter
+  if (strategy_ == AllocationStrategy::Linear && !shared_counter_) {
+    ENVOY_LOG(warn, "LINEAR strategy requires a shared counter, falling back to HASH");
+    strategy_ = AllocationStrategy::Hash;
   }
 }
 
@@ -75,20 +90,53 @@ bool PolicyConfig::matches(absl::string_view domain) const {
   return domain == domain_pattern;
 }
 
-std::string PolicyConfig::allocateSyntheticIp(absl::string_view domain) const {
-  // Deterministic hash-based allocation
-  uint32_t hash = hashDomain(domain);
+std::string PolicyConfig::allocateSyntheticIp(absl::string_view domain,
+                                              Random::RandomGenerator* random) const {
   uint32_t ip_offset;
 
-  if (cidr_prefix_len == 32) {
-    // For /32, there's only one IP, no offset needed
-    ip_offset = 0;
-  } else if (cidr_prefix_len == 31) {
-    // For /31, use either .0 or .1
-    ip_offset = hash % 2;
-  } else {
-    // For other ranges, skip network address (add 1)
-    ip_offset = (hash % max_ips_in_cidr) + 1;
+  switch (strategy_) {
+  case AllocationStrategy::Hash: {
+    // Deterministic hash-based allocation
+    uint32_t hash = hashDomain(domain);
+    if (cidr_prefix_len == 32) {
+      ip_offset = 0;
+    } else if (cidr_prefix_len == 31) {
+      ip_offset = hash % 2;
+    } else {
+      ip_offset = (hash % max_ips_in_cidr) + 1;
+    }
+    break;
+  }
+
+  case AllocationStrategy::Linear: {
+    ASSERT(shared_counter_ != nullptr, "LINEAR strategy requires shared counter");
+
+    // Atomic increment - thread-safe across all workers
+    uint32_t current = shared_counter_->fetch_add(1, std::memory_order_relaxed);
+
+    if (cidr_prefix_len == 32) {
+      ip_offset = 0;
+    } else if (cidr_prefix_len == 31) {
+      ip_offset = current % 2;
+    } else {
+      // Wrap around within CIDR block: 1, 2, ..., max_ips, 1, 2, ...
+      ip_offset = ((current - 1) % max_ips_in_cidr) + 1;
+    }
+    break;
+  }
+
+  case AllocationStrategy::Random: {
+    ASSERT(random != nullptr, "RANDOM strategy requires random generator");
+
+    if (cidr_prefix_len == 32) {
+      ip_offset = 0;
+    } else if (cidr_prefix_len == 31) {
+      ip_offset = random->random() % 2;
+    } else {
+      ip_offset = (random->random() % max_ips_in_cidr) + 1;
+    }
+    break;
+  }
   }
 
   // Calculate synthetic IP
@@ -105,9 +153,11 @@ std::string PolicyConfig::allocateSyntheticIp(absl::string_view domain) const {
 
 DnsGatewayFilter::DnsGatewayFilter(
     Network::UdpReadFilterCallbacks& callbacks, const DnsGatewayConfig& config,
-    Common::SyntheticIp::SyntheticIpCacheManagerSharedPtr cache_manager, TimeSource& time_source,
-    Random::RandomGenerator& random)
-    : UdpListenerReadFilter(callbacks), cache_manager_(cache_manager), stats_store_(),
+    Common::SyntheticIp::SyntheticIpCacheManagerSharedPtr cache_manager,
+    const absl::flat_hash_map<std::string, std::shared_ptr<std::atomic<uint32_t>>>& shared_counters,
+    TimeSource& time_source, Random::RandomGenerator& random)
+    : UdpListenerReadFilter(callbacks), cache_manager_(cache_manager), random_(random),
+      stats_store_(),
       // Initialize DNS parser with recursion disabled (we don't forward queries)
       message_parser_(
           false, time_source, 0, random,
@@ -122,12 +172,41 @@ DnsGatewayFilter::DnsGatewayFilter(
 
   // Parse policies
   for (const auto& policy_proto : config.policies()) {
+    // Determine strategy
+    PolicyConfig::AllocationStrategy strategy;
+    switch (policy_proto.allocation_strategy()) {
+    case envoy::extensions::filters::udp::dns_gateway::v3::LINEAR:
+      strategy = PolicyConfig::AllocationStrategy::Linear;
+      break;
+    case envoy::extensions::filters::udp::dns_gateway::v3::RANDOM:
+      strategy = PolicyConfig::AllocationStrategy::Random;
+      break;
+    case envoy::extensions::filters::udp::dns_gateway::v3::HASH:
+    default:
+      strategy = PolicyConfig::AllocationStrategy::Hash;
+      break;
+    }
+
     std::chrono::seconds ttl =
         policy_proto.has_ttl() ? std::chrono::seconds(policy_proto.ttl().seconds()) : default_ttl_;
 
     const auto& cidr = policy_proto.cidr_block();
+
+    // Get shared counter if LINEAR
+    std::shared_ptr<std::atomic<uint32_t>> counter = nullptr;
+    if (strategy == PolicyConfig::AllocationStrategy::Linear) {
+      std::string policy_key =
+          makePolicyKey(policy_proto.domain_pattern(), cidr.address_prefix(),
+                        cidr.prefix_len().value());
+
+      auto it = shared_counters.find(policy_key);
+      if (it != shared_counters.end()) {
+        counter = it->second;
+      }
+    }
+
     policies_.emplace_back(policy_proto.domain_pattern(), cidr.address_prefix(),
-                           cidr.prefix_len().value(), ttl);
+                           cidr.prefix_len().value(), ttl, strategy, counter);
   }
 
   ENVOY_LOG(info, "DNS Gateway Filter initialized with {} policies", policies_.size());
@@ -175,15 +254,15 @@ Network::FilterStatus DnsGatewayFilter::onData(Network::UdpRecvData& data) {
               policy->domain_pattern);
 
     // Allocate synthetic IP
-    std::string synthetic_ip = policy->allocateSyntheticIp(query->name_);
+    std::string synthetic_ip = policy->allocateSyntheticIp(query->name_, &random_);
     ENVOY_LOG(info, "Allocated synthetic IP {} for domain {}", synthetic_ip, query->name_);
 
     // Store in current worker's cache immediately
-    cache_manager_->put(synthetic_ip, query->name_, policy->ttl);
+    cache_manager_->put(synthetic_ip, query->name_);
 
     // Replicate to all workers via main thread
     // This ensures TCP connections on any worker can find the mapping
-    cache_manager_->replicateFromWorker(synthetic_ip, query->name_, policy->ttl);
+    cache_manager_->replicateFromWorker(synthetic_ip, query->name_);
 
     // Parse the synthetic IP and create an address
     auto ipaddr = Network::Utility::parseInternetAddressNoThrow(synthetic_ip, 0);

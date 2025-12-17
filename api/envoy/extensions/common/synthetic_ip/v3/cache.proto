@@ -2,8 +2,6 @@ syntax = "proto3";
 
 package envoy.extensions.common.synthetic_ip.v3;
 
-import "google/protobuf/duration.proto";
-
 import "udpa/annotations/status.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.common.synthetic_ip.v3";
@@ -14,19 +12,9 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Synthetic IP Cache]
 // Configuration for the synthetic IP cache that stores mappings from synthetic IPs
-// to original hostnames and real destination IPs.
+// to original hostnames.
 
 message SyntheticIpCacheConfig {
-  // How often to run eviction of expired entries.
-  // Default: 60 seconds.
-  google.protobuf.Duration eviction_interval = 1;
-
-  // Default TTL for cache entries if not specified per-entry.
-  // Default: 300 seconds (5 minutes).
-  google.protobuf.Duration default_ttl = 2;
-
-  // Maximum number of entries in the cache.
-  // When limit is reached, oldest entries will be evicted.
-  // Default: 10000 entries.
-  uint32 max_entries = 3;
+  // This message is reserved for future cache configuration.
+  // Currently, the cache stores all entries indefinitely.
 }
