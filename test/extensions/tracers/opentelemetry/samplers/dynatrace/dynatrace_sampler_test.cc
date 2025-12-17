@@ -428,7 +428,7 @@ INSTANTIATE_TEST_SUITE_P(
                         SamplingResultTestData({"atm", "fixed", "custom"},
                                                "5b3f9fed-980df25c@dt=fw4;0;0;0;0;0;0;95;8h0107")),
 
-        // trace state with multiple extensions, but no TCR
+        // trace state with multiple extensions, but no trace capture reason
         std::make_tuple(
             "5b3f9fed-980df25c@dt=fw4;4;de84a412;50a92;0;0;0;13d;6edd;2h02;3he2a8e619;4h075f04;"
             "5h01;6h1f8d0931f1bbe07139169c26faddb564;7hcc46d06657b9b021",
