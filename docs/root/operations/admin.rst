@@ -235,6 +235,11 @@ modify different aspects of the server:
   Dump current Envoy mutex contention stats (:ref:`MutexStats <envoy_v3_api_msg_admin.v3.MutexStats>`) in JSON
   format, if mutex tracing is enabled. See :option:`--enable-mutex-tracing`.
 
+.. http:get:: /cpu/workers
+
+  Print CPU utilization for each worker thread in percentage. The output format can be specified by the ``format`` query parameter.
+  The sampling interval can be specified by the ``sampling_interval_ms`` query parameter.
+
 .. http:post:: /cpuprofiler
 
   Enable or disable the CPU profiler. Requires compiling with gperftools. The output file can be configured by admin.profile_path.

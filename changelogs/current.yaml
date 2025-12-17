@@ -546,5 +546,8 @@ new_features:
     Added per HTTP event :ref:'procesing effects <envoy.filters.http.ext_proc.ProcessingEffect' in the
     ExtProcLoggingInfo in the FilterState. This new data will be automatically collected and can be accesses via
     method processingEffects.
+- area: admin
+  change: |
+    Added ``/cpu/workers`` admin endpoint providing CPU utilization for each worker thread in percentage.
 
 deprecated:
