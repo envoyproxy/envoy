@@ -39,6 +39,7 @@ public:
 listener.
    * @param rebalanced indicates whether rebalancing is already done
    * @param network_namespace file path to the network namespace from the listener address
+   */
   virtual void onAcceptWorker(Network::ConnectionSocketPtr&& socket,
                               bool hand_off_restored_destination_connections, bool rebalanced,
                               const absl::optional<std::string>& network_namespace) PURE;
@@ -48,36 +49,36 @@ listener.
  * An implementation of a connection balancer. This abstracts the underlying policy (e.g., exact,
  * fuzzy, etc.).
  */
-  class ConnectionBalancer {
-  public:
-    virtual ~ConnectionBalancer() = default;
+class ConnectionBalancer {
+public:
+  virtual ~ConnectionBalancer() = default;
 
-    /**
-     * Register a new handler with the balancer that is available for balancing.
-     */
-    virtual void registerHandler(BalancedConnectionHandler& handler) PURE;
+  /**
+   * Register a new handler with the balancer that is available for balancing.
+   */
+  virtual void registerHandler(BalancedConnectionHandler& handler) PURE;
 
-    /**
-     * Unregister a handler with the balancer that is no longer available for balancing.
-     */
-    virtual void unregisterHandler(BalancedConnectionHandler& handler) PURE;
+  /**
+   * Unregister a handler with the balancer that is no longer available for balancing.
+   */
+  virtual void unregisterHandler(BalancedConnectionHandler& handler) PURE;
 
-    /**
-     * Pick a target handler to send a connection to.
-     * @param current_handler supplies the currently executing connection handler.
-     * @return current_handler if the connection should stay bound to the current handler, or a
-     *         different handler if the connection should be rebalanced.
-     *
-     * NOTE: It is the responsibility of the balancer to call incNumConnections() on the returned
-     *       balancer. See the comments above for more explanation.
-     */
-    virtual BalancedConnectionHandler&
-    pickTargetHandler(BalancedConnectionHandler& current_handler) PURE;
-  };
+  /**
+   * Pick a target handler to send a connection to.
+   * @param current_handler supplies the currently executing connection handler.
+   * @return current_handler if the connection should stay bound to the current handler, or a
+   *         different handler if the connection should be rebalanced.
+   *
+   * NOTE: It is the responsibility of the balancer to call incNumConnections() on the returned
+   *       balancer. See the comments above for more explanation.
+   */
+  virtual BalancedConnectionHandler&
+  pickTargetHandler(BalancedConnectionHandler& current_handler) PURE;
+};
 
-  using ConnectionBalancerSharedPtr = std::shared_ptr<ConnectionBalancer>;
-  using BalancedConnectionHandlerOptRef =
-      absl::optional<std::reference_wrapper<BalancedConnectionHandler>>;
+using ConnectionBalancerSharedPtr = std::shared_ptr<ConnectionBalancer>;
+using BalancedConnectionHandlerOptRef =
+    absl::optional<std::reference_wrapper<BalancedConnectionHandler>>;
 
 } // namespace Network
 } // namespace Envoy
