@@ -15,13 +15,77 @@
 #include "source/common/http/response_decoder_impl_base.h"
 #include "source/common/network/filter_impl.h"
 
+#include "absl/strings/str_cat.h"
+#include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Bootstrap {
 namespace ReverseConnection {
 
-// Forward declaration.
+// Forward declarations.
 class ReverseConnectionIOHandle;
+class ReverseTunnelInitiatorExtension;
+
+/**
+ * Class representing handshake failure with type and context.
+ * Provides methods to generate detailed error messages and stat names.
+ */
+class HandshakeFailureReason {
+public:
+  enum class Type {
+    HttpStatusError, // HTTP response with non-200 status code
+    EncodeError,     // HTTP request encoding failed
+  };
+
+  /**
+   * Create a handshake failure reason for HTTP status errors.
+   * @param status_code the HTTP status code received
+   */
+  static HandshakeFailureReason httpStatusError(absl::string_view status_code) {
+    return {Type::HttpStatusError, status_code};
+  }
+
+  /**
+   * Create a handshake failure reason for encoding errors.
+   */
+  static HandshakeFailureReason encodeError() { return {Type::EncodeError, ""}; }
+
+  /**
+   * Get a detailed human-readable error message.
+   * @return detailed error message string
+   */
+  std::string getDetailedName() const {
+    switch (type_) {
+    case Type::HttpStatusError:
+      return absl::StrCat("HTTP handshake failed with status ", context_);
+    case Type::EncodeError:
+      return "HTTP handshake encode failed";
+    }
+    return "Unknown handshake failure";
+  }
+
+  /**
+   * Get the stat name suffix for this failure.
+   * @return stat name suffix (e.g., "http.401", "encode_error")
+   */
+  std::string getNameForStats() const {
+    switch (type_) {
+    case Type::HttpStatusError:
+      return absl::StrCat("http.", context_);
+    case Type::EncodeError:
+      return "encode_error";
+    }
+    return "unknown";
+  }
+
+private:
+  HandshakeFailureReason(Type type, absl::string_view context) : type_(type), context_(context) {}
+
+  Type type_;
+  std::string context_;
+};
 
 /**
  * Simple read filter for handling reverse connection handshake responses.
@@ -120,9 +184,9 @@ public:
 
   /**
    * Handle handshake failure.
-   * @param message error message
+   * @param reason the failure reason with type and context
    */
-  void onHandshakeFailure(const std::string& message);
+  void onHandshakeFailure(const HandshakeFailureReason& reason);
 
   /**
    * Perform graceful shutdown of the connection.
@@ -150,6 +214,12 @@ private:
   bool http_handshake_sent_{false};
   bool handshake_completed_{false};
   bool shutdown_called_{false};
+
+  /**
+   * Get the downstream extension for accessing stats.
+   * @return pointer to ReverseTunnelInitiatorExtension
+   */
+  ReverseTunnelInitiatorExtension* getDownstreamExtension() const;
 
 public:
   // Dispatch incoming bytes to HTTP/1 codec.

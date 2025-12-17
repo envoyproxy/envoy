@@ -108,10 +108,11 @@ const std::string ServerContextConfigImpl::DEFAULT_CURVES_FIPS = "P-256";
 
 absl::StatusOr<std::unique_ptr<ServerContextConfigImpl>> ServerContextConfigImpl::create(
     const envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext& config,
-    Server::Configuration::TransportSocketFactoryContext& secret_provider_context, bool for_quic) {
+    Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
+    const std::vector<std::string>& server_names, bool for_quic) {
   absl::Status creation_status = absl::OkStatus();
-  std::unique_ptr<ServerContextConfigImpl> ret = absl::WrapUnique(
-      new ServerContextConfigImpl(config, secret_provider_context, creation_status, for_quic));
+  std::unique_ptr<ServerContextConfigImpl> ret = absl::WrapUnique(new ServerContextConfigImpl(
+      config, secret_provider_context, creation_status, server_names, for_quic));
   RETURN_IF_NOT_OK(creation_status);
   return ret;
 }
@@ -119,13 +120,13 @@ absl::StatusOr<std::unique_ptr<ServerContextConfigImpl>> ServerContextConfigImpl
 ServerContextConfigImpl::ServerContextConfigImpl(
     const envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext& config,
     Server::Configuration::TransportSocketFactoryContext& factory_context,
-    absl::Status& creation_status, bool for_quic)
+    absl::Status& creation_status, const std::vector<std::string>& server_names, bool for_quic)
     : ContextConfigImpl(
           config.common_tls_context(), false /* auto_sni_san_match */, DEFAULT_MIN_VERSION,
           DEFAULT_MAX_VERSION, FIPS_mode() ? DEFAULT_CIPHER_SUITES_FIPS : DEFAULT_CIPHER_SUITES,
           FIPS_mode() ? DEFAULT_CURVES_FIPS : DEFAULT_CURVES, factory_context, creation_status),
-      require_client_certificate_(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, require_client_certificate, false)),
+      server_names_(server_names), require_client_certificate_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+                                       config, require_client_certificate, false)),
       ocsp_staple_policy_(ocspStaplePolicyFromProto(config.ocsp_staple_policy())),
       session_ticket_keys_provider_(
           getTlsSessionTicketKeysConfigProvider(factory_context, config, creation_status)),
@@ -151,7 +152,8 @@ ServerContextConfigImpl::ServerContextConfigImpl(
 
   if (!capabilities().provides_certificates) {
     if ((config.common_tls_context().tls_certificates().size() +
-         config.common_tls_context().tls_certificate_sds_secret_configs().size()) == 0) {
+         config.common_tls_context().tls_certificate_sds_secret_configs().size()) == 0 &&
+        !config.common_tls_context().has_custom_tls_certificate_selector()) {
       creation_status = absl::InvalidArgumentError("No TLS certificates found for server context");
     } else if (!config.common_tls_context().tls_certificates().empty() &&
                !config.common_tls_context().tls_certificate_sds_secret_configs().empty()) {
@@ -169,12 +171,16 @@ ServerContextConfigImpl::ServerContextConfigImpl(
   if (config.common_tls_context().has_custom_tls_certificate_selector()) {
     // If a custom tls context provider is configured, derive the factory from the config.
     const auto& provider_config = config.common_tls_context().custom_tls_certificate_selector();
-    Ssl::TlsCertificateSelectorConfigFactory* provider_factory =
-        &Config::Utility::getAndCheckFactory<Ssl::TlsCertificateSelectorConfigFactory>(
+    Ssl::TlsCertificateSelectorConfigFactory& provider_factory =
+        Config::Utility::getAndCheckFactory<Ssl::TlsCertificateSelectorConfigFactory>(
             provider_config);
-    tls_certificate_selector_factory_ = provider_factory->createTlsCertificateSelectorFactory(
-        provider_config.typed_config(), factory_context.serverFactoryContext(),
-        factory_context.messageValidationVisitor(), creation_status, for_quic);
+    ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
+        provider_config.typed_config(), factory_context.messageValidationVisitor(),
+        provider_factory);
+    auto selector_factory = provider_factory.createTlsCertificateSelectorFactory(
+        *message, factory_context, *this, for_quic);
+    SET_AND_RETURN_IF_NOT_OK(selector_factory.status(), creation_status);
+    tls_certificate_selector_factory_ = *std::move(selector_factory);
     return;
   }
 
@@ -193,22 +199,27 @@ ServerContextConfigImpl::ServerContextConfigImpl(
   auto factory =
       TlsCertificateSelectorConfigFactoryImpl::getDefaultTlsCertificateSelectorConfigFactory();
   const Protobuf::Any any;
-  tls_certificate_selector_factory_ = factory->createTlsCertificateSelectorFactory(
-      any, factory_context.serverFactoryContext(), ProtobufMessage::getNullValidationVisitor(),
-      creation_status, for_quic);
+  auto selector_factory =
+      factory->createTlsCertificateSelectorFactory(any, factory_context, *this, for_quic);
+  SET_AND_RETURN_IF_NOT_OK(selector_factory.status(), creation_status);
+  tls_certificate_selector_factory_ = *std::move(selector_factory);
 }
 
 void ServerContextConfigImpl::setSecretUpdateCallback(std::function<absl::Status()> callback) {
-  ContextConfigImpl::setSecretUpdateCallback(callback);
+  auto callback_with_notify = [this, callback] {
+    RETURN_IF_NOT_OK(callback());
+    return tls_certificate_selector_factory_->onConfigUpdate();
+  };
+  ContextConfigImpl::setSecretUpdateCallback(callback_with_notify);
   if (session_ticket_keys_provider_) {
     // Once session_ticket_keys_ receives new secret, this callback updates
     // ContextConfigImpl::session_ticket_keys_ with new session ticket keys.
     stk_update_callback_handle_ =
-        session_ticket_keys_provider_->addUpdateCallback([this, callback]() {
+        session_ticket_keys_provider_->addUpdateCallback([this, callback_with_notify]() {
           auto keys_or_error = getSessionTicketKeys(*session_ticket_keys_provider_->secret());
           RETURN_IF_NOT_OK(keys_or_error.status());
           session_ticket_keys_ = *keys_or_error;
-          return callback();
+          return callback_with_notify();
         });
   }
 }
@@ -270,11 +281,11 @@ Ssl::ServerContextConfig::OcspStaplePolicy ServerContextConfigImpl::ocspStaplePo
   PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
-Ssl::TlsCertificateSelectorFactory ServerContextConfigImpl::tlsCertificateSelectorFactory() const {
+Ssl::TlsCertificateSelectorFactory& ServerContextConfigImpl::tlsCertificateSelectorFactory() const {
   if (!tls_certificate_selector_factory_) {
     IS_ENVOY_BUG("No envoy.tls.certificate_selectors registered");
   }
-  return tls_certificate_selector_factory_;
+  return *tls_certificate_selector_factory_;
 }
 
 } // namespace Tls

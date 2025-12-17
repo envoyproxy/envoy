@@ -411,7 +411,9 @@ ProtoApiScrubberFilter::createRequestProtoScrubber() {
   RETURN_IF_NOT_OK(request_type_or_status.status());
 
   request_match_tree_field_checker_ = std::make_unique<FieldChecker>(
-      ScrubberContext::kRequestScrubbing, &decoder_callbacks_->streamInfo(), method_name_,
+      ScrubberContext::kRequestScrubbing, &decoder_callbacks_->streamInfo(),
+      decoder_callbacks_->requestHeaders(), OptRef<const Http::ResponseHeaderMap>{},
+      decoder_callbacks_->requestTrailers(), OptRef<const Http::ResponseTrailerMap>{}, method_name_,
       &filter_config_);
 
   return std::make_unique<ProtoScrubber>(
@@ -427,7 +429,9 @@ ProtoApiScrubberFilter::createResponseProtoScrubber() {
   RETURN_IF_NOT_OK(response_type_or_status.status());
 
   response_match_tree_field_checker_ = std::make_unique<FieldChecker>(
-      ScrubberContext::kResponseScrubbing, &encoder_callbacks_->streamInfo(), method_name_,
+      ScrubberContext::kResponseScrubbing, &encoder_callbacks_->streamInfo(),
+      decoder_callbacks_->requestHeaders(), encoder_callbacks_->responseHeaders(),
+      decoder_callbacks_->requestTrailers(), encoder_callbacks_->responseTrailers(), method_name_,
       &filter_config_);
 
   return std::make_unique<ProtoScrubber>(

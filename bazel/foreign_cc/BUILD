@@ -442,7 +442,7 @@ envoy_cmake(
         "Ninja",
     ],
     lib_source = "@com_github_wamr//:all",
-    out_static_libs = ["libvmlib.a"],
+    out_static_libs = ["libiwasm.a"],
     tags = ["skip_on_windows"],
 )
 

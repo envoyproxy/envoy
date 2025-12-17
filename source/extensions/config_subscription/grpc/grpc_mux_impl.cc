@@ -59,14 +59,15 @@ std::string convertToWildcard(const std::string& resource_name) {
 }
 } // namespace
 
-GrpcMuxImpl::GrpcMuxImpl(GrpcMuxContext& grpc_mux_context, bool skip_subsequent_node)
+GrpcMuxImpl::GrpcMuxImpl(GrpcMuxContext& grpc_mux_context)
     : dispatcher_(grpc_mux_context.dispatcher_),
       grpc_stream_(createGrpcStreamObject(std::move(grpc_mux_context.async_client_),
                                           std::move(grpc_mux_context.failover_async_client_),
                                           grpc_mux_context.service_method_, grpc_mux_context.scope_,
                                           std::move(grpc_mux_context.backoff_strategy_),
                                           grpc_mux_context.rate_limit_settings_)),
-      local_info_(grpc_mux_context.local_info_), skip_subsequent_node_(skip_subsequent_node),
+      local_info_(grpc_mux_context.local_info_),
+      skip_subsequent_node_(grpc_mux_context.skip_subsequent_node_),
       config_validators_(std::move(grpc_mux_context.config_validators_)),
       xds_config_tracker_(grpc_mux_context.xds_config_tracker_),
       xds_resources_delegate_(grpc_mux_context.xds_resources_delegate_),
@@ -687,9 +688,9 @@ public:
         (use_eds_resources_cache &&
          Runtime::runtimeFeatureEnabled("envoy.restart_features.use_eds_cache_for_ads"))
             ? std::make_unique<EdsResourcesCacheImpl>(dispatcher)
-            : nullptr};
-    return std::make_shared<Config::GrpcMuxImpl>(grpc_mux_context,
-                                                 ads_config.set_node_on_first_message_only());
+            : nullptr,
+        /*skip_subsequent_node_=*/ads_config.set_node_on_first_message_only()};
+    return std::make_shared<Config::GrpcMuxImpl>(grpc_mux_context);
   }
 };
 
