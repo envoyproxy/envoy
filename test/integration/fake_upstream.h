@@ -359,8 +359,8 @@ public:
     absl::MutexLock lock(lock_);
     if (event == Network::ConnectionEvent::RemoteClose ||
         event == Network::ConnectionEvent::LocalClose) {
-      if (connection_.detectedCloseType() == Network::DetectedCloseType::RemoteReset ||
-          connection_.detectedCloseType() == Network::DetectedCloseType::LocalReset) {
+      if (connection_.detectedCloseType() == StreamInfo::DetectedCloseType::RemoteReset ||
+          connection_.detectedCloseType() == StreamInfo::DetectedCloseType::LocalReset) {
         rst_disconnected_ = true;
       }
       disconnected_ = true;
