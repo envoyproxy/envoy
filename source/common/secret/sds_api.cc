@@ -101,26 +101,19 @@ absl::Status SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef
     validateConfig(secret);
     secret_hash_ = new_hash;
     setSecret(secret);
+    const auto files = loadFiles();
+    files_hash_ = getHashForFiles(files);
+    resolveSecret(files);
+    THROW_IF_NOT_OK(update_callback_manager_.runCallbacks());
 
-    // Set up the watch callback before loadFiles() call so that if the loadFiles() call fails
-    // (e.g., cert files don't exist yet), the callback already gets configured.
-    // This would enable automatic recovery when files get created later on.
-    auto* watched_directory = getWatchedDirectory();
-    // Either we have a watched path and can defer the watch monitoring to a
-    // WatchedDirectory object, or we need to implement per-file watches in the else
-    // clause.
-    if (watched_directory != nullptr) {
-      watched_directory->setCallback([this]() {
-        onWatchUpdate();
-        return absl::OkStatus();
-      });
-    } else {
+    // If there's no watched_directory, we need to set up per-file watchers.
+    if (getWatchedDirectory() == nullptr) {
       // List DataSources that refer to files.
-      auto datasource_files = getDataSourceFilenames();
-      if (!datasource_files.empty()) {
+      auto files = getDataSourceFilenames();
+      if (!files.empty()) {
         // Create new watch, also destroys the old watch if any.
         watcher_ = dispatcher_.createFilesystemWatcher();
-        for (auto const& filename : datasource_files) {
+        for (auto const& filename : files) {
           // Watch for directory instead of file. This allows users to do atomic renames
           // on directory level (e.g. Kubernetes secret update).
           const auto result_or_error = api_.fileSystem().splitPathFromFilename(filename);
@@ -136,11 +129,6 @@ absl::Status SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef
         watcher_.reset(); // Destroy the old watch if any
       }
     }
-
-    const auto files = loadFiles();
-    files_hash_ = getHashForFiles(files);
-    resolveSecret(files);
-    THROW_IF_NOT_OK(update_callback_manager_.runCallbacks());
   }
   secret_data_.last_updated_ = time_source_.systemTime();
   secret_data_.version_info_ = version_info;
@@ -276,6 +264,12 @@ void TlsCertificateSdsApi::setSecret(
     watched_directory_ = THROW_OR_RETURN_VALUE(
         Config::WatchedDirectory::create(secret.tls_certificate().watched_directory(), dispatcher_),
         std::unique_ptr<Config::WatchedDirectory>);
+    // Set the callback immediately so that if subsequent operations fail, the watch is
+    // still active and can trigger recovery when files appear later.
+    watched_directory_->setCallback([this]() {
+      onWatchUpdate();
+      return absl::OkStatus();
+    });
   } else {
     watched_directory_.reset();
   }
@@ -331,6 +325,12 @@ void CertificateValidationContextSdsApi::setSecret(
         THROW_OR_RETURN_VALUE(Config::WatchedDirectory::create(
                                   secret.validation_context().watched_directory(), dispatcher_),
                               std::unique_ptr<Config::WatchedDirectory>);
+    // Set the callback immediately so that if subsequent operations fail, the watch is
+    // still active and can trigger recovery when files appear later.
+    watched_directory_->setCallback([this]() {
+      onWatchUpdate();
+      return absl::OkStatus();
+    });
   } else {
     watched_directory_.reset();
   }

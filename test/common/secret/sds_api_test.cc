@@ -246,9 +246,8 @@ protected:
 
     auto* watcher = new Filesystem::MockWatcher();
     if (watched_directory_) {
-      // With watched_directory, the order is that the call to setSecret creates WatchedDirectory
-      // which adds watch, then the call to setCallback is called, then the call to loadFiles reads
-      // the files.
+      // With watched_directory, the WatchedDirectory is created in setSecret() before loadFiles().
+      // The callback is set immediately in setSecret() to enable recovery if loadFiles() fails.
       EXPECT_CALL(mock_dispatcher_, createFilesystemWatcher_()).WillOnce(Return(watcher));
       EXPECT_CALL(*watcher, addWatch(trigger_path_ + "/", Filesystem::Watcher::Events::MovedTo, _))
           .WillOnce(
@@ -260,8 +259,10 @@ protected:
       EXPECT_CALL(filesystem_, fileReadToEnd(key_path_)).WillOnce(Return(key_value));
       EXPECT_CALL(secret_callback_, onAddOrUpdateSecret());
     } else {
-      // Without watched_directory, per-file watchers are created before loadFiles() is called.
-      // This enables auto-recovery when files appear after initial load failure.
+      // Without watched_directory, per-file watchers are created after loadFiles() succeeds.
+      EXPECT_CALL(filesystem_, fileReadToEnd(cert_path_)).WillOnce(Return(cert_value));
+      EXPECT_CALL(filesystem_, fileReadToEnd(key_path_)).WillOnce(Return(key_value));
+      EXPECT_CALL(secret_callback_, onAddOrUpdateSecret());
       EXPECT_CALL(mock_dispatcher_, createFilesystemWatcher_()).WillOnce(Return(watcher));
       EXPECT_CALL(*watcher, addWatch(expected_watch_path_, Filesystem::Watcher::Events::MovedTo, _))
           .Times(2)
@@ -270,9 +271,6 @@ protected:
                 watch_cbs_.push_back(cb);
                 return absl::OkStatus();
               }));
-      EXPECT_CALL(filesystem_, fileReadToEnd(cert_path_)).WillOnce(Return(cert_value));
-      EXPECT_CALL(filesystem_, fileReadToEnd(key_path_)).WillOnce(Return(key_value));
-      EXPECT_CALL(secret_callback_, onAddOrUpdateSecret());
     }
     EXPECT_TRUE(
         subscription_factory_.callbacks_->onConfigUpdate(decoded_resources.refvec_, "").ok());
@@ -322,8 +320,10 @@ protected:
     const auto decoded_resources = TestUtility::decodeResources({typed_secret});
 
     auto* watcher = new Filesystem::MockWatcher();
-    // Per-file watchers are created before loadFiles() is called.
-    // This enables auto-recovery when files appear after initial load failure.
+    // Per-file watchers are created after loadFiles() succeeds.
+    EXPECT_CALL(filesystem_, fileReadToEnd(trusted_ca_path)).WillOnce(Return(trusted_ca_value));
+    EXPECT_CALL(filesystem_, fileReadToEnd(crl_path)).WillOnce(Return(crl_value));
+    EXPECT_CALL(secret_callback_, onAddOrUpdateSecret());
     EXPECT_CALL(mock_dispatcher_, createFilesystemWatcher_()).WillOnce(Return(watcher));
     EXPECT_CALL(*watcher, addWatch(watch_path, Filesystem::Watcher::Events::MovedTo, _))
         .WillOnce(Invoke([this](absl::string_view, uint32_t, Filesystem::Watcher::OnChangedCb cb) {
@@ -335,9 +335,6 @@ protected:
           watch_cbs_.push_back(cb);
           return absl::OkStatus();
         }));
-    EXPECT_CALL(filesystem_, fileReadToEnd(trusted_ca_path)).WillOnce(Return(trusted_ca_value));
-    EXPECT_CALL(filesystem_, fileReadToEnd(crl_path)).WillOnce(Return(crl_value));
-    EXPECT_CALL(secret_callback_, onAddOrUpdateSecret());
     EXPECT_TRUE(
         subscription_factory_.callbacks_->onConfigUpdate(decoded_resources.refvec_, "").ok());
   }
@@ -485,6 +482,11 @@ TEST_P(TlsCertificateSdsRotationApiTest, RotationConsistency) {
 // Test that when initial loadFiles() fails due to the secrets not existing yet, the watch
 // callback is still set up, enabling auto-recovery when the secrets appear later.
 TEST_P(TlsCertificateSdsRotationApiTest, InitialLoadFailsAutoRecoveryWorks) {
+  if (!watched_directory_) {
+    // Auto-recovery only works with watched_directory.
+    return;
+  }
+
   InSequence s;
 
   const std::string yaml = fmt::format(
@@ -499,37 +501,21 @@ TEST_P(TlsCertificateSdsRotationApiTest, InitialLoadFailsAutoRecoveryWorks) {
       cert_path_, key_path_);
   envoy::extensions::transport_sockets::tls::v3::Secret typed_secret;
   TestUtility::loadFromYaml(yaml, typed_secret);
-  if (watched_directory_) {
-    typed_secret.mutable_tls_certificate()->mutable_watched_directory()->set_path(trigger_path_);
-  }
+  typed_secret.mutable_tls_certificate()->mutable_watched_directory()->set_path(trigger_path_);
   const auto decoded_resources = TestUtility::decodeResources({typed_secret});
 
   auto* watcher = new Filesystem::MockWatcher();
-  if (watched_directory_) {
-    // Watch should be set up before loadFiles() is called.
-    EXPECT_CALL(mock_dispatcher_, createFilesystemWatcher_()).WillOnce(Return(watcher));
-    EXPECT_CALL(*watcher, addWatch(trigger_path_ + "/", Filesystem::Watcher::Events::MovedTo, _))
-        .WillOnce(Invoke([this](absl::string_view, uint32_t, Filesystem::Watcher::OnChangedCb cb) {
-          watch_cbs_.push_back(cb);
-          return absl::OkStatus();
-        }));
-    // Initial file read fails because the files don't exist yet.
-    EXPECT_CALL(filesystem_, fileReadToEnd(cert_path_))
-        .WillOnce(Throw(EnvoyException("file not found")));
-  } else {
-    // For non-watched-directory case, watch is set up before loadFiles().
-    EXPECT_CALL(mock_dispatcher_, createFilesystemWatcher_()).WillOnce(Return(watcher));
-    EXPECT_CALL(*watcher, addWatch(expected_watch_path_, Filesystem::Watcher::Events::MovedTo, _))
-        .Times(2)
-        .WillRepeatedly(
-            Invoke([this](absl::string_view, uint32_t, Filesystem::Watcher::OnChangedCb cb) {
-              watch_cbs_.push_back(cb);
-              return absl::OkStatus();
-            }));
-    // Initial file read fails because the files don't exist yet.
-    EXPECT_CALL(filesystem_, fileReadToEnd(cert_path_))
-        .WillOnce(Throw(EnvoyException("file not found")));
-  }
+  // WatchedDirectory is created in setSecret() before loadFiles() is called.
+  // The callback is set immediately, enabling recovery if loadFiles() fails.
+  EXPECT_CALL(mock_dispatcher_, createFilesystemWatcher_()).WillOnce(Return(watcher));
+  EXPECT_CALL(*watcher, addWatch(trigger_path_ + "/", Filesystem::Watcher::Events::MovedTo, _))
+      .WillOnce(Invoke([this](absl::string_view, uint32_t, Filesystem::Watcher::OnChangedCb cb) {
+        watch_cbs_.push_back(cb);
+        return absl::OkStatus();
+      }));
+  // Initial file read fails because the files don't exist yet.
+  EXPECT_CALL(filesystem_, fileReadToEnd(cert_path_))
+      .WillOnce(Throw(EnvoyException("file not found")));
 
   // onConfigUpdate should throw an exception because loadFiles() throws an exception.
   EXPECT_THROW(
@@ -562,6 +548,11 @@ TEST_P(TlsCertificateSdsRotationApiTest, InitialLoadFailsAutoRecoveryWorks) {
 
 // Test that auto-recovery still works after multiple failed attempts.
 TEST_P(TlsCertificateSdsRotationApiTest, AutoRecoveryAfterMultipleFailures) {
+  if (!watched_directory_) {
+    // Auto-recovery only works with watched_directory.
+    return;
+  }
+
   InSequence s;
 
   const std::string yaml = fmt::format(
@@ -576,33 +567,19 @@ TEST_P(TlsCertificateSdsRotationApiTest, AutoRecoveryAfterMultipleFailures) {
       cert_path_, key_path_);
   envoy::extensions::transport_sockets::tls::v3::Secret typed_secret;
   TestUtility::loadFromYaml(yaml, typed_secret);
-  if (watched_directory_) {
-    typed_secret.mutable_tls_certificate()->mutable_watched_directory()->set_path(trigger_path_);
-  }
+  typed_secret.mutable_tls_certificate()->mutable_watched_directory()->set_path(trigger_path_);
   const auto decoded_resources = TestUtility::decodeResources({typed_secret});
 
   auto* watcher = new Filesystem::MockWatcher();
-  if (watched_directory_) {
-    EXPECT_CALL(mock_dispatcher_, createFilesystemWatcher_()).WillOnce(Return(watcher));
-    EXPECT_CALL(*watcher, addWatch(trigger_path_ + "/", Filesystem::Watcher::Events::MovedTo, _))
-        .WillOnce(Invoke([this](absl::string_view, uint32_t, Filesystem::Watcher::OnChangedCb cb) {
-          watch_cbs_.push_back(cb);
-          return absl::OkStatus();
-        }));
-    EXPECT_CALL(filesystem_, fileReadToEnd(cert_path_))
-        .WillOnce(Throw(EnvoyException("file not found")));
-  } else {
-    EXPECT_CALL(mock_dispatcher_, createFilesystemWatcher_()).WillOnce(Return(watcher));
-    EXPECT_CALL(*watcher, addWatch(expected_watch_path_, Filesystem::Watcher::Events::MovedTo, _))
-        .Times(2)
-        .WillRepeatedly(
-            Invoke([this](absl::string_view, uint32_t, Filesystem::Watcher::OnChangedCb cb) {
-              watch_cbs_.push_back(cb);
-              return absl::OkStatus();
-            }));
-    EXPECT_CALL(filesystem_, fileReadToEnd(cert_path_))
-        .WillOnce(Throw(EnvoyException("file not found")));
-  }
+  // WatchedDirectory is created in setSecret() before loadFiles() is called.
+  EXPECT_CALL(mock_dispatcher_, createFilesystemWatcher_()).WillOnce(Return(watcher));
+  EXPECT_CALL(*watcher, addWatch(trigger_path_ + "/", Filesystem::Watcher::Events::MovedTo, _))
+      .WillOnce(Invoke([this](absl::string_view, uint32_t, Filesystem::Watcher::OnChangedCb cb) {
+        watch_cbs_.push_back(cb);
+        return absl::OkStatus();
+      }));
+  EXPECT_CALL(filesystem_, fileReadToEnd(cert_path_))
+      .WillOnce(Throw(EnvoyException("file not found")));
 
   // Initial load fails and throws an exception.
   EXPECT_THROW(

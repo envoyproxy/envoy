@@ -23,7 +23,10 @@ protected:
 
 private:
   std::unique_ptr<Filesystem::Watcher> watcher_;
-  Callback cb_;
+  // Initialize with a no-op callback to prevent `std::bad_function_call` if the watch
+  // triggers before `setCallback()` is called for the case when initial file loading fails
+  // but files appear later.
+  Callback cb_ = []() { return absl::OkStatus(); };
 };
 
 using WatchedDirectoryPtr = std::unique_ptr<WatchedDirectory>;
