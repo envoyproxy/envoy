@@ -71,6 +71,11 @@ ClusterResponseHandlerFactory::createAggregateHandler(const std::string& command
     return std::make_unique<ArrayAppendAggregateResponseHandler>(shard_count);
   }
 
+  // HELLO command
+  if (command_name == "hello") {
+    return std::make_unique<HelloResponseHandler>(shard_count);
+  }
+
   // This should never be reached - all commands mapped to aggregate_all_responses
   // should be handled above
   ASSERT(false, fmt::format("Unhandled aggregate command: {}:{}", command_name, subcommand));
@@ -112,6 +117,7 @@ ClusterResponseHandlerFactory::getResponseHandlerType(const std::string& command
           {"select", ClusterScopeResponseHandlerType::allresponses_mustbe_same},
 
           // Aggregate responses
+          {"hello", ClusterScopeResponseHandlerType::aggregate_all_responses},
           {"config:get", ClusterScopeResponseHandlerType::aggregate_all_responses},
           {"slowlog:get", ClusterScopeResponseHandlerType::aggregate_all_responses},
           {"slowlog:len", ClusterScopeResponseHandlerType::aggregate_all_responses},
@@ -315,8 +321,8 @@ void ArrayMergeAggregateResponseHandler::processAggregatedResponses(
 }
 
 // Implementation of ArrayAppendAggregateResponseHandler
-void ArrayAppendAggregateResponseHandler::processAggregatedResponses(
-    ClusterScopeCmdRequest& request) {
+void ArrayAppendAggregateResponseHandler::processAggregatedResponses(ClusterScopeCmdRequest& request) {
+
   Common::Redis::RespValuePtr response = std::make_unique<Common::Redis::RespValue>();
   response->type(Common::Redis::RespType::Array);
 
@@ -336,6 +342,93 @@ void ArrayAppendAggregateResponseHandler::processAggregatedResponses(
   }
 
   sendSuccessResponse(request, std::move(response));
+}
+
+void HelloResponseHandler::processAggregatedResponses(ClusterScopeCmdRequest& request) {
+  // Helper to check if two RespValues are equal
+  auto valuesEqual = [](const Common::Redis::RespValue& v1, const Common::Redis::RespValue& v2) {
+    if (v1.type() != v2.type())
+      return false;
+    if (v1.type() == Common::Redis::RespType::BulkString)
+      return v1.asString() == v2.asString();
+    if (v1.type() == Common::Redis::RespType::Integer)
+      return v1.asInteger() == v2.asInteger();
+    return true;
+  };
+
+  // Find first valid array response and build map for all key value pairs for validation
+  size_t first_response_index = 0;
+  bool found_first = false;
+  absl::flat_hash_map<std::string, const Common::Redis::RespValue*> first_response_map;
+
+  for (size_t idx = 0; idx < pending_responses_.size(); ++idx) {
+    auto& resp = pending_responses_[idx];
+    if (resp && resp->type() == Common::Redis::RespType::Array && !resp->asArray().empty()) {
+      first_response_index = idx;
+      found_first = true;
+      auto& arr = resp->asArray();
+      for (size_t i = 0; i + 1 < arr.size(); i += 2) {
+        if (arr[i].type() == Common::Redis::RespType::BulkString) {
+          const std::string& key = arr[i].asString();
+          first_response_map.emplace(key, &arr[i + 1]);
+          // Sanitize id field in first response
+          if (key == "id") {
+            arr[i + 1].type(Common::Redis::RespType::Null);
+            ENVOY_LOG(debug, "HELLO: sanitized id field to null");
+          }
+        }
+      }
+      break;
+    }
+  }
+
+  // If no array response found, forward first valid response
+  if (!found_first) {
+    sendSuccessResponse(request, std::move(pending_responses_[0]));
+    return;
+  }
+
+  // Validate key-value consistency across all responses
+  for (const auto& resp : pending_responses_) {
+    if (!resp)
+      continue;
+
+    if (resp->type() != Common::Redis::RespType::Array) {
+      ENVOY_LOG(warn, "HELLO: shard returned non-array response, skipping validation");
+      continue;
+    }
+
+    if (resp.get() == pending_responses_[first_response_index].get())
+      continue; // Skip the first response
+
+    const auto& arr2 = resp->asArray();
+    for (size_t i = 0; i + 1 < arr2.size(); i += 2) {
+      if (arr2[i].type() != Common::Redis::RespType::BulkString)
+        continue;
+
+      const std::string& key = arr2[i].asString();
+      if (key == "id")
+        continue; // Skip id field comparison
+
+      auto it = first_response_map.find(key);
+      if (it == first_response_map.end()) {
+        ENVOY_LOG(warn, "HELLO: key '{}' not found in first response", key);
+        continue;
+      }
+
+      if (!valuesEqual(*it->second, arr2[i + 1])) {
+        if (key == "proto") {
+          ENVOY_LOG(error, "HELLO: protocol version mismatch");
+          sendErrorResponse(request, "ERR inconsistent responses across shards");
+          return;
+        }
+        ENVOY_LOG(warn, "HELLO: value mismatch for key '{}'", key);
+      }
+    }
+  }
+
+  // All validations passed, send the first response (already sanitized)
+  sendSuccessResponse(request, std::move(pending_responses_[first_response_index]));
 }
 
 } // namespace CommandSplitter
