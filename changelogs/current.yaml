@@ -336,6 +336,9 @@ new_features:
     #. ``%RESPONSE_TRAILER(X?Y):Z%`` as full name version of ``%TRAILER(X?Y):Z%``.
 
     This provides a more consistent naming scheme for users to understand and use.
+- area: formatter
+  change: |
+    Added the new access log formatter support of ``DOWNSTREAM_LOCAL_CLOSE_REASON`` and ``UPSTREAM_LOCAL_CLOSE_REASON``.
 - area: tracing
   change: |
     Added new :ref:`value <envoy_v3_api_field_type.tracing.v3.CustomTag.value>` field and support for
