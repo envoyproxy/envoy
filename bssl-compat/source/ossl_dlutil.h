@@ -1,3 +1,5 @@
+#pragma once
+
 #ifndef _OSSL_DLUTIL_H_
 #define _OSSL_DLUTIL_H_
 
@@ -39,6 +41,6 @@ void ossl_dlclose();
  * @param symbol The symbol name to look up (with "ossl_" prefix)
  * @return void* Pointer to the symbol, or NULL if not found
  */
-void *ossl_dlsym(const char *symbol);
+void* ossl_dlsym(const char* symbol);
 
 #endif // _OSSL_DLUTIL_H_

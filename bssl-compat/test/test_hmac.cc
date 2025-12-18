@@ -1,15 +1,15 @@
 #include <gtest/gtest.h>
 #include <openssl/hmac.h>
 
-
 TEST(HMACTest, test_HMAC) {
-  std::string key {"hello"};
-  std::string data {"plain text data"};
-  std::string digest {"27a8d47ded4d53080d3582dbb396ba74"};
+  std::string key{"hello"};
+  std::string data{"plain text data"};
+  std::string digest{"27a8d47ded4d53080d3582dbb396ba74"};
 
   uint8_t out[EVP_MAX_MD_SIZE];
   unsigned int out_len;
-  uint8_t *hmac = HMAC(EVP_md5(), key.data(), key.length(), (uint8_t*)data.data(), data.length(), out, &out_len);
+  uint8_t* hmac = HMAC(EVP_md5(), key.data(), key.length(), (uint8_t*)data.data(), data.length(),
+                       out, &out_len);
   ASSERT_TRUE(hmac);
   ASSERT_EQ(digest.length() / 2, out_len);
 

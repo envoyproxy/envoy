@@ -67,7 +67,7 @@ protected:
     SSL_set_accept_state(server_ssl_.get());
     ASSERT_NE(key, nullptr);
 
-    #ifdef ENVOY_SSL_OPENSSL
+#ifdef ENVOY_SSL_OPENSSL
     // In TLS1.3 OpenSSL server will send session ticket after an ssl handshake.
     // While technically not part of the handshake, it's part of the server state-machine,
     // and SSL_do_handshake will return errors (SSL_ERROR_WANT_WRITE) on the server-side if
@@ -75,7 +75,7 @@ protected:
     // To avoid this altogether, we disable session tickets by setting the number of tickets
     // to generate for a new session to zero.
     ossl_SSL_set_num_tickets(server_ssl_.get(), 0); // TODO: Could we hide this in SSL_CTX_new() ?
-    #endif
+#endif
 
     ASSERT_EQ(1, SSL_set_chain_and_key(server_ssl_.get(), chain.data(), chain.size(), key.get(),
                                        nullptr));

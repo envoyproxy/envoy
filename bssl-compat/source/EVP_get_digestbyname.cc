@@ -3,7 +3,7 @@
 
 extern "C" {
 
-const EVP_MD *EVP_get_digestbyname(const char *name) {
+const EVP_MD* EVP_get_digestbyname(const char* name) {
 #ifdef ossl_EVP_get_digestbyname
   return ossl_EVP_get_digestbyname(name);
 #else

@@ -6,7 +6,6 @@ load(
 )
 load(
     "//bazel:envoy_select.bzl",
-    "envoy_select_boringssl",
     "envoy_select_ssl",
 )
 
@@ -68,8 +67,8 @@ envoy_cc_library(
     name = "version_lib",
     srcs = ["version.cc"],
     copts = envoy_select_ssl(
-        if_openssl = ["-DENVOY_SSL_VERSION=\\\"OpenSSL\\\""],
         if_boringssl = ["-DENVOY_SSL_VERSION=\\\"BoringSSL\\\""],
+        if_openssl = ["-DENVOY_SSL_VERSION=\\\"OpenSSL\\\""],
     ),
     external_deps = ["ssl"],
     tags = ["notidy"],

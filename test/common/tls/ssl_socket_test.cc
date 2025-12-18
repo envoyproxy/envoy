@@ -16,6 +16,7 @@
 #include "source/common/network/tcp_listener_impl.h"
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/network/utility.h"
+#include "source/common/ssl/ssl.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/common/tls/client_ssl_socket.h"
 #include "source/common/tls/context_config_impl.h"
@@ -58,7 +59,6 @@
 #include "test/test_common/registry.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
-#include "source/common/ssl/ssl.h"
 
 #include "absl/strings/str_replace.h"
 #include "absl/types/optional.h"
@@ -2145,7 +2145,8 @@ TEST_P(SslSocketTest, CertWithNotECCapable) {
   // TODO(luyao): We might need to modify ssl socket to set proper stats for failed handshake
   testUtil(test_options.setExpectedServerStats("")
                .setExpectedSni("server1.example.com")
-               .setExpectedTransportFailureReasonContains(SSL_SELECT("HANDSHAKE_FAILURE_ON_CLIENT_HELLO", "SSLV3_ALERT_HANDSHAKE_FAILURE")));
+               .setExpectedTransportFailureReasonContains(SSL_SELECT(
+                   "HANDSHAKE_FAILURE_ON_CLIENT_HELLO", "SSLV3_ALERT_HANDSHAKE_FAILURE")));
 }
 
 TEST_P(SslSocketTest, GetUriWithLocalUriSan) {
@@ -2596,7 +2597,8 @@ TEST_P(SslSocketTest, FailedClientAuthCaVerification) {
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, false, version_);
   testUtil(test_options.setExpectedServerStats("ssl.fail_verify_error")
-               .setExpectedVerifyErrorCode(SSL_SELECT(X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT_LOCALLY, X509_V_ERR_DEPTH_ZERO_SELF_SIGNED_CERT)));
+               .setExpectedVerifyErrorCode(SSL_SELECT(X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT_LOCALLY,
+                                                      X509_V_ERR_DEPTH_ZERO_SELF_SIGNED_CERT)));
 }
 
 TEST_P(SslSocketTest, FailedClientAuthSanVerificationNoClientCert) {
@@ -3052,18 +3054,18 @@ TEST_P(SslSocketTest, CertificatesWithPassword) {
 }
 
 TEST_P(SslSocketTest, Pkcs12CertificatesWithPassword) {
-  #ifdef ENVOY_SSL_OPENSSL
+#ifdef ENVOY_SSL_OPENSSL
   // The password_protected_certkey.p12 used in this test, uses the "RC2-40-CBC"
   // encryption algorithm, which OpenSSL considers legacy and insecure.
   // Therefore, to get this test to pass, we need to temporarily load OpenSSL's
   // legacy provider (as well as the default one) and also unload it when finished.
-  std::unique_ptr<ossl_OSSL_PROVIDER,void(*)(ossl_OSSL_PROVIDER*)> legacy_provider(
-                      ossl_OSSL_PROVIDER_load(nullptr, "legacy"),
-                      [](ossl_OSSL_PROVIDER *p){ ossl_OSSL_PROVIDER_unload(p); });
-  std::unique_ptr<ossl_OSSL_PROVIDER,void(*)(ossl_OSSL_PROVIDER*)> default_provider(
-                      ossl_OSSL_PROVIDER_load(nullptr, "default"),
-                      [](ossl_OSSL_PROVIDER *p){ ossl_OSSL_PROVIDER_unload(p); });
-  #endif
+  std::unique_ptr<ossl_OSSL_PROVIDER, void (*)(ossl_OSSL_PROVIDER*)> legacy_provider(
+      ossl_OSSL_PROVIDER_load(nullptr, "legacy"),
+      [](ossl_OSSL_PROVIDER* p) { ossl_OSSL_PROVIDER_unload(p); });
+  std::unique_ptr<ossl_OSSL_PROVIDER, void (*)(ossl_OSSL_PROVIDER*)> default_provider(
+      ossl_OSSL_PROVIDER_load(nullptr, "default"),
+      [](ossl_OSSL_PROVIDER* p) { ossl_OSSL_PROVIDER_unload(p); });
+#endif
   envoy::config::listener::v3::Listener listener;
   envoy::config::listener::v3::FilterChain* filter_chain = listener.add_filter_chains();
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
@@ -6149,12 +6151,12 @@ TEST_P(SslSocketTest, RevokedIntermediateCertificate) {
   testUtil(complete_revoked_test_options.setExpectedServerStats("ssl.fail_verify_error")
                .setExpectedVerifyErrorCode(X509_V_ERR_CERT_REVOKED));
 
-  // Ensure that complete crl chains succeed with unrevoked certificates.
-  #ifndef ENVOY_SSL_OPENSSL
+// Ensure that complete crl chains succeed with unrevoked certificates.
+#ifndef ENVOY_SSL_OPENSSL
   TestUtilOptions complete_unrevoked_test_options(unrevoked_client_ctx_yaml,
                                                   complete_server_ctx_yaml, true, version_);
   testUtil(complete_unrevoked_test_options.setExpectedSerialNumber(TEST_SAN_DNS4_CERT_SERIAL));
-  #endif
+#endif
 }
 
 TEST_P(SslSocketTest, RevokedIntermediateCertificateCRLInTrustedCA) {
@@ -6237,12 +6239,12 @@ TEST_P(SslSocketTest, RevokedIntermediateCertificateCRLInTrustedCA) {
   testUtil(complete_revoked_test_options.setExpectedServerStats("ssl.fail_verify_error")
                .setExpectedVerifyErrorCode(X509_V_ERR_CERT_REVOKED));
 
-  // Ensure that complete crl chains succeed with unrevoked certificates.
-  #ifndef ENVOY_SSL_OPENSSL
+// Ensure that complete crl chains succeed with unrevoked certificates.
+#ifndef ENVOY_SSL_OPENSSL
   TestUtilOptions complete_unrevoked_test_options(unrevoked_client_ctx_yaml,
                                                   complete_server_ctx_yaml, true, version_);
   testUtil(complete_unrevoked_test_options.setExpectedSerialNumber(TEST_SAN_DNS4_CERT_SERIAL));
-  #endif
+#endif
 }
 
 TEST_P(SslSocketTest, NotRevokedLeafCertificateOnlyLeafCRLValidation) {

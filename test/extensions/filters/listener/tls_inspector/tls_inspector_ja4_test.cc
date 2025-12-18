@@ -1,6 +1,7 @@
 #include "source/common/common/hex.h"
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/network/listener_filter_buffer_impl.h"
+#include "source/common/ssl/ssl.h"
 #include "source/extensions/filters/listener/tls_inspector/tls_inspector.h"
 
 #include "test/common/stats/stat_test_utility.h"
@@ -8,7 +9,6 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
-#include "source/common/ssl/ssl.h"
 
 #include "gtest/gtest.h"
 
@@ -255,7 +255,8 @@ const std::vector<std::tuple<std::string, std::string, std::string>> JA4_TEST_VE
      "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
      "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
      "00000000000",
-     SSL_SELECT("t13d1516baad_8daaf6152771_e5627efa2ab1", "t13d1514baad_8daaf6152771_827b515c4f52")},
+     SSL_SELECT("t13d1516baad_8daaf6152771_e5627efa2ab1",
+                "t13d1514baad_8daaf6152771_827b515c4f52")},
 };
 
 class TlsInspectorJA4Test

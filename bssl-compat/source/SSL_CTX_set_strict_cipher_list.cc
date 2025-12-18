@@ -1,7 +1,7 @@
 #include <openssl/ssl.h>
 #include <ossl.h>
-#include "iana_2_ossl_names.h"
 
+#include "iana_2_ossl_names.h"
 
 /*
  * https://github.com/google/boringssl/blob/098695591f3a2665fccef83a3732ecfc99acdcdd/src/include/openssl/ssl.h#L1508
@@ -10,8 +10,8 @@
  * https://www.openssl.org/docs/man3.0/man3/SSL_CTX_get_ciphers.html
  * https://www.openssl.org/docs/man3.0/man3/SSL_CIPHER_get_name.html
  */
-extern "C" int SSL_CTX_set_strict_cipher_list(SSL_CTX *ctx, const char *str) {
-  std::string osslstr {iana_2_ossl_names(str)};
+extern "C" int SSL_CTX_set_strict_cipher_list(SSL_CTX* ctx, const char* str) {
+  std::string osslstr{iana_2_ossl_names(str)};
 
   // OpenSSL's SSL_CTX_set_cipher_list() performs virtually no checking on str.
   // It only returns 0 (fail) if no cipher could be selected from the list at
@@ -21,7 +21,8 @@ extern "C" int SSL_CTX_set_strict_cipher_list(SSL_CTX *ctx, const char *str) {
     return 0;
   }
 
-  STACK_OF(SSL_CIPHER)* ciphers = reinterpret_cast<STACK_OF(SSL_CIPHER)*>(ossl.ossl_SSL_CTX_get_ciphers(ctx));
+  STACK_OF(SSL_CIPHER)* ciphers =
+      reinterpret_cast<STACK_OF(SSL_CIPHER)*>(ossl.ossl_SSL_CTX_get_ciphers(ctx));
   char* dup = strdup(osslstr.c_str());
   char* token = strtok(dup, ":+![|]");
   while (token != NULL) {

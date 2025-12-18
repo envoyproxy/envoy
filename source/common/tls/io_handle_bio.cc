@@ -123,7 +123,6 @@ long io_handle_ctrl(BIO* b, int cmd, long num, void*) {
   return ret;
 }
 
-
 // NOLINTNEXTLINE(readability-identifier-naming)
 const BIO_METHOD* BIO_s_io_handle(void) {
   static const BIO_METHOD* method = [&] {

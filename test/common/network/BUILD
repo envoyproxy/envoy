@@ -104,6 +104,7 @@ envoy_cc_test(
         "//source/common/network:connection_lib",
         "//source/common/network:listen_socket_lib",
         "//source/common/network:utility_lib",
+        "//source/common/ssl:ssl_lib",
         "//source/common/stats:stats_lib",
         "//test/common/memory:memory_test_utility_lib",
         "//test/mocks/api:api_mocks",
@@ -118,7 +119,6 @@ envoy_cc_test(
         "//test/test_common:test_runtime_lib",
         "//test/test_common:test_time_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
-        "//source/common/ssl:ssl_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

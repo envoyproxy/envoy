@@ -10,6 +10,7 @@
 #include "source/common/crypto/utility.h"
 #include "source/common/json/json_loader.h"
 #include "source/common/secret/sds_api.h"
+#include "source/common/ssl/ssl.h"
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/common/tls/context_config_impl.h"
 #include "source/common/tls/context_impl.h"
@@ -32,7 +33,6 @@
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
-#include "source/common/ssl/ssl.h"
 
 #include "gtest/gtest.h"
 #include "openssl/crypto.h"

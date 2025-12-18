@@ -8,6 +8,7 @@
 #include "source/common/config/api_version.h"
 #include "source/common/network/raw_buffer_socket.h"
 #include "source/common/network/utility.h"
+#include "source/common/ssl/ssl.h"
 #include "source/common/tls/client_ssl_socket.h"
 #include "source/common/tls/context_manager_impl.h"
 #include "source/extensions/filters/listener/tls_inspector/tls_inspector.h"
@@ -16,7 +17,6 @@
 #include "test/integration/ssl_utility.h"
 #include "test/integration/utility.h"
 #include "test/mocks/secret/mocks.h"
-#include "source/common/ssl/ssl.h"
 
 #include "gtest/gtest.h"
 
@@ -309,7 +309,8 @@ TEST_P(TlsInspectorIntegrationTest, JA3FingerprintIsSet) {
   client_->close(Network::ConnectionCloseType::NoFlush);
 
   EXPECT_THAT(waitForAccessLog(listener_access_log_name_),
-              testing::Eq(SSL_SELECT("71d1f47d1125ac53c3c6a4863c087cfe", "54619c7296adab310ed514d06812d95f")));
+              testing::Eq(SSL_SELECT("71d1f47d1125ac53c3c6a4863c087cfe",
+                                     "54619c7296adab310ed514d06812d95f")));
 
   test_server_->waitUntilHistogramHasSamples("tls_inspector.bytes_processed");
   auto bytes_processed_histogram = test_server_->histogram("tls_inspector.bytes_processed");
@@ -337,7 +338,8 @@ TEST_P(TlsInspectorIntegrationTest, JA4FingerprintIsSet) {
   client_->close(Network::ConnectionCloseType::NoFlush);
 
   EXPECT_THAT(waitForAccessLog(listener_access_log_name_),
-              testing::Eq(SSL_SELECT("t12i0107en_f06271c2b022_0f3b2bcde21d", "t12i0207en_b06afd972a5c_e7e480e5a997")));
+              testing::Eq(SSL_SELECT("t12i0107en_f06271c2b022_0f3b2bcde21d",
+                                     "t12i0207en_b06afd972a5c_e7e480e5a997")));
 
   test_server_->waitUntilHistogramHasSamples("tls_inspector.bytes_processed");
   auto bytes_processed_histogram = test_server_->histogram("tls_inspector.bytes_processed");

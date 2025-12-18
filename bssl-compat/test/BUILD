@@ -10,26 +10,26 @@ licenses(["notice"])  # Apache 2
 patched_bssl_filegroup(
     name = "patched_bssl_tests",
     srcs = [
+        "crypto/bcm_support.h",
         "crypto/bio/bio_test.cc",
         "crypto/digest/digest_test.cc",
         "crypto/err/err_test.cc",
         "crypto/hmac/hmac_test.cc",
+        "crypto/internal.h",
         "crypto/pkcs8/pkcs12_test.cc",
         "crypto/rand/rand_test.cc",
         "crypto/rsa/rsa_test.cc",
         "crypto/stack/stack_test.cc",
-        "crypto/test/file_test_gtest.cc",
         "crypto/test/file_test.cc",
         "crypto/test/file_test.h",
+        "crypto/test/file_test_gtest.cc",
         "crypto/test/file_util.cc",
         "crypto/test/file_util.h",
         "crypto/test/test_data.cc",
         "crypto/test/test_data.h",
-        "crypto/bcm_support.h",
         "crypto/test/test_util.cc",
         "crypto/test/test_util.h",
         "crypto/x509/x509_test.cc",
-        "crypto/internal.h",
         "ssl/ssl_c_test.c",
         "ssl/ssl_test.cc",
     ],
@@ -71,20 +71,20 @@ cc_test(
         ":patched_bssl_tests",
     ],
     data = [
-        "@boringssl//:test_data"
+        "@boringssl//:test_data",
     ],
     env = {
-        "BORINGSSL_TEST_DATA_ROOT" : "./external/boringssl"
+        "BORINGSSL_TEST_DATA_ROOT": "./external/boringssl",
     },
     includes = [
         ".",
     ],
+    visibility = ["//visibility:public"],
     deps = [
-        "@bssl-compat//:ssl",
         "@bssl-compat//:crypto",
+        "@bssl-compat//:ssl",
         "@com_google_googletest//:gtest",
     ],
-    visibility = ["//visibility:public"],
 )
 
 # The same unit tests as above, but linked against BoringSSL proper, rather than
@@ -98,18 +98,18 @@ cc_test(
         ":patched_bssl_tests",
     ],
     data = [
-        "@boringssl//:test_data"
+        "@boringssl//:test_data",
     ],
     env = {
-        "BORINGSSL_TEST_DATA_ROOT" : "./external/boringssl"
+        "BORINGSSL_TEST_DATA_ROOT": "./external/boringssl",
     },
     includes = [
         ".",
     ],
+    visibility = ["//visibility:public"],
     deps = [
-        "@boringssl//:ssl",
         "@boringssl//:crypto",
+        "@boringssl//:ssl",
         "@com_google_googletest//:gtest",
     ],
-    visibility = ["//visibility:public"],
 )

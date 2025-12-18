@@ -1,3 +1,5 @@
+#pragma once
+
 static const char client_2_key_pem_str[] = R"""(-----BEGIN RSA PRIVATE KEY-----
 MIIEowIBAAKCAQEA739gPNoJ5z9Hr7r8bieS8JeHaTvFKouvcmG3fVaX+a/dEr2k
 qE8xn3tCH1394tdPjmOEhuMTlXlkv9U/WxAKMiLk5Hkw6VW28txAEbyJU1BJGOjT

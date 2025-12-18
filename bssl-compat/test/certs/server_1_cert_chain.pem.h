@@ -1,3 +1,5 @@
+#pragma once
+
 static const char server_1_cert_chain_pem_str[] = R"""(-----BEGIN CERTIFICATE-----
 MIIEjjCCA3agAwIBAgIUCTpAUdI0paiRKgPH3UKinAJAh5MwDQYJKoZIhvcNAQEL
 BQAwgYoxCzAJBgNVBAYTAkdCMRYwFAYDVQQIDA1UeW5lIGFuZCBXZWFyMRwwGgYD

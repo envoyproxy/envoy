@@ -1,3 +1,5 @@
+#pragma once
+
 static const char intermediate_ca_1_key_pem_str[] = R"""(-----BEGIN RSA PRIVATE KEY-----
 MIIEowIBAAKCAQEAyEuANcgEbTmf5GRs2GYqmtm3+RiAb8/IJy/pHIFx8id9B7km
 CxKrMT5mLvUSMJrWT2lLBYXRM79L9854mj97ay8065UJOOzluAh96/wC02DQ1BXg

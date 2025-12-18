@@ -10,17 +10,20 @@ filegroup(
 
 configure_make(
     name = "openssl",
-    lib_source = ":all",
-    configure_in_place = True,
-    configure_command = "Configure",
-    configure_options = ["--libdir=lib"],
-    targets = ["build_sw", "install_sw"],
     args = ["-j"],
+    configure_command = "Configure",
+    configure_in_place = True,
+    configure_options = ["--libdir=lib"],
+    lib_source = ":all",
     out_lib_dir = "lib",
     out_shared_libs = [
         "libssl.so.3",
         "libcrypto.so.3",
-        "ossl-modules/legacy.so"
+        "ossl-modules/legacy.so",
+    ],
+    targets = [
+        "build_sw",
+        "install_sw",
     ],
     visibility = ["//visibility:public"],
 )
@@ -55,6 +58,10 @@ filegroup(
 
 filegroup(
     name = "libs",
-    srcs = [":libssl", ":libcrypto", ":legacy"],
+    srcs = [
+        ":legacy",
+        ":libcrypto",
+        ":libssl",
+    ],
     visibility = ["//visibility:public"],
 )

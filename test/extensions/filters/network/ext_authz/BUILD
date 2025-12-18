@@ -84,6 +84,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.network.ext_authz"],
     rbe_pool = "6gig",
     deps = [
+        "//source/common/ssl:ssl_lib",
         "//source/common/tls:context_config_lib",
         "//source/common/tls:context_lib",
         "//source/extensions/filters/network/ext_authz",
@@ -92,7 +93,6 @@ envoy_extension_cc_test(
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/integration:integration_lib",
         "//test/test_common:utility_lib",
-        "//source/common/ssl:ssl_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/ext_authz/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/auth/v3:pkg_cc_proto",

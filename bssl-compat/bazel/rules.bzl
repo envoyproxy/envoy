@@ -58,6 +58,7 @@ def patched_bssl_filegroup(name, srcs):
             """.format(src_file = src_file, dst_file = dst_file),
             tools = ["//tools:uncomment.sh"],
         )
+
     # Create a filegroup containing the copied & patched files
     native.filegroup(
         name = name,
@@ -78,7 +79,7 @@ def mapping_func_filegroup(name, funcs):
         funcs: List of function names (e.g., ["BIO_new", "BIO_free", "SSL_new"])
     """
     targets = []
-    for func in funcs: # Check for handwritten implementation (.c or .cc)
+    for func in funcs:  # Check for handwritten implementation (.c or .cc)
         handwritten = native.glob(["source/" + func + ".c", "source/" + func + ".cc"])
         if handwritten:
             target_name = "handwritten_" + func
@@ -87,7 +88,7 @@ def mapping_func_filegroup(name, funcs):
                 name = target_name,
                 srcs = [handwritten[0]],
             )
-        else: # Else generate an implementation using generate.c.sh
+        else:  # Else generate an implementation using generate.c.sh
             target_name = "generated_" + func
             targets.append(":" + target_name)
             out = "source/" + func + ".c"
@@ -107,6 +108,7 @@ def mapping_func_filegroup(name, funcs):
                     $(location //tools:generate.c.sh) "{func}" "$(location {out})" "$$PATCHED_BSSL_INCLUDE_DIR"
                 """.format(func = func, out = out),
             )
+
     # Create a filegroup containing all function implementations (both handwritten and generated)
     native.filegroup(
         name = name,

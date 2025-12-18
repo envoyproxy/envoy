@@ -337,7 +337,7 @@ Network::IoResult SslSocket::doWrite(Buffer::Instance& write_buffer, bool end_st
           bytes_to_retry_ = bytes_to_write;
           break;
         }
-      FALLTHRU;
+        FALLTHRU;
 #endif
       case SSL_ERROR_WANT_READ:
       // Renegotiation has started. We don't handle renegotiation so just fall through.

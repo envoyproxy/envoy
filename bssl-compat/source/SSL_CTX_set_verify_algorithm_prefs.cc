@@ -1,12 +1,12 @@
 #include <openssl/ssl.h>
 #include <ossl.h>
 
-
 /*
  * https://github.com/google/boringssl/blob/098695591f3a2665fccef83a3732ecfc99acdcdd/src/include/openssl/ssl.h#L2639
  * https://www.openssl.org/docs/man3.0/man3/SSL_CTX_set1_sigalgs.html
  */
-extern "C" int SSL_CTX_set_verify_algorithm_prefs(SSL_CTX *ctx, const uint16_t *prefs, size_t num_prefs) {
+extern "C" int SSL_CTX_set_verify_algorithm_prefs(SSL_CTX* ctx, const uint16_t* prefs,
+                                                  size_t num_prefs) {
   static const struct { // Copied from boringssl/ssl/ssl_privkey.cc
     int pkey_type;
     int hash_nid;
@@ -25,25 +25,25 @@ extern "C" int SSL_CTX_set_verify_algorithm_prefs(SSL_CTX *ctx, const uint16_t *
       {EVP_PKEY_EC, NID_sha512, SSL_SIGN_ECDSA_SECP521R1_SHA512},
       {EVP_PKEY_ED25519, NID_undef, SSL_SIGN_ED25519},
   };
-  static const int mmax = sizeof(kSignatureAlgorithmsMapping) /
-                          sizeof(kSignatureAlgorithmsMapping[0]);
+  static const int mmax =
+      sizeof(kSignatureAlgorithmsMapping) / sizeof(kSignatureAlgorithmsMapping[0]);
 
   int sigalgs[num_prefs * 2];
 
-  for(size_t pi = 0; pi < num_prefs; pi++) {
+  for (size_t pi = 0; pi < num_prefs; pi++) {
     int mi;
 
-    for(mi = 0; mi < mmax; mi++) {
-      if(kSignatureAlgorithmsMapping[mi].signature_algorithm == prefs[pi]) {
+    for (mi = 0; mi < mmax; mi++) {
+      if (kSignatureAlgorithmsMapping[mi].signature_algorithm == prefs[pi]) {
         sigalgs[pi * 2] = kSignatureAlgorithmsMapping[mi].hash_nid;
         sigalgs[pi * 2 + 1] = kSignatureAlgorithmsMapping[mi].pkey_type;
         break;
       }
     }
 
-    if(mi == mmax) {
+    if (mi == mmax) {
       ossl_ERR_raise_data(ossl_ERR_LIB_SSL, ossl_ERR_R_INTERNAL_ERROR,
-                        "unknown signature algorithm : %d", prefs[pi]);
+                          "unknown signature algorithm : %d", prefs[pi]);
       return 0;
     }
   }

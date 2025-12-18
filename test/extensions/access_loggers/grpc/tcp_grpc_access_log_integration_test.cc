@@ -11,6 +11,7 @@
 #include "source/common/buffer/zero_copy_input_stream_impl.h"
 #include "source/common/grpc/codec.h"
 #include "source/common/grpc/common.h"
+#include "source/common/ssl/ssl.h"
 #include "source/common/tls/client_ssl_socket.h"
 #include "source/common/tls/context_manager_impl.h"
 #include "source/common/version/version.h"
@@ -20,7 +21,6 @@
 #include "test/integration/http_integration.h"
 #include "test/integration/ssl_utility.h"
 #include "test/test_common/utility.h"
-#include "source/common/ssl/ssl.h"
 
 #if defined(USE_CEL)
 #include "source/extensions/filters/network/rbac/config.h"
@@ -583,8 +583,8 @@ TEST_P(TcpGrpcAccessLogIntegrationTest, SslTerminatedWithJA3) {
   client_->close(Network::ConnectionCloseType::NoFlush);
   ASSERT_TRUE(waitForAccessLogConnection());
   ASSERT_TRUE(waitForAccessLogStream());
-  ASSERT_TRUE(
-      waitForAccessLogRequest(fmt::format(R"EOF(
+  ASSERT_TRUE(waitForAccessLogRequest(fmt::format(
+      R"EOF(
 identifier:
   node:
     id: node_name
@@ -627,10 +627,10 @@ tcp_logs:
       access_log_type: NotSet
     connection_properties:
 )EOF",
-                                          Network::Test::getLoopbackAddressString(ipVersion()),
-                                          Network::Test::getLoopbackAddressString(ipVersion()),
-                                          SSL_SELECT("ecaf91d232e224038f510cb81aa08b94", "f34cc73a821433e5f56e38868737a636"),
-                                          Network::Test::getLoopbackAddressString(ipVersion()))));
+      Network::Test::getLoopbackAddressString(ipVersion()),
+      Network::Test::getLoopbackAddressString(ipVersion()),
+      SSL_SELECT("ecaf91d232e224038f510cb81aa08b94", "f34cc73a821433e5f56e38868737a636"),
+      Network::Test::getLoopbackAddressString(ipVersion()))));
 
   cleanup();
 }
@@ -685,8 +685,7 @@ tcp_logs:
                                           Network::Test::getLoopbackAddressString(ipVersion()),
                                           Network::Test::getLoopbackAddressString(ipVersion()),
                                           Network::Test::getLoopbackAddressString(ipVersion()),
-                                          SSL_SELECT(138, 163),
-                                          SSL_SELECT(138, 163))));
+                                          SSL_SELECT(138, 163), SSL_SELECT(138, 163))));
 
   cleanup();
 }
@@ -705,8 +704,8 @@ TEST_P(TcpGrpcAccessLogIntegrationTest, SslNotTerminatedWithJA3) {
   client_->close(Network::ConnectionCloseType::NoFlush);
   ASSERT_TRUE(waitForAccessLogConnection());
   ASSERT_TRUE(waitForAccessLogStream());
-  ASSERT_TRUE(
-      waitForAccessLogRequest(fmt::format(R"EOF(
+  ASSERT_TRUE(waitForAccessLogRequest(fmt::format(
+      R"EOF(
 identifier:
   node:
     id: node_name
@@ -739,12 +738,11 @@ tcp_logs:
       received_bytes: {}
       sent_bytes: {}
 )EOF",
-                                          Network::Test::getLoopbackAddressString(ipVersion()),
-                                          Network::Test::getLoopbackAddressString(ipVersion()),
-                                          Network::Test::getLoopbackAddressString(ipVersion()),
-                                          SSL_SELECT("ecaf91d232e224038f510cb81aa08b94", "f34cc73a821433e5f56e38868737a636"),
-                                          SSL_SELECT(138, 163),
-                                          SSL_SELECT(138, 163))));
+      Network::Test::getLoopbackAddressString(ipVersion()),
+      Network::Test::getLoopbackAddressString(ipVersion()),
+      Network::Test::getLoopbackAddressString(ipVersion()),
+      SSL_SELECT("ecaf91d232e224038f510cb81aa08b94", "f34cc73a821433e5f56e38868737a636"),
+      SSL_SELECT(138, 163), SSL_SELECT(138, 163))));
 
   cleanup();
 }
@@ -762,8 +760,8 @@ TEST_P(TcpGrpcAccessLogIntegrationTest, SslNotTerminatedWithJA3NoSNI) {
   client_->close(Network::ConnectionCloseType::NoFlush);
   ASSERT_TRUE(waitForAccessLogConnection());
   ASSERT_TRUE(waitForAccessLogStream());
-  ASSERT_TRUE(
-      waitForAccessLogRequest(fmt::format(R"EOF(
+  ASSERT_TRUE(waitForAccessLogRequest(fmt::format(
+      R"EOF(
 identifier:
   node:
     id: node_name
@@ -795,12 +793,11 @@ tcp_logs:
       received_bytes: {}
       sent_bytes: {}
 )EOF",
-                                          Network::Test::getLoopbackAddressString(ipVersion()),
-                                          Network::Test::getLoopbackAddressString(ipVersion()),
-                                          Network::Test::getLoopbackAddressString(ipVersion()),
-                                          SSL_SELECT("71d1f47d1125ac53c3c6a4863c087cfe", "54619c7296adab310ed514d06812d95f"),
-                                          SSL_SELECT(126, 151),
-                                          SSL_SELECT(126, 151))));
+      Network::Test::getLoopbackAddressString(ipVersion()),
+      Network::Test::getLoopbackAddressString(ipVersion()),
+      Network::Test::getLoopbackAddressString(ipVersion()),
+      SSL_SELECT("71d1f47d1125ac53c3c6a4863c087cfe", "54619c7296adab310ed514d06812d95f"),
+      SSL_SELECT(126, 151), SSL_SELECT(126, 151))));
 
   cleanup();
 }
@@ -821,7 +818,7 @@ TEST_P(TcpGrpcAccessLogIntegrationTest, TlsHandshakeFailure_VerifyFailed) {
           subject: "emailAddress=frontend-team@lyft.com,CN=Test Frontend Team,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US"
           issuer: "CN=Test CA,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US"
 )EOF",
-                                               "{}");
+                                                      "{}");
   Ssl::ClientSslTransportOptions ssl_options;
   ssl_options.setClientEcdsaCert(false);
   ssl_options.setCipherSuites({"ECDHE-RSA-AES128-GCM-SHA256"});
@@ -831,8 +828,8 @@ TEST_P(TcpGrpcAccessLogIntegrationTest, TlsHandshakeFailure_VerifyFailed) {
 
   ASSERT_TRUE(waitForAccessLogConnection());
   ASSERT_TRUE(waitForAccessLogStream());
-  ASSERT_TRUE(
-      waitForAccessLogRequest(fmt::format(R"EOF(
+  ASSERT_TRUE(waitForAccessLogRequest(fmt::format(
+      R"EOF(
 identifier:
   node:
     id: node_name
@@ -870,11 +867,13 @@ tcp_logs:
         socket_address: {{}}
     connection_properties: {{}}
 )EOF",
-                                          Network::Test::getLoopbackAddressString(ipVersion()),
-                                          SSL_SELECT(49199, 65535),
-                                          peer_certificate_properties,
-                                          SSL_SELECT("TLS_error:|268435581:SSL routines:OPENSSL_internal:CERTIFICATE_VERIFY_FAILED:verify cert failed: cert hash and spki:TLS_error_end",
-                                                     "TLS_error:|268435581:SSL routines:OPENSSL_internal:CERTIFICATE_VERIFY_FAILED:TLS_error_end"))));
+      Network::Test::getLoopbackAddressString(ipVersion()), SSL_SELECT(49199, 65535),
+      peer_certificate_properties,
+      SSL_SELECT(
+          "TLS_error:|268435581:SSL routines:OPENSSL_internal:CERTIFICATE_VERIFY_FAILED:verify "
+          "cert failed: cert hash and spki:TLS_error_end",
+          "TLS_error:|268435581:SSL "
+          "routines:OPENSSL_internal:CERTIFICATE_VERIFY_FAILED:TLS_error_end"))));
   cleanup();
 }
 

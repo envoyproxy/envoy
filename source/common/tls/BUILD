@@ -150,8 +150,8 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/secret:sds_api_lib",
         "//source/common/ssl:certificate_validation_context_config_impl_lib",
-        "//source/common/ssl:tls_certificate_config_impl_lib",
         "//source/common/ssl:ssl_lib",
+        "//source/common/ssl:tls_certificate_config_impl_lib",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )
