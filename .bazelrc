@@ -82,7 +82,7 @@ build:linux --action_env=BAZEL_LINKOPTS=-lm:-fuse-ld=gold
 build --define absl=1
 
 # Disable ICU linking for googleurl.
-build --@com_googlesource_googleurl//build_config:system_icu=0
+build --@googleurl//build_config:system_icu=0
 
 # Common flags for sanitizers
 build:sanitizer --define tcmalloc=disabled
