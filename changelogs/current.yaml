@@ -541,6 +541,9 @@ new_features:
     requests to more backend servers. The filter supports fanout to multiple backends for initialize and tools-list requests,
     single-backend routing for tools-call based on tool name prefix, session management with composite session IDs,
     and response aggregation.
+- area: access_log
+  change: |
+    Added ``LISTENER_FILTER_CHAIN`` to the ``METADATA`` command operator to allow access to listener filter chain metadata.
 - area: ext_proc
   change: |
     Added per HTTP event :ref:'procesing effects <envoy.filters.http.ext_proc.ProcessingEffect' in the
