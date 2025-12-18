@@ -14,7 +14,6 @@
 #include "source/common/config/remote_data_fetcher.h"
 #include "source/common/config/watched_directory.h"
 #include "source/common/init/target_impl.h"
-#include "source/common/network/lc_trie.h"
 
 #include "absl/types/optional.h"
 
