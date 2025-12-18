@@ -84,6 +84,7 @@ public:
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
   Network::Address::InstanceConstSharedPtr upstream_remote_address_;
   std::string failure_reason_;
+  DetectedCloseType upstream_detected_close_type_ = DetectedCloseType::Normal;
   Upstream::HostDescriptionConstSharedPtr upstream_host_;
   FilterStateSharedPtr filter_state_;
   uint64_t num_streams_ = 0;
@@ -209,6 +210,7 @@ public:
   absl::optional<std::string> virtual_cluster_name_;
   DownstreamTiming downstream_timing_;
   std::string downstream_transport_failure_reason_;
+  DetectedCloseType downstream_detected_close_type_ = DetectedCloseType::Normal;
   std::string stream_flags_;
   Router::VirtualHostConstSharedPtr virtual_host_;
 };
