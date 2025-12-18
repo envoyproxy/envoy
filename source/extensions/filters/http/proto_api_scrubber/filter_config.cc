@@ -342,6 +342,30 @@ void ProtoApiScrubberFilterConfig::initializeTypeUtils() {
       });
 }
 
+void ProtoApiScrubberFilterConfig::resolveAndCacheType(
+    const std::string& raw_type_name, const std::string& package_prefix,
+    const std::string& method_key,
+    absl::flat_hash_map<std::string, const Envoy::Protobuf::Type*>& cache,
+    absl::string_view type_category) {
+  std::string type_name = raw_type_name;
+
+  // Handle fully qualified names starting with "." or append package prefix
+  if (absl::StartsWith(type_name, ".")) {
+    type_name = type_name.substr(1);
+  } else if (!package_prefix.empty()) {
+    type_name = absl::StrCat(package_prefix, type_name);
+  }
+
+  std::string type_url = absl::StrCat(Envoy::Grpc::Common::typeUrlPrefix(), "/", type_name);
+
+  if (const auto* type_ptr = (*type_finder_)(type_url)) {
+    cache[method_key] = type_ptr;
+  } else {
+    ENVOY_LOG(error, "Failed to resolve {} Type for {}. URL: {}", type_category, method_key,
+              type_url);
+  }
+}
+
 void ProtoApiScrubberFilterConfig::precomputeTypeCache(
     const Envoy::Protobuf::FileDescriptorSet& descriptor_set) {
   for (const auto& file : descriptor_set.file()) {
@@ -356,41 +380,11 @@ void ProtoApiScrubberFilterConfig::precomputeTypeCache(
         std::string method_key =
             absl::StrCat("/", package_prefix, service.name(), "/", method.name());
 
-        // Resolve Request Type.
-        std::string input_type_name = method.input_type();
-        if (absl::StartsWith(input_type_name, ".")) {
-          input_type_name = input_type_name.substr(1);
-        } else if (!package_prefix.empty()) {
-          input_type_name = absl::StrCat(package_prefix, input_type_name);
-        }
+        resolveAndCacheType(method.input_type(), package_prefix, method_key, request_type_cache_,
+                            "Request");
 
-        std::string request_type_url =
-            absl::StrCat(Envoy::Grpc::Common::typeUrlPrefix(), "/", input_type_name);
-
-        if (const auto* req_type = (*type_finder_)(request_type_url)) {
-          request_type_cache_[method_key] = req_type;
-        } else {
-          ENVOY_LOG(error, "Failed to resolve Request Type for {}. URL: {}", method_key,
-                    request_type_url);
-        }
-
-        // Resolve Response Type.
-        std::string output_type_name = method.output_type();
-        if (absl::StartsWith(output_type_name, ".")) {
-          output_type_name = output_type_name.substr(1);
-        } else if (!package_prefix.empty()) {
-          output_type_name = absl::StrCat(package_prefix, output_type_name);
-        }
-
-        std::string response_type_url =
-            absl::StrCat(Envoy::Grpc::Common::typeUrlPrefix(), "/", output_type_name);
-
-        if (const auto* resp_type = (*type_finder_)(response_type_url)) {
-          response_type_cache_[method_key] = resp_type;
-        } else {
-          ENVOY_LOG(error, "Failed to resolve Response Type for {}. URL: {}", method_key,
-                    response_type_url);
-        }
+        resolveAndCacheType(method.output_type(), package_prefix, method_key, response_type_cache_,
+                            "Response");
       }
     }
   }
@@ -403,7 +397,7 @@ ProtoApiScrubberFilterConfig::getRequestType(const std::string& method_name) con
     return it->second;
   }
 
-  // Fallback for cases where method isn't in descriptor pool (should ideally return error)
+  // Fallback for cases where method isn't in descriptor pool (should return error).
   return absl::InvalidArgumentError(
       fmt::format("Method '{}' not found in descriptor pool (type lookup failed).", method_name));
 }
