@@ -482,11 +482,13 @@ TEST_F(HttpConnectionManagerImplTest, PopulateStreamInfo) {
   Buffer::OwnedImpl fake_input("input");
   conn_manager_->createCodec(fake_input);
 
+  EXPECT_CALL(response_encoder_.stream_, codecStreamId()).WillOnce(Return(123));
   startRequest(false);
 
   EXPECT_NE(absl::nullopt, decoder_->streamInfo().getStreamIdProvider());
   EXPECT_NE(absl::nullopt, decoder_->streamInfo().getStreamIdProvider()->toInteger());
   EXPECT_NE(absl::nullopt, decoder_->streamInfo().getStreamIdProvider()->toStringView());
+  EXPECT_EQ(123, decoder_->streamInfo().getStreamIdProvider()->getCodecStreamId().value());
   EXPECT_EQ(ssl_connection_, decoder_->streamInfo().downstreamAddressProvider().sslConnection());
   EXPECT_EQ(filter_callbacks_.connection_.id_,
             decoder_->streamInfo().downstreamAddressProvider().connectionID().value());

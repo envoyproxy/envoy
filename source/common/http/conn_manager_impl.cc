@@ -869,6 +869,13 @@ absl::optional<uint64_t> ConnectionManagerImpl::HttpStreamIdProviderImpl::toInte
       *parent_.request_headers_);
 }
 
+absl::optional<uint32_t> ConnectionManagerImpl::HttpStreamIdProviderImpl::getCodecStreamId() const {
+  if (parent_.response_encoder_ == nullptr) {
+    return absl::nullopt;
+  }
+  return parent_.response_encoder_->getStream().codecStreamId();
+}
+
 namespace {
 constexpr absl::string_view kRouteFactoryName = "envoy.route_config_update_requester.default";
 } // namespace

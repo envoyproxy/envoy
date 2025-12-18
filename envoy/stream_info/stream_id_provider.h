@@ -29,6 +29,12 @@ public:
    * @return the optional integer view of the stream id.
    */
   virtual absl::optional<uint64_t> toInteger() const PURE;
+
+  /**
+   * @return the stream id assigned by the codec. See
+   * {Envoy::Http::Stream::protocolStreamId} for more info.
+   */
+  virtual absl::optional<uint32_t> getCodecStreamId() const PURE;
 };
 using StreamIdProviderSharedPtr = std::shared_ptr<StreamIdProvider>;
 
