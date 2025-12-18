@@ -19,7 +19,6 @@
 #include <openssl/ssl.h>
 #include <ossl.h>
 
-
-extern "C" int SSL_SESSION_should_be_single_use(const SSL_SESSION *session) {
+extern "C" int SSL_SESSION_should_be_single_use(const SSL_SESSION* session) {
   return (ossl.ossl_SSL_SESSION_get_protocol_version(session) >= ossl_TLS1_3_VERSION);
 }

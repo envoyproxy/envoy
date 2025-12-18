@@ -1,3 +1,5 @@
+#pragma once
+
 static const char intermediate_ca_1_cert_pem_str[] = R"""(-----BEGIN CERTIFICATE-----
 MIIEFDCCAvygAwIBAgIUCTpAUdI0paiRKgPH3UKinAJAh5IwDQYJKoZIhvcNAQEL
 BQAwgYoxCzAJBgNVBAYTAkdCMRYwFAYDVQQIDA1UeW5lIGFuZCBXZWFyMRwwGgYD

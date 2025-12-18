@@ -938,7 +938,7 @@ def _foreign_cc_dependencies():
         name = "rules_foreign_cc",
         patch_args = ["-p1"],
         patches = [
-           "@envoy//bazel:rules_foreign_cc.patch",
+            "@envoy//bazel:rules_foreign_cc.patch",
         ],
     )
 
@@ -960,4 +960,3 @@ def _com_github_maxmind_libmaxminddb():
         name = "maxmind",
         actual = "@envoy//bazel/foreign_cc:maxmind_linux",
     )
-

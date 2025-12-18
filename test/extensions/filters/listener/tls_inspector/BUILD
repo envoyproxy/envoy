@@ -36,6 +36,7 @@ envoy_cc_test(
         "//source/common/http:utility_lib",
         "//source/common/network:default_socket_interface_lib",
         "//source/common/network:listener_filter_buffer_lib",
+        "//source/common/ssl:ssl_lib",
         "//source/extensions/filters/listener/tls_inspector:config",
         "//source/extensions/filters/listener/tls_inspector:tls_inspector_lib",
         "//test/common/stats:stat_test_utility_lib",
@@ -43,7 +44,6 @@ envoy_cc_test(
         "//test/mocks/network:network_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:threadsafe_singleton_injector_lib",
-        "//source/common/ssl:ssl_lib",
     ],
 )
 
@@ -56,6 +56,7 @@ envoy_cc_test(
         "//source/common/common:hex_lib",
         "//source/common/network:default_socket_interface_lib",
         "//source/common/network:listener_filter_buffer_lib",
+        "//source/common/ssl:ssl_lib",
         "//source/extensions/filters/listener/tls_inspector:config",
         "//source/extensions/filters/listener/tls_inspector:tls_inspector_lib",
         "//test/common/stats:stat_test_utility_lib",
@@ -63,7 +64,6 @@ envoy_cc_test(
         "//test/mocks/network:network_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:threadsafe_singleton_injector_lib",
-        "//source/common/ssl:ssl_lib",
     ],
 )
 
@@ -138,6 +138,7 @@ envoy_cc_test(
         "//source/common/event:dispatcher_includes",
         "//source/common/event:dispatcher_lib",
         "//source/common/network:utility_lib",
+        "//source/common/ssl:ssl_lib",
         "//source/common/tls:context_config_lib",
         "//source/common/tls:context_lib",
         "//source/extensions/access_loggers/file:config",
@@ -149,7 +150,6 @@ envoy_cc_test(
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/secret:secret_mocks",
         "//test/test_common:utility_lib",
-        "//source/common/ssl:ssl_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",

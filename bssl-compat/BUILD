@@ -1,5 +1,5 @@
-load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
-load("//:bazel/rules.bzl", "patched_bssl_filegroup", "mapping_func_filegroup")
+load("@rules_cc//cc:defs.bzl", "cc_library")
+load("//:bazel/rules.bzl", "mapping_func_filegroup", "patched_bssl_filegroup")
 
 licenses(["notice"])  # Apache 2
 
@@ -181,7 +181,7 @@ genrule(
             --prefix ossl 2>&1
     """,
     tools = [
-        "//prefixer:prefixer",
+        "//prefixer",
         "@llvm_toolchain_llvm//:lib/libclang-cpp.so.18.1",
     ],
     visibility = ["//visibility:private"],
@@ -196,8 +196,8 @@ patched_bssl_filegroup(
     srcs = [
         "include/openssl/aead.h",
         "include/openssl/aes.h",
-        "include/openssl/asm_base.h",
         "include/openssl/arm_arch.h",
+        "include/openssl/asm_base.h",
         "include/openssl/asn1.h",
         "include/openssl/asn1_mac.h",
         "include/openssl/asn1t.h",
@@ -287,7 +287,7 @@ patched_bssl_filegroup(
         "include/openssl/x509_vfy.h",
         "include/openssl/x509v3.h",
         "include/openssl/x509v3_errors.h",
-    ]
+    ],
 )
 
 # Create rules for processing all BoringSSL sources that we need. This creates
@@ -297,10 +297,10 @@ patched_bssl_filegroup(
 patched_bssl_filegroup(
     name = "patched_bssl_sources",
     srcs = [
+        "crypto/bytestring/cbb.cc",
+        "crypto/bytestring/cbs.cc",
         "crypto/internal.h",
         "crypto/mem.cc",
-        "crypto/bytestring/cbs.cc",
-        "crypto/bytestring/cbb.cc",
         "ssl/ssl_x509.cc",
     ],
 )
@@ -861,15 +861,16 @@ mapping_func_filegroup(
 # Full bssl-compat library
 cc_library(
     name = "bssl-compat",
-    linkstatic = True,
     srcs = [
-        ":prefixed_ossl_source",
+        ":mapping_function_sources",
         ":patched_bssl_headers",
         ":patched_bssl_sources",
-        ":mapping_function_sources",
+        ":prefixed_ossl_source",
     ] + [
         "include/ext/openssl/ssl.h",
         "source/CRYPTO_BUFFER.h",
+        "source/SSL_CTX_set_select_certificate_cb.h",
+        "source/SSL_get_curve_name.cc",
         "source/err.cc",
         "source/ext_SSL_get_all_async_fds.c",
         "source/iana_2_ossl_names.cc",
@@ -881,21 +882,20 @@ cc_library(
         "source/ossl_dlutil.h",
         "source/override.cc",
         "source/override.h",
-        "source/SSL_CTX_set_select_certificate_cb.h",
-        "source/SSL_get_curve_name.cc",
         "source/stack.c",
     ],
-    includes = [
-        "include",
-        "source",
-    ],
-    linkopts = ["-ldl"],
-    visibility = ["//visibility:public"],
 
     # Add the OpenSSL shared libraries as a *data* dependency, so they get
     # propagated to dependant targets, and made available in their runfiles
     # directory when they run, so libbssl-compat.a can dlopen() them.
     data = ["@openssl//:libs"],
+    includes = [
+        "include",
+        "source",
+    ],
+    linkopts = ["-ldl"],
+    linkstatic = True,
+    visibility = ["//visibility:public"],
 )
 
 # Aliases for compatibility

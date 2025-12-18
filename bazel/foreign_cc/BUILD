@@ -436,7 +436,6 @@ envoy_cmake(
     tags = ["skip_on_windows"],
 )
 
-
 envoy_cc_library(
     name = "maxmind_linux",
     srcs = [],

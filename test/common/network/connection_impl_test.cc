@@ -23,6 +23,7 @@
 #include "source/common/network/tcp_listener_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/runtime/runtime_impl.h"
+#include "source/common/ssl/ssl.h"
 
 #include "test/common/memory/memory_test_utility.h"
 #include "test/mocks/api/mocks.h"
@@ -39,7 +40,6 @@
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
-#include "source/common/ssl/ssl.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

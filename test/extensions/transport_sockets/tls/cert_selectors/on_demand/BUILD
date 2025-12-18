@@ -47,7 +47,8 @@ envoy_extension_cc_test(
         [],
         [
             "integration_test.cc",
-        ]),
+        ],
+    ),
     data = [
         "//test/config/integration/certs",
     ],

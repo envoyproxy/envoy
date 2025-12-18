@@ -19,10 +19,10 @@
 #include <openssl/rand.h>
 #include <ossl.h>
 
-extern "C" int RAND_bytes(uint8_t *buf, size_t len) {
+extern "C" int RAND_bytes(uint8_t* buf, size_t len) {
 
-  if (ossl.ossl_RAND_bytes((unsigned char *)buf, (int)len) <= 0)
+  if (ossl.ossl_RAND_bytes((unsigned char*)buf, (int)len) <= 0)
     return 0;
 
-	return 1;
+  return 1;
 }

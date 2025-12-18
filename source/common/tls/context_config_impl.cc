@@ -20,7 +20,6 @@
 #include "openssl/crypto.h"
 #include "openssl/ssl.h"
 
-
 namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
@@ -381,11 +380,13 @@ unsigned ContextConfigImpl::tlsVersionFromProto(
 const unsigned ClientContextConfigImpl::DEFAULT_MIN_VERSION = TLS1_2_VERSION;
 const unsigned ClientContextConfigImpl::DEFAULT_MAX_VERSION = TLS1_2_VERSION;
 
-const std::string ClientContextConfigImpl::DEFAULT_CIPHER_SUITES =
-    SSL_SELECT("[ECDHE-ECDSA-AES128-GCM-SHA256|ECDHE-ECDSA-CHACHA20-POLY1305]:", "ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-ECDSA-CHACHA20-POLY1305:")
-    SSL_SELECT("[ECDHE-RSA-AES128-GCM-SHA256|ECDHE-RSA-CHACHA20-POLY1305]:", "ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-CHACHA20-POLY1305:")
-    "ECDHE-ECDSA-AES256-GCM-SHA384:"
-    "ECDHE-RSA-AES256-GCM-SHA384:";
+const std::string ClientContextConfigImpl::DEFAULT_CIPHER_SUITES = SSL_SELECT(
+    "[ECDHE-ECDSA-AES128-GCM-SHA256|ECDHE-ECDSA-CHACHA20-POLY1305]:",
+    "ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-ECDSA-CHACHA20-POLY1305:")
+    SSL_SELECT(
+        "[ECDHE-RSA-AES128-GCM-SHA256|ECDHE-RSA-CHACHA20-POLY1305]:",
+        "ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-CHACHA20-POLY1305:") "ECDHE-ECDSA-AES256-GCM-SHA384:"
+                                                                    "ECDHE-RSA-AES256-GCM-SHA384:";
 
 const std::string ClientContextConfigImpl::DEFAULT_CIPHER_SUITES_FIPS =
     "ECDHE-ECDSA-AES128-GCM-SHA256:"

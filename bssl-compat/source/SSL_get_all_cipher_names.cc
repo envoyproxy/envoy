@@ -1,7 +1,7 @@
 #include <openssl/ssl.h>
+
 #include <string>
 #include <vector>
-
 
 static std::vector<std::string> init_all_cipher_names() {
   static std::vector<std::string> names;
@@ -13,11 +13,11 @@ static std::vector<std::string> init_all_cipher_names() {
       if (STACK_OF(SSL_CIPHER)* cipherStack = SSL_get_ciphers(ssl.get())) {
         size_t sslCipherNum = sk_SSL_CIPHER_num(cipherStack);
         for (int i = 0; i < sslCipherNum; i++) {
-            if (const SSL_CIPHER* cipher = sk_SSL_CIPHER_value(cipherStack, i)) {
-                if (const char* cipherName = SSL_CIPHER_get_name(cipher)) {
-                  names.push_back(cipherName);
-                }
+          if (const SSL_CIPHER* cipher = sk_SSL_CIPHER_value(cipherStack, i)) {
+            if (const char* cipherName = SSL_CIPHER_get_name(cipher)) {
+              names.push_back(cipherName);
             }
+          }
         }
       }
     }
@@ -26,7 +26,7 @@ static std::vector<std::string> init_all_cipher_names() {
   return names;
 }
 
-size_t SSL_get_all_cipher_names(const char **out, size_t max_out) {
+size_t SSL_get_all_cipher_names(const char** out, size_t max_out) {
   static std::vector<std::string> validCiphers = init_all_cipher_names();
 
   if (max_out == 0 || out == nullptr) {

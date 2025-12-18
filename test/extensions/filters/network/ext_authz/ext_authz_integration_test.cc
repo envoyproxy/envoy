@@ -2,6 +2,7 @@
 #include "envoy/extensions/filters/network/ext_authz/v3/ext_authz.pb.h"
 #include "envoy/service/auth/v3/external_auth.pb.h"
 
+#include "source/common/ssl/ssl.h"
 #include "source/common/tls/client_ssl_socket.h"
 #include "source/common/tls/context_manager_impl.h"
 #include "source/common/tls/ssl_handshaker.h"
@@ -11,7 +12,6 @@
 #include "test/integration/ssl_utility.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
-#include "source/common/ssl/ssl.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

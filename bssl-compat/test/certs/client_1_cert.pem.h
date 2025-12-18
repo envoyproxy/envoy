@@ -1,3 +1,5 @@
+#pragma once
+
 static const char client_1_cert_pem_str[] = R"""(-----BEGIN CERTIFICATE-----
 MIIEjjCCA3agAwIBAgIUCTpAUdI0paiRKgPH3UKinAJAh5QwDQYJKoZIhvcNAQEL
 BQAwgYoxCzAJBgNVBAYTAkdCMRYwFAYDVQQIDA1UeW5lIGFuZCBXZWFyMRwwGgYD

@@ -17,30 +17,30 @@
  */
 #include <openssl/ssl.h>
 #include <ossl.h>
+
 #include "log.h"
 
-
-extern "C" void SSL_set_renegotiate_mode(SSL *ssl, enum ssl_renegotiate_mode_t mode) {
-  switch(mode) {
-    case ssl_renegotiate_never: {
-      ossl.ossl_SSL_clear_options(ssl,ossl_SSL_OP_ALLOW_CLIENT_RENEGOTIATION);
-      break;
-    }
-    case ssl_renegotiate_freely: {
-      ossl.ossl_SSL_set_options(ssl,ossl_SSL_OP_ALLOW_CLIENT_RENEGOTIATION);
-      break;
-    }
-    case ssl_renegotiate_once: {
-      bssl_compat_fatal("%s(ssl_renegotiate_once) NYI", __func__);
-      break;
-    }
-    case ssl_renegotiate_ignore: {
-      bssl_compat_fatal("%s(ssl_renegotiate_ignore) NYI", __func__);
-      break;
-    }
-    case ssl_renegotiate_explicit: {
-      bssl_compat_fatal("%s(ssl_renegotiate_explicit) NYI", __func__);
-      break;
-    }
+extern "C" void SSL_set_renegotiate_mode(SSL* ssl, enum ssl_renegotiate_mode_t mode) {
+  switch (mode) {
+  case ssl_renegotiate_never: {
+    ossl.ossl_SSL_clear_options(ssl, ossl_SSL_OP_ALLOW_CLIENT_RENEGOTIATION);
+    break;
+  }
+  case ssl_renegotiate_freely: {
+    ossl.ossl_SSL_set_options(ssl, ossl_SSL_OP_ALLOW_CLIENT_RENEGOTIATION);
+    break;
+  }
+  case ssl_renegotiate_once: {
+    bssl_compat_fatal("%s(ssl_renegotiate_once) NYI", __func__);
+    break;
+  }
+  case ssl_renegotiate_ignore: {
+    bssl_compat_fatal("%s(ssl_renegotiate_ignore) NYI", __func__);
+    break;
+  }
+  case ssl_renegotiate_explicit: {
+    bssl_compat_fatal("%s(ssl_renegotiate_explicit) NYI", __func__);
+    break;
+  }
   }
 }
