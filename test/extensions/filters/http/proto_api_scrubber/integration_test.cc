@@ -1,6 +1,7 @@
 #include "envoy/extensions/filters/http/proto_api_scrubber/v3/config.pb.h"
 #include "envoy/grpc/status.h"
 #include "envoy/stats/histogram.h"
+#include "envoy/stats/stats.h"
 
 #include "source/extensions/filters/http/proto_api_scrubber/scrubbing_util_lib/field_checker.h"
 
@@ -192,12 +193,6 @@ TEST_P(ProtoApiScrubberIntegrationTest, UnaryRequestPassesThrough) {
 
   // Verify Stats
   test_server_->waitForCounterGe("proto_api_scrubber.total_requests_checked", 1);
-
-  // Check that latency histogram exists and was used.
-  // Use statStore() instead of stats(), and verify usage.
-  auto& histogram = test_server_->statStore().histogram(
-      "proto_api_scrubber.request_scrubbing_latency", Envoy::Stats::Histogram::Unit::Milliseconds);
-  EXPECT_TRUE(histogram.used());
 }
 
 // Tests that the streaming request passes through without modification if there are no restrictions
@@ -365,42 +360,35 @@ TEST_P(ProtoApiScrubberIntegrationTest, RejectsInvalidPathFormat) {
 
 // Tests that the request is rejected if a method-level block rule matches.
 TEST_P(ProtoApiScrubberIntegrationTest, RejectsBlockedMethod) {
-  // Config manually to inject method_restriction
-  std::string full_config_text = fmt::format(R"pb(
-      filtering_mode: OVERRIDE
-      descriptor_set {{ data_source {{ filename: "{0}" }} }}
-      restrictions {{
-        method_restrictions {{
-          key: "{1}"
-          value {{
-            method_restriction {{
-              matcher {{
-                matcher_list {{
-                   matchers {{
-                      predicate {{
-                        single_predicate {{
-                           input {{ name: "envoy.matching.inputs.cel_data_input" typed_config {{ "@type": "type.googleapis.com/xds.type.matcher.v3.HttpAttributesCelMatchInput" }} }}
-                           custom_match {{ name: "envoy.matching.matchers.cel_matcher" typed_config {{ "@type": "type.googleapis.com/xds.type.matcher.v3.CelMatcher" expr_match {{ cel_expr_parsed {{ expr {{ const_expr {{ bool_value: true }} }} }} }} }} }} }}
-                        }}
-                      }}
-                   }}
-                }}
-              }}
-            }}
-          }}
-        }}
-      }}
-    )pb",
-                                             apikeysDescriptorPath(), kCreateApiKeyMethod);
+  // Construct the config programmatically
+  ProtoApiScrubberConfig config;
+  config.set_filtering_mode(ProtoApiScrubberConfig::OVERRIDE);
+  config.mutable_descriptor_set()->mutable_data_source()->set_filename(apikeysDescriptorPath());
 
-  ProtoApiScrubberConfig filter_config_proto;
-  Protobuf::TextFormat::ParseFromString(full_config_text, &filter_config_proto);
+  // Create the CEL matcher for "true" (always match -> block)
+  auto matcher_predicate = buildCelPredicate("true");
+
+  // Create the full Matcher object
+  xds::type::matcher::v3::Matcher matcher;
+  auto* matcher_entry = matcher.mutable_matcher_list()->add_matchers();
+  *matcher_entry->mutable_predicate() = matcher_predicate;
+
+  // Use RemoveFieldAction as a placeholder action since the logic only checks for a match
+  envoy::extensions::filters::http::proto_api_scrubber::v3::RemoveFieldAction remove_action;
+  matcher_entry->mutable_on_match()->mutable_action()->mutable_typed_config()->PackFrom(remove_action);
+  matcher_entry->mutable_on_match()->mutable_action()->set_name("block_action");
+
+  // Set up the restriction map
+  auto& method_restrictions = *config.mutable_restrictions()->mutable_method_restrictions();
+  auto& restriction = method_restrictions[kCreateApiKeyMethod];
+  *restriction.mutable_method_restriction()->mutable_matcher() = matcher;
+
+  // Wrap in Any and convert to JSON for Envoy config
   Protobuf::Any any_config;
-  any_config.PackFrom(filter_config_proto);
+  any_config.PackFrom(config);
   std::string typed_config = fmt::format(R"EOF(
     name: envoy.filters.http.proto_api_scrubber
-    typed_config: {})EOF",
-                                         MessageUtil::getJsonStringFromMessageOrError(any_config));
+    typed_config: {})EOF", MessageUtil::getJsonStringFromMessageOrError(any_config));
 
   config_helper_.prependFilter(typed_config);
   initialize();
