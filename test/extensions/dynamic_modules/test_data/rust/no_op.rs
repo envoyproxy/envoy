@@ -36,7 +36,7 @@ struct NopHttpFilterConfig {
 }
 
 impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for NopHttpFilterConfig {
-  fn new_http_filter(&mut self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+  fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
     Box::new(NopHttpFilter {
       on_request_headers_called: false,
       on_request_body_called: false,

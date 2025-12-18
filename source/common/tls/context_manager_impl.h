@@ -34,7 +34,6 @@ public:
                          const Envoy::Ssl::ClientContextConfig& config) override;
   absl::StatusOr<Ssl::ServerContextSharedPtr>
   createSslServerContext(Stats::Scope& scope, const Envoy::Ssl::ServerContextConfig& config,
-                         const std::vector<std::string>& server_names,
                          Ssl::ContextAdditionalInitFunc additional_init) override;
   absl::optional<uint32_t> daysUntilFirstCertExpires() const override;
   absl::optional<uint64_t> secondsUntilFirstOcspResponseExpires() const override;

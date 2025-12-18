@@ -85,7 +85,7 @@ fn test_envoy_dynamic_module_on_http_filter_new_destroy() {
   static DROPPED: AtomicBool = AtomicBool::new(false);
   struct TestHttpFilterConfig;
   impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for TestHttpFilterConfig {
-    fn new_http_filter(&mut self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
       Box::new(TestHttpFilter)
     }
   }
@@ -119,7 +119,7 @@ fn test_envoy_dynamic_module_on_http_filter_new_destroy() {
 fn test_envoy_dynamic_module_on_http_filter_callbacks() {
   struct TestHttpFilterConfig;
   impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for TestHttpFilterConfig {
-    fn new_http_filter(&mut self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
       Box::new(TestHttpFilter)
     }
   }

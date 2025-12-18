@@ -1,7 +1,44 @@
+diff --git a/configure b/configure
+index 3c95214..1bdf301 100755
+--- a/configure
++++ b/configure
+@@ -118,8 +118,12 @@ print_config() {
+ }
+ 
+ # Default CFLAGS
+-CFLAGS="-D_GNU_SOURCE -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 -include config-host.h"
+-BUILD_CFLAGS=""
++# Preserve original CFLAGS from environment (with sysroot etc)
++ENV_CFLAGS="${CFLAGS}"
++# Add required flags for configure tests
++CFLAGS="${CFLAGS:+$CFLAGS }-D_GNU_SOURCE -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 -include config-host.h"
++# BUILD_CFLAGS will be used by Makefile
++BUILD_CFLAGS="${ENV_CFLAGS}"
+ 
+ # Print configure header at the top of $config_host_h
+ echo "/*" > $config_host_h
+@@ -580,6 +584,8 @@ fi
+ echo "CC=$cc" >> $config_host_mak
+ print_config "CC" "$cc"
+ echo "CXX=$cxx" >> $config_host_mak
++# Write BUILD_CFLAGS so Makefile can use original CFLAGS with sysroot
++echo "BUILD_CFLAGS=$BUILD_CFLAGS" >> $config_host_mak
+ print_config "CXX" "$cxx"
+ 
+ # generate io_uring_version.h
 diff --git a/src/Makefile b/src/Makefile
-index 8f89701a..65439c2f 100644
+index 8f89701..194b6a4 100644
 --- a/src/Makefile
 +++ b/src/Makefile
+@@ -12,7 +12,7 @@ override CPPFLAGS += -D_GNU_SOURCE \
+ 	-D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64
+ CFLAGS ?= -O3 -Wall -Wextra -fno-stack-protector
+ override CFLAGS += -Wno-unused-parameter \
+-	-DLIBURING_INTERNAL \
++	-DLIBURING_INTERNAL $(BUILD_CFLAGS) \
+ 	$(LIBURING_CFLAGS)
+ SO_CFLAGS=-fPIC $(CFLAGS)
+ L_CFLAGS=$(CFLAGS)
 @@ -44,6 +44,22 @@ else
  endif
  LINK_FLAGS+=$(LDFLAGS)

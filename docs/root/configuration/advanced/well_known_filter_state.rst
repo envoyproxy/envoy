@@ -73,6 +73,23 @@ The following lists the filter state object keys used by the Envoy extensions to
   <envoy_v3_api_field_service.ratelimit.v3.RateLimitRequest.hits_addend>` override on a per-route basis.
   Accepts a number string as a constructor.
 
+``envoy.geoip``
+  :ref:`Network GeoIP filter <config_network_filters_geoip>` stores geolocation lookup results
+  in this filter state object. The object contains fields for geographic data such as country,
+  city, region, and ASN. Supports serialization for access logging and field-level access. Fields:
+
+  * ``country``: ISO country code;
+  * ``city``: city name;
+  * ``region``: ISO region code;
+  * ``asn``: autonomous system number;
+  * ``anon``: anonymization network check result (``true`` or ``false``);
+  * ``anon_vpn``: VPN check result (``true`` or ``false``);
+  * ``anon_hosting``: hosting provider check result (``true`` or ``false``);
+  * ``anon_tor``: TOR exit node check result (``true`` or ``false``);
+  * ``anon_proxy``: public proxy check result (``true`` or ``false``);
+  * ``isp``: ISP name;
+  * ``apple_private_relay``: iCloud Private Relay check result (``true`` or ``false``).
+
 ``envoy.network.network_namespace``
   Contains the value of the downstream connection's Linux network namespace if it differs from the default.
 
