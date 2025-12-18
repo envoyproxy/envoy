@@ -1,5 +1,6 @@
 #include "source/common/access_log/access_log_manager_impl.h"
 
+#include <cstdint>
 #include <string>
 
 #include "envoy/common/exception.h"
@@ -55,6 +56,7 @@ AccessLogManagerImpl::createAccessLog(const Filesystem::FilePathAndType& file_in
 AccessLogFileImpl::AccessLogFileImpl(Filesystem::FilePtr&& file, Event::Dispatcher& dispatcher,
                                      Thread::BasicLockable& lock, AccessLogFileStats& stats,
                                      std::chrono::milliseconds flush_interval_msec,
+                                     uint64_t min_flush_size_kb,
                                      Thread::ThreadFactory& thread_factory)
     : file_(std::move(file)), file_lock_(lock),
       flush_timer_(dispatcher.createTimer([this]() -> void {
@@ -62,7 +64,8 @@ AccessLogFileImpl::AccessLogFileImpl(Filesystem::FilePtr&& file, Event::Dispatch
         flush_event_.notifyOne();
         flush_timer_->enableTimer(flush_interval_msec_);
       })),
-      thread_factory_(thread_factory), flush_interval_msec_(flush_interval_msec), stats_(stats) {
+      thread_factory_(thread_factory), flush_interval_msec_(flush_interval_msec),
+      min_flush_size_(min_flush_size_kb * 1024), stats_(stats) {
   flush_timer_->enableTimer(flush_interval_msec_);
 }
 
