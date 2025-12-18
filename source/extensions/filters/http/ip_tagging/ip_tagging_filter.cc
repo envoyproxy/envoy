@@ -98,7 +98,7 @@ IpTagsLoader::loadTags(const envoy::config::core::v3::DataSource& ip_tags_dataso
               if (absl::EndsWith(datasource_filename, MessageUtil::FileExtensions::get().Yaml)) {
                 auto data = std::string(new_data);
                 auto load_status =
-                    // todo(nezdolik) remove string casting once yaml utuility has been migrated to
+                    // TODO(nezdolik) remove string casting once yaml utuility has been migrated to
                     // string_view.
                     MessageUtil::loadFromYamlNoThrow(data, ip_tags_proto, validation_visitor_);
                 if (!load_status.ok()) {
