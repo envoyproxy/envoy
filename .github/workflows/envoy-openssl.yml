@@ -18,8 +18,6 @@ jobs:
     permissions:
       contents: read
       packages: read
-    if: >-
-      ${{ github.repository == 'envoyproxy/envoy-openssl' }}
     steps:
     - name: Free disk space
       uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.3.28
