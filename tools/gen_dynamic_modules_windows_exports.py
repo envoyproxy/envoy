@@ -1,6 +1,7 @@
 import re
 import sys
 
+
 def main():
     if len(sys.argv) != 3:
         print("Usage: gen_dynamic_modules_def.py <input_header> <output_def>")
@@ -23,6 +24,7 @@ def main():
         f.write("EXPORTS\n")
         for symbol in symbols:
             f.write(f"    {symbol}\n")
+
 
 if __name__ == "__main__":
     main()
