@@ -39,6 +39,7 @@
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
+#include "source/common/ssl/ssl.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -4341,7 +4342,24 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ReadBufferLimitTest,
 
 TEST_P(ReadBufferLimitTest, NoLimit) { readBufferLimitTest(0, 256 * 1024); }
 
-TEST_P(ReadBufferLimitTest, SomeLimit) {
+// OpenSSL: This test is disabled because it makes an incorrect assumption about
+// what happens when a partial read occurs, followed by additional reads.
+//
+// The calculation of expected_chunk_size assumes that the empty space in the
+// buffer, left over from the first partial read, remains empty after the
+// second read (this is what the -1 is meant to account for). However, in
+// reality, the second read will fill that unused space in addition to the
+// extra slice that is allocated. Therefore, the calculation of
+// expected_chunk_size should be the read_buffer_limit + slice size.
+//
+// This test should be modified so that the partial read _always_ happens
+// determinitically, rather than depending on the buffering/scheduling in the
+// network stack.
+//
+// These fixes will be done upstream on main branch, backported to 1.34, and
+// eventually sync'd back here, into envoy-openssl.
+//
+BORINGSSL_TEST_P(ReadBufferLimitTest, SomeLimit) {
   const uint32_t read_buffer_limit = 32 * 1024;
   // Envoy has soft limits, so as long as the first read is < read_buffer_limit it will do a second
   // read, before presenting the data to the ReadFilter. This additional read may include allocating

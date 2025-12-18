@@ -184,3 +184,48 @@ index 28247dd..e35142b 100644
 +        "@com_google_googletest//:gtest_main",
      ],
  )
+diff --git a/src/jwt.cc b/src/jwt.cc
+index 2c22eb4..f2cbf5e 100644
+--- a/src/jwt.cc
++++ b/src/jwt.cc
+@@ -48,7 +48,11 @@ Jwt& Jwt::operator=(const Jwt& rhs) {
+ }
+ 
+ Status Jwt::parseFromString(const std::string& jwt) {
+-  // jwt must have exactly 2 dots with 3 sections.
++  // jwt must have exactly 2 dots...
++  if (std::count(jwt.begin(), jwt.end(), '.') != 2) {
++    return Status::JwtBadFormat;
++  }
++  // ...and 3 sections
+   jwt_ = jwt;
+   std::vector<absl::string_view> jwt_split =
+       absl::StrSplit(jwt, '.', absl::SkipEmpty());
+diff --git a/src/verify.cc b/src/verify.cc
+index 70eb817..1fcd235 100644
+--- a/src/verify.cc
++++ b/src/verify.cc
+@@ -132,12 +132,20 @@ bool verifySignatureEC(EC_KEY* key, const EVP_MD* md, const uint8_t* signature,
+     return false;
+   }
+ 
+-  if (BN_bin2bn(signature, signature_len / 2, ecdsa_sig->r) == nullptr ||
+-      BN_bin2bn(signature + (signature_len / 2), signature_len / 2,
+-                ecdsa_sig->s) == nullptr) {
++  bssl::UniquePtr<BIGNUM> ecdsa_sig_r {BN_bin2bn(signature, signature_len / 2, nullptr)};
++  bssl::UniquePtr<BIGNUM> ecdsa_sig_s {BN_bin2bn(signature + (signature_len / 2), signature_len / 2, nullptr)};
++
++  if (ecdsa_sig_r.get() == nullptr || ecdsa_sig_s.get() == nullptr) {
+     return false;
+   }
+ 
++  if (ECDSA_SIG_set0(ecdsa_sig.get(), ecdsa_sig_r.get(), ecdsa_sig_s.get()) == 0) {
++    return false;
++  }
++
++  ecdsa_sig_r.release();
++  ecdsa_sig_s.release();
++
+   if (ECDSA_do_verify(digest.data(), digest_len, ecdsa_sig.get(), key) == 1) {
+     return true;
+   }

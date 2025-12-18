@@ -150,6 +150,7 @@ envoy_extension_cc_test(
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/integration:http_integration_lib",
         "//test/test_common:utility_lib",
+        "//source/common/ssl:ssl_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/access_loggers/grpc/v3:pkg_cc_proto",

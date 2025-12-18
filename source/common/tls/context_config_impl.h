@@ -83,6 +83,19 @@ public:
       const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext&
           dynamic_cvc,
       const std::string& name);
+  static bool getFipsEnabled() {
+    std::ifstream file("/proc/sys/crypto/fips_enabled");
+    if (file.fail()) {
+      return false;
+    }
+
+    std::stringstream file_string;
+    file_string << file.rdbuf();
+
+    std::string fipsEnabledText = file_string.str();
+    fipsEnabledText.erase(fipsEnabledText.find_last_not_of("\n") + 1);
+    return fipsEnabledText.compare("1") == 0;
+  }
 
 protected:
   ContextConfigImpl(const envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& config,

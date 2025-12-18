@@ -502,6 +502,16 @@ config_setting(
     values = {"define": "boringssl=disabled"},
 )
 
+config_setting(
+    name = "ssl_openssl",
+    values = {"define": "ssl=openssl"},
+)
+
+config_setting(
+    name = "ssl_boringssl",
+    values = {"define": "ssl=boringssl"},
+)
+
 selects.config_setting_group(
     name = "boringssl_fips_x86",
     match_all = [
@@ -523,6 +533,7 @@ selects.config_setting_group(
     match_all = [
         ":boringssl_fips",
         ":not_ppc",
+        ":ssl_boringssl",
     ],
 )
 
@@ -576,12 +587,14 @@ config_setting(
 )
 
 # Alias pointing to the selected version of BoringSSL:
+# - OpenSSL via bssl-compat from @bssl-compat//:ssl,
 # - BoringSSL FIPS from @boringssl_fips//:ssl,
 # - non-FIPS BoringSSL from @boringssl//:ssl.
 # - aws-lc from @aws_lc//:ssl
 alias(
     name = "boringssl",
     actual = select({
+        ":ssl_openssl": "@bssl-compat//:ssl",
         "//bazel:boringssl_fips_ppc": "@aws_lc//:ssl",
         "//bazel:boringssl_fips_not_ppc": "@boringssl_fips//:ssl",
         "//conditions:default": "@boringssl//:ssl",
@@ -591,6 +604,7 @@ alias(
 alias(
     name = "boringcrypto",
     actual = select({
+        ":ssl_openssl": "@bssl-compat//:crypto",
         "//bazel:boringssl_fips_ppc": "@aws_lc//:crypto",
         "//bazel:boringssl_fips_not_ppc": "@boringssl_fips//:crypto",
         "//conditions:default": "@boringssl//:crypto",

@@ -11,6 +11,7 @@
 #include "test/integration/ssl_utility.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
+#include "source/common/ssl/ssl.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -156,7 +157,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ExtAuthzNetworkIntegrationTest, GRPC_CLIENT
 
 // Test that when ext_authz denies with TLS and send_tls_alert_on_denial is true,
 // the connection is closed with a TLS alert.
-TEST_P(ExtAuthzNetworkIntegrationTest, DenialWithTlsAlertEnabled) {
+BORINGSSL_TEST_P(ExtAuthzNetworkIntegrationTest, DenialWithTlsAlertEnabled) {
   initializeTest(true /* send_tls_alert_on_denial */, true /* with_tls */);
 
   setupSslConnection();

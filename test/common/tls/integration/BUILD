@@ -52,6 +52,7 @@ envoy_cc_test(
         "//test/mocks/secret:secret_mocks",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
+        "//source/common/ssl:ssl_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",

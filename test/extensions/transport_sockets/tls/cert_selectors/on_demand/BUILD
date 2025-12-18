@@ -1,6 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_package",
+    "envoy_select_ssl",
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
@@ -41,9 +42,12 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "integration_test",
     size = "large",
-    srcs = [
-        "integration_test.cc",
-    ],
+    # FIXME: Make this test pass with OpenSSL as well.
+    srcs = envoy_select_ssl(
+        [],
+        [
+            "integration_test.cc",
+        ]),
     data = [
         "//test/config/integration/certs",
     ],

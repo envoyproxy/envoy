@@ -130,13 +130,21 @@ def envoy_dependencies(skip_targets = []):
     # Setup external Bazel rules
     _foreign_cc_dependencies()
 
-    # BoringSSL:
-    # - BoringSSL FIPS from @boringssl_fips//:ssl,
-    # - non-FIPS BoringSSL from @boringssl//:ssl.
-    # SSL/crypto dependencies are resolved via EXTERNAL_DEPS_MAP in envoy_internal.bzl
+    # Load both SSL backends - the actual one used is selected via --define=ssl=<boringssl|openssl>
     _boringssl()
     _boringssl_fips()
-    _aws_lc()
+    _openssl()
+
+    # Binding to an alias that selects between BoringSSL and OpenSSL via bssl-compat
+    # The selection is made in //bazel:boringssl and //bazel:boringcrypto aliases
+    native.bind(
+        name = "ssl",
+        actual = "@envoy//bazel:boringssl",
+    )
+    native.bind(
+        name = "crypto",
+        actual = "@envoy//bazel:boringcrypto",
+    )
 
     # The long repo names (`com_github_fmtlib_fmt` instead of `fmtlib`) are
     # semi-standard in the Bazel community, intended to avoid both duplicate
@@ -254,7 +262,13 @@ def envoy_dependencies(skip_targets = []):
     )
 
 def _boringssl():
-    external_http_archive(name = "boringssl")
+    external_http_archive(
+        name = "boringssl",
+        patches = [
+            "@envoy//bazel:boringssl-bssl-compat.patch",
+        ],
+        patch_args = ["-p1"],
+    )
 
 def _boringssl_fips():
     external_http_archive(
@@ -293,6 +307,12 @@ def _aws_lc():
     external_http_archive(
         name = "aws_lc",
         build_file = "@envoy//bazel/external:aws_lc.BUILD",
+    )
+
+def _openssl():
+    external_http_archive(
+        name = "openssl",
+        build_file = "@envoy//bazel/external:openssl.BUILD",
     )
 
 def _com_github_openhistogram_libcircllhist():
@@ -754,7 +774,6 @@ def _com_github_grpc_grpc():
         name = "com_github_grpc_grpc",
         patch_args = ["-p1"],
         patches = ["@envoy//bazel:grpc.patch"],
-        repo_mapping = {"@openssl": "@boringssl"},
     )
     external_http_archive(
         "build_bazel_rules_apple",
@@ -916,8 +935,10 @@ def _rules_ruby():
 def _foreign_cc_dependencies():
     external_http_archive(
         name = "rules_foreign_cc",
-        patches = ["@envoy//bazel:rules_foreign_cc.patch"],
         patch_args = ["-p1"],
+        patches = [
+           "@envoy//bazel:rules_foreign_cc.patch",
+        ],
     )
 
 def _thrift():
@@ -934,3 +955,8 @@ def _com_github_maxmind_libmaxminddb():
         name = "com_github_maxmind_libmaxminddb",
         build_file_content = BUILD_ALL_CONTENT,
     )
+    native.bind(
+        name = "maxmind",
+        actual = "@envoy//bazel/foreign_cc:maxmind_linux",
+    )
+

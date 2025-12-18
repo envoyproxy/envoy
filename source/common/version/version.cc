@@ -37,7 +37,14 @@ const envoy::config::core::v3::BuildVersion& VersionInfo::buildVersion() {
   return *result;
 }
 
-bool VersionInfo::sslFipsCompliant() { return FIPS_mode() == 1; }
+bool VersionInfo::sslFipsCompliant() {
+#ifdef ENVOY_SSL_FIPS
+  RELEASE_ASSERT(FIPS_mode() == 1, "FIPS mode must be enabled in Envoy FIPS configuration.");
+  return true;
+#else
+  return false;
+#endif
+}
 
 const std::string& VersionInfo::buildType() {
 #ifdef NDEBUG

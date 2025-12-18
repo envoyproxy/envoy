@@ -1,4 +1,4 @@
-diff --git a/toolchains/private/BUILD.bazel b/toolchains/private/BUILD.bazel
+t a/toolchains/private/BUILD.bazel b/toolchains/private/BUILD.bazel
 index 4ccdeef..25658e9 100644
 --- a/toolchains/private/BUILD.bazel
 +++ b/toolchains/private/BUILD.bazel
