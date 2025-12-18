@@ -236,6 +236,15 @@ common:aws-lc-fips --//bazel:ssl=@aws_lc//:ssl
 common:aws-lc-fips --//bazel:crypto=@aws_lc//:crypto
 common:aws-lc-fips --//bazel:http3=False
 
+# OpenSSL
+common:openssl --//bazel:ssl=@compat-openssl//:ssl
+common:openssl --//bazel:crypto=@compat-openssl//:crypto
+common:openssl --copt=-DENVOY_SSL_OPENSSL
+common:openssl --host_copt=-DENVOY_SSL_OPENSSL
+common:openssl --@envoy//bazel:http3=False
+common:openssl --test_tag_filters=-nofips
+common:openssl --build_tag_filters=-nofips
+
 
 #############################################################################
 # sanitizers

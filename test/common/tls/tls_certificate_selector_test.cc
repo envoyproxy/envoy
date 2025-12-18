@@ -16,6 +16,7 @@
 #include "source/common/network/tcp_listener_impl.h"
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/network/utility.h"
+#include "source/common/ssl/ssl.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/common/tls/client_ssl_socket.h"
 #include "source/common/tls/context_config_impl.h"

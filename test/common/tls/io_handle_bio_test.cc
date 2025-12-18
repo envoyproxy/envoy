@@ -41,7 +41,11 @@ TEST_F(IoHandleBioTest, TestMiscApis) {
   int ret = BIO_reset(bio_);
   EXPECT_EQ(ret, 0);
 
+#ifdef ENVOY_SSL_OPENSSL
+  ret = BIO_ctrl(bio_, BIO_CTRL_FLUSH, 0, nullptr);
+#else
   ret = BIO_flush(bio_);
+#endif
   EXPECT_EQ(ret, 1);
 }
 

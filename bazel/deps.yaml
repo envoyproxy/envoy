@@ -61,6 +61,19 @@ boringssl:
   license: "Mixed"
   license_url: "https://github.com/google/boringssl/blob/{version}/LICENSE"
 
+openssl:
+  project_name: "OpenSSL"
+  project_desc: "TLS/SSL and crypto library"
+  project_url: "https://github.com/openssl/openssl"
+  release_date: "2026-01-27"
+  use_category:
+  - controlplane
+  - dataplane_core
+  - test_only
+  cpe: "cpe:2.3:a:openssl:openssl:*"
+  license: "Apache-2.0"
+  license_url: "https://github.com/openssl/openssl/blob/openssl-{version}/LICENSE.txt"
+
 build_bazel_rules_apple:
   project_name: "Apple Rules for Bazel"
   project_desc: "Bazel rules for Apple platforms"
