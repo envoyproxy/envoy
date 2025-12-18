@@ -145,8 +145,17 @@ TEST_F(QuicClientTransportSocketFactoryTest, SupportedAlpns) {
 }
 
 TEST_F(QuicClientTransportSocketFactoryTest, TlsCertificateSelector) {
-  EXPECT_CALL(*context_config_, tlsCertificateSelectorFactory())
-      .WillOnce(Return([](Ssl::TlsCertificateSelectorContext&) { return nullptr; }));
+  class TestSelector : public Ssl::UpstreamTlsCertificateSelectorFactory {
+  public:
+    Ssl::UpstreamTlsCertificateSelectorPtr
+    createUpstreamTlsCertificateSelector(Ssl::TlsCertificateSelectorContext&) override {
+      return nullptr;
+    }
+    absl::Status onConfigUpdate() override { return absl::OkStatus(); }
+  } selector;
+  EXPECT_CALL(*context_config_, tlsCertificateSelectorFactory()).WillOnce(Invoke([&]() {
+    return makeOptRef(selector);
+  }));
   auto factory_or_error = Quic::QuicClientTransportSocketFactory::create(
       std::unique_ptr<Envoy::Ssl::ClientContextConfig>(context_config_), context_);
   EXPECT_FALSE(factory_or_error.ok());

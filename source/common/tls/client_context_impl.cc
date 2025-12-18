@@ -99,7 +99,7 @@ ClientContextImpl::ClientContextImpl(Stats::Scope& scope,
   }
 
   if (auto factory = config.tlsCertificateSelectorFactory(); factory) {
-    tls_certificate_selector_ = factory(*this);
+    tls_certificate_selector_ = factory->createUpstreamTlsCertificateSelector(*this);
     SSL_CTX_set_cert_cb(
         tls_contexts_[0].ssl_ctx_.get(),
         [](SSL* ssl, void*) -> int {

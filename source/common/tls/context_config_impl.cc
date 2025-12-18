@@ -440,11 +440,22 @@ ClientContextConfigImpl::ClientContextConfigImpl(
     ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
         provider_config.typed_config(), factory_context.messageValidationVisitor(),
         provider_factory);
-    auto selector_factory =
-        provider_factory.createTlsCertificateSelectorFactory(*message, factory_context, *this);
+    auto selector_factory = provider_factory.createUpstreamTlsCertificateSelectorFactory(
+        *message, factory_context, *this);
     SET_AND_RETURN_IF_NOT_OK(selector_factory.status(), creation_status);
     tls_certificate_selector_factory_ = *std::move(selector_factory);
   }
+}
+
+void ClientContextConfigImpl::setSecretUpdateCallback(std::function<absl::Status()> callback) {
+  auto callback_with_notify = [this, callback] {
+    RETURN_IF_NOT_OK(callback());
+    if (tls_certificate_selector_factory_) {
+      return tls_certificate_selector_factory_->onConfigUpdate();
+    }
+    return absl::OkStatus();
+  };
+  ContextConfigImpl::setSecretUpdateCallback(callback_with_notify);
 }
 
 } // namespace Tls

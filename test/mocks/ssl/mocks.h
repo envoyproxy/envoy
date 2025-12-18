@@ -125,7 +125,7 @@ public:
   MOCK_METHOD(absl::optional<
                   envoy::extensions::transport_sockets::tls::v3::TlsParameters::CompliancePolicy>,
               compliancePolicy, (), (const));
-  MOCK_METHOD(Ssl::UpstreamTlsCertificateSelectorFactory, tlsCertificateSelectorFactory, (),
+  MOCK_METHOD(OptRef<Ssl::UpstreamTlsCertificateSelectorFactory>, tlsCertificateSelectorFactory, (),
               (const, override));
   Ssl::HandshakerCapabilities capabilities_;
   std::string sni_{"default_sni.example.com"};

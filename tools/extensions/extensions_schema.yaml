@@ -97,6 +97,7 @@ categories:
 - envoy.tls.certificate_selectors
 - envoy.tls.certificate_mappers
 - envoy.tls.key_providers
+- envoy.tls.upstream_certificate_selectors
 - envoy.upstream_options
 - envoy.quic.connection_debug_visitor
 - envoy.quic.connection_id_generator
@@ -117,8 +118,6 @@ categories:
 - envoy.transport_sockets.downstream
 - envoy.transport_sockets.upstream
 - envoy.tls.cert_validator
-- envoy.tls.certificate_selectors
-- envoy.tls.upstream_certificate_selectors
 - envoy.upstreams
 - envoy.upstream.local_address_selector
 - envoy.udp_packet_writer

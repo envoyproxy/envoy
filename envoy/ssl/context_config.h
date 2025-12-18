@@ -165,9 +165,9 @@ public:
   virtual bool enforceRsaKeyUsage() const PURE;
 
   /**
-   * @return a factory which can be used to create TLS context provider instances.
+   * @return an optional factory which can be used to create TLS context provider instances.
    */
-  virtual UpstreamTlsCertificateSelectorFactory tlsCertificateSelectorFactory() const PURE;
+  virtual OptRef<UpstreamTlsCertificateSelectorFactory> tlsCertificateSelectorFactory() const PURE;
 };
 
 using ClientContextConfigPtr = std::unique_ptr<ClientContextConfig>;

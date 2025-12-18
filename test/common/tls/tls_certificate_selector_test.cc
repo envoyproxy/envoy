@@ -122,26 +122,23 @@ private:
   Ssl::CertificateSelectionCallbackPtr cb_;
 };
 
-<<<<<<< HEAD
-class TestTlsCertificateSelectorFactory : public Ssl::TlsCertificateSelectorConfigFactory,
-                                          public Ssl::UpstreamTlsCertificateSelectorConfigFactory {
-=======
 class TestTlsCertificateSelectorFactory;
 
-class TestTlsSelectorFactory : public Ssl::TlsCertificateSelectorFactory {
+class TestTlsSelectorFactory : public Ssl::TlsCertificateSelectorFactory,
+                               public Ssl::UpstreamTlsCertificateSelectorFactory {
 public:
-  TestTlsSelectorFactory(const Protobuf::Message& config, TestTlsCertificateSelectorFactory& parent)
-      : config_(config), parent_(parent) {}
+  TestTlsSelectorFactory(TestTlsCertificateSelectorFactory& parent) : parent_(parent) {}
   Ssl::TlsCertificateSelectorPtr create(Ssl::TlsCertificateSelectorContext& selector_ctx) override;
+  Ssl::UpstreamTlsCertificateSelectorPtr
+  createUpstreamTlsCertificateSelector(Ssl::TlsCertificateSelectorContext& selector_ctx) override;
   absl::Status onConfigUpdate() override { return absl::OkStatus(); }
 
 private:
-  const Protobuf::Message& config_;
   TestTlsCertificateSelectorFactory& parent_;
 };
 
-class TestTlsCertificateSelectorFactory : public Ssl::TlsCertificateSelectorConfigFactory {
->>>>>>> upstream/main
+class TestTlsCertificateSelectorFactory : public Ssl::TlsCertificateSelectorConfigFactory,
+                                          public Ssl::UpstreamTlsCertificateSelectorConfigFactory {
 public:
   using CreateProviderHook =
       std::function<void(const Protobuf::Message&, Server::Configuration::GenericFactoryContext&)>;
@@ -156,22 +153,13 @@ public:
     if (for_quic) {
       return absl::InvalidArgumentError("does not supported for quic");
     }
-<<<<<<< HEAD
-    return
-        [this](const Ssl::ServerContextConfig&, Ssl::TlsCertificateSelectorContext& selector_ctx) {
-          return std::make_unique<TestTlsCertificateSelector>(selector_ctx, mod_);
-        };
+    return std::make_unique<TestTlsSelectorFactory>(*this);
   }
-  absl::StatusOr<Ssl::UpstreamTlsCertificateSelectorFactory>
-  createTlsCertificateSelectorFactory(const Protobuf::Message&,
-                                      Server::Configuration::GenericFactoryContext&,
-                                      const Ssl::ClientContextConfig&) override {
-    return [&](Ssl::TlsCertificateSelectorContext& selector_ctx) {
-      return std::make_unique<TestTlsCertificateSelector>(selector_ctx, mod_);
-    };
-=======
-    return std::make_unique<TestTlsSelectorFactory>(config, *this);
->>>>>>> upstream/main
+  absl::StatusOr<Ssl::UpstreamTlsCertificateSelectorFactoryPtr>
+  createUpstreamTlsCertificateSelectorFactory(const Protobuf::Message&,
+                                              Server::Configuration::GenericFactoryContext&,
+                                              const Ssl::ClientContextConfig&) override {
+    return std::make_unique<TestTlsSelectorFactory>(*this);
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
@@ -185,11 +173,13 @@ public:
 
 Ssl::TlsCertificateSelectorPtr
 TestTlsSelectorFactory::create(Ssl::TlsCertificateSelectorContext& selector_ctx) {
-  ENVOY_LOG_MISC(info, "debug: init provider");
-  auto provider = std::make_unique<TestTlsCertificateSelector>(selector_ctx, config_);
-  provider->mod_ = parent_.mod_;
-  return provider;
+  return std::make_unique<TestTlsCertificateSelector>(selector_ctx, parent_.mod_);
 };
+
+Ssl::UpstreamTlsCertificateSelectorPtr TestTlsSelectorFactory::createUpstreamTlsCertificateSelector(
+    Ssl::TlsCertificateSelectorContext& selector_ctx) {
+  return std::make_unique<TestTlsCertificateSelector>(selector_ctx, parent_.mod_);
+}
 
 Network::ListenerPtr createListener(Network::SocketSharedPtr&& socket,
                                     Network::TcpListenerCallbacks& cb, Runtime::Loader& runtime,
@@ -250,7 +240,7 @@ protected:
   void runTest() {
     const auto mod = GetParam().mode;
     const bool upstream = GetParam().upstream;
-    std::string server_ctx_yaml = R"EOF(
+    const std::string ctx_yaml = R"EOF(
   common_tls_context:
     tls_certificates:
       certificate_chain:
@@ -260,21 +250,6 @@ protected:
     validation_context:
       trusted_ca:
         filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
-<<<<<<< HEAD
-=======
-    custom_tls_certificate_selector:
-      name: test-tls-context-provider
-      typed_config:
-        "@type": type.googleapis.com/google.protobuf.StringValue
->>>>>>> upstream/main
-)EOF";
-    std::string client_ctx_yaml = R"EOF(
-  common_tls_context:
-    tls_certificates:
-      certificate_chain:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_cert.pem"
-      private_key:
-        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_key.pem"
 )EOF";
     const std::string selector_yaml = R"EOF(
     custom_tls_certificate_selector:
@@ -282,14 +257,10 @@ protected:
       typed_config:
         "@type": type.googleapis.com/google.protobuf.StringValue
 )EOF";
-    if (upstream) {
-      client_ctx_yaml = absl::StrCat(client_ctx_yaml, selector_yaml);
-    } else {
-      server_ctx_yaml = absl::StrCat(server_ctx_yaml, selector_yaml);
-    }
+    const std::string server_ctx_yaml = upstream ? ctx_yaml : absl::StrCat(ctx_yaml, selector_yaml);
+    const std::string client_ctx_yaml = upstream ? absl::StrCat(ctx_yaml, selector_yaml) : ctx_yaml;
 
     Event::SimulatedTimeSystem time_system;
-
     Stats::TestUtil::TestStore server_stats_store;
     Api::ApiPtr server_api = Api::createApiForTest(server_stats_store, time_system);
     NiceMock<Runtime::MockLoader> runtime;
@@ -300,24 +271,14 @@ protected:
 
     MockFunction<TestTlsCertificateSelectorFactory::CreateProviderHook> mock_factory_cb;
     provider_factory_.selector_cb_ = mock_factory_cb.AsStdFunction();
-<<<<<<< HEAD
     if (!upstream) {
       EXPECT_CALL(mock_factory_cb, Call)
-          .WillOnce(WithArg<1>([&](Server::Configuration::CommonFactoryContext& context) {
+          .WillOnce(WithArg<1>([&](Server::Configuration::GenericFactoryContext& context) {
             // Check that the objects available via the context are the same ones
             // provided to the parent context.
-            EXPECT_THAT(context.api(), Ref(*server_api));
+            EXPECT_THAT(context.serverFactoryContext().api(), Ref(*server_api));
           }));
     }
-=======
-
-    EXPECT_CALL(mock_factory_cb, Call)
-        .WillOnce(WithArg<1>([&](Server::Configuration::GenericFactoryContext& context) {
-          // Check that the objects available via the context are the same ones
-          // provided to the parent context.
-          EXPECT_THAT(context.serverFactoryContext().api(), Ref(*server_api));
-        }));
->>>>>>> upstream/main
 
     envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_tls_context;
     TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), server_tls_context);

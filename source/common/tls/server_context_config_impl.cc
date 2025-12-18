@@ -168,6 +168,18 @@ ServerContextConfigImpl::ServerContextConfigImpl(
         std::chrono::seconds(DurationUtil::durationToSeconds(config.session_timeout()));
   }
 
+  if (!config.has_require_client_certificate() &&
+      config.common_tls_context().validation_context_type_case() !=
+          envoy::extensions::transport_sockets::tls::v3::CommonTlsContext::
+              ValidationContextTypeCase::VALIDATION_CONTEXT_TYPE_NOT_SET) {
+    ENVOY_LOG_MISC(
+        warn,
+        "Using deprecated insecure default of not requiring client cert when a validation context "
+        "is configured. This default will be changed in a future version. Please explicitly "
+        "configure a value for require_client_certificate.");
+    factory_context.serverFactoryContext().runtime().countDeprecatedFeatureUse();
+  }
+
   if (config.common_tls_context().has_custom_tls_certificate_selector()) {
     // If a custom tls context provider is configured, derive the factory from the config.
     const auto& provider_config = config.common_tls_context().custom_tls_certificate_selector();
@@ -181,28 +193,15 @@ ServerContextConfigImpl::ServerContextConfigImpl(
         *message, factory_context, *this, for_quic);
     SET_AND_RETURN_IF_NOT_OK(selector_factory.status(), creation_status);
     tls_certificate_selector_factory_ = *std::move(selector_factory);
-    return;
+  } else {
+    auto factory =
+        TlsCertificateSelectorConfigFactoryImpl::getDefaultTlsCertificateSelectorConfigFactory();
+    const Protobuf::Any any;
+    auto selector_factory =
+        factory->createTlsCertificateSelectorFactory(any, factory_context, *this, for_quic);
+    SET_AND_RETURN_IF_NOT_OK(selector_factory.status(), creation_status);
+    tls_certificate_selector_factory_ = *std::move(selector_factory);
   }
-
-  if (!config.has_require_client_certificate() &&
-      config.common_tls_context().validation_context_type_case() !=
-          envoy::extensions::transport_sockets::tls::v3::CommonTlsContext::
-              ValidationContextTypeCase::VALIDATION_CONTEXT_TYPE_NOT_SET) {
-    ENVOY_LOG_MISC(
-        warn,
-        "Using deprecated insecure default of not requiring client cert when a validation context "
-        "is configured. This default will be changed in a future version. Please explicitly "
-        "configure a value for require_client_certificate.");
-    factory_context.serverFactoryContext().runtime().countDeprecatedFeatureUse();
-  }
-
-  auto factory =
-      TlsCertificateSelectorConfigFactoryImpl::getDefaultTlsCertificateSelectorConfigFactory();
-  const Protobuf::Any any;
-  auto selector_factory =
-      factory->createTlsCertificateSelectorFactory(any, factory_context, *this, for_quic);
-  SET_AND_RETURN_IF_NOT_OK(selector_factory.status(), creation_status);
-  tls_certificate_selector_factory_ = *std::move(selector_factory);
 }
 
 void ServerContextConfigImpl::setSecretUpdateCallback(std::function<absl::Status()> callback) {
