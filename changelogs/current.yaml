@@ -231,6 +231,14 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.router_filter_resetall_on_local_reply`` and legacy code paths.
 
 new_features:
+- area: admin
+  change: |
+    Added support for group-based logging control via the ``/logging`` endpoint. Users can now change log levels for
+    predefined groups of loggers using ``/logging?group=<group_name>:<level>`` (e.g., ``/logging?group=http:trace``).
+    Available groups include ``http``, ``router``, ``network``, ``upstream``, ``connection``, ``admin``, ``config``,
+    ``grpc``, ``filter``, ``listener``, ``tls``, ``quic``, ``tracing``, ``stats``, ``runtime``, and ``secret``.
+    This feature requires fine-grain logging to be enabled and simplifies debugging by allowing log level changes
+    for entire subsystems with a single command.
 - area: network_filter
   change: |
     Added :ref:`geoip network filter <config_network_filters_geoip>` to perform geolocation lookups

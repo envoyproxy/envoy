@@ -33,6 +33,12 @@ public:
    */
   static std::vector<absl::string_view> levelStrings();
 
+  /**
+   * Returns a map of predefined logger groups to file patterns.
+   */
+  static const absl::flat_hash_map<absl::string_view, std::vector<absl::string_view>>&
+  getLoggerGroups();
+
 private:
   /**
    * Attempt to change the log level of a logger or all loggers.
