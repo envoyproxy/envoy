@@ -223,7 +223,7 @@ TEST(DataSourceProviderTest, NonFileDataSourceTest) {
 
   auto provider_or_error = DataSource::DataSourceProvider<std::string>::create(
       config, *dispatcher, tls, *api, false,
-      [](absl::string_view data) { return std::make_shared<std::string>(data); }, 0);
+      [](absl::string_view data) { return std::make_shared<std::string>(data); }, 0, absl::nullopt);
   EXPECT_NE(provider_or_error.value(), nullptr);
   EXPECT_EQ(*provider_or_error.value()->data(), "Hello, world!");
 }
@@ -266,7 +266,7 @@ TEST(DataSourceProviderTest, FileDataSourceButNoWatch) {
 
   auto provider_or_error = DataSource::DataSourceProvider<std::string>::create(
       config, *dispatcher, tls, *api, false,
-      [](absl::string_view data) { return std::make_shared<std::string>(data); }, 0);
+      [](absl::string_view data) { return std::make_shared<std::string>(data); }, 0, absl::nullopt);
   EXPECT_NE(provider_or_error.value()->data(), nullptr);
   EXPECT_EQ(*provider_or_error.value()->data(), "Hello, world!");
 
@@ -328,7 +328,7 @@ TEST(DataSourceProviderTest, FileDataSourceNoWatchWithFailedDataTransformCb) {
   };
   auto provider_or_error =
       DataSource::DataSourceProvider<typename absl::flat_hash_set<std::string>>::create(
-          config, *dispatcher, tls, *api, false, data_transform_cb, 0);
+          config, *dispatcher, tls, *api, false, data_transform_cb, 0, absl::nullopt);
   EXPECT_FALSE(provider_or_error.ok());
   EXPECT_EQ("Failed to transform data", provider_or_error.status().message());
 
@@ -382,7 +382,7 @@ TEST(DataSourceProviderTest, FileDataSourceNoWatchWithDataTransformCb) {
   };
   auto provider_or_error =
       DataSource::DataSourceProvider<typename absl::flat_hash_set<std::string>>::create(
-          config, *dispatcher, tls, *api, false, data_transform_cb, 0);
+          config, *dispatcher, tls, *api, false, data_transform_cb, 0, absl::nullopt);
   auto provider = std::move(provider_or_error.value());
   EXPECT_NE(provider->data(), nullptr);
   EXPECT_EQ(provider->data()->size(), 1);
@@ -460,7 +460,7 @@ TEST(DataSourceProviderTest, FileDataSourceWithWatchAndFailedDataTransformCbUses
   };
   auto provider_or_error =
       DataSource::DataSourceProvider<typename absl::flat_hash_set<std::string>>::create(
-          config, *dispatcher, tls, *api, false, data_transform_cb, 0);
+          config, *dispatcher, tls, *api, false, data_transform_cb, 0, absl::nullopt);
   auto provider = std::move(provider_or_error.value());
   EXPECT_NE(provider->data(), nullptr);
   EXPECT_EQ(provider->data()->size(), 1);
@@ -532,7 +532,7 @@ TEST(DataSourceProviderTest, FileDataSourceWithWatchAndDataTransformCb) {
   };
   auto provider_or_error =
       DataSource::DataSourceProvider<typename absl::flat_hash_set<std::string>>::create(
-          config, *dispatcher, tls, *api, false, data_transform_cb, 0);
+          config, *dispatcher, tls, *api, false, data_transform_cb, 0, absl::nullopt);
   auto provider = std::move(provider_or_error.value());
   EXPECT_NE(provider->data(), nullptr);
   EXPECT_EQ(provider->data()->size(), 1);
@@ -600,7 +600,7 @@ TEST(DataSourceProviderTest, FileDataSourceAndWithWatch) {
   // Create a provider with watch.
   auto provider_or_error = DataSource::DataSourceProvider<std::string>::create(
       config, *dispatcher, tls, *api, false,
-      [](absl::string_view data) { return std::make_shared<std::string>(data); }, 0);
+      [](absl::string_view data) { return std::make_shared<std::string>(data); }, 0, absl::nullopt);
   EXPECT_NE(provider_or_error.value()->data(), nullptr);
   EXPECT_EQ(*provider_or_error.value()->data(), "Hello, world!");
 
@@ -664,7 +664,8 @@ TEST(DataSourceProviderTest, FileDataSourceAndWithWatchButUpdateError) {
   // ignored.
   auto provider_or_error = DataSource::DataSourceProvider<std::string>::create(
       config, *dispatcher, tls, *api, false,
-      [](absl::string_view data) { return std::make_shared<std::string>(data); }, 15);
+      [](absl::string_view data) { return std::make_shared<std::string>(data); }, 15,
+      absl::nullopt);
   EXPECT_NE(provider_or_error.value()->data(), nullptr);
   EXPECT_EQ(*provider_or_error.value()->data(), "Hello, world!");
 
@@ -718,7 +719,7 @@ TEST(DataSourceProviderTest, FileDataSourceAndWatchDirectoryCreationFailure) {
   // Creating a provider with an invalid watched directory path should return an error.
   auto provider_or_error = DataSource::DataSourceProvider<std::string>::create(
       config, *dispatcher, tls, *api, false,
-      [](absl::string_view data) { return std::make_shared<std::string>(data); }, 0);
+      [](absl::string_view data) { return std::make_shared<std::string>(data); }, 0, absl::nullopt);
   EXPECT_FALSE(provider_or_error.ok());
   EXPECT_THAT(provider_or_error.status().message(),
               testing::HasSubstr("/non/existent/directory/path"));
