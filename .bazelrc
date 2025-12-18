@@ -38,6 +38,8 @@ build --copt=-DABSL_MIN_LOG_LEVEL=4
 build --cxxopt=-std=c++20 --host_cxxopt=-std=c++20
 build --copt=-Wno-deprecated-declarations
 build --define envoy_mobile_listener=enabled
+# Default to BoringSSL. Use --config=openssl to switch to OpenSSL.
+build --define=ssl=boringssl
 build --experimental_repository_downloader_retries=2
 build --experimental_cc_static_library
 build --enable_platform_specific_config
@@ -493,3 +495,7 @@ try-import %workspace%/repo.bazelrc
 try-import %workspace%/clang.bazelrc
 try-import %workspace%/user.bazelrc
 try-import %workspace%/local_tsan.bazelrc
+
+# OpenSSL-specific configuration (use with --config=openssl)
+# To use the default BoringSSL backend, simply don't specify this config
+try-import %workspace%/openssl/openssl.bazelrc
