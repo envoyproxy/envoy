@@ -32,6 +32,7 @@
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
+#include "source/common/ssl/ssl.h"
 
 #include "gtest/gtest.h"
 #include "openssl/crypto.h"
@@ -81,7 +82,10 @@ INSTANTIATE_TEST_SUITE_P(CipherSuites, SslLibraryCipherSuiteSupport,
 
 // Tests for whether new cipher suites are added. When they are, they must be added to
 // knownCipherSuites() so that this test can detect if they are removed in the future.
-TEST_F(SslLibraryCipherSuiteSupport, CipherSuitesNotAdded) {
+// OpenSSL: Not sure how useful this test under OpenSSL is: cipher suites
+// change from version to vertsion, and also depend on the system-wide config.
+// This is going to be a test-fail-fest. Disabling for now.
+BORINGSSL_TEST_F(SslLibraryCipherSuiteSupport, CipherSuitesNotAdded) {
   bssl::UniquePtr<SSL_CTX> ctx(SSL_CTX_new(TLS_method()));
   EXPECT_NE(0, SSL_CTX_set_strict_cipher_list(ctx.get(), "ALL"));
 
@@ -95,7 +99,8 @@ TEST_F(SslLibraryCipherSuiteSupport, CipherSuitesNotAdded) {
 // Test that no previously supported cipher suites were removed from the SSL library. If a cipher
 // suite is removed, it must be added to the release notes as an incompatible change, because it can
 // cause previously loadable configurations to no longer load if they reference the cipher suite.
-TEST_P(SslLibraryCipherSuiteSupport, CipherSuitesNotRemoved) {
+// OpenSSL: Disabled for the same reason as the CipherSuitesNotAdded test above.
+BORINGSSL_TEST_P(SslLibraryCipherSuiteSupport, CipherSuitesNotRemoved) {
   bssl::UniquePtr<SSL_CTX> ctx(SSL_CTX_new(TLS_method()));
   EXPECT_NE(0, SSL_CTX_set_strict_cipher_list(ctx.get(), GetParam().c_str()));
 }

@@ -1,0 +1,58 @@
+name: OpenSSL testing
+
+permissions:
+  contents: read
+
+on:
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+
+jobs:
+  openssl:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    permissions:
+      contents: read
+      packages: read
+    if: >-
+      ${{ github.repository == 'envoyproxy/envoy-openssl' }}
+    steps:
+    - name: Free disk space
+      uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.3.28
+    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+    - run: |
+        ./ci/run_envoy_docker.sh './ci/do_ci.sh dev @bssl-compat//test/... //test/...'
+      env:
+        BAZEL_BUILD_EXTRA_OPTIONS: >-
+          --config=rbe
+          --config=bes
+          --config=remote-ci
+          --config=openssl
+        ENVOY_RBE: 1
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  boringssl:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    permissions:
+      contents: read
+      packages: read
+    if: >-
+      ${{ github.repository == 'envoyproxy/envoy-openssl' }}
+    steps:
+    - name: Free disk space
+      uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.3.28
+    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+    - run: |
+        ./ci/run_envoy_docker.sh './ci/do_ci.sh dev //test/...'
+      env:
+        BAZEL_BUILD_EXTRA_OPTIONS: >-
+          --config=rbe
+          --config=bes
+          --config=remote-ci
+        ENVOY_RBE: 1
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

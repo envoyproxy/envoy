@@ -57,6 +57,7 @@
 #include "test/test_common/registry.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
+#include "source/common/ssl/ssl.h"
 
 #include "absl/strings/str_replace.h"
 #include "absl/types/optional.h"
@@ -364,7 +365,7 @@ TEST_P(TlsCertificateSelectorFactoryTest, Failed) {
   testUtil(Ssl::SelectionResult::SelectionStatus::Failed);
 }
 
-TEST_P(TlsCertificateSelectorFactoryTest, Pending) {
+BORINGSSL_TEST_P(TlsCertificateSelectorFactoryTest, Pending) {
   testUtil(Ssl::SelectionResult::SelectionStatus::Pending);
 }
 

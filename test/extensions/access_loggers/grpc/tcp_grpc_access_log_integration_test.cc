@@ -20,6 +20,7 @@
 #include "test/integration/http_integration.h"
 #include "test/integration/ssl_utility.h"
 #include "test/test_common/utility.h"
+#include "source/common/ssl/ssl.h"
 
 #if defined(USE_CEL)
 #include "source/extensions/filters/network/rbac/config.h"
@@ -606,7 +607,7 @@ tcp_logs:
         tls_cipher_suite:
           value: 49199
         tls_sni_hostname: sni
-        ja3_fingerprint: "ecaf91d232e224038f510cb81aa08b94"
+        ja3_fingerprint: "{}"
         local_certificate_properties:
           subject_alt_name:
             uri: "spiffe://lyft.com/backend-team"
@@ -628,6 +629,7 @@ tcp_logs:
 )EOF",
                                           Network::Test::getLoopbackAddressString(ipVersion()),
                                           Network::Test::getLoopbackAddressString(ipVersion()),
+                                          SSL_SELECT("ecaf91d232e224038f510cb81aa08b94", "f34cc73a821433e5f56e38868737a636"),
                                           Network::Test::getLoopbackAddressString(ipVersion()))));
 
   cleanup();
@@ -677,12 +679,14 @@ tcp_logs:
       tls_properties:
         tls_sni_hostname: sni
     connection_properties:
-      received_bytes: 138
-      sent_bytes: 138
+      received_bytes: {}
+      sent_bytes: {}
 )EOF",
                                           Network::Test::getLoopbackAddressString(ipVersion()),
                                           Network::Test::getLoopbackAddressString(ipVersion()),
-                                          Network::Test::getLoopbackAddressString(ipVersion()))));
+                                          Network::Test::getLoopbackAddressString(ipVersion()),
+                                          SSL_SELECT(138, 163),
+                                          SSL_SELECT(138, 163))));
 
   cleanup();
 }
@@ -730,14 +734,17 @@ tcp_logs:
           address: {}
       tls_properties:
         tls_sni_hostname: sni
-        ja3_fingerprint: "ecaf91d232e224038f510cb81aa08b94"
+        ja3_fingerprint: "{}"
     connection_properties:
-      received_bytes: 138
-      sent_bytes: 138
+      received_bytes: {}
+      sent_bytes: {}
 )EOF",
                                           Network::Test::getLoopbackAddressString(ipVersion()),
                                           Network::Test::getLoopbackAddressString(ipVersion()),
-                                          Network::Test::getLoopbackAddressString(ipVersion()))));
+                                          Network::Test::getLoopbackAddressString(ipVersion()),
+                                          SSL_SELECT("ecaf91d232e224038f510cb81aa08b94", "f34cc73a821433e5f56e38868737a636"),
+                                          SSL_SELECT(138, 163),
+                                          SSL_SELECT(138, 163))));
 
   cleanup();
 }
@@ -783,14 +790,17 @@ tcp_logs:
         socket_address:
           address: {}
       tls_properties:
-        ja3_fingerprint: "71d1f47d1125ac53c3c6a4863c087cfe"
+        ja3_fingerprint: "{}"
     connection_properties:
-      received_bytes: 126
-      sent_bytes: 126
+      received_bytes: {}
+      sent_bytes: {}
 )EOF",
                                           Network::Test::getLoopbackAddressString(ipVersion()),
                                           Network::Test::getLoopbackAddressString(ipVersion()),
-                                          Network::Test::getLoopbackAddressString(ipVersion()))));
+                                          Network::Test::getLoopbackAddressString(ipVersion()),
+                                          SSL_SELECT("71d1f47d1125ac53c3c6a4863c087cfe", "54619c7296adab310ed514d06812d95f"),
+                                          SSL_SELECT(126, 151),
+                                          SSL_SELECT(126, 151))));
 
   cleanup();
 }
@@ -805,6 +815,13 @@ TEST_P(TcpGrpcAccessLogIntegrationTest, TlsHandshakeFailure_VerifyFailed) {
   setupTlsInspectorFilter(server_options);
   initialize();
 
+  const auto peer_certificate_properties = SSL_SELECT(R"EOF(
+          subject_alt_name:
+            - uri: "spiffe://lyft.com/frontend-team"
+          subject: "emailAddress=frontend-team@lyft.com,CN=Test Frontend Team,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US"
+          issuer: "CN=Test CA,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US"
+)EOF",
+                                               "{}");
   Ssl::ClientSslTransportOptions ssl_options;
   ssl_options.setClientEcdsaCert(false);
   ssl_options.setCipherSuites({"ECDHE-RSA-AES128-GCM-SHA256"});
@@ -833,7 +850,7 @@ tcp_logs:
       downstream_local_address:
         socket_address:
           address: {0}
-      downstream_transport_failure_reason: "TLS_error:|268435581:SSL routines:OPENSSL_internal:CERTIFICATE_VERIFY_FAILED:verify cert failed: cert hash and spki:TLS_error_end"
+      downstream_transport_failure_reason: "{3}"
       access_log_type: NotSet
       downstream_direct_remote_address:
         socket_address:
@@ -841,23 +858,23 @@ tcp_logs:
       tls_properties:
         tls_version: TLSv1_2
         tls_cipher_suite:
-          value: 49199
+          value: {1}
         local_certificate_properties:
           subject_alt_name:
             - uri: "spiffe://lyft.com/backend-team"
           subject: "emailAddress=backend-team@lyft.com,CN=Test Backend Team,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US"
-        peer_certificate_properties:
-          subject_alt_name:
-            - uri: "spiffe://lyft.com/frontend-team"
-          subject: "emailAddress=frontend-team@lyft.com,CN=Test Frontend Team,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US"
-          issuer: "CN=Test CA,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US"
+        peer_certificate_properties: {2}
       upstream_remote_address:
         socket_address: {{}}
       upstream_local_address:
         socket_address: {{}}
     connection_properties: {{}}
 )EOF",
-                                          Network::Test::getLoopbackAddressString(ipVersion()))));
+                                          Network::Test::getLoopbackAddressString(ipVersion()),
+                                          SSL_SELECT(49199, 65535),
+                                          peer_certificate_properties,
+                                          SSL_SELECT("TLS_error:|268435581:SSL routines:OPENSSL_internal:CERTIFICATE_VERIFY_FAILED:verify cert failed: cert hash and spki:TLS_error_end",
+                                                     "TLS_error:|268435581:SSL routines:OPENSSL_internal:CERTIFICATE_VERIFY_FAILED:TLS_error_end"))));
   cleanup();
 }
 
