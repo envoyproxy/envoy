@@ -75,7 +75,7 @@ newDynamicModule(const std::filesystem::path& object_file_absolute_path, const b
     return absl::InvalidArgumentError(
         absl::StrCat("ABI version mismatch: got ", abi_version, ", but expected ", kAbiVersion));
   }
-  return std::move(dynamic_module);
+  return dynamic_module;
 }
 
 absl::StatusOr<DynamicModulePtr> newDynamicModuleByName(const absl::string_view module_name,
