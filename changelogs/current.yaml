@@ -543,7 +543,7 @@ new_features:
     and response aggregation.
 - area: access_log
   change: |
-    Added `LISTENER_FILTER_CHAIN` to the `METADATA` command operator to allow access to listener filter chain metadata.
+    Added ``LISTENER_FILTER_CHAIN`` to the ``METADATA`` command operator to allow access to listener filter chain metadata.
 - area: ext_proc
   change: |
     Added per HTTP event :ref:'procesing effects <envoy.filters.http.ext_proc.ProcessingEffect' in the
