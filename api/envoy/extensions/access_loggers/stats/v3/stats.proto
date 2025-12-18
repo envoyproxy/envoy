@@ -5,7 +5,9 @@ package envoy.extensions.access_loggers.stats.v3;
 import "envoy/config/accesslog/v3/accesslog.proto";
 
 import "google/protobuf/wrappers.proto";
+
 import "xds/annotations/v3/status.proto";
+
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
