@@ -1,0 +1,26 @@
+--- a/source/crypto/digest_extra/digest_test.cc
++++ b/source/crypto/digest_extra/digest_test.cc
+@@ -71,14 +71,15 @@
+ static const DigestTestVector kTestVectors[] = {
+     // MD4 tests, from RFC 1320. (crypto/md4 does not provide a
+     // one-shot MD4 function.)
+-    {md4, "", 1, "31d6cfe0d16ae931b73c59d7e0c089c0"},
+-    {md4, "a", 1, "bde52cb31de33e46245e05fbdbd6fb24"},
+-    {md4, "abc", 1, "a448017aaf21d8525fc10ae87aa6729d"},
+-    {md4, "message digest", 1, "d9130a8164549fe818874806e1c7014b"},
+-    {md4, "abcdefghijklmnopqrstuvwxyz", 1, "d79e1c308aa5bbcdeea8ed63df412da9"},
+-    {md4, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789", 1,
+-     "043f8582f241db351ce627e153e7f0e4"},
+-    {md4, "1234567890", 8, "e33b4ddc9c38f2199c3e7b164fcc0536"},
++    // OpenSSL does not support MD4, so these tests are commented out.
++    // {md4, "", 1, "31d6cfe0d16ae931b73c59d7e0c089c0"},
++    // {md4, "a", 1, "bde52cb31de33e46245e05fbdbd6fb24"},
++    // {md4, "abc", 1, "a448017aaf21d8525fc10ae87aa6729d"},
++    // {md4, "message digest", 1, "d9130a8164549fe818874806e1c7014b"},
++    // {md4, "abcdefghijklmnopqrstuvwxyz", 1, "d79e1c308aa5bbcdeea8ed63df412da9"},
++    // {md4, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789", 1,
++    //  "043f8582f241db351ce627e153e7f0e4"},
++    // {md4, "1234567890", 8, "e33b4ddc9c38f2199c3e7b164fcc0536"},
+ 
+     // MD5 tests, from RFC 1321.
+     {md5, "", 1, "d41d8cd98f00b204e9800998ecf8427e"},

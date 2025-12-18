@@ -526,6 +526,11 @@ config_setting(
     flag_values = {":ssl": "@aws_lc//:ssl"},
 )
 
+config_setting(
+    name = "using_openssl",
+    flag_values = {":ssl": "@bssl-compat//:ssl"},
+)
+
 # Convenience grouping for any FIPS SSL library
 selects.config_setting_group(
     name = "using_fips_ssl",

@@ -164,6 +164,7 @@ def envoy_dependencies(skip_targets = []):
     _boringssl()
     _boringssl_fips()
     _aws_lc()
+    _openssl()
 
     _aws_c_auth_testdata()
     _liburing()
@@ -270,7 +271,13 @@ def envoy_dependencies(skip_targets = []):
     )
 
 def _boringssl():
-    external_http_archive(name = "boringssl")
+    external_http_archive(
+        name = "boringssl",
+        patches = [
+            "@envoy//bazel:boringssl-bssl-compat.patch",
+        ],
+        patch_args = ["-p1"],
+    )
 
 def _boringssl_fips():
     external_http_archive(
@@ -307,6 +314,12 @@ def _aws_lc():
     external_http_archive(
         name = "aws_lc",
         build_file = "@envoy//bazel/external:aws_lc.BUILD",
+    )
+
+def _openssl():
+    external_http_archive(
+        name = "openssl",
+        build_file = "@envoy//bazel/external:openssl.BUILD",
     )
 
 def _com_github_openhistogram_libcircllhist():

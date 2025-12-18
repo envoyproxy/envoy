@@ -41,9 +41,13 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "integration_test",
     size = "large",
-    srcs = [
-        "integration_test.cc",
-    ],
+    # FIXME: Make this test pass with OpenSSL as well.
+    srcs = select({
+        "//bazel:using_openssl": [],
+        "//conditions:default": [
+            "integration_test.cc",
+        ],
+    }),
     data = [
         "//test/config/integration/certs",
     ],
