@@ -86,6 +86,20 @@ minor_behavior_changes:
     Execute foreign functions on the effective context, when set by Wasm SDKs. Previously, foreign functions called from
     HTTP or gRPC callbacks could receive a root context instead of a stream context. This behavior can be reverted by
     setting the runtime guard ``envoy.reloadable_features.wasm_use_effective_ctx_for_foreign_functions`` to ``false``.
+- area: ext_proc
+  change: |
+    added immediate_responses_sent counter for ext proc in :ref:'FilterStats
+    <envoy_v3_api_msg_extensions.filters.http.ext_proc.v3.ExternalProcessor.ExtProcFilterStats>'.
+- area: http
+  change: |
+    Now the :ref:`route level body buffer limit
+    <envoy_v3_api_field_config.route.v3.Route.request_body_buffer_limit>` will be applied to requests when
+    the route is matched. Previously, it will only be applied when the router filter is reached.
+- area: http
+  change: |
+    Now the retrying of async HTTP client calls will respect the set buffer limits and the retry will be ignored
+    if the buffer limit is exceeded. This behavior can be reverted by setting the runtime guard
+    ``envoy.reloadable_features.http_async_client_retry_respect_buffer_limits`` to ``false``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -138,6 +152,12 @@ bug_fixes:
   change: |
     Fixed an upstream HTTP filter issue when a route retried on 5xx and the filter returned
     ``FilterHeadersStatus::StopIteration`` in ``encodeHeaders()``.
+- area: router
+  change: |
+    Fixed a bug where the :ref:`vhost per request buffer limit bytes
+    <envoy_v3_api_field_config.route.v3.VirtualHost.per_request_buffer_limit_bytes>`
+    will take precedence over the :ref:`route per request buffer limit bytes
+    <envoy_v3_api_field_config.route.v3.Route.per_request_buffer_limit_bytes>`.
 - area: ext_proc
   change: |
     Fixed missing attributes based on request headers (for example, ``request.host``) when ext_proc was configured to run
@@ -169,15 +189,25 @@ bug_fixes:
   change: |
     Fixed a remote ``jwt_auth`` token fetch crash when two or more auth headers were present and
     ``allow_missing_or_failed`` was set.
+- area: dynamic modules
+  change: |
+    Fixed a soundness bug in the Rust SDK by tightening bounds on the ``HttpFilterConfig`` trait.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+- area: http
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.http1_balsa_disallow_lone_cr_in_chunk_extension``
+    and legacy code paths.
 - area: jwt_authn
   change: |
     Removed runtime guard ``envoy.reloadable_features.jwt_fetcher_use_scheme_from_uri`` and legacy code paths.
 - area: tcp
   change: |
     Removed runtime guard ``envoy.reloadable_features.tcp_proxy_retry_on_different_event_loop`` and legacy code paths.
+- area: http
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.http1_balsa_delay_reset`` and legacy code paths.
 - area: http
   change: |
     Removed runtime guard ``envoy.reloadable_features.http1_balsa_allow_cr_or_lf_at_request_start`` and legacy code paths.
@@ -187,11 +217,25 @@ removed_config_or_runtime:
 - area: http
   change: |
     Removed runtime guard ``envoy.reloadable_features.original_src_fix_port_exhaustion`` and legacy code paths.
+- area: http
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.http2_propagate_reset_events`` and legacy code paths.
 - area: xds
   change: |
     Removed runtime guard ``envoy.reloadable_features.report_load_with_rq_issued`` and legacy code paths.
+- area: xds
+  change: |
+    Removed runtime guard ``envoy.restart_features.skip_backing_cluster_check_for_sds`` and legacy code paths.
+- area: router
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.router_filter_resetall_on_local_reply`` and legacy code paths.
 
 new_features:
+- area: network_filter
+  change: |
+    Added :ref:`geoip network filter <config_network_filters_geoip>` to perform geolocation lookups
+    at the network layer and store results in filter state. This enables geolocation data to be
+    used for access logging, routing, and other purposes without requiring HTTP traffic.
 - area: oauth2
   change: |
     Added support for configuring cookie path in the OAuth2 filter. The :ref:`path
@@ -297,6 +341,14 @@ new_features:
     Added new :ref:`value <envoy_v3_api_field_type.tracing.v3.CustomTag.value>` field and support for
     :ref:`substitution format specifier <config_access_log_format>` to extract values from request and response data for
     custom tags.
+- area: tracing
+  change: |
+    Added new :ref:`tracing operation
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing.operation>`
+    and :ref:`upstream tracing operation
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing.upstream_operation>`
+    fields in the tracing configuration to set custom operation names for spans with the
+    substitution format specifier.
 - area: generic_proxy
   change: |
     Added custom substitution format specifier support in tracing custom tags for the
@@ -413,9 +465,21 @@ new_features:
   change: |
     Propagated transport errors from tls_inspector to ``DownstreamTransportFailureReason`` in ``StreamInfo`` for access logging
     prior to the TLS handshake.
+- area: geoip
+  change: |
+    Added support for MaxMind Country database via
+    :ref:`country_db_path <envoy_v3_api_field_extensions.geoip_providers.maxmind.v3.MaxMindConfig.country_db_path>`.
 - area: tls_inspector
   change: |
     Added configuration parameter to TLS inspector for maximum acceptable client hello size.
+- area: tls
+  change: |
+    Enhanced TLS certificate validation failure messages in access logs to include detailed error information.
+    The ``%DOWNSTREAM_TRANSPORT_FAILURE_REASON%`` and ``%UPSTREAM_TRANSPORT_FAILURE_REASON%`` access log
+    formatters now include specific validation failure reasons such as ``verify cert failed: SAN matcher``,
+    ``verify cert failed: cert hash and spki``, or the OpenSSL verification error string (e.g., certificate
+    has expired, unable to get local issuer certificate). This provides better visibility into TLS handshake
+    failures without requiring debug-level logging.
 - area: ext_proc
   change: |
     Added support for forwarding cluster metadata to ext_proc server.
@@ -423,6 +487,11 @@ new_features:
   change: |
     Added ``match_included_headers`` to the request signing extension to allow positive header matching while excluding
     other non-SigV4-required headers.
+- area: geoip
+  change: |
+    Added :ref:`custom_header_config <envoy_v3_api_field_extensions.filters.http.geoip.v3.Geoip.custom_header_config>`
+    to allow extracting the client IP address from a custom request header which can be used instead of
+    ``x-forwarded-for`` header or downstream connection source address.
 - area: ext_authz
   change: |
     Added support for :ref:`metadata_context_namespaces
@@ -431,6 +500,11 @@ new_features:
     <envoy_v3_api_field_extensions.filters.network.ext_authz.v3.ExtAuthz.typed_metadata_context_namespaces>` in the
     ext-authz network filter. This allows passing connection metadata (such as proxy protocol TLV data) to the
     external authorization server for making authorization decisions.
+- area: tls
+  change: |
+    Added support for fetching certificates on-demand via SDS in the downstream TLS transport socket
+    using the extension :ref:`on-demand certificate selector
+    <extension_envoy.tls.certificate_selectors.on_demand_secret>`.
 - area: admin
   change: |
     Added :ref:`allow_paths <envoy_v3_api_field_config.bootstrap.v3.Admin.allow_paths>` to admin
@@ -455,5 +529,25 @@ new_features:
     access TLV values via FilterStateInput without requiring custom HTTP filters to copy metadata. Individual TLV values
     can be accessed via field access: ``%FILTER_STATE(envoy.network.proxy_protocol.tlv:FIELD:key)%``. Defaults to
     ``DYNAMIC_METADATA`` to maintain existing behavior.
+- area: mcp
+  change: |
+    Added :ref:`MCP filter <config_http_filters_mcp>` for parsing Model Context Protocol (MCP) JSON-RPC requests.
+    The filter extracts the ``method`` and ``id`` fields from incoming requests and stores them in dynamic metadata
+    for use by downstream filters and access logging. Notifications (methods starting with ``notifications/``) are
+    correctly handled as they don't have an ``id`` field per the JSON-RPC specification.
+- area: mcp
+  change: |
+    Added :ref:`mcp_router HTTP filter <config_http_filters_mcp_router>` which routes MCP (Model Context Protocol)
+    requests to more backend servers. The filter supports fanout to multiple backends for initialize and tools-list requests,
+    single-backend routing for tools-call based on tool name prefix, session management with composite session IDs,
+    and response aggregation.
+- area: access_log
+  change: |
+    Added ``LISTENER_FILTER_CHAIN`` to the ``METADATA`` command operator to allow access to listener filter chain metadata.
+- area: ext_proc
+  change: |
+    Added per HTTP event :ref:'procesing effects <envoy.filters.http.ext_proc.ProcessingEffect' in the
+    ExtProcLoggingInfo in the FilterState. This new data will be automatically collected and can be accesses via
+    method processingEffects.
 
 deprecated:

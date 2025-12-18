@@ -287,7 +287,8 @@ void AuthenticatorImpl::startVerify() {
   // jwks fetching can be shared by two requests.
   if (jwks_data_->getJwtProvider().has_remote_jwks()) {
     if (!fetcher_) {
-      fetcher_ = create_jwks_fetcher_cb_(cm_, jwks_data_->getJwtProvider().remote_jwks());
+      fetcher_ = create_jwks_fetcher_cb_(cm_, jwks_data_->retryPolicy(),
+                                         jwks_data_->getJwtProvider().remote_jwks());
     } else {
       // Cancel the previous fetch to reset if it is pending or not completed.
       // At most one outstanding request may be in-flight, and it is possible that

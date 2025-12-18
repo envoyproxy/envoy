@@ -162,6 +162,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_unicode_org_icu()
     _com_github_intel_ipp_crypto_crypto_mb()
     _numactl()
+    _uadk()
     _com_github_intel_qatlib()
     _com_github_intel_qatzip()
     _com_github_qat_zstd()
@@ -396,6 +397,14 @@ def _numactl():
         build_file = "@envoy//bazel/external:numactl.BUILD",
     )
 
+def _uadk():
+    external_http_archive(
+        name = "uadk",
+        patches = ["@envoy//bazel/foreign_cc:uadk.patch"],
+        patch_args = ["-p1"],
+        build_file_content = BUILD_ALL_CONTENT,
+    )
+
 def _com_github_intel_qatlib():
     external_http_archive(
         name = "com_github_intel_qatlib",
@@ -583,8 +592,6 @@ def _com_github_skyapm_cpp2sky():
     )
     external_http_archive(
         name = "skywalking_data_collect_protocol",
-        patches = ["@envoy//bazel:skywalking_data_collect_protocol.patch"],
-        patch_args = ["-p1"],
     )
 
 def _com_github_nlohmann_json():

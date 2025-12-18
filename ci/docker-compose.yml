@@ -28,6 +28,7 @@ x-envoy-build-base: &envoy-build-base
   - BAZEL_STARTUP_EXTRA_OPTIONS
   - BAZEL_REMOTE_INSTANCE
   - BAZELISK_BASE_URL
+  - CLANG_TIDY_TARGETS
 
   # CI/CD variables
   - CI_BRANCH

@@ -325,6 +325,7 @@ envoy_extension_cc_test(
         ":utils_lib",
         "//source/extensions/filters/common/mutation_rules:mutation_rules_lib",
         "//source/extensions/filters/http/ext_proc:mutation_utils_lib",
+        "//source/extensions/filters/http/ext_proc:processing_effect_lib",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:status_utility_lib",
@@ -355,6 +356,7 @@ envoy_extension_cc_test_library(
         "@com_google_absl//absl/strings",
         "@envoy_api//envoy/config/common/matcher/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/common/matching/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/composite/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/ext_proc/v3:pkg_cc_proto",
@@ -777,5 +779,15 @@ envoy_extension_cc_test_library(
         "//source/common/tracing:http_tracer_lib",
         "//source/common/tracing:trace_context_lib",
         "//source/extensions/tracers/common:factory_base_lib",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "allowed_override_modes_set_test",
+    size = "small",
+    srcs = ["allowed_override_modes_set_test.cc"],
+    extension_names = ["envoy.filters.http.ext_proc"],
+    deps = [
+        "//source/extensions/filters/http/ext_proc:allowed_override_modes_set_lib",
     ],
 )

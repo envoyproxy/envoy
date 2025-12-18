@@ -197,23 +197,7 @@ protected:
 
   ConfigSubscriptionCommonBase(const std::string& name, const uint64_t manager_identifier,
                                ConfigProviderManagerImplBase& config_provider_manager,
-                               Server::Configuration::ServerFactoryContext& factory_context)
-      : name_(name), tls_(factory_context.threadLocal()),
-        local_init_target_(
-            fmt::format("ConfigSubscriptionCommonBase local init target '{}'", name_),
-            [this]() { start(); }),
-        parent_init_target_(fmt::format("ConfigSubscriptionCommonBase init target '{}'", name_),
-                            [this]() { local_init_manager_.initialize(local_init_watcher_); }),
-        local_init_watcher_(fmt::format("ConfigSubscriptionCommonBase local watcher '{}'", name_),
-                            [this]() { parent_init_target_.ready(); }),
-        local_init_manager_(
-            fmt::format("ConfigSubscriptionCommonBase local init manager '{}'", name_)),
-        manager_identifier_(manager_identifier), config_provider_manager_(config_provider_manager),
-        time_source_(factory_context.timeSource()),
-        last_updated_(factory_context.timeSource().systemTime()) {
-    THROW_IF_NOT_OK(Envoy::Config::Utility::checkLocalInfo(name, factory_context.localInfo()));
-    local_init_manager_.add(local_init_target_);
-  }
+                               Server::Configuration::ServerFactoryContext& factory_context);
 
   /**
    * Propagates a config update to worker threads.

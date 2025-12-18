@@ -1,289 +1,3 @@
-From d6e7129f1d3f52fd1eca3bdaf91d06bb8a14e70d Mon Sep 17 00:00:00 2001
-From: Matt Leon <mattleon@google.com>
-Date: Wed, 16 Jul 2025 20:05:48 -0400
-Subject: [PATCH 1/3] chore: Update v8 to use 13.8 interface
-
-Signed-off-by: Matt Leon <mattleon@google.com>
----
- src/v8/v8.cc | 84 ++++++++++++++++++++++++++--------------------------
- 1 file changed, 42 insertions(+), 42 deletions(-)
-
-diff --git a/src/v8/v8.cc b/src/v8/v8.cc
-index 61779c1..1047f5c 100644
---- a/src/v8/v8.cc
-+++ b/src/v8/v8.cc
-@@ -140,20 +140,20 @@ private:
- 
- static std::string printValue(const wasm::Val &value) {
-   switch (value.kind()) {
--  case wasm::I32:
-+  case wasm::ValKind::I32:
-     return std::to_string(value.get<uint32_t>());
--  case wasm::I64:
-+  case wasm::ValKind::I64:
-     return std::to_string(value.get<uint64_t>());
--  case wasm::F32:
-+  case wasm::ValKind::F32:
-     return std::to_string(value.get<float>());
--  case wasm::F64:
-+  case wasm::ValKind::F64:
-     return std::to_string(value.get<double>());
-   default:
-     return "unknown";
-   }
- }
- 
--static std::string printValues(const wasm::Val values[], size_t size) {
-+static std::string printValues(const wasm::vec<wasm::Val> &values, size_t size) {
-   if (size == 0) {
-     return "";
-   }
-@@ -170,17 +170,17 @@ static std::string printValues(const wasm::Val values[], size_t size) {
- 
- static const char *printValKind(wasm::ValKind kind) {
-   switch (kind) {
--  case wasm::I32:
-+  case wasm::ValKind::I32:
-     return "i32";
--  case wasm::I64:
-+  case wasm::ValKind::I64:
-     return "i64";
--  case wasm::F32:
-+  case wasm::ValKind::F32:
-     return "f32";
--  case wasm::F64:
-+  case wasm::ValKind::F64:
-     return "f64";
--  case wasm::ANYREF:
--    return "anyref";
--  case wasm::FUNCREF:
-+  case wasm::ValKind::EXTERNREF:
-+    return "externref";
-+  case wasm::ValKind::FUNCREF:
-     return "funcref";
-   default:
-     return "unknown";
-@@ -229,11 +229,11 @@ template <typename T> wasm::Val makeVal(T t) { return wasm::Val::make(t); }
- template <> wasm::Val makeVal(Word t) { return wasm::Val::make(static_cast<uint32_t>(t.u64_)); }
- 
- template <typename T> constexpr auto convertArgToValKind();
--template <> constexpr auto convertArgToValKind<Word>() { return wasm::I32; };
--template <> constexpr auto convertArgToValKind<uint32_t>() { return wasm::I32; };
--template <> constexpr auto convertArgToValKind<int64_t>() { return wasm::I64; };
--template <> constexpr auto convertArgToValKind<uint64_t>() { return wasm::I64; };
--template <> constexpr auto convertArgToValKind<double>() { return wasm::F64; };
-+template <> constexpr auto convertArgToValKind<Word>() { return wasm::ValKind::I32; };
-+template <> constexpr auto convertArgToValKind<uint32_t>() { return wasm::ValKind::I32; };
-+template <> constexpr auto convertArgToValKind<int64_t>() { return wasm::ValKind::I64; };
-+template <> constexpr auto convertArgToValKind<uint64_t>() { return wasm::ValKind::I64; };
-+template <> constexpr auto convertArgToValKind<double>() { return wasm::ValKind::F64; };
- 
- template <typename T, std::size_t... I>
- constexpr auto convertArgsTupleToValTypesImpl(std::index_sequence<I...> /*comptime*/) {
-@@ -343,7 +343,8 @@ bool V8::link(std::string_view /*debug_name*/) {
-   assert(module_ != nullptr);
- 
-   const auto import_types = module_.get()->imports();
--  std::vector<const wasm::Extern *> imports;
-+  wasm::vec<wasm::Extern *> imports =
-+      wasm::vec<wasm::Extern *>::make_uninitialized(import_types.size());
- 
-   for (size_t i = 0; i < import_types.size(); i++) {
-     std::string_view module(import_types[i]->module().get(), import_types[i]->module().size());
-@@ -352,7 +353,7 @@ bool V8::link(std::string_view /*debug_name*/) {
- 
-     switch (import_type->kind()) {
- 
--    case wasm::EXTERN_FUNC: {
-+    case wasm::ExternKind::FUNC: {
-       auto it = host_functions_.find(std::string(module) + "." + std::string(name));
-       if (it == host_functions_.end()) {
-         fail(FailState::UnableToInitializeCode,
-@@ -372,10 +373,10 @@ bool V8::link(std::string_view /*debug_name*/) {
-                  printValTypes(func->type()->results()));
-         return false;
-       }
--      imports.push_back(func);
-+      imports[i] = func;
-     } break;
- 
--    case wasm::EXTERN_GLOBAL: {
-+    case wasm::ExternKind::GLOBAL: {
-       // TODO(PiotrSikora): add support when/if needed.
-       fail(FailState::UnableToInitializeCode,
-            "Failed to load Wasm module due to a missing import: " + std::string(module) + "." +
-@@ -383,7 +384,7 @@ bool V8::link(std::string_view /*debug_name*/) {
-       return false;
-     } break;
- 
--    case wasm::EXTERN_MEMORY: {
-+    case wasm::ExternKind::MEMORY: {
-       assert(memory_ == nullptr);
-       auto type = wasm::MemoryType::make(import_type->memory()->limits());
-       if (type == nullptr) {
-@@ -393,10 +394,10 @@ bool V8::link(std::string_view /*debug_name*/) {
-       if (memory_ == nullptr) {
-         return false;
-       }
--      imports.push_back(memory_.get());
-+      imports[i] = memory_.get();
-     } break;
- 
--    case wasm::EXTERN_TABLE: {
-+    case wasm::ExternKind::TABLE: {
-       assert(table_ == nullptr);
-       auto type =
-           wasm::TableType::make(wasm::ValType::make(import_type->table()->element()->kind()),
-@@ -408,16 +409,12 @@ bool V8::link(std::string_view /*debug_name*/) {
-       if (table_ == nullptr) {
-         return false;
-       }
--      imports.push_back(table_.get());
-+      imports[i] = table_.get();
-     } break;
-     }
-   }
- 
--  if (import_types.size() != imports.size()) {
--    return false;
--  }
--
--  instance_ = wasm::Instance::make(store_.get(), module_.get(), imports.data());
-+  instance_ = wasm::Instance::make(store_.get(), module_.get(), imports);
-   if (instance_ == nullptr) {
-     fail(FailState::UnableToInitializeCode, "Failed to create new Wasm instance");
-     return false;
-@@ -435,16 +432,16 @@ bool V8::link(std::string_view /*debug_name*/) {
- 
-     switch (export_type->kind()) {
- 
--    case wasm::EXTERN_FUNC: {
-+    case wasm::ExternKind::FUNC: {
-       assert(export_item->func() != nullptr);
-       module_functions_.insert_or_assign(std::string(name), export_item->func()->copy());
-     } break;
- 
--    case wasm::EXTERN_GLOBAL: {
-+    case wasm::ExternKind::GLOBAL: {
-       // TODO(PiotrSikora): add support when/if needed.
-     } break;
- 
--    case wasm::EXTERN_MEMORY: {
-+    case wasm::ExternKind::MEMORY: {
-       assert(export_item->memory() != nullptr);
-       assert(memory_ == nullptr);
-       memory_ = exports[i]->memory()->copy();
-@@ -453,7 +450,7 @@ bool V8::link(std::string_view /*debug_name*/) {
-       }
-     } break;
- 
--    case wasm::EXTERN_TABLE: {
-+    case wasm::ExternKind::TABLE: {
-       // TODO(PiotrSikora): add support when/if needed.
-     } break;
-     }
-@@ -531,7 +528,8 @@ void V8::registerHostFunctionImpl(std::string_view module_name, std::string_view
-                                    convertArgsTupleToValTypes<std::tuple<>>());
-   auto func = wasm::Func::make(
-       store_.get(), type.get(),
--      [](void *data, const wasm::Val params[], wasm::Val /*results*/[]) -> wasm::own<wasm::Trap> {
-+      [](void *data, const wasm::vec<wasm::Val> &params,
-+         wasm::vec<wasm::Val> & /*results*/) -> wasm::own<wasm::Trap> {
-         auto *func_data = reinterpret_cast<FuncData *>(data);
-         const bool log = func_data->vm_->cmpLogLevel(LogLevel::trace);
-         if (log) {
-@@ -567,7 +565,8 @@ void V8::registerHostFunctionImpl(std::string_view module_name, std::string_view
-                                    convertArgsTupleToValTypes<std::tuple<R>>());
-   auto func = wasm::Func::make(
-       store_.get(), type.get(),
--      [](void *data, const wasm::Val params[], wasm::Val results[]) -> wasm::own<wasm::Trap> {
-+      [](void *data, const wasm::vec<wasm::Val> &params,
-+         wasm::vec<wasm::Val> &results) -> wasm::own<wasm::Trap> {
-         auto *func_data = reinterpret_cast<FuncData *>(data);
-         const bool log = func_data->vm_->cmpLogLevel(LogLevel::trace);
-         if (log) {
-@@ -621,20 +620,21 @@ void V8::getModuleFunctionImpl(std::string_view function_name,
-     const bool log = cmpLogLevel(LogLevel::trace);
-     SaveRestoreContext saved_context(context);
-     wasm::own<wasm::Trap> trap = nullptr;
-+    wasm::vec<wasm::Val> results = wasm::vec<wasm::Val>::make_uninitialized();
- 
-     // Workaround for MSVC++ not supporting zero-sized arrays.
-     if constexpr (sizeof...(args) > 0) {
--      wasm::Val params[] = {makeVal(args)...};
-+      wasm::vec<wasm::Val> params = wasm::vec<wasm::Val>::make(makeVal(args)...);
-       if (log) {
-         integration()->trace("[host->vm] " + std::string(function_name) + "(" +
-                              printValues(params, sizeof...(Args)) + ")");
-       }
--      trap = func->call(params, nullptr);
-+      trap = func->call(params, results);
-     } else {
-       if (log) {
-         integration()->trace("[host->vm] " + std::string(function_name) + "()");
-       }
--      trap = func->call(nullptr, nullptr);
-+      trap = func->call(wasm::vec<wasm::Val>::make_uninitialized(), results);
-     }
- 
-     if (trap) {
-@@ -671,12 +671,12 @@ void V8::getModuleFunctionImpl(std::string_view function_name,
-   *function = [func, function_name, this](ContextBase *context, Args... args) -> R {
-     const bool log = cmpLogLevel(LogLevel::trace);
-     SaveRestoreContext saved_context(context);
--    wasm::Val results[1];
-+    wasm::vec<wasm::Val> results = wasm::vec<wasm::Val>::make_uninitialized(1);
-     wasm::own<wasm::Trap> trap = nullptr;
- 
-     // Workaround for MSVC++ not supporting zero-sized arrays.
-     if constexpr (sizeof...(args) > 0) {
--      wasm::Val params[] = {makeVal(args)...};
-+      wasm::vec<wasm::Val> params = wasm::vec<wasm::Val>::make(makeVal(args)...);
-       if (log) {
-         integration()->trace("[host->vm] " + std::string(function_name) + "(" +
-                              printValues(params, sizeof...(Args)) + ")");
-@@ -686,7 +686,7 @@ void V8::getModuleFunctionImpl(std::string_view function_name,
-       if (log) {
-         integration()->trace("[host->vm] " + std::string(function_name) + "()");
-       }
--      trap = func->call(nullptr, results);
-+      trap = func->call(wasm::vec<wasm::Val>::make_uninitialized(), results);
-     }
- 
-     if (trap) {
--- 
-2.50.0.727.gbf7dc18ff4-goog
-
-
-From 6c2ffcb9d797d86e817dc29e0dea53e8bd53bdcf Mon Sep 17 00:00:00 2001
-From: Matt Leon <mattleon@google.com>
-Date: Fri, 18 Jul 2025 09:29:26 -0400
-Subject: [PATCH 2/3] fix: remove racy call to
- isolate->IsExecutionTerminating()
-
-Signed-off-by: Matt Leon <mattleon@google.com>
----
- src/v8/v8.cc | 3 ---
- 1 file changed, 3 deletions(-)
-
-diff --git a/src/v8/v8.cc b/src/v8/v8.cc
-index 1047f5c..bc5b828 100644
---- a/src/v8/v8.cc
-+++ b/src/v8/v8.cc
-@@ -706,9 +706,6 @@ void V8::terminate() {
-   auto *store_impl = reinterpret_cast<wasm::StoreImpl *>(store_.get());
-   auto *isolate = store_impl->isolate();
-   isolate->TerminateExecution();
--  while (isolate->IsExecutionTerminating()) {
--    std::this_thread::yield();
--  }
- }
- 
- std::string V8::getFailMessage(std::string_view function_name, wasm::own<wasm::Trap> trap) {
--- 
-2.50.0.727.gbf7dc18ff4-goog
-
-
 From 23327ea30f714a6ac25f197e47764d1f8960986e Mon Sep 17 00:00:00 2001
 From: Matt Leon <mattleon@google.com>
 Date: Tue, 22 Jul 2025 10:45:41 -0400
@@ -364,3 +78,31 @@ index aaf7bd2..b1234567 100644
 
 -- 
 2.50.0.727.gbf7dc18ff4-goog
+
+diff --git a/include/proxy-wasm/context.h b/include/proxy-wasm/context.h
+index 208633a..183eaab 100644
+--- a/include/proxy-wasm/context.h
++++ b/include/proxy-wasm/context.h
+@@ -150,7 +150,7 @@ public:
+               const std::shared_ptr<PluginHandleBase> &plugin_handle); // Stream context.
+   virtual ~ContextBase();
+
+-  virtual WasmBase *wasm() const { return wasm_; }
++  WasmBase *wasm() const { return wasm_; }
+   uint32_t id() const { return id_; }
+   // The VM Context used for calling "malloc" has an id_ == 0.
+   bool isVmContext() const { return id_ == 0; }
+diff --git a/include/proxy-wasm/wasm_vm.h b/include/proxy-wasm/wasm_vm.h
+index 9a2f0a6..e2e2ea0 100644
+--- a/include/proxy-wasm/wasm_vm.h
++++ b/include/proxy-wasm/wasm_vm.h
+@@ -161,7 +161,7 @@ struct WasmVmIntegration {
+   virtual proxy_wasm::LogLevel getLogLevel() = 0;
+   virtual void error(std::string_view message) = 0;
+   // Allow integrations to handle specific FailStates differently.
+-  virtual void error(FailState fail_state, std::string_view message) { error(message); }
++  virtual void error(FailState, std::string_view message) { error(message); }
+   virtual void trace(std::string_view message) = 0;
+   // Get a NullVm implementation of a function.
+   // @param function_name is the name of the function with the implementation specific prefix.
+   
