@@ -1,7 +1,12 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
+#include "envoy/extensions/common/matching/v3/extension_matcher.pb.h"
+#include "envoy/extensions/filters/common/matcher/action/v3/skip_action.pb.h"
 #include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/extensions/matching/common_inputs/network/v3/network_inputs.pb.h"
+#include "envoy/extensions/matching/input_matchers/metadata/v3/metadata.pb.h"
 #include "envoy/service/auth/v3/external_auth.pb.h"
 
 #include "source/common/common/macros.h"
@@ -2599,6 +2604,166 @@ TEST_P(ExtAuthzGrpcIntegrationTest, ErrorResponseWithInvalidHeaders) {
   EXPECT_TRUE(response_->body().empty());
 
   cleanup();
+}
+
+// Test ExtensionWithMatcher with DynamicMetadataInput for conditional ext_authz invocation.
+TEST_P(ExtAuthzGrpcIntegrationTest, ExtensionWithMatcherDynamicMetadata) {
+  // Setup ext_authz cluster and filter configuration.
+  // This must be in a config modifier because we need fake_upstreams_ to be populated.
+  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* ext_authz_cluster = bootstrap.mutable_static_resources()->add_clusters();
+    ext_authz_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+    ext_authz_cluster->set_name("ext_authz_cluster");
+    ConfigHelper::setHttp2(*ext_authz_cluster);
+
+    // Build ext_authz filter config.
+    envoy::extensions::filters::http::ext_authz::v3::ExtAuthz ext_authz_config;
+    setGrpcService(*ext_authz_config.mutable_grpc_service(), "ext_authz_cluster",
+                   fake_upstreams_.back()->localAddress());
+    ext_authz_config.set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
+
+    // Build the ExtensionWithMatcher wrapper.
+    envoy::extensions::common::matching::v3::ExtensionWithMatcher extension_with_matcher;
+    extension_with_matcher.mutable_extension_config()->set_name("envoy.filters.http.ext_authz");
+    extension_with_matcher.mutable_extension_config()->mutable_typed_config()->PackFrom(
+        ext_authz_config);
+
+    // Build the matcher with DynamicMetadataInput using matcher list.
+    auto* matcher_list = extension_with_matcher.mutable_xds_matcher()->mutable_matcher_list();
+    auto* field_matcher = matcher_list->add_matchers();
+    auto* single_predicate = field_matcher->mutable_predicate()->mutable_single_predicate();
+
+    // Set up the DynamicMetadataInput.
+    envoy::extensions::matching::common_inputs::network::v3::DynamicMetadataInput metadata_input;
+    metadata_input.set_filter("envoy.filters.http.ext_authz");
+    metadata_input.add_path()->set_key("require_auth");
+    single_predicate->mutable_input()->set_name("envoy.matching.inputs.dynamic_metadata");
+    single_predicate->mutable_input()->mutable_typed_config()->PackFrom(metadata_input);
+
+    // Set up the metadata input matcher to match when value equals "false".
+    envoy::extensions::matching::input_matchers::metadata::v3::Metadata meta_matcher;
+    meta_matcher.mutable_value()->mutable_string_match()->set_exact("false");
+    single_predicate->mutable_custom_match()->set_name("envoy.matching.matchers.metadata_matcher");
+    single_predicate->mutable_custom_match()->mutable_typed_config()->PackFrom(meta_matcher);
+
+    // Set up the on_match action to skip the filter when metadata matches "false".
+    envoy::extensions::filters::common::matcher::action::v3::SkipFilter skip_action;
+    field_matcher->mutable_on_match()->mutable_action()->set_name("skip");
+    field_matcher->mutable_on_match()->mutable_action()->mutable_typed_config()->PackFrom(
+        skip_action);
+
+    // Create the HttpFilter with ExtensionWithMatcher as typed_config.
+    envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter http_filter;
+    http_filter.set_name("ext-authz-with-matcher");
+    http_filter.mutable_typed_config()->PackFrom(extension_with_matcher);
+    config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(http_filter));
+
+    // Add Lua filter before ext_authz to set dynamic metadata.
+    // We use string values "true"/"false" because the exact_match_map expects strings.
+    config_helper_.prependFilter(R"EOF(
+    name: envoy.filters.http.lua
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+      default_source_code:
+        inline_string: |
+          function envoy_on_request(request_handle)
+            local path = request_handle:headers():get(":path")
+            if string.match(path, "^/secure") then
+              request_handle:streamInfo():dynamicMetadata():set("envoy.filters.http.ext_authz", "require_auth", "true")
+            else
+              request_handle:streamInfo():dynamicMetadata():set("envoy.filters.http.ext_authz", "require_auth", "false")
+            end
+          end
+  )EOF");
+  });
+
+  setDownstreamProtocol(Http::CodecType::HTTP1);
+  HttpIntegrationTest::initialize();
+
+  // Test 1: Request to /public path should skip ext_authz (require_auth = false).
+  {
+    auto conn = makeClientConnection(lookupPort("http"));
+    codec_client_ = makeHttpConnection(std::move(conn));
+    auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+        {":method", "GET"}, {":path", "/public"}, {":scheme", "http"}, {":authority", "host"}});
+    // ext_authz should be skipped, so no check request should be sent.
+    // The request should proceed directly to upstream.
+    waitForNextUpstreamRequest();
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_TRUE(response->complete());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+    cleanupUpstreamAndDownstream();
+  }
+
+  // Test 2: Request to /secure path should invoke ext_authz (require_auth = true).
+  {
+    auto conn = makeClientConnection(lookupPort("http"));
+    codec_client_ = makeHttpConnection(std::move(conn));
+    auto response = codec_client_->makeHeaderOnlyRequest(
+        Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                       {":path", "/secure/data"},
+                                       {":scheme", "http"},
+                                       {":authority", "host"}});
+    // ext_authz should be invoked, wait for the check request.
+    // Use simplified waiting logic since we don't set up labels.
+    AssertionResult result =
+        fake_upstreams_.back()->waitForHttpConnection(*dispatcher_, fake_ext_authz_connection_);
+    RELEASE_ASSERT(result, result.message());
+    result = fake_ext_authz_connection_->waitForNewStream(*dispatcher_, ext_authz_request_);
+    RELEASE_ASSERT(result, result.message());
+
+    envoy::service::auth::v3::CheckRequest check_request;
+    result = ext_authz_request_->waitForGrpcMessage(*dispatcher_, check_request);
+    RELEASE_ASSERT(result, result.message());
+
+    // Send authorization response (OK).
+    ext_authz_request_->startGrpcStream();
+    envoy::service::auth::v3::CheckResponse check_response;
+    check_response.mutable_status()->set_code(Grpc::Status::WellKnownGrpcStatus::Ok);
+    ext_authz_request_->sendGrpcMessage(check_response);
+    ext_authz_request_->finishGrpcStream(Grpc::Status::Ok);
+
+    // Now wait for upstream request.
+    waitForNextUpstreamRequest();
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_TRUE(response->complete());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+    cleanupUpstreamAndDownstream();
+  }
+
+  // Test 3: Request to /secure path with authorization denied.
+  {
+    auto conn = makeClientConnection(lookupPort("http"));
+    codec_client_ = makeHttpConnection(std::move(conn));
+    auto response = codec_client_->makeHeaderOnlyRequest(
+        Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                       {":path", "/secure/admin"},
+                                       {":scheme", "http"},
+                                       {":authority", "host"}});
+    // ext_authz should be invoked.
+    AssertionResult result =
+        fake_ext_authz_connection_->waitForNewStream(*dispatcher_, ext_authz_request_);
+    RELEASE_ASSERT(result, result.message());
+
+    envoy::service::auth::v3::CheckRequest check_request;
+    result = ext_authz_request_->waitForGrpcMessage(*dispatcher_, check_request);
+    RELEASE_ASSERT(result, result.message());
+
+    // Send authorization response (DENIED).
+    ext_authz_request_->startGrpcStream();
+    envoy::service::auth::v3::CheckResponse check_response;
+    check_response.mutable_status()->set_code(Grpc::Status::WellKnownGrpcStatus::PermissionDenied);
+    ext_authz_request_->sendGrpcMessage(check_response);
+    ext_authz_request_->finishGrpcStream(Grpc::Status::Ok);
+
+    // Request should be denied without reaching upstream.
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_TRUE(response->complete());
+    EXPECT_EQ("403", response->headers().getStatusValue());
+    cleanup();
+  }
 }
 
 // Regression test for https://github.com/envoyproxy/envoy/issues/17344

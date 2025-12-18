@@ -249,6 +249,11 @@ public:
   virtual absl::string_view requestedServerName() const PURE;
 
   /**
+   * @return requestedApplicationProtocols value for downstream host.
+   */
+  virtual const std::vector<std::string>& requestedApplicationProtocols() const PURE;
+
+  /**
    * @return Connection ID of the downstream connection, or unset if not available.
    **/
   virtual absl::optional<uint64_t> connectionID() const PURE;
@@ -331,6 +336,12 @@ public:
    * @param SNI value requested.
    */
   virtual void setRequestedServerName(const absl::string_view requested_server_name) PURE;
+
+  /**
+   * @param protocols Application protocols requested.
+   */
+  virtual void
+  setRequestedApplicationProtocols(const std::vector<absl::string_view>& protocols) PURE;
 
   /**
    * @param id Connection ID of the downstream connection.

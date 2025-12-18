@@ -17,9 +17,13 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Common configuration shared across geolocation providers.
 
 message CommonGeoipProviderConfig {
-  // The set of geolocation headers to add to the request. If any of the configured headers is present
-  // in the incoming request, it will be overridden by the :ref:`GeoIP filter <config_http_filters_geoip>`.
+  // The set of geolocation headers to add to request. If any of the configured headers is present
+  // in the incoming request, it will be overridden by the :ref:`HTTP GeoIP filter <config_http_filters_geoip>`.
   // [#next-free-field: 13]
+  //
+  // .. attention::
+  //   This field is deprecated in favor of :ref:`geo_field_keys
+  //   <envoy_v3_api_field_extensions.geoip_providers.common.v3.CommonGeoipProviderConfig.geo_field_keys>`.
   message GeolocationHeadersToAdd {
     // If set, the header will be used to populate the country ISO code associated with the IP address.
     string country = 1
@@ -80,6 +84,69 @@ message CommonGeoipProviderConfig {
         [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
   }
 
-  // Configuration for geolocation headers to add to the request.
-  GeolocationHeadersToAdd geo_headers_to_add = 1 [(validate.rules).message = {required: true}];
+  // The set of geolocation field keys to use for storing lookup results.
+  // These keys define how the geolocation lookup results will be stored. The actual storage
+  // mechanism depends on the filter using the provider:
+  //
+  // - The :ref:`HTTP GeoIP filter <config_http_filters_geoip>` stores results as HTTP request headers.
+  // - The :ref:`Network GeoIP filter <config_network_filters_geoip>` stores results in the
+  //   connection's filter state under the well-known key ``envoy.geoip``.
+  //
+  // [#next-free-field: 12]
+  message GeolocationFieldKeys {
+    // If set, the key will be used to populate the country ISO code associated with the IP address.
+    string country = 1;
+
+    // If set, the key will be used to populate the city associated with the IP address.
+    string city = 2;
+
+    // If set, the key will be used to populate the region ISO code associated with the IP address.
+    // The least specific subdivision will be selected as the region value.
+    string region = 3;
+
+    // If set, the key will be used to populate the ASN associated with the IP address.
+    string asn = 4;
+
+    // If set, the IP address will be checked if it belongs to any type of anonymization network
+    // (e.g., VPN, public proxy). The result will be stored with this key. Value will be set to
+    // either ``true`` or ``false`` depending on the check result.
+    string anon = 5;
+
+    // If set, the IP address will be checked if it belongs to a VPN and the result will be stored
+    // with this key. Value will be set to either ``true`` or ``false`` depending on the check result.
+    string anon_vpn = 6;
+
+    // If set, the IP address will be checked if it belongs to a hosting provider and the result
+    // will be stored with this key. Value will be set to either ``true`` or ``false`` depending on
+    // the check result.
+    string anon_hosting = 7;
+
+    // If set, the IP address will be checked if it belongs to a TOR exit node and the result will
+    // be stored with this key. Value will be set to either ``true`` or ``false`` depending on the
+    // check result.
+    string anon_tor = 8;
+
+    // If set, the IP address will be checked if it belongs to a public proxy and the result will
+    // be stored with this key. Value will be set to either ``true`` or ``false`` depending on the
+    // check result.
+    string anon_proxy = 9;
+
+    // If set, the key will be used to populate the ISP associated with the IP address.
+    string isp = 10;
+
+    // If set, the IP address will be checked if it belongs to the ISP named iCloud Private Relay
+    // and the result will be stored with this key. Value will be set to either ``true`` or ``false``
+    // depending on the check result.
+    string apple_private_relay = 11;
+  }
+
+  // Configuration for geolocation headers to add to HTTP requests.
+  // This field is deprecated in favor of ``geo_field_keys``. If both are set, ``geo_field_keys``
+  // takes precedence.
+  GeolocationHeadersToAdd geo_headers_to_add = 1
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
+
+  // Configuration for geolocation field keys.
+  // At least one of ``geo_headers_to_add`` or ``geo_field_keys`` must be set.
+  GeolocationFieldKeys geo_field_keys = 3;
 }

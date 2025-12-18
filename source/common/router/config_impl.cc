@@ -419,6 +419,16 @@ RouteTracingImpl::RouteTracingImpl(const envoy::config::route::v3::Tracing& trac
   for (const auto& tag : tracing.custom_tags()) {
     custom_tags_.emplace(tag.tag(), Tracing::CustomTagUtility::createCustomTag(tag));
   }
+  if (!tracing.operation().empty()) {
+    auto operation = Formatter::FormatterImpl::create(tracing.operation(), true);
+    THROW_IF_NOT_OK_REF(operation.status());
+    operation_ = std::move(operation.value());
+  }
+  if (!tracing.upstream_operation().empty()) {
+    auto operation = Formatter::FormatterImpl::create(tracing.upstream_operation(), true);
+    THROW_IF_NOT_OK_REF(operation.status());
+    upstream_operation_ = std::move(operation.value());
+  }
 }
 
 const envoy::type::v3::FractionalPercent& RouteTracingImpl::getClientSampling() const {
@@ -433,6 +443,32 @@ const envoy::type::v3::FractionalPercent& RouteTracingImpl::getOverallSampling()
   return overall_sampling_;
 }
 const Tracing::CustomTagMap& RouteTracingImpl::getCustomTags() const { return custom_tags_; }
+
+uint64_t getRequestBodyBufferLimit(const CommonVirtualHostSharedPtr& vhost,
+                                   const envoy::config::route::v3::Route& route) {
+  // Route level request_body_buffer_limit takes precedence over all others.
+  if (route.has_request_body_buffer_limit()) {
+    return route.request_body_buffer_limit().value();
+  }
+
+  // Then virtual host level request_body_buffer_limit.
+  if (const auto v = vhost->requestBodyBufferLimit(); v.has_value()) {
+    return v.value();
+  }
+
+  // Then route level legacy per_request_buffer_limit_bytes.
+  if (route.has_per_request_buffer_limit_bytes()) {
+    return route.per_request_buffer_limit_bytes().value();
+  }
+
+  // Then virtual host level legacy per_request_buffer_limit_bytes.
+  if (const auto v = vhost->legacyRequestBodyBufferLimit(); v.has_value()) {
+    return v.value();
+  }
+
+  // Finally return max value to indicate no limit.
+  return std::numeric_limits<uint64_t>::max();
+}
 
 RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
                                        const envoy::config::route::v3::Route& route,
@@ -492,10 +528,7 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
       opaque_config_(parseOpaqueConfig(route)), decorator_(parseDecorator(route)),
       route_tracing_(parseRouteTracing(route)), route_name_(route.name()),
       time_source_(factory_context.mainThreadDispatcher().timeSource()),
-      per_request_buffer_limit_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-          route, per_request_buffer_limit_bytes, std::numeric_limits<uint32_t>::max())),
-      request_body_buffer_limit_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(route, request_body_buffer_limit,
-                                                                 vhost->requestBodyBufferLimit())),
+      request_body_buffer_limit_(getRequestBodyBufferLimit(vhost, route)),
       direct_response_code_(ConfigUtility::parseDirectResponseCode(route)),
       cluster_not_found_response_code_(ConfigUtility::parseClusterNotFoundResponseCode(
           route.route().cluster_not_found_response_code())),
@@ -518,9 +551,10 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
                                                      : RetryPolicyImpl::DefaultRetryPolicy;
 
   if (route.has_direct_response() && route.direct_response().has_body()) {
-    auto provider_or_error = Envoy::Config::DataSource::DataSourceProvider::create(
+    auto provider_or_error = Envoy::Config::DataSource::DataSourceProvider<std::string>::create(
         route.direct_response().body(), factory_context.mainThreadDispatcher(),
         factory_context.threadLocal(), factory_context.api(), true,
+        [](absl::string_view data) { return std::make_shared<std::string>(data); },
         vhost_->globalRouteConfig().maxDirectResponseBodySizeBytes());
     SET_AND_RETURN_IF_NOT_OK(provider_or_error.status(), creation_status);
     direct_response_body_provider_ = std::move(provider_or_error.value());
@@ -1053,8 +1087,9 @@ absl::string_view RouteEntryImplBase::formatBody(const Http::RequestHeaderMap& r
                                                  const Http::ResponseHeaderMap& response_headers,
                                                  const StreamInfo::StreamInfo& stream_info,
                                                  std::string& body_out) const {
-  absl::string_view direct_body = direct_response_body_provider_ != nullptr
-                                      ? direct_response_body_provider_->data()
+  absl::string_view direct_body = (direct_response_body_provider_ != nullptr &&
+                                   direct_response_body_provider_->data() != nullptr)
+                                      ? *direct_response_body_provider_->data()
                                       : EMPTY_STRING;
   if (direct_response_body_formatter_ == nullptr) {
     return direct_body;
@@ -1530,10 +1565,10 @@ CommonVirtualHostImpl::CommonVirtualHostImpl(
           THROW_OR_RETURN_VALUE(PerFilterConfigs::create(virtual_host.typed_per_filter_config(),
                                                          factory_context, validator),
                                 std::unique_ptr<PerFilterConfigs>)),
-      per_request_buffer_limit_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-          virtual_host, per_request_buffer_limit_bytes, std::numeric_limits<uint32_t>::max())),
-      request_body_buffer_limit_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-          virtual_host, request_body_buffer_limit, std::numeric_limits<uint64_t>::max())),
+      per_request_buffer_limit_(
+          PROTOBUF_GET_OPTIONAL_WRAPPED(virtual_host, per_request_buffer_limit_bytes)),
+      request_body_buffer_limit_(
+          PROTOBUF_GET_OPTIONAL_WRAPPED(virtual_host, request_body_buffer_limit)),
       include_attempt_count_in_request_(virtual_host.include_request_attempt_count()),
       include_attempt_count_in_response_(virtual_host.include_attempt_count_in_response()),
       include_is_timeout_retry_header_(virtual_host.include_is_timeout_retry_header()) {

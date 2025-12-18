@@ -88,8 +88,9 @@ public:
             SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs,
             random_),
         /*target_xds_authority_=*/"",
-        /*eds_resources_cache_=*/std::unique_ptr<MockEdsResourcesCache>(eds_resources_cache_)};
-    grpc_mux_ = std::make_unique<GrpcMuxImpl>(grpc_mux_context, true);
+        /*eds_resources_cache_=*/std::unique_ptr<MockEdsResourcesCache>(eds_resources_cache_),
+        /*skip_subsequent_node_=*/true};
+    grpc_mux_ = std::make_unique<GrpcMuxImpl>(grpc_mux_context);
   }
 
   void expectSendMessage(const std::string& type_url,
@@ -1052,9 +1053,10 @@ TEST_P(GrpcMuxImplTest, BadLocalInfoEmptyClusterName) {
       std::make_unique<JitteredExponentialBackOffStrategy>(
           SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs, random_),
       /*target_xds_authority_=*/"",
-      /*eds_resources_cache_=*/nullptr};
+      /*eds_resources_cache_=*/nullptr,
+      /*skip_subsequent_node_=*/true};
   EXPECT_THROW_WITH_MESSAGE(
-      GrpcMuxImpl(grpc_mux_context, true), EnvoyException,
+      (GrpcMuxImpl(grpc_mux_context)), EnvoyException,
       "ads: node 'id' and 'cluster' are required. Set it either in 'node' config or via "
       "--service-node and --service-cluster options.");
 }
@@ -1078,9 +1080,10 @@ TEST_P(GrpcMuxImplTest, BadLocalInfoEmptyNodeName) {
       std::make_unique<JitteredExponentialBackOffStrategy>(
           SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs, random_),
       /*target_xds_authority_=*/"",
-      /*eds_resources_cache_=*/nullptr};
+      /*eds_resources_cache_=*/nullptr,
+      /*skip_subsequent_node_=*/true};
   EXPECT_THROW_WITH_MESSAGE(
-      GrpcMuxImpl(grpc_mux_context, true), EnvoyException,
+      (GrpcMuxImpl(grpc_mux_context)), EnvoyException,
       "ads: node 'id' and 'cluster' are required. Set it either in 'node' config or via "
       "--service-node and --service-cluster options.");
 }

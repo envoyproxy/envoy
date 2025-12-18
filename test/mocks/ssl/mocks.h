@@ -30,7 +30,6 @@ public:
               (Stats::Scope & scope, const ClientContextConfig& config));
   MOCK_METHOD(absl::StatusOr<ServerContextSharedPtr>, createSslServerContext,
               (Stats::Scope & stats, const ServerContextConfig& config,
-               const std::vector<std::string>& server_names,
                ContextAdditionalInitFunc additional_init));
   MOCK_METHOD(absl::optional<uint32_t>, daysUntilFirstCertExpires, (), (const));
   MOCK_METHOD(absl::optional<uint64_t>, secondsUntilFirstOcspResponseExpires, (), (const));
@@ -157,7 +156,7 @@ public:
   MOCK_METHOD(void, setSecretUpdateCallback, (std::function<absl::Status()> callback));
 
   MOCK_METHOD(Ssl::HandshakerFactoryCb, createHandshaker, (), (const, override));
-  MOCK_METHOD(Ssl::TlsCertificateSelectorFactory, tlsCertificateSelectorFactory, (),
+  MOCK_METHOD(Ssl::TlsCertificateSelectorFactory&, tlsCertificateSelectorFactory, (),
               (const, override));
   MOCK_METHOD(Ssl::HandshakerCapabilities, capabilities, (), (const, override));
   MOCK_METHOD(Ssl::SslCtxCb, sslctxCb, (), (const, override));
@@ -175,6 +174,7 @@ public:
   MOCK_METHOD(absl::optional<
                   envoy::extensions::transport_sockets::tls::v3::TlsParameters::CompliancePolicy>,
               compliancePolicy, (), (const));
+  MOCK_METHOD(const std::vector<std::string>&, serverNames, (), (const));
 
   Ssl::HandshakerCapabilities capabilities_;
   std::string ciphers_{"RSA"};
@@ -183,6 +183,7 @@ public:
   Network::Address::IpList iplist_;
   std::string path_;
   std::vector<SessionTicketKey> ticket_keys_;
+  std::vector<std::string> server_names_;
 };
 
 class MockTlsCertificateConfig : public TlsCertificateConfig {

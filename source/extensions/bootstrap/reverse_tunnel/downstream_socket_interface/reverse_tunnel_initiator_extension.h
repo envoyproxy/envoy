@@ -93,6 +93,16 @@ public:
   Stats::Scope& getStatsScope() const { return context_.scope(); }
 
   /**
+   * Increment handshake stats for reverse tunnel connections (per-worker only).
+   * Only tracks stats if enable_detailed_stats flag is true.
+   * @param cluster_id the cluster identifier for the connection
+   * @param success true for successful handshake, false for failure
+   * @param failure_reason optional failure reason (e.g., "encode_error", "http.401", "http.500")
+   */
+  void incrementHandshakeStats(const std::string& cluster_id, bool success,
+                               const std::string& failure_reason = "");
+
+  /**
    * Test-only method to set the thread local slot for testing purposes.
    * This allows tests to inject a custom thread local registry and is used
    * in unit tests to simulate different worker threads.

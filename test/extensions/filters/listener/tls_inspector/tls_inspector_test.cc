@@ -294,6 +294,9 @@ TEST_P(TlsInspectorTest, ClientHelloTooBig) {
   const std::vector<uint64_t> bytes_processed =
       store_.histogramValues("tls_inspector.bytes_processed", false);
   ASSERT_EQ(1, bytes_processed.size());
+  EXPECT_EQ("TLS_error|error:10000092:SSL "
+            "routines:OPENSSL_internal:ENCRYPTED_LENGTH_TOO_LONG:TLS_error_end",
+            cb_.streamInfo().downstreamTransportFailureReason());
 }
 
 TEST_P(TlsInspectorTest, ClientHelloTooBigTreatParsingErrorAsPlainText) {
@@ -458,6 +461,39 @@ TEST_P(TlsInspectorTest, NotSsl) {
 
   auto state = filter_->onData(*buffer_);
   EXPECT_EQ(Network::FilterStatus::Continue, state);
+  EXPECT_EQ(1, cfg_->stats().tls_not_found_.value());
+  const std::vector<uint64_t> bytes_processed =
+      store_.histogramValues("tls_inspector.bytes_processed", false);
+  ASSERT_EQ(1, bytes_processed.size());
+  EXPECT_EQ(5, bytes_processed[0]);
+  EXPECT_EQ(
+      "TLS_error|error:100000f7:SSL routines:OPENSSL_internal:WRONG_VERSION_NUMBER:TLS_error_end",
+      cb_.streamInfo().downstreamTransportFailureReason());
+}
+
+TEST_P(TlsInspectorTest, NotSslCloseConnection) {
+  std::vector<uint8_t> data;
+
+  envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector proto_config;
+  proto_config.set_close_connection_on_client_hello_parsing_errors(true);
+  cfg_ = std::make_shared<Config>(*store_.rootScope(), proto_config);
+
+  init();
+
+  // Use 100 bytes of zeroes. This is not valid as a ClientHello.
+  data.resize(100);
+  mockSysCallForPeek(data);
+  // trigger the event to copy the client hello message into buffer:q
+  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
+
+  Protobuf::Struct expected_metadata;
+  auto& fields = *expected_metadata.mutable_fields();
+  fields[Filter::failureReasonKey()].set_string_value(
+      Filter::failureReasonClientHelloNotDetected());
+  EXPECT_CALL(cb_, setDynamicMetadata(Filter::dynamicMetadataKey(), ProtoEq(expected_metadata)));
+
+  auto state = filter_->onData(*buffer_);
+  EXPECT_EQ(Network::FilterStatus::StopIteration, state);
   EXPECT_EQ(1, cfg_->stats().tls_not_found_.value());
   const std::vector<uint64_t> bytes_processed =
       store_.histogramValues("tls_inspector.bytes_processed", false);

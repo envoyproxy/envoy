@@ -275,15 +275,9 @@ public:
     }
     return absl::nullopt;
   }
-  uint64_t requestBodyBufferLimit() const override {
-    // Return the new field if set, otherwise return the legacy field.
-    if (request_body_buffer_limit_ != std::numeric_limits<uint64_t>::max()) {
-      return request_body_buffer_limit_;
-    }
-    if (per_request_buffer_limit_ != std::numeric_limits<uint32_t>::max()) {
-      return static_cast<uint64_t>(per_request_buffer_limit_);
-    }
-    return std::numeric_limits<uint64_t>::max();
+  absl::optional<uint64_t> requestBodyBufferLimit() const { return request_body_buffer_limit_; }
+  absl::optional<uint32_t> legacyRequestBodyBufferLimit() const {
+    return per_request_buffer_limit_;
   }
 
   RouteSpecificFilterConfigs perFilterConfigs(absl::string_view) const override;
@@ -356,9 +350,9 @@ private:
   std::unique_ptr<envoy::config::route::v3::HedgePolicy> hedge_policy_;
   std::unique_ptr<const CatchAllVirtualCluster> virtual_cluster_catch_all_;
   RouteMetadataPackPtr metadata_;
+  const absl::optional<uint32_t> per_request_buffer_limit_;
+  const absl::optional<uint64_t> request_body_buffer_limit_;
   // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
-  uint32_t per_request_buffer_limit_{std::numeric_limits<uint32_t>::max()};
-  uint64_t request_body_buffer_limit_{std::numeric_limits<uint64_t>::max()};
   const bool include_attempt_count_in_request_ : 1;
   const bool include_attempt_count_in_response_ : 1;
   const bool include_is_timeout_retry_header_ : 1;
@@ -492,22 +486,25 @@ class RouteTracingImpl : public RouteTracing {
 public:
   explicit RouteTracingImpl(const envoy::config::route::v3::Tracing& tracing);
 
-  // Tracing::getClientSampling
+  // RouteTracing
   const envoy::type::v3::FractionalPercent& getClientSampling() const override;
-
-  // Tracing::getRandomSampling
   const envoy::type::v3::FractionalPercent& getRandomSampling() const override;
-
-  // Tracing::getOverallSampling
   const envoy::type::v3::FractionalPercent& getOverallSampling() const override;
-
   const Tracing::CustomTagMap& getCustomTags() const override;
+  OptRef<const Formatter::Formatter> operation() const override {
+    return makeOptRefFromPtr(operation_.get());
+  }
+  OptRef<const Formatter::Formatter> upstreamOperation() const override {
+    return makeOptRefFromPtr(upstream_operation_.get());
+  }
 
 private:
   envoy::type::v3::FractionalPercent client_sampling_;
   envoy::type::v3::FractionalPercent random_sampling_;
   envoy::type::v3::FractionalPercent overall_sampling_;
   Tracing::CustomTagMap custom_tags_;
+  Formatter::FormatterPtr operation_;
+  Formatter::FormatterPtr upstream_operation_;
 };
 
 /**
@@ -659,16 +656,7 @@ public:
   const PathMatcherSharedPtr& pathMatcher() const override { return path_matcher_; }
   const PathRewriterSharedPtr& pathRewriter() const override { return path_rewriter_; }
 
-  uint64_t requestBodyBufferLimit() const override {
-    // Return the new field if set, otherwise return the legacy field.
-    if (request_body_buffer_limit_ != std::numeric_limits<uint64_t>::max()) {
-      return request_body_buffer_limit_;
-    }
-    if (per_request_buffer_limit_ != std::numeric_limits<uint32_t>::max()) {
-      return static_cast<uint64_t>(per_request_buffer_limit_);
-    }
-    return std::numeric_limits<uint64_t>::max();
-  }
+  uint64_t requestBodyBufferLimit() const override { return request_body_buffer_limit_; }
   const std::vector<ShadowPolicyPtr>& shadowPolicies() const override { return shadow_policies_; }
   std::chrono::milliseconds timeout() const override { return timeout_; }
   bool usingNewTimeouts() const override { return using_new_timeouts_; }
@@ -919,17 +907,16 @@ private:
 
   const DecoratorConstPtr decorator_;
   const RouteTracingConstPtr route_tracing_;
-  Envoy::Config::DataSource::DataSourceProviderPtr direct_response_body_provider_;
+  Envoy::Config::DataSource::DataSourceProviderPtr<std::string> direct_response_body_provider_;
   Formatter::FormatterPtr direct_response_body_formatter_;
   std::unique_ptr<PerFilterConfigs> per_filter_configs_;
   const std::string route_name_;
   TimeSource& time_source_;
   EarlyDataPolicyPtr early_data_policy_;
 
-  // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
-  uint32_t per_request_buffer_limit_{std::numeric_limits<uint32_t>::max()};
-  uint64_t request_body_buffer_limit_{std::numeric_limits<uint64_t>::max()};
+  const uint64_t request_body_buffer_limit_{std::numeric_limits<uint64_t>::max()};
   const absl::optional<Http::Code> direct_response_code_;
+  // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
   const Http::Code cluster_not_found_response_code_;
   const Upstream::ResourcePriority priority_;
   const bool auto_host_rewrite_ : 1;

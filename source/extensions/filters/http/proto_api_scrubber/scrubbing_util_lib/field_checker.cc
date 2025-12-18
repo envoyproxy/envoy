@@ -65,6 +65,11 @@ std::string FieldChecker::constructFieldMask(const std::vector<std::string>& pat
 
 FieldCheckResults FieldChecker::CheckField(const std::vector<std::string>& path,
                                            const Protobuf::Field* field) const {
+  // If the field is unknown (i.e., not present in the descriptor), it should be preserved.
+  if (field == nullptr) {
+    return FieldCheckResults::kInclude;
+  }
+
   const std::string field_mask = constructFieldMask(path, field);
 
   MatchTreeHttpMatchingDataSharedPtr match_tree;

@@ -322,6 +322,11 @@ std::vector<std::string> EnvoyQuicClientSession::GetAlpnsToOffer() const {
                                    : configured_alpns_;
 }
 
+void EnvoyQuicClientSession::OnConfigNegotiated() {
+  received_custom_transport_parameters_ = config()->received_custom_transport_parameters();
+  quic::QuicSpdyClientSession::OnConfigNegotiated();
+}
+
 void EnvoyQuicClientSession::registerNetworkObserver(EnvoyQuicNetworkObserverRegistry& registry) {
   if (network_connectivity_observer_ == nullptr) {
     network_connectivity_observer_ = std::make_unique<QuicNetworkConnectivityObserverImpl>(*this);

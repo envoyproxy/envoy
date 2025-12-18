@@ -44,35 +44,37 @@ private:
   Event::TimerPtr selection_timer_;
 };
 
+class AsyncTlsFactory : public Ssl::TlsCertificateSelectorFactory {
+public:
+  AsyncTlsFactory(const std::string& mode, Stats::Scope& scope) : mode_(mode), scope_(scope) {}
+  Ssl::TlsCertificateSelectorPtr create(Ssl::TlsCertificateSelectorContext& selector_ctx) override {
+    return std::make_unique<AsyncTlsCertificateSelector>(scope_, selector_ctx, mode_);
+  };
+  absl::Status onConfigUpdate() override { return absl::OkStatus(); }
+
+private:
+  const std::string mode_;
+  Stats::Scope& scope_;
+};
+
 class AsyncTlsCertificateSelectorFactory : public Ssl::TlsCertificateSelectorConfigFactory {
 public:
-  Ssl::TlsCertificateSelectorFactory createTlsCertificateSelectorFactory(
-      const Protobuf::Message& config, Server::Configuration::CommonFactoryContext& factory_context,
-      ProtobufMessage::ValidationVisitor&, absl::Status& creation_status, bool for_quic) override {
+  absl::StatusOr<Ssl::TlsCertificateSelectorFactoryPtr>
+  createTlsCertificateSelectorFactory(const Protobuf::Message& config,
+                                      Server::Configuration::GenericFactoryContext& factory_context,
+                                      const Ssl::ServerContextConfig&, bool for_quic) override {
     if (for_quic) {
-      creation_status = absl::InvalidArgumentError("does not support for quic");
-      return Ssl::TlsCertificateSelectorFactory();
+      return absl::InvalidArgumentError("does not support for quic");
     }
 
-    std::string mode;
-    const Protobuf::Any* any_config = dynamic_cast<const Protobuf::Any*>(&config);
-    if (any_config) {
-      Protobuf::StringValue string_value;
-      if (any_config->UnpackTo(&string_value)) {
-        mode = string_value.value();
-      }
-    }
+    auto& string_value = dynamic_cast<const Protobuf::StringValue&>(config);
+    std::string mode = string_value.value();
     if (mode.empty()) {
-      creation_status = absl::InvalidArgumentError("invalid cert selection mode");
-      return Ssl::TlsCertificateSelectorFactory();
+      return absl::InvalidArgumentError("invalid cert selection mode");
     }
 
-    auto& scope = factory_context.scope();
-
-    return [mode, &scope](const Ssl::ServerContextConfig&,
-                          Ssl::TlsCertificateSelectorContext& selector_ctx) {
-      return std::make_unique<AsyncTlsCertificateSelector>(scope, selector_ctx, mode);
-    };
+    auto& scope = factory_context.serverFactoryContext().scope();
+    return std::make_unique<AsyncTlsFactory>(mode, scope);
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
