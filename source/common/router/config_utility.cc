@@ -101,22 +101,24 @@ ConfigUtility::CookieMatcher::CookieMatcher(const envoy::config::route::v3::Cook
 bool ConfigUtility::CookieMatcher::matches(
     const absl::optional<absl::string_view>& cookie_value) const {
   if (string_match_.has_value()) {
-    if (!cookie_value.has_value() && !treat_missing_as_empty_) {
-      return false;
+    const bool has_value = cookie_value.has_value() || treat_missing_as_empty_;
+    bool matched = false;
+    if (has_value) {
+      const absl::string_view value = cookie_value.value_or(EMPTY_STRING);
+      matched = string_match_->match(value);
     }
-    const absl::string_view value = cookie_value.value_or(EMPTY_STRING);
-    const bool matched = string_match_->match(value);
     return matched != invert_match_;
   }
 
   if (range_match_.has_value()) {
-    if (!cookie_value.has_value() && !treat_missing_as_empty_) {
-      return false;
+    const bool has_value = cookie_value.has_value() || treat_missing_as_empty_;
+    bool matched = false;
+    if (has_value) {
+      const absl::string_view value = cookie_value.value_or(EMPTY_STRING);
+      int64_t parsed_value = 0;
+      matched = absl::SimpleAtoi(value, &parsed_value) && parsed_value >= range_match_->start &&
+                parsed_value < range_match_->end;
     }
-    const absl::string_view value = cookie_value.value_or(EMPTY_STRING);
-    int64_t parsed_value = 0;
-    const bool matched = absl::SimpleAtoi(value, &parsed_value) &&
-                         parsed_value >= range_match_->start && parsed_value < range_match_->end;
     return matched != invert_match_;
   }
 
