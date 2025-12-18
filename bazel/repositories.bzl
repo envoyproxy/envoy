@@ -133,6 +133,7 @@ def envoy_dependencies(skip_targets = []):
     # Load both SSL backends - the actual one used is selected via --define=ssl=<boringssl|openssl>
     _boringssl()
     _boringssl_fips()
+    _aws_lc()
     _openssl()
 
     # Binding to an alias that selects between BoringSSL and OpenSSL via bssl-compat
