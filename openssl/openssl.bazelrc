@@ -1,0 +1,24 @@
+# This file is sourced from %workspace%/.bazelrc, and includes additional
+# configuration specific to building envoy on openssl/bssl-compat
+# Use with: bazel build --config=openssl ...
+
+# Select OpenSSL as the SSL backend instead of BoringSSL
+common:openssl --define=ssl=openssl
+
+# Define ENVOY_SSL_OPENSSL for preprocessor conditionals in source code
+build:openssl --copt=-DENVOY_SSL_OPENSSL
+build:openssl --host_copt=-DENVOY_SSL_OPENSSL
+
+test:openssl --test_env=ENVOY_IP_TEST_VERSIONS=v4only
+
+# As of today we do not support QUIC/HTTP3, hence we exclude it from the build, always.
+# Unfortunately, just setting //bazel:http3=False, is not enough to achieve this.
+# Instead, we also have to use boringssl=fips define and filter on the nofips tag.
+# This is based on the fact that the FIPS version of BoringSSL doesn't provide enough
+# of the functions required to build the QUIC implementation provided by Quiche i.e. if
+# we say that we are using the FIPS version of BoringSSL, then all the QUIC support is
+# excluded from the build.
+common:openssl --//bazel:http3=False
+common:openssl --define=boringssl=fips
+build:openssl --build_tag_filters=-nofips
+test:openssl --test_tag_filters=-nofips

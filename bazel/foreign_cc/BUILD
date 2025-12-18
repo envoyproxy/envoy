@@ -437,11 +437,10 @@ envoy_cmake(
 )
 
 envoy_cc_library(
-    name = "maxmind_linux_darwin",
+    name = "maxmind_linux",
     srcs = [],
     deps = select({
         "//bazel:linux": [":maxmind"],
-        "//bazel:darwin_any": [":maxmind"],
         "//conditions:default": [],
     }),
 )
