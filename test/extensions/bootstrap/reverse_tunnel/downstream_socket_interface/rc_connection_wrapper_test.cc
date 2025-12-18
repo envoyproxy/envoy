@@ -40,6 +40,7 @@ protected:
     EXPECT_CALL(context_, threadLocal()).WillRepeatedly(ReturnRef(thread_local_));
     EXPECT_CALL(context_, scope()).WillRepeatedly(ReturnRef(*stats_scope_));
     EXPECT_CALL(context_, clusterManager()).WillRepeatedly(ReturnRef(cluster_manager_));
+    EXPECT_CALL(thread_local_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
     // Set stat prefix to "reverse_connections" for tests.
     config_.set_stat_prefix("reverse_connections");
     // Enable detailed stats for tests that need per-node/cluster stats.
@@ -365,6 +366,31 @@ TEST_F(RCConnectionWrapperTest, OnHandshakeSuccess) {
   std::string host_stat_name = "test_scope.reverse_connections.host.192.168.1.1.connected";
   std::string cluster_stat_name = "test_scope.reverse_connections.cluster.test-cluster.connected";
 
+  // Handshake stats use labels (tags) for worker, cluster, result, and reason.
+  // Base stat name: reverse_connections.handshake (scope will add test_scope. prefix)
+  // Tags: worker=worker_0, cluster=test-cluster, result=success
+  auto& stats_scope = extension_->getStatsScope();
+  std::string base_stat_name = "reverse_connections.handshake";
+  Stats::StatNameManagedStorage stat_storage(base_stat_name, stats_scope.symbolTable());
+
+  // Create tags matching the success case.
+  Stats::StatNameTagVector tags;
+  Stats::StatNameManagedStorage worker_key_storage("worker", stats_scope.symbolTable());
+  Stats::StatNameManagedStorage worker_value_storage("worker_0", stats_scope.symbolTable());
+  tags.push_back({worker_key_storage.statName(), worker_value_storage.statName()});
+
+  Stats::StatNameManagedStorage cluster_key_storage("cluster", stats_scope.symbolTable());
+  Stats::StatNameManagedStorage cluster_value_storage("test-cluster", stats_scope.symbolTable());
+  tags.push_back({cluster_key_storage.statName(), cluster_value_storage.statName()});
+
+  Stats::StatNameManagedStorage result_key_storage("result", stats_scope.symbolTable());
+  Stats::StatNameManagedStorage result_value_storage("success", stats_scope.symbolTable());
+  tags.push_back({result_key_storage.statName(), result_value_storage.statName()});
+
+  auto& handshake_success_counter =
+      Stats::Utility::counterFromStatNames(stats_scope, {stat_storage.statName()}, tags);
+  uint64_t initial_handshake_success_count = handshake_success_counter.value();
+
   // Call onHandshakeSuccess.
   wrapper_ptr->onHandshakeSuccess();
 
@@ -374,6 +400,9 @@ TEST_F(RCConnectionWrapperTest, OnHandshakeSuccess) {
   // Verify that connected stats were incremented.
   EXPECT_EQ(final_stats[host_stat_name], initial_stats[host_stat_name] + 1);
   EXPECT_EQ(final_stats[cluster_stat_name], initial_stats[cluster_stat_name] + 1);
+
+  // Verify that handshake success stat was incremented.
+  EXPECT_EQ(handshake_success_counter.value(), initial_handshake_success_count + 1);
 }
 
 // Test RCConnectionWrapper::onHandshakeFailure method.
@@ -430,9 +459,38 @@ TEST_F(RCConnectionWrapperTest, OnHandshakeFailure) {
   std::string cluster_failed_stat_name =
       "test_scope.reverse_connections.cluster.test-cluster.failed";
 
-  // Call onHandshakeFailure with an error message.
-  std::string error_message = "Handshake failed due to authentication error";
-  wrapper_ptr->onHandshakeFailure(error_message);
+  // Handshake stats use labels (tags) for worker, cluster, result, and failure_reason.
+  // Base stat name: reverse_connections.handshake (scope will add test_scope. prefix)
+  // Tags: worker=worker_0, cluster=test-cluster, result=failed, failure_reason=http.401
+  auto& stats_scope = extension_->getStatsScope();
+  std::string base_stat_name = "reverse_connections.handshake";
+  Stats::StatNameManagedStorage stat_storage(base_stat_name, stats_scope.symbolTable());
+
+  // Create tags matching the failure case with HTTP 401.
+  Stats::StatNameTagVector tags;
+  Stats::StatNameManagedStorage worker_key_storage("worker", stats_scope.symbolTable());
+  Stats::StatNameManagedStorage worker_value_storage("worker_0", stats_scope.symbolTable());
+  tags.push_back({worker_key_storage.statName(), worker_value_storage.statName()});
+
+  Stats::StatNameManagedStorage cluster_key_storage("cluster", stats_scope.symbolTable());
+  Stats::StatNameManagedStorage cluster_value_storage("test-cluster", stats_scope.symbolTable());
+  tags.push_back({cluster_key_storage.statName(), cluster_value_storage.statName()});
+
+  Stats::StatNameManagedStorage result_key_storage("result", stats_scope.symbolTable());
+  Stats::StatNameManagedStorage result_value_storage("failed", stats_scope.symbolTable());
+  tags.push_back({result_key_storage.statName(), result_value_storage.statName()});
+
+  Stats::StatNameManagedStorage failure_reason_key_storage("failure_reason",
+                                                           stats_scope.symbolTable());
+  Stats::StatNameManagedStorage failure_reason_value_storage("http.401", stats_scope.symbolTable());
+  tags.push_back({failure_reason_key_storage.statName(), failure_reason_value_storage.statName()});
+
+  auto& handshake_failed_counter =
+      Stats::Utility::counterFromStatNames(stats_scope, {stat_storage.statName()}, tags);
+  uint64_t initial_handshake_failed_count = handshake_failed_counter.value();
+
+  // Call onHandshakeFailure with HTTP status error.
+  wrapper_ptr->onHandshakeFailure(HandshakeFailureReason::httpStatusError("401"));
 
   // Get stats after onHandshakeFailure.
   auto final_stats = extension_->getCrossWorkerStatMap();
@@ -440,6 +498,95 @@ TEST_F(RCConnectionWrapperTest, OnHandshakeFailure) {
   // Verify that failed stats were incremented.
   EXPECT_EQ(final_stats[host_failed_stat_name], initial_stats[host_failed_stat_name] + 1);
   EXPECT_EQ(final_stats[cluster_failed_stat_name], initial_stats[cluster_failed_stat_name] + 1);
+
+  // Verify that handshake failure stat was incremented.
+  EXPECT_EQ(handshake_failed_counter.value(), initial_handshake_failed_count + 1);
+}
+
+// Test RCConnectionWrapper::onHandshakeFailure method with EncodeError.
+TEST_F(RCConnectionWrapperTest, OnHandshakeFailureEncodeError) {
+  // Set up thread local slot first so stats can be properly tracked.
+  setupThreadLocalSlot();
+
+  // Set up mock thread local cluster.
+  auto mock_thread_local_cluster = std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster("test-cluster"))
+      .WillRepeatedly(Return(mock_thread_local_cluster.get()));
+
+  // Set up priority set with hosts.
+  auto mock_priority_set = std::make_shared<NiceMock<Upstream::MockPrioritySet>>();
+  EXPECT_CALL(*mock_thread_local_cluster, prioritySet())
+      .WillRepeatedly(ReturnRef(*mock_priority_set));
+
+  // Create host map with a host.
+  auto host_map = std::make_shared<Upstream::HostMap>();
+  auto mock_host = createMockHost("192.168.1.1");
+  (*host_map)["192.168.1.1"] = std::const_pointer_cast<Upstream::Host>(mock_host);
+
+  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap()).WillRepeatedly(Return(host_map));
+
+  // Create HostConnectionInfo entry.
+  addHostConnectionInfo("192.168.1.1", "test-cluster", 1);
+
+  auto mock_connection = setupMockConnection();
+  Upstream::MockHost::MockCreateConnectionData success_conn_data;
+  success_conn_data.connection_ = mock_connection.get();
+  success_conn_data.host_description_ = mock_host;
+
+  EXPECT_CALL(*mock_thread_local_cluster, tcpConn_(_)).WillOnce(Return(success_conn_data));
+
+  mock_connection.release();
+
+  // Call initiateOneReverseConnection to create the wrapper and add it to the map.
+  bool result = initiateOneReverseConnection("test-cluster", "192.168.1.1", mock_host);
+  EXPECT_TRUE(result);
+
+  // Verify wrapper was created and mapped.
+  const auto& connection_wrappers = getConnectionWrappers();
+  EXPECT_EQ(connection_wrappers.size(), 1);
+
+  const auto& wrapper_to_host_map = getConnWrapperToHostMap();
+  EXPECT_EQ(wrapper_to_host_map.size(), 1);
+
+  RCConnectionWrapper* wrapper_ptr = connection_wrappers[0].get();
+  EXPECT_EQ(wrapper_to_host_map.at(wrapper_ptr), "192.168.1.1");
+
+  // Handshake stats use labels (tags) for worker, cluster, result, and failure_reason.
+  // Base stat name: reverse_connections.handshake (scope will add test_scope. prefix)
+  // Tags: worker=worker_0, cluster=test-cluster, result=failed, failure_reason=encode_error
+  auto& stats_scope = extension_->getStatsScope();
+  std::string base_stat_name = "reverse_connections.handshake";
+  Stats::StatNameManagedStorage stat_storage(base_stat_name, stats_scope.symbolTable());
+
+  // Create tags matching the encode error failure case.
+  Stats::StatNameTagVector tags;
+  Stats::StatNameManagedStorage worker_key_storage("worker", stats_scope.symbolTable());
+  Stats::StatNameManagedStorage worker_value_storage("worker_0", stats_scope.symbolTable());
+  tags.push_back({worker_key_storage.statName(), worker_value_storage.statName()});
+
+  Stats::StatNameManagedStorage cluster_key_storage("cluster", stats_scope.symbolTable());
+  Stats::StatNameManagedStorage cluster_value_storage("test-cluster", stats_scope.symbolTable());
+  tags.push_back({cluster_key_storage.statName(), cluster_value_storage.statName()});
+
+  Stats::StatNameManagedStorage result_key_storage("result", stats_scope.symbolTable());
+  Stats::StatNameManagedStorage result_value_storage("failed", stats_scope.symbolTable());
+  tags.push_back({result_key_storage.statName(), result_value_storage.statName()});
+
+  Stats::StatNameManagedStorage failure_reason_key_storage("failure_reason",
+                                                           stats_scope.symbolTable());
+  Stats::StatNameManagedStorage failure_reason_value_storage("encode_error",
+                                                             stats_scope.symbolTable());
+  tags.push_back({failure_reason_key_storage.statName(), failure_reason_value_storage.statName()});
+
+  auto& handshake_failed_counter =
+      Stats::Utility::counterFromStatNames(stats_scope, {stat_storage.statName()}, tags);
+  uint64_t initial_handshake_failed_count = handshake_failed_counter.value();
+
+  // Call onHandshakeFailure with EncodeError.
+  wrapper_ptr->onHandshakeFailure(HandshakeFailureReason::encodeError());
+
+  // Verify that handshake failure stat was incremented.
+  EXPECT_EQ(handshake_failed_counter.value(), initial_handshake_failed_count + 1);
 }
 
 // Test RCConnectionWrapper::onEvent method with RemoteClose event.

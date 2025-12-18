@@ -39,7 +39,7 @@ using AllMuxes = ThreadSafeSingleton<AllMuxesState>;
 
 template <class S, class F, class RQ, class RS>
 GrpcMuxImpl<S, F, RQ, RS>::GrpcMuxImpl(std::unique_ptr<F> subscription_state_factory,
-                                       GrpcMuxContext& grpc_mux_context, bool skip_subsequent_node)
+                                       GrpcMuxContext& grpc_mux_context)
     : dispatcher_(grpc_mux_context.dispatcher_),
       grpc_stream_(createGrpcStreamObject(std::move(grpc_mux_context.async_client_),
                                           std::move(grpc_mux_context.failover_async_client_),
@@ -47,7 +47,8 @@ GrpcMuxImpl<S, F, RQ, RS>::GrpcMuxImpl(std::unique_ptr<F> subscription_state_fac
                                           std::move(grpc_mux_context.backoff_strategy_),
                                           grpc_mux_context.rate_limit_settings_)),
       subscription_state_factory_(std::move(subscription_state_factory)),
-      skip_subsequent_node_(skip_subsequent_node), local_info_(grpc_mux_context.local_info_),
+      skip_subsequent_node_(grpc_mux_context.skip_subsequent_node_),
+      local_info_(grpc_mux_context.local_info_),
       dynamic_update_callback_handle_(
           grpc_mux_context.local_info_.contextProvider().addDynamicContextUpdateCallback(
               [this](absl::string_view resource_type_url) {
@@ -458,9 +459,9 @@ template class GrpcMuxImpl<SotwSubscriptionState, SotwSubscriptionStateFactory,
                            envoy::service::discovery::v3::DiscoveryResponse>;
 
 // Delta- and SotW-specific concrete subclasses:
-GrpcMuxDelta::GrpcMuxDelta(GrpcMuxContext& grpc_mux_context, bool skip_subsequent_node)
+GrpcMuxDelta::GrpcMuxDelta(GrpcMuxContext& grpc_mux_context)
     : GrpcMuxImpl(std::make_unique<DeltaSubscriptionStateFactory>(grpc_mux_context.dispatcher_),
-                  grpc_mux_context, skip_subsequent_node) {}
+                  grpc_mux_context) {}
 
 // GrpcStreamCallbacks for GrpcMuxDelta
 void GrpcMuxDelta::requestOnDemandUpdate(const std::string& type_url,
@@ -473,9 +474,9 @@ void GrpcMuxDelta::requestOnDemandUpdate(const std::string& type_url,
   }
 }
 
-GrpcMuxSotw::GrpcMuxSotw(GrpcMuxContext& grpc_mux_context, bool skip_subsequent_node)
+GrpcMuxSotw::GrpcMuxSotw(GrpcMuxContext& grpc_mux_context)
     : GrpcMuxImpl(std::make_unique<SotwSubscriptionStateFactory>(grpc_mux_context.dispatcher_),
-                  grpc_mux_context, skip_subsequent_node) {}
+                  grpc_mux_context) {}
 
 Config::GrpcMuxWatchPtr NullGrpcMuxImpl::addWatch(const std::string&,
                                                   const absl::flat_hash_set<std::string>&,
@@ -519,9 +520,9 @@ public:
         (use_eds_resources_cache &&
          Runtime::runtimeFeatureEnabled("envoy.restart_features.use_eds_cache_for_ads"))
             ? std::make_unique<EdsResourcesCacheImpl>(dispatcher)
-            : nullptr};
-    return std::make_shared<GrpcMuxDelta>(grpc_mux_context,
-                                          ads_config.set_node_on_first_message_only());
+            : nullptr,
+        /*skip_subsequent_node_=*/ads_config.set_node_on_first_message_only()};
+    return std::make_shared<GrpcMuxDelta>(grpc_mux_context);
   }
 };
 
@@ -559,9 +560,9 @@ public:
         (use_eds_resources_cache &&
          Runtime::runtimeFeatureEnabled("envoy.restart_features.use_eds_cache_for_ads"))
             ? std::make_unique<EdsResourcesCacheImpl>(dispatcher)
-            : nullptr};
-    return std::make_shared<GrpcMuxSotw>(grpc_mux_context,
-                                         ads_config.set_node_on_first_message_only());
+            : nullptr,
+        /*skip_subsequent_node_=*/ads_config.set_node_on_first_message_only()};
+    return std::make_shared<GrpcMuxSotw>(grpc_mux_context);
   }
 };
 
