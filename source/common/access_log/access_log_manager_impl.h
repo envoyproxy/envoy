@@ -38,8 +38,8 @@ public:
   AccessLogManagerImpl(std::chrono::milliseconds file_flush_interval_msec,
                        uint64_t min_flush_size_kb, Api::Api& api, Event::Dispatcher& dispatcher,
                        Thread::BasicLockable& lock, Stats::Store& stats_store)
-      : file_flush_interval_msec_(file_flush_interval_msec), min_flush_size_kb_(min_flush_size_kb),
-        api_(api), dispatcher_(dispatcher), lock_(lock),
+      : file_flush_interval_msec_(file_flush_interval_msec),
+        file_min_flush_size_kb_(min_flush_size_kb), api_(api), dispatcher_(dispatcher), lock_(lock),
         file_stats_{ACCESS_LOG_FILE_STATS(POOL_COUNTER_PREFIX(stats_store, "filesystem."),
                                           POOL_GAUGE_PREFIX(stats_store, "filesystem."))} {}
   ~AccessLogManagerImpl() override;
@@ -51,7 +51,7 @@ public:
 
 private:
   const std::chrono::milliseconds file_flush_interval_msec_;
-  const uint64_t min_flush_size_kb_;
+  const uint64_t file_min_flush_size_kb_;
   Api::Api& api_;
   Event::Dispatcher& dispatcher_;
   Thread::BasicLockable& lock_;
@@ -89,8 +89,6 @@ private:
   void doWrite(Buffer::Instance& buffer);
   void flushThreadFunc();
   void createFlushStructures();
-
-  static const uint64_t MIN_FLUSH_SIZE = 1024 * 64;
 
   Filesystem::FilePtr file_;
 

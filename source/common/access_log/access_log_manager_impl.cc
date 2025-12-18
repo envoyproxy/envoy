@@ -47,9 +47,9 @@ AccessLogManagerImpl::createAccessLog(const Filesystem::FilePathAndType& file_in
                                                   open_result.err_->getErrorDetails()));
   }
 
-  access_logs_[file_name] =
-      std::make_shared<AccessLogFileImpl>(std::move(file), dispatcher_, lock_, file_stats_,
-                                          file_flush_interval_msec_, api_.threadFactory());
+  access_logs_[file_name] = std::make_shared<AccessLogFileImpl>(
+      std::move(file), dispatcher_, lock_, file_stats_, file_flush_interval_msec_,
+      file_min_flush_size_kb_, api_.threadFactory());
   return access_logs_[file_name];
 }
 
@@ -216,7 +216,7 @@ void AccessLogFileImpl::write(absl::string_view data) {
   stats_.write_buffered_.inc();
   stats_.write_total_buffered_.add(data.length());
   flush_buffer_.add(data.data(), data.size());
-  if (flush_buffer_.length() > MIN_FLUSH_SIZE) {
+  if (flush_buffer_.length() > min_flush_size_) {
     flush_event_.notifyOne();
   }
 }
