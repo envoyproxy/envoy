@@ -1,0 +1,58 @@
+#!/bin/bash
+
+set -euo pipefail
+
+uncomment.sh "$1" --comment -h \
+  --sed '/#include <openssl\/base\.h>/a#include <ossl/openssl/stack.h>' \
+  --uncomment-macro STACK_OF \
+  --uncomment-macro DECLARE_STACK_OF \
+  --uncomment-macro DEFINE_NAMED_STACK_OF \
+  --uncomment-macro DEFINE_STACK_OF \
+  --uncomment-macro DEFINE_CONST_STACK_OF \
+  --uncomment-regex 'template <typename Stack>'\
+  --uncomment-regex 'namespace internal {' 'template <typename T>' 'struct StackTraits \{\};' '}' \
+  --uncomment-macro BORINGSSL_DEFINE_STACK_TRAITS \
+  --uncomment-macro BORINGSSL_DEFINE_STACK_OF_IMPL \
+  --uncomment-struct DeleterImpl \
+  --uncomment-struct DeleterImpl \
+  --uncomment-class StackIteratorImpl \
+  --uncomment-using StackIterator \
+  --uncomment-regex-range 'inline std::enable_if_t.*' '}' \
+  --uncomment-regex-range 'inline .*StackIterator.*begin' '}' \
+  --uncomment-regex-range 'inline .*StackIterator.*end' '}' \
+  --uncomment-regex '}$' \
+  --uncomment-regex 'namespace internal {' \
+  --uncomment-regex '}  // namespace internal' \
+  --uncomment-typedef OPENSSL_sk_free_func \
+  --uncomment-typedef OPENSSL_sk_copy_func \
+  --uncomment-typedef OPENSSL_sk_cmp_func \
+  --uncomment-typedef OPENSSL_sk_call_free_func \
+  --uncomment-typedef OPENSSL_sk_call_copy_func \
+  --uncomment-typedef OPENSSL_sk_call_cmp_func \
+  --uncomment-typedef OPENSSL_sk_delete_if_func \
+  --uncomment-func-decl OPENSSL_sk_deep_copy \
+  --uncomment-func-decl OPENSSL_sk_num \
+  --uncomment-func-decl OPENSSL_sk_pop_free_ex \
+  --uncomment-func-decl OPENSSL_sk_push \
+  --uncomment-func-decl OPENSSL_sk_pop \
+  --uncomment-func-decl OPENSSL_sk_new_null \
+  --uncomment-func-decl OPENSSL_sk_value \
+  --uncomment-func-decl OPENSSL_sk_set \
+  --uncomment-func-decl OPENSSL_sk_free \
+  --uncomment-func-decl OPENSSL_sk_delete \
+  --uncomment-func-decl OPENSSL_sk_delete_ptr \
+  --uncomment-func-decl OPENSSL_sk_new \
+  --uncomment-func-decl OPENSSL_sk_insert \
+  --uncomment-func-decl OPENSSL_sk_is_sorted \
+  --uncomment-func-decl OPENSSL_sk_dup \
+  --uncomment-func-decl OPENSSL_sk_find \
+  --uncomment-func-decl OPENSSL_sk_set_cmp_func \
+  --uncomment-func-decl OPENSSL_sk_shift \
+  --uncomment-func-decl OPENSSL_sk_sort \
+  --uncomment-func-decl OPENSSL_sk_zero \
+  --uncomment-func-decl sk_new_null \
+  --uncomment-func-decl sk_num \
+  --uncomment-func-decl sk_value \
+  --uncomment-func-decl sk_free \
+  --uncomment-macro OPENSSL_STACK \
+  --uncomment-macro _STACK \

@@ -1,0 +1,34 @@
+name: OpenSSL testing
+
+permissions:
+  contents: read
+
+on:
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+
+jobs:
+  openssl:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    permissions:
+      contents: read
+      packages: read
+    steps:
+    - name: Free disk space
+      uses: envoyproxy/toolshed/actions/diskspace@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
+    - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
+    - run: |
+        ./ci/run_envoy_docker.sh './ci/do_ci.sh dev //test/...'
+      env:
+        BAZEL_BUILD_EXTRA_OPTIONS: >-
+          --config=rbe
+          --config=bes
+          --config=remote-ci
+          --config=openssl
+        ENVOY_RBE: 1
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
