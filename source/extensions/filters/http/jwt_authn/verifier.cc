@@ -367,9 +367,9 @@ JwtProviderList getAllProvidersAsList(const Protobuf::Map<std::string, JwtProvid
   return list;
 }
 
-class ExtractOnlyVerifierImpl : public BaseVerifierImpl {
+class ExtractOnlyWithoutValidationVerifierImpl : public BaseVerifierImpl {
 public:
-  ExtractOnlyVerifierImpl(const AuthFactory& factory, const JwtProviderList& providers,
+  ExtractOnlyWithoutValidationVerifierImpl(const AuthFactory& factory, const JwtProviderList& providers,
                           const BaseVerifierImpl* parent)
       : BaseVerifierImpl(parent), auth_factory_(factory), extractor_(Extractor::create(providers)) {
     ENVOY_LOG(info,
@@ -441,8 +441,8 @@ VerifierConstPtr innerCreate(const JwtRequirement& requirement,
   case JwtRequirement::RequiresTypeCase::kAllowMissing:
     return std::make_unique<AllowMissingVerifierImpl>(factory, getAllProvidersAsList(providers),
                                                       parent);
-  case JwtRequirement::RequiresTypeCase::kExtractOnly:
-    return std::make_unique<ExtractOnlyVerifierImpl>(factory, getAllProvidersAsList(providers),
+  case JwtRequirement::RequiresTypeCase::kExtractOnlyWithoutValidationWithoutValidation:
+    return std::make_unique<ExtractOnlyWithoutValidationVerifierImpl>(factory, getAllProvidersAsList(providers),
                                                      parent);
   case JwtRequirement::RequiresTypeCase::REQUIRES_TYPE_NOT_SET:
     return std::make_unique<AllowAllVerifierImpl>(parent);

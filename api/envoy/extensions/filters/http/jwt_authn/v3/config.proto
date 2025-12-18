@@ -619,11 +619,11 @@ message JwtRequirement {
     // * Validate the (issuer) claim
     // * Validate the (audience) claim
     // * Check not-before time (nbf claim)
-    ExtractOnly extract_only = 7;
+    ExtractOnlyWithoutValidation extract_only_without_validation = 7;
   }
 }
 
-message ExtractOnly {
+message ExtractOnlyWithoutValidation {
   // Reserved for future extensions (e.g., claim filtering, logging options)
 }
 
