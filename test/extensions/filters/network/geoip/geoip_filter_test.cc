@@ -1,6 +1,7 @@
 #include "envoy/extensions/filters/network/geoip/v3/geoip.pb.h"
 
 #include "source/common/network/address_impl.h"
+#include "source/common/router/string_accessor_impl.h"
 #include "source/common/stream_info/filter_state_impl.h"
 #include "source/extensions/filters/network/geoip/geoip_filter.h"
 
@@ -8,6 +9,7 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/stats/mocks.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
@@ -85,6 +87,12 @@ public:
 
   void expectStatsTotalIncremented(const uint32_t n_total = 1) {
     EXPECT_CALL(stats_, counter("prefix.geoip.total")).Times(n_total);
+  }
+
+  void setFilterStateClientIp(const std::string& key, const std::string& ip) {
+    filter_state_->setData(key, std::make_shared<Router::StringAccessorImpl>(ip),
+                           StreamInfo::FilterState::StateType::Mutable,
+                           StreamInfo::FilterState::LifeSpan::Connection);
   }
 
   NiceMock<Stats::MockStore> stats_;
@@ -282,6 +290,183 @@ TEST_F(GeoipFilterTest, AsyncCallbackStoresFilterState) {
 
   // Verify GeoipInfo was stored after async callback.
   EXPECT_THAT(filter_state_, HasGeoField("x-geo-city", "AsyncCity"));
+}
+
+TEST_F(GeoipFilterTest, UsesClientIpFromFilterStateWhenConfigured) {
+  initializeProviderFactory();
+  const std::string config_yaml = R"EOF(
+    provider:
+        name: "envoy.geoip_providers.dummy"
+        typed_config:
+          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
+    client_ip_filter_state_config:
+        filter_state_key: "my.custom.client.ip"
+)EOF";
+  initializeFilter(config_yaml);
+
+  // Set the connection remote address (this should be ignored).
+  Network::Address::InstanceConstSharedPtr remote_address =
+      Network::Utility::parseInternetAddressNoThrow("1.2.3.4");
+  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      remote_address);
+
+  // Set the client IP in filter state (this should be used).
+  setFilterStateClientIp("my.custom.client.ip", "5.6.7.8");
+
+  expectStatsTotalIncremented();
+  EXPECT_CALL(*dummy_driver_, lookup(HasRemoteAddress("5.6.7.8:0"), _))
+      .WillOnce([](Geolocation::LookupRequest&&, Geolocation::LookupGeoHeadersCallback&& cb) {
+        cb(Geolocation::LookupResult{{"x-geo-city", "FilterStateCity"}});
+      });
+
+  EXPECT_LOG_CONTAINS("debug", "geoip: using client IP '5.6.7.8' from filter state key",
+                      EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection()));
+
+  EXPECT_THAT(filter_state_, HasGeoField("x-geo-city", "FilterStateCity"));
+}
+
+TEST_F(GeoipFilterTest, UsesClientIpFromFilterStateWithIpv6) {
+  initializeProviderFactory();
+  const std::string config_yaml = R"EOF(
+    provider:
+        name: "envoy.geoip_providers.dummy"
+        typed_config:
+          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
+    client_ip_filter_state_config:
+        filter_state_key: "my.custom.client.ip"
+)EOF";
+  initializeFilter(config_yaml);
+
+  // Set the connection remote address (this should be ignored).
+  Network::Address::InstanceConstSharedPtr remote_address =
+      Network::Utility::parseInternetAddressNoThrow("1.2.3.4");
+  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      remote_address);
+
+  // Set an IPv6 client IP in filter state.
+  setFilterStateClientIp("my.custom.client.ip", "2001:db8::1");
+
+  expectStatsTotalIncremented();
+  EXPECT_CALL(*dummy_driver_, lookup(HasRemoteAddress("[2001:db8::1]:0"), _))
+      .WillOnce([](Geolocation::LookupRequest&&, Geolocation::LookupGeoHeadersCallback&& cb) {
+        cb(Geolocation::LookupResult{{"x-geo-city", "IPv6City"}});
+      });
+
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+  EXPECT_THAT(filter_state_, HasGeoField("x-geo-city", "IPv6City"));
+}
+
+TEST_F(GeoipFilterTest, FallsBackToConnectionAddressWhenFilterStateKeyNotFound) {
+  initializeProviderFactory();
+  const std::string config_yaml = R"EOF(
+    provider:
+        name: "envoy.geoip_providers.dummy"
+        typed_config:
+          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
+    client_ip_filter_state_config:
+        filter_state_key: "my.custom.client.ip"
+)EOF";
+  initializeFilter(config_yaml);
+
+  // Set the connection remote address (this should be used as fallback).
+  Network::Address::InstanceConstSharedPtr remote_address =
+      Network::Utility::parseInternetAddressNoThrow("1.2.3.4");
+  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      remote_address);
+
+  // Do NOT set any filter state - key will not be found.
+
+  expectStatsTotalIncremented();
+  EXPECT_CALL(*dummy_driver_, lookup(HasRemoteAddress("1.2.3.4:0"), _))
+      .WillOnce([](Geolocation::LookupRequest&&, Geolocation::LookupGeoHeadersCallback&& cb) {
+        cb(Geolocation::LookupResult{{"x-geo-city", "FallbackCity"}});
+      });
+
+  EXPECT_LOG_CONTAINS("debug",
+                      "geoip: filter state key 'my.custom.client.ip' not found, falling back",
+                      EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection()));
+
+  EXPECT_THAT(filter_state_, HasGeoField("x-geo-city", "FallbackCity"));
+}
+
+TEST_F(GeoipFilterTest, FallsBackToConnectionAddressWhenFilterStateValueIsInvalidIp) {
+  initializeProviderFactory();
+  const std::string config_yaml = R"EOF(
+    provider:
+        name: "envoy.geoip_providers.dummy"
+        typed_config:
+          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
+    client_ip_filter_state_config:
+        filter_state_key: "my.custom.client.ip"
+)EOF";
+  initializeFilter(config_yaml);
+
+  // Set the connection remote address (this should be used as fallback).
+  Network::Address::InstanceConstSharedPtr remote_address =
+      Network::Utility::parseInternetAddressNoThrow("1.2.3.4");
+  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      remote_address);
+
+  // Set an invalid IP in filter state.
+  setFilterStateClientIp("my.custom.client.ip", "not-a-valid-ip");
+
+  expectStatsTotalIncremented();
+  EXPECT_CALL(*dummy_driver_, lookup(HasRemoteAddress("1.2.3.4:0"), _))
+      .WillOnce([](Geolocation::LookupRequest&&, Geolocation::LookupGeoHeadersCallback&& cb) {
+        cb(Geolocation::LookupResult{{"x-geo-city", "FallbackCity"}});
+      });
+
+  EXPECT_LOG_CONTAINS("debug",
+                      "geoip: failed to parse IP address 'not-a-valid-ip' from filter state key",
+                      EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection()));
+
+  EXPECT_THAT(filter_state_, HasGeoField("x-geo-city", "FallbackCity"));
+}
+
+TEST_F(GeoipFilterTest, UsesConnectionAddressWhenNoFilterStateConfigured) {
+  initializeProviderFactory();
+  // Config without client_ip_filter_state_config.
+  const std::string config_yaml = R"EOF(
+    provider:
+        name: "envoy.geoip_providers.dummy"
+        typed_config:
+          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
+)EOF";
+  initializeFilter(config_yaml);
+
+  // Verify that clientIpFilterStateKey is not set.
+  EXPECT_FALSE(config_->clientIpFilterStateKey().has_value());
+
+  Network::Address::InstanceConstSharedPtr remote_address =
+      Network::Utility::parseInternetAddressNoThrow("1.2.3.4");
+  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      remote_address);
+
+  expectStatsTotalIncremented();
+  EXPECT_CALL(*dummy_driver_, lookup(HasRemoteAddress("1.2.3.4:0"), _))
+      .WillOnce([](Geolocation::LookupRequest&&, Geolocation::LookupGeoHeadersCallback&& cb) {
+        cb(Geolocation::LookupResult{{"x-geo-city", "ConnectionCity"}});
+      });
+
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+  EXPECT_THAT(filter_state_, HasGeoField("x-geo-city", "ConnectionCity"));
+}
+
+TEST_F(GeoipFilterTest, ClientIpFilterStateConfigAccessor) {
+  initializeProviderFactory();
+  const std::string config_yaml = R"EOF(
+    provider:
+        name: "envoy.geoip_providers.dummy"
+        typed_config:
+          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
+    client_ip_filter_state_config:
+        filter_state_key: "test.key"
+)EOF";
+  initializeFilter(config_yaml);
+
+  // Verify the accessor returns the correct value.
+  EXPECT_TRUE(config_->clientIpFilterStateKey().has_value());
+  EXPECT_EQ("test.key", config_->clientIpFilterStateKey().value());
 }
 
 } // namespace

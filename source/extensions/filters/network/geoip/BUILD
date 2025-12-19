@@ -17,9 +17,11 @@ envoy_cc_library(
     deps = [
         "//envoy/geoip:geoip_provider_driver_interface",
         "//envoy/network:filter_interface",
+        "//envoy/router:string_accessor_interface",
         "//envoy/stream_info:filter_state_interface",
         "//source/common/common:assert_lib",
         "//source/common/json:json_loader_lib",
+        "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/stats:symbol_table_lib",
         "@envoy_api//envoy/extensions/filters/network/geoip/v3:pkg_cc_proto",

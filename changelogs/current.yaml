@@ -495,6 +495,11 @@ new_features:
     Added :ref:`custom_header_config <envoy_v3_api_field_extensions.filters.http.geoip.v3.Geoip.custom_header_config>`
     to allow extracting the client IP address from a custom request header which can be used instead of
     ``x-forwarded-for`` header or downstream connection source address.
+- area: geoip
+  change: |
+    Added :ref:`client_ip_filter_state_config <envoy_v3_api_field_extensions.filters.network.geoip.v3.Geoip.client_ip_filter_state_config>`
+    to the network geoip filter, enabling dynamic client IP override via filter state. This allows preceding
+    filters to set the client IP address (e.g., extracted from PROXY protocol) for geolocation lookups.
 - area: ext_authz
   change: |
     Added support for :ref:`metadata_context_namespaces

@@ -4,6 +4,7 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/json/json_loader.h"
+#include "source/common/network/utility.h"
 #include "source/common/protobuf/utility.h"
 
 namespace Envoy {
@@ -34,10 +35,16 @@ StreamInfo::FilterState::Object::FieldType GeoipInfo::getField(absl::string_view
   return absl::monostate{};
 }
 
-GeoipFilterConfig::GeoipFilterConfig(const envoy::extensions::filters::network::geoip::v3::Geoip&,
-                                     const std::string& stat_prefix, Stats::Scope& scope)
+GeoipFilterConfig::GeoipFilterConfig(
+    const envoy::extensions::filters::network::geoip::v3::Geoip& config,
+    const std::string& stat_prefix, Stats::Scope& scope)
     : scope_(scope), stat_name_set_(scope.symbolTable().makeSet("Geoip")),
-      stats_prefix_(stat_name_set_->add(stat_prefix + "geoip")) {
+      stats_prefix_(stat_name_set_->add(stat_prefix + "geoip")),
+      client_ip_filter_state_key_(
+          config.has_client_ip_filter_state_config()
+              ? absl::make_optional<std::string>(
+                    config.client_ip_filter_state_config().filter_state_key())
+              : absl::nullopt) {
   stat_name_set_->rememberBuiltin("total");
 }
 
@@ -50,8 +57,42 @@ GeoipFilter::GeoipFilter(GeoipFilterConfigSharedPtr config, Geolocation::DriverS
     : config_(std::move(config)), driver_(std::move(driver)) {}
 
 Network::FilterStatus GeoipFilter::onNewConnection() {
-  auto remote_address = read_callbacks_->connection().connectionInfoProvider().remoteAddress();
   ASSERT(driver_, "No driver is available to perform geolocation lookup.");
+
+  Network::Address::InstanceConstSharedPtr remote_address;
+
+  // Check if a filter state key is configured for dynamic client IP override.
+  const auto& filter_state_key = config_->clientIpFilterStateKey();
+  if (filter_state_key.has_value()) {
+    const Router::StringAccessor* client_ip_filter_state =
+        read_callbacks_->connection()
+            .streamInfo()
+            .filterState()
+            ->getDataReadOnly<Router::StringAccessor>(filter_state_key.value());
+
+    if (client_ip_filter_state != nullptr) {
+      const std::string ip_string(client_ip_filter_state->asString());
+      remote_address = Network::Utility::parseInternetAddressNoThrow(ip_string);
+      if (remote_address != nullptr) {
+        ENVOY_LOG(debug, "geoip: using client IP '{}' from filter state key '{}'", ip_string,
+                  filter_state_key.value());
+      } else {
+        ENVOY_LOG(debug,
+                  "geoip: failed to parse IP address '{}' from filter state key '{}', "
+                  "falling back to connection remote address",
+                  ip_string, filter_state_key.value());
+      }
+    } else {
+      ENVOY_LOG(debug,
+                "geoip: filter state key '{}' not found, falling back to connection remote address",
+                filter_state_key.value());
+    }
+  }
+
+  // Fall back to the downstream connection remote address if no filter state override is available.
+  if (remote_address == nullptr) {
+    remote_address = read_callbacks_->connection().connectionInfoProvider().remoteAddress();
+  }
 
   // Capture weak_ptr to GeoipFilter so that filter can be safely accessed in the posted callback.
   // This protects against the case when filter gets deleted before the callback is run
