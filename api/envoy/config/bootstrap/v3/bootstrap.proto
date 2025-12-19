@@ -37,7 +37,7 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/config/bootstr
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Bootstrap]
-// This proto is supplied via the ``-c`` CLI flag and acts as the root
+// This proto is supplied via the :option:`-c` CLI flag and acts as the root
 // of the Envoy v3 configuration. See the :ref:`v3 configuration overview
 // <config_overview_bootstrap>` for more detail.
 
@@ -92,8 +92,8 @@ message Bootstrap {
 
     // A single :ref:`ADS <config_overview_ads>` source may be optionally
     // specified. This must have :ref:`api_type
-    // <envoy_v3_api_field_config.core.v3.ApiConfigSource.api_type>` set to ``GRPC
-    // <envoy_v3_api_enum_value_config.core.v3.ApiConfigSource.ApiType.GRPC>``. Only
+    // <envoy_v3_api_field_config.core.v3.ApiConfigSource.api_type>` :ref:`GRPC
+    // <envoy_v3_api_enum_value_config.core.v3.ApiConfigSource.ApiType.GRPC>`. Only
     // :ref:`ConfigSources <envoy_v3_api_msg_config.core.v3.ConfigSource>` that have
     // the :ref:`ads <envoy_v3_api_field_config.core.v3.ConfigSource.ads>` field set will be
     // streamed on the ADS channel.
@@ -106,19 +106,19 @@ message Bootstrap {
         option (validate.required) = true;
 
         // Flush application logs in JSON format. The configured JSON struct can
-        // support all the format flags specified in the ``--log-format``
+        // support all the format flags specified in the :option:`--log-format`
         // command line options section, except for the ``%v`` and ``%_`` flags.
         google.protobuf.Struct json_format = 1;
 
         // Flush application log in a format defined by a string. The text format
-        // can support all the format flags specified in the ``--log-format``
+        // can support all the format flags specified in the :option:`--log-format`
         // command line option section.
         string text_format = 2;
       }
     }
 
     // Optional field to set the application logs format. If this field is set, it will override
-    // the default log format. Setting both this field and ``--log-format`` command line
+    // the default log format. Setting both this field and :option:`--log-format` command line
     // option is not allowed, and will cause a bootstrap error.
     LogFormat log_format = 1;
   }
@@ -510,7 +510,7 @@ message ClusterManager {
   // <envoy_v3_api_msg_config.cluster.v3.Cluster>` must be defined in the :ref:`Bootstrap
   // static cluster resources
   // <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.StaticResources.clusters>`. This is unrelated to
-  // the ``--service-cluster`` option which does not `affect zone aware
+  // the :option:`--service-cluster` option which does not `affect zone aware
   // routing <https://github.com/envoyproxy/envoy/issues/774>`_.
   string local_cluster_name = 1;
 
@@ -523,8 +523,8 @@ message ClusterManager {
 
   // A management server endpoint to stream load stats to via
   // ``StreamLoadStats``. This must have :ref:`api_type
-  // <envoy_v3_api_field_config.core.v3.ApiConfigSource.api_type>` set to ``GRPC
-  // <envoy_v3_api_enum_value_config.core.v3.ApiConfigSource.ApiType.GRPC>``.
+  // <envoy_v3_api_field_config.core.v3.ApiConfigSource.api_type>` :ref:`GRPC
+  // <envoy_v3_api_enum_value_config.core.v3.ApiConfigSource.ApiType.GRPC>`.
   core.v3.ApiConfigSource load_stats_config = 4;
 
   // Whether the ClusterManager will create clusters on the worker threads
