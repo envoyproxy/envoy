@@ -11,14 +11,15 @@ namespace Upstream {
 
 namespace {
 
-envoy::service::load_stats::v3::LoadStatsRequest MakeRequestTemplate(const LocalInfo::LocalInfo& local_info) {
+envoy::service::load_stats::v3::LoadStatsRequest
+MakeRequestTemplate(const LocalInfo::LocalInfo& local_info) {
   envoy::service::load_stats::v3::LoadStatsRequest request;
   request.mutable_node()->MergeFrom(local_info.node());
   request.mutable_node()->add_client_features("envoy.lrs.supports_send_all_clusters");
   return request;
 }
 
-}
+} // namespace
 
 LoadStatsReporter::LoadStatsReporter(const LocalInfo::LocalInfo& local_info,
                                      ClusterManager& cluster_manager, Stats::Scope& scope,
@@ -29,8 +30,7 @@ LoadStatsReporter::LoadStatsReporter(const LocalInfo::LocalInfo& local_info,
       async_client_(std::move(async_client)),
       service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "envoy.service.load_stats.v3.LoadReportingService.StreamLoadStats")),
-      request_template_(MakeRequestTemplate(local_info)),
-      time_source_(dispatcher.timeSource()) {
+      request_template_(MakeRequestTemplate(local_info)), time_source_(dispatcher.timeSource()) {
   retry_timer_ = dispatcher.createTimer([this]() -> void {
     stats_.retries_.inc();
     establishNewStream();
@@ -72,7 +72,8 @@ void LoadStatsReporter::sendLoadStatsRequest() {
   // added to the cluster manager. When we get the notification, we record the current time in
   // clusters_ as the start time for the load reporting window for that cluster.
   Envoy::Protobuf::Arena arena;
-  auto* request = Envoy::Protobuf::Arena::Create<envoy::service::load_stats::v3::LoadStatsRequest>(&arena);
+  auto* request =
+      Envoy::Protobuf::Arena::Create<envoy::service::load_stats::v3::LoadStatsRequest>(&arena);
   request->MergeFrom(request_template_);
   for (const auto& cluster_name_and_timestamp : clusters_) {
     const std::string& cluster_name = cluster_name_and_timestamp.first;
