@@ -28,14 +28,14 @@ UpstreamSocketManager::UpstreamSocketManager(Event::Dispatcher& dispatcher,
   ping_timer_ = dispatcher_.createTimer([this]() { pingConnections(); });
 
   // Register this socket manager instance for rebalancing.
-  absl::WriterMutexLock lock(&UpstreamSocketManager::socket_manager_lock);
+  absl::WriterMutexLock lock(UpstreamSocketManager::socket_manager_lock);
   UpstreamSocketManager::socket_managers_.push_back(this);
 }
 
 UpstreamSocketManager&
 UpstreamSocketManager::pickLeastLoadedSocketManager(const std::string& node_id,
                                                     const std::string& cluster_id) {
-  absl::WriterMutexLock wlock(&UpstreamSocketManager::socket_manager_lock);
+  absl::WriterMutexLock wlock(UpstreamSocketManager::socket_manager_lock);
 
   // Assume that this worker is the best candidate for sending the reverse.
   // connection socket.
@@ -471,8 +471,14 @@ void UpstreamSocketManager::pingConnections(const std::string& node_id) {
 
 void UpstreamSocketManager::pingConnections() {
   ENVOY_LOG(trace, "reverse_tunnel: pinging connections.");
-  for (auto& itr : accepted_reverse_connections_) {
-    pingConnections(itr.first);
+  // If the last socket for a node errors out the map entry is cleared. So we cant use normal for
+  // loops.
+  for (auto itr = accepted_reverse_connections_.begin();
+       itr != accepted_reverse_connections_.end();) {
+    auto next = std::next(itr);
+
+    pingConnections(itr->first);
+    itr = next;
   }
   ping_timer_->enableTimer(ping_interval_);
 }
@@ -528,7 +534,7 @@ UpstreamSocketManager::~UpstreamSocketManager() {
   }
 
   // Remove this instance from the global socket managers list.
-  absl::WriterMutexLock lock(&UpstreamSocketManager::socket_manager_lock);
+  absl::WriterMutexLock lock(UpstreamSocketManager::socket_manager_lock);
   auto it = std::find(socket_managers_.begin(), socket_managers_.end(), this);
   if (it != socket_managers_.end()) {
     socket_managers_.erase(it);

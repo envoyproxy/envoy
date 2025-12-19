@@ -1,8 +1,5 @@
 #pragma once
 
-#include <chrono>
-#include <cstdint>
-#include <memory>
 #include <string>
 
 #include "envoy/config/core/v3/base.pb.h"
@@ -25,9 +22,11 @@
 #include "source/extensions/filters/common/ext_proc/client_base.h"
 #include "source/extensions/filters/common/mutation_rules/mutation_rules.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
+#include "source/extensions/filters/http/ext_proc/allowed_override_modes_set.h"
 #include "source/extensions/filters/http/ext_proc/client_impl.h"
 #include "source/extensions/filters/http/ext_proc/matching_utils.h"
 #include "source/extensions/filters/http/ext_proc/on_processing_response.h"
+#include "source/extensions/filters/http/ext_proc/processing_effect.h"
 #include "source/extensions/filters/http/ext_proc/processing_request_modifier.h"
 #include "source/extensions/filters/http/ext_proc/processor_state.h"
 
@@ -51,7 +50,8 @@ namespace ExternalProcessing {
   COUNTER(clear_route_cache_ignored)                                                               \
   COUNTER(clear_route_cache_disabled)                                                              \
   COUNTER(clear_route_cache_upstream_ignored)                                                      \
-  COUNTER(http_not_ok_resp_received)
+  COUNTER(http_not_ok_resp_received)                                                               \
+  COUNTER(immediate_responses_sent)
 
 struct ExtProcFilterStats {
   ALL_EXT_PROC_FILTER_STATS(GENERATE_COUNTER_STRUCT)
@@ -91,11 +91,27 @@ public:
     std::unique_ptr<GrpcCallBody> body_stats_;
   };
 
+  struct ProcessingEffects {
+    ProcessingEffect::Effect header_effect_;
+    ProcessingEffect::Effect body_effect_;
+    ProcessingEffect::Effect trailer_effect_;
+  };
+
   using GrpcCalls = struct GrpcCallStats;
 
   void recordGrpcCall(std::chrono::microseconds latency, Grpc::Status::GrpcStatus call_status,
                       ProcessorState::CallbackState callback_state,
                       envoy::config::core::v3::TrafficDirection traffic_direction);
+  void recordGrpcStatusBeforeFirstCall(Grpc::Status::GrpcStatus call_status) {
+    grpc_status_before_first_call_ = call_status;
+  }
+  Grpc::Status::GrpcStatus getGrpcStatusBeforeFirstCall() const {
+    return grpc_status_before_first_call_;
+  }
+
+  void recordProcessingEffect(ProcessorState::CallbackState callback_state,
+                              envoy::config::core::v3::TrafficDirection traffic_direction,
+                              ProcessingEffect::Effect processing_effect);
   void setBytesSent(uint64_t bytes_sent) { bytes_sent_ = bytes_sent; }
   void setBytesReceived(uint64_t bytes_received) { bytes_received_ = bytes_received; }
   void setClusterInfo(absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info) {
@@ -121,6 +137,7 @@ public:
   Upstream::ClusterInfoConstSharedPtr clusterInfo() const { return cluster_info_; }
   Upstream::HostDescriptionConstSharedPtr upstreamHost() const { return upstream_host_; }
   const GrpcCalls& grpcCalls(envoy::config::core::v3::TrafficDirection traffic_direction) const;
+  ProcessingEffects& processingEffects(envoy::config::core::v3::TrafficDirection traffic_direction);
   const Envoy::Protobuf::Struct& filterMetadata() const { return filter_metadata_; }
   const std::string& httpResponseCodeDetails() const { return http_response_code_details_; }
 
@@ -136,6 +153,8 @@ private:
   GrpcCalls& grpcCalls(envoy::config::core::v3::TrafficDirection traffic_direction);
   GrpcCalls decoding_processor_grpc_calls_;
   GrpcCalls encoding_processor_grpc_calls_;
+  ProcessingEffects encoding_processor_effects_{};
+  ProcessingEffects decoding_processor_effects_{};
   const Envoy::Protobuf::Struct filter_metadata_;
   // The following stats are populated for ext_proc filters using Envoy gRPC only.
   // The bytes sent and received are for the entire stream.
@@ -144,6 +163,8 @@ private:
   Upstream::HostDescriptionConstSharedPtr upstream_host_;
   // The status details of the underlying HTTP/2 stream. Envoy gRPC only.
   std::string http_response_code_details_;
+  // The gRPC status when the openStream() operation fails.
+  Grpc::Status::GrpcStatus grpc_status_before_first_call_ = Grpc::Status::Ok;
 };
 
 class ThreadLocalStreamManager;
@@ -270,9 +291,15 @@ public:
     return typed_cluster_metadata_forwarding_namespaces_;
   }
 
-  const std::vector<envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>&
-  allowedOverrideModes() const {
-    return allowed_override_modes_;
+  /*
+   * Returns true if there are no allowed_override_modes defined, or if defined
+   * then one of them matches the given input.
+   *
+   * @param mode the processing mode that needs to be explicitly defined.
+   */
+  bool isAllowedOverrideMode(
+      const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode& mode) const {
+    return allowed_override_modes_.empty() || allowed_override_modes_.isModeSupported(mode);
   }
 
   ThreadLocalStreamManager& threadLocalStreamManager() {
@@ -346,8 +373,7 @@ private:
   const std::vector<std::string> untyped_receiving_namespaces_;
   const std::vector<std::string> untyped_cluster_metadata_forwarding_namespaces_;
   const std::vector<std::string> typed_cluster_metadata_forwarding_namespaces_;
-  const std::vector<envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>
-      allowed_override_modes_;
+  const AllowedOverrideModesSet allowed_override_modes_;
   const ExpressionManager expression_manager_;
 
   const std::function<std::unique_ptr<ProcessingRequestModifier>()>
@@ -548,6 +574,7 @@ private:
   void closeStream();
   void halfCloseAndWaitForRemoteClose();
 
+  void recordGrpcStatusBeforeFirstCall(Grpc::Status::GrpcStatus call_status);
   void onFinishProcessorCalls(Grpc::Status::GrpcStatus call_status);
   void clearAsyncState(Grpc::Status::GrpcStatus call_status = Grpc::Status::Aborted);
   void sendImmediateResponse(const envoy::service::ext_proc::v3::ImmediateResponse& response);

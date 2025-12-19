@@ -66,7 +66,7 @@ protected:
       descriptor_set: { }
       restrictions: {
         method_restrictions: {
-          key: "/library.BookService/GetBook"
+          key: "/apikeys.ApiKeys/CreateApiKey"
           value: {
             request_field_restrictions: {
               key: "debug_info"
@@ -201,7 +201,7 @@ protected:
         R"pb(
         restrictions: {
           method_restrictions: {
-            key: "/library.BookService/GetBook"
+            key: "/apikeys.ApiKeys/CreateApiKey"
             value: {
               response_field_restrictions: {
                 key: "%s"
@@ -225,7 +225,7 @@ protected:
     std::string filter_conf_string = absl::StrFormat(R"pb(
       restrictions: {
         method_restrictions: {
-          key: "/library.BookService/GetBook"
+          key: "/apikeys.ApiKeys/CreateApiKey"
           value: {
             request_field_restrictions: {
               key: "debug_info"
@@ -392,7 +392,7 @@ protected:
       descriptor_set : {}
       restrictions: {
         method_restrictions: {
-          key: "/library.BookService/GetBook"
+          key: "/apikeys.ApiKeys/CreateApiKey"
           value: {
             method_restriction: {
               matcher: {
@@ -510,7 +510,7 @@ TEST_F(ProtoApiScrubberFilterConfigTest, MatchTreeValidation) {
     // The match expression in hardcoded to `true` for `debug_info` which should result in a match
     // and a corresponding action named `RemoveFieldAction`.
     match_tree =
-        filter_config_->getRequestFieldMatcher("/library.BookService/GetBook", "debug_info");
+        filter_config_->getRequestFieldMatcher("/apikeys.ApiKeys/CreateApiKey", "debug_info");
     ASSERT_NE(match_tree, nullptr);
     EXPECT_THAT(
         match_tree->match(http_matching_data_impl),
@@ -522,7 +522,7 @@ TEST_F(ProtoApiScrubberFilterConfigTest, MatchTreeValidation) {
     // The match expression in hardcoded to `false` for `book.debug_info` which should result in
     // no match.
     match_tree =
-        filter_config_->getResponseFieldMatcher("/library.BookService/GetBook", "book.debug_info");
+        filter_config_->getResponseFieldMatcher("/apikeys.ApiKeys/CreateApiKey", "book.debug_info");
     ASSERT_NE(match_tree, nullptr);
     EXPECT_THAT(match_tree->match(http_matching_data_impl), HasNoMatch());
   }
@@ -542,14 +542,14 @@ TEST_F(ProtoApiScrubberFilterConfigTest, MatchTreeValidation) {
 
   {
     // Validate invalid field mask for request field matchers.
-    match_tree = filter_config_->getRequestFieldMatcher("/library.BookService/GetBook",
+    match_tree = filter_config_->getRequestFieldMatcher("/apikeys.ApiKeys/CreateApiKey",
                                                         "non.existent.field.mask");
     ASSERT_EQ(match_tree, nullptr);
   }
 
   {
     // Validate invalid field mask for response field matchers.
-    match_tree = filter_config_->getResponseFieldMatcher("/library.BookService/GetBook",
+    match_tree = filter_config_->getResponseFieldMatcher("/apikeys.ApiKeys/CreateApiKey",
                                                          "non.existent.field.mask");
     ASSERT_EQ(match_tree, nullptr);
   }
@@ -814,8 +814,18 @@ TEST_F(ProtoApiScrubberFilterConfigTest, MethodNameValidations) {
   }
 
   {
+    // Valid format, but method does not exist in the loaded descriptor.
     filter_config = ProtoApiScrubberFilterConfig::create(
         getConfigWithMethodName("/library.BookService/GetBook"), factory_context_);
+    EXPECT_EQ(filter_config.status().code(), absl::StatusCode::kInvalidArgument);
+    EXPECT_THAT(filter_config.status().message(),
+                testing::HasSubstr("The method is not found in the descriptor pool."));
+  }
+
+  {
+    // Valid format and method exists in descriptor.
+    filter_config = ProtoApiScrubberFilterConfig::create(
+        getConfigWithMethodName("/apikeys.ApiKeys/CreateApiKey"), factory_context_);
     EXPECT_EQ(filter_config.status().code(), absl::StatusCode::kOk);
     EXPECT_EQ(filter_config.status().message(), "");
   }
@@ -904,41 +914,6 @@ TEST_F(ProtoApiScrubberFilterConfigTest, FilteringModeValidations) {
     EXPECT_EQ(filter_config.status().code(), absl::StatusCode::kInvalidArgument);
     EXPECT_EQ(filter_config.status().message(),
               "Error encountered during config initialization. Unsupported 'filtering_mode': .");
-  }
-}
-
-TEST_F(ProtoApiScrubberFilterConfigTest, MatcherInputTypeValidations) {
-  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  absl::StatusOr<std::shared_ptr<const ProtoApiScrubberFilterConfig>> filter_config;
-
-  {
-    EXPECT_THROW_WITH_MESSAGE(
-        filter_config = ProtoApiScrubberFilterConfig::create(
-            getConfigWithInputType(
-                "type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput"),
-            factory_context),
-        EnvoyException,
-        "Unsupported data input type: string. The matcher supports input type: cel_data_input");
-  }
-
-  {
-    EXPECT_THROW_WITH_MESSAGE(
-        filter_config = ProtoApiScrubberFilterConfig::create(
-            getConfigWithInputType(
-                "type.googleapis.com/"
-                "envoy.extensions.matching.common_inputs.network.v3.ServerNameInput"),
-            factory_context),
-        EnvoyException,
-        "Unsupported data input type: string. The matcher supports input type: cel_data_input");
-  }
-
-  {
-    filter_config = ProtoApiScrubberFilterConfig::create(
-        getConfigWithInputType(
-            "type.googleapis.com/xds.type.matcher.v3.HttpAttributesCelMatchInput"),
-        factory_context);
-    EXPECT_EQ(filter_config.status().code(), absl::StatusCode::kOk);
-    EXPECT_EQ(filter_config.status().message(), "");
   }
 }
 
@@ -1120,7 +1095,7 @@ TEST_F(ProtoApiScrubberFilterConfigTest, ParseMethodLevelRestriction) {
   NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
   Http::Matching::HttpMatchingDataImpl http_matching_data_impl(mock_stream_info);
 
-  auto matcher1 = filter_config_->getMethodMatcher("/library.BookService/GetBook");
+  auto matcher1 = filter_config_->getMethodMatcher("/apikeys.ApiKeys/CreateApiKey");
   ASSERT_NE(matcher1, nullptr);
   EXPECT_THAT(
       matcher1->match(http_matching_data_impl),
@@ -1175,7 +1150,7 @@ TEST_F(ProtoApiScrubberFilterConfigTest, UnsupportedActionType) {
     descriptor_set: {}
     restrictions: {
       method_restrictions: {
-        key: "/library.BookService/GetBook"
+        key: "/apikeys.ApiKeys/CreateApiKey"
         value: {
           request_field_restrictions: {
             key: "debug_info"

@@ -1,0 +1,85 @@
+name: Copilot Setup Steps
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+    - .github/workflows/copilot-setup-steps.yml
+  pull_request:
+    paths:
+    - .github/workflows/copilot-setup-steps.yml
+
+jobs:
+  copilot-setup-steps:
+    runs-on: ubuntu-22.04
+    steps:
+    - name: Manual Cleanup
+      run: |
+        sudo rm -rf /usr/local/lib/android &
+        sudo rm -rf /usr/share/dotnet &
+    - name: Checkout code
+      uses: actions/checkout@v5
+    - name: Install deps
+      shell: bash
+      run: |
+       sudo apt-get -qq update --error-on=any
+       sudo apt-get -qq install --yes \
+           libtool libtinfo5 automake autoconf curl unzip mkcert libnss3-tools
+    - name: Bazel setup
+      run: |
+        mkcert -install
+        java_home=$(dirname $(dirname $(readlink -f $(which java))))
+        cacerts_file="${java_home}/lib/security/cacerts"
+        cp "$cacerts_file" /tmp/custom-cacerts
+        chmod 644 /tmp/custom-cacerts
+        keytool -importcert -noprompt -trustcacerts \
+          -alias mkcert_root \
+          -file $(mkcert -CAROOT)/rootCA.pem \
+          -keystore /tmp/custom-cacerts \
+          -storepass changeit
+        echo "startup --host_jvm_args=-Djavax.net.ssl.trustStore=/tmp/custom-cacerts" > user.bazelrc
+        echo "startup --host_jvm_args=-Djavax.net.ssl.trustStorePassword=changeit" >> user.bazelrc
+        echo "startup --output_user_root=/build/bazel_root" >> user.bazelrc
+        echo "startup --output_base=/build/bazel_root/base" >> user.bazelrc
+        # Download bazelisk
+        arch=$([ $(uname -m) = "aarch64" ] && echo "arm64" || echo "amd64")
+        sudo wget -O /usr/local/bin/bazel \
+          https://github.com/bazelbuild/bazelisk/releases/latest/download/bazelisk-linux-${arch}
+        sudo chmod +x /usr/local/bin/bazel
+        sudo mkdir -p /build/bazel_root
+        sudo chown -R runner:runner /build
+        # Create a helper script to fix truststore as mkcert CA changes when copilot starts
+        cat > /tmp/fix-bazel-truststore.sh << 'SCRIPT_EOF'
+        #!/bin/bash
+        set -e
+        echo "Checking if mkcert CA certificate in truststore needs updating..."
+        mkcert_fingerprint=$(openssl x509 -in $(mkcert -CAROOT)/rootCA.pem -noout -fingerprint -sha256 | cut -d= -f2)
+        truststore_fingerprint=$(keytool -list \
+          -keystore /tmp/custom-cacerts -storepass changeit \
+          -alias mkcert_root 2>/dev/null | grep "SHA-256" | sed 's/.*SHA-256): //')
+        if [ "$mkcert_fingerprint" != "$truststore_fingerprint" ]; then
+            echo "Fingerprints don't match. Updating truststore..."
+            echo "  Current mkcert CA: $mkcert_fingerprint"
+            echo "  In truststore:     $truststore_fingerprint"
+            keytool -delete -alias mkcert_root -keystore /tmp/custom-cacerts -storepass changeit 2>/dev/null || true
+            keytool -importcert -noprompt -trustcacerts \
+              -alias mkcert_root \
+              -file $(mkcert -CAROOT)/rootCA.pem \
+              -keystore /tmp/custom-cacerts \
+              -storepass changeit
+            echo "Truststore updated. Restarting Bazel..."
+            bazel shutdown 2>/dev/null || true
+            echo "Done!"
+        else
+            echo "Truststore is up to date."
+        fi
+        SCRIPT_EOF
+        chmod +x /tmp/fix-bazel-truststore.sh
+        echo "Created /tmp/fix-bazel-truststore.sh helper script"
+    - name: Bazel
+      run: |
+        bazel shutdown
+        bazel --version

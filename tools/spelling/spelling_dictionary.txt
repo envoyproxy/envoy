@@ -10,6 +10,7 @@ PUBSUB
 RANDOMKEY
 SLOWLOG
 addrlen
+defragmentation
 evictable
 flushdb
 itr
@@ -221,6 +222,7 @@ dereferencing
 deprioritized
 differentially
 dnsresolvers
+eb
 endpos
 eps
 fo
@@ -305,6 +307,7 @@ ingressed
 integrations
 iouring
 jkl
+keyspace
 lang
 libcurl
 libsxg
@@ -744,6 +747,7 @@ deduplicate
 deduplicates
 deduplication
 deflater
+defragmenting
 deletable
 deleter
 delim
@@ -827,6 +831,7 @@ faceplant
 facto
 failover
 fallbacks
+fanout
 fastbuild
 favicon
 fbs
@@ -1597,6 +1602,7 @@ routable
 vhosts
 infos
 ElastiCache
+Parametrized
 pinterest
 callouts
 streamable

@@ -275,3 +275,66 @@ namespace. In addition, the following statistics are tracked in this namespace:
      :widths: 1, 2
 
      key_rotation_failed, Total number of filesystem key rotations that failed outside of an SDS update.
+
+On-demand certificates
+----------------------
+
+By default SDS certificate fetching blocks initialization of the listeners and the clusters that
+reference them. In some cases, it is preferable to accept connections without having the SDS secret
+and request the certificate on-demand using the peer hello message fields, such as SNI, to derive
+the secret name. This is useful for multi-tenant deployments, where a single listener or an upstream
+cluster can present a variety of certificates to the peer. Envoy provides an :ref:`on-demand
+certificate selector <extension_envoy.tls.certificate_selectors.on_demand_secret>` that pauses the
+TLS handshake to issue an SDS request for a certificate if not present, and then continues the
+handshake after receiving the response. For example, the following downstream TLS context
+configuration uses the SNI field as the secret name in the SDS request:
+
+.. validated-code-block:: yaml
+  :type-name: envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext"
+
+  common_tls_context:
+    custom_tls_certificate_selector:
+      name: on-demand
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_selectors.on_demand_secret.v3.Config
+        config_source:
+          api_config_source:
+            api_type: DELTA_GRPC
+            grpc_services:
+            - envoy_grpc:
+                cluster_name: some_xds_cluster
+        certificate_mapper:
+          name: sni
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.sni.v3.SNI
+            default_value: "default_host"
+        # Starts fetching the secret prior to any requests.
+        prefetch_secret_names:
+        - default_host
+  disable_stateless_session_resumption: true
+  disable_stateful_session_resumption: true
+
+A certificate obtained via the on-demand SDS is configured the same way as a regular TLS certificate
+defined in the context, e.g. all parent settings are applied. If there is a dynamic update to the
+parent TLS context, e.g. a validation context SDS update, on-demand certificates also receive it and
+get updated.
+
+On-demand SDS should be used with DELTA_GRPC to manage the deletion of the secrets from the data
+plane. A resource removal sent via the xDS response will cancel the data plane subscription for the
+specific secret name.
+
+In addition to the standard SDS `subscription statistics <subscription_statistics>`, the following
+statistics are produced by the on-demand certificate extension. For downstream listeners, they are
+in the *listener.<stat_prefix>.on_demand_secret.* namespace.
+
+.. csv-table::
+     :header: Name, Type, Description
+     :widths: 1, 1, 2
+
+     cert_requested, Counter, Total number of new SDS subscriptions created
+     cert_updated, Counter, Total number of certificate updates
+     cert_active, Gauge, Number of active certificate subscriptions and certificates
+
+.. note::
+
+    Session resumption is currently not supported for on-demand certificates.

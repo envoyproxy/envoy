@@ -633,6 +633,9 @@ public:
   absl::string_view requestedServerName() const override {
     return StreamInfoImpl::downstreamAddressProvider().requestedServerName();
   }
+  const std::vector<std::string>& requestedApplicationProtocols() const override {
+    return StreamInfoImpl::downstreamAddressProvider().requestedApplicationProtocols();
+  }
   absl::optional<uint64_t> connectionID() const override {
     return StreamInfoImpl::downstreamAddressProvider().connectionID();
   }
@@ -801,6 +804,11 @@ public:
 
   // Possibly increases buffer_limit_ to the value of limit.
   void setBufferLimit(uint64_t limit);
+
+  /**
+   * @return uint64_t the current buffer limit.
+   */
+  uint64_t bufferLimit() const { return buffer_limit_; }
 
   /**
    * @return bool whether any above high watermark triggers are currently active
