@@ -433,7 +433,7 @@ const absl::string_view ClusterImplBase::DropOverloadRuntimeKey =
 // a single copy of the stat name into a thread-local key->index map so that the lock can be avoided
 // and using the index as the key to the stat map instead.
 void LoadMetricStatsImpl::add(const absl::string_view key, double value) {
-  absl::MutexLock lock(&mu_);
+  absl::MutexLock lock(mu_);
   if (map_ == nullptr) {
     map_ = std::make_unique<StatMap>();
   }
@@ -443,7 +443,7 @@ void LoadMetricStatsImpl::add(const absl::string_view key, double value) {
 }
 
 LoadMetricStats::StatMapPtr LoadMetricStatsImpl::latch() {
-  absl::MutexLock lock(&mu_);
+  absl::MutexLock lock(mu_);
   StatMapPtr latched = std::move(map_);
   map_ = nullptr;
   return latched;

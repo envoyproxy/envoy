@@ -58,7 +58,8 @@ ClientContextImpl::ClientContextImpl(Stats::Scope& scope,
                                      const Envoy::Ssl::ClientContextConfig& config,
                                      Server::Configuration::CommonFactoryContext& factory_context,
                                      absl::Status& creation_status)
-    : ContextImpl(scope, config, factory_context, nullptr /* additional_init */, creation_status),
+    : ContextImpl(scope, config, config.tlsCertificates(), factory_context,
+                  nullptr /* additional_init */, creation_status),
       server_name_indication_(config.serverNameIndication()),
       auto_host_sni_(config.autoHostServerNameIndication()),
       allow_renegotiation_(config.allowRenegotiation()),
@@ -161,7 +162,7 @@ ClientContextImpl::newSsl(const Network::TransportSocketOptionsConstSharedPtr& o
   if (max_session_keys_ > 0) {
     if (session_keys_single_use_) {
       // Stored single-use session keys, use write/write locks.
-      absl::WriterMutexLock l(&session_keys_mu_);
+      absl::WriterMutexLock l(session_keys_mu_);
       if (!session_keys_.empty()) {
         // Use the most recently stored session key, since it has the highest
         // probability of still being recognized/accepted by the server.
@@ -174,7 +175,7 @@ ClientContextImpl::newSsl(const Network::TransportSocketOptionsConstSharedPtr& o
       }
     } else {
       // Never stored single-use session keys, use read/write locks.
-      absl::ReaderMutexLock l(&session_keys_mu_);
+      absl::ReaderMutexLock l(session_keys_mu_);
       if (!session_keys_.empty()) {
         // Use the most recently stored session key, since it has the highest
         // probability of still being recognized/accepted by the server.
@@ -193,7 +194,7 @@ int ClientContextImpl::newSessionKey(SSL_SESSION* session) {
   if (SSL_SESSION_should_be_single_use(session)) {
     session_keys_single_use_ = true;
   }
-  absl::WriterMutexLock l(&session_keys_mu_);
+  absl::WriterMutexLock l(session_keys_mu_);
   // Evict oldest entries.
   while (session_keys_.size() >= max_session_keys_) {
     session_keys_.pop_back();

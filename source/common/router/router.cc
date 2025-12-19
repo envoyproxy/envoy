@@ -976,8 +976,7 @@ uint64_t Filter::calculateEffectiveBufferLimit() const {
 
 bool Filter::isEarlyConnectData() {
   return downstream_headers_ != nullptr && Http::HeaderUtility::isConnect(*downstream_headers_) &&
-         !downstream_response_started_ &&
-         Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reject_early_connect_data");
+         !downstream_response_started_ && reject_early_connect_data_enabled_;
 }
 
 Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {

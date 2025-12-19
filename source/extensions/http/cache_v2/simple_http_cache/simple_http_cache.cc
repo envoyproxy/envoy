@@ -109,28 +109,28 @@ void InsertContext::onTrailers(Http::ResponseTrailerMapPtr trailers, EndStream e
 } // namespace
 
 Buffer::InstancePtr SimpleHttpCache::Entry::body(AdjustedByteRange range) const {
-  absl::ReaderMutexLock lock(&mu_);
+  absl::ReaderMutexLock lock(mu_);
   return std::make_unique<Buffer::OwnedImpl>(
       absl::string_view{body_}.substr(range.begin(), range.length()));
 }
 
 void SimpleHttpCache::Entry::appendBody(Buffer::InstancePtr buf) {
-  absl::WriterMutexLock lock(&mu_);
+  absl::WriterMutexLock lock(mu_);
   body_ += buf->toString();
 }
 
 uint64_t SimpleHttpCache::Entry::bodySize() const {
-  absl::ReaderMutexLock lock(&mu_);
+  absl::ReaderMutexLock lock(mu_);
   return body_.size();
 }
 
 Http::ResponseHeaderMapPtr SimpleHttpCache::Entry::copyHeaders() const {
-  absl::ReaderMutexLock lock(&mu_);
+  absl::ReaderMutexLock lock(mu_);
   return Http::createHeaderMap<Http::ResponseHeaderMapImpl>(*response_headers_);
 }
 
 Http::ResponseTrailerMapPtr SimpleHttpCache::Entry::copyTrailers() const {
-  absl::ReaderMutexLock lock(&mu_);
+  absl::ReaderMutexLock lock(mu_);
   if (!trailers_) {
     return nullptr;
   }
@@ -138,24 +138,24 @@ Http::ResponseTrailerMapPtr SimpleHttpCache::Entry::copyTrailers() const {
 }
 
 ResponseMetadata SimpleHttpCache::Entry::metadata() const {
-  absl::ReaderMutexLock lock(&mu_);
+  absl::ReaderMutexLock lock(mu_);
   return metadata_;
 }
 
 void SimpleHttpCache::Entry::updateHeadersAndMetadata(Http::ResponseHeaderMapPtr response_headers,
                                                       ResponseMetadata metadata) {
-  absl::WriterMutexLock lock(&mu_);
+  absl::WriterMutexLock lock(mu_);
   response_headers_ = std::move(response_headers);
   metadata_ = std::move(metadata);
 }
 
 void SimpleHttpCache::Entry::setTrailers(Http::ResponseTrailerMapPtr trailers) {
-  absl::WriterMutexLock lock(&mu_);
+  absl::WriterMutexLock lock(mu_);
   trailers_ = std::move(trailers);
 }
 
 void SimpleHttpCache::Entry::setEndStreamAfterBody() {
-  absl::WriterMutexLock lock(&mu_);
+  absl::WriterMutexLock lock(mu_);
   end_stream_after_body_ = true;
 }
 
@@ -168,7 +168,7 @@ CacheInfo SimpleHttpCache::cacheInfo() const {
 void SimpleHttpCache::lookup(LookupRequest&& request, LookupCallback&& callback) {
   LookupResult result;
   {
-    absl::ReaderMutexLock lock(&mu_);
+    absl::ReaderMutexLock lock(mu_);
     auto it = entries_.find(request.key());
     if (it != entries_.end()) {
       result.cache_reader_ = std::make_unique<SimpleHttpCacheReader>(it->second);
@@ -182,14 +182,14 @@ void SimpleHttpCache::lookup(LookupRequest&& request, LookupCallback&& callback)
 }
 
 void SimpleHttpCache::evict(Event::Dispatcher&, const Key& key) {
-  absl::WriterMutexLock lock(&mu_);
+  absl::WriterMutexLock lock(mu_);
   entries_.erase(key);
 }
 
 void SimpleHttpCache::updateHeaders(Event::Dispatcher&, const Key& key,
                                     const Http::ResponseHeaderMap& updated_headers,
                                     const ResponseMetadata& updated_metadata) {
-  absl::WriterMutexLock lock(&mu_);
+  absl::WriterMutexLock lock(mu_);
   auto it = entries_.find(key);
   if (it == entries_.end()) {
     return;
@@ -204,7 +204,7 @@ void SimpleHttpCache::insert(Event::Dispatcher&, Key key, Http::ResponseHeaderMa
   auto entry = std::make_shared<Entry>(Http::createHeaderMap<Http::ResponseHeaderMapImpl>(*headers),
                                        std::move(metadata));
   {
-    absl::WriterMutexLock lock(&mu_);
+    absl::WriterMutexLock lock(mu_);
     entries_.emplace(key, entry);
   }
   if (source) {
