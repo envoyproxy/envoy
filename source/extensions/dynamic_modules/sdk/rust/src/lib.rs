@@ -2576,7 +2576,7 @@ impl EnvoyHttpFilterImpl {
     // At this point, we assume at least one value is present.
     results.push(unsafe { EnvoyBuffer::new_from_raw(result_ptr, result_size) });
     // So, we iterate from 1 to count - 1.
-    for i in 1..count {
+    for i in 1 .. count {
       let mut result_ptr: *const u8 = std::ptr::null();
       let mut result_size: usize = 0;
       unsafe {
@@ -3363,14 +3363,13 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
       return (Vec::new(), 0);
     }
 
-    let mut buffers: Vec<abi::envoy_dynamic_module_type_envoy_buffer> =
-      vec![
-        abi::envoy_dynamic_module_type_envoy_buffer {
-          ptr: std::ptr::null_mut(),
-          length: 0,
-        };
-        size
-      ];
+    let mut buffers: Vec<abi::envoy_dynamic_module_type_envoy_buffer> = vec![
+      abi::envoy_dynamic_module_type_envoy_buffer {
+        ptr: std::ptr::null_mut(),
+        length: 0,
+      };
+      size
+    ];
     let total_length = unsafe {
       abi::envoy_dynamic_module_callback_network_filter_get_read_buffer_slices(
         self.raw,
@@ -3395,14 +3394,13 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
       return (Vec::new(), 0);
     }
 
-    let mut buffers: Vec<abi::envoy_dynamic_module_type_envoy_buffer> =
-      vec![
-        abi::envoy_dynamic_module_type_envoy_buffer {
-          ptr: std::ptr::null_mut(),
-          length: 0,
-        };
-        size
-      ];
+    let mut buffers: Vec<abi::envoy_dynamic_module_type_envoy_buffer> = vec![
+      abi::envoy_dynamic_module_type_envoy_buffer {
+        ptr: std::ptr::null_mut(),
+        length: 0,
+      };
+      size
+    ];
     let total_length = unsafe {
       abi::envoy_dynamic_module_callback_network_filter_get_write_buffer_slices(
         self.raw,

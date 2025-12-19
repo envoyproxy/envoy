@@ -36,7 +36,7 @@ struct NopNetworkFilterConfig {
 }
 
 impl<ENF: EnvoyNetworkFilter> NetworkFilterConfig<ENF> for NopNetworkFilterConfig {
-  fn new_network_filter(&mut self, _envoy: &mut ENF) -> Box<dyn NetworkFilter<ENF>> {
+  fn new_network_filter(&self, _envoy: &mut ENF) -> Box<dyn NetworkFilter<ENF>> {
     Box::new(NopNetworkFilter {
       on_new_connection_called: false,
       on_read_called: false,
