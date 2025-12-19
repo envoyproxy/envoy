@@ -48,6 +48,7 @@ envoy_cc_library(
         "@envoy_mobile//library/common/extensions/filters/http/local_error:filter_cc_proto",
         "@envoy_mobile//library/common/extensions/filters/http/network_configuration:filter_cc_proto",
         "@envoy_mobile//library/common/extensions/filters/http/socket_tag:filter_cc_proto",
+        "@envoy_mobile//library/common/extensions/quic_packet_writer/platform:platform_packet_writer_proto_cc_proto",
         "@envoy_mobile//library/common/types:matcher_data_lib",
     ] + select({
         "@envoy//bazel:apple": [

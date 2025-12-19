@@ -149,7 +149,8 @@ public:
     if (!quiche_handles_migration_) {
       quic_connection_->setWriterFactory(writer_factory_);
     } else {
-      migration_helper = &quic_connection_->getOrCreateMigrationHelper(writer_factory_, {});
+      migration_helper = &quic_connection_->getOrCreateMigrationHelper(
+          writer_factory_, quic::kInvalidNetworkHandle, {});
     }
 
     OptRef<Http::HttpServerPropertiesCache> cache;

@@ -12,6 +12,7 @@
 #include "source/common/router/context_impl.h"
 #include "source/extensions/transport_sockets/raw_buffer/config.h"
 
+#include "test/common/quic/test_utils.h"
 #include "test/common/upstream/cluster_manager_impl_test_common.h"
 #include "test/common/upstream/test_cluster_manager.h"
 #include "test/config/v2_link_hacks.h"
@@ -2337,7 +2338,7 @@ TEST_F(ClusterManagerImplTest, PassDownNetworkObserverRegistryToConnectionPool) 
   EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(parseClusterFromV3Yaml(cluster_api), "v1"));
   auto cluster_added_via_api = cluster_manager_->getThreadLocalCluster("added_via_api");
 
-  Quic::EnvoyQuicNetworkObserverRegistryFactory registry_factory;
+  Quic::TestEnvoyQuicNetworkObserverRegistryFactory registry_factory;
   cluster_manager_->createNetworkObserverRegistries(registry_factory);
 
   NiceMock<MockLoadBalancerContext> lb_context;

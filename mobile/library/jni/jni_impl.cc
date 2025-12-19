@@ -1135,27 +1135,27 @@ javaObjectArrayToStringPairVector(Envoy::JNI::JniHelper& jni_helper, jobjectArra
   return ret;
 }
 
-void configureBuilder(Envoy::JNI::JniHelper& jni_helper, jlong connect_timeout_seconds,
-                      jboolean disable_dns_refresh_on_failure,
-                      jboolean disable_dns_refresh_on_network_change, jlong dns_refresh_seconds,
-                      jlong dns_failure_refresh_seconds_base, jlong dns_failure_refresh_seconds_max,
-                      jlong dns_query_timeout_seconds, jlong dns_min_refresh_seconds,
-                      jobjectArray dns_preresolve_hostnames, jboolean enable_dns_cache,
-                      jlong dns_cache_save_interval_seconds, jint dns_num_retries,
-                      jboolean enable_drain_post_dns_refresh, jboolean enable_http3,
-                      jstring http3_connection_options, jstring http3_client_connection_options,
-                      jobjectArray quic_hints, jobjectArray quic_canonical_suffixes,
-                      jboolean enable_gzip_decompression, jboolean enable_brotli_decompression,
-                      jint num_timeouts_to_trigger_port_migration, jboolean enable_socket_tagging,
-                      jboolean enable_interface_binding,
-                      jlong h2_connection_keepalive_idle_interval_milliseconds,
-                      jlong h2_connection_keepalive_timeout_seconds, jlong max_connections_per_host,
-                      jlong stream_idle_timeout_seconds, jlong per_try_idle_timeout_seconds,
-                      jstring app_version, jstring app_id, jboolean trust_chain_verification,
-                      jobjectArray filter_chain, jboolean enable_platform_certificates_validation,
-                      jstring upstream_tls_sni, jobjectArray runtime_guards,
-                      jlong h3_connection_keepalive_initial_interval_milliseconds,
-                      Envoy::Platform::EngineBuilder& builder) {
+void configureBuilder(
+    Envoy::JNI::JniHelper& jni_helper, jlong connect_timeout_seconds,
+    jboolean disable_dns_refresh_on_failure, jboolean disable_dns_refresh_on_network_change,
+    jlong dns_refresh_seconds, jlong dns_failure_refresh_seconds_base,
+    jlong dns_failure_refresh_seconds_max, jlong dns_query_timeout_seconds,
+    jlong dns_min_refresh_seconds, jobjectArray dns_preresolve_hostnames, jboolean enable_dns_cache,
+    jlong dns_cache_save_interval_seconds, jint dns_num_retries,
+    jboolean enable_drain_post_dns_refresh, jboolean enable_http3, jstring http3_connection_options,
+    jstring http3_client_connection_options, jobjectArray quic_hints,
+    jobjectArray quic_canonical_suffixes, jboolean enable_gzip_decompression,
+    jboolean enable_brotli_decompression, jint num_timeouts_to_trigger_port_migration,
+    jboolean enable_socket_tagging, jboolean enable_interface_binding,
+    jlong h2_connection_keepalive_idle_interval_milliseconds,
+    jlong h2_connection_keepalive_timeout_seconds, jlong max_connections_per_host,
+    jlong stream_idle_timeout_seconds, jlong per_try_idle_timeout_seconds, jstring app_version,
+    jstring app_id, jboolean trust_chain_verification, jobjectArray filter_chain,
+    jboolean enable_platform_certificates_validation, jstring upstream_tls_sni,
+    jobjectArray runtime_guards, jlong h3_connection_keepalive_initial_interval_milliseconds,
+    jboolean use_quic_platform_packet_writer, jboolean enable_connection_migration,
+    jboolean migrate_idle_connection, jlong max_idle_time_before_migration_seconds,
+    jlong max_time_on_non_default_network_seconds, Envoy::Platform::EngineBuilder& builder) {
   builder.addConnectTimeoutSeconds((connect_timeout_seconds));
   builder.setDisableDnsRefreshOnFailure(disable_dns_refresh_on_failure);
   builder.setDisableDnsRefreshOnNetworkChange(disable_dns_refresh_on_network_change);
@@ -1204,7 +1204,13 @@ void configureBuilder(Envoy::JNI::JniHelper& jni_helper, jlong connect_timeout_s
   builder.setUpstreamTlsSni(Envoy::JNI::javaStringToCppString(jni_helper, upstream_tls_sni));
   builder.setKeepAliveInitialIntervalMilliseconds(
       (h3_connection_keepalive_initial_interval_milliseconds));
-
+  builder.setUseQuicPlatformPacketWriter(use_quic_platform_packet_writer == JNI_TRUE);
+  if (enable_connection_migration == JNI_TRUE) {
+    builder.enableQuicConnectionMigration(true);
+    builder.setMigrateIdleQuicConnection(migrate_idle_connection == JNI_TRUE);
+    builder.setMaxIdleTimeBeforeQuicMigrationSeconds(max_idle_time_before_migration_seconds);
+    builder.setMaxTimeOnNonDefaultNetworkSeconds(max_time_on_non_default_network_seconds);
+  }
   auto guards = javaObjectArrayToStringPairVector(jni_helper, runtime_guards);
   for (std::pair<std::string, std::string>& entry : guards) {
     builder.addRuntimeGuard(entry.first, entry.second == "true");
@@ -1252,7 +1258,10 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
     jlong stream_idle_timeout_seconds, jlong per_try_idle_timeout_seconds, jstring app_version,
     jstring app_id, jboolean trust_chain_verification, jobjectArray filter_chain,
     jboolean enable_platform_certificates_validation, jstring upstream_tls_sni,
-    jobjectArray runtime_guards, jlong h3_connection_keepalive_initial_interval_milliseconds) {
+    jobjectArray runtime_guards, jlong h3_connection_keepalive_initial_interval_milliseconds,
+    jboolean use_quic_platform_packet_writer, jboolean enable_connection_migration,
+    jboolean migrate_idle_connection, jlong max_idle_time_before_migration_seconds,
+    jlong max_time_on_non_default_network_seconds) {
   Envoy::JNI::JniHelper jni_helper(env);
   Envoy::Platform::EngineBuilder builder;
 
@@ -1269,7 +1278,9 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
       max_connections_per_host, stream_idle_timeout_seconds, per_try_idle_timeout_seconds,
       app_version, app_id, trust_chain_verification, filter_chain,
       enable_platform_certificates_validation, upstream_tls_sni, runtime_guards,
-      h3_connection_keepalive_initial_interval_milliseconds, builder);
+      h3_connection_keepalive_initial_interval_milliseconds, use_quic_platform_packet_writer,
+      enable_connection_migration, migrate_idle_connection, max_idle_time_before_migration_seconds,
+      max_time_on_non_default_network_seconds, builder);
   return reinterpret_cast<intptr_t>(builder.generateBootstrap().release());
 }
 

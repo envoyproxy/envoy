@@ -554,6 +554,7 @@ envoy_cc_test(
         "//test/mocks/server:overload_manager_mocks",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "//test/test_common:test_runtime_lib",
+        "//test/common/quic:test_utils_lib",
         "//source/common/quic:quic_client_factory_lib",
         "//source/common/quic:quic_transport_socket_factory_lib",
         "//source/common/quic:client_connection_factory_lib",

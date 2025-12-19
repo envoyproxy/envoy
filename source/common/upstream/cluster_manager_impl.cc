@@ -2211,7 +2211,7 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
 #ifdef ENVOY_ENABLE_QUIC
     Envoy::Http::ConnectivityGrid::ConnectivityOptions coptions{protocols};
     if (quic_info == nullptr) {
-      quic_info = Quic::createPersistentQuicInfoForCluster(dispatcher, host->cluster());
+      quic_info = Quic::createPersistentQuicInfoForCluster(dispatcher, host->cluster(), context_);
     }
     return std::make_unique<Http::ConnectivityGrid>(
         dispatcher, context_.api().randomGenerator(), host, priority, options,
@@ -2250,7 +2250,7 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
       context_.runtime().snapshot().featureEnabled("upstream.use_http3", 100)) {
 #ifdef ENVOY_ENABLE_QUIC
     if (quic_info == nullptr) {
-      quic_info = Quic::createPersistentQuicInfoForCluster(dispatcher, host->cluster());
+      quic_info = Quic::createPersistentQuicInfoForCluster(dispatcher, host->cluster(), context_);
     }
     return Http::Http3::allocateConnPool(
         dispatcher, context_.api().randomGenerator(), host, priority, options,

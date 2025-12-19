@@ -336,6 +336,9 @@ void EnvoyQuicClientSession::registerNetworkObserver(EnvoyQuicNetworkObserverReg
 }
 
 void EnvoyQuicClientSession::StartDraining() {
+  ENVOY_CONN_LOG(
+      trace, "Failed to migrate to the default network {}. Drain the connection on network {}.",
+      *this, migration_manager().default_network(), migration_manager().current_network());
   quic::QuicSpdyClientSession::StartDraining();
   // Treat draining as receiving a GOAWAY.
   if (http_connection_callbacks_ != nullptr) {

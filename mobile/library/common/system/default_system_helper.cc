@@ -22,4 +22,7 @@ std::vector<std::pair<int64_t, ConnectionType>> DefaultSystemHelper::getAllConne
   return {};
 }
 
+void DefaultSystemHelper::bindSocketToNetwork(Network::ConnectionSocket& /*socket*/,
+                                              int64_t /*network_handle*/) {}
+
 } // namespace Envoy
