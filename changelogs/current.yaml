@@ -261,6 +261,11 @@ new_features:
   change: |
     Added process-level rate limiting on access log emission via
     :ref:`ProcessRateLimitFilter <envoy_v3_api_msg_extensions.access_loggers.filters.process_ratelimit.v3.ProcessRateLimitFilter>`.
+- area: access_log
+  change: |
+    Added :ref:`COALESCE <config_access_log_format_coalesce>` substitution formatter operator that evaluates multiple
+    formatter operators in sequence and returns the first non-null result. This enables fallback behavior such as
+    using SNI when available but falling back to the ``:authority`` header when SNI is not set.
 - area: listener_filters
   change: |
     Added :ref:`Postgres Inspector <config_listener_filters_postgres_inspector>` listener filter for detecting
