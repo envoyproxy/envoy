@@ -130,7 +130,8 @@ private:
   const std::chrono::milliseconds flush_interval_msec_; // Time interval buffer gets flushed no
                                                         // matter if it reached the MIN_FLUSH_SIZE
                                                         // or not.
-  const uint64_t min_flush_size_; // Minimum size before the flush thread will be told to flush.
+  const uint64_t min_flush_size_{
+      64 * 1024}; // Minimum size before the flush thread will be told to flush.
   AccessLogFileStats& stats_;
 };
 
