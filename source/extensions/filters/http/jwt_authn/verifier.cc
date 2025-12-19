@@ -369,8 +369,9 @@ JwtProviderList getAllProvidersAsList(const Protobuf::Map<std::string, JwtProvid
 
 class ExtractOnlyWithoutValidationVerifierImpl : public BaseVerifierImpl {
 public:
-  ExtractOnlyWithoutValidationVerifierImpl(const AuthFactory& factory, const JwtProviderList& providers,
-                          const BaseVerifierImpl* parent)
+  ExtractOnlyWithoutValidationVerifierImpl(const AuthFactory& factory,
+                                           const JwtProviderList& providers,
+                                           const BaseVerifierImpl* parent)
       : BaseVerifierImpl(parent), auth_factory_(factory), extractor_(Extractor::create(providers)) {
     ENVOY_LOG(info,
               "JWT filter configured for claim extraction only - signature validation is disabled");
@@ -442,8 +443,8 @@ VerifierConstPtr innerCreate(const JwtRequirement& requirement,
     return std::make_unique<AllowMissingVerifierImpl>(factory, getAllProvidersAsList(providers),
                                                       parent);
   case JwtRequirement::RequiresTypeCase::kExtractOnlyWithoutValidationWithoutValidation:
-    return std::make_unique<ExtractOnlyWithoutValidationVerifierImpl>(factory, getAllProvidersAsList(providers),
-                                                     parent);
+    return std::make_unique<ExtractOnlyWithoutValidationVerifierImpl>(
+        factory, getAllProvidersAsList(providers), parent);
   case JwtRequirement::RequiresTypeCase::REQUIRES_TYPE_NOT_SET:
     return std::make_unique<AllowAllVerifierImpl>(parent);
   }
