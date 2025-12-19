@@ -303,7 +303,10 @@ public:
   Filter(const FilterConfigSharedPtr& config, FilterStats& stats)
       : config_(config), stats_(stats),
         allow_multiplexed_upstream_half_close_(Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.allow_multiplexed_upstream_half_close")) {}
+            "envoy.reloadable_features.allow_multiplexed_upstream_half_close")),
+        reject_early_connect_data_enabled_(
+            Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reject_early_connect_data")) {
+  }
 
   ~Filter() override;
 
@@ -640,7 +643,8 @@ private:
   std::unique_ptr<Stats::StatNameDynamicStorage> alt_stat_prefix_;
   const VirtualCluster* request_vcluster_{};
   RouteStatsContextOptRef route_stats_context_;
-  std::function<void(Upstream::HostConstSharedPtr&& host, std::string details)> on_host_selected_;
+  std::function<void(Upstream::HostConstSharedPtr&& host, absl::string_view details)>
+      on_host_selected_;
   std::unique_ptr<Upstream::AsyncHostSelectionHandle> host_selection_cancelable_;
   Event::TimerPtr response_timeout_;
   TimeoutData timeout_;
@@ -688,6 +692,9 @@ private:
   // Indicate that ORCA report is received to process it only once in either response headers or
   // trailers.
   bool orca_load_report_received_ : 1 = false;
+  // Cached runtime flag value for reject_early_connect_data to avoid evaluating it on every data
+  // chunk.
+  bool reject_early_connect_data_enabled_ : 1 = false;
 };
 
 class ProdFilter : public Filter {

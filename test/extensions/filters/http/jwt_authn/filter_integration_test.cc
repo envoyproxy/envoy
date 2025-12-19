@@ -466,8 +466,8 @@ public:
     }
   }
 
-  FakeHttpConnectionPtr fake_jwks_connection_{};
-  FakeStreamPtr jwks_request_{};
+  FakeHttpConnectionPtr fake_jwks_connection_;
+  FakeStreamPtr jwks_request_;
 };
 
 INSTANTIATE_TEST_SUITE_P(

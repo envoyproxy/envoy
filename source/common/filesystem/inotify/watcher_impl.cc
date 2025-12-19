@@ -10,6 +10,7 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/fmt.h"
+#include "source/common/common/thread.h"
 #include "source/common/common/utility.h"
 #include "source/common/filesystem/watcher_impl.h"
 
@@ -52,6 +53,28 @@ absl::Status WatcherImpl::addWatch(absl::string_view path, uint32_t events, OnCh
   return absl::OkStatus();
 }
 
+void WatcherImpl::callAndLogOnError(OnChangedCb& cb, uint32_t events, const std::string& file) {
+  TRY_ASSERT_MAIN_THREAD {
+    const absl::Status status = cb(events);
+    if (!status.ok()) {
+      // Use ENVOY_LOG_EVERY_POW_2 to avoid log spam if a callback keeps failing.
+      ENVOY_LOG_EVERY_POW_2(warn, "Filesystem watch callback for '{}' returned error: {}", file,
+                            status.message());
+    }
+  }
+  END_TRY
+  MULTI_CATCH(
+      const std::exception& e,
+      {
+        ENVOY_LOG_EVERY_POW_2(warn, "Filesystem watch callback for '{}' threw exception: {}", file,
+                              e.what());
+      },
+      {
+        ENVOY_LOG_EVERY_POW_2(warn, "Filesystem watch callback for '{}' threw unknown exception",
+                              file);
+      });
+}
+
 absl::Status WatcherImpl::onInotifyEvent() {
   while (true) {
     // The buffer needs to be suitably aligned to store the first inotify_event structure.
@@ -90,10 +113,10 @@ absl::Status WatcherImpl::onInotifyEvent() {
         if (watch.events_ & events) {
           if (watch.file_ == file) {
             ENVOY_LOG(debug, "matched callback: file: {}", file);
-            RETURN_IF_NOT_OK(watch.cb_(events));
+            callAndLogOnError(watch.cb_, events, file);
           } else if (watch.file_.empty()) {
             ENVOY_LOG(debug, "matched callback: directory: {}", file);
-            RETURN_IF_NOT_OK(watch.cb_(events));
+            callAndLogOnError(watch.cb_, events, file);
           }
         }
       }

@@ -78,6 +78,7 @@ public:
 
   quic::HttpDatagramSupport LocalHttpDatagramSupport() override { return http_datagram_support_; }
   std::vector<std::string> GetAlpnsToOffer() const override;
+  void OnConfigNegotiated() override;
 
   // quic::QuicSpdyClientSessionBase
   bool ShouldKeepConnectionAlive() const override;
@@ -101,6 +102,10 @@ public:
 
   // Register this session to the given registry for receiving network change events.
   void registerNetworkObserver(EnvoyQuicNetworkObserverRegistry& registry);
+
+  const quic::TransportParameters::ParameterMap& received_custom_transport_parameters() {
+    return received_custom_transport_parameters_;
+  }
 
   using quic::QuicSpdyClientSession::PerformActionOnActiveStreams;
 
@@ -140,6 +145,7 @@ private:
   const bool session_handles_migration_;
   QuicNetworkConnectivityObserverPtr network_connectivity_observer_;
   OptRef<EnvoyQuicNetworkObserverRegistry> registry_;
+  quic::TransportParameters::ParameterMap received_custom_transport_parameters_;
 };
 
 } // namespace Quic

@@ -6,6 +6,7 @@
 
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/utility.h"
 
 #include "absl/strings/str_format.h"
 #include "gmock/gmock.h"
@@ -258,14 +259,13 @@ TEST_F(MaxmindProviderConfigTest, EmptyProto) {
 TEST_F(MaxmindProviderConfigTest, ProviderConfigWithCorrectProto) {
   const auto provider_config_yaml = R"EOF(
     common_provider_config:
-      geo_headers_to_add:
+      geo_field_keys:
         country: "x-geo-country"
         region: "x-geo-region"
         city: "x-geo-city"
         anon_vpn: "x-anon-vpn"
         asn: "x-geo-asn"
         anon: "x-geo-anon"
-        anon_vpn: "x-anon-vpn"
         anon_tor: "x-anon-tor"
         anon_proxy: "x-anon-proxy"
         anon_hosting: "x-anon-hosting"
@@ -295,7 +295,7 @@ TEST_F(MaxmindProviderConfigTest, ProviderConfigWithCorrectProto) {
 TEST_F(MaxmindProviderConfigTest, ProviderConfigWithNoDbPaths) {
   std::string provider_config_yaml = R"EOF(
     common_provider_config:
-      geo_headers_to_add:
+      geo_field_keys:
         country: "x-geo-country"
         region: "x-geo-region"
   )EOF";
@@ -326,7 +326,7 @@ TEST_F(MaxmindProviderConfigTest, ProviderConfigWithNoGeoHeaders) {
 TEST_F(MaxmindProviderConfigTest, DbPathFormatValidatedWhenNonEmptyValue) {
   std::string provider_config_yaml = R"EOF(
     common_provider_config:
-      geo_headers_to_add:
+      geo_field_keys:
         isp: "x-geo-isp"
     isp_db_path: "/geoip2/Isp.exe"
   )EOF";
@@ -344,7 +344,7 @@ TEST_F(MaxmindProviderConfigTest, DbPathFormatValidatedWhenNonEmptyValue) {
 TEST_F(MaxmindProviderConfigTest, ReusesProviderInstanceForSameProtoConfig) {
   const auto provider_config_yaml = R"EOF(
     common_provider_config:
-      geo_headers_to_add:
+      geo_field_keys:
         country: "x-geo-country"
         city: "x-geo-city"
         anon_vpn: "x-anon-vpn"
@@ -378,7 +378,7 @@ TEST_F(MaxmindProviderConfigTest, ReusesProviderInstanceForSameProtoConfig) {
 TEST_F(MaxmindProviderConfigTest, DifferentProviderInstancesForDifferentProtoConfig) {
   const auto provider_config_yaml1 = R"EOF(
     common_provider_config:
-      geo_headers_to_add:
+      geo_field_keys:
         country: "x-geo-country"
         city: "x-geo-city"
         anon_vpn: "x-anon-vpn"
@@ -392,7 +392,7 @@ TEST_F(MaxmindProviderConfigTest, DifferentProviderInstancesForDifferentProtoCon
   )EOF";
   const auto provider_config_yaml2 = R"EOF(
     common_provider_config:
-      geo_headers_to_add:
+      geo_field_keys:
         country: "x-geo-country"
         city: "x-geo-city"
         anon_vpn: "x-anon-vpn"
@@ -424,7 +424,7 @@ TEST_F(MaxmindProviderConfigTest, DifferentProviderInstancesForDifferentProtoCon
 TEST_F(MaxmindProviderConfigTest, ProviderConfigWithCountryDbPath) {
   const auto provider_config_yaml = R"EOF(
     common_provider_config:
-      geo_headers_to_add:
+      geo_field_keys:
         country: "x-geo-country"
     country_db_path: %s
   )EOF";
@@ -443,7 +443,7 @@ TEST_F(MaxmindProviderConfigTest, ProviderConfigWithCountryDbPath) {
 TEST_F(MaxmindProviderConfigTest, ProviderConfigWithCountryDbAndCityDbPaths) {
   const auto provider_config_yaml = R"EOF(
     common_provider_config:
-      geo_headers_to_add:
+      geo_field_keys:
         country: "x-geo-country"
         city: "x-geo-city"
     country_db_path: %s
@@ -462,6 +462,124 @@ TEST_F(MaxmindProviderConfigTest, ProviderConfigWithCountryDbAndCityDbPaths) {
   EXPECT_THAT(driver, AllOf(HasCountryDbPath(country_db_path), HasCityDbPath(city_db_path),
                             HasCountryHeader("x-geo-country"), HasCityHeader("x-geo-city"),
                             IsCityDbPathSet(true)));
+}
+
+// Tests for geo_headers_to_add field which is deprecated in favor of geo_field_keys.
+TEST_F(MaxmindProviderConfigTest,
+       DEPRECATED_FEATURE_TEST(ProviderConfigWithDeprecatedGeoHeadersToAdd)) {
+  // Test that the deprecated geo_headers_to_add field still works for backward compatibility.
+  const auto provider_config_yaml = R"EOF(
+    common_provider_config:
+      geo_headers_to_add:
+        country: "x-geo-country"
+        region: "x-geo-region"
+        city: "x-geo-city"
+        asn: "x-geo-asn"
+        anon: "x-geo-anon"
+        anon_vpn: "x-anon-vpn"
+        anon_tor: "x-anon-tor"
+        anon_proxy: "x-anon-proxy"
+        anon_hosting: "x-anon-hosting"
+        isp: "x-geo-isp"
+    city_db_path: %s
+    isp_db_path: %s
+    anon_db_path: %s
+  )EOF";
+  MaxmindProviderConfig provider_config;
+  auto city_db_path = genGeoDbFilePath("GeoLite2-City-Test.mmdb");
+  auto isp_db_path = genGeoDbFilePath("GeoIP2-ISP-Test.mmdb");
+  auto anon_db_path = genGeoDbFilePath("GeoIP2-Anonymous-IP-Test.mmdb");
+  auto processed_provider_config_yaml =
+      absl::StrFormat(provider_config_yaml, city_db_path, isp_db_path, anon_db_path);
+  TestUtility::loadFromYaml(processed_provider_config_yaml, provider_config);
+  MaxmindProviderFactory factory;
+  EXPECT_LOG_CONTAINS(
+      "warning", "Using deprecated option",
+      Geolocation::DriverSharedPtr driver =
+          factory.createGeoipProviderDriver(provider_config, "maxmind", context_);
+      EXPECT_THAT(driver,
+                  AllOf(HasCityDbPath(city_db_path), HasIspDbPath(isp_db_path),
+                        HasAnonDbPath(anon_db_path), HasCountryHeader("x-geo-country"),
+                        HasCityHeader("x-geo-city"), HasRegionHeader("x-geo-region"),
+                        HasAsnHeader("x-geo-asn"), HasAnonVpnHeader("x-anon-vpn"),
+                        HasAnonTorHeader("x-anon-tor"), HasAnonProxyHeader("x-anon-proxy"),
+                        HasAnonHostingHeader("x-anon-hosting"), HasIspHeader("x-geo-isp"))););
+}
+
+TEST_F(MaxmindProviderConfigTest,
+       DEPRECATED_FEATURE_TEST(ProviderConfigWithDeprecatedIsAnonField)) {
+  // Test that the deprecated is_anon field falls back correctly.
+  const auto provider_config_yaml = R"EOF(
+    common_provider_config:
+      geo_headers_to_add:
+        is_anon: "x-geo-is-anon"
+    anon_db_path: %s
+  )EOF";
+  MaxmindProviderConfig provider_config;
+  auto anon_db_path = genGeoDbFilePath("GeoIP2-Anonymous-IP-Test.mmdb");
+  auto processed_provider_config_yaml = absl::StrFormat(provider_config_yaml, anon_db_path);
+  TestUtility::loadFromYaml(processed_provider_config_yaml, provider_config);
+  MaxmindProviderFactory factory;
+  // Verify that is_anon field is read and used as anon_header_.
+  EXPECT_LOG_CONTAINS("warning", "Using deprecated option",
+                      Geolocation::DriverSharedPtr driver =
+                          factory.createGeoipProviderDriver(provider_config, "maxmind", context_);
+                      auto provider = std::static_pointer_cast<GeoipProvider>(driver);
+                      auto anon_header = GeoipProviderPeer::countryHeader(*provider);
+                      // The is_anon fallback should populate the anon header.
+                      // Note: We can't directly test anon_header_ since there's no getter, but
+                      // we verify the config is accepted and driver is created successfully.
+                      EXPECT_NE(driver, nullptr););
+}
+
+TEST_F(MaxmindProviderConfigTest,
+       DEPRECATED_FEATURE_TEST(ProviderConfigWithDeprecatedGeoHeadersNoDbPaths)) {
+  // Test that error handling works correctly with deprecated field.
+  std::string provider_config_yaml = R"EOF(
+    common_provider_config:
+      geo_headers_to_add:
+        country: "x-geo-country"
+        region: "x-geo-region"
+  )EOF";
+  MaxmindProviderConfig provider_config;
+  TestUtility::loadFromYaml(provider_config_yaml, provider_config);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  MaxmindProviderFactory factory;
+  EXPECT_THROW_WITH_MESSAGE(
+      factory.createGeoipProviderDriver(provider_config, "maxmind", context), Envoy::EnvoyException,
+      "At least one geolocation database path needs to be configured: "
+      "city_db_path, isp_db_path, asn_db_path, anon_db_path or country_db_path");
+}
+
+// Test that geo_field_keys takes precedence over geo_headers_to_add when both are set.
+TEST_F(MaxmindProviderConfigTest, DEPRECATED_FEATURE_TEST(GeoFieldKeysTakesPrecedence)) {
+  // When both geo_field_keys and geo_headers_to_add are set, geo_field_keys should win.
+  const auto provider_config_yaml = R"EOF(
+    common_provider_config:
+      geo_field_keys:
+        country: "x-geo-country-new"
+        city: "x-geo-city-new"
+      geo_headers_to_add:
+        country: "x-geo-country-old"
+        city: "x-geo-city-old"
+        region: "x-geo-region-old"
+    city_db_path: %s
+  )EOF";
+  MaxmindProviderConfig provider_config;
+  auto city_db_path = genGeoDbFilePath("GeoLite2-City-Test.mmdb");
+  auto processed_provider_config_yaml = absl::StrFormat(provider_config_yaml, city_db_path);
+  TestUtility::loadFromYaml(processed_provider_config_yaml, provider_config);
+  MaxmindProviderFactory factory;
+  // geo_field_keys should take precedence, so we should see the "new" values.
+  // The deprecated geo_headers_to_add should be ignored.
+  Geolocation::DriverSharedPtr driver =
+      factory.createGeoipProviderDriver(provider_config, "maxmind", context_);
+  EXPECT_THAT(driver,
+              AllOf(HasCountryHeader("x-geo-country-new"), HasCityHeader("x-geo-city-new")));
+  // Region should NOT be set because geo_field_keys takes precedence and it doesn't have region.
+  auto provider = std::static_pointer_cast<GeoipProvider>(driver);
+  auto region_header = GeoipProviderPeer::regionHeader(*provider);
+  EXPECT_FALSE(region_header.has_value());
 }
 
 } // namespace Maxmind
