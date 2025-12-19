@@ -96,6 +96,7 @@ ScopedRouteInfo::ScopedRouteInfo(envoy::config::route::v3::ScopedRouteConfigurat
 
 ScopeKeyBuilderImpl::ScopeKeyBuilderImpl(ScopedRoutes::ScopeKeyBuilder&& config)
     : ScopeKeyBuilderBase(std::move(config)) {
+  fragment_builders_.reserve(config_.fragments().size());
   for (const auto& fragment_builder : config_.fragments()) {
     switch (fragment_builder.type_case()) {
     case ScopedRoutes::ScopeKeyBuilder::FragmentBuilder::kHeaderValueExtractor:
