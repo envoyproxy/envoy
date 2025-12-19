@@ -95,6 +95,8 @@ protected:
 
   // Invoked for filesystem watches on update. Protected so subclasses can set up the callback.
   void onWatchUpdate();
+
+  // Initializes the SDS API.
   void initialize(bool warm);
 
 private:
