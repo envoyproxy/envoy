@@ -24,9 +24,6 @@ public:
   }
 
   void initializeFilter() {
-    // Explicitly enable the reset_with_error runtime guard to ensure tests pass with
-    // the new HTTP/2 reset behavior (INTERNAL_ERROR instead of NO_ERROR).
-    config_helper_.addRuntimeOverride("envoy.reloadable_features.reset_with_error", "true");
     config_helper_.skipPortUsageValidation();
 
     // Add both clusters for MCP backends
