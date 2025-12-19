@@ -68,7 +68,7 @@ bool RedisClusterLoadBalancerFactory::onClusterSlotUpdate(ClusterSlotsSharedPtr&
   }
 
   {
-    absl::WriterMutexLock lock(&mutex_);
+    absl::WriterMutexLock lock(mutex_);
     current_cluster_slot_ = std::move(slots);
     slot_array_ = std::move(updated_slots);
     shard_vector_ = std::move(shard_vector);
@@ -79,7 +79,7 @@ bool RedisClusterLoadBalancerFactory::onClusterSlotUpdate(ClusterSlotsSharedPtr&
 void RedisClusterLoadBalancerFactory::onHostHealthUpdate() {
   ShardVectorSharedPtr current_shard_vector;
   {
-    absl::ReaderMutexLock lock(&mutex_);
+    absl::ReaderMutexLock lock(mutex_);
     current_shard_vector = shard_vector_;
   }
 
@@ -96,13 +96,13 @@ void RedisClusterLoadBalancerFactory::onHostHealthUpdate() {
   }
 
   {
-    absl::WriterMutexLock lock(&mutex_);
+    absl::WriterMutexLock lock(mutex_);
     shard_vector_ = std::move(shard_vector);
   }
 }
 
 Upstream::LoadBalancerPtr RedisClusterLoadBalancerFactory::create(Upstream::LoadBalancerParams) {
-  absl::ReaderMutexLock lock(&mutex_);
+  absl::ReaderMutexLock lock(mutex_);
   return std::make_unique<RedisClusterLoadBalancer>(slot_array_, shard_vector_, random_);
 }
 

@@ -1363,8 +1363,7 @@ int ConnectionImpl::onFrameSend(int32_t stream_id, size_t length, uint8_t type, 
   case OGHTTP2_RST_STREAM_FRAME_TYPE: {
     ENVOY_CONN_LOG(debug, "sent reset code={}", connection_, error_code);
     stats_.tx_reset_.inc();
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http2_propagate_reset_events") &&
-        stream != nullptr && !stream->local_end_stream_sent_) {
+    if (stream != nullptr && !stream->local_end_stream_sent_) {
       // The RST_STREAM may preempt further DATA frames, and serves as the
       // notification of the end of the stream.
       stream->onResetEncoded(error_code);

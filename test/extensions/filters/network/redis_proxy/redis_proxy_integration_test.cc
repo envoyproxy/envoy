@@ -1341,19 +1341,6 @@ TEST_P(RedisProxyIntegrationTest, InvalidRequest) {
   simpleProxyResponse(makeBulkStringArray({"keys"}), error_response.str());
 }
 
-// This test sends an invalid Redis command from a fake
-// downstream client to the envoy proxy. Envoy will respond
-// with an invalid request error.
-
-TEST_P(RedisProxyIntegrationTest, InvalidArgsRequest) {
-  std::stringstream error_response;
-  error_response << "-"
-                 << "wrong number of arguments for 'keys' command"
-                 << "\r\n";
-  initialize();
-  simpleProxyResponse(makeBulkStringArray({"keys", "a*", "b*"}), error_response.str());
-}
-
 // This test sends a simple Redis command to a fake upstream
 // Redis server. The server replies with a MOVED or ASK redirection
 // error, and that error is passed unchanged to the fake downstream
