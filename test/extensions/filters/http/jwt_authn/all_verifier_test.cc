@@ -912,7 +912,8 @@ protected:
   void SetUp() override { AllVerifierTest::SetUp(); }
 };
 
-TEST_F(ExtractOnlyWithoutValidationEdgeCasesTest, ExtractOnlyWithoutValidationWithMultipleProviders) {
+TEST_F(ExtractOnlyWithoutValidationEdgeCasesTest,
+       ExtractOnlyWithoutValidationWithMultipleProviders) {
   const char extract_only_without_validation_yaml[] = "extract_only_without_validation: {}";
   modifyRequirement(extract_only_without_validation_yaml);
   createVerifier();
@@ -938,7 +939,8 @@ TEST_F(ExtractOnlyWithoutValidationEdgeCasesTest, ExtractOnlyWithoutValidationWi
   verifier_->verify(context_);
 }
 
-TEST_F(ExtractOnlyWithoutValidationEdgeCasesTest, ExtractOnlyWithoutValidationInComplexNestedStructure) {
+TEST_F(ExtractOnlyWithoutValidationEdgeCasesTest,
+       ExtractOnlyWithoutValidationInComplexNestedStructure) {
   const char complex_yaml[] = R"(
 requires_all:
   requirements:
@@ -971,7 +973,8 @@ TEST_F(ExtractOnlyWithoutValidationEdgeCasesTest, ExtractOnlyWithoutValidationWi
   verifier_->verify(context_);
 }
 
-TEST_F(ExtractOnlyWithoutValidationEdgeCasesTest, ExtractOnlyWithoutValidationInOrListWithAllOptions) {
+TEST_F(ExtractOnlyWithoutValidationEdgeCasesTest,
+       ExtractOnlyWithoutValidationInOrListWithAllOptions) {
   const char complex_or_yaml[] = R"(
 requires_any:
   requirements:
@@ -989,7 +992,8 @@ requires_any:
   EXPECT_THAT(headers, JwtOutputSuccess(kExampleHeader));
 }
 
-TEST_F(ExtractOnlyWithoutValidationEdgeCasesTest, ExtractOnlyWithoutValidationWithSecondProviderMatching) {
+TEST_F(ExtractOnlyWithoutValidationEdgeCasesTest,
+       ExtractOnlyWithoutValidationWithSecondProviderMatching) {
   const char complex_or_yaml[] = R"(
 requires_any:
   requirements:
@@ -1024,7 +1028,8 @@ requires_any:
   verifier_->verify(context_);
 }
 
-TEST_F(ExtractOnlyWithoutValidationEdgeCasesTest, ExtractOnlyWithoutValidationInAndListWithFailure) {
+TEST_F(ExtractOnlyWithoutValidationEdgeCasesTest,
+       ExtractOnlyWithoutValidationInAndListWithFailure) {
   const char and_yaml[] = R"(
 requires_all:
   requirements:
@@ -1040,7 +1045,8 @@ requires_all:
   verifier_->verify(context_);
 }
 
-TEST_F(ExtractOnlyWithoutValidationEdgeCasesTest, ExtractOnlyWithoutValidationInAndListBothSucceed) {
+TEST_F(ExtractOnlyWithoutValidationEdgeCasesTest,
+       ExtractOnlyWithoutValidationInAndListBothSucceed) {
   const char and_yaml[] = R"(
 requires_all:
   requirements:
