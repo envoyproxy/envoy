@@ -127,10 +127,10 @@ index 00000000..8dca96e6
 +  install
 diff --git a/luajit_build_win.sh b/luajit_build_win.sh
 new file mode 100755
-index 00000000..8fb0fbe8
+index 00000000..c6267893
 --- /dev/null
 +++ b/luajit_build_win.sh
-@@ -0,0 +1,39 @@
+@@ -0,0 +1,38 @@
 +#!/bin/bash
 +
 +set -e
@@ -158,8 +158,7 @@ index 00000000..8fb0fbe8
 +cp -r "$SRC_DIR" "$BUILD_DIR"
 +cd "$BUILD_DIR"
 +
-+ ls
-+ cd src
++cd src
 +./msvcbuild.bat static
 +
 +mkdir -p "$PREFIX/lib"
@@ -171,18 +170,16 @@ index 00000000..8fb0fbe8
 +mkdir -p "$PREFIX/bin"
 +cp luajit.exe "$PREFIX/bin"
 diff --git a/src/msvcbuild.bat b/src/msvcbuild.bat
-index d6aed170..8a86b766 100644
+index d6aed170..67c255ab 100644
 --- a/src/msvcbuild.bat
 +++ b/src/msvcbuild.bat
-@@ -18,9 +18,9 @@
- @rem Add more debug flags here, e.g. DEBUGCFLAGS=/DLUA_USE_ASSERT
+@@ -19,8 +19,8 @@
  @set DEBUGCFLAGS=
  @set LJCOMPILE=cl /nologo /c /O2 /W3 /D_CRT_SECURE_NO_DEPRECATE /D_CRT_STDIO_INLINE=__declspec(dllexport)__inline
--@set LJDYNBUILD=/DLUA_BUILD_AS_DLL /MD
+ @set LJDYNBUILD=/DLUA_BUILD_AS_DLL /MD
 -@set LJDYNBUILD_DEBUG=/DLUA_BUILD_AS_DLL /MDd 
 -@set LJCOMPILETARGET=/Zi
-+@set LJDYNBUILD=/DLUA_BUILD_AS_DLL /MT
-+@set LJDYNBUILD_DEBUG=/DLUA_BUILD_AS_DLL /MTd 
++@set LJDYNBUILD_DEBUG=/DLUA_BUILD_AS_DLL /MDd
 +@set LJCOMPILETARGET=/Z7
  @set LJLINKTYPE=/DEBUG /RELEASE
  @set LJLINKTYPE_DEBUG=/DEBUG
