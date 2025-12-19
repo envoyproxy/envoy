@@ -51,6 +51,12 @@ public:
   void emitValidationMetadata(absl::string_view node_id, absl::string_view cluster_id,
                               bool validation_passed, StreamInfo::StreamInfo& stream_info) const;
 
+  // Returns the configured listener name.
+  const std::string& name() const { return name_; }
+
+  // Returns whether cluster match enforcement is enabled.
+  bool enforceClusterMatch() const { return enforce_cluster_match_; }
+
 private:
   ReverseTunnelFilterConfig(
       const envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel& proto_config,
@@ -67,6 +73,10 @@ private:
   Formatter::FormatterConstSharedPtr cluster_id_formatter_;
   const bool emit_dynamic_metadata_{false};
   const std::string dynamic_metadata_namespace_;
+
+  // Listener identification and cluster matching.
+  const std::string name_;
+  const bool enforce_cluster_match_{false};
 };
 
 using ReverseTunnelFilterConfigSharedPtr = std::shared_ptr<ReverseTunnelFilterConfig>;
