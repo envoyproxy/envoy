@@ -281,8 +281,10 @@ QueryParameterValueMatchAction::buildQueryParameterMatcherVector(
         query_parameters,
     Server::Configuration::CommonFactoryContext& context) {
   std::vector<ConfigUtility::QueryParameterMatcherPtr> ret;
+  ret.reserve(query_parameters.size());
   for (const auto& query_parameter : query_parameters) {
-    ret.push_back(std::make_unique<ConfigUtility::QueryParameterMatcher>(query_parameter, context));
+    ret.emplace_back(
+        std::make_unique<ConfigUtility::QueryParameterMatcher>(query_parameter, context));
   }
   return ret;
 }
@@ -293,6 +295,7 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
     : disable_key_(config.disable_key()),
       stage_(static_cast<uint64_t>(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, stage, 0))),
       apply_on_stream_done_(config.apply_on_stream_done()) {
+  actions_.reserve(config.actions().size());
   for (const auto& action : config.actions()) {
     switch (action.action_specifier_case()) {
     case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::kSourceCluster:
