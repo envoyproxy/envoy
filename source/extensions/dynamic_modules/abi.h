@@ -2476,36 +2476,72 @@ envoy_dynamic_module_callback_get_most_specific_route_config(
 // =============================================================================
 
 /**
+ * envoy_dynamic_module_callback_network_filter_get_read_buffer_slices_size is called by the module
+ * to get the number of slices in the current read data buffer. Combined with
+ * envoy_dynamic_module_callback_network_filter_get_read_buffer_slices, this can be used to iterate
+ * over all slices in the read buffer. This is only valid during the
+ * envoy_dynamic_module_on_network_filter_read callback.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param size is the pointer to the variable where the number of slices will be stored.
+ * @return true if the buffer is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_network_filter_get_read_buffer_slices_size(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, size_t* size);
+
+/**
  * envoy_dynamic_module_callback_network_filter_get_read_buffer_slices is called by the module to
  * get the current read data buffer as slices. This is only valid during the
  * envoy_dynamic_module_on_network_filter_read callback.
  *
- * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
- * @param result_buffer_ptr is the output pointer to an array of buffer slices.
- * @param result_buffer_length_ptr is the output pointer to the number of slices.
- * @return the total length of all slices.
+ * PRECONDITION: The module must ensure that the result_buffer_vector is valid and has enough length
+ * to store all the slices. The module can use
+ * envoy_dynamic_module_callback_network_filter_get_read_buffer_slices_size to get the number of
+ * slices before calling this function.
  *
- * The returned slices are owned by Envoy and valid until the end of the callback.
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param result_buffer_vector is the pointer to the array of envoy_dynamic_module_type_envoy_buffer
+ * where the slices will be stored. The lifetime of the buffer is guaranteed until the end of the
+ * current callback.
+ * @return the total length of all slices, or 0 if the buffer is not available.
  */
 size_t envoy_dynamic_module_callback_network_filter_get_read_buffer_slices(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_envoy_buffer** result_buffer_ptr, size_t* result_buffer_length_ptr);
+    envoy_dynamic_module_type_envoy_buffer* result_buffer_vector);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_get_write_buffer_slices_size is called by the module
+ * to get the number of slices in the current write data buffer. Combined with
+ * envoy_dynamic_module_callback_network_filter_get_write_buffer_slices, this can be used to iterate
+ * over all slices in the write buffer. This is only valid during the
+ * envoy_dynamic_module_on_network_filter_write callback.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param size is the pointer to the variable where the number of slices will be stored.
+ * @return true if the buffer is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_network_filter_get_write_buffer_slices_size(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, size_t* size);
 
 /**
  * envoy_dynamic_module_callback_network_filter_get_write_buffer_slices is called by the module to
  * get the current write data buffer as slices. This is only valid during the
  * envoy_dynamic_module_on_network_filter_write callback.
  *
- * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
- * @param result_buffer_ptr is the output pointer to an array of buffer slices.
- * @param result_buffer_length_ptr is the output pointer to the number of slices.
- * @return the total length of all slices.
+ * PRECONDITION: The module must ensure that the result_buffer_vector is valid and has enough length
+ * to store all the slices. The module can use
+ * envoy_dynamic_module_callback_network_filter_get_write_buffer_slices_size to get the number of
+ * slices before calling this function.
  *
- * The returned slices are owned by Envoy and valid until the end of the callback.
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param result_buffer_vector is the pointer to the array of envoy_dynamic_module_type_envoy_buffer
+ * where the slices will be stored. The lifetime of the buffer is guaranteed until the end of the
+ * current callback.
+ * @return the total length of all slices, or 0 if the buffer is not available.
  */
 size_t envoy_dynamic_module_callback_network_filter_get_write_buffer_slices(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_envoy_buffer** result_buffer_ptr, size_t* result_buffer_length_ptr);
+    envoy_dynamic_module_type_envoy_buffer* result_buffer_vector);
 
 /**
  * envoy_dynamic_module_callback_network_filter_drain_read_buffer is called by the module to drain

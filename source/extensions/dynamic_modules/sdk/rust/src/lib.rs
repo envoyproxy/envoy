@@ -2576,7 +2576,7 @@ impl EnvoyHttpFilterImpl {
     // At this point, we assume at least one value is present.
     results.push(unsafe { EnvoyBuffer::new_from_raw(result_ptr, result_size) });
     // So, we iterate from 1 to count - 1.
-    for i in 1 .. count {
+    for i in 1..count {
       let mut result_ptr: *const u8 = std::ptr::null();
       let mut result_size: usize = 0;
       unsafe {
@@ -3198,10 +3198,13 @@ pub trait EnvoyNetworkFilterConfig {}
 /// This has one to one mapping with the [`EnvoyNetworkFilterConfig`] object.
 ///
 /// The object is created when the corresponding Envoy network filter config is created, and it is
-/// dropped when the corresponding Envoy network filter config is destroyed.
-pub trait NetworkFilterConfig<ENF: EnvoyNetworkFilter> {
-  /// This is called when a new TCP connection is established.
-  fn new_network_filter(&mut self, _envoy: &mut ENF) -> Box<dyn NetworkFilter<ENF>>;
+/// dropped when the corresponding Envoy network filter config is destroyed. Therefore, the
+/// implementation is recommended to implement the [`Drop`] trait to handle the necessary cleanup.
+///
+/// Implementations must also be `Sync` since they are accessed from worker threads.
+pub trait NetworkFilterConfig<ENF: EnvoyNetworkFilter>: Sync {
+  /// This is called from a worker thread when a new TCP connection is established.
+  fn new_network_filter(&self, _envoy: &mut ENF) -> Box<dyn NetworkFilter<ENF>>;
 }
 
 /// The trait that corresponds to an Envoy network filter for each TCP connection
@@ -3350,45 +3353,67 @@ impl EnvoyNetworkFilterImpl {
 
 impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
   fn get_read_buffer_slices(&mut self) -> (Vec<EnvoyBuffer>, usize) {
-    let mut buffer_ptr: *mut abi::envoy_dynamic_module_type_envoy_buffer = std::ptr::null_mut();
-    let mut buffer_count: usize = 0;
+    let mut size: usize = 0;
+    let ok = unsafe {
+      abi::envoy_dynamic_module_callback_network_filter_get_read_buffer_slices_size(
+        self.raw, &mut size,
+      )
+    };
+    if !ok || size == 0 {
+      return (Vec::new(), 0);
+    }
+
+    let mut buffers: Vec<abi::envoy_dynamic_module_type_envoy_buffer> =
+      vec![
+        abi::envoy_dynamic_module_type_envoy_buffer {
+          ptr: std::ptr::null_mut(),
+          length: 0,
+        };
+        size
+      ];
     let total_length = unsafe {
       abi::envoy_dynamic_module_callback_network_filter_get_read_buffer_slices(
         self.raw,
-        &mut buffer_ptr,
-        &mut buffer_count,
+        buffers.as_mut_ptr(),
       )
     };
-    if buffer_count == 0 || buffer_ptr.is_null() {
-      return (Vec::new(), total_length);
-    }
-    let slices = unsafe { std::slice::from_raw_parts(buffer_ptr, buffer_count) };
-    let buffers: Vec<EnvoyBuffer> = slices
+    let envoy_buffers: Vec<EnvoyBuffer> = buffers
       .iter()
       .map(|s| unsafe { EnvoyBuffer::new_from_raw(s.ptr as *const u8, s.length) })
       .collect();
-    (buffers, total_length)
+    (envoy_buffers, total_length)
   }
 
   fn get_write_buffer_slices(&mut self) -> (Vec<EnvoyBuffer>, usize) {
-    let mut buffer_ptr: *mut abi::envoy_dynamic_module_type_envoy_buffer = std::ptr::null_mut();
-    let mut buffer_count: usize = 0;
+    let mut size: usize = 0;
+    let ok = unsafe {
+      abi::envoy_dynamic_module_callback_network_filter_get_write_buffer_slices_size(
+        self.raw, &mut size,
+      )
+    };
+    if !ok || size == 0 {
+      return (Vec::new(), 0);
+    }
+
+    let mut buffers: Vec<abi::envoy_dynamic_module_type_envoy_buffer> =
+      vec![
+        abi::envoy_dynamic_module_type_envoy_buffer {
+          ptr: std::ptr::null_mut(),
+          length: 0,
+        };
+        size
+      ];
     let total_length = unsafe {
       abi::envoy_dynamic_module_callback_network_filter_get_write_buffer_slices(
         self.raw,
-        &mut buffer_ptr,
-        &mut buffer_count,
+        buffers.as_mut_ptr(),
       )
     };
-    if buffer_count == 0 || buffer_ptr.is_null() {
-      return (Vec::new(), total_length);
-    }
-    let slices = unsafe { std::slice::from_raw_parts(buffer_ptr, buffer_count) };
-    let buffers: Vec<EnvoyBuffer> = slices
+    let envoy_buffers: Vec<EnvoyBuffer> = buffers
       .iter()
       .map(|s| unsafe { EnvoyBuffer::new_from_raw(s.ptr as *const u8, s.length) })
       .collect();
-    (buffers, total_length)
+    (envoy_buffers, total_length)
   }
 
   fn drain_read_buffer(&mut self, length: usize) {
@@ -3574,30 +3599,40 @@ fn init_network_filter_config<EC: EnvoyNetworkFilterConfig, ENF: EnvoyNetworkFil
 ) -> abi::envoy_dynamic_module_type_network_filter_config_module_ptr {
   let network_filter_config = new_network_filter_config_fn(envoy_filter_config, name, config);
   match network_filter_config {
-    Some(config) => Box::into_raw(Box::new(config)) as *const std::ffi::c_void,
+    Some(config) => wrap_into_c_void_ptr!(config),
     None => std::ptr::null(),
   }
 }
 
 #[no_mangle]
-pub extern "C" fn envoy_dynamic_module_on_network_filter_config_destroy(
+unsafe extern "C" fn envoy_dynamic_module_on_network_filter_config_destroy(
   filter_config_ptr: abi::envoy_dynamic_module_type_network_filter_config_module_ptr,
 ) {
-  let _ = unsafe {
-    Box::from_raw(filter_config_ptr as *mut Box<dyn NetworkFilterConfig<EnvoyNetworkFilterImpl>>)
-  };
+  drop_wrapped_c_void_ptr!(
+    filter_config_ptr,
+    NetworkFilterConfig<EnvoyNetworkFilterImpl>
+  );
 }
 
 #[no_mangle]
-pub extern "C" fn envoy_dynamic_module_on_network_filter_new(
+unsafe extern "C" fn envoy_dynamic_module_on_network_filter_new(
   filter_config_ptr: abi::envoy_dynamic_module_type_network_filter_config_module_ptr,
   envoy_filter_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
 ) -> abi::envoy_dynamic_module_type_network_filter_module_ptr {
-  let filter_config =
-    filter_config_ptr as *mut Box<dyn NetworkFilterConfig<EnvoyNetworkFilterImpl>>;
-  let filter_config = unsafe { &mut *filter_config };
-  let filter = filter_config.new_network_filter(&mut EnvoyNetworkFilterImpl::new(envoy_filter_ptr));
-  Box::into_raw(Box::new(filter)) as *const std::ffi::c_void
+  let mut envoy_filter = EnvoyNetworkFilterImpl::new(envoy_filter_ptr);
+  let filter_config = {
+    let raw = filter_config_ptr as *const *const dyn NetworkFilterConfig<EnvoyNetworkFilterImpl>;
+    &**raw
+  };
+  envoy_dynamic_module_on_network_filter_new_impl(&mut envoy_filter, filter_config)
+}
+
+fn envoy_dynamic_module_on_network_filter_new_impl(
+  envoy_filter: &mut EnvoyNetworkFilterImpl,
+  filter_config: &dyn NetworkFilterConfig<EnvoyNetworkFilterImpl>,
+) -> abi::envoy_dynamic_module_type_network_filter_module_ptr {
+  let filter = filter_config.new_network_filter(envoy_filter);
+  wrap_into_c_void_ptr!(filter)
 }
 
 #[no_mangle]

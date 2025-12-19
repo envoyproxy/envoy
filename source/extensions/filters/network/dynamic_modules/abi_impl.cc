@@ -27,21 +27,15 @@ toEnvoyCloseType(envoy_dynamic_module_type_network_connection_close_type close_t
   return Network::ConnectionCloseType::NoFlush;
 }
 
-// Helper to get buffer slices from a Buffer::Instance.
-void getBufferSlices(Buffer::Instance& buffer,
-                     std::vector<envoy_dynamic_module_type_envoy_buffer>& slices) {
-  const uint64_t num_slices = buffer.getRawSlices().size();
-  if (num_slices == 0) {
-    return;
-  }
-
+// Helper to fill buffer slices from a Buffer::Instance into a pre-allocated array.
+void fillBufferSlices(const Buffer::Instance& buffer,
+                      envoy_dynamic_module_type_envoy_buffer* result_buffer_vector) {
   Buffer::RawSliceVector raw_slices = buffer.getRawSlices();
-  slices.reserve(raw_slices.size());
+  auto counter = 0;
   for (const auto& slice : raw_slices) {
-    envoy_dynamic_module_type_envoy_buffer envoy_buffer;
-    envoy_buffer.ptr = static_cast<char*>(slice.mem_);
-    envoy_buffer.length = slice.len_;
-    slices.push_back(envoy_buffer);
+    result_buffer_vector[counter].length = slice.len_;
+    result_buffer_vector[counter].ptr = static_cast<char*>(slice.mem_);
+    counter++;
   }
 }
 
@@ -49,61 +43,55 @@ void getBufferSlices(Buffer::Instance& buffer,
 
 extern "C" {
 
-size_t envoy_dynamic_module_callback_network_filter_get_read_buffer_slices(
-    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_envoy_buffer** result_buffer_ptr, size_t* result_buffer_length_ptr) {
+bool envoy_dynamic_module_callback_network_filter_get_read_buffer_slices_size(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, size_t* size) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
   Buffer::Instance* buffer = filter->currentReadBuffer();
 
   if (buffer == nullptr) {
-    *result_buffer_ptr = nullptr;
-    *result_buffer_length_ptr = 0;
+    return false;
+  }
+  *size = buffer->getRawSlices(std::nullopt).size();
+  return true;
+}
+
+size_t envoy_dynamic_module_callback_network_filter_get_read_buffer_slices(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result_buffer_vector) {
+  auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
+  Buffer::Instance* buffer = filter->currentReadBuffer();
+
+  if (buffer == nullptr) {
     return 0;
   }
 
-  // Get the slices. Please note that here we allocate memory here that the
-  // module must not free. These slices are valid until the end of the callback.
-  static thread_local std::vector<envoy_dynamic_module_type_envoy_buffer> slices;
-  slices.clear();
-  getBufferSlices(*buffer, slices);
-
-  if (slices.empty()) {
-    *result_buffer_ptr = nullptr;
-    *result_buffer_length_ptr = 0;
-    return 0;
-  }
-
-  *result_buffer_ptr = slices.data();
-  *result_buffer_length_ptr = slices.size();
+  fillBufferSlices(*buffer, result_buffer_vector);
   return buffer->length();
 }
 
-size_t envoy_dynamic_module_callback_network_filter_get_write_buffer_slices(
-    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_envoy_buffer** result_buffer_ptr, size_t* result_buffer_length_ptr) {
+bool envoy_dynamic_module_callback_network_filter_get_write_buffer_slices_size(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, size_t* size) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
   Buffer::Instance* buffer = filter->currentWriteBuffer();
 
   if (buffer == nullptr) {
-    *result_buffer_ptr = nullptr;
-    *result_buffer_length_ptr = 0;
+    return false;
+  }
+  *size = buffer->getRawSlices(std::nullopt).size();
+  return true;
+}
+
+size_t envoy_dynamic_module_callback_network_filter_get_write_buffer_slices(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result_buffer_vector) {
+  auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
+  Buffer::Instance* buffer = filter->currentWriteBuffer();
+
+  if (buffer == nullptr) {
     return 0;
   }
 
-  // Get the slices. Please note that here we allocate memory here that the
-  // module must not free. These slices are valid until the end of the callback.
-  static thread_local std::vector<envoy_dynamic_module_type_envoy_buffer> slices;
-  slices.clear();
-  getBufferSlices(*buffer, slices);
-
-  if (slices.empty()) {
-    *result_buffer_ptr = nullptr;
-    *result_buffer_length_ptr = 0;
-    return 0;
-  }
-
-  *result_buffer_ptr = slices.data();
-  *result_buffer_length_ptr = slices.size();
+  fillBufferSlices(*buffer, result_buffer_vector);
   return buffer->length();
 }
 
