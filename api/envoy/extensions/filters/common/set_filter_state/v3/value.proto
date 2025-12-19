@@ -46,7 +46,7 @@ message FilterStateValue {
     // <envoy_v3_api_field_extensions.filters.common.set_filter_state.v3.FilterStateValue.factory_key>`
     // to indicate which factory should create the object from your value.
     //
-    // Example using a well-known key where `factory_key` is not needed:
+    // Example using a well-known key where ``factory_key`` is not needed:
     //
     // .. code-block:: yaml
     //
@@ -55,7 +55,7 @@ message FilterStateValue {
     //      text_format_source:
     //        inline_string: "my-cluster"
     //
-    // Example using a custom key which requires a `factory_key`:
+    // Example using a custom key which requires a ``factory_key``:
     //
     // .. code-block:: yaml
     //
