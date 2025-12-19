@@ -261,7 +261,7 @@ TEST_P(TcpAsyncClientIntegrationTest, TestUpstreamCloseRST) {
 // Test the behaviour when the connection is half closed and then the connection is reset by
 // the client. The behavior is different for windows, since RST support is literally supported for
 // unix like system, disabled the test for windows.
-TEST_P(TcpAsyncClientIntegrationTest, DISABLED_TestDownstremHalfClosedThenRST) {
+TEST_P(TcpAsyncClientIntegrationTest, TestDownstremHalfClosedThenRST) {
   init();
 
   std::string request("request");
@@ -293,7 +293,7 @@ TEST_P(TcpAsyncClientIntegrationTest, DISABLED_TestDownstremHalfClosedThenRST) {
   // As a basic half close process, the connection is already half closed in Envoy before.
   // The normal close in Envoy will not trigger the remote close event for the upstream connection.
   // This is the same behavior as the normal half close process without detection of RST.
-  // ASSERT_TRUE(fake_upstream_connection->write(" ", true));
+  ASSERT_TRUE(fake_upstream_connection->write(" ", true));
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 }
 #endif
