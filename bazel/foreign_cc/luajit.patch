@@ -127,7 +127,7 @@ index 00000000..8dca96e6
 +  install
 diff --git a/luajit_build_win.sh b/luajit_build_win.sh
 new file mode 100755
-index 00000000..c6267893
+index 00000000..a493e7e0
 --- /dev/null
 +++ b/luajit_build_win.sh
 @@ -0,0 +1,38 @@
@@ -162,23 +162,10 @@ index 00000000..c6267893
 +./msvcbuild.bat static
 +
 +mkdir -p "$PREFIX/lib"
-+cp lua51.lib "$PREFIX/lib"
++cp lua51.lib vc140.pdb "$PREFIX/lib"
 +mkdir -p "$PREFIX/include/luajit-2.1"
 +for header in lauxlib.h luaconf.h lua.h lua.hpp luajit.h lualib.h; do
 +    cp "$header" "$PREFIX/include/luajit-2.1"
 +done
 +mkdir -p "$PREFIX/bin"
 +cp luajit.exe "$PREFIX/bin"
-diff --git a/src/msvcbuild.bat b/src/msvcbuild.bat
-index d6aed170..44afb72e 100644
---- a/src/msvcbuild.bat
-+++ b/src/msvcbuild.bat
-@@ -20,7 +20,7 @@
- @set LJCOMPILE=cl /nologo /c /O2 /W3 /D_CRT_SECURE_NO_DEPRECATE /D_CRT_STDIO_INLINE=__declspec(dllexport)__inline
- @set LJDYNBUILD=/DLUA_BUILD_AS_DLL /MD
- @set LJDYNBUILD_DEBUG=/DLUA_BUILD_AS_DLL /MDd 
--@set LJCOMPILETARGET=/Zi
-+@set LJCOMPILETARGET=/Z7
- @set LJLINKTYPE=/DEBUG /RELEASE
- @set LJLINKTYPE_DEBUG=/DEBUG
- @set LJLINKTARGET=/OPT:REF /OPT:ICF /INCREMENTAL:NO
