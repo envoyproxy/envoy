@@ -663,10 +663,11 @@ message Http2ProtocolOptions {
   // Configure the maximum amount of metadata than can be handled per stream. Defaults to 1 MB.
   google.protobuf.UInt64Value max_metadata_size = 17;
 
-  // Disables encoding the headers using huffman encoding.
+  // Controls whether to encode headers using huffman encoding.
   // This can be useful in cases where the cpu spent encoding the headers isn't
   // worth the network bandwidth saved e.g. for localhost.
-  bool disable_huffman_encoding = 18;
+  // If unset, uses the data plane's default value.
+  google.protobuf.BoolValue enable_huffman_encoding = 18;
 }
 
 // [#not-implemented-hide:]

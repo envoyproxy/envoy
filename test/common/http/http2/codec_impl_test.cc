@@ -3188,7 +3188,7 @@ TEST_P(Http2CodecImplTest, TestCanDisableHuffmanEncoding) {
   request_headers.addCopy("x-well-compressable-header", std::string(1000, 'a'));
 
   // Create a connection with huffman disabled.
-  client_http2_options_.set_disable_huffman_encoding(true);
+  client_http2_options_.mutable_enable_huffman_encoding()->set_value(false);
   initialize();
 
   std::string buffer_without_huffman;
@@ -3206,7 +3206,7 @@ TEST_P(Http2CodecImplTest, TestCanDisableHuffmanEncoding) {
   ASSERT_EQ(server_wrapper_->buffer_.length(), 0);
 
   // Create a connection with huffman enabled.
-  client_http2_options_.set_disable_huffman_encoding(false);
+  client_http2_options_.mutable_enable_huffman_encoding()->set_value(true);
   NiceMock<Network::MockConnection> client_connection2;
   MockConnectionCallbacks client_callbacks2;
   client_ = std::make_unique<TestClientConnectionImpl>(
