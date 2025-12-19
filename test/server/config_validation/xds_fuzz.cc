@@ -241,11 +241,9 @@ void XdsFuzzTest::replay() {
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TestTypeUrl::get().Cluster,
                                                              {buildCluster("cluster_0")},
                                                              {buildCluster("cluster_0")}, {}, "0");
-  // TODO (dmitri-d) legacy delta sends node with every DiscoveryRequest, other mux implementations
-  // follow set_node_on_first_message_only config flag
+  // All Mux implementations respect set_node_on_first_message_only config flag
   EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().ClusterLoadAssignment, "",
-                                      {"cluster_0"}, {"cluster_0"}, {},
-                                      sotw_or_delta_ == Grpc::SotwOrDelta::Delta));
+                                      {"cluster_0"}, {"cluster_0"}, {}, false));
   sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
       Config::TestTypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment("cluster_0")},
       {buildClusterLoadAssignment("cluster_0")}, {}, "0");

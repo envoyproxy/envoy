@@ -13,7 +13,6 @@ namespace Config {
 
 DeltaSubscriptionState::DeltaSubscriptionState(std::string type_url,
                                                UntypedConfigUpdateCallbacks& watch_map,
-                                               const LocalInfo::LocalInfo& local_info,
                                                Event::Dispatcher& dispatcher,
                                                XdsConfigTrackerOptRef xds_config_tracker)
     // TODO(snowp): Hard coding VHDS here is temporary until we can move it away from relying on
@@ -37,7 +36,7 @@ DeltaSubscriptionState::DeltaSubscriptionState(std::string type_url,
             watch_map_.onConfigUpdate({}, removed_resources, "");
           },
           dispatcher, dispatcher.timeSource()),
-      type_url_(std::move(type_url)), watch_map_(watch_map), local_info_(local_info),
+      type_url_(std::move(type_url)), watch_map_(watch_map),
       xds_config_tracker_(xds_config_tracker) {}
 
 void DeltaSubscriptionState::updateSubscriptionInterest(
@@ -335,7 +334,6 @@ DeltaSubscriptionState::getNextRequestAckless() {
   names_removed_.clear();
 
   request.set_type_url(type_url_);
-  request.mutable_node()->MergeFrom(local_info_.node());
   return request;
 }
 

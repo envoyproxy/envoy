@@ -70,7 +70,7 @@ public:
         {{"envoy.restart_features.xds_failover_support", using_xds_failover_ ? "true" : "false"}});
   }
 
-  void setup() {
+  void setup(bool skip_subsequent_node = false) {
     auto backoff_strategy = std::make_unique<JitteredExponentialBackOffStrategy>(
         SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs, random_);
     GrpcMuxContext grpc_mux_context{
@@ -89,7 +89,7 @@ public:
         /*backoff_strategy_=*/std::move(backoff_strategy),
         /*target_xds_authority_=*/"",
         /*eds_resources_cache_=*/std::unique_ptr<MockEdsResourcesCache>(eds_resources_cache_),
-        /*skip_subsequent_node_=*/false};
+        /*skip_subsequent_node_=*/skip_subsequent_node};
     if (isUnifiedMuxTest()) {
       grpc_mux_ = std::make_unique<XdsMux::GrpcMuxDelta>(grpc_mux_context);
       return;
@@ -104,9 +104,11 @@ public:
                          const Protobuf::int32 error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
                          const std::string& error_message = "",
                          const std::map<std::string, std::string>& initial_resource_versions = {},
-                         Grpc::MockAsyncStream* async_stream = nullptr) {
+                         Grpc::MockAsyncStream* async_stream = nullptr, bool expect_node = true) {
     API_NO_BOOST(envoy::service::discovery::v3::DeltaDiscoveryRequest) expected_request;
-    expected_request.mutable_node()->CopyFrom(local_info_.node());
+    if (expect_node) {
+      expected_request.mutable_node()->CopyFrom(local_info_.node());
+    }
     for (const auto& resource : resource_names_subscribe) {
       expected_request.add_resource_names_subscribe(resource);
     }
@@ -210,13 +212,15 @@ INSTANTIATE_TEST_SUITE_P(NewGrpcMuxImplTest, NewGrpcMuxImplTest,
 
 // Validate behavior when dynamic context parameters are updated.
 TEST_P(NewGrpcMuxImplTest, DynamicContextParameters) {
-  setup();
+  setup(true);
   InSequence s;
   auto foo_sub = grpc_mux_->addWatch("foo", {"x", "y"}, callbacks_, resource_decoder_, {});
   auto bar_sub = grpc_mux_->addWatch("bar", {}, callbacks_, resource_decoder_, {});
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
-  expectSendMessage("foo", {"x", "y"}, {});
-  expectSendMessage("bar", {}, {});
+  expectSendMessage("foo", {"x", "y"}, {}, "", Grpc::Status::WellKnownGrpcStatus::Ok, "", {},
+                    nullptr, true);
+  expectSendMessage("bar", {}, {}, "", Grpc::Status::WellKnownGrpcStatus::Ok, "", {}, nullptr,
+                    false);
   grpc_mux_->start();
   // Unknown type, shouldn't do anything.
   EXPECT_TRUE(local_info_.context_provider_.update_cb_handler_.runCallbacks("baz").ok());
@@ -227,7 +231,51 @@ TEST_P(NewGrpcMuxImplTest, DynamicContextParameters) {
   expectSendMessage("bar", {}, {});
   EXPECT_TRUE(local_info_.context_provider_.update_cb_handler_.runCallbacks("bar").ok());
 
-  expectSendMessage("foo", {}, {"x", "y"});
+  expectSendMessage("foo", {}, {"x", "y"}, "", Grpc::Status::WellKnownGrpcStatus::Ok, "", {},
+                    nullptr, false);
+}
+
+// Validate behavior when skip_subsequent_node is set to true.
+TEST_P(NewGrpcMuxImplTest, SkipSubsequentNode) {
+  setup(true);
+  InSequence s;
+  auto watch = grpc_mux_->addWatch("foo", {"x"}, callbacks_, resource_decoder_, {});
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  // first message
+  expectSendMessage("foo", {"x"}, {}, "", Grpc::Status::WellKnownGrpcStatus::Ok, "", {}, nullptr,
+                    true);
+  grpc_mux_->start();
+
+  // second message
+  expectSendMessage("foo", {"y"}, {}, "", Grpc::Status::WellKnownGrpcStatus::Ok, "", {}, nullptr,
+                    false);
+  watch->update({"x", "y"});
+  // for teardown
+  expectSendMessage("foo", {}, {"x", "y"}, "", Grpc::Status::WellKnownGrpcStatus::Ok, "", {},
+                    nullptr, false);
+}
+
+// Validate behavior when skip_subsequent_node is set to true but runtime flag is disabled.
+// Note the flag only affects the legacy (non-unified) implementation.
+TEST_P(NewGrpcMuxImplTest, SkipSubsequentNodeFlagDisabled) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.legacy_delta_xds_skip_subsequent_node", "false"}});
+  setup(true);
+  InSequence s;
+  auto watch = grpc_mux_->addWatch("foo", {"x"}, callbacks_, resource_decoder_, {});
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  // first message
+  expectSendMessage("foo", {"x"}, {}, "", Grpc::Status::WellKnownGrpcStatus::Ok, "", {}, nullptr,
+                    true);
+  grpc_mux_->start();
+
+  // second message
+  expectSendMessage("foo", {"y"}, {}, "", Grpc::Status::WellKnownGrpcStatus::Ok, "", {}, nullptr,
+                    !isUnifiedMuxTest());
+  watch->update({"x", "y"});
+  // for teardown
+  expectSendMessage("foo", {}, {"x", "y"}, "", Grpc::Status::WellKnownGrpcStatus::Ok, "", {},
+                    nullptr, !isUnifiedMuxTest());
 }
 
 // Validate cached nonces are cleared on reconnection.

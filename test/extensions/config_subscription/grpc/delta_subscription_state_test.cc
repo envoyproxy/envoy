@@ -64,7 +64,7 @@ protected:
           type_url, callbacks_, dispatcher_, XdsConfigTrackerOptRef());
     } else {
       state_ = std::make_unique<Envoy::Config::DeltaSubscriptionState>(
-          type_url, callbacks_, local_info_, dispatcher_, XdsConfigTrackerOptRef());
+          type_url, callbacks_, dispatcher_, XdsConfigTrackerOptRef());
     }
   }
 
@@ -192,6 +192,34 @@ public:
 
 INSTANTIATE_TEST_SUITE_P(DeltaSubscriptionStateTestBlank, DeltaSubscriptionStateTestBlank,
                          testing::ValuesIn({LegacyOrUnified::Legacy, LegacyOrUnified::Unified}));
+
+// Checks that setDynamicContextChanged sets the dirty bit and potentially
+// triggers pending updates.
+TEST_P(DeltaSubscriptionStateTestBlank, DynamicContextChange) {
+  // Initial request
+  EXPECT_TRUE(subscriptionUpdatePending());
+  getNextRequestAckless();
+  EXPECT_FALSE(subscriptionUpdatePending());
+
+  if (should_use_unified_) {
+    auto* sub = absl::get<1>(state_).get();
+    EXPECT_FALSE(sub->dynamicContextChanged());
+    sub->setDynamicContextChanged();
+    EXPECT_TRUE(sub->dynamicContextChanged());
+    EXPECT_TRUE(subscriptionUpdatePending());
+    sub->clearDynamicContextChanged();
+  } else {
+    auto* sub = absl::get<0>(state_).get();
+    EXPECT_FALSE(sub->dynamicContextChanged());
+    sub->setDynamicContextChanged();
+    EXPECT_TRUE(sub->dynamicContextChanged());
+    EXPECT_TRUE(subscriptionUpdatePending());
+    getNextRequestAckless();
+    // dynamic_context_changed_ flag is not cleared by getNextRequestAckless()
+    EXPECT_TRUE(sub->dynamicContextChanged());
+    sub->clearDynamicContextChanged();
+  }
+}
 
 // Checks if subscriptionUpdatePending returns correct value depending on scenario.
 TEST_P(DeltaSubscriptionStateTestBlank, SubscriptionPendingTest) {
