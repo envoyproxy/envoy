@@ -131,6 +131,10 @@ std::string cookieNameWithSuffix(absl::string_view base_name, absl::string_view 
 }
 
 bool cookieNameMatchesBase(absl::string_view cookie_name, absl::string_view base_name) {
+  // TODO(Huabing): Remove this once all supported releases understand suffixed names.
+  if (cookie_name == base_name) {
+    return true;
+  }
   if (cookie_name.size() <= base_name.size() + CookieSuffixDelimiter.size()) {
     return false;
   }
@@ -142,6 +146,14 @@ absl::optional<std::string> readCookieValueWithSuffix(const Http::RequestHeaderM
                                                       absl::string_view suffix) {
   const std::string suffixed_name = cookieNameWithSuffix(base_name, suffix);
   std::string value = Http::Utility::parseCookieValue(headers, suffixed_name);
+  if (!value.empty()) {
+    return value;
+  }
+
+  // Fall back to the legacy cookie name without the flow-specific suffix for backward
+  // compatibility with older Envoy versions that do not append the suffix.
+  // TODO(Huabing): Remove this once all supported releases understand suffixed names.
+  value = Http::Utility::parseCookieValue(headers, std::string(base_name));
   if (!value.empty()) {
     return value;
   }
@@ -913,6 +925,13 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
   response_headers->addReferenceKey(
       Http::Headers::get().SetCookie,
       absl::StrCat(csrf_cookie_name, "=", csrf_token, csrf_cookie_tail));
+  // Also set the legacy cookie without the flow id suffix for backward compatibility with Envoy
+  // versions that do not support per-flow cookie names.
+  // TODO(Huabing): Drop the legacy Set-Cookie once all supported releases understand suffixed
+  // names.
+  response_headers->addReferenceKey(
+      Http::Headers::get().SetCookie,
+      absl::StrCat(cookie_names.oauth_nonce_, "=", csrf_token, csrf_cookie_tail));
 
   // Encode the state parameter for the OAuth flow.
   // The flow id is included in the state to allow retrieval of flow-specific cookies later.
@@ -937,13 +956,22 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
       buildCookieTail(config_->codeVerifierCookieSettings(), code_verifier_expire_in);
   // Use the flow id to create a unique cookie name for this OAuth flow.
   // This allows multiple concurrent OAuth flows to be handled correctly.
+  const std::string encrypted_code_verifier =
+      encrypt(code_verifier, config_->hmacSecret(), random_);
   const std::string code_verifier_cookie_name =
       cookieNameWithSuffix(cookie_names.code_verifier_, flow_id);
-  response_headers->addReferenceKey(
-      Http::Headers::get().SetCookie,
-      absl::StrCat(code_verifier_cookie_name, "=",
-                   encrypt(code_verifier, config_->hmacSecret(), random_),
-                   code_verifier_cookie_tail));
+  response_headers->addReferenceKey(Http::Headers::get().SetCookie,
+                                    absl::StrCat(code_verifier_cookie_name, "=",
+                                                 encrypted_code_verifier,
+                                                 code_verifier_cookie_tail));
+
+  // Also set the legacy cookie without the flow id suffix for backward compatibility with Envoy
+  // TODO(Huabing): Remove the extra legacy cookie once all supported releases understand suffixed
+  // names.
+  response_headers->addReferenceKey(Http::Headers::get().SetCookie,
+                                    absl::StrCat(cookie_names.code_verifier_, "=",
+                                                 encrypted_code_verifier,
+                                                 code_verifier_cookie_tail));
 
   const std::string code_challenge = generateCodeChallenge(code_verifier);
   query_params.overwrite(queryParamsCodeChallenge, code_challenge);
@@ -976,6 +1004,7 @@ Http::FilterHeadersStatus OAuth2Filter::signOutUser(const Http::RequestHeaderMap
       {cookie_names.bearer_token_, config_->bearerTokenCookieSettings().path_},
       {cookie_names.id_token_, config_->idTokenCookieSettings().path_},
       {cookie_names.refresh_token_, config_->refreshTokenCookieSettings().path_},
+
   };
 
   absl::flat_hash_map<std::string, std::string> request_cookies =
@@ -1313,8 +1342,10 @@ void OAuth2Filter::addFlowCookieDeletionHeaders(Http::ResponseHeaderMap& headers
     cookie_domain = fmt::format(CookieDomainFormatString, config_->cookieDomain());
   }
 
-  auto add_delete_cookie = [&](absl::string_view base_name, absl::string_view cookie_path) {
-    const std::string cookie_name = cookieNameWithSuffix(base_name, flow_id);
+  auto add_delete_cookie = [&](absl::string_view cookie_name, absl::string_view cookie_path) {
+    if (cookie_name.empty()) {
+      return;
+    }
     const bool add_secure_attr =
         cookie_name.starts_with("__Secure-") || cookie_name.starts_with("__Host-");
     const absl::string_view maybe_secure_attr = add_secure_attr ? "; Secure" : "";
@@ -1325,8 +1356,19 @@ void OAuth2Filter::addFlowCookieDeletionHeaders(Http::ResponseHeaderMap& headers
                      maybe_secure_attr));
   };
 
-  add_delete_cookie(cookie_names.oauth_nonce_, config_->nonceCookieSettings().path_);
-  add_delete_cookie(cookie_names.code_verifier_, config_->codeVerifierCookieSettings().path_);
+  auto add_delete_cookie_variants = [&](absl::string_view base_name,
+                                        absl::string_view cookie_path) {
+    if (!flow_id.empty()) {
+      add_delete_cookie(cookieNameWithSuffix(base_name, flow_id), cookie_path);
+    }
+    // Always delete the legacy unsuffixed cookie for mixed-version clusters.
+    // TODO(Huabing): Remove once all supported releases understand suffixed names.
+    add_delete_cookie(base_name, cookie_path);
+  };
+
+  add_delete_cookie_variants(cookie_names.oauth_nonce_, config_->nonceCookieSettings().path_);
+  add_delete_cookie_variants(cookie_names.code_verifier_,
+                             config_->codeVerifierCookieSettings().path_);
 }
 
 void OAuth2Filter::sendUnauthorizedResponse(const std::string& details) {
@@ -1476,6 +1518,10 @@ void OAuth2Filter::removeOAuthFlowCookies(Http::RequestHeaderMap& headers) const
     cookies.erase(cookie_names.refresh_token_);
 
     auto eraseCookieWithSuffix = [&cookies](const std::string& base_name) {
+      // Keep removing the legacy cookie name while we support mixed-version clusters.
+      // TODO(Huabing): Delete only suffixed names once all supported releases understand suffixed
+      // names.
+      cookies.erase(base_name);
       const std::string prefix = absl::StrCat(base_name, CookieSuffixDelimiter);
       for (auto it = cookies.begin(); it != cookies.end();) {
         if (it->first.starts_with(prefix)) {
