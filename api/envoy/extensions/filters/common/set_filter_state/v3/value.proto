@@ -78,7 +78,7 @@ message FilterStateValue {
   // use one of the following generic factories:
   //
   // * ``envoy.string``: Creates a generic string object. Use this for arbitrary string values that
-  //   will be accessed via :ref:`StringAccessor <envoy_v3_api_msg_extensions.filters.common.expr.v3.CelExtractor>`.
+  //   will be accessed via ``StringAccessor``.
   //
   // If not specified, defaults to the value of ``object_key``.
   string factory_key = 6;
