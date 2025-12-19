@@ -442,7 +442,7 @@ VerifierConstPtr innerCreate(const JwtRequirement& requirement,
   case JwtRequirement::RequiresTypeCase::kAllowMissing:
     return std::make_unique<AllowMissingVerifierImpl>(factory, getAllProvidersAsList(providers),
                                                       parent);
-  case JwtRequirement::RequiresTypeCase::kExtractOnlyWithoutValidationWithoutValidation:
+  case JwtRequirement::RequiresTypeCase::kExtractOnlyWithoutValidation:
     return std::make_unique<ExtractOnlyWithoutValidationVerifierImpl>(
         factory, getAllProvidersAsList(providers), parent);
   case JwtRequirement::RequiresTypeCase::REQUIRES_TYPE_NOT_SET:
