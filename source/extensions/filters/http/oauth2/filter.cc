@@ -1445,13 +1445,13 @@ CallbackValidationResult OAuth2Filter::validateState(const Http::RequestHeaderMa
     return {false, "", "", "", fmt::format("State query param is not a valid JSON: {}", state)};
   }
 
+  // TODO(huabing): make the flow_id mandatory in the state parameter once all supported releases
+  // understand suffixed cookie names.
   const auto& filed_value_pair = message.fields();
   if (!filed_value_pair.contains(stateParamsUrl) ||
-      !filed_value_pair.contains(stateParamsCsrfToken) ||
-      !filed_value_pair.contains(stateParamsFlowId)) {
-    return {
-        false, "", "", "",
-        fmt::format("State query param does not contain url, CSRF token, or flow id: {}", state)};
+      !filed_value_pair.contains(stateParamsCsrfToken)) {
+    return {false, "", "", "",
+            fmt::format("State query param does not contain url or CSRF token: {}", state)};
   }
 
   // Return 401 unauthorized if the CSRF token cookie does not match the CSRF token in the state.
@@ -1461,10 +1461,9 @@ CallbackValidationResult OAuth2Filter::validateState(const Http::RequestHeaderMa
   // in the attacker's account.
   // More information can be found at https://datatracker.ietf.org/doc/html/rfc6819#section-5.3.5
   std::string csrf_token = filed_value_pair.at(stateParamsCsrfToken).string_value();
-  std::string flow_id = filed_value_pair.at(stateParamsFlowId).string_value();
-  if (flow_id.empty()) {
-    return {false, "", "", "", fmt::format("Flow id in state is empty: {}", state)};
-  }
+  std::string flow_id = filed_value_pair.contains(stateParamsFlowId)
+                            ? filed_value_pair.at(stateParamsFlowId).string_value()
+                            : "";
 
   // We can't trust the flow_id from the state parameter without validating the CSRF token first.
   if (!validateCsrfToken(headers, csrf_token, flow_id)) {
