@@ -14,7 +14,7 @@ namespace {
 envoy::service::load_stats::v3::LoadStatsRequest MakeRequestTemplate(const LocalInfo::LocalInfo& local_info) {
   envoy::service::load_stats::v3::LoadStatsRequest request;
   request.mutable_node()->MergeFrom(local_info.node());
-  request.mutable_node.add_client_features("envoy.lrs.supports_send_all_clusters");
+  request.mutable_node()->add_client_features("envoy.lrs.supports_send_all_clusters");
   return request;
 }
 
@@ -72,7 +72,7 @@ void LoadStatsReporter::sendLoadStatsRequest() {
   // added to the cluster manager. When we get the notification, we record the current time in
   // clusters_ as the start time for the load reporting window for that cluster.
   Envoy::Protobuf::Arena arena;
-  envoy::service::load_stats::v3::LoadStatsRequest* request = Envoy::Protobuf::Arena::Create<MyMessage>(&arena);
+  auto* request = Envoy::Protobuf::Arena::Create<envoy::service::load_stats::v3::LoadStatsRequest>(&arena);
   request->MergeFrom(request_template_);
   for (const auto& cluster_name_and_timestamp : clusters_) {
     const std::string& cluster_name = cluster_name_and_timestamp.first;
