@@ -192,6 +192,11 @@ bug_fixes:
 - area: dynamic modules
   change: |
     Fixed a soundness bug in the Rust SDK by tightening bounds on the ``HttpFilterConfig`` trait.
+- area: sds
+  change: |
+    Fixed SDS to enable auto-recovery when initial certificate file loading fails. Previously, if certificate
+    files did not exist during initial SDS configuration, no file watch callbacks were set up, preventing
+    automatic recovery when files appeared later.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`

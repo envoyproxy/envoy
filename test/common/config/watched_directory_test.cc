@@ -34,7 +34,7 @@ TEST(WatchedDirectory, All) {
 }
 
 // Verify that watch callback doesn't crash if setCallback() was never called.
-TEST(WatchedDirectory, DefaultCallbackDoesNotCrash) {
+TEST(WatchedDirectory, CallbackNotSetDoesNotCrash) {
   Event::MockDispatcher dispatcher;
   envoy::config::core::v3::WatchedDirectory config;
   config.set_path("foo/bar");
@@ -45,8 +45,7 @@ TEST(WatchedDirectory, DefaultCallbackDoesNotCrash) {
       .WillOnce(DoAll(SaveArg<2>(&cb), Return(absl::OkStatus())));
   auto wd = *WatchedDirectory::create(config, dispatcher);
   // We are not calling setCallback() to simulate the case where file loading fails
-  // before the callback can be set. This should not crash.
-  // The default no-op callback should return OkStatus.
+  // before the callback can be set. The watch callback checks for null and returns OkStatus.
   EXPECT_TRUE(cb(Filesystem::Watcher::Events::MovedTo).ok());
 }
 
