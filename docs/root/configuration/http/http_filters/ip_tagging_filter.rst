@@ -112,7 +112,7 @@ the owning HTTP connection manager.
         no_hit, Counter, Total number of requests with no applicable IP tags
         total, Counter, Total number of requests the IP Tagging Filter operated on
 
-When file based reload of IP tags is enabled ,additional reload stats will be  available in the ``http.<stat_prefix>.ip_tagging_reload.`` namespace.
+When file based reload of IP tags is enabled, additional reload stats will be  available in the ``http.<stat_prefix>.ip_tagging_reload.`` namespace.
 
 .. csv-table::
   :header: Name, Type, Description
