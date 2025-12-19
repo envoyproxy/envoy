@@ -175,8 +175,7 @@ TEST_P(StreamingIntegrationTest, PostAndProcessHeadersOnly) {
       [](grpc::ServerContext* ctx) {
         // Verify that the metadata set in the grpc client configuration
         // above is actually sent to our RPC.
-        auto [request_id, request_id_end] =
-            ctx->client_metadata().equal_range("x-request-id");
+        auto [request_id, request_id_end] = ctx->client_metadata().equal_range("x-request-id");
         ASSERT_NE(request_id, request_id_end);
         EXPECT_EQ(request_id->second, "sent some metadata");
       });
