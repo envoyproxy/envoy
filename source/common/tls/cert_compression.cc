@@ -1,7 +1,7 @@
 #include "source/common/tls/cert_compression.h"
 
 #include "source/common/common/assert.h"
-#include "source/common/tls/ssl_ctx_stats_provider.h"
+#include "source/common/common/macros.h"
 #include "source/common/tls/stats.h"
 
 #include "brotli/decode.h"
@@ -31,7 +31,12 @@ private:
   CleanupFunc cleanup_;
 };
 
-// Record certificate compression stats per algorithm for monitoring compression effectiveness.
+// ex_data index for Stats::Scope* - avoids conflict with QUICHE's own SSL_CTX usage.
+int getScopeExDataIndex() {
+  static int index = SSL_CTX_get_ex_new_index(0, nullptr, nullptr, nullptr, nullptr);
+  return index;
+}
+
 void recordCompressedCertSize(SSL* ssl, size_t uncompressed_size, size_t compressed_size,
                               const std::string& algo) {
   if (ssl == nullptr) {
@@ -41,10 +46,10 @@ void recordCompressedCertSize(SSL* ssl, size_t uncompressed_size, size_t compres
   if (ssl_ctx == nullptr) {
     return;
   }
-  auto* provider = static_cast<SslCtxStatsProvider*>(SSL_CTX_get_app_data(ssl_ctx));
-  if (provider != nullptr) {
+  auto* scope = static_cast<Stats::Scope*>(SSL_CTX_get_ex_data(ssl_ctx, getScopeExDataIndex()));
+  if (scope != nullptr) {
     const std::string prefix = "ssl.certificate_compression." + algo + ".";
-    CertCompressionStats stats = generateCertCompressionStats(provider->statsScope(), prefix);
+    CertCompressionStats stats = generateCertCompressionStats(*scope, prefix);
     stats.compressed_.inc();
     stats.total_uncompressed_bytes_.add(uncompressed_size);
     stats.total_compressed_bytes_.add(compressed_size);
@@ -71,7 +76,27 @@ void CertCompression::registerZlib(SSL_CTX* ssl_ctx) {
   ASSERT(ret == 1);
 }
 
-// Brotli compression implementation
+void CertCompression::registerAlgorithms(SSL_CTX* ssl_ctx,
+                                         const std::vector<Algorithm>& algorithms,
+                                         Stats::Scope* scope) {
+  if (scope != nullptr) {
+    SSL_CTX_set_ex_data(ssl_ctx, getScopeExDataIndex(), scope);
+  }
+  for (const auto& algo : algorithms) {
+    switch (algo) {
+    case Algorithm::Brotli:
+      registerBrotli(ssl_ctx);
+      break;
+    case Algorithm::Zstd:
+      registerZstd(ssl_ctx);
+      break;
+    case Algorithm::Zlib:
+      registerZlib(ssl_ctx);
+      break;
+    }
+  }
+}
+
 int CertCompression::compressBrotli(SSL* ssl, CBB* out, const uint8_t* in, size_t in_len) {
   size_t encoded_size = BrotliEncoderMaxCompressedSize(in_len);
   if (encoded_size == 0) {
@@ -137,7 +162,6 @@ int CertCompression::decompressBrotli(SSL*, CRYPTO_BUFFER** out, size_t uncompre
   return SUCCESS;
 }
 
-// Zstd compression implementation
 int CertCompression::compressZstd(SSL* ssl, CBB* out, const uint8_t* in, size_t in_len) {
   size_t const max_size = ZSTD_compressBound(in_len);
   if (max_size == 0) {
@@ -200,7 +224,6 @@ int CertCompression::decompressZstd(SSL*, CRYPTO_BUFFER** out, size_t uncompress
   return SUCCESS;
 }
 
-// Zlib compression implementation
 int CertCompression::compressZlib(SSL* ssl, CBB* out, const uint8_t* in, size_t in_len) {
   z_stream z = {};
   // The deflateInit macro from zlib.h contains an old-style cast, so we need to suppress the

@@ -1,5 +1,9 @@
 #pragma once
 
+#include <vector>
+
+#include "envoy/stats/scope.h"
+
 #include "source/common/common/logger.h"
 
 #include "openssl/ssl.h"
@@ -10,49 +14,41 @@ namespace TransportSockets {
 namespace Tls {
 
 // RFC 8879 Certificate Compression Algorithm IDs.
-// TLSEXT_cert_compression_zlib (1) is defined in BoringSSL.
-// Define brotli (2) and zstd (3) locally as they may not be in all BoringSSL versions.
-#ifndef TLSEXT_cert_compression_brotli
-#define TLSEXT_cert_compression_brotli 2
-#endif
+// TLSEXT_cert_compression_zlib (1) and TLSEXT_cert_compression_brotli (2) are defined in BoringSSL.
+// Define zstd (3) locally as BoringSSL does not define it.
 #ifndef TLSEXT_cert_compression_zstd
 #define TLSEXT_cert_compression_zstd 3
 #endif
 
-/**
- * Support for certificate compression and decompression in TLS handshakes.
- * Certificate compression reduces the size of TLS handshakes, which is especially
- * important for QUIC where the ServerHello needs to fit in the initial response,
- * and beneficial for TCP TLS to reduce bandwidth overhead.
- *
- * Supported algorithms (RFC 8879):
- * - zlib (algorithm ID 1): Standard deflate compression
- * - brotli (algorithm ID 2): Better compression ratio, widely supported
- * - zstd (algorithm ID 3): Fast compression with good ratio
- */
+// RFC 8879 TLS Certificate Compression.
 class CertCompression : protected Logger::Loggable<Logger::Id::connection> {
 public:
-  // Individual registration functions for each algorithm.
+  enum class Algorithm : uint16_t {
+    Zlib = 1,
+    Brotli = 2,
+    Zstd = 3,
+  };
+
+  // Registers algorithms in the order provided (first = highest priority).
+  static void registerAlgorithms(SSL_CTX* ssl_ctx, const std::vector<Algorithm>& algorithms,
+                                 Stats::Scope* scope = nullptr);
+
   static void registerBrotli(SSL_CTX* ssl_ctx);
   static void registerZstd(SSL_CTX* ssl_ctx);
   static void registerZlib(SSL_CTX* ssl_ctx);
 
-  // Brotli compression callbacks.
   static int compressBrotli(SSL* ssl, CBB* out, const uint8_t* in, size_t in_len);
   static int decompressBrotli(SSL* ssl, CRYPTO_BUFFER** out, size_t uncompressed_len,
                               const uint8_t* in, size_t in_len);
 
-  // Zstd compression callbacks.
   static int compressZstd(SSL* ssl, CBB* out, const uint8_t* in, size_t in_len);
   static int decompressZstd(SSL* ssl, CRYPTO_BUFFER** out, size_t uncompressed_len,
                             const uint8_t* in, size_t in_len);
 
-  // Zlib compression callbacks.
   static int compressZlib(SSL* ssl, CBB* out, const uint8_t* in, size_t in_len);
   static int decompressZlib(SSL* ssl, CRYPTO_BUFFER** out, size_t uncompressed_len,
                             const uint8_t* in, size_t in_len);
 
-  // Defined return values for callbacks from `SSL_CTX_add_cert_compression_alg`.
   static constexpr int SUCCESS = 1;
   static constexpr int FAILURE = 0;
 };

@@ -169,9 +169,11 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
     if (Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.tls_support_certificate_compression")) {
       // Priority: brotli > zstd > zlib (brotli generally provides best compression for certs)
-      CertCompression::registerBrotli(ctx.ssl_ctx_.get());
-      CertCompression::registerZstd(ctx.ssl_ctx_.get());
-      CertCompression::registerZlib(ctx.ssl_ctx_.get());
+      CertCompression::registerAlgorithms(
+          ctx.ssl_ctx_.get(),
+          {CertCompression::Algorithm::Brotli, CertCompression::Algorithm::Zstd,
+           CertCompression::Algorithm::Zlib},
+          &scope);
     }
   }
 
