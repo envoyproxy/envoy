@@ -1181,6 +1181,9 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
       upstream_.reset();
     }
     disableIdleTimer();
+    getStreamInfo().upstreamInfo()->setUpstreamDetectedCloseType(
+        event == Network::ConnectionEvent::RemoteClose ? StreamInfo::DetectedCloseType::RemoteReset
+                                                       : StreamInfo::DetectedCloseType::LocalReset);
 
     if (connecting) {
       if (event == Network::ConnectionEvent::RemoteClose) {
