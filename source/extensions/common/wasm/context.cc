@@ -1520,7 +1520,8 @@ WasmResult Context::continueStream(WasmStreamType stream_type) {
   case WasmStreamType::Downstream:
     if (network_read_filter_callbacks_) {
       // We are in a reentrant call, so defer.
-      envoyWasm()->addAfterVmCallAction([this] { network_read_filter_callbacks_->continueReading(); });
+      envoyWasm()->addAfterVmCallAction(
+          [this] { network_read_filter_callbacks_->continueReading(); });
     }
     return WasmResult::Ok;
   case WasmStreamType::Upstream:
@@ -1638,9 +1639,9 @@ WasmResult Context::sendLocalResponse(uint32_t response_code, std::string_view b
     // but because it only gets called after the connections have drained, the call to
     // sendLocalReply() will fail. Net net, this is safe.
     envoyWasm()->addAfterVmCallAction([this, response_code, body_text = std::string(body_text),
-                                  modify_headers = std::move(modify_headers), grpc_status,
-                                  details = StringUtil::replaceAllEmptySpace(
-                                      absl::string_view(details.data(), details.size()))] {
+                                       modify_headers = std::move(modify_headers), grpc_status,
+                                       details = StringUtil::replaceAllEmptySpace(
+                                           absl::string_view(details.data(), details.size()))] {
       // C++, Rust and other SDKs use -1 (InvalidCode) as the default value if gRPC code is not set,
       // which should be mapped to nullopt in Envoy to prevent it from sending a grpc-status trailer
       // at all.

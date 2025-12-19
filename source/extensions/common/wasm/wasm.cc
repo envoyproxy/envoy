@@ -156,8 +156,8 @@ Word resolve_dns(Word dns_address_ptr, Word dns_address_size, Word token_ptr) {
   if (!context->envoyWasm()->setDatatype(token_ptr, token)) {
     return WasmResult::InvalidMemoryAccess;
   }
-  auto callback = [weak_wasm = std::weak_ptr<Wasm>(context->envoyWasm()->sharedThis()), root_context,
-                   context_id = context->id(),
+  auto callback = [weak_wasm = std::weak_ptr<Wasm>(context->envoyWasm()->sharedThis()),
+                   root_context, context_id = context->id(),
                    token](Envoy::Network::DnsResolver::ResolutionStatus status, absl::string_view,
                           std::list<Envoy::Network::DnsResponse>&& response) {
     auto wasm = weak_wasm.lock();
@@ -170,13 +170,14 @@ Word resolve_dns(Word dns_address_ptr, Word dns_address_size, Word token_ptr) {
     envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
     Network::DnsResolverFactory& dns_resolver_factory =
         Network::createDefaultDnsResolverFactory(typed_dns_resolver_config);
-    context->envoyWasm()->dnsResolver() = THROW_OR_RETURN_VALUE(
-        dns_resolver_factory.createDnsResolver(context->envoyWasm()->dispatcher(),
-                                               context->envoyWasm()->api(), typed_dns_resolver_config),
-        Network::DnsResolverSharedPtr);
+    context->envoyWasm()->dnsResolver() =
+        THROW_OR_RETURN_VALUE(dns_resolver_factory.createDnsResolver(
+                                  context->envoyWasm()->dispatcher(), context->envoyWasm()->api(),
+                                  typed_dns_resolver_config),
+                              Network::DnsResolverSharedPtr);
   }
   context->envoyWasm()->dnsResolver()->resolve(std::string(address.value()),
-                                          Network::DnsLookupFamily::Auto, callback);
+                                               Network::DnsLookupFamily::Auto, callback);
   return WasmResult::Ok;
 }
 
