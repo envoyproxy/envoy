@@ -559,22 +559,6 @@ TEST_F(RedisSingleServerRequestTest, EvalWrongNumberOfArgs) {
             splitter_.makeRequest(std::move(request2), callbacks_, dispatcher_, stream_info_));
 };
 
-TEST_F(RedisSingleServerRequestTest, SelectWrongNumberOfArgs) {
-  InSequence s;
-
-  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
-  makeBulkStringArray(*request, {"select", "1", "2"});
-
-  Common::Redis::RespValue response;
-  response.type(Common::Redis::RespType::Error);
-  response.asString() = "wrong number of arguments for 'select' command";
-
-  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
-  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
-  handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
-  EXPECT_EQ(nullptr, handle_);
-};
-
 TEST_F(RedisSingleServerRequestTest, EvalNoUpstream) {
   InSequence s;
 
@@ -1065,145 +1049,6 @@ TEST_F(RedisMSETCommandHandlerTest, WrongNumberOfArgs) {
   EXPECT_EQ(1UL, store_.counter("redis.foo.command.mset.total").value());
   EXPECT_EQ(1UL, store_.counter("redis.foo.command.mset.error").value());
 };
-
-class KeysHandlerTest : public FragmentedRequestCommandHandlerTest,
-                        public testing::WithParamInterface<std::string> {
-public:
-  void setup(uint16_t shard_size, const std::list<uint64_t>& null_handle_indexes,
-             bool mirrored = false) {
-    std::vector<std::string> request_strings = {"keys", "*"};
-    makeRequestToShard(shard_size, request_strings, null_handle_indexes, mirrored);
-  }
-
-  Common::Redis::RespValuePtr response() {
-    Common::Redis::RespValuePtr response = std::make_unique<Common::Redis::RespValue>();
-    response->type(Common::Redis::RespType::Array);
-    return response;
-  }
-};
-
-TEST_P(KeysHandlerTest, Normal) {
-  InSequence s;
-
-  setup(2, {});
-  EXPECT_NE(nullptr, handle_);
-  Common::Redis::RespValue expected_response;
-  expected_response.type(Common::Redis::RespType::Array);
-  pool_callbacks_[1]->onResponse(response());
-  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
-  EXPECT_CALL(
-      store_,
-      deliverHistogramToSinks(
-          Property(&Stats::Metric::name, "redis.foo.command." + GetParam() + ".latency"), 10));
-  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
-  pool_callbacks_[0]->onResponse(response());
-  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".total").value());
-  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".success").value());
-};
-
-TEST_P(KeysHandlerTest, Mirrored) {
-  InSequence s;
-
-  setupMirrorPolicy();
-  setup(2, {}, true);
-  EXPECT_NE(nullptr, handle_);
-
-  Common::Redis::RespValue expected_response;
-  expected_response.type(Common::Redis::RespType::Array);
-
-  pool_callbacks_[1]->onResponse(response());
-  mirror_pool_callbacks_[1]->onResponse(response());
-
-  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
-  EXPECT_CALL(
-      store_,
-      deliverHistogramToSinks(
-          Property(&Stats::Metric::name, "redis.foo.command." + GetParam() + ".latency"), 10));
-  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
-  pool_callbacks_[0]->onResponse(response());
-  mirror_pool_callbacks_[0]->onResponse(response());
-
-  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".total").value());
-  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".success").value());
-};
-
-TEST_F(KeysHandlerTest, Cancel) {
-  InSequence s;
-
-  setup(2, {});
-  EXPECT_NE(nullptr, handle_);
-
-  EXPECT_CALL(pool_requests_[0], cancel());
-  EXPECT_CALL(pool_requests_[1], cancel());
-  handle_->cancel();
-};
-
-TEST_P(KeysHandlerTest, NormalOneZero) {
-  InSequence s;
-
-  setup(2, {});
-  EXPECT_NE(nullptr, handle_);
-
-  Common::Redis::RespValue expected_response;
-  expected_response.type(Common::Redis::RespType::Array);
-
-  pool_callbacks_[1]->onResponse(response());
-
-  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
-  pool_callbacks_[0]->onResponse(response());
-
-  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".total").value());
-  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".success").value());
-};
-
-TEST_P(KeysHandlerTest, UpstreamError) {
-  Common::Redis::RespValue expected_response;
-  expected_response.type(Common::Redis::RespType::Error);
-  expected_response.asString() = "finished with 2 error(s)";
-
-  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
-  setup(2, {0, 1});
-  EXPECT_EQ(nullptr, handle_);
-  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".total").value());
-  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".error").value());
-};
-
-TEST_P(KeysHandlerTest, NoUpstreamHostForAll) {
-  Common::Redis::RespValue expected_response;
-  expected_response.type(Common::Redis::RespType::Error);
-  expected_response.asString() = "no upstream host";
-
-  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
-  setup(0, {});
-  EXPECT_EQ(nullptr, handle_);
-  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".total").value());
-  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".error").value());
-};
-
-TEST_F(KeysHandlerTest, KeysWrongNumberOfArgs) {
-  InSequence s;
-
-  Common::Redis::RespValuePtr request1{new Common::Redis::RespValue()};
-  Common::Redis::RespValuePtr request2{new Common::Redis::RespValue()};
-  Common::Redis::RespValue response;
-  response.type(Common::Redis::RespType::Error);
-
-  response.asString() = "wrong number of arguments for 'keys' command";
-  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
-  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
-  makeBulkStringArray(*request1, {"keys", "a*", "b*"});
-  EXPECT_EQ(nullptr,
-            splitter_.makeRequest(std::move(request1), callbacks_, dispatcher_, stream_info_));
-
-  response.asString() = "invalid request";
-  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
-  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
-  makeBulkStringArray(*request2, {"keys"});
-  EXPECT_EQ(nullptr,
-            splitter_.makeRequest(std::move(request2), callbacks_, dispatcher_, stream_info_));
-};
-
-INSTANTIATE_TEST_SUITE_P(KeysHandlerTest, KeysHandlerTest, testing::Values("keys"));
 
 class RedisSplitKeysSumResultHandlerTest : public FragmentedRequestCommandHandlerTest,
                                            public testing::WithParamInterface<std::string> {
@@ -1828,107 +1673,8 @@ TEST_F(InfoShardHandlerTest, InfoShardNoUpstreamForShard) {
 
 INSTANTIATE_TEST_SUITE_P(InfoShardHandlerTest, InfoShardHandlerTest, testing::Values("info.shard"));
 
-class SelectHandlerTest : public FragmentedRequestCommandHandlerTest,
-                          public testing::WithParamInterface<std::string> {
-public:
-  void setup(uint16_t shard_size, const std::list<uint64_t>& null_handle_indexes,
-             bool mirrored = false) {
-    std::vector<std::string> request_strings = {"select", "0"};
-    makeRequestToShard(shard_size, request_strings, null_handle_indexes, mirrored);
-  }
-
-  Common::Redis::RespValuePtr response() {
-    Common::Redis::RespValuePtr response = std::make_unique<Common::Redis::RespValue>();
-    response->type(Common::Redis::RespType::SimpleString);
-    response->asString() = "OK";
-    return response;
-  }
-};
-
-TEST_P(SelectHandlerTest, Normal) {
-  InSequence s;
-
-  setup(2, {});
-  EXPECT_NE(nullptr, handle_);
-  Common::Redis::RespValue expected_response;
-  expected_response.type(Common::Redis::RespType::SimpleString);
-  expected_response.asString() = "OK";
-  pool_callbacks_[1]->onResponse(response());
-  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
-  EXPECT_CALL(
-      store_,
-      deliverHistogramToSinks(
-          Property(&Stats::Metric::name, "redis.foo.command." + GetParam() + ".latency"), 10));
-  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
-  pool_callbacks_[0]->onResponse(response());
-  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".total").value());
-  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".success").value());
-};
-
-TEST_F(SelectHandlerTest, SelectInvalid) {
-  InSequence s;
-
-  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
-  makeBulkStringArray(*request, {"select"});
-
-  Common::Redis::RespValue response;
-  response.type(Common::Redis::RespType::Error);
-  response.asString() = "ERR wrong number of arguments for 'select' command";
-
-  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
-  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
-  handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
-  EXPECT_EQ(nullptr, handle_);
-};
-
-TEST_F(SelectHandlerTest, WrongNumberOfArguments) {
-  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
-  makeBulkStringArray(*request, {"select", "0", "extra_arg"});
-  Common::Redis::RespValue response;
-  response.type(Common::Redis::RespType::Error);
-  response.asString() = "wrong number of arguments for 'select' command";
-
-  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
-  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
-  EXPECT_EQ(nullptr,
-            splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_));
-  EXPECT_EQ(1UL, store_.counter("redis.foo.command.select.error").value());
-}
-
-TEST_P(SelectHandlerTest, NoUpstreamHost) {
-  Common::Redis::RespValue expected_response;
-  expected_response.type(Common::Redis::RespType::Error);
-  expected_response.asString() = "no upstream host";
-
-  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
-  setup(0, {});
-  EXPECT_EQ(nullptr, handle_);
-  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".total").value());
-  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".error").value());
-}
-
-TEST_P(SelectHandlerTest, SingleShardErrorResponse) {
-  InSequence s;
-  setup(2, {});
-  EXPECT_NE(nullptr, handle_);
-
-  Common::Redis::RespValue expected_error;
-  expected_error.type(Common::Redis::RespType::Error);
-  expected_error.asString() = "finished with 1 error(s) from select";
-
-  pool_callbacks_[1]->onResponse(response());
-
-  Common::Redis::RespValuePtr error_resp = Common::Redis::Utility::makeError("some error");
-
-  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_error)));
-  pool_callbacks_[0]->onResponse(std::move(error_resp));
-  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".error").value());
-}
-
-INSTANTIATE_TEST_SUITE_P(SelectHandlerTest, SelectHandlerTest, testing::Values("select"));
-
-class RoleHandlerTest : public FragmentedRequestCommandHandlerTest,
-                        public testing::WithParamInterface<std::string> {
+// Test cluster scope commands - ROLE (ArrayAppendAggregateResponseHandler)
+class ClusterScopeRoleTest : public FragmentedRequestCommandHandlerTest {
 public:
   void setup(uint16_t shard_size, const std::list<uint64_t>& null_handle_indexes,
              bool mirrored = false) {
@@ -1973,11 +1719,14 @@ public:
     response->asString() = "master";
     return response;
   }
+
+  Common::Redis::RespValuePtr errorResponse(const std::string& error_msg) {
+    return Common::Redis::Utility::makeError(error_msg);
+  }
 };
 
-TEST_P(RoleHandlerTest, Normal) {
+TEST_F(ClusterScopeRoleTest, RoleNormal) {
   InSequence s;
-
   setup(2, {});
   EXPECT_NE(nullptr, handle_);
 
@@ -2011,20 +1760,17 @@ TEST_P(RoleHandlerTest, Normal) {
 
   pool_callbacks_[0]->onResponse(masterResponse());
   time_system_.setMonotonicTime(std::chrono::milliseconds(10));
-  EXPECT_CALL(
-      store_,
-      deliverHistogramToSinks(
-          Property(&Stats::Metric::name, "redis.foo.command." + GetParam() + ".latency"), 10));
+  EXPECT_CALL(store_, deliverHistogramToSinks(
+                          Property(&Stats::Metric::name, "redis.foo.command.role.latency"), 10));
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
   pool_callbacks_[1]->onResponse(slaveResponse());
 
-  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".total").value());
-  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".success").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.role.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.role.success").value());
 }
 
-TEST_P(RoleHandlerTest, Mirrored) {
+TEST_F(ClusterScopeRoleTest, RoleMirrored) {
   InSequence s;
-
   setupMirrorPolicy();
   setup(2, {}, true);
   EXPECT_NE(nullptr, handle_);
@@ -2054,44 +1800,17 @@ TEST_P(RoleHandlerTest, Mirrored) {
   mirror_pool_callbacks_[0]->onResponse(masterResponse());
 
   time_system_.setMonotonicTime(std::chrono::milliseconds(10));
-  EXPECT_CALL(
-      store_,
-      deliverHistogramToSinks(
-          Property(&Stats::Metric::name, "redis.foo.command." + GetParam() + ".latency"), 10));
+  EXPECT_CALL(store_, deliverHistogramToSinks(
+                          Property(&Stats::Metric::name, "redis.foo.command.role.latency"), 10));
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
   pool_callbacks_[1]->onResponse(masterResponse());
   mirror_pool_callbacks_[1]->onResponse(masterResponse());
 
-  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".total").value());
-  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".success").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.role.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.role.success").value());
 }
 
-TEST_P(RoleHandlerTest, BulkStringResponse) {
-  InSequence s;
-
-  setup(1, {});
-  EXPECT_NE(nullptr, handle_);
-
-  Common::Redis::RespValue expected_response;
-  expected_response.type(Common::Redis::RespType::Array);
-  std::vector<Common::Redis::RespValue> elements(1);
-  elements[0].type(Common::Redis::RespType::BulkString);
-  elements[0].asString() = "master";
-  expected_response.asArray().swap(elements);
-
-  time_system_.setMonotonicTime(std::chrono::milliseconds(5));
-  EXPECT_CALL(
-      store_,
-      deliverHistogramToSinks(
-          Property(&Stats::Metric::name, "redis.foo.command." + GetParam() + ".latency"), 5));
-  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
-  pool_callbacks_[0]->onResponse(bulkStringResponse());
-
-  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".total").value());
-  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".success").value());
-}
-
-TEST_P(RoleHandlerTest, NoUpstreamHostForAll) {
+TEST_F(ClusterScopeRoleTest, RoleNoUpstreamHostForAll) {
   Common::Redis::RespValue expected_response;
   expected_response.type(Common::Redis::RespType::Error);
   expected_response.asString() = "no upstream host";
@@ -2099,58 +1818,44 @@ TEST_P(RoleHandlerTest, NoUpstreamHostForAll) {
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
   setup(0, {});
   EXPECT_EQ(nullptr, handle_);
-  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".total").value());
-  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".error").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.role.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.role.error").value());
 }
 
-TEST_P(RoleHandlerTest, NoUpstreamHostForOne) {
+TEST_F(ClusterScopeRoleTest, RoleNoUpstreamHostForOne) {
   InSequence s;
-
   setup(2, {0});
   EXPECT_NE(nullptr, handle_);
 
-  Common::Redis::RespValue expected_response;
-  expected_response.type(Common::Redis::RespType::Error);
-  expected_response.asString() = "finished with 1 error(s)";
-
-  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
+  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  EXPECT_CALL(store_, deliverHistogramToSinks(
+                          Property(&Stats::Metric::name, "redis.foo.command.role.latency"), 10));
+  EXPECT_CALL(callbacks_, onResponse_(_));
   pool_callbacks_[1]->onResponse(masterResponse());
-  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".total").value());
-  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".error").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.role.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.role.error").value());
 }
 
-TEST_P(RoleHandlerTest, UpstreamFailure) {
+TEST_F(ClusterScopeRoleTest, RoleUpstreamFailure) {
   InSequence s;
-
   setup(2, {});
   EXPECT_NE(nullptr, handle_);
-
-  Common::Redis::RespValue expected_response;
-  expected_response.type(Common::Redis::RespType::Error);
-  expected_response.asString() = "finished with 1 error(s)";
 
   pool_callbacks_[1]->onFailure();
 
   time_system_.setMonotonicTime(std::chrono::milliseconds(5));
-  EXPECT_CALL(
-      store_,
-      deliverHistogramToSinks(
-          Property(&Stats::Metric::name, "redis.foo.command." + GetParam() + ".latency"), 5));
-  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
+  EXPECT_CALL(store_, deliverHistogramToSinks(
+                          Property(&Stats::Metric::name, "redis.foo.command.role.latency"), 5));
+  EXPECT_CALL(callbacks_, onResponse_(_));
   pool_callbacks_[0]->onResponse(masterResponse());
-  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".total").value());
-  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".error").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.role.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.role.error").value());
 }
 
-TEST_P(RoleHandlerTest, InvalidUpstreamResponse) {
+TEST_F(ClusterScopeRoleTest, RoleInvalidUpstreamResponse) {
   InSequence s;
-
   setup(2, {});
   EXPECT_NE(nullptr, handle_);
-
-  Common::Redis::RespValue expected_response;
-  expected_response.type(Common::Redis::RespType::Error);
-  expected_response.asString() = "finished with 1 error(s)";
 
   pool_callbacks_[1]->onResponse(masterResponse());
 
@@ -2159,19 +1864,52 @@ TEST_P(RoleHandlerTest, InvalidUpstreamResponse) {
   invalid_response->asInteger() = 123;
 
   time_system_.setMonotonicTime(std::chrono::milliseconds(10));
-  EXPECT_CALL(
-      store_,
-      deliverHistogramToSinks(
-          Property(&Stats::Metric::name, "redis.foo.command." + GetParam() + ".latency"), 10));
-  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
+  EXPECT_CALL(store_, deliverHistogramToSinks(
+                          Property(&Stats::Metric::name, "redis.foo.command.role.latency"), 10));
+  EXPECT_CALL(callbacks_, onResponse_(_));
   pool_callbacks_[0]->onResponse(std::move(invalid_response));
-  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".total").value());
-  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".error").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.role.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.role.error").value());
 }
 
-TEST_P(RoleHandlerTest, Cancel) {
+TEST_F(ClusterScopeRoleTest, RoleErrorResponse) {
   InSequence s;
+  setup(2, {});
+  EXPECT_NE(nullptr, handle_);
 
+  pool_callbacks_[0]->onResponse(masterResponse());
+
+  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  EXPECT_CALL(store_, deliverHistogramToSinks(
+                          Property(&Stats::Metric::name, "redis.foo.command.role.latency"), 10));
+  EXPECT_CALL(callbacks_, onResponse_(_));
+  pool_callbacks_[1]->onResponse(errorResponse("ERR shard error"));
+
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.role.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.role.error").value());
+}
+
+TEST_F(ClusterScopeRoleTest, RoleNullResponse) {
+  InSequence s;
+  setup(2, {});
+  EXPECT_NE(nullptr, handle_);
+
+  pool_callbacks_[0]->onResponse(masterResponse());
+
+  Common::Redis::RespValuePtr null_resp;
+
+  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  EXPECT_CALL(store_, deliverHistogramToSinks(
+                          Property(&Stats::Metric::name, "redis.foo.command.role.latency"), 10));
+  EXPECT_CALL(callbacks_, onResponse_(_));
+  pool_callbacks_[1]->onResponse(std::move(null_resp));
+
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.role.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.role.error").value());
+}
+
+TEST_F(ClusterScopeRoleTest, RoleCancel) {
+  InSequence s;
   setup(2, {});
   EXPECT_NE(nullptr, handle_);
 
@@ -2179,59 +1917,6 @@ TEST_P(RoleHandlerTest, Cancel) {
   EXPECT_CALL(pool_requests_[1], cancel());
   handle_->cancel();
 }
-
-TEST_F(RoleHandlerTest, RoleWithMultipleArguments) {
-  InSequence s;
-
-  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
-  makeBulkStringArray(*request, {"role", "1", "2"});
-
-  Common::Redis::RespValue response;
-  response.type(Common::Redis::RespType::Error);
-  response.asString() = "ERR wrong number of arguments for 'role' command";
-
-  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
-  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
-  handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
-  EXPECT_EQ(nullptr, handle_);
-}
-
-TEST_F(RoleHandlerTest, RoleNoArgs) {
-  InSequence s;
-
-  // Test the special handling path for ROLE command in makeRequest
-  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
-  makeBulkStringArray(*request, {"role"});
-
-  // Set up the mock calls for the ROLE special handling path
-  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
-  EXPECT_CALL(*conn_pool_, shardSize_()).WillOnce(Return(1));
-
-  ConnPool::PoolCallbacks* pool_callback;
-  Common::Redis::Client::MockPoolRequest pool_request;
-
-  EXPECT_CALL(*conn_pool_, makeRequestToShard_(0, _, _))
-      .WillOnce(DoAll(WithArg<2>(SaveArgAddress(&pool_callback)), Return(&pool_request)));
-
-  handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
-  EXPECT_NE(nullptr, handle_);
-
-  // Verify that the total counter is incremented in the special handling path
-  EXPECT_EQ(1UL, store_.counter("redis.foo.command.role.total").value());
-
-  // Complete the request successfully
-  Common::Redis::RespValuePtr role_response = std::make_unique<Common::Redis::RespValue>();
-  role_response->type(Common::Redis::RespType::Array);
-  std::vector<Common::Redis::RespValue> elements(1);
-  elements[0].type(Common::Redis::RespType::BulkString);
-  elements[0].asString() = "master";
-  role_response->asArray().swap(elements);
-
-  EXPECT_CALL(callbacks_, onResponse_(_));
-  pool_callback->onResponse(std::move(role_response));
-}
-
-INSTANTIATE_TEST_SUITE_P(RoleHandlerTest, RoleHandlerTest, testing::Values("role"));
 
 // ===== RANDOM SHARD COMMAND TESTS =====
 
@@ -3564,7 +3249,6 @@ TEST_F(ClusterScopeInfoTest, InfoBytesToHumanAllSizes) {
   time_system_.setMonotonicTime(std::chrono::milliseconds(10));
   EXPECT_CALL(store_, deliverHistogramToSinks(
                           Property(&Stats::Metric::name, "redis.foo.command.info.latency"), 10));
-
   // Verify the response contains correctly formatted human-readable values
   EXPECT_CALL(callbacks_, onResponse_(_)).WillOnce([](Common::Redis::RespValuePtr& response) {
     ASSERT_NE(nullptr, response);

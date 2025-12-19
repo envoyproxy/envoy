@@ -11,9 +11,8 @@ bool SupportedCommands::isSupportedCommand(const std::string& command) {
           hashMultipleSumResultCommands().contains(command) ||
           ClusterScopeCommands().contains(command) || randomShardCommands().contains(command) ||
           transactionCommands().contains(command) || auth() == command || echo() == command ||
-          mget() == command || mset() == command || keys() == command || ping() == command ||
-          time() == command || quit() == command || select() == command || scan() == command ||
-          infoShard() == command || role() == command);
+          mget() == command || mset() == command || ping() == command || time() == command ||
+          quit() == command || scan() == command || infoShard() == command);
 }
 
 bool SupportedCommands::isCommandValidWithoutArgs(const std::string& command_name) {
