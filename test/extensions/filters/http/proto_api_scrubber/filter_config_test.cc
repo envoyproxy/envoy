@@ -1205,12 +1205,9 @@ TEST_F(ProtoApiScrubberFilterConfigTest, UnsupportedActionType) {
   // Validate that creating the config throws an EnvoyException because the action
   // "some_unknown_action" is not registered.
   EXPECT_THAT_THROWS_MESSAGE(
-      {
-        auto status_or_config =
-            ProtoApiScrubberFilterConfig::create(proto_config, factory_context_);
-      },
+      { auto _ = ProtoApiScrubberFilterConfig::create(proto_config, factory_context_); },
       EnvoyException,
-      HasSubstr("Didn't find a registered implementation for name: 'some_unknown_action'"));
+      HasSubstr("Didn't find a registered implementation for 'some_unknown_action'"));
 }
 
 } // namespace
