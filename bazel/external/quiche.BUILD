@@ -1099,7 +1099,7 @@ envoy_cc_library(
     deps = [
         ":http2_constants_lib",
         ":http2_hpack_hpack_constants_lib",
-        ":http2_hpack_hpack_static_table_entries_lib",
+        ":http2_hpack_hpack_lib",
         ":quiche_common_circular_deque_lib",
         ":quiche_common_platform",
     ],
@@ -1254,12 +1254,6 @@ envoy_cc_library(
     copts = quiche_copts,
     repository = "@envoy",
     deps = [":quiche_common_platform"],
-)
-
-envoy_cc_library(
-    name = "http2_hpack_hpack_static_table_entries_lib",
-    hdrs = ["quiche/http2/hpack/hpack_static_table_entries.inc"],
-    repository = "@envoy",
 )
 
 envoy_cc_library(
@@ -4514,16 +4508,6 @@ envoy_quic_cc_test_library(
 )
 
 envoy_quic_cc_test_library(
-    name = "quic_test_tools_stream_send_buffer_peer_lib",
-    srcs = ["quiche/quic/test_tools/quic_stream_send_buffer_peer.cc"],
-    hdrs = ["quiche/quic/test_tools/quic_stream_send_buffer_peer.h"],
-    deps = [
-        ":quic_core_stream_send_buffer_lib",
-        ":quic_test_tools_interval_deque_peer_lib",
-    ],
-)
-
-envoy_quic_cc_test_library(
     name = "quic_test_tools_stream_peer_lib",
     srcs = ["quiche/quic/test_tools/quic_stream_peer.cc"],
     hdrs = ["quiche/quic/test_tools/quic_stream_peer.h"],
@@ -4533,7 +4517,6 @@ envoy_quic_cc_test_library(
         ":quic_core_stream_send_buffer_lib",
         ":quic_platform_base",
         ":quic_test_tools_flow_controller_peer_lib",
-        ":quic_test_tools_stream_send_buffer_peer_lib",
     ],
 )
 
@@ -5068,6 +5051,7 @@ envoy_cc_test_library(
         ":quiche_common_platform_googleurl",
         ":quiche_common_platform_iovec",
         ":quiche_common_platform_test",
+        "@com_google_absl//absl/status:status_matchers",
         "@envoy//test/common/quic/platform:quiche_test_helpers_impl_lib",
         "@envoy//test/common/quic/platform:quiche_test_impl_lib",
     ],

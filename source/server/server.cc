@@ -96,8 +96,8 @@ InstanceBase::InstanceBase(Init::Manager& init_manager, const Options& options,
           process_context ? ProcessContextOptRef(std::ref(*process_context)) : absl::nullopt,
           watermark_factory)),
       dispatcher_(api_->allocateDispatcher("main_thread")),
-      access_log_manager_(options.fileFlushIntervalMsec(), *api_, *dispatcher_, access_log_lock,
-                          store),
+      access_log_manager_(options.fileFlushIntervalMsec(), options.fileFlushMinSizeKB(), *api_,
+                          *dispatcher_, access_log_lock, store),
       handler_(getHandler(*dispatcher_)), worker_factory_(thread_local_, *api_, hooks),
       mutex_tracer_(options.mutexTracingEnabled() ? &Envoy::MutexTracerImpl::getOrCreateTracer()
                                                   : nullptr),
@@ -650,9 +650,15 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
 
   OptRef<Server::ConfigTracker> config_tracker;
 #ifdef ENVOY_ADMIN_FUNCTIONALITY
-  admin_ = std::make_shared<AdminImpl>(initial_config.admin().profilePath(), *this,
-                                       initial_config.admin().ignoreGlobalConnLimit());
+  auto admin_impl = std::make_shared<AdminImpl>(initial_config.admin().profilePath(), *this,
+                                                initial_config.admin().ignoreGlobalConnLimit());
 
+  for (const auto& allowlisted_path : bootstrap_.admin().allow_paths()) {
+    admin_impl->addAllowlistedPath(
+        std::make_unique<Matchers::StringMatcherImpl>(allowlisted_path, server_contexts_));
+  }
+
+  admin_ = admin_impl;
   config_tracker = admin_->getConfigTracker();
 #endif
   secret_manager_ = std::make_unique<Secret::SecretManagerImpl>(config_tracker);

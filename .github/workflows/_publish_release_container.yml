@@ -90,6 +90,15 @@ jobs:
             additional-tags:
             - contrib-debug-dev-${{ github.sha }}
           - name: ${{ inputs.dockerhub-repo }}
+            tag: contrib-distroless-dev
+            registry: docker.io/envoyproxy
+            architectures:
+            - amd64
+            - arm64
+            artifact-pattern: envoy-contrib-distroless.{arch}.tar
+            additional-tags:
+            - contrib-distroless-dev-${{ github.sha }}
+          - name: ${{ inputs.dockerhub-repo }}
             tag: debug-dev
             registry: docker.io/envoyproxy
             architectures:
@@ -161,6 +170,15 @@ jobs:
             artifact-pattern: envoy-contrib-debug.{arch}.tar
             additional-tags:
             - contrib-debug-v${{ inputs.version-major }}.${{ inputs.version-minor }}-latest
+          - name: ${{ inputs.dockerhub-repo }}
+            tag: contrib-distroless-v${{ inputs.version-major }}.${{ inputs.version-minor }}.${{ inputs.version-patch }}
+            registry: docker.io/envoyproxy
+            architectures:
+            - amd64
+            - arm64
+            artifact-pattern: contrib-distroless.{arch}.tar
+            additional-tags:
+            - contrib-distroless-v${{ inputs.version-major }}.${{ inputs.version-minor }}-latest
           - name: ${{ inputs.dockerhub-repo }}
             tag: debug-v${{ inputs.version-major }}.${{ inputs.version-minor }}.${{ inputs.version-patch }}
             registry: docker.io/envoyproxy
