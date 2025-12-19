@@ -51,7 +51,7 @@ public:
 
 private:
   const std::chrono::milliseconds file_flush_interval_msec_;
-  const uint64_t file_min_flush_size_kb_;
+  const uint64_t file_min_flush_size_kb_{64};
   Api::Api& api_;
   Event::Dispatcher& dispatcher_;
   Thread::BasicLockable& lock_;
@@ -130,8 +130,7 @@ private:
   const std::chrono::milliseconds flush_interval_msec_; // Time interval buffer gets flushed no
                                                         // matter if it reached the MIN_FLUSH_SIZE
                                                         // or not.
-  const uint64_t min_flush_size_{
-      64 * 1024}; // Minimum size before the flush thread will be told to flush.
+  const uint64_t min_flush_size_; // Minimum size before the flush thread will be told to flush.
   AccessLogFileStats& stats_;
 };
 
