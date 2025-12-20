@@ -33,6 +33,26 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // * :ref:`redirect <envoy_v3_api_field_config.route.v3.Route.redirect>`
 // * :ref:`direct_response <envoy_v3_api_field_config.route.v3.Route.direct_response>`
 //
+// Subject validation configuration.
+message SubjectValidation {
+  oneof subject_source {
+    // Extract subject from dynamic metadata (e.g., JWT filter).
+    MetadataSubjectSource metadata = 1;
+
+    // Extract subject from a request header.
+    string header = 2 [(validate.rules).string = {min_len: 1}];
+  }
+}
+
+// Extract subject from dynamic metadata.
+message MetadataSubjectSource {
+  // Filter metadata namespace (e.g., "envoy.filters.http.jwt_authn").
+  string filter = 1 [(validate.rules).string = {min_len: 1}];
+
+  // Dot-notation path to the subject field (e.g., "payload.sub").
+  string path = 2 [(validate.rules).string = {min_len: 1}];
+}
+
 message McpRouter {
   // Specification of the MCP server.
   message McpBackend {
@@ -68,4 +88,9 @@ message McpRouter {
   // and presents itself as single MCP server to the client. All remote MCP servers are sent the same capabilities
   // that the client presented to Envoy.
   repeated McpBackend servers = 1;
+
+  // Validates that the session's subject matches the authenticated identity.
+  // On initialize, extracts subject from this source to embed in the session ID.
+  // On subsequent requests, validates the session subject matches. Rejects with 403 on mismatch.
+  SubjectValidation subject_validation = 2;
 }

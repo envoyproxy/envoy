@@ -1,14 +1,38 @@
 #include "source/extensions/filters/http/mcp_router/filter_config.h"
 
+#include "absl/strings/str_split.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace McpRouter {
 
+namespace {
+SubjectSource
+parseSubjectValidation(const envoy::extensions::filters::http::mcp_router::v3::McpRouter& config) {
+  if (!config.has_subject_validation()) {
+    return absl::monostate{};
+  }
+
+  const auto& validation = config.subject_validation();
+  switch (validation.subject_source_case()) {
+  case envoy::extensions::filters::http::mcp_router::v3::SubjectValidation::kMetadata: {
+    return MetadataSubjectSource{validation.metadata().filter(),
+                                 absl::StrSplit(validation.metadata().path(), '.')};
+  }
+  case envoy::extensions::filters::http::mcp_router::v3::SubjectValidation::kHeader: {
+    return HeaderSubjectSource{validation.header()};
+  }
+  default:
+    return absl::monostate{};
+  }
+}
+} // namespace
+
 McpRouterConfig::McpRouterConfig(
     const envoy::extensions::filters::http::mcp_router::v3::McpRouter& proto_config,
     Server::Configuration::FactoryContext& context)
-    : factory_context_(context) {
+    : factory_context_(context), subject_source_(parseSubjectValidation(proto_config)) {
   for (const auto& server : proto_config.servers()) {
     McpBackendConfig backend;
     const auto& mcp_cluster = server.mcp_cluster();

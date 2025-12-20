@@ -261,6 +261,69 @@ TEST_F(SessionCodecTest, SpecialCharactersInSessionId) {
   EXPECT_EQ(parsed->backend_sessions["backend"], "sess+with/special=chars");
 }
 
+// Verifies subject validation config is disabled by default.
+TEST_F(McpRouterConfigTest, SubjectValidationDisabledByDefault) {
+  envoy::extensions::filters::http::mcp_router::v3::McpRouter proto_config;
+  auto* server = proto_config.add_servers();
+  server->set_name("test");
+  server->mutable_mcp_cluster()->set_cluster("test_cluster");
+
+  McpRouterConfig config(proto_config, factory_context_);
+  EXPECT_FALSE(config.hasSubjectValidation());
+}
+
+// Verifies subject validation config is enabled when configured with header source.
+TEST_F(McpRouterConfigTest, SubjectValidationWithHeaderSource) {
+  envoy::extensions::filters::http::mcp_router::v3::McpRouter proto_config;
+  auto* server = proto_config.add_servers();
+  server->set_name("test");
+  server->mutable_mcp_cluster()->set_cluster("test_cluster");
+
+  auto* validation = proto_config.mutable_subject_validation();
+  validation->set_header("x-user-id");
+
+  McpRouterConfig config(proto_config, factory_context_);
+  EXPECT_TRUE(config.hasSubjectValidation());
+  EXPECT_TRUE(absl::holds_alternative<HeaderSubjectSource>(config.subjectSource()));
+}
+
+// Verifies subject validation config is enabled when configured with metadata source.
+TEST_F(McpRouterConfigTest, SubjectValidationWithMetadataSource) {
+  envoy::extensions::filters::http::mcp_router::v3::McpRouter proto_config;
+  auto* server = proto_config.add_servers();
+  server->set_name("test");
+  server->mutable_mcp_cluster()->set_cluster("test_cluster");
+
+  auto* validation = proto_config.mutable_subject_validation();
+  auto* metadata = validation->mutable_metadata();
+  metadata->set_filter("envoy.filters.http.jwt_authn");
+  metadata->set_path("payload.sub");
+
+  McpRouterConfig config(proto_config, factory_context_);
+  EXPECT_TRUE(config.hasSubjectValidation());
+  EXPECT_TRUE(absl::holds_alternative<MetadataSubjectSource>(config.subjectSource()));
+}
+
+// Verifies metadata path is pre-split into parts.
+TEST_F(McpRouterConfigTest, MetadataPathIsSplit) {
+  envoy::extensions::filters::http::mcp_router::v3::McpRouter proto_config;
+  auto* server = proto_config.add_servers();
+  server->set_name("test");
+  server->mutable_mcp_cluster()->set_cluster("test_cluster");
+
+  auto* validation = proto_config.mutable_subject_validation();
+  auto* metadata = validation->mutable_metadata();
+  metadata->set_filter("jwt");
+  metadata->set_path("payload.sub");
+
+  McpRouterConfig config(proto_config, factory_context_);
+  const auto& source = absl::get<MetadataSubjectSource>(config.subjectSource());
+  EXPECT_EQ(source.filter, "jwt");
+  ASSERT_EQ(source.path_parts.size(), 2);
+  EXPECT_EQ(source.path_parts[0], "payload");
+  EXPECT_EQ(source.path_parts[1], "sub");
+}
+
 } // namespace
 } // namespace McpRouter
 } // namespace HttpFilters

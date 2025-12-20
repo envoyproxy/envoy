@@ -8,6 +8,8 @@
 #include "envoy/extensions/filters/http/mcp_router/v3/mcp_router.pb.h"
 #include "envoy/server/filter_config.h"
 
+#include "absl/types/variant.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -24,6 +26,17 @@ struct McpBackendConfig {
   std::string host_rewrite_literal;
 };
 
+struct MetadataSubjectSource {
+  std::string filter;
+  std::vector<std::string> path_parts;
+};
+
+struct HeaderSubjectSource {
+  std::string header_name;
+};
+
+using SubjectSource = absl::variant<absl::monostate, MetadataSubjectSource, HeaderSubjectSource>;
+
 /**
  * Configuration for the MCP router filter, containing backend server definitions.
  */
@@ -38,10 +51,16 @@ public:
   Server::Configuration::FactoryContext& factoryContext() const { return factory_context_; }
   const McpBackendConfig* findBackend(const std::string& name) const;
 
+  bool hasSubjectValidation() const {
+    return !absl::holds_alternative<absl::monostate>(subject_source_);
+  }
+  const SubjectSource& subjectSource() const { return subject_source_; }
+
 private:
   std::vector<McpBackendConfig> backends_;
   std::string default_backend_name_;
   Server::Configuration::FactoryContext& factory_context_;
+  SubjectSource subject_source_;
 };
 
 using McpRouterConfigSharedPtr = std::shared_ptr<McpRouterConfig>;
