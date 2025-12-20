@@ -336,7 +336,7 @@ message HttpProtocolOptions {
   // duration simultaneously, causing synchronized connection draining and service disruptions.
   // For example, with a max_connection_duration of 3600s (1 hour) and a jitter percentage of 10%,
   // connections will be closed between 3600s and 3960s (1 hour to 1 hour 6 minutes).
-  type.v3.Percent max_connection_duration_jitter_percentage = 8;
+  type.v3.Percent max_connection_duration_jitter = 8;
 
   // The maximum number of headers (request headers if configured on HttpConnectionManager,
   // response headers when configured on a cluster).

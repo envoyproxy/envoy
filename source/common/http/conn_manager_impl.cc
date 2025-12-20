@@ -201,7 +201,7 @@ void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCal
     connection_idle_timer_->enableTimer(config_->idleTimeout().value());
   }
 
-  const auto& max_connection_duration_with_jitter =
+  const auto max_connection_duration_with_jitter =
       config_->calculateMaxConnectionDurationWithJitter();
   if (max_connection_duration_with_jitter) {
     connection_duration_timer_ =

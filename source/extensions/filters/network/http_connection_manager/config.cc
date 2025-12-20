@@ -393,10 +393,10 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       idle_timeout_(PROTOBUF_GET_OPTIONAL_MS(config.common_http_protocol_options(), idle_timeout)),
       max_connection_duration_(
           PROTOBUF_GET_OPTIONAL_MS(config.common_http_protocol_options(), max_connection_duration)),
-      max_connection_duration_jitter_percentage_(
-          config.common_http_protocol_options().has_max_connection_duration_jitter_percentage()
+      max_connection_duration_jitter_(
+          config.common_http_protocol_options().has_max_connection_duration_jitter()
               ? absl::optional<double>(
-                    config.common_http_protocol_options().max_connection_duration_jitter_percentage().value())
+                    config.common_http_protocol_options().max_connection_duration_jitter().value())
               : absl::nullopt),
       http1_safe_max_connection_duration_(config.http1_safe_max_connection_duration()),
       max_stream_duration_(
@@ -829,19 +829,19 @@ const Network::Address::Instance& HttpConnectionManagerConfig::localAddress() {
 
 absl::optional<std::chrono::milliseconds>
 HttpConnectionManagerConfig::calculateMaxConnectionDurationWithJitter() const {
-  const auto& max_connection_duration = maxConnectionDuration();
+  const auto max_connection_duration = maxConnectionDuration();
   if (!max_connection_duration) {
     return max_connection_duration;
   }
 
-  const auto& jitter_percentage = maxConnectionDurationJitterPercentage();
+  const auto jitter_percentage = maxConnectionDurationJitter();
   if (!jitter_percentage) {
     return max_connection_duration;
   }
 
   // Apply jitter: base_duration + random(0, base_duration * jitter_percentage / 100.0);
-  const uint64_t max_jitter_ms = std::ceil(max_connection_duration.value().count() *
-                                           (jitter_percentage.value() / 100.0));
+  const uint64_t max_jitter_ms =
+      std::ceil(max_connection_duration.value().count() * (jitter_percentage.value() / 100.0));
 
   if (max_jitter_ms == 0) {
     return max_connection_duration;

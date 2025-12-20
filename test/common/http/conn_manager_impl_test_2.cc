@@ -2269,23 +2269,23 @@ TEST_F(HttpConnectionManagerImplTest, ZombieStreamClosesConnectionOnCodecLowLeve
 
 // Test max_connection_duration with jitter
 TEST_F(HttpConnectionManagerImplTest, MaxConnectionDurationWithJitter) {
-  max_connection_duration_ = std::chrono::milliseconds(10000);  // 10 seconds
-  max_connection_duration_jitter_percentage_ = 50.0;  // 50% jitter
+  max_connection_duration_ = std::chrono::milliseconds(10000); // 10 seconds
+  max_connection_duration_jitter_ = 50.0;                      // 50% jitter
 
   setup();
-  
+
   // Calculate jittered duration multiple times to verify randomness
   std::set<uint64_t> durations;
   for (int i = 0; i < 10; i++) {
     auto duration = calculateMaxConnectionDurationWithJitter();
     ASSERT_TRUE(duration.has_value());
     durations.insert(duration.value().count());
-    
+
     // Verify duration is between base and base + 50%
     EXPECT_GE(duration.value().count(), 10000);
     EXPECT_LE(duration.value().count(), 15000);
   }
-  
+
   // With randomness, we should get at least 2 different values
   EXPECT_GT(durations.size(), 1);
 }
@@ -2296,7 +2296,7 @@ TEST_F(HttpConnectionManagerImplTest, MaxConnectionDurationWithoutJitter) {
   // No jitter percentage set
 
   setup();
-  
+
   auto duration = calculateMaxConnectionDurationWithJitter();
   ASSERT_TRUE(duration.has_value());
   EXPECT_EQ(duration.value().count(), 10000);
@@ -2306,7 +2306,7 @@ TEST_F(HttpConnectionManagerImplTest, MaxConnectionDurationWithoutJitter) {
 TEST_F(HttpConnectionManagerImplTest, NoMaxConnectionDuration) {
   // No max_connection_duration_ set
   setup();
-  
+
   auto duration = calculateMaxConnectionDurationWithJitter();
   EXPECT_FALSE(duration.has_value());
 }

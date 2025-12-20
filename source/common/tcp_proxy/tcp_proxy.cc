@@ -287,12 +287,12 @@ RouteConstSharedPtr Config::getRouteFromEntries(Network::Connection& connection)
 
 const absl::optional<std::chrono::milliseconds>
 Config::calculateMaxDownstreamConnectionDurationWithJitter() {
-  const auto& max_downstream_connection_duration = maxDownstreamConnectionDuration();
+  const auto max_downstream_connection_duration = maxDownstreamConnectionDuration();
   if (!max_downstream_connection_duration) {
     return max_downstream_connection_duration;
   }
 
-  const auto& jitter_percentage = maxDownstreamConnectionDurationJitterPercentage();
+  const auto jitter_percentage = maxDownstreamConnectionDurationJitterPercentage();
   if (!jitter_percentage) {
     return max_downstream_connection_duration;
   }
