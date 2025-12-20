@@ -65,7 +65,7 @@ private:
   const Protobuf::MethodDescriptor& service_method_;
   Event::TimerPtr retry_timer_;
   Event::TimerPtr response_timer_;
-  envoy::service::load_stats::v3::LoadStatsRequest request_;
+  const envoy::service::load_stats::v3::LoadStatsRequest request_template_;
   std::unique_ptr<envoy::service::load_stats::v3::LoadStatsResponse> message_;
   // Map from cluster name to start of measurement interval.
   absl::node_hash_map<std::string, std::chrono::steady_clock::duration> clusters_;
