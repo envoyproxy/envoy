@@ -52,6 +52,10 @@ void ActiveStreamListenerBase::newConnection(Network::ConnectionSocketPtr&& sock
         timeout, stats_.downstream_cx_transport_socket_connect_timeout_);
   }
   server_conn_ptr->setBufferLimits(config_->perConnectionBufferLimitBytes());
+  const auto timeout = config_->perConnectionBufferHighWatermarkTimeout();
+  if (timeout.count() > 0) {
+    server_conn_ptr->setBufferHighWatermarkTimeout(timeout);
+  }
   RELEASE_ASSERT(server_conn_ptr->connectionInfoProvider().remoteAddress() != nullptr, "");
   const bool empty_filter_chain = !config_->filterChainFactory().createNetworkFilterChain(
       *server_conn_ptr, filter_chain->networkFilterFactories());
