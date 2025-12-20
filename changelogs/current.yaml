@@ -231,6 +231,9 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.router_filter_resetall_on_local_reply`` and legacy code paths.
 
 new_features:
+- area: server
+  change: |
+    Add new command-line option ``--file-flush-min-size-kb <integer>`` to configure the minimum size in kilobytes for log file flushing.
 - area: network_filter
   change: |
     Added :ref:`geoip network filter <config_network_filters_geoip>` to perform geolocation lookups
@@ -368,8 +371,7 @@ new_features:
     <arch_overview_wasm_foreign_functions>` for details.
 - area: redis
   change: |
-    Optimized the ``INFO`` command to provide limited metrics with a consolidated cluster view and added ``INFO.SHARD``
-    to retrieve shard-specific metrics.
+    Moved the implementation of KEYS,SELECT,ROLE to the cluster scope command framework.
 - area: overload management
   change: |
     The fixed heap resource monitor can calculate memory pressure as currently allocated memory divided by maximum heap
@@ -541,6 +543,9 @@ new_features:
     requests to more backend servers. The filter supports fanout to multiple backends for initialize and tools-list requests,
     single-backend routing for tools-call based on tool name prefix, session management with composite session IDs,
     and response aggregation.
+- area: access_log
+  change: |
+    Added ``LISTENER_FILTER_CHAIN`` to the ``METADATA`` command operator to allow access to listener filter chain metadata.
 - area: ext_proc
   change: |
     Added per HTTP event :ref:'procesing effects <envoy.filters.http.ext_proc.ProcessingEffect' in the

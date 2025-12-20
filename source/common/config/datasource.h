@@ -173,7 +173,7 @@ public:
                                      std::move(*transformed_new_data_or_error.value()))](
                                     OptRef<typename DynamicData<DataType>::ThreadLocalData> obj) {
         if (obj.has_value()) {
-          obj->data_ = std::make_shared<DataType>(*new_data);
+          obj->data_ = new_data;
         }
       });
       return absl::OkStatus();
