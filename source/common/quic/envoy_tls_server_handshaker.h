@@ -32,6 +32,13 @@ public:
   static int ticketKeyCallback(SSL* ssl, uint8_t* key_name, uint8_t* iv, EVP_CIPHER_CTX* ctx,
                                HMAC_CTX* hmac_ctx, int encrypt);
 
+  // Key log callback installed on the QUICHE ssl context. Retrieves the
+  // handshaker from ssl ex_data and writes an NSS Key Log line via the
+  // pinned ServerContextImpl, applying the same local/remote IP-list
+  // filtering as TCP TLS key log. Connection addresses are read from the
+  // QUIC session at callback time.
+  static void keylogCallback(const SSL* ssl, const char* line);
+
   // SSL ex_data index for storing the handshaker pointer per-connection.
   static int handshakerExDataIndex();
 

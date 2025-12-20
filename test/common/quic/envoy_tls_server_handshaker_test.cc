@@ -25,6 +25,15 @@ TEST(EnvoyTlsServerHandshakerTest, TicketKeyCallbackNullHandshaker) {
                                                            nullptr, 0));
 }
 
+TEST(EnvoyTlsServerHandshakerTest, KeylogCallbackNullHandshaker) {
+  bssl::UniquePtr<SSL_CTX> ssl_ctx(SSL_CTX_new(TLS_method()));
+  ASSERT_NE(ssl_ctx, nullptr);
+  bssl::UniquePtr<SSL> ssl(SSL_new(ssl_ctx.get()));
+  ASSERT_NE(ssl, nullptr);
+  // No ex_data set → silently no-ops (no crash, no ENVOY_BUG, no file write).
+  EnvoyTlsServerHandshaker::keylogCallback(ssl.get(), "CLIENT_RANDOM 00 11");
+}
+
 } // namespace
 } // namespace Quic
 } // namespace Envoy

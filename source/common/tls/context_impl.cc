@@ -405,14 +405,20 @@ void ContextImpl::keylogCallback(const SSL* ssl, const char* line) {
   auto ctx = static_cast<ContextImpl*>(SSL_CTX_get_app_data(SSL_get_SSL_CTX(ssl)));
   ASSERT(callbacks != nullptr);
   ASSERT(ctx != nullptr);
+  ctx->writeKeyLog(line, callbacks->connection().connectionInfoProvider().localAddress().get(),
+                   callbacks->connection().connectionInfoProvider().remoteAddress().get());
+}
 
-  if ((ctx->tls_keylog_local_.getIpListSize() == 0 ||
-       ctx->tls_keylog_local_.contains(
-           *(callbacks->connection().connectionInfoProvider().localAddress()))) &&
-      (ctx->tls_keylog_remote_.getIpListSize() == 0 ||
-       ctx->tls_keylog_remote_.contains(
-           *(callbacks->connection().connectionInfoProvider().remoteAddress())))) {
-    ctx->tls_keylog_file_->write(absl::StrCat(line, "\n"));
+void ContextImpl::writeKeyLog(const char* line, const Network::Address::Instance* local_addr,
+                              const Network::Address::Instance* remote_addr) const {
+  if (tls_keylog_file_ == nullptr) {
+    return;
+  }
+  if ((tls_keylog_local_.getIpListSize() == 0 ||
+       (local_addr != nullptr && tls_keylog_local_.contains(*local_addr))) &&
+      (tls_keylog_remote_.getIpListSize() == 0 ||
+       (remote_addr != nullptr && tls_keylog_remote_.contains(*remote_addr)))) {
+    tls_keylog_file_->write(absl::StrCat(line, "\n"));
   }
 }
 

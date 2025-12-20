@@ -1,6 +1,7 @@
 #include "source/common/quic/envoy_tls_server_handshaker.h"
 
 #include "source/common/common/macros.h"
+#include "source/common/quic/envoy_quic_utils.h"
 
 namespace Envoy {
 namespace Quic {
@@ -39,6 +40,22 @@ int EnvoyTlsServerHandshaker::ticketKeyCallback(SSL* ssl, uint8_t* key_name, uin
   }
   return handshaker->pinnedServerContext()->sessionTicketProcess(ssl, key_name, iv, ctx, hmac_ctx,
                                                                  encrypt);
+}
+
+void EnvoyTlsServerHandshaker::keylogCallback(const SSL* ssl, const char* line) {
+  auto* handshaker =
+      static_cast<EnvoyTlsServerHandshaker*>(SSL_get_ex_data(ssl, handshakerExDataIndex()));
+  if (handshaker == nullptr || handshaker->pinnedServerContext() == nullptr) {
+    // Same gating rationale as ticketKeyCallback: when EnvoyTlsServerHandshaker is not
+    // installed (vanilla quic::TlsServerHandshaker path), there is no pinned context
+    // to write through, so silently skip.
+    return;
+  }
+  auto local_addr =
+      quicAddressToEnvoyAddressInstance(handshaker->session()->connection()->self_address());
+  auto remote_addr =
+      quicAddressToEnvoyAddressInstance(handshaker->session()->connection()->peer_address());
+  handshaker->pinnedServerContext()->writeKeyLog(line, local_addr.get(), remote_addr.get());
 }
 
 } // namespace Quic
