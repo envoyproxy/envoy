@@ -617,13 +617,19 @@ TEST_F(TlsCertificateWatchedDirectoryAutoRecoveryTest, InitialLoadFailsAutoRecov
       .WillOnce(Throw(EnvoyException("file not found")));
 
   // onConfigUpdate should throw because loadFiles() throws.
-  EXPECT_THROW(
-      subscription_factory_.callbacks_->onConfigUpdate(decoded_resources.refvec_, "").IgnoreError(),
-      EnvoyException);
+  EXPECT_THROW(subscription_factory_.callbacks_->onConfigUpdate(decoded_resources.refvec_, "v1")
+                   .IgnoreError(),
+               EnvoyException);
 
   // The watch callback should have been captured despite the failure.
   EXPECT_FALSE(watch_cbs_.empty());
   EXPECT_EQ(nullptr, sds_api_->secret());
+
+  // Verify version_info was set despite the failure.
+  {
+    auto secret_data = sds_api_->secretData();
+    EXPECT_EQ("v1", secret_data.version_info_);
+  }
 
   // Files appear and watch triggers - recovery should succeed.
   EXPECT_CALL(filesystem_, fileReadToEnd(cert_path_)).WillOnce(Return("cert_content"));
@@ -631,11 +637,20 @@ TEST_F(TlsCertificateWatchedDirectoryAutoRecoveryTest, InitialLoadFailsAutoRecov
   EXPECT_CALL(filesystem_, fileReadToEnd(cert_path_)).WillOnce(Return("cert_content"));
   EXPECT_CALL(filesystem_, fileReadToEnd(key_path_)).WillOnce(Return("key_content"));
   EXPECT_CALL(secret_callback_, onAddOrUpdateSecret());
+
+  const auto before_recovery = time_system_.systemTime();
   EXPECT_TRUE(watch_cbs_[0](Filesystem::Watcher::Events::MovedTo).ok());
 
   ASSERT_NE(nullptr, sds_api_->secret());
   EXPECT_EQ("cert_content", sds_api_->secret()->certificate_chain().inline_bytes());
   EXPECT_EQ("key_content", sds_api_->secret()->private_key().inline_bytes());
+
+  // Verify last_updated was set during recovery and version_info is still correct.
+  {
+    auto secret_data = sds_api_->secretData();
+    EXPECT_EQ("v1", secret_data.version_info_);
+    EXPECT_GE(secret_data.last_updated_, before_recovery);
+  }
 }
 
 // Test that auto-recovery still works after multiple failed attempts with watched_directory.
@@ -755,13 +770,19 @@ TEST_F(TlsCertificatePerFileWatcherAutoRecoveryTest, InitialLoadFailsAutoRecover
       .WillOnce(Throw(EnvoyException("file not found")));
 
   // onConfigUpdate should throw because loadFiles() throws.
-  EXPECT_THROW(
-      subscription_factory_.callbacks_->onConfigUpdate(decoded_resources.refvec_, "").IgnoreError(),
-      EnvoyException);
+  EXPECT_THROW(subscription_factory_.callbacks_->onConfigUpdate(decoded_resources.refvec_, "v1")
+                   .IgnoreError(),
+               EnvoyException);
 
   // The watch callbacks should have been captured despite the failures.
   EXPECT_EQ(2U, watch_cbs_.size());
   EXPECT_EQ(nullptr, sds_api_->secret());
+
+  // Verify version_info was set despite the failure.
+  {
+    auto secret_data = sds_api_->secretData();
+    EXPECT_EQ("v1", secret_data.version_info_);
+  }
 
   // Files appear and watch triggers, recovery should succeed.
   EXPECT_CALL(filesystem_, fileReadToEnd(cert_path_)).WillOnce(Return("cert_content"));
@@ -769,11 +790,20 @@ TEST_F(TlsCertificatePerFileWatcherAutoRecoveryTest, InitialLoadFailsAutoRecover
   EXPECT_CALL(filesystem_, fileReadToEnd(cert_path_)).WillOnce(Return("cert_content"));
   EXPECT_CALL(filesystem_, fileReadToEnd(key_path_)).WillOnce(Return("key_content"));
   EXPECT_CALL(secret_callback_, onAddOrUpdateSecret());
+
+  const auto before_recovery = time_system_.systemTime();
   EXPECT_TRUE(watch_cbs_[0](Filesystem::Watcher::Events::MovedTo).ok());
 
   ASSERT_NE(nullptr, sds_api_->secret());
   EXPECT_EQ("cert_content", sds_api_->secret()->certificate_chain().inline_bytes());
   EXPECT_EQ("key_content", sds_api_->secret()->private_key().inline_bytes());
+
+  // Verify metadata was updated during recovery.
+  {
+    auto secret_data = sds_api_->secretData();
+    EXPECT_EQ("v1", secret_data.version_info_);
+    EXPECT_GE(secret_data.last_updated_, before_recovery);
+  }
 }
 
 // Test that auto-recovery still works after multiple failed attempts with per-file watchers.
