@@ -148,6 +148,49 @@ TEST(DecodedResourceImplTest, All) {
     EXPECT_THAT(decoded_resource.resource(), ProtoEq(Protobuf::Empty()));
     EXPECT_TRUE(decoded_resource.hasResource());
   }
+
+  // To verify the name is correctly retrieved when only the resource_name field is set.
+  {
+    envoy::service::discovery::v3::Resource resource_wrapper;
+    resource_wrapper.mutable_resource_name()->set_name("resource_name");
+    resource_wrapper.add_aliases("bar");
+    resource_wrapper.add_aliases("baz");
+    resource_wrapper.mutable_resource()->MergeFrom(some_opaque_resource);
+    resource_wrapper.set_version("foo");
+    EXPECT_CALL(resource_decoder, decodeResource(ProtoEq(some_opaque_resource)))
+        .WillOnce(InvokeWithoutArgs(
+            []() -> ProtobufTypes::MessagePtr { return std::make_unique<Protobuf::Empty>(); }));
+    EXPECT_CALL(resource_decoder, resourceName(ProtoEq(Protobuf::Empty()))).Times(0);
+    DecodedResourceImpl decoded_resource(resource_decoder, resource_wrapper);
+    EXPECT_EQ("resource_name", decoded_resource.name());
+    EXPECT_EQ((std::vector<std::string>{"bar", "baz"}), decoded_resource.aliases());
+    EXPECT_EQ("foo", decoded_resource.version());
+    EXPECT_THAT(decoded_resource.resource(), ProtoEq(Protobuf::Empty()));
+    EXPECT_TRUE(decoded_resource.hasResource());
+    EXPECT_FALSE(decoded_resource.metadata().has_value());
+  }
+
+  // To verify the name field takes precedence over resource_name when both are set.
+  {
+    envoy::service::discovery::v3::Resource resource_wrapper;
+    resource_wrapper.set_name("real_name");
+    resource_wrapper.mutable_resource_name()->set_name("resource_name");
+    resource_wrapper.add_aliases("bar");
+    resource_wrapper.add_aliases("baz");
+    resource_wrapper.mutable_resource()->MergeFrom(some_opaque_resource);
+    resource_wrapper.set_version("foo");
+    EXPECT_CALL(resource_decoder, decodeResource(ProtoEq(some_opaque_resource)))
+        .WillOnce(InvokeWithoutArgs(
+            []() -> ProtobufTypes::MessagePtr { return std::make_unique<Protobuf::Empty>(); }));
+    EXPECT_CALL(resource_decoder, resourceName(ProtoEq(Protobuf::Empty()))).Times(0);
+    DecodedResourceImpl decoded_resource(resource_decoder, resource_wrapper);
+    EXPECT_EQ("real_name", decoded_resource.name());
+    EXPECT_EQ((std::vector<std::string>{"bar", "baz"}), decoded_resource.aliases());
+    EXPECT_EQ("foo", decoded_resource.version());
+    EXPECT_THAT(decoded_resource.resource(), ProtoEq(Protobuf::Empty()));
+    EXPECT_TRUE(decoded_resource.hasResource());
+    EXPECT_FALSE(decoded_resource.metadata().has_value());
+  }
 }
 
 } // namespace
