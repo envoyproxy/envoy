@@ -56,6 +56,7 @@ RateLimitPolicy::RateLimitPolicy(const ProtoRateLimit& config,
     }
   }
 
+  actions_.reserve(config.actions().size());
   for (const ProtoRateLimit::Action& action : config.actions()) {
     switch (action.action_specifier_case()) {
     case ProtoRateLimit::Action::ActionSpecifierCase::kSourceCluster:

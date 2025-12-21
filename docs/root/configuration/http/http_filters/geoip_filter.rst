@@ -33,7 +33,7 @@ Configuration example
 
 .. literalinclude:: _include/geoip-filter.yaml
     :language: yaml
-    :lines: 27-43
+    :lines: 27-44
     :lineno-start: 27
     :linenos:
     :caption: :download:`geoip-filter.yaml <_include/geoip-filter.yaml>`
@@ -53,7 +53,7 @@ comes from the owning HTTP connection manager.
 
 Besides Geolocation filter level statisctics, there is statistics emitted by the :ref:`Maxmind geolocation provider <envoy_v3_api_msg_extensions.geoip_providers.maxmind.v3.MaxMindConfig>`
 per geolocation database type (rooted at ``<stat_prefix>.maxmind.``). Database type can be one of `city_db <https://www.maxmind.com/en/geoip2-city>`_,
-`isp_db <https://www.maxmind.com/en/geoip2-isp-database>`_, `anon_db <https://dev.maxmind.com/geoip/docs/databases/anonymous-ip>`_, `asn_db <https://www.maxmind.com/en/geoip2-asn-database>`_.
+`country_db <https://www.maxmind.com/en/geoip2-country>`_, `isp_db <https://www.maxmind.com/en/geoip2-isp-database>`_, `anon_db <https://dev.maxmind.com/geoip/docs/databases/anonymous-ip>`_, `asn_db <https://www.maxmind.com/en/geoip2-asn-database>`_.
 
 .. csv-table::
    :header: Name, Type, Description

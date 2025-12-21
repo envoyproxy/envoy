@@ -201,6 +201,7 @@ TEST_F(OptionsImplTest, SetAll) {
   options->setLogPath("/foo/bar");
   options->setRestartEpoch(44);
   options->setFileFlushIntervalMsec(std::chrono::milliseconds(45));
+  options->setFileFlushMinSizeKB(128);
   options->setMode(Server::Mode::Validate);
   options->setServiceClusterName("cluster_foo");
   options->setServiceNodeName("node_foo");
@@ -234,6 +235,7 @@ TEST_F(OptionsImplTest, SetAll) {
   EXPECT_EQ(std::chrono::seconds(43), options->parentShutdownTime());
   EXPECT_EQ(44, options->restartEpoch());
   EXPECT_EQ(std::chrono::milliseconds(45), options->fileFlushIntervalMsec());
+  EXPECT_EQ(128U, options->fileFlushMinSizeKB());
   EXPECT_EQ(Server::Mode::Validate, options->mode());
   EXPECT_EQ("cluster_foo", options->serviceClusterName());
   EXPECT_EQ("node_foo", options->serviceNodeName());

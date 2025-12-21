@@ -385,7 +385,7 @@ case $CI_TARGET in
             -c fastbuild \
             "${TEST_TARGETS[@]}" \
             --test_tag_filters=-nofips \
-            --build_tests_only
+            --build_tag_filters=-nofips
         echo "Building and testing with wasm=wasmtime: and admin_functionality and admin_html disabled ${TEST_TARGETS[*]}"
         bazel_with_collection \
             test "${BAZEL_BUILD_OPTIONS[@]}" \
@@ -395,7 +395,7 @@ case $CI_TARGET in
             -c fastbuild \
             "${TEST_TARGETS[@]}" \
             --test_tag_filters=-nofips \
-            --build_tests_only
+            --build_tag_filters=-nofips
         # "--define log_debug_assert_in_release=enabled" must be tested with a release build, so run only
         # these tests under "-c opt" to save time in CI.
         bazel_with_collection \
