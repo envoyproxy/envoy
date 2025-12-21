@@ -556,5 +556,11 @@ new_features:
     Added per HTTP event :ref:'procesing effects <envoy.filters.http.ext_proc.ProcessingEffect' in the
     ExtProcLoggingInfo in the FilterState. This new data will be automatically collected and can be accesses via
     method processingEffects.
+- area: oauth2
+  change: |
+    Added support for additional parameters in the OAuth2 token request body via
+    :ref:`endpoint_params <envoy_v3_api_field_extensions.http.injected_credentials.oauth2.v3.OAuth2.endpoint_params>`.
+    This allows passing custom parameters required by authorization servers (such as Logto or EntraID) that expect
+    additional body parameters during the token exchange.
 
 deprecated:
