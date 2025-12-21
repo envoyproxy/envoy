@@ -63,10 +63,10 @@ private:
   static constexpr uint32_t DefaultBufferedAgedDuration = 15;
   // The tapped data from Transport socket may be incomplete
   // for some protocols (e.g., HTTP/2 frames may span multiple reads/writes).
-  // Add byteSeqNum to allow the receiver to reconstruct byte order and
+  // Add sequence number to allow the receiver to reconstruct byte order and
   // determine completeness, similar to TCP sequence numbers.
-  uint64_t byte_seq_num{};
-  static constexpr uint64_t MaxByteSeqNum = std::numeric_limits<uint64_t>::max();
+  uint64_t seq_num{};
+  static constexpr uint64_t MaxSeqNum = std::numeric_limits<uint64_t>::max();
   SocketTapConfigSharedPtr config_;
   Extensions::Common::Tap::PerTapSinkHandleManagerPtr sink_handle_;
   const Network::Connection& connection_;

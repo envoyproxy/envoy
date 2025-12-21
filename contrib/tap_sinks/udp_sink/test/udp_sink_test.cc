@@ -287,7 +287,7 @@ TEST_F(UdpTapSinkTest, TestSubmitTraceSendOkForProtoBinaryReadEvForBigUdpMsg) {
   std::string body_data("01234567890123456789012345678901234567890123456789");
   dst_streamed_trace.mutable_event()->mutable_read()->mutable_data()->set_as_bytes(
       body_data.data(), body_data.size());
-  dst_streamed_trace.mutable_event()->set_byte_seq_num(1);
+  dst_streamed_trace.mutable_event()->set_seq_num(1);
 
   local_handle->submitTrace(std::move(local_buffered_trace),
                             envoy::config::tap::v3::OutputSink::PROTO_BINARY);
@@ -342,7 +342,7 @@ TEST_F(UdpTapSinkTest, TestSubmitTraceSendOkForJsonBodyAsBytesReadEvForBigUdpMsg
   std::string body_data("01234567890123456789012345678901234567890123456789");
   dst_streamed_trace.mutable_event()->mutable_read()->mutable_data()->set_as_bytes(
       body_data.data(), body_data.size());
-  dst_streamed_trace.mutable_event()->set_byte_seq_num(1);
+  dst_streamed_trace.mutable_event()->set_seq_num(1);
 
   local_handle->submitTrace(std::move(local_buffered_trace),
                             envoy::config::tap::v3::OutputSink::JSON_BODY_AS_BYTES);
@@ -398,7 +398,7 @@ TEST_F(UdpTapSinkTest, TestSubmitTraceSendOkForJsonBodyAsBytesWriteEvForBigUdpMs
   std::string body_data("01234567890123456789012345678901234567890123456789");
   dst_streamed_trace.mutable_event()->mutable_write()->mutable_data()->set_as_bytes(
       body_data.data(), body_data.size());
-  dst_streamed_trace.mutable_event()->set_byte_seq_num(1);
+  dst_streamed_trace.mutable_event()->set_seq_num(1);
 
   local_handle->submitTrace(std::move(local_buffered_trace),
                             envoy::config::tap::v3::OutputSink::JSON_BODY_AS_BYTES);
@@ -455,7 +455,7 @@ TEST_F(UdpTapSinkTest, TestSubmitTraceSendOkForJsonBodyAsBytesWriteEvTwoForBigUd
   std::string body_data("01234567890123456789");
   dst_streamed_trace.mutable_event()->mutable_write()->mutable_data()->set_as_bytes(
       body_data.data(), body_data.size());
-  dst_streamed_trace.mutable_event()->set_byte_seq_num(1);
+  dst_streamed_trace.mutable_event()->set_seq_num(1);
 
   local_handle->submitTrace(std::move(local_buffered_trace),
                             envoy::config::tap::v3::OutputSink::JSON_BODY_AS_BYTES);
@@ -489,7 +489,7 @@ TEST_F(UdpTapSinkTest, TestSubmitTraceSendOkForJsonBodyAsStringReadEvForBigUdpMs
 
   dst_streamed_trace.mutable_event()->mutable_timestamp()->set_seconds(1);
   dst_streamed_trace.mutable_event()->mutable_timestamp()->set_nanos(1);
-  dst_streamed_trace.mutable_event()->set_byte_seq_num(1);
+  dst_streamed_trace.mutable_event()->set_seq_num(1);
 
   dst_streamed_trace.mutable_connection()
       ->mutable_local_address()
@@ -511,7 +511,7 @@ TEST_F(UdpTapSinkTest, TestSubmitTraceSendOkForJsonBodyAsStringReadEvForBigUdpMs
   std::string body_data("01234567890123456789012345678901234567890123456789");
   dst_streamed_trace.mutable_event()->mutable_read()->mutable_data()->set_as_string(
       body_data.data(), body_data.size());
-  dst_streamed_trace.mutable_event()->set_byte_seq_num(1);
+  dst_streamed_trace.mutable_event()->set_seq_num(1);
   local_handle->submitTrace(std::move(local_buffered_trace),
                             envoy::config::tap::v3::OutputSink::JSON_BODY_AS_STRING);
 }
@@ -567,7 +567,7 @@ TEST_F(UdpTapSinkTest, TestSubmitTraceSendOkForJsonBodyAsStringWriteEvForBigUdpM
   dst_streamed_trace.mutable_event()->mutable_write()->mutable_data()->set_as_string(
       body_data.data(), body_data.size());
 
-  dst_streamed_trace.mutable_event()->set_byte_seq_num(1);
+  dst_streamed_trace.mutable_event()->set_seq_num(1);
   local_handle->submitTrace(std::move(local_buffered_trace),
                             envoy::config::tap::v3::OutputSink::JSON_BODY_AS_STRING);
 }
@@ -723,7 +723,7 @@ TEST_F(UdpTapSinkTest, TestSubmitTraceSendOkForJsonBodyAsBytesWriteEventsBigData
   std::string body_data("01234567890123456789012345678901234567890123456789012345678901234567890123"
                         "456789012345678901234567890123456789012345678901234567890123456789");
   event.mutable_write()->mutable_data()->set_as_bytes(body_data.data(), body_data.size());
-  event.set_byte_seq_num(1);
+  event.set_seq_num(1);
   event.mutable_connection()->mutable_local_address()->mutable_socket_address()->set_address(
       "127.0.0.1");
   event.mutable_connection()->mutable_remote_address()->mutable_socket_address()->set_address(
@@ -770,7 +770,7 @@ TEST_F(UdpTapSinkTest, TestSubmitTraceSendOkForJsonBodyAsBytesWriteTwoBigDataEve
   std::string body_data("01234567890123456789012345678901234567890123456789012345678901234567890123"
                         "456789012345678901234567890123456789012345678901234567890123456789");
   event.mutable_write()->mutable_data()->set_as_bytes(body_data.data(), body_data.size());
-  event.set_byte_seq_num(1);
+  event.set_seq_num(1);
   event.mutable_connection()->mutable_local_address()->mutable_socket_address()->set_address(
       "127.0.0.1");
   event.mutable_connection()->mutable_remote_address()->mutable_socket_address()->set_address(
@@ -784,7 +784,7 @@ TEST_F(UdpTapSinkTest, TestSubmitTraceSendOkForJsonBodyAsBytesWriteTwoBigDataEve
   event1.mutable_timestamp()->set_nanos(1);
   std::string body_data1("12345678901");
   event1.mutable_write()->mutable_data()->set_as_bytes(body_data1.data(), body_data1.size());
-  event1.set_byte_seq_num(1 + body_data.size());
+  event1.set_seq_num(1 + body_data.size());
   event1.mutable_connection()->mutable_local_address()->mutable_socket_address()->set_address(
       "127.0.0.1");
   event1.mutable_connection()->mutable_remote_address()->mutable_socket_address()->set_address(
@@ -801,7 +801,7 @@ TEST_F(UdpTapSinkTest, TestSubmitTraceSendOkForJsonBodyAsBytesWriteTwoBigDataEve
       "23456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123"
       "456789012345678901234567890123456789");
   event2.mutable_write()->mutable_data()->set_as_bytes(body_data2.data(), body_data2.size());
-  event2.set_byte_seq_num(1 + body_data.size() + body_data1.size());
+  event2.set_seq_num(1 + body_data.size() + body_data1.size());
   event2.mutable_connection()->mutable_local_address()->mutable_socket_address()->set_address(
       "127.0.0.1");
   event2.mutable_connection()->mutable_remote_address()->mutable_socket_address()->set_address(
@@ -815,7 +815,7 @@ TEST_F(UdpTapSinkTest, TestSubmitTraceSendOkForJsonBodyAsBytesWriteTwoBigDataEve
   event3.mutable_timestamp()->set_nanos(1);
   std::string body_data3("1234567890123");
   event3.mutable_write()->mutable_data()->set_as_bytes(body_data3.data(), body_data3.size());
-  event3.set_byte_seq_num(1 + body_data.size() + body_data1.size() + body_data2.size());
+  event3.set_seq_num(1 + body_data.size() + body_data1.size() + body_data2.size());
   event3.mutable_connection()->mutable_local_address()->mutable_socket_address()->set_address(
       "127.0.0.1");
   event3.mutable_connection()->mutable_remote_address()->mutable_socket_address()->set_address(
@@ -860,7 +860,7 @@ TEST_F(UdpTapSinkTest, TestSubmitTraceSendOkForJsonBodyAsBytesWriteTwoEvents) {
   event1.mutable_timestamp()->set_nanos(1);
   std::string body_data1("1234567890123456789012345678");
   event1.mutable_write()->mutable_data()->set_as_bytes(body_data1.data(), body_data1.size());
-  event1.set_byte_seq_num(1);
+  event1.set_seq_num(1);
   event1.mutable_connection()->mutable_local_address()->mutable_socket_address()->set_address(
       "127.0.0.1");
   event1.mutable_connection()->mutable_remote_address()->mutable_socket_address()->set_address(
@@ -874,7 +874,7 @@ TEST_F(UdpTapSinkTest, TestSubmitTraceSendOkForJsonBodyAsBytesWriteTwoEvents) {
   event3.mutable_timestamp()->set_nanos(1);
   std::string body_data3("12345678901");
   event3.mutable_write()->mutable_data()->set_as_bytes(body_data3.data(), body_data3.size());
-  event3.set_byte_seq_num(1 + body_data1.size());
+  event3.set_seq_num(1 + body_data1.size());
   event3.mutable_connection()->mutable_local_address()->mutable_socket_address()->set_address(
       "127.0.0.1");
   event3.mutable_connection()->mutable_remote_address()->mutable_socket_address()->set_address(
@@ -919,7 +919,7 @@ TEST_F(UdpTapSinkTest, TestSubmitTraceSendOkForJsonBodyAsBytesReadOneBigTwoSmall
   event1.mutable_timestamp()->set_nanos(1);
   std::string body_data1("1234567890123456789012345678");
   event1.mutable_read()->mutable_data()->set_as_bytes(body_data1.data(), body_data1.size());
-  event1.set_byte_seq_num(1);
+  event1.set_seq_num(1);
   event1.mutable_connection()->mutable_local_address()->mutable_socket_address()->set_address(
       "127.0.0.1");
   event1.mutable_connection()->mutable_remote_address()->mutable_socket_address()->set_address(
@@ -933,7 +933,7 @@ TEST_F(UdpTapSinkTest, TestSubmitTraceSendOkForJsonBodyAsBytesReadOneBigTwoSmall
   event2.mutable_timestamp()->set_nanos(2);
   std::string body_data2("123456782");
   event2.mutable_read()->mutable_data()->set_as_bytes(body_data2.data(), body_data2.size());
-  event2.set_byte_seq_num(1 + body_data1.size());
+  event2.set_seq_num(1 + body_data1.size());
   event2.mutable_connection()->mutable_local_address()->mutable_socket_address()->set_address(
       "127.0.0.1");
   event2.mutable_connection()->mutable_remote_address()->mutable_socket_address()->set_address(
@@ -947,7 +947,7 @@ TEST_F(UdpTapSinkTest, TestSubmitTraceSendOkForJsonBodyAsBytesReadOneBigTwoSmall
   event3.mutable_timestamp()->set_nanos(2);
   std::string body_data3("123456783");
   event3.mutable_read()->mutable_data()->set_as_bytes(body_data3.data(), body_data3.size());
-  event2.set_byte_seq_num(1 + body_data1.size() + body_data2.size());
+  event2.set_seq_num(1 + body_data1.size() + body_data2.size());
   event3.mutable_connection()->mutable_local_address()->mutable_socket_address()->set_address(
       "127.0.0.1");
   event3.mutable_connection()->mutable_remote_address()->mutable_socket_address()->set_address(
@@ -993,7 +993,7 @@ TEST_F(UdpTapSinkTest, TestSubmitTraceSendOkForJsonBodyAsBytesReadOneBigTwoSmall
   std::string body_data1("1234567890123456789012345678901234567890123456789012345678901234567890123"
                          "4567890123456789012345678901234567890123456789012345678901234567890");
   event1.mutable_read()->mutable_data()->set_as_bytes(body_data1.data(), body_data1.size());
-  event1.set_byte_seq_num(1);
+  event1.set_seq_num(1);
   event1.mutable_connection()->mutable_local_address()->mutable_socket_address()->set_address(
       "127.0.0.1");
   event1.mutable_connection()->mutable_remote_address()->mutable_socket_address()->set_address(
@@ -1007,7 +1007,7 @@ TEST_F(UdpTapSinkTest, TestSubmitTraceSendOkForJsonBodyAsBytesReadOneBigTwoSmall
   event2.mutable_timestamp()->set_nanos(2);
   std::string body_data2("123456782");
   event2.mutable_read()->mutable_data()->set_as_bytes(body_data2.data(), body_data2.size());
-  event2.set_byte_seq_num(1 + body_data1.size());
+  event2.set_seq_num(1 + body_data1.size());
   event2.mutable_connection()->mutable_local_address()->mutable_socket_address()->set_address(
       "127.0.0.1");
   event2.mutable_connection()->mutable_remote_address()->mutable_socket_address()->set_address(
@@ -1020,7 +1020,7 @@ TEST_F(UdpTapSinkTest, TestSubmitTraceSendOkForJsonBodyAsBytesReadOneBigTwoSmall
   event3.mutable_timestamp()->set_seconds(3);
   event3.mutable_timestamp()->set_nanos(3);
   std::string body_data3("123456783");
-  event2.set_byte_seq_num(1 + body_data1.size() + body_data2.size());
+  event2.set_seq_num(1 + body_data1.size() + body_data2.size());
   event3.mutable_read()->mutable_data()->set_as_bytes(body_data3.data(), body_data3.size());
   event3.mutable_connection()->mutable_local_address()->mutable_socket_address()->set_address(
       "127.0.0.1");

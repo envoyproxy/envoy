@@ -70,8 +70,8 @@ message SocketEvent {
   // Connection information per event
   Connection connection = 5;
 
-  // Data byte sequence number
-  uint64 byte_seq_num = 6;
+  // Data sequence number
+  uint64 seq_num = 6;
 }
 
 // Sequence of read/write events that constitute a buffered trace on a socket.
