@@ -266,7 +266,8 @@ TEST_P(ProtoApiScrubberIntegrationTest, ScrubAllMapTypes) {
           "object_map.value.secret",       // String to Object map: all fields scrubbed (A).
           "object_map.value.public_field", // String to Object map: all fields scrubbed (B).
           "object_map.value.other_info",   // String to Object map: all fields scrubbed (C).
-          "full_scrub_map.value"           // String to Object map: object itself scrubbed.
+          "full_scrub_map.value",          // String to Object map: object itself scrubbed.
+          "deep_map.value.internal_details.deep_secret" // 2-Level Deep Nesting in Map.
       },
       RestrictionType::Request, buildCelPredicate("true")));
 
@@ -302,6 +303,13 @@ TEST_P(ProtoApiScrubberIntegrationTest, ScrubAllMapTypes) {
   auto& obj_scrub = (*request.mutable_full_scrub_map())["k_object"];
   obj_scrub.set_secret("sensitive");
 
+  // 2-Level Deep Nesting (Map Value -> Message -> Message -> Field).
+  // deep_map.value.internal_details.deep_secret is scrubbed.
+  // deep_map.value.internal_details.deep_public is kept.
+  auto& deep_nested = (*request.mutable_deep_map())["k_deep_nested"];
+  deep_nested.mutable_internal_details()->set_deep_secret("secret_cvv");
+  deep_nested.mutable_internal_details()->set_deep_public("public_name");
+
   auto response = sendGrpcRequest(
       request, "/test.extensions.filters.http.proto_api_scrubber.ScrubberTestService/Scrub");
   waitForNextUpstreamRequest();
@@ -332,6 +340,11 @@ TEST_P(ProtoApiScrubberIntegrationTest, ScrubAllMapTypes) {
 
   // Object Scrubbed: Value message excluded -> Entry REMOVED.
   expected.mutable_full_scrub_map()->erase("k_object");
+
+  // 2-Level Deep Nesting Verification.
+  auto& deep_nested_exp = (*expected.mutable_deep_map())["k_deep_nested"];
+  deep_nested_exp.mutable_internal_details()->set_deep_secret(""); // Scrubbed
+  // deep_public remains "public_name"
 
   Buffer::OwnedImpl data;
   data.add(upstream_request_->body());

@@ -33,8 +33,12 @@ using proto_processing_lib::proto_scrubber::ScrubberContext;
 class FieldChecker : public FieldCheckerInterface, public Logger::Loggable<Logger::Id::filter> {
 public:
   FieldChecker(const ScrubberContext scrubber_context,
-               const Envoy::StreamInfo::StreamInfo* stream_info, const std::string& method_name,
-               const ProtoApiScrubberFilterConfig* filter_config);
+               const Envoy::StreamInfo::StreamInfo* stream_info,
+               OptRef<const Http::RequestHeaderMap> request_headers,
+               OptRef<const Http::ResponseHeaderMap> response_headers,
+               OptRef<const Http::RequestTrailerMap> request_trailers,
+               OptRef<const Http::ResponseTrailerMap> response_trailers,
+               const std::string& method_name, const ProtoApiScrubberFilterConfig* filter_config);
 
   // This type is neither copyable nor movable.
   FieldChecker(const FieldChecker&) = delete;
