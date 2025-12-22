@@ -4695,14 +4695,17 @@ TEST_P(HttpFilterTestParam, OnDestroyCancelsCorrectClient) {
   EXPECT_CALL(*mock_raw_grpc_client, sendRaw(_, _, _, _, _, _))
       .WillOnce(Return(mock_async_request_ptr));
 
-  // Start the authorization check - this will create the per-route client and call check.
+  // Set expectations on default client BEFORE decodeHeaders() because the default client
+  // is destroyed when replaced by the per-route client during decodeHeaders().
+  // gMock will verify these expectations when the mock object is destroyed.
   EXPECT_CALL(*default_client_ptr, check(_, _, _, _)).Times(0);
+  EXPECT_CALL(*default_client_ptr, cancel()).Times(0);
+
+  // Start the authorization check - this will create the per-route client and replace
+  // the default client. The default client is destroyed here.
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             test_filter->decodeHeaders(request_headers_, false));
 
-  // Verify that when onDestroy is called, the default client's cancel is NOT called
-  // (because per-route client was used).
-  EXPECT_CALL(*default_client_ptr, cancel()).Times(0);
   // Verify that the per-route client's async request is cancelled.
   EXPECT_CALL(*mock_async_request_ptr, cancel());
   test_filter->onDestroy();
