@@ -1,3 +1,5 @@
+#include "envoy/common/optref.h"
+
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/http/proto_api_scrubber/filter_config.h"
@@ -85,6 +87,42 @@ void setupMockEnumRule(MockProtoApiScrubberFilterConfig& mock_config, const std:
       .WillByDefault(testing::Return(match_tree));
   ON_CALL(mock_config, getResponseFieldMatcher(method, full_mask))
       .WillByDefault(testing::Return(match_tree));
+}
+
+// Custom Matcher to verify that HttpMatchingData contains specific Request Headers
+MATCHER_P(HasRequestHeader, key, "") {
+  const auto headers = arg.requestHeaders();
+  if (!headers.has_value()) {
+    return false;
+  }
+  return !headers->get(Http::LowerCaseString(key)).empty();
+}
+
+// Custom Matcher to verify that HttpMatchingData contains specific Response Headers
+MATCHER_P(HasResponseHeader, key, "") {
+  const auto headers = arg.responseHeaders();
+  if (!headers.has_value()) {
+    return false;
+  }
+  return !headers->get(Http::LowerCaseString(key)).empty();
+}
+
+// Custom Matcher to verify that HttpMatchingData contains specific Request Trailers
+MATCHER_P(HasRequestTrailer, key, "") {
+  const auto trailers = arg.requestTrailers();
+  if (!trailers.has_value()) {
+    return false;
+  }
+  return !trailers->get(Http::LowerCaseString(key)).empty();
+}
+
+// Custom Matcher to verify that HttpMatchingData contains specific Response Trailers
+MATCHER_P(HasResponseTrailer, key, "") {
+  const auto trailers = arg.responseTrailers();
+  if (!trailers.has_value()) {
+    return false;
+  }
+  return !trailers->get(Http::LowerCaseString(key)).empty();
 }
 
 class FieldCheckerTest : public ::testing::Test {
@@ -218,8 +256,8 @@ TEST_F(FieldCheckerTest, IncompleteMatch) {
     EXPECT_CALL(mock_filter_config, getRequestFieldMatcher(method_name, field_name))
         .WillOnce(testing::Return(mock_match_tree));
 
-    FieldChecker request_field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info,
-                                       method_name, &mock_filter_config);
+    FieldChecker request_field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info, {},
+                                       {}, {}, {}, method_name, &mock_filter_config);
 
     EXPECT_LOG_CONTAINS(
         "warn",
@@ -235,8 +273,8 @@ TEST_F(FieldCheckerTest, IncompleteMatch) {
     EXPECT_CALL(mock_filter_config, getResponseFieldMatcher(method_name, field_name))
         .WillOnce(testing::Return(mock_match_tree));
 
-    FieldChecker response_field_checker(ScrubberContext::kResponseScrubbing, &mock_stream_info,
-                                        method_name, &mock_filter_config);
+    FieldChecker response_field_checker(ScrubberContext::kResponseScrubbing, &mock_stream_info, {},
+                                        {}, {}, {}, method_name, &mock_filter_config);
 
     EXPECT_LOG_CONTAINS(
         "warn",
@@ -274,8 +312,8 @@ TEST_F(FieldCheckerTest, CompleteMatchWithUnsupportedAction) {
     EXPECT_CALL(mock_filter_config, getRequestFieldMatcher(method_name, field_name))
         .WillOnce(testing::Return(mock_match_tree));
 
-    FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info, method_name,
-                               &mock_filter_config);
+    FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info, {}, {}, {},
+                               {}, method_name, &mock_filter_config);
 
     // Assert that kInclude is returned because standard matching behavior dictates that
     // if an action is unknown to this specific filter, it should default to preserving the field.
@@ -297,8 +335,8 @@ TEST_F(FieldCheckerTest, CompleteMatchWithUnsupportedAction) {
     EXPECT_CALL(mock_filter_config, getRequestFieldMatcher(method_name, field_name))
         .WillOnce(testing::Return(mock_match_tree));
 
-    FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info, method_name,
-                               &mock_filter_config);
+    FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info, {}, {}, {},
+                               {}, method_name, &mock_filter_config);
 
     // Assert that kInclude is returned because standard matching behavior dictates that
     // if an action is unknown to this specific filter, it should default to preserving the field.
@@ -311,7 +349,7 @@ using RequestFieldCheckerTest = FieldCheckerTest;
 // Tests CheckField() method for primitive and message type request fields.
 TEST_F(RequestFieldCheckerTest, PrimitiveAndMessageType) {
   ProtoApiScrubberConfig config;
-  std::string method = "/library.BookService/GetBook";
+  std::string method = "/apikeys.ApiKeys/CreateApiKey";
 
   addRestriction(config, method, "shelf", FieldType::Request, false);
   addRestriction(config, method, "filter_criteria.publication_details.original_release_info.year",
@@ -325,8 +363,8 @@ TEST_F(RequestFieldCheckerTest, PrimitiveAndMessageType) {
   initializeFilterConfig(config);
 
   NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
-  FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info, method,
-                             filter_config_.get());
+  FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info, {}, {}, {}, {},
+                             method, filter_config_.get());
 
   {
     // The field `urn` doesn't have any match tree configured.
@@ -440,7 +478,7 @@ TEST_F(RequestFieldCheckerTest, PrimitiveAndMessageType) {
 // Tests CheckField() specifically for repeated fields (Arrays) in the request.
 TEST_F(RequestFieldCheckerTest, ArrayType) {
   ProtoApiScrubberConfig config;
-  std::string method = "/library.BookService/UpdateBook";
+  std::string method = "/apikeys.ApiKeys/CreateApiKey";
 
   // Top-level repeated primitive: "tags" -> Remove.
   addRestriction(config, method, "tags", FieldType::Request, true);
@@ -453,8 +491,8 @@ TEST_F(RequestFieldCheckerTest, ArrayType) {
   initializeFilterConfig(config);
 
   NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
-  FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info, method,
-                             filter_config_.get());
+  FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info, {}, {}, {}, {},
+                             method, filter_config_.get());
 
   {
     // Case 1: Top-level repeated primitive (e.g., repeated string tags).
@@ -532,8 +570,8 @@ TEST_F(RequestFieldCheckerTest, EnumType) {
   setupMockEnumRule(*mock_config, method, "config.status", "type.googleapis.com/pkg.Status", 0,
                     "OK", false);
 
-  FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info, method,
-                             mock_config.get());
+  FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info, {}, {}, {}, {},
+                             method, mock_config.get());
 
   {
     // Scenario 1: Field-Level Scrubbing.
@@ -593,7 +631,7 @@ using ResponseFieldCheckerTest = FieldCheckerTest;
 // Tests CheckField() method for primitive and message type response fields.
 TEST_F(ResponseFieldCheckerTest, PrimitiveAndMessageType) {
   ProtoApiScrubberConfig config;
-  std::string method = "/library.BookService/GetBook";
+  std::string method = "/apikeys.ApiKeys/CreateApiKey";
 
   addRestriction(config, method, "publisher", FieldType::Response, false);
   addRestriction(config, method, "fulfillment.primary_location.exact_coordinates.aisle",
@@ -605,8 +643,8 @@ TEST_F(ResponseFieldCheckerTest, PrimitiveAndMessageType) {
   initializeFilterConfig(config);
 
   NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
-  FieldChecker field_checker(ScrubberContext::kResponseScrubbing, &mock_stream_info, method,
-                             filter_config_.get());
+  FieldChecker field_checker(ScrubberContext::kResponseScrubbing, &mock_stream_info, {}, {}, {}, {},
+                             method, filter_config_.get());
 
   {
     // The field `author` doesn't have any match tree configured.
@@ -651,7 +689,7 @@ TEST_F(ResponseFieldCheckerTest, PrimitiveAndMessageType) {
     // The field `name` has a match tree configured which always evaluates to true and has a match
     // action configured of type
     // `envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction`
-    // and hence, CheckField returns kInclude.
+    // and hence, CheckField returns kExclude.
     Protobuf::Field field;
     field.set_name("name");
     field.set_kind(Protobuf::Field_Kind_TYPE_STRING);
@@ -695,7 +733,7 @@ TEST_F(ResponseFieldCheckerTest, PrimitiveAndMessageType) {
 // Tests CheckField() specifically for repeated fields (Arrays) in the response.
 TEST_F(ResponseFieldCheckerTest, ArrayType) {
   ProtoApiScrubberConfig config;
-  std::string method = "/library.BookService/GetBook";
+  std::string method = "/apikeys.ApiKeys/CreateApiKey";
 
   // Top-level repeated primitive: "comments" -> Remove.
   addRestriction(config, method, "comments", FieldType::Response, true);
@@ -708,8 +746,8 @@ TEST_F(ResponseFieldCheckerTest, ArrayType) {
   initializeFilterConfig(config);
 
   NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
-  FieldChecker field_checker(ScrubberContext::kResponseScrubbing, &mock_stream_info, method,
-                             filter_config_.get());
+  FieldChecker field_checker(ScrubberContext::kResponseScrubbing, &mock_stream_info, {}, {}, {}, {},
+                             method, filter_config_.get());
 
   {
     // Case 1: Top-level repeated primitive.
@@ -777,8 +815,8 @@ TEST_F(ResponseFieldCheckerTest, EnumType) {
   setupMockEnumRule(*mock_config, method, "config.state", "type.googleapis.com/pkg.State", 2,
                     "DEPRECATED", true);
 
-  FieldChecker field_checker(ScrubberContext::kResponseScrubbing, &mock_stream_info, method,
-                             mock_config.get());
+  FieldChecker field_checker(ScrubberContext::kResponseScrubbing, &mock_stream_info, {}, {}, {}, {},
+                             method, mock_config.get());
 
   {
     // Scenario 1: Field-Level Scrubbing.
@@ -827,8 +865,8 @@ TEST_F(FieldCheckerTest, UnsupportedScrubberContext) {
   field.set_name("user");
   field.set_kind(Protobuf::Field_Kind_TYPE_STRING);
 
-  FieldChecker field_checker(ScrubberContext::kTestScrubbing, &mock_stream_info,
-                             "/library.BookService/GetBook", filter_config_.get());
+  FieldChecker field_checker(ScrubberContext::kTestScrubbing, &mock_stream_info, {}, {}, {}, {},
+                             "/apikeys.ApiKeys/CreateApiKey", filter_config_.get());
 
   EXPECT_LOG_CONTAINS("warn", "Unsupported scrubber context enum value", {
     FieldCheckResults result = field_checker.CheckField({"user"}, &field);
@@ -836,13 +874,52 @@ TEST_F(FieldCheckerTest, UnsupportedScrubberContext) {
   });
 }
 
+TEST_F(FieldCheckerTest, ConstructorPropagatesHeadersAndTrailersToMatchTree) {
+  NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
+  NiceMock<MockProtoApiScrubberFilterConfig> mock_config;
+  std::string method = "method";
+  std::string field_name = "target_field";
+  Http::TestRequestHeaderMapImpl request_headers{{"x-req-header", "true"}};
+  Http::TestResponseHeaderMapImpl response_headers{{"x-res-header", "true"}};
+  Http::TestRequestTrailerMapImpl request_trailers{{"x-req-trailer", "true"}};
+  Http::TestResponseTrailerMapImpl response_trailers{{"x-res-trailer", "true"}};
+
+  // Setup the MatchTree expectation
+  // We want to prove that the 'matching_data' passed to the match() method
+  // actually contains the data we passed to the FieldChecker constructor.
+  auto mock_match_tree = std::make_shared<NiceMock<MockMatchTree>>();
+
+  EXPECT_CALL(
+      *mock_match_tree,
+      match(testing::AllOf(HasRequestHeader("x-req-header"), HasResponseHeader("x-res-header"),
+                           HasRequestTrailer("x-req-trailer"), HasResponseTrailer("x-res-trailer")),
+            testing::_))
+      .WillOnce(testing::Return(Matcher::MatchResult(Matcher::ActionConstSharedPtr{nullptr})));
+
+  // Wire up the config to return our spying match tree.
+  ON_CALL(mock_config, getRequestFieldMatcher(method, field_name))
+      .WillByDefault(testing::Return(mock_match_tree));
+
+  // Instantiate FieldChecker.
+  FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info, request_headers,
+                             response_headers, request_trailers, response_trailers, method,
+                             &mock_config);
+
+  // Trigger the check. This calls tryMatch -> match_tree->match(matching_data_)
+  Protobuf::Field field;
+  field.set_name(field_name);
+  field.set_kind(Protobuf::Field_Kind_TYPE_STRING);
+
+  field_checker.CheckField({field_name}, &field);
+}
+
 TEST_F(FieldCheckerTest, IncludesType) {
   ProtoApiScrubberConfig config;
   initializeFilterConfig(config);
 
   NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
-  FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info,
-                             "/library.BookService/GetBook", filter_config_.get());
+  FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info, {}, {}, {}, {},
+                             "/apikeys.ApiKeys/CreateApiKey", filter_config_.get());
 
   Protobuf::Type type;
   type.set_name("type");
@@ -854,8 +931,8 @@ TEST_F(FieldCheckerTest, SupportAny) {
   initializeFilterConfig(config);
 
   NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
-  FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info,
-                             "/library.BookService/GetBook", filter_config_.get());
+  FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info, {}, {}, {}, {},
+                             "/apikeys.ApiKeys/CreateApiKey", filter_config_.get());
 
   EXPECT_FALSE(field_checker.SupportAny());
 }
@@ -865,10 +942,24 @@ TEST_F(FieldCheckerTest, FilterName) {
   initializeFilterConfig(config);
 
   NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
-  FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info,
-                             "/library.BookService/GetBook", filter_config_.get());
+  FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info, {}, {}, {}, {},
+                             "/apikeys.ApiKeys/CreateApiKey", filter_config_.get());
 
   EXPECT_EQ(field_checker.FilterName(), FieldFilters::FieldMaskFilter);
+}
+
+// Tests that when `field` is nullptr (indicating an unknown field), CheckField returns kInclude.
+TEST_F(FieldCheckerTest, UnknownFieldIsNull) {
+  ProtoApiScrubberConfig config;
+  initializeFilterConfig(config);
+
+  NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
+  FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info, {}, {}, {}, {},
+                             "/apikeys.ApiKeys/CreateApiKey", filter_config_.get());
+
+  // Pass nullptr to simulate an unknown field.
+  EXPECT_EQ(field_checker.CheckField({"some", "unknown", "field"}, nullptr),
+            FieldCheckResults::kInclude);
 }
 
 } // namespace

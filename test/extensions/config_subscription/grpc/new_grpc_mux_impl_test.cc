@@ -88,9 +88,10 @@ public:
         /*xds_config_tracker_=*/XdsConfigTrackerOptRef(),
         /*backoff_strategy_=*/std::move(backoff_strategy),
         /*target_xds_authority_=*/"",
-        /*eds_resources_cache_=*/std::unique_ptr<MockEdsResourcesCache>(eds_resources_cache_)};
+        /*eds_resources_cache_=*/std::unique_ptr<MockEdsResourcesCache>(eds_resources_cache_),
+        /*skip_subsequent_node_=*/false};
     if (isUnifiedMuxTest()) {
-      grpc_mux_ = std::make_unique<XdsMux::GrpcMuxDelta>(grpc_mux_context, false);
+      grpc_mux_ = std::make_unique<XdsMux::GrpcMuxDelta>(grpc_mux_context);
       return;
     }
     grpc_mux_ = std::make_unique<NewGrpcMuxImpl>(grpc_mux_context);

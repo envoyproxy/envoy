@@ -66,7 +66,7 @@ protected:
       descriptor_set: { }
       restrictions: {
         method_restrictions: {
-          key: "/library.BookService/GetBook"
+          key: "/apikeys.ApiKeys/CreateApiKey"
           value: {
             request_field_restrictions: {
               key: "debug_info"
@@ -201,7 +201,7 @@ protected:
         R"pb(
         restrictions: {
           method_restrictions: {
-            key: "/library.BookService/GetBook"
+            key: "/apikeys.ApiKeys/CreateApiKey"
             value: {
               response_field_restrictions: {
                 key: "%s"
@@ -225,7 +225,7 @@ protected:
     std::string filter_conf_string = absl::StrFormat(R"pb(
       restrictions: {
         method_restrictions: {
-          key: "/library.BookService/GetBook"
+          key: "/apikeys.ApiKeys/CreateApiKey"
           value: {
             request_field_restrictions: {
               key: "debug_info"
@@ -392,7 +392,7 @@ protected:
       descriptor_set : {}
       restrictions: {
         method_restrictions: {
-          key: "/library.BookService/GetBook"
+          key: "/apikeys.ApiKeys/CreateApiKey"
           value: {
             method_restriction: {
               matcher: {
@@ -510,7 +510,7 @@ TEST_F(ProtoApiScrubberFilterConfigTest, MatchTreeValidation) {
     // The match expression in hardcoded to `true` for `debug_info` which should result in a match
     // and a corresponding action named `RemoveFieldAction`.
     match_tree =
-        filter_config_->getRequestFieldMatcher("/library.BookService/GetBook", "debug_info");
+        filter_config_->getRequestFieldMatcher("/apikeys.ApiKeys/CreateApiKey", "debug_info");
     ASSERT_NE(match_tree, nullptr);
     EXPECT_THAT(
         match_tree->match(http_matching_data_impl),
@@ -522,7 +522,7 @@ TEST_F(ProtoApiScrubberFilterConfigTest, MatchTreeValidation) {
     // The match expression in hardcoded to `false` for `book.debug_info` which should result in
     // no match.
     match_tree =
-        filter_config_->getResponseFieldMatcher("/library.BookService/GetBook", "book.debug_info");
+        filter_config_->getResponseFieldMatcher("/apikeys.ApiKeys/CreateApiKey", "book.debug_info");
     ASSERT_NE(match_tree, nullptr);
     EXPECT_THAT(match_tree->match(http_matching_data_impl), HasNoMatch());
   }
@@ -542,14 +542,14 @@ TEST_F(ProtoApiScrubberFilterConfigTest, MatchTreeValidation) {
 
   {
     // Validate invalid field mask for request field matchers.
-    match_tree = filter_config_->getRequestFieldMatcher("/library.BookService/GetBook",
+    match_tree = filter_config_->getRequestFieldMatcher("/apikeys.ApiKeys/CreateApiKey",
                                                         "non.existent.field.mask");
     ASSERT_EQ(match_tree, nullptr);
   }
 
   {
     // Validate invalid field mask for response field matchers.
-    match_tree = filter_config_->getResponseFieldMatcher("/library.BookService/GetBook",
+    match_tree = filter_config_->getResponseFieldMatcher("/apikeys.ApiKeys/CreateApiKey",
                                                          "non.existent.field.mask");
     ASSERT_EQ(match_tree, nullptr);
   }
@@ -575,8 +575,8 @@ TEST_F(ProtoApiScrubberFilterConfigTest, DescriptorValidations) {
     filter_config = ProtoApiScrubberFilterConfig::create(config, factory_context_);
     EXPECT_EQ(filter_config.status().code(), absl::StatusCode::kInvalidArgument);
     EXPECT_THAT(filter_config.status().message(),
-                testing::HasSubstr("Error encountered during config initialization. Unable to "
-                                   "parse proto descriptor from inline bytes"));
+                HasSubstr("Error encountered during config initialization. Unable to "
+                          "parse proto descriptor from inline bytes"));
   }
 
   {
@@ -600,8 +600,8 @@ TEST_F(ProtoApiScrubberFilterConfigTest, DescriptorValidations) {
     filter_config = ProtoApiScrubberFilterConfig::create(config, factory_context_);
     EXPECT_EQ(filter_config.status().code(), absl::StatusCode::kInvalidArgument);
     EXPECT_THAT(filter_config.status().message(),
-                testing::HasSubstr("Error encountered during config initialization. Unable to "
-                                   "parse proto descriptor from inline bytes"));
+                HasSubstr("Error encountered during config initialization. Unable to "
+                          "parse proto descriptor from inline bytes"));
   }
 
   {
@@ -633,10 +633,9 @@ TEST_F(ProtoApiScrubberFilterConfigTest, DescriptorValidations) {
         invalid_binary_descriptor;
     filter_config = ProtoApiScrubberFilterConfig::create(config, factory_context_);
     EXPECT_EQ(filter_config.status().code(), absl::StatusCode::kInvalidArgument);
-    EXPECT_THAT(
-        filter_config.status().message(),
-        testing::HasSubstr("Error encountered during config initialization. Error occurred in file "
-                           "`test_file2.proto` while trying to build proto descriptors."));
+    EXPECT_THAT(filter_config.status().message(),
+                HasSubstr("Error encountered during config initialization. Error occurred in file "
+                          "`test_file2.proto` while trying to build proto descriptors."));
   }
 
   {
@@ -658,11 +657,11 @@ TEST_F(ProtoApiScrubberFilterConfigTest, DescriptorValidations) {
         TestEnvironment::runfilesPath("path/to/non-existent-file.descriptor");
     filter_config = ProtoApiScrubberFilterConfig::create(config, factory_context_);
     EXPECT_EQ(filter_config.status().code(), absl::StatusCode::kInvalidArgument);
+    EXPECT_THAT(
+        filter_config.status().message(),
+        HasSubstr("Error encountered during config initialization. Unable to read from file"));
     EXPECT_THAT(filter_config.status().message(),
-                testing::HasSubstr(
-                    "Error encountered during config initialization. Unable to read from file"));
-    EXPECT_THAT(filter_config.status().message(),
-                testing::HasSubstr("path/to/non-existent-file.descriptor"));
+                HasSubstr("path/to/non-existent-file.descriptor"));
   }
 
   {
@@ -673,10 +672,10 @@ TEST_F(ProtoApiScrubberFilterConfigTest, DescriptorValidations) {
     filter_config = ProtoApiScrubberFilterConfig::create(config, factory_context_);
     EXPECT_EQ(filter_config.status().code(), absl::StatusCode::kInvalidArgument);
     EXPECT_THAT(filter_config.status().message(),
-                testing::HasSubstr("Error encountered during config initialization. Unable to "
-                                   "parse proto descriptor from file"));
+                HasSubstr("Error encountered during config initialization. Unable to "
+                          "parse proto descriptor from file"));
     EXPECT_THAT(filter_config.status().message(),
-                testing::HasSubstr("test/config/integration/certs/upstreamcacert.pem"));
+                HasSubstr("test/config/integration/certs/upstreamcacert.pem"));
   }
 
   {
@@ -814,8 +813,18 @@ TEST_F(ProtoApiScrubberFilterConfigTest, MethodNameValidations) {
   }
 
   {
+    // Valid format, but method does not exist in the loaded descriptor.
     filter_config = ProtoApiScrubberFilterConfig::create(
         getConfigWithMethodName("/library.BookService/GetBook"), factory_context_);
+    EXPECT_EQ(filter_config.status().code(), absl::StatusCode::kInvalidArgument);
+    EXPECT_THAT(filter_config.status().message(),
+                HasSubstr("The method is not found in the descriptor pool."));
+  }
+
+  {
+    // Valid format and method exists in descriptor.
+    filter_config = ProtoApiScrubberFilterConfig::create(
+        getConfigWithMethodName("/apikeys.ApiKeys/CreateApiKey"), factory_context_);
     EXPECT_EQ(filter_config.status().code(), absl::StatusCode::kOk);
     EXPECT_EQ(filter_config.status().message(), "");
   }
@@ -907,41 +916,6 @@ TEST_F(ProtoApiScrubberFilterConfigTest, FilteringModeValidations) {
   }
 }
 
-TEST_F(ProtoApiScrubberFilterConfigTest, MatcherInputTypeValidations) {
-  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  absl::StatusOr<std::shared_ptr<const ProtoApiScrubberFilterConfig>> filter_config;
-
-  {
-    EXPECT_THROW_WITH_MESSAGE(
-        filter_config = ProtoApiScrubberFilterConfig::create(
-            getConfigWithInputType(
-                "type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput"),
-            factory_context),
-        EnvoyException,
-        "Unsupported data input type: string. The matcher supports input type: cel_data_input");
-  }
-
-  {
-    EXPECT_THROW_WITH_MESSAGE(
-        filter_config = ProtoApiScrubberFilterConfig::create(
-            getConfigWithInputType(
-                "type.googleapis.com/"
-                "envoy.extensions.matching.common_inputs.network.v3.ServerNameInput"),
-            factory_context),
-        EnvoyException,
-        "Unsupported data input type: string. The matcher supports input type: cel_data_input");
-  }
-
-  {
-    filter_config = ProtoApiScrubberFilterConfig::create(
-        getConfigWithInputType(
-            "type.googleapis.com/xds.type.matcher.v3.HttpAttributesCelMatchInput"),
-        factory_context);
-    EXPECT_EQ(filter_config.status().code(), absl::StatusCode::kOk);
-    EXPECT_EQ(filter_config.status().message(), "");
-  }
-}
-
 TEST_F(ProtoApiScrubberFilterConfigTest, GetRequestType) {
   // 1. Initialize the config
   absl::StatusOr<std::shared_ptr<const ProtoApiScrubberFilterConfig>> config_or_status =
@@ -974,7 +948,7 @@ TEST_F(ProtoApiScrubberFilterConfigTest, GetRequestType) {
     EXPECT_EQ(type_or_status.status().code(), absl::StatusCode::kInvalidArgument);
     EXPECT_THAT(
         type_or_status.status().message(),
-        testing::HasSubstr(
+        HasSubstr(
             "Unable to find method `apikeys.ApiKeys.NonExistentMethod` in the descriptor pool"));
   }
 }
@@ -1011,7 +985,7 @@ TEST_F(ProtoApiScrubberFilterConfigTest, GetResponseType) {
     EXPECT_EQ(type_or_status.status().code(), absl::StatusCode::kInvalidArgument);
     EXPECT_THAT(
         type_or_status.status().message(),
-        testing::HasSubstr(
+        HasSubstr(
             "Unable to find method `apikeys.ApiKeys.NonExistentMethod` in the descriptor pool"));
   }
 }
@@ -1120,7 +1094,7 @@ TEST_F(ProtoApiScrubberFilterConfigTest, ParseMethodLevelRestriction) {
   NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
   Http::Matching::HttpMatchingDataImpl http_matching_data_impl(mock_stream_info);
 
-  auto matcher1 = filter_config_->getMethodMatcher("/library.BookService/GetBook");
+  auto matcher1 = filter_config_->getMethodMatcher("/apikeys.ApiKeys/CreateApiKey");
   ASSERT_NE(matcher1, nullptr);
   EXPECT_THAT(
       matcher1->match(http_matching_data_impl),
@@ -1175,7 +1149,7 @@ TEST_F(ProtoApiScrubberFilterConfigTest, UnsupportedActionType) {
     descriptor_set: {}
     restrictions: {
       method_restrictions: {
-        key: "/library.BookService/GetBook"
+        key: "/apikeys.ApiKeys/CreateApiKey"
         value: {
           request_field_restrictions: {
             key: "debug_info"
@@ -1230,14 +1204,10 @@ TEST_F(ProtoApiScrubberFilterConfigTest, UnsupportedActionType) {
 
   // Validate that creating the config throws an EnvoyException because the action
   // "some_unknown_action" is not registered.
-  EXPECT_THROW_WITH_MESSAGE(
-      {
-        auto status_or_config =
-            ProtoApiScrubberFilterConfig::create(proto_config, factory_context_);
-      },
+  EXPECT_THAT_THROWS_MESSAGE(
+      { auto _ = ProtoApiScrubberFilterConfig::create(proto_config, factory_context_); },
       EnvoyException,
-      "Didn't find a registered implementation for 'some_unknown_action' with type URL: "
-      "'google.protobuf.Empty'");
+      HasSubstr("Didn't find a registered implementation for 'some_unknown_action'"));
 }
 
 } // namespace

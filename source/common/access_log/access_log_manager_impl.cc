@@ -1,5 +1,6 @@
 #include "source/common/access_log/access_log_manager_impl.h"
 
+#include <cstdint>
 #include <string>
 
 #include "envoy/common/exception.h"
@@ -46,15 +47,16 @@ AccessLogManagerImpl::createAccessLog(const Filesystem::FilePathAndType& file_in
                                                   open_result.err_->getErrorDetails()));
   }
 
-  access_logs_[file_name] =
-      std::make_shared<AccessLogFileImpl>(std::move(file), dispatcher_, lock_, file_stats_,
-                                          file_flush_interval_msec_, api_.threadFactory());
+  access_logs_[file_name] = std::make_shared<AccessLogFileImpl>(
+      std::move(file), dispatcher_, lock_, file_stats_, file_flush_interval_msec_,
+      file_min_flush_size_kb_, api_.threadFactory());
   return access_logs_[file_name];
 }
 
 AccessLogFileImpl::AccessLogFileImpl(Filesystem::FilePtr&& file, Event::Dispatcher& dispatcher,
                                      Thread::BasicLockable& lock, AccessLogFileStats& stats,
                                      std::chrono::milliseconds flush_interval_msec,
+                                     uint64_t min_flush_size_kb,
                                      Thread::ThreadFactory& thread_factory)
     : file_(std::move(file)), file_lock_(lock),
       flush_timer_(dispatcher.createTimer([this]() -> void {
@@ -62,7 +64,8 @@ AccessLogFileImpl::AccessLogFileImpl(Filesystem::FilePtr&& file, Event::Dispatch
         flush_event_.notifyOne();
         flush_timer_->enableTimer(flush_interval_msec_);
       })),
-      thread_factory_(thread_factory), flush_interval_msec_(flush_interval_msec), stats_(stats) {
+      thread_factory_(thread_factory), flush_interval_msec_(flush_interval_msec),
+      min_flush_size_(min_flush_size_kb * 1024), stats_(stats) {
   flush_timer_->enableTimer(flush_interval_msec_);
 }
 
@@ -213,7 +216,7 @@ void AccessLogFileImpl::write(absl::string_view data) {
   stats_.write_buffered_.inc();
   stats_.write_total_buffered_.add(data.length());
   flush_buffer_.add(data.data(), data.size());
-  if (flush_buffer_.length() > MIN_FLUSH_SIZE) {
+  if (flush_buffer_.length() > min_flush_size_) {
     flush_event_.notifyOne();
   }
 }

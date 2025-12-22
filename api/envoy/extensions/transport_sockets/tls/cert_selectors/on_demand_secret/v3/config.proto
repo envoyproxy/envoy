@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+package envoy.extensions.transport_sockets.tls.cert_selectors.on_demand_secret.v3;
+
+import "envoy/config/core/v3/config_source.proto";
+import "envoy/config/core/v3/extension.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.transport_sockets.tls.cert_selectors.on_demand_secret.v3";
+option java_outer_classname = "ConfigProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/transport_sockets/tls/cert_selectors/on_demand_secret/v3;on_demand_secretv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: On-demand secret certificate selector]
+// [#extension: envoy.tls.certificate_selectors.on_demand_secret]
+
+// Fetches the secret on-demand while allowing the parent cluster or listener to accept connections
+// without warming. During the handshake, a secret name is derived from the peer hello message, an
+// SDS resource request starts, and the handshake is paused. Once an SDS response is received with a
+// resource, the handshake is resumed with the provided certificate. If the SDS server indicates the
+// resource removal, the handshake is failed, and the SDS subscription to the resource is stopped.
+//
+// Similar to the regular SDS, the certificate is configured using the outer common TLS context,
+// e.g. by setting the FIPS compliance policy on the loaded certificate.
+message Config {
+  // Defines the configuration source of the secrets.
+  config.core.v3.ConfigSource config_source = 1 [(validate.rules).message = {required: true}];
+
+  // Extension point to specify a function to compute the secret name. The extension is called
+  // during the TLS handshake after receiving the "CLIENT HELLO" message from the client.
+  // [#extension-category: envoy.tls.certificate_mappers]
+  config.core.v3.TypedExtensionConfig certificate_mapper = 2
+      [(validate.rules).message = {required: true}];
+
+  // A list of secret resource names to start fetching on configuration load (prior to receiving any
+  // requests). The parent resource initializes immediately without waiting for the fetch to
+  // complete.
+  repeated string prefetch_secret_names = 3;
+}

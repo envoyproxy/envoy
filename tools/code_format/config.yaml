@@ -119,6 +119,8 @@ paths:
     - source/common/router/weighted_cluster_specifier.cc
     - source/common/router/scoped_config_impl.cc
     - source/common/common/utility.cc
+    - source/common/secret/sds_api.h
+    - source/common/secret/sds_api.cc
     - source/exe/stripped_main_base.cc
     - source/common/http/header_utility.cc
     - source/common/common/matchers.cc
