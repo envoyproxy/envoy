@@ -2586,7 +2586,7 @@ TEST(SubstitutionFormatterTest, requestedServerNameFormatter) {
   }
 
   {
-    auto providers = *SubstitutionFormatParser::parse(absl::StrCat("%REQUESTED_SERVER_NAME(SNI)%"));
+    auto providers = *SubstitutionFormatParser::parse(absl::StrCat("%REQUESTED_SERVER_NAME(SNI_ONLY)%"));
     EXPECT_EQ(providers.size(), 1);
     EXPECT_EQ("outbound_.8080_._.example.com", providers[0]->format({}, stream_info));
     EXPECT_EQ(absl::nullopt, providers[0]->format({}, stream_info_no_requested_name));
