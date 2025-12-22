@@ -21,6 +21,8 @@ namespace HttpFilters {
 namespace ProtoApiScrubber {
 namespace {
 
+namespace scrubber_test = test::extensions::filters::http::proto_api_scrubber;
+
 using envoy::extensions::filters::http::proto_api_scrubber::v3::ProtoApiScrubberConfig;
 using envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter;
 using ::Envoy::Extensions::HttpFilters::GrpcFieldExtraction::checkSerializedData;
@@ -161,7 +163,8 @@ apikeys::CreateApiKeyRequest makeCreateApiKeyRequest(absl::string_view pb = R"pb
 // Consolidated Map Scrubbing Test covering all map scenarios.
 TEST_P(ProtoApiScrubberIntegrationTest, ScrubAllMapTypes) {
   config_helper_.prependFilter(getMultiFieldFilterConfig(
-      scrubberTestDescriptorPath(), "/scrubber_test.ScrubberTestService/Scrub",
+      scrubberTestDescriptorPath(),
+      "/test.extensions.filters.http.proto_api_scrubber.ScrubberTestService/Scrub",
       {
           "tags.value",                    // String to String map: value should be scrubbed.
           "int_map.value",                 // String to Int map: value should be scrubbed.
@@ -206,7 +209,8 @@ TEST_P(ProtoApiScrubberIntegrationTest, ScrubAllMapTypes) {
   auto& obj_scrub = (*request.mutable_full_scrub_map())["k_object"];
   obj_scrub.set_secret("sensitive");
 
-  auto response = sendGrpcRequest(request, "/scrubber_test.ScrubberTestService/Scrub");
+  auto response = sendGrpcRequest(
+      request, "/test.extensions.filters.http.proto_api_scrubber.ScrubberTestService/Scrub");
   waitForNextUpstreamRequest();
 
   // Verification.

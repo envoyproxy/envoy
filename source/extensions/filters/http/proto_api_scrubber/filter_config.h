@@ -132,7 +132,8 @@ public:
 
   // Returns method descriptor by looking up the `descriptor_pool_`.
   // If the method doesn't exist in the `descriptor_pool`, it returns absl::InvalidArgument error.
-  absl::StatusOr<const MethodDescriptor*> getMethodDescriptor(const std::string& method_name) const;
+  virtual absl::StatusOr<const MethodDescriptor*>
+  getMethodDescriptor(const std::string& method_name) const;
 
   FilteringMode filteringMode() const { return filtering_mode_; }
 
