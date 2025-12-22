@@ -16,6 +16,7 @@ envoy_cc_test(
         "//test/proto:apikeys_proto_descriptor",
     ],
     deps = [
+        "//envoy/common:optref_lib",
         "//source/common/protobuf",
         "//source/extensions/filters/http/proto_api_scrubber/scrubbing_util_lib",
         "//source/extensions/matching/http/cel_input:cel_input_lib",

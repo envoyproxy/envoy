@@ -256,7 +256,7 @@ private:
   // The following fields and functions are only used by CacheSessions.
   friend class CacheSessionsImpl;
   bool inserting() const {
-    absl::MutexLock lock(&mu_);
+    absl::MutexLock lock(mu_);
     return state_ == State::Inserting;
   }
   void setExpiry(SystemTime expiry) { expires_at_ = expiry; }

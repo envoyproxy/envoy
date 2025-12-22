@@ -19,10 +19,11 @@ SdsApiStats SdsApi::generateStats(Stats::Scope& scope) {
 SdsApi::SdsApi(envoy::config::core::v3::ConfigSource sds_config, absl::string_view sds_config_name,
                Config::SubscriptionFactory& subscription_factory, TimeSource& time_source,
                ProtobufMessage::ValidationVisitor& validation_visitor, Stats::Store& stats,
-               std::function<void()> destructor_cb, Event::Dispatcher& dispatcher, Api::Api& api)
+               std::function<void()> destructor_cb, Event::Dispatcher& dispatcher, Api::Api& api,
+               bool warm)
     : Envoy::Config::SubscriptionBase<envoy::extensions::transport_sockets::tls::v3::Secret>(
           validation_visitor, "name"),
-      init_target_(fmt::format("SdsApi {}", sds_config_name), [this] { initialize(); }),
+      init_target_(fmt::format("SdsApi {}", sds_config_name), [this, warm] { initialize(warm); }),
       dispatcher_(dispatcher), api_(api),
       scope_(stats.createScope(absl::StrCat("sds.", sds_config_name, "."))),
       sds_api_stats_(generateStats(*scope_)), sds_config_(std::move(sds_config)),
@@ -101,27 +102,17 @@ absl::Status SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef
     validateConfig(secret);
     secret_hash_ = new_hash;
     setSecret(secret);
-    const auto files = loadFiles();
-    files_hash_ = getHashForFiles(files);
-    resolveSecret(files);
-    THROW_IF_NOT_OK(update_callback_manager_.runCallbacks());
 
-    auto* watched_directory = getWatchedDirectory();
-    // Either we have a watched path and can defer the watch monitoring to a
-    // WatchedDirectory object, or we need to implement per-file watches in the else
-    // clause.
-    if (watched_directory != nullptr) {
-      watched_directory->setCallback([this]() {
-        onWatchUpdate();
-        return absl::OkStatus();
-      });
-    } else {
-      // List DataSources that refer to files
-      auto files = getDataSourceFilenames();
-      if (!files.empty()) {
+    // Set up per-file watchers before loadFiles() so that if loadFiles() fails, the watches
+    // are still setup for the next auto-recovery when files appear later.
+    // For watched_directory case, the callback is already set in setSecret().
+    if (getWatchedDirectory() == nullptr) {
+      // List DataSources that refer to files.
+      auto datasource_files = getDataSourceFilenames();
+      if (!datasource_files.empty()) {
         // Create new watch, also destroys the old watch if any.
         watcher_ = dispatcher_.createFilesystemWatcher();
-        for (auto const& filename : files) {
+        for (auto const& filename : datasource_files) {
           // Watch for directory instead of file. This allows users to do atomic renames
           // on directory level (e.g. Kubernetes secret update).
           const auto result_or_error = api_.fileSystem().splitPathFromFilename(filename);
@@ -134,9 +125,14 @@ absl::Status SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef
                                               }));
         }
       } else {
-        watcher_.reset(); // Destroy the old watch if any
+        watcher_.reset(); // Destroy the old watch if any.
       }
     }
+
+    const auto files = loadFiles();
+    files_hash_ = getHashForFiles(files);
+    resolveSecret(files);
+    THROW_IF_NOT_OK(update_callback_manager_.runCallbacks());
   }
   secret_data_.last_updated_ = time_source_.systemTime();
   secret_data_.version_info_ = version_info;
@@ -157,10 +153,9 @@ SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_reso
     // SDS is a singleton (e.g. single-resource) resource subscription, so it should never be
     // removed except by the modification of the referenced cluster/listener. Therefore, since the
     // server indicates a removal, ignore it (via an ACK).
-    ENVOY_LOG_MISC(
-        trace,
-        "Server sent a delta SDS update attempting to remove a resource (name: {}). Ignoring.",
-        removed_resources[0]);
+    ENVOY_LOG_MISC(trace, "Server sent a delta SDS update removing a resource (name: {}).",
+                   removed_resources[0]);
+    THROW_IF_NOT_OK(remove_callback_manager_.runCallbacks());
 
     // Even if we ignore this resource, the owning resource (LDS/CDS) should still complete
     // warming.
@@ -197,10 +192,13 @@ absl::Status SdsApi::validateUpdateSize(uint32_t added_resources_num,
   return absl::OkStatus();
 }
 
-void SdsApi::initialize() {
+void SdsApi::initialize(bool warm) {
   // Don't put any code here that can throw exceptions, this has been the cause of multiple
   // hard-to-diagnose regressions.
   subscription_->start({sds_config_name_});
+  if (!warm) {
+    init_target_.ready();
+  }
 }
 
 SdsApi::SecretData SdsApi::secretData() { return secret_data_; }
@@ -227,7 +225,7 @@ TlsCertificateSdsApiSharedPtr
 TlsCertificateSdsApi::create(Server::Configuration::ServerFactoryContext& server_context,
                              const envoy::config::core::v3::ConfigSource& sds_config,
                              const std::string& sds_config_name,
-                             std::function<void()> destructor_cb) {
+                             std::function<void()> destructor_cb, bool warm) {
   // We need to do this early as we invoke the subscription factory during initialization, which
   // is too late to throw.
   THROW_IF_NOT_OK(
@@ -236,15 +234,7 @@ TlsCertificateSdsApi::create(Server::Configuration::ServerFactoryContext& server
       sds_config, sds_config_name, server_context.clusterManager().subscriptionFactory(),
       server_context.mainThreadDispatcher().timeSource(), server_context.messageValidationVisitor(),
       server_context.serverScope().store(), destructor_cb, server_context.mainThreadDispatcher(),
-      server_context.api());
-}
-
-ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
-TlsCertificateSdsApi::addUpdateCallback(std::function<absl::Status()> callback) {
-  if (secret()) {
-    THROW_IF_NOT_OK(callback());
-  }
-  return update_callback_manager_.add(callback);
+      server_context.api(), warm);
 }
 
 std::vector<std::string> TlsCertificateSdsApi::getDataSourceFilenames() {
@@ -272,6 +262,12 @@ void TlsCertificateSdsApi::setSecret(
     watched_directory_ = THROW_OR_RETURN_VALUE(
         Config::WatchedDirectory::create(secret.tls_certificate().watched_directory(), dispatcher_),
         std::unique_ptr<Config::WatchedDirectory>);
+    // Set the callback immediately so that if subsequent operations fail, the watch is
+    // still active and can trigger recovery when files appear later.
+    watched_directory_->setCallback([this]() {
+      onWatchUpdate();
+      return absl::OkStatus();
+    });
   } else {
     watched_directory_.reset();
   }
@@ -291,7 +287,7 @@ void TlsCertificateSdsApi::resolveSecret(const FileContentMap& files) {
 CertificateValidationContextSdsApiSharedPtr CertificateValidationContextSdsApi::create(
     Server::Configuration::ServerFactoryContext& server_context,
     const envoy::config::core::v3::ConfigSource& sds_config, const std::string& sds_config_name,
-    std::function<void()> destructor_cb) {
+    std::function<void()> destructor_cb, bool warm) {
   // We need to do this early as we invoke the subscription factory during initialization, which
   // is too late to throw.
   THROW_IF_NOT_OK(Config::Utility::checkLocalInfo("CertificateValidationContextSdsApi",
@@ -300,15 +296,7 @@ CertificateValidationContextSdsApiSharedPtr CertificateValidationContextSdsApi::
       sds_config, sds_config_name, server_context.clusterManager().subscriptionFactory(),
       server_context.mainThreadDispatcher().timeSource(), server_context.messageValidationVisitor(),
       server_context.serverScope().store(), destructor_cb, server_context.mainThreadDispatcher(),
-      server_context.api());
-}
-
-ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
-CertificateValidationContextSdsApi::addUpdateCallback(std::function<absl::Status()> callback) {
-  if (secret()) {
-    THROW_IF_NOT_OK(callback());
-  }
-  return update_callback_manager_.add(callback);
+      server_context.api(), warm);
 }
 
 void CertificateValidationContextSdsApi::validateConfig(
@@ -327,6 +315,12 @@ void CertificateValidationContextSdsApi::setSecret(
         THROW_OR_RETURN_VALUE(Config::WatchedDirectory::create(
                                   secret.validation_context().watched_directory(), dispatcher_),
                               std::unique_ptr<Config::WatchedDirectory>);
+    // Set the callback immediately so that if subsequent operations fail, the watch is
+    // still active and can trigger recovery when files appear later.
+    watched_directory_->setCallback([this]() {
+      onWatchUpdate();
+      return absl::OkStatus();
+    });
   } else {
     watched_directory_.reset();
   }
@@ -368,7 +362,7 @@ TlsSessionTicketKeysSdsApiSharedPtr
 TlsSessionTicketKeysSdsApi::create(Server::Configuration::ServerFactoryContext& server_context,
                                    const envoy::config::core::v3::ConfigSource& sds_config,
                                    const std::string& sds_config_name,
-                                   std::function<void()> destructor_cb) {
+                                   std::function<void()> destructor_cb, bool warm) {
   // We need to do this early as we invoke the subscription factory during initialization, which
   // is too late to throw.
   THROW_IF_NOT_OK(
@@ -377,22 +371,7 @@ TlsSessionTicketKeysSdsApi::create(Server::Configuration::ServerFactoryContext& 
       sds_config, sds_config_name, server_context.clusterManager().subscriptionFactory(),
       server_context.mainThreadDispatcher().timeSource(), server_context.messageValidationVisitor(),
       server_context.serverScope().store(), destructor_cb, server_context.mainThreadDispatcher(),
-      server_context.api());
-}
-
-ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
-TlsSessionTicketKeysSdsApi::addUpdateCallback(std::function<absl::Status()> callback) {
-  if (secret()) {
-    THROW_IF_NOT_OK(callback());
-  }
-  return update_callback_manager_.add(callback);
-}
-
-ABSL_MUST_USE_RESULT Common::CallbackHandlePtr TlsSessionTicketKeysSdsApi::addValidationCallback(
-    std::function<
-        absl::Status(const envoy::extensions::transport_sockets::tls::v3::TlsSessionTicketKeys&)>
-        callback) {
-  return validation_callback_manager_.add(callback);
+      server_context.api(), warm);
 }
 
 void TlsSessionTicketKeysSdsApi::validateConfig(
@@ -405,8 +384,8 @@ std::vector<std::string> TlsSessionTicketKeysSdsApi::getDataSourceFilenames() { 
 GenericSecretSdsApiSharedPtr
 GenericSecretSdsApi::create(Server::Configuration::ServerFactoryContext& server_context,
                             const envoy::config::core::v3::ConfigSource& sds_config,
-                            const std::string& sds_config_name,
-                            std::function<void()> destructor_cb) {
+                            const std::string& sds_config_name, std::function<void()> destructor_cb,
+                            bool warm) {
   // We need to do this early as we invoke the subscription factory during initialization, which
   // is too late to throw.
   THROW_IF_NOT_OK(
@@ -415,7 +394,7 @@ GenericSecretSdsApi::create(Server::Configuration::ServerFactoryContext& server_
       sds_config, sds_config_name, server_context.clusterManager().subscriptionFactory(),
       server_context.mainThreadDispatcher().timeSource(), server_context.messageValidationVisitor(),
       server_context.serverScope().store(), destructor_cb, server_context.mainThreadDispatcher(),
-      server_context.api());
+      server_context.api(), warm);
 }
 
 void GenericSecretSdsApi::validateConfig(

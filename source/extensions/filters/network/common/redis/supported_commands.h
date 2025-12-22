@@ -74,7 +74,7 @@ struct SupportedCommands {
    */
   static const absl::flat_hash_set<std::string>& ClusterScopeCommands() {
     CONSTRUCT_ON_FIRST_USE(absl::flat_hash_set<std::string>, "script", "flushall", "flushdb",
-                           "slowlog", "config", "info");
+                           "slowlog", "config", "info", "keys", "select", "role");
   }
 
   /**
@@ -125,11 +125,6 @@ struct SupportedCommands {
   static const std::string& mset() { CONSTRUCT_ON_FIRST_USE(std::string, "mset"); }
 
   /**
-   * @return keys command
-   */
-  static const std::string& keys() { CONSTRUCT_ON_FIRST_USE(std::string, "keys"); }
-
-  /**
    * @return ping command
    */
   static const std::string& ping() { CONSTRUCT_ON_FIRST_USE(std::string, "ping"); }
@@ -145,11 +140,6 @@ struct SupportedCommands {
   static const std::string& quit() { CONSTRUCT_ON_FIRST_USE(std::string, "quit"); }
 
   /**
-   * @return select command
-   */
-  static const std::string& select() { CONSTRUCT_ON_FIRST_USE(std::string, "select"); }
-
-  /**
    * @return scan command
    */
   static const std::string& scan() { CONSTRUCT_ON_FIRST_USE(std::string, "scan"); }
@@ -158,11 +148,6 @@ struct SupportedCommands {
    * @return info.shard command
    */
   static const std::string& infoShard() { CONSTRUCT_ON_FIRST_USE(std::string, "info.shard"); }
-
-  /**
-   * @return role command
-   */
-  static const std::string& role() { CONSTRUCT_ON_FIRST_USE(std::string, "role"); }
 
   /**
    * @return commands which alters the state of redis
