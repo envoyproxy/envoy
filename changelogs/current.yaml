@@ -192,6 +192,11 @@ bug_fixes:
 - area: dynamic modules
   change: |
     Fixed a soundness bug in the Rust SDK by tightening bounds on the ``HttpFilterConfig`` trait.
+- area: sds
+  change: |
+    Fixed SDS to enable auto-recovery when initial certificate file loading fails. Previously, if certificate
+    files did not exist during initial SDS configuration, no file watch callbacks were set up, preventing
+    automatic recovery when files appeared later.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -231,6 +236,14 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.router_filter_resetall_on_local_reply`` and legacy code paths.
 
 new_features:
+- area: server
+  change: |
+    Add new command-line option ``--file-flush-min-size-kb <integer>`` to configure the minimum size in kilobytes for log file flushing.
+- area: network_filter
+  change: |
+    Added :ref:`geoip network filter <config_network_filters_geoip>` to perform geolocation lookups
+    at the network layer and store results in filter state. This enables geolocation data to be
+    used for access logging, routing, and other purposes without requiring HTTP traffic.
 - area: oauth2
   change: |
     Added support for configuring cookie path in the OAuth2 filter. The :ref:`path
@@ -363,8 +376,7 @@ new_features:
     <arch_overview_wasm_foreign_functions>` for details.
 - area: redis
   change: |
-    Optimized the ``INFO`` command to provide limited metrics with a consolidated cluster view and added ``INFO.SHARD``
-    to retrieve shard-specific metrics.
+    Moved the implementation of KEYS,SELECT,ROLE to the cluster scope command framework.
 - area: overload management
   change: |
     The fixed heap resource monitor can calculate memory pressure as currently allocated memory divided by maximum heap
@@ -495,6 +507,11 @@ new_features:
     <envoy_v3_api_field_extensions.filters.network.ext_authz.v3.ExtAuthz.typed_metadata_context_namespaces>` in the
     ext-authz network filter. This allows passing connection metadata (such as proxy protocol TLV data) to the
     external authorization server for making authorization decisions.
+- area: tls
+  change: |
+    Added support for fetching certificates on-demand via SDS in the downstream TLS transport socket
+    using the extension :ref:`on-demand certificate selector
+    <extension_envoy.tls.certificate_selectors.on_demand_secret>`.
 - area: admin
   change: |
     Added :ref:`allow_paths <envoy_v3_api_field_config.bootstrap.v3.Admin.allow_paths>` to admin
@@ -534,5 +551,19 @@ new_features:
     requests to more backend servers. The filter supports fanout to multiple backends for initialize and tools-list requests,
     single-backend routing for tools-call based on tool name prefix, session management with composite session IDs,
     and response aggregation.
+- area: access_log
+  change: |
+    Added ``LISTENER_FILTER_CHAIN`` to the ``METADATA`` command operator to allow access to listener filter chain metadata.
+- area: ext_proc
+  change: |
+    Added per HTTP event :ref:'procesing effects <envoy.filters.http.ext_proc.ProcessingEffect' in the
+    ExtProcLoggingInfo in the FilterState. This new data will be automatically collected and can be accesses via
+    method processingEffects.
+- area: oauth2
+  change: |
+    Added support for additional parameters in the OAuth2 token request body via
+    :ref:`endpoint_params <envoy_v3_api_field_extensions.http.injected_credentials.oauth2.v3.OAuth2.endpoint_params>`.
+    This allows passing custom parameters required by authorization servers (such as Logto or EntraID) that expect
+    additional body parameters during the token exchange.
 
 deprecated:
