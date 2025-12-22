@@ -62,6 +62,14 @@ struct SupportedCommands {
   }
 
   /**
+   * @return commands which hash on the third argument (subcommand key pattern)
+   * OBJECT subcommand key [arguments] -> key is at index 2
+   */
+  static const absl::flat_hash_set<std::string>& objectCommands() {
+    CONSTRUCT_ON_FIRST_USE(absl::flat_hash_set<std::string>, "object");
+  }
+
+  /**
    * @return commands which are sent to multiple servers and coalesced by summing the responses
    */
   static const absl::flat_hash_set<std::string>& hashMultipleSumResultCommands() {
