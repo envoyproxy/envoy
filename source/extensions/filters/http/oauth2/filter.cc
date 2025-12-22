@@ -1343,9 +1343,6 @@ void OAuth2Filter::addFlowCookieDeletionHeaders(Http::ResponseHeaderMap& headers
   }
 
   auto add_delete_cookie = [&](absl::string_view cookie_name, absl::string_view cookie_path) {
-    if (cookie_name.empty()) {
-      return;
-    }
     const bool add_secure_attr =
         cookie_name.starts_with("__Secure-") || cookie_name.starts_with("__Host-");
     const absl::string_view maybe_secure_attr = add_secure_attr ? "; Secure" : "";
