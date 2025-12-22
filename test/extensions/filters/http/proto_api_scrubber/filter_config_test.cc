@@ -387,6 +387,64 @@ protected:
     return proto_config;
   }
 
+  ProtoApiScrubberConfig getConfigWithMessageFieldRestrictions() {
+    std::string filter_conf_string = R"pb(
+      descriptor_set: {}
+      restrictions: {
+        message_restrictions: {
+          key: "package.MyMessage"
+          value: {
+            field_restrictions: {
+              key: "sensitive_data"
+              value: {
+                matcher: {
+                  matcher_list: {
+                    matchers: {
+                      predicate: {
+                        single_predicate: {
+                          input: {
+                            typed_config: {
+                              [type.googleapis.com/xds.type.matcher.v3
+                                   .HttpAttributesCelMatchInput] {}
+                            }
+                          }
+                          custom_match: {
+                            typed_config: {
+                              [type.googleapis.com/xds.type.matcher.v3.CelMatcher] {
+                                expr_match: {
+                                  parsed_expr: { expr: { const_expr: { bool_value: true } } }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                      on_match: {
+                        action: {
+                          typed_config: {
+                            [type.googleapis.com/envoy.extensions.filters.http
+                                 .proto_api_scrubber.v3.RemoveFieldAction] {}
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    )pb";
+    ProtoApiScrubberConfig proto_config;
+    Protobuf::TextFormat::ParseFromString(filter_conf_string, &proto_config);
+    *proto_config.mutable_descriptor_set()->mutable_data_source()->mutable_inline_bytes() =
+        api_->fileSystem()
+            .fileReadToEnd(Envoy::TestEnvironment::runfilesPath(kApiKeysDescriptorRelativePath))
+            .value();
+    return proto_config;
+  }
+
   ProtoApiScrubberConfig getConfigWithMethodLevelRestriction() {
     std::string filter_conf_string = R"pb(
       descriptor_set : {}
@@ -1080,6 +1138,30 @@ TEST_F(ProtoApiScrubberFilterConfigTest, ParseMessageRestrictions) {
   EXPECT_THAT(matcher2->match(http_matching_data_impl), HasNoMatch());
 
   auto matcher3 = filter_config_->getMessageMatcher("non.existent.Message");
+  EXPECT_EQ(matcher3, nullptr);
+}
+
+TEST_F(ProtoApiScrubberFilterConfigTest, ParseMessageFieldRestrictions) {
+  ProtoApiScrubberConfig proto_config = getConfigWithMessageFieldRestrictions();
+  auto filter_config_or_status =
+      ProtoApiScrubberFilterConfig::create(proto_config, factory_context_);
+  ASSERT_THAT(filter_config_or_status, IsOk());
+  filter_config_ = filter_config_or_status.value();
+  ASSERT_NE(filter_config_, nullptr);
+
+  NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
+  Http::Matching::HttpMatchingDataImpl http_matching_data_impl(mock_stream_info);
+
+  auto matcher1 = filter_config_->getMessageFieldMatcher("package.MyMessage", "sensitive_data");
+  ASSERT_NE(matcher1, nullptr);
+  EXPECT_THAT(
+      matcher1->match(http_matching_data_impl),
+      HasActionWithType("envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction"));
+
+  auto matcher2 = filter_config_->getMessageFieldMatcher("package.MyMessage", "public_data");
+  EXPECT_EQ(matcher2, nullptr);
+
+  auto matcher3 = filter_config_->getMessageFieldMatcher("non.existent.Message", "any_field");
   EXPECT_EQ(matcher3, nullptr);
 }
 

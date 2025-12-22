@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package test.extensions.filters.http.proto_api_scrubber;
 
+import "google/protobuf/any.proto";
+
 message InnerDetails {
   string deep_secret = 1;
   string deep_public = 2;
@@ -26,11 +28,13 @@ message ScrubRequest {
 
   repeated string repeated_secrets = 7;
   repeated SensitiveMessage repeated_messages = 8;
-
   oneof single_choice {
     string choice_a_string = 10;
     int32 choice_b_int = 11;
   }
+
+  // Field for testing Any scrubbing.
+  google.protobuf.Any any_field = 12;
 }
 
 service ScrubberTestService {

@@ -137,6 +137,13 @@ absl::Status ProtoApiScrubberFilterConfig::initializeMessageRestrictions(
       message_level_restrictions_[message_name] =
           getMatcher(context.serverFactoryContext(), message_config.config().matcher());
     }
+
+    for (const auto& field_restriction : message_config.field_restrictions()) {
+      absl::string_view field_mask = field_restriction.first;
+      RETURN_IF_ERROR(validateFieldMask(field_mask));
+      message_field_restrictions_[std::make_pair(message_name, std::string(field_mask))] =
+          getMatcher(context.serverFactoryContext(), field_restriction.second.matcher());
+    }
   }
   return absl::OkStatus();
 }
@@ -333,6 +340,16 @@ MatchTreeHttpMatchingDataSharedPtr
 ProtoApiScrubberFilterConfig::getMessageMatcher(const std::string& message_name) const {
   if (auto it = message_level_restrictions_.find(message_name);
       it != message_level_restrictions_.end()) {
+    return it->second;
+  }
+  return nullptr;
+}
+
+MatchTreeHttpMatchingDataSharedPtr
+ProtoApiScrubberFilterConfig::getMessageFieldMatcher(const std::string& message_name,
+                                                     const std::string& field_name) const {
+  if (auto it = message_field_restrictions_.find(std::make_pair(message_name, field_name));
+      it != message_field_restrictions_.end()) {
     return it->second;
   }
   return nullptr;

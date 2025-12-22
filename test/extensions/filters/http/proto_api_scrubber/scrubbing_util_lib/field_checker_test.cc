@@ -35,6 +35,9 @@ public:
   MOCK_METHOD(MatchTreeHttpMatchingDataSharedPtr, getResponseFieldMatcher,
               (const std::string& method_name, const std::string& field_mask), (const, override));
 
+  MOCK_METHOD(MatchTreeHttpMatchingDataSharedPtr, getMessageFieldMatcher,
+              (const std::string& message_name, const std::string& field_name), (const, override));
+
   MOCK_METHOD(absl::StatusOr<absl::string_view>, getEnumName,
               (absl::string_view enum_type_name, int enum_value), (const, override));
 
@@ -357,6 +360,42 @@ TEST_F(FieldCheckerTest, CompleteMatchWithUnsupportedAction) {
     // if an action is unknown to this specific filter, it should default to preserving the field.
     EXPECT_EQ(field_checker.CheckField({"user"}, &field), FieldCheckResults::kInclude);
   }
+}
+
+TEST_F(FieldCheckerTest, MessageLevelFieldRestriction) {
+  const std::string method_name = "example.v1.Service/GetFoo";
+  const std::string field_name = "secret_field";
+  const std::string message_type = "example.v1.SensitiveMessage";
+
+  Protobuf::Type parent_type;
+  parent_type.set_name(message_type);
+
+  Protobuf::Field field;
+  field.set_name(field_name);
+
+  NiceMock<MockProtoApiScrubberFilterConfig> mock_filter_config;
+  NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
+
+  ON_CALL(mock_filter_config, getMethodDescriptor(testing::_))
+      .WillByDefault(testing::Return(absl::NotFoundError("Method not found")));
+
+  auto mock_match_tree = std::make_shared<NiceMock<MockMatchTree>>();
+  auto remove_action = std::make_shared<NiceMock<MockAction>>();
+  ON_CALL(*remove_action, typeUrl())
+      .WillByDefault(testing::Return(kRemoveFieldActionTypeWithoutPrefix));
+  ON_CALL(*mock_match_tree, match(testing::_, testing::_))
+      .WillByDefault(testing::Return(Matcher::MatchResult(remove_action)));
+
+  EXPECT_CALL(mock_filter_config, getMessageFieldMatcher(message_type, field_name))
+      .WillOnce(testing::Return(mock_match_tree));
+
+  FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info, {}, {}, {}, {},
+                             method_name, &mock_filter_config);
+
+  // When parent_type is passed, the checker should look up message-level rules.
+  FieldCheckResults result =
+      field_checker.CheckField({"path", "to", "secret_field"}, &field, 0, &parent_type);
+  EXPECT_EQ(result, FieldCheckResults::kExclude);
 }
 
 using RequestFieldCheckerTest = FieldCheckerTest;

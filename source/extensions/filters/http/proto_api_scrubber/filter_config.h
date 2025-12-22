@@ -108,6 +108,19 @@ public:
   getMessageMatcher(const std::string& message_name) const;
 
   /**
+   * Returns the match tree associated with a specific field within a message type.
+   * This allows defining restrictions that apply whenever a specific message type is encountered,
+   * regardless of where it appears (e.g. inside an Any field).
+   *
+   * @param message_name The fully qualified message name (e.g., "package.MyMessage").
+   * @param field_name The name of the field within that message.
+   * @return A MatchTreeHttpMatchingDataSharedPtr if a restriction is configured.
+   * Returns `nullptr` otherwise.
+   */
+  virtual MatchTreeHttpMatchingDataSharedPtr
+  getMessageFieldMatcher(const std::string& message_name, const std::string& field_name) const;
+
+  /**
    * Resolves the human-readable name of a specific enum value.
    *
    * @param enum_type_name The fully qualified name of the enum type (e.g., "package.Status").
@@ -209,6 +222,9 @@ private:
 
   // A map from message_name to the respective match tree for message-level restrictions.
   absl::flat_hash_map<std::string, MatchTreeHttpMatchingDataSharedPtr> message_level_restrictions_;
+
+  // A map from {message_name, field_name} to the respective match tree for fields within a message.
+  StringPairToMatchTreeMap message_field_restrictions_;
 
   // An instance of `google::grpc::transcoding::TypeHelper` which can be used for type resolution.
   std::unique_ptr<const TypeHelper> type_helper_;

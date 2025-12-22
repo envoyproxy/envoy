@@ -101,6 +101,11 @@ message MessageRestrictions {
   // The 'matcher' within RestrictionConfig will determine if the message is
   // scrubbed/denied/allowed.
   RestrictionConfig config = 1;
+
+  // Restrictions that apply to specific fields within this message type.
+  // Key - field mask (e.g. "social_security_number").
+  // Value - The restriction configuration for that field.
+  map<string, RestrictionConfig> field_restrictions = 2;
 }
 
 // The restriction configuration.

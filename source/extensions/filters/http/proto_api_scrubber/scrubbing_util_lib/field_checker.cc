@@ -178,10 +178,26 @@ FieldChecker::normalizePath(const std::vector<std::string>& path) const {
 
 FieldCheckResults FieldChecker::CheckField(const std::vector<std::string>& path,
                                            const Protobuf::Field* field, const int /*field_depth*/,
-                                           const Protobuf::Type* /*parent_type*/) const {
+                                           const Protobuf::Type* parent_type) const {
   // If the field is unknown (i.e., not present in the descriptor), it should be preserved.
   if (field == nullptr) {
     return FieldCheckResults::kInclude;
+  }
+
+  // Moved match_tree declaration to the top to support early exit for Any/Recursive types.
+  MatchTreeHttpMatchingDataSharedPtr match_tree = nullptr;
+
+  // Try to find a specific rule for this message type. This handles cases where we are scrubbing
+  // inside an `Any` field or a recursive message, where the path has been reset or is relative
+  // to the parent message.
+  if (parent_type != nullptr) {
+    match_tree = filter_config_ptr_->getMessageFieldMatcher(parent_type->name(), field->name());
+  }
+
+  // If a specific rule is found, apply it immediately.
+  if (match_tree != nullptr) {
+    absl::StatusOr<Matcher::MatchResult> match_result = tryMatch(match_tree);
+    return matchResultStatusToFieldCheckResult(match_result, field->name());
   }
 
   const auto& norm = normalizePath(path);
@@ -216,8 +232,6 @@ FieldCheckResults FieldChecker::CheckField(const std::vector<std::string>& path,
     }
     field_mask_ptr = &modified_mask;
   }
-
-  MatchTreeHttpMatchingDataSharedPtr match_tree;
 
   switch (scrubber_context_) {
   case ScrubberContext::kRequestScrubbing:
