@@ -802,6 +802,8 @@ TEST_F(OAuth2Test, RequestSignout) {
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
       {Http::Headers::get().Scheme.get(), "https"},
+      {Http::Headers::get().Cookie.get(), "OauthNonce=csrf_token"},
+      {Http::Headers::get().Cookie.get(), "CodeVerifier=code_verifier"},
       {Http::Headers::get().Cookie.get(), "OauthNonce.1=csrf_token_1"},
       {Http::Headers::get().Cookie.get(), "CodeVerifier.1=code_verifier_1"},
       {Http::Headers::get().Cookie.get(), "OauthNonce.2=csrf_token_2"},
@@ -818,6 +820,8 @@ TEST_F(OAuth2Test, RequestSignout) {
         EXPECT_EQ(Http::Utility::parseSetCookieValue(headers, "BearerToken"), "deleted");
         EXPECT_EQ(Http::Utility::parseSetCookieValue(headers, "IdToken"), "deleted");
         EXPECT_EQ(Http::Utility::parseSetCookieValue(headers, "RefreshToken"), "deleted");
+        EXPECT_EQ(Http::Utility::parseSetCookieValue(headers, "OauthNonce"), "deleted");
+        EXPECT_EQ(Http::Utility::parseSetCookieValue(headers, "CodeVerifier"), "deleted");
         EXPECT_EQ(Http::Utility::parseSetCookieValue(headers, "OauthNonce.1"), "deleted");
         EXPECT_EQ(Http::Utility::parseSetCookieValue(headers, "CodeVerifier.1"), "deleted");
         EXPECT_EQ(Http::Utility::parseSetCookieValue(headers, "OauthNonce.2"), "deleted");
