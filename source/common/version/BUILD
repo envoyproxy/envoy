@@ -16,7 +16,6 @@ genrule(
     outs = ["version_number.h"],
     cmd = """echo "#define BUILD_VERSION_NUMBER \\"$$(cat $<)\\"" >$@""",
     visibility = ["//visibility:private"],
-    tags = ["no-sandbox"],
 )
 
 genrule(
