@@ -1,3 +1,4 @@
+#include <cstdint>
 #include <memory>
 
 #include "source/common/access_log/access_log_manager_impl.h"
@@ -31,7 +32,7 @@ class AccessLogManagerImplTest : public testing::Test {
 protected:
   AccessLogManagerImplTest()
       : file_(new NiceMock<Filesystem::MockFile>), thread_factory_(Thread::threadFactoryForTest()),
-        access_log_manager_(timeout_40ms_, api_, dispatcher_, lock_, store_) {
+        access_log_manager_(timeout_40ms_, flush_size_kb_, api_, dispatcher_, lock_, store_) {
     EXPECT_CALL(file_system_,
                 createFile(testing::Matcher<const Envoy::Filesystem::FilePathAndType&>(
                     Filesystem::FilePathAndType{Filesystem::DestinationType::File, "foo"})))
@@ -59,6 +60,7 @@ protected:
   NiceMock<Filesystem::MockInstance> file_system_;
   NiceMock<Filesystem::MockFile>* file_;
   const std::chrono::milliseconds timeout_40ms_{40};
+  const uint64_t flush_size_kb_{64};
   Stats::TestUtil::TestStore store_;
   Thread::ThreadFactory& thread_factory_;
   NiceMock<Event::MockDispatcher> dispatcher_;

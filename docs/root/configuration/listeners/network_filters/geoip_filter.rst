@@ -81,6 +81,17 @@ The filter outputs statistics in the ``geoip.`` namespace.
 
   total, Counter, Total number of connections processed by the filter.
 
-The MaxMind provider emits additional statistics in the ``maxmind.`` namespace per database type.
-See the :ref:`MaxMind provider documentation <envoy_v3_api_msg_extensions.geoip_providers.maxmind.v3.MaxMindConfig>`
-for details.
+The MaxMind provider emits additional statistics in the ``<stat_prefix>.maxmind.`` namespace per database type.
+Database type can be one of `city_db <https://www.maxmind.com/en/geoip2-city>`_,
+`country_db <https://www.maxmind.com/en/geoip2-country>`_, `isp_db <https://www.maxmind.com/en/geoip2-isp-database>`_, `anon_db <https://dev.maxmind.com/geoip/docs/databases/anonymous-ip>`_, `asn_db <https://www.maxmind.com/en/geoip2-asn-database>`_.
+
+.. csv-table::
+   :header: Name, Type, Description
+   :widths: 1, 1, 2
+
+   ``<db_type>.total``, Counter, Total number of lookups performed for a given geolocation database file.
+   ``<db_type>.hit``, Counter, Total number of successful lookups (with non empty lookup result) performed for a given geolocation database file.
+   ``<db_type>.lookup_error``, Counter, Total number of errors that occured during lookups for a given geolocation database file.
+   ``<db_type>.db_reload_success``, Counter, Total number of times when the geolocation database file was reloaded successfully.
+   ``<db_type>.db_reload_error``, Counter, Total number of times when the geolocation database file failed to reload.
+   ``<db_type>.db_build_epoch``, Gauge, The build timestamp of the geolocation database file represented as a Unix epoch value.

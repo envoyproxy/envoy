@@ -61,6 +61,16 @@ ClusterResponseHandlerFactory::createAggregateHandler(const std::string& command
     return std::make_unique<InfoCmdAggregateResponseHandler>(shard_count, subcommand);
   }
 
+  // KEYS command
+  if (command_name == "keys") {
+    return std::make_unique<ArrayMergeAggregateResponseHandler>(shard_count);
+  }
+
+  // ROLE command
+  if (command_name == "role") {
+    return std::make_unique<ArrayAppendAggregateResponseHandler>(shard_count);
+  }
+
   // This should never be reached - all commands mapped to aggregate_all_responses
   // should be handled above
   ASSERT(false, fmt::format("Unhandled aggregate command: {}:{}", command_name, subcommand));
@@ -87,7 +97,7 @@ ClusterResponseHandlerFactory::createFromRequest(const Common::Redis::RespValue&
 ClusterScopeResponseHandlerType
 ClusterResponseHandlerFactory::getResponseHandlerType(const std::string& command_name,
                                                       const std::string& subcommand) {
-  // Based on ClusterScopeCommands: script, flushall, flushdb, slowlog, config, unwatch
+  // Based on ClusterScopeCommands: script, flushall, flushdb, slowlog, config, info, keys, select
   // Note: randomkey and cluster are now handled by RandomShardRequest
   static const absl::flat_hash_map<std::string, ClusterScopeResponseHandlerType>
       command_to_handler_map = {
@@ -99,12 +109,15 @@ ClusterResponseHandlerFactory::getResponseHandlerType(const std::string& command
           {"config:rewrite", ClusterScopeResponseHandlerType::allresponses_mustbe_same},
           {"config:resetstat", ClusterScopeResponseHandlerType::allresponses_mustbe_same},
           {"slowlog:reset", ClusterScopeResponseHandlerType::allresponses_mustbe_same},
+          {"select", ClusterScopeResponseHandlerType::allresponses_mustbe_same},
 
           // Aggregate responses
           {"config:get", ClusterScopeResponseHandlerType::aggregate_all_responses},
           {"slowlog:get", ClusterScopeResponseHandlerType::aggregate_all_responses},
           {"slowlog:len", ClusterScopeResponseHandlerType::aggregate_all_responses},
           {"info", ClusterScopeResponseHandlerType::aggregate_all_responses},
+          {"keys", ClusterScopeResponseHandlerType::aggregate_all_responses},
+          {"role", ClusterScopeResponseHandlerType::aggregate_all_responses},
       };
 
   // First check with subcommand to see if there is a map entry
@@ -261,21 +274,13 @@ void IntegerSumAggregateResponseHandler::processAggregatedResponses(
       return;
     }
 
-    TRY_NEEDS_AUDIT {
-      int64_t integerValue = resp->asInteger();
-      if (integerValue < 0) {
-        ENVOY_LOG(error, "Error: Negative integer value: {}", integerValue);
-        sendErrorResponse(request, "negative value received from upstream");
-        return;
-      }
-      sum += integerValue;
-    }
-    END_TRY
-    CATCH(const std::exception& e, {
-      ENVOY_LOG(error, "Error converting integer: {}", e.what());
-      sendErrorResponse(request, "invalid integer response from upstream");
+    int64_t integerValue = resp->asInteger();
+    if (integerValue < 0) {
+      ENVOY_LOG(error, "Error: Negative integer value: {}", integerValue);
+      sendErrorResponse(request, "negative value received from upstream");
       return;
-    });
+    }
+    sum += integerValue;
   }
 
   Common::Redis::RespValuePtr response = std::make_unique<Common::Redis::RespValue>();
@@ -301,17 +306,33 @@ void ArrayMergeAggregateResponseHandler::processAggregatedResponses(
       return;
     }
 
-    TRY_NEEDS_AUDIT {
-      for (auto& elem : resp->asArray()) {
-        response->asArray().emplace_back(std::move(elem));
-      }
+    for (auto& elem : resp->asArray()) {
+      response->asArray().emplace_back(std::move(elem));
     }
-    END_TRY
-    CATCH(const std::exception& e, {
-      ENVOY_LOG(error, "Error merging array: {}", e.what());
-      sendErrorResponse(request, "error merging array responses");
+  }
+
+  sendSuccessResponse(request, std::move(response));
+}
+
+// Implementation of ArrayAppendAggregateResponseHandler
+void ArrayAppendAggregateResponseHandler::processAggregatedResponses(
+    ClusterScopeCmdRequest& request) {
+  Common::Redis::RespValuePtr response = std::make_unique<Common::Redis::RespValue>();
+  response->type(Common::Redis::RespType::Array);
+
+  for (const auto& resp : pending_responses_) {
+    if (!resp) {
+      sendErrorResponse(request, "null response received from shard");
       return;
-    });
+    }
+
+    if (resp->type() != Common::Redis::RespType::Array) {
+      sendErrorResponse(request, "non-array response received from shard");
+      return;
+    }
+
+    // Append the entire response as an element (preserves array structure)
+    response->asArray().push_back(std::move(*resp));
   }
 
   sendSuccessResponse(request, std::move(response));

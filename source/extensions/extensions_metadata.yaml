@@ -425,7 +425,7 @@ envoy.filters.http.dynamic_forward_proxy:
 envoy.filters.http.ext_authz:
   categories:
   - envoy.filters.http
-  security_posture: robust_to_untrusted_downstream
+  security_posture: robust_to_untrusted_downstream_and_upstream
   status: stable
   type_urls:
   - envoy.extensions.filters.http.ext_authz.v3.ExtAuthz

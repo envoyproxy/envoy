@@ -615,8 +615,8 @@ TEST_F(ProtoApiScrubberFilterConfigTest, DescriptorValidations) {
     filter_config = ProtoApiScrubberFilterConfig::create(config, factory_context_);
     EXPECT_EQ(filter_config.status().code(), absl::StatusCode::kInvalidArgument);
     EXPECT_THAT(filter_config.status().message(),
-                testing::HasSubstr("Error encountered during config initialization. Unable to "
-                                   "parse proto descriptor from inline bytes"));
+                HasSubstr("Error encountered during config initialization. Unable to "
+                          "parse proto descriptor from inline bytes"));
   }
 
   {
@@ -640,8 +640,8 @@ TEST_F(ProtoApiScrubberFilterConfigTest, DescriptorValidations) {
     filter_config = ProtoApiScrubberFilterConfig::create(config, factory_context_);
     EXPECT_EQ(filter_config.status().code(), absl::StatusCode::kInvalidArgument);
     EXPECT_THAT(filter_config.status().message(),
-                testing::HasSubstr("Error encountered during config initialization. Unable to "
-                                   "parse proto descriptor from inline bytes"));
+                HasSubstr("Error encountered during config initialization. Unable to "
+                          "parse proto descriptor from inline bytes"));
   }
 
   {
@@ -673,10 +673,9 @@ TEST_F(ProtoApiScrubberFilterConfigTest, DescriptorValidations) {
         invalid_binary_descriptor;
     filter_config = ProtoApiScrubberFilterConfig::create(config, factory_context_);
     EXPECT_EQ(filter_config.status().code(), absl::StatusCode::kInvalidArgument);
-    EXPECT_THAT(
-        filter_config.status().message(),
-        testing::HasSubstr("Error encountered during config initialization. Error occurred in file "
-                           "`test_file2.proto` while trying to build proto descriptors."));
+    EXPECT_THAT(filter_config.status().message(),
+                HasSubstr("Error encountered during config initialization. Error occurred in file "
+                          "`test_file2.proto` while trying to build proto descriptors."));
   }
 
   {
@@ -698,11 +697,11 @@ TEST_F(ProtoApiScrubberFilterConfigTest, DescriptorValidations) {
         TestEnvironment::runfilesPath("path/to/non-existent-file.descriptor");
     filter_config = ProtoApiScrubberFilterConfig::create(config, factory_context_);
     EXPECT_EQ(filter_config.status().code(), absl::StatusCode::kInvalidArgument);
+    EXPECT_THAT(
+        filter_config.status().message(),
+        HasSubstr("Error encountered during config initialization. Unable to read from file"));
     EXPECT_THAT(filter_config.status().message(),
-                testing::HasSubstr(
-                    "Error encountered during config initialization. Unable to read from file"));
-    EXPECT_THAT(filter_config.status().message(),
-                testing::HasSubstr("path/to/non-existent-file.descriptor"));
+                HasSubstr("path/to/non-existent-file.descriptor"));
   }
 
   {
@@ -713,10 +712,10 @@ TEST_F(ProtoApiScrubberFilterConfigTest, DescriptorValidations) {
     filter_config = ProtoApiScrubberFilterConfig::create(config, factory_context_);
     EXPECT_EQ(filter_config.status().code(), absl::StatusCode::kInvalidArgument);
     EXPECT_THAT(filter_config.status().message(),
-                testing::HasSubstr("Error encountered during config initialization. Unable to "
-                                   "parse proto descriptor from file"));
+                HasSubstr("Error encountered during config initialization. Unable to "
+                          "parse proto descriptor from file"));
     EXPECT_THAT(filter_config.status().message(),
-                testing::HasSubstr("test/config/integration/certs/upstreamcacert.pem"));
+                HasSubstr("test/config/integration/certs/upstreamcacert.pem"));
   }
 
   {
@@ -859,7 +858,7 @@ TEST_F(ProtoApiScrubberFilterConfigTest, MethodNameValidations) {
         getConfigWithMethodName("/library.BookService/GetBook"), factory_context_);
     EXPECT_EQ(filter_config.status().code(), absl::StatusCode::kInvalidArgument);
     EXPECT_THAT(filter_config.status().message(),
-                testing::HasSubstr("The method is not found in the descriptor pool."));
+                HasSubstr("The method is not found in the descriptor pool."));
   }
 
   {
@@ -988,7 +987,7 @@ TEST_F(ProtoApiScrubberFilterConfigTest, GetRequestType) {
 
     EXPECT_EQ(type_or_status.status().code(), absl::StatusCode::kInvalidArgument);
     EXPECT_THAT(type_or_status.status().message(),
-                testing::HasSubstr(
+                HasSubstr(
                     "Method '/apikeys.ApiKeys/NonExistentMethod' not found in descriptor pool"));
   }
 }
@@ -1024,7 +1023,7 @@ TEST_F(ProtoApiScrubberFilterConfigTest, GetResponseType) {
 
     EXPECT_EQ(type_or_status.status().code(), absl::StatusCode::kInvalidArgument);
     EXPECT_THAT(type_or_status.status().message(),
-                testing::HasSubstr(
+                HasSubstr(
                     "Method '/apikeys.ApiKeys/NonExistentMethod' not found in descriptor pool"));
   }
 }
@@ -1366,14 +1365,10 @@ TEST_F(ProtoApiScrubberFilterConfigTest, UnsupportedActionType) {
 
   // Validate that creating the config throws an EnvoyException because the action
   // "some_unknown_action" is not registered.
-  EXPECT_THROW_WITH_MESSAGE(
-      {
-        auto status_or_config =
-            ProtoApiScrubberFilterConfig::create(proto_config, factory_context_);
-      },
+  EXPECT_THAT_THROWS_MESSAGE(
+      { auto _ = ProtoApiScrubberFilterConfig::create(proto_config, factory_context_); },
       EnvoyException,
-      "Didn't find a registered implementation for 'some_unknown_action' with type URL: "
-      "'google.protobuf.Empty'");
+      HasSubstr("Didn't find a registered implementation for 'some_unknown_action'"));
 }
 
 } // namespace
