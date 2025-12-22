@@ -802,6 +802,7 @@ TEST_F(OAuth2Test, RequestSignout) {
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
       {Http::Headers::get().Scheme.get(), "https"},
+      // TODO(Huabing): remove these cookies once the old cookie names are removed.
       {Http::Headers::get().Cookie.get(), "OauthNonce=csrf_token"},
       {Http::Headers::get().Cookie.get(), "CodeVerifier=code_verifier"},
       {Http::Headers::get().Cookie.get(), "OauthNonce.1=csrf_token_1"},
@@ -813,7 +814,7 @@ TEST_F(OAuth2Test, RequestSignout) {
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, true))
       .WillOnce(Invoke([&](Http::ResponseHeaderMap& headers, bool) {
         EXPECT_EQ(headers.Status()->value(), "302");
-        EXPECT_EQ(headers.get(Http::Headers::get().SetCookie).size(), 8);
+        EXPECT_EQ(headers.get(Http::Headers::get().SetCookie).size(), 10);
         EXPECT_EQ(headers.get(Http::Headers::get().Location)[0]->value().getStringView(),
                   "https://traffic.example.com/");
         EXPECT_EQ(Http::Utility::parseSetCookieValue(headers, "OauthHMAC"), "deleted");
