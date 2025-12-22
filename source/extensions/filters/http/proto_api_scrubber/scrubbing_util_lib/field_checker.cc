@@ -100,10 +100,27 @@ void normalizePathSegment(const std::vector<std::string>& path, size_t& index,
 
 FieldChecker::FieldChecker(const ScrubberContext scrubber_context,
                            const Envoy::StreamInfo::StreamInfo* stream_info,
+                           OptRef<const Http::RequestHeaderMap> request_headers,
+                           OptRef<const Http::ResponseHeaderMap> response_headers,
+                           OptRef<const Http::RequestTrailerMap> request_trailers,
+                           OptRef<const Http::ResponseTrailerMap> response_trailers,
                            const std::string& method_name,
                            const ProtoApiScrubberFilterConfig* filter_config)
     : scrubber_context_(scrubber_context), matching_data_(*stream_info), method_name_(method_name),
       filter_config_ptr_(filter_config), root_descriptor_(nullptr) {
+
+  if (request_headers.has_value()) {
+    matching_data_.onRequestHeaders(request_headers.ref());
+  }
+  if (response_headers.has_value()) {
+    matching_data_.onResponseHeaders(response_headers.ref());
+  }
+  if (request_trailers.has_value()) {
+    matching_data_.onRequestTrailers(request_trailers.ref());
+  }
+  if (response_trailers.has_value()) {
+    matching_data_.onResponseTrailers(response_trailers.ref());
+  }
 
   // Initialize root descriptor to support advanced path normalization.
   auto method_desc_or_error = filter_config_ptr_->getMethodDescriptor(method_name_);
