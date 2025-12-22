@@ -101,12 +101,6 @@ private:
   // Optimized helper to walk the type descriptor and normalize map keys in the path.
   const NormalizationResult& normalizePath(const std::vector<std::string>& path) const;
 
-  // Constructs the field mask, handling translations for different data types.
-  // Currently, it only handles enum and protobuf maps. Support for `Any` types will be
-  // added in the future.
-  std::string constructFieldMask(const std::vector<std::string>& path,
-                                 const Protobuf::Field* field) const;
-
   ScrubberContext scrubber_context_;
   Http::Matching::HttpMatchingDataImpl matching_data_;
   std::string method_name_;
