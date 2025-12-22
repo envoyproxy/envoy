@@ -658,8 +658,8 @@ TEST_F(RequestFieldCheckerTest, MapType) {
   initializeFilterConfig(config, kScrubberTestDescriptorRelativePath);
 
   NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
-  FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info, method,
-                             filter_config_.get());
+  FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info, {}, {}, {}, {},
+                             method, filter_config_.get());
 
   // Construct a fake map entry parent type to simulate traversal context.
   // Type name must match what's in scrubber_test.proto:
@@ -934,8 +934,8 @@ TEST_F(ResponseFieldCheckerTest, MapType) {
   initializeFilterConfig(config, kScrubberTestDescriptorRelativePath);
 
   NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
-  FieldChecker field_checker(ScrubberContext::kResponseScrubbing, &mock_stream_info, method,
-                             filter_config_.get());
+  FieldChecker field_checker(ScrubberContext::kResponseScrubbing, &mock_stream_info, {}, {}, {}, {},
+                             method, filter_config_.get());
 
   // Construct a fake map entry parent type to simulate traversal context.
   // Map fields are repeated messages of a "MapEntry" type.
