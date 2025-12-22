@@ -74,6 +74,9 @@ public:
               (const std::string& method_name), (const, override));
   MOCK_METHOD(const TypeFinder&, getTypeFinder, (), (const, override));
 
+  MOCK_METHOD(absl::StatusOr<const Protobuf::MethodDescriptor*>, getMethodDescriptor,
+              (const std::string& method_name), (const, override));
+
   // Delegate non-mocked calls to the real object
   MockProtoApiScrubberFilterConfig() : ProtoApiScrubberFilterConfig() {
     ON_CALL(*this, getRequestType(_)).WillByDefault([this](const std::string& method_name) {
@@ -95,6 +98,9 @@ public:
         });
     ON_CALL(*this, getMethodMatcher(_)).WillByDefault([this](const std::string& method_name) {
       return real_config_->getMethodMatcher(method_name);
+    });
+    ON_CALL(*this, getMethodDescriptor(_)).WillByDefault([this](const std::string& method_name) {
+      return real_config_->getMethodDescriptor(method_name);
     });
   }
 
@@ -1200,6 +1206,10 @@ TEST_F(MethodLevelRestrictionTest, MethodAllowedWithFieldRestrictions) {
   ON_CALL(*mock_filter_config_, getRequestFieldMatcher(_, _))
       .WillByDefault([this](const std::string& method_name, const std::string& field_mask) {
         return mock_filter_config_->real_config_->getRequestFieldMatcher(method_name, field_mask);
+      });
+  ON_CALL(*mock_filter_config_, getMethodDescriptor(_))
+      .WillByDefault([this](const std::string& method_name) {
+        return mock_filter_config_->real_config_->getMethodDescriptor(method_name);
       });
 
   auto req_headers = TestRequestHeaderMapImpl{
