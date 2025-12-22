@@ -217,6 +217,10 @@ private:
   initializeMessageRestrictions(const Map<std::string, MessageRestrictions>& message_configs,
                                 Envoy::Server::Configuration::FactoryContext& context);
 
+  // Returns method descriptor by looking up the `descriptor_pool_`.
+  // If the method doesn't exist in the `descriptor_pool`, it returns absl::InvalidArgument error.
+  absl::StatusOr<const MethodDescriptor*> getMethodDescriptor(const std::string& method_name) const;
+
   FilteringMode filtering_mode_;
 
   std::unique_ptr<const Envoy::Protobuf::DescriptorPool> descriptor_pool_;
