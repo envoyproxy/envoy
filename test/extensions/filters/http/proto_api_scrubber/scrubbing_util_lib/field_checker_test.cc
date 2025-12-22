@@ -654,7 +654,6 @@ TEST_F(RequestFieldCheckerTest, MapType) {
   // The normalized path for "tags" map is "tags.value".
   addRestriction(config, method, "tags.value", FieldType::Request, true);
 
-  // Load scrubber_test.descriptor instead of apikeys.
   initializeFilterConfig(config, kScrubberTestDescriptorRelativePath);
 
   NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
