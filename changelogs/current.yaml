@@ -268,6 +268,10 @@ new_features:
   change: |
     Added :ref:`network filter <envoy_v3_api_msg_extensions.filters.network.dynamic_modules.v3.DynamicModuleNetworkFilter>`
     support for dynamic modules, enabling TCP stream processing with dynamic modules.
+- area: dynamic modules
+  change: |
+    Added :ref:`listener filter <envoy_v3_api_msg_extensions.filters.listener.dynamic_modules.v3.DynamicModuleListenerFilter>`
+    support for dynamic modules, enabling connection inspection and protocol detection before connection establishment.
 - area: http filter
   change: |
     Added :ref:`transform http filter <config_http_filters_transform>` to modify request and response bodies in any
