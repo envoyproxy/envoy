@@ -244,6 +244,13 @@ new_features:
   change: |
     Added support for configuring a chain of filters in the composite filter's :ref:`ExecuteFilterAction
     <envoy_v3_api_msg_extensions.filters.http.composite.v3.ExecuteFilterAction>` via the ``filter_chain`` field.
+- area: composite filter
+  change: |
+    Added support for named filter chains defined at the :ref:`HttpConnectionManager
+    <envoy_v3_api_msg_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager>` level via
+    the ``named_filter_chains`` field. These pre-compiled filter chains can be referenced from composite filter
+    actions using the ``filter_chain_ref`` field in :ref:`ExecuteFilterAction
+    <envoy_v3_api_msg_extensions.filters.http.composite.v3.ExecuteFilterAction>`.
 - area: server
   change: |
     Add new command-line option ``--file-flush-min-size-kb <integer>`` to configure the minimum size in kilobytes for log file flushing.

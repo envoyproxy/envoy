@@ -312,48 +312,6 @@ TEST_F(FilterTest, StreamFilterDelegationMultipleAccessLoggers) {
   filter_.log({}, StreamInfo::MockStreamInfo());
 }
 
-// Validate that when dynamic_config and typed_config are both set, an exception is thrown.
-TEST(ConfigTest, TestConfig) {
-  const std::string yaml_string = R"EOF(
-      typed_config:
-        name: set-response-code
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.filters.http.fault.v3.HTTPFault
-          abort:
-            http_status: 503
-            percentage:
-              numerator: 0
-              denominator: HUNDRED
-      dynamic_config:
-        name: set-response-code
-        config_discovery:
-          config_source:
-              path_config_source:
-                path: "{{ test_tmpdir }}/set_response_code.yaml"
-          type_urls:
-          - type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
-  )EOF";
-
-  envoy::extensions::filters::http::composite::v3::ExecuteFilterAction config;
-  TestUtility::loadFromYaml(yaml_string, config);
-
-  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
-  testing::NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  testing::NiceMock<Server::Configuration::MockUpstreamFactoryContext> upstream_factory_context;
-  for (bool is_downstream : {false, true}) {
-    Envoy::Http::Matching::HttpFilterActionContext action_context{
-        .is_downstream_ = is_downstream,
-        .stat_prefix_ = "test",
-        .factory_context_ = factory_context,
-        .upstream_factory_context_ = upstream_factory_context,
-        .server_factory_context_ = server_factory_context};
-    ExecuteFilterActionFactory factory;
-    EXPECT_THROW_WITH_MESSAGE(
-        factory.createAction(config, action_context, ProtobufMessage::getStrictValidationVisitor()),
-        EnvoyException, "Error: Only one of `dynamic_config` or `typed_config` can be set.");
-  }
-}
-
 TEST(ConfigTest, TestDynamicConfigInDownstream) {
   const std::string yaml_string = R"EOF(
       dynamic_config:
@@ -376,7 +334,8 @@ TEST(ConfigTest, TestDynamicConfigInDownstream) {
       .stat_prefix_ = "test",
       .factory_context_ = absl::nullopt,
       .upstream_factory_context_ = absl::nullopt,
-      .server_factory_context_ = server_factory_context};
+      .server_factory_context_ = server_factory_context,
+      .named_filter_chains_ = nullptr};
   ExecuteFilterActionFactory factory;
   EXPECT_THROW_WITH_MESSAGE(
       factory.createAction(config, action_context, ProtobufMessage::getStrictValidationVisitor()),
@@ -404,7 +363,8 @@ TEST(ConfigTest, TestDynamicConfigInUpstream) {
       .stat_prefix_ = "test",
       .factory_context_ = absl::nullopt,
       .upstream_factory_context_ = upstream_factory_context,
-      .server_factory_context_ = absl::nullopt};
+      .server_factory_context_ = absl::nullopt,
+      .named_filter_chains_ = nullptr};
   ExecuteFilterActionFactory factory;
   EXPECT_THROW_WITH_MESSAGE(
       factory.createAction(config, action_context, ProtobufMessage::getStrictValidationVisitor()),
@@ -431,7 +391,8 @@ TEST(ConfigTest, CreateFilterFromServerContextDual) {
       .stat_prefix_ = "test",
       .factory_context_ = absl::nullopt,
       .upstream_factory_context_ = absl::nullopt,
-      .server_factory_context_ = server_factory_context};
+      .server_factory_context_ = server_factory_context,
+      .named_filter_chains_ = nullptr};
   ExecuteFilterActionFactory factory;
   EXPECT_THROW_WITH_MESSAGE(
       factory.createAction(config, action_context, ProtobufMessage::getStrictValidationVisitor()),
@@ -458,7 +419,8 @@ TEST(ConfigTest, DualFilterNoUpstreamFactoryContext) {
       .stat_prefix_ = "test",
       .factory_context_ = absl::nullopt,
       .upstream_factory_context_ = absl::nullopt,
-      .server_factory_context_ = server_factory_context};
+      .server_factory_context_ = server_factory_context,
+      .named_filter_chains_ = nullptr};
   ExecuteFilterActionFactory factory;
   EXPECT_THROW_WITH_MESSAGE(
       factory.createAction(config, action_context, ProtobufMessage::getStrictValidationVisitor()),
@@ -483,7 +445,8 @@ TEST(ConfigTest, DownstreamFilterNoFactoryContext) {
       .stat_prefix_ = "test",
       .factory_context_ = absl::nullopt,
       .upstream_factory_context_ = absl::nullopt,
-      .server_factory_context_ = absl::nullopt};
+      .server_factory_context_ = absl::nullopt,
+      .named_filter_chains_ = nullptr};
   ExecuteFilterActionFactory factory;
   EXPECT_THROW_WITH_MESSAGE(
       factory.createAction(config, action_context, ProtobufMessage::getStrictValidationVisitor()),
@@ -510,7 +473,8 @@ TEST(ConfigTest, TestDownstreamFilterNoOverridingServerContext) {
       .stat_prefix_ = "test",
       .factory_context_ = absl::nullopt,
       .upstream_factory_context_ = absl::nullopt,
-      .server_factory_context_ = server_factory_context};
+      .server_factory_context_ = server_factory_context,
+      .named_filter_chains_ = nullptr};
   ExecuteFilterActionFactory factory;
   EXPECT_THROW_WITH_MESSAGE(
       factory.createAction(config, action_context, ProtobufMessage::getStrictValidationVisitor()),
@@ -539,7 +503,8 @@ TEST(ConfigTest, TestSamplePercentNotSpecifiedl) {
       .stat_prefix_ = "test",
       .factory_context_ = absl::nullopt,
       .upstream_factory_context_ = absl::nullopt,
-      .server_factory_context_ = server_factory_context};
+      .server_factory_context_ = server_factory_context,
+      .named_filter_chains_ = nullptr};
   ExecuteFilterActionFactory factory;
   auto action =
       factory.createAction(config, action_context, ProtobufMessage::getStrictValidationVisitor());
@@ -573,7 +538,8 @@ TEST(ConfigTest, TestSamplePercentInPlaceFeatureEnabled) {
       .stat_prefix_ = "test",
       .factory_context_ = absl::nullopt,
       .upstream_factory_context_ = absl::nullopt,
-      .server_factory_context_ = server_factory_context};
+      .server_factory_context_ = server_factory_context,
+      .named_filter_chains_ = nullptr};
   ExecuteFilterActionFactory factory;
   auto action =
       factory.createAction(config, action_context, ProtobufMessage::getStrictValidationVisitor());
@@ -611,7 +577,8 @@ TEST(ConfigTest, TestSamplePercentInPlaceFeatureNotEnabled) {
       .stat_prefix_ = "test",
       .factory_context_ = absl::nullopt,
       .upstream_factory_context_ = absl::nullopt,
-      .server_factory_context_ = server_factory_context};
+      .server_factory_context_ = server_factory_context,
+      .named_filter_chains_ = nullptr};
   ExecuteFilterActionFactory factory;
   auto action =
       factory.createAction(config, action_context, ProtobufMessage::getStrictValidationVisitor());
@@ -645,7 +612,8 @@ TEST_F(FilterTest, FilterStateShouldBeUpdatedWithTheMatchingActionForDynamicConf
       .stat_prefix_ = "test",
       .factory_context_ = factory_context,
       .upstream_factory_context_ = upstream_factory_context,
-      .server_factory_context_ = server_factory_context};
+      .server_factory_context_ = server_factory_context,
+      .named_filter_chains_ = nullptr};
   ExecuteFilterActionFactory factory;
   auto action =
       factory.createAction(config, action_context, ProtobufMessage::getStrictValidationVisitor());
@@ -676,7 +644,8 @@ TEST_F(FilterTest, FilterStateShouldBeUpdatedWithTheMatchingActionForTypedConfig
       .stat_prefix_ = "test",
       .factory_context_ = factory_context,
       .upstream_factory_context_ = upstream_factory_context,
-      .server_factory_context_ = server_factory_context};
+      .server_factory_context_ = server_factory_context,
+      .named_filter_chains_ = nullptr};
   ExecuteFilterActionFactory factory;
   auto action =
       factory.createAction(config, action_context, ProtobufMessage::getStrictValidationVisitor());
@@ -1553,11 +1522,12 @@ TEST(ConfigTest, TestEmptyFilterChainThrowsException) {
       .stat_prefix_ = "test",
       .factory_context_ = factory_context,
       .upstream_factory_context_ = absl::nullopt,
-      .server_factory_context_ = server_factory_context};
+      .server_factory_context_ = server_factory_context,
+      .named_filter_chains_ = nullptr};
   ExecuteFilterActionFactory factory;
   EXPECT_THROW_WITH_MESSAGE(
       factory.createAction(config, action_context, ProtobufMessage::getStrictValidationVisitor()),
-      EnvoyException, "Error: filter_chain must contain at least one filter.");
+      EnvoyException, "filter_chain must contain at least one filter.");
 }
 
 // Test filter chain configuration for upstream filters.
@@ -1581,7 +1551,8 @@ TEST(ConfigTest, TestUpstreamFilterChainConfiguration) {
       .stat_prefix_ = "test",
       .factory_context_ = absl::nullopt,
       .upstream_factory_context_ = upstream_factory_context,
-      .server_factory_context_ = server_factory_context};
+      .server_factory_context_ = server_factory_context,
+      .named_filter_chains_ = nullptr};
   ExecuteFilterActionFactory factory;
   auto action =
       factory.createAction(config, action_context, ProtobufMessage::getStrictValidationVisitor());
@@ -1610,11 +1581,190 @@ TEST(ConfigTest, TestUpstreamFilterChainNoUpstreamFactoryContext) {
       .stat_prefix_ = "test",
       .factory_context_ = absl::nullopt,
       .upstream_factory_context_ = absl::nullopt,
-      .server_factory_context_ = server_factory_context};
+      .server_factory_context_ = server_factory_context,
+      .named_filter_chains_ = nullptr};
   ExecuteFilterActionFactory factory;
   EXPECT_THROW_WITH_MESSAGE(
       factory.createAction(config, action_context, ProtobufMessage::getStrictValidationVisitor()),
       EnvoyException, "Failed to create upstream filter factory for filter 'set-response-code'");
+}
+
+// Test filter_chain_ref successfully references a named filter chain.
+TEST(ConfigTest, TestFilterChainRefSuccess) {
+  const std::string yaml_string = R"EOF(
+      filter_chain_ref: "my-chain"
+  )EOF";
+
+  envoy::extensions::filters::http::composite::v3::ExecuteFilterAction config;
+  TestUtility::loadFromYaml(yaml_string, config);
+
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
+  testing::NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+
+  // Create a named filter chains map with "my-chain".
+  auto named_chains = std::make_shared<Http::Matching::NamedFilterChainFactoryMap>();
+  (*named_chains)["my-chain"] = {[](Http::FilterChainFactoryCallbacks& cb) {
+    cb.addStreamFilter(std::make_shared<Http::MockStreamFilter>());
+  }};
+
+  Envoy::Http::Matching::HttpFilterActionContext action_context{
+      .is_downstream_ = true,
+      .stat_prefix_ = "test",
+      .factory_context_ = factory_context,
+      .upstream_factory_context_ = absl::nullopt,
+      .server_factory_context_ = server_factory_context,
+      .named_filter_chains_ = named_chains};
+  ExecuteFilterActionFactory factory;
+  auto action =
+      factory.createAction(config, action_context, ProtobufMessage::getStrictValidationVisitor());
+
+  EXPECT_TRUE(action->getTyped<ExecuteFilterAction>().isFilterChain());
+  EXPECT_EQ("my-chain", action->getTyped<ExecuteFilterAction>().actionName());
+}
+
+// Test filter_chain_ref with sample_percent configuration.
+TEST(ConfigTest, TestFilterChainRefWithSamplePercent) {
+  const std::string yaml_string = R"EOF(
+      filter_chain_ref: "my-chain"
+      sample_percent:
+        default_value:
+          numerator: 50
+          denominator: HUNDRED
+  )EOF";
+
+  envoy::extensions::filters::http::composite::v3::ExecuteFilterAction config;
+  TestUtility::loadFromYaml(yaml_string, config);
+
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
+  testing::NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+
+  // Create a named filter chains map with "my-chain".
+  auto named_chains = std::make_shared<Http::Matching::NamedFilterChainFactoryMap>();
+  (*named_chains)["my-chain"] = {[](Http::FilterChainFactoryCallbacks& cb) {
+    cb.addStreamFilter(std::make_shared<Http::MockStreamFilter>());
+  }};
+
+  Envoy::Http::Matching::HttpFilterActionContext action_context{
+      .is_downstream_ = true,
+      .stat_prefix_ = "test",
+      .factory_context_ = factory_context,
+      .upstream_factory_context_ = absl::nullopt,
+      .server_factory_context_ = server_factory_context,
+      .named_filter_chains_ = named_chains};
+  ExecuteFilterActionFactory factory;
+  auto action =
+      factory.createAction(config, action_context, ProtobufMessage::getStrictValidationVisitor());
+
+  EXPECT_TRUE(action->getTyped<ExecuteFilterAction>().isFilterChain());
+
+  // Test sampling enabled.
+  EXPECT_CALL(server_factory_context.runtime_loader_.snapshot_,
+              featureEnabled(_, testing::A<const envoy::type::v3::FractionalPercent&>()))
+      .WillOnce(testing::Return(false));
+  EXPECT_TRUE(action->getTyped<ExecuteFilterAction>().actionSkip());
+}
+
+// Test filter_chain_ref throws exception when referencing non-existent chain.
+TEST(ConfigTest, TestFilterChainRefNonExistentChain) {
+  const std::string yaml_string = R"EOF(
+      filter_chain_ref: "non-existent-chain"
+  )EOF";
+
+  envoy::extensions::filters::http::composite::v3::ExecuteFilterAction config;
+  TestUtility::loadFromYaml(yaml_string, config);
+
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
+  testing::NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+
+  // Create a named filter chains map without "non-existent-chain".
+  auto named_chains = std::make_shared<Http::Matching::NamedFilterChainFactoryMap>();
+  (*named_chains)["chain-a"] = {};
+  (*named_chains)["chain-b"] = {};
+
+  Envoy::Http::Matching::HttpFilterActionContext action_context{
+      .is_downstream_ = true,
+      .stat_prefix_ = "test",
+      .factory_context_ = factory_context,
+      .upstream_factory_context_ = absl::nullopt,
+      .server_factory_context_ = server_factory_context,
+      .named_filter_chains_ = named_chains};
+  ExecuteFilterActionFactory factory;
+  EXPECT_THROW_WITH_REGEX(
+      factory.createAction(config, action_context, ProtobufMessage::getStrictValidationVisitor()),
+      EnvoyException, "filter_chain_ref 'non-existent-chain' not found.*");
+}
+
+// Test filter_chain_ref throws exception when no named filter chains are defined.
+TEST(ConfigTest, TestFilterChainRefNoNamedChainsAvailable) {
+  const std::string yaml_string = R"EOF(
+      filter_chain_ref: "my-chain"
+  )EOF";
+
+  envoy::extensions::filters::http::composite::v3::ExecuteFilterAction config;
+  TestUtility::loadFromYaml(yaml_string, config);
+
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
+  testing::NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+
+  Envoy::Http::Matching::HttpFilterActionContext action_context{
+      .is_downstream_ = true,
+      .stat_prefix_ = "test",
+      .factory_context_ = factory_context,
+      .upstream_factory_context_ = absl::nullopt,
+      .server_factory_context_ = server_factory_context,
+      .named_filter_chains_ = nullptr};
+  ExecuteFilterActionFactory factory;
+  EXPECT_THROW_WITH_MESSAGE(
+      factory.createAction(config, action_context, ProtobufMessage::getStrictValidationVisitor()),
+      EnvoyException,
+      "filter_chain_ref 'my-chain' references a named filter chain, but no named filter chains "
+      "are defined at the HttpConnectionManager level.");
+}
+
+// Test filter_chain_ref with multiple filters in the chain.
+TEST_F(FilterTest, FilterChainRefWithMultipleFilters) {
+  auto filter1 = std::make_shared<Http::MockStreamFilter>();
+  auto filter2 = std::make_shared<Http::MockStreamFilter>();
+
+  StreamInfo::FilterStateSharedPtr filter_state =
+      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
+  ON_CALL(decoder_callbacks_, filterConfigName()).WillByDefault(testing::Return("rootFilterName"));
+  ON_CALL(decoder_callbacks_.stream_info_, filterState())
+      .WillByDefault(testing::ReturnRef(filter_state));
+
+  // Simulate filter factories that would be created from a named filter chain.
+  FilterFactoryCbList filter_factories;
+  filter_factories.push_back(
+      [&](Http::FilterChainFactoryCallbacks& cb) { cb.addStreamFilter(filter1); });
+  filter_factories.push_back(
+      [&](Http::FilterChainFactoryCallbacks& cb) { cb.addStreamFilter(filter2); });
+
+  EXPECT_CALL(*filter1, setDecoderFilterCallbacks(_));
+  EXPECT_CALL(*filter1, setEncoderFilterCallbacks(_));
+  EXPECT_CALL(*filter2, setDecoderFilterCallbacks(_));
+  EXPECT_CALL(*filter2, setEncoderFilterCallbacks(_));
+  EXPECT_CALL(success_counter_, inc());
+
+  // Using the named filter chain reference name as action name.
+  ExecuteFilterAction action(std::move(filter_factories), "my-named-chain", absl::nullopt,
+                             context_.runtime_loader_);
+  filter_.onMatchCallback(action);
+
+  // Verify the action name is the named chain reference.
+  EXPECT_EQ("my-named-chain", action.actionName());
+
+  // Verify decode order where filter1 should be called before filter2.
+  testing::InSequence seq;
+  EXPECT_CALL(*filter1, decodeHeaders(_, false))
+      .WillOnce(testing::Return(Http::FilterHeadersStatus::Continue));
+  EXPECT_CALL(*filter2, decodeHeaders(_, false))
+      .WillOnce(testing::Return(Http::FilterHeadersStatus::Continue));
+
+  filter_.decodeHeaders(default_request_headers_, false);
+
+  EXPECT_CALL(*filter1, onDestroy());
+  EXPECT_CALL(*filter2, onDestroy());
+  filter_.onDestroy();
 }
 
 } // namespace

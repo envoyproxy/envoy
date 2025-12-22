@@ -280,7 +280,8 @@ absl::StatusOr<Envoy::Http::FilterFactoryCb> MatchDelegateConfig::createFilterFa
       .stat_prefix_ = prefix,
       .factory_context_ = context,
       .upstream_factory_context_ = absl::nullopt,
-      .server_factory_context_ = context.serverFactoryContext()};
+      .server_factory_context_ = context.serverFactoryContext(),
+      .named_filter_chains_ = Envoy::Http::Matching::NamedFilterChainScope::get()};
   return createFilterFactory(proto_config, prefix, context.messageValidationVisitor(),
                              action_context, context, factory);
 }
@@ -297,7 +298,8 @@ absl::StatusOr<Envoy::Http::FilterFactoryCb> MatchDelegateConfig::createFilterFa
       .stat_prefix_ = prefix,
       .factory_context_ = absl::nullopt,
       .upstream_factory_context_ = context,
-      .server_factory_context_ = context.serverFactoryContext()};
+      .server_factory_context_ = context.serverFactoryContext(),
+      .named_filter_chains_ = Envoy::Http::Matching::NamedFilterChainScope::get()};
   return createFilterFactory(proto_config, prefix,
                              context.serverFactoryContext().messageValidationVisitor(),
                              action_context, context, factory);
@@ -374,7 +376,8 @@ FilterConfigPerRoute::createFilterMatchTree(
                                                   server_context.scope().prefix())),
       .factory_context_ = absl::nullopt,
       .upstream_factory_context_ = absl::nullopt,
-      .server_factory_context_ = server_context};
+      .server_factory_context_ = server_context,
+      .named_filter_chains_ = Envoy::Http::Matching::NamedFilterChainScope::get()};
 
   Factory::MatchTreeValidationVisitor validation_visitor(*requirements);
   Matcher::MatchTreeFactory<Envoy::Http::HttpMatchingData,

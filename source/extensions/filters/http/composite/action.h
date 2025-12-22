@@ -128,6 +128,11 @@ private:
       const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
       Http::Matching::HttpFilterActionContext& context,
       ProtobufMessage::ValidationVisitor& validation_visitor);
+
+  // Create an action for filter_chain_ref that references a named filter chain.
+  Matcher::ActionConstSharedPtr createFilterChainRefAction(
+      const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
+      Http::Matching::HttpFilterActionContext& context);
 };
 
 DECLARE_FACTORY(ExecuteFilterActionFactory);

@@ -58,24 +58,36 @@ message DynamicConfig {
 
 // Composite match action (see :ref:`matching docs <arch_overview_matching_api>` for more info on match actions).
 // This specifies the filter configuration of the filter that the composite filter should delegate filter interactions to.
+// [#next-free-field: 6]
 message ExecuteFilterAction {
   // Filter specific configuration which depends on the filter being
   // instantiated. See the supported filters for further documentation.
-  // Only one of ``typed_config`` or ``dynamic_config`` can be set.
-  // Ignored if ``filter_chain`` is set.
+  // Only one of ``typed_config``, ``dynamic_config``, ``filter_chain``, or ``filter_chain_ref``
+  // can be set.
   // [#extension-category: envoy.filters.http]
   config.core.v3.TypedExtensionConfig typed_config = 1
       [(udpa.annotations.field_migrate).oneof_promotion = "config_type"];
 
   // Dynamic configuration of filter obtained via extension configuration discovery service.
-  // Only one of ``typed_config`` or ``dynamic_config`` can be set.
-  // Ignored if ``filter_chain`` is set.
+  // Only one of ``typed_config``, ``dynamic_config``, ``filter_chain``, or ``filter_chain_ref``
+  // can be set.
   DynamicConfig dynamic_config = 2
       [(udpa.annotations.field_migrate).oneof_promotion = "config_type"];
 
   // An inlined list of filter configurations. The specified filters will be executed in order.
-  // If this field is set, ``typed_config`` and ``dynamic_config`` are ignored.
+  // Only one of ``typed_config``, ``dynamic_config``, ``filter_chain``, or ``filter_chain_ref``
+  // can be set.
   FilterChainConfiguration filter_chain = 4;
+
+  // A reference to a named filter chain defined in the
+  // :ref:`HttpConnectionManager.named_filter_chains
+  // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.named_filter_chains>`
+  // field. This allows filter chains to be defined once at the HCM level and
+  // referenced multiple times from composite filter actions, which is useful
+  // when the same filter chain needs to be applied across many routes.
+  // Only one of ``typed_config``, ``dynamic_config``, ``filter_chain``, or ``filter_chain_ref``
+  // can be set.
+  string filter_chain_ref = 5;
 
   // Probability of the action execution. If not specified, this is 100%.
   // This allows sampling behavior for the configured actions.
