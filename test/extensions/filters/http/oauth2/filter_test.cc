@@ -1037,6 +1037,10 @@ TEST_F(OAuth2Test, SetBearerToken) {
       {Http::Headers::get().Cookie.get(), "OauthNonce.00000000075bcd15=" + TEST_CSRF_TOKEN},
       {Http::Headers::get().Cookie.get(),
        "CodeVerifier.00000000075bcd15=" + TEST_ENCRYPTED_CODE_VERIFIER},
+      // Cookies from other OAuth flows that should be ignored
+      {Http::Headers::get().Cookie.get(), "OauthNonce.123456789abcdef0=csrf_token_from_other_flow"},
+      {Http::Headers::get().Cookie.get(),
+       "CodeVerifier.123456789abcdef0=code_verifier_from_other_flow"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Scheme.get(), "https"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
