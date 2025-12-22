@@ -27,21 +27,6 @@ using namespace std::chrono_literals;
 namespace Envoy {
 namespace {
 
-void blockFormat(YAML::Node node) {
-  node.SetStyle(YAML::EmitterStyle::Block);
-
-  if (node.Type() == YAML::NodeType::Sequence) {
-    for (const auto& it : node) {
-      blockFormat(it);
-    }
-  }
-  if (node.Type() == YAML::NodeType::Map) {
-    for (const auto& it : node) {
-      blockFormat(it.second);
-    }
-  }
-}
-
 Protobuf::Value parseYamlNode(const YAML::Node& node) {
   Protobuf::Value value;
   switch (node.Type()) {
@@ -186,10 +171,50 @@ void MessageUtil::loadFromYaml(const std::string& yaml, Protobuf::Message& messa
   throw EnvoyException("Unable to convert YAML as JSON: " + yaml);
 }
 
+void emitWithQuotedKeys(YAML::Emitter& out, YAML::Node node, bool block_print) {
+  if (node.IsScalar()) {
+    // Just emit the scalar value (let emitter decide quoting for values)
+    out << node;
+    return;
+  }
+  if (node.IsSequence()) {
+    if (!block_print) {
+      out << YAML::Flow;
+    }
+    out << YAML::BeginSeq;
+    for (const auto& item : node) {
+      emitWithQuotedKeys(out, item, block_print);
+    }
+    out << YAML::EndSeq;
+    return;
+  }
+  if (node.IsMap()) {
+    if (!block_print) {
+      out << YAML::Flow;
+    }
+    out << YAML::BeginMap;
+    for (const auto& it : node) {
+      // 1. Force Double Quotes for the Key
+      // We treat the key as a string to ensure the manipulator applies correctly
+      out << YAML::Key << YAML::DoubleQuoted << it.first.as<std::string>();
+
+      // 2. Recurse for the Value
+      out << YAML::Value;
+      emitWithQuotedKeys(out, it.second, block_print);
+    }
+    out << YAML::EndMap;
+    return;
+  }
+  // Handle Null or other types if necessary
+  if (node.IsNull()) {
+    out << YAML::Null;
+    return;
+  }
+}
+
 std::string MessageUtil::getYamlStringFromMessage(const Protobuf::Message& message,
                                                   const bool block_print,
                                                   const bool always_print_primitive_fields) {
-
   auto json_or_error = getJsonStringFromMessage(message, false, always_print_primitive_fields);
   if (!json_or_error.ok()) {
     throw EnvoyException(json_or_error.status().ToString());
@@ -207,11 +232,8 @@ std::string MessageUtil::getYamlStringFromMessage(const Protobuf::Message& messa
     // Catch unknown YAML parsing exceptions.
     throw EnvoyException(fmt::format("Unexpected YAML exception: {}", +e.what()));
   }
-  if (block_print) {
-    blockFormat(node);
-  }
   YAML::Emitter out;
-  out << node;
+  emitWithQuotedKeys(out, node, block_print);
   return out.c_str();
 }
 
