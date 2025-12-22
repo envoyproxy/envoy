@@ -142,7 +142,7 @@ All other supported commands must contain a key. Supported commands are function
 original Redis command except possibly in failure scenarios.
 
 RESP Protocol
-^^^^^^^^^^^^
+^^^^^^^^^^^^^
 Envoy redis proxy supports only RESP2 protocol for now. Clients should connect to Envoy using RESP2 protocol.
 hello command with only hello 2 argument is supported, hello 3 will result in error response from Envoy.
 
