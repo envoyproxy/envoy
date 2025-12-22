@@ -143,6 +143,7 @@ socket_streamed_trace_segment:
     read:
       data:
         as_bytes: aGVsbG8=
+    seq_num: 1
 )EOF")));
   tapper_->onRead(Buffer::OwnedImpl("hello"), 5);
 
@@ -156,6 +157,7 @@ socket_streamed_trace_segment:
       data:
         as_bytes: d29ybGQ=
       end_stream: true
+    seq_num: 6
 )EOF")));
   time_system_.setSystemTime(std::chrono::seconds(1));
   tapper_->onWrite(Buffer::OwnedImpl("world"), 5, true);
@@ -167,6 +169,7 @@ socket_streamed_trace_segment:
   event:
     timestamp: 1970-01-01T00:00:02Z
     closed: {}
+    seq_num: 18446744073709551615
 )EOF")));
   time_system_.setSystemTime(std::chrono::seconds(2));
   tapper_->closeSocket(Network::ConnectionEvent::RemoteClose);
@@ -222,6 +225,7 @@ socket_streamed_trace_segment:
         socket_address:
           address: 10.0.0.3
           port_value: 50000
+    seq_num: 1
 )EOF")));
   tapper_->onRead(Buffer::OwnedImpl("hello"), 5);
 
@@ -244,6 +248,7 @@ socket_streamed_trace_segment:
         socket_address:
           address: 10.0.0.3
           port_value: 50000
+    seq_num: 6
 )EOF")));
   time_system_.setSystemTime(std::chrono::seconds(1));
   tapper_->onWrite(Buffer::OwnedImpl("world"), 5, true);
@@ -264,6 +269,7 @@ socket_streamed_trace_segment:
         socket_address:
           address: 10.0.0.3
           port_value: 50000
+    seq_num: 18446744073709551615
 )EOF")));
   time_system_.setSystemTime(std::chrono::seconds(2));
   tapper_->closeSocket(Network::ConnectionEvent::RemoteClose);
@@ -318,6 +324,7 @@ socket_streamed_trace_segment:
         socket_address:
           address: 10.0.0.3
           port_value: 50000
+    seq_num: 1
 )EOF")));
   tapper_->onRead(Buffer::OwnedImpl("hello"), 5);
 
@@ -341,6 +348,7 @@ socket_streamed_trace_segment:
         socket_address:
           address: 10.0.0.3
           port_value: 50000
+    seq_num: 6
 )EOF")));
   time_system_.setSystemTime(std::chrono::seconds(1));
   tapper_->onWrite(Buffer::OwnedImpl("world"), 5, true);
@@ -362,6 +370,7 @@ socket_streamed_trace_segment:
         socket_address:
           address: 10.0.0.3
           port_value: 50000
+    seq_num: 18446744073709551615
 )EOF")));
   time_system_.setSystemTime(std::chrono::seconds(2));
   tapper_->closeSocket(Network::ConnectionEvent::RemoteClose);
@@ -425,6 +434,7 @@ socket_streamed_trace_segment:
           socket_address:
             address: 10.0.0.3
             port_value: 50000
+      seq_num: 1
 )EOF")));
   tapper_->onRead(Buffer::OwnedImpl("Test transport socket tap buffered data onRead submit"), 53);
 
@@ -450,6 +460,7 @@ socket_streamed_trace_segment:
           socket_address:
             address: 10.0.0.3
             port_value: 50000
+      seq_num: 54
 )EOF")));
   time_system_.setSystemTime(std::chrono::seconds(1));
   tapper_->onWrite(Buffer::OwnedImpl("Test transport socket tap buffered data onWrite submit"), 54,
@@ -473,6 +484,7 @@ socket_streamed_trace_segment:
           socket_address:
             address: 10.0.0.3
             port_value: 50000
+      seq_num: 18446744073709551615
 )EOF")));
   time_system_.setSystemTime(std::chrono::seconds(2));
   tapper_->closeSocket(Network::ConnectionEvent::RemoteClose);
@@ -537,6 +549,7 @@ socket_streamed_trace_segment:
           socket_address:
             address: 10.0.0.3
             port_value: 50000
+      seq_num: 1
     - timestamp: 1970-01-01T00:00:15Z
       read:
         data:
@@ -550,6 +563,7 @@ socket_streamed_trace_segment:
           socket_address:
             address: 10.0.0.3
             port_value: 50000
+      seq_num: 54
 )EOF")));
   tapper_->onRead(Buffer::OwnedImpl("Test transport socket tap buffered data onRead submit"), 53);
   time_system_.setSystemTime(std::chrono::seconds(15));
@@ -573,6 +587,7 @@ socket_streamed_trace_segment:
           socket_address:
             address: 10.0.0.3
             port_value: 50000
+      seq_num: 18446744073709551615
 )EOF")));
   time_system_.setSystemTime(std::chrono::seconds(2));
   tapper_->closeSocket(Network::ConnectionEvent::RemoteClose);
@@ -637,6 +652,7 @@ socket_streamed_trace_segment:
           socket_address:
             address: 10.0.0.3
             port_value: 50000
+      seq_num: 1
     - timestamp: 1970-01-01T00:00:15Z
       write:
         data:
@@ -651,6 +667,7 @@ socket_streamed_trace_segment:
           socket_address:
             address: 10.0.0.3
             port_value: 50000
+      seq_num: 55
 )EOF")));
   tapper_->onWrite(Buffer::OwnedImpl("Test transport socket tap buffered data onWrite submit"), 54,
                    true);
@@ -676,6 +693,7 @@ socket_streamed_trace_segment:
           socket_address:
             address: 10.0.0.3
             port_value: 50000
+      seq_num: 18446744073709551615
 )EOF")));
   time_system_.setSystemTime(std::chrono::seconds(2));
   tapper_->closeSocket(Network::ConnectionEvent::RemoteClose);
@@ -739,6 +757,7 @@ socket_streamed_trace_segment:
           socket_address:
             address: 10.0.0.3
             port_value: 50000
+      seq_num: 1
     - timestamp: 1970-01-01T00:00:02Z
       write:
         data:
@@ -754,6 +773,7 @@ socket_streamed_trace_segment:
           socket_address:
             address: 10.0.0.3
             port_value: 50000
+      seq_num: 54
     - timestamp: 1970-01-01T00:00:03Z
       closed: {}
       connection:
@@ -765,6 +785,7 @@ socket_streamed_trace_segment:
           socket_address:
             address: 10.0.0.3
             port_value: 50000
+      seq_num: 18446744073709551615
 )EOF")));
   tapper_->onRead(Buffer::OwnedImpl("Test transport socket tap buffered data onRead submit"), 53);
   time_system_.setSystemTime(std::chrono::seconds(2));
