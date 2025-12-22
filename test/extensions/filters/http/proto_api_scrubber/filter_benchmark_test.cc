@@ -91,7 +91,7 @@ public:
         // Rule targeting a 2-level deep nested field inside a map value.
         addRule(method_rules, "deep_map.value.internal_details.deep_secret", is_response);
 
-        // Rules targeting Repeated fields and OneOfs.
+        // Rules targeting repeated fields and `oneof` fields.
         addRule(method_rules, "repeated_secrets", is_response);
         addRule(method_rules, "repeated_messages.secret", is_response);
         addRule(method_rules, "choice_a_string", is_response);
