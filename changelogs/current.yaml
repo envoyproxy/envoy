@@ -197,6 +197,10 @@ bug_fixes:
     Fixed SDS to enable auto-recovery when initial certificate file loading fails. Previously, if certificate
     files did not exist during initial SDS configuration, no file watch callbacks were set up, preventing
     automatic recovery when files appeared later.
+- area: upstream
+  change: |
+    Fixed transport socket matcher to correctly use downstream connection filter state for matching and optimized the
+    selection path to avoid per-connection resolution overhead when filter state input is not used.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
