@@ -176,35 +176,6 @@ FieldChecker::normalizePath(const std::vector<std::string>& path) const {
   return path_cache_.emplace(path, result).first->second;
 }
 
-std::string FieldChecker::constructFieldMask(const std::vector<std::string>& path,
-                                             const Protobuf::Field* field) const {
-  if (path.empty()) {
-    return "";
-  }
-
-  const auto& norm = normalizePath(path);
-  std::string field_mask = norm.mask;
-
-  // Translate the last segment of the `path` wherever required.
-  if (field->kind() == Protobuf::Field::TYPE_ENUM) {
-    absl::string_view last_segment = path.back();
-    if (auto name_or_status = resolveEnumName(last_segment, field);
-        name_or_status.ok() && !name_or_status.value().empty()) {
-      size_t last_dot = field_mask.find_last_of('.');
-      if (last_dot != std::string::npos) {
-        field_mask.replace(last_dot + 1, std::string::npos, name_or_status.value());
-      } else {
-        field_mask = std::string(name_or_status.value());
-      }
-    } else {
-      ENVOY_LOG(warn, "Enum translation skipped for value '{}': {}", last_segment,
-                name_or_status.status().ToString());
-    }
-  }
-
-  return field_mask;
-}
-
 FieldCheckResults FieldChecker::CheckField(const std::vector<std::string>& path,
                                            const Protobuf::Field* field, const int /*field_depth*/,
                                            const Protobuf::Type* /*parent_type*/) const {
