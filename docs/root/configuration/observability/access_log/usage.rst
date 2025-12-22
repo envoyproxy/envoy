@@ -1106,11 +1106,12 @@ UDP
   HTTP/TCP/THRIFT
     String value set on ssl connection socket for Server Name Indication (SNI) or host header.
     The parameter X is used to specify should the output fallback to get from host header when SNI is not set.
-    The parameter Y is used to specify the source of the request host. Both X and Y are optional.
+    The parameter Y is used to specify the source of the request host. Both X and Y are optional. Y make no sense
+    when X is set to ``SNI_ONLY``.
 
     The X parameter can be:
 
-    * ``SNI_ONLY``: String value set on ssl connection socket for Server Name Indication (SNI).
+    * ``SNI_ONLY``: String value set on ssl connection socket for Server Name Indication (SNI), this's the default value of X.
     * ``SNI_FIRST``: The output will retrive from ``:authority`` or ``x-envoy-original-host`` header when SNI is not set.
     * ``HOST_FIRST``: The output will retrive from ``:authority`` or ``x-envoy-original-host`` header.
 

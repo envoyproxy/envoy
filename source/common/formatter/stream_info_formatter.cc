@@ -1,7 +1,5 @@
 #include "source/common/formatter/stream_info_formatter.h"
 
-#include <string_view>
-
 #include "source/common/common/random_generator.h"
 #include "source/common/config/metadata.h"
 #include "source/common/http/header_utility.h"
@@ -617,7 +615,7 @@ RequestedServerNameFormatter::RequestedServerNameFormatter(absl::string_view sou
   HostFormatterSource host_source = SNI;
   HostFormatterOption option_enum = OriginalHostOrHost;
 
-  if (source == "SNI") {
+  if (source == "SNI_ONLY") {
     host_source = SNI;
   } else if (source == "SNI_FIRST") {
     host_source = SNIFirst;
@@ -627,7 +625,7 @@ RequestedServerNameFormatter::RequestedServerNameFormatter(absl::string_view sou
     host_source = SNI;
   } else {
     throw EnvoyException(fmt::format("Invalid REQUESTED_SERVER_NAME option: '{}', only "
-                                     "'SNI'/'SNI_FIRST'/'HOST_FIRST' are allowed",
+                                     "'SNI_ONLY'/'SNI_FIRST'/'HOST_FIRST' are allowed",
                                      source));
   }
 

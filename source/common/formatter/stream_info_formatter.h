@@ -5,7 +5,6 @@
 #include <list>
 #include <regex>
 #include <string>
-#include <string_view>
 #include <vector>
 
 #include "envoy/formatter/substitution_formatter.h"
