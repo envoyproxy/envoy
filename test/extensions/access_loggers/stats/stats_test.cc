@@ -199,147 +199,6 @@ TEST_F(StatsAccessLoggerTest, NonNumberValueFormatted) {
 }
 
 // Format string resolved to a number string.
-TEST_F(StatsAccessLoggerTest, GaugeNumberValueFormatted) {
-  const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
-    gauges:
-      - stat:
-          name: gauge
-        value_format: '%BYTES_RECEIVED%'
-        operation_type: Add
-)EOF";
-
-  initialize(yaml);
-
-  EXPECT_CALL(stream_info_, bytesReceived()).WillRepeatedly(testing::Return(42));
-  EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate));
-  EXPECT_CALL(store_.gauge_, add(42));
-  logger_->log(formatter_context_, stream_info_);
-}
-
-TEST_F(StatsAccessLoggerTest, GaugeValueFixed) {
-  const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
-    gauges:
-      - stat:
-          name: gauge
-          tags:
-            - name: mytag
-              value_format: '%UPSTREAM_CLUSTER%'
-            - name: other_tag
-              value_format: '%RESPONSE_CODE%'
-        value_fixed: 42
-        operation_type: Add
-)EOF";
-
-  initialize(yaml);
-
-  absl::optional<std::string> a_number{"42"};
-  EXPECT_CALL(stream_info_, responseCodeDetails()).WillRepeatedly(testing::ReturnRef(a_number));
-  EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate));
-  EXPECT_CALL(store_.gauge_, add(42));
-  logger_->log(formatter_context_, stream_info_);
-}
-
-TEST_F(StatsAccessLoggerTest, GaugeOperationTypeSubstract) {
-  const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
-    gauges:
-      - stat:
-          name: gauge
-        value_fixed: 42
-        operation_type: Subtract
-)EOF";
-
-  initialize(yaml);
-
-  absl::optional<std::string> a_number{"42"};
-  EXPECT_CALL(stream_info_, responseCodeDetails()).WillRepeatedly(testing::ReturnRef(a_number));
-  EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate));
-  EXPECT_CALL(store_.gauge_, sub(42));
-  logger_->log(formatter_context_, stream_info_);
-}
-
-TEST_F(StatsAccessLoggerTest, GaugeOperationTypeSet) {
-  const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
-    gauges:
-      - stat:
-          name: gauge
-        value_fixed: 42
-        operation_type: Set
-)EOF";
-
-  initialize(yaml);
-
-  absl::optional<std::string> a_number{"42"};
-  EXPECT_CALL(stream_info_, responseCodeDetails()).WillRepeatedly(testing::ReturnRef(a_number));
-  EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::NeverImport));
-  EXPECT_CALL(store_.gauge_, set(42));
-  logger_->log(formatter_context_, stream_info_);
-}
-
-TEST_F(StatsAccessLoggerTest, GaugeAccessLogType) {
-  const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
-    gauges:
-      - stat:
-          name: gauge
-        value_fixed: 42
-        operation_type: Set
-        access_log_type: DownstreamStart
-)EOF";
-
-  initialize(yaml);
-
-  absl::optional<std::string> a_number{"42"};
-  EXPECT_CALL(stream_info_, responseCodeDetails()).WillRepeatedly(testing::ReturnRef(a_number));
-
-  // Log with non-matching type: no call to set() expected.
-  EXPECT_CALL(store_.gauge_, set(_)).Times(0);
-  logger_->log(Envoy::Formatter::Context(nullptr, nullptr, nullptr, {},
-                                         envoy::data::accesslog::v3::AccessLogType::DownstreamEnd),
-               stream_info_);
-
-  // Log with matching type: set(42) expected.
-  EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::NeverImport));
-  EXPECT_CALL(store_.gauge_, set(42));
-  logger_->log(
-      Envoy::Formatter::Context(nullptr, nullptr, nullptr, {},
-                                envoy::data::accesslog::v3::AccessLogType::DownstreamStart),
-      stream_info_);
-}
-
-TEST_F(StatsAccessLoggerTest, GaugeBothFormatAndFixed) {
-  const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
-    gauges:
-      - stat:
-          name: gauge
-        value_format: '%BYTES_RECEIVED%'
-        value_fixed: 1
-        operation_type: Add
-)EOF";
-
-  EXPECT_THROW_WITH_MESSAGE(
-      initialize(yaml), EnvoyException,
-      "Stats logger cannot have both `value_format` and `value_fixed` configured.");
-}
-
-TEST_F(StatsAccessLoggerTest, GaugeNoValueConfig) {
-  const std::string yaml = R"EOF(
-    stat_prefix: test_stat_prefix
-    gauges:
-      - stat:
-          name: gauge
-        operation_type: Add
-)EOF";
-
-  EXPECT_THROW_WITH_MESSAGE(initialize(yaml), EnvoyException,
-                            "Stats logger gauge must have either `value_format` or `value_fixed`.");
-}
-
-// Format string resolved to a number string.
 TEST_F(StatsAccessLoggerTest, NumberStringValueFormatted) {
   const std::string yaml = R"EOF(
     stat_prefix: test_stat_prefix
@@ -437,6 +296,136 @@ TEST_F(StatsAccessLoggerTest, EmptyTagFormatter) {
             return scope_->counterFromStatNameWithTags_(name, tags);
           }));
   logger_->log(formatter_context_, stream_info_);
+}
+
+TEST_F(StatsAccessLoggerTest, GaugeNonNumberValueFormatted) {
+  const std::string yaml = R"EOF(
+    stat_prefix: test_stat_prefix
+    gauges:
+      - stat:
+          name: gauge
+        value_format: '%RESPONSE_CODE_DETAILS%'
+        operation_type: Add
+)EOF";
+
+  initialize(yaml);
+
+  absl::optional<std::string> not_a_number{"hello"};
+  EXPECT_CALL(stream_info_, responseCodeDetails()).WillRepeatedly(testing::ReturnRef(not_a_number));
+  EXPECT_CALL(store_, gauge(_, _)).Times(0);
+  // Note: Logging is verified in NonNumberValueFormatted. We skip verification here due to shared
+  // rate limiting in ENVOY_LOG_PERIODIC_MISC which causes this second test to suppress the log.
+  logger_->log(formatter_context_, stream_info_);
+}
+
+// Format string resolved to a number string.
+TEST_F(StatsAccessLoggerTest, GaugeNumberValueFormatted) {
+  const std::string yaml = R"EOF(
+    stat_prefix: test_stat_prefix
+    gauges:
+      - stat:
+          name: gauge
+        value_format: '%BYTES_RECEIVED%'
+        operation_type: Add
+)EOF";
+
+  initialize(yaml);
+
+  EXPECT_CALL(stream_info_, bytesReceived()).WillRepeatedly(testing::Return(42));
+  EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate));
+  EXPECT_CALL(store_.gauge_, add(42));
+  logger_->log(formatter_context_, stream_info_);
+}
+
+TEST_F(StatsAccessLoggerTest, GaugeValueFixed) {
+  const std::string yaml = R"EOF(
+    stat_prefix: test_stat_prefix
+    gauges:
+      - stat:
+          name: gauge
+          tags:
+            - name: mytag
+              value_format: '%UPSTREAM_CLUSTER%'
+            - name: other_tag
+              value_format: '%RESPONSE_CODE%'
+        value_fixed: 42
+        operation_type: Add
+)EOF";
+
+  initialize(yaml);
+
+  absl::optional<std::string> a_number{"42"};
+  EXPECT_CALL(stream_info_, responseCodeDetails()).WillRepeatedly(testing::ReturnRef(a_number));
+  EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate));
+  EXPECT_CALL(store_.gauge_, add(42));
+  logger_->log(formatter_context_, stream_info_);
+}
+
+TEST_F(StatsAccessLoggerTest, GaugeOperationTypeSubstract) {
+  const std::string yaml = R"EOF(
+    stat_prefix: test_stat_prefix
+    gauges:
+      - stat:
+          name: gauge
+        value_fixed: 42
+        operation_type: Subtract
+)EOF";
+
+  initialize(yaml);
+
+  absl::optional<std::string> a_number{"42"};
+  EXPECT_CALL(stream_info_, responseCodeDetails()).WillRepeatedly(testing::ReturnRef(a_number));
+  EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate));
+  EXPECT_CALL(store_.gauge_, sub(42));
+  logger_->log(formatter_context_, stream_info_);
+}
+
+TEST_F(StatsAccessLoggerTest, GaugeOperationTypeSet) {
+  const std::string yaml = R"EOF(
+    stat_prefix: test_stat_prefix
+    gauges:
+      - stat:
+          name: gauge
+        value_fixed: 42
+        operation_type: Set
+)EOF";
+
+  initialize(yaml);
+
+  absl::optional<std::string> a_number{"42"};
+  EXPECT_CALL(stream_info_, responseCodeDetails()).WillRepeatedly(testing::ReturnRef(a_number));
+  EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::NeverImport));
+  EXPECT_CALL(store_.gauge_, set(42));
+  logger_->log(formatter_context_, stream_info_);
+}
+
+TEST_F(StatsAccessLoggerTest, GaugeBothFormatAndFixed) {
+  const std::string yaml = R"EOF(
+    stat_prefix: test_stat_prefix
+    gauges:
+      - stat:
+          name: gauge
+        value_format: '%BYTES_RECEIVED%'
+        value_fixed: 1
+        operation_type: Add
+)EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      initialize(yaml), EnvoyException,
+      "Stats logger cannot have both `value_format` and `value_fixed` configured.");
+}
+
+TEST_F(StatsAccessLoggerTest, GaugeNoValueConfig) {
+  const std::string yaml = R"EOF(
+    stat_prefix: test_stat_prefix
+    gauges:
+      - stat:
+          name: gauge
+        operation_type: Add
+)EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(initialize(yaml), EnvoyException,
+                            "Stats logger gauge must have either `value_format` or `value_fixed`.");
 }
 
 } // namespace StatsAccessLog

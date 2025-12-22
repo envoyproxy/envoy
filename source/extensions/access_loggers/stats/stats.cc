@@ -84,7 +84,7 @@ StatsAccessLog::StatsAccessLog(const envoy::extensions::access_loggers::stats::v
         for (const auto& gauge_cfg : config.gauges()) {
           Gauge& inserted =
               gauges.emplace_back(NameAndTags(gauge_cfg.stat(), stat_name_pool_, commands), nullptr,
-                                  0, gauge_cfg.operation_type(), gauge_cfg.access_log_type());
+                                  0, gauge_cfg.operation_type());
           if (gauge_cfg.operation_type() ==
               envoy::extensions::access_loggers::stats::v3::Config::Gauge::Unspecified) {
             throw EnvoyException("Stats logger gauge must have `operation_type` configured.");
@@ -211,10 +211,6 @@ void StatsAccessLog::emitLogConst(const Formatter::Context& context,
   }
 
   for (const auto& gauge : gauges_) {
-    if (gauge.access_log_type_ != envoy::data::accesslog::v3::NotSet &&
-        gauge.access_log_type_ != context.accessLogType()) {
-      continue;
-    }
     uint64_t value;
     if (gauge.value_formatter_ != nullptr) {
       absl::optional<uint64_t> computed_value_opt =

@@ -71,7 +71,6 @@ private:
     Formatter::FormatterProviderPtr value_formatter_;
     uint64_t value_fixed_;
     envoy::extensions::access_loggers::stats::v3::Config::Gauge::OperationType operation_type_;
-    envoy::data::accesslog::v3::AccessLogType access_log_type_;
   };
 
   const Stats::ScopeSharedPtr scope_;

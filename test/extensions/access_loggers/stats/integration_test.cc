@@ -15,15 +15,24 @@ public:
 
   void init(const std::string& config_yaml, bool autonomous_upstream = true,
             bool flush_access_log_on_new_request = false) {
+    init(std::vector<std::string>{config_yaml}, autonomous_upstream,
+         flush_access_log_on_new_request);
+  }
+
+  void init(const std::vector<std::string>& config_yamls, bool autonomous_upstream = true,
+            bool flush_access_log_on_new_request = false) {
     autonomous_upstream_ = autonomous_upstream;
     config_helper_.addConfigModifier(
-        [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+        [&, config_yamls](
+            envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 hcm) {
           if (flush_access_log_on_new_request) {
             hcm.mutable_access_log_options()->set_flush_access_log_on_new_request(true);
           }
-          auto* access_log = hcm.add_access_log();
-          TestUtility::loadFromYaml(config_yaml, *access_log);
+          for (const auto& config_yaml : config_yamls) {
+            auto* access_log = hcm.add_access_log();
+            TestUtility::loadFromYaml(config_yaml, *access_log);
+          }
         });
 
     HttpIntegrationTest::initialize();
@@ -169,8 +178,11 @@ TEST_P(StatsAccessLogIntegrationTest, PercentHistogram) {
 }
 
 TEST_P(StatsAccessLogIntegrationTest, ActiveRequestsGauge) {
-  const std::string config_yaml = R"EOF(
+  const std::string config_yaml_start = R"EOF(
               name: envoy.access_loggers.stats
+              filter:
+                log_type_filter:
+                  types: [DownstreamStart]
               typed_config:
                 "@type": type.googleapis.com/envoy.extensions.access_loggers.stats.v3.Config
                 stat_prefix: test_stat_prefix
@@ -182,7 +194,17 @@ TEST_P(StatsAccessLogIntegrationTest, ActiveRequestsGauge) {
                           value_format: '%REQUEST_HEADER(tag-value)%'
                     value_fixed: 1
                     operation_type: Add
-                    access_log_type: DownstreamStart
+)EOF";
+
+  const std::string config_yaml_end = R"EOF(
+              name: envoy.access_loggers.stats
+              filter:
+                log_type_filter:
+                  types: [DownstreamEnd]
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.access_loggers.stats.v3.Config
+                stat_prefix: test_stat_prefix
+                gauges:
                   - stat:
                       name: active_requests
                       tags:
@@ -190,10 +212,10 @@ TEST_P(StatsAccessLogIntegrationTest, ActiveRequestsGauge) {
                           value_format: '%REQUEST_HEADER(tag-value)%'
                     value_fixed: 1
                     operation_type: Subtract
-                    access_log_type: DownstreamEnd
 )EOF";
 
-  init(config_yaml, /*autonomous_upstream=*/false, /*flush_access_log_on_new_request=*/true);
+  init({config_yaml_start, config_yaml_end}, /*autonomous_upstream=*/false,
+       /*flush_access_log_on_new_request=*/true);
 
   Http::TestRequestHeaderMapImpl request_headers{
       {":method", "GET"},  {":authority", "envoyproxy.io"}, {":path", "/"},
