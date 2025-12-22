@@ -1,7 +1,6 @@
 #include <fstream>
 #include <sstream>
 #include <string>
-#include <vector>
 
 #include "envoy/extensions/filters/http/proto_api_scrubber/v3/config.pb.h"
 
@@ -15,7 +14,6 @@
 #include "test/extensions/filters/http/proto_api_scrubber/scrubber_test.pb.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/mocks.h"
-#include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
 #include "benchmark/benchmark.h"
@@ -37,28 +35,33 @@ namespace TestProto = test::extensions::filters::http::proto_api_scrubber;
 
 namespace {
 
-// Path to the test descriptor file.
 constexpr absl::string_view kScrubberTestDescriptorPath =
     "test/extensions/filters/http/proto_api_scrubber/scrubber_test.descriptor";
 
-// Helper to read the descriptor file using Envoy's test environment utilities.
+// Manually resolve the file path using Bazel's TEST_SRCDIR environment variable.
+// This avoids the dependency on Envoy::TestEnvironment which causes crashes in benchmarks.
 std::string readDescriptorContent() {
-  const std::string path = TestEnvironment::runfilesPath(std::string(kScrubberTestDescriptorPath));
-  return TestEnvironment::readFileToStringForTest(path);
-}
-
-// Static class to initialize the Envoy TestEnvironment before the default benchmark main runs.
-// This ensures 'runfilesPath' works correctly without defining a conflicting main function.
-struct EnvoyEnvironmentInitializer {
-  EnvoyEnvironmentInitializer() {
-    char app_name[] = "filter_benchmark_test";
-    char* argv[] = {app_name, nullptr};
-    int argc = 1;
-    Envoy::TestEnvironment::initializeOptions(argc, argv);
+  std::string path;
+  // Bazel sets this environment variable pointing to the runfiles root.
+  if (const char* srcdir = std::getenv("TEST_SRCDIR")) {
+    // Construct path: <runfiles_root>/envoy/<workspace_relative_path>
+    path = std::string(srcdir) + "/envoy/" + std::string(kScrubberTestDescriptorPath);
+  } else {
+    // Fallback for manual local execution if needed.
+    path = std::string(kScrubberTestDescriptorPath);
   }
-};
-// Global instance triggers constructor at startup.
-static EnvoyEnvironmentInitializer envoy_env_init;
+
+  std::ifstream file(path, std::ios::binary);
+  if (!file.good()) {
+    std::cerr << "Benchmark Error: Could not open descriptor file at: " << path << std::endl;
+    // Fail hard if data dependency is missing.
+    std::abort();
+  }
+
+  std::stringstream buffer;
+  buffer << file.rdbuf();
+  return buffer.str();
+}
 
 class FilterBenchmarkFixture {
 public:
@@ -396,7 +399,7 @@ static void BM_Response_Streaming_Scrubbing(benchmark::State& state) {
 }
 BENCHMARK(BM_Response_Streaming_Scrubbing)->RangeMultiplier(10)->Range(10, 10000)->Complexity();
 
-// Scenario 5: Raw Protobuf Round-Trip (Control Group).
+// Raw Protobuf Round-Trip (Control Group).
 // Measures the theoretical minimum cost of Parsing and Serializing the payload
 // using the raw Google Protobuf library, bypassing all Envoy filter logic.
 static void BM_Raw_Proto_RoundTrip(benchmark::State& state) {
