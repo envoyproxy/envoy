@@ -74,7 +74,8 @@ public:
 
     if (add_rules) {
       auto* method_config = config.mutable_restrictions()->mutable_method_restrictions();
-      auto& method_rules = (*method_config)["/test.extensions.filters.http.proto_api_scrubber.ScrubberTestService/Scrub"];
+      auto& method_rules = (*method_config)
+          ["/test.extensions.filters.http.proto_api_scrubber.ScrubberTestService/Scrub"];
 
       for (int i = 0; i < 2; ++i) {
         // Configure rules for both Request (i=0) and Response (i=1).
@@ -199,20 +200,22 @@ bool verifyFilterBehavior(benchmark::State& state, FilterBenchmarkFixture& fixtu
   filter->setDecoderFilterCallbacks(fixture.callbacks_);
   filter->setEncoderFilterCallbacks(fixture.encoder_callbacks_);
 
-  Http::TestRequestHeaderMapImpl req_headers{{":path", "/test.extensions.filters.http.proto_api_scrubber.ScrubberTestService/Scrub"},
-                                         {"content-type", "application/grpc"}};
-  Http::TestResponseHeaderMapImpl resp_headers{{":status", "200"}, {"content-type", "application/grpc"}};
+  Http::TestRequestHeaderMapImpl req_headers{
+      {":path", "/test.extensions.filters.http.proto_api_scrubber.ScrubberTestService/Scrub"},
+      {"content-type", "application/grpc"}};
+  Http::TestResponseHeaderMapImpl resp_headers{{":status", "200"},
+                                               {"content-type", "application/grpc"}};
 
   // Headers Phase.
   if (filter->decodeHeaders(req_headers, false) != Http::FilterHeadersStatus::Continue) {
-     state.SkipWithError("Setup: decodeHeaders failed");
-     return false;
+    state.SkipWithError("Setup: decodeHeaders failed");
+    return false;
   }
   if (is_response) {
-      if (filter->encodeHeaders(resp_headers, false) != Http::FilterHeadersStatus::Continue) {
-          state.SkipWithError("Setup: encodeHeaders failed");
-          return false;
-      }
+    if (filter->encodeHeaders(resp_headers, false) != Http::FilterHeadersStatus::Continue) {
+      state.SkipWithError("Setup: encodeHeaders failed");
+      return false;
+    }
   }
 
   // Data Phase.
@@ -221,15 +224,15 @@ bool verifyFilterBehavior(benchmark::State& state, FilterBenchmarkFixture& fixtu
 
   Http::FilterDataStatus status;
   if (is_response) {
-      status = filter->encodeData(temp_data, true);
+    status = filter->encodeData(temp_data, true);
   } else {
-      status = filter->decodeData(temp_data, true);
+    status = filter->decodeData(temp_data, true);
   }
 
   // Verify Status Code.
   if (status != Http::FilterDataStatus::Continue) {
-      state.SkipWithError("Invalid Status: Expected Continue");
-      return false;
+    state.SkipWithError("Invalid Status: Expected Continue");
+    return false;
   }
 
   // Verify Scrubbing Correctness.
@@ -237,12 +240,12 @@ bool verifyFilterBehavior(benchmark::State& state, FilterBenchmarkFixture& fixtu
   std::string output = temp_data.toString();
   bool secret_found = (output.find("super_secret") != std::string::npos);
   if (expect_scrubbing && secret_found) {
-      state.SkipWithError("Correctness Fail: Scrubbing enabled but secret found in output!");
-      return false;
+    state.SkipWithError("Correctness Fail: Scrubbing enabled but secret found in output!");
+    return false;
   }
   if (!expect_scrubbing && !secret_found) {
-      state.SkipWithError("Correctness Fail: Passthrough enabled but secret missing from output!");
-      return false;
+    state.SkipWithError("Correctness Fail: Passthrough enabled but secret missing from output!");
+    return false;
   }
 
   return true;
@@ -253,10 +256,12 @@ bool verifyFilterBehavior(benchmark::State& state, FilterBenchmarkFixture& fixtu
 static void BM_Request_Unary_Passthrough(benchmark::State& state) {
   FilterBenchmarkFixture fixture(state.range(0), false);
   // Perform validation to ensure setup is correct.
-  if (!verifyFilterBehavior(state, fixture, false, false)) return;
+  if (!verifyFilterBehavior(state, fixture, false, false))
+    return;
 
-  Http::TestRequestHeaderMapImpl headers{{":path", "/test.extensions.filters.http.proto_api_scrubber.ScrubberTestService/Scrub"},
-                                         {"content-type", "application/grpc"}};
+  Http::TestRequestHeaderMapImpl headers{
+      {":path", "/test.extensions.filters.http.proto_api_scrubber.ScrubberTestService/Scrub"},
+      {"content-type", "application/grpc"}};
   std::string raw_payload = fixture.payload_.toString();
 
   for (auto _ : state) {
@@ -272,14 +277,16 @@ static void BM_Request_Unary_Passthrough(benchmark::State& state) {
 }
 BENCHMARK(BM_Request_Unary_Passthrough)->RangeMultiplier(10)->Range(10, 10000)->Complexity();
 
-// Measures the latency of processing a unary request when fields (including Maps) are actively scrubbed.
-// This measures the cost of path normalization, match evaluation, and field removal.
+// Measures the latency of processing a unary request when fields (including Maps) are actively
+// scrubbed. This measures the cost of path normalization, match evaluation, and field removal.
 static void BM_Request_Unary_Scrubbing(benchmark::State& state) {
   FilterBenchmarkFixture fixture(state.range(0), true);
-  if (!verifyFilterBehavior(state, fixture, false, true)) return;
+  if (!verifyFilterBehavior(state, fixture, false, true))
+    return;
 
-  Http::TestRequestHeaderMapImpl headers{{":path", "/test.extensions.filters.http.proto_api_scrubber.ScrubberTestService/Scrub"},
-                                         {"content-type", "application/grpc"}};
+  Http::TestRequestHeaderMapImpl headers{
+      {":path", "/test.extensions.filters.http.proto_api_scrubber.ScrubberTestService/Scrub"},
+      {"content-type", "application/grpc"}};
   std::string raw_payload = fixture.payload_.toString();
 
   for (auto _ : state) {
@@ -299,10 +306,12 @@ BENCHMARK(BM_Request_Unary_Scrubbing)->RangeMultiplier(10)->Range(10, 10000)->Co
 // In streaming mode, data frames may be processed incrementally.
 static void BM_Request_Streaming_Scrubbing(benchmark::State& state) {
   FilterBenchmarkFixture fixture(state.range(0), true);
-  if (!verifyFilterBehavior(state, fixture, false, true)) return;
+  if (!verifyFilterBehavior(state, fixture, false, true))
+    return;
 
-  Http::TestRequestHeaderMapImpl headers{{":path", "/test.extensions.filters.http.proto_api_scrubber.ScrubberTestService/Scrub"},
-                                         {"content-type", "application/grpc"}};
+  Http::TestRequestHeaderMapImpl headers{
+      {":path", "/test.extensions.filters.http.proto_api_scrubber.ScrubberTestService/Scrub"},
+      {"content-type", "application/grpc"}};
   std::string raw_payload = fixture.payload_.toString();
 
   auto filter = std::make_unique<FilterType>(*fixture.config_);
@@ -324,11 +333,14 @@ BENCHMARK(BM_Request_Streaming_Scrubbing)->RangeMultiplier(10)->Range(10, 10000)
 // Measures the latency of processing a unary response when no fields match the scrubbing rules.
 static void BM_Response_Unary_Passthrough(benchmark::State& state) {
   FilterBenchmarkFixture fixture(state.range(0), false);
-  if (!verifyFilterBehavior(state, fixture, true, false)) return;
+  if (!verifyFilterBehavior(state, fixture, true, false))
+    return;
 
-  Http::TestRequestHeaderMapImpl req_headers{{":path", "/test.extensions.filters.http.proto_api_scrubber.ScrubberTestService/Scrub"},
-                                         {"content-type", "application/grpc"}};
-  Http::TestResponseHeaderMapImpl resp_headers{{":status", "200"}, {"content-type", "application/grpc"}};
+  Http::TestRequestHeaderMapImpl req_headers{
+      {":path", "/test.extensions.filters.http.proto_api_scrubber.ScrubberTestService/Scrub"},
+      {"content-type", "application/grpc"}};
+  Http::TestResponseHeaderMapImpl resp_headers{{":status", "200"},
+                                               {"content-type", "application/grpc"}};
   std::string raw_payload = fixture.payload_.toString();
 
   for (auto _ : state) {
@@ -349,11 +361,14 @@ BENCHMARK(BM_Response_Unary_Passthrough)->RangeMultiplier(10)->Range(10, 10000)-
 // Measures the latency of processing a unary response with active scrubbing enabled.
 static void BM_Response_Unary_Scrubbing(benchmark::State& state) {
   FilterBenchmarkFixture fixture(state.range(0), true);
-  if (!verifyFilterBehavior(state, fixture, true, true)) return;
+  if (!verifyFilterBehavior(state, fixture, true, true))
+    return;
 
-  Http::TestRequestHeaderMapImpl req_headers{{":path", "/test.extensions.filters.http.proto_api_scrubber.ScrubberTestService/Scrub"},
-                                         {"content-type", "application/grpc"}};
-  Http::TestResponseHeaderMapImpl resp_headers{{":status", "200"}, {"content-type", "application/grpc"}};
+  Http::TestRequestHeaderMapImpl req_headers{
+      {":path", "/test.extensions.filters.http.proto_api_scrubber.ScrubberTestService/Scrub"},
+      {"content-type", "application/grpc"}};
+  Http::TestResponseHeaderMapImpl resp_headers{{":status", "200"},
+                                               {"content-type", "application/grpc"}};
   std::string raw_payload = fixture.payload_.toString();
 
   for (auto _ : state) {
@@ -374,11 +389,14 @@ BENCHMARK(BM_Response_Unary_Scrubbing)->RangeMultiplier(10)->Range(10, 10000)->C
 // Measures the latency of processing a streaming response with active scrubbing enabled.
 static void BM_Response_Streaming_Scrubbing(benchmark::State& state) {
   FilterBenchmarkFixture fixture(state.range(0), true);
-  if (!verifyFilterBehavior(state, fixture, true, true)) return;
+  if (!verifyFilterBehavior(state, fixture, true, true))
+    return;
 
-  Http::TestRequestHeaderMapImpl req_headers{{":path", "/test.extensions.filters.http.proto_api_scrubber.ScrubberTestService/Scrub"},
-                                         {"content-type", "application/grpc"}};
-  Http::TestResponseHeaderMapImpl resp_headers{{":status", "200"}, {"content-type", "application/grpc"}};
+  Http::TestRequestHeaderMapImpl req_headers{
+      {":path", "/test.extensions.filters.http.proto_api_scrubber.ScrubberTestService/Scrub"},
+      {"content-type", "application/grpc"}};
+  Http::TestResponseHeaderMapImpl resp_headers{{":status", "200"},
+                                               {"content-type", "application/grpc"}};
   std::string raw_payload = fixture.payload_.toString();
 
   auto filter = std::make_unique<FilterType>(*fixture.config_);
