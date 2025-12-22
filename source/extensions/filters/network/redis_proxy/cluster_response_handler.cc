@@ -321,7 +321,8 @@ void ArrayMergeAggregateResponseHandler::processAggregatedResponses(
 }
 
 // Implementation of ArrayAppendAggregateResponseHandler
-void ArrayAppendAggregateResponseHandler::processAggregatedResponses(ClusterScopeCmdRequest& request) {
+void ArrayAppendAggregateResponseHandler::processAggregatedResponses(
+    ClusterScopeCmdRequest& request) {
 
   Common::Redis::RespValuePtr response = std::make_unique<Common::Redis::RespValue>();
   response->type(Common::Redis::RespType::Array);

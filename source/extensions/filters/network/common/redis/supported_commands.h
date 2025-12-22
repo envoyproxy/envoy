@@ -74,7 +74,7 @@ struct SupportedCommands {
    */
   static const absl::flat_hash_set<std::string>& ClusterScopeCommands() {
     CONSTRUCT_ON_FIRST_USE(absl::flat_hash_set<std::string>, "script", "flushall", "flushdb",
-                           "slowlog", "config", "info", "hello");
+                           "slowlog", "config", "info", "keys", "select", "role", "hello");
   }
 
   /**
