@@ -986,9 +986,9 @@ TEST_F(ProtoApiScrubberFilterConfigTest, GetRequestType) {
         filter_config_->getRequestType(method_name);
 
     EXPECT_EQ(type_or_status.status().code(), absl::StatusCode::kInvalidArgument);
-    EXPECT_THAT(type_or_status.status().message(),
-                HasSubstr(
-                    "Method '/apikeys.ApiKeys/NonExistentMethod' not found in descriptor pool"));
+    EXPECT_THAT(
+        type_or_status.status().message(),
+        HasSubstr("Method '/apikeys.ApiKeys/NonExistentMethod' not found in descriptor pool"));
   }
 }
 
@@ -1022,9 +1022,9 @@ TEST_F(ProtoApiScrubberFilterConfigTest, GetResponseType) {
         filter_config_->getResponseType(method_name);
 
     EXPECT_EQ(type_or_status.status().code(), absl::StatusCode::kInvalidArgument);
-    EXPECT_THAT(type_or_status.status().message(),
-                HasSubstr(
-                    "Method '/apikeys.ApiKeys/NonExistentMethod' not found in descriptor pool"));
+    EXPECT_THAT(
+        type_or_status.status().message(),
+        HasSubstr("Method '/apikeys.ApiKeys/NonExistentMethod' not found in descriptor pool"));
   }
 }
 
