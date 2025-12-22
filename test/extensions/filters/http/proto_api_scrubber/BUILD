@@ -2,11 +2,28 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test",
     "envoy_package",
+    "envoy_proto_descriptor",
+    "envoy_proto_library",
 )
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
+
+envoy_proto_library(
+    name = "scrubber_test_proto",
+    srcs = ["scrubber_test.proto"],
+    java = False,
+)
+
+envoy_proto_descriptor(
+    name = "scrubber_test_proto_descriptor",
+    srcs = ["scrubber_test.proto"],
+    out = "scrubber_test.descriptor",
+    external_deps = [
+        "well_known_protos",
+    ],
+)
 
 envoy_cc_test(
     name = "filter_config_test",
@@ -72,6 +89,7 @@ envoy_cc_test(
         "integration_test.cc",
     ],
     data = [
+        ":scrubber_test_proto_descriptor",
         "//test/proto:apikeys_proto_descriptor",
         "//test/proto:bookstore_proto_descriptor",
     ],
@@ -79,6 +97,7 @@ envoy_cc_test(
     # extension_names = ["envoy.filters.http.proto_api_scrubber"],
     rbe_pool = "6gig",
     deps = [
+        ":scrubber_test_proto_cc_proto",
         "//source/common/grpc:common_lib",
         "//source/extensions/filters/http/proto_api_scrubber:config",
         "//source/extensions/matching/http/cel_input:cel_input_lib",

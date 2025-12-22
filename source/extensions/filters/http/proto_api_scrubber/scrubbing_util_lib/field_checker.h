@@ -8,6 +8,7 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/filters/http/proto_api_scrubber/filter_config.h"
 
+#include "absl/container/flat_hash_map.h"
 #include "proto_processing_lib/proto_scrubber/field_checker_interface.h"
 #include "proto_processing_lib/proto_scrubber/proto_scrubber_enums.h"
 
@@ -33,9 +34,7 @@ class FieldChecker : public FieldCheckerInterface, public Logger::Loggable<Logge
 public:
   FieldChecker(const ScrubberContext scrubber_context,
                const Envoy::StreamInfo::StreamInfo* stream_info, const std::string& method_name,
-               const ProtoApiScrubberFilterConfig* filter_config)
-      : scrubber_context_(scrubber_context), matching_data_(*stream_info),
-        method_name_(method_name), filter_config_ptr_(filter_config) {}
+               const ProtoApiScrubberFilterConfig* filter_config);
 
   // This type is neither copyable nor movable.
   FieldChecker(const FieldChecker&) = delete;
@@ -89,16 +88,30 @@ private:
   absl::StatusOr<absl::string_view> resolveEnumName(absl::string_view value_str,
                                                     const Protobuf::Field* field) const;
 
+  // Struct to hold normalization result and metadata.
+  struct NormalizationResult {
+    std::string mask;
+    bool is_map_entry; // True if the path points directly to a Map Entry (key/value pair).
+  };
+
+  // Optimized helper to walk the type descriptor and normalize map keys in the path.
+  const NormalizationResult& normalizePath(const std::vector<std::string>& path) const;
+
   // Constructs the field mask, handling translations for different data types.
   // Currently, it only handles enum and protobuf maps. Support for `Any` types will be
   // added in the future.
-  std::string constructFieldMask(const std::vector<std::string>& path, const Protobuf::Field* field,
-                                 const Protobuf::Type* parent_type) const;
+  std::string constructFieldMask(const std::vector<std::string>& path,
+                                 const Protobuf::Field* field) const;
 
   ScrubberContext scrubber_context_;
   Http::Matching::HttpMatchingDataImpl matching_data_;
   std::string method_name_;
   const ProtoApiScrubberFilterConfig* filter_config_ptr_;
+
+  const Protobuf::Descriptor* root_descriptor_;
+
+  // Cache normalized results.
+  mutable absl::flat_hash_map<std::vector<std::string>, NormalizationResult> path_cache_;
 };
 
 } // namespace ProtoApiScrubber

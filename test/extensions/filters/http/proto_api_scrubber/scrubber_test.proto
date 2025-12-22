@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.proto_api_scrubber.v3;
+
+// A message mimicking a sensitive data structure.
+message SensitiveMessage {
+  string secret_data = 1;
+  string public_data = 2;
+  string other_data = 3;
+}
+
+// A highly nested structure to test traversal depth.
+message DeeplyNestedStructure {
+  message InnerLevel {
+    string deeply_sensitive_data = 1;
+  }
+  message MiddleLevel {
+    InnerLevel bottom = 1;
+  }
+  MiddleLevel mid = 1;
+}
+
+// Shared Payload for both Request and Response
+message BenchmarkPayload {
+  map<string, string> string_map = 1;
+  map<string, int32> int_map = 2;
+  map<string, SensitiveMessage> object_map = 3;
+  map<string, SensitiveMessage> partial_scrub_map = 4;
+  map<string, int32> passthrough_int_map = 5;
+  map<string, SensitiveMessage> full_scrub_map = 6;
+  repeated string repeated_secrets = 7;
+  repeated SensitiveMessage repeated_messages = 8;
+  DeeplyNestedStructure deep_structure = 9;
+  oneof single_choice {
+    string choice_a_string = 10;
+    int32 choice_b_int = 11;
+  }
+}
+
+service ScrubberBenchmarkService {
+  // Test scrub method which returns the same complex payload it receives.
+  rpc Scrub(BenchmarkPayload) returns (BenchmarkPayload);
+}

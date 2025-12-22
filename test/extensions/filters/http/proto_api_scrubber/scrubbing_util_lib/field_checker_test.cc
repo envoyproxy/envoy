@@ -589,63 +589,44 @@ TEST_F(RequestFieldCheckerTest, EnumType) {
 }
 
 TEST_F(RequestFieldCheckerTest, MapType) {
-  // Setup the Config
-  auto mock_config = std::make_shared<NiceMock<MockProtoApiScrubberFilterConfig>>();
+  ProtoApiScrubberConfig config;
+  std::string method = "/apikeys.ApiKeys/CreateApiKey";
+
+  // Configure rule to scrub the VALUES of the "tags" map.
+  // The normalized path for "tags" map is "tags.value".
+  addRestriction(config, method, "tags.value", FieldType::Request, true);
+
+  initializeFilterConfig(config);
+
   NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
-  const std::string method = "/pkg.Service/UpdateConfig";
+  FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info, method,
+                             filter_config_.get());
 
-  // Configure the Matcher for "tags.value"
-  // The scrubber normalizes map paths to ends with ".value".
-  // So we configure our rule to match "tags.value".
-  auto exclude_tree = std::make_shared<NiceMock<MockMatchTree>>();
-  auto remove_action = std::make_shared<NiceMock<MockAction>>();
-  ON_CALL(*remove_action, typeUrl())
-      .WillByDefault(testing::Return(kRemoveFieldActionTypeWithoutPrefix));
-
-  // The FieldChecker should look up this exact mask
-  ON_CALL(*mock_config, getRequestFieldMatcher(method, "tags.value"))
-      .WillByDefault(testing::Return(exclude_tree));
-
-  // The matcher returns the remove action
-  ON_CALL(*exclude_tree, match(testing::_, testing::_))
-      .WillByDefault(testing::Return(Matcher::MatchResult(remove_action)));
-
-  // Construct a Fake MapEntry Type
-  // Map fields are repeated messages of a "MapEntry" type.
-  // This type must have the "map_entry" option set to true.
+  // Construct a fake map entry parent type to simulate traversal context.
+  // In a real scenario, the scrubbing library passes the 'parent_type' which is the Map Entry.
+  // However, the new field_checker logic relies on root descriptor traversal (normalizePath)
+  // to detect maps.
   Protobuf::Type map_entry_type;
-  map_entry_type.set_name("pkg.Service.TagsEntry");
-
+  map_entry_type.set_name("apikeys.CreateApiKeyRequest.TagsEntry");
   auto* option = map_entry_type.add_options();
   option->set_name("map_entry");
-  Protobuf::BoolValue bool_val;
-  bool_val.set_value(true);
-  option->mutable_value()->PackFrom(bool_val);
+  option->mutable_value()->PackFrom(Protobuf::BoolValue()); // Value not strictly checked by logic.
 
-  // Create the FieldChecker
-  // We need to inject the root type logic, but since we are calling the
-  // 4-arg CheckField directly with our fake parent type, the root lookup isn't strictly necessary
-  // for this specific assertion, but good for completeness.
-  FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info, method,
-                             mock_config.get());
-
-  // Test the CheckField call
-  // The proto_scrubber library passes:
-  // - path: ["tags", "specific_key"]
-  // - field: The 'value' field of the map entry (usually field #2)
-  // - parent_type: The MapEntry type we constructed
+  // Test the CheckField call for a map value.
+  // Path: ["tags", "some_random_key"]
+  // Field: The 'value' field of the map entry (field #2).
   Protobuf::Field value_field;
   value_field.set_name("value");
   value_field.set_number(2);
   value_field.set_kind(Protobuf::Field_Kind_TYPE_STRING);
 
-  // Perform the check
+  // Perform the check.
+  // The normalization logic should detect "tags" is a map, "some_random_key" is the key,
+  // and normalize the path to "tags.value".
   FieldCheckResults result =
-      field_checker.CheckField({"tags", "specific_key_123"}, &value_field, 0,
-                               &map_entry_type // Passing the parent type triggers the map logic
-      );
+      field_checker.CheckField({"tags", "some_random_key"}, &value_field, 0, &map_entry_type);
 
-  // Expect Exclusion because "tags.value" matches the configured rule
+  // Expect Exclusion because "tags.value" matches the configured rule.
   EXPECT_EQ(result, FieldCheckResults::kExclude);
 }
 
@@ -880,60 +861,39 @@ TEST_F(ResponseFieldCheckerTest, EnumType) {
 }
 
 TEST_F(ResponseFieldCheckerTest, MapType) {
-  // Setup the Config
-  auto mock_config = std::make_shared<NiceMock<MockProtoApiScrubberFilterConfig>>();
+  ProtoApiScrubberConfig config;
+  std::string method = "/apikeys.ApiKeys/CreateApiKey";
+
+  // Configure rule to scrub the VALUES of the "tags" map.
+  // The normalized path for "tags" map is "tags.value".
+  addRestriction(config, method, "tags.value", FieldType::Response, true);
+
+  initializeFilterConfig(config);
+
   NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
-  const std::string method = "/pkg.Service/GetConfig";
+  FieldChecker field_checker(ScrubberContext::kResponseScrubbing, &mock_stream_info, method,
+                             filter_config_.get());
 
-  // Configure the Matcher for "tags.value"
-  // The scrubber normalizes map paths to ends with ".value".
-  // So we configure our rule to match "tags.value".
-  auto exclude_tree = std::make_shared<NiceMock<MockMatchTree>>();
-  auto remove_action = std::make_shared<NiceMock<MockAction>>();
-  ON_CALL(*remove_action, typeUrl())
-      .WillByDefault(testing::Return(kRemoveFieldActionTypeWithoutPrefix));
-
-  // The FieldChecker should look up this exact mask
-  ON_CALL(*mock_config, getResponseFieldMatcher(method, "tags.value"))
-      .WillByDefault(testing::Return(exclude_tree));
-
-  // The matcher returns the remove action
-  ON_CALL(*exclude_tree, match(testing::_, testing::_))
-      .WillByDefault(testing::Return(Matcher::MatchResult(remove_action)));
-
-  // Construct a Fake MapEntry Type
-  // Map fields are repeated messages of a "MapEntry" type.
-  // This type must have the "map_entry" option set to true.
+  // Construct a fake map entry parent type to simulate traversal context.
   Protobuf::Type map_entry_type;
-  map_entry_type.set_name("pkg.Service.TagsEntry");
-
+  map_entry_type.set_name("apikeys.CreateApiKeyRequest.TagsEntry");
   auto* option = map_entry_type.add_options();
   option->set_name("map_entry");
-  Protobuf::BoolValue bool_val;
-  bool_val.set_value(true);
-  option->mutable_value()->PackFrom(bool_val);
+  option->mutable_value()->PackFrom(Protobuf::BoolValue()); // Value not strictly checked by logic.
 
-  // Create the FieldChecker
-  FieldChecker field_checker(ScrubberContext::kResponseScrubbing, &mock_stream_info, method,
-                             mock_config.get());
-
-  // Test the CheckField call
-  // The proto_scrubber library passes:
-  // - path: ["tags", "specific_key"]
-  // - field: The 'value' field of the map entry (usually field #2)
-  // - parent_type: The MapEntry type we constructed
+  // Test the CheckField call for a map value.
+  // Path: ["tags", "some_random_key"]
+  // Field: The 'value' field of the map entry (field #2).
   Protobuf::Field value_field;
   value_field.set_name("value");
   value_field.set_number(2);
   value_field.set_kind(Protobuf::Field_Kind_TYPE_STRING);
 
-  // Perform the check
+  // Perform the check.
   FieldCheckResults result =
-      field_checker.CheckField({"tags", "specific_key_123"}, &value_field, 0,
-                               &map_entry_type // Passing the parent type triggers the map logic
-      );
+      field_checker.CheckField({"tags", "some_random_key"}, &value_field, 0, &map_entry_type);
 
-  // Expect Exclusion because "tags.value" matches the configured rule
+  // Expect Exclusion because "tags.value" matches the configured rule.
   EXPECT_EQ(result, FieldCheckResults::kExclude);
 }
 
