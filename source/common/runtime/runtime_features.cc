@@ -98,6 +98,10 @@ RUNTIME_GUARD(envoy_restart_features_validate_http3_pseudo_headers);
 
 // Sentinel and test flag.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_test_feature_false);
+// TODO: Flip to true after sufficient testing to enable formatter support for rate limit action
+// descriptor_value fields by default.
+FALSE_RUNTIME_GUARD(
+    envoy_reloadable_features_enable_formatter_for_ratelimit_action_descriptor_value);
 // TODO(adisuissa) reset to true to enable unified mux by default
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_unified_mux);
 // Used to track if runtime is initialized.

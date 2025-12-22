@@ -197,6 +197,10 @@ bug_fixes:
     Fixed SDS to enable auto-recovery when initial certificate file loading fails. Previously, if certificate
     files did not exist during initial SDS configuration, no file watch callbacks were set up, preventing
     automatic recovery when files appeared later.
+- area: upstream
+  change: |
+    Fixed transport socket matcher to correctly use downstream connection filter state for matching and optimized the
+    selection path to avoid per-connection resolution overhead when filter state input is not used.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -236,6 +240,10 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.router_filter_resetall_on_local_reply`` and legacy code paths.
 
 new_features:
+- area: composite filter
+  change: |
+    Added support for configuring a chain of filters in the composite filter's :ref:`ExecuteFilterAction
+    <envoy_v3_api_msg_extensions.filters.http.composite.v3.ExecuteFilterAction>` via the ``filter_chain`` field.
 - area: server
   change: |
     Add new command-line option ``--file-flush-min-size-kb <integer>`` to configure the minimum size in kilobytes for log file flushing.
@@ -398,6 +406,9 @@ new_features:
   change: |
     Added :ref:`access_log <envoy_v3_api_field_extensions.filters.udp.dns_filter.v3.DnsFilterConfig.access_log>` for the
     DNS filter.
+- area: ratelimit
+  change: |
+    Added support for substitution formatting in rate limit descriptor values.
 - area: redis
   change: |
     Added support for ``redis_proxy`` to use separate credentials for each upstream Redis cluster.
@@ -562,5 +573,11 @@ new_features:
     Added per HTTP event :ref:'procesing effects <envoy.filters.http.ext_proc.ProcessingEffect' in the
     ExtProcLoggingInfo in the FilterState. This new data will be automatically collected and can be accesses via
     method processingEffects.
+- area: oauth2
+  change: |
+    Added support for additional parameters in the OAuth2 token request body via
+    :ref:`endpoint_params <envoy_v3_api_field_extensions.http.injected_credentials.oauth2.v3.OAuth2.endpoint_params>`.
+    This allows passing custom parameters required by authorization servers (such as Logto or EntraID) that expect
+    additional body parameters during the token exchange.
 
 deprecated:

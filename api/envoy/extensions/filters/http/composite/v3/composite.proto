@@ -74,7 +74,7 @@ message ExecuteFilterAction {
       [(udpa.annotations.field_migrate).oneof_promotion = "config_type"];
 
   // An inlined list of filter configurations. The specified filters will be executed in order.
-  // [#not-implemented-hide:]
+  // If this field is set, ``typed_config`` and ``dynamic_config`` are ignored.
   FilterChainConfiguration filter_chain = 4;
 
   // Probability of the action execution. If not specified, this is 100%.

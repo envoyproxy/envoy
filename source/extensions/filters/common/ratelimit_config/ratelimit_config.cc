@@ -3,6 +3,7 @@
 #include "source/common/config/utility.h"
 #include "source/common/http/matching/data_impl.h"
 #include "source/common/matcher/matcher.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -74,16 +75,42 @@ RateLimitPolicy::RateLimitPolicy(const ProtoRateLimit& config,
     case ProtoRateLimit::Action::ActionSpecifierCase::kRemoteAddress:
       actions_.emplace_back(new Envoy::Router::RemoteAddressAction());
       break;
-    case ProtoRateLimit::Action::ActionSpecifierCase::kGenericKey:
-      actions_.emplace_back(new Envoy::Router::GenericKeyAction(action.generic_key()));
+    case ProtoRateLimit::Action::ActionSpecifierCase::kGenericKey: {
+      const auto& generic_key = action.generic_key();
+      // Legacy behavior: use the descriptor_value as a literal string without any formatter
+      // parsing or substitution.
+      if (!Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.enable_formatter_for_ratelimit_action_descriptor_value")) {
+        actions_.emplace_back(new Envoy::Router::GenericKeyAction(action.generic_key()));
+        break;
+      }
+      auto formatter_or_error =
+          Formatter::FormatterImpl::create(generic_key.descriptor_value(), true);
+      SET_AND_RETURN_IF_NOT_OK(formatter_or_error.status(), creation_status);
+      actions_.emplace_back(new Envoy::Router::GenericKeyAction(
+          action.generic_key(), std::move(formatter_or_error.value())));
       break;
+    }
     case ProtoRateLimit::Action::ActionSpecifierCase::kMetadata:
       actions_.emplace_back(new Envoy::Router::MetaDataAction(action.metadata()));
       break;
-    case ProtoRateLimit::Action::ActionSpecifierCase::kHeaderValueMatch:
-      actions_.emplace_back(
-          new Envoy::Router::HeaderValueMatchAction(action.header_value_match(), context));
+    case ProtoRateLimit::Action::ActionSpecifierCase::kHeaderValueMatch: {
+      const auto& header_value_match = action.header_value_match();
+      // Legacy behavior: use the descriptor_value as a literal string without any formatter
+      // parsing or substitution.
+      if (!Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.enable_formatter_for_ratelimit_action_descriptor_value")) {
+        actions_.emplace_back(
+            new Envoy::Router::HeaderValueMatchAction(action.header_value_match(), context));
+        break;
+      }
+      auto formatter_or_error =
+          Formatter::FormatterImpl::create(header_value_match.descriptor_value(), true);
+      SET_AND_RETURN_IF_NOT_OK(formatter_or_error.status(), creation_status);
+      actions_.emplace_back(new Envoy::Router::HeaderValueMatchAction(
+          action.header_value_match(), context, std::move(formatter_or_error.value())));
       break;
+    }
     case ProtoRateLimit::Action::ActionSpecifierCase::kExtension: {
       ProtobufMessage::ValidationVisitor& validator = context.messageValidationVisitor();
       auto* factory =
@@ -114,10 +141,23 @@ RateLimitPolicy::RateLimitPolicy(const ProtoRateLimit& config,
     case ProtoRateLimit::Action::ActionSpecifierCase::kMaskedRemoteAddress:
       actions_.emplace_back(new Router::MaskedRemoteAddressAction(action.masked_remote_address()));
       break;
-    case ProtoRateLimit::Action::ActionSpecifierCase::kQueryParameterValueMatch:
+    case ProtoRateLimit::Action::ActionSpecifierCase::kQueryParameterValueMatch: {
+      const auto& query_parameter_value_match = action.query_parameter_value_match();
+      // Legacy behavior: use the descriptor_value as a literal string without any formatter
+      // parsing or substitution.
+      if (!Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.enable_formatter_for_ratelimit_action_descriptor_value")) {
+        actions_.emplace_back(new Router::QueryParameterValueMatchAction(
+            action.query_parameter_value_match(), context));
+        break;
+      }
+      auto formatter_or_error =
+          Formatter::FormatterImpl::create(query_parameter_value_match.descriptor_value(), true);
+      SET_AND_RETURN_IF_NOT_OK(formatter_or_error.status(), creation_status);
       actions_.emplace_back(new Router::QueryParameterValueMatchAction(
-          action.query_parameter_value_match(), context));
+          action.query_parameter_value_match(), context, std::move(formatter_or_error.value())));
       break;
+    }
     default:
       creation_status = absl::InvalidArgumentError(fmt::format(
           "Unsupported rate limit action: {}", static_cast<int>(action.action_specifier_case())));
