@@ -1487,3 +1487,61 @@ UDP
 %CUSTOM_FLAGS%
   Custom flags set into the stream info. This could be used to log any custom event from the filters.
   Multiple flags are separated by comma.
+
+.. _config_access_log_format_coalesce:
+
+%COALESCE(JSON_CONFIG):Z%
+  HTTP
+    A higher-order formatter operator that evaluates multiple formatter operators in sequence and
+    returns the first non-null, non-empty result. This is useful for implementing fallback behavior,
+    such as using SNI when available but falling back to the ``:authority`` header when SNI is not set.
+
+    The ``JSON_CONFIG`` parameter is a JSON object with an ``operators`` array. Each operator can be
+    specified as either:
+
+    * A string representing a simple command name that does not require a parameter.
+    * An object with the following fields:
+
+      * ``command`` (required): The command name (e.g., ``REQ``, ``REQUESTED_SERVER_NAME``).
+      * ``param`` (optional): The command parameter (e.g., ``:authority`` for the ``REQ`` command).
+      * ``max_length`` (optional): Maximum length for this operator's output.
+
+    ``Z`` is an optional parameter denoting string truncation up to ``Z`` characters for the final output.
+
+    .. note::
+
+      The JSON parameter cannot contain literal ``)`` characters as they would interfere with the
+      command parser. If you need a ``)`` character in a string value, use the Unicode escape
+      sequence ``\u0029``.
+
+    **Example: SNI with fallback to authority header**
+
+    .. code-block:: none
+
+      %COALESCE({"operators": ["REQUESTED_SERVER_NAME", {"command": "REQ", "param": ":authority"}]})%
+
+    This returns the Server Name Indication (SNI) if available, otherwise falls back to the
+    ``:authority`` header.
+
+    **Example: Cascade fallback with multiple headers**
+
+    .. code-block:: none
+
+      %COALESCE({"operators": ["REQUESTED_SERVER_NAME", {"command": "REQ", "param": ":authority"}, {"command": "REQ", "param": "x-envoy-original-host"}]})%
+
+    This tries SNI first, then ``:authority``, then ``x-envoy-original-host``.
+
+    **Example: With length truncation**
+
+    .. code-block:: none
+
+      %COALESCE({"operators": [{"command": "REQ", "param": ":authority"}]}):50%
+
+    This returns the ``:authority`` header value truncated to 50 characters.
+
+    **Supported Commands**
+
+    The ``COALESCE`` operator supports any built-in formatter command.
+
+  TCP/UDP
+    Not implemented ("-").
