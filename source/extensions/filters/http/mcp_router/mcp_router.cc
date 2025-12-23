@@ -121,10 +121,6 @@ void McpRouterFilter::onDestroy() {
   if (multistream_) {
     multistream_.reset(); // This will reset all streams
   }
-  if (single_stream_) {
-    single_stream_->reset();
-    single_stream_ = nullptr;
-  }
   stream_callbacks_.clear();
   upstream_headers_.clear();
 }
@@ -223,8 +219,6 @@ Http::FilterDataStatus McpRouterFilter::decodeData(Buffer::Instance& data, bool 
 Http::FilterTrailersStatus McpRouterFilter::decodeTrailers(Http::RequestTrailerMap& trailers) {
   if (multistream_) {
     multistream_->multicastTrailers(trailers);
-  } else if (single_stream_) {
-    single_stream_->sendTrailers(trailers);
   }
   return Http::FilterTrailersStatus::Continue;
 }
@@ -435,12 +429,12 @@ void McpRouterFilter::initializeFanout(AggregationCallback callback) {
 
 void McpRouterFilter::initializeSingleBackend(const McpBackendConfig& backend,
                                               std::function<void(BackendResponse)> callback) {
-  auto* cluster =
-      config_->factoryContext().serverFactoryContext().clusterManager().getThreadLocalCluster(
-          backend.cluster_name);
-  if (!cluster) {
-    ENVOY_LOG(error, "Cluster '{}' not found", backend.cluster_name);
-    sendHttpError(500, fmt::format("Cluster '{}' not found", backend.cluster_name));
+  if (!muxdemux_->isIdle()) {
+    ENVOY_LOG(warn, "MuxDemux not idle, cannot start new single backend request for '{}'",
+              backend.name);
+    sendHttpError(500,
+                  fmt::format("Internal error: concurrent request not allowed for backend '{}'",
+                              backend.name));
     return;
   }
 
@@ -451,12 +445,21 @@ void McpRouterFilter::initializeSingleBackend(const McpBackendConfig& backend,
   Http::AsyncClient::StreamOptions options;
   options.setTimeout(backend.timeout);
 
-  single_stream_ = cluster->httpAsyncClient().start(*stream_cb, options);
-  if (!single_stream_) {
-    ENVOY_LOG(error, "Failed to start stream for cluster '{}'", backend.cluster_name);
+  std::vector<Http::MuxDemux::Callbacks> mux_callbacks;
+  mux_callbacks.push_back({
+      .cluster_name = backend.cluster_name,
+      .callbacks = std::weak_ptr<Http::AsyncClient::StreamCallbacks>(stream_cb),
+  });
+
+  auto multistream_or = muxdemux_->multicast(options, mux_callbacks);
+  if (!multistream_or.ok()) {
+    ENVOY_LOG(error, "Failed to start multicast for cluster '{}': {}", backend.cluster_name,
+              multistream_or.status().message());
     sendHttpError(500, "Failed to start backend request");
     return;
   }
+
+  multistream_ = std::move(*multistream_or);
 
   std::string backend_session;
   auto it = backend_sessions_.find(backend.name);
@@ -466,17 +469,20 @@ void McpRouterFilter::initializeSingleBackend(const McpBackendConfig& backend,
 
   // Store headers in upstream_headers_ because AsyncStreamImpl::sendHeaders only
   // stores a pointer to the headers.
-  auto headers = createUpstreamHeaders(backend, backend_session);
   upstream_headers_.clear();
+  upstream_headers_.reserve(1);
+  auto headers = createUpstreamHeaders(backend, backend_session);
   upstream_headers_.push_back(std::move(headers));
-  single_stream_->sendHeaders(*upstream_headers_.back(), false);
+
+  auto stream_it = multistream_->begin();
+  if (stream_it != multistream_->end()) {
+    (*stream_it)->sendHeaders(*upstream_headers_.back(), false);
+  }
 }
 
 void McpRouterFilter::streamData(Buffer::Instance& data, bool end_stream) {
   if (multistream_) {
     multistream_->multicastData(data, end_stream);
-  } else if (single_stream_) {
-    single_stream_->sendData(data, end_stream);
   }
 }
 

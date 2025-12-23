@@ -218,6 +218,7 @@ public:
   }
 
   void setupHttp2Overrides() {
+    scoped_runtime_.mergeValues({{"envoy.reloadable_features.reset_with_error", "true"}});
     switch (http2_implementation_) {
     case Http2Impl::Nghttp2:
       scoped_runtime_.mergeValues({{"envoy.reloadable_features.http2_use_oghttp2", "false"}});

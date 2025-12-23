@@ -27,7 +27,7 @@ public:
 
 private:
   void initEvent(envoy::data::tap::v3::SocketEvent&);
-  void initStreamingEvent(envoy::data::tap::v3::SocketEvent&);
+  void initStreamingEvent(envoy::data::tap::v3::SocketEvent&, uint64_t);
   void makeStreamedTraceIfNeeded() {
     if (streamed_trace_ == nullptr) {
       streamed_trace_ = Extensions::Common::Tap::makeTraceWrapper();
@@ -61,6 +61,12 @@ private:
   // and the tapped data volume is low, therefore, set below buffer aged duration (seconds)
   // to make sure that the tapped data is submitted in time.
   static constexpr uint32_t DefaultBufferedAgedDuration = 15;
+  // The tapped data from Transport socket may be incomplete
+  // for some protocols (e.g., HTTP/2 frames may span multiple reads/writes).
+  // Add sequence number to allow the receiver to reconstruct byte order and
+  // determine completeness, similar to TCP sequence numbers.
+  uint64_t seq_num{};
+  static constexpr uint64_t MaxSeqNum = std::numeric_limits<uint64_t>::max();
   SocketTapConfigSharedPtr config_;
   Extensions::Common::Tap::PerTapSinkHandleManagerPtr sink_handle_;
   const Network::Connection& connection_;

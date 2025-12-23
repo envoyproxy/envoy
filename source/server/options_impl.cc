@@ -138,6 +138,9 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   TCLAP::ValueArg<uint32_t> file_flush_interval_msec("", "file-flush-interval-msec",
                                                      "Interval for log flushing in msec", false,
                                                      10000, "uint32_t", cmd);
+  TCLAP::ValueArg<uint32_t> file_flush_min_size_kb("", "file-flush-min-size-kb",
+                                                   "Minimum size in KB for log flushing", false, 64,
+                                                   "uint32_t", cmd);
   TCLAP::ValueArg<uint32_t> drain_time_s("", "drain-time-s",
                                          "Hot restart and LDS removal drain time in seconds", false,
                                          600, "uint32_t", cmd);
@@ -292,6 +295,7 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   service_node_ = service_node.getValue();
   service_zone_ = service_zone.getValue();
   file_flush_interval_msec_ = std::chrono::milliseconds(file_flush_interval_msec.getValue());
+  file_flush_min_size_kb_ = file_flush_min_size_kb.getValue();
   drain_time_ = std::chrono::seconds(drain_time_s.getValue());
   parent_shutdown_time_ = std::chrono::seconds(parent_shutdown_time_s.getValue());
   socket_path_ = socket_path.getValue();

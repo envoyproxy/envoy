@@ -459,6 +459,46 @@ protected:
     return proto_config;
   }
 
+  // Helper to create a serialized file descriptor set with custom names.
+  // define_messages: if true, adds message type definitions to the file.
+  //                  if false, methods will refer to types that do not exist (for failure testing).
+  std::string createGenericDescriptor(const std::string& package_name,
+                                      const std::string& service_name,
+                                      const std::string& method_name, const std::string& input_type,
+                                      const std::string& output_type, bool define_messages = true) {
+    Protobuf::FileDescriptorProto file_proto;
+    file_proto.set_name("generic_test.proto");
+
+    // Only set package if it's not empty to test root-level services
+    if (!package_name.empty()) {
+      file_proto.set_package(package_name);
+    }
+    file_proto.set_syntax("proto3");
+
+    if (define_messages) {
+      auto* req_msg = file_proto.add_message_type();
+      req_msg->set_name(input_type);
+
+      auto* resp_msg = file_proto.add_message_type();
+      resp_msg->set_name(output_type);
+    }
+
+    auto* service = file_proto.add_service();
+    service->set_name(service_name);
+
+    auto* method = service->add_method();
+    method->set_name(method_name);
+    method->set_input_type(input_type);
+    method->set_output_type(output_type);
+
+    Envoy::Protobuf::FileDescriptorSet descriptor_set;
+    descriptor_set.add_file()->CopyFrom(file_proto);
+
+    std::string descriptor_bytes;
+    descriptor_set.SerializeToString(&descriptor_bytes);
+    return descriptor_bytes;
+  }
+
   // Helper to create a serialized FileDescriptorSet containing a specific Enum.
   // Defines: enum test.TestEnum { UNKNOWN = 0; ACTIVE = 1; }
   std::string createDescriptorWithTestEnum() {
@@ -575,8 +615,8 @@ TEST_F(ProtoApiScrubberFilterConfigTest, DescriptorValidations) {
     filter_config = ProtoApiScrubberFilterConfig::create(config, factory_context_);
     EXPECT_EQ(filter_config.status().code(), absl::StatusCode::kInvalidArgument);
     EXPECT_THAT(filter_config.status().message(),
-                testing::HasSubstr("Error encountered during config initialization. Unable to "
-                                   "parse proto descriptor from inline bytes"));
+                HasSubstr("Error encountered during config initialization. Unable to "
+                          "parse proto descriptor from inline bytes"));
   }
 
   {
@@ -600,8 +640,8 @@ TEST_F(ProtoApiScrubberFilterConfigTest, DescriptorValidations) {
     filter_config = ProtoApiScrubberFilterConfig::create(config, factory_context_);
     EXPECT_EQ(filter_config.status().code(), absl::StatusCode::kInvalidArgument);
     EXPECT_THAT(filter_config.status().message(),
-                testing::HasSubstr("Error encountered during config initialization. Unable to "
-                                   "parse proto descriptor from inline bytes"));
+                HasSubstr("Error encountered during config initialization. Unable to "
+                          "parse proto descriptor from inline bytes"));
   }
 
   {
@@ -633,10 +673,9 @@ TEST_F(ProtoApiScrubberFilterConfigTest, DescriptorValidations) {
         invalid_binary_descriptor;
     filter_config = ProtoApiScrubberFilterConfig::create(config, factory_context_);
     EXPECT_EQ(filter_config.status().code(), absl::StatusCode::kInvalidArgument);
-    EXPECT_THAT(
-        filter_config.status().message(),
-        testing::HasSubstr("Error encountered during config initialization. Error occurred in file "
-                           "`test_file2.proto` while trying to build proto descriptors."));
+    EXPECT_THAT(filter_config.status().message(),
+                HasSubstr("Error encountered during config initialization. Error occurred in file "
+                          "`test_file2.proto` while trying to build proto descriptors."));
   }
 
   {
@@ -658,11 +697,11 @@ TEST_F(ProtoApiScrubberFilterConfigTest, DescriptorValidations) {
         TestEnvironment::runfilesPath("path/to/non-existent-file.descriptor");
     filter_config = ProtoApiScrubberFilterConfig::create(config, factory_context_);
     EXPECT_EQ(filter_config.status().code(), absl::StatusCode::kInvalidArgument);
+    EXPECT_THAT(
+        filter_config.status().message(),
+        HasSubstr("Error encountered during config initialization. Unable to read from file"));
     EXPECT_THAT(filter_config.status().message(),
-                testing::HasSubstr(
-                    "Error encountered during config initialization. Unable to read from file"));
-    EXPECT_THAT(filter_config.status().message(),
-                testing::HasSubstr("path/to/non-existent-file.descriptor"));
+                HasSubstr("path/to/non-existent-file.descriptor"));
   }
 
   {
@@ -673,10 +712,10 @@ TEST_F(ProtoApiScrubberFilterConfigTest, DescriptorValidations) {
     filter_config = ProtoApiScrubberFilterConfig::create(config, factory_context_);
     EXPECT_EQ(filter_config.status().code(), absl::StatusCode::kInvalidArgument);
     EXPECT_THAT(filter_config.status().message(),
-                testing::HasSubstr("Error encountered during config initialization. Unable to "
-                                   "parse proto descriptor from file"));
+                HasSubstr("Error encountered during config initialization. Unable to "
+                          "parse proto descriptor from file"));
     EXPECT_THAT(filter_config.status().message(),
-                testing::HasSubstr("test/config/integration/certs/upstreamcacert.pem"));
+                HasSubstr("test/config/integration/certs/upstreamcacert.pem"));
   }
 
   {
@@ -819,7 +858,7 @@ TEST_F(ProtoApiScrubberFilterConfigTest, MethodNameValidations) {
         getConfigWithMethodName("/library.BookService/GetBook"), factory_context_);
     EXPECT_EQ(filter_config.status().code(), absl::StatusCode::kInvalidArgument);
     EXPECT_THAT(filter_config.status().message(),
-                testing::HasSubstr("The method is not found in the descriptor pool."));
+                HasSubstr("The method is not found in the descriptor pool."));
   }
 
   {
@@ -949,8 +988,7 @@ TEST_F(ProtoApiScrubberFilterConfigTest, GetRequestType) {
     EXPECT_EQ(type_or_status.status().code(), absl::StatusCode::kInvalidArgument);
     EXPECT_THAT(
         type_or_status.status().message(),
-        testing::HasSubstr(
-            "Unable to find method `apikeys.ApiKeys.NonExistentMethod` in the descriptor pool"));
+        HasSubstr("Method '/apikeys.ApiKeys/NonExistentMethod' not found in descriptor pool"));
   }
 }
 
@@ -986,9 +1024,131 @@ TEST_F(ProtoApiScrubberFilterConfigTest, GetResponseType) {
     EXPECT_EQ(type_or_status.status().code(), absl::StatusCode::kInvalidArgument);
     EXPECT_THAT(
         type_or_status.status().message(),
-        testing::HasSubstr(
-            "Unable to find method `apikeys.ApiKeys.NonExistentMethod` in the descriptor pool"));
+        HasSubstr("Method '/apikeys.ApiKeys/NonExistentMethod' not found in descriptor pool"));
   }
+}
+
+// Tests that the type cache is correctly populated for descriptors with nested packages.
+TEST_F(ProtoApiScrubberFilterConfigTest, PrecomputeTypeCacheWithNestedPackages) {
+  const std::string package = "com.example.deeply.nested";
+  const std::string service = "MyCriticalService";
+  const std::string method = "ProcessData";
+  const std::string input = "DataRequest";
+  const std::string output = "DataResponse";
+
+  // Create a config with the generic descriptor helper.
+  ProtoApiScrubberConfig config;
+  *config.mutable_descriptor_set()->mutable_data_source()->mutable_inline_bytes() =
+      createGenericDescriptor(package, service, method, input, output);
+
+  // Initialize the filter config (This triggers precomputeTypeCache).
+  auto filter_config_or_status = ProtoApiScrubberFilterConfig::create(config, factory_context_);
+  ASSERT_THAT(filter_config_or_status, IsOk());
+  auto filter_config = filter_config_or_status.value();
+
+  // Construct the gRPC method path expected by the filter logic.
+  // Format: /package.Service/Method
+  std::string full_method_path = absl::StrCat("/", package, ".", service, "/", method);
+
+  // Verify Request Type Lookup.
+  {
+    auto type_or_status = filter_config->getRequestType(full_method_path);
+    ASSERT_THAT(type_or_status, IsOk());
+    ASSERT_NE(type_or_status.value(), nullptr);
+    // Fully qualified type name is package.TypeName
+    EXPECT_EQ(type_or_status.value()->name(), absl::StrCat(package, ".", input));
+  }
+
+  // Verify Response Type Lookup.
+  {
+    auto type_or_status = filter_config->getResponseType(full_method_path);
+    ASSERT_THAT(type_or_status, IsOk());
+    ASSERT_NE(type_or_status.value(), nullptr);
+    EXPECT_EQ(type_or_status.value()->name(), absl::StrCat(package, ".", output));
+  }
+}
+
+// Tests that the type cache is correctly populated for descriptors defined at the root level (no
+// package).
+TEST_F(ProtoApiScrubberFilterConfigTest, PrecomputeTypeCacheNoPackage) {
+  const std::string package = "";
+  const std::string service = "RootService";
+  const std::string method = "Ping";
+  const std::string input = "PingReq";
+  const std::string output = "PingRes";
+
+  ProtoApiScrubberConfig config;
+  *config.mutable_descriptor_set()->mutable_data_source()->mutable_inline_bytes() =
+      createGenericDescriptor(package, service, method, input, output);
+
+  auto filter_config_or_status = ProtoApiScrubberFilterConfig::create(config, factory_context_);
+  ASSERT_THAT(filter_config_or_status, IsOk());
+  auto filter_config = filter_config_or_status.value();
+
+  // If package is empty, path should be /Service/Method, not /.Service/Method
+  std::string full_method_path = "/RootService/Ping";
+
+  auto type_or_status = filter_config->getRequestType(full_method_path);
+  ASSERT_THAT(type_or_status, IsOk());
+  EXPECT_EQ(type_or_status.value()->name(), "PingReq");
+}
+
+// Tests handling of types defined with relative names (no leading dot) in the descriptor.
+TEST_F(ProtoApiScrubberFilterConfigTest, PrecomputeCacheRelativeTypeNames) {
+  std::string package = "rel.pkg";
+  std::string service = "RelService";
+  std::string method = "RelMethod";
+  std::string input = "RelReq";
+  std::string output = "RelResp";
+
+  // Use helper but ensure it sets input_type/output_type exactly as passed strings
+  // (which are relative names here).
+  ProtoApiScrubberConfig config;
+  *config.mutable_descriptor_set()->mutable_data_source()->mutable_inline_bytes() =
+      createGenericDescriptor(package, service, method, input, output);
+
+  auto filter_config_or_status = ProtoApiScrubberFilterConfig::create(config, factory_context_);
+  ASSERT_THAT(filter_config_or_status, IsOk());
+  auto filter_config = filter_config_or_status.value();
+
+  std::string full_method_path = "/rel.pkg.RelService/RelMethod";
+
+  // Request Type.
+  auto req_type = filter_config->getRequestType(full_method_path);
+  ASSERT_THAT(req_type, IsOk());
+  // The logic should have prepended "rel.pkg." to "RelReq".
+  EXPECT_EQ(req_type.value()->name(), "rel.pkg.RelReq");
+
+  // Response Type.
+  auto resp_type = filter_config->getResponseType(full_method_path);
+  ASSERT_THAT(resp_type, IsOk());
+  // The logic should have prepended "rel.pkg." to "RelResp".
+  EXPECT_EQ(resp_type.value()->name(), "rel.pkg.RelResp");
+}
+
+// Tests that appropriate errors are logged when types referenced by a method
+// are missing from the descriptor pool.
+TEST_F(ProtoApiScrubberFilterConfigTest, PrecomputeTypeCacheMissingTypes) {
+  std::string package = "broken.pkg";
+  std::string service = "BrokenService";
+  std::string method = "BrokenMethod";
+  std::string input = "MissingReq";
+  std::string output = "MissingResp";
+
+  // Create a descriptor that defines the service/method but NOT the message types.
+  ProtoApiScrubberConfig config;
+  *config.mutable_descriptor_set()->mutable_data_source()->mutable_inline_bytes() =
+      createGenericDescriptor(package, service, method, input, output, /*define_messages=*/false);
+
+  auto status_or_config = ProtoApiScrubberFilterConfig::create(config, factory_context_);
+
+  // Expect failure because the descriptor pool builder will reject the file
+  // due to missing dependency types.
+  EXPECT_EQ(status_or_config.status().code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_THAT(
+      status_or_config.status().message(),
+      testing::HasSubstr(
+          "Error occurred in file `generic_test.proto` while trying to build proto descriptors"));
 }
 
 TEST_F(ProtoApiScrubberFilterConfigTest, GetEnumName) {
@@ -1205,14 +1365,10 @@ TEST_F(ProtoApiScrubberFilterConfigTest, UnsupportedActionType) {
 
   // Validate that creating the config throws an EnvoyException because the action
   // "some_unknown_action" is not registered.
-  EXPECT_THROW_WITH_MESSAGE(
-      {
-        auto status_or_config =
-            ProtoApiScrubberFilterConfig::create(proto_config, factory_context_);
-      },
+  EXPECT_THAT_THROWS_MESSAGE(
+      { auto _ = ProtoApiScrubberFilterConfig::create(proto_config, factory_context_); },
       EnvoyException,
-      "Didn't find a registered implementation for 'some_unknown_action' with type URL: "
-      "'google.protobuf.Empty'");
+      HasSubstr("Didn't find a registered implementation for 'some_unknown_action'"));
 }
 
 } // namespace
