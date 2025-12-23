@@ -72,8 +72,7 @@ envoy_cc_test(
         "integration_test.cc",
     ],
     data = ["//test/proto:apikeys_proto_descriptor"],
-    # Following attribute will be enabled once the filter is registered.
-    # extension_names = ["envoy.filters.http.proto_api_scrubber"],
+    extension_names = ["envoy.filters.http.proto_api_scrubber"],
     rbe_pool = "6gig",
     deps = [
         "//source/common/grpc:common_lib",
