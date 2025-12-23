@@ -28,14 +28,14 @@ UpstreamSocketManager::UpstreamSocketManager(Event::Dispatcher& dispatcher,
   ping_timer_ = dispatcher_.createTimer([this]() { pingConnections(); });
 
   // Register this socket manager instance for rebalancing.
-  absl::WriterMutexLock lock(&UpstreamSocketManager::socket_manager_lock);
+  absl::WriterMutexLock lock(UpstreamSocketManager::socket_manager_lock);
   UpstreamSocketManager::socket_managers_.push_back(this);
 }
 
 UpstreamSocketManager&
 UpstreamSocketManager::pickLeastLoadedSocketManager(const std::string& node_id,
                                                     const std::string& cluster_id) {
-  absl::WriterMutexLock wlock(&UpstreamSocketManager::socket_manager_lock);
+  absl::WriterMutexLock wlock(UpstreamSocketManager::socket_manager_lock);
 
   // Assume that this worker is the best candidate for sending the reverse.
   // connection socket.
@@ -311,6 +311,9 @@ void UpstreamSocketManager::markSocketDead(const int fd) {
   // Update Envoy's stats system.
   if (auto extension = getUpstreamExtension()) {
     extension->updateConnectionStats(node_id, cluster_id, false /* decrement */);
+    // Report the disconnection to the extension for further action.
+    extension->reportDisconnection(node_id, cluster_id);
+
     ENVOY_LOG(trace, "reverse_tunnel: decremented stats registry for node '{}' cluster '{}'.",
               node_id, cluster_id);
   }
@@ -534,7 +537,7 @@ UpstreamSocketManager::~UpstreamSocketManager() {
   }
 
   // Remove this instance from the global socket managers list.
-  absl::WriterMutexLock lock(&UpstreamSocketManager::socket_manager_lock);
+  absl::WriterMutexLock lock(UpstreamSocketManager::socket_manager_lock);
   auto it = std::find(socket_managers_.begin(), socket_managers_.end(), this);
   if (it != socket_managers_.end()) {
     socket_managers_.erase(it);

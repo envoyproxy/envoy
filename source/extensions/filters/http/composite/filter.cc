@@ -94,7 +94,10 @@ void Filter::encodeComplete() {
 
 void Filter::onMatchCallback(const Matcher::Action& action) {
   const auto& composite_action = action.getTyped<ExecuteFilterAction>();
-  FactoryCallbacksWrapper wrapper(*this, dispatcher_);
+
+  // Use filter chain mode if the action is a filter chain.
+  const bool is_filter_chain = composite_action.isFilterChain();
+  FactoryCallbacksWrapper wrapper(*this, dispatcher_, is_filter_chain);
   composite_action.createFilters(wrapper);
 
   if (!wrapper.errors_.empty()) {
@@ -105,10 +108,27 @@ void Filter::onMatchCallback(const Matcher::Action& action) {
     return;
   }
 
+  const std::string& action_name = composite_action.actionName();
+
+  // Handle filter chain mode.
+  if (is_filter_chain) {
+    if (!wrapper.filters_to_inject_.empty()) {
+      stats_.filter_delegation_success_.inc();
+      delegated_filter_ =
+          std::make_shared<DelegatedFilterChain>(std::move(wrapper.filters_to_inject_));
+      updateFilterState(decoder_callbacks_, std::string(decoder_callbacks_->filterConfigName()),
+                        action_name);
+      delegated_filter_->setDecoderFilterCallbacks(*decoder_callbacks_);
+      delegated_filter_->setEncoderFilterCallbacks(*encoder_callbacks_);
+      access_loggers_.insert(access_loggers_.end(), wrapper.access_loggers_.begin(),
+                             wrapper.access_loggers_.end());
+    }
+    return;
+  }
+
+  // Handle single filter mode.
   if (wrapper.filter_to_inject_.has_value()) {
     stats_.filter_delegation_success_.inc();
-
-    const std::string& action_name = composite_action.actionName();
 
     auto createDelegatedFilterFn = Overloaded{
         [this, action_name](Http::StreamDecoderFilterSharedPtr filter) {
@@ -242,6 +262,147 @@ void Filter::StreamFilterWrapper::onStreamComplete() {
 
   if (encoder_filter_) {
     encoder_filter_->onStreamComplete();
+  }
+}
+
+// DelegatedFilterChain implementation.
+// For decode operations, iterate filters in order from first to last.
+// For encode operations, iterate filters in reverse order from last to first.
+Http::FilterHeadersStatus DelegatedFilterChain::decodeHeaders(Http::RequestHeaderMap& headers,
+                                                              bool end_stream) {
+  for (auto& filter : filters_) {
+    auto status = filter->decodeHeaders(headers, end_stream);
+    if (status != Http::FilterHeadersStatus::Continue) {
+      return status;
+    }
+  }
+  return Http::FilterHeadersStatus::Continue;
+}
+
+Http::FilterDataStatus DelegatedFilterChain::decodeData(Buffer::Instance& data, bool end_stream) {
+  for (auto& filter : filters_) {
+    auto status = filter->decodeData(data, end_stream);
+    if (status != Http::FilterDataStatus::Continue) {
+      return status;
+    }
+  }
+  return Http::FilterDataStatus::Continue;
+}
+
+Http::FilterTrailersStatus DelegatedFilterChain::decodeTrailers(Http::RequestTrailerMap& trailers) {
+  for (auto& filter : filters_) {
+    auto status = filter->decodeTrailers(trailers);
+    if (status != Http::FilterTrailersStatus::Continue) {
+      return status;
+    }
+  }
+  return Http::FilterTrailersStatus::Continue;
+}
+
+Http::FilterMetadataStatus DelegatedFilterChain::decodeMetadata(Http::MetadataMap& metadata_map) {
+  for (auto& filter : filters_) {
+    auto status = filter->decodeMetadata(metadata_map);
+    if (status != Http::FilterMetadataStatus::Continue) {
+      return status;
+    }
+  }
+  return Http::FilterMetadataStatus::Continue;
+}
+
+void DelegatedFilterChain::setDecoderFilterCallbacks(
+    Http::StreamDecoderFilterCallbacks& callbacks) {
+  for (auto& filter : filters_) {
+    filter->setDecoderFilterCallbacks(callbacks);
+  }
+}
+
+void DelegatedFilterChain::decodeComplete() {
+  for (auto& filter : filters_) {
+    filter->decodeComplete();
+  }
+}
+
+Http::Filter1xxHeadersStatus
+DelegatedFilterChain::encode1xxHeaders(Http::ResponseHeaderMap& headers) {
+  // Encode operations iterate in reverse order.
+  for (auto it = filters_.rbegin(); it != filters_.rend(); ++it) {
+    auto status = (*it)->encode1xxHeaders(headers);
+    if (status != Http::Filter1xxHeadersStatus::Continue) {
+      return status;
+    }
+  }
+  return Http::Filter1xxHeadersStatus::Continue;
+}
+
+Http::FilterHeadersStatus DelegatedFilterChain::encodeHeaders(Http::ResponseHeaderMap& headers,
+                                                              bool end_stream) {
+  // Encode operations iterate in reverse order.
+  for (auto it = filters_.rbegin(); it != filters_.rend(); ++it) {
+    auto status = (*it)->encodeHeaders(headers, end_stream);
+    if (status != Http::FilterHeadersStatus::Continue) {
+      return status;
+    }
+  }
+  return Http::FilterHeadersStatus::Continue;
+}
+
+Http::FilterDataStatus DelegatedFilterChain::encodeData(Buffer::Instance& data, bool end_stream) {
+  // Encode operations iterate in reverse order.
+  for (auto it = filters_.rbegin(); it != filters_.rend(); ++it) {
+    auto status = (*it)->encodeData(data, end_stream);
+    if (status != Http::FilterDataStatus::Continue) {
+      return status;
+    }
+  }
+  return Http::FilterDataStatus::Continue;
+}
+
+Http::FilterTrailersStatus
+DelegatedFilterChain::encodeTrailers(Http::ResponseTrailerMap& trailers) {
+  // Encode operations iterate in reverse order.
+  for (auto it = filters_.rbegin(); it != filters_.rend(); ++it) {
+    auto status = (*it)->encodeTrailers(trailers);
+    if (status != Http::FilterTrailersStatus::Continue) {
+      return status;
+    }
+  }
+  return Http::FilterTrailersStatus::Continue;
+}
+
+Http::FilterMetadataStatus DelegatedFilterChain::encodeMetadata(Http::MetadataMap& metadata_map) {
+  // Encode operations iterate in reverse order.
+  for (auto it = filters_.rbegin(); it != filters_.rend(); ++it) {
+    auto status = (*it)->encodeMetadata(metadata_map);
+    if (status != Http::FilterMetadataStatus::Continue) {
+      return status;
+    }
+  }
+  return Http::FilterMetadataStatus::Continue;
+}
+
+void DelegatedFilterChain::setEncoderFilterCallbacks(
+    Http::StreamEncoderFilterCallbacks& callbacks) {
+  for (auto& filter : filters_) {
+    filter->setEncoderFilterCallbacks(callbacks);
+  }
+}
+
+void DelegatedFilterChain::encodeComplete() {
+  // Encode operations iterate in reverse order.
+  for (auto it = filters_.rbegin(); it != filters_.rend(); ++it) {
+    (*it)->encodeComplete();
+  }
+}
+
+void DelegatedFilterChain::onDestroy() {
+  for (auto& filter : filters_) {
+    static_cast<Http::StreamDecoderFilter&>(*filter).onDestroy();
+  }
+}
+
+void DelegatedFilterChain::onStreamComplete() {
+  for (auto& filter : filters_) {
+    static_cast<Http::StreamDecoderFilter&>(*filter).onStreamComplete();
   }
 }
 

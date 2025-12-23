@@ -87,6 +87,10 @@ public:
   void setCertificateValidationAlert(uint8_t alert) { cert_validation_alert_ = alert; }
 
   Ssl::CertificateSelectionCallbackPtr createCertificateSelectionCallback() override;
+  void setCertSelectionHandle(Ssl::SelectionHandleConstSharedPtr cert_selection_handle) override {
+    ASSERT(cert_selection_handle_ == nullptr);
+    cert_selection_handle_ = std::move(cert_selection_handle);
+  }
   void onCertificateSelectionCompleted(OptRef<const Ssl::TlsContext> selected_ctx, bool staple,
                                        bool async) override;
   Ssl::CertificateSelectionStatus certificateSelectionResult() const override {
@@ -119,6 +123,8 @@ private:
       Ssl::CertificateSelectionStatus::NotStarted};
   // Stores the detailed certificate validation error message.
   std::string cert_validation_error_;
+  // Stores additional per-connection data needed by the certificate selector.
+  Ssl::SelectionHandleConstSharedPtr cert_selection_handle_;
 };
 
 class SslHandshakerImpl : public ConnectionInfoImplBase,

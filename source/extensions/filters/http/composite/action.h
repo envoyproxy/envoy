@@ -14,18 +14,30 @@ namespace Composite {
 using HttpExtensionConfigProviderSharedPtr =
     std::shared_ptr<Config::DynamicExtensionConfigProvider<Envoy::Filter::HttpFilterFactoryCb>>;
 
+// Vector of filter factory callbacks for filter chain support.
+using FilterFactoryCbList = std::vector<Http::FilterFactoryCb>;
+
 class ExecuteFilterAction
     : public Matcher::ActionBase<
           envoy::extensions::filters::http::composite::v3::ExecuteFilterAction> {
 public:
   using FilterConfigProvider = std::function<OptRef<Http::FilterFactoryCb>()>;
 
+  // Constructor for single filter which is either typed_config or dynamic_config.
   explicit ExecuteFilterAction(
       FilterConfigProvider config_provider, const std::string& name,
       const absl::optional<envoy::config::core::v3::RuntimeFractionalPercent>& sample,
       Runtime::Loader& runtime)
       : config_provider_(std::move(config_provider)), name_(name), sample_(sample),
-        runtime_(runtime) {}
+        runtime_(runtime), is_filter_chain_(false) {}
+
+  // Constructor for filter chain.
+  explicit ExecuteFilterAction(
+      FilterFactoryCbList filter_factories, const std::string& name,
+      const absl::optional<envoy::config::core::v3::RuntimeFractionalPercent>& sample,
+      Runtime::Loader& runtime)
+      : filter_factories_(std::move(filter_factories)), name_(name), sample_(sample),
+        runtime_(runtime), is_filter_chain_(true) {}
 
   void createFilters(Http::FilterChainFactoryCallbacks& callbacks) const;
 
@@ -33,11 +45,18 @@ public:
 
   bool actionSkip() const;
 
+  // Returns true if this action executes a filter chain rather than a single filter.
+  bool isFilterChain() const { return is_filter_chain_; }
+
 private:
+  // Used for single filter mode which is either typed_config or dynamic_config.
   FilterConfigProvider config_provider_;
+  // Used for filter chain mode.
+  FilterFactoryCbList filter_factories_;
   const std::string name_;
   const absl::optional<envoy::config::core::v3::RuntimeFractionalPercent> sample_;
   Runtime::Loader& runtime_;
+  const bool is_filter_chain_;
 };
 
 class ExecuteFilterActionFactory
@@ -100,6 +119,12 @@ private:
       ProtobufMessage::ValidationVisitor& validation_visitor);
 
   Matcher::ActionConstSharedPtr createStaticActionUpstream(
+      const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
+      Http::Matching::HttpFilterActionContext& context,
+      ProtobufMessage::ValidationVisitor& validation_visitor);
+
+  // Create an action for filter chain configuration.
+  Matcher::ActionConstSharedPtr createFilterChainAction(
       const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
       Http::Matching::HttpFilterActionContext& context,
       ProtobufMessage::ValidationVisitor& validation_visitor);
