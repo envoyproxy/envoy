@@ -1,0 +1,71 @@
+syntax = "proto3";
+
+package envoy.extensions.clusters.dynamic_modules.v3;
+
+import "envoy/extensions/dynamic_modules/v3/dynamic_modules.proto";
+
+import "google/protobuf/any.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/wrappers.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.clusters.dynamic_modules.v3";
+option java_outer_classname = "ClusterProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/clusters/dynamic_modules/v3;dynamic_modulesv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Dynamic Modules Cluster]
+// [#extension: envoy.clusters.dynamic_modules]
+
+// Configuration for a cluster backed by a dynamic module.
+// The dynamic module implements custom cluster logic including host management
+// and load balancing. This allows users to write custom cluster implementations
+// in languages like Rust that follow the Dynamic Modules ABI specification.
+//
+// The module receives callbacks for cluster lifecycle events (initialization, cleanup)
+// and implements load balancing by providing a ``choose_host`` function.
+// [#next-free-field: 7]
+message ClusterConfig {
+  // Shared-object level configuration for the dynamic module.
+  envoy.extensions.dynamic_modules.v3.DynamicModuleConfig dynamic_module_config = 1
+      [(validate.rules).message = {required: true}];
+
+  // Name to identify the cluster implementation within the module.
+  // This is passed to the module's cluster config init function, allowing
+  // a single module to provide multiple cluster implementations.
+  string cluster_name = 2 [(validate.rules).string = {min_len: 1}];
+
+  // Configuration passed to the module's cluster initialization.
+  // Supports the same encoding as HTTP filter configs:
+  //
+  // - ``google.protobuf.Struct`` is serialized as JSON.
+  // - ``google.protobuf.BytesValue`` is passed directly without the wrapper.
+  // - ``google.protobuf.StringValue`` is passed directly without the wrapper.
+  //
+  // .. code-block:: yaml
+  //
+  //  # Passing in a string
+  //  cluster_config:
+  //    "@type": "type.googleapis.com/google.protobuf.StringValue"
+  //    value: '{"initial_hosts": ["127.0.0.1:8080", "127.0.0.1:8081"]}'
+  //
+  google.protobuf.Any cluster_config = 3;
+
+  // Whether the module manages hosts dynamically (like Original Dst cluster).
+  // When true, the cluster starts with no hosts and the module adds them on-demand
+  // via the add_host callback.
+  // When false, initial hosts should be added during the initialization phase.
+  bool dynamic_host_discovery = 4;
+
+  // Interval for the module's cleanup callback. Defaults to 5s.
+  // The cleanup callback allows modules to remove stale hosts or perform
+  // periodic maintenance tasks.
+  google.protobuf.Duration cleanup_interval = 5 [(validate.rules).duration = {gt {}}];
+
+  // Maximum number of hosts the module can add. Prevents unbounded growth.
+  // Defaults to 1024.
+  google.protobuf.UInt32Value max_hosts = 6 [(validate.rules).uint32 = {gt: 0}];
+}

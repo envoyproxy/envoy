@@ -1,8 +1,9 @@
-load("//test/extensions/dynamic_modules/test_data/c:test_data.bzl", "test_program")
+load("//test/extensions/dynamic_modules/test_data/c:test_data.bzl", "cluster_test_program", "test_program")
 
 licenses(["notice"])  # Apache 2
 
 package(default_visibility = [
+    "//test/extensions/clusters/dynamic_modules:__pkg__",
     "//test/extensions/dynamic_modules:__pkg__",
     "//test/extensions/dynamic_modules/http:__pkg__",
 ])
@@ -48,3 +49,5 @@ test_program(name = "no_http_filter_response_trailers")
 test_program(name = "program_global")
 
 test_program(name = "program_child")
+
+cluster_test_program(name = "cluster_no_op")

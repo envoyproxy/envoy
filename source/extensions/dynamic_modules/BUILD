@@ -10,7 +10,9 @@ envoy_extension_package()
 
 envoy_cc_library(
     name = "dynamic_modules_lib",
-    srcs = ["dynamic_modules.cc"],
+    srcs = [
+        "dynamic_modules.cc",
+    ],
     hdrs = [
         "abi.h",
         "dynamic_modules.h",

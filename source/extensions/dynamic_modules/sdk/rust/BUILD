@@ -36,6 +36,8 @@ cargo_build_script(
         "//conditions:default": {},
     }),
     data = [
+        "//source/extensions/clusters/dynamic_modules:abi.h",
+        "//source/extensions/clusters/dynamic_modules:abi_version.h",
         "//source/extensions/dynamic_modules:abi.h",
         "//source/extensions/dynamic_modules:abi_version.h",
     ] + select({

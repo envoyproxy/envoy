@@ -27,3 +27,32 @@ def test_program(name):
         shared_lib_name = "lib{}.so".format(name),
         deps = [_name],
     )
+
+# Similar to test_program but for cluster modules which need the cluster ABI headers.
+def cluster_test_program(name):
+    _name = "_" + name
+    cc_library(
+        name = _name,
+        srcs = [name + ".c"],
+        hdrs = [
+            "//source/extensions/dynamic_modules:abi.h",
+            "//source/extensions/dynamic_modules:abi_version.h",
+            "//source/extensions/clusters/dynamic_modules:abi.h",
+            "//source/extensions/clusters/dynamic_modules:abi_version.h",
+        ],
+        linkopts = [
+            "-shared",
+            "-fPIC",
+        ],
+        # All programs here are C, not C++, so we don't need to apply clang-tidy.
+        tags = ["notidy"],
+        linkstatic = False,
+    )
+
+    # Use cc_shared_library to create a shared library in a consistent naming across
+    # platforms.
+    cc_shared_library(
+        name = name,
+        shared_lib_name = "lib{}.so".format(name),
+        deps = [_name],
+    )

@@ -16,9 +16,14 @@ fn main() {
   }
 
   println!("cargo:rerun-if-changed=abi.h");
+  println!("cargo:rerun-if-changed=../../../clusters/dynamic_modules/abi.h");
   let bindings = bindgen::Builder::default()
     .header("../../abi.h")
     .header("../../abi_version.h")
+    .header("../../../clusters/dynamic_modules/abi.h")
+    .header("../../../clusters/dynamic_modules/abi_version.h")
+    // Add include path for the workspace root so that #include "source/extensions/..." works.
+    .clang_arg("-I../../../../..")
     .clang_arg("-v")
     .default_enum_style(bindgen::EnumVariation::Rust {
       non_exhaustive: false,
