@@ -21,6 +21,12 @@ behavior_changes:
     runtime guard ``envoy.reloadable_features.reset_with_error`` to ``false``.
 - area: http
   change: |
+    Changed the default reset behavior when an upstream protocol error occurs. In the previous behavior, Envoy would
+    propagate the upstream protocol error to the downstream client. In the new behavior, Envoy will ignore the upstream
+    protocol error. This change can be reverted by setting the runtime guard
+    ``envoy.reloadable_features.reset_ignore_upstream_reason`` to ``false``.
+- area: http
+  change: |
     Added runtime flag ``envoy.reloadable_features.reject_early_connect_data`` to reject ``CONNECT`` requests that send
     data before Envoy returns a ``200`` response. This non-compliant behavior is common for latency reduction, so the
     option is disabled by default.
