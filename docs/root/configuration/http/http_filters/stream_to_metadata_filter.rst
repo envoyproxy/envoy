@@ -96,8 +96,10 @@ Key Configuration Options
 **rules**
   A list of rules to apply. Each rule contains:
 
-  * **selector**: A path through the JSON object (e.g., ``["usage", "total_tokens"]`` extracts
-    ``json_object["usage"]["total_tokens"]``)
+  * **selector**: Specifies how to extract a value from the stream payload. Currently supports:
+
+    - **json_path**: A path through the JSON object (e.g., ``["usage", "total_tokens"]`` extracts
+      ``json_object["usage"]["total_tokens"]``)
   * **metadata_descriptors**: One or more destinations where the extracted value should be written.
     Each descriptor specifies:
 

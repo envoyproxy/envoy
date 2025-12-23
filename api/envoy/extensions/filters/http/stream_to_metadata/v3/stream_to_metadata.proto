@@ -76,18 +76,12 @@ message StreamToMetadata {
   }
 
   // Selector specifies how to extract a value from the stream payload.
-  // This uses a oneof to allow future extension for different extraction methods
-  // (e.g., regex, protobuf field paths, JSONPath expressions).
+  // Multiple selector types can be added over time for different extraction methods.
+  //
+  // Exactly one selector type must be specified.
   message Selector {
-    oneof selector_type {
-      option (validate.required) = true;
-
-      // Extract value using JSON path traversal.
-      // Currently the only supported selector type.
-      JsonPathSelector json_path = 1;
-
-      // Future: Add other selector types here as needed
-    }
+    // Extract value using JSON path traversal.
+    JsonPathSelector json_path = 1;
   }
 
   // [#next-free-field: 4]

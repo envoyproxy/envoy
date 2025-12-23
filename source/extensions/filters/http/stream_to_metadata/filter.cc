@@ -18,6 +18,11 @@ constexpr absl::string_view DefaultSseContentType{"text/event-stream"};
 } // namespace
 
 Rule::Rule(const ProtoRule& rule) : rule_(rule) {
+  // Validate that exactly one selector type is set
+  if (!rule_.selector().has_json_path()) {
+    throw EnvoyException("Selector must have json_path specified");
+  }
+
   for (const auto& key : rule_.selector().json_path().path()) {
     selector_path_.push_back(key);
   }

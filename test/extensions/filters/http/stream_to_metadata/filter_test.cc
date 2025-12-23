@@ -48,7 +48,7 @@ public:
     response_data_.drain(response_data_.length());
   }
 
-  ProtobufWkt::Value getMetadata(const std::string& ns, const std::string& key) {
+  Protobuf::Value getMetadata(const std::string& ns, const std::string& key) {
     return Envoy::Config::Metadata::metadataValue(
         &encoder_callbacks_.streamInfo().dynamicMetadata(), ns, key);
   }
@@ -170,7 +170,7 @@ TEST_F(StreamToMetadataFilterTest, ContentTypeWithParameters) {
   addEncodeDataChunks(data, true);
 
   auto metadata = getMetadata("envoy.lb", "tokens");
-  EXPECT_EQ(metadata.kind_case(), ProtobufWkt::Value::kNumberValue);
+  EXPECT_EQ(metadata.kind_case(), Protobuf::Value::kNumberValue);
   EXPECT_EQ(metadata.number_value(), 30);
 
   EXPECT_EQ(findCounter("stream_to_metadata.success"), 1);
@@ -184,7 +184,7 @@ TEST_F(StreamToMetadataFilterTest, BasicTokenExtraction) {
   addEncodeDataChunks(data, true);
 
   auto metadata = getMetadata("envoy.lb", "tokens");
-  EXPECT_EQ(metadata.kind_case(), ProtobufWkt::Value::kNumberValue);
+  EXPECT_EQ(metadata.kind_case(), Protobuf::Value::kNumberValue);
   EXPECT_EQ(metadata.number_value(), 30);
 
   EXPECT_EQ(findCounter("stream_to_metadata.success"), 1);
@@ -262,7 +262,7 @@ TEST_F(StreamToMetadataFilterTest, PreserveExistingMetadata) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
 
   // Set existing metadata
-  ProtobufWkt::Struct existing_metadata;
+  Protobuf::Struct existing_metadata;
   (*existing_metadata.mutable_fields())["tokens"].set_number_value(100);
   encoder_callbacks_.streamInfo().setDynamicMetadata("envoy.lb", existing_metadata);
 
@@ -280,7 +280,7 @@ TEST_F(StreamToMetadataFilterTest, OverwriteExistingMetadata) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
 
   // Set existing metadata
-  ProtobufWkt::Struct existing_metadata;
+  Protobuf::Struct existing_metadata;
   (*existing_metadata.mutable_fields())["tokens"].set_number_value(100);
   encoder_callbacks_.streamInfo().setDynamicMetadata("envoy.lb", existing_metadata);
 
