@@ -7,6 +7,7 @@
 #include "source/extensions/filters/http/proto_api_scrubber/scrubbing_util_lib/field_checker.h"
 
 #include "test/extensions/filters/http/grpc_field_extraction/message_converter/message_converter_test_lib.h"
+#include "test/extensions/filters/http/proto_api_scrubber/scrubber_test.pb.h"
 #include "test/integration/http_protocol_integration.h"
 #include "test/proto/apikeys.pb.h"
 #include "test/test_common/registry.h"
@@ -24,12 +25,20 @@ namespace HttpFilters {
 namespace ProtoApiScrubber {
 namespace {
 
+// ALIAS for Map Scrubbing Tests
+namespace scrubber_test = test::extensions::filters::http::proto_api_scrubber;
+
 using envoy::extensions::filters::http::proto_api_scrubber::v3::ProtoApiScrubberConfig;
 using envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter;
 using ::Envoy::Extensions::HttpFilters::GrpcFieldExtraction::checkSerializedData;
 
 std::string apikeysDescriptorPath() {
   return TestEnvironment::runfilesPath("test/proto/apikeys.descriptor");
+}
+
+std::string scrubberTestDescriptorPath() {
+  return TestEnvironment::runfilesPath(
+      "test/extensions/filters/http/proto_api_scrubber/scrubber_test.descriptor");
 }
 
 const std::string kCreateApiKeyMethod = "/apikeys.ApiKeys/CreateApiKey";
@@ -138,26 +147,26 @@ public:
     return predicate;
   }
 
-  // Helper to build the configuration with a generic predicate.
-  std::string
-  getFilterConfig(const std::string& descriptor_path, const std::string& method_name = "",
-                  const std::string& field_to_scrub = "",
-                  RestrictionType type = RestrictionType::Request,
-                  const xds::type::matcher::v3::Matcher::MatcherList::Predicate& match_predicate =
-                      buildCelPredicate("true")) {
-    std::string full_config_text;
-    if (method_name.empty() || field_to_scrub.empty()) {
-      full_config_text = fmt::format(R"pb(
-      filtering_mode: OVERRIDE
-      descriptor_set {{ data_source {{ filename: "{0}" }} }}
-    )pb",
-                                     descriptor_path);
-    } else {
-      std::string restriction_key = (type == RestrictionType::Request)
-                                        ? "request_field_restrictions"
-                                        : "response_field_restrictions";
+  // Helper to build config with multiple fields to scrub.
+  std::string getMultiFieldFilterConfig(
+      const std::string& descriptor_path, const std::string& method_name,
+      const std::vector<std::string>& fields_to_scrub,
+      RestrictionType type = RestrictionType::Request,
+      const xds::type::matcher::v3::Matcher::MatcherList::Predicate& match_predicate =
+          buildCelPredicate("true")) {
 
-      // Build the Matcher
+    ProtoApiScrubberConfig config;
+    config.set_filtering_mode(ProtoApiScrubberConfig::OVERRIDE);
+    config.mutable_descriptor_set()->mutable_data_source()->set_filename(descriptor_path);
+
+    if (!method_name.empty() && !fields_to_scrub.empty()) {
+      auto* method_restrictions = config.mutable_restrictions()->mutable_method_restrictions();
+      auto& method_config = (*method_restrictions)[method_name];
+      auto* restrictions_map = (type == RestrictionType::Request)
+                                   ? method_config.mutable_request_field_restrictions()
+                                   : method_config.mutable_response_field_restrictions();
+
+      // Create the Matcher object once.
       xds::type::matcher::v3::Matcher matcher_proto;
       auto* matcher_entry = matcher_proto.mutable_matcher_list()->add_matchers();
       *matcher_entry->mutable_predicate() = match_predicate;
@@ -166,44 +175,32 @@ public:
           remove_action);
       matcher_entry->mutable_on_match()->mutable_action()->set_name("remove_field");
 
-      std::string matcher_text;
-      Protobuf::TextFormat::PrintToString(matcher_proto, &matcher_text);
-      full_config_text = fmt::format(R"pb(
-      filtering_mode: OVERRIDE
-      descriptor_set {{
-        data_source {{ filename: "{0}" }}
-      }}
-      restrictions {{
-        method_restrictions {{
-          key: "{1}"
-          value {{
-            {2} {{
-              key: "{3}"
-              value {{
-                matcher {{ {4} }}
-              }}
-            }}
-          }}
-        }}
-      }}
-    )pb",
-                                     descriptor_path, // {0}
-                                     method_name,     // {1}
-                                     restriction_key, // {2}
-                                     field_to_scrub,  // {3}
-                                     matcher_text     // {4} Inject the Generic Matcher
-      );
+      // Apply to all requested fields.
+      for (const auto& field : fields_to_scrub) {
+        *(*restrictions_map)[field].mutable_matcher() = matcher_proto;
+      }
     }
 
-    ProtoApiScrubberConfig filter_config_proto;
-    Protobuf::TextFormat::ParseFromString(full_config_text, &filter_config_proto);
-
     Protobuf::Any any_config;
-    any_config.PackFrom(filter_config_proto);
+    any_config.PackFrom(config);
     return fmt::format(R"EOF(
     name: envoy.filters.http.proto_api_scrubber
     typed_config: {})EOF",
                        MessageUtil::getJsonStringFromMessageOrError(any_config));
+  }
+
+  // Helper to build the configuration with a generic predicate.
+  std::string
+  getFilterConfig(const std::string& descriptor_path, const std::string& method_name = "",
+                  const std::string& field_to_scrub = "",
+                  RestrictionType type = RestrictionType::Request,
+                  const xds::type::matcher::v3::Matcher::MatcherList::Predicate& match_predicate =
+                      buildCelPredicate("true")) {
+    std::vector<std::string> fields;
+    if (!field_to_scrub.empty()) {
+      fields.push_back(field_to_scrub);
+    }
+    return getMultiFieldFilterConfig(descriptor_path, method_name, fields, type, match_predicate);
   }
 
   template <typename T>
@@ -254,6 +251,107 @@ apikeys::CreateApiKeyRequest makeCreateApiKeyRequest(absl::string_view pb = R"pb
   apikeys::CreateApiKeyRequest request;
   Protobuf::TextFormat::ParseFromString(pb, &request);
   return request;
+}
+
+// Consolidated Map Scrubbing Test covering all map scenarios.
+TEST_P(ProtoApiScrubberIntegrationTest, ScrubAllMapTypes) {
+  config_helper_.prependFilter(getMultiFieldFilterConfig(
+      scrubberTestDescriptorPath(),
+      "/test.extensions.filters.http.proto_api_scrubber.ScrubberTestService/Scrub",
+      {
+          "tags.value",                    // String to String map: value should be scrubbed.
+          "int_map.value",                 // String to Int map: value should be scrubbed.
+                                           // String to Int map: value kept (Implicit).
+          "deep_map.value.secret",         // String to Object map: partial field scrubbed.
+          "object_map.value.secret",       // String to Object map: all fields scrubbed (A).
+          "object_map.value.public_field", // String to Object map: all fields scrubbed (B).
+          "object_map.value.other_info",   // String to Object map: all fields scrubbed (C).
+          "full_scrub_map.value",          // String to Object map: object itself scrubbed.
+          "deep_map.value.internal_details.deep_secret" // 2-Level Deep Nesting in Map.
+      },
+      RestrictionType::Request, buildCelPredicate("true")));
+
+  initialize();
+
+  scrubber_test::ScrubRequest request;
+
+  // String to String (Scrubbed).
+  (*request.mutable_tags())["key_scrub"] = "secret";
+
+  // String to Int (Scrubbed).
+  (*request.mutable_int_map())["key_scrub"] = 123;
+
+  // String to Int (Kept).
+  (*request.mutable_safe_int_map())["key_safe"] = 456;
+
+  // String to Object (Partial Scrub).
+  // deep_map rules only target "secret". "public_field" and "other_info" are untouched.
+  auto& partial = (*request.mutable_deep_map())["k_partial"];
+  partial.set_secret("sensitive");
+  partial.set_public_field("safe");
+
+  // String to Object (All Fields Scrubbed -> Empty Message).
+  // object_map rules target ALL fields ("secret", "public_field", "other_info").
+  // The 'value' message itself is kept, but it becomes empty.
+  auto& all_fields = (*request.mutable_object_map())["k_empty_res"];
+  all_fields.set_secret("sensitive");
+  all_fields.set_public_field("sensitive_too");
+  all_fields.set_other_info("info");
+
+  // String to Object (Object Scrubbed).
+  // full_scrub_map rule targets "value" directly.
+  auto& obj_scrub = (*request.mutable_full_scrub_map())["k_object"];
+  obj_scrub.set_secret("sensitive");
+
+  // 2-Level Deep Nesting (Map Value -> Message -> Message -> Field).
+  // deep_map.value.internal_details.deep_secret is scrubbed.
+  // deep_map.value.internal_details.deep_public is kept.
+  auto& deep_nested = (*request.mutable_deep_map())["k_deep_nested"];
+  deep_nested.mutable_internal_details()->set_deep_secret("secret_cvv");
+  deep_nested.mutable_internal_details()->set_deep_public("public_name");
+
+  auto response = sendGrpcRequest(
+      request, "/test.extensions.filters.http.proto_api_scrubber.ScrubberTestService/Scrub");
+  waitForNextUpstreamRequest();
+
+  // Verification.
+  scrubber_test::ScrubRequest expected = request;
+
+  // String to String: Value scrubbed -> Entry Removed.
+  expected.mutable_tags()->erase("key_scrub");
+
+  // String to Int: Value scrubbed -> Entry Removed.
+  expected.mutable_int_map()->erase("key_scrub");
+
+  // String to Int: Kept. (No change).
+
+  // Partial Scrub: 'secret' removed. 'public_field' remains.
+  auto& partial_exp = (*expected.mutable_deep_map())["k_partial"];
+  partial_exp.set_secret("");
+  // public_field remains "safe".
+
+  // All Fields Scrubbed (Effectively).
+  // All 3 fields scrubbed.
+  // Result: Key + Empty Message -> Entry KEPT.
+  auto& all_fields_exp = (*expected.mutable_object_map())["k_empty_res"];
+  all_fields_exp.set_secret("");
+  all_fields_exp.set_public_field("");
+  all_fields_exp.set_other_info("");
+
+  // Object Scrubbed: Value message excluded -> Entry REMOVED.
+  expected.mutable_full_scrub_map()->erase("k_object");
+
+  // 2-Level Deep Nesting Verification.
+  auto& deep_nested_exp = (*expected.mutable_deep_map())["k_deep_nested"];
+  deep_nested_exp.mutable_internal_details()->set_deep_secret(""); // Scrubbed
+  // deep_public remains "public_name"
+
+  Buffer::OwnedImpl data;
+  data.add(upstream_request_->body());
+  checkSerializedData<scrubber_test::ScrubRequest>(data, {expected});
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
 }
 
 // ============================================================================
