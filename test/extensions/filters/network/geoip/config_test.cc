@@ -75,15 +75,17 @@ TEST_F(GeoipConfigTest, FilterIsNotTerminal) {
   EXPECT_FALSE(factory.isTerminalFilterByProto(proto_config, context_.serverFactoryContext()));
 }
 
-TEST_F(GeoipConfigTest, CreateFilterFactoryWithClientIpFilterStateConfig) {
+TEST_F(GeoipConfigTest, CreateFilterFactoryWithClientIpConfig) {
   initializeProviderFactory();
+  // Use a static IP address in the formatter (plain text format works with mock context).
   const std::string config_yaml = R"EOF(
     provider:
         name: "envoy.geoip_providers.dummy"
         typed_config:
           "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
-    client_ip_filter_state_config:
-        filter_state_key: "my.custom.client.ip"
+    client_ip_config:
+        text_format_source:
+          inline_string: "192.168.1.100"
 )EOF";
 
   envoy::extensions::filters::network::geoip::v3::Geoip proto_config;
@@ -98,23 +100,6 @@ TEST_F(GeoipConfigTest, CreateFilterFactoryWithClientIpFilterStateConfig) {
   Network::MockFilterManager filter_manager;
   EXPECT_CALL(filter_manager, addReadFilter(_));
   cb(filter_manager);
-}
-
-TEST_F(GeoipConfigTest, InvalidConfigEmptyFilterStateKey) {
-  initializeProviderFactory();
-  const std::string config_yaml = R"EOF(
-    provider:
-        name: "envoy.geoip_providers.dummy"
-        typed_config:
-          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
-    client_ip_filter_state_config:
-        filter_state_key: ""
-)EOF";
-
-  envoy::extensions::filters::network::geoip::v3::Geoip proto_config;
-  // Proto validation should fail for empty filter_state_key.
-  EXPECT_THROW_WITH_REGEX(TestUtility::loadFromYamlAndValidate(config_yaml, proto_config),
-                          EnvoyException, "FilterStateKey.*value length must be at least");
 }
 
 } // namespace

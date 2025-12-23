@@ -1,13 +1,16 @@
 #include "envoy/extensions/filters/network/geoip/v3/geoip.pb.h"
 
+#include "source/common/formatter/substitution_format_string.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/common/stream_info/filter_state_impl.h"
 #include "source/extensions/filters/network/geoip/geoip_filter.h"
+#include "source/server/generic_factory_context.h"
 
 #include "test/extensions/filters/http/geoip/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/registry.h"
@@ -36,15 +39,6 @@ const std::string BasicGeoipConfig = R"EOF(
         name: "envoy.geoip_providers.dummy"
         typed_config:
           "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
-)EOF";
-
-const std::string GeoipConfigWithClientIpOverride = R"EOF(
-    provider:
-        name: "envoy.geoip_providers.dummy"
-        typed_config:
-          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
-    client_ip_filter_state_config:
-        filter_state_key: "my.custom.client.ip"
 )EOF";
 
 // Matcher to verify LookupRequest has the expected remote address.
@@ -90,12 +84,25 @@ public:
         .WillByDefault(testing::ReturnRef(filter_state_));
   }
 
-  void initializeFilter(const std::string& yaml) {
+  void initializeFilter(const std::string& yaml,
+                        Formatter::FormatterConstSharedPtr client_ip_formatter = nullptr) {
     envoy::extensions::filters::network::geoip::v3::Geoip config;
     TestUtility::loadFromYaml(yaml, config);
-    config_ = std::make_shared<GeoipFilterConfig>(config, "prefix.", stats_.mockScope());
+
+    config_ = std::make_shared<GeoipFilterConfig>(config, "prefix.", stats_.mockScope(),
+                                                  std::move(client_ip_formatter));
     filter_ = std::make_shared<GeoipFilter>(config_, dummy_driver_);
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
+  }
+
+  // Create a simple formatter that returns a static IP address.
+  Formatter::FormatterConstSharedPtr createStaticIpFormatter(const std::string& ip) {
+    envoy::config::core::v3::SubstitutionFormatString format_config;
+    format_config.mutable_text_format_source()->set_inline_string(ip);
+    auto formatter_or_error =
+        Formatter::SubstitutionFormatStringUtils::fromProtoConfig(format_config, context_);
+    EXPECT_TRUE(formatter_or_error.ok());
+    return std::move(formatter_or_error.value());
   }
 
   void initializeProviderFactory() {
@@ -113,6 +120,7 @@ public:
   }
 
   NiceMock<Stats::MockStore> stats_;
+  NiceMock<Server::Configuration::MockGenericFactoryContext> context_;
   GeoipFilterConfigSharedPtr config_;
   std::shared_ptr<GeoipFilter> filter_;
   std::unique_ptr<DummyGeoipProviderFactory> dummy_factory_;
@@ -279,43 +287,41 @@ TEST_F(GeoipFilterTest, AsyncCallbackStoresFilterState) {
   EXPECT_THAT(filter_state_, HasGeoField("x-geo-city", "AsyncCity"));
 }
 
-TEST_F(GeoipFilterTest, UsesClientIpFromFilterStateWhenConfigured) {
+TEST_F(GeoipFilterTest, UsesClientIpFromFormatterWhenConfigured) {
   initializeProviderFactory();
-  initializeFilter(GeoipConfigWithClientIpOverride);
+  // Create a formatter that returns a static IP address.
+  auto formatter = createStaticIpFormatter("5.6.7.8");
+  initializeFilter(BasicGeoipConfig, std::move(formatter));
 
-  // Set the connection remote address (this should be ignored).
+  // Set the connection remote address (this should be ignored when formatter is configured).
   Network::Address::InstanceConstSharedPtr remote_address =
       Network::Utility::parseInternetAddressNoThrow("1.2.3.4");
   filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       remote_address);
-
-  // Set the client IP in filter state (this should be used).
-  setFilterStateClientIp("my.custom.client.ip", "5.6.7.8");
 
   expectStatsTotalIncremented();
   EXPECT_CALL(*dummy_driver_, lookup(HasRemoteAddress("5.6.7.8:0"), _))
       .WillOnce([](Geolocation::LookupRequest&&, Geolocation::LookupGeoHeadersCallback&& cb) {
-        cb(Geolocation::LookupResult{{"x-geo-city", "FilterStateCity"}});
+        cb(Geolocation::LookupResult{{"x-geo-city", "FormatterCity"}});
       });
 
-  EXPECT_LOG_CONTAINS("debug", "geoip: using client IP '5.6.7.8' from filter state key",
+  EXPECT_LOG_CONTAINS("debug", "geoip: using client IP '5.6.7.8' from configured formatter",
                       EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection()));
 
-  EXPECT_THAT(filter_state_, HasGeoField("x-geo-city", "FilterStateCity"));
+  EXPECT_THAT(filter_state_, HasGeoField("x-geo-city", "FormatterCity"));
 }
 
-TEST_F(GeoipFilterTest, UsesClientIpFromFilterStateWithIpv6) {
+TEST_F(GeoipFilterTest, UsesClientIpFromFormatterWithIpv6) {
   initializeProviderFactory();
-  initializeFilter(GeoipConfigWithClientIpOverride);
+  // Create a formatter that returns an IPv6 address.
+  auto formatter = createStaticIpFormatter("2001:db8::1");
+  initializeFilter(BasicGeoipConfig, std::move(formatter));
 
   // Set the connection remote address (this should be ignored).
   Network::Address::InstanceConstSharedPtr remote_address =
       Network::Utility::parseInternetAddressNoThrow("1.2.3.4");
   filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       remote_address);
-
-  // Set an IPv6 client IP in filter state.
-  setFilterStateClientIp("my.custom.client.ip", "2001:db8::1");
 
   expectStatsTotalIncremented();
   EXPECT_CALL(*dummy_driver_, lookup(HasRemoteAddress("[2001:db8::1]:0"), _))
@@ -327,9 +333,11 @@ TEST_F(GeoipFilterTest, UsesClientIpFromFilterStateWithIpv6) {
   EXPECT_THAT(filter_state_, HasGeoField("x-geo-city", "IPv6City"));
 }
 
-TEST_F(GeoipFilterTest, FallsBackToConnectionAddressWhenFilterStateKeyNotFound) {
+TEST_F(GeoipFilterTest, FallsBackToConnectionAddressWhenFormatterReturnsInvalidIp) {
   initializeProviderFactory();
-  initializeFilter(GeoipConfigWithClientIpOverride);
+  // Create a formatter that returns an invalid IP.
+  auto formatter = createStaticIpFormatter("not-a-valid-ip");
+  initializeFilter(BasicGeoipConfig, std::move(formatter));
 
   // Set the connection remote address (this should be used as fallback).
   Network::Address::InstanceConstSharedPtr remote_address =
@@ -337,54 +345,26 @@ TEST_F(GeoipFilterTest, FallsBackToConnectionAddressWhenFilterStateKeyNotFound) 
   filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       remote_address);
 
-  // Do NOT set any filter state - key will not be found.
-
   expectStatsTotalIncremented();
   EXPECT_CALL(*dummy_driver_, lookup(HasRemoteAddress("1.2.3.4:0"), _))
       .WillOnce([](Geolocation::LookupRequest&&, Geolocation::LookupGeoHeadersCallback&& cb) {
         cb(Geolocation::LookupResult{{"x-geo-city", "FallbackCity"}});
       });
 
-  EXPECT_LOG_CONTAINS("debug",
-                      "geoip: filter state key 'my.custom.client.ip' not found, falling back",
-                      EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection()));
+  EXPECT_LOG_CONTAINS(
+      "debug", "geoip: failed to parse IP address 'not-a-valid-ip' from configured formatter",
+      EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection()));
 
   EXPECT_THAT(filter_state_, HasGeoField("x-geo-city", "FallbackCity"));
 }
 
-TEST_F(GeoipFilterTest, FallsBackToConnectionAddressWhenFilterStateValueIsInvalidIp) {
+TEST_F(GeoipFilterTest, UsesConnectionAddressWhenNoFormatterConfigured) {
   initializeProviderFactory();
-  initializeFilter(GeoipConfigWithClientIpOverride);
-
-  // Set the connection remote address (this should be used as fallback).
-  Network::Address::InstanceConstSharedPtr remote_address =
-      Network::Utility::parseInternetAddressNoThrow("1.2.3.4");
-  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
-      remote_address);
-
-  // Set an invalid IP in filter state.
-  setFilterStateClientIp("my.custom.client.ip", "not-a-valid-ip");
-
-  expectStatsTotalIncremented();
-  EXPECT_CALL(*dummy_driver_, lookup(HasRemoteAddress("1.2.3.4:0"), _))
-      .WillOnce([](Geolocation::LookupRequest&&, Geolocation::LookupGeoHeadersCallback&& cb) {
-        cb(Geolocation::LookupResult{{"x-geo-city", "FallbackCity"}});
-      });
-
-  EXPECT_LOG_CONTAINS("debug",
-                      "geoip: failed to parse IP address 'not-a-valid-ip' from filter state key",
-                      EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection()));
-
-  EXPECT_THAT(filter_state_, HasGeoField("x-geo-city", "FallbackCity"));
-}
-
-TEST_F(GeoipFilterTest, UsesConnectionAddressWhenNoFilterStateConfigured) {
-  initializeProviderFactory();
-  // Config without client_ip_filter_state_config.
+  // Config without client_ip_config (no formatter).
   initializeFilter(BasicGeoipConfig);
 
-  // Verify that clientIpFilterStateKey is not set.
-  EXPECT_FALSE(config_->clientIpFilterStateKey().has_value());
+  // Verify that clientIpFormatter is not set.
+  EXPECT_EQ(nullptr, config_->clientIpFormatter());
 
   Network::Address::InstanceConstSharedPtr remote_address =
       Network::Utility::parseInternetAddressNoThrow("1.2.3.4");
@@ -401,21 +381,13 @@ TEST_F(GeoipFilterTest, UsesConnectionAddressWhenNoFilterStateConfigured) {
   EXPECT_THAT(filter_state_, HasGeoField("x-geo-city", "ConnectionCity"));
 }
 
-TEST_F(GeoipFilterTest, ClientIpFilterStateConfigAccessor) {
+TEST_F(GeoipFilterTest, ClientIpFormatterAccessor) {
   initializeProviderFactory();
-  const std::string config_yaml = R"EOF(
-    provider:
-        name: "envoy.geoip_providers.dummy"
-        typed_config:
-          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
-    client_ip_filter_state_config:
-        filter_state_key: "test.key"
-)EOF";
-  initializeFilter(config_yaml);
+  auto formatter = createStaticIpFormatter("1.2.3.4");
+  initializeFilter(BasicGeoipConfig, std::move(formatter));
 
-  // Verify the accessor returns the correct value.
-  EXPECT_TRUE(config_->clientIpFilterStateKey().has_value());
-  EXPECT_EQ("test.key", config_->clientIpFilterStateKey().value());
+  // Verify the accessor returns a non-null formatter.
+  EXPECT_NE(nullptr, config_->clientIpFormatter());
 }
 
 } // namespace

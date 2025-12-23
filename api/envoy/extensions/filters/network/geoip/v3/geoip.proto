@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.extensions.filters.network.geoip.v3;
 
 import "envoy/config/core/v3/extension.proto";
+import "envoy/config/core/v3/substitution_format_string.proto";
 
 import "xds/annotations/v3/status.proto";
 
@@ -28,26 +29,6 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // See :ref:`well known filter state <well_known_filter_state>` for details on accessing
 // the geolocation data.
 message Geoip {
-  // Configuration for dynamically overriding the client IP address used for geolocation lookups.
-  message ClientIpFilterStateConfig {
-    // The name of the filter state object from which to read the client IP address.
-    // The filter state object must implement the ``Router::StringAccessor`` interface
-    // and contain a valid IPv4 or IPv6 address string.
-    //
-    // If the filter state object is not found or contains an invalid IP address,
-    // the filter will fall back to using the downstream connection source address.
-    //
-    // This is useful when a preceding filter (such as a listener filter or network filter)
-    // has extracted the true client IP from a protocol header (e.g., PROXY protocol)
-    // and stored it in filter state.
-    //
-    // Example filter state keys that might be used:
-    //
-    // * A custom key set by a preceding filter that parses PROXY protocol TLVs.
-    // * ``envoy.filters.listener.original_dst.remote_ip`` from the original destination filter.
-    string filter_state_key = 1 [(validate.rules).string = {min_len: 1}];
-  }
-
   // The prefix to use when emitting statistics. This is useful when there are multiple
   // listeners configured with geoip filters, allowing stats to be grouped per listener.
   // For example, with ``stat_prefix: "listener_1."``, stats would be emitted as
@@ -58,14 +39,30 @@ message Geoip {
   // [#extension-category: envoy.geoip_providers]
   config.core.v3.TypedExtensionConfig provider = 2 [(validate.rules).message = {required: true}];
 
-  // Configuration for dynamically overriding the client IP address used for geolocation lookups.
+  // Configuration for dynamically extracting the client IP address used for geolocation lookups.
   //
-  // If set, the filter will first attempt to read the client IP address from the filter state
-  // object specified by
-  // :ref:`filter_state_key <envoy_v3_api_field_extensions.filters.network.geoip.v3.Geoip.ClientIpFilterStateConfig.filter_state_key>`.
-  // If the filter state object is not found or contains an invalid IP address, the filter
+  // This field accepts a :ref:`SubstitutionFormatString <envoy_v3_api_msg_config.core.v3.SubstitutionFormatString>`
+  // that is evaluated at connection time to produce the client IP address.
+  // The formatted result must be a valid IPv4 or IPv6 address string.
+  //
+  // This allows flexible extraction of the client IP using any available
+  // :ref:`command operator <config_access_log_command_operators>`. For example:
+  //
+  // * ``%FILTER_STATE(my.custom.client.ip:PLAIN)%`` - Read from filter state populated by a preceding filter.
+  // * ``%DYNAMIC_METADATA(namespace:key)%`` - Read from dynamic metadata.
+  //
+  // If not set, the filter uses the downstream connection's remote address.
+  //
+  // If set but the formatted result is empty or not a valid IP address, the filter
   // falls back to using the downstream connection source address.
   //
-  // If not set, the filter always uses the downstream connection source address.
-  ClientIpFilterStateConfig client_ip_filter_state_config = 3;
+  // Example configuration using filter state:
+  //
+  // .. code-block:: yaml
+  //
+  //   client_ip_config:
+  //     text_format_source:
+  //       inline_string: "%FILTER_STATE(my.custom.client.ip:PLAIN)%"
+  //
+  config.core.v3.SubstitutionFormatString client_ip_config = 3;
 }

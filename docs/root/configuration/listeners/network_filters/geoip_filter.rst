@@ -48,43 +48,56 @@ Dynamic Client IP Override
 --------------------------
 
 By default, the filter uses the downstream connection's remote address for geolocation lookups.
-However, the client IP can be dynamically overridden by setting
-:ref:`client_ip_filter_state_config <envoy_v3_api_field_extensions.filters.network.geoip.v3.Geoip.client_ip_filter_state_config>`.
-When configured, the filter will first attempt to read the client IP address from the specified
-filter state key. If the filter state object is not found or contains an invalid IP address,
-the filter falls back to using the downstream connection source address.
+For most deployments, this is sufficient since Envoy can obtain the correct client IP through:
 
-This is useful when a preceding filter (such as the PROXY protocol listener filter or a custom
-network filter) has extracted the real client IP address from a protocol header and stored it in filter
-state. For example, you can use the :ref:`set_filter_state network filter
-<config_network_filters_set_filter_state>` to set the client IP from PROXY protocol TLVs.
+* Direct client connections (remote address is the client IP)
+* PROXY protocol (listener filter updates the connection's remote address)
+* Original destination filter (preserves the original destination)
 
-Example configuration with dynamic client IP override:
+However, in advanced scenarios where the client IP needs to be extracted from another source,
+you can configure
+:ref:`client_ip_config <envoy_v3_api_field_extensions.filters.network.geoip.v3.Geoip.client_ip_config>`.
+This field accepts a :ref:`SubstitutionFormatString <envoy_v3_api_msg_config.core.v3.SubstitutionFormatString>`
+that is evaluated at connection time to produce the client IP address.
+
+This is useful for scenarios such as:
+
+* Reading client IP from filter state populated by a custom filter that parses application-layer
+  protocol headers
+* Extracting client IP from dynamic metadata set by another filter
+
+Example using filter state
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+If a preceding filter has stored the client IP in filter state, you can read it using the
+``FILTER_STATE`` formatter:
 
 .. code-block:: yaml
 
   filter_chains:
   - filters:
-    # First, set the client IP in filter state.
+    # First, a custom filter sets the client IP in filter state.
     - name: envoy.filters.network.set_filter_state
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.filters.network.set_filter_state.v3.Config
         on_new_connection:
-        - object_key: my.client.ip
+        - object_key: my.custom.client.ip
           format_string:
             text_format_source:
-              inline_string: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
-    # Then use the geoip filter with the filter state key.
+              inline_string: "192.0.2.1"
+    # Then use the geoip filter with the formatter to read from filter state.
     - name: envoy.filters.network.geoip
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.filters.network.geoip.v3.Geoip
-        client_ip_filter_state_config:
-          filter_state_key: "my.client.ip"
+        client_ip_config:
+          text_format_source:
+            inline_string: "%FILTER_STATE(my.custom.client.ip:PLAIN)%"
         provider:
           # ... provider configuration ...
 
-The filter state object must implement the ``Router::StringAccessor`` interface and contain a
-valid IPv4 or IPv6 address string.
+The formatted result must be a valid IPv4 or IPv6 address string. If the formatter returns an
+empty result or an invalid IP address, the filter falls back to using the downstream connection
+source address.
 
 Accessing Geolocation Data
 --------------------------

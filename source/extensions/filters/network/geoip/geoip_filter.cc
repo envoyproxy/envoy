@@ -35,16 +35,12 @@ StreamInfo::FilterState::Object::FieldType GeoipInfo::getField(absl::string_view
   return absl::monostate{};
 }
 
-GeoipFilterConfig::GeoipFilterConfig(
-    const envoy::extensions::filters::network::geoip::v3::Geoip& config,
-    const std::string& stat_prefix, Stats::Scope& scope)
+GeoipFilterConfig::GeoipFilterConfig(const envoy::extensions::filters::network::geoip::v3::Geoip&,
+                                     const std::string& stat_prefix, Stats::Scope& scope,
+                                     Formatter::FormatterConstSharedPtr client_ip_formatter)
     : scope_(scope), stat_name_set_(scope.symbolTable().makeSet("Geoip")),
       stats_prefix_(stat_name_set_->add(stat_prefix + "geoip")),
-      client_ip_filter_state_key_(
-          config.has_client_ip_filter_state_config()
-              ? absl::make_optional<std::string>(
-                    config.client_ip_filter_state_config().filter_state_key())
-              : absl::nullopt) {
+      client_ip_formatter_(std::move(client_ip_formatter)) {
   stat_name_set_->rememberBuiltin("total");
 }
 
@@ -61,35 +57,29 @@ Network::FilterStatus GeoipFilter::onNewConnection() {
 
   Network::Address::InstanceConstSharedPtr remote_address;
 
-  // Check if a filter state key is configured for dynamic client IP override.
-  const auto& filter_state_key = config_->clientIpFilterStateKey();
-  if (filter_state_key.has_value()) {
-    const Router::StringAccessor* client_ip_filter_state =
-        read_callbacks_->connection()
-            .streamInfo()
-            .filterState()
-            ->getDataReadOnly<Router::StringAccessor>(filter_state_key.value());
+  // Check if a client IP formatter is configured for dynamic extraction.
+  const auto& formatter = config_->clientIpFormatter();
+  if (formatter != nullptr) {
+    // Format the client IP using the configured formatter.
+    const std::string ip_string = formatter->format({}, read_callbacks_->connection().streamInfo());
 
-    if (client_ip_filter_state != nullptr) {
-      const std::string ip_string(client_ip_filter_state->asString());
+    if (!ip_string.empty() && ip_string != "-") {
       remote_address = Network::Utility::parseInternetAddressNoThrow(ip_string);
       if (remote_address != nullptr) {
-        ENVOY_LOG(debug, "geoip: using client IP '{}' from filter state key '{}'", ip_string,
-                  filter_state_key.value());
+        ENVOY_LOG(debug, "geoip: using client IP '{}' from configured formatter", ip_string);
       } else {
         ENVOY_LOG(debug,
-                  "geoip: failed to parse IP address '{}' from filter state key '{}', "
+                  "geoip: failed to parse IP address '{}' from configured formatter, "
                   "falling back to connection remote address",
-                  ip_string, filter_state_key.value());
+                  ip_string);
       }
     } else {
-      ENVOY_LOG(debug,
-                "geoip: filter state key '{}' not found, falling back to connection remote address",
-                filter_state_key.value());
+      ENVOY_LOG(debug, "geoip: formatter returned empty result, falling back to connection remote "
+                       "address");
     }
   }
 
-  // Fall back to the downstream connection remote address if no filter state override is available.
+  // Fall back to the downstream connection remote address if no formatter override is available.
   if (remote_address == nullptr) {
     remote_address = read_callbacks_->connection().connectionInfoProvider().remoteAddress();
   }

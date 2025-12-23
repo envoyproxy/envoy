@@ -4,16 +4,15 @@
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/extensions/filters/network/geoip/v3/geoip.pb.h"
+#include "envoy/formatter/substitution_formatter.h"
 #include "envoy/geoip/geoip_provider_driver.h"
 #include "envoy/network/filter.h"
-#include "envoy/router/string_accessor.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stream_info/filter_state.h"
 
 #include "source/common/common/logger.h"
 
 #include "absl/container/flat_hash_map.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -60,16 +59,15 @@ private:
 class GeoipFilterConfig {
 public:
   GeoipFilterConfig(const envoy::extensions::filters::network::geoip::v3::Geoip& config,
-                    const std::string& stat_prefix, Stats::Scope& scope);
+                    const std::string& stat_prefix, Stats::Scope& scope,
+                    Formatter::FormatterConstSharedPtr client_ip_formatter);
 
   void incTotal() { incCounter(stat_name_set_->getBuiltin("total", unknown_hit_)); }
 
   /**
-   * @return the optional filter state key from which to read the client IP address.
+   * @return the optional formatter for extracting the client IP address.
    */
-  const absl::optional<std::string>& clientIpFilterStateKey() const {
-    return client_ip_filter_state_key_;
-  }
+  Formatter::FormatterConstSharedPtr clientIpFormatter() const { return client_ip_formatter_; }
 
 private:
   void incCounter(Stats::StatName name);
@@ -78,7 +76,7 @@ private:
   Stats::StatNameSetPtr stat_name_set_;
   const Stats::StatName stats_prefix_;
   const Stats::StatName unknown_hit_;
-  const absl::optional<std::string> client_ip_filter_state_key_;
+  const Formatter::FormatterConstSharedPtr client_ip_formatter_;
 };
 
 using GeoipFilterConfigSharedPtr = std::shared_ptr<GeoipFilterConfig>;
