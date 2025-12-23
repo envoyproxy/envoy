@@ -83,7 +83,7 @@ typed_config:
       {":scheme", "http"}, {":path", "/chat"}, {":method", "POST"}, {":authority", "host"}};
 
   Http::TestResponseHeaderMapImpl response_headers_{{":status", "200"},
-                                                     {"content-type", "text/event-stream"}};
+                                                    {"content-type", "text/event-stream"}};
 
   const std::string sse_response_body_ =
       "data: "
@@ -123,7 +123,7 @@ TEST_P(StreamToMetadataIntegrationTest, SseWithLargeChunks) {
 
 TEST_P(StreamToMetadataIntegrationTest, MismatchedContentType) {
   Http::TestResponseHeaderMapImpl json_headers{{":status", "200"},
-                                                {"content-type", "application/json"}};
+                                               {"content-type", "application/json"}};
   initializeFilter();
   const std::string json_body = R"({"result": "not an SSE stream"})";
   runTest(request_headers_, "", json_headers, json_body);

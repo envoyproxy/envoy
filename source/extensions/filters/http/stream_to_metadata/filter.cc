@@ -98,9 +98,10 @@ void Filter::processBuffer(bool end_stream) {
       // No complete event found. Check if buffer exceeds max size.
       const uint32_t max_size = config_->maxEventSize();
       if (max_size > 0 && buffer_view.size() > max_size) {
-        ENVOY_LOG(warn,
-                  "SSE event exceeds max_event_size ({} bytes). Discarding {} bytes of buffered data.",
-                  max_size, buffer_view.size());
+        ENVOY_LOG(
+            warn,
+            "SSE event exceeds max_event_size ({} bytes). Discarding {} bytes of buffered data.",
+            max_size, buffer_view.size());
         config_->stats().event_too_large_.inc();
         buffer_.clear();
         return;
@@ -277,7 +278,7 @@ bool Filter::applyRule(const Json::ObjectSharedPtr& json_obj, const Rule& rule) 
 
 absl::StatusOr<Json::ValueType>
 Filter::extractValueFromJson(const Json::ObjectSharedPtr& json_obj,
-                              const std::vector<std::string>& path) const {
+                             const std::vector<std::string>& path) const {
   if (path.empty()) {
     return absl::InvalidArgumentError("Empty selector path");
   }
@@ -354,8 +355,8 @@ bool Filter::writeMetadata(const Json::ValueType& value, const MetadataDescripto
   return true;
 }
 
-absl::StatusOr<ProtobufWkt::Value>
-Filter::convertToProtobufValue(const Json::ValueType& json_value, ValueType type) const {
+absl::StatusOr<ProtobufWkt::Value> Filter::convertToProtobufValue(const Json::ValueType& json_value,
+                                                                  ValueType type) const {
   ProtobufWkt::Value proto_value;
 
   if (absl::holds_alternative<std::string>(json_value)) {

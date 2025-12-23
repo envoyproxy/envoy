@@ -39,8 +39,7 @@ struct StreamToMetadataStats {
   ALL_STREAM_TO_METADATA_FILTER_STATS(GENERATE_COUNTER_STRUCT)
 };
 
-using ProtoRule =
-    envoy::extensions::filters::http::stream_to_metadata::v3::StreamToMetadata::Rule;
+using ProtoRule = envoy::extensions::filters::http::stream_to_metadata::v3::StreamToMetadata::Rule;
 using MetadataDescriptor =
     envoy::extensions::filters::http::stream_to_metadata::v3::StreamToMetadata::MetadataDescriptor;
 using Selector =
@@ -161,7 +160,7 @@ private:
    * @return the extracted value, or nullptr if not found.
    */
   absl::StatusOr<Json::ValueType> extractValueFromJson(const Json::ObjectSharedPtr& json_obj,
-                                                        const std::vector<std::string>& path) const;
+                                                       const std::vector<std::string>& path) const;
 
   /**
    * Write a value to dynamic metadata.
@@ -178,7 +177,7 @@ private:
    * @return the Protobuf Value, or error status.
    */
   absl::StatusOr<ProtobufWkt::Value> convertToProtobufValue(const Json::ValueType& json_value,
-                                                             ValueType type) const;
+                                                            ValueType type) const;
 
   std::shared_ptr<FilterConfig> config_;
   bool should_process_{false};

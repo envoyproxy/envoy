@@ -23,7 +23,8 @@ public:
 
 private:
   absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
-      const envoy::extensions::filters::http::stream_to_metadata::v3::StreamToMetadata& proto_config,
+      const envoy::extensions::filters::http::stream_to_metadata::v3::StreamToMetadata&
+          proto_config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 };
 

@@ -1,3 +1,4 @@
+#include "source/common/config/metadata.h"
 #include "source/extensions/filters/http/stream_to_metadata/config.h"
 #include "source/extensions/filters/http/stream_to_metadata/filter.h"
 
@@ -5,8 +6,6 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/utility.h"
-
-#include "source/common/config/metadata.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -299,8 +298,7 @@ TEST_F(StreamToMetadataFilterTest, MultipleRules) {
   setupFilter(multi_rule_config_);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
 
-  addEncodeDataChunks(
-      "data: {\"model\":\"gpt-4\",\"usage\":{\"total_tokens\":30}}\n\n", true);
+  addEncodeDataChunks("data: {\"model\":\"gpt-4\",\"usage\":{\"total_tokens\":30}}\n\n", true);
 
   auto tokens = getMetadata("envoy.lb", "tokens");
   EXPECT_EQ(tokens.number_value(), 30);
@@ -351,8 +349,7 @@ TEST_F(StreamToMetadataFilterTest, PartialSelectorPath) {
 TEST_F(StreamToMetadataFilterTest, CRLFLineEndings) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
 
-  const std::string data =
-      "data: {\"usage\":{\"total_tokens\":30}}\r\n\r\n";
+  const std::string data = "data: {\"usage\":{\"total_tokens\":30}}\r\n\r\n";
   addEncodeDataChunks(data, true);
 
   auto metadata = getMetadata("envoy.lb", "tokens");
@@ -363,8 +360,7 @@ TEST_F(StreamToMetadataFilterTest, CRLFLineEndings) {
 TEST_F(StreamToMetadataFilterTest, CRLineEndings) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
 
-  const std::string data =
-      "data: {\"usage\":{\"total_tokens\":30}}\r\r";
+  const std::string data = "data: {\"usage\":{\"total_tokens\":30}}\r\r";
   addEncodeDataChunks(data, true);
 
   auto metadata = getMetadata("envoy.lb", "tokens");
@@ -375,9 +371,8 @@ TEST_F(StreamToMetadataFilterTest, CRLineEndings) {
 TEST_F(StreamToMetadataFilterTest, MixedLineEndings) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
 
-  const std::string data =
-      "data: {\"usage\":{\"total_tokens\":30}}\r\n"
-      "event: usage\n\n";
+  const std::string data = "data: {\"usage\":{\"total_tokens\":30}}\r\n"
+                           "event: usage\n\n";
   addEncodeDataChunks(data, true);
 
   auto metadata = getMetadata("envoy.lb", "tokens");
@@ -623,13 +618,16 @@ TEST_F(StreamToMetadataFilterTest, ComplexRealWorldScenario) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
 
   // Simulate real OpenAI-like streaming response
-  addEncodeDataChunks("data: {\"id\":\"1\",\"object\":\"chat.completion.chunk\",\"model\":\"gpt-4\","
-                      "\"choices\":[{\"delta\":{\"content\":\"Hello\"}}]}\n\n");
-  addEncodeDataChunks("data: {\"id\":\"2\",\"object\":\"chat.completion.chunk\",\"model\":\"gpt-4\","
-                      "\"choices\":[{\"delta\":{\"content\":\" world\"}}]}\n\n");
-  addEncodeDataChunks("data: {\"id\":\"3\",\"object\":\"chat.completion.chunk\",\"model\":\"gpt-4\","
-                      "\"choices\":[],\"usage\":{\"prompt_tokens\":10,\"completion_tokens\":20,"
-                      "\"total_tokens\":30}}\n\n");
+  addEncodeDataChunks(
+      "data: {\"id\":\"1\",\"object\":\"chat.completion.chunk\",\"model\":\"gpt-4\","
+      "\"choices\":[{\"delta\":{\"content\":\"Hello\"}}]}\n\n");
+  addEncodeDataChunks(
+      "data: {\"id\":\"2\",\"object\":\"chat.completion.chunk\",\"model\":\"gpt-4\","
+      "\"choices\":[{\"delta\":{\"content\":\" world\"}}]}\n\n");
+  addEncodeDataChunks(
+      "data: {\"id\":\"3\",\"object\":\"chat.completion.chunk\",\"model\":\"gpt-4\","
+      "\"choices\":[],\"usage\":{\"prompt_tokens\":10,\"completion_tokens\":20,"
+      "\"total_tokens\":30}}\n\n");
   addEncodeDataChunks("data: [DONE]\n\n", true);
 
   auto tokens = getMetadata("envoy.lb", "tokens");

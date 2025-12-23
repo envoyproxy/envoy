@@ -9,8 +9,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace StreamToMetadata {
 
-absl::StatusOr<Http::FilterFactoryCb>
-StreamToMetadataConfig::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb> StreamToMetadataConfig::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::stream_to_metadata::v3::StreamToMetadata& proto_config,
     const std::string&, Server::Configuration::FactoryContext& context) {
 
