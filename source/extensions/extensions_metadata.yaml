@@ -685,6 +685,13 @@ envoy.filters.http.stateful_session:
   type_urls:
   - envoy.extensions.filters.http.stateful_session.v3.StatefulSession
   - envoy.extensions.filters.http.stateful_session.v3.StatefulSessionPerRoute
+envoy.filters.http.stream_to_metadata:
+  categories:
+  - envoy.filters.http
+  security_posture: robust_to_untrusted_downstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.http.stream_to_metadata.v3.StreamToMetadata
 envoy.filters.http.header_mutation:
   categories:
   - envoy.filters.http

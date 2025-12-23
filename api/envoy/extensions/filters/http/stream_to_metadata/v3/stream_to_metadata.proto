@@ -1,0 +1,146 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.stream_to_metadata.v3;
+
+import "google/protobuf/struct.proto";
+import "google/protobuf/wrappers.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.stream_to_metadata.v3";
+option java_outer_classname = "StreamToMetadataProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/stream_to_metadata/v3;stream_to_metadatav3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Stream-To-Metadata Filter]
+//
+// The Stream-To-Metadata filter extracts values from streaming response bodies
+// and writes them to dynamic metadata. This is useful for rate limiting based on
+// token usage, logging, and other observability use cases.
+//
+// The filter currently supports Server-Sent Events (SSE) format with JSON payloads
+// in the data fields. It can be extended to support other streaming formats in the future.
+//
+// [#extension: envoy.filters.http.stream_to_metadata]
+
+// Stream-To-Metadata :ref:`configuration overview <config_http_filters_stream_to_metadata>`.
+message StreamToMetadata {
+  // Specifies the format of the streaming response body.
+  enum Format {
+    // Server-Sent Events format (text/event-stream).
+    // See: https://html.spec.whatwg.org/multipage/server-sent-events.html
+    SERVER_SENT_EVENTS = 0;
+  }
+
+  // Value type for extracted metadata.
+  enum ValueType {
+    // The value is a serialized protobuf.Value.
+    PROTOBUF_VALUE = 0;
+
+    // String value.
+    STRING = 1;
+
+    // Number value.
+    NUMBER = 2;
+  }
+
+  // [#next-free-field: 5]
+  // Describes where to write the extracted value in dynamic metadata.
+  message MetadataDescriptor {
+    // The namespace in dynamic metadata where the key-value pair will be written.
+    // This field is required.
+    string metadata_namespace = 1 [(validate.rules).string = {min_len: 1}];
+
+    // The key to use within the namespace.
+    // This field is required.
+    string key = 2 [(validate.rules).string = {min_len: 1}];
+
+    // The value's type — defaults to PROTOBUF_VALUE.
+    ValueType type = 3 [(validate.rules).enum = {defined_only: true}];
+
+    // If true, do not overwrite existing metadata value for this key.
+    // Default is false (overwrite existing values).
+    bool preserve_existing_metadata_value = 4;
+  }
+
+  // Specifies a path to a value within a JSON object using a sequence of keys.
+  // For example, to extract the value "42" from {"usage": {"total_tokens": 42}},
+  // the path would be ["usage", "total_tokens"].
+  message JsonPathSelector {
+    // The sequence of keys to traverse in the JSON object.
+    // For example: ["usage", "total_tokens"] will extract the value at
+    // json_obj["usage"]["total_tokens"].
+    repeated string path = 1 [(validate.rules).repeated = {min_items: 1}];
+  }
+
+  // Selector specifies how to extract a value from the stream payload.
+  // This uses a oneof to allow future extension for different extraction methods
+  // (e.g., regex, protobuf field paths, JSONPath expressions).
+  message Selector {
+    oneof selector_type {
+      option (validate.required) = true;
+
+      // Extract value using JSON path traversal.
+      // Currently the only supported selector type.
+      JsonPathSelector json_path = 1;
+
+      // Future: Add other selector types here as needed
+    }
+  }
+
+  // [#next-free-field: 4]
+  // A rule describes what value to extract from the stream and where to write it.
+  message Rule {
+    // Specifies how to extract the value from the stream payload.
+    // For SSE format with JSON payloads, use json_path selector which is applied
+    // to the JSON parsed from the "data" field of each event.
+    Selector selector = 1 [(validate.rules).message = {required: true}];
+
+    // One or more metadata descriptors specifying where to write the extracted value.
+    // The same value can be written to multiple namespaces.
+    repeated MetadataDescriptor metadata_descriptors = 2
+        [(validate.rules).repeated = {min_items: 1}];
+
+    // If true, stop processing the stream after this rule matches and writes metadata.
+    // This picks the FIRST occurrence and is efficient when you only need the first value
+    // (e.g., when a token count appears in the final SSE event of a stream).
+    //
+    // If false, continue processing the entire stream. Combined with
+    // preserve_existing_metadata_value=false (default), later matches will overwrite
+    // earlier ones, effectively picking the LAST occurrence.
+    //
+    // Default is false (process entire stream). Set to true for better performance
+    // when you only need the first matching value.
+    bool stop_processing_on_match = 3;
+  }
+
+  // The format of the streaming response body.
+  // Currently only Server-Sent Events (SSE) is supported.
+  // Default is SERVER_SENT_EVENTS.
+  Format format = 1 [(validate.rules).enum = {defined_only: true}];
+
+  // The rules to apply for extracting values from the stream.
+  // Rules are evaluated in order for each event/chunk.
+  // At least one rule must be specified.
+  repeated Rule rules = 2 [(validate.rules).repeated = {min_items: 1}];
+
+  // Allowed content types for stream processing.
+  // For SSE format, defaults to ["text/event-stream"].
+  // The content-type header is matched against this list (case-insensitive,
+  // ignoring parameters like charset).
+  repeated string allowed_content_types = 3;
+
+  // Maximum size in bytes for a single event before it's considered invalid
+  // and discarded. This protects against unbounded memory growth from malicious
+  // or malformed streams that never send event delimiters (blank lines).
+  //
+  // For SSE format, this is the maximum size of a complete event (all lines
+  // from one blank line to the next).
+  //
+  // Default is 8192 bytes (8KB), which is sufficient for most legitimate events.
+  // Set to 0 to disable the limit (not recommended for production).
+  // Maximum allowed value is 10485760 bytes (10MB).
+  google.protobuf.UInt32Value max_event_size = 4 [(validate.rules).uint32 = {lte: 10485760}];
+}

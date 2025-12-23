@@ -210,6 +210,7 @@ EXTENSIONS = {
     "envoy.filters.http.thrift_to_metadata":            "//source/extensions/filters/http/thrift_to_metadata:config",
     "envoy.filters.http.wasm":                          "//source/extensions/filters/http/wasm:config",
     "envoy.filters.http.stateful_session":              "//source/extensions/filters/http/stateful_session:config",
+    "envoy.filters.http.stream_to_metadata":            "//source/extensions/filters/http/stream_to_metadata:config",
     "envoy.filters.http.header_mutation":               "//source/extensions/filters/http/header_mutation:config",
     "envoy.filters.http.transform":                     "//source/extensions/filters/http/transform:config",
 
