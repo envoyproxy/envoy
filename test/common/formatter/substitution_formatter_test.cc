@@ -2560,6 +2560,80 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
   }
 }
 
+TEST(SubstitutionFormatterTest, requestedServerNameFormatter) {
+  Event::SimulatedTimeSystem time_system;
+  time_system.setSystemTime(std::chrono::milliseconds(0));
+  auto connection_info_provider = std::make_shared<Network::ConnectionInfoSetterImpl>(
+      std::make_shared<Network::Address::Ipv4Instance>("80.80.80.80"), nullptr);
+  connection_info_provider->setRequestedServerName("outbound_.8080_._.example.com");
+  Http::TestRequestHeaderMapImpl request_header{{":authority", "fake-authority"},
+                                                {"x-envoy-original-host", "fake-original-host"}};
+  StreamInfo::StreamInfoImpl stream_info{Http::Protocol::Http2, time_system,
+                                         connection_info_provider,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain};
+
+  stream_info.setRequestHeaders(request_header);
+
+  StreamInfo::StreamInfoImpl stream_info_no_requested_name{
+      Http::Protocol::Http2, time_system, nullptr, StreamInfo::FilterState::LifeSpan::FilterChain};
+  stream_info_no_requested_name.setRequestHeaders(request_header);
+
+  {
+    auto providers = *SubstitutionFormatParser::parse(absl::StrCat("%REQUESTED_SERVER_NAME%"));
+    EXPECT_EQ(providers.size(), 1);
+    EXPECT_EQ("outbound_.8080_._.example.com", providers[0]->format({}, stream_info));
+    EXPECT_EQ(absl::nullopt, providers[0]->format({}, stream_info_no_requested_name));
+  }
+
+  {
+    auto providers =
+        *SubstitutionFormatParser::parse(absl::StrCat("%REQUESTED_SERVER_NAME(SNI_ONLY)%"));
+    EXPECT_EQ(providers.size(), 1);
+    EXPECT_EQ("outbound_.8080_._.example.com", providers[0]->format({}, stream_info));
+    EXPECT_EQ(absl::nullopt, providers[0]->format({}, stream_info_no_requested_name));
+  }
+
+  {
+    auto providers =
+        *SubstitutionFormatParser::parse(absl::StrCat("%REQUESTED_SERVER_NAME(SNI_FIRST)%"));
+    EXPECT_EQ(providers.size(), 1);
+    EXPECT_EQ("outbound_.8080_._.example.com", providers[0]->format({}, stream_info));
+    EXPECT_EQ("fake-original-host", providers[0]->format({}, stream_info_no_requested_name));
+  }
+
+  {
+    auto providers = *SubstitutionFormatParser::parse(
+        absl::StrCat("%REQUESTED_SERVER_NAME(SNI_FIRST:ORIG_OR_HOST)%"));
+    EXPECT_EQ(providers.size(), 1);
+    EXPECT_EQ("outbound_.8080_._.example.com", providers[0]->format({}, stream_info));
+    EXPECT_EQ("fake-original-host", providers[0]->format({}, stream_info_no_requested_name));
+  }
+
+  {
+    auto providers =
+        *SubstitutionFormatParser::parse(absl::StrCat("%REQUESTED_SERVER_NAME(SNI_FIRST:HOST)%"));
+    EXPECT_EQ(providers.size(), 1);
+    EXPECT_EQ("outbound_.8080_._.example.com", providers[0]->format({}, stream_info));
+    EXPECT_EQ("fake-authority", providers[0]->format({}, stream_info_no_requested_name));
+  }
+
+  {
+    auto providers =
+        *SubstitutionFormatParser::parse(absl::StrCat("%REQUESTED_SERVER_NAME(HOST_FIRST:HOST)%"));
+    EXPECT_EQ(providers.size(), 1);
+    EXPECT_EQ("fake-authority", providers[0]->format({}, stream_info));
+    EXPECT_EQ("fake-authority", providers[0]->format({}, stream_info_no_requested_name));
+  }
+
+  {
+    auto providers =
+        *SubstitutionFormatParser::parse(absl::StrCat("%REQUESTED_SERVER_NAME(HOST_FIRST)%"));
+    EXPECT_EQ(providers.size(), 1);
+    EXPECT_EQ("fake-original-host", providers[0]->format({}, stream_info));
+    EXPECT_EQ("fake-original-host", providers[0]->format({}, stream_info_no_requested_name));
+  }
+}
+
 TEST(SubstitutionFormatterTest, requestHeaderFormatter) {
   StreamInfo::MockStreamInfo stream_info;
   Http::TestRequestHeaderMapImpl request_header{{":method", "GET"}, {":path", "/"}};
