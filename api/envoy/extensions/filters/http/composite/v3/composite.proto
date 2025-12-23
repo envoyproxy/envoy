@@ -92,6 +92,12 @@ message ExecuteFilterAction {
   // field. This allows filter chains to be defined once and referenced multiple times
   // from match actions, which is useful when the same filter chain needs to be applied
   // across many routes.
+  //
+  // .. note::
+  //   This field cannot be used in the per-route configuration because named filter chains are
+  //   scoped to the Composite filter configuration and are not current available during route
+  //   configuration processing.
+  //
   // Only one of ``typed_config``, ``dynamic_config``, ``filter_chain``, or ``filter_chain_ref``
   // can be set.
   string filter_chain_ref = 5;
