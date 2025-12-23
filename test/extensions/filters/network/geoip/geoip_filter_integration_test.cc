@@ -106,7 +106,7 @@ TEST_P(GeoipFilterIntegrationTest, GeoipFilterNoCrashOnLdsUpdate) {
 // geolocation data.
 TEST_P(GeoipFilterIntegrationTest, GeoipFilterUsesClientIpFromFormatter) {
   // IP address 2.125.160.216 is a test IP in GeoLite2-City-Test.mmdb that resolves to
-  // Boxford, England, GB.
+  // England, GB.
   const std::string set_filter_state_config = R"EOF(
 name: envoy.filters.network.set_filter_state
 typed_config:
