@@ -269,6 +269,19 @@ TEST_F(CodecClientTest, IdleTimerClientLocalCloseWithActiveRequests) {
   EXPECT_EQ(client_->idleTimer(), nullptr);
 }
 
+// Test that idle timeout does not close the connection when not yet connected.
+TEST_F(CodecClientTest, IdleTimeoutWhenNotConnected) {
+  initialize();
+
+  // Verify the connection is not connected yet (Connected event not fired).
+  // Trigger idle timeout - it should not close the connection or increment stats.
+  EXPECT_CALL(*connection_, close(_)).Times(0);
+  client_->triggerIdleTimeout();
+
+  // Verify idle timeout stat was not incremented.
+  EXPECT_EQ(0U, cluster_->traffic_stats_->upstream_cx_idle_timeout_.value());
+}
+
 TEST_F(CodecClientTest, ProtocolError) {
   initialize();
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Return(codecProtocolError("protocol error")));

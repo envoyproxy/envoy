@@ -192,6 +192,9 @@ bug_fixes:
 - area: dynamic modules
   change: |
     Fixed a soundness bug in the Rust SDK by tightening bounds on the ``HttpFilterConfig`` trait.
+- area: http
+  change: |
+    Fixed upstream client to not close connection when idle timeout fires before the connection is established.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
