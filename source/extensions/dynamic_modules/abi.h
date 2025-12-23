@@ -2912,8 +2912,8 @@ void envoy_dynamic_module_callback_network_filter_disable_close(
 // -----------------------------------------------------------------------------
 
 /**
- * envoy_dynamic_module_callback_listener_filter_get_buffer_slice is called by the module to
- * get the current data buffer as a single slice. This is only valid during the
+ * envoy_dynamic_module_callback_listener_filter_get_buffer_chunk is called by the module to
+ * get the current data buffer as a single chunk. This is only valid during the
  * envoy_dynamic_module_on_listener_filter_on_data callback.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
@@ -2923,7 +2923,7 @@ void envoy_dynamic_module_callback_network_filter_disable_close(
  *
  * The returned data is owned by Envoy and valid until the end of the callback.
  */
-bool envoy_dynamic_module_callback_listener_filter_get_buffer_slice(
+bool envoy_dynamic_module_callback_listener_filter_get_buffer_chunk(
     envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_buffer_envoy_ptr* data_ptr_out, size_t* data_length_out);
 

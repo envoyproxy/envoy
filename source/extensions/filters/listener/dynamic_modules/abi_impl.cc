@@ -14,7 +14,7 @@ namespace ListenerFilters {
 
 extern "C" {
 
-bool envoy_dynamic_module_callback_listener_filter_get_buffer_slice(
+bool envoy_dynamic_module_callback_listener_filter_get_buffer_chunk(
     envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_buffer_envoy_ptr* data_ptr_out, size_t* data_length_out) {
   auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
