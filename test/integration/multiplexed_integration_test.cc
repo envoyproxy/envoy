@@ -3564,6 +3564,8 @@ TEST_P(MultiplexedIntegrationTestWithSimulatedTimeHttp2Only, ResetPropogation) {
   // to receive the related error code in onStreamClose().
   // But note, the onStreamClose() for the active closing side will also be called.
   // But the error code for active closing side will always be 0 if the Oghttp2 is used.
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.reset_ignore_upstream_reason",
+                                    "true");
 
   initialize();
 
