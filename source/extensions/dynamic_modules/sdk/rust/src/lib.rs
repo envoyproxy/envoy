@@ -3272,11 +3272,11 @@ pub trait NetworkFilter<ENF: EnvoyNetworkFilter> {
 /// The trait that represents the Envoy network filter.
 /// This is used in [`NetworkFilter`] to interact with the underlying Envoy network filter object.
 pub trait EnvoyNetworkFilter {
-  /// Get the read buffer slices. This is only valid during the on_read callback.
-  fn get_read_buffer_slices(&mut self) -> (Vec<EnvoyBuffer>, usize);
+  /// Get the read buffer chunks. This is only valid during the on_read callback.
+  fn get_read_buffer_chunks(&mut self) -> (Vec<EnvoyBuffer>, usize);
 
-  /// Get the write buffer slices. This is only valid during the on_write callback.
-  fn get_write_buffer_slices(&mut self) -> (Vec<EnvoyBuffer>, usize);
+  /// Get the write buffer chunks. This is only valid during the on_write callback.
+  fn get_write_buffer_chunks(&mut self) -> (Vec<EnvoyBuffer>, usize);
 
   /// Drain bytes from the beginning of the read buffer.
   fn drain_read_buffer(&mut self, length: usize);
@@ -3352,10 +3352,10 @@ impl EnvoyNetworkFilterImpl {
 }
 
 impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
-  fn get_read_buffer_slices(&mut self) -> (Vec<EnvoyBuffer>, usize) {
+  fn get_read_buffer_chunks(&mut self) -> (Vec<EnvoyBuffer>, usize) {
     let mut size: usize = 0;
     let ok = unsafe {
-      abi::envoy_dynamic_module_callback_network_filter_get_read_buffer_slices_size(
+      abi::envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks_size(
         self.raw, &mut size,
       )
     };
@@ -3371,7 +3371,7 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
       size
     ];
     let total_length = unsafe {
-      abi::envoy_dynamic_module_callback_network_filter_get_read_buffer_slices(
+      abi::envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks(
         self.raw,
         buffers.as_mut_ptr(),
       )
@@ -3383,10 +3383,10 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
     (envoy_buffers, total_length)
   }
 
-  fn get_write_buffer_slices(&mut self) -> (Vec<EnvoyBuffer>, usize) {
+  fn get_write_buffer_chunks(&mut self) -> (Vec<EnvoyBuffer>, usize) {
     let mut size: usize = 0;
     let ok = unsafe {
-      abi::envoy_dynamic_module_callback_network_filter_get_write_buffer_slices_size(
+      abi::envoy_dynamic_module_callback_network_filter_get_write_buffer_chunks_size(
         self.raw, &mut size,
       )
     };
@@ -3402,7 +3402,7 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
       size
     ];
     let total_length = unsafe {
-      abi::envoy_dynamic_module_callback_network_filter_get_write_buffer_slices(
+      abi::envoy_dynamic_module_callback_network_filter_get_write_buffer_chunks(
         self.raw,
         buffers.as_mut_ptr(),
       )
