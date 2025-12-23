@@ -311,6 +311,9 @@ void UpstreamSocketManager::markSocketDead(const int fd) {
   // Update Envoy's stats system.
   if (auto extension = getUpstreamExtension()) {
     extension->updateConnectionStats(node_id, cluster_id, false /* decrement */);
+    // Report the disconnection to the extension for further action.
+    extension->reportDisconnection(node_id, cluster_id);
+
     ENVOY_LOG(trace, "reverse_tunnel: decremented stats registry for node '{}' cluster '{}'.",
               node_id, cluster_id);
   }

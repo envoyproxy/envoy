@@ -18,6 +18,11 @@ UpstreamSocketThreadLocal::UpstreamSocketThreadLocal(Event::Dispatcher& dispatch
 
 // ReverseTunnelAcceptorExtension implementation
 void ReverseTunnelAcceptorExtension::onServerInitialized() {
+  // Initialize the reporter.
+  if (reporter_) {
+    reporter_->onServerInitialized();
+  }
+
   ENVOY_LOG(debug,
             "ReverseTunnelAcceptorExtension::onServerInitialized: creating thread-local slot.");
 

@@ -2560,6 +2560,80 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
   }
 }
 
+TEST(SubstitutionFormatterTest, requestedServerNameFormatter) {
+  Event::SimulatedTimeSystem time_system;
+  time_system.setSystemTime(std::chrono::milliseconds(0));
+  auto connection_info_provider = std::make_shared<Network::ConnectionInfoSetterImpl>(
+      std::make_shared<Network::Address::Ipv4Instance>("80.80.80.80"), nullptr);
+  connection_info_provider->setRequestedServerName("outbound_.8080_._.example.com");
+  Http::TestRequestHeaderMapImpl request_header{{":authority", "fake-authority"},
+                                                {"x-envoy-original-host", "fake-original-host"}};
+  StreamInfo::StreamInfoImpl stream_info{Http::Protocol::Http2, time_system,
+                                         connection_info_provider,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain};
+
+  stream_info.setRequestHeaders(request_header);
+
+  StreamInfo::StreamInfoImpl stream_info_no_requested_name{
+      Http::Protocol::Http2, time_system, nullptr, StreamInfo::FilterState::LifeSpan::FilterChain};
+  stream_info_no_requested_name.setRequestHeaders(request_header);
+
+  {
+    auto providers = *SubstitutionFormatParser::parse(absl::StrCat("%REQUESTED_SERVER_NAME%"));
+    EXPECT_EQ(providers.size(), 1);
+    EXPECT_EQ("outbound_.8080_._.example.com", providers[0]->format({}, stream_info));
+    EXPECT_EQ(absl::nullopt, providers[0]->format({}, stream_info_no_requested_name));
+  }
+
+  {
+    auto providers =
+        *SubstitutionFormatParser::parse(absl::StrCat("%REQUESTED_SERVER_NAME(SNI_ONLY)%"));
+    EXPECT_EQ(providers.size(), 1);
+    EXPECT_EQ("outbound_.8080_._.example.com", providers[0]->format({}, stream_info));
+    EXPECT_EQ(absl::nullopt, providers[0]->format({}, stream_info_no_requested_name));
+  }
+
+  {
+    auto providers =
+        *SubstitutionFormatParser::parse(absl::StrCat("%REQUESTED_SERVER_NAME(SNI_FIRST)%"));
+    EXPECT_EQ(providers.size(), 1);
+    EXPECT_EQ("outbound_.8080_._.example.com", providers[0]->format({}, stream_info));
+    EXPECT_EQ("fake-original-host", providers[0]->format({}, stream_info_no_requested_name));
+  }
+
+  {
+    auto providers = *SubstitutionFormatParser::parse(
+        absl::StrCat("%REQUESTED_SERVER_NAME(SNI_FIRST:ORIG_OR_HOST)%"));
+    EXPECT_EQ(providers.size(), 1);
+    EXPECT_EQ("outbound_.8080_._.example.com", providers[0]->format({}, stream_info));
+    EXPECT_EQ("fake-original-host", providers[0]->format({}, stream_info_no_requested_name));
+  }
+
+  {
+    auto providers =
+        *SubstitutionFormatParser::parse(absl::StrCat("%REQUESTED_SERVER_NAME(SNI_FIRST:HOST)%"));
+    EXPECT_EQ(providers.size(), 1);
+    EXPECT_EQ("outbound_.8080_._.example.com", providers[0]->format({}, stream_info));
+    EXPECT_EQ("fake-authority", providers[0]->format({}, stream_info_no_requested_name));
+  }
+
+  {
+    auto providers =
+        *SubstitutionFormatParser::parse(absl::StrCat("%REQUESTED_SERVER_NAME(HOST_FIRST:HOST)%"));
+    EXPECT_EQ(providers.size(), 1);
+    EXPECT_EQ("fake-authority", providers[0]->format({}, stream_info));
+    EXPECT_EQ("fake-authority", providers[0]->format({}, stream_info_no_requested_name));
+  }
+
+  {
+    auto providers =
+        *SubstitutionFormatParser::parse(absl::StrCat("%REQUESTED_SERVER_NAME(HOST_FIRST)%"));
+    EXPECT_EQ(providers.size(), 1);
+    EXPECT_EQ("fake-original-host", providers[0]->format({}, stream_info));
+    EXPECT_EQ("fake-original-host", providers[0]->format({}, stream_info_no_requested_name));
+  }
+}
+
 TEST(SubstitutionFormatterTest, requestHeaderFormatter) {
   StreamInfo::MockStreamInfo stream_info;
   Http::TestRequestHeaderMapImpl request_header{{":method", "GET"}, {":path", "/"}};
@@ -4832,6 +4906,290 @@ TEST(SubstitutionFormatterTest, UniqueIdFormatterTest) {
   // Check the new ID is also unique compared to the previous ones
   EXPECT_NE(id1, id3);
   EXPECT_NE(id2, id3);
+}
+
+// COALESCE formatter tests.
+TEST(SubstitutionFormatterTest, CoalesceFormatterBasic) {
+  StreamInfo::MockStreamInfo stream_info;
+  absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
+  EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
+
+  // Test basic coalescing when the first value is available.
+  {
+    auto providers = *SubstitutionFormatParser::parse(R"(%COALESCE({"operators": ["PROTOCOL"]})%)");
+    ASSERT_EQ(providers.size(), 1);
+    EXPECT_EQ("HTTP/1.1", providers[0]->format({}, stream_info).value_or("-"));
+  }
+
+  // Test with request headers using the REQ command.
+  {
+    Http::TestRequestHeaderMapImpl request_headers{{":authority", "example.com"}};
+    auto providers = *SubstitutionFormatParser::parse(
+        R"(%COALESCE({"operators": [{"command": "REQ", "param": ":authority"}]})%)");
+    ASSERT_EQ(providers.size(), 1);
+    EXPECT_EQ("example.com", providers[0]->format({&request_headers}, stream_info).value_or("-"));
+  }
+}
+
+TEST(SubstitutionFormatterTest, CoalesceFormatterFallback) {
+  StreamInfo::MockStreamInfo stream_info;
+  EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(absl::nullopt));
+
+  // Create mock address provider with empty SNI.
+  auto address = Network::Address::InstanceConstSharedPtr{
+      new Network::Address::Ipv4Instance("127.0.0.1", 8080)};
+  auto downstream_address_provider =
+      std::make_shared<Network::ConnectionInfoSetterImpl>(address, address);
+  downstream_address_provider->setRequestedServerName("");
+  EXPECT_CALL(stream_info, downstreamAddressProvider())
+      .WillRepeatedly(ReturnPointee(downstream_address_provider.get()));
+
+  // Test fallback when first operator returns null.
+  {
+    Http::TestRequestHeaderMapImpl request_headers{{":authority", "example.com"}};
+
+    auto providers = *SubstitutionFormatParser::parse(
+        R"(%COALESCE({"operators": ["REQUESTED_SERVER_NAME", {"command": "REQ", "param": ":authority"}]})%)");
+    ASSERT_EQ(providers.size(), 1);
+    // REQUESTED_SERVER_NAME is empty, so should fallback to :authority.
+    EXPECT_EQ("example.com", providers[0]->format({&request_headers}, stream_info).value_or("-"));
+  }
+
+  // Test when all operators return null.
+  {
+    Http::TestRequestHeaderMapImpl request_headers{};
+
+    auto providers = *SubstitutionFormatParser::parse(
+        R"(%COALESCE({"operators": ["REQUESTED_SERVER_NAME", {"command": "REQ", "param": ":authority"}]})%)");
+    ASSERT_EQ(providers.size(), 1);
+    // Both operators return null, should return nullopt.
+    EXPECT_FALSE(providers[0]->format({&request_headers}, stream_info).has_value());
+  }
+}
+
+TEST(SubstitutionFormatterTest, CoalesceFormatterMaxLength) {
+  StreamInfo::MockStreamInfo stream_info;
+  Http::TestRequestHeaderMapImpl request_headers{{":authority", "very-long-hostname.example.com"}};
+
+  // Test max_length at command level.
+  {
+    auto providers = *SubstitutionFormatParser::parse(
+        R"(%COALESCE({"operators": [{"command": "REQ", "param": ":authority"}]}):10%)");
+    ASSERT_EQ(providers.size(), 1);
+    EXPECT_EQ("very-long-", providers[0]->format({&request_headers}, stream_info).value_or("-"));
+  }
+
+  // Test max_length in operator entry.
+  {
+    auto providers = *SubstitutionFormatParser::parse(
+        R"(%COALESCE({"operators": [{"command": "REQ", "param": ":authority", "max_length": 5}]})%)");
+    ASSERT_EQ(providers.size(), 1);
+    EXPECT_EQ("very-", providers[0]->format({&request_headers}, stream_info).value_or("-"));
+  }
+}
+
+TEST(SubstitutionFormatterTest, CoalesceFormatterMixedOperators) {
+  StreamInfo::MockStreamInfo stream_info;
+  absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
+  EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
+
+  // Create mock address provider with SNI set.
+  auto address = Network::Address::InstanceConstSharedPtr{
+      new Network::Address::Ipv4Instance("127.0.0.1", 8080)};
+  auto downstream_address_provider =
+      std::make_shared<Network::ConnectionInfoSetterImpl>(address, address);
+  downstream_address_provider->setRequestedServerName("sni.example.com");
+  EXPECT_CALL(stream_info, downstreamAddressProvider())
+      .WillRepeatedly(ReturnPointee(downstream_address_provider.get()));
+
+  // Test with mixed operator types with string and object.
+  {
+    Http::TestRequestHeaderMapImpl request_headers{{":authority", "host.example.com"}};
+
+    auto providers = *SubstitutionFormatParser::parse(
+        R"(%COALESCE({"operators": ["REQUESTED_SERVER_NAME", {"command": "REQ", "param": ":authority"}, "PROTOCOL"]})%)");
+    ASSERT_EQ(providers.size(), 1);
+    // REQUESTED_SERVER_NAME should be returned as it's the first available value.
+    EXPECT_EQ("sni.example.com",
+              providers[0]->format({&request_headers}, stream_info).value_or("-"));
+  }
+}
+
+TEST(SubstitutionFormatterTest, CoalesceFormatterGridTest) {
+  // Multiple combinations of operators and headers.
+  struct TestCase {
+    std::string sni;
+    std::string authority;
+    std::string original_host;
+    std::string expected;
+  };
+
+  // Test SNI -> :authority -> x-envoy-original-host cascade.
+  std::vector<TestCase> test_cases = {
+      // SNI set, others set - return SNI.
+      {"sni.example.com", "authority.example.com", "original.example.com", "sni.example.com"},
+      // SNI empty, authority set - return authority.
+      {"", "authority.example.com", "original.example.com", "authority.example.com"},
+      // SNI empty, authority empty, original set - return original.
+      {"", "", "original.example.com", "original.example.com"},
+      // All empty - return nullopt.
+      {"", "", "", ""},
+  };
+
+  for (const auto& tc : test_cases) {
+    SCOPED_TRACE(fmt::format("sni='{}', authority='{}', original_host='{}'", tc.sni, tc.authority,
+                             tc.original_host));
+
+    StreamInfo::MockStreamInfo stream_info;
+
+    auto address = Network::Address::InstanceConstSharedPtr{
+        new Network::Address::Ipv4Instance("127.0.0.1", 8080)};
+    auto downstream_address_provider =
+        std::make_shared<Network::ConnectionInfoSetterImpl>(address, address);
+    downstream_address_provider->setRequestedServerName(tc.sni);
+    EXPECT_CALL(stream_info, downstreamAddressProvider())
+        .WillRepeatedly(ReturnPointee(downstream_address_provider.get()));
+
+    Http::TestRequestHeaderMapImpl request_headers;
+    if (!tc.authority.empty()) {
+      request_headers.addCopy(":authority", tc.authority);
+    }
+    if (!tc.original_host.empty()) {
+      request_headers.addCopy("x-envoy-original-host", tc.original_host);
+    }
+
+    auto providers = *SubstitutionFormatParser::parse(
+        R"(%COALESCE({"operators": ["REQUESTED_SERVER_NAME", {"command": "REQ", "param": ":authority"}, {"command": "REQ", "param": "x-envoy-original-host"}]})%)");
+    ASSERT_EQ(providers.size(), 1);
+
+    auto result = providers[0]->format({&request_headers}, stream_info);
+    if (tc.expected.empty()) {
+      EXPECT_FALSE(result.has_value());
+    } else {
+      EXPECT_EQ(tc.expected, result.value_or("-"));
+    }
+  }
+}
+
+TEST(SubstitutionFormatterTest, CoalesceFormatterErrorCases) {
+  // Empty JSON config.
+  {
+    EXPECT_THROW_WITH_MESSAGE(SubstitutionFormatParser::parse("%COALESCE()%").IgnoreError(),
+                              EnvoyException, "COALESCE requires parameters");
+  }
+
+  // Invalid JSON.
+  {
+    EXPECT_THROW_WITH_REGEX(SubstitutionFormatParser::parse("%COALESCE(not json)%").IgnoreError(),
+                            EnvoyException, "COALESCE: failed to parse JSON configuration.*");
+  }
+
+  // Missing operators field.
+  {
+    EXPECT_THROW_WITH_MESSAGE(
+        SubstitutionFormatParser::parse(R"(%COALESCE({"foo": "bar"})%)").IgnoreError(),
+        EnvoyException, "COALESCE: JSON configuration must contain 'operators' array");
+  }
+
+  // Empty operators array.
+  {
+    EXPECT_THROW_WITH_MESSAGE(
+        SubstitutionFormatParser::parse(R"(%COALESCE({"operators": []})%)").IgnoreError(),
+        EnvoyException, "COALESCE: 'operators' array must not be empty");
+  }
+
+  // Invalid operator which is not a string or object.
+  {
+    EXPECT_THROW_WITH_REGEX(
+        SubstitutionFormatParser::parse(R"(%COALESCE({"operators": [123]})%)").IgnoreError(),
+        EnvoyException, "COALESCE: failed to parse operator at index 0.*");
+  }
+
+  // Missing command field in operator object.
+  {
+    EXPECT_THROW_WITH_REGEX(
+        SubstitutionFormatParser::parse(R"(%COALESCE({"operators": [{"param": "foo"}]})%)")
+            .IgnoreError(),
+        EnvoyException, "COALESCE: failed to parse operator at index 0.*");
+  }
+
+  // Unknown command.
+  {
+    EXPECT_THROW_WITH_REGEX(
+        SubstitutionFormatParser::parse(R"(%COALESCE({"operators": ["UNKNOWN_COMMAND"]})%)")
+            .IgnoreError(),
+        EnvoyException, "COALESCE: failed to parse operator at index 0.*unknown command.*");
+  }
+
+  // Invalid not positive max_length.
+  {
+    EXPECT_THROW_WITH_REGEX(
+        SubstitutionFormatParser::parse(
+            R"(%COALESCE({"operators": [{"command": "PROTOCOL", "max_length": 0}]})%)")
+            .IgnoreError(),
+        EnvoyException, "COALESCE: failed to parse operator at index 0.*max_length.*positive.*");
+  }
+}
+
+TEST(SubstitutionFormatterTest, CoalesceFormatterFormatValue) {
+  StreamInfo::MockStreamInfo stream_info;
+  absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
+  EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
+
+  // Test formatValue returns proper protobuf value.
+  {
+    auto providers = *SubstitutionFormatParser::parse(R"(%COALESCE({"operators": ["PROTOCOL"]})%)");
+    ASSERT_EQ(providers.size(), 1);
+    auto value = providers[0]->formatValue({}, stream_info);
+    EXPECT_EQ(Protobuf::Value::kStringValue, value.kind_case());
+    EXPECT_EQ("HTTP/1.1", value.string_value());
+  }
+
+  // Test formatValue when all operators return null.
+  {
+    StreamInfo::MockStreamInfo null_stream_info;
+    EXPECT_CALL(null_stream_info, protocol()).WillRepeatedly(Return(absl::nullopt));
+    auto address = Network::Address::InstanceConstSharedPtr{
+        new Network::Address::Ipv4Instance("127.0.0.1", 8080)};
+    auto downstream_address_provider =
+        std::make_shared<Network::ConnectionInfoSetterImpl>(address, address);
+    downstream_address_provider->setRequestedServerName("");
+    EXPECT_CALL(null_stream_info, downstreamAddressProvider())
+        .WillRepeatedly(ReturnPointee(downstream_address_provider.get()));
+
+    Http::TestRequestHeaderMapImpl request_headers{};
+
+    auto providers = *SubstitutionFormatParser::parse(
+        R"(%COALESCE({"operators": ["REQUESTED_SERVER_NAME", {"command": "REQ", "param": ":authority"}]})%)");
+    ASSERT_EQ(providers.size(), 1);
+    auto value = providers[0]->formatValue({&request_headers}, null_stream_info);
+    EXPECT_EQ(Protobuf::Value::kNullValue, value.kind_case());
+  }
+}
+
+TEST(SubstitutionFormatterTest, CoalesceFormatterWithOtherCommands) {
+  // Test COALESCE in combination with other formatters in the same format string.
+  StreamInfo::MockStreamInfo stream_info;
+  absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
+  EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
+
+  auto address = Network::Address::InstanceConstSharedPtr{
+      new Network::Address::Ipv4Instance("127.0.0.1", 8080)};
+  auto downstream_address_provider =
+      std::make_shared<Network::ConnectionInfoSetterImpl>(address, address);
+  downstream_address_provider->setRequestedServerName("sni.example.com");
+  EXPECT_CALL(stream_info, downstreamAddressProvider())
+      .WillRepeatedly(ReturnPointee(downstream_address_provider.get()));
+
+  Http::TestRequestHeaderMapImpl request_headers{{":authority", "host.example.com"}};
+
+  auto formatter_or_error = FormatterImpl::create(
+      R"(protocol=%PROTOCOL% host=%COALESCE({"operators": ["REQUESTED_SERVER_NAME", {"command": "REQ", "param": ":authority"}]})%)");
+  ASSERT_TRUE(formatter_or_error.ok());
+  auto& formatter = *formatter_or_error.value();
+
+  std::string result = formatter.format({&request_headers}, stream_info);
+  EXPECT_EQ("protocol=HTTP/1.1 host=sni.example.com", result);
 }
 } // namespace
 } // namespace Formatter

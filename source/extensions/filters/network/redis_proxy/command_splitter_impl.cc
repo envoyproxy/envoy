@@ -245,6 +245,39 @@ SplitRequestPtr EvalRequest::create(Router& router, Common::Redis::RespValuePtr&
   return request_ptr;
 }
 
+SplitRequestPtr ObjectRequest::create(Router& router,
+                                      Common::Redis::RespValuePtr&& incoming_request,
+                                      SplitCallbacks& callbacks, CommandStats& command_stats,
+                                      TimeSource& time_source, bool delay_command_latency,
+                                      const StreamInfo::StreamInfo& stream_info) {
+  // OBJECT looks like: OBJECT subcommand key [arguments ...]
+  // Ensure there are at least two args (subcommand and key) to the command.
+  if (incoming_request->asArray().size() < 3) {
+    onWrongNumberOfArguments(callbacks, *incoming_request);
+    command_stats.error_.inc();
+    return nullptr;
+  }
+
+  std::unique_ptr<ObjectRequest> request_ptr{
+      new ObjectRequest(callbacks, command_stats, time_source, delay_command_latency)};
+
+  const auto route = router.upstreamPool(incoming_request->asArray()[2].asString(), stream_info);
+  if (route) {
+    Common::Redis::RespValueSharedPtr base_request = std::move(incoming_request);
+    request_ptr->handle_ = makeSingleServerRequest(
+        route, base_request->asArray()[0].asString(), base_request->asArray()[2].asString(),
+        base_request, *request_ptr, callbacks.transaction());
+  }
+
+  if (!request_ptr->handle_) {
+    command_stats.error_.inc();
+    callbacks.onResponse(Common::Redis::Utility::makeError(Response::get().NoUpstreamHost));
+    return nullptr;
+  }
+
+  return request_ptr;
+}
+
 FragmentedRequest::~FragmentedRequest() {
 #ifndef NDEBUG
   for (const PendingRequest& request : pending_requests_) {
@@ -935,10 +968,10 @@ InstanceImpl::InstanceImpl(RouterPtr&& router, Stats::Scope& scope, const std::s
                            Common::Redis::FaultManagerPtr&& fault_manager,
                            absl::flat_hash_set<std::string>&& custom_commands)
     : router_(std::move(router)), simple_command_handler_(*router_),
-      eval_command_handler_(*router_), mget_handler_(*router_), mset_handler_(*router_),
-      scan_handler_(*router_), shard_info_handler_(*router_), random_shard_handler_(*router_),
-      split_keys_sum_result_handler_(*router_), transaction_handler_(*router_),
-      cluster_scope_handler_(*router_),
+      eval_command_handler_(*router_), object_command_handler_(*router_), mget_handler_(*router_),
+      mset_handler_(*router_), scan_handler_(*router_), shard_info_handler_(*router_),
+      random_shard_handler_(*router_), split_keys_sum_result_handler_(*router_),
+      transaction_handler_(*router_), cluster_scope_handler_(*router_),
       stats_{ALL_COMMAND_SPLITTER_STATS(POOL_COUNTER_PREFIX(scope, stat_prefix + "splitter."))},
       time_source_(time_source), fault_manager_(std::move(fault_manager)),
       custom_commands_(std::move(custom_commands)) {
@@ -948,6 +981,10 @@ InstanceImpl::InstanceImpl(RouterPtr&& router, Stats::Scope& scope, const std::s
 
   for (const std::string& command : Common::Redis::SupportedCommands::evalCommands()) {
     addHandler(scope, stat_prefix, command, latency_in_micros, eval_command_handler_);
+  }
+
+  for (const std::string& command : Common::Redis::SupportedCommands::objectCommands()) {
+    addHandler(scope, stat_prefix, command, latency_in_micros, object_command_handler_);
   }
 
   for (const std::string& command :

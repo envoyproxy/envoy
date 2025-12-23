@@ -64,10 +64,26 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "coalesce_formatter_lib",
+    srcs = ["coalesce_formatter.cc"],
+    hdrs = ["coalesce_formatter.h"],
+    deps = [
+        ":substitution_format_utility_lib",
+        "//envoy/formatter:substitution_formatter_interface",
+        "//envoy/json:json_object_interface",
+        "//envoy/stream_info:stream_info_interface",
+        "//source/common/common:fmt_lib",
+        "//source/common/common:statusor_lib",
+        "//source/common/json:json_loader_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "http_speicific_formatter_extension_lib",
     srcs = ["http_specific_formatter.cc"],
     hdrs = ["http_specific_formatter.h"],
     deps = [
+        ":coalesce_formatter_lib",
         "//envoy/api:api_interface",
         "//envoy/formatter:substitution_formatter_interface",
         "//envoy/runtime:runtime_interface",
