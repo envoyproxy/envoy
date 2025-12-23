@@ -87,6 +87,7 @@ FilterConfig::FilterConfig(Stats::StatName stat_prefix,
           config.has_upstream_log_options()
               ? config.upstream_log_options().flush_upstream_log_on_upstream_stream()
               : false,
+          config.reject_connect_request_early_data(),
           config.strict_check_headers(), context.serverFactoryContext().api().timeSource(),
           context.serverFactoryContext().httpContext(),
           context.serverFactoryContext().routerContext()) {

@@ -19,11 +19,6 @@ behavior_changes:
   change: |
     Changed the default reset code from ``NO_ERROR`` to ``INTERNAL_ERROR``. This change can be reverted by setting the
     runtime guard ``envoy.reloadable_features.reset_with_error`` to ``false``.
-- area: http
-  change: |
-    Added runtime flag ``envoy.reloadable_features.reject_early_connect_data`` to reject ``CONNECT`` requests that send
-    data before Envoy returns a ``200`` response. This non-compliant behavior is common for latency reduction, so the
-    option is disabled by default.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -244,6 +239,10 @@ removed_config_or_runtime:
 - area: router
   change: |
     Removed runtime guard ``envoy.reloadable_features.router_filter_resetall_on_local_reply`` and legacy code paths.
+- area: router
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.reject_early_connect_data``. This is now controlled by the router filter
+    config option :ref:`reject_connect_request_early_data <envoy_v3_api_field_extensions.filters.http.router.v3.Router.reject_connect_request_early_data>`.
 
 new_features:
 - area: composite filter
@@ -594,5 +593,9 @@ new_features:
     :ref:`endpoint_params <envoy_v3_api_field_extensions.http.injected_credentials.oauth2.v3.OAuth2.endpoint_params>`.
     This allows passing custom parameters required by authorization servers (such as Logto or EntraID) that expect
     additional body parameters during the token exchange.
+- area: router
+  change: |
+    Added :ref:`reject_connect_request_early_data <envoy_v3_api_field_extensions.filters.http.router.v3.Router.reject_connect_request_early_data>`
+    to reject ``CONNECT`` requests that send data before receiving a ``200`` response from upstream. Defaults to false.
 
 deprecated:
