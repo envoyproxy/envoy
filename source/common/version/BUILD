@@ -3,7 +3,10 @@ load(
     "envoy_basic_cc_library",
     "envoy_cc_library",
     "envoy_package",
-    "envoy_select_boringssl",
+)
+load(
+    "//bazel:envoy_select.bzl",
+    "envoy_select_ssl",
 )
 
 licenses(["notice"])  # Apache 2
@@ -63,9 +66,9 @@ envoy_cc_library(
 envoy_cc_library(
     name = "version_lib",
     srcs = ["version.cc"],
-    copts = envoy_select_boringssl(
-        ["-DENVOY_SSL_VERSION=\\\"BoringSSL-FIPS\\\""],
-        ["-DENVOY_SSL_VERSION=\\\"BoringSSL\\\""],
+    copts = envoy_select_ssl(
+        if_boringssl = ["-DENVOY_SSL_VERSION=\\\"BoringSSL\\\""],
+        if_openssl = ["-DENVOY_SSL_VERSION=\\\"OpenSSL\\\""],
     ),
     external_deps = ["ssl"],
     tags = ["notidy"],
