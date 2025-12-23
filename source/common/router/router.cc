@@ -980,7 +980,6 @@ bool Filter::isEarlyConnectData() {
 }
 
 Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
-  ENVOY_STREAM_LOG(debug, "router decoding data: {}", *callbacks_, data.length());
   if (data.length() > 0 && isEarlyConnectData()) {
     callbacks_->sendLocalReply(Http::Code::BadRequest, "", nullptr, absl::nullopt,
                                StreamInfo::ResponseCodeDetails::get().EarlyConnectData);
