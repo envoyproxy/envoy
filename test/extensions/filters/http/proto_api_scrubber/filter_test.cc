@@ -82,6 +82,9 @@ public:
   MOCK_METHOD(absl::StatusOr<const Protobuf::MethodDescriptor*>, getMethodDescriptor,
               (const std::string& method_name), (const, override));
 
+  MOCK_METHOD(const Protobuf::Type*, getParentType, (const Protobuf::Field* field),
+              (const, override));
+
   // Delegate non-mocked calls to the real object
   MockProtoApiScrubberFilterConfig() : ProtoApiScrubberFilterConfig() {
     ON_CALL(*this, getRequestType(_)).WillByDefault([this](const std::string& method_name) {
@@ -110,6 +113,9 @@ public:
         });
     ON_CALL(*this, getMethodDescriptor(_)).WillByDefault([this](const std::string& method_name) {
       return real_config_->getMethodDescriptor(method_name);
+    });
+    ON_CALL(*this, getParentType(_)).WillByDefault([this](const Protobuf::Field* field) {
+      return real_config_->getParentType(field);
     });
   }
 

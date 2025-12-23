@@ -135,6 +135,16 @@ public:
   // corresponding `Protobuf::Type*`.
   virtual const TypeFinder& getTypeFinder() const { return *type_finder_; };
 
+  /**
+   * Returns the parent Type for a given Field pointer.
+   * This map is pre-computed during initialization to allow recovering context when
+   * traversing dynamic types (e.g., Any).
+   *
+   * @param field The field pointer to look up.
+   * @return The parent Type pointer, or nullptr if not found.
+   */
+  virtual const Envoy::Protobuf::Type* getParentType(const Envoy::Protobuf::Field* field) const;
+
   // Returns the request type of the method.
   virtual absl::StatusOr<const Protobuf::Type*>
   getRequestType(const std::string& method_name) const;
@@ -181,12 +191,21 @@ private:
   absl::Status initialize(const ProtoApiScrubberConfig& proto_config,
                           Envoy::Server::Configuration::FactoryContext& context);
 
-  // Initializes the descriptor pool from the provided 'data_source'.
-  absl::Status initializeDescriptorPool(Api::Api& api,
-                                        const ::envoy::config::core::v3::DataSource& data_source);
+  // Loads and parses the descriptor set from the data source.
+  // Returns the parsed FileDescriptorSet and populates the internal descriptor_pool_.
+  absl::StatusOr<Envoy::Protobuf::FileDescriptorSet>
+  loadDescriptorSet(Api::Api& api, const ::envoy::config::core::v3::DataSource& data_source);
 
   // Initializes the type utilities (e.g., type helper, type finder, etc.).
   void initializeTypeUtils();
+
+  // Traverses the FileDescriptorSet and pre-computes the Field* -> Parent Type* map.
+  // This must be called after initializeTypeUtils().
+  void buildFieldParentMap(const Envoy::Protobuf::FileDescriptorSet& descriptor_set);
+
+  // Recursive helper for buildFieldParentMap.
+  void populateMapForMessage(const Envoy::Protobuf::DescriptorProto& msg,
+                             const std::string& package_prefix);
 
   // Initializes the method's request and response restrictions using the restrictions configured
   // in the proto config.
@@ -225,6 +244,11 @@ private:
 
   // A map from {message_name, field_name} to the respective match tree for fields within a message.
   StringPairToMatchTreeMap message_field_restrictions_;
+
+  // A global map used to recover the parent Type context from a Field pointer.
+  // This is read-only after initialization.
+  absl::flat_hash_map<const Envoy::Protobuf::Field*, const Envoy::Protobuf::Type*>
+      field_to_parent_type_map_;
 
   // An instance of `google::grpc::transcoding::TypeHelper` which can be used for type resolution.
   std::unique_ptr<const TypeHelper> type_helper_;

@@ -15,6 +15,15 @@ message SensitiveMessage {
   string public_field = 2;
   string other_info = 3;
   InnerDetails internal_details = 4;
+
+  // Field for testing nested Any scrubbing.
+  google.protobuf.Any nested_any = 5;
+
+  // Field for testing path collision with top-level request.
+  string duplicate_field = 6;
+
+  // Field for testing recursive messages.
+  SensitiveMessage recursive_child = 7;
 }
 
 message ScrubRequest {
@@ -35,6 +44,9 @@ message ScrubRequest {
 
   // Field for testing Any scrubbing.
   google.protobuf.Any any_field = 12;
+
+  // Field for testing path collision.
+  string duplicate_field = 13;
 }
 
 service ScrubberTestService {

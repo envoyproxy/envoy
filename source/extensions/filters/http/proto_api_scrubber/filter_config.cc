@@ -85,9 +85,9 @@ ProtoApiScrubberFilterConfig::initialize(const ProtoApiScrubberConfig& proto_con
   filtering_mode_ = filtering_mode;
 
   // Initialize proto descriptor pool.
-  absl::Status descriptor_pool_init_status = initializeDescriptorPool(
+  absl::StatusOr<Envoy::Protobuf::FileDescriptorSet> descriptor_set_or_error = loadDescriptorSet(
       context.serverFactoryContext().api(), proto_config.descriptor_set().data_source());
-  RETURN_IF_ERROR(descriptor_pool_init_status);
+  RETURN_IF_ERROR(descriptor_set_or_error.status());
 
   if (proto_config.has_restrictions()) {
     for (const auto& method_restriction_pair : proto_config.restrictions().method_restrictions()) {
@@ -108,6 +108,9 @@ ProtoApiScrubberFilterConfig::initialize(const ProtoApiScrubberConfig& proto_con
   }
 
   initializeTypeUtils();
+
+  // Pre-compute the Field* -> Type* map for O(1) lock-free lookup during request processing.
+  buildFieldParentMap(descriptor_set_or_error.value());
 
   ENVOY_LOG(trace, "Filter config initialized successfully.");
   return absl::OkStatus();
@@ -148,7 +151,7 @@ absl::Status ProtoApiScrubberFilterConfig::initializeMessageRestrictions(
   return absl::OkStatus();
 }
 
-absl::Status ProtoApiScrubberFilterConfig::initializeDescriptorPool(
+absl::StatusOr<Envoy::Protobuf::FileDescriptorSet> ProtoApiScrubberFilterConfig::loadDescriptorSet(
     Api::Api& api, const ::envoy::config::core::v3::DataSource& data_source) {
   Envoy::Protobuf::FileDescriptorSet descriptor_set;
 
@@ -181,6 +184,7 @@ absl::Status ProtoApiScrubberFilterConfig::initializeDescriptorPool(
                     kConfigInitializationError, static_cast<int>(data_source.specifier_case())));
   }
 
+  // Populate the descriptor pool member.
   auto pool = std::make_unique<Envoy::Protobuf::DescriptorPool>();
   for (const auto& file : descriptor_set.file()) {
     if (pool->BuildFile(file) == nullptr) {
@@ -189,9 +193,9 @@ absl::Status ProtoApiScrubberFilterConfig::initializeDescriptorPool(
                       kConfigInitializationError, file.name()));
     }
   }
-
   descriptor_pool_ = std::move(pool);
-  return absl::OkStatus();
+
+  return descriptor_set;
 }
 
 absl::Status ProtoApiScrubberFilterConfig::validateFilteringMode(FilteringMode filtering_mode) {
@@ -364,6 +368,42 @@ void ProtoApiScrubberFilterConfig::initializeTypeUtils() {
       [this](absl::string_view type_url) -> const ::Envoy::Protobuf::Type* {
         return type_helper_->Info()->GetTypeByTypeUrl(type_url);
       });
+}
+
+const Envoy::Protobuf::Type*
+ProtoApiScrubberFilterConfig::getParentType(const Envoy::Protobuf::Field* field) const {
+  auto it = field_to_parent_type_map_.find(field);
+  return (it != field_to_parent_type_map_.end()) ? it->second : nullptr;
+}
+
+void ProtoApiScrubberFilterConfig::buildFieldParentMap(
+    const Envoy::Protobuf::FileDescriptorSet& descriptor_set) {
+  for (const auto& file : descriptor_set.file()) {
+    std::string package_prefix = file.package();
+    for (const auto& msg : file.message_type()) {
+      populateMapForMessage(msg, package_prefix);
+    }
+  }
+}
+
+void ProtoApiScrubberFilterConfig::populateMapForMessage(
+    const Envoy::Protobuf::DescriptorProto& msg, const std::string& package_prefix) {
+  std::string full_name =
+      package_prefix.empty() ? msg.name() : absl::StrCat(package_prefix, ".", msg.name());
+  std::string type_url = absl::StrCat(Envoy::Grpc::Common::typeUrlPrefix(), "/", full_name);
+
+  const auto* type = (*type_finder_)(type_url);
+  // We only index types that are successfully resolved by TypeHelper.
+  if (type != nullptr) {
+    for (const auto& field : type->fields()) {
+      field_to_parent_type_map_[&field] = type;
+    }
+  }
+
+  // Recurse for nested messages.
+  for (const auto& nested : msg.nested_type()) {
+    populateMapForMessage(nested, full_name);
+  }
 }
 
 absl::StatusOr<const MethodDescriptor*>

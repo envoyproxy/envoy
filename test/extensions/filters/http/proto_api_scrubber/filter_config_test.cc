@@ -1292,6 +1292,40 @@ TEST_F(ProtoApiScrubberFilterConfigTest, UnsupportedActionType) {
       HasSubstr("Didn't find a registered implementation for 'some_unknown_action'"));
 }
 
+TEST_F(ProtoApiScrubberFilterConfigTest, FieldParentMapPopulation) {
+  // Initialize config with the apikeys descriptor.
+  absl::StatusOr<std::shared_ptr<const ProtoApiScrubberFilterConfig>> config_or_status =
+      ProtoApiScrubberFilterConfig::create(proto_config_, factory_context_);
+  ASSERT_EQ(config_or_status.status().code(), absl::StatusCode::kOk);
+  filter_config_ = std::move(config_or_status.value());
+
+  // Resolve a known message type (CreateApiKeyRequest).
+  std::string type_url = "type.googleapis.com/apikeys.CreateApiKeyRequest";
+  const Protobuf::Type* parent_type = filter_config_->getTypeFinder()(type_url);
+  ASSERT_NE(parent_type, nullptr);
+
+  // Find a field inside it (e.g., 'parent').
+  const Protobuf::Field* parent_field = nullptr;
+  for (const auto& field : parent_type->fields()) {
+    if (field.name() == "parent") {
+      parent_field = &field;
+      break;
+    }
+  }
+  ASSERT_NE(parent_field, nullptr);
+
+  // Verify that getParentType returns the correct type for this field pointer.
+  const Protobuf::Type* resolved_parent = filter_config_->getParentType(parent_field);
+  ASSERT_NE(resolved_parent, nullptr);
+  EXPECT_EQ(resolved_parent->name(), "apikeys.CreateApiKeyRequest");
+  // Pointer equality check.
+  EXPECT_EQ(resolved_parent, parent_type);
+
+  // Verify negative case (unregistered field).
+  Protobuf::Field dummy_field;
+  EXPECT_EQ(filter_config_->getParentType(&dummy_field), nullptr);
+}
+
 } // namespace
 } // namespace ProtoApiScrubber
 } // namespace HttpFilters

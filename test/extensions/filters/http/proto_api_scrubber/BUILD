@@ -56,11 +56,13 @@ envoy_cc_test(
     name = "filter_test",
     srcs = ["filter_test.cc"],
     data = [
+        ":scrubber_test_proto_descriptor",
         "//test/proto:apikeys_proto_descriptor",
         "//test/proto:bookstore_proto_descriptor",
     ],
     rbe_pool = "6gig",
     deps = [
+        ":scrubber_test_proto_cc_proto",
         "//source/common/grpc:common_lib",
         "//source/common/grpc:status_lib",
         "//source/common/http/matching:inputs_lib",

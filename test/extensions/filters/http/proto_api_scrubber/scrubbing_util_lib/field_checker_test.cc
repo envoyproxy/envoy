@@ -43,6 +43,9 @@ public:
 
   MOCK_METHOD(absl::StatusOr<const Protobuf::MethodDescriptor*>, getMethodDescriptor,
               (const std::string& method_name), (const, override));
+
+  MOCK_METHOD(const Protobuf::Type*, getParentType, (const Protobuf::Field* field),
+              (const, override));
 };
 
 namespace {
@@ -379,6 +382,10 @@ TEST_F(FieldCheckerTest, MessageLevelFieldRestriction) {
   ON_CALL(mock_filter_config, getMethodDescriptor(testing::_))
       .WillByDefault(testing::Return(absl::NotFoundError("Method not found")));
 
+  // When CheckField calls getParentType(&field), we MUST return &parent_type for this test logic
+  // to succeed, mimicking the map lookup happening in the real config.
+  EXPECT_CALL(mock_filter_config, getParentType(&field)).WillOnce(testing::Return(&parent_type));
+
   auto mock_match_tree = std::make_shared<NiceMock<MockMatchTree>>();
   auto remove_action = std::make_shared<NiceMock<MockAction>>();
   ON_CALL(*remove_action, typeUrl())
@@ -392,9 +399,10 @@ TEST_F(FieldCheckerTest, MessageLevelFieldRestriction) {
   FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info, {}, {}, {}, {},
                              method_name, &mock_filter_config);
 
-  // When parent_type is passed, the checker should look up message-level rules.
+  // We intentionally pass nullptr as the parent_type to simulate the ProtoScrubber calling from
+  // ScanField. The FieldChecker should recover the parent type using the mock_filter_config.
   FieldCheckResults result =
-      field_checker.CheckField({"path", "to", "secret_field"}, &field, 0, &parent_type);
+      field_checker.CheckField({"path", "to", "secret_field"}, &field, 0, nullptr);
   EXPECT_EQ(result, FieldCheckResults::kExclude);
 }
 
@@ -1074,7 +1082,8 @@ TEST_F(FieldCheckerTest, IncludesType) {
 
   Protobuf::Type type;
   type.set_name("type");
-  EXPECT_EQ(field_checker.CheckType(&type), FieldCheckResults::kInclude);
+  // CheckType should now return kPartial to force unpacking of Any fields.
+  EXPECT_EQ(field_checker.CheckType(&type), FieldCheckResults::kPartial);
 }
 
 TEST_F(FieldCheckerTest, SupportAny) {
@@ -1085,7 +1094,8 @@ TEST_F(FieldCheckerTest, SupportAny) {
   FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info, {}, {}, {}, {},
                              "/apikeys.ApiKeys/CreateApiKey", filter_config_.get());
 
-  EXPECT_FALSE(field_checker.SupportAny());
+  // SupportAny should now return true.
+  EXPECT_TRUE(field_checker.SupportAny());
 }
 
 TEST_F(FieldCheckerTest, FilterName) {
