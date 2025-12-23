@@ -81,7 +81,7 @@ message StreamToMetadata {
   // Exactly one selector type must be specified.
   message Selector {
     // Extract value using JSON path traversal.
-    JsonPathSelector json_path = 1;
+    JsonPathSelector json_path = 1 [(validate.rules).message = {required: true}];
   }
 
   // [#next-free-field: 4]
