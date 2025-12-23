@@ -102,10 +102,10 @@ TEST_P(GeoipFilterIntegrationTest, GeoipFilterNoCrashOnLdsUpdate) {
   tcp_client2->close();
 }
 
-// Tests that the filter uses client IP from filter state when configured.
+// Tests that the filter uses client IP from filter state and stores correct geolocation data.
 TEST_P(GeoipFilterIntegrationTest, GeoipFilterUsesClientIpFromFilterState) {
   // IP address 2.125.160.216 is a test IP in GeoLite2-City-Test.mmdb that resolves to
-  // England, GB.
+  // Boxford, England, GB.
   const std::string set_filter_state_config = R"EOF(
 name: envoy.filters.network.set_filter_state
 typed_config:
@@ -138,19 +138,27 @@ typed_config:
       asn_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-ASN-Test.mmdb"
 )EOF";
 
+  useListenerAccessLog("%FILTER_STATE(envoy.geoip:PLAIN)%");
   config_helper_.renameListener("tcp");
-  // Add set_filter_state filter first to set the client IP before geoip processes it.
-  config_helper_.addNetworkFilter(set_filter_state_config);
+  // addNetworkFilter prepends, so add geoip first, then set_filter_state.
   config_helper_.addNetworkFilter(TestEnvironment::substitute(geoip_config));
+  config_helper_.addNetworkFilter(set_filter_state_config);
   initialize();
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp"));
   ASSERT_TRUE(tcp_client->connected());
 
-  // Verify stats were incremented indicating the filter processed the connection.
+  // Wait for geoip lookup to complete before closing connection.
   test_server_->waitForCounterEq("geoip.total", 1);
 
   tcp_client->close();
+  test_server_.reset();
+
+  // Verify filter state contains correct geolocation data for IP 2.125.160.216.
+  std::string access_log = waitForAccessLog(listener_access_log_name_);
+  EXPECT_THAT(access_log, testing::HasSubstr("\"country\":\"GB\""));
+  EXPECT_THAT(access_log, testing::HasSubstr("\"city\":"));
+  EXPECT_THAT(access_log, testing::HasSubstr("\"region\":"));
 }
 
 // Tests that the filter falls back to connection address when filter state is not set.
