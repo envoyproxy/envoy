@@ -42,7 +42,7 @@ jobs:
     name: "[${{ inputs.arch }}] Prime Bazel cache"
     if: ${{ ! fromJSON(inputs.caches).bazel[inputs.arch] }}
     steps:
-    - uses: envoyproxy/toolshed/gh-actions/bind-mounts@actions-v0.3.35
+    - uses: envoyproxy/toolshed/gh-actions/bind-mounts@cb93f5b06def5199bf739b007615f7a257bb0165  # v0.3.37
       with:
         mounts: |
           - src: /mnt/workspace
@@ -56,9 +56,9 @@ jobs:
             target: /build
             chown: "runner:docker"
     - name: Free diskspace
-      uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.3.35
+      uses: envoyproxy/toolshed/gh-actions/diskspace@cb93f5b06def5199bf739b007615f7a257bb0165  # v0.3.37
       if: inputs.arch == 'x64' && github.event.repository.private
-    - uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.3.35
+    - uses: envoyproxy/toolshed/gh-actions/github/checkout@cb93f5b06def5199bf739b007615f7a257bb0165  # v0.3.37
       id: checkout-target
       name: Checkout Envoy repository (target branch)
       with:
@@ -66,14 +66,14 @@ jobs:
         config: |
           fetch-depth: 1
 
-    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.3.35
+    - uses: envoyproxy/toolshed/gh-actions/appauth@cb93f5b06def5199bf739b007615f7a257bb0165  # v0.3.37
       id: appauth
       name: Appauth (mutex lock)
       with:
         app_id: ${{ secrets.app-id }}
         key: ${{ secrets.app-key }}
 
-    - uses: envoyproxy/toolshed/gh-actions/cache/prime@actions-v0.3.35
+    - uses: envoyproxy/toolshed/gh-actions/cache/prime@cb93f5b06def5199bf739b007615f7a257bb0165  # v0.3.37
       id: bazel-cache
       name: Prime Bazel cache
       with:

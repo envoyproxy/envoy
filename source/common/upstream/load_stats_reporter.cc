@@ -9,6 +9,18 @@
 namespace Envoy {
 namespace Upstream {
 
+namespace {
+
+envoy::service::load_stats::v3::LoadStatsRequest
+MakeRequestTemplate(const LocalInfo::LocalInfo& local_info) {
+  envoy::service::load_stats::v3::LoadStatsRequest request;
+  request.mutable_node()->MergeFrom(local_info.node());
+  request.mutable_node()->add_client_features("envoy.lrs.supports_send_all_clusters");
+  return request;
+}
+
+} // namespace
+
 LoadStatsReporter::LoadStatsReporter(const LocalInfo::LocalInfo& local_info,
                                      ClusterManager& cluster_manager, Stats::Scope& scope,
                                      Grpc::RawAsyncClientSharedPtr&& async_client,
@@ -18,9 +30,7 @@ LoadStatsReporter::LoadStatsReporter(const LocalInfo::LocalInfo& local_info,
       async_client_(std::move(async_client)),
       service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "envoy.service.load_stats.v3.LoadReportingService.StreamLoadStats")),
-      time_source_(dispatcher.timeSource()) {
-  request_.mutable_node()->MergeFrom(local_info.node());
-  request_.mutable_node()->add_client_features("envoy.lrs.supports_send_all_clusters");
+      request_template_(MakeRequestTemplate(local_info)), time_source_(dispatcher.timeSource()) {
   retry_timer_ = dispatcher.createTimer([this]() -> void {
     stats_.retries_.inc();
     establishNewStream();
@@ -43,7 +53,6 @@ void LoadStatsReporter::establishNewStream() {
     return;
   }
 
-  request_.mutable_cluster_stats()->Clear();
   sendLoadStatsRequest();
 }
 
@@ -62,7 +71,10 @@ void LoadStatsReporter::sendLoadStatsRequest() {
   // One possible way to deal with this would be to get a notification whenever a new cluster is
   // added to the cluster manager. When we get the notification, we record the current time in
   // clusters_ as the start time for the load reporting window for that cluster.
-  request_.mutable_cluster_stats()->Clear();
+  Envoy::Protobuf::Arena arena;
+  auto* request =
+      Envoy::Protobuf::Arena::Create<envoy::service::load_stats::v3::LoadStatsRequest>(&arena);
+  request->MergeFrom(request_template_);
   for (const auto& cluster_name_and_timestamp : clusters_) {
     const std::string& cluster_name = cluster_name_and_timestamp.first;
     OptRef<const Upstream::Cluster> active_cluster = cm_.getActiveCluster(cluster_name);
@@ -71,7 +83,7 @@ void LoadStatsReporter::sendLoadStatsRequest() {
       continue;
     }
     const Upstream::Cluster& cluster = active_cluster.value();
-    auto* cluster_stats = request_.add_cluster_stats();
+    auto* cluster_stats = request->add_cluster_stats();
     cluster_stats->set_cluster_name(cluster_name);
     if (const auto& name = cluster.info()->edsServiceName(); !name.empty()) {
       cluster_stats->set_cluster_service_name(name);
@@ -189,8 +201,8 @@ void LoadStatsReporter::sendLoadStatsRequest() {
     clusters_[cluster_name] = now;
   }
 
-  ENVOY_LOG(trace, "Sending LoadStatsRequest: {}", request_.DebugString());
-  stream_->sendMessage(request_, false);
+  ENVOY_LOG(trace, "Sending LoadStatsRequest: {}", request->DebugString());
+  stream_->sendMessage(*request, false);
   stats_.responses_.inc();
   // When the connection is established, the message has not yet been read so we will not have a
   // load reporting period.
