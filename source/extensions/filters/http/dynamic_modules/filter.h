@@ -176,7 +176,7 @@ public:
    * Sends an HTTP callout to the specified cluster with the given message.
    */
   envoy_dynamic_module_type_http_callout_init_result
-  sendHttpCallout(uint32_t callout_id, absl::string_view cluster_name,
+  sendHttpCallout(uint64_t* callout_id_out, absl::string_view cluster_name,
                   Http::RequestMessagePtr&& message, uint64_t timeout_milliseconds);
 
   /**
@@ -184,26 +184,24 @@ public:
    * Returns a stream handle that can be used to reset the stream.
    */
   envoy_dynamic_module_type_http_callout_init_result
-  startHttpStream(envoy_dynamic_module_type_http_stream_envoy_ptr* stream_ptr_out,
-                  absl::string_view cluster_name, Http::RequestMessagePtr&& message,
-                  bool end_stream, uint64_t timeout_milliseconds);
+  startHttpStream(uint64_t* stream_id_out, absl::string_view cluster_name,
+                  Http::RequestMessagePtr&& message, bool end_stream,
+                  uint64_t timeout_milliseconds);
 
   /**
    * Resets an ongoing streamable HTTP callout stream.
    */
-  void resetHttpStream(envoy_dynamic_module_type_http_stream_envoy_ptr stream_ptr);
+  void resetHttpStream(uint64_t stream_id);
 
   /**
    * Sends data on an ongoing streamable HTTP callout stream.
    */
-  bool sendStreamData(envoy_dynamic_module_type_http_stream_envoy_ptr stream_ptr,
-                      Buffer::Instance& data, bool end_stream);
+  bool sendStreamData(uint64_t stream_id, Buffer::Instance& data, bool end_stream);
 
   /**
    * Sends trailers on an ongoing streamable HTTP callout stream.
    */
-  bool sendStreamTrailers(envoy_dynamic_module_type_http_stream_envoy_ptr stream_ptr,
-                          Http::RequestTrailerMapPtr trailers);
+  bool sendStreamTrailers(uint64_t stream_id, Http::RequestTrailerMapPtr trailers);
 
   const DynamicModuleHttpFilterConfig& getFilterConfig() const { return *config_; }
   Stats::StatNameDynamicPool& getStatNamePool() { return stat_name_pool_; }
@@ -243,7 +241,7 @@ private:
    */
   class HttpCalloutCallback : public Http::AsyncClient::Callbacks {
   public:
-    HttpCalloutCallback(std::shared_ptr<DynamicModuleHttpFilter> filter, uint32_t id)
+    HttpCalloutCallback(std::shared_ptr<DynamicModuleHttpFilter> filter, uint64_t id)
         : filter_(std::move(filter)), callout_id_(id) {}
     ~HttpCalloutCallback() override = default;
 
@@ -257,8 +255,8 @@ private:
     Http::AsyncClient::Request* request_ = nullptr;
 
   private:
-    std::shared_ptr<DynamicModuleHttpFilter> filter_;
-    uint32_t callout_id_;
+    const std::shared_ptr<DynamicModuleHttpFilter> filter_;
+    const uint64_t callout_id_{};
   };
 
   /**
@@ -268,8 +266,8 @@ private:
   class HttpStreamCalloutCallback : public Http::AsyncClient::StreamCallbacks,
                                     public Event::DeferredDeletable {
   public:
-    HttpStreamCalloutCallback(std::shared_ptr<DynamicModuleHttpFilter> filter)
-        : this_as_void_ptr_(static_cast<void*>(this)), filter_(std::move(filter)) {}
+    HttpStreamCalloutCallback(std::shared_ptr<DynamicModuleHttpFilter> filter, uint64_t callout_id)
+        : callout_id_(callout_id), filter_(std::move(filter)) {}
     ~HttpStreamCalloutCallback() override = default;
 
     // AsyncClient::StreamCallbacks
@@ -291,7 +289,7 @@ private:
     Http::RequestTrailerMapPtr request_trailers_ = nullptr;
 
     // Store this as void* so it can be passed directly to the module without casting.
-    void* this_as_void_ptr_;
+    const uint64_t callout_id_{};
 
     // Track if this callback has already been cleaned up to avoid double cleanup.
     bool cleaned_up_ = false;
@@ -300,12 +298,15 @@ private:
     std::shared_ptr<DynamicModuleHttpFilter> filter_;
   };
 
-  absl::flat_hash_map<uint32_t, std::unique_ptr<DynamicModuleHttpFilter::HttpCalloutCallback>>
-      http_callouts_;
+  uint64_t getNextCalloutId() { return next_callout_id_++; }
 
+  uint64_t next_callout_id_ = 1; // 0 is reserved as an invalid id.
+
+  absl::flat_hash_map<uint64_t, std::unique_ptr<DynamicModuleHttpFilter::HttpCalloutCallback>>
+      http_callouts_;
   // Unlike http_callouts_, we don't use an id-based map because the stream pointer itself is the
   // unique identifier. We store the callback objects here to manage their lifetime.
-  absl::flat_hash_map<void*, std::unique_ptr<DynamicModuleHttpFilter::HttpStreamCalloutCallback>>
+  absl::flat_hash_map<uint64_t, std::unique_ptr<DynamicModuleHttpFilter::HttpStreamCalloutCallback>>
       http_stream_callouts_;
 };
 
