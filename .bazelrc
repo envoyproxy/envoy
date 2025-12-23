@@ -20,6 +20,9 @@ startup --host_jvm_args="-DBAZEL_TRACK_SOURCE_DIRECTORIES=1"
 #############################################################################
 
 common --noenable_bzlmod
+common --enable_workspace
+common --noincompatible_disallow_empty_glob
+common --noincompatible_disallow_ctx_resolve_tools
 
 fetch --color=yes
 run --color=yes
@@ -59,7 +62,7 @@ test --test_verbose_timeout_warnings
 test --experimental_ui_max_stdouterr_bytes=11712829 #default 1048576
 
 # Allow tags to influence execution requirements
-common --experimental_allow_tags_propagation
+common --incompatible_allow_tags_propagation
 
 # Python
 common --@rules_python//python/config_settings:bootstrap_impl=script
