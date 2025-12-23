@@ -1718,7 +1718,7 @@ TEST(ConfigTest, TestFilterChainRefNoNamedChainsAvailable) {
       factory.createAction(config, action_context, ProtobufMessage::getStrictValidationVisitor()),
       EnvoyException,
       "filter_chain_ref 'my-chain' references a named filter chain, but no named filter chains "
-      "are defined at the HttpConnectionManager level.");
+      "are defined in the Composite filter config.");
 }
 
 // Test filter_chain_ref with multiple filters in the chain.

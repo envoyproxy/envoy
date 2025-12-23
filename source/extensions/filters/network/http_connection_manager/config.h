@@ -31,7 +31,6 @@
 #include "source/common/http/http1/codec_stats.h"
 #include "source/common/http/http2/codec_stats.h"
 #include "source/common/http/http3/codec_stats.h"
-#include "source/common/http/matching/data_impl.h"
 #include "source/common/json/json_loader.h"
 #include "source/common/local_reply/local_reply.h"
 #include "source/common/network/cidr_range.h"
@@ -375,8 +374,6 @@ private:
   const bool append_local_overload_;
   const bool append_x_forwarded_port_;
   const bool add_proxy_protocol_connection_state_;
-  // Pre-compiled named filter chains that can be referenced from composite filter actions.
-  Http::Matching::NamedFilterChainFactoryMapConstSharedPtr named_filter_chains_;
 };
 
 /**

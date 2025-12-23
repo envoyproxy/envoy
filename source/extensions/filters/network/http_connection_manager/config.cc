@@ -735,44 +735,6 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       helper(filter_config_provider_manager_, context_.serverFactoryContext(),
              context_.serverFactoryContext().clusterManager(), context_, stats_prefix_);
 
-  // Compile named filter chains before processing http_filters so they can be referenced.
-  if (!config.named_filter_chains().empty()) {
-    auto named_chains = std::make_shared<Http::Matching::NamedFilterChainFactoryMap>();
-    for (const auto& [name, filter_chain_config] : config.named_filter_chains()) {
-      if (filter_chain_config.typed_config().empty()) {
-        creation_status =
-            absl::InvalidArgumentError(fmt::format("Named filter chain '{}' must contain at least "
-                                                   "one filter.",
-                                                   name));
-        return;
-      }
-      std::vector<Http::FilterFactoryCb> filter_factories;
-      filter_factories.reserve(filter_chain_config.typed_config().size());
-      for (const auto& filter_config : filter_chain_config.typed_config()) {
-        auto& factory = Config::Utility::getAndCheckFactory<
-            Server::Configuration::NamedHttpFilterConfigFactory>(filter_config);
-        ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
-            filter_config.typed_config(), context_.messageValidationVisitor(), factory);
-        auto callback_or_status =
-            factory.createFilterFactoryFromProto(*message, stats_prefix_, context_);
-        if (!callback_or_status.status().ok()) {
-          creation_status = absl::InvalidArgumentError(
-              fmt::format("Failed to create filter factory for filter '{}' in named filter chain "
-                          "'{}': {}",
-                          filter_config.name(), name, callback_or_status.status().message()));
-          return;
-        }
-        filter_factories.push_back(std::move(callback_or_status.value()));
-      }
-      (*named_chains)[name] = std::move(filter_factories);
-    }
-    named_filter_chains_ = std::move(named_chains);
-  }
-
-  // Set the named filter chains scope so they're accessible during filter processing.
-  // This allows composite filter actions to reference named chains via filter_chain_ref.
-  Http::Matching::ScopedNamedFilterChainSetter named_chain_scope(named_filter_chains_);
-
   SET_AND_RETURN_IF_NOT_OK(
       helper.processFilters(config.http_filters(), "http", "http", filter_factories_),
       creation_status);

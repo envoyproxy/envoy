@@ -187,7 +187,7 @@ Matcher::ActionConstSharedPtr ExecuteFilterActionFactory::createFilterChainRefAc
   if (!context.named_filter_chains_) {
     throw EnvoyException(fmt::format(
         "filter_chain_ref '{}' references a named filter chain, but no named filter chains "
-        "are defined at the HttpConnectionManager level.",
+        "are defined in the Composite filter config.",
         ref_name));
   }
 
@@ -201,7 +201,7 @@ Matcher::ActionConstSharedPtr ExecuteFilterActionFactory::createFilterChainRefAc
         })));
   }
 
-  // The filter chain has already been pre-compiled at HCM config time.
+  // The filter chain has already been pre-compiled at config time.
   // Create a copy of the filter factories vector for the action.
   FilterFactoryCbList filter_factories(it->second.begin(), it->second.end());
 

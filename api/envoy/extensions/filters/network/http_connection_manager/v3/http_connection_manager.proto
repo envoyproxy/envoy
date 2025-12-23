@@ -470,16 +470,6 @@ message HttpConnectionManager {
   // as the filters are processed sequentially as request events happen.
   repeated HttpFilter http_filters = 5;
 
-  // Named filter chain definitions that can be referenced from composite filter actions.
-  // This allows filter chains to be defined once and referenced multiple times via
-  // :ref:`ExecuteFilterAction.filter_chain_ref
-  // <envoy_v3_api_field_extensions.filters.http.composite.v3.ExecuteFilterAction.filter_chain_ref>`.
-  // The filter chains are compiled at configuration time and can be referenced by name.
-  // This is useful when the same filter chain needs to be applied across many routes,
-  // as it avoids duplicating the filter chain configuration and allows for efficient
-  // pre-compilation.
-  map<string, FilterChainConfiguration> named_filter_chains = 61;
-
   // Whether the connection manager manipulates the :ref:`config_http_conn_man_headers_user-agent`
   // and :ref:`config_http_conn_man_headers_downstream-service-cluster` headers. See the linked
   // documentation for more information. Defaults to false.
@@ -1312,14 +1302,6 @@ message RequestIDExtension {
 
   // Request ID extension specific configuration.
   google.protobuf.Any typed_config = 1;
-}
-
-// A list of HTTP filter configurations to be executed as a filter chain.
-// This is used for named filter chains defined at the HCM level that can be
-// referenced from composite filter actions.
-message FilterChainConfiguration {
-  // A list of filter configurations to be executed in order.
-  repeated config.core.v3.TypedExtensionConfig typed_config = 1;
 }
 
 // [#protodoc-title: Envoy Mobile HTTP connection manager]

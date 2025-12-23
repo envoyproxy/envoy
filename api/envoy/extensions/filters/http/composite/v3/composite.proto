@@ -31,6 +31,13 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // :ref:`ExecuteFilterAction <envoy_v3_api_msg_extensions.filters.http.composite.v3.ExecuteFilterAction>`)
 // which filter configuration to create and delegate to.
 message Composite {
+  // Named filter chain definitions that can be referenced from
+  // :ref:`ExecuteFilterAction.filter_chain_ref
+  // <envoy_v3_api_field_extensions.filters.http.composite.v3.ExecuteFilterAction.filter_chain_ref>`.
+  // The filter chains are compiled at configuration time and can be referenced by name.
+  // This is useful when the same filter chain needs to be applied across many routes,
+  // as it avoids duplicating the filter chain configuration.
+  map<string, FilterChainConfiguration> named_filter_chains = 1;
 }
 
 // A list of filter configurations to be called in order. Note that this can be used as the type
@@ -80,11 +87,11 @@ message ExecuteFilterAction {
   FilterChainConfiguration filter_chain = 4;
 
   // A reference to a named filter chain defined in the
-  // :ref:`HttpConnectionManager.named_filter_chains
-  // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.named_filter_chains>`
-  // field. This allows filter chains to be defined once at the HCM level and
-  // referenced multiple times from composite filter actions, which is useful
-  // when the same filter chain needs to be applied across many routes.
+  // :ref:`Composite.named_filter_chains
+  // <envoy_v3_api_field_extensions.filters.http.composite.v3.Composite.named_filter_chains>`
+  // field. This allows filter chains to be defined once and referenced multiple times
+  // from match actions, which is useful when the same filter chain needs to be applied
+  // across many routes.
   // Only one of ``typed_config``, ``dynamic_config``, ``filter_chain``, or ``filter_chain_ref``
   // can be set.
   string filter_chain_ref = 5;

@@ -26,6 +26,7 @@ envoy_cc_extension(
         "//source/extensions/filters/http/common:factory_base_lib",
         "@envoy_api//envoy/extensions/common/matching/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/common/matcher/action/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/composite/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],
 )

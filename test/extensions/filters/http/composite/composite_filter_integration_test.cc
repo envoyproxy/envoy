@@ -1000,7 +1000,8 @@ TEST_P(CompositeFilterChainIntegrationTest, TestNoMatchBypassesFilterChain) {
   EXPECT_THAT(response->headers(), Http::HttpStatusIs("200"));
 }
 
-// Tests that a named filter chain defined at HCM level can be referenced by filter_chain_ref.
+// Tests that a named filter chain defined in Composite config can be referenced by
+// filter_chain_ref.
 class NamedFilterChainIntegrationTest : public testing::TestWithParam<CompositeFilterTestParams>,
                                         public HttpIntegrationTest {
 public:
@@ -1011,34 +1012,9 @@ public:
 
   void addNamedFilterChainAndCompositeFilter(const std::string& chain_name,
                                              const std::string& composite_name = "composite") {
-    // Add named filter chain at HCM level and composite filter that references it.
-    config_helper_.addConfigModifier([this, chain_name](ConfigHelper::HttpConnectionManager& hcm) {
-      auto* named_chain = hcm.mutable_named_filter_chains();
-      envoy::extensions::filters::network::http_connection_manager::v3::FilterChainConfiguration
-          filter_chain_config;
-      // Add add-header-filter as first filter.
-      auto* filter1 = filter_chain_config.add_typed_config();
-      filter1->set_name("add-header-filter");
-      filter1->mutable_typed_config()->PackFrom(Protobuf::Struct());
-
-      // Add set-response-code as second filter.
-      auto* filter2 = filter_chain_config.add_typed_config();
-      filter2->set_name("set-response-code");
-      if (is_dual_factory_) {
-        test::integration::filters::SetResponseCodeFilterConfigDual response_code_config;
-        response_code_config.set_code(418);
-        response_code_config.set_prefix("/respond-directly");
-        filter2->mutable_typed_config()->PackFrom(response_code_config);
-      } else {
-        test::integration::filters::SetResponseCodeFilterConfig response_code_config;
-        response_code_config.set_code(418);
-        response_code_config.set_prefix("/respond-directly");
-        filter2->mutable_typed_config()->PackFrom(response_code_config);
-      }
-      (*named_chain)[chain_name] = filter_chain_config;
-    });
-
-    config_helper_.prependFilter(absl::StrFormat(R"EOF(
+    // Use YAML format with named_filter_chains in the Composite typed_config.
+    std::string filter_config =
+        absl::StrFormat(R"EOF(
       name: %s
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.common.matching.v3.ExtensionWithMatcher
@@ -1046,6 +1022,17 @@ public:
           name: composite
           typed_config:
             "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.Composite
+            named_filter_chains:
+              %s:
+                typed_config:
+                  - name: add-header-filter
+                    typed_config:
+                      "@type": type.googleapis.com/google.protobuf.Struct
+                  - name: set-response-code
+                    typed_config:
+                      "@type": type.googleapis.com/test.integration.filters.%s
+                      code: 418
+                      prefix: "/respond-directly"
         xds_matcher:
           matcher_tree:
             input:
@@ -1062,55 +1049,13 @@ public:
                       "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.ExecuteFilterAction
                       filter_chain_ref: "%s"
     )EOF",
-                                                 composite_name, chain_name),
-                                 downstream_filter_);
+                        composite_name, chain_name, proto_type_, chain_name);
+    config_helper_.prependFilter(filter_config, downstream_filter_);
   }
 
   void addMultipleNamedFilterChains(const std::string& composite_name = "composite") {
-    // Add multiple named filter chains at HCM level.
-    config_helper_.addConfigModifier([this](ConfigHelper::HttpConnectionManager& hcm) {
-      auto* named_chain = hcm.mutable_named_filter_chains();
-
-      // First filter chain adds header and responds with 418.
-      envoy::extensions::filters::network::http_connection_manager::v3::FilterChainConfiguration
-          filter_chain1;
-      auto* filter1_1 = filter_chain1.add_typed_config();
-      filter1_1->set_name("add-header-filter");
-      filter1_1->mutable_typed_config()->PackFrom(Protobuf::Struct());
-      auto* filter1_2 = filter_chain1.add_typed_config();
-      filter1_2->set_name("set-response-code");
-      if (is_dual_factory_) {
-        test::integration::filters::SetResponseCodeFilterConfigDual response_code_config;
-        response_code_config.set_code(418);
-        response_code_config.set_prefix("/respond-directly");
-        filter1_2->mutable_typed_config()->PackFrom(response_code_config);
-      } else {
-        test::integration::filters::SetResponseCodeFilterConfig response_code_config;
-        response_code_config.set_code(418);
-        response_code_config.set_prefix("/respond-directly");
-        filter1_2->mutable_typed_config()->PackFrom(response_code_config);
-      }
-      (*named_chain)["chain-418"] = filter_chain1;
-
-      // Second filter chain just responds with 503.
-      envoy::extensions::filters::network::http_connection_manager::v3::FilterChainConfiguration
-          filter_chain2;
-      auto* filter2_1 = filter_chain2.add_typed_config();
-      filter2_1->set_name("set-response-code");
-      if (is_dual_factory_) {
-        test::integration::filters::SetResponseCodeFilterConfigDual response_code_config2;
-        response_code_config2.set_code(503);
-        filter2_1->mutable_typed_config()->PackFrom(response_code_config2);
-      } else {
-        test::integration::filters::SetResponseCodeFilterConfig response_code_config2;
-        response_code_config2.set_code(503);
-        filter2_1->mutable_typed_config()->PackFrom(response_code_config2);
-      }
-      (*named_chain)["chain-503"] = filter_chain2;
-    });
-
-    // Add composite filter with matcher list to reference different chains based on headers.
-    config_helper_.prependFilter(absl::StrFormat(R"EOF(
+    // Named filter chains are now defined in the Composite filter config itself.
+    std::string filter_config = absl::StrFormat(R"EOF(
       name: %s
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.common.matching.v3.ExtensionWithMatcher
@@ -1118,6 +1063,23 @@ public:
           name: composite
           typed_config:
             "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.Composite
+            named_filter_chains:
+              chain-418:
+                typed_config:
+                  - name: add-header-filter
+                    typed_config:
+                      "@type": type.googleapis.com/google.protobuf.Struct
+                  - name: set-response-code
+                    typed_config:
+                      "@type": type.googleapis.com/test.integration.filters.%s
+                      code: 418
+                      prefix: "/respond-directly"
+              chain-503:
+                typed_config:
+                  - name: set-response-code
+                    typed_config:
+                      "@type": type.googleapis.com/test.integration.filters.%s
+                      code: 503
         xds_matcher:
           matcher_tree:
             input:
@@ -1140,8 +1102,8 @@ public:
                       "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.ExecuteFilterAction
                       filter_chain_ref: "chain-503"
     )EOF",
-                                                 composite_name),
-                                 downstream_filter_);
+                                                composite_name, proto_type_, proto_type_);
+    config_helper_.prependFilter(filter_config, downstream_filter_);
   }
 
   const Http::TestRequestHeaderMapImpl match_request_headers_ = {{":method", "GET"},
@@ -1209,8 +1171,7 @@ INSTANTIATE_TEST_SUITE_P(
     testing::ValuesIn(NamedFilterChainIntegrationTest::getValuesForNamedFilterChainTest()),
     NamedFilterChainIntegrationTest::NamedFilterChainTestParamsToString);
 
-// Verifies that a named filter chain defined at HCM level is executed correctly when
-// referenced via filter_chain_ref.
+// Verifies that a named filter chain is executed correctly when referenced via filter_chain_ref.
 TEST_P(NamedFilterChainIntegrationTest, TestNamedFilterChainRef) {
   addNamedFilterChainAndCompositeFilter("test-chain");
   initialize();
