@@ -199,8 +199,7 @@ public:
                ShadowWriterPtr&& shadow_writer, bool emit_dynamic_stats, bool start_child_span,
                bool suppress_envoy_headers, bool respect_expected_rq_timeout,
                bool suppress_grpc_request_failure_code_stats,
-               bool flush_upstream_log_on_upstream_stream,
-               bool reject_connect_request_early_data,
+               bool flush_upstream_log_on_upstream_stream, bool reject_connect_request_early_data,
                const Protobuf::RepeatedPtrField<std::string>& strict_check_headers,
                TimeSource& time_source, Http::Context& http_context,
                Router::Context& router_context)
@@ -307,8 +306,7 @@ public:
       : config_(config), stats_(stats),
         allow_multiplexed_upstream_half_close_(Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.allow_multiplexed_upstream_half_close")),
-        reject_early_connect_data_enabled_(config->reject_connect_request_early_data_) {
-  }
+        reject_early_connect_data_enabled_(config->reject_connect_request_early_data_) {}
 
   ~Filter() override;
 
