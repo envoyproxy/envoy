@@ -32,7 +32,7 @@ Format Strings
 Format strings are plain strings, specified using the ``format`` key. They may contain
 either command operators or other characters interpreted as a plain string.
 The access log formatter does not make any assumptions about a new line separator, so one
-has to specified as part of the format string.
+has to be specified as part of the format string.
 See the :ref:`default format <config_access_log_default_format>` for an example.
 
 .. _config_access_log_default_format:
@@ -40,7 +40,7 @@ See the :ref:`default format <config_access_log_default_format>` for an example.
 Default Format String
 ---------------------
 
-If custom format string is not specified, Envoy uses the following default format:
+If a custom format string is not specified, Envoy uses the following default format:
 
 .. code-block:: none
 
@@ -51,7 +51,7 @@ If custom format string is not specified, Envoy uses the following default forma
 
 Example of the default Envoy access log format:
 
-.. code-block:: none
+.. code-block:: console
 
   [2016-04-15T20:17:00.310Z] "POST /api/v1/locations HTTP/2" 204 - 154 0 226 100 "10.0.35.28"
   "nsq2http" "cc21d9b0-cf5c-432b-8c7e-98aeb7988cd2" "locations" "tcp://10.0.2.1:80"
@@ -68,17 +68,13 @@ their values inserted into the format dictionary to construct the log output.
 
 For example, with the following format provided in the configuration as ``json_format``:
 
-.. code-block:: json
+.. code-block:: yaml
 
-  {
-    "config": {
-      "json_format": {
-          "protocol": "%PROTOCOL%",
-          "duration": "%DURATION%",
-          "my_custom_header": "%REQUEST_HEADER(MY_CUSTOM_HEADER)%"
-      }
-    }
-  }
+  config:
+    json_format:
+      protocol: "%PROTOCOL%"
+      duration: "%DURATION%"
+      my_custom_header: "%REQUEST_HEADER(MY_CUSTOM_HEADER)%"
 
 The following JSON object would be written to the log file:
 
@@ -114,13 +110,15 @@ Command Operators
 Command operators are used to extract values that will be inserted into the access logs.
 The same operators are used by different types of access logs (such as HTTP and TCP). Some
 fields may have slightly different meanings, depending on what type of log it is. Differences
-are noted.
+are noted in the descriptions.
 
-Note that if a value is not set/empty, the logs will contain a ``-`` character or, for JSON logs,
-the string ``"-"``. For typed JSON logs unset values are represented as ``null`` values and empty
-strings are rendered as ``""``. :ref:`omit_empty_values
-<envoy_v3_api_field_config.core.v3.SubstitutionFormatString.omit_empty_values>` option could be used
-to omit empty values entirely.
+.. note::
+
+  If a value is not set/empty, the logs will contain a ``-`` character or, for JSON logs,
+  the string ``"-"``. For typed JSON logs unset values are represented as ``null`` values and empty
+  strings are rendered as ``""``. :ref:`omit_empty_values
+  <envoy_v3_api_field_config.core.v3.SubstitutionFormatString.omit_empty_values>` option could be used
+  to omit empty values entirely.
 
 Unless otherwise noted, command operators produce string outputs for typed JSON logs.
 
@@ -138,8 +136,8 @@ The following command operators are supported:
   UDP
     UDP proxy session start time including milliseconds.
 
-  START_TIME can be customized using a `format string <https://en.cppreference.com/w/cpp/io/manip/put_time>`_.
-  In addition to that, START_TIME also accepts following specifiers:
+  ``START_TIME`` can be customized using a `format string <https://en.cppreference.com/w/cpp/io/manip/put_time>`_.
+  In addition, ``START_TIME`` also accepts the following specifiers:
 
   +------------------------+-------------------------------------------------------------+
   | Specifier              | Explanation                                                 |
@@ -153,7 +151,7 @@ The following command operators are supported:
   |                        | - ``%9f`` nanosecond (9 digits)                             |
   +------------------------+-------------------------------------------------------------+
 
-  Examples of formatting START_TIME is as follows:
+  Examples of formatting ``START_TIME`` are as follows:
 
   .. code-block:: none
 
@@ -168,7 +166,7 @@ The following command operators are supported:
 
     %START_TIME(%s.%9f)%
 
-  In typed JSON logs, START_TIME is always rendered as a string.
+  In typed JSON logs, ``START_TIME`` is always rendered as a string.
 
 .. _config_access_log_format_start_time_local:
 
@@ -180,7 +178,7 @@ The following command operators are supported:
 %EMIT_TIME%
   The time when log entry is emitted including milliseconds.
 
-  EMIT_TIME can be customized using a `format string <https://en.cppreference.com/w/cpp/io/manip/put_time>`_.
+  ``EMIT_TIME`` can be customized using a `format string <https://en.cppreference.com/w/cpp/io/manip/put_time>`_.
   See :ref:`START_TIME <config_access_log_format_start_time>` for additional format specifiers and examples.
 
 .. _config_access_log_format_emit_time_local:
@@ -238,8 +236,8 @@ The following command operators are supported:
   TCP/UDP
     Not implemented ("-").
 
-  In typed JSON logs, PROTOCOL will render the string ``"-"`` if the protocol is not
-  available (e.g. in TCP logs).
+  In typed JSON logs, ``PROTOCOL`` will render the string ``"-"`` if the protocol is not
+  available (e.g., in TCP logs).
 
 %UPSTREAM_PROTOCOL%
   HTTP
@@ -248,17 +246,23 @@ The following command operators are supported:
   TCP/UDP
     Not implemented ("-").
 
-  In typed JSON logs, UPSTREAM_PROTOCOL will render the string ``"-"`` if the protocol is not
-  available (e.g. in TCP logs).
+  In typed JSON logs, ``UPSTREAM_PROTOCOL`` will render the string ``"-"`` if the protocol is not
+  available (e.g., in TCP logs).
 
 %RESPONSE_CODE%
   HTTP
-    HTTP response code. Note that a response code of '0' means that the server never sent the
-    beginning of a response. This generally means that the (downstream) client disconnected.
+    HTTP response code.
 
-    Note that in the case of 100-continue responses, only the response code of the final headers
-    will be logged. If a 100-continue is followed by a 200, the logged response will be 200.
-    If a 100-continue results in a disconnect, the 100 will be logged.
+    .. note::
+
+      A response code of ``0`` means that the server never sent the beginning of a response.
+      This generally means that the (downstream) client disconnected.
+
+    .. note::
+
+      In the case of 100-continue responses, only the response code of the final headers
+      will be logged. If a 100-continue is followed by a 200, the logged response will be 200.
+      If a 100-continue results in a disconnect, the 100 will be logged.
 
   TCP/UDP
     Not implemented ("-").
@@ -271,7 +275,7 @@ The following command operators are supported:
   HTTP
     HTTP response code details provides additional information about the response code, such as
     who set it (the upstream or envoy) and why. The string will not contain any whitespaces, which
-    will be converted to underscore '_', unless optional parameter X is ALLOW_WHITESPACES.
+    will be converted to underscore '_', unless optional parameter ``X`` is ``ALLOW_WHITESPACES``.
 
   TCP/UDP
     Not implemented ("-")
@@ -309,12 +313,18 @@ The following command operators are supported:
 
 %UPSTREAM_REQUEST_ATTEMPT_COUNT%
   HTTP
-    Number of times the request is attempted upstream. Note that an attempt count of '0' means that
-    the request was never attempted upstream.
+    Number of times the request is attempted upstream.
+
+    .. note::
+
+      An attempt count of ``0`` means that the request was never attempted upstream.
 
   TCP
-    Number of times the connection request is attempted upstream. Note that an attempt count of '0'
-    means that the connection request was never attempted upstream.
+    Number of times the connection request is attempted upstream.
+
+    .. note::
+
+      An attempt count of ``0`` means that the connection request was never attempted upstream.
 
   UDP
     Not implemented (0).
@@ -444,8 +454,8 @@ The following command operators are supported:
 
 %COMMON_DURATION(START:END:PRECISION)%
   HTTP
-    Total duration between the START time point and the END time point in specific PRECISION.
-    The START and END time points are specified by the following values (NOTE: all values
+    Total duration between the ``START`` time point and the ``END`` time point in specific ``PRECISION``.
+    The ``START`` and ``END`` time points are specified by the following values (all values
     here are case-sensitive):
 
     * ``DS_RX_BEG``: The time point of the downstream request receiving begin.
@@ -462,18 +472,22 @@ The following command operators are supported:
     * ``DS_TX_END``: The time point of the downstream response sending end.
     * Dynamic value: Other values will be treated as custom time points that are set by named keys.
 
-    NOTE: Upstream connection establishment time points (US_CX_*, US_HS_END) repeat for all requests
-    in a given connection.
+    .. note::
 
-    The PRECISION is specified by the following values (NOTE: all values here are case-sensitive):
+      Upstream connection establishment time points (``US_CX_*``, ``US_HS_END``) repeat for all requests
+      in a given connection.
+
+    The ``PRECISION`` is specified by the following values (all values here are case-sensitive):
 
     * ``ms``: Millisecond precision.
     * ``us``: Microsecond precision.
     * ``ns``: Nanosecond precision.
 
-    NOTE: enabling independent half-close behavior for H/2 and H/3 protocols can produce
-    ``*_TX_END`` values lower than ``*_RX_END`` values, in cases where upstream peer has half-closed
-    its stream before downstream peer. In these cases ``COMMON_DURATION`` value will become negative.
+    .. note::
+
+      Enabling independent half-close behavior for H/2 and H/3 protocols can produce
+      ``*_TX_END`` values lower than ``*_RX_END`` values, in cases where upstream peer has half-closed
+      its stream before downstream peer. In these cases the ``COMMON_DURATION`` value will become negative.
 
   TCP/UDP
     Not implemented ("-").
@@ -555,7 +569,7 @@ The following command operators are supported:
 
 %RESPONSE_FLAGS% / %RESPONSE_FLAGS_LONG%
   Additional details about the response or connection, if any. For TCP connections, the response codes mentioned in
-  the descriptions do not apply. %RESPONSE_FLAGS% will output a short string. %RESPONSE_FLAGS_LONG% will output a Pascal case string.
+  the descriptions do not apply. ``%RESPONSE_FLAGS%`` will output a short string. ``%RESPONSE_FLAGS_LONG%`` will output a Pascal case string.
   Possible values are:
 
 HTTP and TCP
@@ -645,7 +659,7 @@ UDP
   <envoy_v3_api_field_config.cluster.v3.Cluster.alt_stat_name>` does NOT modify this value.
 
 %UPSTREAM_LOCAL_ADDRESS%
-  Local address of the upstream connection. If the address is an IP address it includes both
+  Local address of the upstream connection. If the address is an IP address, it includes both
   address and port.
 
 %UPSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%
@@ -659,7 +673,7 @@ UDP
 .. _config_access_log_format_upstream_remote_address:
 
 %UPSTREAM_REMOTE_ADDRESS%
-  Remote address of the upstream connection. If the address is an IP address it includes both
+  Remote address of the upstream connection. If the address is an IP address, it includes both
   address and port. Identical to the :ref:`UPSTREAM_HOST <config_access_log_format_upstream_host>` value if the upstream
   host only has one address and connection is established successfully.
 
@@ -675,9 +689,9 @@ UDP
 
 %UPSTREAM_TRANSPORT_FAILURE_REASON%
   HTTP
-    If upstream connection failed due to transport socket (e.g. TLS handshake), provides the failure
+    If upstream connection failed due to transport socket (e.g., TLS handshake), provides the failure
     reason from the transport socket. The format of this field depends on the configured upstream
-    transport socket. Common TLS failures are in :ref:`TLS trouble shooting <arch_overview_ssl_trouble_shooting>`.
+    transport socket. Common TLS failures are in :ref:`TLS troubleshooting <arch_overview_ssl_trouble_shooting>`.
 
   TCP/UDP
     Not implemented ("-")
@@ -686,16 +700,18 @@ UDP
 
 %DOWNSTREAM_TRANSPORT_FAILURE_REASON%
   HTTP/TCP
-    If downstream connection failed due to transport socket (e.g. TLS handshake), provides the failure
+    If downstream connection failed due to transport socket (e.g., TLS handshake), provides the failure
     reason from the transport socket. The format of this field depends on the configured downstream
-    transport socket. Common TLS failures are in :ref:`TLS trouble shooting <arch_overview_ssl_trouble_shooting>`.
-    Note: it only works in listener access config, and the HTTP or TCP access logs would observe empty values.
+    transport socket. Common TLS failures are in :ref:`TLS troubleshooting <arch_overview_ssl_trouble_shooting>`.
+
+    .. note::
+      It only works in listener access config, and the HTTP or TCP access logs would observe empty values.
 
   UDP
     Not implemented ("-")
 
 %DOWNSTREAM_REMOTE_ADDRESS%
-  Remote address of the downstream connection. If the address is an IP address it includes both
+  Remote address of the downstream connection. If the address is an IP address, it includes both
   address and port.
 
   .. note::
@@ -725,7 +741,7 @@ UDP
     <config_http_conn_man_headers_x-forwarded-for>`.
 
 %DOWNSTREAM_DIRECT_REMOTE_ADDRESS%
-  Direct remote address of the downstream connection. If the address is an IP address it includes both
+  Direct remote address of the downstream connection. If the address is an IP address, it includes both
   address and port.
 
   .. note::
@@ -755,7 +771,7 @@ UDP
     or :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`.
 
 %DOWNSTREAM_LOCAL_ADDRESS%
-  Local address of the downstream connection. If the address is an IP address it includes both
+  Local address of the downstream connection. If the address is an IP address, it includes both
   address and port.
 
   If the original connection was redirected by iptables REDIRECT, this represents
@@ -835,9 +851,9 @@ UDP
 %STREAM_ID%
   An identifier for the stream (HTTP request, long-live HTTP2 stream, TCP connection, etc.). It can be used to
   cross-reference TCP access logs across multiple log sinks, or to cross-reference timer-based reports for the same connection.
-  Different with %CONNECTION_ID%, the identifier should be unique across multiple instances or between restarts.
-  And it's value should be same with %REQUEST_HEADER(X-REQUEST-ID)% for HTTP request.
-  This should be used to replace %CONNECTION_ID% and %REQUEST_HEADER(X-REQUEST-ID)% in most cases.
+  Unlike ``%CONNECTION_ID%``, the identifier should be unique across multiple instances or between restarts.
+  And its value should be the same as ``%REQUEST_HEADER(X-REQUEST-ID)%`` for HTTP requests.
+  This should be used to replace ``%CONNECTION_ID%`` and ``%REQUEST_HEADER(X-REQUEST-ID)%`` in most cases.
 
 %GRPC_STATUS(X)%
   `gRPC status code <https://github.com/googleapis/googleapis/blob/master/google/rpc/code.proto>`_ formatted according to the optional parameter ``X``, which can be ``CAMEL_STRING``, ``SNAKE_STRING`` and ``NUMBER``.
@@ -849,26 +865,26 @@ UDP
 
 .. _config_access_log_format_req:
 
-%REQUEST_HEADER(X?Y):Z%/%REQ(X?Y):Z%
+%REQUEST_HEADER(X?Y):Z% / %REQ(X?Y):Z%
   HTTP
-    An HTTP request header where X is the main HTTP header, Y is the alternative one, and Z is an
-    optional parameter denoting string truncation up to Z characters long. The value is taken from
-    the HTTP request header named X first and if it's not set, then request header Y is used. If
+    An HTTP request header where ``X`` is the main HTTP header, ``Y`` is the alternative one, and ``Z`` is an
+    optional parameter denoting string truncation up to ``Z`` characters long. The value is taken from
+    the HTTP request header named ``X`` first and if it's not set, then request header ``Y`` is used. If
     none of the headers are present ``"-"`` symbol will be in the log.
 
   TCP/UDP
     Not implemented ("-").
 
-%RESPONSE_HEADER(X?Y):Z%/%RESP(X?Y):Z%
+%RESPONSE_HEADER(X?Y):Z% / %RESP(X?Y):Z%
   HTTP
-    Same as **%REQUEST_HEADER(X?Y):Z%** but taken from HTTP response headers.
+    Same as ``%REQUEST_HEADER(X?Y):Z%`` but taken from HTTP response headers.
 
   TCP/UDP
     Not implemented ("-").
 
-%RESPONSE_TRAILER(X?Y):Z%/%TRAILER(X?Y):Z%
+%RESPONSE_TRAILER(X?Y):Z% / %TRAILER(X?Y):Z%
   HTTP
-    Same as **%REQUEST_HEADER(X?Y):Z%** but taken from HTTP response trailers.
+    Same as ``%REQUEST_HEADER(X?Y):Z%`` but taken from HTTP response trailers.
 
   TCP/UDP
     Not implemented ("-").
@@ -878,9 +894,9 @@ UDP
 %DYNAMIC_METADATA(NAMESPACE:KEY*):Z%
   HTTP
     :ref:`Dynamic Metadata <envoy_v3_api_msg_config.core.v3.Metadata>` info,
-    where NAMESPACE is the filter namespace used when setting the metadata, KEY is an optional
-    lookup key in the namespace with the option of specifying nested keys separated by ':', and Z is an
-    optional parameter denoting string (and other non-structured value) truncation up to Z characters long.
+    where ``NAMESPACE`` is the filter namespace used when setting the metadata, ``KEY`` is an optional
+    lookup key in the namespace with the option of specifying nested keys separated by ':', and ``Z`` is an
+    optional parameter denoting string (and other non-structured value) truncation up to ``Z`` characters long.
     Dynamic Metadata can be set by filters using the :repo:`StreamInfo <envoy/stream_info/stream_info.h>` API:
     *setDynamicMetadata*. The data will be logged as a JSON string. For example, for the following dynamic metadata:
 
@@ -900,11 +916,11 @@ UDP
 
   UDP
     For :ref:`UDP Proxy <config_udp_listener_filters_udp_proxy>`,
-    when NAMESPACE is set to "udp.proxy.session", optional KEYs are as follows:
+    when ``NAMESPACE`` is set to "udp.proxy.session", optional ``KEY``s are as follows:
 
     * ``cluster_name``: Name of the cluster.
-    * ``bytes_sent``: Total number of bytes sent to the downstream in the session. *Deprecated, use %BYTES_SENT% instead.*
-    * ``bytes_received``: Total number of bytes received from the downstream in the session. *Deprecated, use %BYTES_RECEIVED% instead.*
+    * ``bytes_sent``: Total number of bytes sent to the downstream in the session. *Deprecated, use ``%BYTES_SENT%`` instead.*
+    * ``bytes_received``: Total number of bytes received from the downstream in the session. *Deprecated, use ``%BYTES_RECEIVED%`` instead.*
     * ``errors_sent``: Number of errors that have occurred when sending datagrams to the downstream in the session.
     * ``datagrams_sent``: Number of datagrams sent to the downstream in the session.
     * ``datagrams_received``: Number of datagrams received from the downstream in the session.
@@ -920,10 +936,10 @@ UDP
       %DYNAMIC_METADATA(udp.proxy.session:datagrams_sent)%
       %DYNAMIC_METADATA(udp.proxy.session:datagrams_received)%\n
 
-    when NAMESPACE is set to "udp.proxy.proxy", optional KEYs are as follows:
+    when ``NAMESPACE`` is set to "udp.proxy.proxy", optional ``KEY``s are as follows:
 
-    * ``bytes_sent``: Total number of bytes sent to the downstream in UDP proxy. *Deprecated, use %BYTES_SENT% instead.*
-    * ``bytes_received``: Total number of bytes received from the downstream in UDP proxy. *Deprecated, use %BYTES_RECEIVED% instead.*
+    * ``bytes_sent``: Total number of bytes sent to the downstream in UDP proxy. *Deprecated, use ``%BYTES_SENT%`` instead.*
+    * ``bytes_received``: Total number of bytes received from the downstream in UDP proxy. *Deprecated, use ``%BYTES_RECEIVED%`` instead.*
     * ``errors_sent``: Number of errors that have occurred when sending datagrams to the downstream in UDP proxy.
     * ``errors_received``: Number of errors that have occurred when receiving datagrams from the downstream in UDP proxy.
     * ``datagrams_sent``: Number of datagrams sent to the downstream in UDP proxy.
@@ -947,7 +963,7 @@ UDP
 
   THRIFT
     For :ref:`Thrift Proxy <config_network_filters_thrift_proxy>`,
-    NAMESPACE should be always set to "thrift.proxy", optional KEYs are as follows:
+    ``NAMESPACE`` should be always set to "thrift.proxy", optional ``KEY``s are as follows:
 
     * ``method``: Name of the method.
     * ``cluster_name``: Name of the cluster.
@@ -987,16 +1003,16 @@ UDP
 
   .. note::
 
-   DYNAMIC_METADATA command operator will be deprecated in the future in favor of :ref:`METADATA<envoy_v3_api_msg_extensions.formatter.metadata.v3.Metadata>` operator.
+   The ``DYNAMIC_METADATA`` command operator will be deprecated in the future in favor of :ref:`METADATA<envoy_v3_api_msg_extensions.formatter.metadata.v3.Metadata>` operator.
 
 .. _config_access_log_format_cluster_metadata:
 
 %CLUSTER_METADATA(NAMESPACE:KEY*):Z%
   HTTP
     :ref:`Upstream cluster Metadata <envoy_v3_api_msg_config.core.v3.Metadata>` info,
-    where NAMESPACE is the filter namespace used when setting the metadata, KEY is an optional
+    where ``NAMESPACE`` is the filter namespace used when setting the metadata, ``KEY`` is an optional
     lookup key in the namespace with the option of specifying nested keys separated by ':',
-    and Z is an optional parameter denoting string truncation up to Z characters long. The data
+    and ``Z`` is an optional parameter denoting string truncation up to ``Z`` characters long. The data
     will be logged as a JSON string. For example, for the following dynamic metadata:
 
     ``com.test.my_filter: {"test_key": "foo", "test_object": {"inner_key": "bar"}}``
@@ -1021,16 +1037,16 @@ UDP
 
   .. note::
 
-   CLUSTER_METADATA command operator will be deprecated in the future in favor of :ref:`METADATA<envoy_v3_api_msg_extensions.formatter.metadata.v3.Metadata>` operator.
+   The ``CLUSTER_METADATA`` command operator will be deprecated in the future in favor of :ref:`METADATA<envoy_v3_api_msg_extensions.formatter.metadata.v3.Metadata>` operator.
 
 .. _config_access_log_format_upstream_host_metadata:
 
 %UPSTREAM_METADATA(NAMESPACE:KEY*):Z%
   HTTP/TCP
     :ref:`Upstream host Metadata <envoy_v3_api_msg_config.core.v3.Metadata>` info,
-    where NAMESPACE is the filter namespace used when setting the metadata, KEY is an optional
+    where ``NAMESPACE`` is the filter namespace used when setting the metadata, ``KEY`` is an optional
     lookup key in the namespace with the option of specifying nested keys separated by ':',
-    and Z is an optional parameter denoting string truncation up to Z characters long. The data
+    and ``Z`` is an optional parameter denoting string truncation up to ``Z`` characters long. The data
     will be logged as a JSON string. For example, for the following upstream host metadata:
 
     ``com.test.my_filter: {"test_key": "foo", "test_object": {"inner_key": "bar"}}``
@@ -1055,21 +1071,21 @@ UDP
 
   .. note::
 
-   UPSTREAM_METADATA command operator will be deprecated in the future in favor of :ref:`METADATA<envoy_v3_api_msg_extensions.formatter.metadata.v3.Metadata>` operator.
+   The ``UPSTREAM_METADATA`` command operator will be deprecated in the future in favor of :ref:`METADATA<envoy_v3_api_msg_extensions.formatter.metadata.v3.Metadata>` operator.
 
 .. _config_access_log_format_filter_state:
 
 %FILTER_STATE(KEY:F:FIELD?):Z%
   HTTP
-    :ref:`Filter State <arch_overview_data_sharing_between_filters>` info, where the KEY is required to
+    :ref:`Filter State <arch_overview_data_sharing_between_filters>` info, where the ``KEY`` is required to
     look up the filter state object. The serialized proto will be logged as JSON string if possible.
     If the serialized proto is unknown to Envoy it will be logged as protobuf debug string.
-    Z is an optional parameter denoting string truncation up to Z characters long.
-    F is an optional parameter used to indicate which method FilterState uses for serialization.
-    If `PLAIN` is set, the filter state object will be serialized as an unstructured string.
-    If `TYPED` is set or no F provided, the filter state object will be serialized as an JSON string.
-    If F is set to `FIELD`, the filter state object field with the name FIELD will be serialized.
-    FIELD parameter should only be used with F set to `FIELD`.
+    ``Z`` is an optional parameter denoting string truncation up to ``Z`` characters long.
+    ``F`` is an optional parameter used to indicate which method FilterState uses for serialization.
+    If ``PLAIN`` is set, the filter state object will be serialized as an unstructured string.
+    If ``TYPED`` is set or no ``F`` provided, the filter state object will be serialized as an JSON string.
+    If ``F`` is set to ``FIELD``, the filter state object field with the name ``FIELD`` will be serialized.
+    ``FIELD`` parameter should only be used with ``F`` set to ``FIELD``.
 
   TCP/UDP
     Same as HTTP, the filter state is from connection instead of a L7 request.
@@ -1085,42 +1101,42 @@ UDP
   HTTP
     Extracts filter state from upstream components like cluster or transport socket extensions.
 
-    :ref:`Filter State <arch_overview_data_sharing_between_filters>` info, where the KEY is required to
+    :ref:`Filter State <arch_overview_data_sharing_between_filters>` info, where the ``KEY`` is required to
     look up the filter state object. The serialized proto will be logged as JSON string if possible.
     If the serialized proto is unknown to Envoy it will be logged as protobuf debug string.
-    Z is an optional parameter denoting string truncation up to Z characters long.
-    F is an optional parameter used to indicate which method FilterState uses for serialization.
-    If `PLAIN` is set, the filter state object will be serialized as an unstructured string.
-    If `TYPED` is set or no F provided, the filter state object will be serialized as an JSON string.
-    If F is set to `FIELD`, the filter state object field with the name FIELD will be serialized.
-    FIELD parameter should only be used with F set to `FIELD`.
+    ``Z`` is an optional parameter denoting string truncation up to ``Z`` characters long.
+    ``F`` is an optional parameter used to indicate which method FilterState uses for serialization.
+    If ``PLAIN`` is set, the filter state object will be serialized as an unstructured string.
+    If ``TYPED`` is set or no ``F`` provided, the filter state object will be serialized as an JSON string.
+    If ``F`` is set to ``FIELD``, the filter state object field with the name ``FIELD`` will be serialized.
+    ``FIELD`` parameter should only be used with ``F`` set to ``FIELD``.
 
   TCP/UDP
     Not implemented.
 
   .. note::
 
-    This command operator is only available for :ref:`upstream_log <envoy_v3_api_field_extensions.filters.http.router.v3.Router.upstream_log>`.
+    The ``UPSTREAM_FILTER_STATE`` command operator is only available for :ref:`upstream_log <envoy_v3_api_field_extensions.filters.http.router.v3.Router.upstream_log>`.
 
 %REQUESTED_SERVER_NAME(X:Y)%
   HTTP/TCP/THRIFT
     String value set on ssl connection socket for Server Name Indication (SNI) or host header.
-    The parameter X is used to specify should the output fallback to get from host header when SNI is not set.
-    The parameter Y is used to specify the source of the request host. Both X and Y are optional. Y make no sense
-    when X is set to ``SNI_ONLY``.
+    The parameter ``X`` is used to specify whether the output should fallback to the host header when SNI is not set.
+    The parameter ``Y`` is used to specify the source of the request host. Both ``X`` and ``Y`` are optional. ``Y`` makes no sense
+    when ``X`` is set to ``SNI_ONLY``.
 
-    The X parameter can be:
+    The ``X`` parameter can be:
 
-    * ``SNI_ONLY``: String value set on ssl connection socket for Server Name Indication (SNI), this's the default value of X.
-    * ``SNI_FIRST``: The output will retrive from ``:authority`` or ``x-envoy-original-host`` header when SNI is not set.
-    * ``HOST_FIRST``: The output will retrive from ``:authority`` or ``x-envoy-original-host`` header.
+    * ``SNI_ONLY``: String value set on ssl connection socket for Server Name Indication (SNI), this is the default value of ``X``.
+    * ``SNI_FIRST``: The output will retrieve from ``:authority`` or ``x-envoy-original-host`` header when SNI is not set.
+    * ``HOST_FIRST``: The output will retrieve from ``:authority`` or ``x-envoy-original-host`` header.
 
-    The Y parameter can be:
+    The ``Y`` parameter can be:
 
     * ``ORIG``: Get the request host from the ``x-envoy-original-host`` header.
     * ``HOST``: Get the request host from the ``:authority`` header.
     * ``ORIG_OR_HOST``: Get the request host from the ``x-envoy-original-host`` header if it is
-      present, otherwise get it from the ``:authority`` header. If the Y is not present, ``ORIG_OR_HOST``
+      present, otherwise get it from the ``:authority`` header. If the ``Y`` is not present, ``ORIG_OR_HOST``
       will be used.
   UDP
     Not implemented ("-").
@@ -1280,7 +1296,7 @@ UDP
     order, and ALPN (Application-Layer Protocol Negotiation) protocols. This enhanced fingerprinting facilitates
     improved threat hunting and security analysis.
 
-    The JA4 fingerprint follows the format `a_b_c`, where:
+    The JA4 fingerprint follows the format ``a_b_c``, where:
 
     - **a**: Represents the TLS protocol version and cipher preference order.
     - **b**: Encodes the list of cipher suites offered by the client.
@@ -1303,7 +1319,7 @@ UDP
   UDP
     Not implemented ("-").
 
-  DOWNSTREAM_PEER_CERT_V_START can be customized using a `format string <https://en.cppreference.com/w/cpp/io/manip/put_time>`_.
+  ``DOWNSTREAM_PEER_CERT_V_START`` can be customized using a `format string <https://en.cppreference.com/w/cpp/io/manip/put_time>`_.
   See :ref:`START_TIME <config_access_log_format_start_time>` for additional format specifiers and examples.
 
 .. _config_access_log_format_downstream_peer_cert_v_end:
@@ -1314,7 +1330,7 @@ UDP
   UDP
     Not implemented ("-").
 
-  DOWNSTREAM_PEER_CERT_V_END can be customized using a `format string <https://en.cppreference.com/w/cpp/io/manip/put_time>`_.
+  ``DOWNSTREAM_PEER_CERT_V_END`` can be customized using a `format string <https://en.cppreference.com/w/cpp/io/manip/put_time>`_.
   See :ref:`START_TIME <config_access_log_format_start_time>` for additional format specifiers and examples.
 
 %UPSTREAM_PEER_SUBJECT%
@@ -1361,7 +1377,7 @@ UDP
   UDP
     Not implemented ("-").
 
-  UPSTREAM_PEER_CERT_V_START can be customized using a `format string <https://en.cppreference.com/w/cpp/io/manip/put_time>`_.
+  ``UPSTREAM_PEER_CERT_V_START`` can be customized using a `format string <https://en.cppreference.com/w/cpp/io/manip/put_time>`_.
   See :ref:`START_TIME <config_access_log_format_start_time>` for additional format specifiers and examples.
 
 .. _config_access_log_format_upstream_peer_cert_v_end:
@@ -1372,7 +1388,7 @@ UDP
   UDP
     Not implemented ("-").
 
-  UPSTREAM_PEER_CERT_V_END can be customized using a `format string <https://en.cppreference.com/w/cpp/io/manip/put_time>`_.
+  ``UPSTREAM_PEER_CERT_V_END`` can be customized using a `format string <https://en.cppreference.com/w/cpp/io/manip/put_time>`_.
   See :ref:`START_TIME <config_access_log_format_start_time>` for additional format specifiers and examples.
 
 %UPSTREAM_PEER_URI_SAN%
@@ -1430,15 +1446,18 @@ UDP
   * TcpPeriodic - On any TCP Proxy filter periodic log record.
   * TcpConnectionEnd - When a TCP connection is ended on TCP Proxy filter.
   * DownstreamStart - When HTTP Connection Manager filter receives a new HTTP request.
-  * DownstreamTunnelSuccessfullyEstablished - When the HTTP Connection Manager sends response headers
-                                              indicating a successful HTTP tunnel.
+  * DownstreamTunnelSuccessfullyEstablished - When the HTTP Connection Manager sends response headers indicating a successful HTTP tunnel.
   * DownstreamPeriodic - On any HTTP Connection Manager periodic log record.
   * DownstreamEnd - When an HTTP stream is ended on HTTP Connection Manager filter.
   * UpstreamPoolReady - When a new HTTP request is received by the HTTP Router filter.
   * UpstreamPeriodic - On any HTTP Router filter periodic log record.
   * UpstreamEnd - When an HTTP request is finished on the HTTP Router filter.
   * UdpTunnelUpstreamConnected - When UDP Proxy filter has successfully established an upstream connection.
-                                 Note: It is only relevant for UDP tunneling over HTTP.
+
+    .. note::
+
+      It is only relevant for UDP tunneling over HTTP.
+
   * UdpPeriodic - On any UDP Proxy filter periodic log record.
   * UdpSessionEnd - When a UDP session is ended on UDP Proxy filter.
 
@@ -1446,8 +1465,8 @@ UDP
    A unique identifier (UUID) that is generated dynamically.
 
 %ENVIRONMENT(X):Z%
-  Environment value of environment variable X. If no valid environment variable X, ``"-"`` symbol will be used.
-  Z is an optional parameter denoting string truncation up to Z characters long.
+  Environment value of environment variable ``X``. If no valid environment variable ``X``, ``"-"`` symbol will be used.
+  ``Z`` is an optional parameter denoting string truncation up to ``Z`` characters long.
 
 %TRACE_ID%
   HTTP
@@ -1457,29 +1476,29 @@ UDP
 
 %QUERY_PARAM(X):Z%
   HTTP
-    The value of the query parameter X. If the query parameter X is not present, ``"-"`` symbol will be used.
-    Z is an optional parameter denoting string truncation up to Z characters long.
+    The value of the query parameter ``X``. If the query parameter ``X`` is not present, ``"-"`` symbol will be used.
+    ``Z`` is an optional parameter denoting string truncation up to ``Z`` characters long.
   TCP/UDP
     Not implemented ("-").
 
 %PATH(X:Y):Z%
   HTTP
-    The value of the request path. The parameter X is used to specify should the output contains
-    query or not. The parameter Y is used to specify the source of the request path. Both X and Y
-    are optional. And Z is an optional parameter denoting string truncation up to Z characters long.
+    The value of the request path. The parameter ``X`` is used to specify whether the output contains
+    the query or not. The parameter ``Y`` is used to specify the source of the request path. Both ``X`` and ``Y``
+    are optional. And ``Z`` is an optional parameter denoting string truncation up to ``Z`` characters long.
 
-    The X parameter can be:
+    The ``X`` parameter can be:
 
-    * ``WQ``: The output will be the full request path which contains the query parameters. If the X
+    * ``WQ``: The output will be the full request path which contains the query parameters. If the ``X``
       is not present, ``WQ`` will be used.
     * ``NQ``: The output will be the request path without the query parameters.
 
-    The Y parameter can be:
+    The ``Y`` parameter can be:
 
     * ``ORIG``: Get the request path from the ``x-envoy-original-path`` header.
     * ``PATH``: Get the request path from the ``:path`` header.
     * ``ORIG_OR_PATH``: Get the request path from the ``x-envoy-original-path`` header if it is
-      present, otherwise get it from the ``:path`` header. If the Y is not present, ``ORIG_OR_PATH``
+      present, otherwise get it from the ``:path`` header. If the ``Y`` is not present, ``ORIG_OR_PATH``
       will be used.
   TCP/UDP
     Not implemented ("-").
