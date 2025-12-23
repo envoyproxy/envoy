@@ -27,8 +27,8 @@ toEnvoyCloseType(envoy_dynamic_module_type_network_connection_close_type close_t
   return Network::ConnectionCloseType::NoFlush;
 }
 
-// Helper to fill buffer slices from a Buffer::Instance into a pre-allocated array.
-void fillBufferSlices(const Buffer::Instance& buffer,
+// Helper to fill buffer chunks from a Buffer::Instance into a pre-allocated array.
+void fillBufferChunks(const Buffer::Instance& buffer,
                       envoy_dynamic_module_type_envoy_buffer* result_buffer_vector) {
   Buffer::RawSliceVector raw_slices = buffer.getRawSlices();
   auto counter = 0;
@@ -43,7 +43,7 @@ void fillBufferSlices(const Buffer::Instance& buffer,
 
 extern "C" {
 
-bool envoy_dynamic_module_callback_network_filter_get_read_buffer_slices_size(
+bool envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks_size(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, size_t* size) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
   Buffer::Instance* buffer = filter->currentReadBuffer();
@@ -55,7 +55,7 @@ bool envoy_dynamic_module_callback_network_filter_get_read_buffer_slices_size(
   return true;
 }
 
-size_t envoy_dynamic_module_callback_network_filter_get_read_buffer_slices(
+size_t envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer* result_buffer_vector) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
@@ -65,11 +65,11 @@ size_t envoy_dynamic_module_callback_network_filter_get_read_buffer_slices(
     return 0;
   }
 
-  fillBufferSlices(*buffer, result_buffer_vector);
+  fillBufferChunks(*buffer, result_buffer_vector);
   return buffer->length();
 }
 
-bool envoy_dynamic_module_callback_network_filter_get_write_buffer_slices_size(
+bool envoy_dynamic_module_callback_network_filter_get_write_buffer_chunks_size(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, size_t* size) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
   Buffer::Instance* buffer = filter->currentWriteBuffer();
@@ -81,7 +81,7 @@ bool envoy_dynamic_module_callback_network_filter_get_write_buffer_slices_size(
   return true;
 }
 
-size_t envoy_dynamic_module_callback_network_filter_get_write_buffer_slices(
+size_t envoy_dynamic_module_callback_network_filter_get_write_buffer_chunks(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer* result_buffer_vector) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
@@ -91,7 +91,7 @@ size_t envoy_dynamic_module_callback_network_filter_get_write_buffer_slices(
     return 0;
   }
 
-  fillBufferSlices(*buffer, result_buffer_vector);
+  fillBufferChunks(*buffer, result_buffer_vector);
   return buffer->length();
 }
 

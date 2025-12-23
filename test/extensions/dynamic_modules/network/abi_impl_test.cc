@@ -44,21 +44,21 @@ public:
 };
 
 // =============================================================================
-// Tests for get_read_buffer_slices with actual buffer.
+// Tests for get_read_buffer_chunks with actual buffer.
 // =============================================================================
 
-TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetReadBufferSlicesWithData) {
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetReadBufferChunksWithData) {
   Buffer::OwnedImpl buffer("hello world");
   filter_->setCurrentReadBufferForTest(&buffer);
 
   size_t size = 0;
   bool ok =
-      envoy_dynamic_module_callback_network_filter_get_read_buffer_slices_size(filterPtr(), &size);
+      envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks_size(filterPtr(), &size);
   EXPECT_TRUE(ok);
   EXPECT_GT(size, 0);
 
   std::vector<envoy_dynamic_module_type_envoy_buffer> result_buffer(size);
-  size_t total_length = envoy_dynamic_module_callback_network_filter_get_read_buffer_slices(
+  size_t total_length = envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks(
       filterPtr(), result_buffer.data());
 
   EXPECT_EQ(11, total_length);
@@ -67,32 +67,32 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetReadBufferSlicesWithData) {
   filter_->setCurrentReadBufferForTest(nullptr);
 }
 
-TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetReadBufferSlicesNullBuffer) {
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetReadBufferChunksNullBuffer) {
   size_t size = 0;
   bool ok =
-      envoy_dynamic_module_callback_network_filter_get_read_buffer_slices_size(filterPtr(), &size);
+      envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks_size(filterPtr(), &size);
   EXPECT_FALSE(ok);
   EXPECT_EQ(0, size);
 
   std::vector<envoy_dynamic_module_type_envoy_buffer> result_buffer(1);
-  size_t total_length = envoy_dynamic_module_callback_network_filter_get_read_buffer_slices(
+  size_t total_length = envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks(
       filterPtr(), result_buffer.data());
 
   EXPECT_EQ(0, total_length);
 }
 
-TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetReadBufferSlicesEmptyBuffer) {
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetReadBufferChunksEmptyBuffer) {
   Buffer::OwnedImpl empty_buffer;
   filter_->setCurrentReadBufferForTest(&empty_buffer);
 
   size_t size = 0;
   bool ok =
-      envoy_dynamic_module_callback_network_filter_get_read_buffer_slices_size(filterPtr(), &size);
+      envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks_size(filterPtr(), &size);
   EXPECT_TRUE(ok);
   EXPECT_EQ(0, size);
 
   std::vector<envoy_dynamic_module_type_envoy_buffer> result_buffer(1);
-  size_t total_length = envoy_dynamic_module_callback_network_filter_get_read_buffer_slices(
+  size_t total_length = envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks(
       filterPtr(), result_buffer.data());
 
   EXPECT_EQ(0, total_length);
@@ -101,21 +101,21 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetReadBufferSlicesEmptyBuffer
 }
 
 // =============================================================================
-// Tests for get_write_buffer_slices with actual buffer.
+// Tests for get_write_buffer_chunks with actual buffer.
 // =============================================================================
 
-TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetWriteBufferSlicesWithData) {
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetWriteBufferChunksWithData) {
   Buffer::OwnedImpl buffer("test data");
   filter_->setCurrentWriteBufferForTest(&buffer);
 
   size_t size = 0;
   bool ok =
-      envoy_dynamic_module_callback_network_filter_get_write_buffer_slices_size(filterPtr(), &size);
+      envoy_dynamic_module_callback_network_filter_get_write_buffer_chunks_size(filterPtr(), &size);
   EXPECT_TRUE(ok);
   EXPECT_GT(size, 0);
 
   std::vector<envoy_dynamic_module_type_envoy_buffer> result_buffer(size);
-  size_t total_length = envoy_dynamic_module_callback_network_filter_get_write_buffer_slices(
+  size_t total_length = envoy_dynamic_module_callback_network_filter_get_write_buffer_chunks(
       filterPtr(), result_buffer.data());
 
   EXPECT_EQ(9, total_length);
@@ -124,32 +124,32 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetWriteBufferSlicesWithData) 
   filter_->setCurrentWriteBufferForTest(nullptr);
 }
 
-TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetWriteBufferSlicesNullBuffer) {
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetWriteBufferChunksNullBuffer) {
   size_t size = 0;
   bool ok =
-      envoy_dynamic_module_callback_network_filter_get_write_buffer_slices_size(filterPtr(), &size);
+      envoy_dynamic_module_callback_network_filter_get_write_buffer_chunks_size(filterPtr(), &size);
   EXPECT_FALSE(ok);
   EXPECT_EQ(0, size);
 
   std::vector<envoy_dynamic_module_type_envoy_buffer> result_buffer(1);
-  size_t total_length = envoy_dynamic_module_callback_network_filter_get_write_buffer_slices(
+  size_t total_length = envoy_dynamic_module_callback_network_filter_get_write_buffer_chunks(
       filterPtr(), result_buffer.data());
 
   EXPECT_EQ(0, total_length);
 }
 
-TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetWriteBufferSlicesEmptyBuffer) {
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetWriteBufferChunksEmptyBuffer) {
   Buffer::OwnedImpl empty_buffer;
   filter_->setCurrentWriteBufferForTest(&empty_buffer);
 
   size_t size = 0;
   bool ok =
-      envoy_dynamic_module_callback_network_filter_get_write_buffer_slices_size(filterPtr(), &size);
+      envoy_dynamic_module_callback_network_filter_get_write_buffer_chunks_size(filterPtr(), &size);
   EXPECT_TRUE(ok);
   EXPECT_EQ(0, size);
 
   std::vector<envoy_dynamic_module_type_envoy_buffer> result_buffer(1);
-  size_t total_length = envoy_dynamic_module_callback_network_filter_get_write_buffer_slices(
+  size_t total_length = envoy_dynamic_module_callback_network_filter_get_write_buffer_chunks(
       filterPtr(), result_buffer.data());
 
   EXPECT_EQ(0, total_length);
