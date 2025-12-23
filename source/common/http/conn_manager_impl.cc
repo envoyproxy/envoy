@@ -2142,6 +2142,11 @@ void ConnectionManagerImpl::ActiveStream::onCodecEncodeComplete() {
   // Only reap stream once.
   if (state_.is_zombie_stream_) {
     connection_manager_.doDeferredStreamDestroy(*this);
+    // After destroying a zombie stream, check if the connection should be
+    // closed. doEndStream() call that created the zombie may have set
+    // drain_state_ to Closing, but checkForDeferredClose() couldn't close the
+    // connection at that time because streams_ wasn't empty yet.
+    connection_manager_.checkForDeferredClose(false);
   }
 }
 
@@ -2155,6 +2160,11 @@ void ConnectionManagerImpl::ActiveStream::onCodecLowLevelReset() {
   // Only reap stream once.
   if (state_.is_zombie_stream_) {
     connection_manager_.doDeferredStreamDestroy(*this);
+    // After destroying a zombie stream, check if the connection should be
+    // closed. doEndStream() call that created the zombie may have set
+    // drain_state_ to Closing, but checkForDeferredClose() couldn't close the
+    // connection at that time because streams_ wasn't empty yet.
+    connection_manager_.checkForDeferredClose(false);
   }
 }
 
