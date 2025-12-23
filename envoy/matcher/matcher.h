@@ -129,11 +129,11 @@ public:
 // - The match was completed, no match found (isNoMatch() will return true.)
 // - The match was completed, match found (isMatch() will return true, action() will return the
 //   ActionConstSharedPtr.)
-struct MatchResult {
+struct ActionMatchResult {
 public:
-  MatchResult(ActionConstSharedPtr cb) : result_(std::move(cb)) {}
-  static MatchResult noMatch() { return MatchResult(NoMatch{}); }
-  static MatchResult insufficientData() { return MatchResult(InsufficientData{}); }
+  ActionMatchResult(ActionConstSharedPtr cb) : result_(std::move(cb)) {}
+  static ActionMatchResult noMatch() { return ActionMatchResult(NoMatch{}); }
+  static ActionMatchResult insufficientData() { return ActionMatchResult(InsufficientData{}); }
   bool isInsufficientData() const { return absl::holds_alternative<InsufficientData>(result_); }
   bool isComplete() const { return !isInsufficientData(); }
   bool isNoMatch() const { return absl::holds_alternative<NoMatch>(result_); }
@@ -142,7 +142,7 @@ public:
     ASSERT(isMatch());
     return absl::get<ActionConstSharedPtr>(result_);
   }
-  // Returns the action by move. The caller must ensure that the MatchResult is not used after
+  // Returns the action by move. The caller must ensure that the ActionMatchResult is not used after
   // this call.
   ActionConstSharedPtr actionByMove() {
     ASSERT(isMatch());
@@ -154,8 +154,8 @@ private:
   struct NoMatch {};
   using Result = absl::variant<ActionConstSharedPtr, NoMatch, InsufficientData>;
   Result result_;
-  MatchResult(NoMatch) : result_(NoMatch{}) {}
-  MatchResult(InsufficientData) : result_(InsufficientData{}) {}
+  ActionMatchResult(NoMatch) : result_(NoMatch{}) {}
+  ActionMatchResult(InsufficientData) : result_(InsufficientData{}) {}
 };
 
 // Callback to execute against skipped matches' actions.
@@ -170,33 +170,33 @@ public:
 
   // Attempts to match against the matching data (which should contain all the data requested via
   // matching requirements).
-  // If the match couldn't be completed, MatchResult::insufficientData() will be returned.
+  // If the match couldn't be completed, ActionMatchResult::insufficientData() will be returned.
   // If a match result was determined, an action callback factory will be returned.
-  // If it was determined to be no match, MatchResult::noMatch() will be returned.
+  // If it was determined to be no match, ActionMatchResult::noMatch() will be returned.
   //
   // Implementors should call handleRecursionAndSkips() to transform OnMatch values
-  // into MatchResult values, and handle noMatch and insufficientData results as appropriate
+  // into ActionMatchResult values, and handle noMatch and insufficientData results as appropriate
   // for the specific matcher type.
-  virtual MatchResult match(const DataType& matching_data,
+  virtual ActionMatchResult match(const DataType& matching_data,
                             SkippedMatchCb skipped_match_cb = nullptr) PURE;
 
 protected:
   // Internally handle recursion & keep_matching logic in matcher implementations.
   // This should be called against initial matching & on-no-match results.
-  static inline MatchResult
+  static inline ActionMatchResult
   handleRecursionAndSkips(const absl::optional<OnMatch<DataType>>& on_match, const DataType& data,
                           SkippedMatchCb skipped_match_cb) {
     if (!on_match.has_value()) {
-      return MatchResult::noMatch();
+      return ActionMatchResult::noMatch();
     }
     if (on_match->matcher_) {
-      MatchResult nested_result = on_match->matcher_->match(data, skipped_match_cb);
+      ActionMatchResult nested_result = on_match->matcher_->match(data, skipped_match_cb);
       // Parent result's keep_matching skips the nested result.
       if (on_match->keep_matching_ && nested_result.isMatch()) {
         if (skipped_match_cb) {
           skipped_match_cb(nested_result.action());
         }
-        return MatchResult::noMatch();
+        return ActionMatchResult::noMatch();
       }
       return nested_result;
     }
@@ -204,9 +204,9 @@ protected:
       if (skipped_match_cb) {
         skipped_match_cb(on_match->action_);
       }
-      return MatchResult::noMatch();
+      return ActionMatchResult::noMatch();
     }
-    return MatchResult{on_match->action_};
+    return ActionMatchResult{on_match->action_};
   }
 };
 
