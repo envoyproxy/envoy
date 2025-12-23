@@ -12,6 +12,7 @@
 #include "envoy/router/router_ratelimit.h"
 
 #include "source/common/config/metadata.h"
+#include "source/common/formatter/substitution_formatter.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/http/matching/data_impl.h"
 #include "source/common/matcher/matcher.h"
@@ -124,10 +125,8 @@ private:
  */
 class GenericKeyAction : public RateLimit::DescriptorProducer {
 public:
-  GenericKeyAction(const envoy::config::route::v3::RateLimit::Action::GenericKey& action)
-      : descriptor_value_(action.descriptor_value()),
-        descriptor_key_(!action.descriptor_key().empty() ? action.descriptor_key()
-                                                         : "generic_key") {}
+  GenericKeyAction(const envoy::config::route::v3::RateLimit::Action::GenericKey& action,
+                   std::unique_ptr<Formatter::FormatterImpl> formatter = nullptr);
 
   // Ratelimit::DescriptorProducer
   bool populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry,
@@ -138,6 +137,8 @@ public:
 private:
   const std::string descriptor_value_;
   const std::string descriptor_key_;
+  const std::string default_value_;
+  const std::unique_ptr<Formatter::FormatterImpl> descriptor_formatter_;
 };
 
 /**
@@ -189,7 +190,8 @@ class HeaderValueMatchAction : public RateLimit::DescriptorProducer {
 public:
   HeaderValueMatchAction(
       const envoy::config::route::v3::RateLimit::Action::HeaderValueMatch& action,
-      Server::Configuration::CommonFactoryContext& context);
+      Server::Configuration::CommonFactoryContext& context,
+      std::unique_ptr<Formatter::FormatterImpl> formatter = nullptr);
 
   // Ratelimit::DescriptorProducer
   bool populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry,
@@ -200,8 +202,10 @@ public:
 private:
   const std::string descriptor_value_;
   const std::string descriptor_key_;
+  const std::string default_value_;
   const bool expect_match_;
   const std::vector<Http::HeaderUtility::HeaderDataPtr> action_headers_;
+  const std::unique_ptr<Formatter::FormatterImpl> descriptor_formatter_;
 };
 
 /**
@@ -211,7 +215,8 @@ class QueryParameterValueMatchAction : public RateLimit::DescriptorProducer {
 public:
   QueryParameterValueMatchAction(
       const envoy::config::route::v3::RateLimit::Action::QueryParameterValueMatch& action,
-      Server::Configuration::CommonFactoryContext& context);
+      Server::Configuration::CommonFactoryContext& context,
+      std::unique_ptr<Formatter::FormatterImpl> formatter = nullptr);
 
   // Ratelimit::DescriptorProducer
   bool populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry,
@@ -227,8 +232,10 @@ public:
 private:
   const std::string descriptor_value_;
   const std::string descriptor_key_;
+  const std::string default_value_;
   const bool expect_match_;
   const std::vector<ConfigUtility::QueryParameterMatcherPtr> action_query_parameters_;
+  const std::unique_ptr<Formatter::FormatterImpl> descriptor_formatter_;
 };
 
 class RateLimitDescriptorValidationVisitor

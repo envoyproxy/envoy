@@ -93,7 +93,10 @@ protected:
   Event::Dispatcher& dispatcher_;
   Api::Api& api_;
 
-protected:
+  // Invoked for filesystem watches on update. Protected so subclasses can set up the callback.
+  void onWatchUpdate();
+
+  // Initializes the SDS API.
   void initialize(bool warm);
 
 private:
@@ -101,8 +104,6 @@ private:
                                   uint32_t removed_resources_num) const;
   FileContentMap loadFiles();
   uint64_t getHashForFiles(const FileContentMap& files);
-  // Invoked for filesystem watches on update.
-  void onWatchUpdate();
   SdsApiStats generateStats(Stats::Scope& scope);
 
   Stats::ScopeSharedPtr scope_;
@@ -113,7 +114,7 @@ private:
   const std::string sds_config_name_;
 
   uint64_t secret_hash_{0};
-  uint64_t files_hash_;
+  uint64_t files_hash_{0};
   Cleanup clean_up_;
   Config::SubscriptionFactory& subscription_factory_;
   TimeSource& time_source_;

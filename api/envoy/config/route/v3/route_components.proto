@@ -2227,8 +2227,39 @@ message RateLimit {
       option (udpa.annotations.versioning).previous_message_type =
           "envoy.api.v2.route.RateLimit.Action.GenericKey";
 
-      // The value to use in the descriptor entry.
+      // Descriptor value of entry.
+      //
+      // The same :ref:`format specifier <config_access_log_format>` as used for
+      // :ref:`HTTP access logging <config_access_log>` applies here, however
+      // unknown specifier values are replaced with the empty string instead of ``-``.
+      //
+      // .. note::
+      //
+      //   Formatter parsing is controlled by the runtime feature flag
+      //   ``envoy.reloadable_features.enable_formatter_for_ratelimit_action_descriptor_value``
+      //   (disabled by default).
+      //
+      //   When enabled: The format string can contain multiple valid substitution
+      //   fields. If multiple substitution fields are present, their results will be concatenated
+      //   to form the final descriptor value. If it contains no substitution fields, the value
+      //   will be used as is. If the final concatenated result is empty and ``default_value`` is set,
+      //   the ``default_value`` will be used. If ``default_value`` is not set and the result is
+      //   empty, this descriptor will be skipped and not included in the rate limit call.
+      //
+      //   When disabled (default): The descriptor_value is used as a literal string without any formatter
+      //   parsing or substitution.
+      //
+      // For example, ``static_value`` will be used as is since there are no substitution fields.
+      // ``%REQ(:method)%`` will be replaced with the HTTP method, and
+      // ``%REQ(:method)%%REQ(:path)%`` will be replaced with the concatenation of the HTTP method and path.
+      // ``%CEL(request.headers['user-id'])%`` will use CEL to extract the user ID from request headers.
+      //
       string descriptor_value = 1 [(validate.rules).string = {min_len: 1}];
+
+      // An optional value to use if the final concatenated ``descriptor_value`` result is empty.
+      // Only applicable when formatter parsing is enabled by the runtime feature flag
+      // ``envoy.reloadable_features.enable_formatter_for_ratelimit_action_descriptor_value`` (disabled by default).
+      string default_value = 3;
 
       // An optional key to use in the descriptor entry. If not set it defaults
       // to 'generic_key' as the descriptor key.
@@ -2240,17 +2271,50 @@ message RateLimit {
     // .. code-block:: cpp
     //
     //   ("header_match", "<descriptor_value>")
+    // [#next-free-field: 6]
     message HeaderValueMatch {
       option (udpa.annotations.versioning).previous_message_type =
           "envoy.api.v2.route.RateLimit.Action.HeaderValueMatch";
+
+      // Descriptor value of entry.
+      //
+      // The same :ref:`format specifier <config_access_log_format>` as used for
+      // :ref:`HTTP access logging <config_access_log>` applies here, however
+      // unknown specifier values are replaced with the empty string instead of ``-``.
+      //
+      // .. note::
+      //
+      //   Formatter parsing is controlled by the runtime feature flag
+      //   ``envoy.reloadable_features.enable_formatter_for_ratelimit_action_descriptor_value``
+      //   (disabled by default).
+      //
+      //   When enabled: The format string can contain multiple valid substitution
+      //   fields. If multiple substitution fields are present, their results will be concatenated
+      //   to form the final descriptor value. If it contains no substitution fields, the value
+      //   will be used as is. All substitution fields will be evaluated and their results
+      //   concatenated. If the final concatenated result is empty and ``default_value`` is set,
+      //   the ``default_value`` will be used. If ``default_value`` is not set and the result is
+      //   empty, this descriptor will be skipped and not included in the rate limit call.
+      //
+      //   When disabled (default): The descriptor_value is used as a literal string without any formatter
+      //   parsing or substitution.
+      //
+      // For example, ``static_value`` will be used as is since there are no substitution fields.
+      // ``%REQ(:method)%`` will be replaced with the HTTP method, and
+      // ``%REQ(:method)%%REQ(:path)%`` will be replaced with the concatenation of the HTTP method and path.
+      // ``%CEL(request.headers['user-id'])%`` will use CEL to extract the user ID from request headers.
+      //
+      string descriptor_value = 1 [(validate.rules).string = {min_len: 1}];
+
+      // An optional value to use if the final concatenated ``descriptor_value`` result is empty.
+      // Only applicable when formatter parsing is enabled by the runtime feature flag
+      // ``envoy.reloadable_features.enable_formatter_for_ratelimit_action_descriptor_value`` (disabled by default).
+      string default_value = 5;
 
       // The key to use in the descriptor entry.
       //
       // Defaults to ``header_match``.
       string descriptor_key = 4;
-
-      // The value to use in the descriptor entry.
-      string descriptor_value = 1 [(validate.rules).string = {min_len: 1}];
 
       // If set to true, the action will append a descriptor entry when the
       // request matches the headers. If set to false, the action will append a
@@ -2259,7 +2323,7 @@ message RateLimit {
       google.protobuf.BoolValue expect_match = 2;
 
       // Specifies a set of headers that the rate limit action should match
-      // on. The action will check the request’s headers against all the
+      // on. The action will check the request's headers against all the
       // specified headers in the config. A match will happen if all the
       // headers in the config are present in the request with the same values
       // (or based on presence if the value field is not in the config).
@@ -2339,14 +2403,47 @@ message RateLimit {
     // .. code-block:: cpp
     //
     //   ("query_match", "<descriptor_value>")
+    // [#next-free-field: 6]
     message QueryParameterValueMatch {
+      // Descriptor value of entry.
+      //
+      // The same :ref:`format specifier <config_access_log_format>` as used for
+      // :ref:`HTTP access logging <config_access_log>` applies here, however
+      // unknown specifier values are replaced with the empty string instead of ``-``.
+      //
+      // .. note::
+      //
+      //   Formatter parsing is controlled by the runtime feature flag
+      //   ``envoy.reloadable_features.enable_formatter_for_ratelimit_action_descriptor_value``
+      //   (disabled by default).
+      //
+      //   When enabled: The format string can contain multiple valid substitution
+      //   fields. If multiple substitution fields are present, their results will be concatenated
+      //   to form the final descriptor value. If it contains no substitution fields, the value
+      //   will be used as is. All substitution fields will be evaluated and their results
+      //   concatenated. If the final concatenated result is empty and ``default_value`` is set,
+      //   the ``default_value`` will be used. If ``default_value`` is not set and the result is
+      //   empty, this descriptor will be skipped and not included in the rate limit call.
+      //
+      //   When disabled (default): The descriptor_value is used as a literal string without any formatter
+      //   parsing or substitution.
+      //
+      // For example, ``static_value`` will be used as is since there are no substitution fields.
+      // ``%REQ(:method)%`` will be replaced with the HTTP method, and
+      // ``%REQ(:method)%%REQ(:path)%`` will be replaced with the concatenation of the HTTP method and path.
+      // ``%CEL(request.headers['user-id'])%`` will use CEL to extract the user ID from request headers.
+      //
+      string descriptor_value = 1 [(validate.rules).string = {min_len: 1}];
+
+      // An optional value to use if the final concatenated ``descriptor_value`` result is empty.
+      // Only applicable when formatter parsing is enabled by the runtime feature flag
+      // ``envoy.reloadable_features.enable_formatter_for_ratelimit_action_descriptor_value`` (disabled by default).
+      string default_value = 5;
+
       // The key to use in the descriptor entry.
       //
       // Defaults to ``query_match``.
       string descriptor_key = 4;
-
-      // The value to use in the descriptor entry.
-      string descriptor_value = 1 [(validate.rules).string = {min_len: 1}];
 
       // If set to true, the action will append a descriptor entry when the
       // request matches the headers. If set to false, the action will append a
@@ -2355,7 +2452,7 @@ message RateLimit {
       google.protobuf.BoolValue expect_match = 2;
 
       // Specifies a set of query parameters that the rate limit action should match
-      // on. The action will check the request’s query parameters against all the
+      // on. The action will check the request's query parameters against all the
       // specified query parameters in the config. A match will happen if all the
       // query parameters in the config are present in the request with the same values
       // (or based on presence if the value field is not in the config).

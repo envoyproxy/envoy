@@ -41,7 +41,7 @@ CacheShared::CacheShared(ConfigProto config, Stats::Scope& stats_scope,
       stats_(generateStats(stat_names_, stats_scope, cachePath())) {}
 
 void CacheShared::disconnectEviction() {
-  absl::MutexLock lock(&signal_mu_);
+  absl::MutexLock lock(signal_mu_);
   signal_eviction_ = []() {};
 }
 
@@ -256,7 +256,7 @@ void CacheShared::trackFileAdded(uint64_t file_size) {
   stats_.size_bytes_.add(file_size);
   if (needsEviction()) {
     {
-      absl::MutexLock lock(&signal_mu_);
+      absl::MutexLock lock(signal_mu_);
       signal_eviction_();
     }
   }

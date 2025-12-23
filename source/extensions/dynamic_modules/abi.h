@@ -525,6 +525,108 @@ typedef enum envoy_dynamic_module_type_metrics_result {
   envoy_dynamic_module_type_metrics_result_Frozen,
 } envoy_dynamic_module_type_metrics_result;
 
+// =============================================================================
+// Network Filter Types
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_type_network_filter_config_envoy_ptr is a raw pointer to
+ * the DynamicModuleNetworkFilterConfig class in Envoy. This is passed to the module when
+ * creating a new in-module network filter configuration and used to access the network
+ * filter-scoped information.
+ *
+ * This has 1:1 correspondence with envoy_dynamic_module_type_network_filter_config_module_ptr in
+ * the module.
+ *
+ * OWNERSHIP: Envoy owns the pointer.
+ */
+typedef void* envoy_dynamic_module_type_network_filter_config_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_network_filter_config_module_ptr is a pointer to an in-module network
+ * filter configuration corresponding to an Envoy network filter configuration. The config is
+ * responsible for creating a new network filter that corresponds to each TCP connection.
+ *
+ * This has 1:1 correspondence with the DynamicModuleNetworkFilterConfig class in Envoy.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer. The pointer can be
+ * released when envoy_dynamic_module_on_network_filter_config_destroy is called for the same
+ * pointer.
+ */
+typedef const void* envoy_dynamic_module_type_network_filter_config_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_network_filter_envoy_ptr is a raw pointer to the
+ * DynamicModuleNetworkFilter class in Envoy. This is passed to the module when creating a new
+ * network filter for each TCP connection and used to access the network filter-scoped information
+ * such as connection data, buffers, etc.
+ *
+ * This has 1:1 correspondence with envoy_dynamic_module_type_network_filter_module_ptr in the
+ * module.
+ *
+ * OWNERSHIP: Envoy owns the pointer, and can be accessed by the module until the filter is
+ * destroyed, i.e. envoy_dynamic_module_on_network_filter_destroy is called.
+ */
+typedef void* envoy_dynamic_module_type_network_filter_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_network_filter_module_ptr is a pointer to an in-module network filter
+ * corresponding to an Envoy network filter. The filter is responsible for processing each TCP
+ * connection.
+ *
+ * This has 1:1 correspondence with the DynamicModuleNetworkFilter class in Envoy.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer. The pointer can be
+ * released when envoy_dynamic_module_on_network_filter_destroy is called for the same pointer.
+ */
+typedef const void* envoy_dynamic_module_type_network_filter_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_on_network_filter_data_status represents the status of the filter
+ * after processing data. This corresponds to `Network::FilterStatus` in envoy/network/filter.h.
+ */
+typedef enum envoy_dynamic_module_type_on_network_filter_data_status {
+  // Continue to further filters.
+  envoy_dynamic_module_type_on_network_filter_data_status_Continue,
+  // Stop executing further filters.
+  envoy_dynamic_module_type_on_network_filter_data_status_StopIteration,
+} envoy_dynamic_module_type_on_network_filter_data_status;
+
+/**
+ * envoy_dynamic_module_type_network_connection_close_type represents how to close the connection.
+ * This corresponds to `Network::ConnectionCloseType` in envoy/network/connection.h.
+ */
+typedef enum envoy_dynamic_module_type_network_connection_close_type {
+  // Flush pending write data before raising ConnectionEvent::LocalClose.
+  envoy_dynamic_module_type_network_connection_close_type_FlushWrite,
+  // Do not flush any pending data. Write the pending data to the transport and then immediately
+  // raise ConnectionEvent::LocalClose.
+  envoy_dynamic_module_type_network_connection_close_type_NoFlush,
+  // Flush pending write data and delay raising ConnectionEvent::LocalClose until the delayed_close
+  // timeout has expired.
+  envoy_dynamic_module_type_network_connection_close_type_FlushWriteAndDelay,
+  // Do not write pending data and immediately raise ConnectionEvent::LocalClose.
+  envoy_dynamic_module_type_network_connection_close_type_Abort,
+  // Do not write pending data, immediately send RST, and immediately raise
+  // ConnectionEvent::LocalClose.
+  envoy_dynamic_module_type_network_connection_close_type_AbortReset,
+} envoy_dynamic_module_type_network_connection_close_type;
+
+/**
+ * envoy_dynamic_module_type_network_connection_event represents connection events.
+ * This corresponds to `Network::ConnectionEvent` in envoy/network/connection.h.
+ */
+typedef enum envoy_dynamic_module_type_network_connection_event {
+  // Remote close.
+  envoy_dynamic_module_type_network_connection_event_RemoteClose,
+  // Local close.
+  envoy_dynamic_module_type_network_connection_event_LocalClose,
+  // Connected.
+  envoy_dynamic_module_type_network_connection_event_Connected,
+  // Connected with 0-RTT.
+  envoy_dynamic_module_type_network_connection_event_ConnectedZeroRtt,
+} envoy_dynamic_module_type_network_connection_event;
+
 // -----------------------------------------------------------------------------
 // ------------------------------- Event Hooks ---------------------------------
 // -----------------------------------------------------------------------------
@@ -922,6 +1024,132 @@ void envoy_dynamic_module_on_http_filter_downstream_above_write_buffer_high_wate
 void envoy_dynamic_module_on_http_filter_downstream_below_write_buffer_low_watermark(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr);
+
+// =============================================================================
+// Network Filter Event Hooks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_on_network_filter_config_new is called by the main thread when the network
+ * filter config is loaded. The function returns a
+ * envoy_dynamic_module_type_network_filter_config_module_ptr for given name and config.
+ *
+ * @param filter_config_envoy_ptr is the pointer to the DynamicModuleNetworkFilterConfig object for
+ * the corresponding config.
+ * @param name_ptr is the name of the filter.
+ * @param name_size is the size of the name.
+ * @param config_ptr is the configuration for the module.
+ * @param config_size is the size of the configuration.
+ * @return envoy_dynamic_module_type_network_filter_config_module_ptr is the pointer to the
+ * in-module network filter configuration. Returning nullptr indicates a failure to initialize the
+ * module. When it fails, the filter configuration will be rejected.
+ */
+envoy_dynamic_module_type_network_filter_config_module_ptr
+envoy_dynamic_module_on_network_filter_config_new(
+    envoy_dynamic_module_type_network_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_const_buffer_envoy_ptr name_ptr, size_t name_size,
+    envoy_dynamic_module_type_const_buffer_envoy_ptr config_ptr, size_t config_size);
+
+/**
+ * envoy_dynamic_module_on_network_filter_config_destroy is called when the network filter
+ * configuration is destroyed in Envoy. The module should release any resources associated with
+ * the corresponding in-module network filter configuration.
+ *
+ * @param filter_config_ptr is a pointer to the in-module network filter configuration whose
+ * corresponding Envoy network filter configuration is being destroyed.
+ */
+void envoy_dynamic_module_on_network_filter_config_destroy(
+    envoy_dynamic_module_type_network_filter_config_module_ptr filter_config_ptr);
+
+/**
+ * envoy_dynamic_module_on_network_filter_new is called when a new network filter is created for
+ * each TCP connection.
+ *
+ * @param filter_config_ptr is the pointer to the in-module network filter configuration.
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object of the
+ * corresponding network filter.
+ * @return envoy_dynamic_module_type_network_filter_module_ptr is the pointer to the in-module
+ * network filter. Returning nullptr indicates a failure to initialize the module. When it fails,
+ * the connection will be closed.
+ */
+envoy_dynamic_module_type_network_filter_module_ptr envoy_dynamic_module_on_network_filter_new(
+    envoy_dynamic_module_type_network_filter_config_module_ptr filter_config_ptr,
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_on_network_filter_new_connection is called when a new TCP connection is
+ * established. This is called after the filter is created and callbacks are initialized.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object of the
+ * corresponding network filter.
+ * @param filter_module_ptr is the pointer to the in-module network filter created by
+ * envoy_dynamic_module_on_network_filter_new.
+ * @return envoy_dynamic_module_type_on_network_filter_data_status is the status of the filter.
+ * Continue means further filters should be invoked, StopIteration means further filters should
+ * not be invoked until continueReading() is called.
+ */
+envoy_dynamic_module_type_on_network_filter_data_status
+envoy_dynamic_module_on_network_filter_new_connection(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_network_filter_module_ptr filter_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_network_filter_read is called when data is read from the connection
+ * (downstream -> upstream direction).
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object of the
+ * corresponding network filter.
+ * @param filter_module_ptr is the pointer to the in-module network filter created by
+ * envoy_dynamic_module_on_network_filter_new.
+ * @param data_length is the total length of the read data buffer.
+ * @param end_stream is true if this is the last data (half-close from downstream).
+ * @return envoy_dynamic_module_type_on_network_filter_data_status is the status of the filter.
+ */
+envoy_dynamic_module_type_on_network_filter_data_status envoy_dynamic_module_on_network_filter_read(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_network_filter_module_ptr filter_module_ptr, size_t data_length,
+    bool end_stream);
+
+/**
+ * envoy_dynamic_module_on_network_filter_write is called when data is to be written to the
+ * connection (upstream -> downstream direction).
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object of the
+ * corresponding network filter.
+ * @param filter_module_ptr is the pointer to the in-module network filter created by
+ * envoy_dynamic_module_on_network_filter_new.
+ * @param data_length is the total length of the write data buffer.
+ * @param end_stream is true if this is the last data.
+ * @return envoy_dynamic_module_type_on_network_filter_data_status is the status of the filter.
+ */
+envoy_dynamic_module_type_on_network_filter_data_status
+envoy_dynamic_module_on_network_filter_write(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_network_filter_module_ptr filter_module_ptr, size_t data_length,
+    bool end_stream);
+
+/**
+ * envoy_dynamic_module_on_network_filter_event is called when a connection event occurs.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object of the
+ * corresponding network filter.
+ * @param filter_module_ptr is the pointer to the in-module network filter created by
+ * envoy_dynamic_module_on_network_filter_new.
+ * @param event is the connection event type.
+ */
+void envoy_dynamic_module_on_network_filter_event(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_network_filter_module_ptr filter_module_ptr,
+    envoy_dynamic_module_type_network_connection_event event);
+
+/**
+ * envoy_dynamic_module_on_network_filter_destroy is called when the network filter is destroyed
+ * for each TCP connection.
+ *
+ * @param filter_module_ptr is the pointer to the in-module network filter.
+ */
+void envoy_dynamic_module_on_network_filter_destroy(
+    envoy_dynamic_module_type_network_filter_module_ptr filter_module_ptr);
 
 // -----------------------------------------------------------------------------
 // -------------------------------- Callbacks ----------------------------------
@@ -2242,6 +2470,261 @@ void envoy_dynamic_module_callback_http_filter_continue_encoding(
 envoy_dynamic_module_type_http_filter_per_route_config_module_ptr
 envoy_dynamic_module_callback_get_most_specific_route_config(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
+
+// =============================================================================
+// Network Filter Callbacks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks_size is called by the module
+ * to get the number of chunks in the current read data buffer. Combined with
+ * envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks, this can be used to iterate
+ * over all chunks in the read buffer. This is only valid during the
+ * envoy_dynamic_module_on_network_filter_read callback.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param size is the pointer to the variable where the number of chunks will be stored.
+ * @return true if the buffer is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks_size(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, size_t* size);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks is called by the module to
+ * get the current read data buffer as chunks. This is only valid during the
+ * envoy_dynamic_module_on_network_filter_read callback.
+ *
+ * PRECONDITION: The module must ensure that the result_buffer_vector is valid and has enough length
+ * to store all the chunks. The module can use
+ * envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks_size to get the number of
+ * chunks before calling this function.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param result_buffer_vector is the pointer to the array of envoy_dynamic_module_type_envoy_buffer
+ * where the chunks will be stored. The lifetime of the buffer is guaranteed until the end of the
+ * current callback.
+ * @return the total length of all chunks, or 0 if the buffer is not available.
+ */
+size_t envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result_buffer_vector);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_get_write_buffer_chunks_size is called by the module
+ * to get the number of chunks in the current write data buffer. Combined with
+ * envoy_dynamic_module_callback_network_filter_get_write_buffer_chunks, this can be used to iterate
+ * over all chunks in the write buffer. This is only valid during the
+ * envoy_dynamic_module_on_network_filter_write callback.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param size is the pointer to the variable where the number of chunks will be stored.
+ * @return true if the buffer is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_network_filter_get_write_buffer_chunks_size(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, size_t* size);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_get_write_buffer_chunks is called by the module to
+ * get the current write data buffer as chunks. This is only valid during the
+ * envoy_dynamic_module_on_network_filter_write callback.
+ *
+ * PRECONDITION: The module must ensure that the result_buffer_vector is valid and has enough length
+ * to store all the chunks. The module can use
+ * envoy_dynamic_module_callback_network_filter_get_write_buffer_chunks_size to get the number of
+ * chunks before calling this function.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param result_buffer_vector is the pointer to the array of envoy_dynamic_module_type_envoy_buffer
+ * where the chunks will be stored. The lifetime of the buffer is guaranteed until the end of the
+ * current callback.
+ * @return the total length of all chunks, or 0 if the buffer is not available.
+ */
+size_t envoy_dynamic_module_callback_network_filter_get_write_buffer_chunks(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result_buffer_vector);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_drain_read_buffer is called by the module to drain
+ * bytes from the beginning of the read buffer.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param length is the number of bytes to drain from the beginning of the buffer.
+ */
+void envoy_dynamic_module_callback_network_filter_drain_read_buffer(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, size_t length);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_drain_write_buffer is called by the module to drain
+ * bytes from the beginning of the write buffer.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param length is the number of bytes to drain from the beginning of the buffer.
+ */
+void envoy_dynamic_module_callback_network_filter_drain_write_buffer(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, size_t length);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_prepend_read_buffer is called by the module to
+ * prepend data to the beginning of the read buffer.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param data is the pointer to the data to prepend.
+ * @param length is the length of the data.
+ */
+void envoy_dynamic_module_callback_network_filter_prepend_read_buffer(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_buffer_module_ptr data, size_t length);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_append_read_buffer is called by the module to
+ * append data to the end of the read buffer.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param data is the pointer to the data to append.
+ * @param length is the length of the data.
+ */
+void envoy_dynamic_module_callback_network_filter_append_read_buffer(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_buffer_module_ptr data, size_t length);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_prepend_write_buffer is called by the module to
+ * prepend data to the beginning of the write buffer.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param data is the pointer to the data to prepend.
+ * @param length is the length of the data.
+ */
+void envoy_dynamic_module_callback_network_filter_prepend_write_buffer(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_buffer_module_ptr data, size_t length);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_append_write_buffer is called by the module to
+ * append data to the end of the write buffer.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param data is the pointer to the data to append.
+ * @param length is the length of the data.
+ */
+void envoy_dynamic_module_callback_network_filter_append_write_buffer(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_buffer_module_ptr data, size_t length);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_write is called by the module to write data
+ * directly to the connection (downstream).
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param data is the pointer to the data to write.
+ * @param length is the length of the data.
+ * @param end_stream is true to half-close the connection after writing.
+ */
+void envoy_dynamic_module_callback_network_filter_write(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_buffer_module_ptr data, size_t length, bool end_stream);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_inject_read_data is called by the module to inject
+ * data into the read filter chain (after this filter).
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param data is the pointer to the data to inject.
+ * @param length is the length of the data.
+ * @param end_stream is true if this is the last data.
+ */
+void envoy_dynamic_module_callback_network_filter_inject_read_data(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_buffer_module_ptr data, size_t length, bool end_stream);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_inject_write_data is called by the module to inject
+ * data into the write filter chain (after this filter).
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param data is the pointer to the data to inject.
+ * @param length is the length of the data.
+ * @param end_stream is true if this is the last data.
+ */
+void envoy_dynamic_module_callback_network_filter_inject_write_data(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_buffer_module_ptr data, size_t length, bool end_stream);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_continue_reading is called by the module to
+ * continue reading after returning StopIteration from onNewConnection or onData.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ */
+void envoy_dynamic_module_callback_network_filter_continue_reading(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_close is called by the module to close the
+ * connection.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param close_type specifies how to close the connection.
+ */
+void envoy_dynamic_module_callback_network_filter_close(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_network_connection_close_type close_type);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_get_connection_id is called by the module to get
+ * the unique connection ID.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @return the unique connection ID.
+ */
+uint64_t envoy_dynamic_module_callback_network_filter_get_connection_id(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_get_remote_address is called by the module to get
+ * the remote (client) address.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param address_out is the output pointer to the address string.
+ * @param port_out is the output pointer to the port number.
+ * @return the length of the address string.
+ */
+size_t envoy_dynamic_module_callback_network_filter_get_remote_address(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_buffer_envoy_ptr* address_out, uint32_t* port_out);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_get_local_address is called by the module to get
+ * the local address.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param address_out is the output pointer to the address string.
+ * @param port_out is the output pointer to the port number.
+ * @return the length of the address string.
+ */
+size_t envoy_dynamic_module_callback_network_filter_get_local_address(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_buffer_envoy_ptr* address_out, uint32_t* port_out);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_is_ssl is called by the module to check if the
+ * connection uses SSL/TLS.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @return true if the connection uses SSL/TLS, false otherwise.
+ */
+bool envoy_dynamic_module_callback_network_filter_is_ssl(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_disable_close is called by the module to disable
+ * or enable connection close handling for this filter.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param disabled true to disable close handling, false to enable.
+ */
+void envoy_dynamic_module_callback_network_filter_disable_close(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, bool disabled);
 
 #ifdef __cplusplus
 }
