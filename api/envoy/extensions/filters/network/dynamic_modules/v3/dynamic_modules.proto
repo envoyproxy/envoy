@@ -68,4 +68,9 @@ message DynamicModuleNetworkFilter {
   //    value: aGVsbG8=  # echo -n "hello" | base64
   //
   google.protobuf.Any filter_config = 3;
+
+  // Set true if the dynamic module is a terminal filter to use without an upstream connection.
+  // The dynamic module is responsible for creating and sending the response to downstream.
+  // If not specified, defaults to false.
+  bool terminal_filter = 4;
 }
