@@ -916,7 +916,7 @@ UDP
 
   UDP
     For :ref:`UDP Proxy <config_udp_listener_filters_udp_proxy>`,
-    when ``NAMESPACE`` is set to "udp.proxy.session", optional ``KEY``s are as follows:
+    when ``NAMESPACE`` is set to "udp.proxy.session", the following optional ``KEY`` values are available:
 
     * ``cluster_name``: Name of the cluster.
     * ``bytes_sent``: Total number of bytes sent to the downstream in the session. *Deprecated, use ``%BYTES_SENT%`` instead.*
@@ -936,7 +936,7 @@ UDP
       %DYNAMIC_METADATA(udp.proxy.session:datagrams_sent)%
       %DYNAMIC_METADATA(udp.proxy.session:datagrams_received)%\n
 
-    when ``NAMESPACE`` is set to "udp.proxy.proxy", optional ``KEY``s are as follows:
+    when ``NAMESPACE`` is set to "udp.proxy.proxy", the following optional ``KEY`` values are available:
 
     * ``bytes_sent``: Total number of bytes sent to the downstream in UDP proxy. *Deprecated, use ``%BYTES_SENT%`` instead.*
     * ``bytes_received``: Total number of bytes received from the downstream in UDP proxy. *Deprecated, use ``%BYTES_RECEIVED%`` instead.*
@@ -963,7 +963,7 @@ UDP
 
   THRIFT
     For :ref:`Thrift Proxy <config_network_filters_thrift_proxy>`,
-    ``NAMESPACE`` should be always set to "thrift.proxy", optional ``KEY``s are as follows:
+    ``NAMESPACE`` should be always set to "thrift.proxy", the following optional ``KEY`` values are available:
 
     * ``method``: Name of the method.
     * ``cluster_name``: Name of the cluster.
