@@ -176,8 +176,8 @@ private:
    * @param type the desired value type.
    * @return the Protobuf Value, or error status.
    */
-  absl::StatusOr<ProtobufWkt::Value> convertToProtobufValue(const Json::ValueType& json_value,
-                                                            ValueType type) const;
+  absl::StatusOr<Protobuf::Value> convertToProtobufValue(const Json::ValueType& json_value,
+                                                         ValueType type) const;
 
   std::shared_ptr<FilterConfig> config_;
   bool should_process_{false};

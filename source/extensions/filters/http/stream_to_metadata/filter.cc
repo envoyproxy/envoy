@@ -41,7 +41,7 @@ FilterConfig::FilterConfig(
           types.insert(std::string(DefaultSseContentType));
         } else {
           for (const auto& type : config.allowed_content_types()) {
-            types.insert(Http::Utility::sanitizeContentType(type));
+            types.insert(type);
           }
         }
         return types;
@@ -49,19 +49,18 @@ FilterConfig::FilterConfig(
       max_event_size_(config.has_max_event_size() ? config.max_event_size().value() : 8192) {}
 
 bool FilterConfig::isContentTypeAllowed(absl::string_view content_type) const {
-  const std::string sanitized = Http::Utility::sanitizeContentType(content_type);
-  return allowed_content_types_.contains(sanitized);
+  return allowed_content_types_.contains(content_type);
 }
 
 Filter::Filter(std::shared_ptr<FilterConfig> config) : config_(std::move(config)) {}
 
 Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers, bool) {
-  const auto* content_type = headers.ContentType();
-  if (content_type != nullptr) {
-    if (config_->isContentTypeAllowed(content_type->value().getStringView())) {
+  const absl::string_view content_type = headers.getContentTypeValue();
+  if (!content_type.empty()) {
+    if (config_->isContentTypeAllowed(content_type)) {
       should_process_ = true;
     } else {
-      ENVOY_LOG(trace, "Content-Type not allowed: {}", content_type->value().getStringView());
+      ENVOY_LOG(trace, "Content-Type not allowed: {}", content_type);
       config_->stats().mismatched_content_type_.inc();
     }
   } else {
@@ -318,7 +317,8 @@ Filter::extractValueFromJson(const Json::ObjectSharedPtr& json_obj,
 
   auto obj_val = current->getObject(final_key);
   if (obj_val.ok()) {
-    return Json::ValueType{obj_val.value()};
+    // Convert object to JSON string
+    return Json::ValueType{obj_val.value()->asJsonString()};
   }
 
   return absl::NotFoundError(absl::StrCat("Key '", final_key, "' not found"));
@@ -346,7 +346,7 @@ bool Filter::writeMetadata(const Json::ValueType& value, const MetadataDescripto
     return false;
   }
 
-  ProtobufWkt::Struct metadata;
+  Protobuf::Struct metadata;
   (*metadata.mutable_fields())[descriptor.key()] = proto_value_or.value();
   encoder_callbacks_->streamInfo().setDynamicMetadata(descriptor.metadata_namespace(), metadata);
 
@@ -355,9 +355,9 @@ bool Filter::writeMetadata(const Json::ValueType& value, const MetadataDescripto
   return true;
 }
 
-absl::StatusOr<ProtobufWkt::Value> Filter::convertToProtobufValue(const Json::ValueType& json_value,
-                                                                  ValueType type) const {
-  ProtobufWkt::Value proto_value;
+absl::StatusOr<Protobuf::Value> Filter::convertToProtobufValue(const Json::ValueType& json_value,
+                                                               ValueType type) const {
+  Protobuf::Value proto_value;
 
   if (absl::holds_alternative<std::string>(json_value)) {
     const auto& str_val = absl::get<std::string>(json_value);
@@ -370,6 +370,13 @@ absl::StatusOr<ProtobufWkt::Value> Filter::convertToProtobufValue(const Json::Va
       }
     } else {
       proto_value.set_string_value(str_val);
+    }
+  } else if (absl::holds_alternative<int64_t>(json_value)) {
+    const auto num_val = absl::get<int64_t>(json_value);
+    if (type == ValueType::StreamToMetadata_ValueType_STRING) {
+      proto_value.set_string_value(absl::StrCat(num_val));
+    } else {
+      proto_value.set_number_value(static_cast<double>(num_val));
     }
   } else if (absl::holds_alternative<double>(json_value)) {
     const auto num_val = absl::get<double>(json_value);
@@ -386,13 +393,6 @@ absl::StatusOr<ProtobufWkt::Value> Filter::convertToProtobufValue(const Json::Va
       proto_value.set_number_value(bool_val ? 1.0 : 0.0);
     } else {
       proto_value.set_bool_value(bool_val);
-    }
-  } else if (absl::holds_alternative<Json::ObjectSharedPtr>(json_value)) {
-    const auto& obj = absl::get<Json::ObjectSharedPtr>(json_value);
-    if (type == ValueType::StreamToMetadata_ValueType_STRING) {
-      proto_value.set_string_value(obj->asJsonString());
-    } else {
-      return absl::InvalidArgumentError("Cannot convert object to number");
     }
   } else {
     return absl::InvalidArgumentError("Unsupported JSON value type");
