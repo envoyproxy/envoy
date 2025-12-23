@@ -17,6 +17,7 @@ const std::string DefaultConfig = R"EOF(
 name: envoy.filters.network.geoip
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.network.geoip.v3.Geoip
+  stat_prefix: ""
   provider:
     name: envoy.geoip_providers.maxmind
     typed_config:
@@ -104,7 +105,7 @@ TEST_P(GeoipFilterIntegrationTest, GeoipFilterNoCrashOnLdsUpdate) {
 // Tests that the filter uses client IP from filter state when configured.
 TEST_P(GeoipFilterIntegrationTest, GeoipFilterUsesClientIpFromFilterState) {
   // IP address 2.125.160.216 is a test IP in GeoLite2-City-Test.mmdb that resolves to
-  // Boxford, England, GB.
+  // England, GB.
   const std::string set_filter_state_config = R"EOF(
 name: envoy.filters.network.set_filter_state
 typed_config:
@@ -120,6 +121,7 @@ typed_config:
 name: envoy.filters.network.geoip
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.network.geoip.v3.Geoip
+  stat_prefix: ""
   client_ip_filter_state_config:
     filter_state_key: "test.geoip.client_ip"
   provider:
@@ -157,6 +159,7 @@ TEST_P(GeoipFilterIntegrationTest, GeoipFilterFallsBackToConnectionAddress) {
 name: envoy.filters.network.geoip
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.network.geoip.v3.Geoip
+  stat_prefix: ""
   client_ip_filter_state_config:
     filter_state_key: "nonexistent.filter.state.key"
   provider:

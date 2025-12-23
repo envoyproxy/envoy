@@ -30,6 +30,23 @@ namespace NetworkFilters {
 namespace Geoip {
 namespace {
 
+// Common test configuration strings.
+const std::string BasicGeoipConfig = R"EOF(
+    provider:
+        name: "envoy.geoip_providers.dummy"
+        typed_config:
+          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
+)EOF";
+
+const std::string GeoipConfigWithClientIpOverride = R"EOF(
+    provider:
+        name: "envoy.geoip_providers.dummy"
+        typed_config:
+          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
+    client_ip_filter_state_config:
+        filter_state_key: "my.custom.client.ip"
+)EOF";
+
 // Matcher to verify LookupRequest has the expected remote address.
 MATCHER_P(HasRemoteAddress, expected_address, "") {
   if (arg.remoteAddress()->asString() != expected_address) {
@@ -106,13 +123,7 @@ public:
 
 TEST_F(GeoipFilterTest, SuccessfulLookupStoresFilterState) {
   initializeProviderFactory();
-  const std::string config_yaml = R"EOF(
-    provider:
-        name: "envoy.geoip_providers.dummy"
-        typed_config:
-          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
-)EOF";
-  initializeFilter(config_yaml);
+  initializeFilter(BasicGeoipConfig);
 
   Network::Address::InstanceConstSharedPtr remote_address =
       Network::Utility::parseInternetAddressNoThrow("1.2.3.4");
@@ -133,13 +144,7 @@ TEST_F(GeoipFilterTest, SuccessfulLookupStoresFilterState) {
 
 TEST_F(GeoipFilterTest, EmptyLookupDoesNotSetFilterState) {
   initializeProviderFactory();
-  const std::string config_yaml = R"EOF(
-    provider:
-        name: "envoy.geoip_providers.dummy"
-        typed_config:
-          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
-)EOF";
-  initializeFilter(config_yaml);
+  initializeFilter(BasicGeoipConfig);
 
   Network::Address::InstanceConstSharedPtr remote_address =
       Network::Utility::parseInternetAddressNoThrow("10.0.0.1");
@@ -160,13 +165,7 @@ TEST_F(GeoipFilterTest, EmptyLookupDoesNotSetFilterState) {
 
 TEST_F(GeoipFilterTest, OnDataReturnsContinue) {
   initializeProviderFactory();
-  const std::string config_yaml = R"EOF(
-    provider:
-        name: "envoy.geoip_providers.dummy"
-        typed_config:
-          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
-)EOF";
-  initializeFilter(config_yaml);
+  initializeFilter(BasicGeoipConfig);
 
   Buffer::OwnedImpl data;
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
@@ -223,13 +222,7 @@ TEST_F(GeoipFilterTest, GeoipInfoEmptyAndSize) {
 
 TEST_F(GeoipFilterTest, EmptyValuesAreNotStored) {
   initializeProviderFactory();
-  const std::string config_yaml = R"EOF(
-    provider:
-        name: "envoy.geoip_providers.dummy"
-        typed_config:
-          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
-)EOF";
-  initializeFilter(config_yaml);
+  initializeFilter(BasicGeoipConfig);
 
   Network::Address::InstanceConstSharedPtr remote_address =
       Network::Utility::parseInternetAddressNoThrow("1.2.3.4");
@@ -256,13 +249,7 @@ TEST_F(GeoipFilterTest, EmptyValuesAreNotStored) {
 
 TEST_F(GeoipFilterTest, AsyncCallbackStoresFilterState) {
   initializeProviderFactory();
-  const std::string config_yaml = R"EOF(
-    provider:
-        name: "envoy.geoip_providers.dummy"
-        typed_config:
-          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
-)EOF";
-  initializeFilter(config_yaml);
+  initializeFilter(BasicGeoipConfig);
 
   Network::Address::InstanceConstSharedPtr remote_address =
       Network::Utility::parseInternetAddressNoThrow("1.2.3.4");
@@ -294,15 +281,7 @@ TEST_F(GeoipFilterTest, AsyncCallbackStoresFilterState) {
 
 TEST_F(GeoipFilterTest, UsesClientIpFromFilterStateWhenConfigured) {
   initializeProviderFactory();
-  const std::string config_yaml = R"EOF(
-    provider:
-        name: "envoy.geoip_providers.dummy"
-        typed_config:
-          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
-    client_ip_filter_state_config:
-        filter_state_key: "my.custom.client.ip"
-)EOF";
-  initializeFilter(config_yaml);
+  initializeFilter(GeoipConfigWithClientIpOverride);
 
   // Set the connection remote address (this should be ignored).
   Network::Address::InstanceConstSharedPtr remote_address =
@@ -327,15 +306,7 @@ TEST_F(GeoipFilterTest, UsesClientIpFromFilterStateWhenConfigured) {
 
 TEST_F(GeoipFilterTest, UsesClientIpFromFilterStateWithIpv6) {
   initializeProviderFactory();
-  const std::string config_yaml = R"EOF(
-    provider:
-        name: "envoy.geoip_providers.dummy"
-        typed_config:
-          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
-    client_ip_filter_state_config:
-        filter_state_key: "my.custom.client.ip"
-)EOF";
-  initializeFilter(config_yaml);
+  initializeFilter(GeoipConfigWithClientIpOverride);
 
   // Set the connection remote address (this should be ignored).
   Network::Address::InstanceConstSharedPtr remote_address =
@@ -358,15 +329,7 @@ TEST_F(GeoipFilterTest, UsesClientIpFromFilterStateWithIpv6) {
 
 TEST_F(GeoipFilterTest, FallsBackToConnectionAddressWhenFilterStateKeyNotFound) {
   initializeProviderFactory();
-  const std::string config_yaml = R"EOF(
-    provider:
-        name: "envoy.geoip_providers.dummy"
-        typed_config:
-          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
-    client_ip_filter_state_config:
-        filter_state_key: "my.custom.client.ip"
-)EOF";
-  initializeFilter(config_yaml);
+  initializeFilter(GeoipConfigWithClientIpOverride);
 
   // Set the connection remote address (this should be used as fallback).
   Network::Address::InstanceConstSharedPtr remote_address =
@@ -391,15 +354,7 @@ TEST_F(GeoipFilterTest, FallsBackToConnectionAddressWhenFilterStateKeyNotFound) 
 
 TEST_F(GeoipFilterTest, FallsBackToConnectionAddressWhenFilterStateValueIsInvalidIp) {
   initializeProviderFactory();
-  const std::string config_yaml = R"EOF(
-    provider:
-        name: "envoy.geoip_providers.dummy"
-        typed_config:
-          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
-    client_ip_filter_state_config:
-        filter_state_key: "my.custom.client.ip"
-)EOF";
-  initializeFilter(config_yaml);
+  initializeFilter(GeoipConfigWithClientIpOverride);
 
   // Set the connection remote address (this should be used as fallback).
   Network::Address::InstanceConstSharedPtr remote_address =
@@ -426,13 +381,7 @@ TEST_F(GeoipFilterTest, FallsBackToConnectionAddressWhenFilterStateValueIsInvali
 TEST_F(GeoipFilterTest, UsesConnectionAddressWhenNoFilterStateConfigured) {
   initializeProviderFactory();
   // Config without client_ip_filter_state_config.
-  const std::string config_yaml = R"EOF(
-    provider:
-        name: "envoy.geoip_providers.dummy"
-        typed_config:
-          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
-)EOF";
-  initializeFilter(config_yaml);
+  initializeFilter(BasicGeoipConfig);
 
   // Verify that clientIpFilterStateKey is not set.
   EXPECT_FALSE(config_->clientIpFilterStateKey().has_value());
