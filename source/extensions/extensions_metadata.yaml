@@ -765,6 +765,13 @@ envoy.filters.network.dubbo_proxy:
   status: alpha
   type_urls:
   - envoy.extensions.filters.network.dubbo_proxy.v3.DubboProxy
+envoy.filters.network.dynamic_modules:
+  categories:
+  - envoy.filters.network
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.network.dynamic_modules.v3.DynamicModuleNetworkFilter
 envoy.filters.network.echo:
   categories:
   - envoy.filters.network

@@ -264,6 +264,10 @@ new_features:
   change: |
     Added support for loading dynamic modules globally by setting :ref:`load_globally
     <envoy_v3_api_field_extensions.dynamic_modules.v3.DynamicModuleConfig.load_globally>` to ``true``.
+- area: dynamic modules
+  change: |
+    Added :ref:`network filter <envoy_v3_api_msg_extensions.filters.network.dynamic_modules.v3.DynamicModuleNetworkFilter>`
+    support for dynamic modules, enabling TCP stream processing with dynamic modules.
 - area: http filter
   change: |
     Added :ref:`transform http filter <config_http_filters_transform>` to modify request and response bodies in any
