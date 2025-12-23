@@ -124,6 +124,7 @@ Upstream::HostConstSharedPtr chooseRandomHost(const Upstream::HostSetImpl& host_
     return nullptr;
   }
 }
+
 } // namespace
 
 Upstream::HostSelectionResponse
@@ -174,6 +175,50 @@ RedisClusterLoadBalancerFactory::RedisClusterLoadBalancer::chooseHost(
       }
     case NetworkFilters::Common::Redis::Client::ReadPolicy::Any:
       return chooseRandomHost(shard->allHosts(), random_);
+    case NetworkFilters::Common::Redis::Client::ReadPolicy::AzAffinity: {
+      // Spread read requests between replicas in the same AZ in round robin.
+      // Falls back to other replicas or primary if needed.
+      const std::string& client_zone = redis_context->clientZone();
+      if (!client_zone.empty()) {
+        const auto* local_replicas = shard->replicasInZone(client_zone);
+        if (local_replicas) {
+          auto host = chooseRandomHost(*local_replicas, random_);
+          if (host) {
+            return host;
+          }
+        }
+      }
+      // Fall back to any replica, then primary
+      if (!shard->replicas().hosts().empty()) {
+        return chooseRandomHost(shard->replicas(), random_);
+      }
+      return shard->primary();
+    }
+    case NetworkFilters::Common::Redis::Client::ReadPolicy::AzAffinityReplicasAndPrimary: {
+      // Spread read requests among nodes within the client's AZ in round robin,
+      // prioritizing: local replicas → local primary → any replica → primary.
+      const std::string& client_zone = redis_context->clientZone();
+      if (!client_zone.empty()) {
+        // Try local replicas first
+        const auto* local_replicas = shard->replicasInZone(client_zone);
+        if (local_replicas) {
+          auto host = chooseRandomHost(*local_replicas, random_);
+          if (host) {
+            return host;
+          }
+        }
+        // Try local primary
+        if (shard->primaryZone() == client_zone &&
+            shard->primary()->coarseHealth() == Upstream::Host::Health::Healthy) {
+          return shard->primary();
+        }
+      }
+      // Fall back to any replica, then primary
+      if (!shard->replicas().hosts().empty()) {
+        return chooseRandomHost(shard->replicas(), random_);
+      }
+      return shard->primary();
+    }
     }
   }
   return shard->primary();
@@ -201,10 +246,10 @@ bool RedisLoadBalancerContextImpl::isReadRequest(
 RedisLoadBalancerContextImpl::RedisLoadBalancerContextImpl(
     const std::string& key, bool enabled_hashtagging, bool is_redis_cluster,
     const NetworkFilters::Common::Redis::RespValue& request,
-    NetworkFilters::Common::Redis::Client::ReadPolicy read_policy)
+    NetworkFilters::Common::Redis::Client::ReadPolicy read_policy, const std::string& client_zone)
     : hash_key_(is_redis_cluster ? Crc16::crc16(hashtag(key, true))
                                  : MurmurHash::murmurHash2(hashtag(key, enabled_hashtagging))),
-      is_read_(isReadRequest(request)), read_policy_(read_policy) {}
+      is_read_(isReadRequest(request)), read_policy_(read_policy), client_zone_(client_zone) {}
 
 // Inspired by the redis-cluster hashtagging algorithm
 // https://redis.io/topics/cluster-spec#keys-hash-tags
@@ -227,8 +272,9 @@ absl::string_view RedisLoadBalancerContextImpl::hashtag(absl::string_view v, boo
 }
 RedisSpecifyShardContextImpl::RedisSpecifyShardContextImpl(
     uint64_t shard_index, const NetworkFilters::Common::Redis::RespValue& request,
-    NetworkFilters::Common::Redis::Client::ReadPolicy read_policy)
-    : RedisLoadBalancerContextImpl(std::to_string(shard_index), true, true, request, read_policy),
+    NetworkFilters::Common::Redis::Client::ReadPolicy read_policy, const std::string& client_zone)
+    : RedisLoadBalancerContextImpl(std::to_string(shard_index), true, true, request, read_policy,
+                                   client_zone),
       shard_index_(shard_index) {}
 
 } // namespace Redis
