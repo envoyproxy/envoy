@@ -1293,7 +1293,7 @@ TEST_F(ProtoApiScrubberFilterConfigTest, UnsupportedActionType) {
 }
 
 TEST_F(ProtoApiScrubberFilterConfigTest, FieldParentMapPopulation) {
-  // Initialize config with the apikeys descriptor.
+  // Initialize config with the api keys descriptor.
   absl::StatusOr<std::shared_ptr<const ProtoApiScrubberFilterConfig>> config_or_status =
       ProtoApiScrubberFilterConfig::create(proto_config_, factory_context_);
   ASSERT_EQ(config_or_status.status().code(), absl::StatusCode::kOk);
