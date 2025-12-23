@@ -136,8 +136,8 @@ message Router {
   repeated network.http_connection_manager.v3.HttpFilter upstream_http_filters = 8;
 
   // If set to true, Envoy will reject ``CONNECT`` requests that send data before
-  // receiving a ``200`` response from the upstream. This non-compliant early data
-  // behavior is common for latency reduction but can cause issues with some upstreams.
-  // Defaults to false (early data is allowed).
+  // receiving a ``200`` response from the upstream. This early data behavior
+  // is common for latency reduction but can cause issues with some upstreams.
+  // Defaults to false to allow early data and be compatible with common behavior.
   bool reject_connect_request_early_data = 10;
 }
