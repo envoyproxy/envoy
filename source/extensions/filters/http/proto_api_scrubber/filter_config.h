@@ -130,6 +130,11 @@ public:
   virtual absl::StatusOr<const Protobuf::Type*>
   getResponseType(const std::string& method_name) const;
 
+  // Returns method descriptor by looking up the `descriptor_pool_`.
+  // If the method doesn't exist in the `descriptor_pool`, it returns absl::InvalidArgument error.
+  virtual absl::StatusOr<const MethodDescriptor*>
+  getMethodDescriptor(const std::string& method_name) const;
+
   FilteringMode filteringMode() const { return filtering_mode_; }
 
 protected:
@@ -216,10 +221,6 @@ private:
   absl::Status
   initializeMessageRestrictions(const Map<std::string, MessageRestrictions>& message_configs,
                                 Envoy::Server::Configuration::FactoryContext& context);
-
-  // Returns method descriptor by looking up the `descriptor_pool_`.
-  // If the method doesn't exist in the `descriptor_pool`, it returns absl::InvalidArgument error.
-  absl::StatusOr<const MethodDescriptor*> getMethodDescriptor(const std::string& method_name) const;
 
   FilteringMode filtering_mode_;
 
