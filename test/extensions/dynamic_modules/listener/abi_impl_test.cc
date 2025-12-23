@@ -154,8 +154,9 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDetectedTransportProtocol)
   EXPECT_CALL(callbacks_.socket_, setDetectedTransportProtocol(absl::string_view("tls")));
 
   char protocol[] = "tls";
+  envoy_dynamic_module_type_module_buffer protocol_buf = {protocol, 3};
   envoy_dynamic_module_callback_listener_filter_set_detected_transport_protocol(filterPtr(),
-                                                                                protocol, 3);
+                                                                                protocol_buf);
 }
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDetectedTransportProtocolNullCallbacks) {
@@ -164,22 +165,25 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDetectedTransportProtocolN
   // Callbacks not set.
 
   char protocol[] = "tls";
+  envoy_dynamic_module_type_module_buffer protocol_buf = {protocol, 3};
   // Should not crash.
   envoy_dynamic_module_callback_listener_filter_set_detected_transport_protocol(
-      static_cast<void*>(filter.get()), protocol, 3);
+      static_cast<void*>(filter.get()), protocol_buf);
 }
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDetectedTransportProtocolNullProtocol) {
   // Should not crash with null protocol.
+  envoy_dynamic_module_type_module_buffer protocol_buf = {nullptr, 3};
   envoy_dynamic_module_callback_listener_filter_set_detected_transport_protocol(filterPtr(),
-                                                                                nullptr, 3);
+                                                                                protocol_buf);
 }
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDetectedTransportProtocolZeroLength) {
   char protocol[] = "tls";
+  envoy_dynamic_module_type_module_buffer protocol_buf = {protocol, 0};
   // Should not call socket method with zero length.
   envoy_dynamic_module_callback_listener_filter_set_detected_transport_protocol(filterPtr(),
-                                                                                protocol, 0);
+                                                                                protocol_buf);
 }
 
 // =============================================================================
@@ -190,7 +194,8 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetRequestedServerName) {
   EXPECT_CALL(callbacks_.socket_, setRequestedServerName(absl::string_view("example.com")));
 
   char name[] = "example.com";
-  envoy_dynamic_module_callback_listener_filter_set_requested_server_name(filterPtr(), name, 11);
+  envoy_dynamic_module_type_module_buffer name_buf = {name, 11};
+  envoy_dynamic_module_callback_listener_filter_set_requested_server_name(filterPtr(), name_buf);
 }
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetRequestedServerNameNullCallbacks) {
@@ -198,13 +203,15 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetRequestedServerNameNullCal
   filter->initializeInModuleFilter();
 
   char name[] = "example.com";
+  envoy_dynamic_module_type_module_buffer name_buf = {name, 11};
   // Should not crash.
   envoy_dynamic_module_callback_listener_filter_set_requested_server_name(
-      static_cast<void*>(filter.get()), name, 11);
+      static_cast<void*>(filter.get()), name_buf);
 }
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetRequestedServerNameNullName) {
-  envoy_dynamic_module_callback_listener_filter_set_requested_server_name(filterPtr(), nullptr, 5);
+  envoy_dynamic_module_type_module_buffer name_buf = {nullptr, 5};
+  envoy_dynamic_module_callback_listener_filter_set_requested_server_name(filterPtr(), name_buf);
 }
 
 // =============================================================================
@@ -217,11 +224,10 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetRequestedApplicationProtoc
 
   char proto1[] = "h2";
   char proto2[] = "http/1.1";
-  const char* protocols[] = {proto1, proto2};
-  size_t lengths[] = {2, 8};
+  envoy_dynamic_module_type_module_buffer protocols[] = {{proto1, 2}, {proto2, 8}};
 
-  envoy_dynamic_module_callback_listener_filter_set_requested_application_protocols(
-      filterPtr(), protocols, lengths, 2);
+  envoy_dynamic_module_callback_listener_filter_set_requested_application_protocols(filterPtr(),
+                                                                                    protocols, 2);
 }
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetRequestedApplicationProtocolsNullCallbacks) {
@@ -229,27 +235,24 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetRequestedApplicationProtoc
   filter->initializeInModuleFilter();
 
   char proto1[] = "h2";
-  const char* protocols[] = {proto1};
-  size_t lengths[] = {2};
+  envoy_dynamic_module_type_module_buffer protocols[] = {{proto1, 2}};
 
   // Should not crash.
   envoy_dynamic_module_callback_listener_filter_set_requested_application_protocols(
-      static_cast<void*>(filter.get()), protocols, lengths, 1);
+      static_cast<void*>(filter.get()), protocols, 1);
 }
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetRequestedApplicationProtocolsNullArray) {
-  size_t lengths[] = {2};
-  envoy_dynamic_module_callback_listener_filter_set_requested_application_protocols(
-      filterPtr(), nullptr, lengths, 1);
+  envoy_dynamic_module_callback_listener_filter_set_requested_application_protocols(filterPtr(),
+                                                                                    nullptr, 1);
 }
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetRequestedApplicationProtocolsZeroCount) {
   char proto1[] = "h2";
-  const char* protocols[] = {proto1};
-  size_t lengths[] = {2};
+  envoy_dynamic_module_type_module_buffer protocols[] = {{proto1, 2}};
 
-  envoy_dynamic_module_callback_listener_filter_set_requested_application_protocols(
-      filterPtr(), protocols, lengths, 0);
+  envoy_dynamic_module_callback_listener_filter_set_requested_application_protocols(filterPtr(),
+                                                                                    protocols, 0);
 }
 
 // =============================================================================
@@ -260,7 +263,8 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetJa3Hash) {
   EXPECT_CALL(callbacks_.socket_, setJA3Hash("abc123"));
 
   char hash[] = "abc123";
-  envoy_dynamic_module_callback_listener_filter_set_ja3_hash(filterPtr(), hash, 6);
+  envoy_dynamic_module_type_module_buffer hash_buf = {hash, 6};
+  envoy_dynamic_module_callback_listener_filter_set_ja3_hash(filterPtr(), hash_buf);
 }
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetJa3HashNullCallbacks) {
@@ -268,12 +272,14 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetJa3HashNullCallbacks) {
   filter->initializeInModuleFilter();
 
   char hash[] = "abc123";
-  envoy_dynamic_module_callback_listener_filter_set_ja3_hash(static_cast<void*>(filter.get()), hash,
-                                                             6);
+  envoy_dynamic_module_type_module_buffer hash_buf = {hash, 6};
+  envoy_dynamic_module_callback_listener_filter_set_ja3_hash(static_cast<void*>(filter.get()),
+                                                             hash_buf);
 }
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetJa3HashNullHash) {
-  envoy_dynamic_module_callback_listener_filter_set_ja3_hash(filterPtr(), nullptr, 6);
+  envoy_dynamic_module_type_module_buffer hash_buf = {nullptr, 6};
+  envoy_dynamic_module_callback_listener_filter_set_ja3_hash(filterPtr(), hash_buf);
 }
 
 // =============================================================================
@@ -284,7 +290,8 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetJa4Hash) {
   EXPECT_CALL(callbacks_.socket_, setJA4Hash("def456"));
 
   char hash[] = "def456";
-  envoy_dynamic_module_callback_listener_filter_set_ja4_hash(filterPtr(), hash, 6);
+  envoy_dynamic_module_type_module_buffer hash_buf = {hash, 6};
+  envoy_dynamic_module_callback_listener_filter_set_ja4_hash(filterPtr(), hash_buf);
 }
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetJa4HashNullCallbacks) {
@@ -292,8 +299,9 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetJa4HashNullCallbacks) {
   filter->initializeInModuleFilter();
 
   char hash[] = "def456";
-  envoy_dynamic_module_callback_listener_filter_set_ja4_hash(static_cast<void*>(filter.get()), hash,
-                                                             6);
+  envoy_dynamic_module_type_module_buffer hash_buf = {hash, 6};
+  envoy_dynamic_module_callback_listener_filter_set_ja4_hash(static_cast<void*>(filter.get()),
+                                                             hash_buf);
 }
 
 // =============================================================================
@@ -306,13 +314,14 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetRemoteAddressWithIp) {
   callbacks_.socket_.connection_info_provider_ =
       std::make_shared<Network::ConnectionInfoSetterImpl>(address, address);
 
-  envoy_dynamic_module_type_buffer_envoy_ptr address_out = nullptr;
+  envoy_dynamic_module_type_envoy_buffer address_out = {nullptr, 0};
   uint32_t port_out = 0;
-  size_t len = envoy_dynamic_module_callback_listener_filter_get_remote_address(
+  bool found = envoy_dynamic_module_callback_listener_filter_get_remote_address(
       filterPtr(), &address_out, &port_out);
 
-  EXPECT_GT(len, 0);
-  EXPECT_NE(nullptr, address_out);
+  EXPECT_TRUE(found);
+  EXPECT_GT(address_out.length, 0);
+  EXPECT_NE(nullptr, address_out.ptr);
   EXPECT_EQ(8080, port_out);
 }
 
@@ -320,13 +329,14 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetRemoteAddressNullCallbacks
   auto filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
   filter->initializeInModuleFilter();
 
-  envoy_dynamic_module_type_buffer_envoy_ptr address_out = nullptr;
+  envoy_dynamic_module_type_envoy_buffer address_out = {nullptr, 0};
   uint32_t port_out = 0;
-  size_t len = envoy_dynamic_module_callback_listener_filter_get_remote_address(
+  bool found = envoy_dynamic_module_callback_listener_filter_get_remote_address(
       static_cast<void*>(filter.get()), &address_out, &port_out);
 
-  EXPECT_EQ(0, len);
-  EXPECT_EQ(nullptr, address_out);
+  EXPECT_FALSE(found);
+  EXPECT_EQ(nullptr, address_out.ptr);
+  EXPECT_EQ(0, address_out.length);
   EXPECT_EQ(0, port_out);
 }
 
@@ -337,13 +347,14 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetRemoteAddressNonIp) {
   callbacks_.socket_.connection_info_provider_ =
       std::make_shared<Network::ConnectionInfoSetterImpl>(pipe, pipe);
 
-  envoy_dynamic_module_type_buffer_envoy_ptr address_out = nullptr;
+  envoy_dynamic_module_type_envoy_buffer address_out = {nullptr, 0};
   uint32_t port_out = 0;
-  size_t len = envoy_dynamic_module_callback_listener_filter_get_remote_address(
+  bool found = envoy_dynamic_module_callback_listener_filter_get_remote_address(
       filterPtr(), &address_out, &port_out);
 
-  EXPECT_EQ(0, len);
-  EXPECT_EQ(nullptr, address_out);
+  EXPECT_FALSE(found);
+  EXPECT_EQ(nullptr, address_out.ptr);
+  EXPECT_EQ(0, address_out.length);
   EXPECT_EQ(0, port_out);
 }
 
@@ -356,13 +367,14 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetLocalAddressWithIp) {
   callbacks_.socket_.connection_info_provider_ =
       std::make_shared<Network::ConnectionInfoSetterImpl>(address, address);
 
-  envoy_dynamic_module_type_buffer_envoy_ptr address_out = nullptr;
+  envoy_dynamic_module_type_envoy_buffer address_out = {nullptr, 0};
   uint32_t port_out = 0;
-  size_t len = envoy_dynamic_module_callback_listener_filter_get_local_address(
+  bool found = envoy_dynamic_module_callback_listener_filter_get_local_address(
       filterPtr(), &address_out, &port_out);
 
-  EXPECT_GT(len, 0);
-  EXPECT_NE(nullptr, address_out);
+  EXPECT_TRUE(found);
+  EXPECT_GT(address_out.length, 0);
+  EXPECT_NE(nullptr, address_out.ptr);
   EXPECT_EQ(9090, port_out);
 }
 
@@ -370,13 +382,14 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetLocalAddressNullCallbacks)
   auto filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
   filter->initializeInModuleFilter();
 
-  envoy_dynamic_module_type_buffer_envoy_ptr address_out = nullptr;
+  envoy_dynamic_module_type_envoy_buffer address_out = {nullptr, 0};
   uint32_t port_out = 0;
-  size_t len = envoy_dynamic_module_callback_listener_filter_get_local_address(
+  bool found = envoy_dynamic_module_callback_listener_filter_get_local_address(
       static_cast<void*>(filter.get()), &address_out, &port_out);
 
-  EXPECT_EQ(0, len);
-  EXPECT_EQ(nullptr, address_out);
+  EXPECT_FALSE(found);
+  EXPECT_EQ(nullptr, address_out.ptr);
+  EXPECT_EQ(0, address_out.length);
   EXPECT_EQ(0, port_out);
 }
 
@@ -391,8 +404,9 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetRemoteAddressIpv4) {
       std::make_shared<Network::ConnectionInfoSetterImpl>(local_address, local_address);
 
   char address[] = "10.0.0.1";
+  envoy_dynamic_module_type_module_buffer addr_buf = {address, 8};
   bool result = envoy_dynamic_module_callback_listener_filter_set_remote_address(
-      filterPtr(), address, 8, 8080, false);
+      filterPtr(), addr_buf, 8080, false);
   EXPECT_TRUE(result);
 }
 
@@ -402,15 +416,17 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetRemoteAddressIpv6) {
       std::make_shared<Network::ConnectionInfoSetterImpl>(local_address, local_address);
 
   char address[] = "2001:db8::1";
+  envoy_dynamic_module_type_module_buffer addr_buf = {address, 11};
   bool result = envoy_dynamic_module_callback_listener_filter_set_remote_address(
-      filterPtr(), address, 11, 8080, true);
+      filterPtr(), addr_buf, 8080, true);
   EXPECT_TRUE(result);
 }
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetRemoteAddressInvalidAddress) {
   char address[] = "invalid";
+  envoy_dynamic_module_type_module_buffer addr_buf = {address, 7};
   bool result = envoy_dynamic_module_callback_listener_filter_set_remote_address(
-      filterPtr(), address, 7, 8080, false);
+      filterPtr(), addr_buf, 8080, false);
   EXPECT_FALSE(result);
 }
 
@@ -419,14 +435,16 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetRemoteAddressNullCallbacks
   filter->initializeInModuleFilter();
 
   char address[] = "10.0.0.1";
+  envoy_dynamic_module_type_module_buffer addr_buf = {address, 8};
   bool result = envoy_dynamic_module_callback_listener_filter_set_remote_address(
-      static_cast<void*>(filter.get()), address, 8, 8080, false);
+      static_cast<void*>(filter.get()), addr_buf, 8080, false);
   EXPECT_FALSE(result);
 }
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetRemoteAddressNullAddress) {
+  envoy_dynamic_module_type_module_buffer addr_buf = {nullptr, 8};
   bool result = envoy_dynamic_module_callback_listener_filter_set_remote_address(
-      filterPtr(), nullptr, 8, 8080, false);
+      filterPtr(), addr_buf, 8080, false);
   EXPECT_FALSE(result);
 }
 
@@ -440,15 +458,17 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, RestoreLocalAddressIpv4) {
       std::make_shared<Network::ConnectionInfoSetterImpl>(remote_address, remote_address);
 
   char address[] = "10.0.0.1";
+  envoy_dynamic_module_type_module_buffer addr_buf = {address, 8};
   bool result = envoy_dynamic_module_callback_listener_filter_restore_local_address(
-      filterPtr(), address, 8, 9090, false);
+      filterPtr(), addr_buf, 9090, false);
   EXPECT_TRUE(result);
 }
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, RestoreLocalAddressInvalidAddress) {
   char address[] = "not_an_ip";
+  envoy_dynamic_module_type_module_buffer addr_buf = {address, 9};
   bool result = envoy_dynamic_module_callback_listener_filter_restore_local_address(
-      filterPtr(), address, 9, 9090, false);
+      filterPtr(), addr_buf, 9090, false);
   EXPECT_FALSE(result);
 }
 
@@ -457,8 +477,9 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, RestoreLocalAddressNullCallba
   filter->initializeInModuleFilter();
 
   char address[] = "10.0.0.1";
+  envoy_dynamic_module_type_module_buffer addr_buf = {address, 8};
   bool result = envoy_dynamic_module_callback_listener_filter_restore_local_address(
-      static_cast<void*>(filter.get()), address, 8, 9090, false);
+      static_cast<void*>(filter.get()), addr_buf, 9090, false);
   EXPECT_FALSE(result);
 }
 
@@ -507,8 +528,11 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicMetadata) {
   char ns[] = "test_ns";
   char key[] = "my_key";
   char value[] = "my_value";
-  envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata(filterPtr(), ns, 7, key, 6,
-                                                                     value, 8);
+  envoy_dynamic_module_type_module_buffer ns_buf = {ns, 7};
+  envoy_dynamic_module_type_module_buffer key_buf = {key, 6};
+  envoy_dynamic_module_type_module_buffer value_buf = {value, 8};
+  envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata(filterPtr(), ns_buf, key_buf,
+                                                                     value_buf);
 }
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicMetadataNullCallbacks) {
@@ -518,33 +542,45 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicMetadataNullCallbac
   char ns[] = "test_ns";
   char key[] = "my_key";
   char value[] = "my_value";
+  envoy_dynamic_module_type_module_buffer ns_buf = {ns, 7};
+  envoy_dynamic_module_type_module_buffer key_buf = {key, 6};
+  envoy_dynamic_module_type_module_buffer value_buf = {value, 8};
   // Should not crash.
   envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata(
-      static_cast<void*>(filter.get()), ns, 7, key, 6, value, 8);
+      static_cast<void*>(filter.get()), ns_buf, key_buf, value_buf);
 }
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicMetadataNullNamespace) {
   char key[] = "my_key";
   char value[] = "my_value";
+  envoy_dynamic_module_type_module_buffer ns_buf = {nullptr, 7};
+  envoy_dynamic_module_type_module_buffer key_buf = {key, 6};
+  envoy_dynamic_module_type_module_buffer value_buf = {value, 8};
   // Should not crash with null namespace.
-  envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata(filterPtr(), nullptr, 7, key,
-                                                                     6, value, 8);
+  envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata(filterPtr(), ns_buf, key_buf,
+                                                                     value_buf);
 }
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicMetadataNullKey) {
   char ns[] = "test_ns";
   char value[] = "my_value";
+  envoy_dynamic_module_type_module_buffer ns_buf = {ns, 7};
+  envoy_dynamic_module_type_module_buffer key_buf = {nullptr, 6};
+  envoy_dynamic_module_type_module_buffer value_buf = {value, 8};
   // Should not crash with null key.
-  envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata(filterPtr(), ns, 7, nullptr, 6,
-                                                                     value, 8);
+  envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata(filterPtr(), ns_buf, key_buf,
+                                                                     value_buf);
 }
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicMetadataNullValue) {
   char ns[] = "test_ns";
   char key[] = "my_key";
+  envoy_dynamic_module_type_module_buffer ns_buf = {ns, 7};
+  envoy_dynamic_module_type_module_buffer key_buf = {key, 6};
+  envoy_dynamic_module_type_module_buffer value_buf = {nullptr, 8};
   // Should not crash with null value.
-  envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata(filterPtr(), ns, 7, key, 6,
-                                                                     nullptr, 8);
+  envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata(filterPtr(), ns_buf, key_buf,
+                                                                     value_buf);
 }
 
 // =============================================================================
@@ -554,15 +590,18 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicMetadataNullValue) 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetFilterState) {
   char key[] = "my_state_key";
   char value[] = "my_state_value";
-  envoy_dynamic_module_callback_listener_filter_set_filter_state(filterPtr(), key, 12, value, 14);
+  envoy_dynamic_module_type_module_buffer key_buf = {key, 12};
+  envoy_dynamic_module_type_module_buffer value_buf = {value, 14};
+  envoy_dynamic_module_callback_listener_filter_set_filter_state(filterPtr(), key_buf, value_buf);
 
   // Verify the state was set by retrieving it.
-  envoy_dynamic_module_type_buffer_envoy_ptr value_out = nullptr;
-  size_t len = envoy_dynamic_module_callback_listener_filter_get_filter_state(filterPtr(), key, 12,
-                                                                              &value_out);
-  EXPECT_EQ(14, len);
-  EXPECT_NE(nullptr, value_out);
-  EXPECT_EQ("my_state_value", std::string(value_out, len));
+  envoy_dynamic_module_type_envoy_buffer result_buf = {nullptr, 0};
+  bool found = envoy_dynamic_module_callback_listener_filter_get_filter_state(filterPtr(), key_buf,
+                                                                              &result_buf);
+  EXPECT_TRUE(found);
+  EXPECT_EQ(14, result_buf.length);
+  EXPECT_NE(nullptr, result_buf.ptr);
+  EXPECT_EQ("my_state_value", std::string(result_buf.ptr, result_buf.length));
 }
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetFilterStateNullCallbacks) {
@@ -571,22 +610,27 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetFilterStateNullCallbacks) 
 
   char key[] = "my_state_key";
   char value[] = "my_state_value";
+  envoy_dynamic_module_type_module_buffer key_buf = {key, 12};
+  envoy_dynamic_module_type_module_buffer value_buf = {value, 14};
   // Should not crash.
   envoy_dynamic_module_callback_listener_filter_set_filter_state(static_cast<void*>(filter.get()),
-                                                                 key, 12, value, 14);
+                                                                 key_buf, value_buf);
 }
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetFilterStateNullKey) {
   char value[] = "my_state_value";
+  envoy_dynamic_module_type_module_buffer key_buf = {nullptr, 12};
+  envoy_dynamic_module_type_module_buffer value_buf = {value, 14};
   // Should not crash with null key.
-  envoy_dynamic_module_callback_listener_filter_set_filter_state(filterPtr(), nullptr, 12, value,
-                                                                 14);
+  envoy_dynamic_module_callback_listener_filter_set_filter_state(filterPtr(), key_buf, value_buf);
 }
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetFilterStateNullValue) {
   char key[] = "my_state_key";
+  envoy_dynamic_module_type_module_buffer key_buf = {key, 12};
+  envoy_dynamic_module_type_module_buffer value_buf = {nullptr, 14};
   // Should not crash with null value.
-  envoy_dynamic_module_callback_listener_filter_set_filter_state(filterPtr(), key, 12, nullptr, 14);
+  envoy_dynamic_module_callback_listener_filter_set_filter_state(filterPtr(), key_buf, value_buf);
 }
 
 // =============================================================================
@@ -597,24 +641,29 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetFilterStateExisting) {
   // First set a state.
   char key[] = "test_key";
   char value[] = "test_value";
-  envoy_dynamic_module_callback_listener_filter_set_filter_state(filterPtr(), key, 8, value, 10);
+  envoy_dynamic_module_type_module_buffer key_buf = {key, 8};
+  envoy_dynamic_module_type_module_buffer value_buf = {value, 10};
+  envoy_dynamic_module_callback_listener_filter_set_filter_state(filterPtr(), key_buf, value_buf);
 
   // Now retrieve it.
-  envoy_dynamic_module_type_buffer_envoy_ptr value_out = nullptr;
-  size_t len = envoy_dynamic_module_callback_listener_filter_get_filter_state(filterPtr(), key, 8,
-                                                                              &value_out);
-  EXPECT_EQ(10, len);
-  EXPECT_NE(nullptr, value_out);
-  EXPECT_EQ("test_value", std::string(value_out, len));
+  envoy_dynamic_module_type_envoy_buffer result_buf = {nullptr, 0};
+  bool found = envoy_dynamic_module_callback_listener_filter_get_filter_state(filterPtr(), key_buf,
+                                                                              &result_buf);
+  EXPECT_TRUE(found);
+  EXPECT_EQ(10, result_buf.length);
+  EXPECT_NE(nullptr, result_buf.ptr);
+  EXPECT_EQ("test_value", std::string(result_buf.ptr, result_buf.length));
 }
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetFilterStateNonExisting) {
   char key[] = "nonexistent_key";
-  envoy_dynamic_module_type_buffer_envoy_ptr value_out = nullptr;
-  size_t len = envoy_dynamic_module_callback_listener_filter_get_filter_state(filterPtr(), key, 15,
-                                                                              &value_out);
-  EXPECT_EQ(0, len);
-  EXPECT_EQ(nullptr, value_out);
+  envoy_dynamic_module_type_module_buffer key_buf = {key, 15};
+  envoy_dynamic_module_type_envoy_buffer result_buf = {nullptr, 0};
+  bool found = envoy_dynamic_module_callback_listener_filter_get_filter_state(filterPtr(), key_buf,
+                                                                              &result_buf);
+  EXPECT_FALSE(found);
+  EXPECT_EQ(0, result_buf.length);
+  EXPECT_EQ(nullptr, result_buf.ptr);
 }
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetFilterStateNullCallbacks) {
@@ -622,19 +671,23 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetFilterStateNullCallbacks) 
   filter->initializeInModuleFilter();
 
   char key[] = "test_key";
-  envoy_dynamic_module_type_buffer_envoy_ptr value_out = nullptr;
-  size_t len = envoy_dynamic_module_callback_listener_filter_get_filter_state(
-      static_cast<void*>(filter.get()), key, 8, &value_out);
-  EXPECT_EQ(0, len);
-  EXPECT_EQ(nullptr, value_out);
+  envoy_dynamic_module_type_module_buffer key_buf = {key, 8};
+  envoy_dynamic_module_type_envoy_buffer result_buf = {nullptr, 0};
+  bool found = envoy_dynamic_module_callback_listener_filter_get_filter_state(
+      static_cast<void*>(filter.get()), key_buf, &result_buf);
+  EXPECT_FALSE(found);
+  EXPECT_EQ(0, result_buf.length);
+  EXPECT_EQ(nullptr, result_buf.ptr);
 }
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetFilterStateNullKey) {
-  envoy_dynamic_module_type_buffer_envoy_ptr value_out = nullptr;
-  size_t len = envoy_dynamic_module_callback_listener_filter_get_filter_state(filterPtr(), nullptr,
-                                                                              8, &value_out);
-  EXPECT_EQ(0, len);
-  EXPECT_EQ(nullptr, value_out);
+  envoy_dynamic_module_type_module_buffer key_buf = {nullptr, 8};
+  envoy_dynamic_module_type_envoy_buffer result_buf = {nullptr, 0};
+  bool found = envoy_dynamic_module_callback_listener_filter_get_filter_state(filterPtr(), key_buf,
+                                                                              &result_buf);
+  EXPECT_FALSE(found);
+  EXPECT_EQ(0, result_buf.length);
+  EXPECT_EQ(nullptr, result_buf.ptr);
 }
 
 } // namespace ListenerFilters

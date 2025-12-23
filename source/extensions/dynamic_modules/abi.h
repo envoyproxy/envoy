@@ -1229,10 +1229,8 @@ void envoy_dynamic_module_on_network_filter_destroy(
  *
  * @param filter_config_envoy_ptr is the pointer to the DynamicModuleListenerFilterConfig object
  * for the corresponding config.
- * @param name_ptr is the name of the filter.
- * @param name_size is the size of the name.
- * @param config_ptr is the configuration for the module.
- * @param config_size is the size of the configuration.
+ * @param name is the name of the filter owned by Envoy.
+ * @param config is the configuration for the module owned by Envoy.
  * @return envoy_dynamic_module_type_listener_filter_config_module_ptr is the pointer to the
  * in-module listener filter configuration. Returning nullptr indicates a failure to initialize the
  * module. When it fails, the filter configuration will be rejected.
@@ -1240,8 +1238,7 @@ void envoy_dynamic_module_on_network_filter_destroy(
 envoy_dynamic_module_type_listener_filter_config_module_ptr
 envoy_dynamic_module_on_listener_filter_config_new(
     envoy_dynamic_module_type_listener_filter_config_envoy_ptr filter_config_envoy_ptr,
-    envoy_dynamic_module_type_const_buffer_envoy_ptr name_ptr, size_t name_size,
-    envoy_dynamic_module_type_const_buffer_envoy_ptr config_ptr, size_t config_size);
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config);
 
 /**
  * envoy_dynamic_module_on_listener_filter_config_destroy is called when the listener filter
@@ -2950,62 +2947,56 @@ bool envoy_dynamic_module_callback_listener_filter_drain_buffer(
  * module to set the detected transport protocol (e.g., "tls", "raw_buffer").
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
- * @param protocol is the pointer to the protocol string.
- * @param length is the length of the protocol string.
+ * @param protocol is the protocol string owned by the module.
  */
 void envoy_dynamic_module_callback_listener_filter_set_detected_transport_protocol(
     envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_const_buffer_envoy_ptr protocol, size_t length);
+    envoy_dynamic_module_type_module_buffer protocol);
 
 /**
  * envoy_dynamic_module_callback_listener_filter_set_requested_server_name is called by the module
  * to set the requested server name (SNI).
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
- * @param name is the pointer to the server name string.
- * @param length is the length of the server name string.
+ * @param name is the server name string owned by the module.
  */
 void envoy_dynamic_module_callback_listener_filter_set_requested_server_name(
     envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_const_buffer_envoy_ptr name, size_t length);
+    envoy_dynamic_module_type_module_buffer name);
 
 /**
  * envoy_dynamic_module_callback_listener_filter_set_requested_application_protocols is called by
  * the module to set the requested application protocols (ALPN).
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
- * @param protocols_ptr is an array of protocol name pointers.
- * @param protocols_length is an array of protocol name lengths.
+ * @param protocols is an array of protocol name buffers owned by the module.
  * @param protocols_count is the number of protocols.
  */
 void envoy_dynamic_module_callback_listener_filter_set_requested_application_protocols(
     envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_const_buffer_envoy_ptr* protocols_ptr, size_t* protocols_length,
-    size_t protocols_count);
+    envoy_dynamic_module_type_module_buffer* protocols, size_t protocols_count);
 
 /**
  * `envoy_dynamic_module_callback_listener_filter_set_ja3_hash` is called by the module to set the
  * `JA3` fingerprint hash.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
- * @param hash is the pointer to the hash string.
- * @param length is the length of the hash string.
+ * @param hash is the hash string owned by the module.
  */
 void envoy_dynamic_module_callback_listener_filter_set_ja3_hash(
     envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_const_buffer_envoy_ptr hash, size_t length);
+    envoy_dynamic_module_type_module_buffer hash);
 
 /**
  * `envoy_dynamic_module_callback_listener_filter_set_ja4_hash` is called by the module to set the
  * `JA4` fingerprint hash.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
- * @param hash is the pointer to the hash string.
- * @param length is the length of the hash string.
+ * @param hash is the hash string owned by the module.
  */
 void envoy_dynamic_module_callback_listener_filter_set_ja4_hash(
     envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_const_buffer_envoy_ptr hash, size_t length);
+    envoy_dynamic_module_type_module_buffer hash);
 
 // -----------------------------------------------------------------------------
 // Address Operations
@@ -3016,58 +3007,54 @@ void envoy_dynamic_module_callback_listener_filter_set_ja4_hash(
  * the remote (client) address.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
- * @param address_out is the output pointer to the address string.
+ * @param address_out is the output buffer where the address owned by Envoy will be stored.
  * @param port_out is the output pointer to the port number.
- * @return the length of the address string.
+ * @return true if the address was found and is an IP address, false otherwise.
  */
-size_t envoy_dynamic_module_callback_listener_filter_get_remote_address(
+bool envoy_dynamic_module_callback_listener_filter_get_remote_address(
     envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_buffer_envoy_ptr* address_out, uint32_t* port_out);
+    envoy_dynamic_module_type_envoy_buffer* address_out, uint32_t* port_out);
 
 /**
  * envoy_dynamic_module_callback_listener_filter_get_local_address is called by the module to get
  * the local address.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
- * @param address_out is the output pointer to the address string.
+ * @param address_out is the output buffer where the address owned by Envoy will be stored.
  * @param port_out is the output pointer to the port number.
- * @return the length of the address string.
+ * @return true if the address was found and is an IP address, false otherwise.
  */
-size_t envoy_dynamic_module_callback_listener_filter_get_local_address(
+bool envoy_dynamic_module_callback_listener_filter_get_local_address(
     envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_buffer_envoy_ptr* address_out, uint32_t* port_out);
+    envoy_dynamic_module_type_envoy_buffer* address_out, uint32_t* port_out);
 
 /**
  * envoy_dynamic_module_callback_listener_filter_set_remote_address is called by the module to set
  * the remote address (for proxy protocol parsing).
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
- * @param address is the pointer to the address string.
- * @param address_length is the length of the address string.
+ * @param address is the address string owned by the module.
  * @param port is the port number.
  * @param is_ipv6 true if the address is IPv6, false for IPv4.
  * @return true if successful, false otherwise.
  */
 bool envoy_dynamic_module_callback_listener_filter_set_remote_address(
     envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_const_buffer_envoy_ptr address, size_t address_length, uint32_t port,
-    bool is_ipv6);
+    envoy_dynamic_module_type_module_buffer address, uint32_t port, bool is_ipv6);
 
 /**
  * envoy_dynamic_module_callback_listener_filter_restore_local_address is called by the module to
  * restore the local address (for original destination or proxy protocol).
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
- * @param address is the pointer to the address string.
- * @param address_length is the length of the address string.
+ * @param address is the address string owned by the module.
  * @param port is the port number.
  * @param is_ipv6 true if the address is IPv6, false for IPv4.
  * @return true if successful, false otherwise.
  */
 bool envoy_dynamic_module_callback_listener_filter_restore_local_address(
     envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_const_buffer_envoy_ptr address, size_t address_length, uint32_t port,
-    bool is_ipv6);
+    envoy_dynamic_module_type_module_buffer address, uint32_t port, bool is_ipv6);
 
 // -----------------------------------------------------------------------------
 // Filter Chain Control
@@ -3102,18 +3089,14 @@ void envoy_dynamic_module_callback_listener_filter_close_socket(
  * set a string value in dynamic metadata.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
- * @param namespace_ptr is the pointer to the namespace string.
- * @param namespace_size is the size of the namespace string.
- * @param key_ptr is the pointer to the key string.
- * @param key_size is the size of the key string.
- * @param value_ptr is the pointer to the value string.
- * @param value_size is the size of the value string.
+ * @param filter_namespace is the namespace string owned by the module.
+ * @param key is the key string owned by the module.
+ * @param value is the value string owned by the module.
  */
 void envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata(
     envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_const_buffer_envoy_ptr namespace_ptr, size_t namespace_size,
-    envoy_dynamic_module_type_const_buffer_envoy_ptr key_ptr, size_t key_size,
-    envoy_dynamic_module_type_const_buffer_envoy_ptr value_ptr, size_t value_size);
+    envoy_dynamic_module_type_module_buffer filter_namespace,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value);
 
 // -----------------------------------------------------------------------------
 // Filter State Operations
@@ -3124,30 +3107,25 @@ void envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata(
  * set a string value in filter state with Connection life span.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
- * @param key_ptr is the pointer to the key string.
- * @param key_size is the size of the key string.
- * @param value_ptr is the pointer to the value string.
- * @param value_size is the size of the value string.
+ * @param key is the key string owned by the module.
+ * @param value is the value string owned by the module.
  */
 void envoy_dynamic_module_callback_listener_filter_set_filter_state(
     envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_const_buffer_envoy_ptr key_ptr, size_t key_size,
-    envoy_dynamic_module_type_const_buffer_envoy_ptr value_ptr, size_t value_size);
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value);
 
 /**
  * envoy_dynamic_module_callback_listener_filter_get_filter_state is called by the module to
  * get a string value from filter state.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
- * @param key_ptr is the pointer to the key string.
- * @param key_size is the size of the key string.
- * @param value_out is the output pointer to the value string.
- * @return the length of the value string, or 0 if not found.
+ * @param key is the key string owned by the module.
+ * @param value_out is the output buffer where the value owned by Envoy will be stored.
+ * @return true if the value was found, false otherwise.
  */
-size_t envoy_dynamic_module_callback_listener_filter_get_filter_state(
+bool envoy_dynamic_module_callback_listener_filter_get_filter_state(
     envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_const_buffer_envoy_ptr key_ptr, size_t key_size,
-    envoy_dynamic_module_type_buffer_envoy_ptr* value_out);
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* value_out);
 
 #ifdef __cplusplus
 }
