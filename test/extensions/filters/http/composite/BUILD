@@ -45,6 +45,7 @@ envoy_extension_cc_test(
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/common/http:common_lib",
         "//test/integration:http_integration_lib",
+        "//test/integration/filters:add_header_filter_config_lib",
         "//test/integration/filters:local_reply_during_encoding_filter_lib",
         "//test/integration/filters:server_factory_context_filter_config_proto_cc_proto",
         "//test/integration/filters:server_factory_context_filter_lib",

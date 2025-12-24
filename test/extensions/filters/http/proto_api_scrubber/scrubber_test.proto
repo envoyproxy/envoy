@@ -37,6 +37,7 @@ message ScrubRequest {
 
   repeated string repeated_secrets = 7;
   repeated SensitiveMessage repeated_messages = 8;
+
   oneof single_choice {
     string choice_a_string = 10;
     int32 choice_b_int = 11;

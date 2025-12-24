@@ -112,7 +112,8 @@ public:
   }
   MOCK_METHOD(Network::UpstreamTransportSocketFactory&, resolveTransportSocketFactory,
               (const Network::Address::InstanceConstSharedPtr& dest_address,
-               const envoy::config::core::v3::Metadata* metadata),
+               const envoy::config::core::v3::Metadata* metadata,
+               Network::TransportSocketOptionsConstSharedPtr transport_socket_options),
               (const));
   MOCK_METHOD(void, setLbPolicyData, (HostLbPolicyDataPtr lb_policy_data));
   MOCK_METHOD(OptRef<HostLbPolicyData>, lbPolicyData, (), (const));
@@ -230,7 +231,8 @@ public:
 
   MOCK_METHOD(Network::UpstreamTransportSocketFactory&, resolveTransportSocketFactory,
               (const Network::Address::InstanceConstSharedPtr& dest_address,
-               const envoy::config::core::v3::Metadata* metadata),
+               const envoy::config::core::v3::Metadata* metadata,
+               Network::TransportSocketOptionsConstSharedPtr transport_socket_options),
               (const));
 
   testing::NiceMock<MockClusterInfo> cluster_;
