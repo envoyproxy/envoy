@@ -1,4 +1,5 @@
 #include <cstddef>
+#include <cstdint>
 
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/message_impl.h"
@@ -1553,7 +1554,7 @@ bool envoy_dynamic_module_callback_http_add_custom_flag(
 
 envoy_dynamic_module_type_http_callout_init_result
 envoy_dynamic_module_callback_http_filter_http_callout(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, uint32_t callout_id,
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, uint64_t* callout_id,
     envoy_dynamic_module_type_buffer_module_ptr cluster_name, size_t cluster_name_length,
     envoy_dynamic_module_type_module_http_header* headers, size_t headers_size,
     envoy_dynamic_module_type_buffer_module_ptr body, size_t body_size,
@@ -1588,8 +1589,7 @@ envoy_dynamic_module_callback_http_filter_http_callout(
 
 envoy_dynamic_module_type_http_callout_init_result
 envoy_dynamic_module_callback_http_filter_start_http_stream(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_http_stream_envoy_ptr* stream_ptr_out,
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, uint64_t* stream_id_out,
     envoy_dynamic_module_type_buffer_module_ptr cluster_name, size_t cluster_name_length,
     envoy_dynamic_module_type_module_http_header* headers, size_t headers_size,
     envoy_dynamic_module_type_buffer_module_ptr body, size_t body_size, bool end_stream,
@@ -1617,20 +1617,18 @@ envoy_dynamic_module_callback_http_filter_start_http_stream(
   if (body_size > 0) {
     message->body().add(absl::string_view(static_cast<const char*>(body), body_size));
   }
-  return filter->startHttpStream(stream_ptr_out, cluster_name_view, std::move(message), end_stream,
+  return filter->startHttpStream(stream_id_out, cluster_name_view, std::move(message), end_stream,
                                  timeout_milliseconds);
 }
 
 void envoy_dynamic_module_callback_http_filter_reset_http_stream(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_http_stream_envoy_ptr stream_ptr) {
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, uint64_t stream_id) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
-  filter->resetHttpStream(stream_ptr);
+  filter->resetHttpStream(stream_id);
 }
 
 bool envoy_dynamic_module_callback_http_stream_send_data(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_http_stream_envoy_ptr stream_ptr,
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, uint64_t stream_id,
     envoy_dynamic_module_type_buffer_module_ptr data, size_t data_length, bool end_stream) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
 
@@ -1639,12 +1637,11 @@ bool envoy_dynamic_module_callback_http_stream_send_data(
   if (data_length > 0) {
     buffer.add(absl::string_view(static_cast<const char*>(data), data_length));
   }
-  return filter->sendStreamData(stream_ptr, buffer, end_stream);
+  return filter->sendStreamData(stream_id, buffer, end_stream);
 }
 
 bool envoy_dynamic_module_callback_http_stream_send_trailers(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_http_stream_envoy_ptr stream_ptr,
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, uint64_t stream_id,
     envoy_dynamic_module_type_module_http_header* trailers, size_t trailers_size) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
 
@@ -1658,7 +1655,7 @@ bool envoy_dynamic_module_callback_http_stream_send_trailers(
     trailer_map->addCopy(Http::LowerCaseString(key), value);
   }
 
-  return filter->sendStreamTrailers(stream_ptr, std::move(trailer_map));
+  return filter->sendStreamTrailers(stream_id, std::move(trailer_map));
 }
 
 envoy_dynamic_module_type_http_filter_scheduler_module_ptr
