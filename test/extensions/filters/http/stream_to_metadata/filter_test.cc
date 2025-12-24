@@ -54,76 +54,81 @@ public:
   }
 
   const std::string basic_config_ = R"EOF(
-  format: SERVER_SENT_EVENTS
-  rules:
-    - selector:
-        json_path:
-          path: ["usage", "total_tokens"]
-      metadata_descriptors:
-        - metadata_namespace: "envoy.lb"
-          key: "tokens"
-          type: NUMBER
+  response_rules:
+    format: SERVER_SENT_EVENTS
+    rules:
+      - selector:
+          json_path:
+            path: ["usage", "total_tokens"]
+        metadata_descriptors:
+          - metadata_namespace: "envoy.lb"
+            key: "tokens"
+            type: NUMBER
   )EOF";
 
   const std::string multi_namespace_config_ = R"EOF(
-  format: SERVER_SENT_EVENTS
-  rules:
-    - selector:
-        json_path:
-          path: ["usage", "total_tokens"]
-      metadata_descriptors:
-        - metadata_namespace: "envoy.lb"
-          key: "tokens"
-          type: NUMBER
-        - metadata_namespace: "envoy.audit"
-          key: "token_count"
-          type: NUMBER
+  response_rules:
+    format: SERVER_SENT_EVENTS
+    rules:
+      - selector:
+          json_path:
+            path: ["usage", "total_tokens"]
+        metadata_descriptors:
+          - metadata_namespace: "envoy.lb"
+            key: "tokens"
+            type: NUMBER
+          - metadata_namespace: "envoy.audit"
+            key: "token_count"
+            type: NUMBER
   )EOF";
 
   const std::string preserve_config_ = R"EOF(
-  format: SERVER_SENT_EVENTS
-  rules:
-    - selector:
-        json_path:
-          path: ["usage", "total_tokens"]
-      metadata_descriptors:
-        - metadata_namespace: "envoy.lb"
-          key: "tokens"
-          type: NUMBER
-          preserve_existing_metadata_value: true
+  response_rules:
+    format: SERVER_SENT_EVENTS
+    rules:
+      - selector:
+          json_path:
+            path: ["usage", "total_tokens"]
+        metadata_descriptors:
+          - metadata_namespace: "envoy.lb"
+            key: "tokens"
+            type: NUMBER
+            preserve_existing_metadata_value: true
   )EOF";
 
   const std::string multi_rule_config_ = R"EOF(
-  format: SERVER_SENT_EVENTS
-  rules:
-    - selector:
-        json_path:
-          path: ["usage", "total_tokens"]
-      metadata_descriptors:
-        - metadata_namespace: "envoy.lb"
-          key: "tokens"
-          type: NUMBER
-    - selector:
-        json_path:
-          path: ["model"]
-      metadata_descriptors:
-        - metadata_namespace: "envoy.lb"
-          key: "model_name"
-          type: STRING
-      stop_processing_on_match: false
+  response_rules:
+    format: SERVER_SENT_EVENTS
+    rules:
+      - selector:
+          json_path:
+            path: ["usage", "total_tokens"]
+        metadata_descriptors:
+          - metadata_namespace: "envoy.lb"
+            key: "tokens"
+            type: NUMBER
+      - selector:
+          json_path:
+            path: ["model"]
+        metadata_descriptors:
+          - metadata_namespace: "envoy.lb"
+            key: "model_name"
+            type: STRING
+        stop_processing_on_match: false
   )EOF";
 
   const std::string no_stop_config_ = R"EOF(
-  format: SERVER_SENT_EVENTS
-  rules:
-    - selector:
-        json_path:
-          path: ["usage", "total_tokens"]
-      metadata_descriptors:
-        - metadata_namespace: "envoy.lb"
-          key: "tokens"
-          type: NUMBER
-      stop_processing_on_match: false
+  response_rules:
+    format: SERVER_SENT_EVENTS
+    rules:
+      - selector:
+          json_path:
+            path: ["usage", "total_tokens"]
+        metadata_descriptors:
+          - metadata_namespace: "envoy.lb"
+            key: "tokens"
+            type: NUMBER
+        stop_processing_on_match: false
   )EOF";
 
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
@@ -487,15 +492,16 @@ TEST_F(StreamToMetadataFilterTest, StopProcessingDisabled) {
 
 TEST_F(StreamToMetadataFilterTest, StringValueType) {
   const std::string config = R"EOF(
-  format: SERVER_SENT_EVENTS
-  rules:
-    - selector:
-        json_path:
-          path: ["model"]
-      metadata_descriptors:
-        - metadata_namespace: "envoy.lb"
-          key: "model_name"
-          type: STRING
+  response_rules:
+    format: SERVER_SENT_EVENTS
+    rules:
+      - selector:
+          json_path:
+            path: ["model"]
+        metadata_descriptors:
+          - metadata_namespace: "envoy.lb"
+            key: "model_name"
+            type: STRING
   )EOF";
   setupFilter(config);
 
@@ -509,15 +515,16 @@ TEST_F(StreamToMetadataFilterTest, StringValueType) {
 
 TEST_F(StreamToMetadataFilterTest, ProtobufValueType) {
   const std::string config = R"EOF(
-  format: SERVER_SENT_EVENTS
-  rules:
-    - selector:
-        json_path:
-          path: ["value"]
-      metadata_descriptors:
-        - metadata_namespace: "envoy.lb"
-          key: "test"
-          type: PROTOBUF_VALUE
+  response_rules:
+    format: SERVER_SENT_EVENTS
+    rules:
+      - selector:
+          json_path:
+            path: ["value"]
+        metadata_descriptors:
+          - metadata_namespace: "envoy.lb"
+            key: "test"
+            type: PROTOBUF_VALUE
   )EOF";
   setupFilter(config);
 
@@ -531,14 +538,15 @@ TEST_F(StreamToMetadataFilterTest, ProtobufValueType) {
 
 TEST_F(StreamToMetadataFilterTest, BooleanValue) {
   const std::string config = R"EOF(
-  format: SERVER_SENT_EVENTS
-  rules:
-    - selector:
-        json_path:
-          path: ["enabled"]
-      metadata_descriptors:
-        - metadata_namespace: "envoy.lb"
-          key: "flag"
+  response_rules:
+    format: SERVER_SENT_EVENTS
+    rules:
+      - selector:
+          json_path:
+            path: ["enabled"]
+        metadata_descriptors:
+          - metadata_namespace: "envoy.lb"
+            key: "flag"
   )EOF";
   setupFilter(config);
 
@@ -552,15 +560,16 @@ TEST_F(StreamToMetadataFilterTest, BooleanValue) {
 
 TEST_F(StreamToMetadataFilterTest, NestedObjectValue) {
   const std::string config = R"EOF(
-  format: SERVER_SENT_EVENTS
-  rules:
-    - selector:
-        json_path:
-          path: ["usage"]
-      metadata_descriptors:
-        - metadata_namespace: "envoy.lb"
-          key: "usage_obj"
-          type: STRING
+  response_rules:
+    format: SERVER_SENT_EVENTS
+    rules:
+      - selector:
+          json_path:
+            path: ["usage"]
+        metadata_descriptors:
+          - metadata_namespace: "envoy.lb"
+            key: "usage_obj"
+            type: STRING
   )EOF";
   setupFilter(config);
 
@@ -575,14 +584,15 @@ TEST_F(StreamToMetadataFilterTest, NestedObjectValue) {
 
 TEST_F(StreamToMetadataFilterTest, DeepNestedPath) {
   const std::string config = R"EOF(
-  format: SERVER_SENT_EVENTS
-  rules:
-    - selector:
-        json_path:
-          path: ["level1", "level2", "level3", "value"]
-      metadata_descriptors:
-        - metadata_namespace: "envoy.lb"
-          key: "deep_value"
+  response_rules:
+    format: SERVER_SENT_EVENTS
+    rules:
+      - selector:
+          json_path:
+            path: ["level1", "level2", "level3", "value"]
+        metadata_descriptors:
+          - metadata_namespace: "envoy.lb"
+            key: "deep_value"
   )EOF";
   setupFilter(config);
 
@@ -596,14 +606,15 @@ TEST_F(StreamToMetadataFilterTest, DeepNestedPath) {
 
 TEST_F(StreamToMetadataFilterTest, NullValueInJson) {
   const std::string config = R"EOF(
-  format: SERVER_SENT_EVENTS
-  rules:
-    - selector:
-        json_path:
-          path: ["usage"]
-      metadata_descriptors:
-        - metadata_namespace: "envoy.lb"
-          key: "value"
+  response_rules:
+    format: SERVER_SENT_EVENTS
+    rules:
+      - selector:
+          json_path:
+            path: ["usage"]
+        metadata_descriptors:
+          - metadata_namespace: "envoy.lb"
+            key: "value"
   )EOF";
   setupFilter(config);
 
@@ -644,16 +655,17 @@ TEST_F(StreamToMetadataFilterTest, ComplexRealWorldScenario) {
 
 TEST_F(StreamToMetadataFilterTest, EventExceedsMaxSize) {
   const std::string config_with_small_limit = R"EOF(
-  format: SERVER_SENT_EVENTS
-  max_event_size: 100
-  rules:
-    - selector:
-        json_path:
-          path: ["usage", "total_tokens"]
-      metadata_descriptors:
-        - metadata_namespace: "envoy.lb"
-          key: "tokens"
-          type: NUMBER
+  response_rules:
+    format: SERVER_SENT_EVENTS
+    max_event_size: 100
+    rules:
+      - selector:
+          json_path:
+            path: ["usage", "total_tokens"]
+        metadata_descriptors:
+          - metadata_namespace: "envoy.lb"
+            key: "tokens"
+            type: NUMBER
   )EOF";
 
   setupFilter(config_with_small_limit);
@@ -679,16 +691,17 @@ TEST_F(StreamToMetadataFilterTest, EventExceedsMaxSize) {
 
 TEST_F(StreamToMetadataFilterTest, EventWithinMaxSize) {
   const std::string config_with_large_limit = R"EOF(
-  format: SERVER_SENT_EVENTS
-  max_event_size: 1000
-  rules:
-    - selector:
-        json_path:
-          path: ["usage", "total_tokens"]
-      metadata_descriptors:
-        - metadata_namespace: "envoy.lb"
-          key: "tokens"
-          type: NUMBER
+  response_rules:
+    format: SERVER_SENT_EVENTS
+    max_event_size: 1000
+    rules:
+      - selector:
+          json_path:
+            path: ["usage", "total_tokens"]
+        metadata_descriptors:
+          - metadata_namespace: "envoy.lb"
+            key: "tokens"
+            type: NUMBER
   )EOF";
 
   setupFilter(config_with_large_limit);
@@ -705,16 +718,17 @@ TEST_F(StreamToMetadataFilterTest, EventWithinMaxSize) {
 
 TEST_F(StreamToMetadataFilterTest, MaxSizeDisabled) {
   const std::string config_no_limit = R"EOF(
-  format: SERVER_SENT_EVENTS
-  max_event_size: 0
-  rules:
-    - selector:
-        json_path:
-          path: ["usage", "total_tokens"]
-      metadata_descriptors:
-        - metadata_namespace: "envoy.lb"
-          key: "tokens"
-          type: NUMBER
+  response_rules:
+    format: SERVER_SENT_EVENTS
+    max_event_size: 0
+    rules:
+      - selector:
+          json_path:
+            path: ["usage", "total_tokens"]
+        metadata_descriptors:
+          - metadata_namespace: "envoy.lb"
+            key: "tokens"
+            type: NUMBER
   )EOF";
 
   setupFilter(config_no_limit);

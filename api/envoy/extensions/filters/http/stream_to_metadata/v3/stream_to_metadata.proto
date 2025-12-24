@@ -2,7 +2,6 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.stream_to_metadata.v3;
 
-import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
@@ -109,30 +108,37 @@ message StreamToMetadata {
     bool stop_processing_on_match = 3;
   }
 
-  // The format of the streaming body.
-  // Currently only Server-Sent Events (SSE) is supported.
-  // Default is SERVER_SENT_EVENTS.
-  Format format = 1 [(validate.rules).enum = {defined_only: true}];
+  // Configuration for processing response streams.
+  message ResponseRules {
+    // The format of the streaming body.
+    // Currently only Server-Sent Events (SSE) is supported.
+    // Default is SERVER_SENT_EVENTS.
+    Format format = 1 [(validate.rules).enum = {defined_only: true}];
 
-  // The rules to apply for extracting values from the stream.
-  // Rules are evaluated in order for each event/chunk.
-  // At least one rule must be specified.
-  repeated Rule rules = 2 [(validate.rules).repeated = {min_items: 1}];
+    // The rules to apply for extracting values from the stream.
+    // Rules are evaluated in order for each event/chunk.
+    // At least one rule must be specified.
+    repeated Rule rules = 2 [(validate.rules).repeated = {min_items: 1}];
 
-  // Allowed content types for stream processing.
-  // For SSE format, defaults to ["text/event-stream"].
-  // The content-type header value is matched exactly against this list.
-  repeated string allowed_content_types = 3;
+    // Allowed content types for stream processing.
+    // For SSE format, defaults to ["text/event-stream"].
+    // The content-type header value is matched exactly against this list.
+    repeated string allowed_content_types = 3;
 
-  // Maximum size in bytes for a single event before it's considered invalid
-  // and discarded. This protects against unbounded memory growth from malicious
-  // or malformed streams that never send event delimiters (blank lines).
-  //
-  // For SSE format, this is the maximum size of a complete event (all lines
-  // from one blank line to the next).
-  //
-  // Default is 8192 bytes (8KB), which is sufficient for most legitimate events.
-  // Set to 0 to disable the limit (not recommended for production).
-  // Maximum allowed value is 10485760 bytes (10MB).
-  google.protobuf.UInt32Value max_event_size = 4 [(validate.rules).uint32 = {lte: 10485760}];
+    // Maximum size in bytes for a single event before it's considered invalid
+    // and discarded. This protects against unbounded memory growth from malicious
+    // or malformed streams that never send event delimiters (blank lines).
+    //
+    // For SSE format, this is the maximum size of a complete event (all lines
+    // from one blank line to the next).
+    //
+    // Default is 8192 bytes (8KB), which is sufficient for most legitimate events.
+    // Set to 0 to disable the limit (not recommended for production).
+    // Maximum allowed value is 10485760 bytes (10MB).
+    google.protobuf.UInt32Value max_event_size = 4 [(validate.rules).uint32 = {lte: 10485760}];
+  }
+
+  // Rules for processing response streams.
+  // Currently, only response stream processing is implemented.
+  ResponseRules response_rules = 1 [(validate.rules).message = {required: true}];
 }

@@ -30,25 +30,27 @@ FilterConfig::FilterConfig(
     Stats::Scope& scope)
     : stats_{ALL_STREAM_TO_METADATA_FILTER_STATS(
           POOL_COUNTER_PREFIX(scope, "stream_to_metadata."))},
-      format_(config.format()), rules_([&config]() {
+      format_(config.response_rules().format()), rules_([&config]() {
         Rules rules;
-        for (const auto& rule : config.rules()) {
+        for (const auto& rule : config.response_rules().rules()) {
           rules.emplace_back(rule);
         }
         return rules;
       }()),
       allowed_content_types_([&config]() {
         absl::flat_hash_set<std::string> types;
-        if (config.allowed_content_types().empty()) {
+        if (config.response_rules().allowed_content_types().empty()) {
           types.insert(std::string(DefaultSseContentType));
         } else {
-          for (const auto& type : config.allowed_content_types()) {
+          for (const auto& type : config.response_rules().allowed_content_types()) {
             types.insert(type);
           }
         }
         return types;
       }()),
-      max_event_size_(config.has_max_event_size() ? config.max_event_size().value() : 8192) {}
+      max_event_size_(config.response_rules().has_max_event_size()
+                          ? config.response_rules().max_event_size().value()
+                          : 8192) {}
 
 bool FilterConfig::isContentTypeAllowed(absl::string_view content_type) const {
   return allowed_content_types_.contains(content_type);

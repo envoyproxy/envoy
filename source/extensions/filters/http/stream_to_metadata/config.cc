@@ -16,7 +16,7 @@ absl::StatusOr<Http::FilterFactoryCb> StreamToMetadataConfig::createFilterFactor
   // Validate that each rule has a selector specified.
   // Currently only json_path is supported. When additional selector types are added,
   // mutual exclusivity validation should be added here.
-  for (const auto& rule : proto_config.rules()) {
+  for (const auto& rule : proto_config.response_rules().rules()) {
     if (!rule.selector().has_json_path()) {
       return absl::InvalidArgumentError("Selector must have json_path specified");
     }

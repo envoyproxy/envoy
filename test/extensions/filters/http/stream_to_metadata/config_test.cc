@@ -14,15 +14,16 @@ namespace {
 
 TEST(StreamToMetadataConfigTest, ValidConfig) {
   const std::string yaml = R"EOF(
-  format: SERVER_SENT_EVENTS
-  rules:
-    - selector:
-        json_path:
-          path: ["usage", "total_tokens"]
-      metadata_descriptors:
-        - metadata_namespace: "envoy.lb"
-          key: "tokens"
-          type: NUMBER
+  response_rules:
+    format: SERVER_SENT_EVENTS
+    rules:
+      - selector:
+          json_path:
+            path: ["usage", "total_tokens"]
+        metadata_descriptors:
+          - metadata_namespace: "envoy.lb"
+            key: "tokens"
+            type: NUMBER
   )EOF";
 
   envoy::extensions::filters::http::stream_to_metadata::v3::StreamToMetadata proto_config;
@@ -41,19 +42,20 @@ TEST(StreamToMetadataConfigTest, ValidConfig) {
 
 TEST(StreamToMetadataConfigTest, MultipleMetadataDescriptors) {
   const std::string yaml = R"EOF(
-  format: SERVER_SENT_EVENTS
-  rules:
-    - selector:
-        json_path:
-          path: ["usage", "total_tokens"]
-      metadata_descriptors:
-        - metadata_namespace: "envoy.lb"
-          key: "tokens"
-          type: NUMBER
-        - metadata_namespace: "envoy.audit"
-          key: "token_count"
-          type: NUMBER
-          preserve_existing_metadata_value: true
+  response_rules:
+    format: SERVER_SENT_EVENTS
+    rules:
+      - selector:
+          json_path:
+            path: ["usage", "total_tokens"]
+        metadata_descriptors:
+          - metadata_namespace: "envoy.lb"
+            key: "tokens"
+            type: NUMBER
+          - metadata_namespace: "envoy.audit"
+            key: "token_count"
+            type: NUMBER
+            preserve_existing_metadata_value: true
   )EOF";
 
   envoy::extensions::filters::http::stream_to_metadata::v3::StreamToMetadata proto_config;
@@ -72,23 +74,24 @@ TEST(StreamToMetadataConfigTest, MultipleMetadataDescriptors) {
 
 TEST(StreamToMetadataConfigTest, MultipleRules) {
   const std::string yaml = R"EOF(
-  format: SERVER_SENT_EVENTS
-  rules:
-    - selector:
-        json_path:
-          path: ["usage", "total_tokens"]
-      metadata_descriptors:
-        - metadata_namespace: "envoy.lb"
-          key: "tokens"
-          type: NUMBER
-    - selector:
-        json_path:
-          path: ["model"]
-      metadata_descriptors:
-        - metadata_namespace: "envoy.lb"
-          key: "model_name"
-          type: STRING
-      stop_processing_on_match: false
+  response_rules:
+    format: SERVER_SENT_EVENTS
+    rules:
+      - selector:
+          json_path:
+            path: ["usage", "total_tokens"]
+        metadata_descriptors:
+          - metadata_namespace: "envoy.lb"
+            key: "tokens"
+            type: NUMBER
+      - selector:
+          json_path:
+            path: ["model"]
+        metadata_descriptors:
+          - metadata_namespace: "envoy.lb"
+            key: "model_name"
+            type: STRING
+        stop_processing_on_match: false
   )EOF";
 
   envoy::extensions::filters::http::stream_to_metadata::v3::StreamToMetadata proto_config;
@@ -103,17 +106,18 @@ TEST(StreamToMetadataConfigTest, MultipleRules) {
 
 TEST(StreamToMetadataConfigTest, CustomContentTypes) {
   const std::string yaml = R"EOF(
-  format: SERVER_SENT_EVENTS
-  rules:
-    - selector:
-        json_path:
-          path: ["data"]
-      metadata_descriptors:
-        - metadata_namespace: "envoy.lb"
-          key: "value"
-  allowed_content_types:
-    - "text/event-stream"
-    - "application/stream+json"
+  response_rules:
+    format: SERVER_SENT_EVENTS
+    rules:
+      - selector:
+          json_path:
+            path: ["data"]
+        metadata_descriptors:
+          - metadata_namespace: "envoy.lb"
+            key: "value"
+    allowed_content_types:
+      - "text/event-stream"
+      - "application/stream+json"
   )EOF";
 
   envoy::extensions::filters::http::stream_to_metadata::v3::StreamToMetadata proto_config;
@@ -141,11 +145,12 @@ TEST(StreamToMetadataConfigTest, EmptyConfig) {
 
 TEST(StreamToMetadataConfigTest, InvalidConfigMissingPath) {
   const std::string yaml = R"EOF(
-  format: SERVER_SENT_EVENTS
-  rules:
-    - metadata_descriptors:
-        - metadata_namespace: "envoy.lb"
-          key: "tokens"
+  response_rules:
+    format: SERVER_SENT_EVENTS
+    rules:
+      - metadata_descriptors:
+          - metadata_namespace: "envoy.lb"
+            key: "tokens"
   )EOF";
 
   envoy::extensions::filters::http::stream_to_metadata::v3::StreamToMetadata proto_config;
@@ -154,14 +159,15 @@ TEST(StreamToMetadataConfigTest, InvalidConfigMissingPath) {
 
 TEST(StreamToMetadataConfigTest, InvalidConfigEmptyPath) {
   const std::string yaml = R"EOF(
-  format: SERVER_SENT_EVENTS
-  rules:
-    - selector:
-        json_path:
-          path: []
-      metadata_descriptors:
-        - metadata_namespace: "envoy.lb"
-          key: "tokens"
+  response_rules:
+    format: SERVER_SENT_EVENTS
+    rules:
+      - selector:
+          json_path:
+            path: []
+        metadata_descriptors:
+          - metadata_namespace: "envoy.lb"
+            key: "tokens"
   )EOF";
 
   envoy::extensions::filters::http::stream_to_metadata::v3::StreamToMetadata proto_config;
@@ -170,13 +176,14 @@ TEST(StreamToMetadataConfigTest, InvalidConfigEmptyPath) {
 
 TEST(StreamToMetadataConfigTest, InvalidConfigMissingNamespace) {
   const std::string yaml = R"EOF(
-  format: SERVER_SENT_EVENTS
-  rules:
-    - selector:
-        json_path:
-          path: ["usage"]
-      metadata_descriptors:
-        - key: "tokens"
+  response_rules:
+    format: SERVER_SENT_EVENTS
+    rules:
+      - selector:
+          json_path:
+            path: ["usage"]
+        metadata_descriptors:
+          - key: "tokens"
   )EOF";
 
   envoy::extensions::filters::http::stream_to_metadata::v3::StreamToMetadata proto_config;
@@ -185,13 +192,14 @@ TEST(StreamToMetadataConfigTest, InvalidConfigMissingNamespace) {
 
 TEST(StreamToMetadataConfigTest, InvalidConfigMissingKey) {
   const std::string yaml = R"EOF(
-  format: SERVER_SENT_EVENTS
-  rules:
-    - selector:
-        json_path:
-          path: ["usage"]
-      metadata_descriptors:
-        - metadata_namespace: "envoy.lb"
+  response_rules:
+    format: SERVER_SENT_EVENTS
+    rules:
+      - selector:
+          json_path:
+            path: ["usage"]
+        metadata_descriptors:
+          - metadata_namespace: "envoy.lb"
   )EOF";
 
   envoy::extensions::filters::http::stream_to_metadata::v3::StreamToMetadata proto_config;

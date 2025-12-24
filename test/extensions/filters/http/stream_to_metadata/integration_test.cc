@@ -60,23 +60,24 @@ public:
 name: envoy.filters.http.stream_to_metadata
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.stream_to_metadata.v3.StreamToMetadata
-  format: SERVER_SENT_EVENTS
-  rules:
-    - selector:
-        json_path:
-          path: ["usage", "total_tokens"]
-      metadata_descriptors:
-        - metadata_namespace: "envoy.lb"
-          key: "tokens"
-          type: NUMBER
-    - selector:
-        json_path:
-          path: ["model"]
-      metadata_descriptors:
-        - metadata_namespace: "envoy.lb"
-          key: "model_name"
-          type: STRING
-      stop_processing_on_match: false
+  response_rules:
+    format: SERVER_SENT_EVENTS
+    rules:
+      - selector:
+          json_path:
+            path: ["usage", "total_tokens"]
+        metadata_descriptors:
+          - metadata_namespace: "envoy.lb"
+            key: "tokens"
+            type: NUMBER
+      - selector:
+          json_path:
+            path: ["model"]
+        metadata_descriptors:
+          - metadata_namespace: "envoy.lb"
+            key: "model_name"
+            type: STRING
+        stop_processing_on_match: false
 )EOF";
 
   Http::TestRequestHeaderMapImpl request_headers_{
