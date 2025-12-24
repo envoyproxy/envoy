@@ -47,7 +47,6 @@ message StreamToMetadata {
     NUMBER = 2;
   }
 
-  // [#next-free-field: 5]
   // Describes where to write the extracted value in dynamic metadata.
   message MetadataDescriptor {
     // The namespace in dynamic metadata where the key-value pair will be written.
@@ -85,7 +84,6 @@ message StreamToMetadata {
     JsonPathSelector json_path = 1;
   }
 
-  // [#next-free-field: 4]
   // A rule describes what value to extract from the stream and where to write it.
   message Rule {
     // Specifies how to extract the value from the stream payload.
