@@ -43,22 +43,23 @@ Extract multiple values from streaming responses for logging and monitoring:
 
 .. code-block:: yaml
 
-  rules:
-  - selector:
-      json_path:
-        path: ["usage", "total_tokens"]
-    metadata_descriptors:
-    - metadata_namespace: envoy.audit
-      key: tokens
-      type: NUMBER
-  - selector:
-      json_path:
-        path: ["model"]
-    metadata_descriptors:
-    - metadata_namespace: envoy.audit
-      key: model_name
-      type: STRING
-    stop_processing_on_match: false
+  response_rules:
+    rules:
+    - selector:
+        json_path:
+          path: ["usage", "total_tokens"]
+      metadata_descriptors:
+      - metadata_namespace: envoy.audit
+        key: tokens
+        type: NUMBER
+    - selector:
+        json_path:
+          path: ["model"]
+      metadata_descriptors:
+      - metadata_namespace: envoy.audit
+        key: model_name
+        type: STRING
+      stop_processing_on_match: false
 
 How It Works
 ------------
@@ -90,10 +91,13 @@ Complete Example
 Key Configuration Options
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-**format**
+**response_rules**
+  Configuration for processing response streams. Contains:
+
+**response_rules.format**
   The streaming format to parse. Currently only ``SERVER_SENT_EVENTS`` is supported.
 
-**rules**
+**response_rules.rules**
   A list of rules to apply. Each rule contains:
 
   * **selector**: Specifies how to extract a value from the stream payload. Currently supports:
@@ -114,10 +118,10 @@ Key Configuration Options
     overwrite earlier ones (picks LAST occurrence). Set to true for better performance
     when you only need the first matching value.
 
-**allowed_content_types**
+**response_rules.allowed_content_types**
   A list of content types to process. Defaults to ``["text/event-stream"]`` for SSE format.
 
-**max_event_size**
+**response_rules.max_event_size**
   Maximum size in bytes for a single event before it's considered invalid and discarded.
   This protects against unbounded memory growth from malicious or malformed streams that
   never send event delimiters (blank lines). Default is 8192 bytes (8KB). Set to 0 to
@@ -132,17 +136,18 @@ Write the same value to multiple metadata namespaces, useful during migrations:
 
 .. code-block:: yaml
 
-  rules:
-  - selector:
-      json_path:
-        path: ["usage", "total_tokens"]
-    metadata_descriptors:
-    - metadata_namespace: old.namespace
-      key: tokens
-      type: NUMBER
-    - metadata_namespace: new.namespace
-      key: tokens
-      type: NUMBER
+  response_rules:
+    rules:
+    - selector:
+        json_path:
+          path: ["usage", "total_tokens"]
+      metadata_descriptors:
+      - metadata_namespace: old.namespace
+        key: tokens
+        type: NUMBER
+      - metadata_namespace: new.namespace
+        key: tokens
+        type: NUMBER
 
 **Preserving Existing Metadata**
 
@@ -150,15 +155,16 @@ Avoid overwriting previously set metadata values:
 
 .. code-block:: yaml
 
-  rules:
-  - selector:
-      json_path:
-        path: ["usage", "total_tokens"]
-    metadata_descriptors:
-    - metadata_namespace: envoy.lb
-      key: tokens
-      type: NUMBER
-      preserve_existing_metadata_value: true
+  response_rules:
+    rules:
+    - selector:
+        json_path:
+          path: ["usage", "total_tokens"]
+      metadata_descriptors:
+      - metadata_namespace: envoy.lb
+        key: tokens
+        type: NUMBER
+        preserve_existing_metadata_value: true
 
 **Custom Content Types**
 
@@ -166,12 +172,13 @@ Accept additional content types beyond the default:
 
 .. code-block:: yaml
 
-  format: SERVER_SENT_EVENTS
-  allowed_content_types:
-  - "text/event-stream"
-  - "application/stream+json"
-  rules:
-    # ... rules ...
+  response_rules:
+    format: SERVER_SENT_EVENTS
+    allowed_content_types:
+    - "text/event-stream"
+    - "application/stream+json"
+    rules:
+      # ... rules ...
 
 Statistics
 ----------
@@ -184,13 +191,13 @@ comes from the owning HTTP connection manager.
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
-  success, Counter, Total number of values successfully extracted and written to metadata
-  mismatched_content_type, Counter, Total number of responses with non-allowed content types
-  no_data_field, Counter, Total number of SSE events without a data field
-  invalid_json, Counter, Total number of data fields that could not be parsed as JSON
-  selector_not_found, Counter, Total number of times the selector path was not found in the JSON
-  preserved_existing_metadata, Counter, Total number of times metadata was not written due to preserve_existing_metadata_value being true
-  event_too_large, Counter, Total number of events discarded because they exceeded max_event_size
+  resp.success, Counter, Total number of values successfully extracted and written to metadata
+  resp.mismatched_content_type, Counter, Total number of responses with non-allowed content types
+  resp.no_data_field, Counter, Total number of SSE events without a data field
+  resp.invalid_json, Counter, Total number of data fields that could not be parsed as JSON
+  resp.selector_not_found, Counter, Total number of times the selector path was not found in the JSON
+  resp.preserved_existing_metadata, Counter, Total number of times metadata was not written due to preserve_existing_metadata_value being true
+  resp.event_too_large, Counter, Total number of events discarded because they exceeded max_event_size
 
 SSE Specification Compliance
 -----------------------------

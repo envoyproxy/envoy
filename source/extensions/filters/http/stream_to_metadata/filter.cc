@@ -29,7 +29,7 @@ FilterConfig::FilterConfig(
     const envoy::extensions::filters::http::stream_to_metadata::v3::StreamToMetadata& config,
     Stats::Scope& scope)
     : stats_{ALL_STREAM_TO_METADATA_FILTER_STATS(
-          POOL_COUNTER_PREFIX(scope, "stream_to_metadata."))},
+          POOL_COUNTER_PREFIX(scope, "stream_to_metadata.resp"))},
       format_(config.response_rules().format()), rules_([&config]() {
         Rules rules;
         for (const auto& rule : config.response_rules().rules()) {

@@ -152,8 +152,8 @@ TEST_F(StreamToMetadataFilterTest, BadContentType) {
 
   addEncodeDataChunks("data: {\"test\": \"value\"}\n\n", true);
 
-  EXPECT_EQ(findCounter("stream_to_metadata.success"), 0);
-  EXPECT_EQ(findCounter("stream_to_metadata.mismatched_content_type"), 1);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.success"), 0);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.mismatched_content_type"), 1);
 }
 
 TEST_F(StreamToMetadataFilterTest, NoContentTypeHeader) {
@@ -162,8 +162,8 @@ TEST_F(StreamToMetadataFilterTest, NoContentTypeHeader) {
 
   addEncodeDataChunks("data: {\"test\": \"value\"}\n\n", true);
 
-  EXPECT_EQ(findCounter("stream_to_metadata.success"), 0);
-  EXPECT_EQ(findCounter("stream_to_metadata.mismatched_content_type"), 1);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.success"), 0);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.mismatched_content_type"), 1);
 }
 
 TEST_F(StreamToMetadataFilterTest, ContentTypeWithParameters) {
@@ -180,7 +180,7 @@ TEST_F(StreamToMetadataFilterTest, ContentTypeWithParameters) {
   auto metadata = getMetadata("envoy.lb", "tokens");
   EXPECT_EQ(metadata.kind_case(), 0); // Not set
 
-  EXPECT_EQ(findCounter("stream_to_metadata.mismatched_content_type"), 1);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.mismatched_content_type"), 1);
 }
 
 TEST_F(StreamToMetadataFilterTest, BasicTokenExtraction) {
@@ -194,11 +194,11 @@ TEST_F(StreamToMetadataFilterTest, BasicTokenExtraction) {
   EXPECT_EQ(metadata.kind_case(), Protobuf::Value::kNumberValue);
   EXPECT_EQ(metadata.number_value(), 30);
 
-  EXPECT_EQ(findCounter("stream_to_metadata.success"), 1);
-  EXPECT_EQ(findCounter("stream_to_metadata.mismatched_content_type"), 0);
-  EXPECT_EQ(findCounter("stream_to_metadata.no_data_field"), 0);
-  EXPECT_EQ(findCounter("stream_to_metadata.invalid_json"), 0);
-  EXPECT_EQ(findCounter("stream_to_metadata.selector_not_found"), 0);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.success"), 1);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.mismatched_content_type"), 0);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.no_data_field"), 0);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.invalid_json"), 0);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.selector_not_found"), 0);
 }
 
 TEST_F(StreamToMetadataFilterTest, MultipleEventsStopOnFirstMatch) {
@@ -210,7 +210,7 @@ TEST_F(StreamToMetadataFilterTest, MultipleEventsStopOnFirstMatch) {
 
   auto metadata = getMetadata("envoy.lb", "tokens");
   EXPECT_EQ(metadata.number_value(), 30);
-  EXPECT_EQ(findCounter("stream_to_metadata.success"), 1);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.success"), 1);
 }
 
 TEST_F(StreamToMetadataFilterTest, MultipleEventsInSingleChunk) {
@@ -223,7 +223,7 @@ TEST_F(StreamToMetadataFilterTest, MultipleEventsInSingleChunk) {
 
   auto metadata = getMetadata("envoy.lb", "tokens");
   EXPECT_EQ(metadata.number_value(), 30);
-  EXPECT_EQ(findCounter("stream_to_metadata.success"), 1);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.success"), 1);
 }
 
 TEST_F(StreamToMetadataFilterTest, EventSplitAcrossChunks) {
@@ -234,7 +234,7 @@ TEST_F(StreamToMetadataFilterTest, EventSplitAcrossChunks) {
 
   auto metadata = getMetadata("envoy.lb", "tokens");
   EXPECT_EQ(metadata.number_value(), 30);
-  EXPECT_EQ(findCounter("stream_to_metadata.success"), 1);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.success"), 1);
 }
 
 TEST_F(StreamToMetadataFilterTest, EventSplitAcrossThreeChunks) {
@@ -246,7 +246,7 @@ TEST_F(StreamToMetadataFilterTest, EventSplitAcrossThreeChunks) {
 
   auto metadata = getMetadata("envoy.lb", "tokens");
   EXPECT_EQ(metadata.number_value(), 30);
-  EXPECT_EQ(findCounter("stream_to_metadata.success"), 1);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.success"), 1);
 }
 
 TEST_F(StreamToMetadataFilterTest, MultipleMetadataNamespaces) {
@@ -261,7 +261,7 @@ TEST_F(StreamToMetadataFilterTest, MultipleMetadataNamespaces) {
   auto metadata2 = getMetadata("envoy.audit", "token_count");
   EXPECT_EQ(metadata2.number_value(), 30);
 
-  EXPECT_EQ(findCounter("stream_to_metadata.success"), 1);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.success"), 1);
 }
 
 TEST_F(StreamToMetadataFilterTest, PreserveExistingMetadata) {
@@ -279,8 +279,8 @@ TEST_F(StreamToMetadataFilterTest, PreserveExistingMetadata) {
   auto metadata = getMetadata("envoy.lb", "tokens");
   EXPECT_EQ(metadata.number_value(), 100);
 
-  EXPECT_EQ(findCounter("stream_to_metadata.success"), 1);
-  EXPECT_EQ(findCounter("stream_to_metadata.preserved_existing_metadata"), 1);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.success"), 1);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.preserved_existing_metadata"), 1);
 }
 
 TEST_F(StreamToMetadataFilterTest, OverwriteExistingMetadata) {
@@ -297,8 +297,8 @@ TEST_F(StreamToMetadataFilterTest, OverwriteExistingMetadata) {
   auto metadata = getMetadata("envoy.lb", "tokens");
   EXPECT_EQ(metadata.number_value(), 30);
 
-  EXPECT_EQ(findCounter("stream_to_metadata.success"), 1);
-  EXPECT_EQ(findCounter("stream_to_metadata.preserved_existing_metadata"), 0);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.success"), 1);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.preserved_existing_metadata"), 0);
 }
 
 TEST_F(StreamToMetadataFilterTest, MultipleRules) {
@@ -313,7 +313,7 @@ TEST_F(StreamToMetadataFilterTest, MultipleRules) {
   auto model = getMetadata("envoy.lb", "model_name");
   EXPECT_EQ(model.string_value(), "gpt-4");
 
-  EXPECT_EQ(findCounter("stream_to_metadata.success"), 2);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.success"), 2);
 }
 
 TEST_F(StreamToMetadataFilterTest, NoDataField) {
@@ -321,8 +321,8 @@ TEST_F(StreamToMetadataFilterTest, NoDataField) {
 
   addEncodeDataChunks("event: message\nid: 123\n\n", true);
 
-  EXPECT_EQ(findCounter("stream_to_metadata.success"), 0);
-  EXPECT_EQ(findCounter("stream_to_metadata.no_data_field"), 1);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.success"), 0);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.no_data_field"), 1);
 }
 
 TEST_F(StreamToMetadataFilterTest, InvalidJson) {
@@ -330,8 +330,8 @@ TEST_F(StreamToMetadataFilterTest, InvalidJson) {
 
   addEncodeDataChunks("data: [DONE]\n\n", true);
 
-  EXPECT_EQ(findCounter("stream_to_metadata.success"), 0);
-  EXPECT_EQ(findCounter("stream_to_metadata.invalid_json"), 1);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.success"), 0);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.invalid_json"), 1);
 }
 
 TEST_F(StreamToMetadataFilterTest, SelectorNotFound) {
@@ -339,8 +339,8 @@ TEST_F(StreamToMetadataFilterTest, SelectorNotFound) {
 
   addEncodeDataChunks("data: {\"other_field\":\"value\"}\n\n", true);
 
-  EXPECT_EQ(findCounter("stream_to_metadata.success"), 0);
-  EXPECT_EQ(findCounter("stream_to_metadata.selector_not_found"), 1);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.success"), 0);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.selector_not_found"), 1);
 }
 
 TEST_F(StreamToMetadataFilterTest, PartialSelectorPath) {
@@ -349,8 +349,8 @@ TEST_F(StreamToMetadataFilterTest, PartialSelectorPath) {
   // Has 'usage' but not 'total_tokens'
   addEncodeDataChunks("data: {\"usage\":{\"prompt_tokens\":10}}\n\n", true);
 
-  EXPECT_EQ(findCounter("stream_to_metadata.success"), 0);
-  EXPECT_EQ(findCounter("stream_to_metadata.selector_not_found"), 1);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.success"), 0);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.selector_not_found"), 1);
 }
 
 TEST_F(StreamToMetadataFilterTest, CRLFLineEndings) {
@@ -361,7 +361,7 @@ TEST_F(StreamToMetadataFilterTest, CRLFLineEndings) {
 
   auto metadata = getMetadata("envoy.lb", "tokens");
   EXPECT_EQ(metadata.number_value(), 30);
-  EXPECT_EQ(findCounter("stream_to_metadata.success"), 1);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.success"), 1);
 }
 
 TEST_F(StreamToMetadataFilterTest, CRLineEndings) {
@@ -372,7 +372,7 @@ TEST_F(StreamToMetadataFilterTest, CRLineEndings) {
 
   auto metadata = getMetadata("envoy.lb", "tokens");
   EXPECT_EQ(metadata.number_value(), 30);
-  EXPECT_EQ(findCounter("stream_to_metadata.success"), 1);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.success"), 1);
 }
 
 TEST_F(StreamToMetadataFilterTest, MixedLineEndings) {
@@ -384,7 +384,7 @@ TEST_F(StreamToMetadataFilterTest, MixedLineEndings) {
 
   auto metadata = getMetadata("envoy.lb", "tokens");
   EXPECT_EQ(metadata.number_value(), 30);
-  EXPECT_EQ(findCounter("stream_to_metadata.success"), 1);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.success"), 1);
 }
 
 TEST_F(StreamToMetadataFilterTest, CRLFSplitAcrossChunks) {
@@ -395,7 +395,7 @@ TEST_F(StreamToMetadataFilterTest, CRLFSplitAcrossChunks) {
 
   auto metadata = getMetadata("envoy.lb", "tokens");
   EXPECT_EQ(metadata.number_value(), 30);
-  EXPECT_EQ(findCounter("stream_to_metadata.success"), 1);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.success"), 1);
 }
 
 TEST_F(StreamToMetadataFilterTest, NoSpaceAfterColon) {
@@ -405,7 +405,7 @@ TEST_F(StreamToMetadataFilterTest, NoSpaceAfterColon) {
 
   auto metadata = getMetadata("envoy.lb", "tokens");
   EXPECT_EQ(metadata.number_value(), 30);
-  EXPECT_EQ(findCounter("stream_to_metadata.success"), 1);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.success"), 1);
 }
 
 TEST_F(StreamToMetadataFilterTest, CommentLines) {
@@ -417,7 +417,7 @@ TEST_F(StreamToMetadataFilterTest, CommentLines) {
 
   auto metadata = getMetadata("envoy.lb", "tokens");
   EXPECT_EQ(metadata.number_value(), 30);
-  EXPECT_EQ(findCounter("stream_to_metadata.success"), 1);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.success"), 1);
 }
 
 TEST_F(StreamToMetadataFilterTest, CommentOnlyEvent) {
@@ -425,8 +425,8 @@ TEST_F(StreamToMetadataFilterTest, CommentOnlyEvent) {
 
   addEncodeDataChunks(": keep-alive\n\n", true);
 
-  EXPECT_EQ(findCounter("stream_to_metadata.success"), 0);
-  EXPECT_EQ(findCounter("stream_to_metadata.no_data_field"), 1);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.success"), 0);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.no_data_field"), 1);
 }
 
 TEST_F(StreamToMetadataFilterTest, DataFieldAfterOtherFields) {
@@ -439,7 +439,7 @@ TEST_F(StreamToMetadataFilterTest, DataFieldAfterOtherFields) {
 
   auto metadata = getMetadata("envoy.lb", "tokens");
   EXPECT_EQ(metadata.number_value(), 30);
-  EXPECT_EQ(findCounter("stream_to_metadata.success"), 1);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.success"), 1);
 }
 
 TEST_F(StreamToMetadataFilterTest, MultipleDataFieldsConcatenated) {
@@ -452,7 +452,7 @@ TEST_F(StreamToMetadataFilterTest, MultipleDataFieldsConcatenated) {
 
   auto metadata = getMetadata("envoy.lb", "tokens");
   EXPECT_EQ(metadata.number_value(), 30);
-  EXPECT_EQ(findCounter("stream_to_metadata.success"), 1);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.success"), 1);
 }
 
 TEST_F(StreamToMetadataFilterTest, UnterminatedEventAtStreamEnd) {
@@ -462,7 +462,7 @@ TEST_F(StreamToMetadataFilterTest, UnterminatedEventAtStreamEnd) {
   addEncodeDataChunks("data: {\"usage\":{\"total_tokens\":30}}", true);
 
   // Event is incomplete, should not be processed
-  EXPECT_EQ(findCounter("stream_to_metadata.success"), 0);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.success"), 0);
 }
 
 TEST_F(StreamToMetadataFilterTest, EmptyDataChunk) {
@@ -473,7 +473,7 @@ TEST_F(StreamToMetadataFilterTest, EmptyDataChunk) {
 
   auto metadata = getMetadata("envoy.lb", "tokens");
   EXPECT_EQ(metadata.number_value(), 30);
-  EXPECT_EQ(findCounter("stream_to_metadata.success"), 1);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.success"), 1);
 }
 
 TEST_F(StreamToMetadataFilterTest, StopProcessingDisabled) {
@@ -487,7 +487,7 @@ TEST_F(StreamToMetadataFilterTest, StopProcessingDisabled) {
   // Should have processed both events
   auto metadata = getMetadata("envoy.lb", "tokens");
   EXPECT_EQ(metadata.number_value(), 40); // Last write wins
-  EXPECT_EQ(findCounter("stream_to_metadata.success"), 2);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.success"), 2);
 }
 
 TEST_F(StreamToMetadataFilterTest, StringValueType) {
@@ -510,7 +510,7 @@ TEST_F(StreamToMetadataFilterTest, StringValueType) {
 
   auto metadata = getMetadata("envoy.lb", "model_name");
   EXPECT_EQ(metadata.string_value(), "gpt-4");
-  EXPECT_EQ(findCounter("stream_to_metadata.success"), 1);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.success"), 1);
 }
 
 TEST_F(StreamToMetadataFilterTest, ProtobufValueType) {
@@ -533,7 +533,7 @@ TEST_F(StreamToMetadataFilterTest, ProtobufValueType) {
 
   auto metadata = getMetadata("envoy.lb", "test");
   EXPECT_EQ(metadata.number_value(), 42);
-  EXPECT_EQ(findCounter("stream_to_metadata.success"), 1);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.success"), 1);
 }
 
 TEST_F(StreamToMetadataFilterTest, BooleanValue) {
@@ -555,7 +555,7 @@ TEST_F(StreamToMetadataFilterTest, BooleanValue) {
 
   auto metadata = getMetadata("envoy.lb", "flag");
   EXPECT_EQ(metadata.bool_value(), true);
-  EXPECT_EQ(findCounter("stream_to_metadata.success"), 1);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.success"), 1);
 }
 
 TEST_F(StreamToMetadataFilterTest, NestedObjectValue) {
@@ -579,7 +579,7 @@ TEST_F(StreamToMetadataFilterTest, NestedObjectValue) {
   auto metadata = getMetadata("envoy.lb", "usage_obj");
   EXPECT_TRUE(metadata.has_string_value());
   EXPECT_NE(metadata.string_value().find("tokens"), std::string::npos);
-  EXPECT_EQ(findCounter("stream_to_metadata.success"), 1);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.success"), 1);
 }
 
 TEST_F(StreamToMetadataFilterTest, DeepNestedPath) {
@@ -601,7 +601,7 @@ TEST_F(StreamToMetadataFilterTest, DeepNestedPath) {
 
   auto metadata = getMetadata("envoy.lb", "deep_value");
   EXPECT_EQ(metadata.number_value(), 99);
-  EXPECT_EQ(findCounter("stream_to_metadata.success"), 1);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.success"), 1);
 }
 
 TEST_F(StreamToMetadataFilterTest, NullValueInJson) {
@@ -622,8 +622,8 @@ TEST_F(StreamToMetadataFilterTest, NullValueInJson) {
   addEncodeDataChunks("data: {\"usage\":null}\n\n", true);
 
   // Should fail to extract null value
-  EXPECT_EQ(findCounter("stream_to_metadata.success"), 0);
-  EXPECT_EQ(findCounter("stream_to_metadata.selector_not_found"), 1);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.success"), 0);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.selector_not_found"), 1);
 }
 
 TEST_F(StreamToMetadataFilterTest, ComplexRealWorldScenario) {
@@ -650,7 +650,7 @@ TEST_F(StreamToMetadataFilterTest, ComplexRealWorldScenario) {
   EXPECT_EQ(model.string_value(), "gpt-4");
 
   // First rule matches once and stops (tokens), second rule matches multiple times
-  EXPECT_GE(findCounter("stream_to_metadata.success"), 2);
+  EXPECT_GE(findCounter("stream_to_metadata.resp.success"), 2);
 }
 
 TEST_F(StreamToMetadataFilterTest, EventExceedsMaxSize) {
@@ -679,14 +679,14 @@ TEST_F(StreamToMetadataFilterTest, EventExceedsMaxSize) {
   addEncodeDataChunks(large_data, false);
 
   // Buffer should exceed limit and be discarded
-  EXPECT_EQ(findCounter("stream_to_metadata.event_too_large"), 1);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.event_too_large"), 1);
 
   // Now send a valid event, it should process normally
   addEncodeDataChunks("data: {\"usage\":{\"total_tokens\":42}}\n\n", true);
 
   auto tokens = getMetadata("envoy.lb", "tokens");
   EXPECT_EQ(tokens.number_value(), 42);
-  EXPECT_EQ(findCounter("stream_to_metadata.success"), 1);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.success"), 1);
 }
 
 TEST_F(StreamToMetadataFilterTest, EventWithinMaxSize) {
@@ -712,8 +712,8 @@ TEST_F(StreamToMetadataFilterTest, EventWithinMaxSize) {
 
   auto tokens = getMetadata("envoy.lb", "tokens");
   EXPECT_EQ(tokens.number_value(), 50);
-  EXPECT_EQ(findCounter("stream_to_metadata.event_too_large"), 0);
-  EXPECT_EQ(findCounter("stream_to_metadata.success"), 1);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.event_too_large"), 0);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.success"), 1);
 }
 
 TEST_F(StreamToMetadataFilterTest, MaxSizeDisabled) {
@@ -745,8 +745,8 @@ TEST_F(StreamToMetadataFilterTest, MaxSizeDisabled) {
   // Should process successfully even though it's large
   auto tokens = getMetadata("envoy.lb", "tokens");
   EXPECT_EQ(tokens.number_value(), 30);
-  EXPECT_EQ(findCounter("stream_to_metadata.event_too_large"), 0);
-  EXPECT_EQ(findCounter("stream_to_metadata.success"), 1);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.event_too_large"), 0);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.success"), 1);
 }
 
 } // namespace
