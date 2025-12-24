@@ -842,8 +842,7 @@ TEST(HttpFilter, SendStreamDataOnInvalidStream) {
 
   // Try to send data on a non-existent stream (invalid handle).
   Buffer::OwnedImpl data("test");
-  void* invalid_handle = reinterpret_cast<void*>(0x12345678);
-  EXPECT_FALSE(filter.sendStreamData(invalid_handle, data, false));
+  EXPECT_FALSE(filter.sendStreamData(0, data, false));
 }
 
 // Test resetHttpStream on invalid stream handle.
@@ -855,8 +854,7 @@ TEST(HttpFilter, ResetInvalidStream) {
   filter.setDecoderFilterCallbacks(decoder_callbacks);
 
   // Try to reset a non-existent stream (invalid handle).
-  void* invalid_handle = reinterpret_cast<void*>(0x12345678);
-  filter.resetHttpStream(invalid_handle);
+  filter.resetHttpStream(0);
   // Should not crash - just no-op for invalid handle.
 }
 
@@ -870,8 +868,7 @@ TEST(HttpFilter, SendStreamTrailersOnInvalidStream) {
 
   // Try to send trailers on a non-existent stream (invalid handle).
   auto trailers = Http::RequestTrailerMapImpl::create();
-  void* invalid_handle = reinterpret_cast<void*>(0x12345678);
-  EXPECT_FALSE(filter.sendStreamTrailers(invalid_handle, std::move(trailers)));
+  EXPECT_FALSE(filter.sendStreamTrailers(0, std::move(trailers)));
 }
 
 TEST(DynamicModulesTest, HttpFilterHttpStreamCalloutOnComplete) {
@@ -911,12 +908,12 @@ TEST(DynamicModulesTest, HttpFilterHttpStreamCalloutOnComplete) {
       }));
 
   // Start Stream
-  envoy_dynamic_module_type_http_stream_envoy_ptr stream_ptr;
+  uint64_t stream_id;
   auto headers = std::make_unique<Http::TestRequestHeaderMapImpl>(
       std::initializer_list<std::pair<std::string, std::string>>{
           {":method", "GET"}, {":path", "/"}, {":authority", "host"}});
   auto message = std::make_unique<Http::RequestMessageImpl>(std::move(headers));
-  auto result = filter->startHttpStream(&stream_ptr, "cluster", std::move(message), false, 1000);
+  auto result = filter->startHttpStream(&stream_id, "cluster", std::move(message), false, 1000);
   EXPECT_EQ(result, envoy_dynamic_module_type_http_callout_init_result_Success);
   EXPECT_NE(captured_callbacks, nullptr);
 
@@ -968,7 +965,7 @@ TEST(DynamicModulesTest, StartHttpStreamDoesNotSetContentLength) {
       }));
   EXPECT_CALL(stream, sendData(_, true));
 
-  envoy_dynamic_module_type_http_stream_envoy_ptr stream_ptr = nullptr;
+  uint64_t stream_id = 0;
   char cluster_name[] = "cluster";
   char method_key[] = ":method";
   char method_value[] = "POST";
@@ -983,11 +980,11 @@ TEST(DynamicModulesTest, StartHttpStreamDoesNotSetContentLength) {
   char body[] = "hello";
 
   auto result = envoy_dynamic_module_callback_http_filter_start_http_stream(
-      filter.get(), &stream_ptr, cluster_name, strlen(cluster_name), headers, 3, body,
+      filter.get(), &stream_id, cluster_name, strlen(cluster_name), headers, 3, body,
       sizeof(body) - 1, true, 1000);
   EXPECT_EQ(result, envoy_dynamic_module_type_http_callout_init_result_Success);
   EXPECT_NE(captured_callbacks, nullptr);
-  EXPECT_NE(stream_ptr, nullptr);
+  EXPECT_NE(stream_id, 0);
   if (captured_callbacks != nullptr) {
     captured_callbacks->onComplete();
   }
@@ -1035,14 +1032,14 @@ TEST(DynamicModulesTest, StartHttpStreamHandlesInlineResetDuringHeaders) {
   }));
   EXPECT_CALL(stream, sendData(_, _)).Times(0);
 
-  envoy_dynamic_module_type_http_stream_envoy_ptr stream_ptr;
+  uint64_t stream_id;
   auto headers = std::make_unique<Http::TestRequestHeaderMapImpl>(
       std::initializer_list<std::pair<std::string, std::string>>{
           {":method", "POST"}, {":path", "/"}, {":authority", "host"}});
   auto message = std::make_unique<Http::RequestMessageImpl>(std::move(headers));
   message->body().add(absl::string_view("payload"));
 
-  auto result = filter->startHttpStream(&stream_ptr, "cluster", std::move(message),
+  auto result = filter->startHttpStream(&stream_id, "cluster", std::move(message),
                                         true /* end_stream */, 1000);
   EXPECT_EQ(result, envoy_dynamic_module_type_http_callout_init_result_Success);
   EXPECT_NE(captured_callbacks, nullptr);
@@ -1087,12 +1084,12 @@ TEST(DynamicModulesTest, HttpStreamCalloutDeferredDeleteOnDestroy) {
         return &stream;
       }));
 
-  envoy_dynamic_module_type_http_stream_envoy_ptr stream_ptr;
+  uint64_t stream_id;
   auto headers = std::make_unique<Http::TestRequestHeaderMapImpl>(
       std::initializer_list<std::pair<std::string, std::string>>{
           {":method", "GET"}, {":path", "/"}, {":authority", "host"}});
   auto message = std::make_unique<Http::RequestMessageImpl>(std::move(headers));
-  auto result = filter->startHttpStream(&stream_ptr, "cluster", std::move(message), false, 1000);
+  auto result = filter->startHttpStream(&stream_id, "cluster", std::move(message), false, 1000);
   EXPECT_EQ(result, envoy_dynamic_module_type_http_callout_init_result_Success);
   ASSERT_NE(captured_callbacks, nullptr);
 
@@ -1142,12 +1139,12 @@ TEST(DynamicModulesTest, HttpFilterHttpStreamCalloutOnReset) {
       }));
 
   // Start Stream
-  envoy_dynamic_module_type_http_stream_envoy_ptr stream_ptr;
+  uint64_t stream_id;
   auto headers = std::make_unique<Http::TestRequestHeaderMapImpl>(
       std::initializer_list<std::pair<std::string, std::string>>{
           {":method", "GET"}, {":path", "/"}, {":authority", "host"}});
   auto message = std::make_unique<Http::RequestMessageImpl>(std::move(headers));
-  auto result = filter->startHttpStream(&stream_ptr, "cluster", std::move(message), false, 1000);
+  auto result = filter->startHttpStream(&stream_id, "cluster", std::move(message), false, 1000);
   EXPECT_EQ(result, envoy_dynamic_module_type_http_callout_init_result_Success);
   EXPECT_NE(captured_callbacks, nullptr);
 
