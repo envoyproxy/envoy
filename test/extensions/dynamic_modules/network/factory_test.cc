@@ -79,12 +79,36 @@ TEST_F(DynamicModuleNetworkFilterFactoryTest, FactoryName) {
   EXPECT_EQ("envoy.filters.network.dynamic_modules", factory_.name());
 }
 
-TEST_F(DynamicModuleNetworkFilterFactoryTest, IsTerminalFilter) {
+TEST_F(DynamicModuleNetworkFilterFactoryTest, IsTerminalFilterDefaultFalse) {
   envoy::extensions::filters::network::dynamic_modules::v3::DynamicModuleNetworkFilter config;
   NiceMock<MockServerFactoryContext> server_context;
 
   // Network dynamic modules are not terminal by default.
   EXPECT_FALSE(factory_.isTerminalFilterByProto(config, server_context));
+}
+
+TEST_F(DynamicModuleNetworkFilterFactoryTest, IsTerminalFilterExplicitTrue) {
+  envoy::extensions::filters::network::dynamic_modules::v3::DynamicModuleNetworkFilter config;
+  config.set_terminal_filter(true);
+  NiceMock<MockServerFactoryContext> server_context;
+
+  EXPECT_TRUE(factory_.isTerminalFilterByProto(config, server_context));
+}
+
+TEST_F(DynamicModuleNetworkFilterFactoryTest, ValidConfigWithTerminalFilter) {
+  envoy::extensions::filters::network::dynamic_modules::v3::DynamicModuleNetworkFilter config;
+  config.mutable_dynamic_module_config()->set_name("network_no_op");
+  config.set_filter_name("test_filter");
+  config.set_terminal_filter(true);
+
+  // Terminal filter configuration should be accepted and create filter factory successfully.
+  auto result = factory_.createFilterFactoryFromProto(config, context_);
+  EXPECT_TRUE(result.ok()) << result.status().message();
+
+  // Verify the filter can still be added to filter manager.
+  NiceMock<Network::MockFilterManager> filter_manager;
+  EXPECT_CALL(filter_manager, addFilter(testing::_));
+  result.value()(filter_manager);
 }
 
 TEST_F(DynamicModuleNetworkFilterFactoryTest, FilterFactoryCallbackAddsFilter) {
