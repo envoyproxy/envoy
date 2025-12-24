@@ -208,6 +208,10 @@ bug_fixes:
   change: |
     Fixed transport socket matcher to correctly use downstream connection filter state for matching and optimized the
     selection path to avoid per-connection resolution overhead when filter state input is not used.
+- area: ext_authz
+  change: |
+    Fixed the gRPC ext_authz client to respect ``status_on_error`` configuration when gRPC calls fail.
+    Previously, gRPC call failures always returned 403 Forbidden regardless of the configured error status.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
