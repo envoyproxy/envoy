@@ -25,6 +25,7 @@ envoy_cc_library(
     hdrs = ["filter.h"],
     deps = [
         ":filter_config_lib",
+        "//source/common/http:utility_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
     ],
 )
