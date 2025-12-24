@@ -5,9 +5,9 @@ Stream-To-Metadata Filter
 * This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.stream_to_metadata.v3.StreamToMetadata``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.stream_to_metadata.v3.StreamToMetadata>`
 
-The Stream-To-Metadata filter extracts values from streaming response bodies and writes them to dynamic metadata.
-This is particularly useful for observability, rate limiting, and routing decisions based on values that only
-appear in streaming responses.
+The Stream-To-Metadata filter extracts values from streaming HTTP bodies and writes them to dynamic metadata.
+Currently, the filter processes response bodies only. This is particularly useful for observability, rate limiting,
+and routing decisions based on values that only appear in streaming responses.
 
 The filter is configured with rules that specify:
 

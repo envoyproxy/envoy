@@ -16,18 +16,19 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Stream-To-Metadata Filter]
 //
-// The Stream-To-Metadata filter extracts values from streaming response bodies
+// The Stream-To-Metadata filter extracts values from streaming HTTP bodies
 // and writes them to dynamic metadata. This is useful for rate limiting based on
 // token usage, logging, and other observability use cases.
 //
-// The filter currently supports Server-Sent Events (SSE) format with JSON payloads
-// in the data fields. It can be extended to support other streaming formats in the future.
+// Currently, the filter processes response bodies only and supports Server-Sent
+// Events (SSE) format with JSON payloads. Future extensions may support additional
+// formats and request body processing.
 //
 // [#extension: envoy.filters.http.stream_to_metadata]
 
 // Stream-To-Metadata :ref:`configuration overview <config_http_filters_stream_to_metadata>`.
 message StreamToMetadata {
-  // Specifies the format of the streaming response body.
+  // Specifies the format of the streaming body.
   enum Format {
     // Server-Sent Events format (text/event-stream).
     // See: https://html.spec.whatwg.org/multipage/server-sent-events.html
@@ -110,7 +111,7 @@ message StreamToMetadata {
     bool stop_processing_on_match = 3;
   }
 
-  // The format of the streaming response body.
+  // The format of the streaming body.
   // Currently only Server-Sent Events (SSE) is supported.
   // Default is SERVER_SENT_EVENTS.
   Format format = 1 [(validate.rules).enum = {defined_only: true}];
