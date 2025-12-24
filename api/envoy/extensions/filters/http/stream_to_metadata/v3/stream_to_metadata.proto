@@ -78,10 +78,10 @@ message StreamToMetadata {
   // Selector specifies how to extract a value from the stream payload.
   // Multiple selector types can be added over time for different extraction methods.
   //
-  // Exactly one selector type must be specified.
+  // Exactly one selector type must be specified (validated in C++).
   message Selector {
     // Extract value using JSON path traversal.
-    JsonPathSelector json_path = 1 [(validate.rules).message = {required: true}];
+    JsonPathSelector json_path = 1;
   }
 
   // [#next-free-field: 4]

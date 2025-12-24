@@ -18,9 +18,10 @@ constexpr absl::string_view DefaultSseContentType{"text/event-stream"};
 } // namespace
 
 Rule::Rule(const ProtoRule& rule) : rule_(rule) {
-  // Proto validation ensures json_path is set
-  for (const auto& key : rule_.selector().json_path().path()) {
-    selector_path_.push_back(key);
+  if (rule_.selector().has_json_path()) {
+    for (const auto& key : rule_.selector().json_path().path()) {
+      selector_path_.push_back(key);
+    }
   }
 }
 
