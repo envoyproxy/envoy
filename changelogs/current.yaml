@@ -103,6 +103,10 @@ minor_behavior_changes:
     Now the retrying of async HTTP client calls will respect the set buffer limits and the retry will be ignored
     if the buffer limit is exceeded. This behavior can be reverted by setting the runtime guard
     ``envoy.reloadable_features.http_async_client_retry_respect_buffer_limits`` to ``false``.
+- area: ext_proc
+  change: |
+    added server_half_closed counter for ext proc in :ref:'FilterStats
+    <envoy_v3_api_msg_extensions.filters.http.ext_proc.v3.ExternalProcessor.ExtProcFilterStats>'.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -207,6 +211,10 @@ bug_fixes:
 - area: http
   change: |
     Fixed upstream client to not close connection when idle timeout fires before the connection is established.
+- area: ext_authz
+  change: |
+    Fixed the gRPC ext_authz client to respect ``status_on_error`` configuration when gRPC calls fail.
+    Previously, gRPC call failures always returned 403 Forbidden regardless of the configured error status.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -347,6 +355,13 @@ new_features:
 - area: http2
   change: |
     Added a parameter to ``sendGoAwayAndClose`` to support graceful closure of HTTP/2 connections.
+- area: http2
+  change: |
+    Added :ref:`enable_huffman_encoding
+    <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.enable_huffman_encoding>` which controls
+    whether to use huffman encoding when sending headers. This is useful in scenarios where the
+    bandwidth saved from huffman encoding is not worth the cpu cost. e.g. for localhost, sidecar
+    traffic.
 - area: logging
   change: |
     Added support for the not-equal operator in access log filter rules via

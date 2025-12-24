@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+package test.extensions.filters.http.proto_api_scrubber;
+
+message InnerDetails {
+  string deep_secret = 1;
+  string deep_public = 2;
+}
+
+// A message mimicking a sensitive data structure.
+message SensitiveMessage {
+  string secret = 1;
+  string public_field = 2;
+  string other_info = 3;
+  InnerDetails internal_details = 4;
+}
+
+message ScrubRequest {
+  map<string, string> tags = 1;
+  map<string, int32> int_map = 2;
+  map<string, int32> safe_int_map = 3;
+
+  map<string, SensitiveMessage> deep_map = 4;
+  map<string, SensitiveMessage> object_map = 5;
+  map<string, SensitiveMessage> full_scrub_map = 6;
+
+  repeated string repeated_secrets = 7;
+  repeated SensitiveMessage repeated_messages = 8;
+
+  oneof single_choice {
+    string choice_a_string = 10;
+    int32 choice_b_int = 11;
+  }
+}
+
+service ScrubberTestService {
+  rpc Scrub(ScrubRequest) returns (ScrubRequest);
+}
