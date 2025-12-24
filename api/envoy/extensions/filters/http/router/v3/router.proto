@@ -139,5 +139,5 @@ message Router {
   // receiving a ``200`` response from the upstream. This early data behavior
   // is common for latency reduction but can cause issues with some upstreams.
   // Defaults to false to allow early data and be compatible with common behavior.
-  bool reject_connect_request_early_data = 10;
+  google.protobuf.BoolValue reject_connect_request_early_data = 10;
 }

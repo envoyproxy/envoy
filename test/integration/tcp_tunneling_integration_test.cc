@@ -462,7 +462,7 @@ TEST_P(ConnectTerminationIntegrationTest, EarlyConnectDataRejectedWithOverride) 
             if (filter.has_typed_config()) {
               filter.typed_config().UnpackTo(&router_config);
             }
-            router_config.set_reject_connect_request_early_data(true);
+            router_config.mutable_reject_connect_request_early_data()->set_value(true);
             filter.mutable_typed_config()->PackFrom(router_config);
             break;
           }
