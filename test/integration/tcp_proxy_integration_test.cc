@@ -496,6 +496,44 @@ TEST_P(TcpProxyIntegrationTest, AccessLogUpstreamConnectFailure) {
   EXPECT_THAT(log_result, testing::StartsWith("delayed_connect_error:"));
 }
 
+// Verifies that access log value for `DOWNSTREAM_LOCAL_CLOSE_REASON` matches
+// the failure message when there is a session idle timeout.
+TEST_P(TcpProxyIntegrationTest, AccessLogSessionIdleTimeout) {
+  std::string access_log_path = TestEnvironment::temporaryPath(
+      fmt::format("access_log{}{}.txt", version_ == Network::Address::IpVersion::v4 ? "v4" : "v6",
+                  TestUtility::uniqueFilename()));
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* filter_chain = listener->mutable_filter_chains(0);
+    auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
+    ASSERT_TRUE(config_blob->Is<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>());
+    auto tcp_proxy_config =
+        MessageUtil::anyConvert<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>(
+            *config_blob);
+    auto* access_log = tcp_proxy_config.add_access_log();
+    access_log->set_name("accesslog");
+    envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
+    access_log_config.set_path(access_log_path);
+    access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
+        "%DOWNSTREAM_LOCAL_CLOSE_REASON%");
+    access_log->mutable_typed_config()->PackFrom(access_log_config);
+    tcp_proxy_config.mutable_idle_timeout()->set_nanos(
+        std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::milliseconds(500))
+            .count());
+    config_blob->PackFrom(tcp_proxy_config);
+  });
+  enableHalfClose(false);
+  initialize();
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  // Session should idle timeout, causing disconnect.
+  tcp_client->waitForDisconnect();
+  // Guarantee client is done writing to the log.
+  auto log_result = waitForAccessLog(access_log_path);
+  EXPECT_EQ(log_result, "tcp_session_idle_timeout");
+}
+
 TEST_P(TcpProxyIntegrationTest, AccessLogOnUpstreamConnect) {
   std::string access_log_path = TestEnvironment::temporaryPath(
       fmt::format("access_log{}{}.txt", version_ == Network::Address::IpVersion::v4 ? "v4" : "v6",

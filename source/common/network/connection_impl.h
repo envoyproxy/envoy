@@ -277,6 +277,11 @@ public:
   void raiseEvent(ConnectionEvent event) override;
   bool initializeReadFilters() override;
 
+  void setLocalCloseReason(absl::string_view reason) override {
+    ConnectionImpl::setLocalCloseReason(reason);
+    stream_info_.setDownstreamLocalCloseReason(reason);
+  }
+
 private:
   void onTransportSocketConnectTimeout();
 
@@ -307,6 +312,13 @@ public:
 
   // Network::ClientConnection
   void connect() override;
+
+  void setLocalCloseReason(absl::string_view reason) override {
+    ConnectionImpl::setLocalCloseReason(reason);
+    if (stream_info_.upstreamInfo()) {
+      stream_info_.upstreamInfo()->setUpstreamLocalCloseReason(reason);
+    }
+  }
 
 private:
   void onConnected() override;

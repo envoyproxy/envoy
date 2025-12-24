@@ -1415,5 +1415,49 @@ typed_config:
   connection.reset();
 }
 
+TEST_P(SslIntegrationTest, DownstreamLocalCloseReason) {
+  TestScopedRuntime scoped_runtime;
+  useListenerAccessLog("DOWNSTREAM_LOCAL_CLOSE_REASON=%DOWNSTREAM_LOCAL_CLOSE_REASON%");
+
+  auto custom_validator_config = std::make_unique<envoy::config::core::v3::TypedExtensionConfig>(
+      envoy::config::core::v3::TypedExtensionConfig());
+  TestUtility::loadFromYaml(TestEnvironment::substitute(R"EOF(
+name: "envoy.tls.cert_validator.timed_cert_validator"
+typed_config:
+  "@type": type.googleapis.com/test.common.config.DummyConfig
+  )EOF"),
+                            *custom_validator_config);
+
+  auto* cert_validator_factory =
+      Registry::FactoryRegistry<Extensions::TransportSockets::Tls::CertValidatorFactory>::
+          getFactory("envoy.tls.cert_validator.timed_cert_validator");
+  static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
+      ->resetForTest();
+  // Set validation timeout to 500ms to ensure we hit the transport socket timeout first.
+  static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
+      ->setValidationTimeOutMs(std::chrono::milliseconds(500));
+
+  // Set transport_socket_connect_timeout to 200ms.
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* filter_chain = listener->mutable_filter_chains(0);
+    filter_chain->mutable_transport_socket_connect_timeout()->set_nanos(200 * 1000 * 1000); // 200ms
+  });
+
+  initialize();
+
+  // The client uses a custom certificate validator that delays the handshake by 500ms.
+  Network::ClientConnectionPtr connection = makeSslClientConnection(
+      ClientSslTransportOptions().setCustomCertValidatorConfig(custom_validator_config.get()));
+  connection->connect();
+
+  // Wait for the connection to be closed by the server due to timeout.
+  auto log_result = waitForAccessLog(listener_access_log_name_);
+  EXPECT_THAT(log_result,
+              testing::HasSubstr("DOWNSTREAM_LOCAL_CLOSE_REASON=transport_socket_timeout"));
+
+  connection->close(Network::ConnectionCloseType::NoFlush);
+}
+
 } // namespace Ssl
 } // namespace Envoy

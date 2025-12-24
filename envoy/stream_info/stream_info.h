@@ -629,6 +629,17 @@ public:
   virtual const std::string& upstreamTransportFailureReason() const PURE;
 
   /**
+   * @param failure_reason the upstream connection local close reason.
+   */
+  virtual void setUpstreamLocalCloseReason(absl::string_view failure_reason) PURE;
+
+  /**
+   * @return absl::string_view the upstream connection local close reason, if local close did not
+   * occur an empty string view is returned.
+   */
+  virtual absl::string_view upstreamLocalCloseReason() const PURE;
+
+  /**
    * @param host the selected upstream host for the request.
    */
   virtual void setUpstreamHost(Upstream::HostDescriptionConstSharedPtr host) PURE;
@@ -1016,6 +1027,17 @@ public:
    * @param failure_reason the downstream transport failure reason.
    */
   virtual void setDownstreamTransportFailureReason(absl::string_view failure_reason) PURE;
+
+  /**
+   * @param failure_reason the downstream connection local close reason.
+   */
+  virtual void setDownstreamLocalCloseReason(absl::string_view failure_reason) PURE;
+
+  /**
+   * @return absl::string_view the downstream connection local close reason, if local close did not
+   * occur an empty string view is returned.
+   */
+  virtual absl::string_view downstreamLocalCloseReason() const PURE;
 
   /**
    * Checked by routing filters before forwarding a request upstream.

@@ -1837,6 +1837,19 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                     return result;
                   });
             }}},
+          {"DOWNSTREAM_LOCAL_CLOSE_REASON",
+           {CommandSyntaxChecker::COMMAND_ONLY,
+            [](absl::string_view, absl::optional<size_t>) {
+              return std::make_unique<StreamInfoStringFormatterProvider>(
+                  [](const StreamInfo::StreamInfo& stream_info) {
+                    absl::optional<std::string> result;
+                    if (!stream_info.downstreamLocalCloseReason().empty()) {
+                      result = absl::StrReplaceAll(stream_info.downstreamLocalCloseReason(),
+                                                   {{" ", "_"}});
+                    }
+                    return result;
+                  });
+            }}},
           {"UPSTREAM_TRANSPORT_FAILURE_REASON",
            {CommandSyntaxChecker::COMMAND_ONLY,
             [](absl::string_view, absl::optional<size_t>) {
@@ -1857,6 +1870,23 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                     }
                     return result;
                   });
+            }}},
+          {"UPSTREAM_LOCAL_CLOSE_REASON",
+           {CommandSyntaxChecker::COMMAND_ONLY,
+            [](absl::string_view, absl::optional<size_t>) {
+              return std::make_unique<
+                  StreamInfoStringFormatterProvider>([](const StreamInfo::StreamInfo& stream_info) {
+                absl::optional<std::string> result;
+                if (stream_info.upstreamInfo().has_value() &&
+                    !stream_info.upstreamInfo().value().get().upstreamLocalCloseReason().empty()) {
+                  result = std::string(
+                      stream_info.upstreamInfo().value().get().upstreamLocalCloseReason());
+                }
+                if (result) {
+                  std::replace(result->begin(), result->end(), ' ', '_');
+                }
+                return result;
+              });
             }}},
           {"HOSTNAME",
            {CommandSyntaxChecker::COMMAND_ONLY,

@@ -694,6 +694,21 @@ UDP
   UDP
     Not implemented ("-")
 
+%DOWNSTREAM_LOCAL_CLOSE_REASON%
+  HTTP/TCP
+    If downstream connection was closed locally, provides the reason.
+    Note: it only works in listener access config, and the HTTP or TCP access logs would observe empty values.
+
+  UDP
+    Not implemented ("-")
+
+%UPSTREAM_LOCAL_CLOSE_REASON%
+  HTTP/TCP
+    If upstream connection was closed locally, provides the reason.
+
+  UDP
+    Not implemented ("-")
+
 %DOWNSTREAM_REMOTE_ADDRESS%
   Remote address of the downstream connection. If the address is an IP address it includes both
   address and port.
