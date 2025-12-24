@@ -916,15 +916,11 @@ The following command operators are supported:
     * ``cluster_name``: Name of the cluster.
     * ``bytes_sent``: Total number of bytes sent to the downstream in the session.
 
-      .. deprecated::
-
-       This is now deprecated. Please use ``%BYTES_SENT%`` instead.
+      .. deprecated:: Use ``%BYTES_SENT%`` instead.
 
     * ``bytes_received``: Total number of bytes received from the downstream in the session.
 
-      .. deprecated::
-
-       This is now deprecated. Please use ``%BYTES_RECEIVED%`` instead.
+      .. deprecated:: Use ``%BYTES_RECEIVED%`` instead.
 
     * ``errors_sent``: Number of errors that have occurred when sending datagrams to the downstream in the session.
     * ``datagrams_sent``: Number of datagrams sent to the downstream in the session.
@@ -945,15 +941,11 @@ The following command operators are supported:
 
     * ``bytes_sent``: Total number of bytes sent to the downstream in UDP proxy.
 
-      .. deprecated::
-
-       This is now deprecated. Please use ``%BYTES_SENT%`` instead.
+      .. deprecated:: Use ``%BYTES_SENT%`` instead.
 
     * ``bytes_received``: Total number of bytes received from the downstream in UDP proxy.
 
-      .. deprecated::
-
-       This is now deprecated. Please use ``%BYTES_RECEIVED%`` instead.
+      .. deprecated:: Use ``%BYTES_RECEIVED%`` instead.
 
     * ``errors_sent``: Number of errors that have occurred when sending datagrams to the downstream in UDP proxy.
     * ``errors_received``: Number of errors that have occurred when receiving datagrams from the downstream in UDP proxy.
