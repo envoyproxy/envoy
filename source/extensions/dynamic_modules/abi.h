@@ -487,16 +487,6 @@ typedef enum envoy_dynamic_module_type_http_callout_result {
 } envoy_dynamic_module_type_http_callout_result;
 
 /**
- * envoy_dynamic_module_type_http_stream_envoy_ptr is a handle to an HTTP stream for streamable
- * callouts. This represents an ongoing HTTP stream initiated via
- * envoy_dynamic_module_callback_http_filter_start_http_stream.
- *
- * OWNERSHIP: Envoy owns the stream. The module must not store this pointer beyond the lifetime of
- * the stream callbacks.
- */
-typedef void* envoy_dynamic_module_type_http_stream_envoy_ptr;
-
-/**
  * envoy_dynamic_module_type_http_stream_reset_reason represents the reason for a stream reset.
  * This corresponds to `AsyncClient::StreamResetReason::*` in envoy/http/async_client.h.
  */
@@ -939,7 +929,7 @@ void envoy_dynamic_module_on_http_filter_destroy(
  */
 void envoy_dynamic_module_on_http_filter_http_callout_done(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr, uint32_t callout_id,
+    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr, uint64_t callout_id,
     envoy_dynamic_module_type_http_callout_result result,
     envoy_dynamic_module_type_envoy_http_header* headers, size_t headers_size,
     envoy_dynamic_module_type_envoy_buffer* body_chunks, size_t body_chunks_size);
@@ -962,8 +952,7 @@ void envoy_dynamic_module_on_http_filter_http_callout_done(
  */
 void envoy_dynamic_module_on_http_filter_http_stream_headers(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr,
-    envoy_dynamic_module_type_http_stream_envoy_ptr stream_ptr,
+    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr, uint64_t stream_id,
     envoy_dynamic_module_type_envoy_http_header* headers, size_t headers_size, bool end_stream);
 
 /**
@@ -984,8 +973,7 @@ void envoy_dynamic_module_on_http_filter_http_stream_headers(
  */
 void envoy_dynamic_module_on_http_filter_http_stream_data(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr,
-    envoy_dynamic_module_type_http_stream_envoy_ptr stream_ptr,
+    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr, uint64_t stream_id,
     const envoy_dynamic_module_type_envoy_buffer* data, size_t data_count, bool end_stream);
 
 /**
@@ -1004,8 +992,7 @@ void envoy_dynamic_module_on_http_filter_http_stream_data(
  */
 void envoy_dynamic_module_on_http_filter_http_stream_trailers(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr,
-    envoy_dynamic_module_type_http_stream_envoy_ptr stream_ptr,
+    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr, uint64_t stream_id,
     envoy_dynamic_module_type_envoy_http_header* trailers, size_t trailers_size);
 
 /**
@@ -1023,8 +1010,7 @@ void envoy_dynamic_module_on_http_filter_http_stream_trailers(
  */
 void envoy_dynamic_module_on_http_filter_http_stream_complete(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr,
-    envoy_dynamic_module_type_http_stream_envoy_ptr stream_ptr);
+    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr, uint64_t stream_id);
 
 /**
  * envoy_dynamic_module_on_http_filter_http_stream_reset is called when a streamable HTTP callout
@@ -1042,8 +1028,7 @@ void envoy_dynamic_module_on_http_filter_http_stream_complete(
  */
 void envoy_dynamic_module_on_http_filter_http_stream_reset(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr,
-    envoy_dynamic_module_type_http_stream_envoy_ptr stream_ptr,
+    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr, uint64_t stream_id,
     envoy_dynamic_module_type_http_stream_reset_reason reason);
 
 /**
@@ -2495,8 +2480,8 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_int(
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
  * corresponding HTTP filter.
- * @param callout_id is the ID of the callout. This can be arbitrary and is used to
- * differentiate between multiple calls from the same filter.
+ * @param callout_id_out is a pointer to a variable where the callout ID will be stored. This can be
+ * arbitrary and is used to differentiate between multiple calls from the same filter.
  * @param cluster_name is the name of the cluster to which the callout is sent.
  * @param cluster_name_length is the length of the cluster name.
  * @param headers is the headers of the request. It must contain :method, :path and host headers.
@@ -2508,7 +2493,7 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_int(
  */
 envoy_dynamic_module_type_http_callout_init_result
 envoy_dynamic_module_callback_http_filter_http_callout(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, uint32_t callout_id,
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, uint64_t* callout_id_out,
     envoy_dynamic_module_type_buffer_module_ptr cluster_name, size_t cluster_name_length,
     envoy_dynamic_module_type_module_http_header* headers, size_t headers_size,
     envoy_dynamic_module_type_buffer_module_ptr body, size_t body_size,
@@ -2552,8 +2537,7 @@ envoy_dynamic_module_callback_http_filter_http_callout(
  */
 envoy_dynamic_module_type_http_callout_init_result
 envoy_dynamic_module_callback_http_filter_start_http_stream(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_http_stream_envoy_ptr* stream_ptr_out,
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, uint64_t* stream_id_out,
     envoy_dynamic_module_type_buffer_module_ptr cluster_name, size_t cluster_name_length,
     envoy_dynamic_module_type_module_http_header* headers, size_t headers_size,
     envoy_dynamic_module_type_buffer_module_ptr body, size_t body_size, bool end_stream,
@@ -2572,8 +2556,7 @@ envoy_dynamic_module_callback_http_filter_start_http_stream(
  * @param stream_ptr is the handle to the HTTP stream to reset.
  */
 void envoy_dynamic_module_callback_http_filter_reset_http_stream(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_http_stream_envoy_ptr stream_ptr);
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, uint64_t stream_id);
 
 /**
  * envoy_dynamic_module_callback_http_stream_send_data is called by the module to send request
@@ -2592,8 +2575,7 @@ void envoy_dynamic_module_callback_http_filter_reset_http_stream(
  * @return true if the operation is successful, false otherwise.
  */
 bool envoy_dynamic_module_callback_http_stream_send_data(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_http_stream_envoy_ptr stream_ptr,
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, uint64_t stream_id,
     envoy_dynamic_module_type_buffer_module_ptr data, size_t data_length, bool end_stream);
 
 /**
@@ -2611,8 +2593,7 @@ bool envoy_dynamic_module_callback_http_stream_send_data(
  * @return true if the operation is successful, false otherwise.
  */
 bool envoy_dynamic_module_callback_http_stream_send_trailers(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_http_stream_envoy_ptr stream_ptr,
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, uint64_t stream_id,
     envoy_dynamic_module_type_module_http_header* trailers, size_t trailers_size);
 
 /**
