@@ -36,6 +36,7 @@ filegroup(
             "root/configuration/listeners/network_filters/_include/generic_proxy_filter.yaml",
             "root/configuration/overview/_include/xds_api/oauth-sds-example.yaml",
             "root/configuration/security/_include/sds-source-example.yaml",
+            "root/configuration/observability/access_log/_include/json-format-config.yaml",
         ],
     ) + select({
         "//bazel:windows_x86_64": [],
