@@ -255,9 +255,9 @@ The following command operators are supported:
 
     .. note::
 
-      In the case of 100-continue responses, only the response code of the final headers
-      will be logged. If a 100-continue is followed by a ``200``, the logged response will be ``200``.
-      If a 100-continue results in a disconnect, the ``100`` will be logged.
+      In the case of ``100``-continue responses, only the response code of the final headers
+      will be logged. If a ``100``-continue is followed by a ``200``, the logged response will be ``200``.
+      If a ``100``-continue results in a disconnect, the ``100`` will be logged.
 
   TCP/UDP
     Not implemented. It will appear as ``"-"`` in the access logs.
