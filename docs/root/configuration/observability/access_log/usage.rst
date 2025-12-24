@@ -682,6 +682,12 @@ UDP
   TCP/UDP
     Not implemented ("-")
 
+.. _config_access_log_format_upstream_detected_close_type:
+
+%UPSTREAM_DETECTED_CLOSE_TYPE%
+    The detected close type of the upstream connection. This is only available on access logs recorded after the connection has been closed.
+    Possible values are ``Normal``, ``LocalReset``, and ``RemoteReset``.
+
 .. _config_access_log_format_downstream_transport_failure_reason:
 
 %DOWNSTREAM_TRANSPORT_FAILURE_REASON%
@@ -703,6 +709,12 @@ UDP
     This may not be the physical remote address of the peer if the address has been inferred from
     :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>` or :ref:`x-forwarded-for
     <config_http_conn_man_headers_x-forwarded-for>`.
+
+.. _config_access_log_format_downstream_detected_close_type:
+
+%DOWNSTREAM_DETECTED_CLOSE_TYPE%
+    The detected close type of the downstream connection. This is only available on access logs recorded after the connection has been closed.
+    Possible values are ``Normal``, ``LocalReset``, and ``RemoteReset``.
 
 %DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%
   Remote address of the downstream connection, without any port component.

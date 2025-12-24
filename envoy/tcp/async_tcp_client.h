@@ -59,7 +59,7 @@ public:
   /**
    * @return the detected close type from socket.
    */
-  virtual Network::DetectedCloseType detectedCloseType() const PURE;
+  virtual StreamInfo::DetectedCloseType detectedCloseType() const PURE;
 
   /**
    * Write data through the client.

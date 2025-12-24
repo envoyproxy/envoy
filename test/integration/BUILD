@@ -2205,6 +2205,7 @@ envoy_cc_test(
     deps = [
         ":integration_lib",
         "//test/integration/filters:test_network_async_tcp_filter_lib",
+        "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",
     ],
 )
 
