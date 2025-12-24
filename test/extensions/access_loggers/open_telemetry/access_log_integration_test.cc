@@ -78,10 +78,8 @@ public:
 
           envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig
               config;
-          auto* common_config = config.mutable_common_config();
-          common_config->set_log_name("foo");
-          common_config->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
-          setGrpcService(*common_config->mutable_grpc_service(), "accesslog",
+          config.set_log_name("foo");
+          setGrpcService(*config.mutable_grpc_service(), "accesslog",
                          fake_upstreams_.back()->localAddress());
           auto* body_config = config.mutable_body();
           body_config->set_string_value("%REQ(:METHOD)% %PROTOCOL% %RESPONSE_CODE%");

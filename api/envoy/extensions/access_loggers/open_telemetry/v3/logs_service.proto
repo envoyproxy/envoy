@@ -3,12 +3,18 @@ syntax = "proto3";
 package envoy.extensions.access_loggers.open_telemetry.v3;
 
 import "envoy/config/core/v3/extension.proto";
+import "envoy/config/core/v3/grpc_service.proto";
+import "envoy/config/core/v3/http_service.proto";
 import "envoy/extensions/access_loggers/grpc/v3/als.proto";
+import "envoy/type/tracing/v3/custom_tag.proto";
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/wrappers.proto";
 
 import "opentelemetry/proto/common/v1/common.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.access_loggers.open_telemetry.v3";
 option java_outer_classname = "LogsServiceProto";
@@ -16,17 +22,37 @@ option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/access_loggers/open_telemetry/v3;open_telemetryv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: OpenTelemetry (gRPC) Access Log]
+// [#protodoc-title: OpenTelemetry Access Log]
 
 // Configuration for the built-in ``envoy.access_loggers.open_telemetry``
 // :ref:`AccessLog <envoy_v3_api_msg_config.accesslog.v3.AccessLog>`. This configuration will
 // populate `opentelemetry.proto.collector.v1.logs.ExportLogsServiceRequest.resource_logs <https://github.com/open-telemetry/opentelemetry-proto/blob/main/opentelemetry/proto/collector/logs/v1/logs_service.proto>`_.
 // In addition, the request start time is set in the dedicated field.
 // [#extension: envoy.access_loggers.open_telemetry]
-// [#next-free-field: 8]
+// [#next-free-field: 15]
 message OpenTelemetryAccessLogConfig {
   // [#comment:TODO(itamarkam): add 'filter_state_objects_to_log' to logs.]
-  grpc.v3.CommonGrpcAccessLogConfig common_config = 1 [(validate.rules).message = {required: true}];
+  // Deprecated. Use ``grpc_service`` or ``http_service`` instead.
+  grpc.v3.CommonGrpcAccessLogConfig common_config = 1
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
+
+  // The upstream HTTP cluster that will receive OTLP logs via
+  // `OTLP/HTTP <https://opentelemetry.io/docs/specs/otlp/#otlphttp>`_.
+  // Note: Only one of ``common_config``, ``grpc_service``, or ``http_service`` may be used.
+  //
+  // .. note::
+  //
+  //   The ``request_headers_to_add`` property in the OTLP HTTP exporter service
+  //   does not support the :ref:`format specifier <config_access_log_format>` as used for
+  //   :ref:`HTTP access logging <config_access_log>`.
+  //   The values configured are added as HTTP headers on the OTLP export request
+  //   without any formatting applied.
+  config.core.v3.HttpService http_service = 8;
+
+  // The upstream gRPC cluster that will receive OTLP logs.
+  // Note: Only one of ``common_config``, ``grpc_service``, or ``http_service`` may be used.
+  // This field is preferred over ``common_config.grpc_service``.
+  config.core.v3.GrpcService grpc_service = 9;
 
   // If specified, Envoy will not generate built-in resource labels
   // like ``log_name``, ``zone_name``, ``cluster_name``, ``node_name``.
@@ -57,4 +83,19 @@ message OpenTelemetryAccessLogConfig {
   // See the formatters extensions documentation for details.
   // [#extension-category: envoy.formatter]
   repeated config.core.v3.TypedExtensionConfig formatters = 7;
+
+  string log_name = 10;
+
+  // The interval for flushing access logs to the transport. Default: 1 second.
+  google.protobuf.Duration buffer_flush_interval = 11;
+
+  // Soft size limit in bytes for the access log buffer. When the buffer exceeds
+  // this limit, logs will be flushed. Default: 16KB.
+  google.protobuf.UInt32Value buffer_size_bytes = 12;
+
+  // Additional filter state objects to log as attributes.
+  repeated string filter_state_objects_to_log = 13;
+
+  // Custom tags to include as log attributes.
+  repeated type.tracing.v3.CustomTag custom_tags = 14;
 }
