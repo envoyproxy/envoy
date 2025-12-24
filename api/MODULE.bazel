@@ -11,6 +11,9 @@ bazel_dep(name = "bazel_skylib", version = "1.8.2")
 bazel_dep(name = "cel-spec", version = "0.25.1", repo_name = "dev_cel")
 bazel_dep(name = "gazelle", version = "0.46.0", repo_name = "bazel_gazelle")
 bazel_dep(name = "googleapis", version = "0.0.0-20251003-2193a2bf", repo_name = "com_google_googleapis")
+bazel_dep(name = "googleapis-cc", version = "1.0.0")
+bazel_dep(name = "googleapis-go", version = "1.0.0")
+bazel_dep(name = "googleapis-java", version = "1.0.0")
 bazel_dep(name = "grpc", version = "1.76.0.bcr.1", repo_name = "com_github_grpc_grpc")
 bazel_dep(name = "opencensus-proto", version = "0.4.1.bcr.2", repo_name = "opencensus_proto")
 bazel_dep(name = "opentelemetry-proto", version = "1.8.0", repo_name = "opentelemetry_proto")
@@ -39,16 +42,6 @@ use_repo(
     go_sdk,
     "go_toolchains",
 )
-
-# Googleapis extension for language-specific rules
-# Using switched_rules from googleapis for compatibility with grpc
-switched_rules = use_extension("@com_google_googleapis//:extensions.bzl", "switched_rules")
-switched_rules.use_languages(
-    cc = True,
-    go = True,
-    java = True,
-)
-use_repo(switched_rules, "com_google_googleapis_imports")
 
 # Non-BCR dependencies extension
 # These dependencies are not yet available in BCR or require custom build files
