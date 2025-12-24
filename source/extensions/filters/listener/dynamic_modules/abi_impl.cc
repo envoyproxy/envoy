@@ -16,19 +16,19 @@ extern "C" {
 
 bool envoy_dynamic_module_callback_listener_filter_get_buffer_chunk(
     envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_buffer_envoy_ptr* data_ptr_out, size_t* data_length_out) {
+    envoy_dynamic_module_type_envoy_buffer* chunk_out) {
   auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
   Network::ListenerFilterBuffer* buffer = filter->currentBuffer();
 
   if (buffer == nullptr) {
-    *data_ptr_out = nullptr;
-    *data_length_out = 0;
+    chunk_out->ptr = nullptr;
+    chunk_out->length = 0;
     return false;
   }
 
   auto raw_slice = buffer->rawSlice();
-  *data_ptr_out = static_cast<char*>(const_cast<void*>(raw_slice.mem_));
-  *data_length_out = raw_slice.len_;
+  chunk_out->ptr = static_cast<char*>(const_cast<void*>(raw_slice.mem_));
+  chunk_out->length = raw_slice.len_;
   return true;
 }
 

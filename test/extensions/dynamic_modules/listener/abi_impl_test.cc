@@ -73,28 +73,24 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetBufferChunkWithData) {
   MockListenerFilterBuffer mock_buffer(buffer);
   filter_->setCurrentBufferForTest(&mock_buffer);
 
-  envoy_dynamic_module_type_buffer_envoy_ptr data_ptr = nullptr;
-  size_t data_length = 0;
-  bool ok = envoy_dynamic_module_callback_listener_filter_get_buffer_chunk(filterPtr(), &data_ptr,
-                                                                           &data_length);
+  envoy_dynamic_module_type_envoy_buffer chunk = {nullptr, 0};
+  bool ok = envoy_dynamic_module_callback_listener_filter_get_buffer_chunk(filterPtr(), &chunk);
 
   EXPECT_TRUE(ok);
-  EXPECT_NE(nullptr, data_ptr);
-  EXPECT_EQ(11, data_length);
-  EXPECT_EQ("hello world", std::string(data_ptr, data_length));
+  EXPECT_NE(nullptr, chunk.ptr);
+  EXPECT_EQ(11, chunk.length);
+  EXPECT_EQ("hello world", std::string(chunk.ptr, chunk.length));
 
   filter_->setCurrentBufferForTest(nullptr);
 }
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetBufferChunkNullBuffer) {
-  envoy_dynamic_module_type_buffer_envoy_ptr data_ptr = nullptr;
-  size_t data_length = 0;
-  bool ok = envoy_dynamic_module_callback_listener_filter_get_buffer_chunk(filterPtr(), &data_ptr,
-                                                                           &data_length);
+  envoy_dynamic_module_type_envoy_buffer chunk = {nullptr, 0};
+  bool ok = envoy_dynamic_module_callback_listener_filter_get_buffer_chunk(filterPtr(), &chunk);
 
   EXPECT_FALSE(ok);
-  EXPECT_EQ(nullptr, data_ptr);
-  EXPECT_EQ(0, data_length);
+  EXPECT_EQ(nullptr, chunk.ptr);
+  EXPECT_EQ(0, chunk.length);
 }
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetBufferChunkEmptyBuffer) {
@@ -102,13 +98,11 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetBufferChunkEmptyBuffer) {
   MockListenerFilterBuffer mock_buffer(empty_buffer);
   filter_->setCurrentBufferForTest(&mock_buffer);
 
-  envoy_dynamic_module_type_buffer_envoy_ptr data_ptr = nullptr;
-  size_t data_length = 0;
-  bool ok = envoy_dynamic_module_callback_listener_filter_get_buffer_chunk(filterPtr(), &data_ptr,
-                                                                           &data_length);
+  envoy_dynamic_module_type_envoy_buffer chunk = {nullptr, 0};
+  bool ok = envoy_dynamic_module_callback_listener_filter_get_buffer_chunk(filterPtr(), &chunk);
 
   EXPECT_TRUE(ok);
-  EXPECT_EQ(0, data_length);
+  EXPECT_EQ(0, chunk.length);
 
   filter_->setCurrentBufferForTest(nullptr);
 }
