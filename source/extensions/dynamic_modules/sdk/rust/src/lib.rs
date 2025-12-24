@@ -3421,73 +3421,74 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
 
   fn prepend_read_buffer(&mut self, data: &[u8]) {
     unsafe {
-      abi::envoy_dynamic_module_callback_network_filter_prepend_read_buffer(
-        self.raw,
-        data.as_ptr() as abi::envoy_dynamic_module_type_buffer_module_ptr,
-        data.len(),
-      );
+      let buffer = abi::envoy_dynamic_module_type_module_buffer {
+        ptr: data.as_ptr() as abi::envoy_dynamic_module_type_buffer_module_ptr,
+        length: data.len(),
+      };
+      abi::envoy_dynamic_module_callback_network_filter_prepend_read_buffer(self.raw, buffer);
     }
   }
 
   fn append_read_buffer(&mut self, data: &[u8]) {
     unsafe {
-      abi::envoy_dynamic_module_callback_network_filter_append_read_buffer(
-        self.raw,
-        data.as_ptr() as abi::envoy_dynamic_module_type_buffer_module_ptr,
-        data.len(),
-      );
+      let buffer = abi::envoy_dynamic_module_type_module_buffer {
+        ptr: data.as_ptr() as abi::envoy_dynamic_module_type_buffer_module_ptr,
+        length: data.len(),
+      };
+      abi::envoy_dynamic_module_callback_network_filter_append_read_buffer(self.raw, buffer);
     }
   }
 
   fn prepend_write_buffer(&mut self, data: &[u8]) {
     unsafe {
-      abi::envoy_dynamic_module_callback_network_filter_prepend_write_buffer(
-        self.raw,
-        data.as_ptr() as abi::envoy_dynamic_module_type_buffer_module_ptr,
-        data.len(),
-      );
+      let buffer = abi::envoy_dynamic_module_type_module_buffer {
+        ptr: data.as_ptr() as abi::envoy_dynamic_module_type_buffer_module_ptr,
+        length: data.len(),
+      };
+      abi::envoy_dynamic_module_callback_network_filter_prepend_write_buffer(self.raw, buffer);
     }
   }
 
   fn append_write_buffer(&mut self, data: &[u8]) {
     unsafe {
-      abi::envoy_dynamic_module_callback_network_filter_append_write_buffer(
-        self.raw,
-        data.as_ptr() as abi::envoy_dynamic_module_type_buffer_module_ptr,
-        data.len(),
-      );
+      let buffer = abi::envoy_dynamic_module_type_module_buffer {
+        ptr: data.as_ptr() as abi::envoy_dynamic_module_type_buffer_module_ptr,
+        length: data.len(),
+      };
+      abi::envoy_dynamic_module_callback_network_filter_append_write_buffer(self.raw, buffer);
     }
   }
 
   fn write(&mut self, data: &[u8], end_stream: bool) {
     unsafe {
-      abi::envoy_dynamic_module_callback_network_filter_write(
-        self.raw,
-        data.as_ptr() as abi::envoy_dynamic_module_type_buffer_module_ptr,
-        data.len(),
-        end_stream,
-      );
+      let buffer = abi::envoy_dynamic_module_type_module_buffer {
+        ptr: data.as_ptr() as abi::envoy_dynamic_module_type_buffer_module_ptr,
+        length: data.len(),
+      };
+      abi::envoy_dynamic_module_callback_network_filter_write(self.raw, buffer, end_stream);
     }
   }
 
   fn inject_read_data(&mut self, data: &[u8], end_stream: bool) {
     unsafe {
+      let buffer = abi::envoy_dynamic_module_type_module_buffer {
+        ptr: data.as_ptr() as abi::envoy_dynamic_module_type_buffer_module_ptr,
+        length: data.len(),
+      };
       abi::envoy_dynamic_module_callback_network_filter_inject_read_data(
-        self.raw,
-        data.as_ptr() as abi::envoy_dynamic_module_type_buffer_module_ptr,
-        data.len(),
-        end_stream,
+        self.raw, buffer, end_stream,
       );
     }
   }
 
   fn inject_write_data(&mut self, data: &[u8], end_stream: bool) {
     unsafe {
+      let buffer = abi::envoy_dynamic_module_type_module_buffer {
+        ptr: data.as_ptr() as abi::envoy_dynamic_module_type_buffer_module_ptr,
+        length: data.len(),
+      };
       abi::envoy_dynamic_module_callback_network_filter_inject_write_data(
-        self.raw,
-        data.as_ptr() as abi::envoy_dynamic_module_type_buffer_module_ptr,
-        data.len(),
-        end_stream,
+        self.raw, buffer, end_stream,
       );
     }
   }
