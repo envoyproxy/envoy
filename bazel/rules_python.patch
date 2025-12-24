@@ -1,0 +1,67 @@
+--- a/python/private/toolchain_aliases.bzl
++++ b/python/private/toolchain_aliases.bzl
+@@ -43,6 +43,11 @@
+             visibility = ["//visibility:private"],
+         )
+ 
++    # Use first platform as default for unsupported platforms (e.g., WASI).
++    # This allows builds to proceed when Python is transitively depended on
++    # but not actually used in the target configuration.
++    default_platform = platforms[0] if platforms else None
++
+     prefix = name
+     for name in [
+         "files",
+@@ -52,29 +57,39 @@
+         "python_headers",
+         "python_runtimes",
+     ]:
++        select_dict = {
++            ":" + platform: "@{}_{}//:{}".format(prefix, platform, name)
++            for platform in platforms
++        }
++        if default_platform:
++            select_dict["//conditions:default"] = "@{}_{}//:{}".format(prefix, default_platform, name)
+         native.alias(
+             name = name,
+-            actual = select({
+-                ":" + platform: "@{}_{}//:{}".format(prefix, platform, name)
+-                for platform in platforms
+-            }),
++            actual = select(select_dict),
+             visibility = visibility,
+         )
+ 
++    python3_select_dict = {
++        ":" + platform: "@{}_{}//:{}".format(prefix, platform, "python.exe" if "windows" in platform else "bin/python3")
++        for platform in platforms
++    }
++    if default_platform:
++        python3_select_dict["//conditions:default"] = "@{}_{}//:bin/python3".format(prefix, default_platform)
+     native.alias(
+         name = "python3",
+-        actual = select({
+-            ":" + platform: "@{}_{}//:{}".format(prefix, platform, "python.exe" if "windows" in platform else "bin/python3")
+-            for platform in platforms
+-        }),
++        actual = select(python3_select_dict),
+         visibility = visibility,
+     )
++
++    pip_select_dict = {
++        ":" + platform: "@{}_{}//:python_runtimes".format(prefix, platform)
++        for platform in platforms
++        if "windows" not in platform
++    }
++    if default_platform and "windows" not in default_platform:
++        pip_select_dict["//conditions:default"] = "@{}_{}//:python_runtimes".format(prefix, default_platform)
+     native.alias(
+         name = "pip",
+-        actual = select({
+-            ":" + platform: "@{}_{}//:python_runtimes".format(prefix, platform)
+-            for platform in platforms
+-            if "windows" not in platform
+-        }),
++        actual = select(pip_select_dict),
+         visibility = visibility,
+     )
