@@ -250,8 +250,9 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.router_filter_resetall_on_local_reply`` and legacy code paths.
 - area: router
   change: |
-    Removed runtime guard ``envoy.reloadable_features.reject_early_connect_data``. This is now controlled by the router filter
-    config option :ref:`reject_connect_request_early_data <envoy_v3_api_field_extensions.filters.http.router.v3.Router.reject_connect_request_early_data>`.
+    Removed runtime guard ``envoy.reloadable_features.reject_early_connect_data``.
+    This is now controlled by the router filter config option
+    :ref:`reject_connect_request_early_data <envoy_v3_api_field_extensions.filters.http.router.v3.Router.reject_connect_request_early_data>`.
 
 new_features:
 - area: composite filter
