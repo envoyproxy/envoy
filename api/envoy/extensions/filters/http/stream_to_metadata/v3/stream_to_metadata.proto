@@ -121,8 +121,7 @@ message StreamToMetadata {
 
   // Allowed content types for stream processing.
   // For SSE format, defaults to ["text/event-stream"].
-  // The content-type header is matched against this list (case-insensitive,
-  // ignoring parameters like charset).
+  // The content-type header value is matched exactly against this list.
   repeated string allowed_content_types = 3;
 
   // Maximum size in bytes for a single event before it's considered invalid

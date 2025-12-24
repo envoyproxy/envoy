@@ -266,15 +266,12 @@ bool Filter::applyRule(const Json::ObjectSharedPtr& json_obj, const Rule& rule) 
   }
 
   const auto& value = value_or.value();
-  bool wrote_any = false;
 
   for (const auto& descriptor : rule.rule_.metadata_descriptors()) {
-    if (writeMetadata(value, descriptor)) {
-      wrote_any = true;
-    }
+    writeMetadata(value, descriptor);
   }
 
-  return wrote_any;
+  return true;
 }
 
 absl::StatusOr<Json::ValueType>
@@ -326,7 +323,7 @@ Filter::extractValueFromJson(const Json::ObjectSharedPtr& json_obj,
   return absl::NotFoundError(absl::StrCat("Key '", final_key, "' not found"));
 }
 
-bool Filter::writeMetadata(const Json::ValueType& value, const MetadataDescriptor& descriptor) {
+void Filter::writeMetadata(const Json::ValueType& value, const MetadataDescriptor& descriptor) {
   if (descriptor.preserve_existing_metadata_value()) {
     const auto& filter_metadata =
         encoder_callbacks_->streamInfo().dynamicMetadata().filter_metadata();
@@ -337,7 +334,7 @@ bool Filter::writeMetadata(const Json::ValueType& value, const MetadataDescripto
         ENVOY_LOG(trace, "Preserving existing metadata value for key {} in namespace {}",
                   descriptor.key(), descriptor.metadata_namespace());
         config_->stats().preserved_existing_metadata_.inc();
-        return false;
+        return;
       }
     }
   }
@@ -345,7 +342,7 @@ bool Filter::writeMetadata(const Json::ValueType& value, const MetadataDescripto
   auto proto_value_or = convertToProtobufValue(value, descriptor.type());
   if (!proto_value_or.ok()) {
     ENVOY_LOG(warn, "Failed to convert value to protobuf: {}", proto_value_or.status().message());
-    return false;
+    return;
   }
 
   Protobuf::Struct metadata;
@@ -354,7 +351,6 @@ bool Filter::writeMetadata(const Json::ValueType& value, const MetadataDescripto
 
   ENVOY_LOG(trace, "Wrote metadata: namespace={}, key={}", descriptor.metadata_namespace(),
             descriptor.key());
-  return true;
 }
 
 absl::StatusOr<Protobuf::Value> Filter::convertToProtobufValue(const Json::ValueType& json_value,

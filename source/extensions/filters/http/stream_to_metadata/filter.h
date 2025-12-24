@@ -166,9 +166,8 @@ private:
    * Write a value to dynamic metadata.
    * @param value the value to write.
    * @param descriptor the metadata descriptor specifying where to write.
-   * @return true if written successfully, false if preserved existing value.
    */
-  bool writeMetadata(const Json::ValueType& value, const MetadataDescriptor& descriptor);
+  void writeMetadata(const Json::ValueType& value, const MetadataDescriptor& descriptor);
 
   /**
    * Convert a JSON value to a Protobuf Value.

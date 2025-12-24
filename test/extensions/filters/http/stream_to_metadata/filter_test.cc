@@ -162,6 +162,8 @@ TEST_F(StreamToMetadataFilterTest, NoContentTypeHeader) {
 }
 
 TEST_F(StreamToMetadataFilterTest, ContentTypeWithParameters) {
+  // Content-type matching is exact, so "text/event-stream; charset=utf-8" should NOT match
+  // "text/event-stream" in allowed_content_types.
   EXPECT_EQ(Http::FilterHeadersStatus::Continue,
             filter_->encodeHeaders(response_headers_with_params_, false));
 
@@ -169,11 +171,11 @@ TEST_F(StreamToMetadataFilterTest, ContentTypeWithParameters) {
       "data: {\"usage\":{\"prompt_tokens\":10,\"completion_tokens\":20,\"total_tokens\":30}}\n\n";
   addEncodeDataChunks(data, true);
 
+  // Verify no metadata was written since content-type didn't match
   auto metadata = getMetadata("envoy.lb", "tokens");
-  EXPECT_EQ(metadata.kind_case(), Protobuf::Value::kNumberValue);
-  EXPECT_EQ(metadata.number_value(), 30);
+  EXPECT_EQ(metadata.kind_case(), 0); // Not set
 
-  EXPECT_EQ(findCounter("stream_to_metadata.success"), 1);
+  EXPECT_EQ(findCounter("stream_to_metadata.mismatched_content_type"), 1);
 }
 
 TEST_F(StreamToMetadataFilterTest, BasicTokenExtraction) {
