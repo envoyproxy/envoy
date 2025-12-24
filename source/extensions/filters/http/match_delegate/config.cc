@@ -2,7 +2,6 @@
 
 #include <memory>
 
-#include "envoy/extensions/filters/http/composite/v3/composite.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/registry/registry.h"
 #include "envoy/type/matcher/v3/http_inputs.pb.h"
@@ -96,67 +95,6 @@ struct DelegatingFactoryCallbacks : public Envoy::Http::FilterChainFactoryCallba
   Envoy::Http::FilterChainFactoryCallbacks& delegated_callbacks_;
   Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> match_tree_;
 };
-
-// Compiles named filter chains from a Composite filter config.
-// Returns a shared pointer to the compiled map, or nullptr if not a Composite filter
-// or if there are no named filter chains.
-template <class FactoryCtx>
-Envoy::Http::Matching::NamedFilterChainFactoryMapConstSharedPtr
-compileNamedFilterChainsFromComposite(
-    const envoy::config::core::v3::TypedExtensionConfig& extension_config,
-    const std::string& stat_prefix, FactoryCtx& context,
-    ProtobufMessage::ValidationVisitor& validation_visitor, absl::Status& status) {
-  // Check if this is a Composite filter by type URL.
-  const std::string composite_type_url =
-      "type.googleapis.com/envoy.extensions.filters.http.composite.v3.Composite";
-  if (extension_config.typed_config().type_url() != composite_type_url) {
-    return nullptr;
-  }
-
-  // Parse the Composite config.
-  envoy::extensions::filters::http::composite::v3::Composite composite_config;
-  if (!extension_config.typed_config().UnpackTo(&composite_config)) {
-    status = absl::InvalidArgumentError("Failed to unpack Composite filter config");
-    return nullptr;
-  }
-
-  if (composite_config.named_filter_chains().empty()) {
-    return nullptr;
-  }
-
-  auto named_chains = std::make_shared<Envoy::Http::Matching::NamedFilterChainFactoryMap>();
-  for (const auto& [name, filter_chain_config] : composite_config.named_filter_chains()) {
-    if (filter_chain_config.typed_config().empty()) {
-      status = absl::InvalidArgumentError(
-          fmt::format("Named filter chain '{}' must contain at least one filter.", name));
-      return nullptr;
-    }
-
-    std::vector<Envoy::Http::FilterFactoryCb> filter_factories;
-    filter_factories.reserve(filter_chain_config.typed_config().size());
-
-    for (const auto& filter_config : filter_chain_config.typed_config()) {
-      auto& factory =
-          Config::Utility::getAndCheckFactory<Server::Configuration::NamedHttpFilterConfigFactory>(
-              filter_config);
-      ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
-          filter_config.typed_config(), validation_visitor, factory);
-      auto callback_or_status =
-          factory.createFilterFactoryFromProto(*message, stat_prefix, context);
-      if (!callback_or_status.status().ok()) {
-        status = absl::InvalidArgumentError(
-            fmt::format("Failed to create filter factory for filter '{}' in named filter chain "
-                        "'{}': {}",
-                        filter_config.name(), name, callback_or_status.status().message()));
-        return nullptr;
-      }
-      filter_factories.push_back(std::move(callback_or_status.value()));
-    }
-    (*named_chains)[name] = std::move(filter_factories);
-  }
-
-  return named_chains;
-}
 
 } // namespace Factory
 
@@ -338,23 +276,12 @@ absl::StatusOr<Envoy::Http::FilterFactoryCb> MatchDelegateConfig::createFilterFa
       Config::Utility::getAndCheckFactory<Server::Configuration::NamedHttpFilterConfigFactory>(
           proto_config.extension_config());
 
-  // Compile named filter chains from Composite config if present.
-  absl::Status compile_status = absl::OkStatus();
-  auto named_filter_chains = Factory::compileNamedFilterChainsFromComposite(
-      proto_config.extension_config(), prefix, context, context.messageValidationVisitor(),
-      compile_status);
-  RETURN_IF_NOT_OK(compile_status);
-
-  // Set the scope so actions can resolve filter_chain_ref.
-  Envoy::Http::Matching::ScopedNamedFilterChainSetter scope_setter(named_filter_chains);
-
   Envoy::Http::Matching::HttpFilterActionContext action_context{
       .is_downstream_ = true,
       .stat_prefix_ = prefix,
       .factory_context_ = context,
       .upstream_factory_context_ = absl::nullopt,
-      .server_factory_context_ = context.serverFactoryContext(),
-      .named_filter_chains_ = named_filter_chains};
+      .server_factory_context_ = context.serverFactoryContext()};
   return createFilterFactory(proto_config, prefix, context.messageValidationVisitor(),
                              action_context, context, factory);
 }
@@ -367,15 +294,12 @@ absl::StatusOr<Envoy::Http::FilterFactoryCb> MatchDelegateConfig::createFilterFa
       Config::Utility::getAndCheckFactory<Server::Configuration::UpstreamHttpFilterConfigFactory>(
           proto_config.extension_config());
 
-  // Named filter chains are not currently supported for upstream filters.
-  // The Composite filter's named_filter_chains feature is designed for downstream use.
   Envoy::Http::Matching::HttpFilterActionContext action_context{
       .is_downstream_ = false,
       .stat_prefix_ = prefix,
       .factory_context_ = absl::nullopt,
       .upstream_factory_context_ = context,
-      .server_factory_context_ = context.serverFactoryContext(),
-      .named_filter_chains_ = nullptr};
+      .server_factory_context_ = context.serverFactoryContext()};
   return createFilterFactory(proto_config, prefix,
                              context.serverFactoryContext().messageValidationVisitor(),
                              action_context, context, factory);
@@ -452,8 +376,7 @@ FilterConfigPerRoute::createFilterMatchTree(
                                                   server_context.scope().prefix())),
       .factory_context_ = absl::nullopt,
       .upstream_factory_context_ = absl::nullopt,
-      .server_factory_context_ = server_context,
-      .named_filter_chains_ = Envoy::Http::Matching::NamedFilterChainScope::get()};
+      .server_factory_context_ = server_context};
 
   Factory::MatchTreeValidationVisitor validation_visitor(*requirements);
   Matcher::MatchTreeFactory<Envoy::Http::HttpMatchingData,

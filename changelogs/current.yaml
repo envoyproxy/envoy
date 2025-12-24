@@ -263,7 +263,7 @@ new_features:
     Added support for named filter chains in the :ref:`Composite
     <envoy_v3_api_msg_extensions.filters.http.composite.v3.Composite>` filter config via the
     ``named_filter_chains`` field. These pre-compiled filter chains can be referenced from match
-    actions using the ``filter_chain_ref`` field in :ref:`ExecuteFilterAction
+    actions using the ``filter_chain_name`` field in :ref:`ExecuteFilterAction
     <envoy_v3_api_msg_extensions.filters.http.composite.v3.ExecuteFilterAction>`. This improves
     scalability by allowing filter chains to be defined once and referenced across many match actions.
 - area: server

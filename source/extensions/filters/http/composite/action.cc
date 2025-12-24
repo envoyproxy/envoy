@@ -1,8 +1,5 @@
 #include "source/extensions/filters/http/composite/action.h"
 
-#include "absl/strings/str_cat.h"
-#include "absl/strings/str_join.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -18,6 +15,11 @@ void ExecuteFilterAction::createFilters(Http::FilterChainFactoryCallbacks& callb
     for (const auto& factory_cb : filter_factories_) {
       factory_cb(callbacks);
     }
+    return;
+  }
+
+  // Named filter chain lookup is handled by the Filter at runtime.
+  if (is_named_filter_chain_lookup_) {
     return;
   }
 
@@ -46,13 +48,24 @@ ExecuteFilterActionFactory::createAction(const Protobuf::Message& config,
       const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction&>(
       config, validation_visitor);
 
-  // Priority order: filter_chain > filter_chain_ref > dynamic_config > typed_config
+  // Priority order: filter_chain > filter_chain_name > dynamic_config > typed_config
   if (composite_action.has_filter_chain()) {
     return createFilterChainAction(composite_action, context, validation_visitor);
   }
 
-  if (!composite_action.filter_chain_ref().empty()) {
-    return createFilterChainRefAction(composite_action, context);
+  if (!composite_action.filter_chain_name().empty()) {
+    // Create an action that just stores the name. The actual filter chain lookup
+    // will happen at runtime in the Composite filter.
+    ASSERT(context.server_factory_context_ != absl::nullopt);
+    Envoy::Runtime::Loader& runtime = context.server_factory_context_->runtime();
+
+    return std::make_shared<ExecuteFilterAction>(
+        composite_action.filter_chain_name(),
+        composite_action.has_sample_percent()
+            ? absl::make_optional<envoy::config::core::v3::RuntimeFractionalPercent>(
+                  composite_action.sample_percent())
+            : absl::nullopt,
+        runtime);
   }
 
   if (composite_action.has_dynamic_config()) {
@@ -176,46 +189,6 @@ Matcher::ActionConstSharedPtr ExecuteFilterActionFactory::createStaticActionUpst
   }
 
   return createActionCommon(composite_action, context, callback, false);
-}
-
-Matcher::ActionConstSharedPtr ExecuteFilterActionFactory::createFilterChainRefAction(
-    const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
-    Http::Matching::HttpFilterActionContext& context) {
-  const std::string& ref_name = composite_action.filter_chain_ref();
-
-  // Check if named filter chains are available.
-  if (!context.named_filter_chains_) {
-    throw EnvoyException(fmt::format(
-        "filter_chain_ref '{}' references a named filter chain, but no named filter chains "
-        "are defined in the Composite filter config.",
-        ref_name));
-  }
-
-  // Look up the named filter chain.
-  auto it = context.named_filter_chains_->find(ref_name);
-  if (it == context.named_filter_chains_->end()) {
-    throw EnvoyException(fmt::format(
-        "filter_chain_ref '{}' not found. Available named filter chains: [{}]", ref_name,
-        absl::StrJoin(*context.named_filter_chains_, ", ", [](std::string* out, const auto& pair) {
-          absl::StrAppend(out, pair.first);
-        })));
-  }
-
-  // The filter chain has already been pre-compiled at config time.
-  // Create a copy of the filter factories vector for the action.
-  FilterFactoryCbList filter_factories(it->second.begin(), it->second.end());
-
-  ASSERT(context.server_factory_context_ != absl::nullopt);
-  Envoy::Runtime::Loader& runtime = context.server_factory_context_->runtime();
-
-  // Use the reference name as the action name for filter chain references.
-  return std::make_shared<ExecuteFilterAction>(
-      std::move(filter_factories), ref_name,
-      composite_action.has_sample_percent()
-          ? absl::make_optional<envoy::config::core::v3::RuntimeFractionalPercent>(
-                composite_action.sample_percent())
-          : absl::nullopt,
-      runtime);
 }
 
 Matcher::ActionConstSharedPtr ExecuteFilterActionFactory::createFilterChainAction(

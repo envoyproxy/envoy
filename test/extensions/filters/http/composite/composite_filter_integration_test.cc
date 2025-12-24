@@ -1001,7 +1001,7 @@ TEST_P(CompositeFilterChainIntegrationTest, TestNoMatchBypassesFilterChain) {
 }
 
 // Tests that a named filter chain defined in Composite config can be referenced by
-// filter_chain_ref.
+// filter_chain_name.
 class NamedFilterChainIntegrationTest : public testing::TestWithParam<CompositeFilterTestParams>,
                                         public HttpIntegrationTest {
 public:
@@ -1047,7 +1047,7 @@ public:
                     name: composite-action
                     typed_config:
                       "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.ExecuteFilterAction
-                      filter_chain_ref: "%s"
+                      filter_chain_name: "%s"
     )EOF",
                         composite_name, chain_name, proto_type_, chain_name);
     config_helper_.prependFilter(filter_config, downstream_filter_);
@@ -1094,13 +1094,13 @@ public:
                     name: composite-action-418
                     typed_config:
                       "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.ExecuteFilterAction
-                      filter_chain_ref: "chain-418"
+                      filter_chain_name: "chain-418"
                 use-503:
                   action:
                     name: composite-action-503
                     typed_config:
                       "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.ExecuteFilterAction
-                      filter_chain_ref: "chain-503"
+                      filter_chain_name: "chain-503"
     )EOF",
                                                 composite_name, proto_type_, proto_type_);
     config_helper_.prependFilter(filter_config, downstream_filter_);
@@ -1171,7 +1171,7 @@ INSTANTIATE_TEST_SUITE_P(
     testing::ValuesIn(NamedFilterChainIntegrationTest::getValuesForNamedFilterChainTest()),
     NamedFilterChainIntegrationTest::NamedFilterChainTestParamsToString);
 
-// Verifies that a named filter chain is executed correctly when referenced via filter_chain_ref.
+// Verifies that a named filter chain is executed correctly when referenced via filter_chain_name.
 TEST_P(NamedFilterChainIntegrationTest, TestNamedFilterChainRef) {
   addNamedFilterChainAndCompositeFilter("test-chain");
   initialize();
