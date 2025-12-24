@@ -71,7 +71,8 @@ For example, the following Envoy configuration snippet shows how to configure ``
 .. literalinclude:: _include/json-format-config.yaml
     :language: yaml
     :linenos:
-    :emphasize-lines: 15-23
+    :lines: 13-25
+    :emphasize-lines: 3-11
     :caption: :download:`json-format-config.yaml <_include/json-format-config.yaml>`
 
 The following JSON object would be written to the log file:
