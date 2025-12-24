@@ -206,6 +206,32 @@ TEST(StreamToMetadataConfigTest, InvalidConfigMissingKey) {
   EXPECT_THROW(TestUtility::loadFromYamlAndValidate(yaml, proto_config), EnvoyException);
 }
 
+TEST(StreamToMetadataConfigTest, InvalidConfigNoJsonPath) {
+  // Create a config programmatically with an empty selector (not possible via YAML)
+  envoy::extensions::filters::http::stream_to_metadata::v3::StreamToMetadata proto_config;
+  auto* rules = proto_config.mutable_response_rules();
+  rules->set_format(envoy::extensions::filters::http::stream_to_metadata::v3::StreamToMetadata::
+                        SERVER_SENT_EVENTS);
+
+  auto* rule = rules->add_rules();
+  rule->mutable_selector(); // Create empty selector (no json_path)
+
+  auto* descriptor = rule->add_metadata_descriptors();
+  descriptor->set_metadata_namespace("envoy.lb");
+  descriptor->set_key("tokens");
+  descriptor->set_type(
+      envoy::extensions::filters::http::stream_to_metadata::v3::StreamToMetadata::NUMBER);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  StreamToMetadataConfig factory;
+
+  // Should fail because selector doesn't have json_path
+  auto result = factory.createFilterFactoryFromProto(proto_config, "stats", context);
+  EXPECT_FALSE(result.ok());
+  EXPECT_THAT(result.status().message(),
+              testing::HasSubstr("Selector must have json_path specified"));
+}
+
 } // namespace
 } // namespace StreamToMetadata
 } // namespace HttpFilters

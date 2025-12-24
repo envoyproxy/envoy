@@ -749,6 +749,204 @@ TEST_F(StreamToMetadataFilterTest, MaxSizeDisabled) {
   EXPECT_EQ(findCounter("stream_to_metadata.resp.success"), 1);
 }
 
+TEST_F(StreamToMetadataFilterTest, CustomContentTypes) {
+  const std::string config = R"EOF(
+  response_rules:
+    format: SERVER_SENT_EVENTS
+    allowed_content_types:
+      - "application/stream+json"
+      - "text/custom-stream"
+    rules:
+      - selector:
+          json_path:
+            path: ["value"]
+        metadata_descriptors:
+          - metadata_namespace: "envoy.lb"
+            key: "result"
+  )EOF";
+  setupFilter(config);
+
+  // Test first custom content type
+  Http::TestResponseHeaderMapImpl custom_headers1{{"content-type", "application/stream+json"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(custom_headers1, false));
+  addEncodeDataChunks("data: {\"value\":123}\n\n", true);
+
+  auto metadata = getMetadata("envoy.lb", "result");
+  EXPECT_EQ(metadata.number_value(), 123);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.success"), 1);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.mismatched_content_type"), 0);
+}
+
+TEST_F(StreamToMetadataFilterTest, StringToNumberConversionFailure) {
+  const std::string config = R"EOF(
+  response_rules:
+    format: SERVER_SENT_EVENTS
+    rules:
+      - selector:
+          json_path:
+            path: ["value"]
+        metadata_descriptors:
+          - metadata_namespace: "envoy.lb"
+            key: "result"
+            type: NUMBER
+  )EOF";
+  setupFilter(config);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
+
+  // String value that cannot be converted to number
+  addEncodeDataChunks("data: {\"value\":\"not-a-number\"}\n\n", true);
+
+  // Should succeed in extraction but fail in conversion, so no metadata written
+  auto metadata = getMetadata("envoy.lb", "result");
+  EXPECT_EQ(metadata.kind_case(), 0); // Not set
+
+  // The rule application succeeds but writeMetadata logs warning
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.success"), 1);
+}
+
+TEST_F(StreamToMetadataFilterTest, BoolToNumberConversion) {
+  const std::string config = R"EOF(
+  response_rules:
+    format: SERVER_SENT_EVENTS
+    rules:
+      - selector:
+          json_path:
+            path: ["flag"]
+        metadata_descriptors:
+          - metadata_namespace: "envoy.lb"
+            key: "result"
+            type: NUMBER
+  )EOF";
+  setupFilter(config);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
+  addEncodeDataChunks("data: {\"flag\":true}\n\n", true);
+
+  auto metadata = getMetadata("envoy.lb", "result");
+  EXPECT_EQ(metadata.number_value(), 1.0);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.success"), 1);
+}
+
+TEST_F(StreamToMetadataFilterTest, BoolToStringConversion) {
+  const std::string config = R"EOF(
+  response_rules:
+    format: SERVER_SENT_EVENTS
+    rules:
+      - selector:
+          json_path:
+            path: ["flag"]
+        metadata_descriptors:
+          - metadata_namespace: "envoy.lb"
+            key: "result"
+            type: STRING
+  )EOF";
+  setupFilter(config);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
+  addEncodeDataChunks("data: {\"flag\":false}\n\n", true);
+
+  auto metadata = getMetadata("envoy.lb", "result");
+  EXPECT_EQ(metadata.string_value(), "false");
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.success"), 1);
+}
+
+TEST_F(StreamToMetadataFilterTest, NumberToStringConversion) {
+  const std::string config = R"EOF(
+  response_rules:
+    format: SERVER_SENT_EVENTS
+    rules:
+      - selector:
+          json_path:
+            path: ["count"]
+        metadata_descriptors:
+          - metadata_namespace: "envoy.lb"
+            key: "result"
+            type: STRING
+  )EOF";
+  setupFilter(config);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
+  addEncodeDataChunks("data: {\"count\":42}\n\n", true);
+
+  auto metadata = getMetadata("envoy.lb", "result");
+  EXPECT_EQ(metadata.string_value(), "42");
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.success"), 1);
+}
+
+TEST_F(StreamToMetadataFilterTest, DoubleToStringConversion) {
+  const std::string config = R"EOF(
+  response_rules:
+    format: SERVER_SENT_EVENTS
+    rules:
+      - selector:
+          json_path:
+            path: ["value"]
+        metadata_descriptors:
+          - metadata_namespace: "envoy.lb"
+            key: "result"
+            type: STRING
+  )EOF";
+  setupFilter(config);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
+  addEncodeDataChunks("data: {\"value\":3.14}\n\n", true);
+
+  auto metadata = getMetadata("envoy.lb", "result");
+  EXPECT_EQ(metadata.string_value(), "3.14");
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.success"), 1);
+}
+
+TEST_F(StreamToMetadataFilterTest, FieldWithoutColon) {
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
+
+  // Field name without colon (treated as field with empty value per SSE spec)
+  const std::string data = "data\n\n";
+  addEncodeDataChunks(data, true);
+
+  // Empty data field
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.success"), 0);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.no_data_field"), 1);
+}
+
+TEST_F(StreamToMetadataFilterTest, IntermediatePathNotObject) {
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
+
+  // 'usage' is a string, not an object, so can't traverse to 'total_tokens'
+  addEncodeDataChunks("data: {\"usage\":\"not-an-object\"}\n\n", true);
+
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.success"), 0);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.selector_not_found"), 1);
+}
+
+TEST_F(StreamToMetadataFilterTest, StopProcessingOnMatch) {
+  const std::string config = R"EOF(
+  response_rules:
+    format: SERVER_SENT_EVENTS
+    rules:
+      - selector:
+          json_path:
+            path: ["usage", "total_tokens"]
+        metadata_descriptors:
+          - metadata_namespace: "envoy.lb"
+            key: "tokens"
+            type: NUMBER
+        stop_processing_on_match: true
+  )EOF";
+  setupFilter(config);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
+
+  // First event matches and should stop processing
+  addEncodeDataChunks("data: {\"usage\":{\"total_tokens\":30}}\n\n");
+
+  // This should not be processed due to stop_processing_on_match
+  addEncodeDataChunks("data: {\"usage\":{\"total_tokens\":99}}\n\n", true);
+
+  auto metadata = getMetadata("envoy.lb", "tokens");
+  EXPECT_EQ(metadata.number_value(), 30);                       // First value, not 99
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.success"), 1); // Only one success
+}
+
 } // namespace
 } // namespace StreamToMetadata
 } // namespace HttpFilters
