@@ -985,6 +985,32 @@ TEST_F(StreamToMetadataFilterTest, FormatGetter) {
                                    StreamToMetadata::SERVER_SENT_EVENTS);
 }
 
+TEST_F(StreamToMetadataFilterTest, StringToNumberConversionSuccess) {
+  const std::string config = R"EOF(
+  response_rules:
+    format: SERVER_SENT_EVENTS
+    rules:
+      - selector:
+          json_path:
+            path: ["price"]
+        metadata_descriptors:
+          - metadata_namespace: "envoy.lb"
+            key: "price_as_number"
+            type: NUMBER
+  )EOF";
+  setupFilter(config);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
+
+  // JSON field with string value that contains a valid number
+  addEncodeDataChunks("data: {\"price\":\"123.45\"}\n\n", true);
+
+  // String should be parsed and converted to number
+  auto metadata = getMetadata("envoy.lb", "price_as_number");
+  EXPECT_EQ(metadata.number_value(), 123.45);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.success"), 1);
+}
+
 } // namespace
 } // namespace StreamToMetadata
 } // namespace HttpFilters
