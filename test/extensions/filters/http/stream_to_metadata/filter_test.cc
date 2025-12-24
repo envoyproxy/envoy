@@ -943,7 +943,7 @@ TEST_F(StreamToMetadataFilterTest, StopProcessingOnMatch) {
   addEncodeDataChunks("data: {\"usage\":{\"total_tokens\":99}}\n\n", true);
 
   auto metadata = getMetadata("envoy.lb", "tokens");
-  EXPECT_EQ(metadata.number_value(), 30);                       // First value, not 99
+  EXPECT_EQ(metadata.number_value(), 30); // First value, not 99
   EXPECT_EQ(findCounter("stream_to_metadata.resp.success"), 1);
 }
 
