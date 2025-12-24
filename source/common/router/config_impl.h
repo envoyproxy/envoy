@@ -38,6 +38,7 @@
 #include "source/common/router/tls_context_match_criteria_impl.h"
 #include "source/common/stats/symbol_table.h"
 
+#include "absl/container/inlined_vector.h"
 #include "absl/container/node_hash_map.h"
 #include "absl/types/optional.h"
 
@@ -389,7 +390,7 @@ private:
   std::shared_ptr<const SslRedirectRoute> ssl_redirect_route_;
   SslRequirements ssl_requirements_;
 
-  std::vector<RouteEntryImplBaseConstSharedPtr> routes_;
+  absl::InlinedVector<RouteEntryImplBaseConstSharedPtr, 2> routes_;
   Matcher::MatchTreeSharedPtr<Http::HttpMatchingData> matcher_;
 };
 

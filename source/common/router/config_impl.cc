@@ -1755,6 +1755,7 @@ VirtualHostImpl::VirtualHostImpl(const envoy::config::route::v3::VirtualHost& vi
       return;
     }
   } else {
+    routes_.reserve(virtual_host.routes().size());
     for (const auto& route : virtual_host.routes()) {
       auto route_or_error = RouteCreator::createAndValidateRoute(
           route, shared_virtual_host_, factory_context, validator, validate_clusters);
