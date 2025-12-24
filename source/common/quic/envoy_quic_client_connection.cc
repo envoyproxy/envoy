@@ -8,6 +8,8 @@
 #include "source/common/network/udp_packet_writer_handler_impl.h"
 #include "source/common/runtime/runtime_features.h"
 
+#include "absl/status/statusor.h"
+
 namespace Envoy {
 namespace Quic {
 
@@ -86,9 +88,18 @@ void EnvoyQuicClientConnection::EnvoyQuicClinetPathContextFactory::CreatePathVal
           ? connection_.connectionSocket()->connectionInfoProvider().remoteAddress()
           : quicAddressToEnvoyAddressInstance(peer_address);
   // new_local_address will be re-assigned if it is nullptr.
-  QuicClientPacketWriterFactory::CreationResult result =
+  absl::StatusOr<QuicClientPacketWriterFactory::CreationResult> result_or =
       writer_factory_.createSocketAndQuicPacketWriter(remote_address, network, new_local_address,
                                                       connection_.connectionSocket()->options());
+
+  if (!result_or.ok()) {
+    ENVOY_LOG_MISC(warn, "Failed to create probing socket for path validation: {}",
+                   result_or.status().message());
+    result_delegate->OnCreationFailed(network, result_or.status().message());
+    return;
+  }
+
+  QuicClientPacketWriterFactory::CreationResult result = std::move(*result_or);
   connection_.setUpConnectionSocket(*result.socket_, connection_.delegate_);
   result_delegate->OnCreationSucceeded(std::make_unique<EnvoyQuicClientPathValidationContext>(
       envoyIpAddressToQuicSocketAddress(new_local_address->ip()), peer_address, network,
@@ -263,12 +274,20 @@ void EnvoyQuicClientConnection::probeWithNewPort(const quic::QuicSocketAddress& 
 
   // The probing socket will have the same host but a different port.
   ASSERT(migration_helper_ == nullptr && writer_factory_.has_value());
-  QuicClientPacketWriterFactory::CreationResult creation_result =
+  absl::StatusOr<QuicClientPacketWriterFactory::CreationResult> creation_result_or =
       writer_factory_->createSocketAndQuicPacketWriter(
           (peer_addr == peer_address()
                ? connectionSocket()->connectionInfoProvider().remoteAddress()
                : quicAddressToEnvoyAddressInstance(peer_addr)),
           quic::kInvalidNetworkHandle, new_local_address, connectionSocket()->options());
+
+  if (!creation_result_or.ok()) {
+    ENVOY_LOG_MISC(warn, "Failed to create probing socket for path validation: {}",
+                   creation_result_or.status().message());
+    return;
+  }
+
+  QuicClientPacketWriterFactory::CreationResult creation_result = std::move(*creation_result_or);
   setUpConnectionSocket(*creation_result.socket_, delegate_);
   auto writer = std::move(creation_result.writer_);
   quic::QuicSocketAddress self_address = envoyIpAddressToQuicSocketAddress(

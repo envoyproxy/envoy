@@ -11,6 +11,7 @@
 #include "source/common/network/connection_socket_impl.h"
 #include "source/common/quic/quic_io_handle_wrapper.h"
 
+#include "absl/status/statusor.h"
 #include "openssl/ssl.h"
 #include "quiche/common/http/http_header_block.h"
 #include "quiche/quic/core/http/quic_connection_migration_manager.h"
@@ -180,7 +181,8 @@ Http::StreamResetReason quicErrorCodeToEnvoyRemoteResetReason(quic::QuicErrorCod
 
 // Create a connection socket instance and apply given socket options to the
 // socket. IP_PKTINFO and SO_RXQ_OVFL is always set if supported.
-Network::ConnectionSocketPtr
+// Returns StatusOr to allow error propagation.
+absl::StatusOr<Network::ConnectionSocketPtr>
 createConnectionSocket(const Network::Address::InstanceConstSharedPtr& peer_addr,
                        Network::Address::InstanceConstSharedPtr& local_addr,
                        const Network::ConnectionSocket::OptionsSharedPtr& options);

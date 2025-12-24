@@ -15,6 +15,7 @@
 #include "source/common/router/upstream_request.h"
 #include "source/common/stream_info/stream_info_impl.h"
 
+#include "absl/status/statusor.h"
 #include "quiche/common/capsule.h"
 #include "quiche/common/simple_buffer_allocator.h"
 
@@ -41,14 +42,12 @@ public:
 
   Upstream::HostDescriptionConstSharedPtr host() const override { return host_; }
 
-  Network::SocketPtr createSocket(const Upstream::HostConstSharedPtr& host) {
+  absl::StatusOr<Network::SocketPtr> createSocket(const Upstream::HostConstSharedPtr& host) {
     const Network::Address::InstanceConstSharedPtr& host_address = host->address();
-    auto ret = std::make_unique<Network::SocketImpl>(Network::Socket::Type::Datagram,
-                                                     /*address_for_io_handle=*/host_address,
-                                                     /*remote_address=*/host_address,
-                                                     Network::SocketCreationOptions{});
-    RELEASE_ASSERT(ret->isOpen(), "Socket creation fail");
-    return ret;
+    return Network::SocketImpl::create(Network::Socket::Type::Datagram,
+                                       /*address_for_io_handle=*/host_address,
+                                       /*remote_address=*/host_address,
+                                       Network::SocketCreationOptions{});
   }
 
   bool valid() const override { return host_ != nullptr; }

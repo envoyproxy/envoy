@@ -5,6 +5,7 @@
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
+#include "absl/status/statusor.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "quiche/quic/test_tools/quic_test_utils.h"
@@ -340,13 +341,18 @@ TEST(EnvoyQuicUtilsTest, CreateConnectionSocket) {
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1");
   Network::Address::InstanceConstSharedPtr peer_addr =
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 54321, nullptr);
-  auto connection_socket = createConnectionSocket(peer_addr, local_addr, nullptr);
+  absl::StatusOr<Network::ConnectionSocketPtr> connection_socket_or =
+      createConnectionSocket(peer_addr, local_addr, nullptr);
+  ASSERT_TRUE(connection_socket_or.ok());
+  Network::ConnectionSocketPtr connection_socket = std::move(*connection_socket_or);
   EXPECT_TRUE(connection_socket->isOpen());
   EXPECT_TRUE(connection_socket->ioHandle().wasConnected());
   connection_socket->close();
 
   Network::Address::InstanceConstSharedPtr no_local_addr = nullptr;
-  connection_socket = createConnectionSocket(peer_addr, no_local_addr, nullptr);
+  connection_socket_or = createConnectionSocket(peer_addr, no_local_addr, nullptr);
+  ASSERT_TRUE(connection_socket_or.ok());
+  connection_socket = std::move(*connection_socket_or);
   EXPECT_TRUE(connection_socket->isOpen());
   EXPECT_TRUE(connection_socket->ioHandle().wasConnected());
   EXPECT_EQ("127.0.0.1", no_local_addr->ip()->addressAsString());
@@ -372,7 +378,9 @@ TEST(EnvoyQuicUtilsTest, CreateConnectionSocket) {
       std::make_shared<Network::Address::Ipv6Instance>("::1", 0, nullptr, /*v6only*/ true);
   Network::Address::InstanceConstSharedPtr peer_addr_v6 =
       std::make_shared<Network::Address::Ipv6Instance>("::1", 54321, nullptr, /*v6only*/ false);
-  connection_socket = createConnectionSocket(peer_addr_v6, local_addr_v6, nullptr);
+  connection_socket_or = createConnectionSocket(peer_addr_v6, local_addr_v6, nullptr);
+  ASSERT_TRUE(connection_socket_or.ok());
+  connection_socket = std::move(*connection_socket_or);
   EXPECT_TRUE(connection_socket->isOpen());
   EXPECT_TRUE(connection_socket->ioHandle().wasConnected());
   EXPECT_TRUE(local_addr_v6->ip()->ipv6()->v6only());
@@ -405,7 +413,9 @@ TEST(EnvoyQuicUtilsTest, CreateConnectionSocket) {
   connection_socket->close();
 
   Network::Address::InstanceConstSharedPtr no_local_addr_v6 = nullptr;
-  connection_socket = createConnectionSocket(peer_addr_v6, no_local_addr_v6, nullptr);
+  connection_socket_or = createConnectionSocket(peer_addr_v6, no_local_addr_v6, nullptr);
+  ASSERT_TRUE(connection_socket_or.ok());
+  connection_socket = std::move(*connection_socket_or);
   EXPECT_TRUE(connection_socket->isOpen());
   EXPECT_TRUE(connection_socket->ioHandle().wasConnected());
   EXPECT_EQ("::1", no_local_addr_v6->ip()->addressAsString());

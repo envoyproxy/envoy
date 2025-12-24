@@ -1757,13 +1757,15 @@ TEST_F(ConnectivityGridTest, ConnectionCloseDuringAsyncConnect) {
   initialize();
   EXPECT_CALL(*cluster_, connectTimeout()).WillRepeatedly(Return(std::chrono::seconds(10)));
 
-  testing::InSequence s;
   dispatcher_.allow_null_callback_ = true;
   // Set the cluster up to have a quic transport socket.
   Envoy::Ssl::ClientContextConfigPtr config(new NiceMock<Ssl::MockClientContextConfig>());
   Ssl::ClientContextSharedPtr ssl_context(new Ssl::MockClientContext());
-  EXPECT_CALL(factory_context_.server_context_.ssl_context_manager_, createSslClientContext(_, _))
-      .WillOnce(Return(ssl_context));
+  {
+    testing::InSequence s;
+    EXPECT_CALL(factory_context_.server_context_.ssl_context_manager_, createSslClientContext(_, _))
+        .WillOnce(Return(ssl_context));
+  }
   auto factory =
       *Quic::QuicClientTransportSocketFactory::create(std::move(config), factory_context_);
   factory->initialize();
@@ -1786,15 +1788,24 @@ TEST_F(ConnectivityGridTest, ConnectionCloseDuringAsyncConnect) {
 
   NiceMock<Api::MockOsSysCalls> os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
-  EXPECT_CALL(os_sys_calls, socket(_, _, _)).WillOnce(Return(Api::SysCallSocketResult{1, 0}));
+
+  // Set up setsockopt_ expectation to allow any number of calls
+  EXPECT_CALL(os_sys_calls, setsockopt_(_, _, _, _, _)).WillRepeatedly(Return(0));
+
+  {
+    testing::InSequence s2;
+    // First socket() call is for ipFamilySupported() check
+    EXPECT_CALL(os_sys_calls, socket(_, _, _)).WillOnce(Return(Api::SysCallSocketResult{2, 0}));
+    // Close for the ipFamilySupported() check socket
+    EXPECT_CALL(os_sys_calls, close(2)).WillOnce(Return(Api::SysCallIntResult{0, 0}));
+    // Second socket() call is for actual connection
+    EXPECT_CALL(os_sys_calls, socket(_, _, _)).WillOnce(Return(Api::SysCallSocketResult{1, 0}));
+  }
 #if defined(__APPLE__) || defined(WIN32)
   EXPECT_CALL(os_sys_calls, setsocketblocking(1, false))
-      .WillOnce(Return(Api::SysCallIntResult{1, 0}));
+      .WillOnce(Return(Api::SysCallIntResult{0, 0}));
 #endif
-  EXPECT_CALL(os_sys_calls, setsockopt_(_, _, _, _, _))
-      .Times(testing::AtLeast(0u))
-      .WillRepeatedly(Return(0));
-  EXPECT_CALL(os_sys_calls, connect(_, _, _)).WillOnce(Return(Api::SysCallIntResult{1, 0}));
+  EXPECT_CALL(os_sys_calls, connect(_, _, _)).WillOnce(Return(Api::SysCallIntResult{0, 0}));
   EXPECT_CALL(os_sys_calls, getsockname(_, _, _))
       .WillOnce(Invoke([](os_fd_t, sockaddr* addr, socklen_t* addrlen) -> Api::SysCallIntResult {
         sockaddr_in* addr_in = reinterpret_cast<sockaddr_in*>(addr);
@@ -1804,7 +1815,6 @@ TEST_F(ConnectivityGridTest, ConnectionCloseDuringAsyncConnect) {
         *addrlen = sizeof(sockaddr_in);
         return Api::SysCallIntResult{0, 0};
       }));
-  EXPECT_CALL(os_sys_calls, setsockopt_(_, _, _, _, _)).WillRepeatedly(Return(0));
   auto* async_connect_callback = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
 
   ConnectionPool::Cancellable* cancel = pool->newStream(decoder_, callbacks_,

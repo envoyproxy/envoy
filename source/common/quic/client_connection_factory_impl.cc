@@ -7,6 +7,8 @@
 #include "source/common/quic/quic_transport_socket_factory.h"
 #include "source/common/runtime/runtime_features.h"
 
+#include "absl/status/statusor.h"
+
 namespace Envoy {
 namespace Quic {
 
@@ -66,9 +68,19 @@ std::unique_ptr<Network::ClientConnection> createQuicNetworkConnection(
   quic::ParsedQuicVersionVector quic_versions = quic::CurrentSupportedHttp3Versions();
   ASSERT(!quic_versions.empty());
   ASSERT(info_impl->writer_factory_ != nullptr);
-  QuicClientPacketWriterFactory::CreationResult creation_result =
+
+  absl::StatusOr<QuicClientPacketWriterFactory::CreationResult> creation_result_or =
       info_impl->writer_factory_->createSocketAndQuicPacketWriter(
           server_addr, quic::kInvalidNetworkHandle, local_addr, options);
+
+  if (!creation_result_or.ok()) {
+    ENVOY_LOG_MISC(error, "Failed to create QUIC socket: {}",
+                   creation_result_or.status().message());
+    return nullptr;
+  }
+
+  QuicClientPacketWriterFactory::CreationResult creation_result = std::move(*creation_result_or);
+
   const bool use_migration_in_quiche =
       Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_migration_in_quiche");
   quic::QuicForceBlockablePacketWriter* wrapper = nullptr;

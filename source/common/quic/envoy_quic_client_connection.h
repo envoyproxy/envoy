@@ -11,6 +11,8 @@
 #include "quiche/quic/core/http/quic_spdy_client_session.h"
 #include "quiche/quic/core/quic_connection.h"
 
+#include "absl/status/statusor.h"
+
 namespace Envoy {
 namespace Quic {
 
@@ -33,9 +35,9 @@ public:
    * @param local_addr The local address to bind if not nullptr and if the network is invalid. Will
    * be set to the actual local address of the created socket.
    * @param options The socket options to apply.
-   * @return A struct containing the created socket and writer objects.
+   * @return StatusOr containing a struct with the created socket and writer objects, or an error.
    */
-  virtual CreationResult
+  virtual absl::StatusOr<CreationResult>
   createSocketAndQuicPacketWriter(Network::Address::InstanceConstSharedPtr server_addr,
                                   quic::QuicNetworkHandle network,
                                   Network::Address::InstanceConstSharedPtr& local_addr,

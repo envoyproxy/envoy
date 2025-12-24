@@ -15,6 +15,8 @@
 #include "source/common/network/socket_impl.h"
 #include "source/common/network/socket_interface.h"
 
+#include "absl/status/statusor.h"
+
 namespace Envoy {
 namespace Network {
 
@@ -33,17 +35,22 @@ template <> struct NetworkSocketTrait<Socket::Type::Datagram> {
 
 class ConnectionSocketImpl : public SocketImpl, public ConnectionSocket {
 public:
+  // Constructor for wrapping existing IoHandle
   ConnectionSocketImpl(IoHandlePtr&& io_handle,
                        const Address::InstanceConstSharedPtr& local_address,
                        const Address::InstanceConstSharedPtr& remote_address)
       : SocketImpl(std::move(io_handle), local_address, remote_address) {}
 
+  // Factory method that returns StatusOr for socket creation errors
+  static absl::StatusOr<std::unique_ptr<ConnectionSocketImpl>>
+  create(Socket::Type type, const Address::InstanceConstSharedPtr& local_address,
+         const Address::InstanceConstSharedPtr& remote_address,
+         const SocketCreationOptions& options);
+
+  // Legacy constructor - deleted, use create() instead
   ConnectionSocketImpl(Socket::Type type, const Address::InstanceConstSharedPtr& local_address,
                        const Address::InstanceConstSharedPtr& remote_address,
-                       const SocketCreationOptions& options)
-      : SocketImpl(type, local_address, remote_address, options) {
-    connection_info_provider_->setLocalAddress(local_address);
-  }
+                       const SocketCreationOptions& options) = delete;
 
   // Network::ConnectionSocket
   void setDetectedTransportProtocol(absl::string_view protocol) override {
@@ -91,16 +98,33 @@ public:
   }
 
 protected:
+  // Protected constructor for use by factory method
+  ConnectionSocketImpl(IoHandlePtr&& io_handle, Socket::Type sock_type, Address::Type addr_type,
+                       const Address::InstanceConstSharedPtr& local_address,
+                       const Address::InstanceConstSharedPtr& remote_address)
+      : SocketImpl(std::move(io_handle), sock_type, addr_type, remote_address) {
+    connection_info_provider_->setLocalAddress(local_address);
+  }
+
   std::string transport_protocol_;
 };
 
 // ConnectionSocket used with client connections.
 class ClientSocketImpl : public ConnectionSocketImpl {
 public:
+  // Factory method that returns StatusOr for socket creation errors
+  static absl::StatusOr<std::unique_ptr<ClientSocketImpl>>
+  create(const Address::InstanceConstSharedPtr& remote_address, const OptionsSharedPtr& options);
+
+  // Legacy constructor - deleted, use create() instead
   ClientSocketImpl(const Address::InstanceConstSharedPtr& remote_address,
+                   const OptionsSharedPtr& options) = delete;
+
+protected:
+  // Protected constructor for use by factory method
+  ClientSocketImpl(IoHandlePtr&& io_handle, const Address::InstanceConstSharedPtr& remote_address,
                    const OptionsSharedPtr& options)
-      : ConnectionSocketImpl(Network::ioHandleForAddr(Socket::Type::Stream, remote_address, {}),
-                             nullptr, remote_address) {
+      : ConnectionSocketImpl(std::move(io_handle), nullptr, remote_address) {
     if (options) {
       addOptions(options);
     }
