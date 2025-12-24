@@ -16,7 +16,7 @@ DynamicModuleListenerFilterConfig::DynamicModuleListenerFilterConfig(
       dynamic_module_(std::move(dynamic_module)) {}
 
 DynamicModuleListenerFilterConfig::~DynamicModuleListenerFilterConfig() {
-  if (in_module_config_ != nullptr && on_listener_filter_config_destroy_ != nullptr) {
+  if (in_module_config_ != nullptr) {
     on_listener_filter_config_destroy_(in_module_config_);
   }
 }
