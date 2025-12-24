@@ -70,7 +70,7 @@ message DynamicModuleNetworkFilter {
   //
   google.protobuf.Any filter_config = 3;
 
-  // If true, the dynamic module is a terminal filter to use without an upstream connection.
+  // If ``true``, the dynamic module is a terminal filter to use without an upstream connection.
   //
   // The dynamic module is responsible for creating and sending the response to downstream.
   //
