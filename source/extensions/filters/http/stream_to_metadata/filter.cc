@@ -303,7 +303,7 @@ Filter::extractValueFromJson(const Json::ObjectSharedPtr& json_obj,
 
   auto int_val = current->getInteger(final_key);
   if (int_val.ok()) {
-    return Json::ValueType{static_cast<double>(int_val.value())};
+    return Json::ValueType{int_val.value()};
   }
 
   auto double_val = current->getDouble(final_key);
