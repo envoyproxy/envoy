@@ -37,7 +37,6 @@ public:
       const std::string& stats_prefix, DualInfo dual_info,
       Server::Configuration::ServerFactoryContext& context) override;
 
-private:
   // Compiles named filter chains from the config.
   static absl::StatusOr<NamedFilterChainFactoryMapSharedPtr>
   compileNamedFilterChains(const envoy::extensions::filters::http::composite::v3::Composite& config,

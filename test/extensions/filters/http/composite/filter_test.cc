@@ -1,14 +1,20 @@
 #include <memory>
 
 #include "envoy/http/metadata_interface.h"
+#include "envoy/registry/registry.h"
+#include "envoy/server/filter_config.h"
 
+#include "source/extensions/filters/http/common/factory_base.h"
 #include "source/extensions/filters/http/composite/action.h"
+#include "source/extensions/filters/http/composite/config.h"
 #include "source/extensions/filters/http/composite/filter.h"
 
 #include "test/mocks/access_log/mocks.h"
+#include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/server/instance.h"
+#include "test/test_common/registry.h"
 
 #include "gtest/gtest.h"
 
@@ -1694,6 +1700,115 @@ TEST_F(FilterTest, FilterChainWithMultipleFilters) {
   EXPECT_CALL(*filter1, onDestroy());
   EXPECT_CALL(*filter2, onDestroy());
   filter_.onDestroy();
+}
+
+// A failing test filter factory used to exercise error paths in CompositeFilterFactory.
+class FailingNamedFilterFactory : public Server::Configuration::NamedHttpFilterConfigFactory {
+public:
+  std::string name() const override { return "envoy.filters.http.test.fail_factory"; }
+  std::string configType() { return "type.googleapis.com/google.protobuf.Struct"; }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<Protobuf::Struct>();
+  }
+  absl::StatusOr<Http::FilterFactoryCb>
+  createFilterFactoryFromProto(const Protobuf::Message&, const std::string&,
+                               Server::Configuration::FactoryContext&) override {
+    return absl::InvalidArgumentError("boom");
+  }
+  Http::FilterFactoryCb createFilterFactoryFromProtoWithServerContext(
+      const Protobuf::Message&, const std::string&,
+      Server::Configuration::ServerFactoryContext&) override {
+    return nullptr;
+  }
+};
+
+TEST(ConfigTest, CompileNamedFilterChainsFailsOnEmptyChain) {
+  envoy::extensions::filters::http::composite::v3::Composite composite_config;
+  (*composite_config.mutable_named_filter_chains())["empty-chain"];
+  // Leave typed_config empty to trigger the validation error.
+
+  testing::NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  CompositeFilterFactory factory;
+  auto status_or_named =
+      CompositeFilterFactory::compileNamedFilterChains(composite_config, "test.", factory_context);
+  EXPECT_FALSE(status_or_named.ok());
+  EXPECT_THAT(status_or_named.status().message(),
+              testing::HasSubstr("must contain at least one filter"));
+}
+
+TEST(ConfigTest, CompileNamedFilterChainsFailsOnFactoryError) {
+  envoy::extensions::filters::http::composite::v3::Composite composite_config;
+  auto& chain = (*composite_config.mutable_named_filter_chains())["fail-chain"];
+  auto* typed = chain.add_typed_config();
+  typed->set_name("envoy.filters.http.test.fail_factory");
+  Protobuf::Struct struct_config;
+  typed->mutable_typed_config()->PackFrom(struct_config);
+
+  testing::NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  CompositeFilterFactory factory;
+  FailingNamedFilterFactory failing_factory;
+  Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> registration(
+      failing_factory);
+  auto status_or_named =
+      CompositeFilterFactory::compileNamedFilterChains(composite_config, "test.", factory_context);
+  EXPECT_FALSE(status_or_named.ok());
+  EXPECT_THAT(status_or_named.status().message(),
+              testing::HasSubstr("Failed to create filter factory"));
+}
+
+TEST(FilterCallbacksWrapperTest, SingleModeRejectsMultipleFiltersAndExposesDispatcher) {
+  Stats::MockCounter error_counter;
+  Stats::MockCounter success_counter;
+  FilterStats stats{error_counter, success_counter};
+  testing::NiceMock<Event::MockDispatcher> dispatcher;
+  testing::NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  testing::NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks;
+
+  Filter filter(stats, dispatcher, false);
+  filter.setDecoderFilterCallbacks(decoder_callbacks);
+  filter.setEncoderFilterCallbacks(encoder_callbacks);
+
+  FactoryCallbacksWrapper wrapper(filter, dispatcher);
+  auto filter1 = std::make_shared<Http::MockStreamFilter>();
+  auto filter2 = std::make_shared<Http::MockStreamFilter>();
+
+  wrapper.addStreamFilter(filter1);
+  wrapper.addStreamFilter(filter2); // should record an error in single-filter mode
+
+  EXPECT_EQ(&dispatcher, &wrapper.dispatcher());
+  EXPECT_TRUE(wrapper.filter_to_inject_.has_value());
+  EXPECT_EQ(1, wrapper.errors_.size());
+}
+
+TEST(FilterCallbacksWrapperTest, ChainModeAcceptsMultipleFilters) {
+  Stats::MockCounter error_counter;
+  Stats::MockCounter success_counter;
+  FilterStats stats{error_counter, success_counter};
+  testing::NiceMock<Event::MockDispatcher> dispatcher;
+  testing::NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  testing::NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks;
+
+  Filter filter(stats, dispatcher, false);
+  filter.setDecoderFilterCallbacks(decoder_callbacks);
+  filter.setEncoderFilterCallbacks(encoder_callbacks);
+
+  FactoryCallbacksWrapper wrapper(filter, dispatcher, true);
+  auto filter1 = std::make_shared<Http::MockStreamFilter>();
+  auto filter2 = std::make_shared<Http::MockStreamFilter>();
+
+  wrapper.addStreamFilter(filter1);
+  wrapper.addStreamFilter(filter2);
+
+  EXPECT_TRUE(wrapper.errors_.empty());
+  EXPECT_EQ(2, wrapper.filters_to_inject_.size());
+}
+
+TEST(MatchedActionInfoTest, SerializeAsStringProducesJson) {
+  MatchedActionInfo info("filter", "action");
+  auto json = info.serializeAsString();
+  ASSERT_TRUE(json.has_value());
+  // Exact ordering is stable for single entry.
+  EXPECT_EQ("{\"filter\":\"action\"}", json.value());
 }
 
 } // namespace
