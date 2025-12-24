@@ -71,6 +71,7 @@ For example, the following Envoy configuration snippet shows how to configure ``
 .. literalinclude:: _include/json-format-config.yaml
     :language: yaml
     :linenos:
+    :emphasize-lines: 15-23
     :caption: :download:`json-format-config.yaml <_include/json-format-config.yaml>`
 
 The following JSON object would be written to the log file:
@@ -920,13 +921,13 @@ The following command operators are supported:
 
       .. deprecated:: 1.32.0
 
-       This is now deprecated. Please use ``%BYTES_SENT%`` instead.
+       Please use ``%BYTES_SENT%`` instead.
 
     * ``bytes_received``: Total number of bytes received from the downstream in the session.
 
       .. deprecated:: 1.32.0
 
-       This is now deprecated. Please use ``%BYTES_RECEIVED%`` instead.
+       Please use ``%BYTES_RECEIVED%`` instead.
 
     * ``errors_sent``: Number of errors that have occurred when sending datagrams to the downstream in the session.
     * ``datagrams_sent``: Number of datagrams sent to the downstream in the session.
@@ -949,13 +950,13 @@ The following command operators are supported:
 
       .. deprecated:: 1.32.0
 
-       This is now deprecated. Please use ``%BYTES_SENT%`` instead.
+       Please use ``%BYTES_SENT%`` instead.
 
     * ``bytes_received``: Total number of bytes received from the downstream in UDP proxy.
 
       .. deprecated:: 1.32.0
 
-       This is now deprecated. Please use ``%BYTES_RECEIVED%`` instead.
+       Please use ``%BYTES_RECEIVED%`` instead.
 
     * ``errors_sent``: Number of errors that have occurred when sending datagrams to the downstream in UDP proxy.
     * ``errors_received``: Number of errors that have occurred when receiving datagrams from the downstream in UDP proxy.
