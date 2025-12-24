@@ -947,6 +947,44 @@ TEST_F(StreamToMetadataFilterTest, StopProcessingOnMatch) {
   EXPECT_EQ(findCounter("stream_to_metadata.resp.success"), 1); // Only one success
 }
 
+TEST_F(StreamToMetadataFilterTest, IntegerValueExtraction) {
+  const std::string config = R"EOF(
+  response_rules:
+    format: SERVER_SENT_EVENTS
+    rules:
+      - selector:
+          json_path:
+            path: ["count"]
+        metadata_descriptors:
+          - metadata_namespace: "envoy.lb"
+            key: "count_num"
+            type: NUMBER
+          - metadata_namespace: "envoy.lb"
+            key: "count_str"
+            type: STRING
+  )EOF";
+  setupFilter(config);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
+  addEncodeDataChunks("data: {\"count\":42}\n\n", true);
+
+  // Integer converted to number
+  auto metadata_num = getMetadata("envoy.lb", "count_num");
+  EXPECT_EQ(metadata_num.number_value(), 42.0);
+
+  // Integer converted to string
+  auto metadata_str = getMetadata("envoy.lb", "count_str");
+  EXPECT_EQ(metadata_str.string_value(), "42");
+
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.success"), 1);
+}
+
+TEST_F(StreamToMetadataFilterTest, FormatGetter) {
+  // Verify config format is accessible
+  EXPECT_EQ(config_->format(), envoy::extensions::filters::http::stream_to_metadata::v3::
+                                   StreamToMetadata::SERVER_SENT_EVENTS);
+}
+
 } // namespace
 } // namespace StreamToMetadata
 } // namespace HttpFilters
