@@ -1,4 +1,5 @@
 #include <cstddef>
+#include <cstdint>
 #include <iterator>
 #include <memory>
 
@@ -1463,9 +1464,10 @@ TEST(ABIImpl, HttpCallout) {
   Stats::SymbolTableImpl symbol_table;
   DynamicModuleHttpFilter filter{nullptr, symbol_table};
   const std::string cluster{"some_cluster"};
+  uint64_t callout_id = 0;
   EXPECT_EQ(envoy_dynamic_module_callback_http_filter_http_callout(
-                &filter, 1, const_cast<char*>(cluster.data()), cluster.size(), nullptr, 0, nullptr,
-                0, 1000),
+                &filter, &callout_id, const_cast<char*>(cluster.data()), cluster.size(), nullptr, 0,
+                nullptr, 0, 1000),
             envoy_dynamic_module_type_http_callout_init_result_MissingRequiredHeaders);
 }
 
