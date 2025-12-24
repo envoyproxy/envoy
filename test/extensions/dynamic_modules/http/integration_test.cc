@@ -16,14 +16,14 @@ public:
   initializeFilter(const std::string& filter_name, const std::string& config = "",
                    const std::string& per_route_config = "",
                    const std::string& type_url = "type.googleapis.com/google.protobuf.StringValue",
-                   bool upstream_filter = false) {
+                   bool upstream_filter = false, bool per_route_disabled = false) {
     TestEnvironment::setEnvVar(
         "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
         TestEnvironment::substitute(
             "{{ test_rundir }}/test/extensions/dynamic_modules/test_data/rust"),
         1);
 
-    constexpr auto filter_config = R"EOF(
+    constexpr auto filter_config_yaml = R"EOF(
 name: envoy.extensions.filters.http.dynamic_modules
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter
@@ -35,20 +35,22 @@ typed_config:
     value: {}
 )EOF";
 
-    if (!per_route_config.empty()) {
+    if (!per_route_config.empty() || per_route_disabled) {
       constexpr auto filter_per_route_config = R"EOF(
 dynamic_module_config:
   name: http_integration_test
 per_route_config_name: {}
+disabled: {}
 filter_config:
   "@type": {}
   value: {}
 )EOF";
       envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilterPerRoute
           per_route_config_proto;
-      TestUtility::loadFromYaml(
-          fmt::format(filter_per_route_config, filter_name, type_url, per_route_config),
-          per_route_config_proto);
+      TestUtility::loadFromYaml(fmt::format(filter_per_route_config, filter_name,
+                                            per_route_disabled, type_url,
+                                            per_route_config.empty() ? "\"\"" : per_route_config),
+                                per_route_config_proto);
 
       config_helper_.addConfigModifier(
           [per_route_config_proto](envoy::extensions::filters::network::http_connection_manager::
@@ -65,7 +67,7 @@ filter_config:
 
     config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
     config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
-    config_helper_.prependFilter(fmt::format(filter_config, filter_name, type_url, config),
+    config_helper_.prependFilter(fmt::format(filter_config_yaml, filter_name, type_url, config),
                                  !upstream_filter);
     initialize();
   }
@@ -211,6 +213,25 @@ TEST_P(DynamicModulesIntegrationTest, PerRouteConfig) {
                      .get(Http::LowerCaseString("x-per-route-config"))[0]
                      ->value()
                      .getStringView());
+}
+
+TEST_P(DynamicModulesIntegrationTest, PerRouteConfigDisabled) {
+  // Initialize with a filter that normally adds headers, but disable it per route.
+  initializeFilter("per_route_config", "a", "", "type.googleapis.com/google.protobuf.StringValue",
+                   false, true);
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  Http::TestRequestHeaderMapImpl request_headers{{"foo", "bar"},
+                                                 {":method", "POST"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "host"}};
+
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  // Verify that the headers are NOT added because the filter is disabled.
+  EXPECT_TRUE(upstream_request_->headers().get(Http::LowerCaseString("x-config")).empty());
 }
 
 TEST_P(DynamicModulesIntegrationTest, BodyCallbacks) {
