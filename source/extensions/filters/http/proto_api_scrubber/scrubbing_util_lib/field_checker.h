@@ -8,6 +8,7 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/filters/http/proto_api_scrubber/filter_config.h"
 
+#include "absl/container/flat_hash_map.h"
 #include "proto_processing_lib/proto_scrubber/field_checker_interface.h"
 #include "proto_processing_lib/proto_scrubber/proto_scrubber_enums.h"
 
@@ -37,22 +38,7 @@ public:
                OptRef<const Http::ResponseHeaderMap> response_headers,
                OptRef<const Http::RequestTrailerMap> request_trailers,
                OptRef<const Http::ResponseTrailerMap> response_trailers,
-               const std::string& method_name, const ProtoApiScrubberFilterConfig* filter_config)
-      : scrubber_context_(scrubber_context), matching_data_(*stream_info),
-        method_name_(method_name), filter_config_ptr_(filter_config) {
-    if (request_headers.has_value()) {
-      matching_data_.onRequestHeaders(request_headers.ref());
-    }
-    if (response_headers.has_value()) {
-      matching_data_.onResponseHeaders(response_headers.ref());
-    }
-    if (request_trailers.has_value()) {
-      matching_data_.onRequestTrailers(request_trailers.ref());
-    }
-    if (response_trailers.has_value()) {
-      matching_data_.onResponseTrailers(response_trailers.ref());
-    }
-  }
+               const std::string& method_name, const ProtoApiScrubberFilterConfig* filter_config);
 
   // This type is neither copyable nor movable.
   FieldChecker(const FieldChecker&) = delete;
@@ -63,14 +49,18 @@ public:
   // override doesn't hide the other signatures.
   using FieldCheckerInterface::CheckField;
 
+  FieldCheckResults CheckField(const std::vector<std::string>& path, const Protobuf::Field* field,
+                               const int field_depth,
+                               const Protobuf::Type* parent_type) const override;
+
   /**
    * Returns whether the `field` should be included (kInclude), excluded (kExclude)
    * or traversed further (kPartial).
-   * Currently, this method only checks the top level request/response fields. The logic for nested
-   * fields will be added in the future.
    */
   FieldCheckResults CheckField(const std::vector<std::string>& path,
-                               const Protobuf::Field* field) const override;
+                               const Protobuf::Field* field) const override {
+    return CheckField(path, field, 0, nullptr);
+  }
 
   /**
    * Returns false as it currently doesn't support `google.protobuf.Any` type.
@@ -102,16 +92,24 @@ private:
   absl::StatusOr<absl::string_view> resolveEnumName(absl::string_view value_str,
                                                     const Protobuf::Field* field) const;
 
-  // Constructs the field mask, handling translations for different data types.
-  // Currently, it only handles enum data type. Support for protobuf maps and `Any` types will be
-  // added in the future.
-  std::string constructFieldMask(const std::vector<std::string>& path,
-                                 const Protobuf::Field* field) const;
+  // Struct to hold normalization result and metadata.
+  struct NormalizationResult {
+    std::string mask;
+    bool is_map_entry; // True if the path points directly to a Map Entry (key/value pair).
+  };
+
+  // Optimized helper to walk the type descriptor and normalize map keys in the path.
+  const NormalizationResult& normalizePath(const std::vector<std::string>& path) const;
 
   ScrubberContext scrubber_context_;
   Http::Matching::HttpMatchingDataImpl matching_data_;
   std::string method_name_;
   const ProtoApiScrubberFilterConfig* filter_config_ptr_;
+
+  const Protobuf::Descriptor* root_descriptor_;
+
+  // Cache normalized results.
+  mutable absl::flat_hash_map<std::vector<std::string>, NormalizationResult> path_cache_;
 };
 
 } // namespace ProtoApiScrubber

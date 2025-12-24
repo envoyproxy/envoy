@@ -487,7 +487,7 @@ message KeepaliveSettings {
       [(validate.rules).duration = {gte {nanos: 1000000}}];
 }
 
-// [#next-free-field: 18]
+// [#next-free-field: 19]
 message Http2ProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.core.Http2ProtocolOptions";
@@ -678,6 +678,12 @@ message Http2ProtocolOptions {
 
   // Configure the maximum amount of metadata than can be handled per stream. Defaults to ``1 MB``.
   google.protobuf.UInt64Value max_metadata_size = 17;
+
+  // Controls whether to encode headers using huffman encoding.
+  // This can be useful in cases where the cpu spent encoding the headers isn't
+  // worth the network bandwidth saved e.g. for localhost.
+  // If unset, uses the data plane's default value.
+  google.protobuf.BoolValue enable_huffman_encoding = 18;
 }
 
 // [#not-implemented-hide:]
