@@ -149,10 +149,31 @@ Filter1xxHeadersStatus DynamicModuleHttpFilter::encode1xxHeaders(ResponseHeaderM
 }
 
 FilterHeadersStatus DynamicModuleHttpFilter::encodeHeaders(ResponseHeaderMap&, bool end_of_stream) {
-  if (sent_local_reply_ || is_disabled_) { // See the comment on the flag.
+  if (sent_local_reply_) { // See the comment on the flag.
     in_continue_ = true;
     return FilterHeadersStatus::Continue;
   }
+
+  // Check per-route config for disabled flag if not already checked in decodeHeaders.
+  if (in_module_filter_ == nullptr) {
+    if (encoder_callbacks_->route()) {
+      const auto* per_route_config =
+          Http::Utility::resolveMostSpecificPerFilterConfig<DynamicModuleHttpPerRouteFilterConfig>(
+              encoder_callbacks_);
+      if (per_route_config && per_route_config->disabled_) {
+        is_disabled_ = true;
+        in_continue_ = true;
+        return FilterHeadersStatus::Continue;
+      }
+    }
+    initializeInModuleFilter();
+  }
+
+  if (is_disabled_) {
+    in_continue_ = true;
+    return FilterHeadersStatus::Continue;
+  }
+
   const envoy_dynamic_module_type_on_http_filter_response_headers_status status =
       config_->on_http_filter_response_headers_(thisAsVoidPtr(), in_module_filter_, end_of_stream);
   in_continue_ =
