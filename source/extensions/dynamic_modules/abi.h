@@ -961,7 +961,7 @@ void envoy_dynamic_module_on_http_filter_http_stream_complete(
  */
 void envoy_dynamic_module_on_http_filter_http_stream_reset(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr, size_t stream_id,
+    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr, uint64_t stream_id,
     envoy_dynamic_module_type_http_stream_reset_reason reason);
 
 /**
