@@ -944,7 +944,7 @@ TEST_F(StreamToMetadataFilterTest, StopProcessingOnMatch) {
 
   auto metadata = getMetadata("envoy.lb", "tokens");
   EXPECT_EQ(metadata.number_value(), 30);                       // First value, not 99
-  EXPECT_EQ(findCounter("stream_to_metadata.resp.success"), 1); // Only one success
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.success"), 1);
 }
 
 TEST_F(StreamToMetadataFilterTest, IntegerValueExtraction) {
@@ -1015,7 +1015,6 @@ TEST_F(StreamToMetadataFilterTest, EventWithEmptyLines) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
 
   // SSE event with empty lines (per SSE spec, empty lines are event delimiters)
-  // This tests the empty line handling in parseSseFieldLine (lines 186-188)
   const std::string data = "\n"
                            "data: {\"usage\":{\"total_tokens\":42}}\n"
                            "\n"
