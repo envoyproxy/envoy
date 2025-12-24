@@ -344,7 +344,7 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 # Json to metadata
 /*/extensions/filters/http/json_to_metadata @cqi1217 @JuniorHsu @kbaichoo
 # Stream to metadata
-/*/extensions/filters/http/stream_to_metadata @PeterL328
+/*/extensions/filters/http/stream_to_metadata @JuniorHsu @PeterL328
 # zookeeper
 /*/extensions/filters/network/zookeeper_proxy @JuniorHsu @Winbobob @mattklein123
 # Custom response filter
