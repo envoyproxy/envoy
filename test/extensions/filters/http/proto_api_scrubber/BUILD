@@ -92,7 +92,6 @@ envoy_cc_test(
         ":scrubber_test_proto_descriptor",
         "//test/proto:apikeys_proto_descriptor",
     ],
-    data = ["//test/proto:apikeys_proto_descriptor"],
     extension_names = ["envoy.filters.http.proto_api_scrubber"],
     rbe_pool = "6gig",
     deps = [
