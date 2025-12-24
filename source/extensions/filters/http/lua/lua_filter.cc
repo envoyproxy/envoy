@@ -5,6 +5,7 @@
 #include <atomic>
 #include <cstdint>
 #include <functional>
+#include <limits>
 #include <memory>
 
 #include "envoy/http/codes.h"
@@ -461,10 +462,16 @@ void StreamHandleWrapper::onSuccess(const Http::AsyncClient::Request&,
     });
   }
 
-  // TODO(mattklein123): Avoid double copy here.
   if (response->body().length() > 0) {
-    lua_pushlstring(coroutine_.luaState(), response->bodyAsString().data(),
-                    response->body().length());
+    const uint64_t body_length = response->body().length();
+    if (body_length <= std::numeric_limits<uint32_t>::max()) {
+      // Use linearize(uint32_t size) to get contiguous data, avoiding extra copy.
+      void* data = response->body().linearize(static_cast<uint32_t>(body_length));
+      lua_pushlstring(coroutine_.luaState(), static_cast<const char*>(data), body_length);
+    } else {
+      // Body exceeds linearize() limit, fall back to bodyAsString().
+      lua_pushlstring(coroutine_.luaState(), response->bodyAsString().data(), body_length);
+    }
   } else {
     lua_pushnil(coroutine_.luaState());
   }

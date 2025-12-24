@@ -1046,6 +1046,59 @@ TEST_F(LuaHttpFilterTest, HttpCall) {
   EXPECT_EQ(1, stats_store_.counter("test.lua.executions").value());
 }
 
+// HTTP call with multi-slice response body (tests linearize() path).
+TEST_F(LuaHttpFilterTest, HttpCallMultiSliceBody) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      local headers, body = request_handle:httpCall(
+        "cluster",
+        {
+          [":method"] = "POST",
+          [":path"] = "/",
+          [":authority"] = "foo"
+        },
+        "hello world",
+        5000)
+      request_handle:logTrace(string.len(body))
+      request_handle:logTrace(body)
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  Http::MockAsyncClientRequest request(&cluster_manager_.thread_local_cluster_.async_client_);
+  Http::AsyncClient::Callbacks* callbacks;
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(Eq("cluster")));
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient());
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillOnce(
+          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            callbacks = &cb;
+            return &request;
+          }));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, false));
+
+  Http::ResponseMessagePtr response_message(new Http::ResponseMessageImpl(
+      Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
+  // Add body in multiple parts to create multiple buffer slices.
+  response_message->body().add("first");
+  response_message->body().add("second");
+  response_message->body().add("third");
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  EXPECT_LOG_CONTAINS_ALL_OF(Envoy::ExpectedLogMessages({
+                                 {"trace", "16"},
+                                 {"trace", "firstsecondthird"},
+                             }),
+                             { callbacks->onSuccess(request, std::move(response_message)); });
+  EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
+  EXPECT_EQ(1, stats_store_.counter("test.lua.executions").value());
+}
+
 // HTTP request flow with multiple header values for same header name.
 TEST_F(LuaHttpFilterTest, HttpCallWithRepeatedHeaders) {
   const std::string SCRIPT{R"EOF(
