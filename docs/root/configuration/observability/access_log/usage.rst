@@ -70,6 +70,8 @@ For example, the following Envoy configuration snippet shows how to configure ``
 
 .. literalinclude:: _include/json-format-config.yaml
     :language: yaml
+    :linenos:
+    :caption: :download:`json-format-config.yaml <_include/json-format-config.yaml>`
 
 The following JSON object would be written to the log file:
 
@@ -226,7 +228,7 @@ The following command operators are supported:
 
 ``%PROTOCOL%``
   HTTP
-    Protocol. Currently either *HTTP/1.1* *HTTP/2* or *HTTP/3*.
+    Protocol. Currently either **HTTP/1.1**, **HTTP/2** or **HTTP/3**.
 
   TCP/UDP
     Not implemented. It will appear as ``"-"`` in the access logs.
@@ -236,7 +238,7 @@ The following command operators are supported:
 
 ``%UPSTREAM_PROTOCOL%``
   HTTP
-    Upstream protocol. Currently either *HTTP/1.1* *HTTP/2* or *HTTP/3*.
+    Upstream protocol. Currently either **HTTP/1.1**, **HTTP/2** or **HTTP/3**.
 
   TCP/UDP
     Not implemented. It will appear as ``"-"`` in the access logs.
@@ -916,11 +918,15 @@ The following command operators are supported:
     * ``cluster_name``: Name of the cluster.
     * ``bytes_sent``: Total number of bytes sent to the downstream in the session.
 
-      .. deprecated:: Use ``%BYTES_SENT%`` instead.
+      .. deprecated:: 1.32.0
+
+       This is now deprecated. Please use ``%BYTES_SENT%`` instead.
 
     * ``bytes_received``: Total number of bytes received from the downstream in the session.
 
-      .. deprecated:: Use ``%BYTES_RECEIVED%`` instead.
+      .. deprecated:: 1.32.0
+
+       This is now deprecated. Please use ``%BYTES_RECEIVED%`` instead.
 
     * ``errors_sent``: Number of errors that have occurred when sending datagrams to the downstream in the session.
     * ``datagrams_sent``: Number of datagrams sent to the downstream in the session.
@@ -941,11 +947,15 @@ The following command operators are supported:
 
     * ``bytes_sent``: Total number of bytes sent to the downstream in UDP proxy.
 
-      .. deprecated:: Use ``%BYTES_SENT%`` instead.
+      .. deprecated:: 1.32.0
+
+       This is now deprecated. Please use ``%BYTES_SENT%`` instead.
 
     * ``bytes_received``: Total number of bytes received from the downstream in UDP proxy.
 
-      .. deprecated:: Use ``%BYTES_RECEIVED%`` instead.
+      .. deprecated:: 1.32.0
+
+       This is now deprecated. Please use ``%BYTES_RECEIVED%`` instead.
 
     * ``errors_sent``: Number of errors that have occurred when sending datagrams to the downstream in UDP proxy.
     * ``errors_received``: Number of errors that have occurred when receiving datagrams from the downstream in UDP proxy.

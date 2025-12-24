@@ -1,10 +1,9 @@
 access_log:
-  - name: envoy.access_loggers.stdout
-    typed_config:
-      "@type": type.googleapis.com/envoy.extensions.access_loggers.stream.v3.StdoutAccessLog
-      log_format:
-        json_format:
-          protocol: "%PROTOCOL%"
-          duration: "%DURATION%"
-          my_custom_header: "%REQUEST_HEADER(MY_CUSTOM_HEADER)%"
-
+- name: envoy.access_loggers.stdout
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.access_loggers.stream.v3.StdoutAccessLog
+    log_format:
+      json_format:
+        protocol: "%PROTOCOL%"
+        duration: "%DURATION%"
+        my_custom_header: "%REQUEST_HEADER(MY_CUSTOM_HEADER)%"
