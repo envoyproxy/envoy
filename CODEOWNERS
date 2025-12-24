@@ -399,6 +399,7 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 # Dynamic Modules
 /*/extensions/dynamic_modules @mattklein123 @mathetake @marc-barry
 /*/extensions/filters/http/dynamic_modules @mattklein123 @mathetake @marc-barry
+/*/extensions/filters/network/dynamic_modules @agrawroh @mathetake @wbpcode
 # Linux network namespace override
 /*/extensions/local_address_selectors/filter_state_override @tonya11en @kyessenov
 

@@ -579,6 +579,100 @@ TEST_F(RedisSingleServerRequestTest, EvalNoUpstream) {
   EXPECT_EQ(1UL, store_.counter("redis.foo.command.eval.error").value());
 };
 
+// OBJECT command tests - hashes on the third argument (index 2)
+TEST_F(RedisSingleServerRequestTest, ObjectEncodingSuccess) {
+  InSequence s;
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  // OBJECT ENCODING key -> [0]=OBJECT, [1]=ENCODING, [2]=key
+  makeBulkStringArray(*request, {"object", "encoding", "mykey"});
+  makeRequest("mykey", std::move(request));
+  EXPECT_NE(nullptr, handle_);
+
+  std::string lower_command = absl::AsciiStrToLower("object");
+
+  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  EXPECT_CALL(store_, deliverHistogramToSinks(
+                          Property(&Stats::Metric::name,
+                                   fmt::format("redis.foo.command.{}.latency", lower_command)),
+                          10));
+  respond();
+
+  EXPECT_EQ(1UL, store_.counter(fmt::format("redis.foo.command.{}.total", lower_command)).value());
+  EXPECT_EQ(1UL,
+            store_.counter(fmt::format("redis.foo.command.{}.success", lower_command)).value());
+};
+
+TEST_F(RedisSingleServerRequestTest, ObjectRefcountSuccess) {
+  InSequence s;
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  // OBJECT REFCOUNT key -> [0]=OBJECT, [1]=REFCOUNT, [2]=key
+  makeBulkStringArray(*request, {"OBJECT", "REFCOUNT", "testkey"});
+  makeRequest("testkey", std::move(request));
+  EXPECT_NE(nullptr, handle_);
+
+  std::string lower_command = absl::AsciiStrToLower("object");
+
+  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  EXPECT_CALL(store_, deliverHistogramToSinks(
+                          Property(&Stats::Metric::name,
+                                   fmt::format("redis.foo.command.{}.latency", lower_command)),
+                          10));
+  respond();
+
+  EXPECT_EQ(1UL, store_.counter(fmt::format("redis.foo.command.{}.total", lower_command)).value());
+  EXPECT_EQ(1UL,
+            store_.counter(fmt::format("redis.foo.command.{}.success", lower_command)).value());
+};
+
+TEST_F(RedisSingleServerRequestTest, ObjectWrongNumberOfArgs) {
+  InSequence s;
+
+  Common::Redis::RespValuePtr request1{new Common::Redis::RespValue()};
+  Common::Redis::RespValuePtr request2{new Common::Redis::RespValue()};
+  Common::Redis::RespValue response;
+  response.type(Common::Redis::RespType::Error);
+
+  // Missing key argument: OBJECT ENCODING (no key)
+  response.asString() = "wrong number of arguments for 'object' command";
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
+  makeBulkStringArray(*request1, {"object", "encoding"});
+  EXPECT_EQ(nullptr,
+            splitter_.makeRequest(std::move(request1), callbacks_, dispatcher_, stream_info_));
+
+  // Only command name: OBJECT (no subcommand, no key) - returns "invalid request"
+  Common::Redis::RespValue response2;
+  response2.type(Common::Redis::RespType::Error);
+  response2.asString() = "invalid request";
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response2)));
+  makeBulkStringArray(*request2, {"object"});
+  EXPECT_EQ(nullptr,
+            splitter_.makeRequest(std::move(request2), callbacks_, dispatcher_, stream_info_));
+};
+
+TEST_F(RedisSingleServerRequestTest, ObjectNoUpstream) {
+  InSequence s;
+
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"object", "encoding", "mykey"});
+  EXPECT_CALL(*conn_pool_, makeRequest_("mykey", RespVariantEq(*request), _))
+      .WillOnce(Return(nullptr));
+
+  Common::Redis::RespValue response;
+  response.type(Common::Redis::RespType::Error);
+  response.asString() = Response::get().NoUpstreamHost;
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
+  handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
+  EXPECT_EQ(nullptr, handle_);
+
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.object.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.object.error").value());
+};
+
 TEST_F(RedisSingleServerRequestTest, Hello) {
   InSequence s;
 

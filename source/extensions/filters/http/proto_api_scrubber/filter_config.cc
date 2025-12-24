@@ -108,6 +108,7 @@ ProtoApiScrubberFilterConfig::initialize(const ProtoApiScrubberConfig& proto_con
   }
 
   initializeTypeUtils();
+  precomputeTypeCache(descriptor_set_or_error.value());
 
   // Pre-compute the Field* -> Type* map for O(1) lock-free lookup during request processing.
   buildFieldParentMap(descriptor_set_or_error.value());
@@ -184,7 +185,6 @@ absl::StatusOr<Envoy::Protobuf::FileDescriptorSet> ProtoApiScrubberFilterConfig:
                     kConfigInitializationError, static_cast<int>(data_source.specifier_case())));
   }
 
-  // Populate the descriptor pool member.
   auto pool = std::make_unique<Envoy::Protobuf::DescriptorPool>();
   for (const auto& file : descriptor_set.file()) {
     if (pool->BuildFile(file) == nullptr) {
@@ -245,6 +245,22 @@ absl::Status ProtoApiScrubberFilterConfig::validateMethodName(absl::string_view 
   }
 
   return absl::OkStatus();
+}
+
+absl::StatusOr<const MethodDescriptor*>
+ProtoApiScrubberFilterConfig::getMethodDescriptor(const std::string& method_name) const {
+  // Covert grpc method name from `/package.service/method` format to `package.service.method` as
+  // the method `FindMethodByName` expects the method name to be in the latter format.
+  std::string dot_separated_method_name =
+      absl::StrReplaceAll(absl::StripPrefix(method_name, "/"), {{"/", "."}});
+  const MethodDescriptor* method = descriptor_pool_->FindMethodByName(dot_separated_method_name);
+  if (method == nullptr) {
+    return absl::InvalidArgumentError(absl::StrFormat(
+        "Unable to find method `%s` in the descriptor pool configured for this filter.",
+        dot_separated_method_name));
+  }
+
+  return method;
 }
 
 absl::Status ProtoApiScrubberFilterConfig::validateMessageName(absl::string_view message_name) {
@@ -406,43 +422,75 @@ void ProtoApiScrubberFilterConfig::populateMapForMessage(
   }
 }
 
-absl::StatusOr<const MethodDescriptor*>
-ProtoApiScrubberFilterConfig::getMethodDescriptor(const std::string& method_name) const {
-  // Covert grpc method name from `/package.service/method` format to `package.service.method` as
-  // the method `FindMethodByName` expects the method name to be in the latter format.
-  std::string dot_separated_method_name =
-      absl::StrReplaceAll(absl::StripPrefix(method_name, "/"), {{"/", "."}});
-  const MethodDescriptor* method = descriptor_pool_->FindMethodByName(dot_separated_method_name);
-  if (method == nullptr) {
-    return absl::InvalidArgumentError(absl::StrFormat(
-        "Unable to find method `%s` in the descriptor pool configured for this filter.",
-        dot_separated_method_name));
+void ProtoApiScrubberFilterConfig::resolveAndCacheType(
+    const std::string& raw_type_name, const std::string& package_prefix,
+    const std::string& method_key,
+    absl::flat_hash_map<std::string, const Envoy::Protobuf::Type*>& cache,
+    absl::string_view type_category) {
+  std::string type_name = raw_type_name;
+
+  // Handle fully qualified names starting with "." or append package prefix
+  if (absl::StartsWith(type_name, ".")) {
+    type_name = type_name.substr(1);
+  } else if (!package_prefix.empty()) {
+    type_name = absl::StrCat(package_prefix, type_name);
   }
 
-  return method;
+  std::string type_url = absl::StrCat(Envoy::Grpc::Common::typeUrlPrefix(), "/", type_name);
+
+  if (const auto* type_ptr = (*type_finder_)(type_url)) {
+    cache[method_key] = type_ptr;
+  } else {
+    ENVOY_LOG(error, "Failed to resolve {} Type for {}. URL: {}", type_category, method_key,
+              type_url);
+  }
+}
+
+void ProtoApiScrubberFilterConfig::precomputeTypeCache(
+    const Envoy::Protobuf::FileDescriptorSet& descriptor_set) {
+  for (const auto& file : descriptor_set.file()) {
+    std::string package_prefix;
+    if (!file.package().empty()) {
+      package_prefix = absl::StrCat(file.package(), ".");
+    }
+
+    for (const auto& service : file.service()) {
+      for (const auto& method : service.method()) {
+        // Construct the Method Key (e.g., /package.Service/Method).
+        std::string method_key =
+            absl::StrCat("/", package_prefix, service.name(), "/", method.name());
+
+        resolveAndCacheType(method.input_type(), package_prefix, method_key, request_type_cache_,
+                            "Request");
+
+        resolveAndCacheType(method.output_type(), package_prefix, method_key, response_type_cache_,
+                            "Response");
+      }
+    }
+  }
 }
 
 absl::StatusOr<const Protobuf::Type*>
 ProtoApiScrubberFilterConfig::getRequestType(const std::string& method_name) const {
-  absl::StatusOr<const MethodDescriptor*> method_or_status = getMethodDescriptor(method_name);
-  RETURN_IF_NOT_OK(method_or_status.status());
+  auto it = request_type_cache_.find(method_name);
+  if (it != request_type_cache_.end()) {
+    return it->second;
+  }
 
-  std::string request_type_url = absl::StrCat(Envoy::Grpc::Common::typeUrlPrefix(), "/",
-                                              method_or_status.value()->input_type()->full_name());
-  const Protobuf::Type* request_type = (*type_finder_)(request_type_url);
-  return request_type;
+  // Fallback for cases where method isn't in descriptor pool (should return error).
+  return absl::InvalidArgumentError(
+      fmt::format("Method '{}' not found in descriptor pool (type lookup failed).", method_name));
 }
 
 absl::StatusOr<const Protobuf::Type*>
 ProtoApiScrubberFilterConfig::getResponseType(const std::string& method_name) const {
-  absl::StatusOr<const MethodDescriptor*> method_or_status = getMethodDescriptor(method_name);
-  RETURN_IF_NOT_OK(method_or_status.status());
+  auto it = response_type_cache_.find(method_name);
+  if (it != response_type_cache_.end()) {
+    return it->second;
+  }
 
-  std::string response_type_url =
-      absl::StrCat(Envoy::Grpc::Common::typeUrlPrefix(), "/",
-                   method_or_status.value()->output_type()->full_name());
-  const Protobuf::Type* response_type = (*type_finder_)(response_type_url);
-  return response_type;
+  return absl::InvalidArgumentError(
+      fmt::format("Method '{}' not found in descriptor pool (type lookup failed).", method_name));
 }
 
 REGISTER_FACTORY(RemoveFilterActionFactory,

@@ -1102,9 +1102,26 @@ UDP
 
     This command operator is only available for :ref:`upstream_log <envoy_v3_api_field_extensions.filters.http.router.v3.Router.upstream_log>`.
 
-%REQUESTED_SERVER_NAME%
+%REQUESTED_SERVER_NAME(X:Y)%
   HTTP/TCP/THRIFT
-    String value set on ssl connection socket for Server Name Indication (SNI)
+    String value set on ssl connection socket for Server Name Indication (SNI) or host header.
+    The parameter X is used to specify should the output fallback to get from host header when SNI is not set.
+    The parameter Y is used to specify the source of the request host. Both X and Y are optional. Y make no sense
+    when X is set to ``SNI_ONLY``.
+
+    The X parameter can be:
+
+    * ``SNI_ONLY``: String value set on ssl connection socket for Server Name Indication (SNI), this's the default value of X.
+    * ``SNI_FIRST``: The output will retrive from ``:authority`` or ``x-envoy-original-host`` header when SNI is not set.
+    * ``HOST_FIRST``: The output will retrive from ``:authority`` or ``x-envoy-original-host`` header.
+
+    The Y parameter can be:
+
+    * ``ORIG``: Get the request host from the ``x-envoy-original-host`` header.
+    * ``HOST``: Get the request host from the ``:authority`` header.
+    * ``ORIG_OR_HOST``: Get the request host from the ``x-envoy-original-host`` header if it is
+      present, otherwise get it from the ``:authority`` header. If the Y is not present, ``ORIG_OR_HOST``
+      will be used.
   UDP
     Not implemented ("-").
 
@@ -1470,3 +1487,61 @@ UDP
 %CUSTOM_FLAGS%
   Custom flags set into the stream info. This could be used to log any custom event from the filters.
   Multiple flags are separated by comma.
+
+.. _config_access_log_format_coalesce:
+
+%COALESCE(JSON_CONFIG):Z%
+  HTTP
+    A higher-order formatter operator that evaluates multiple formatter operators in sequence and
+    returns the first non-null, non-empty result. This is useful for implementing fallback behavior,
+    such as using SNI when available but falling back to the ``:authority`` header when SNI is not set.
+
+    The ``JSON_CONFIG`` parameter is a JSON object with an ``operators`` array. Each operator can be
+    specified as either:
+
+    * A string representing a simple command name that does not require a parameter.
+    * An object with the following fields:
+
+      * ``command`` (required): The command name (e.g., ``REQ``, ``REQUESTED_SERVER_NAME``).
+      * ``param`` (optional): The command parameter (e.g., ``:authority`` for the ``REQ`` command).
+      * ``max_length`` (optional): Maximum length for this operator's output.
+
+    ``Z`` is an optional parameter denoting string truncation up to ``Z`` characters for the final output.
+
+    .. note::
+
+      The JSON parameter cannot contain literal ``)`` characters as they would interfere with the
+      command parser. If you need a ``)`` character in a string value, use the Unicode escape
+      sequence ``\u0029``.
+
+    **Example: SNI with fallback to authority header**
+
+    .. code-block:: none
+
+      %COALESCE({"operators": ["REQUESTED_SERVER_NAME", {"command": "REQ", "param": ":authority"}]})%
+
+    This returns the Server Name Indication (SNI) if available, otherwise falls back to the
+    ``:authority`` header.
+
+    **Example: Cascade fallback with multiple headers**
+
+    .. code-block:: none
+
+      %COALESCE({"operators": ["REQUESTED_SERVER_NAME", {"command": "REQ", "param": ":authority"}, {"command": "REQ", "param": "x-envoy-original-host"}]})%
+
+    This tries SNI first, then ``:authority``, then ``x-envoy-original-host``.
+
+    **Example: With length truncation**
+
+    .. code-block:: none
+
+      %COALESCE({"operators": [{"command": "REQ", "param": ":authority"}]}):50%
+
+    This returns the ``:authority`` header value truncated to 50 characters.
+
+    **Supported Commands**
+
+    The ``COALESCE`` operator supports any built-in formatter command.
+
+  TCP/UDP
+    Not implemented ("-").

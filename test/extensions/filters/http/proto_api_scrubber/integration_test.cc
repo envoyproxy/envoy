@@ -25,7 +25,6 @@ namespace HttpFilters {
 namespace ProtoApiScrubber {
 namespace {
 
-// ALIAS for Map Scrubbing Tests
 namespace scrubber_test = test::extensions::filters::http::proto_api_scrubber;
 
 using envoy::extensions::filters::http::proto_api_scrubber::v3::ProtoApiScrubberConfig;

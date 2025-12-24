@@ -44,6 +44,9 @@ minor_behavior_changes:
     supports fetching values from HTTP request headers. Non-HTTP protocols must use the substitution formatter-based
     :ref:`custom tag value <envoy_v3_api_field_type.tracing.v3.CustomTag.value>`. This behavior can be reverted by
     setting the runtime guard ``envoy.reloadable_features.get_header_tag_from_header_map`` to ``false``.
+- area: tap
+  change: |
+    Add sequence number per event in transport socket streamed trace.
 - area: ext_proc
   change: |
     Use a hard-coded set of error messages when a :ref:`HeaderMutation
@@ -100,6 +103,10 @@ minor_behavior_changes:
     Now the retrying of async HTTP client calls will respect the set buffer limits and the retry will be ignored
     if the buffer limit is exceeded. This behavior can be reverted by setting the runtime guard
     ``envoy.reloadable_features.http_async_client_retry_respect_buffer_limits`` to ``false``.
+- area: ext_proc
+  change: |
+    added server_half_closed counter for ext proc in :ref:'FilterStats
+    <envoy_v3_api_msg_extensions.filters.http.ext_proc.v3.ExternalProcessor.ExtProcFilterStats>'.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -197,6 +204,14 @@ bug_fixes:
     Fixed SDS to enable auto-recovery when initial certificate file loading fails. Previously, if certificate
     files did not exist during initial SDS configuration, no file watch callbacks were set up, preventing
     automatic recovery when files appeared later.
+- area: upstream
+  change: |
+    Fixed transport socket matcher to correctly use downstream connection filter state for matching and optimized the
+    selection path to avoid per-connection resolution overhead when filter state input is not used.
+- area: ext_authz
+  change: |
+    Fixed the gRPC ext_authz client to respect ``status_on_error`` configuration when gRPC calls fail.
+    Previously, gRPC call failures always returned 403 Forbidden regardless of the configured error status.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -230,12 +245,19 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.report_load_with_rq_issued`` and legacy code paths.
 - area: xds
   change: |
+    Removed runtime guard ``envoy_restart_features_use_eds_cache_for_ads`` and legacy code paths.
+- area: xds
+  change: |
     Removed runtime guard ``envoy.restart_features.skip_backing_cluster_check_for_sds`` and legacy code paths.
 - area: router
   change: |
     Removed runtime guard ``envoy.reloadable_features.router_filter_resetall_on_local_reply`` and legacy code paths.
 
 new_features:
+- area: composite filter
+  change: |
+    Added support for configuring a chain of filters in the composite filter's :ref:`ExecuteFilterAction
+    <envoy_v3_api_msg_extensions.filters.http.composite.v3.ExecuteFilterAction>` via the ``filter_chain`` field.
 - area: server
   change: |
     Add new command-line option ``--file-flush-min-size-kb <integer>`` to configure the minimum size in kilobytes for log file flushing.
@@ -253,6 +275,10 @@ new_features:
   change: |
     Added support for loading dynamic modules globally by setting :ref:`load_globally
     <envoy_v3_api_field_extensions.dynamic_modules.v3.DynamicModuleConfig.load_globally>` to ``true``.
+- area: dynamic modules
+  change: |
+    Added :ref:`network filter <envoy_v3_api_msg_extensions.filters.network.dynamic_modules.v3.DynamicModuleNetworkFilter>`
+    support for dynamic modules, enabling TCP stream processing with dynamic modules.
 - area: http filter
   change: |
     Added :ref:`transform http filter <config_http_filters_transform>` to modify request and response bodies in any
@@ -266,6 +292,11 @@ new_features:
   change: |
     Added process-level rate limiting on access log emission via
     :ref:`ProcessRateLimitFilter <envoy_v3_api_msg_extensions.access_loggers.filters.process_ratelimit.v3.ProcessRateLimitFilter>`.
+- area: access_log
+  change: |
+    Added :ref:`COALESCE <config_access_log_format_coalesce>` substitution formatter operator that evaluates multiple
+    formatter operators in sequence and returns the first non-null result. This enables fallback behavior such as
+    using SNI when available but falling back to the ``:authority`` header when SNI is not set.
 - area: listener_filters
   change: |
     Added :ref:`Postgres Inspector <config_listener_filters_postgres_inspector>` listener filter for detecting
@@ -321,6 +352,13 @@ new_features:
 - area: http2
   change: |
     Added a parameter to ``sendGoAwayAndClose`` to support graceful closure of HTTP/2 connections.
+- area: http2
+  change: |
+    Added :ref:`enable_huffman_encoding
+    <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.enable_huffman_encoding>` which controls
+    whether to use huffman encoding when sending headers. This is useful in scenarios where the
+    bandwidth saved from huffman encoding is not worth the cpu cost. e.g. for localhost, sidecar
+    traffic.
 - area: logging
   change: |
     Added support for the not-equal operator in access log filter rules via
@@ -404,6 +442,9 @@ new_features:
 - area: redis
   change: |
     Added support for ``redis_proxy`` to use separate credentials for each upstream Redis cluster.
+- area: redis
+  change: |
+    Added support for ``OBJECT``.
 - area: quic
   change: |
     Added QUIC protocol option :ref:`max_sessions_per_event_loop
@@ -531,6 +572,9 @@ new_features:
 - area: tracing
   change: |
     Dynatrace sampler parses and propagates trace capture reason in tracestate.
+- area: access_log
+  change: |
+    Added support for the ``REQUESTED_SERVER_NAME`` access log formatter to return SNI and host with parameters.
 - area: proxy_protocol
   change: |
     Added :ref:`tlv_location <envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.tlv_location>`

@@ -207,6 +207,33 @@ private:
   void populateMapForMessage(const Envoy::Protobuf::DescriptorProto& msg,
                              const std::string& package_prefix);
 
+  /**
+   * Helper method to resolve a Protobuf type from its name and populate the type cache.
+   *
+   * This handles normalizing the fully qualified type name (handling leading dots
+   * or prepending the package prefix), constructing the type URL, looking it up
+   * via the type finder, and storing the result in the provided cache map.
+   * If the type cannot be resolved, an error is logged.
+   *
+   * @param raw_type_name   The type name as defined in the method descriptor (e.g. "MyMessage" or
+   * ".pkg.Msg").
+   * @param package_prefix  The package scope of the file (e.g. "my.package.") to use if the type is
+   * relative.
+   * @param method_key      The unique string key for the method (e.g.
+   * "/my.package.Service/Method").
+   * @param cache           The specific cache map to populate (request_type_cache_ or
+   * response_type_cache_).
+   * @param type_category   A label (e.g. "Request" or "Response") used for error logging.
+   */
+  void resolveAndCacheType(const std::string& raw_type_name, const std::string& package_prefix,
+                           const std::string& method_key,
+                           absl::flat_hash_map<std::string, const Envoy::Protobuf::Type*>& cache,
+                           absl::string_view type_category);
+
+  // Pre-computes the request and response types for all methods in the descriptor set.
+  // This allows O(1) access to types during request and response processing.
+  void precomputeTypeCache(const Envoy::Protobuf::FileDescriptorSet& descriptor_set);
+
   // Initializes the method's request and response restrictions using the restrictions configured
   // in the proto config.
   absl::Status
@@ -256,6 +283,11 @@ private:
   // A lambda function which resolves type URL string to the corresponding `Protobuf::Type*`.
   // Internally, it uses `type_helper_` for type resolution.
   std::unique_ptr<const TypeFinder> type_finder_;
+
+  // Caches for request and response types to avoid repeated lookups and string manipulations.
+  // These are populated during initialization and read-only afterwards, so no mutex is required.
+  absl::flat_hash_map<std::string, const Protobuf::Type*> request_type_cache_;
+  absl::flat_hash_map<std::string, const Protobuf::Type*> response_type_cache_;
 };
 
 // A class to validate the input type specified for the unified matcher in the config.
