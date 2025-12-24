@@ -24,10 +24,9 @@ private:
   createFilterFactoryFromProtoTyped(const FilterConfig& proto_config,
                                     FactoryContext& context) override;
 
-  bool isTerminalFilterByProtoTyped(const FilterConfig&, ServerFactoryContext&) override {
-    // Network filters can be terminal or not, but dynamic modules don't have explicit terminal
-    // support like HTTP filters.
-    return false;
+  bool isTerminalFilterByProtoTyped(const FilterConfig& proto_config,
+                                    ServerFactoryContext&) override {
+    return proto_config.terminal_filter();
   }
 };
 
