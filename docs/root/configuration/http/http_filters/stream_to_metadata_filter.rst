@@ -66,7 +66,8 @@ How It Works
 
 For Server-Sent Events (SSE) format:
 
-1. The filter checks the response ``Content-Type`` header against allowed content types (default: ``text/event-stream``)
+1. The filter checks the response ``Content-Type`` header against allowed content types (default: ``text/event-stream``).
+   Matching is performed on the media type (type/subtype) only, ignoring parameters like ``charset``.
 2. It parses the SSE stream according to the `SSE specification <https://html.spec.whatwg.org/multipage/server-sent-events.html>`_,
    handling CRLF, CR, and LF line endings, and properly managing events split across multiple data chunks
 3. For each complete SSE event, it extracts the value from the ``data`` field(s) and parses it as JSON
@@ -120,6 +121,9 @@ Key Configuration Options
 
 **response_rules.allowed_content_types**
   A list of content types to process. Defaults to ``["text/event-stream"]`` for SSE format.
+  Content-Type matching is performed on the media type (type/subtype) only, ignoring parameters
+  such as ``charset``. For example, ``text/event-stream; charset=utf-8`` will match the
+  configured type ``text/event-stream``.
 
 **response_rules.max_event_size**
   Maximum size in bytes for a single event before it's considered invalid and discarded.
@@ -179,6 +183,12 @@ Accept additional content types beyond the default:
     - "application/stream+json"
     rules:
       # ... rules ...
+
+.. note::
+
+  Content-Type matching ignores parameters after the semicolon. The response header
+  ``text/event-stream; charset=utf-8`` will match the configured type ``text/event-stream``.
+  You only need to configure the base media type (type/subtype).
 
 Statistics
 ----------
