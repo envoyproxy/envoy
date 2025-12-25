@@ -3,8 +3,6 @@
 #include <cstdint>
 #include <memory>
 
-#include "source/common/http/utility.h"
-
 #include "absl/container/inlined_vector.h"
 
 namespace Envoy {
@@ -15,16 +13,10 @@ namespace HttpFilters {
 DynamicModuleHttpFilter::~DynamicModuleHttpFilter() { destroy(); }
 
 void DynamicModuleHttpFilter::initializeInModuleFilter() {
-  if (in_module_filter_ != nullptr) {
-    return;
-  }
   in_module_filter_ = config_->on_http_filter_new_(config_->in_module_config_, thisAsVoidPtr());
 }
 
 void DynamicModuleHttpFilter::onStreamComplete() {
-  if (in_module_filter_ == nullptr) {
-    return;
-  }
   config_->on_http_filter_stream_complete_(thisAsVoidPtr(), in_module_filter_);
 }
 
@@ -82,21 +74,6 @@ void DynamicModuleHttpFilter::destroy() {
 }
 
 FilterHeadersStatus DynamicModuleHttpFilter::decodeHeaders(RequestHeaderMap&, bool end_of_stream) {
-  if (decoder_callbacks_->route()) {
-    const auto* per_route_config =
-        Http::Utility::resolveMostSpecificPerFilterConfig<DynamicModuleHttpPerRouteFilterConfig>(
-            decoder_callbacks_);
-    if (per_route_config && per_route_config->disabled_) {
-      is_disabled_ = true;
-      in_continue_ = true;
-      return FilterHeadersStatus::Continue;
-    }
-  }
-
-  if (in_module_filter_ == nullptr) {
-    initializeInModuleFilter();
-  }
-
   const envoy_dynamic_module_type_on_http_filter_request_headers_status status =
       config_->on_http_filter_request_headers_(thisAsVoidPtr(), in_module_filter_, end_of_stream);
   in_continue_ = status == envoy_dynamic_module_type_on_http_filter_request_headers_status_Continue;
@@ -104,13 +81,6 @@ FilterHeadersStatus DynamicModuleHttpFilter::decodeHeaders(RequestHeaderMap&, bo
 };
 
 FilterDataStatus DynamicModuleHttpFilter::decodeData(Buffer::Instance& chunk, bool end_of_stream) {
-  if (is_disabled_) {
-    if (end_of_stream && decoder_callbacks_->decodingBuffer()) {
-      decoder_callbacks_->addDecodedData(chunk, false);
-    }
-    in_continue_ = true;
-    return FilterDataStatus::Continue;
-  }
   if (end_of_stream && decoder_callbacks_->decodingBuffer()) {
     // To make the very last chunk of the body available to the filter when buffering is enabled,
     // we need to call addDecodedData. See the code comment there for more details.
@@ -125,10 +95,6 @@ FilterDataStatus DynamicModuleHttpFilter::decodeData(Buffer::Instance& chunk, bo
 };
 
 FilterTrailersStatus DynamicModuleHttpFilter::decodeTrailers(RequestTrailerMap&) {
-  if (is_disabled_) {
-    in_continue_ = true;
-    return FilterTrailersStatus::Continue;
-  }
   const envoy_dynamic_module_type_on_http_filter_request_trailers_status status =
       config_->on_http_filter_request_trailers_(thisAsVoidPtr(), in_module_filter_);
   in_continue_ =
@@ -150,30 +116,8 @@ Filter1xxHeadersStatus DynamicModuleHttpFilter::encode1xxHeaders(ResponseHeaderM
 
 FilterHeadersStatus DynamicModuleHttpFilter::encodeHeaders(ResponseHeaderMap&, bool end_of_stream) {
   if (sent_local_reply_) { // See the comment on the flag.
-    in_continue_ = true;
     return FilterHeadersStatus::Continue;
   }
-
-  // Check per-route config for disabled flag if not already checked in decodeHeaders.
-  if (in_module_filter_ == nullptr) {
-    if (encoder_callbacks_->route()) {
-      const auto* per_route_config =
-          Http::Utility::resolveMostSpecificPerFilterConfig<DynamicModuleHttpPerRouteFilterConfig>(
-              encoder_callbacks_);
-      if (per_route_config && per_route_config->disabled_) {
-        is_disabled_ = true;
-        in_continue_ = true;
-        return FilterHeadersStatus::Continue;
-      }
-    }
-    initializeInModuleFilter();
-  }
-
-  if (is_disabled_) {
-    in_continue_ = true;
-    return FilterHeadersStatus::Continue;
-  }
-
   const envoy_dynamic_module_type_on_http_filter_response_headers_status status =
       config_->on_http_filter_response_headers_(thisAsVoidPtr(), in_module_filter_, end_of_stream);
   in_continue_ =
@@ -182,11 +126,7 @@ FilterHeadersStatus DynamicModuleHttpFilter::encodeHeaders(ResponseHeaderMap&, b
 };
 
 FilterDataStatus DynamicModuleHttpFilter::encodeData(Buffer::Instance& chunk, bool end_of_stream) {
-  if (sent_local_reply_ || is_disabled_) { // See the comment on the flag.
-    if (end_of_stream && encoder_callbacks_->encodingBuffer()) {
-      encoder_callbacks_->addEncodedData(chunk, false);
-    }
-    in_continue_ = true;
+  if (sent_local_reply_) { // See the comment on the flag.
     return FilterDataStatus::Continue;
   }
   if (end_of_stream && encoder_callbacks_->encodingBuffer()) {
@@ -203,8 +143,7 @@ FilterDataStatus DynamicModuleHttpFilter::encodeData(Buffer::Instance& chunk, bo
 };
 
 FilterTrailersStatus DynamicModuleHttpFilter::encodeTrailers(ResponseTrailerMap&) {
-  if (sent_local_reply_ || is_disabled_) { // See the comment on the flag.
-    in_continue_ = true;
+  if (sent_local_reply_) { // See the comment on the flag.
     return FilterTrailersStatus::Continue;
   }
   const envoy_dynamic_module_type_on_http_filter_response_trailers_status status =

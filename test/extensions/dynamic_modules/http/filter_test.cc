@@ -495,7 +495,7 @@ TEST(DynamicModulesTest, BodyCallbacks) {
   EXPECT_EQ(response_body.toString(), "barend");
 }
 
-TEST(DynamicModulesTest, HttpFilterHttpCalloutNonExistingCluster) {
+TEST(DynamicModulesTest, HttpFilterHttpCallout_non_existing_cluster) {
   const std::string filter_name = "http_callouts";
   // TODO: Add non-Rust test program once we have non-Rust SDK.
   auto dynamic_module =
@@ -535,7 +535,7 @@ TEST(DynamicModulesTest, HttpFilterHttpCalloutNonExistingCluster) {
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter->decodeHeaders(headers, false));
 }
 
-TEST(DynamicModulesTest, HttpFilterHttpCalloutImmediateFailingCluster) {
+TEST(DynamicModulesTest, HttpFilterHttpCallout_immediate_failing_cluster) {
   const std::string filter_name = "http_callouts";
   // TODO: Add non-Rust test program once we have non-Rust SDK.
   auto dynamic_module =
@@ -589,7 +589,7 @@ TEST(DynamicModulesTest, HttpFilterHttpCalloutImmediateFailingCluster) {
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter->decodeHeaders(headers, false));
 }
 
-TEST(DynamicModulesTest, HttpFilterHttpCalloutSuccess) {
+TEST(DynamicModulesTest, HttpFilterHttpCallout_success) {
   const std::string filter_name = "http_callouts";
   // TODO: Add non-Rust test program once we have non-Rust SDK.
   auto dynamic_module =
@@ -659,7 +659,7 @@ TEST(DynamicModulesTest, HttpFilterHttpCalloutSuccess) {
   callbacks_captured->onSuccess(req, std::move(response));
 }
 
-TEST(DynamicModulesTest, HttpFilterHttpCalloutResetting) {
+TEST(DynamicModulesTest, HttpFilterHttpCallout_resetting) {
   const std::string filter_name = "http_callouts";
   // TODO: Add non-Rust test program once we have non-Rust SDK.
   auto dynamic_module =
@@ -703,8 +703,6 @@ TEST(DynamicModulesTest, HttpFilterHttpCalloutResetting) {
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
                                                           stats_scope->symbolTable());
   filter->initializeInModuleFilter();
-  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
-  filter->setDecoderFilterCallbacks(decoder_callbacks);
 
   TestRequestHeaderMapImpl headers{{}};
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter->decodeHeaders(headers, false));
@@ -766,18 +764,14 @@ TEST(DynamicModulesTest, HttpFilterPerFilterConfigLifetimes) {
     const std::string route_filter_config_str = "router config";
     auto route_filter_config_or_status =
         Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpPerRouteConfig(
-            filter_name, route_filter_config_str, std::move(dynamic_module_for_route.value()),
-            false);
+            filter_name, route_filter_config_str, std::move(dynamic_module_for_route.value()));
     EXPECT_TRUE(route_filter_config_or_status.ok());
     auto route_filter_config = std::move(route_filter_config_or_status.value());
 
     const Router::RouteSpecificFilterConfig* router_config_ptr = route_filter_config.get();
 
-    // The filter checks for disabled flag first, then the module also requests per-route config.
-    auto route = std::make_shared<NiceMock<Router::MockRoute>>();
-    ON_CALL(*route, mostSpecificPerFilterConfig(_))
-        .WillByDefault(testing::Return(router_config_ptr));
-    ON_CALL(decoder_callbacks, route()).WillByDefault(testing::Return(route));
+    EXPECT_CALL(decoder_callbacks, mostSpecificPerFilterConfig())
+        .WillOnce(testing::Return(router_config_ptr));
 
     TestRequestHeaderMapImpl headers{{}};
     EXPECT_EQ(FilterHeadersStatus::Continue, filter->decodeHeaders(headers, true));
@@ -1158,223 +1152,6 @@ TEST(DynamicModulesTest, HttpFilterHttpStreamCalloutOnReset) {
   if (captured_callbacks) {
     captured_callbacks->onReset();
   }
-}
-
-TEST(DynamicModulesTest, PerRouteConfigDisabled) {
-  // Test per-route disabled feature. We use C module only because when the filter is disabled,
-  // the module is never initialized, and the Rust module has strict lifecycle assertions.
-  const std::string filter_name = "foo";
-  const std::string filter_config = "bar";
-
-  auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", "c"), false);
-  EXPECT_TRUE(dynamic_module.ok());
-
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  Stats::IsolatedStoreImpl stats_store;
-  auto filter_config_or_status =
-      Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
-          filter_name, filter_config, false, std::move(dynamic_module.value()),
-          *stats_store.createScope(""), context);
-  EXPECT_TRUE(filter_config_or_status.ok());
-
-  auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
-                                                          stats_store.symbolTable());
-
-  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
-  filter->setDecoderFilterCallbacks(decoder_callbacks);
-  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks;
-  filter->setEncoderFilterCallbacks(encoder_callbacks);
-
-  // Create a per-route config with disabled=true.
-  auto dynamic_module_for_per_route = newDynamicModule(testSharedObjectPath("no_op", "c"), false);
-  EXPECT_TRUE(dynamic_module_for_per_route.ok());
-  auto per_route_config = newDynamicModuleHttpPerRouteConfig(
-      "per_route", "config", std::move(dynamic_module_for_per_route.value()), true);
-  EXPECT_TRUE(per_route_config.ok());
-
-  // Mock the route to return the disabled per-route config.
-  auto route = std::make_shared<NiceMock<Router::MockRoute>>();
-  ON_CALL(*route, mostSpecificPerFilterConfig(_))
-      .WillByDefault(testing::Return(per_route_config.value().get()));
-  ON_CALL(decoder_callbacks, route()).WillByDefault(testing::Return(route));
-
-  TestRequestHeaderMapImpl request_headers{{}};
-  // decodeHeaders should return Continue and not initialize the in-module filter.
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter->decodeHeaders(request_headers, false));
-  // The filter should be disabled, so no module interaction should occur.
-
-  // All subsequent decode callbacks should return Continue without calling the module.
-  Buffer::OwnedImpl request_data("data");
-  EXPECT_EQ(Http::FilterDataStatus::Continue, filter->decodeData(request_data, false));
-  TestRequestTrailerMapImpl request_trailers{{}};
-  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter->decodeTrailers(request_trailers));
-
-  // All encode callbacks should also return Continue without calling the module.
-  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter->encodeHeaders(response_headers, false));
-  Buffer::OwnedImpl response_data("data");
-  EXPECT_EQ(Http::FilterDataStatus::Continue, filter->encodeData(response_data, false));
-  TestResponseTrailerMapImpl response_trailers{{}};
-  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter->encodeTrailers(response_trailers));
-
-  filter->onDestroy();
-}
-
-TEST(DynamicModulesTest, PerRouteConfigDisabledWithBuffering) {
-  // Test per-route disabled with buffering enabled. We use C module only because when the
-  // filter is disabled, the module is never initialized, and the Rust module has strict
-  // lifecycle assertions.
-  const std::string filter_name = "foo";
-  const std::string filter_config = "bar";
-
-  auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", "c"), false);
-  EXPECT_TRUE(dynamic_module.ok());
-
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  Stats::IsolatedStoreImpl stats_store;
-  auto filter_config_or_status =
-      Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
-          filter_name, filter_config, false, std::move(dynamic_module.value()),
-          *stats_store.createScope(""), context);
-  EXPECT_TRUE(filter_config_or_status.ok());
-
-  auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
-                                                          stats_store.symbolTable());
-
-  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
-  filter->setDecoderFilterCallbacks(decoder_callbacks);
-  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks;
-  filter->setEncoderFilterCallbacks(encoder_callbacks);
-
-  // Create a per-route config with disabled=true.
-  auto dynamic_module_for_per_route = newDynamicModule(testSharedObjectPath("no_op", "c"), false);
-  EXPECT_TRUE(dynamic_module_for_per_route.ok());
-  auto per_route_config = newDynamicModuleHttpPerRouteConfig(
-      "per_route", "config", std::move(dynamic_module_for_per_route.value()), true);
-  EXPECT_TRUE(per_route_config.ok());
-
-  // Mock the route to return the disabled per-route config.
-  auto route = std::make_shared<NiceMock<Router::MockRoute>>();
-  ON_CALL(*route, mostSpecificPerFilterConfig(_))
-      .WillByDefault(testing::Return(per_route_config.value().get()));
-  ON_CALL(decoder_callbacks, route()).WillByDefault(testing::Return(route));
-
-  TestRequestHeaderMapImpl request_headers{{}};
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter->decodeHeaders(request_headers, false));
-
-  // Test with buffering enabled - should handle end_stream correctly.
-  Buffer::OwnedImpl decoding_buffer;
-  EXPECT_CALL(decoder_callbacks, decodingBuffer())
-      .WillRepeatedly(testing::Return(&decoding_buffer));
-  EXPECT_CALL(decoder_callbacks, addDecodedData(_, false));
-
-  Buffer::OwnedImpl request_data("data");
-  EXPECT_EQ(Http::FilterDataStatus::Continue, filter->decodeData(request_data, true));
-
-  // Test encode path with buffering.
-  Buffer::OwnedImpl encoding_buffer;
-  EXPECT_CALL(encoder_callbacks, encodingBuffer())
-      .WillRepeatedly(testing::Return(&encoding_buffer));
-  EXPECT_CALL(encoder_callbacks, addEncodedData(_, false));
-
-  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter->encodeHeaders(response_headers, false));
-  Buffer::OwnedImpl response_data("data");
-  EXPECT_EQ(Http::FilterDataStatus::Continue, filter->encodeData(response_data, true));
-
-  filter->onDestroy();
-}
-
-TEST_P(DynamicModuleTestLanguages, PerRouteConfigDisabledImmediateResponse) {
-  // Test the scenario where a previous filter sends an immediate response and encodeHeaders
-  // is called without decodeHeaders being called first.
-  const std::string filter_name = "foo";
-  const std::string filter_config = "bar";
-
-  const auto language = GetParam();
-  auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", language), false);
-  EXPECT_TRUE(dynamic_module.ok());
-
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  Stats::IsolatedStoreImpl stats_store;
-  auto filter_config_or_status =
-      Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
-          filter_name, filter_config, false, std::move(dynamic_module.value()),
-          *stats_store.createScope(""), context);
-  EXPECT_TRUE(filter_config_or_status.ok());
-
-  auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
-                                                          stats_store.symbolTable());
-
-  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks;
-  filter->setEncoderFilterCallbacks(encoder_callbacks);
-
-  // Create a per-route config with disabled=true.
-  auto dynamic_module_for_per_route =
-      newDynamicModule(testSharedObjectPath("no_op", language), false);
-  EXPECT_TRUE(dynamic_module_for_per_route.ok());
-  auto per_route_config = newDynamicModuleHttpPerRouteConfig(
-      "per_route", "config", std::move(dynamic_module_for_per_route.value()), true);
-  EXPECT_TRUE(per_route_config.ok());
-
-  // Mock the route to return the disabled per-route config.
-  auto route = std::make_shared<NiceMock<Router::MockRoute>>();
-  ON_CALL(*route, mostSpecificPerFilterConfig(_))
-      .WillByDefault(testing::Return(per_route_config.value().get()));
-  ON_CALL(encoder_callbacks, route()).WillByDefault(testing::Return(route));
-
-  // Directly call encodeHeaders without calling decodeHeaders first.
-  // This simulates an immediate response scenario.
-  TestResponseHeaderMapImpl response_headers{{":status", "403"}};
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter->encodeHeaders(response_headers, false));
-
-  // All subsequent encode callbacks should return Continue without calling the module.
-  Buffer::OwnedImpl response_data("data");
-  EXPECT_EQ(Http::FilterDataStatus::Continue, filter->encodeData(response_data, false));
-  TestResponseTrailerMapImpl response_trailers{{}};
-  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter->encodeTrailers(response_trailers));
-
-  filter->onDestroy();
-}
-
-TEST(DynamicModulesTest, ImmediateResponseFilterEnabled) {
-  // Test the scenario where a previous filter sends an immediate response and encodeHeaders
-  // is called without decodeHeaders being called first, but the filter is not disabled.
-  const std::string filter_name = "foo";
-  const std::string filter_config = "bar";
-
-  auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", "c"), false);
-  EXPECT_TRUE(dynamic_module.ok());
-
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  Stats::IsolatedStoreImpl stats_store;
-  auto filter_config_or_status =
-      Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
-          filter_name, filter_config, false, std::move(dynamic_module.value()),
-          *stats_store.createScope(""), context);
-  EXPECT_TRUE(filter_config_or_status.ok());
-
-  auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
-                                                          stats_store.symbolTable());
-
-  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks;
-  filter->setEncoderFilterCallbacks(encoder_callbacks);
-
-  // No per-route config set, so the filter should be enabled.
-  ON_CALL(encoder_callbacks, route()).WillByDefault(testing::Return(nullptr));
-
-  // Directly call encodeHeaders without calling decodeHeaders first.
-  // The module should be initialized in encodeHeaders and the callback should be invoked.
-  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter->encodeHeaders(response_headers, false));
-
-  // Verify subsequent callbacks work correctly.
-  Buffer::OwnedImpl response_data("data");
-  EXPECT_EQ(Http::FilterDataStatus::Continue, filter->encodeData(response_data, false));
-  TestResponseTrailerMapImpl response_trailers{{}};
-  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter->encodeTrailers(response_trailers));
-
-  filter->onDestroy();
 }
 
 } // namespace HttpFilters
