@@ -309,13 +309,11 @@ public:
   DynamicModuleHttpPerRouteFilterConfig(
       envoy_dynamic_module_type_http_filter_config_module_ptr config,
       OnHttpPerRouteConfigDestroyType destroy,
-      Extensions::DynamicModules::DynamicModulePtr dynamic_module, bool disabled)
-      : config_(config), disabled_(disabled), destroy_(destroy),
-        dynamic_module_(std::move(dynamic_module)) {}
+      Extensions::DynamicModules::DynamicModulePtr dynamic_module)
+      : config_(config), destroy_(destroy), dynamic_module_(std::move(dynamic_module)) {}
   ~DynamicModuleHttpPerRouteFilterConfig() override;
 
   envoy_dynamic_module_type_http_filter_config_module_ptr config_;
-  const bool disabled_;
 
 private:
   OnHttpPerRouteConfigDestroyType destroy_;
@@ -329,8 +327,7 @@ using DynamicModuleHttpPerRouteFilterConfigConstSharedPtr =
 absl::StatusOr<DynamicModuleHttpPerRouteFilterConfigConstSharedPtr>
 newDynamicModuleHttpPerRouteConfig(const absl::string_view per_route_config_name,
                                    const absl::string_view filter_config,
-                                   Extensions::DynamicModules::DynamicModulePtr dynamic_module,
-                                   bool disabled);
+                                   Extensions::DynamicModules::DynamicModulePtr dynamic_module);
 
 /**
  * Creates a new DynamicModuleHttpFilterConfig for given configuration.
