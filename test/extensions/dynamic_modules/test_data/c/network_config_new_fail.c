@@ -10,7 +10,7 @@ envoy_dynamic_module_type_abi_version_module_ptr envoy_dynamic_module_on_program
 envoy_dynamic_module_type_network_filter_config_module_ptr
 envoy_dynamic_module_on_network_filter_config_new(
     envoy_dynamic_module_type_network_filter_config_envoy_ptr filter_config_envoy_ptr,
-    const char* name_ptr, size_t name_size, const char* config_ptr, size_t config_size) {
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config) {
   // Intentionally return nullptr to simulate config initialization failure.
   return 0;
 }

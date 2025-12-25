@@ -1102,10 +1102,8 @@ void envoy_dynamic_module_on_http_filter_downstream_below_write_buffer_low_water
  *
  * @param filter_config_envoy_ptr is the pointer to the DynamicModuleNetworkFilterConfig object for
  * the corresponding config.
- * @param name_ptr is the name of the filter.
- * @param name_size is the size of the name.
- * @param config_ptr is the configuration for the module.
- * @param config_size is the size of the configuration.
+ * @param name is the name of the filter owned by Envoy.
+ * @param config is the configuration for the module owned by Envoy.
  * @return envoy_dynamic_module_type_network_filter_config_module_ptr is the pointer to the
  * in-module network filter configuration. Returning nullptr indicates a failure to initialize the
  * module. When it fails, the filter configuration will be rejected.
@@ -1113,8 +1111,7 @@ void envoy_dynamic_module_on_http_filter_downstream_below_write_buffer_low_water
 envoy_dynamic_module_type_network_filter_config_module_ptr
 envoy_dynamic_module_on_network_filter_config_new(
     envoy_dynamic_module_type_network_filter_config_envoy_ptr filter_config_envoy_ptr,
-    envoy_dynamic_module_type_const_buffer_envoy_ptr name_ptr, size_t name_size,
-    envoy_dynamic_module_type_const_buffer_envoy_ptr config_ptr, size_t config_size);
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config);
 
 /**
  * envoy_dynamic_module_on_network_filter_config_destroy is called when the network filter
@@ -2465,87 +2462,80 @@ void envoy_dynamic_module_callback_network_filter_drain_write_buffer(
  * prepend data to the beginning of the read buffer.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
- * @param data is the pointer to the data to prepend.
- * @param length is the length of the data.
+ * @param data is the data to prepend owned by the module.
  */
 void envoy_dynamic_module_callback_network_filter_prepend_read_buffer(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_buffer_module_ptr data, size_t length);
+    envoy_dynamic_module_type_module_buffer data);
 
 /**
  * envoy_dynamic_module_callback_network_filter_append_read_buffer is called by the module to
  * append data to the end of the read buffer.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
- * @param data is the pointer to the data to append.
- * @param length is the length of the data.
+ * @param data is the data to append owned by the module.
  */
 void envoy_dynamic_module_callback_network_filter_append_read_buffer(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_buffer_module_ptr data, size_t length);
+    envoy_dynamic_module_type_module_buffer data);
 
 /**
  * envoy_dynamic_module_callback_network_filter_prepend_write_buffer is called by the module to
  * prepend data to the beginning of the write buffer.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
- * @param data is the pointer to the data to prepend.
- * @param length is the length of the data.
+ * @param data is the data to prepend owned by the module.
  */
 void envoy_dynamic_module_callback_network_filter_prepend_write_buffer(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_buffer_module_ptr data, size_t length);
+    envoy_dynamic_module_type_module_buffer data);
 
 /**
  * envoy_dynamic_module_callback_network_filter_append_write_buffer is called by the module to
  * append data to the end of the write buffer.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
- * @param data is the pointer to the data to append.
- * @param length is the length of the data.
+ * @param data is the data to append owned by the module.
  */
 void envoy_dynamic_module_callback_network_filter_append_write_buffer(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_buffer_module_ptr data, size_t length);
+    envoy_dynamic_module_type_module_buffer data);
 
 /**
  * envoy_dynamic_module_callback_network_filter_write is called by the module to write data
  * directly to the connection (downstream).
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
- * @param data is the pointer to the data to write.
- * @param length is the length of the data.
+ * @param data is the data to write owned by the module.
  * @param end_stream is true to half-close the connection after writing.
  */
 void envoy_dynamic_module_callback_network_filter_write(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_buffer_module_ptr data, size_t length, bool end_stream);
+    envoy_dynamic_module_type_module_buffer data, bool end_stream);
 
 /**
  * envoy_dynamic_module_callback_network_filter_inject_read_data is called by the module to inject
  * data into the read filter chain (after this filter).
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
- * @param data is the pointer to the data to inject.
- * @param length is the length of the data.
+ * @param data is the data to inject owned by the module.
  * @param end_stream is true if this is the last data.
  */
 void envoy_dynamic_module_callback_network_filter_inject_read_data(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_buffer_module_ptr data, size_t length, bool end_stream);
+    envoy_dynamic_module_type_module_buffer data, bool end_stream);
 
 /**
  * envoy_dynamic_module_callback_network_filter_inject_write_data is called by the module to inject
  * data into the write filter chain (after this filter).
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
- * @param data is the pointer to the data to inject.
- * @param length is the length of the data.
+ * @param data is the data to inject owned by the module.
  * @param end_stream is true if this is the last data.
  */
 void envoy_dynamic_module_callback_network_filter_inject_write_data(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_buffer_module_ptr data, size_t length, bool end_stream);
+    envoy_dynamic_module_type_module_buffer data, bool end_stream);
 
 /**
  * envoy_dynamic_module_callback_network_filter_continue_reading is called by the module to

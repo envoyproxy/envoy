@@ -242,7 +242,8 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, PrependReadBufferWithData) {
   filter_->setCurrentReadBufferForTest(&buffer);
 
   char data[] = "hello ";
-  envoy_dynamic_module_callback_network_filter_prepend_read_buffer(filterPtr(), data, 6);
+  envoy_dynamic_module_type_module_buffer buf = {data, 6};
+  envoy_dynamic_module_callback_network_filter_prepend_read_buffer(filterPtr(), buf);
   EXPECT_EQ("hello world", buffer.toString());
 
   filter_->setCurrentReadBufferForTest(nullptr);
@@ -253,7 +254,8 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, AppendReadBufferWithData) {
   filter_->setCurrentReadBufferForTest(&buffer);
 
   char data[] = " world";
-  envoy_dynamic_module_callback_network_filter_append_read_buffer(filterPtr(), data, 6);
+  envoy_dynamic_module_type_module_buffer buf = {data, 6};
+  envoy_dynamic_module_callback_network_filter_append_read_buffer(filterPtr(), buf);
   EXPECT_EQ("hello world", buffer.toString());
 
   filter_->setCurrentReadBufferForTest(nullptr);
@@ -261,16 +263,18 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, AppendReadBufferWithData) {
 
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, PrependAppendReadBufferNullBuffer) {
   char data[] = "test";
-  envoy_dynamic_module_callback_network_filter_prepend_read_buffer(filterPtr(), data, 4);
-  envoy_dynamic_module_callback_network_filter_append_read_buffer(filterPtr(), data, 4);
+  envoy_dynamic_module_type_module_buffer buf = {data, 4};
+  envoy_dynamic_module_callback_network_filter_prepend_read_buffer(filterPtr(), buf);
+  envoy_dynamic_module_callback_network_filter_append_read_buffer(filterPtr(), buf);
 }
 
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, PrependAppendReadBufferNullData) {
   Buffer::OwnedImpl buffer("test");
   filter_->setCurrentReadBufferForTest(&buffer);
 
-  envoy_dynamic_module_callback_network_filter_prepend_read_buffer(filterPtr(), nullptr, 4);
-  envoy_dynamic_module_callback_network_filter_append_read_buffer(filterPtr(), nullptr, 4);
+  envoy_dynamic_module_type_module_buffer buf = {nullptr, 4};
+  envoy_dynamic_module_callback_network_filter_prepend_read_buffer(filterPtr(), buf);
+  envoy_dynamic_module_callback_network_filter_append_read_buffer(filterPtr(), buf);
   EXPECT_EQ("test", buffer.toString());
 
   filter_->setCurrentReadBufferForTest(nullptr);
@@ -281,8 +285,9 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, PrependAppendReadBufferZeroLen
   filter_->setCurrentReadBufferForTest(&buffer);
 
   char data[] = "x";
-  envoy_dynamic_module_callback_network_filter_prepend_read_buffer(filterPtr(), data, 0);
-  envoy_dynamic_module_callback_network_filter_append_read_buffer(filterPtr(), data, 0);
+  envoy_dynamic_module_type_module_buffer buf = {data, 0};
+  envoy_dynamic_module_callback_network_filter_prepend_read_buffer(filterPtr(), buf);
+  envoy_dynamic_module_callback_network_filter_append_read_buffer(filterPtr(), buf);
   EXPECT_EQ("test", buffer.toString());
 
   filter_->setCurrentReadBufferForTest(nullptr);
@@ -297,7 +302,8 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, PrependWriteBufferWithData) {
   filter_->setCurrentWriteBufferForTest(&buffer);
 
   char data[] = "hello ";
-  envoy_dynamic_module_callback_network_filter_prepend_write_buffer(filterPtr(), data, 6);
+  envoy_dynamic_module_type_module_buffer buf = {data, 6};
+  envoy_dynamic_module_callback_network_filter_prepend_write_buffer(filterPtr(), buf);
   EXPECT_EQ("hello world", buffer.toString());
 
   filter_->setCurrentWriteBufferForTest(nullptr);
@@ -308,7 +314,8 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, AppendWriteBufferWithData) {
   filter_->setCurrentWriteBufferForTest(&buffer);
 
   char data[] = " world";
-  envoy_dynamic_module_callback_network_filter_append_write_buffer(filterPtr(), data, 6);
+  envoy_dynamic_module_type_module_buffer buf = {data, 6};
+  envoy_dynamic_module_callback_network_filter_append_write_buffer(filterPtr(), buf);
   EXPECT_EQ("hello world", buffer.toString());
 
   filter_->setCurrentWriteBufferForTest(nullptr);
@@ -316,16 +323,18 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, AppendWriteBufferWithData) {
 
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, PrependAppendWriteBufferNullBuffer) {
   char data[] = "test";
-  envoy_dynamic_module_callback_network_filter_prepend_write_buffer(filterPtr(), data, 4);
-  envoy_dynamic_module_callback_network_filter_append_write_buffer(filterPtr(), data, 4);
+  envoy_dynamic_module_type_module_buffer buf = {data, 4};
+  envoy_dynamic_module_callback_network_filter_prepend_write_buffer(filterPtr(), buf);
+  envoy_dynamic_module_callback_network_filter_append_write_buffer(filterPtr(), buf);
 }
 
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, PrependAppendWriteBufferNullData) {
   Buffer::OwnedImpl buffer("test");
   filter_->setCurrentWriteBufferForTest(&buffer);
 
-  envoy_dynamic_module_callback_network_filter_prepend_write_buffer(filterPtr(), nullptr, 4);
-  envoy_dynamic_module_callback_network_filter_append_write_buffer(filterPtr(), nullptr, 4);
+  envoy_dynamic_module_type_module_buffer buf = {nullptr, 4};
+  envoy_dynamic_module_callback_network_filter_prepend_write_buffer(filterPtr(), buf);
+  envoy_dynamic_module_callback_network_filter_append_write_buffer(filterPtr(), buf);
   EXPECT_EQ("test", buffer.toString());
 
   filter_->setCurrentWriteBufferForTest(nullptr);
@@ -336,8 +345,9 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, PrependAppendWriteBufferZeroLe
   filter_->setCurrentWriteBufferForTest(&buffer);
 
   char data[] = "x";
-  envoy_dynamic_module_callback_network_filter_prepend_write_buffer(filterPtr(), data, 0);
-  envoy_dynamic_module_callback_network_filter_append_write_buffer(filterPtr(), data, 0);
+  envoy_dynamic_module_type_module_buffer buf = {data, 0};
+  envoy_dynamic_module_callback_network_filter_prepend_write_buffer(filterPtr(), buf);
+  envoy_dynamic_module_callback_network_filter_append_write_buffer(filterPtr(), buf);
   EXPECT_EQ("test", buffer.toString());
 
   filter_->setCurrentWriteBufferForTest(nullptr);
@@ -349,30 +359,35 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, PrependAppendWriteBufferZeroLe
 
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, WriteWithData) {
   char data[] = "test data";
+  envoy_dynamic_module_type_module_buffer buf = {data, 9};
   EXPECT_CALL(connection_, write(testing::_, false));
-  envoy_dynamic_module_callback_network_filter_write(filterPtr(), data, 9, false);
+  envoy_dynamic_module_callback_network_filter_write(filterPtr(), buf, false);
 }
 
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, WriteWithDataEndStream) {
   char data[] = "test";
+  envoy_dynamic_module_type_module_buffer buf = {data, 4};
   EXPECT_CALL(connection_, write(testing::_, true));
-  envoy_dynamic_module_callback_network_filter_write(filterPtr(), data, 4, true);
+  envoy_dynamic_module_callback_network_filter_write(filterPtr(), buf, true);
 }
 
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, WriteEndStreamOnly) {
+  envoy_dynamic_module_type_module_buffer buf = {nullptr, 0};
   EXPECT_CALL(connection_, write(testing::_, true));
-  envoy_dynamic_module_callback_network_filter_write(filterPtr(), nullptr, 0, true);
+  envoy_dynamic_module_callback_network_filter_write(filterPtr(), buf, true);
 }
 
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, WriteNullDataNotEndStream) {
+  envoy_dynamic_module_type_module_buffer buf = {nullptr, 0};
   EXPECT_CALL(connection_, write(testing::_, testing::_)).Times(0);
-  envoy_dynamic_module_callback_network_filter_write(filterPtr(), nullptr, 0, false);
+  envoy_dynamic_module_callback_network_filter_write(filterPtr(), buf, false);
 }
 
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, WriteZeroLengthNotEndStream) {
   char data[] = "test";
+  envoy_dynamic_module_type_module_buffer buf = {data, 0};
   EXPECT_CALL(connection_, write(testing::_, testing::_)).Times(0);
-  envoy_dynamic_module_callback_network_filter_write(filterPtr(), data, 0, false);
+  envoy_dynamic_module_callback_network_filter_write(filterPtr(), buf, false);
 }
 
 // =============================================================================
@@ -381,13 +396,15 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, WriteZeroLengthNotEndStream) {
 
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, InjectReadDataWithData) {
   char data[] = "injected";
+  envoy_dynamic_module_type_module_buffer buf = {data, 8};
   EXPECT_CALL(read_callbacks_, injectReadDataToFilterChain(testing::_, false));
-  envoy_dynamic_module_callback_network_filter_inject_read_data(filterPtr(), data, 8, false);
+  envoy_dynamic_module_callback_network_filter_inject_read_data(filterPtr(), buf, false);
 }
 
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, InjectReadDataEmptyEndStream) {
+  envoy_dynamic_module_type_module_buffer buf = {nullptr, 0};
   EXPECT_CALL(read_callbacks_, injectReadDataToFilterChain(testing::_, true));
-  envoy_dynamic_module_callback_network_filter_inject_read_data(filterPtr(), nullptr, 0, true);
+  envoy_dynamic_module_callback_network_filter_inject_read_data(filterPtr(), buf, true);
 }
 
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, InjectReadDataNullCallbacks) {
@@ -395,8 +412,9 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, InjectReadDataNullCallbacks) {
   filter->initializeInModuleFilter();
 
   char data[] = "test";
+  envoy_dynamic_module_type_module_buffer buf = {data, 4};
   envoy_dynamic_module_callback_network_filter_inject_read_data(static_cast<void*>(filter.get()),
-                                                                data, 4, false);
+                                                                buf, false);
 }
 
 // =============================================================================
@@ -405,13 +423,15 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, InjectReadDataNullCallbacks) {
 
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, InjectWriteDataWithData) {
   char data[] = "injected";
+  envoy_dynamic_module_type_module_buffer buf = {data, 8};
   EXPECT_CALL(write_callbacks_, injectWriteDataToFilterChain(testing::_, false));
-  envoy_dynamic_module_callback_network_filter_inject_write_data(filterPtr(), data, 8, false);
+  envoy_dynamic_module_callback_network_filter_inject_write_data(filterPtr(), buf, false);
 }
 
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, InjectWriteDataEmptyEndStream) {
+  envoy_dynamic_module_type_module_buffer buf = {nullptr, 0};
   EXPECT_CALL(write_callbacks_, injectWriteDataToFilterChain(testing::_, true));
-  envoy_dynamic_module_callback_network_filter_inject_write_data(filterPtr(), nullptr, 0, true);
+  envoy_dynamic_module_callback_network_filter_inject_write_data(filterPtr(), buf, true);
 }
 
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, InjectWriteDataNullCallbacks) {
@@ -419,8 +439,9 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, InjectWriteDataNullCallbacks) 
   filter->initializeInModuleFilter();
 
   char data[] = "test";
+  envoy_dynamic_module_type_module_buffer buf = {data, 4};
   envoy_dynamic_module_callback_network_filter_inject_write_data(static_cast<void*>(filter.get()),
-                                                                 data, 4, false);
+                                                                 buf, false);
 }
 
 // =============================================================================

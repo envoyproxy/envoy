@@ -283,11 +283,6 @@ new_features:
     <envoy_v3_api_field_extensions.dynamic_modules.v3.DynamicModuleConfig.load_globally>` to ``true``.
 - area: dynamic modules
   change: |
-    Added :ref:`disabled <envoy_v3_api_field_extensions.filters.http.dynamic_modules.v3.DynamicModuleFilterPerRoute.disabled>`
-    field to per-route configuration for the dynamic modules HTTP filter, enabling dynamic modules to be disabled on a
-    per-route basis.
-- area: dynamic modules
-  change: |
     Added :ref:`network filter <envoy_v3_api_msg_extensions.filters.network.dynamic_modules.v3.DynamicModuleNetworkFilter>`
     support for dynamic modules, enabling TCP stream processing with dynamic modules.
 - area: dynamic modules

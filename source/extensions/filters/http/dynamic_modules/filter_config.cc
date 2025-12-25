@@ -23,21 +23,13 @@ DynamicModuleHttpFilterConfig::~DynamicModuleHttpFilterConfig() {
 }
 
 DynamicModuleHttpPerRouteFilterConfig::~DynamicModuleHttpPerRouteFilterConfig() {
-  if (destroy_) {
-    (*destroy_)(config_);
-  }
+  (*destroy_)(config_);
 }
 
 absl::StatusOr<DynamicModuleHttpPerRouteFilterConfigConstSharedPtr>
 newDynamicModuleHttpPerRouteConfig(const absl::string_view per_route_config_name,
                                    const absl::string_view filter_config,
-                                   Extensions::DynamicModules::DynamicModulePtr dynamic_module,
-                                   bool disabled) {
-  if (disabled) {
-    return std::make_shared<const DynamicModuleHttpPerRouteFilterConfig>(
-        nullptr, nullptr, std::move(dynamic_module), disabled);
-  }
-
+                                   Extensions::DynamicModules::DynamicModulePtr dynamic_module) {
   auto constructor =
       dynamic_module
           ->getFunctionPointer<decltype(&envoy_dynamic_module_on_http_filter_per_route_config_new)>(
@@ -56,7 +48,7 @@ newDynamicModuleHttpPerRouteConfig(const absl::string_view per_route_config_name
   }
 
   return std::make_shared<const DynamicModuleHttpPerRouteFilterConfig>(
-      filter_config_envoy_ptr, destroy.value(), std::move(dynamic_module), disabled);
+      filter_config_envoy_ptr, destroy.value(), std::move(dynamic_module));
 }
 
 absl::StatusOr<DynamicModuleHttpFilterConfigSharedPtr> newDynamicModuleHttpFilterConfig(

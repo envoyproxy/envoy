@@ -115,51 +115,51 @@ void envoy_dynamic_module_callback_network_filter_drain_write_buffer(
 
 void envoy_dynamic_module_callback_network_filter_prepend_read_buffer(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_buffer_module_ptr data, size_t length) {
+    envoy_dynamic_module_type_module_buffer data) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
   Buffer::Instance* buffer = filter->currentReadBuffer();
-  if (buffer != nullptr && data != nullptr && length > 0) {
-    buffer->prepend(absl::string_view(data, length));
+  if (buffer != nullptr && data.ptr != nullptr && data.length > 0) {
+    buffer->prepend(absl::string_view(data.ptr, data.length));
   }
 }
 
 void envoy_dynamic_module_callback_network_filter_append_read_buffer(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_buffer_module_ptr data, size_t length) {
+    envoy_dynamic_module_type_module_buffer data) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
   Buffer::Instance* buffer = filter->currentReadBuffer();
-  if (buffer != nullptr && data != nullptr && length > 0) {
-    buffer->add(data, length);
+  if (buffer != nullptr && data.ptr != nullptr && data.length > 0) {
+    buffer->add(data.ptr, data.length);
   }
 }
 
 void envoy_dynamic_module_callback_network_filter_prepend_write_buffer(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_buffer_module_ptr data, size_t length) {
+    envoy_dynamic_module_type_module_buffer data) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
   Buffer::Instance* buffer = filter->currentWriteBuffer();
-  if (buffer != nullptr && data != nullptr && length > 0) {
-    buffer->prepend(absl::string_view(data, length));
+  if (buffer != nullptr && data.ptr != nullptr && data.length > 0) {
+    buffer->prepend(absl::string_view(data.ptr, data.length));
   }
 }
 
 void envoy_dynamic_module_callback_network_filter_append_write_buffer(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_buffer_module_ptr data, size_t length) {
+    envoy_dynamic_module_type_module_buffer data) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
   Buffer::Instance* buffer = filter->currentWriteBuffer();
-  if (buffer != nullptr && data != nullptr && length > 0) {
-    buffer->add(data, length);
+  if (buffer != nullptr && data.ptr != nullptr && data.length > 0) {
+    buffer->add(data.ptr, data.length);
   }
 }
 
 void envoy_dynamic_module_callback_network_filter_write(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_buffer_module_ptr data, size_t length, bool end_stream) {
+    envoy_dynamic_module_type_module_buffer data, bool end_stream) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
-  if (data != nullptr && length > 0) {
+  if (data.ptr != nullptr && data.length > 0) {
     Buffer::OwnedImpl buffer;
-    buffer.add(data, length);
+    buffer.add(data.ptr, data.length);
     filter->write(buffer, end_stream);
   } else if (end_stream) {
     Buffer::OwnedImpl empty;
@@ -169,13 +169,13 @@ void envoy_dynamic_module_callback_network_filter_write(
 
 void envoy_dynamic_module_callback_network_filter_inject_read_data(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_buffer_module_ptr data, size_t length, bool end_stream) {
+    envoy_dynamic_module_type_module_buffer data, bool end_stream) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
   auto* callbacks = filter->readCallbacks();
   if (callbacks != nullptr) {
     Buffer::OwnedImpl buffer;
-    if (data != nullptr && length > 0) {
-      buffer.add(data, length);
+    if (data.ptr != nullptr && data.length > 0) {
+      buffer.add(data.ptr, data.length);
     }
     callbacks->injectReadDataToFilterChain(buffer, end_stream);
   }
@@ -183,13 +183,13 @@ void envoy_dynamic_module_callback_network_filter_inject_read_data(
 
 void envoy_dynamic_module_callback_network_filter_inject_write_data(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_buffer_module_ptr data, size_t length, bool end_stream) {
+    envoy_dynamic_module_type_module_buffer data, bool end_stream) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
   auto* callbacks = filter->writeCallbacks();
   if (callbacks != nullptr) {
     Buffer::OwnedImpl buffer;
-    if (data != nullptr && length > 0) {
-      buffer.add(data, length);
+    if (data.ptr != nullptr && data.length > 0) {
+      buffer.add(data.ptr, data.length);
     }
     callbacks->injectWriteDataToFilterChain(buffer, end_stream);
   }

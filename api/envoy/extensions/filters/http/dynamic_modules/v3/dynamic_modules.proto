@@ -120,11 +120,4 @@ message DynamicModuleFilterPerRoute {
   //    value: aGVsbG8= # echo -n "hello" | base64
   //
   google.protobuf.Any filter_config = 3;
-
-  // Disable the filter for this particular vhost or route.
-  // If this field is specified in multiple per-filter-configs, the most specific
-  // one will be used.
-  //
-  // If this field is not specified, the filter would remain enabled.
-  bool disabled = 4;
 }

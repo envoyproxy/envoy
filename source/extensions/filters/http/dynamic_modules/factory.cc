@@ -44,6 +44,7 @@ absl::StatusOr<Http::FilterFactoryCb> DynamicModuleConfigFactory::createFilterFa
     auto filter =
         std::make_shared<Envoy::Extensions::DynamicModules::HttpFilters::DynamicModuleHttpFilter>(
             config, config->stats_scope_->symbolTable());
+    filter->initializeInModuleFilter();
     callbacks.addStreamFilter(filter);
   };
 }
@@ -72,8 +73,7 @@ DynamicModuleConfigFactory::createRouteSpecificFilterConfigTyped(
                      DynamicModuleHttpPerRouteFilterConfigConstSharedPtr>
       filter_config =
           Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpPerRouteConfig(
-              proto_config.per_route_config_name(), config, std::move(dynamic_module.value()),
-              proto_config.disabled());
+              proto_config.per_route_config_name(), config, std::move(dynamic_module.value()));
 
   if (!filter_config.ok()) {
     return absl::InvalidArgumentError("Failed to create pre-route filter config: " +

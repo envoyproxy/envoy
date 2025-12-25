@@ -11,11 +11,11 @@ envoy_dynamic_module_type_abi_version_module_ptr envoy_dynamic_module_on_program
 envoy_dynamic_module_type_network_filter_config_module_ptr
 envoy_dynamic_module_on_network_filter_config_new(
     envoy_dynamic_module_type_network_filter_config_envoy_ptr filter_config_envoy_ptr,
-    const char* name_ptr, size_t name_size, const char* config_ptr, size_t config_size) {
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config) {
   // Return a non-null value to indicate success.
-  int* config = (int*)malloc(sizeof(int));
-  *config = 0;
-  return config;
+  int* module_config = (int*)malloc(sizeof(int));
+  *module_config = 0;
+  return module_config;
 }
 
 void envoy_dynamic_module_on_network_filter_config_destroy(

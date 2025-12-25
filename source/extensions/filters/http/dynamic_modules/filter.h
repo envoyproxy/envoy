@@ -230,8 +230,6 @@ private:
   // multiple mutable borrows of the same object. In practice, a module shouldn't need encodeHeaders
   // and encodeData to be called for local reply contents, so we just skip them with this flag.
   bool sent_local_reply_ = false;
-  // This is set to true when the filter is disabled by the per-route configuration.
-  bool is_disabled_ = false;
 
   const DynamicModuleHttpFilterConfigSharedPtr config_ = nullptr;
   envoy_dynamic_module_type_http_filter_module_ptr in_module_filter_ = nullptr;
