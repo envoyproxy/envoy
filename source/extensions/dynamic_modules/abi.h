@@ -215,12 +215,12 @@ typedef struct envoy_dynamic_module_type_envoy_http_header {
   size_t value_length;
 } envoy_dynamic_module_type_envoy_http_header;
 
-typedef enum envoy_dynamic_module_type_http_header_map_type {
-  envoy_dynamic_module_type_http_header_map_type_RequestHeaders,
-  envoy_dynamic_module_type_http_header_map_type_RequestTrailers,
-  envoy_dynamic_module_type_http_header_map_type_ResponseHeaders,
-  envoy_dynamic_module_type_http_header_map_type_ResponseTrailers,
-} envoy_dynamic_module_type_http_header_map_type;
+typedef enum envoy_dynamic_module_type_http_header_type {
+  envoy_dynamic_module_type_http_header_type_RequestHeader,
+  envoy_dynamic_module_type_http_header_type_RequestTrailer,
+  envoy_dynamic_module_type_http_header_type_ResponseHeader,
+  envoy_dynamic_module_type_http_header_type_ResponseTrailer,
+} envoy_dynamic_module_type_http_header_type;
 
 typedef enum envoy_dynamic_module_type_http_body_type {
   envoy_dynamic_module_type_http_body_type_ReceivedRequestBody,
@@ -1677,7 +1677,7 @@ envoy_dynamic_module_callback_http_filter_record_histogram_value_vec(
  */
 bool envoy_dynamic_module_callback_http_get_header(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_http_header_map_type header_type,
+    envoy_dynamic_module_type_http_header_type header_type,
     envoy_dynamic_module_type_buffer_module_ptr key, size_t key_length,
     envoy_dynamic_module_type_buffer_envoy_ptr* result_buffer_ptr, size_t* result_buffer_length_ptr,
     size_t index, size_t* optional_size);
@@ -1696,7 +1696,7 @@ bool envoy_dynamic_module_callback_http_get_header(
  */
 bool envoy_dynamic_module_callback_http_get_headers_size(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_http_header_map_type header_type, size_t* size);
+    envoy_dynamic_module_type_http_header_type header_type, size_t* size);
 
 /**
  * envoy_dynamic_module_callback_http_get_headers is called by the module to get all the
@@ -1719,7 +1719,7 @@ bool envoy_dynamic_module_callback_http_get_headers_size(
  */
 bool envoy_dynamic_module_callback_http_get_headers(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_http_header_map_type header_type,
+    envoy_dynamic_module_type_http_header_type header_type,
     envoy_dynamic_module_type_envoy_http_header* result_headers);
 
 /**
@@ -1745,7 +1745,7 @@ bool envoy_dynamic_module_callback_http_get_headers(
  */
 bool envoy_dynamic_module_callback_http_add_header(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_http_header_map_type header_type,
+    envoy_dynamic_module_type_http_header_type header_type,
     envoy_dynamic_module_type_buffer_module_ptr key, size_t key_length,
     envoy_dynamic_module_type_buffer_module_ptr value, size_t value_length);
 
@@ -1772,7 +1772,7 @@ bool envoy_dynamic_module_callback_http_add_header(
  */
 bool envoy_dynamic_module_callback_http_set_header(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_http_header_map_type header_type,
+    envoy_dynamic_module_type_http_header_type header_type,
     envoy_dynamic_module_type_buffer_module_ptr key, size_t key_length,
     envoy_dynamic_module_type_buffer_module_ptr value, size_t value_length);
 
