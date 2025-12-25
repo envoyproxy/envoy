@@ -167,8 +167,8 @@ TEST_F(StreamToMetadataFilterTest, NoContentTypeHeader) {
 }
 
 TEST_F(StreamToMetadataFilterTest, ContentTypeWithParameters) {
-  // Content-type matching is exact, so "text/event-stream; charset=utf-8" should NOT match
-  // "text/event-stream" in allowed_content_types.
+  // Content-type matching strips parameters, so "text/event-stream; charset=utf-8"
+  // should match "text/event-stream" in allowed_content_types.
   EXPECT_EQ(Http::FilterHeadersStatus::Continue,
             filter_->encodeHeaders(response_headers_with_params_, false));
 
@@ -176,11 +176,12 @@ TEST_F(StreamToMetadataFilterTest, ContentTypeWithParameters) {
       "data: {\"usage\":{\"prompt_tokens\":10,\"completion_tokens\":20,\"total_tokens\":30}}\n\n";
   addEncodeDataChunks(data, true);
 
-  // Verify no metadata was written since content-type didn't match
   auto metadata = getMetadata("envoy.lb", "tokens");
-  EXPECT_EQ(metadata.kind_case(), 0); // Not set
+  EXPECT_EQ(metadata.kind_case(), Protobuf::Value::kNumberValue);
+  EXPECT_EQ(metadata.number_value(), 30);
 
-  EXPECT_EQ(findCounter("stream_to_metadata.resp.mismatched_content_type"), 1);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.success"), 1);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.mismatched_content_type"), 0);
 }
 
 TEST_F(StreamToMetadataFilterTest, BasicTokenExtraction) {
@@ -1037,6 +1038,87 @@ TEST_F(StreamToMetadataFilterTest, EventStartingWithEmptyLine) {
   auto metadata = getMetadata("envoy.lb", "tokens");
   EXPECT_EQ(metadata.number_value(), 55);
   EXPECT_EQ(findCounter("stream_to_metadata.resp.success"), 1);
+}
+
+TEST_F(StreamToMetadataFilterTest, ContentTypeWithMultipleParameters) {
+  // Test content-type with multiple parameters
+  Http::TestResponseHeaderMapImpl headers_multi_params{
+      {"content-type", "text/event-stream; charset=utf-8; boundary=foo"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+            filter_->encodeHeaders(headers_multi_params, false));
+
+  addEncodeDataChunks("data: {\"usage\":{\"total_tokens\":42}}\n\n", true);
+
+  auto metadata = getMetadata("envoy.lb", "tokens");
+  EXPECT_EQ(metadata.number_value(), 42);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.success"), 1);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.mismatched_content_type"), 0);
+}
+
+TEST_F(StreamToMetadataFilterTest, ContentTypeWithSpaceBeforeSemicolon) {
+  // Test content-type with space before semicolon
+  Http::TestResponseHeaderMapImpl headers_space{
+      {"content-type", "text/event-stream ; charset=utf-8"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers_space, false));
+
+  addEncodeDataChunks("data: {\"usage\":{\"total_tokens\":99}}\n\n", true);
+
+  auto metadata = getMetadata("envoy.lb", "tokens");
+  EXPECT_EQ(metadata.number_value(), 99);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.success"), 1);
+}
+
+TEST_F(StreamToMetadataFilterTest, ContentTypeWithTrailingSpaces) {
+  Http::TestResponseHeaderMapImpl headers_trailing{{"content-type", "text/event-stream  "}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers_trailing, false));
+
+  addEncodeDataChunks("data: {\"usage\":{\"total_tokens\":77}}\n\n", true);
+
+  auto metadata = getMetadata("envoy.lb", "tokens");
+  EXPECT_EQ(metadata.number_value(), 77);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.success"), 1);
+}
+
+TEST_F(StreamToMetadataFilterTest, ContentTypeStillRejectsWrongMediaType) {
+  // Ensure parameter stripping doesn't accept wrong media types
+  Http::TestResponseHeaderMapImpl wrong_type{{"content-type", "application/json; charset=utf-8"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(wrong_type, false));
+
+  addEncodeDataChunks("data: {\"usage\":{\"total_tokens\":88}}\n\n", true);
+
+  // Should still be rejected
+  auto metadata = getMetadata("envoy.lb", "tokens");
+  EXPECT_EQ(metadata.kind_case(), 0); // Not set
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.success"), 0);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.mismatched_content_type"), 1);
+}
+
+TEST_F(StreamToMetadataFilterTest, ConfiguredContentTypeWithParametersNormalized) {
+  const std::string config = R"EOF(
+  response_rules:
+    format: SERVER_SENT_EVENTS
+    allowed_content_types:
+      - "text/event-stream; charset=utf-8"
+    rules:
+      - selector:
+          json_path:
+            path: ["value"]
+        metadata_descriptors:
+          - metadata_namespace: "envoy.lb"
+            key: "result"
+  )EOF";
+  setupFilter(config);
+
+  Http::TestResponseHeaderMapImpl headers_no_params{{"content-type", "text/event-stream"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers_no_params, false));
+
+  addEncodeDataChunks("data: {\"value\":123}\n\n", true);
+
+  // Should match because both are normalized to "text/event-stream"
+  auto metadata = getMetadata("envoy.lb", "result");
+  EXPECT_EQ(metadata.number_value(), 123);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.success"), 1);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.mismatched_content_type"), 0);
 }
 
 } // namespace

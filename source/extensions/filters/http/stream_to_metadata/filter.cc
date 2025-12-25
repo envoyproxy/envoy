@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "source/common/common/utility.h"
 #include "source/common/http/utility.h"
 #include "source/common/json/json_loader.h"
 
@@ -15,6 +16,13 @@ namespace StreamToMetadata {
 
 namespace {
 constexpr absl::string_view DefaultSseContentType{"text/event-stream"};
+
+// Normalize content-type by stripping parameters and whitespace.
+// Match on type/subtype only and ignore parameters.
+std::string normalizeContentType(absl::string_view content_type) {
+  return std::string(StringUtil::trim(StringUtil::cropRight(content_type, ";")));
+}
+
 } // namespace
 
 Rule::Rule(const ProtoRule& rule) : rule_(rule) {
@@ -43,7 +51,7 @@ FilterConfig::FilterConfig(
           types.insert(std::string(DefaultSseContentType));
         } else {
           for (const auto& type : config.response_rules().allowed_content_types()) {
-            types.insert(type);
+            types.insert(normalizeContentType(type));
           }
         }
         return types;
@@ -53,7 +61,8 @@ FilterConfig::FilterConfig(
                           : 8192) {}
 
 bool FilterConfig::isContentTypeAllowed(absl::string_view content_type) const {
-  return allowed_content_types_.contains(content_type);
+  absl::string_view normalized = StringUtil::trim(StringUtil::cropRight(content_type, ";"));
+  return allowed_content_types_.contains(normalized);
 }
 
 Filter::Filter(std::shared_ptr<FilterConfig> config) : config_(std::move(config)) {}
