@@ -65,6 +65,15 @@ extern "C" {
 typedef const char* envoy_dynamic_module_type_abi_version_module_ptr;
 
 /**
+ * envoy_dynamic_module_type_server_factory_context_envoy_ptr is a raw pointer to
+ * the ServerFactoryContext class in Envoy. This is passed to the module on initialize
+ * and used to access the server-wide scoped information such as cluster manager, concurrency, etc.
+ *
+ * OWNERSHIP: Envoy owns the pointer.
+ */
+typedef void* envoy_dynamic_module_type_server_factory_context_envoy_ptr;
+
+/**
  * envoy_dynamic_module_type_http_filter_config_envoy_ptr is a raw pointer to
  * the DynamicModuleHttpFilterConfig class in Envoy. This is passed to the module when
  * creating a new in-module HTTP filter configuration and used to access the HTTP filter-scoped
@@ -552,7 +561,23 @@ typedef enum envoy_dynamic_module_type_metrics_result {
  * @return envoy_dynamic_module_type_abi_version_module_ptr is the ABI version of the dynamic
  * module. Null means the error and the module will be unloaded immediately.
  */
-envoy_dynamic_module_type_abi_version_module_ptr envoy_dynamic_module_on_program_init(void);
+envoy_dynamic_module_type_abi_version_module_ptr envoy_dynamic_module_on_program_init();
+
+/**
+ * envoy_dynamic_module_on_server_init is called by the main thread exactly after the module is
+ * loaded and server context is available.
+ *
+ * For dynamic modules, this is useful when they need to perform initialization dependent
+ * on server-wide configuration such as concurrency.
+ *
+ * @param server_factory_context_ptr is the pointer to the ServerFactoryContext object in Envoy.
+ *
+ * @return true if the initialization is successful. Returning false indicates a failure to
+ * initialize server-related settings. This doesn't unload the module, but server startup will
+ * fail.
+ */
+bool envoy_dynamic_module_on_server_init(
+    envoy_dynamic_module_type_server_factory_context_envoy_ptr server_factory_context_ptr);
 
 /**
  * envoy_dynamic_module_on_http_filter_config_new is called by the main thread when the http
@@ -2242,6 +2267,18 @@ void envoy_dynamic_module_callback_http_filter_continue_encoding(
 envoy_dynamic_module_type_http_filter_per_route_config_module_ptr
 envoy_dynamic_module_callback_get_most_specific_route_config(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
+
+
+// ------------------- Misc Callbacks for Server Context -------------------------
+/**
+ * envoy_dynamic_module_callback_server_factory_context_get_concurrency may be called by the dynamic module
+ * during server initialization to get the configured concurrency level of the server.
+ *
+ * @param server_factory_context_envoy_ptr is the pointer to the ServerFactoryContext object in Envoy.
+ * @return number of worker threads (concurrency) that the server is configured to use.
+ */
+uint32_t envoy_dynamic_module_callback_server_factory_context_get_concurrency(
+    envoy_dynamic_module_type_server_factory_context_envoy_ptr server_factory_context_envoy_ptr);
 
 #ifdef __cplusplus
 }

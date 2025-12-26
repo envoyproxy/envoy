@@ -17,7 +17,7 @@ constexpr char DYNAMIC_MODULES_SEARCH_PATH[] = "ENVOY_DYNAMIC_MODULES_SEARCH_PAT
 
 absl::StatusOr<DynamicModulePtr>
 newDynamicModule(const std::filesystem::path& object_file_absolute_path, const bool do_not_close,
-                 const bool load_globally) {
+                 const bool load_globally, DynamicModuleInitCb init_module_cb) {
   // From the man page of dlopen(3):
   //
   // > This can be used to test if the object is already resident (dlopen() returns NULL if it
@@ -69,12 +69,19 @@ newDynamicModule(const std::filesystem::path& object_file_absolute_path, const b
     return absl::InvalidArgumentError(
         absl::StrCat("ABI version mismatch: got ", abi_version, ", but expected ", kAbiVersion));
   }
+  if (init_module_cb != nullptr) {
+    absl::Status status = init_module_cb(dynamic_module);
+    if (!status.ok()) {
+      return status;
+    }
+  }
   return dynamic_module;
 }
 
 absl::StatusOr<DynamicModulePtr> newDynamicModuleByName(const absl::string_view module_name,
                                                         const bool do_not_close,
-                                                        const bool load_globally) {
+                                                        const bool load_globally,
+                                                        DynamicModuleInitCb init_module_cb) {
   const char* module_search_path = getenv(DYNAMIC_MODULES_SEARCH_PATH);
   if (module_search_path == nullptr) {
     return absl::InvalidArgumentError(absl::StrCat("Failed to load dynamic module: ", module_name,
@@ -83,7 +90,7 @@ absl::StatusOr<DynamicModulePtr> newDynamicModuleByName(const absl::string_view 
   }
   const std::filesystem::path file_path_absolute =
       std::filesystem::absolute(fmt::format("{}/lib{}.so", module_search_path, module_name));
-  return newDynamicModule(file_path_absolute, do_not_close, load_globally);
+  return newDynamicModule(file_path_absolute, do_not_close, load_globally, init_module_cb);
 }
 
 DynamicModule::~DynamicModule() { dlclose(handle_); }

@@ -11,9 +11,24 @@ absl::StatusOr<Http::FilterFactoryCb> DynamicModuleConfigFactory::createFilterFa
     const FilterConfig& proto_config, const std::string&, DualInfo dual_info,
     Server::Configuration::ServerFactoryContext& context) {
 
+  auto init_module_cb = [&](Extensions::DynamicModules::DynamicModulePtr& module_ptr)
+      -> absl::Status {
+    auto init_server_function =
+        module_ptr->getFunctionPointer<decltype(&envoy_dynamic_module_on_server_init)>(
+            "envoy_dynamic_module_on_server_init");
+    RETURN_IF_NOT_OK_REF(init_server_function.status());
+
+    auto success =
+        (*init_server_function.value())(&context);
+    if (!success) {
+      return absl::InvalidArgumentError(
+          "Dynamic module envoy_dynamic_module_on_server_init failed");
+    }
+    return absl::OkStatus();
+  };
   const auto& module_config = proto_config.dynamic_module_config();
   auto dynamic_module = Extensions::DynamicModules::newDynamicModuleByName(
-      module_config.name(), module_config.do_not_close(), module_config.load_globally());
+      module_config.name(), module_config.do_not_close(), module_config.load_globally(), init_module_cb);
   if (!dynamic_module.ok()) {
     return absl::InvalidArgumentError("Failed to load dynamic module: " +
                                       std::string(dynamic_module.status().message()));
@@ -51,12 +66,28 @@ absl::StatusOr<Http::FilterFactoryCb> DynamicModuleConfigFactory::createFilterFa
 
 absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
 DynamicModuleConfigFactory::createRouteSpecificFilterConfigTyped(
-    const RouteConfigProto& proto_config, Server::Configuration::ServerFactoryContext&,
+    const RouteConfigProto& proto_config, Server::Configuration::ServerFactoryContext& context,
     ProtobufMessage::ValidationVisitor&) {
+
+    auto init_module_cb = [&](Extensions::DynamicModules::DynamicModulePtr& module_ptr)
+      -> absl::Status {
+    auto init_server_function =
+        module_ptr->getFunctionPointer<decltype(&envoy_dynamic_module_on_server_init)>(
+            "envoy_dynamic_module_on_server_init");
+    RETURN_IF_NOT_OK_REF(init_server_function.status());
+
+    auto success =
+        (*init_server_function.value())(&context);
+    if (!success) {
+      return absl::InvalidArgumentError(
+          "Dynamic module envoy_dynamic_module_on_server_init failed");
+    }
+    return absl::OkStatus();
+  };
 
   const auto& module_config = proto_config.dynamic_module_config();
   auto dynamic_module = Extensions::DynamicModules::newDynamicModuleByName(
-      module_config.name(), module_config.do_not_close(), module_config.load_globally());
+      module_config.name(), module_config.do_not_close(), module_config.load_globally(), init_module_cb);
   if (!dynamic_module.ok()) {
     return absl::InvalidArgumentError("Failed to load dynamic module: " +
                                       std::string(dynamic_module.status().message()));

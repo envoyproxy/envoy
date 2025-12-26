@@ -1723,6 +1723,12 @@ void envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level level
     break;
   }
 }
+
+uint32_t envoy_dynamic_module_callback_server_factory_context_get_concurrency(
+    envoy_dynamic_module_type_server_factory_context_envoy_ptr server_factory_context_envoy_ptr) {
+  auto context = static_cast<Envoy::Server::Configuration::ServerFactoryContext*>(server_factory_context_envoy_ptr);
+  return context->options().concurrency();
+}
 }
 } // namespace HttpFilters
 } // namespace DynamicModules

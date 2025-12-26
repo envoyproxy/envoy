@@ -31,14 +31,24 @@ pub mod abi {
 /// The second argument has [`NewHttpFilterConfigFunction`] type, and it is called when the new HTTP
 /// filter configuration is created.
 ///
+/// The optional third argument has [`NewHttpFilterPerRouteConfigFunction`] type, and it is called
+/// when the new HTTP filter per-route configuration is created.
+///
+/// The last argument has [`ServerInitFunction`] type, and it is called when the dynamic module is
+/// loaded and server context is available.
+///
 /// # Example
 ///
 /// ```
 /// use envoy_proxy_dynamic_modules_rust_sdk::*;
 ///
-/// declare_init_functions!(my_program_init, my_new_http_filter_config_fn);
+/// declare_init_functions!(my_program_init, my_new_http_filter_config_fn, my_server_init);
 ///
 /// fn my_program_init() -> bool {
+///   true
+/// }
+///
+/// fn my_server_init<ESC>(_envoy_server_factory_context: &mut ESC) -> bool {
 ///   true
 /// }
 ///
@@ -56,7 +66,7 @@ pub mod abi {
 /// ```
 #[macro_export]
 macro_rules! declare_init_functions {
-  ($f:ident, $new_http_filter_config_fn:expr, $new_http_filter_per_route_config_fn:expr) => {
+  ($f:ident, $new_http_filter_config_fn:expr, $new_http_filter_per_route_config_fn:expr, $s:ident) => {
     #[no_mangle]
     pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
       envoy_proxy_dynamic_modules_rust_sdk::NEW_HTTP_FILTER_CONFIG_FUNCTION
@@ -70,8 +80,9 @@ macro_rules! declare_init_functions {
         ::std::ptr::null()
       }
     }
+    __internal_declare_server_init_function!($s);
   };
-  ($f:ident, $new_http_filter_config_fn:expr) => {
+  ($f:ident, $new_http_filter_config_fn:expr, $s:ident) => {
     #[no_mangle]
     pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
       envoy_proxy_dynamic_modules_rust_sdk::NEW_HTTP_FILTER_CONFIG_FUNCTION
@@ -83,7 +94,27 @@ macro_rules! declare_init_functions {
         ::std::ptr::null()
       }
     }
+    __internal_declare_server_init_function!($s);
   };
+}
+
+/// Internal macro to declare the server init function.
+/// This is used by the `declare_init_functions!` macro.
+/// The goal of this function to execute the user-defined server init function
+/// when server initialization is performed
+#[macro_export]
+macro_rules! __internal_declare_server_init_function {
+    ($f:ident) => {
+    #[no_mangle]
+    pub extern "C" fn envoy_dynamic_module_on_server_init(abi::envoy_dynamic_module_type_server_factory_context_envoy_ptr server_factory_context_ptr) -> bool {
+      ret ($f)(server_factory_context_ptr)
+    }
+    };
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_on_server_init() -> bool {
+  return
 }
 
 /// Log a trace message to Envoy's logging system with [dynamic_modules] Id. Messages won't be
@@ -194,6 +225,15 @@ macro_rules! envoy_log {
 ///
 /// This is useful to perform any process-wide initialization that the dynamic module needs.
 pub type ProgramInitFunction = fn() -> bool;
+
+/// The function signature for the server init function.
+///
+/// This is called when the dynamic module is loaded and server context is available.
+/// It must return true on success, and false on failure. When it returns false, the server
+/// initialization will fail.
+pub type ServerInitFunction<ESC> = fn(
+  envoy_server_factory_context: &mut ESC,
+) -> bool;
 
 /// The function signature for the new HTTP filter configuration function.
 ///
