@@ -980,8 +980,8 @@ TEST(DynamicModulesTest, StartHttpStreamDoesNotSetContentLength) {
   char body[] = "hello";
 
   auto result = envoy_dynamic_module_callback_http_filter_start_http_stream(
-      filter.get(), &stream_id, cluster_name, strlen(cluster_name), headers, 3, body,
-      sizeof(body) - 1, true, 1000);
+      filter.get(), &stream_id, {cluster_name, strlen(cluster_name)}, headers, 3,
+      {body, strlen(body)}, true, 1000);
   EXPECT_EQ(result, envoy_dynamic_module_type_http_callout_init_result_Success);
   EXPECT_NE(captured_callbacks, nullptr);
   EXPECT_NE(stream_id, 0);
