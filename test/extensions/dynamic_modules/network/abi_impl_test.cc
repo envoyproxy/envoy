@@ -751,7 +751,7 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetSslUriSansEmpty) {
   EXPECT_TRUE(ok);
   EXPECT_EQ(0, count);
 
-  // Can still call get with empty array - returns 0.
+  // Can still call get with empty array. This returns 0.
   size_t populated =
       envoy_dynamic_module_callback_network_filter_get_ssl_uri_sans(filterPtr(), nullptr);
   EXPECT_EQ(0, populated);
@@ -796,7 +796,7 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetSslDnsSansEmpty) {
   EXPECT_TRUE(ok);
   EXPECT_EQ(0, count);
 
-  // Can still call get with empty array - returns 0.
+  // Can still call get with empty array. This returns 0.
   size_t populated =
       envoy_dynamic_module_callback_network_filter_get_ssl_dns_sans(filterPtr(), nullptr);
   EXPECT_EQ(0, populated);
@@ -849,6 +849,20 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetSslSubjectNoSsl) {
   EXPECT_EQ(nullptr, result.ptr);
 }
 
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetSslSubjectEmpty) {
+  // Test the case where SSL exists but subject is empty.
+  auto ssl = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  std::string empty_subject = "";
+  EXPECT_CALL(connection_, ssl()).WillOnce(testing::Return(ssl));
+  EXPECT_CALL(*ssl, subjectPeerCertificate()).WillOnce(testing::ReturnRef(empty_subject));
+
+  envoy_dynamic_module_type_envoy_buffer result;
+  bool ok = envoy_dynamic_module_callback_network_filter_get_ssl_subject(filterPtr(), &result);
+
+  EXPECT_TRUE(ok);
+  EXPECT_EQ(0, result.length);
+}
+
 // =============================================================================
 // Tests for Filter State.
 // =============================================================================
@@ -881,6 +895,24 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetFilterStateBytesNonExisting
       filterPtr(), {const_cast<char*>(key.data()), key.size()}, &result);
 
   EXPECT_FALSE(ok);
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, SetFilterStateBytesEmptyValue) {
+  // Test setting filter state with an empty value string.
+  const std::string key = "test.key";
+  const std::string empty_value = "";
+
+  bool ok = envoy_dynamic_module_callback_network_set_filter_state_bytes(
+      filterPtr(), {const_cast<char*>(key.data()), key.size()},
+      {const_cast<char*>(empty_value.data()), empty_value.size()});
+  EXPECT_TRUE(ok);
+
+  // Verify by reading it back.
+  envoy_dynamic_module_type_envoy_buffer result;
+  ok = envoy_dynamic_module_callback_network_get_filter_state_bytes(
+      filterPtr(), {const_cast<char*>(key.data()), key.size()}, &result);
+  EXPECT_TRUE(ok);
+  EXPECT_EQ(0, result.length);
 }
 
 // =============================================================================
@@ -1052,6 +1084,85 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetDynamicMetadataNumberWrongT
       {const_cast<char*>(key.data()), key.size()}, &result);
 
   EXPECT_FALSE(ok);
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, SetDynamicMetadataStringEmptyValue) {
+  // Test setting dynamic metadata with an empty string value.
+  const std::string ns = "test.ns";
+  const std::string key = "empty.key";
+  const std::string empty_value = "";
+
+  envoy::config::core::v3::Metadata metadata;
+  EXPECT_CALL(connection_.stream_info_, dynamicMetadata())
+      .WillRepeatedly(testing::ReturnRef(metadata));
+  EXPECT_CALL(connection_.stream_info_, setDynamicMetadata(ns, testing::_))
+      .WillRepeatedly(testing::SaveArg<1>(&(*metadata.mutable_filter_metadata())[ns]));
+
+  bool ok = envoy_dynamic_module_callback_network_set_dynamic_metadata_string(
+      filterPtr(), {const_cast<char*>(ns.data()), ns.size()},
+      {const_cast<char*>(key.data()), key.size()},
+      {const_cast<char*>(empty_value.data()), empty_value.size()});
+  EXPECT_TRUE(ok);
+
+  // Verify by reading it back.
+  envoy_dynamic_module_type_envoy_buffer result;
+  ok = envoy_dynamic_module_callback_network_get_dynamic_metadata_string(
+      filterPtr(), {const_cast<char*>(ns.data()), ns.size()},
+      {const_cast<char*>(key.data()), key.size()}, &result);
+  EXPECT_TRUE(ok);
+  EXPECT_EQ(0, result.length);
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, SetDynamicMetadataNumberZero) {
+  // Test setting dynamic metadata with a zero number value (boundary case).
+  const std::string ns = "test.ns";
+  const std::string key = "zero.key";
+  const double zero_value = 0.0;
+
+  envoy::config::core::v3::Metadata metadata;
+  EXPECT_CALL(connection_.stream_info_, dynamicMetadata())
+      .WillRepeatedly(testing::ReturnRef(metadata));
+  EXPECT_CALL(connection_.stream_info_, setDynamicMetadata(ns, testing::_))
+      .WillRepeatedly(testing::SaveArg<1>(&(*metadata.mutable_filter_metadata())[ns]));
+
+  bool ok = envoy_dynamic_module_callback_network_set_dynamic_metadata_number(
+      filterPtr(), {const_cast<char*>(ns.data()), ns.size()},
+      {const_cast<char*>(key.data()), key.size()}, zero_value);
+  EXPECT_TRUE(ok);
+
+  // Verify by reading it back.
+  double result = 999.0;
+  ok = envoy_dynamic_module_callback_network_get_dynamic_metadata_number(
+      filterPtr(), {const_cast<char*>(ns.data()), ns.size()},
+      {const_cast<char*>(key.data()), key.size()}, &result);
+  EXPECT_TRUE(ok);
+  EXPECT_DOUBLE_EQ(zero_value, result);
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, SetDynamicMetadataNumberNegative) {
+  // Test setting dynamic metadata with a negative number value (boundary case).
+  const std::string ns = "test.ns";
+  const std::string key = "negative.key";
+  const double negative_value = -123.456;
+
+  envoy::config::core::v3::Metadata metadata;
+  EXPECT_CALL(connection_.stream_info_, dynamicMetadata())
+      .WillRepeatedly(testing::ReturnRef(metadata));
+  EXPECT_CALL(connection_.stream_info_, setDynamicMetadata(ns, testing::_))
+      .WillRepeatedly(testing::SaveArg<1>(&(*metadata.mutable_filter_metadata())[ns]));
+
+  bool ok = envoy_dynamic_module_callback_network_set_dynamic_metadata_number(
+      filterPtr(), {const_cast<char*>(ns.data()), ns.size()},
+      {const_cast<char*>(key.data()), key.size()}, negative_value);
+  EXPECT_TRUE(ok);
+
+  // Verify by reading it back.
+  double result = 0.0;
+  ok = envoy_dynamic_module_callback_network_get_dynamic_metadata_number(
+      filterPtr(), {const_cast<char*>(ns.data()), ns.size()},
+      {const_cast<char*>(key.data()), key.size()}, &result);
+  EXPECT_TRUE(ok);
+  EXPECT_DOUBLE_EQ(negative_value, result);
 }
 
 } // namespace NetworkFilters
