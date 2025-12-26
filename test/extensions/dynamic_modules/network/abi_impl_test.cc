@@ -664,6 +664,25 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetRequestedServerName) {
   EXPECT_EQ(sni, std::string(result.ptr, result.length));
 }
 
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetRequestedServerNameEmpty) {
+  // Test the case where SNI exists but is empty.
+  const std::string empty_sni = "";
+
+  auto connection_info_provider = std::make_shared<NiceMock<Network::MockConnectionInfoProvider>>();
+  EXPECT_CALL(*connection_info_provider, requestedServerName())
+      .WillOnce(testing::Return(empty_sni));
+  EXPECT_CALL(connection_, connectionInfoProvider())
+      .WillOnce(testing::ReturnRef(*connection_info_provider));
+
+  envoy_dynamic_module_type_envoy_buffer result;
+  bool ok =
+      envoy_dynamic_module_callback_network_filter_get_requested_server_name(filterPtr(), &result);
+
+  EXPECT_FALSE(ok);
+  EXPECT_EQ(0, result.length);
+  EXPECT_EQ(nullptr, result.ptr);
+}
+
 // =============================================================================
 // Tests for get_direct_remote_address.
 // =============================================================================
@@ -771,6 +790,20 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetSslDnsSansEmpty) {
   EXPECT_TRUE(ok);
 }
 
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetSslDnsSansNoSsl) {
+  // Test the case where there's no SSL connection at all.
+  EXPECT_CALL(connection_, ssl()).WillOnce(testing::Return(nullptr));
+
+  // Size function should return 0.
+  size_t count = envoy_dynamic_module_callback_network_filter_get_ssl_dns_sans_size(filterPtr());
+  EXPECT_EQ(0, count);
+
+  // Get function should return false.
+  EXPECT_CALL(connection_, ssl()).WillOnce(testing::Return(nullptr));
+  bool ok = envoy_dynamic_module_callback_network_filter_get_ssl_dns_sans(filterPtr(), nullptr, 0);
+  EXPECT_FALSE(ok);
+}
+
 // =============================================================================
 // Tests for get_ssl_subject.
 // =============================================================================
@@ -787,6 +820,18 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetSslSubject) {
   EXPECT_TRUE(ok);
   EXPECT_EQ(subject.size(), result.length);
   EXPECT_EQ(subject, std::string(result.ptr, result.length));
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetSslSubjectNoSsl) {
+  // Test the case where there's no SSL connection at all.
+  EXPECT_CALL(connection_, ssl()).WillOnce(testing::Return(nullptr));
+
+  envoy_dynamic_module_type_envoy_buffer result;
+  bool ok = envoy_dynamic_module_callback_network_filter_get_ssl_subject(filterPtr(), &result);
+
+  EXPECT_FALSE(ok);
+  EXPECT_EQ(0, result.length);
+  EXPECT_EQ(nullptr, result.ptr);
 }
 
 // =============================================================================
