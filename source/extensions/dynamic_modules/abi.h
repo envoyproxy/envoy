@@ -2269,20 +2269,20 @@ envoy_dynamic_module_callback_get_most_specific_route_config(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
 
 /**
- * envoy_dynamic_module_callback_http_get_worker_index is called by the module to get the worker index
- * assigned to the current HTTP filter. This can be used by the module to manage worker-specific
- * resources or perform worker-specific logic.
+ * envoy_dynamic_module_callback_http_get_worker_index is called by the module to get the worker
+ * index assigned to the current HTTP filter. This can be used by the module to manage
+ * worker-specific resources or perform worker-specific logic.
  */
 uint32_t envoy_dynamic_module_callback_http_get_worker_index(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
 
-
 // ------------------- Misc Callbacks for Server Context -------------------------
 /**
- * envoy_dynamic_module_callback_server_factory_context_get_concurrency may be called by the dynamic module
- * during server initialization to get the configured concurrency level of the server.
+ * envoy_dynamic_module_callback_server_factory_context_get_concurrency may be called by the dynamic
+ * module during server initialization to get the configured concurrency level of the server.
  *
- * @param server_factory_context_envoy_ptr is the pointer to the ServerFactoryContext object in Envoy.
+ * @param server_factory_context_envoy_ptr is the pointer to the ServerFactoryContext object in
+ * Envoy.
  * @return number of worker threads (concurrency) that the server is configured to use.
  */
 uint32_t envoy_dynamic_module_callback_server_factory_context_get_concurrency(
