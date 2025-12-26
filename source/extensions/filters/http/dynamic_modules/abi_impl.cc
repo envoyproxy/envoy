@@ -1729,6 +1729,13 @@ uint32_t envoy_dynamic_module_callback_server_factory_context_get_concurrency(
   auto context = static_cast<Envoy::Server::Configuration::ServerFactoryContext*>(server_factory_context_envoy_ptr);
   return context->options().concurrency();
 }
+
+uint32_t envoy_dynamic_module_callback_server_factory_context_get_worker_index(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr) {
+  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  return filter->workerIndex();
+}
+
 }
 } // namespace HttpFilters
 } // namespace DynamicModules

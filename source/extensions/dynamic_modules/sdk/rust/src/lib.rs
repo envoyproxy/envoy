@@ -1374,6 +1374,11 @@ pub trait EnvoyHttpFilter {
     labels: &[&'a str],
     value: u64,
   ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Get the index of the current worker thread.
+  fn get_worker_index(
+    &mut self,
+  ) -> u32;
 }
 
 /// This implements the [`EnvoyHttpFilter`] trait with the given raw pointer to the Envoy HTTP
@@ -2634,6 +2639,14 @@ impl EnvoyHttpFilterImpl {
       results.push(unsafe { EnvoyBuffer::new_from_raw(result_ptr, result_size) });
     }
     results
+  }
+
+  fn get_worker_index(
+    &mut self,
+  ) -> u32; {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_get_worker_index(self.raw_ptr)
+    }
   }
 }
 
