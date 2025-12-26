@@ -161,13 +161,12 @@ void envoy_dynamic_module_callback_network_filter_write(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer data, bool end_stream) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
+  Buffer::OwnedImpl buffer;
   if (data.ptr != nullptr && data.length > 0) {
-    Buffer::OwnedImpl buffer;
     buffer.add(data.ptr, data.length);
-    filter->write(buffer, end_stream);
-  } else if (end_stream) {
-    Buffer::OwnedImpl empty;
-    filter->write(empty, true);
+  }
+  if (buffer.length() > 0 || end_stream) {
+    filter->connection().write(buffer, end_stream);
   }
 }
 
@@ -175,41 +174,43 @@ void envoy_dynamic_module_callback_network_filter_inject_read_data(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer data, bool end_stream) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
-  auto* callbacks = filter->readCallbacks();
-  if (callbacks != nullptr) {
-    Buffer::OwnedImpl buffer;
-    if (data.ptr != nullptr && data.length > 0) {
-      buffer.add(data.ptr, data.length);
-    }
-    callbacks->injectReadDataToFilterChain(buffer, end_stream);
+  if (filter->readCallbacks() == nullptr) {
+    return;
   }
+  Buffer::OwnedImpl buffer;
+  if (data.ptr != nullptr && data.length > 0) {
+    buffer.add(data.ptr, data.length);
+  }
+  filter->readCallbacks()->injectReadDataToFilterChain(buffer, end_stream);
 }
 
 void envoy_dynamic_module_callback_network_filter_inject_write_data(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer data, bool end_stream) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
-  auto* callbacks = filter->writeCallbacks();
-  if (callbacks != nullptr) {
-    Buffer::OwnedImpl buffer;
-    if (data.ptr != nullptr && data.length > 0) {
-      buffer.add(data.ptr, data.length);
-    }
-    callbacks->injectWriteDataToFilterChain(buffer, end_stream);
+  if (filter->writeCallbacks() == nullptr) {
+    return;
   }
+  Buffer::OwnedImpl buffer;
+  if (data.ptr != nullptr && data.length > 0) {
+    buffer.add(data.ptr, data.length);
+  }
+  filter->writeCallbacks()->injectWriteDataToFilterChain(buffer, end_stream);
 }
 
 void envoy_dynamic_module_callback_network_filter_continue_reading(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
-  filter->continueReading();
+  if (filter->readCallbacks() != nullptr) {
+    filter->readCallbacks()->continueReading();
+  }
 }
 
 void envoy_dynamic_module_callback_network_filter_close(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_network_connection_close_type close_type) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
-  filter->close(toEnvoyCloseType(close_type));
+  filter->connection().close(toEnvoyCloseType(close_type));
 }
 
 uint64_t envoy_dynamic_module_callback_network_filter_get_connection_id(
@@ -257,152 +258,165 @@ size_t envoy_dynamic_module_callback_network_filter_get_local_address(
 bool envoy_dynamic_module_callback_network_filter_is_ssl(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
-  return filter->connection().ssl() != nullptr;
+  const auto ssl = filter->connection().ssl();
+  return ssl != nullptr;
 }
 
 void envoy_dynamic_module_callback_network_filter_disable_close(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, bool disabled) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
-  auto* callbacks = filter->readCallbacks();
-  if (callbacks != nullptr) {
-    callbacks->disableClose(disabled);
+  if (filter->readCallbacks() != nullptr) {
+    filter->readCallbacks()->disableClose(disabled);
   }
 }
 
 void envoy_dynamic_module_callback_network_filter_close_with_details(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_network_connection_close_type close_type,
-    envoy_dynamic_module_type_buffer_module_ptr details, size_t details_length) {
+    envoy_dynamic_module_type_module_buffer details) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
-  if (details != nullptr && details_length > 0) {
-    absl::string_view details_view(details, details_length);
-    filter->connection().streamInfo().setConnectionTerminationDetails(details_view);
+  if (details.ptr != nullptr && details.length > 0) {
+    filter->connection().streamInfo().setConnectionTerminationDetails(
+        absl::string_view(details.ptr, details.length));
   }
-  filter->close(toEnvoyCloseType(close_type));
+  filter->connection().close(toEnvoyCloseType(close_type));
 }
 
-size_t envoy_dynamic_module_callback_network_filter_get_requested_server_name(
+bool envoy_dynamic_module_callback_network_filter_get_requested_server_name(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_buffer_envoy_ptr* result_out) {
+    envoy_dynamic_module_type_envoy_buffer* result_out) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
-  absl::string_view sni = filter->connection().requestedServerName();
-  *result_out = const_cast<char*>(sni.data());
-  return sni.size();
+  const absl::string_view sni = filter->connection().connectionInfoProvider().requestedServerName();
+
+  if (sni.empty()) {
+    result_out->ptr = nullptr;
+    result_out->length = 0;
+    return false;
+  }
+
+  result_out->ptr = const_cast<char*>(sni.data());
+  result_out->length = sni.size();
+  return true;
 }
 
-size_t envoy_dynamic_module_callback_network_filter_get_direct_remote_address(
+bool envoy_dynamic_module_callback_network_filter_get_direct_remote_address(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_buffer_envoy_ptr* address_out, uint32_t* port_out) {
+    envoy_dynamic_module_type_envoy_buffer* address_out, uint32_t* port_out) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
   const auto& address =
       filter->connection().streamInfo().downstreamAddressProvider().directRemoteAddress();
 
   if (address == nullptr || address->ip() == nullptr) {
-    *address_out = nullptr;
+    address_out->ptr = nullptr;
+    address_out->length = 0;
     *port_out = 0;
-    return 0;
+    return false;
   }
 
   const std::string& addr_str = address->ip()->addressAsString();
-  *address_out = const_cast<char*>(addr_str.c_str());
+  address_out->ptr = const_cast<char*>(addr_str.c_str());
+  address_out->length = addr_str.size();
   *port_out = address->ip()->port();
-  return addr_str.size();
+  return true;
+}
+
+size_t envoy_dynamic_module_callback_network_filter_get_ssl_uri_sans_size(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr) {
+  auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
+  const auto ssl = filter->connection().ssl();
+  if (!ssl) {
+    return 0;
+  }
+
+  const auto& uri_sans = ssl->uriSanPeerCertificate();
+  return uri_sans.size();
 }
 
 bool envoy_dynamic_module_callback_network_filter_get_ssl_uri_sans(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_envoy_buffer** sans_out, size_t* sans_count_out) {
+    envoy_dynamic_module_type_envoy_buffer* sans_out, size_t sans_count) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
   const auto ssl = filter->connection().ssl();
   if (!ssl) {
-    *sans_out = nullptr;
-    *sans_count_out = 0;
     return false;
   }
 
   const auto& uri_sans = ssl->uriSanPeerCertificate();
   if (uri_sans.empty()) {
-    *sans_out = nullptr;
-    *sans_count_out = 0;
     return true;
   }
 
-  // Allocate static thread-local storage for the result.
-  static thread_local std::vector<envoy_dynamic_module_type_envoy_buffer> san_buffers;
-  san_buffers.clear();
-  san_buffers.reserve(uri_sans.size());
-
-  for (const auto& san : uri_sans) {
-    envoy_dynamic_module_type_envoy_buffer buf;
-    buf.ptr = const_cast<char*>(san.data());
-    buf.length = san.size();
-    san_buffers.push_back(buf);
+  // Populate the pre-allocated array.
+  const size_t count = std::min(sans_count, uri_sans.size());
+  for (size_t i = 0; i < count; ++i) {
+    sans_out[i].ptr = const_cast<char*>(uri_sans[i].data());
+    sans_out[i].length = uri_sans[i].size();
   }
 
-  *sans_out = san_buffers.data();
-  *sans_count_out = san_buffers.size();
   return true;
+}
+
+size_t envoy_dynamic_module_callback_network_filter_get_ssl_dns_sans_size(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr) {
+  auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
+  const auto ssl = filter->connection().ssl();
+  if (!ssl) {
+    return 0;
+  }
+
+  const auto& dns_sans = ssl->dnsSansPeerCertificate();
+  return dns_sans.size();
 }
 
 bool envoy_dynamic_module_callback_network_filter_get_ssl_dns_sans(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_envoy_buffer** sans_out, size_t* sans_count_out) {
+    envoy_dynamic_module_type_envoy_buffer* sans_out, size_t sans_count) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
   const auto ssl = filter->connection().ssl();
   if (!ssl) {
-    *sans_out = nullptr;
-    *sans_count_out = 0;
     return false;
   }
 
   const auto& dns_sans = ssl->dnsSansPeerCertificate();
   if (dns_sans.empty()) {
-    *sans_out = nullptr;
-    *sans_count_out = 0;
     return true;
   }
 
-  // Allocate static thread-local storage for the result.
-  static thread_local std::vector<envoy_dynamic_module_type_envoy_buffer> san_buffers;
-  san_buffers.clear();
-  san_buffers.reserve(dns_sans.size());
-
-  for (const auto& san : dns_sans) {
-    envoy_dynamic_module_type_envoy_buffer buf;
-    buf.ptr = const_cast<char*>(san.data());
-    buf.length = san.size();
-    san_buffers.push_back(buf);
+  // Populate the pre-allocated array.
+  const size_t count = std::min(sans_count, dns_sans.size());
+  for (size_t i = 0; i < count; ++i) {
+    sans_out[i].ptr = const_cast<char*>(dns_sans[i].data());
+    sans_out[i].length = dns_sans[i].size();
   }
 
-  *sans_out = san_buffers.data();
-  *sans_count_out = san_buffers.size();
   return true;
 }
 
-size_t envoy_dynamic_module_callback_network_filter_get_ssl_subject(
+bool envoy_dynamic_module_callback_network_filter_get_ssl_subject(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_buffer_envoy_ptr* result_out) {
+    envoy_dynamic_module_type_envoy_buffer* result_out) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
   const auto ssl = filter->connection().ssl();
   if (!ssl) {
-    *result_out = nullptr;
-    return 0;
+    result_out->ptr = nullptr;
+    result_out->length = 0;
+    return false;
   }
 
   const std::string& subject = ssl->subjectPeerCertificate();
-  *result_out = const_cast<char*>(subject.c_str());
-  return subject.size();
+  result_out->ptr = const_cast<char*>(subject.data());
+  result_out->length = subject.size();
+  return true;
 }
 
 bool envoy_dynamic_module_callback_network_set_filter_state_bytes(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_buffer_module_ptr key_ptr, size_t key_length,
-    envoy_dynamic_module_type_buffer_module_ptr value_ptr, size_t value_length) {
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
   auto& stream_info = filter->connection().streamInfo();
 
-  absl::string_view key_view(static_cast<const char*>(key_ptr), key_length);
-  absl::string_view value_view(static_cast<const char*>(value_ptr), value_length);
+  absl::string_view key_view(key.ptr, key.length);
+  absl::string_view value_view(value.ptr, value.length);
 
   stream_info.filterState()->setData(
       key_view, std::make_unique<Router::StringAccessorImpl>(value_view),
@@ -412,34 +426,33 @@ bool envoy_dynamic_module_callback_network_set_filter_state_bytes(
 
 bool envoy_dynamic_module_callback_network_get_filter_state_bytes(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_buffer_module_ptr key_ptr, size_t key_length,
-    envoy_dynamic_module_type_buffer_envoy_ptr* result, size_t* result_length) {
+    envoy_dynamic_module_type_module_buffer key,
+    envoy_dynamic_module_type_envoy_buffer* value_out) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
   auto& stream_info = filter->connection().streamInfo();
 
-  absl::string_view key_view(static_cast<const char*>(key_ptr), key_length);
+  absl::string_view key_view(key.ptr, key.length);
   auto filter_state = stream_info.filterState()->getDataReadOnly<Router::StringAccessor>(key_view);
   if (!filter_state) {
     return false;
   }
 
   absl::string_view str = filter_state->asString();
-  *result = const_cast<char*>(str.data());
-  *result_length = str.size();
+  value_out->ptr = const_cast<char*>(str.data());
+  value_out->length = str.size();
   return true;
 }
 
 bool envoy_dynamic_module_callback_network_set_dynamic_metadata_string(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_buffer_module_ptr namespace_ptr, size_t namespace_length,
-    envoy_dynamic_module_type_buffer_module_ptr key_ptr, size_t key_length,
-    envoy_dynamic_module_type_buffer_module_ptr value_ptr, size_t value_length) {
+    envoy_dynamic_module_type_module_buffer filter_namespace,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
   auto& stream_info = filter->connection().streamInfo();
 
-  std::string namespace_str(static_cast<const char*>(namespace_ptr), namespace_length);
-  absl::string_view key_view(static_cast<const char*>(key_ptr), key_length);
-  absl::string_view value_view(static_cast<const char*>(value_ptr), value_length);
+  std::string namespace_str(filter_namespace.ptr, filter_namespace.length);
+  absl::string_view key_view(key.ptr, key.length);
+  absl::string_view value_view(value.ptr, value.length);
 
   // Get or create the metadata for this namespace.
   Protobuf::Struct metadata(
@@ -452,15 +465,14 @@ bool envoy_dynamic_module_callback_network_set_dynamic_metadata_string(
 
 bool envoy_dynamic_module_callback_network_get_dynamic_metadata_string(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_buffer_module_ptr namespace_ptr, size_t namespace_length,
-    envoy_dynamic_module_type_buffer_module_ptr key_ptr, size_t key_length,
-    envoy_dynamic_module_type_buffer_envoy_ptr* result_buffer_ptr,
-    size_t* result_buffer_length_ptr) {
+    envoy_dynamic_module_type_module_buffer filter_namespace,
+    envoy_dynamic_module_type_module_buffer key,
+    envoy_dynamic_module_type_envoy_buffer* value_out) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
   auto& stream_info = filter->connection().streamInfo();
 
-  std::string namespace_str(static_cast<const char*>(namespace_ptr), namespace_length);
-  std::string key_str(static_cast<const char*>(key_ptr), key_length);
+  std::string namespace_str(filter_namespace.ptr, filter_namespace.length);
+  std::string key_str(key.ptr, key.length);
 
   const auto& metadata_map = stream_info.dynamicMetadata().filter_metadata();
   auto namespace_it = metadata_map.find(namespace_str);
@@ -479,20 +491,20 @@ bool envoy_dynamic_module_callback_network_get_dynamic_metadata_string(
   }
 
   const auto& value = field_it->second.string_value();
-  *result_buffer_ptr = const_cast<char*>(value.data());
-  *result_buffer_length_ptr = value.size();
+  value_out->ptr = const_cast<char*>(value.data());
+  value_out->length = value.size();
   return true;
 }
 
 bool envoy_dynamic_module_callback_network_set_dynamic_metadata_number(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_buffer_module_ptr namespace_ptr, size_t namespace_length,
-    envoy_dynamic_module_type_buffer_module_ptr key_ptr, size_t key_length, double value) {
+    envoy_dynamic_module_type_module_buffer filter_namespace,
+    envoy_dynamic_module_type_module_buffer key, double value) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
   auto& stream_info = filter->connection().streamInfo();
 
-  std::string namespace_str(static_cast<const char*>(namespace_ptr), namespace_length);
-  absl::string_view key_view(static_cast<const char*>(key_ptr), key_length);
+  std::string namespace_str(filter_namespace.ptr, filter_namespace.length);
+  absl::string_view key_view(key.ptr, key.length);
 
   // Get or create the metadata for this namespace.
   Protobuf::Struct metadata(
@@ -505,13 +517,13 @@ bool envoy_dynamic_module_callback_network_set_dynamic_metadata_number(
 
 bool envoy_dynamic_module_callback_network_get_dynamic_metadata_number(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_buffer_module_ptr namespace_ptr, size_t namespace_length,
-    envoy_dynamic_module_type_buffer_module_ptr key_ptr, size_t key_length, double* result) {
+    envoy_dynamic_module_type_module_buffer filter_namespace,
+    envoy_dynamic_module_type_module_buffer key, double* result) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
   auto& stream_info = filter->connection().streamInfo();
 
-  std::string namespace_str(static_cast<const char*>(namespace_ptr), namespace_length);
-  std::string key_str(static_cast<const char*>(key_ptr), key_length);
+  std::string namespace_str(filter_namespace.ptr, filter_namespace.length);
+  std::string key_str(key.ptr, key.length);
 
   const auto& metadata_map = stream_info.dynamicMetadata().filter_metadata();
   auto namespace_it = metadata_map.find(namespace_str);
