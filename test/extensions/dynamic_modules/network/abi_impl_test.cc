@@ -715,15 +715,17 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetSslUriSans) {
       .WillRepeatedly(testing::Return(absl::Span<const std::string>(sans)));
 
   // First get the size.
-  size_t count = envoy_dynamic_module_callback_network_filter_get_ssl_uri_sans_size(filterPtr());
+  size_t count = 0;
+  bool ok = envoy_dynamic_module_callback_network_filter_get_ssl_uri_sans_size(filterPtr(), &count);
+  EXPECT_TRUE(ok);
   EXPECT_EQ(2, count);
 
   // Allocate array and populate.
   std::vector<envoy_dynamic_module_type_envoy_buffer> buffers(count);
-  bool ok = envoy_dynamic_module_callback_network_filter_get_ssl_uri_sans(filterPtr(),
-                                                                          buffers.data(), count);
+  size_t populated =
+      envoy_dynamic_module_callback_network_filter_get_ssl_uri_sans(filterPtr(), buffers.data());
 
-  EXPECT_TRUE(ok);
+  EXPECT_EQ(2, populated);
   EXPECT_EQ("spiffe://example.com/sa", std::string(buffers[0].ptr, buffers[0].length));
   EXPECT_EQ("spiffe://example.com/sb", std::string(buffers[1].ptr, buffers[1].length));
 }
@@ -731,7 +733,9 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetSslUriSans) {
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetSslUriSansNoSsl) {
   EXPECT_CALL(connection_, ssl()).WillOnce(testing::Return(nullptr));
 
-  size_t count = envoy_dynamic_module_callback_network_filter_get_ssl_uri_sans_size(filterPtr());
+  size_t count = 0;
+  bool ok = envoy_dynamic_module_callback_network_filter_get_ssl_uri_sans_size(filterPtr(), &count);
+  EXPECT_FALSE(ok);
   EXPECT_EQ(0, count);
 }
 
@@ -742,12 +746,15 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetSslUriSansEmpty) {
   EXPECT_CALL(*ssl, uriSanPeerCertificate())
       .WillRepeatedly(testing::Return(absl::Span<const std::string>(sans)));
 
-  size_t count = envoy_dynamic_module_callback_network_filter_get_ssl_uri_sans_size(filterPtr());
+  size_t count = 0;
+  bool ok = envoy_dynamic_module_callback_network_filter_get_ssl_uri_sans_size(filterPtr(), &count);
+  EXPECT_TRUE(ok);
   EXPECT_EQ(0, count);
 
-  // Can still call get with empty array.
-  bool ok = envoy_dynamic_module_callback_network_filter_get_ssl_uri_sans(filterPtr(), nullptr, 0);
-  EXPECT_TRUE(ok);
+  // Can still call get with empty array - returns 0.
+  size_t populated =
+      envoy_dynamic_module_callback_network_filter_get_ssl_uri_sans(filterPtr(), nullptr);
+  EXPECT_EQ(0, populated);
 }
 
 // =============================================================================
@@ -762,15 +769,17 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetSslDnsSans) {
       .WillRepeatedly(testing::Return(absl::Span<const std::string>(sans)));
 
   // First get the size.
-  size_t count = envoy_dynamic_module_callback_network_filter_get_ssl_dns_sans_size(filterPtr());
+  size_t count = 0;
+  bool ok = envoy_dynamic_module_callback_network_filter_get_ssl_dns_sans_size(filterPtr(), &count);
+  EXPECT_TRUE(ok);
   EXPECT_EQ(2, count);
 
   // Allocate array and populate.
   std::vector<envoy_dynamic_module_type_envoy_buffer> buffers(count);
-  bool ok = envoy_dynamic_module_callback_network_filter_get_ssl_dns_sans(filterPtr(),
-                                                                          buffers.data(), count);
+  size_t populated =
+      envoy_dynamic_module_callback_network_filter_get_ssl_dns_sans(filterPtr(), buffers.data());
 
-  EXPECT_TRUE(ok);
+  EXPECT_EQ(2, populated);
   EXPECT_EQ("example.com", std::string(buffers[0].ptr, buffers[0].length));
   EXPECT_EQ("www.example.com", std::string(buffers[1].ptr, buffers[1].length));
 }
@@ -782,26 +791,32 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetSslDnsSansEmpty) {
   EXPECT_CALL(*ssl, dnsSansPeerCertificate())
       .WillRepeatedly(testing::Return(absl::Span<const std::string>(sans)));
 
-  size_t count = envoy_dynamic_module_callback_network_filter_get_ssl_dns_sans_size(filterPtr());
+  size_t count = 0;
+  bool ok = envoy_dynamic_module_callback_network_filter_get_ssl_dns_sans_size(filterPtr(), &count);
+  EXPECT_TRUE(ok);
   EXPECT_EQ(0, count);
 
-  // Can still call get with empty array.
-  bool ok = envoy_dynamic_module_callback_network_filter_get_ssl_dns_sans(filterPtr(), nullptr, 0);
-  EXPECT_TRUE(ok);
+  // Can still call get with empty array - returns 0.
+  size_t populated =
+      envoy_dynamic_module_callback_network_filter_get_ssl_dns_sans(filterPtr(), nullptr);
+  EXPECT_EQ(0, populated);
 }
 
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetSslDnsSansNoSsl) {
   // Test the case where there's no SSL connection at all.
   EXPECT_CALL(connection_, ssl()).WillOnce(testing::Return(nullptr));
 
-  // Size function should return 0.
-  size_t count = envoy_dynamic_module_callback_network_filter_get_ssl_dns_sans_size(filterPtr());
+  // Size function should return false and set size to 0.
+  size_t count = 99; // Initialize to non-zero to verify it gets set to 0
+  bool ok = envoy_dynamic_module_callback_network_filter_get_ssl_dns_sans_size(filterPtr(), &count);
+  EXPECT_FALSE(ok);
   EXPECT_EQ(0, count);
 
-  // Get function should return false.
+  // Get function should return 0.
   EXPECT_CALL(connection_, ssl()).WillOnce(testing::Return(nullptr));
-  bool ok = envoy_dynamic_module_callback_network_filter_get_ssl_dns_sans(filterPtr(), nullptr, 0);
-  EXPECT_FALSE(ok);
+  size_t populated =
+      envoy_dynamic_module_callback_network_filter_get_ssl_dns_sans(filterPtr(), nullptr);
+  EXPECT_EQ(0, populated);
 }
 
 // =============================================================================

@@ -320,44 +320,59 @@ bool envoy_dynamic_module_callback_network_filter_get_direct_remote_address(
   return true;
 }
 
-size_t envoy_dynamic_module_callback_network_filter_get_ssl_uri_sans_size(
-    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr) {
+bool envoy_dynamic_module_callback_network_filter_get_ssl_uri_sans_size(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, size_t* size) {
+  auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
+  const auto ssl = filter->connection().ssl();
+  if (!ssl) {
+    *size = 0;
+    return false;
+  }
+
+  const auto& uri_sans = ssl->uriSanPeerCertificate();
+  *size = uri_sans.size();
+  return true;
+}
+
+size_t envoy_dynamic_module_callback_network_filter_get_ssl_uri_sans(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* sans_out) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
   const auto ssl = filter->connection().ssl();
   if (!ssl) {
     return 0;
-  }
-
-  const auto& uri_sans = ssl->uriSanPeerCertificate();
-  return uri_sans.size();
-}
-
-bool envoy_dynamic_module_callback_network_filter_get_ssl_uri_sans(
-    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_envoy_buffer* sans_out, size_t sans_count) {
-  auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
-  const auto ssl = filter->connection().ssl();
-  if (!ssl) {
-    return false;
   }
 
   const auto& uri_sans = ssl->uriSanPeerCertificate();
   if (uri_sans.empty()) {
-    return true;
+    return 0;
   }
 
-  // Populate the pre-allocated array.
-  const size_t count = std::min(sans_count, uri_sans.size());
-  for (size_t i = 0; i < count; ++i) {
+  // Populate the pre-allocated array. Module is responsible for allocating the correct size.
+  for (size_t i = 0; i < uri_sans.size(); ++i) {
     sans_out[i].ptr = const_cast<char*>(uri_sans[i].data());
     sans_out[i].length = uri_sans[i].size();
   }
+  return uri_sans.size();
+}
 
+bool envoy_dynamic_module_callback_network_filter_get_ssl_dns_sans_size(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, size_t* size) {
+  auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
+  const auto ssl = filter->connection().ssl();
+  if (!ssl) {
+    *size = 0;
+    return false;
+  }
+
+  const auto& dns_sans = ssl->dnsSansPeerCertificate();
+  *size = dns_sans.size();
   return true;
 }
 
-size_t envoy_dynamic_module_callback_network_filter_get_ssl_dns_sans_size(
-    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr) {
+size_t envoy_dynamic_module_callback_network_filter_get_ssl_dns_sans(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* sans_out) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
   const auto ssl = filter->connection().ssl();
   if (!ssl) {
@@ -365,31 +380,16 @@ size_t envoy_dynamic_module_callback_network_filter_get_ssl_dns_sans_size(
   }
 
   const auto& dns_sans = ssl->dnsSansPeerCertificate();
-  return dns_sans.size();
-}
-
-bool envoy_dynamic_module_callback_network_filter_get_ssl_dns_sans(
-    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_envoy_buffer* sans_out, size_t sans_count) {
-  auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
-  const auto ssl = filter->connection().ssl();
-  if (!ssl) {
-    return false;
-  }
-
-  const auto& dns_sans = ssl->dnsSansPeerCertificate();
   if (dns_sans.empty()) {
-    return true;
+    return 0;
   }
 
-  // Populate the pre-allocated array.
-  const size_t count = std::min(sans_count, dns_sans.size());
-  for (size_t i = 0; i < count; ++i) {
+  // Populate the pre-allocated array. Module is responsible for allocating the correct size.
+  for (size_t i = 0; i < dns_sans.size(); ++i) {
     sans_out[i].ptr = const_cast<char*>(dns_sans[i].data());
     sans_out[i].length = dns_sans[i].size();
   }
-
-  return true;
+  return dns_sans.size();
 }
 
 bool envoy_dynamic_module_callback_network_filter_get_ssl_subject(

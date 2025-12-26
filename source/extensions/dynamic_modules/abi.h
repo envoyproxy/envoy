@@ -2656,10 +2656,11 @@ bool envoy_dynamic_module_callback_network_filter_get_direct_remote_address(
  * get the count of URI Subject Alternative Names from the peer certificate.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
- * @return the number of URI SANs, or 0 if SSL is not available.
+ * @param size is the output pointer to the count of URI SANs.
+ * @return true if the count was retrieved successfully, false if SSL is not available.
  */
-size_t envoy_dynamic_module_callback_network_filter_get_ssl_uri_sans_size(
-    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr);
+bool envoy_dynamic_module_callback_network_filter_get_ssl_uri_sans_size(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, size_t* size);
 
 /**
  * envoy_dynamic_module_callback_network_filter_get_ssl_uri_sans is called by the module to get
@@ -2668,22 +2669,23 @@ size_t envoy_dynamic_module_callback_network_filter_get_ssl_uri_sans_size(
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
  * @param sans_out is a pre-allocated array owned by the module where Envoy will populate the SANs.
- * @param sans_count is the size of the pre-allocated array.
- * @return true if SSL is available and SANs were populated, false otherwise.
+ *   The module must allocate this array with at least the size returned by get_ssl_uri_sans_size.
+ * @return the number of SANs populated, or 0 if SSL is not available.
  */
-bool envoy_dynamic_module_callback_network_filter_get_ssl_uri_sans(
+size_t envoy_dynamic_module_callback_network_filter_get_ssl_uri_sans(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_envoy_buffer* sans_out, size_t sans_count);
+    envoy_dynamic_module_type_envoy_buffer* sans_out);
 
 /**
  * envoy_dynamic_module_callback_network_filter_get_ssl_dns_sans_size is called by the module to
  * get the count of DNS Subject Alternative Names from the peer certificate.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
- * @return the number of DNS SANs, or 0 if SSL is not available.
+ * @param size is the output pointer to the count of DNS SANs.
+ * @return true if the count was retrieved successfully, false if SSL is not available.
  */
-size_t envoy_dynamic_module_callback_network_filter_get_ssl_dns_sans_size(
-    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr);
+bool envoy_dynamic_module_callback_network_filter_get_ssl_dns_sans_size(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, size_t* size);
 
 /**
  * envoy_dynamic_module_callback_network_filter_get_ssl_dns_sans is called by the module to get
@@ -2692,12 +2694,12 @@ size_t envoy_dynamic_module_callback_network_filter_get_ssl_dns_sans_size(
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
  * @param sans_out is a pre-allocated array owned by the module where Envoy will populate the SANs.
- * @param sans_count is the size of the pre-allocated array.
- * @return true if SSL is available and SANs were populated, false otherwise.
+ *   The module must allocate this array with at least the size returned by get_ssl_dns_sans_size.
+ * @return the number of SANs populated, or 0 if SSL is not available.
  */
-bool envoy_dynamic_module_callback_network_filter_get_ssl_dns_sans(
+size_t envoy_dynamic_module_callback_network_filter_get_ssl_dns_sans(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_envoy_buffer* sans_out, size_t sans_count);
+    envoy_dynamic_module_type_envoy_buffer* sans_out);
 
 /**
  * envoy_dynamic_module_callback_network_filter_get_ssl_subject is called by the module to get
