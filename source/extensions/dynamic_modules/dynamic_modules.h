@@ -92,10 +92,10 @@ newDynamicModule(const std::filesystem::path& object_file_absolute_path, const b
  * share symbols with other modules.
  *  @param init_module_cb an optional callback that is called after the module is loaded.
  */
-absl::StatusOr<DynamicModulePtr> newDynamicModuleByName(const absl::string_view module_name,
-                                                        const bool do_not_close,
-                                                        const bool load_globally = false,
-                                                        DynamicModuleInitCb init_module_cb = nullptr);
+absl::StatusOr<DynamicModulePtr>
+newDynamicModuleByName(const absl::string_view module_name, const bool do_not_close,
+                       const bool load_globally = false,
+                       DynamicModuleInitCb init_module_cb = nullptr);
 } // namespace DynamicModules
 } // namespace Extensions
 } // namespace Envoy

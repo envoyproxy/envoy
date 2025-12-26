@@ -20,8 +20,7 @@ class DynamicModuleHttpFilter : public Http::StreamFilter,
                                 public Http::DownstreamWatermarkCallbacks {
 public:
   DynamicModuleHttpFilter(DynamicModuleHttpFilterConfigSharedPtr config,
-                          Stats::SymbolTable& symbol_table,
-                          uint32_t worker_index)
+                          Stats::SymbolTable& symbol_table, uint32_t worker_index)
       : config_(config), stat_name_pool_(symbol_table), worker_index_(worker_index) {}
   ~DynamicModuleHttpFilter() override;
 
