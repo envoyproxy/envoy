@@ -1650,7 +1650,7 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
       )
     };
     if success {
-      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const u8, result.length) })
+      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) })
     } else {
       None
     }
@@ -1680,7 +1680,7 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
       )
     };
     if success {
-      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const u8, result.length) })
+      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) })
     } else {
       None
     }
@@ -2028,7 +2028,7 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
       )
     };
     if success {
-      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const u8, result.length) })
+      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) })
     } else {
       None
     }
@@ -2438,7 +2438,7 @@ impl EnvoyHttpFilterImpl {
     if result.ptr.is_null() {
       None
     } else {
-      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const u8, result.length) })
+      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) })
     }
   }
 
@@ -2475,7 +2475,7 @@ impl EnvoyHttpFilterImpl {
     }
 
     // At this point, we assume at least one value is present.
-    results.push(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const u8, result.length) });
+    results.push(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) });
     // So, we iterate from 1 to count - 1.
     for i in 1 .. count {
       let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
@@ -2493,7 +2493,7 @@ impl EnvoyHttpFilterImpl {
         )
       };
       // Within the range, all results are guaranteed to be non-null by Envoy.
-      results.push(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const u8, result.length) });
+      results.push(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) });
     }
     results
   }
@@ -3280,7 +3280,7 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
     };
     let envoy_buffers: Vec<EnvoyBuffer> = buffers
       .iter()
-      .map(|s| unsafe { EnvoyBuffer::new_from_raw(s.ptr as *const u8, s.length) })
+      .map(|s| unsafe { EnvoyBuffer::new_from_raw(s.ptr as *const _, s.length) })
       .collect();
     (envoy_buffers, total_length)
   }
@@ -3311,7 +3311,7 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
     };
     let envoy_buffers: Vec<EnvoyBuffer> = buffers
       .iter()
-      .map(|s| unsafe { EnvoyBuffer::new_from_raw(s.ptr as *const u8, s.length) })
+      .map(|s| unsafe { EnvoyBuffer::new_from_raw(s.ptr as *const _, s.length) })
       .collect();
     (envoy_buffers, total_length)
   }
@@ -3436,7 +3436,7 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
     }
     let address = unsafe {
       std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-        address.ptr as *const u8,
+        address.ptr as *const _,
         address.length,
       ))
     };
@@ -3461,7 +3461,7 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
     }
     let address = unsafe {
       std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-        address.ptr as *const u8,
+        address.ptr as *const _,
         address.length,
       ))
     };
@@ -3491,9 +3491,9 @@ pub extern "C" fn envoy_dynamic_module_on_network_filter_config_new(
 ) -> abi::envoy_dynamic_module_type_network_filter_config_module_ptr {
   let mut envoy_filter_config = EnvoyNetworkFilterConfigImpl::new(envoy_filter_config_ptr);
   let name = unsafe {
-    std::str::from_utf8_unchecked(std::slice::from_raw_parts(name_ptr as *const u8, name_size))
+    std::str::from_utf8_unchecked(std::slice::from_raw_parts(name_ptr as *const _, name_size))
   };
-  let config = unsafe { std::slice::from_raw_parts(config_ptr as *const u8, config_size) };
+  let config = unsafe { std::slice::from_raw_parts(config_ptr as *const _, config_size) };
   init_network_filter_config(
     &mut envoy_filter_config,
     name,
