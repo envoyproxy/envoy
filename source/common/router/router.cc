@@ -975,13 +975,11 @@ uint64_t Filter::calculateEffectiveBufferLimit() const {
 }
 
 bool Filter::isEarlyConnectData() {
-  return downstream_headers_ != nullptr && Http::HeaderUtility::isConnect(*downstream_headers_) &&
-         !downstream_response_started_ &&
-         Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reject_early_connect_data");
+  return reject_early_connect_data_enabled_ && downstream_headers_ != nullptr &&
+         Http::HeaderUtility::isConnect(*downstream_headers_) && !downstream_response_started_;
 }
 
 Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
-  ENVOY_STREAM_LOG(debug, "router decoding data: {}", *callbacks_, data.length());
   if (data.length() > 0 && isEarlyConnectData()) {
     callbacks_->sendLocalReply(Http::Code::BadRequest, "", nullptr, absl::nullopt,
                                StreamInfo::ResponseCodeDetails::get().EarlyConnectData);

@@ -74,6 +74,7 @@ constexpr absl::string_view ResponseTrailerLatencyUsField = "response_trailer_la
 constexpr absl::string_view ResponseTrailerCallStatusField = "response_trailer_call_status";
 constexpr absl::string_view BytesSentField = "bytes_sent";
 constexpr absl::string_view BytesReceivedField = "bytes_received";
+constexpr absl::string_view FailedOpenField = "failed_open";
 constexpr absl::string_view GrpcStatusBeforeFirstCallField = "grpc_status_before_first_call";
 constexpr absl::string_view RequestHeaderProcessingEffectField = "request_header_processing_effect";
 constexpr absl::string_view ResponseHeaderProcessingEffectField =
@@ -466,6 +467,7 @@ ProtobufTypes::MessagePtr ExtProcLoggingInfo::serializeAsProto() const {
       static_cast<double>(bytes_sent_));
   (*struct_msg->mutable_fields())[BytesReceivedField].set_number_value(
       static_cast<double>(bytes_received_));
+  (*struct_msg->mutable_fields())[FailedOpenField].set_bool_value(failed_open_);
   (*struct_msg->mutable_fields())[GrpcStatusBeforeFirstCallField].set_number_value(
       static_cast<double>(static_cast<int>(grpc_status_before_first_call_)));
   (*struct_msg->mutable_fields())[ResponseTrailerProcessingEffectField].set_number_value(
@@ -603,6 +605,9 @@ ExtProcLoggingInfo::getField(absl::string_view field_name) const {
   if (field_name == BytesReceivedField) {
     return static_cast<int64_t>(bytes_received_);
   }
+  if (field_name == FailedOpenField) {
+    return failed_open_;
+  }
   if (field_name == GrpcStatusBeforeFirstCallField) {
     return static_cast<int64_t>(grpc_status_before_first_call_);
   }
@@ -706,6 +711,11 @@ void Filter::onComplete(ProcessingResponse& response) {
   onReceiveMessage(std::move(resp_ptr));
 }
 
+void Filter::logFailOpen() {
+  stats_.failure_mode_allowed_.inc();
+  logging_info_->setFailedOpen();
+}
+
 void Filter::onError() {
   ENVOY_STREAM_LOG(debug, "Received Error response from server", *decoder_callbacks_);
   stats_.http_not_ok_resp_received_.inc();
@@ -720,7 +730,7 @@ void Filter::onError() {
     // The user would like a none-200-ok response to not cause message processing to fail.
     // Close the external processing.
     processing_complete_ = true;
-    stats_.failure_mode_allowed_.inc();
+    logFailOpen();
     clearAsyncState();
   } else {
     // Return an error and stop processing the current stream.
@@ -1898,7 +1908,7 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
       // When a message is received out of order,and fail open is configured,
       // ignore it and also ignore the stream for the rest of this filter
       // instance's lifetime to protect us from a malformed server.
-      stats_.failure_mode_allowed_.inc();
+      logFailOpen();
       closeStream();
       clearAsyncState(processing_status.raw_code());
       processing_complete_ = true;
@@ -1926,10 +1936,10 @@ void Filter::onGrpcError(Grpc::Status::GrpcStatus status, const std::string& mes
     return;
   }
 
+  stats_.server_half_closed_.inc();
   if (failureModeAllow()) {
     onGrpcCloseWithStatus(status);
-    stats_.failure_mode_allowed_.inc();
-
+    logFailOpen();
   } else {
     processing_complete_ = true;
     // Since the stream failed, there is no need to handle timeouts, so
@@ -1956,6 +1966,7 @@ void Filter::onGrpcCloseWithStatus(Grpc::Status::GrpcStatus status) {
 
   processing_complete_ = true;
   stats_.streams_closed_.inc();
+  stats_.server_half_closed_.inc();
   // Successful close. We can ignore the stream for the rest of our request
   // and response processing.
   closeStream();
@@ -1973,7 +1984,7 @@ void Filter::onMessageTimeout() {
     // the external processor for the rest of the request.
     processing_complete_ = true;
     closeStream();
-    stats_.failure_mode_allowed_.inc();
+    logFailOpen();
     clearAsyncState(Grpc::Status::DeadlineExceeded);
 
   } else {

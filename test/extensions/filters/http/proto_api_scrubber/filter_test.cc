@@ -74,6 +74,9 @@ public:
               (const std::string& method_name), (const, override));
   MOCK_METHOD(const TypeFinder&, getTypeFinder, (), (const, override));
 
+  MOCK_METHOD(absl::StatusOr<const Protobuf::MethodDescriptor*>, getMethodDescriptor,
+              (const std::string& method_name), (const, override));
+
   // Delegate non-mocked calls to the real object
   MockProtoApiScrubberFilterConfig() : ProtoApiScrubberFilterConfig() {
     ON_CALL(*this, getRequestType(_)).WillByDefault([this](const std::string& method_name) {
@@ -95,6 +98,9 @@ public:
         });
     ON_CALL(*this, getMethodMatcher(_)).WillByDefault([this](const std::string& method_name) {
       return real_config_->getMethodMatcher(method_name);
+    });
+    ON_CALL(*this, getMethodDescriptor(_)).WillByDefault([this](const std::string& method_name) {
+      return real_config_->getMethodDescriptor(method_name);
     });
   }
 
@@ -750,9 +756,8 @@ TEST_F(ProtoApiScrubberFilterTest, UnknownGrpcMethod_RequestFlow) {
   // The headers check passes because content-type is application/grpc.
   EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(req_headers, true));
 
-  std::string expected_error_msg =
-      "Unable to find method `some.nonexistent.Service.UnknownMethod` in the "
-      "descriptor pool configured for this filter.";
+  std::string expected_error_msg = "Method '/some.nonexistent.Service/UnknownMethod' not found in "
+                                   "descriptor pool (type lookup failed).";
 
   EXPECT_CALL(mock_decoder_callbacks_,
               sendLocalReply(Envoy::Http::Code::BadRequest, Eq(expected_error_msg), _,
@@ -798,8 +803,8 @@ TEST_F(ProtoApiScrubberFilterTest, UnknownGrpcMethod_ResponseFlow) {
   // Expect the error log and Local Reply
   EXPECT_CALL(mock_encoder_callbacks_,
               sendLocalReply(Http::Code::BadRequest,
-                             "Unable to find method `apikeys.ApiKeys.NonExistentMethod` in the "
-                             "descriptor pool configured for this filter.",
+                             "Method '/apikeys.ApiKeys/NonExistentMethod' not found in descriptor "
+                             "pool (type lookup failed).",
                              Eq(nullptr), Eq(Envoy::Grpc::Status::InvalidArgument),
                              "proto_api_scrubber_INVALID_ARGUMENT{BAD_REQUEST}"));
 
@@ -1200,6 +1205,10 @@ TEST_F(MethodLevelRestrictionTest, MethodAllowedWithFieldRestrictions) {
   ON_CALL(*mock_filter_config_, getRequestFieldMatcher(_, _))
       .WillByDefault([this](const std::string& method_name, const std::string& field_mask) {
         return mock_filter_config_->real_config_->getRequestFieldMatcher(method_name, field_mask);
+      });
+  ON_CALL(*mock_filter_config_, getMethodDescriptor(_))
+      .WillByDefault([this](const std::string& method_name) {
+        return mock_filter_config_->real_config_->getMethodDescriptor(method_name);
       });
 
   auto req_headers = TestRequestHeaderMapImpl{

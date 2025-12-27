@@ -106,7 +106,5 @@ message MessageRestrictions {
 // The restriction configuration.
 message RestrictionConfig {
   // Matcher tree for matching requests and responses with the configured restrictions.
-  // NOTE: Currently, only CEL expressions are supported for matching. Support for more
-  // matchers will be added incrementally overtime.
   xds.type.matcher.v3.Matcher matcher = 1;
 }

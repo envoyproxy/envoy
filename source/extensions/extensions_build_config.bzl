@@ -227,6 +227,7 @@ EXTENSIONS = {
     #       configured on the listener. Do not remove it in that case or configs will fail to load.
     "envoy.filters.listener.proxy_protocol":            "//source/extensions/filters/listener/proxy_protocol:config",
     "envoy.filters.listener.tls_inspector":             "//source/extensions/filters/listener/tls_inspector:config",
+    "envoy.filters.listener.dynamic_modules":           "//source/extensions/filters/listener/dynamic_modules:config",
 
     #
     # Network filters
@@ -235,6 +236,7 @@ EXTENSIONS = {
     "envoy.filters.network.connection_limit":                     "//source/extensions/filters/network/connection_limit:config",
     "envoy.filters.network.direct_response":                      "//source/extensions/filters/network/direct_response:config",
     "envoy.filters.network.dubbo_proxy":                          "//source/extensions/filters/network/dubbo_proxy:config",
+    "envoy.filters.network.dynamic_modules":                      "//source/extensions/filters/network/dynamic_modules:config",
     "envoy.filters.network.echo":                                 "//source/extensions/filters/network/echo:config",
     "envoy.filters.network.ext_authz":                            "//source/extensions/filters/network/ext_authz:config",
     "envoy.filters.network.ext_proc":                             "//source/extensions/filters/network/ext_proc:config",
