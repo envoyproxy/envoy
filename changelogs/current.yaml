@@ -328,6 +328,13 @@ new_features:
     Marked :ref:`filter_chain_matcher <envoy_v3_api_field_config.listener.v3.Listener.filter_chain_matcher>` as stable
     by removing the work-in-progress annotation. The xDS matcher API for filter chain selection has been thoroughly
     tested and is ready for production use.
+- area: listener
+  change: |
+    Added support for configuring TCP keepalive settings on both primary and additional addresses
+    by setting :ref:`tcp_keepalive <envoy_v3_api_field_config.listener.v3.Listener.tcp_keepalive>`
+    and :ref:`additional address tcp_keepalive <envoy_v3_api_field_config.listener.v3.AdditionalAddress.tcp_keepalive>`.
+    Setting any keepalive field to ``0`` disables TCP keepalive for that address (or for the
+    listener and inherited additional addresses when only the listener keepalive is configured).
 - area: access_log
   change: |
     Added a new :ref:`access logger <envoy_v3_api_msg_extensions.access_loggers.stats.v3.Config>` that emits

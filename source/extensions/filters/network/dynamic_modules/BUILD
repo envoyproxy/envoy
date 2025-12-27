@@ -30,8 +30,11 @@ envoy_cc_library(
         ":filter_config_lib",
         "//envoy/network:connection_interface",
         "//envoy/network:filter_interface",
+        "//envoy/router:string_accessor_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:logger_lib",
+        "//source/common/protobuf",
+        "//source/common/router:string_accessor_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
     ],
 )

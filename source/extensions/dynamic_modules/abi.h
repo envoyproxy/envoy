@@ -2536,6 +2536,201 @@ bool envoy_dynamic_module_callback_network_filter_is_ssl(
 void envoy_dynamic_module_callback_network_filter_disable_close(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, bool disabled);
 
+/**
+ * envoy_dynamic_module_callback_network_filter_close_with_details is called by the module to close
+ * the connection with a specific close reason.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param close_type specifies how to close the connection.
+ * @param details is the close reason string owned by the module. Can be empty.
+ */
+void envoy_dynamic_module_callback_network_filter_close_with_details(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_network_connection_close_type close_type,
+    envoy_dynamic_module_type_module_buffer details);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_get_requested_server_name is called by the module
+ * to get the requested server name (SNI) from the TLS handshake.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param result_out is the output buffer where the SNI string owned by Envoy will be stored.
+ * @return true if SNI is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_network_filter_get_requested_server_name(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result_out);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_get_direct_remote_address is called by the module
+ * to get the direct remote (client) address without considering proxies or XFF.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param address_out is the output buffer where the address owned by Envoy will be stored.
+ * @param port_out is the output pointer to the port number.
+ * @return true if the address was found and is an IP address, false otherwise.
+ */
+bool envoy_dynamic_module_callback_network_filter_get_direct_remote_address(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* address_out, uint32_t* port_out);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_get_ssl_uri_sans_size is called by the module to
+ * get the count of URI Subject Alternative Names from the peer certificate.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param size is the output pointer to the count of URI SANs.
+ * @return true if the count was retrieved successfully, false if SSL is not available.
+ */
+bool envoy_dynamic_module_callback_network_filter_get_ssl_uri_sans_size(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, size_t* size);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_get_ssl_uri_sans is called by the module to get
+ * the URI Subject Alternative Names from the peer certificate. The module should first call
+ * get_ssl_uri_sans_size to get the count and allocate the array.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param sans_out is a pre-allocated array owned by the module where Envoy will populate the SANs.
+ *   The module must allocate this array with at least the size returned by get_ssl_uri_sans_size.
+ * @return the number of SANs populated, or 0 if SSL is not available.
+ */
+size_t envoy_dynamic_module_callback_network_filter_get_ssl_uri_sans(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* sans_out);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_get_ssl_dns_sans_size is called by the module to
+ * get the count of DNS Subject Alternative Names from the peer certificate.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param size is the output pointer to the count of DNS SANs.
+ * @return true if the count was retrieved successfully, false if SSL is not available.
+ */
+bool envoy_dynamic_module_callback_network_filter_get_ssl_dns_sans_size(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, size_t* size);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_get_ssl_dns_sans is called by the module to get
+ * the DNS Subject Alternative Names from the peer certificate. The module should first call
+ * get_ssl_dns_sans_size to get the count and allocate the array.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param sans_out is a pre-allocated array owned by the module where Envoy will populate the SANs.
+ *   The module must allocate this array with at least the size returned by get_ssl_dns_sans_size.
+ * @return the number of SANs populated, or 0 if SSL is not available.
+ */
+size_t envoy_dynamic_module_callback_network_filter_get_ssl_dns_sans(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* sans_out);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_get_ssl_subject is called by the module to get
+ * the subject from the peer certificate.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param result_out is the output buffer where the subject owned by Envoy will be stored.
+ * @return true if SSL is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_network_filter_get_ssl_subject(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result_out);
+
+// ---------------------------- Filter State Callbacks -------------------------
+
+/**
+ * envoy_dynamic_module_callback_network_set_filter_state_bytes is called by the module to set
+ * filter state with a bytes value. The filter state can be read by other filters in the chain and
+ * can influence routing decisions (e.g., tcp_proxy cluster selection).
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param key is the key name owned by the module.
+ * @param value is the value owned by the module.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_network_set_filter_state_bytes(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_network_get_filter_state_bytes is called by the module to get
+ * filter state bytes value.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param key is the key name owned by the module.
+ * @param value_out is the output buffer where the value owned by Envoy will be stored.
+ * @return true if the key exists and is a bytes value, false otherwise.
+ */
+bool envoy_dynamic_module_callback_network_get_filter_state_bytes(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* value_out);
+
+// ---------------------------- Dynamic Metadata Callbacks ---------------------
+
+/**
+ * envoy_dynamic_module_callback_network_set_dynamic_metadata_string is called by the module to
+ * set the string value of the dynamic metadata with the given namespace and key. If the namespace
+ * does not exist, it will be created.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param filter_namespace is the namespace owned by the module.
+ * @param key is the key owned by the module.
+ * @param value is the string value owned by the module.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_network_set_dynamic_metadata_string(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_namespace,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_network_get_dynamic_metadata_string is called by the module to
+ * get the string value of the dynamic metadata with the given namespace and key. If the namespace
+ * does not exist, the key does not exist, or the value is not a string, this returns false.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param filter_namespace is the namespace owned by the module.
+ * @param key is the key owned by the module.
+ * @param value_out is the output buffer where the value owned by Envoy will be stored.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_network_get_dynamic_metadata_string(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_namespace,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* value_out);
+
+/**
+ * envoy_dynamic_module_callback_network_set_dynamic_metadata_number is called by the module to
+ * set the number value of the dynamic metadata with the given namespace and key. If the namespace
+ * does not exist, it will be created.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param filter_namespace is the namespace owned by the module.
+ * @param key is the key owned by the module.
+ * @param value is the number value of the dynamic metadata to be set.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_network_set_dynamic_metadata_number(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_namespace,
+    envoy_dynamic_module_type_module_buffer key, double value);
+
+/**
+ * envoy_dynamic_module_callback_network_get_dynamic_metadata_number is called by the module to
+ * get the number value of the dynamic metadata with the given namespace and key. If the namespace
+ * does not exist, the key does not exist, or the value is not a number, this returns false.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param filter_namespace is the namespace owned by the module.
+ * @param key is the key owned by the module.
+ * @param result is the output pointer to the number value of the dynamic metadata.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_network_get_dynamic_metadata_number(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_namespace,
+    envoy_dynamic_module_type_module_buffer key, double* result);
+
 // =============================================================================
 // ----------------------------- Listener Filter Callbacks ---------------------
 // =============================================================================
