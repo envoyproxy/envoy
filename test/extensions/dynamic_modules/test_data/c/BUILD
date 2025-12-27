@@ -5,6 +5,7 @@ licenses(["notice"])  # Apache 2
 package(default_visibility = [
     "//test/extensions/dynamic_modules:__pkg__",
     "//test/extensions/dynamic_modules/http:__pkg__",
+    "//test/extensions/dynamic_modules/listener:__pkg__",
     "//test/extensions/dynamic_modules/network:__pkg__",
 ])
 
@@ -55,3 +56,9 @@ test_program(name = "no_http_filter_response_trailers")
 test_program(name = "program_global")
 
 test_program(name = "program_child")
+
+test_program(name = "listener_no_op")
+
+test_program(name = "listener_config_new_fail")
+
+test_program(name = "listener_stop_iteration")
