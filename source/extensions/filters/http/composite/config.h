@@ -27,6 +27,9 @@ class CompositeFilterFactory
 public:
   CompositeFilterFactory() : DualFactoryBase("envoy.filters.http.composite") {}
 
+  // Bring base class overloads into scope to avoid hiding them.
+  using DualFactoryBase::createFilterFactoryFromProto;
+
   // Override to compile named filter chains with FactoryContext access.
   absl::StatusOr<Http::FilterFactoryCb>
   createFilterFactoryFromProto(const Protobuf::Message& config, const std::string& stats_prefix,
