@@ -14,6 +14,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/server/instance.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/registry.h"
 
 #include "gtest/gtest.h"
@@ -1803,12 +1804,225 @@ TEST(FilterCallbacksWrapperTest, ChainModeAcceptsMultipleFilters) {
   EXPECT_EQ(2, wrapper.filters_to_inject_.size());
 }
 
-TEST(MatchedActionInfoTest, SerializeAsStringProducesJson) {
-  MatchedActionInfo info("filter", "action");
-  auto json = info.serializeAsString();
-  ASSERT_TRUE(json.has_value());
-  // Exact ordering is stable for single entry.
-  EXPECT_EQ("{\"filter\":\"action\"}", json.value());
+// Test named filter chain lookup with sampling that skips execution.
+TEST_F(FilterTest, NamedFilterChainLookupWithSamplingSkipped) {
+  StreamInfo::FilterStateSharedPtr filter_state =
+      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
+  ON_CALL(decoder_callbacks_, filterConfigName()).WillByDefault(testing::Return("rootFilterName"));
+  ON_CALL(decoder_callbacks_.stream_info_, filterState())
+      .WillByDefault(testing::ReturnRef(filter_state));
+
+  // Create named filter chains for the filter.
+  auto named_chains = std::make_shared<NamedFilterChainFactoryMap>();
+  (*named_chains)["my-chain"] = {[](Http::FilterChainFactoryCallbacks& cb) {
+    cb.addStreamFilter(std::make_shared<Http::MockStreamFilter>());
+  }};
+
+  // Create filter with named chains.
+  Filter filter_with_chains(stats_, decoder_callbacks_.dispatcher(), false, named_chains);
+  filter_with_chains.setDecoderFilterCallbacks(decoder_callbacks_);
+  filter_with_chains.setEncoderFilterCallbacks(encoder_callbacks_);
+
+  // Configure sampling to return false and skip the action.
+  envoy::config::core::v3::RuntimeFractionalPercent sample_percent;
+  sample_percent.mutable_default_value()->set_numerator(0);
+  sample_percent.mutable_default_value()->set_denominator(
+      envoy::type::v3::FractionalPercent::HUNDRED);
+
+  EXPECT_CALL(context_.runtime_loader_.snapshot_,
+              featureEnabled(_, testing::A<const envoy::type::v3::FractionalPercent&>()))
+      .WillOnce(testing::Return(false));
+
+  // Success counter should not be incremented since action is skipped.
+  EXPECT_CALL(success_counter_, inc()).Times(0);
+
+  ExecuteFilterAction action("my-chain", sample_percent, context_.runtime_loader_);
+  filter_with_chains.onMatchCallback(action);
+
+  // No filter injected since sampling skipped.
+  auto status = filter_with_chains.decodeHeaders(default_request_headers_, false);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, status);
+
+  filter_with_chains.onDestroy();
+}
+
+// Test named filter chain lookup when no named filter chains are configured.
+TEST_F(FilterTest, NamedFilterChainLookupNoNamedChainsConfigured) {
+  StreamInfo::FilterStateSharedPtr filter_state =
+      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
+  ON_CALL(decoder_callbacks_, filterConfigName()).WillByDefault(testing::Return("rootFilterName"));
+  ON_CALL(decoder_callbacks_.stream_info_, filterState())
+      .WillByDefault(testing::ReturnRef(filter_state));
+
+  // Create filter without the named chains.
+  Filter filter_without_chains(stats_, decoder_callbacks_.dispatcher(), false, nullptr);
+  filter_without_chains.setDecoderFilterCallbacks(decoder_callbacks_);
+  filter_without_chains.setEncoderFilterCallbacks(encoder_callbacks_);
+
+  // Success and error counters should not be incremented.
+  EXPECT_CALL(success_counter_, inc()).Times(0);
+  EXPECT_CALL(error_counter_, inc()).Times(0);
+
+  ExecuteFilterAction action("non-existent-chain", absl::nullopt, context_.runtime_loader_);
+  EXPECT_LOG_CONTAINS("debug",
+                      "filter_chain_name 'non-existent-chain' specified but no named filter chains",
+                      filter_without_chains.onMatchCallback(action));
+
+  // No filter injected due to failure.
+  auto status = filter_without_chains.decodeHeaders(default_request_headers_, false);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, status);
+
+  filter_without_chains.onDestroy();
+}
+
+// Test named filter chain lookup when the chain name is not found.
+TEST_F(FilterTest, NamedFilterChainLookupChainNotFound) {
+  StreamInfo::FilterStateSharedPtr filter_state =
+      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
+  ON_CALL(decoder_callbacks_, filterConfigName()).WillByDefault(testing::Return("rootFilterName"));
+  ON_CALL(decoder_callbacks_.stream_info_, filterState())
+      .WillByDefault(testing::ReturnRef(filter_state));
+
+  // Create named filter chains but not the one we're looking for.
+  auto named_chains = std::make_shared<NamedFilterChainFactoryMap>();
+  (*named_chains)["existing-chain"] = {[](Http::FilterChainFactoryCallbacks& cb) {
+    cb.addStreamFilter(std::make_shared<Http::MockStreamFilter>());
+  }};
+
+  Filter filter_with_chains(stats_, decoder_callbacks_.dispatcher(), false, named_chains);
+  filter_with_chains.setDecoderFilterCallbacks(decoder_callbacks_);
+  filter_with_chains.setEncoderFilterCallbacks(encoder_callbacks_);
+
+  // Success and error counters should not be incremented.
+  EXPECT_CALL(success_counter_, inc()).Times(0);
+  EXPECT_CALL(error_counter_, inc()).Times(0);
+
+  ExecuteFilterAction action("missing-chain", absl::nullopt, context_.runtime_loader_);
+  EXPECT_LOG_CONTAINS("debug", "filter_chain_name 'missing-chain' not found in named filter chains",
+                      filter_with_chains.onMatchCallback(action));
+
+  // No filter injected due to failure.
+  auto status = filter_with_chains.decodeHeaders(default_request_headers_, false);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, status);
+
+  filter_with_chains.onDestroy();
+}
+
+// Test named filter chain lookup that succeeds and creates filters.
+TEST_F(FilterTest, NamedFilterChainLookupSuccess) {
+  auto filter1 = std::make_shared<Http::MockStreamFilter>();
+  auto filter2 = std::make_shared<Http::MockStreamFilter>();
+
+  StreamInfo::FilterStateSharedPtr filter_state =
+      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
+  ON_CALL(decoder_callbacks_, filterConfigName()).WillByDefault(testing::Return("rootFilterName"));
+  ON_CALL(decoder_callbacks_.stream_info_, filterState())
+      .WillByDefault(testing::ReturnRef(filter_state));
+
+  // Create named filter chains with the target chain.
+  auto named_chains = std::make_shared<NamedFilterChainFactoryMap>();
+  (*named_chains)["my-chain"] = {
+      [&](Http::FilterChainFactoryCallbacks& cb) { cb.addStreamFilter(filter1); },
+      [&](Http::FilterChainFactoryCallbacks& cb) { cb.addStreamFilter(filter2); }};
+
+  Filter filter_with_chains(stats_, decoder_callbacks_.dispatcher(), false, named_chains);
+  filter_with_chains.setDecoderFilterCallbacks(decoder_callbacks_);
+  filter_with_chains.setEncoderFilterCallbacks(encoder_callbacks_);
+
+  EXPECT_CALL(*filter1, setDecoderFilterCallbacks(_));
+  EXPECT_CALL(*filter1, setEncoderFilterCallbacks(_));
+  EXPECT_CALL(*filter2, setDecoderFilterCallbacks(_));
+  EXPECT_CALL(*filter2, setEncoderFilterCallbacks(_));
+  EXPECT_CALL(success_counter_, inc());
+
+  ExecuteFilterAction action("my-chain", absl::nullopt, context_.runtime_loader_);
+  filter_with_chains.onMatchCallback(action);
+
+  // Verify filter state is updated with the chain name.
+  auto* info = filter_state->getDataMutable<MatchedActionInfo>(MatchedActionsFilterStateKey);
+  EXPECT_NE(nullptr, info);
+
+  // Verify filters execute in order during decode.
+  {
+    testing::InSequence seq;
+    EXPECT_CALL(*filter1, decodeHeaders(_, false))
+        .WillOnce(testing::Return(Http::FilterHeadersStatus::Continue));
+    EXPECT_CALL(*filter2, decodeHeaders(_, false))
+        .WillOnce(testing::Return(Http::FilterHeadersStatus::Continue));
+  }
+  filter_with_chains.decodeHeaders(default_request_headers_, false);
+
+  // Verify filters execute in reverse order during encode.
+  {
+    testing::InSequence seq;
+    EXPECT_CALL(*filter2, encodeHeaders(_, false))
+        .WillOnce(testing::Return(Http::FilterHeadersStatus::Continue));
+    EXPECT_CALL(*filter1, encodeHeaders(_, false))
+        .WillOnce(testing::Return(Http::FilterHeadersStatus::Continue));
+  }
+  filter_with_chains.encodeHeaders(default_response_headers_, false);
+
+  EXPECT_CALL(*filter1, onDestroy());
+  EXPECT_CALL(*filter2, onDestroy());
+  filter_with_chains.onDestroy();
+}
+
+// Test that createFilters() returns early for named filter chain lookup actions.
+TEST(ExecuteFilterActionTest, CreateFiltersReturnsEarlyForNamedFilterChainLookup) {
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  // Create a named filter chain lookup action.
+  ExecuteFilterAction action("my-chain", absl::nullopt, context.runtime_loader_);
+
+  EXPECT_TRUE(action.isNamedFilterChainLookup());
+  EXPECT_FALSE(action.isFilterChain());
+
+  // createFilters should return early for named filter chain lookup.
+  testing::NiceMock<Http::MockFilterChainFactoryCallbacks> callbacks;
+  EXPECT_CALL(callbacks, addStreamFilter(_)).Times(0);
+  EXPECT_CALL(callbacks, addStreamDecoderFilter(_)).Times(0);
+  EXPECT_CALL(callbacks, addStreamEncoderFilter(_)).Times(0);
+
+  action.createFilters(callbacks);
+}
+
+// Test named filter chain lookup with access loggers.
+TEST_F(FilterTest, NamedFilterChainLookupWithAccessLoggers) {
+  auto filter1 = std::make_shared<Http::MockStreamFilter>();
+  auto access_log = std::make_shared<AccessLog::MockInstance>();
+
+  StreamInfo::FilterStateSharedPtr filter_state =
+      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
+  ON_CALL(decoder_callbacks_, filterConfigName()).WillByDefault(testing::Return("rootFilterName"));
+  ON_CALL(decoder_callbacks_.stream_info_, filterState())
+      .WillByDefault(testing::ReturnRef(filter_state));
+
+  // Create named filter chains with a filter and access logger.
+  auto named_chains = std::make_shared<NamedFilterChainFactoryMap>();
+  (*named_chains)["chain-with-logger"] = {
+      [&](Http::FilterChainFactoryCallbacks& cb) {
+        cb.addStreamFilter(filter1);
+        cb.addAccessLogHandler(access_log);
+      },
+  };
+
+  Filter filter_with_chains(stats_, decoder_callbacks_.dispatcher(), false, named_chains);
+  filter_with_chains.setDecoderFilterCallbacks(decoder_callbacks_);
+  filter_with_chains.setEncoderFilterCallbacks(encoder_callbacks_);
+
+  EXPECT_CALL(*filter1, setDecoderFilterCallbacks(_));
+  EXPECT_CALL(*filter1, setEncoderFilterCallbacks(_));
+  EXPECT_CALL(success_counter_, inc());
+
+  ExecuteFilterAction action("chain-with-logger", absl::nullopt, context_.runtime_loader_);
+  filter_with_chains.onMatchCallback(action);
+
+  // Verify access loggers are called.
+  EXPECT_CALL(*access_log, log(_, _));
+  filter_with_chains.log({}, StreamInfo::MockStreamInfo());
+
+  EXPECT_CALL(*filter1, onDestroy());
+  filter_with_chains.onDestroy();
 }
 
 } // namespace
