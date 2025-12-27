@@ -511,13 +511,13 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetRemoteAddressWithIp) {
   EXPECT_CALL(connection_, connectionInfoProvider())
       .WillOnce(testing::ReturnRef(*connection_info_provider));
 
-  envoy_dynamic_module_type_buffer_envoy_ptr address_out = nullptr;
+  envoy_dynamic_module_type_envoy_buffer address_out = {nullptr, 0};
   uint32_t port_out = 0;
-  size_t len = envoy_dynamic_module_callback_network_filter_get_remote_address(
+  bool result = envoy_dynamic_module_callback_network_filter_get_remote_address(
       filterPtr(), &address_out, &port_out);
 
-  EXPECT_GT(len, 0);
-  EXPECT_NE(nullptr, address_out);
+  EXPECT_TRUE(result);
+  EXPECT_EQ("1.2.3.4", absl::string_view(address_out.ptr, address_out.length));
   EXPECT_EQ(8080, port_out);
 }
 
@@ -529,13 +529,14 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetRemoteAddressNullIp) {
   EXPECT_CALL(connection_, connectionInfoProvider())
       .WillOnce(testing::ReturnRef(*connection_info_provider));
 
-  envoy_dynamic_module_type_buffer_envoy_ptr address_out = nullptr;
+  envoy_dynamic_module_type_envoy_buffer address_out = {nullptr, 0};
   uint32_t port_out = 0;
-  size_t len = envoy_dynamic_module_callback_network_filter_get_remote_address(
+  bool result = envoy_dynamic_module_callback_network_filter_get_remote_address(
       filterPtr(), &address_out, &port_out);
 
-  EXPECT_EQ(0, len);
-  EXPECT_EQ(nullptr, address_out);
+  EXPECT_FALSE(result);
+  EXPECT_EQ(nullptr, address_out.ptr);
+  EXPECT_EQ(0, address_out.length);
   EXPECT_EQ(0, port_out);
 }
 
@@ -551,13 +552,13 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetLocalAddressWithIp) {
   EXPECT_CALL(connection_, connectionInfoProvider())
       .WillOnce(testing::ReturnRef(*connection_info_provider));
 
-  envoy_dynamic_module_type_buffer_envoy_ptr address_out = nullptr;
+  envoy_dynamic_module_type_envoy_buffer address_out = {nullptr, 0};
   uint32_t port_out = 0;
-  size_t len = envoy_dynamic_module_callback_network_filter_get_local_address(
+  bool result = envoy_dynamic_module_callback_network_filter_get_local_address(
       filterPtr(), &address_out, &port_out);
 
-  EXPECT_GT(len, 0);
-  EXPECT_NE(nullptr, address_out);
+  EXPECT_TRUE(result);
+  EXPECT_EQ("5.6.7.8", absl::string_view(address_out.ptr, address_out.length));
   EXPECT_EQ(9090, port_out);
 }
 
@@ -569,13 +570,14 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetLocalAddressNullIp) {
   EXPECT_CALL(connection_, connectionInfoProvider())
       .WillOnce(testing::ReturnRef(*connection_info_provider));
 
-  envoy_dynamic_module_type_buffer_envoy_ptr address_out = nullptr;
+  envoy_dynamic_module_type_envoy_buffer address_out = {nullptr, 0};
   uint32_t port_out = 0;
-  size_t len = envoy_dynamic_module_callback_network_filter_get_local_address(
+  bool result = envoy_dynamic_module_callback_network_filter_get_local_address(
       filterPtr(), &address_out, &port_out);
 
-  EXPECT_EQ(0, len);
-  EXPECT_EQ(nullptr, address_out);
+  EXPECT_FALSE(result);
+  EXPECT_EQ(nullptr, address_out.ptr);
+  EXPECT_EQ(0, address_out.length);
   EXPECT_EQ(0, port_out);
 }
 

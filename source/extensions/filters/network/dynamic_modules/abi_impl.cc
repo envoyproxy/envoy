@@ -219,40 +219,40 @@ uint64_t envoy_dynamic_module_callback_network_filter_get_connection_id(
   return filter->connection().id();
 }
 
-size_t envoy_dynamic_module_callback_network_filter_get_remote_address(
+bool envoy_dynamic_module_callback_network_filter_get_remote_address(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_buffer_envoy_ptr* address_out, uint32_t* port_out) {
+    envoy_dynamic_module_type_envoy_buffer* address_out, uint32_t* port_out) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
   const auto& address = filter->connection().connectionInfoProvider().remoteAddress();
 
   if (address == nullptr || address->ip() == nullptr) {
-    *address_out = nullptr;
+    *address_out = {nullptr, 0};
     *port_out = 0;
-    return 0;
+    return false;
   }
 
   const std::string& addr_str = address->ip()->addressAsString();
-  *address_out = const_cast<char*>(addr_str.c_str());
+  *address_out = {addr_str.data(), addr_str.size()};
   *port_out = address->ip()->port();
-  return addr_str.size();
+  return true;
 }
 
-size_t envoy_dynamic_module_callback_network_filter_get_local_address(
+bool envoy_dynamic_module_callback_network_filter_get_local_address(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_buffer_envoy_ptr* address_out, uint32_t* port_out) {
+    envoy_dynamic_module_type_envoy_buffer* address_out, uint32_t* port_out) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
   const auto& address = filter->connection().connectionInfoProvider().localAddress();
 
   if (address == nullptr || address->ip() == nullptr) {
-    *address_out = nullptr;
+    *address_out = {nullptr, 0};
     *port_out = 0;
-    return 0;
+    return false;
   }
 
   const std::string& addr_str = address->ip()->addressAsString();
-  *address_out = const_cast<char*>(addr_str.c_str());
+  *address_out = {addr_str.data(), addr_str.size()};
   *port_out = address->ip()->port();
-  return addr_str.size();
+  return true;
 }
 
 bool envoy_dynamic_module_callback_network_filter_is_ssl(

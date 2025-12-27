@@ -172,8 +172,10 @@ macro_rules! envoy_log {
           let message_bytes = message.as_bytes();
           $crate::abi::envoy_dynamic_module_callback_log(
             $level,
-            message_bytes.as_ptr() as *const ::std::os::raw::c_char,
-            message_bytes.len()
+            $crate::abi::envoy_dynamic_module_type_module_buffer {
+              ptr: message_bytes.as_ptr() as *const ::std::os::raw::c_char,
+              length: message_bytes.len(),
+            },
           );
         }
       }
@@ -490,19 +492,30 @@ pub struct EnvoyHttpFilterConfigImpl {
   raw_ptr: abi::envoy_dynamic_module_type_http_filter_config_envoy_ptr,
 }
 
+fn str_to_module_buffer(s: &str) -> abi::envoy_dynamic_module_type_module_buffer {
+  abi::envoy_dynamic_module_type_module_buffer {
+    ptr: s.as_ptr() as *const _ as *mut _,
+    length: s.len(),
+  }
+}
+
+fn bytes_to_module_buffer(b: &[u8]) -> abi::envoy_dynamic_module_type_module_buffer {
+  abi::envoy_dynamic_module_type_module_buffer {
+    ptr: b.as_ptr() as *const _ as *mut _,
+    length: b.len(),
+  }
+}
+
 impl EnvoyHttpFilterConfig for EnvoyHttpFilterConfigImpl {
   fn define_counter(
     &mut self,
     name: &str,
   ) -> Result<EnvoyCounterId, envoy_dynamic_module_type_metrics_result> {
-    let name_ptr = name.as_ptr();
-    let name_size = name.len();
     let mut id: usize = 0;
     Result::from(unsafe {
       abi::envoy_dynamic_module_callback_http_filter_config_define_counter(
         self.raw_ptr,
-        name_ptr as *const _ as *mut _,
-        name_size,
+        str_to_module_buffer(name),
         &mut id,
       )
     })?;
@@ -514,16 +527,13 @@ impl EnvoyHttpFilterConfig for EnvoyHttpFilterConfigImpl {
     name: &str,
     labels: &[&str],
   ) -> Result<EnvoyCounterVecId, envoy_dynamic_module_type_metrics_result> {
-    let name_ptr = name.as_ptr();
-    let name_size = name.len();
     let labels_ptr = labels.as_ptr();
     let labels_size = labels.len();
     let mut id: usize = 0;
     Result::from(unsafe {
       abi::envoy_dynamic_module_callback_http_filter_config_define_counter_vec(
         self.raw_ptr,
-        name_ptr as *const _ as *mut _,
-        name_size,
+        str_to_module_buffer(name),
         labels_ptr as *const _ as *mut _,
         labels_size,
         &mut id,
@@ -536,14 +546,11 @@ impl EnvoyHttpFilterConfig for EnvoyHttpFilterConfigImpl {
     &mut self,
     name: &str,
   ) -> Result<EnvoyGaugeId, envoy_dynamic_module_type_metrics_result> {
-    let name_ptr = name.as_ptr();
-    let name_size = name.len();
     let mut id: usize = 0;
     Result::from(unsafe {
       abi::envoy_dynamic_module_callback_http_filter_config_define_gauge(
         self.raw_ptr,
-        name_ptr as *const _ as *mut _,
-        name_size,
+        str_to_module_buffer(name),
         &mut id,
       )
     })?;
@@ -555,16 +562,13 @@ impl EnvoyHttpFilterConfig for EnvoyHttpFilterConfigImpl {
     name: &str,
     labels: &[&str],
   ) -> Result<EnvoyGaugeVecId, envoy_dynamic_module_type_metrics_result> {
-    let name_ptr = name.as_ptr();
-    let name_size = name.len();
     let labels_ptr = labels.as_ptr();
     let labels_size = labels.len();
     let mut id: usize = 0;
     Result::from(unsafe {
       abi::envoy_dynamic_module_callback_http_filter_config_define_gauge_vec(
         self.raw_ptr,
-        name_ptr as *const _ as *mut _,
-        name_size,
+        str_to_module_buffer(name),
         labels_ptr as *const _ as *mut _,
         labels_size,
         &mut id,
@@ -577,14 +581,11 @@ impl EnvoyHttpFilterConfig for EnvoyHttpFilterConfigImpl {
     &mut self,
     name: &str,
   ) -> Result<EnvoyHistogramId, envoy_dynamic_module_type_metrics_result> {
-    let name_ptr = name.as_ptr();
-    let name_size = name.len();
     let mut id: usize = 0;
     Result::from(unsafe {
       abi::envoy_dynamic_module_callback_http_filter_config_define_histogram(
         self.raw_ptr,
-        name_ptr as *const _ as *mut _,
-        name_size,
+        str_to_module_buffer(name),
         &mut id,
       )
     })?;
@@ -596,16 +597,13 @@ impl EnvoyHttpFilterConfig for EnvoyHttpFilterConfigImpl {
     name: &str,
     labels: &[&str],
   ) -> Result<EnvoyHistogramVecId, envoy_dynamic_module_type_metrics_result> {
-    let name_ptr = name.as_ptr();
-    let name_size = name.len();
     let labels_ptr = labels.as_ptr();
     let labels_size = labels.len();
     let mut id: usize = 0;
     Result::from(unsafe {
       abi::envoy_dynamic_module_callback_http_filter_config_define_histogram_vec(
         self.raw_ptr,
-        name_ptr as *const _ as *mut _,
-        name_size,
+        str_to_module_buffer(name),
         labels_ptr as *const _ as *mut _,
         labels_size,
         &mut id,
@@ -1360,35 +1358,23 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
   }
 
   fn set_request_header(&mut self, key: &str, value: &[u8]) -> bool {
-    let key_ptr = key.as_ptr();
-    let key_size = key.len();
-    let value_ptr = value.as_ptr();
-    let value_size = value.len();
     unsafe {
       abi::envoy_dynamic_module_callback_http_set_header(
         self.raw_ptr,
         abi::envoy_dynamic_module_type_http_header_type::RequestHeader,
-        key_ptr as *const _ as *mut _,
-        key_size,
-        value_ptr as *const _ as *mut _,
-        value_size,
+        str_to_module_buffer(key),
+        bytes_to_module_buffer(value),
       )
     }
   }
 
   fn add_request_header(&mut self, key: &str, value: &[u8]) -> bool {
-    let key_ptr = key.as_ptr();
-    let key_size = key.len();
-    let value_ptr = value.as_ptr();
-    let value_size = value.len();
     unsafe {
       abi::envoy_dynamic_module_callback_http_add_header(
         self.raw_ptr,
         abi::envoy_dynamic_module_type_http_header_type::RequestHeader,
-        key_ptr as *const _ as *mut _,
-        key_size,
-        value_ptr as *const _ as *mut _,
-        value_size,
+        str_to_module_buffer(key),
+        bytes_to_module_buffer(value),
       )
     }
   }
@@ -1412,35 +1398,23 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
   }
 
   fn set_request_trailer(&mut self, key: &str, value: &[u8]) -> bool {
-    let key_ptr = key.as_ptr();
-    let key_size = key.len();
-    let value_ptr = value.as_ptr();
-    let value_size = value.len();
     unsafe {
       abi::envoy_dynamic_module_callback_http_set_header(
         self.raw_ptr,
         abi::envoy_dynamic_module_type_http_header_type::RequestTrailer,
-        key_ptr as *const _ as *mut _,
-        key_size,
-        value_ptr as *const _ as *mut _,
-        value_size,
+        str_to_module_buffer(key),
+        bytes_to_module_buffer(value),
       )
     }
   }
 
   fn add_request_trailer(&mut self, key: &str, value: &[u8]) -> bool {
-    let key_ptr = key.as_ptr();
-    let key_size = key.len();
-    let value_ptr = value.as_ptr();
-    let value_size = value.len();
     unsafe {
       abi::envoy_dynamic_module_callback_http_add_header(
         self.raw_ptr,
         abi::envoy_dynamic_module_type_http_header_type::RequestTrailer,
-        key_ptr as *const _ as *mut _,
-        key_size,
-        value_ptr as *const _ as *mut _,
-        value_size,
+        str_to_module_buffer(key),
+        bytes_to_module_buffer(value),
       )
     }
   }
@@ -1464,35 +1438,23 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
   }
 
   fn set_response_header(&mut self, key: &str, value: &[u8]) -> bool {
-    let key_ptr = key.as_ptr();
-    let key_size = key.len();
-    let value_ptr = value.as_ptr();
-    let value_size = value.len();
     unsafe {
       abi::envoy_dynamic_module_callback_http_set_header(
         self.raw_ptr,
         abi::envoy_dynamic_module_type_http_header_type::ResponseHeader,
-        key_ptr as *const _ as *mut _,
-        key_size,
-        value_ptr as *const _ as *mut _,
-        value_size,
+        str_to_module_buffer(key),
+        bytes_to_module_buffer(value),
       )
     }
   }
 
   fn add_response_header(&mut self, key: &str, value: &[u8]) -> bool {
-    let key_ptr = key.as_ptr();
-    let key_size = key.len();
-    let value_ptr = value.as_ptr();
-    let value_size = value.len();
     unsafe {
       abi::envoy_dynamic_module_callback_http_add_header(
         self.raw_ptr,
         abi::envoy_dynamic_module_type_http_header_type::ResponseHeader,
-        key_ptr as *const _ as *mut _,
-        key_size,
-        value_ptr as *const _ as *mut _,
-        value_size,
+        str_to_module_buffer(key),
+        bytes_to_module_buffer(value),
       )
     }
   }
@@ -1516,35 +1478,23 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
   }
 
   fn set_response_trailer(&mut self, key: &str, value: &[u8]) -> bool {
-    let key_ptr = key.as_ptr();
-    let key_size = key.len();
-    let value_ptr = value.as_ptr();
-    let value_size = value.len();
     unsafe {
       abi::envoy_dynamic_module_callback_http_set_header(
         self.raw_ptr,
         abi::envoy_dynamic_module_type_http_header_type::ResponseTrailer,
-        key_ptr as *const _ as *mut _,
-        key_size,
-        value_ptr as *const _ as *mut _,
-        value_size,
+        str_to_module_buffer(key),
+        bytes_to_module_buffer(value),
       )
     }
   }
 
   fn add_response_trailer(&mut self, key: &str, value: &[u8]) -> bool {
-    let key_ptr = key.as_ptr();
-    let key_size = key.len();
-    let value_ptr = value.as_ptr();
-    let value_size = value.len();
     unsafe {
       abi::envoy_dynamic_module_callback_http_add_header(
         self.raw_ptr,
         abi::envoy_dynamic_module_type_http_header_type::ResponseTrailer,
-        key_ptr as *const _ as *mut _,
-        key_size,
-        value_ptr as *const _ as *mut _,
-        value_size,
+        str_to_module_buffer(key),
+        bytes_to_module_buffer(value),
       )
     }
   }
@@ -1576,10 +1526,14 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
         status_code,
         headers_ptr,
         headers.len(),
-        body_ptr as *mut _,
-        body_length,
-        details_ptr as *const _ as *mut _,
-        details_length,
+        abi::envoy_dynamic_module_type_module_buffer {
+          ptr: body_ptr as *mut _,
+          length: body_length,
+        },
+        abi::envoy_dynamic_module_type_module_buffer {
+          ptr: details_ptr as *mut _,
+          length: details_length,
+        },
       )
     }
   }
@@ -1605,14 +1559,10 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
   }
 
   fn send_response_data(&mut self, body: &[u8], end_stream: bool) {
-    let body_ptr = body.as_ptr();
-    let body_length = body.len();
-
     unsafe {
       abi::envoy_dynamic_module_callback_http_send_response_data(
         self.raw_ptr,
-        body_ptr as *mut _,
-        body_length,
+        bytes_to_module_buffer(body),
         end_stream,
       )
     }
@@ -1638,13 +1588,10 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
   }
 
   fn add_custom_flag(&mut self, flag: &str) {
-    let flag_ptr = flag.as_ptr();
-    let flag_size = flag.len();
     unsafe {
       abi::envoy_dynamic_module_callback_http_add_custom_flag(
         self.raw_ptr,
-        flag_ptr as *const _ as *mut _,
-        flag_size,
+        str_to_module_buffer(flag),
       );
     }
   }
@@ -1655,19 +1602,13 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     namespace: &str,
     key: &str,
   ) -> Option<f64> {
-    let namespace_ptr = namespace.as_ptr();
-    let namespace_size = namespace.len();
-    let key_ptr = key.as_ptr();
-    let key_size = key.len();
     let mut value: f64 = 0f64;
     let success = unsafe {
       abi::envoy_dynamic_module_callback_http_get_metadata_number(
         self.raw_ptr,
         source,
-        namespace_ptr as *const _ as *mut _,
-        namespace_size,
-        key_ptr as *const _ as *mut _,
-        key_size,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
         &mut value as *mut _ as *mut _,
       )
     };
@@ -1679,17 +1620,11 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
   }
 
   fn set_dynamic_metadata_number(&mut self, namespace: &str, key: &str, value: f64) -> bool {
-    let namespace_ptr = namespace.as_ptr();
-    let namespace_size = namespace.len();
-    let key_ptr = key.as_ptr();
-    let key_size = key.len();
     unsafe {
       abi::envoy_dynamic_module_callback_http_set_dynamic_metadata_number(
         self.raw_ptr,
-        namespace_ptr as *const _ as *mut _,
-        namespace_size,
-        key_ptr as *const _ as *mut _,
-        key_size,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
         value,
       )
     }
@@ -1701,84 +1636,62 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     namespace: &str,
     key: &str,
   ) -> Option<EnvoyBuffer> {
-    let namespace_ptr = namespace.as_ptr();
-    let namespace_size = namespace.len();
-    let key_ptr = key.as_ptr();
-    let key_size = key.len();
-    let mut result_ptr: *const u8 = std::ptr::null();
-    let mut result_size: usize = 0;
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
     let success = unsafe {
       abi::envoy_dynamic_module_callback_http_get_metadata_string(
         self.raw_ptr,
         source,
-        namespace_ptr as *const _ as *mut _,
-        namespace_size,
-        key_ptr as *const _ as *mut _,
-        key_size,
-        &mut result_ptr as *mut _ as *mut _,
-        &mut result_size as *mut _ as *mut _,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        &mut result as *mut _ as *mut _,
       )
     };
     if success {
-      Some(unsafe { EnvoyBuffer::new_from_raw(result_ptr, result_size) })
+      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) })
     } else {
       None
     }
   }
 
   fn set_dynamic_metadata_string(&mut self, namespace: &str, key: &str, value: &str) -> bool {
-    let namespace_ptr = namespace.as_ptr();
-    let namespace_size = namespace.len();
-    let key_ptr = key.as_ptr();
-    let key_size = key.len();
-    let value_ptr = value.as_ptr();
-    let value_size = value.len();
     unsafe {
       abi::envoy_dynamic_module_callback_http_set_dynamic_metadata_string(
         self.raw_ptr,
-        namespace_ptr as *const _ as *mut _,
-        namespace_size,
-        key_ptr as *const _ as *mut _,
-        key_size,
-        value_ptr as *const _ as *mut _,
-        value_size,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        str_to_module_buffer(value),
       )
     }
   }
 
   fn get_filter_state_bytes(&self, key: &[u8]) -> Option<EnvoyBuffer> {
-    let key_ptr = key.as_ptr();
-    let key_size = key.len();
-    let mut result_ptr: *const u8 = std::ptr::null();
-    let mut result_size: usize = 0;
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
     let success = unsafe {
       abi::envoy_dynamic_module_callback_http_get_filter_state_bytes(
         self.raw_ptr,
-        key_ptr as *const _ as *mut _,
-        key_size,
-        &mut result_ptr as *mut _ as *mut _,
-        &mut result_size as *mut _ as *mut _,
+        bytes_to_module_buffer(key),
+        &mut result as *mut _ as *mut _,
       )
     };
     if success {
-      Some(unsafe { EnvoyBuffer::new_from_raw(result_ptr, result_size) })
+      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) })
     } else {
       None
     }
   }
 
   fn set_filter_state_bytes(&mut self, key: &[u8], value: &[u8]) -> bool {
-    let key_ptr = key.as_ptr();
-    let key_size = key.len();
-    let value_ptr = value.as_ptr();
-    let value_size = value.len();
     unsafe {
       abi::envoy_dynamic_module_callback_http_set_filter_state_bytes(
         self.raw_ptr,
-        key_ptr as *const _ as *mut _,
-        key_size,
-        value_ptr as *const _ as *mut _,
-        value_size,
+        bytes_to_module_buffer(key),
+        bytes_to_module_buffer(value),
       )
     }
   }
@@ -1896,8 +1809,7 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
       abi::envoy_dynamic_module_callback_http_append_body(
         self.raw_ptr,
         abi::envoy_dynamic_module_type_http_body_type::ReceivedRequestBody,
-        data.as_ptr() as *const _ as *mut _,
-        data.len(),
+        bytes_to_module_buffer(data),
       )
     }
   }
@@ -1907,8 +1819,7 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
       abi::envoy_dynamic_module_callback_http_append_body(
         self.raw_ptr,
         abi::envoy_dynamic_module_type_http_body_type::BufferedRequestBody,
-        data.as_ptr() as *const _ as *mut _,
-        data.len(),
+        bytes_to_module_buffer(data),
       )
     }
   }
@@ -2026,8 +1937,7 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
       abi::envoy_dynamic_module_callback_http_append_body(
         self.raw_ptr,
         abi::envoy_dynamic_module_type_http_body_type::ReceivedResponseBody,
-        data.as_ptr() as *const _ as *mut _,
-        data.len(),
+        bytes_to_module_buffer(data),
       )
     }
   }
@@ -2037,8 +1947,7 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
       abi::envoy_dynamic_module_callback_http_append_body(
         self.raw_ptr,
         abi::envoy_dynamic_module_type_http_body_type::BufferedResponseBody,
-        data.as_ptr() as *const _ as *mut _,
-        data.len(),
+        bytes_to_module_buffer(data),
       )
     }
   }
@@ -2048,61 +1957,57 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
   }
 
   fn remove_request_header(&mut self, key: &str) -> bool {
-    let key_ptr = key.as_ptr();
-    let key_size = key.len();
     unsafe {
       abi::envoy_dynamic_module_callback_http_set_header(
         self.raw_ptr,
         abi::envoy_dynamic_module_type_http_header_type::RequestHeader,
-        key_ptr as *const _ as *mut _,
-        key_size,
-        std::ptr::null_mut(),
-        0,
+        str_to_module_buffer(key),
+        abi::envoy_dynamic_module_type_module_buffer {
+          ptr: std::ptr::null_mut(),
+          length: 0,
+        },
       )
     }
   }
 
   fn remove_request_trailer(&mut self, key: &str) -> bool {
-    let key_ptr = key.as_ptr();
-    let key_size = key.len();
     unsafe {
       abi::envoy_dynamic_module_callback_http_set_header(
         self.raw_ptr,
         abi::envoy_dynamic_module_type_http_header_type::RequestTrailer,
-        key_ptr as *const _ as *mut _,
-        key_size,
-        std::ptr::null_mut(),
-        0,
+        str_to_module_buffer(key),
+        abi::envoy_dynamic_module_type_module_buffer {
+          ptr: std::ptr::null_mut(),
+          length: 0,
+        },
       )
     }
   }
 
   fn remove_response_header(&mut self, key: &str) -> bool {
-    let key_ptr = key.as_ptr();
-    let key_size = key.len();
     unsafe {
       abi::envoy_dynamic_module_callback_http_set_header(
         self.raw_ptr,
         abi::envoy_dynamic_module_type_http_header_type::ResponseHeader,
-        key_ptr as *const _ as *mut _,
-        key_size,
-        std::ptr::null_mut(),
-        0,
+        str_to_module_buffer(key),
+        abi::envoy_dynamic_module_type_module_buffer {
+          ptr: std::ptr::null_mut(),
+          length: 0,
+        },
       )
     }
   }
 
   fn remove_response_trailer(&mut self, key: &str) -> bool {
-    let key_ptr = key.as_ptr();
-    let key_size = key.len();
     unsafe {
       abi::envoy_dynamic_module_callback_http_set_header(
         self.raw_ptr,
         abi::envoy_dynamic_module_type_http_header_type::ResponseTrailer,
-        key_ptr as *const _ as *mut _,
-        key_size,
-        std::ptr::null_mut(),
-        0,
+        str_to_module_buffer(key),
+        abi::envoy_dynamic_module_type_module_buffer {
+          ptr: std::ptr::null_mut(),
+          length: 0,
+        },
       )
     }
   }
@@ -2111,18 +2016,19 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     &self,
     attribute_id: abi::envoy_dynamic_module_type_attribute_id,
   ) -> Option<EnvoyBuffer> {
-    let mut result_ptr: *const u8 = std::ptr::null();
-    let mut result_size: usize = 0;
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
     let success = unsafe {
       abi::envoy_dynamic_module_callback_http_filter_get_attribute_string(
         self.raw_ptr,
         attribute_id,
-        &mut result_ptr as *mut _ as *mut _,
-        &mut result_size as *mut _ as *mut _,
+        &mut result as *mut _ as *mut _,
       )
     };
     if success {
-      Some(unsafe { EnvoyBuffer::new_from_raw(result_ptr, result_size) })
+      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) })
     } else {
       None
     }
@@ -2163,12 +2069,13 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
       abi::envoy_dynamic_module_callback_http_filter_http_callout(
         self.raw_ptr,
         &mut callout_id as *mut _ as *mut _,
-        cluster_name.as_ptr() as *const _ as *mut _,
-        cluster_name.len(),
+        str_to_module_buffer(cluster_name),
         headers_ptr as *const _ as *mut _,
         headers.len(),
-        body_ptr as *const _ as *mut _,
-        body_length,
+        abi::envoy_dynamic_module_type_module_buffer {
+          ptr: body_ptr as *mut _,
+          length: body_length,
+        },
         timeout_milliseconds,
       )
     };
@@ -2193,12 +2100,13 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
       abi::envoy_dynamic_module_callback_http_filter_start_http_stream(
         self.raw_ptr,
         &mut stream_id as *mut _ as *mut _,
-        cluster_name.as_ptr() as *const _ as *mut _,
-        cluster_name.len(),
+        str_to_module_buffer(cluster_name),
         headers_ptr as *const _ as *mut _,
         headers.len(),
-        body_ptr as *const _ as *mut _,
-        body_length,
+        abi::envoy_dynamic_module_type_module_buffer {
+          ptr: body_ptr as *mut _,
+          length: body_length,
+        },
         end_stream,
         timeout_milliseconds,
       )
@@ -2217,8 +2125,7 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
       abi::envoy_dynamic_module_callback_http_stream_send_data(
         self.raw_ptr,
         stream_handle,
-        data.as_ptr() as *const _ as *mut _,
-        data.len(),
+        bytes_to_module_buffer(data),
         end_stream,
       )
     }
@@ -2512,29 +2419,26 @@ impl EnvoyHttpFilterImpl {
     key: &str,
     header_type: abi::envoy_dynamic_module_type_http_header_type,
   ) -> Option<EnvoyBuffer> {
-    let key_ptr = key.as_ptr();
-    let key_size = key.len();
-
-    let mut result_ptr: *const u8 = std::ptr::null();
-    let mut result_size: usize = 0;
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
 
     unsafe {
       abi::envoy_dynamic_module_callback_http_get_header(
         self.raw_ptr,
         header_type,
-        key_ptr as *const _ as *mut _,
-        key_size,
-        &mut result_ptr as *mut _ as *mut _,
-        &mut result_size as *mut _ as *mut _,
+        str_to_module_buffer(key),
+        &mut result as *mut _ as *mut _,
         0, // Only the first value is needed.
         std::ptr::null_mut(),
       )
     };
 
-    if result_ptr.is_null() {
+    if result.ptr.is_null() {
       None
     } else {
-      Some(unsafe { EnvoyBuffer::new_from_raw(result_ptr, result_size) })
+      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) })
     }
   }
 
@@ -2546,10 +2450,10 @@ impl EnvoyHttpFilterImpl {
     key: &str,
     header_type: abi::envoy_dynamic_module_type_http_header_type,
   ) -> Vec<EnvoyBuffer> {
-    let key_ptr = key.as_ptr();
-    let key_size = key.len();
-    let mut result_ptr: *const u8 = std::ptr::null();
-    let mut result_size: usize = 0;
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
 
     let mut count: usize = 0;
 
@@ -2558,10 +2462,8 @@ impl EnvoyHttpFilterImpl {
       abi::envoy_dynamic_module_callback_http_get_header(
         self.raw_ptr,
         header_type,
-        key_ptr as *const _ as *mut _,
-        key_size,
-        &mut result_ptr as *mut _ as *mut _,
-        &mut result_size as *mut _ as *mut _,
+        str_to_module_buffer(key),
+        &mut result as *mut _ as *mut _,
         0,
         &mut count as *mut _ as *mut _,
       )
@@ -2573,25 +2475,25 @@ impl EnvoyHttpFilterImpl {
     }
 
     // At this point, we assume at least one value is present.
-    results.push(unsafe { EnvoyBuffer::new_from_raw(result_ptr, result_size) });
+    results.push(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) });
     // So, we iterate from 1 to count - 1.
     for i in 1 .. count {
-      let mut result_ptr: *const u8 = std::ptr::null();
-      let mut result_size: usize = 0;
+      let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+        ptr: std::ptr::null(),
+        length: 0,
+      };
       unsafe {
         abi::envoy_dynamic_module_callback_http_get_header(
           self.raw_ptr,
           header_type,
-          key_ptr as *const _ as *mut _,
-          key_size,
-          &mut result_ptr as *mut _ as *mut _,
-          &mut result_size as *mut _ as *mut _,
+          str_to_module_buffer(key),
+          &mut result as *mut _ as *mut _,
           i,
           std::ptr::null_mut(),
         )
       };
       // Within the range, all results are guaranteed to be non-null by Envoy.
-      results.push(unsafe { EnvoyBuffer::new_from_raw(result_ptr, result_size) });
+      results.push(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) });
     }
     results
   }
@@ -3378,7 +3280,7 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
     };
     let envoy_buffers: Vec<EnvoyBuffer> = buffers
       .iter()
-      .map(|s| unsafe { EnvoyBuffer::new_from_raw(s.ptr as *const u8, s.length) })
+      .map(|s| unsafe { EnvoyBuffer::new_from_raw(s.ptr as *const _, s.length) })
       .collect();
     (envoy_buffers, total_length)
   }
@@ -3409,7 +3311,7 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
     };
     let envoy_buffers: Vec<EnvoyBuffer> = buffers
       .iter()
-      .map(|s| unsafe { EnvoyBuffer::new_from_raw(s.ptr as *const u8, s.length) })
+      .map(|s| unsafe { EnvoyBuffer::new_from_raw(s.ptr as *const _, s.length) })
       .collect();
     (envoy_buffers, total_length)
   }
@@ -3517,39 +3419,51 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
   }
 
   fn get_remote_address(&self) -> (String, u32) {
-    let mut address_ptr: abi::envoy_dynamic_module_type_buffer_module_ptr = std::ptr::null_mut();
+    let mut address = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null_mut(),
+      length: 0,
+    };
     let mut port: u32 = 0;
-    let length = unsafe {
+    let result = unsafe {
       abi::envoy_dynamic_module_callback_network_filter_get_remote_address(
         self.raw,
-        &mut address_ptr as *mut abi::envoy_dynamic_module_type_buffer_module_ptr,
+        &mut address as *mut _ as *mut _,
         &mut port,
       )
     };
-    if length == 0 || address_ptr.is_null() {
+    if !result || address.length == 0 || address.ptr.is_null() {
       return (String::new(), 0);
     }
     let address = unsafe {
-      std::str::from_utf8_unchecked(std::slice::from_raw_parts(address_ptr as *const u8, length))
+      std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+        address.ptr as *const _,
+        address.length,
+      ))
     };
     (address.to_string(), port)
   }
 
   fn get_local_address(&self) -> (String, u32) {
-    let mut address_ptr: abi::envoy_dynamic_module_type_buffer_module_ptr = std::ptr::null_mut();
+    let mut address = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null_mut(),
+      length: 0,
+    };
     let mut port: u32 = 0;
-    let length = unsafe {
+    let result = unsafe {
       abi::envoy_dynamic_module_callback_network_filter_get_local_address(
         self.raw,
-        &mut address_ptr as *mut abi::envoy_dynamic_module_type_buffer_module_ptr,
+        &mut address as *mut _ as *mut _,
         &mut port,
       )
     };
-    if length == 0 || address_ptr.is_null() {
+    if !result || address.length == 0 || address.ptr.is_null() {
       return (String::new(), 0);
     }
     let address = unsafe {
-      std::str::from_utf8_unchecked(std::slice::from_raw_parts(address_ptr as *const u8, length))
+      std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+        address.ptr as *const _,
+        address.length,
+      ))
     };
     (address.to_string(), port)
   }
@@ -3577,9 +3491,9 @@ pub extern "C" fn envoy_dynamic_module_on_network_filter_config_new(
 ) -> abi::envoy_dynamic_module_type_network_filter_config_module_ptr {
   let mut envoy_filter_config = EnvoyNetworkFilterConfigImpl::new(envoy_filter_config_ptr);
   let name = unsafe {
-    std::str::from_utf8_unchecked(std::slice::from_raw_parts(name_ptr as *const u8, name_size))
+    std::str::from_utf8_unchecked(std::slice::from_raw_parts(name_ptr as *const _, name_size))
   };
-  let config = unsafe { std::slice::from_raw_parts(config_ptr as *const u8, config_size) };
+  let config = unsafe { std::slice::from_raw_parts(config_ptr as *const _, config_size) };
   init_network_filter_config(
     &mut envoy_filter_config,
     name,

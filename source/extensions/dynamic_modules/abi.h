@@ -145,17 +145,7 @@ typedef void* envoy_dynamic_module_type_http_filter_scheduler_module_ptr;
  * OWNERSHIP: The module is responsible for managing the lifetime of the pointer. It depends on the
  * context where the buffer is used. See for the specific event hook or callback for more details.
  */
-typedef char* envoy_dynamic_module_type_buffer_module_ptr;
-
-/**
- * envoy_dynamic_module_type_buffer_module_ptr is a pointer to a buffer in the module. A buffer
- * represents a contiguous block of memory in bytes.
- * The buffer is read-only.
- *
- * OWNERSHIP: The module is responsible for managing the lifetime of the pointer. It depends on the
- * context where the buffer is used. See for the specific event hook or callback for more details.
- */
-typedef const char* envoy_dynamic_module_type_const_buffer_module_ptr;
+typedef const char* envoy_dynamic_module_type_buffer_module_ptr;
 
 /**
  * envoy_dynamic_module_type_buffer_envoy_ptr is a pointer to a buffer in Envoy. A buffer represents
@@ -164,17 +154,7 @@ typedef const char* envoy_dynamic_module_type_const_buffer_module_ptr;
  * OWNERSHIP: Envoy owns the pointer. The lifetime depends on the context where the buffer is used.
  * See for the specific event hook or callback for more details.
  */
-typedef char* envoy_dynamic_module_type_buffer_envoy_ptr;
-
-/**
- * envoy_dynamic_module_type_buffer_envoy_ptr is a pointer to a buffer in Envoy. A buffer represents
- * a contiguous block of memory in bytes.
- * The buffer is read-only.
- *
- * OWNERSHIP: Envoy owns the pointer. The lifetime depends on the context where the buffer is used.
- * See for the specific event hook or callback for more details.
- */
-typedef const char* envoy_dynamic_module_type_const_buffer_envoy_ptr;
+typedef const char* envoy_dynamic_module_type_buffer_envoy_ptr;
 
 /**
  * envoy_dynamic_module_type_envoy_buffer represents a buffer owned by Envoy.
@@ -734,10 +714,8 @@ envoy_dynamic_module_type_abi_version_module_ptr envoy_dynamic_module_on_program
  *
  * @param filter_config_envoy_ptr is the pointer to the DynamicModuleHttpFilterConfig object for the
  * corresponding config.
- * @param name_ptr is the name of the filter.
- * @param name_size is the size of the name.
- * @param config_ptr is the configuration for the module.
- * @param config_size is the size of the configuration.
+ * @param name is the name of the filter.
+ * @param config is the configuration for the module.
  * @return envoy_dynamic_module_type_http_filter_config_module_ptr is the pointer to the
  * in-module HTTP filter configuration. Returning nullptr indicates a failure to initialize the
  * module. When it fails, the filter configuration will be rejected.
@@ -745,8 +723,7 @@ envoy_dynamic_module_type_abi_version_module_ptr envoy_dynamic_module_on_program
 envoy_dynamic_module_type_http_filter_config_module_ptr
 envoy_dynamic_module_on_http_filter_config_new(
     envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
-    envoy_dynamic_module_type_const_buffer_envoy_ptr name_ptr, size_t name_size,
-    envoy_dynamic_module_type_const_buffer_envoy_ptr config_ptr, size_t config_size);
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config);
 
 /**
  * envoy_dynamic_module_on_http_filter_config_destroy is called when the HTTP filter configuration
@@ -763,18 +740,15 @@ void envoy_dynamic_module_on_http_filter_config_destroy(
  * http per-route filter config is loaded. The function returns a
  * envoy_dynamic_module_type_http_filter_per_route_config_module_ptr for given name and config.
  *
- * @param name_ptr is the name of the filter.
- * @param name_size is the size of the name.
- * @param config_ptr is the configuration for the module.
- * @param config_size is the size of the configuration.
+ * @param name is the name of the filter.
+ * @param config is the configuration for the module.
  * @return envoy_dynamic_module_type_http_filter_per_route_config_module_ptr is the pointer to the
  * in-module HTTP filter configuration. Returning nullptr indicates a failure to initialize the
  * module. When it fails, the filter configuration will be rejected.
  */
 envoy_dynamic_module_type_http_filter_per_route_config_module_ptr
 envoy_dynamic_module_on_http_filter_per_route_config_new(
-    envoy_dynamic_module_type_const_buffer_envoy_ptr name_ptr, size_t name_size,
-    envoy_dynamic_module_type_const_buffer_envoy_ptr config_ptr, size_t config_size);
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config);
 
 /**
  * envoy_dynamic_module_on_http_filter_config_destroy is called when the HTTP per-route filter
@@ -956,7 +930,7 @@ void envoy_dynamic_module_on_http_filter_http_callout_done(
  * corresponding HTTP filter.
  * @param filter_module_ptr is the pointer to the in-module HTTP filter created by
  * envoy_dynamic_module_on_http_filter_new.
- * @param stream_ptr is the handle to the HTTP stream.
+ * @param stream_id is the handle to the HTTP stream.
  * @param headers is the headers of the response.
  * @param headers_size is the size of the headers.
  * @param end_stream is true if this is the last data in the stream (no body or trailers will
@@ -978,7 +952,7 @@ void envoy_dynamic_module_on_http_filter_http_stream_headers(
  * corresponding HTTP filter.
  * @param filter_module_ptr is the pointer to the in-module HTTP filter created by
  * envoy_dynamic_module_on_http_filter_new.
- * @param stream_ptr is the handle to the HTTP stream.
+ * @param stream_id is the handle to the HTTP stream.
  * @param data is the pointer to the array of buffers containing the body chunk.
  * @param data_count is the number of buffers.
  * @param end_stream is true if this is the last data in the stream (no trailers will follow).
@@ -998,7 +972,7 @@ void envoy_dynamic_module_on_http_filter_http_stream_data(
  * corresponding HTTP filter.
  * @param filter_module_ptr is the pointer to the in-module HTTP filter created by
  * envoy_dynamic_module_on_http_filter_new.
- * @param stream_ptr is the handle to the HTTP stream.
+ * @param stream_id is the handle to the HTTP stream.
  * @param trailers is the trailers of the response.
  * @param trailers_size is the size of the trailers.
  *
@@ -1018,7 +992,7 @@ void envoy_dynamic_module_on_http_filter_http_stream_trailers(
  * corresponding HTTP filter.
  * @param filter_module_ptr is the pointer to the in-module HTTP filter created by
  * envoy_dynamic_module_on_http_filter_new.
- * @param stream_ptr is the handle to the HTTP stream.
+ * @param stream_id is the handle to the HTTP stream.
  *
  * After this callback, the stream is automatically cleaned up and stream_ptr becomes invalid.
  */
@@ -1035,7 +1009,7 @@ void envoy_dynamic_module_on_http_filter_http_stream_complete(
  * corresponding HTTP filter.
  * @param filter_module_ptr is the pointer to the in-module HTTP filter created by
  * envoy_dynamic_module_on_http_filter_new.
- * @param stream_ptr is the handle to the HTTP stream.
+ * @param stream_id is the handle to the HTTP stream.
  * @param reason is the reason for the stream reset.
  *
  * After this callback, the stream is automatically cleaned up and stream_ptr becomes invalid.
@@ -1338,13 +1312,11 @@ void envoy_dynamic_module_on_listener_filter_destroy(
  * of the standard Envoy logging stream under [dynamic_modules] Id.
  *
  * @param level is the log level of the message.
- * @param message_ptr is the pointer to the message to be logged.
- * @param message_length is the length of the message.
+ * @param message is the log message to be logged.
  *
  */
-void envoy_dynamic_module_callback_log(
-    envoy_dynamic_module_type_log_level level,
-    envoy_dynamic_module_type_const_buffer_module_ptr message_ptr, size_t message_length);
+void envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level level,
+                                       envoy_dynamic_module_type_module_buffer message);
 
 /**
  * envoy_dynamic_module_callback_log_enabled is called by the module to check if the log level is
@@ -1366,7 +1338,6 @@ bool envoy_dynamic_module_callback_log_enabled(envoy_dynamic_module_type_log_lev
  * @param filter_config_envoy_ptr is the pointer to the DynamicModuleHttpFilterConfig in which the
  * counter will be defined.
  * @param name is the name of the counter to be defined.
- * @param name_length is the length of the name.
  * @param counter_id_ptr where the opaque ID that represents a unique metric will be stored. This
  * can be passed to envoy_dynamic_module_callback_http_filter_increment_counter together with
  * filter_envoy_ptr created from filter_config_envoy_ptr.
@@ -1375,7 +1346,7 @@ bool envoy_dynamic_module_callback_log_enabled(envoy_dynamic_module_type_log_lev
 envoy_dynamic_module_type_metrics_result
 envoy_dynamic_module_callback_http_filter_config_define_counter(
     envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
-    envoy_dynamic_module_type_buffer_module_ptr name, size_t name_length, size_t* counter_id_ptr);
+    envoy_dynamic_module_type_module_buffer name, size_t* counter_id_ptr);
 
 /**
  * envoy_dynamic_module_callback_http_filter_config_define_counter_vec is called by the module
@@ -1385,7 +1356,6 @@ envoy_dynamic_module_callback_http_filter_config_define_counter(
  * @param filter_config_envoy_ptr is the pointer to the DynamicModuleHttpFilterConfig in which the
  * counter will be defined.
  * @param name is the name of the counter to be defined.
- * @param name_length is the length of the name.
  * @param label_names is the labels of the counter to be defined.
  * @param label_names_length is the length of the label_names.
  * @param counter_id_ptr where the opaque ID that represents a unique metric will be stored. This
@@ -1396,7 +1366,7 @@ envoy_dynamic_module_callback_http_filter_config_define_counter(
 envoy_dynamic_module_type_metrics_result
 envoy_dynamic_module_callback_http_filter_config_define_counter_vec(
     envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
-    envoy_dynamic_module_type_buffer_module_ptr name, size_t name_length,
+    envoy_dynamic_module_type_module_buffer name,
     envoy_dynamic_module_type_module_buffer* label_names, size_t label_names_length,
     size_t* counter_id_ptr);
 
@@ -1439,7 +1409,6 @@ envoy_dynamic_module_callback_http_filter_increment_counter_vec(
  * @param filter_config_envoy_ptr is the pointer to the DynamicModuleHttpFilterConfig in which the
  * gauge will be defined.
  * @param name is the name of the gauge to be defined.
- * @param name_length is the length of the name.
  * @param gauge_id_ptr where the opaque ID that represents a unique metric will be stored. This can
  * be passed to envoy_dynamic_module_callback_http_filter_increment_gauge together with
  * filter_envoy_ptr created from filter_config_envoy_ptr.
@@ -1447,7 +1416,7 @@ envoy_dynamic_module_callback_http_filter_increment_counter_vec(
 envoy_dynamic_module_type_metrics_result
 envoy_dynamic_module_callback_http_filter_config_define_gauge(
     envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
-    envoy_dynamic_module_type_buffer_module_ptr name, size_t name_length, size_t* gauge_id_ptr);
+    envoy_dynamic_module_type_module_buffer name, size_t* gauge_id_ptr);
 
 /**
  * envoy_dynamic_module_callback_http_filter_config_define_gauge_vec is called by the module during
@@ -1457,7 +1426,6 @@ envoy_dynamic_module_callback_http_filter_config_define_gauge(
  * @param filter_config_envoy_ptr is the pointer to the DynamicModuleHttpFilterConfig in which the
  * gauge will be defined.
  * @param name is the name of the gauge to be defined.
- * @param name_length is the length of the name.
  * @param label_names is the labels of the gauge to be defined.
  * @param label_names_length is the length of the label_names.
  * @param gauge_id_ptr where the opaque ID that represents a unique metric will be stored. This can
@@ -1468,7 +1436,7 @@ envoy_dynamic_module_callback_http_filter_config_define_gauge(
 envoy_dynamic_module_type_metrics_result
 envoy_dynamic_module_callback_http_filter_config_define_gauge_vec(
     envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
-    envoy_dynamic_module_type_buffer_module_ptr name, size_t name_length,
+    envoy_dynamic_module_type_module_buffer name,
     envoy_dynamic_module_type_module_buffer* label_names, size_t label_names_length,
     size_t* gauge_id_ptr);
 
@@ -1571,7 +1539,6 @@ envoy_dynamic_module_type_metrics_result envoy_dynamic_module_callback_http_filt
  * @param filter_config_envoy_ptr is the pointer to the DynamicModuleHttpFilterConfig in which the
  * histogram will be defined.
  * @param name is the name of the histogram to be defined.
- * @param name_length is the length of the name.
  * @param histogram_id_ptr where the opaque ID that represents a unique metric will be stored. This
  * can be passed to envoy_dynamic_module_callback_http_filter_increment_gauge together with
  * filter_envoy_ptr created from filter_config_envoy_ptr.
@@ -1580,7 +1547,7 @@ envoy_dynamic_module_type_metrics_result envoy_dynamic_module_callback_http_filt
 envoy_dynamic_module_type_metrics_result
 envoy_dynamic_module_callback_http_filter_config_define_histogram(
     envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
-    envoy_dynamic_module_type_buffer_module_ptr name, size_t name_length, size_t* histogram_id_ptr);
+    envoy_dynamic_module_type_module_buffer name, size_t* histogram_id_ptr);
 
 /**
  * envoy_dynamic_module_callback_http_filter_config_define_histogram is called by the module during
@@ -1590,7 +1557,6 @@ envoy_dynamic_module_callback_http_filter_config_define_histogram(
  * @param filter_config_envoy_ptr is the pointer to the DynamicModuleHttpFilterConfig in which the
  * histogram will be defined.
  * @param name is the name of the histogram to be defined.
- * @param name_length is the length of the name.
  * @param label_names is the labels of the histogram to be defined.
  * @param label_names_length is the length of the label_names.
  * @param histogram_id_ptr where the opaque ID that represents a unique metric will be stored. This
@@ -1601,7 +1567,7 @@ envoy_dynamic_module_callback_http_filter_config_define_histogram(
 envoy_dynamic_module_type_metrics_result
 envoy_dynamic_module_callback_http_filter_config_define_histogram_vec(
     envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
-    envoy_dynamic_module_type_buffer_module_ptr name, size_t name_length,
+    envoy_dynamic_module_type_module_buffer name,
     envoy_dynamic_module_type_module_buffer* label_names, size_t label_names_length,
     size_t* histogram_id_ptr);
 
@@ -1609,7 +1575,7 @@ envoy_dynamic_module_callback_http_filter_config_define_histogram_vec(
  * envoy_dynamic_module_callback_http_filter_record_histogram_value is called by the module to
  * record a value in a previously defined histogram.
  *
- * @param histogram_envoy_ptr is a pointer to a histogram previously defined using
+ * @param filter_envoy_ptr is a pointer to a histogram previously defined using
  * envoy_dynamic_module_callback_http_define_histogram.
  * @param id is the ID of the histogram previously defined using the config that created
  * filter_envoy_ptr
@@ -1624,7 +1590,7 @@ envoy_dynamic_module_callback_http_filter_record_histogram_value(
  * envoy_dynamic_module_callback_http_filter_record_histogram_value is called by the module to
  * record a value in a previously defined histogram vec.
  *
- * @param histogram_envoy_ptr is a pointer to a histogram previously defined using
+ * @param filter_envoy_ptr is a pointer to a histogram previously defined using
  * envoy_dynamic_module_callback_http_define_histogram.
  * @param id is the ID of the histogram previously defined using the config that created
  * filter_envoy_ptr
@@ -1657,12 +1623,8 @@ envoy_dynamic_module_callback_http_filter_record_histogram_value_vec(
  * @param header_type is the type of the header map to get the header from (request/response
  * headers/trailers).
  * @param key is the key of the header.
- * @param key_length is the length of the key.
- * @param result_buffer_ptr is the pointer to the pointer variable where the pointer to the buffer
- * of the value will be stored. If the key does not exist or the index is out of range, this will be
- * set to nullptr.
- * @param result_buffer_length_ptr is the pointer to the variable where the length of the buffer
- * will be stored. If the key does not exist or the index is out of range, this will be set to 0.
+ * @param result_buffer is the buffer where the value will be stored. If the key does not exist or
+ * the index is out of range, this will be set to a null buffer (length 0).
  * @param index is the index of the header value in the list of values for the given key.
  * @param optional_size is the pointer to the variable where the number of values for the given key
  * will be stored. This parameter can be null if the module does not need this information.
@@ -1678,9 +1640,8 @@ envoy_dynamic_module_callback_http_filter_record_histogram_value_vec(
 bool envoy_dynamic_module_callback_http_get_header(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_http_header_type header_type,
-    envoy_dynamic_module_type_buffer_module_ptr key, size_t key_length,
-    envoy_dynamic_module_type_buffer_envoy_ptr* result_buffer_ptr, size_t* result_buffer_length_ptr,
-    size_t index, size_t* optional_size);
+    envoy_dynamic_module_type_module_buffer key,
+    envoy_dynamic_module_type_envoy_buffer* result_buffer, size_t index, size_t* optional_size);
 
 /**
  * envoy_dynamic_module_callback_http_get_headers_size is called by the module to get the
@@ -1733,9 +1694,7 @@ bool envoy_dynamic_module_callback_http_get_headers(
  * @param header_type is the type of the header map to add the header to (request/response
  * headers/trailers).
  * @param key is the key of the header.
- * @param key_length is the length of the key.
  * @param value is the pointer to the buffer of the value. It can be null to remove the header.
- * @param value_length is the length of the value.
  * @return true if the operation is successful, false otherwise.
  *
  * Note that this only adds the header to the underlying Envoy object. Whether or not the header is
@@ -1746,8 +1705,7 @@ bool envoy_dynamic_module_callback_http_get_headers(
 bool envoy_dynamic_module_callback_http_add_header(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_http_header_type header_type,
-    envoy_dynamic_module_type_buffer_module_ptr key, size_t key_length,
-    envoy_dynamic_module_type_buffer_module_ptr value, size_t value_length);
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value);
 
 /**
  * envoy_dynamic_module_callback_http_set_header is called by the module to set
@@ -1760,9 +1718,7 @@ bool envoy_dynamic_module_callback_http_add_header(
  * @param header_type is the type of the header map to set the header to (request/response
  * headers/trailers).
  * @param key is the key of the header.
- * @param key_length is the length of the key.
  * @param value is the pointer to the buffer of the value. It can be null to remove the header.
- * @param value_length is the length of the value.
  * @return true if the operation is successful, false otherwise.
  *
  * Note that this only sets the header to the underlying Envoy object. Whether or not the header is
@@ -1773,8 +1729,7 @@ bool envoy_dynamic_module_callback_http_add_header(
 bool envoy_dynamic_module_callback_http_set_header(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_http_header_type header_type,
-    envoy_dynamic_module_type_buffer_module_ptr key, size_t key_length,
-    envoy_dynamic_module_type_buffer_module_ptr value, size_t value_length);
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value);
 
 // ---------------------- HTTP local response callbacks ------------------------
 
@@ -1788,19 +1743,16 @@ bool envoy_dynamic_module_callback_http_set_header(
  * @param headers_vector is the array of envoy_dynamic_module_type_module_http_header that contains
  * the headers of the response.
  * @param headers_vector_size is the size of the headers_vector.
- * @param body is the pointer to the buffer of the body of the response.
- * @param body_length is the length of the body.
- * @param details is the pointer to the buffer of the response code details of the response.
+ * @param body is the body of the response.
+ * @param details is the response code details of the response.
  * The response code details is an optional short string that provides additional information about
  * why this response code was sent like "rate_limited". It is typically used for logging purposes.
  * This is optional and can be null.
- * @param details_length is the length of the details.
  */
 void envoy_dynamic_module_callback_http_send_response(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, uint32_t status_code,
     envoy_dynamic_module_type_module_http_header* headers_vector, size_t headers_vector_size,
-    envoy_dynamic_module_type_buffer_module_ptr body, size_t body_length,
-    envoy_dynamic_module_type_buffer_module_ptr details, size_t details_length);
+    envoy_dynamic_module_type_module_buffer body, envoy_dynamic_module_type_module_buffer details);
 
 /**
  * envoy_dynamic_module_callback_http_send_response_headers is called by the module to send the
@@ -1820,21 +1772,20 @@ void envoy_dynamic_module_callback_http_send_response_headers(
     bool end_stream);
 
 /**
- * envoy_dynamic_module_callback_http_send_response is called by the module to send response
+ * envoy_dynamic_module_callback_http_send_response_data is called by the module to send response
  * data to the downstream, optionally ending the stream.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
  * corresponding HTTP filter.
- * @param body is the pointer to the buffer of the body of the response.
- * @param body_length is the length of the body.
+ * @param data is the body data of the response.
  * @param end_stream is a boolean indicating whether to end the stream.
  */
 void envoy_dynamic_module_callback_http_send_response_data(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_buffer_module_ptr data, size_t length, bool end_stream);
+    envoy_dynamic_module_type_module_buffer data, bool end_stream);
 
 /**
- * envoy_dynamic_module_callback_http_send_response_headers is called by the module to send the
+ * envoy_dynamic_module_callback_http_send_response_trailers is called by the module to send the
  * response trailers to the downstream, ending the stream.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
@@ -1931,14 +1882,13 @@ bool envoy_dynamic_module_callback_http_get_body_chunks_size(
  * corresponding HTTP filter.
  * @param body_type is the type of the body to append to (request/response,
  * received/buffered body).
- * @param data is the pointer to the buffer of the data to be appended.
- * @param length is the length of the data.
+ * @param data is the body data to be appended.
  * @return true if the body is available, false otherwise.
  */
 bool envoy_dynamic_module_callback_http_append_body(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_http_body_type body_type,
-    envoy_dynamic_module_type_buffer_module_ptr data, size_t length);
+    envoy_dynamic_module_type_module_buffer data);
 
 /**
  * envoy_dynamic_module_callback_http_drain_body is called by the module to drain
@@ -1965,30 +1915,27 @@ bool envoy_dynamic_module_callback_http_drain_body(
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
  * corresponding HTTP filter.
- * @param namespace_ptr is the namespace of the dynamic metadata.
- * @param namespace_length is the length of the namespace.
- * @param key_ptr is the key of the dynamic metadata.
- * @param key_length is the length of the key.
+ * @param ns is the namespace of the dynamic metadata.
+ * @param key is the key of the dynamic metadata.
  * @param value is the number value of the dynamic metadata to be set.
  * @return true if the operation is successful, false otherwise.
  */
 bool envoy_dynamic_module_callback_http_set_dynamic_metadata_number(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_buffer_module_ptr namespace_ptr, size_t namespace_length,
-    envoy_dynamic_module_type_buffer_module_ptr key_ptr, size_t key_length, double value);
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    double value);
 
 /**
- * envoy_dynamic_module_callback_http_get_dynamic_metadata_number is called by the module to get
+ * envoy_dynamic_module_callback_http_get_metadata_number is called by the module to get
  * the number value of the dynamic metadata with the given namespace and key. If the metadata is not
  * accessible, the namespace does not exist, the key does not exist or the value is not a number,
  * this returns false.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
  * corresponding HTTP filter.
- * @param namespace_ptr is the namespace of the dynamic metadata.
- * @param namespace_length is the length of the namespace.
- * @param key_ptr is the key of the dynamic metadata.
- * @param key_length is the length of the key.
+ * @param metadata_source is the source of the metadata.
+ * @param ns is the namespace of the dynamic metadata.
+ * @param key is the key of the dynamic metadata.
  * @param result is the pointer to the variable where the number value of the dynamic metadata will
  * be stored.
  * @return true if the operation is successful, false otherwise.
@@ -1996,8 +1943,8 @@ bool envoy_dynamic_module_callback_http_set_dynamic_metadata_number(
 bool envoy_dynamic_module_callback_http_get_metadata_number(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_metadata_source metadata_source,
-    envoy_dynamic_module_type_buffer_module_ptr namespace_ptr, size_t namespace_length,
-    envoy_dynamic_module_type_buffer_module_ptr key_ptr, size_t key_length, double* result);
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    double* result);
 
 /**
  * envoy_dynamic_module_callback_http_set_dynamic_metadata_string is called by the module to set
@@ -2006,36 +1953,29 @@ bool envoy_dynamic_module_callback_http_get_metadata_number(
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
  * corresponding HTTP filter.
- * @param namespace_ptr is the namespace of the dynamic metadata.
- * @param namespace_length is the length of the namespace.
- * @param key_ptr is the key of the dynamic metadata.
- * @param key_length is the length of the key.
- * @param value_ptr is the string value of the dynamic metadata to be set.
- * @param value_length is the length of the value.
+ * @param ns is the namespace of the dynamic metadata.
+ * @param key is the key of the dynamic metadata.
+ * @param value is the string value of the dynamic metadata to be set.
  * @return true if the operation is successful, false otherwise.
  */
 bool envoy_dynamic_module_callback_http_set_dynamic_metadata_string(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_buffer_module_ptr namespace_ptr, size_t namespace_length,
-    envoy_dynamic_module_type_buffer_module_ptr key_ptr, size_t key_length,
-    envoy_dynamic_module_type_buffer_module_ptr value_ptr, size_t value_length);
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    envoy_dynamic_module_type_module_buffer value);
 
 /**
- * envoy_dynamic_module_callback_http_get_dynamic_metadata_string is called by the module to get
+ * envoy_dynamic_module_callback_http_get_metadata_string is called by the module to get
  * the string value of the dynamic metadata with the given namespace and key. If the metadata is not
  * accessible, the namespace does not exist, the key does not exist or the value is not a string,
  * this returns false.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
  * corresponding HTTP filter.
- * @param namespace_ptr is the namespace of the dynamic metadata.
- * @param namespace_length is the length of the namespace.
- * @param key_ptr is the key of the dynamic metadata.
- * @param key_length is the length of the key.
- * @param result_buffer_ptr is the pointer to the pointer variable where the pointer to the buffer
- * of the value will be stored.
- * @param result_buffer_length_ptr is the pointer to the variable where the length of the buffer
- * will be stored.
+ * @param metadata_source is the source of the metadata.
+ * @param ns is the namespace of the dynamic metadata.
+ * @param key is the key of the dynamic metadata.
+ * @param result is the pointer to the pointer variable where the pointer to the buffer
+ * of the string value will be stored.
  * @return true if the operation is successful, false otherwise.
  *
  * Note that the buffer pointed by the pointer stored in result is owned by Envoy, and
@@ -2045,9 +1985,8 @@ bool envoy_dynamic_module_callback_http_set_dynamic_metadata_string(
 bool envoy_dynamic_module_callback_http_get_metadata_string(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_metadata_source metadata_source,
-    envoy_dynamic_module_type_buffer_module_ptr namespace_ptr, size_t namespace_length,
-    envoy_dynamic_module_type_buffer_module_ptr key_ptr, size_t key_length,
-    envoy_dynamic_module_type_buffer_envoy_ptr* result, size_t* result_length);
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    envoy_dynamic_module_type_envoy_buffer* result);
 
 // -------------------------- Filter State Callbacks ---------------------------
 
@@ -2058,16 +1997,13 @@ bool envoy_dynamic_module_callback_http_get_metadata_string(
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
  * corresponding HTTP filter.
- * @param key_ptr is the key of the filter state.
- * @param key_length is the length of the key.
- * @param value_ptr is the bytes value of the filter state to be set.
- * @param value_length is the length of the value.
+ * @param key is the key of the filter state.
+ * @param value is the bytes value of the filter state to be set.
  * @return true if the operation is successful, false otherwise.
  */
 bool envoy_dynamic_module_callback_http_set_filter_state_bytes(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_buffer_module_ptr key_ptr, size_t key_length,
-    envoy_dynamic_module_type_buffer_module_ptr value_ptr, size_t value_length);
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value);
 
 /**
  * envoy_dynamic_module_callback_http_get_filter_state_bytes is called by the module to get the
@@ -2076,12 +2012,9 @@ bool envoy_dynamic_module_callback_http_set_filter_state_bytes(
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
  * corresponding HTTP filter.
- * @param key_ptr is the key of the filter state.
- * @param key_length is the length of the key.
- * @param result_buffer_ptr is the pointer to the pointer variable where the pointer to the buffer
- * of the value will be stored.
- * @param result_buffer_length_ptr is the pointer to the variable where the length of the buffer
- * will be stored.
+ * @param key is the key of the filter state.
+ * @param result is the pointer to the pointer variable where the pointer to the buffer
+ * of the bytes value will be stored.
  * @return true if the operation is successful, false otherwise.
  *
  * Note that the buffer pointed by the pointer stored in result is owned by Envoy, and
@@ -2090,8 +2023,7 @@ bool envoy_dynamic_module_callback_http_set_filter_state_bytes(
  */
 bool envoy_dynamic_module_callback_http_get_filter_state_bytes(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_buffer_module_ptr key_ptr, size_t key_length,
-    envoy_dynamic_module_type_buffer_envoy_ptr* result, size_t* result_length);
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result);
 
 // ---------------------- Other HTTP filter callbacks ----------------------------
 
@@ -2103,14 +2035,14 @@ bool envoy_dynamic_module_callback_http_get_filter_state_bytes(
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
  * corresponding HTTP filter.
- * @param flag_ptr is the pointer to the buffer of the flag to be added. Ideally, it should be a
- * very short string that represents a single event, like the the Envoy response flag.
- * @param flag_length is the length of the flag.
+ * @param flag is the custom flag to be added. The flag should not contain any empty or space
+ * characters (' ', '\t', '\f', '\v', '\n', '\r') and should be very short to indicate a noteworthy
+ * event of this stream.
  * @return true if the operation is successful, false otherwise.
  */
 bool envoy_dynamic_module_callback_http_add_custom_flag(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_buffer_module_ptr flag_ptr, size_t flag_length);
+    envoy_dynamic_module_type_module_buffer flag);
 
 // ---------------------- HTTP filter scheduler callbacks ------------------------
 
@@ -2178,10 +2110,8 @@ void envoy_dynamic_module_callback_http_clear_route_cache(
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
  * corresponding HTTP filter.
  * @param attribute_id is the ID of the attribute.
- * @param result_buffer_ptr is the pointer to the pointer variable where the pointer to the
- * buffer of the value will be stored.
- * @param result_length is the pointer to the variable where the length of the buffer will be
- * stored.
+ * @param result is the pointer to the pointer variable where the pointer to the buffer
+ * of the string value will be stored.
  * @return true if the operation is successful, false otherwise.
  *
  * Note: currently, not all attributes are implemented.
@@ -2189,7 +2119,7 @@ void envoy_dynamic_module_callback_http_clear_route_cache(
 bool envoy_dynamic_module_callback_http_filter_get_attribute_string(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_attribute_id attribute_id,
-    envoy_dynamic_module_type_buffer_envoy_ptr* result, size_t* result_length);
+    envoy_dynamic_module_type_envoy_buffer* result);
 
 /**
  * envoy_dynamic_module_callback_http_filter_get_attribute_int is called by the module to get
@@ -2219,21 +2149,18 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_int(
  * @param callout_id_out is a pointer to a variable where the callout ID will be stored. This can be
  * arbitrary and is used to differentiate between multiple calls from the same filter.
  * @param cluster_name is the name of the cluster to which the callout is sent.
- * @param cluster_name_length is the length of the cluster name.
  * @param headers is the headers of the request. It must contain :method, :path and host headers.
  * @param headers_size is the size of the headers.
- * @param body is the pointer to the buffer of the body of the request.
- * @param body_size is the length of the body.
+ * @param body is the body of the request.
  * @param timeout_milliseconds is the timeout for the callout in milliseconds.
  * @return envoy_dynamic_module_type_http_callout_init_result is the result of the callout.
  */
 envoy_dynamic_module_type_http_callout_init_result
 envoy_dynamic_module_callback_http_filter_http_callout(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, uint64_t* callout_id_out,
-    envoy_dynamic_module_type_buffer_module_ptr cluster_name, size_t cluster_name_length,
+    envoy_dynamic_module_type_module_buffer cluster_name,
     envoy_dynamic_module_type_module_http_header* headers, size_t headers_size,
-    envoy_dynamic_module_type_buffer_module_ptr body, size_t body_size,
-    uint64_t timeout_milliseconds);
+    envoy_dynamic_module_type_module_buffer body, uint64_t timeout_milliseconds);
 
 /**
  * envoy_dynamic_module_callback_http_filter_start_http_stream is called by the module to start
@@ -2252,15 +2179,13 @@ envoy_dynamic_module_callback_http_filter_http_callout(
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
  * corresponding HTTP filter.
- * @param stream_ptr_out is a pointer to a variable where the stream handle will be stored. The
+ * @param stream_id_out is a pointer to a variable where the stream handle will be stored. The
  * module can use this handle to reset the stream via
  * envoy_dynamic_module_callback_http_filter_reset_http_stream.
  * @param cluster_name is the name of the cluster to which the stream is sent.
- * @param cluster_name_length is the length of the cluster name.
  * @param headers is the headers of the request. It must contain :method, :path and host headers.
  * @param headers_size is the size of the headers.
- * @param body is the pointer to the buffer of the body of the request.
- * @param body_size is the length of the body.
+ * @param body is the body of the request.
  * @param end_stream is true if the request stream should be ended after sending headers and body.
  * If true and body_size > 0, the body will be sent with end_stream=true.
  * If true and body_size is 0, headers will be sent with end_stream=true.
@@ -2274,10 +2199,9 @@ envoy_dynamic_module_callback_http_filter_http_callout(
 envoy_dynamic_module_type_http_callout_init_result
 envoy_dynamic_module_callback_http_filter_start_http_stream(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, uint64_t* stream_id_out,
-    envoy_dynamic_module_type_buffer_module_ptr cluster_name, size_t cluster_name_length,
+    envoy_dynamic_module_type_module_buffer cluster_name,
     envoy_dynamic_module_type_module_http_header* headers, size_t headers_size,
-    envoy_dynamic_module_type_buffer_module_ptr body, size_t body_size, bool end_stream,
-    uint64_t timeout_milliseconds);
+    envoy_dynamic_module_type_module_buffer body, bool end_stream, uint64_t timeout_milliseconds);
 
 /**
  * envoy_dynamic_module_callback_http_filter_reset_http_stream is called by the module to reset
@@ -2289,7 +2213,7 @@ envoy_dynamic_module_callback_http_filter_start_http_stream(
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
  * corresponding HTTP filter.
- * @param stream_ptr is the handle to the HTTP stream to reset.
+ * @param stream_id is the handle to the HTTP stream to reset.
  */
 void envoy_dynamic_module_callback_http_filter_reset_http_stream(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, uint64_t stream_id);
@@ -2304,15 +2228,14 @@ void envoy_dynamic_module_callback_http_filter_reset_http_stream(
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
  * corresponding HTTP filter.
- * @param stream_ptr is the handle to the HTTP stream.
- * @param data is the pointer to the buffer of the data to send.
- * @param data_length is the length of the data.
+ * @param stream_id is the handle to the HTTP stream.
+ * @param data is the body data to send.
  * @param end_stream is true if this is the last data (no trailers will follow).
  * @return true if the operation is successful, false otherwise.
  */
 bool envoy_dynamic_module_callback_http_stream_send_data(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, uint64_t stream_id,
-    envoy_dynamic_module_type_buffer_module_ptr data, size_t data_length, bool end_stream);
+    envoy_dynamic_module_type_module_buffer data, bool end_stream);
 
 /**
  * envoy_dynamic_module_callback_http_stream_send_trailers is called by the module to send
@@ -2323,7 +2246,7 @@ bool envoy_dynamic_module_callback_http_stream_send_data(
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
  * corresponding HTTP filter.
- * @param stream_ptr is the handle to the HTTP stream.
+ * @param stream_id is the handle to the HTTP stream.
  * @param trailers is the trailers to send.
  * @param trailers_size is the size of the trailers.
  * @return true if the operation is successful, false otherwise.
@@ -2574,11 +2497,11 @@ uint64_t envoy_dynamic_module_callback_network_filter_get_connection_id(
  * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
  * @param address_out is the output pointer to the address string.
  * @param port_out is the output pointer to the port number.
- * @return the length of the address string.
+ * @return true if the address is available, false otherwise.
  */
-size_t envoy_dynamic_module_callback_network_filter_get_remote_address(
+bool envoy_dynamic_module_callback_network_filter_get_remote_address(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_buffer_envoy_ptr* address_out, uint32_t* port_out);
+    envoy_dynamic_module_type_envoy_buffer* address_out, uint32_t* port_out);
 
 /**
  * envoy_dynamic_module_callback_network_filter_get_local_address is called by the module to get
@@ -2587,11 +2510,11 @@ size_t envoy_dynamic_module_callback_network_filter_get_remote_address(
  * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
  * @param address_out is the output pointer to the address string.
  * @param port_out is the output pointer to the port number.
- * @return the length of the address string.
+ * @return true if the address is available, false otherwise.
  */
-size_t envoy_dynamic_module_callback_network_filter_get_local_address(
+bool envoy_dynamic_module_callback_network_filter_get_local_address(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_buffer_envoy_ptr* address_out, uint32_t* port_out);
+    envoy_dynamic_module_type_envoy_buffer* address_out, uint32_t* port_out);
 
 /**
  * envoy_dynamic_module_callback_network_filter_is_ssl is called by the module to check if the
