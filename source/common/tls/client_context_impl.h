@@ -37,7 +37,9 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
 
-class ClientContextImpl : public ContextImpl, public Envoy::Ssl::ClientContext {
+class ClientContextImpl : public ContextImpl,
+                          public Envoy::Ssl::ClientContext,
+                          public Ssl::TlsCertificateSelectorContext {
 public:
   static absl::StatusOr<std::unique_ptr<ClientContextImpl>>
   create(Stats::Scope& scope, const Envoy::Ssl::ClientContextConfig& config,
@@ -46,6 +48,11 @@ public:
   absl::StatusOr<bssl::UniquePtr<SSL>>
   newSsl(const Network::TransportSocketOptionsConstSharedPtr& options,
          Upstream::HostDescriptionConstSharedPtr host) override;
+
+  // Ssl::TlsCertificateSelectorContext
+  const std::vector<Ssl::TlsContext>& getTlsContexts() const override { return tls_contexts_; };
+
+  int selectTlsContext(SSL*);
 
 private:
   ClientContextImpl(Stats::Scope& scope, const Envoy::Ssl::ClientContextConfig& config,
@@ -62,6 +69,7 @@ private:
   absl::Mutex session_keys_mu_;
   std::deque<bssl::UniquePtr<SSL_SESSION>> session_keys_ ABSL_GUARDED_BY(session_keys_mu_);
   bool session_keys_single_use_{false};
+  Ssl::UpstreamTlsCertificateSelectorPtr tls_certificate_selector_;
 };
 
 } // namespace Tls

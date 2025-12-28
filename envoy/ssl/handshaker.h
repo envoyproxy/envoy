@@ -308,6 +308,51 @@ public:
   std::string category() const override { return "envoy.tls.certificate_selectors"; }
 };
 
+class UpstreamTlsCertificateSelector {
+public:
+  virtual ~UpstreamTlsCertificateSelector() = default;
+
+  /**
+   * Select TLS context using a server hello and transport socket options.
+   * Please see BoringSSL documentation on the accessors to the SSL object.
+   */
+  virtual SelectionResult
+  selectTlsContext(const SSL& ssl, const Network::TransportSocketOptionsConstSharedPtr& options,
+                   CertificateSelectionCallbackPtr cb) PURE;
+};
+
+using UpstreamTlsCertificateSelectorPtr = std::unique_ptr<UpstreamTlsCertificateSelector>;
+
+class UpstreamTlsCertificateSelectorFactory {
+public:
+  virtual ~UpstreamTlsCertificateSelectorFactory() = default;
+
+  /** Creates a per-context certificate selector.*/
+  virtual UpstreamTlsCertificateSelectorPtr
+  createUpstreamTlsCertificateSelector(TlsCertificateSelectorContext&) PURE;
+
+  /** Notify about changes in the TLS context config, e.g. an SDS update to the certificates or the
+   * validation context. */
+  virtual absl::Status onConfigUpdate() PURE;
+};
+using UpstreamTlsCertificateSelectorFactoryPtr =
+    std::unique_ptr<UpstreamTlsCertificateSelectorFactory>;
+
+class UpstreamTlsCertificateSelectorConfigFactory : public Config::TypedFactory {
+public:
+  /**
+   * Creates a factory for the upstream TLS certificate selectors. The factory
+   * is bound to the client context config.
+   */
+  virtual absl::StatusOr<UpstreamTlsCertificateSelectorFactoryPtr>
+  createUpstreamTlsCertificateSelectorFactory(
+      const Protobuf::Message& config,
+      Server::Configuration::GenericFactoryContext& factory_context,
+      const ClientContextConfig& tls_context) PURE;
+
+  std::string category() const override { return "envoy.tls.upstream_certificate_selectors"; }
+};
+
 using TlsCertificateMapper = std::function<std::string(const SSL_CLIENT_HELLO&)>;
 using TlsCertificateMapperFactory = std::function<TlsCertificateMapper()>;
 

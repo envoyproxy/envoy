@@ -163,6 +163,11 @@ public:
    * and incompatible with the TLS usage is enabled.
    */
   virtual bool enforceRsaKeyUsage() const PURE;
+
+  /**
+   * @return an optional factory which can be used to create TLS context provider instances.
+   */
+  virtual OptRef<UpstreamTlsCertificateSelectorFactory> tlsCertificateSelectorFactory() const PURE;
 };
 
 using ClientContextConfigPtr = std::unique_ptr<ClientContextConfig>;

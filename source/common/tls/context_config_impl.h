@@ -155,6 +155,12 @@ public:
   bool allowRenegotiation() const override { return allow_renegotiation_; }
   size_t maxSessionKeys() const override { return max_session_keys_; }
   bool enforceRsaKeyUsage() const override { return enforce_rsa_key_usage_; }
+  void setSecretUpdateCallback(std::function<absl::Status()> callback) override;
+  OptRef<Ssl::UpstreamTlsCertificateSelectorFactory>
+  tlsCertificateSelectorFactory() const override {
+    return tls_certificate_selector_factory_ ? makeOptRef(*tls_certificate_selector_factory_)
+                                             : absl::nullopt;
+  }
 
 private:
   ClientContextConfigImpl(
@@ -170,6 +176,8 @@ private:
   const bool allow_renegotiation_;
   const bool enforce_rsa_key_usage_;
   const size_t max_session_keys_;
+  // Certificate selector contains a reference to this context so should be destroyed first.
+  Ssl::UpstreamTlsCertificateSelectorFactoryPtr tls_certificate_selector_factory_;
 };
 
 } // namespace Tls
