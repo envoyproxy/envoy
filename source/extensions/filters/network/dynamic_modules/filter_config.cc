@@ -2,6 +2,8 @@
 
 #include "envoy/common/exception.h"
 
+#include "source/extensions/dynamic_modules/abi.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace DynamicModules {
@@ -72,9 +74,12 @@ newDynamicModuleNetworkFilterConfig(const absl::string_view filter_name,
   config->on_network_filter_destroy_ = on_destroy.value();
 
   // Create the in-module configuration.
+  envoy_dynamic_module_type_envoy_buffer name_buffer = {const_cast<char*>(filter_name.data()),
+                                                        filter_name.size()};
+  envoy_dynamic_module_type_envoy_buffer config_buffer = {const_cast<char*>(filter_config.data()),
+                                                          filter_config.size()};
   config->in_module_config_ =
-      (*on_config_new.value())(static_cast<void*>(config.get()), filter_name.data(),
-                               filter_name.size(), filter_config.data(), filter_config.size());
+      (*on_config_new.value())(static_cast<void*>(config.get()), name_buffer, config_buffer);
 
   if (config->in_module_config_ == nullptr) {
     return absl::InvalidArgumentError("Failed to initialize dynamic module network filter config");
