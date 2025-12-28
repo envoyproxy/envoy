@@ -125,14 +125,6 @@ void Filter::onMatchCallback(const Matcher::Action& action) {
       factory_cb(wrapper);
     }
 
-    if (!wrapper.errors_.empty()) {
-      stats_.filter_delegation_error_.inc();
-      ENVOY_LOG(debug, "failed to create filters from named filter chain '{}': {}", chain_name,
-                accumulateToString<absl::Status>(
-                    wrapper.errors_, [](const auto& status) { return status.ToString(); }));
-      return;
-    }
-
     if (!wrapper.filters_to_inject_.empty()) {
       stats_.filter_delegation_success_.inc();
       delegated_filter_ =
