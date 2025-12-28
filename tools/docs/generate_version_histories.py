@@ -141,7 +141,9 @@ class VersionHistories(runner.Runner):
 
     @cached_property
     def jinja_env(self) -> jinja2.Environment:
-        env = jinja2.Environment()
+        env = jinja2.Environment(
+            autoescape=jinja2.select_autoescape(['html', 'xml']),
+        )
         env.filters["versionize"] = versionize_filter
         return env
 
