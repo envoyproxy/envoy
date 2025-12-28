@@ -623,7 +623,7 @@ new_features:
 - area: network
   change: |
     Fixed socket address proto translations to preserve network namespace filepath information.
-    Previously, listeners in non-default namespaces would lose this information when passed through
+    Previously, listeners in the non-default namespaces would lose this information when passed through
     proto translation, causing admin ``/listeners`` endpoint (and other consumers) to fail to display the namespace.
 - area: oauth2
   change: |
