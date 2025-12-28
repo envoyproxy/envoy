@@ -3080,8 +3080,8 @@ uint64_t envoy_dynamic_module_callback_listener_filter_get_connection_start_time
  * @return true if the socket option was set successfully, false otherwise.
  */
 bool envoy_dynamic_module_callback_http_set_socket_option(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    int level, int optname, const void* optval, size_t optlen);
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, int level, int optname,
+    const void* optval, size_t optlen);
 
 /**
  * envoy_dynamic_module_callback_http_get_socket_option gets a socket option value
@@ -3095,8 +3095,8 @@ bool envoy_dynamic_module_callback_http_set_socket_option(
  * @return true if the socket option was retrieved successfully, false otherwise.
  */
 bool envoy_dynamic_module_callback_http_get_socket_option(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    int level, int optname, void* optval, size_t* optlen);
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, int level, int optname,
+    void* optval, size_t* optlen);
 
 #ifdef __cplusplus
 }

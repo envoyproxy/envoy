@@ -1452,23 +1452,23 @@ void envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level level
 }
 
 bool envoy_dynamic_module_callback_http_set_socket_option(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    int level, int optname, const void* optval, size_t optlen) {
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, int level, int optname,
+    const void* optval, size_t optlen) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
   auto connection = filter->connection();
   if (!connection.has_value()) {
     return false;
   }
-  
+
   // Cast to TransportSocketCallbacks to access ioHandle()
   const auto* callbacks = dynamic_cast<const Network::TransportSocketCallbacks*>(&*connection);
   if (!callbacks) {
     return false;
   }
-  
+
   const Network::IoHandle& io_handle = callbacks->ioHandle();
   os_fd_t socket_fd = io_handle.fdDoNotUse();
-  
+
   if (::setsockopt(socket_fd, level, optname, optval, static_cast<socklen_t>(optlen)) == 0) {
     return true;
   }
@@ -1476,23 +1476,23 @@ bool envoy_dynamic_module_callback_http_set_socket_option(
 }
 
 bool envoy_dynamic_module_callback_http_get_socket_option(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    int level, int optname, void* optval, size_t* optlen) {
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, int level, int optname,
+    void* optval, size_t* optlen) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
   auto connection = filter->connection();
   if (!connection.has_value()) {
     return false;
   }
-  
+
   // Cast to TransportSocketCallbacks to access ioHandle()
   const auto* callbacks = dynamic_cast<const Network::TransportSocketCallbacks*>(&*connection);
   if (!callbacks) {
     return false;
   }
-  
+
   const Network::IoHandle& io_handle = callbacks->ioHandle();
   os_fd_t socket_fd = io_handle.fdDoNotUse();
-  
+
   socklen_t len = static_cast<socklen_t>(*optlen);
   if (::getsockopt(socket_fd, level, optname, optval, &len) == 0) {
     *optlen = static_cast<size_t>(len);
@@ -1500,7 +1500,6 @@ bool envoy_dynamic_module_callback_http_get_socket_option(
   }
   return false;
 }
-
 }
 } // namespace HttpFilters
 } // namespace DynamicModules
