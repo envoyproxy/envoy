@@ -620,6 +620,11 @@ new_features:
     Added per HTTP event :ref:'procesing effects <envoy.filters.http.ext_proc.ProcessingEffect' in the
     ExtProcLoggingInfo in the FilterState. This new data will be automatically collected and can be accesses via
     method processingEffects.
+- area: network
+  change: |
+    Fixed socket address proto translations to preserve network namespace filepath information.
+    Previously, listeners in the non-default namespaces would lose this information when passed through
+    proto translation, causing admin ``/listeners`` endpoint (and other consumers) to fail to display the namespace.
 - area: oauth2
   change: |
     Added support for additional parameters in the OAuth2 token request body via
