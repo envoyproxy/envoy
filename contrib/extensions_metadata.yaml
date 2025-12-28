@@ -151,6 +151,27 @@ envoy.filters.http.peak_ewma:
   status: alpha
   type_urls:
   - envoy.extensions.filters.http.peak_ewma.v3alpha.PeakEwmaConfig
+envoy.filters.http.peer_metadata:
+  categories:
+  - envoy.filters.http
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.http.peer_metadata.v3alpha.PeerMetadataConfig
+envoy.filters.network.metadata_exchange:
+  categories:
+  - envoy.filters.network
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.network.metadata_exchange.v3.MetadataExchange
+envoy.filters.http.istio_stats:
+  categories:
+  - envoy.filters.http
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - stats.PluginConfig
 envoy.load_balancing_policies.peak_ewma:
   categories:
   - envoy.load_balancing_policies
