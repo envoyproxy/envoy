@@ -1,5 +1,6 @@
 syntax = "proto3";
 
+// Keep its legacy package name in Istio for backward compatibility.
 package io.istio.http.peer_metadata;
 
 import "udpa/annotations/status.proto";
@@ -9,6 +10,11 @@ option java_outer_classname = "PeerMetadataProto";
 option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/contrib/io/istio/http/peer_metadata";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Peer metadata HTTP filter]
+//
+// Peer metadata HTTP filter for deriving and propagating peer telemetry attributes.
+// [#extension: envoy.filters.http.peer_metadata]
 
 // Peer metadata provider filter. This filter encapsulates the discovery of the
 // peer telemetry attributes for consumption by the telemetry filters.
@@ -24,9 +30,9 @@ message Config {
   // For upstream discovery:
   //
   // * If the upstream host address is an IP, this IP is used as the lookup key;
-  //
   // * If the upstream host address is internal, uses the
-  // "filter_metadata.tunnel.destination" dynamic metadata value as the lookup key.
+  //   "filter_metadata.tunnel.destination" dynamic metadata value as the lookup key.
+  //
   message WorkloadDiscovery {
   }
 

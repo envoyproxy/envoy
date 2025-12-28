@@ -1,5 +1,6 @@
 syntax = "proto3";
 
+// Keep its legacy package name in Istio for backward compatibility.
 package istio.workload;
 
 import "udpa/annotations/status.proto";

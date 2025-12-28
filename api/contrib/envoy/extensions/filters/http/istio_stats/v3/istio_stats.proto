@@ -1,5 +1,6 @@
 syntax = "proto3";
 
+// Keep its legacy package name in Istio for backward compatibility.
 package stats;
 
 import "google/protobuf/duration.proto";
@@ -11,6 +12,11 @@ option java_outer_classname = "IstioStatsProto";
 option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/contrib/stats";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Istio stats HTTP filter]
+//
+// Istio stats HTTP filter for collecting and reporting metrics.
+// [#extension: envoy.filters.http.istio_stats]
 
 enum MetricType {
   COUNTER = 0;

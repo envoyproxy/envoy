@@ -1,5 +1,6 @@
 syntax = "proto3";
 
+// Keep its legacy package name in Istio for backward compatibility.
 package envoy.tcp.metadataexchange.config;
 
 import "udpa/annotations/status.proto";
@@ -9,6 +10,11 @@ option java_outer_classname = "MetadataExchangeProto";
 option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/contrib/envoy/tcp/metadataexchange/config";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Metadata exchange TCP filter]
+//
+// Metadata exchange TCP filter for deriving and propagating peer telemetry attributes.
+// [#extension: envoy.filters.network.metadata_exchange]
 
 // [#protodoc-title: MetadataExchange protocol match and data transfer]
 // MetadataExchange protocol match and data transfer

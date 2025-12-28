@@ -157,14 +157,14 @@ envoy.filters.http.peer_metadata:
   security_posture: requires_trusted_downstream_and_upstream
   status: alpha
   type_urls:
-  - envoy.extensions.filters.http.peer_metadata.v3alpha.PeerMetadataConfig
+  - io.istio.http.peer_metadata.Config
 envoy.filters.network.metadata_exchange:
   categories:
   - envoy.filters.network
   security_posture: requires_trusted_downstream_and_upstream
   status: alpha
   type_urls:
-  - envoy.extensions.filters.network.metadata_exchange.v3.MetadataExchange
+  - envoy.tcp.metadataexchange.config.MetadataExchange
 envoy.filters.http.istio_stats:
   categories:
   - envoy.filters.http
@@ -172,6 +172,13 @@ envoy.filters.http.istio_stats:
   status: alpha
   type_urls:
   - stats.PluginConfig
+envoy.filters.http.alpn:
+  categories:
+  - envoy.filters.http
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - istio.envoy.config.filter.http.alpn.v2alpha1.FilterConfig
 envoy.load_balancing_policies.peak_ewma:
   categories:
   - envoy.load_balancing_policies

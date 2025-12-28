@@ -18,6 +18,7 @@ CONTRIB_EXTENSIONS = {
     "envoy.filters.http.sxg":                                   "//contrib/sxg/filters/http/source:config",
     "envoy.filters.http.peer_metadata":                         "//contrib/istio/filters/http/peer_metadata/source:config",
     "envoy.filters.http.istio_stats":                           "//contrib/istio/filters/http/istio_stats/source:istio_stats",
+    "envoy.filters.http.alpn":                                  "//contrib/istio/filters/http/alpn/source:config_lib",
 
     #
     # Network filters

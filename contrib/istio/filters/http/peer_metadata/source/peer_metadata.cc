@@ -335,10 +335,11 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
   return Http::FilterHeadersStatus::Continue;
 }
 
-Http::FilterFactoryCb FilterConfigFactory::createFilterFactoryFromProtoTyped(
-    const io::istio::http::peer_metadata::Config& config, const std::string&,
+absl::StatusOr<Http::FilterFactoryCb> FilterConfigFactory::createFilterFactoryFromProto(
+    const Protobuf::Message& config, const std::string&,
     Server::Configuration::FactoryContext& factory_context) {
-  auto filter_config = std::make_shared<FilterConfig>(config, factory_context);
+  auto filter_config = std::make_shared<FilterConfig>(
+      dynamic_cast<const io::istio::http::peer_metadata::Config&>(config), factory_context);
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) {
     auto filter = std::make_shared<Filter>(filter_config);
     callbacks.addStreamFilter(filter);

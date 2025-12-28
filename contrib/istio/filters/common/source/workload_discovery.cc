@@ -270,7 +270,7 @@ public:
 REGISTER_FACTORY(WorkloadDiscoveryFactory, Server::Configuration::BootstrapExtensionFactory);
 
 WorkloadMetadataProviderSharedPtr
-getWorkloadMetadataProvider(Server::Configuration::ServerFactoryContext& context) {
+getProvider(Server::Configuration::ServerFactoryContext& context) {
   return context.singletonManager().getTyped<WorkloadMetadataProvider>(
       SINGLETON_MANAGER_REGISTERED_NAME(workload_metadata_provider));
 }
