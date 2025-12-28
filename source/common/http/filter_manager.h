@@ -362,8 +362,8 @@ struct ActiveStreamEncoderFilter : public ActiveStreamFilterBase,
   void addEncodedMetadata(MetadataMapPtr&& metadata_map) override;
   void onEncoderFilterAboveWriteBufferHighWatermark() override;
   void onEncoderFilterBelowWriteBufferLowWatermark() override;
-  void setEncoderBufferLimit(uint32_t limit) override;
-  uint32_t encoderBufferLimit() override;
+  void setEncoderBufferLimit(uint64_t limit) override;
+  uint64_t encoderBufferLimit() override;
   void continueEncoding() override;
   const Buffer::Instance* encodingBuffer() override;
   void modifyEncodingBuffer(std::function<void(Buffer::Instance&)> callback) override;
