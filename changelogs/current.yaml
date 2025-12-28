@@ -613,6 +613,9 @@ new_features:
     Added per HTTP event :ref:'procesing effects <envoy.filters.http.ext_proc.ProcessingEffect' in the
     ExtProcLoggingInfo in the FilterState. This new data will be automatically collected and can be accesses via
     method processingEffects.
+- area: filters
+  change: |
+    Migrated all extensions in the ``istio/proxy`` to the main Envoy repository's contrib directory.
 - area: oauth2
   change: |
     Added support for additional parameters in the OAuth2 token request body via
