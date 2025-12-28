@@ -3061,6 +3061,43 @@ void envoy_dynamic_module_callback_listener_filter_set_downstream_transport_fail
 uint64_t envoy_dynamic_module_callback_listener_filter_get_connection_start_time_ms(
     envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr);
 
+// -----------------------------------------------------------------------------
+// HTTP Filter Socket Operations
+// -----------------------------------------------------------------------------
+
+/**
+ * envoy_dynamic_module_callback_http_set_socket_option sets an arbitrary socket option
+ * using setsockopt().
+ *
+ * WARNING: This provides direct access to setsockopt(). Incorrect usage can break
+ * the connection or interfere with Envoy's operation.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
+ * @param level is the socket level (e.g., SOL_SOCKET, IPPROTO_TCP).
+ * @param optname is the option name (e.g., SO_REUSEADDR, TCP_NODELAY).
+ * @param optval is a pointer to the option value.
+ * @param optlen is the size of the option value.
+ * @return true if the socket option was set successfully, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_set_socket_option(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    int level, int optname, const void* optval, size_t optlen);
+
+/**
+ * envoy_dynamic_module_callback_http_get_socket_option gets a socket option value
+ * using getsockopt().
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
+ * @param level is the socket level (e.g., SOL_SOCKET, IPPROTO_TCP).
+ * @param optname is the option name (e.g., SO_REUSEADDR, TCP_NODELAY).
+ * @param optval is a pointer to store the option value.
+ * @param optlen is a pointer to the size of the optval buffer; updated with actual size.
+ * @return true if the socket option was retrieved successfully, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_get_socket_option(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    int level, int optname, void* optval, size_t* optlen);
+
 #ifdef __cplusplus
 }
 #endif
