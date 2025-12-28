@@ -174,7 +174,6 @@ if __name__ == '__main__':
             v3_packages.add(strip_file_name(desc.proto_path))
         elif nonstandard_v3_package(pkg):
             v3_packages.add(strip_file_name(desc.proto_path))
-            v3_packages.add(strip_file_name(desc.proto_path))
         elif is_v2_package(pkg):
             v2_packages.add(strip_file_name(desc.proto_path))
             if accidental_v3_package(pkg):

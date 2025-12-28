@@ -9,7 +9,7 @@ licenses(["notice"])  # Apache 2
 envoy_contrib_package()
 
 envoy_cc_test(
-    name = "metadataexchange_test",
+    name = "metadata_exchange_test",
     srcs = [
         "metadata_exchange_test.cc",
     ],

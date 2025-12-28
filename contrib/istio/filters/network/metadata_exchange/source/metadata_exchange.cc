@@ -194,7 +194,6 @@ void MetadataExchangeFilter::writeNodeMetadata() {
     Protobuf::Any metadata_any_value;
     metadata_any_value.set_type_url(StructTypeUrl);
     *metadata_any_value.mutable_value() = Istio::Common::serializeToStringDeterministic(data);
-    ;
     std::unique_ptr<Buffer::OwnedImpl> buf = constructProxyHeaderData(metadata_any_value);
     write_callbacks_->injectWriteDataToFilterChain(*buf, false);
     config_->stats().metadata_added_.inc();
