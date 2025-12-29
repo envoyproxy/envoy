@@ -239,20 +239,6 @@ public:
                        MessageUtil::getJsonStringFromMessageOrError(any_config));
   }
 
-  // Helper to build the configuration with a generic predicate.
-  std::string
-  getFilterConfig(const std::string& descriptor_path, const std::string& method_name = "",
-                  const std::string& field_to_scrub = "",
-                  RestrictionType type = RestrictionType::Request,
-                  const xds::type::matcher::v3::Matcher::MatcherList::Predicate& match_predicate =
-                      buildCelPredicate("true")) {
-    std::vector<std::string> fields;
-    if (!field_to_scrub.empty()) {
-      fields.push_back(field_to_scrub);
-    }
-    return getMultiFieldFilterConfig(descriptor_path, method_name, fields, type, match_predicate);
-  }
-
   template <typename T>
   IntegrationStreamDecoderPtr
   sendGrpcRequest(const T& request_msg, const std::string& method_path,
