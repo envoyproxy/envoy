@@ -1,6 +1,5 @@
 syntax = "proto3";
 
-// Keep its legacy package name in Istio for backward compatibility.
 package istio.envoy.config.filter.http.alpn.v2alpha1;
 
 import "udpa/annotations/status.proto";

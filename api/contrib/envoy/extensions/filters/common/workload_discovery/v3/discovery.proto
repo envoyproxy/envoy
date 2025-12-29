@@ -1,6 +1,5 @@
 syntax = "proto3";
 
-// Keep its legacy package name in Istio for backward compatibility.
 package istio.workload;
 
 import "udpa/annotations/status.proto";
@@ -178,7 +177,7 @@ message Locality {
   string subzone = 3;
 }
 
-// PorList represents the ports for a service
+// This represents the ports for a service
 message PortList {
   repeated Port ports = 1;
 }
