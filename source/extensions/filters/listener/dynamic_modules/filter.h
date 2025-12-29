@@ -35,6 +35,7 @@ public:
   // Accessors for ABI callbacks.
   Network::ListenerFilterCallbacks* callbacks() { return callbacks_; }
   Network::ListenerFilterBuffer* currentBuffer() { return current_buffer_; }
+  Network::Address::InstanceConstSharedPtr& cachedOriginalDst() { return cached_original_dst_; }
 
   // Test-only setters.
   void setCallbacksForTest(Network::ListenerFilterCallbacks* callbacks) { callbacks_ = callbacks; }
@@ -70,6 +71,9 @@ private:
 
   // Current buffer, only valid during onData callback.
   Network::ListenerFilterBuffer* current_buffer_ = nullptr;
+
+  // Cached original destination address to ensure lifetime extends beyond ABI callback.
+  Network::Address::InstanceConstSharedPtr cached_original_dst_;
 
   bool destroyed_ = false;
 };

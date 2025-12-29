@@ -578,12 +578,17 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetOriginalDstSuccessIpv4) {
   callbacks_.socket_.connection_info_provider_ =
       std::make_shared<Network::ConnectionInfoSetterImpl>(address, address);
 
+  // Set up mock IoHandle to return a valid fd.
+  auto mock_io_handle = std::make_unique<NiceMock<Network::MockIoHandle>>();
+  auto* mock_io_handle_ptr = mock_io_handle.get();
+  EXPECT_CALL(*mock_io_handle_ptr, fdDoNotUse()).WillRepeatedly(testing::Return(5));
+  EXPECT_CALL(callbacks_.socket_, ioHandle())
+      .WillRepeatedly(testing::ReturnRef(*mock_io_handle_ptr));
+  callbacks_.socket_.io_handle_ = std::move(mock_io_handle);
+
   // Mock addressType to return IP.
   ON_CALL(callbacks_.socket_, addressType())
       .WillByDefault(testing::Return(Network::Address::Type::Ip));
-
-  // Mock ioHandle to return a valid fd.
-  EXPECT_CALL(callbacks_.socket_.io_handle_, fdDoNotUse()).WillRepeatedly(testing::Return(5));
 
   // Mock ipVersion for getOriginalDst.
   EXPECT_CALL(callbacks_.socket_, ipVersion())
@@ -598,8 +603,8 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetOriginalDstSuccessIpv4) {
 
   EXPECT_CALL(callbacks_.socket_, getSocketOption(testing::Eq(SOL_IP), testing::Eq(SO_ORIGINAL_DST),
                                                   testing::_, testing::_))
-      .WillOnce(testing::DoAll(testing::SetArg2Sockaddr(storage),
-                               testing::Return(Api::SysCallIntResult{0, 0})));
+      .WillOnce(
+          testing::DoAll(SetArg2Sockaddr(storage), testing::Return(Api::SysCallIntResult{0, 0})));
 
   envoy_dynamic_module_type_envoy_buffer address_out = {nullptr, 0};
   uint32_t port_out = 0;

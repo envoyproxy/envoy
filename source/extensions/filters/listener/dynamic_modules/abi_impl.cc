@@ -256,6 +256,9 @@ bool envoy_dynamic_module_callback_listener_filter_get_original_dst(
     return false;
   }
 
+  // Cache the address in the filter to ensure lifetime extends beyond this function.
+  filter->cachedOriginalDst() = original_dst;
+
   const std::string& addr_str = original_dst->ip()->addressAsString();
   address_out->ptr = const_cast<char*>(addr_str.c_str());
   address_out->length = addr_str.size();
