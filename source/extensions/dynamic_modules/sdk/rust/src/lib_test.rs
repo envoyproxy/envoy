@@ -236,3 +236,183 @@ fn test_envoy_dynamic_module_on_http_filter_callbacks() {
   assert!(ON_RESPONSE_TRAILERS_CALLED.load(std::sync::atomic::Ordering::SeqCst));
   assert!(ON_STREAM_COMPLETE_CALLED.load(std::sync::atomic::Ordering::SeqCst));
 }
+
+// =============================================================================
+// Listener Filter Tests
+// =============================================================================
+
+#[test]
+fn test_envoy_dynamic_module_on_listener_filter_config_new_impl() {
+  struct TestListenerFilterConfig;
+  impl<ELF: EnvoyListenerFilter> ListenerFilterConfig<ELF> for TestListenerFilterConfig {
+    fn new_listener_filter(&self, _envoy: &mut ELF) -> Box<dyn ListenerFilter<ELF>> {
+      Box::new(TestListenerFilter)
+    }
+  }
+
+  struct TestListenerFilter;
+  impl<ELF: EnvoyListenerFilter> ListenerFilter<ELF> for TestListenerFilter {}
+
+  let mut envoy_filter_config = EnvoyListenerFilterConfigImpl {
+    raw: std::ptr::null_mut(),
+  };
+  let mut new_fn: NewListenerFilterConfigFunction<
+    EnvoyListenerFilterConfigImpl,
+    EnvoyListenerFilterImpl,
+  > = |_, _, _| Some(Box::new(TestListenerFilterConfig));
+  let result = init_listener_filter_config(
+    &mut envoy_filter_config,
+    "test_name",
+    b"test_config",
+    &new_fn,
+  );
+  assert!(!result.is_null());
+
+  unsafe {
+    envoy_dynamic_module_on_listener_filter_config_destroy(result);
+  }
+
+  // None should result in null pointer.
+  new_fn = |_, _, _| None;
+  let result = init_listener_filter_config(
+    &mut envoy_filter_config,
+    "test_name",
+    b"test_config",
+    &new_fn,
+  );
+  assert!(result.is_null());
+}
+
+#[test]
+fn test_envoy_dynamic_module_on_listener_filter_config_destroy() {
+  static DROPPED: AtomicBool = AtomicBool::new(false);
+  struct TestListenerFilterConfig;
+  impl<ELF: EnvoyListenerFilter> ListenerFilterConfig<ELF> for TestListenerFilterConfig {
+    fn new_listener_filter(&self, _envoy: &mut ELF) -> Box<dyn ListenerFilter<ELF>> {
+      Box::new(TestListenerFilter)
+    }
+  }
+  impl Drop for TestListenerFilterConfig {
+    fn drop(&mut self) {
+      DROPPED.store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+  }
+
+  struct TestListenerFilter;
+  impl<ELF: EnvoyListenerFilter> ListenerFilter<ELF> for TestListenerFilter {}
+
+  let new_fn: NewListenerFilterConfigFunction<
+    EnvoyListenerFilterConfigImpl,
+    EnvoyListenerFilterImpl,
+  > = |_, _, _| Some(Box::new(TestListenerFilterConfig));
+  let config_ptr = init_listener_filter_config(
+    &mut EnvoyListenerFilterConfigImpl {
+      raw: std::ptr::null_mut(),
+    },
+    "test_name",
+    b"test_config",
+    &new_fn,
+  );
+
+  unsafe {
+    envoy_dynamic_module_on_listener_filter_config_destroy(config_ptr);
+  }
+  // Now that the drop is called, DROPPED must be set to true.
+  assert!(DROPPED.load(std::sync::atomic::Ordering::SeqCst));
+}
+
+#[test]
+fn test_envoy_dynamic_module_on_listener_filter_new_destroy() {
+  static DROPPED: AtomicBool = AtomicBool::new(false);
+  struct TestListenerFilterConfig;
+  impl<ELF: EnvoyListenerFilter> ListenerFilterConfig<ELF> for TestListenerFilterConfig {
+    fn new_listener_filter(&self, _envoy: &mut ELF) -> Box<dyn ListenerFilter<ELF>> {
+      Box::new(TestListenerFilter)
+    }
+  }
+
+  struct TestListenerFilter;
+  impl<ELF: EnvoyListenerFilter> ListenerFilter<ELF> for TestListenerFilter {}
+  impl Drop for TestListenerFilter {
+    fn drop(&mut self) {
+      DROPPED.store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+  }
+
+  let mut filter_config = TestListenerFilterConfig;
+  let result = envoy_dynamic_module_on_listener_filter_new_impl(
+    &mut EnvoyListenerFilterImpl {
+      raw: std::ptr::null_mut(),
+    },
+    &mut filter_config,
+  );
+  assert!(!result.is_null());
+
+  unsafe {
+    envoy_dynamic_module_on_listener_filter_destroy(result);
+  }
+
+  assert!(DROPPED.load(std::sync::atomic::Ordering::SeqCst));
+}
+
+#[test]
+fn test_envoy_dynamic_module_on_listener_filter_callbacks() {
+  struct TestListenerFilterConfig;
+  impl<ELF: EnvoyListenerFilter> ListenerFilterConfig<ELF> for TestListenerFilterConfig {
+    fn new_listener_filter(&self, _envoy: &mut ELF) -> Box<dyn ListenerFilter<ELF>> {
+      Box::new(TestListenerFilter)
+    }
+  }
+
+  static ON_ACCEPT_CALLED: AtomicBool = AtomicBool::new(false);
+  static ON_DATA_CALLED: AtomicBool = AtomicBool::new(false);
+  static ON_CLOSE_CALLED: AtomicBool = AtomicBool::new(false);
+
+  struct TestListenerFilter;
+  impl<ELF: EnvoyListenerFilter> ListenerFilter<ELF> for TestListenerFilter {
+    fn on_accept(
+      &mut self,
+      _envoy_filter: &mut ELF,
+    ) -> abi::envoy_dynamic_module_type_on_listener_filter_status {
+      ON_ACCEPT_CALLED.store(true, std::sync::atomic::Ordering::SeqCst);
+      abi::envoy_dynamic_module_type_on_listener_filter_status::Continue
+    }
+
+    fn on_data(
+      &mut self,
+      _envoy_filter: &mut ELF,
+    ) -> abi::envoy_dynamic_module_type_on_listener_filter_status {
+      ON_DATA_CALLED.store(true, std::sync::atomic::Ordering::SeqCst);
+      abi::envoy_dynamic_module_type_on_listener_filter_status::Continue
+    }
+
+    fn on_close(&mut self, _envoy_filter: &mut ELF) {
+      ON_CLOSE_CALLED.store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+  }
+
+  let mut filter_config = TestListenerFilterConfig;
+  let filter = envoy_dynamic_module_on_listener_filter_new_impl(
+    &mut EnvoyListenerFilterImpl {
+      raw: std::ptr::null_mut(),
+    },
+    &mut filter_config,
+  );
+
+  unsafe {
+    assert_eq!(
+      envoy_dynamic_module_on_listener_filter_on_accept(std::ptr::null_mut(), filter),
+      abi::envoy_dynamic_module_type_on_listener_filter_status::Continue
+    );
+    assert_eq!(
+      envoy_dynamic_module_on_listener_filter_on_data(std::ptr::null_mut(), filter),
+      abi::envoy_dynamic_module_type_on_listener_filter_status::Continue
+    );
+    envoy_dynamic_module_on_listener_filter_on_close(std::ptr::null_mut(), filter);
+    envoy_dynamic_module_on_listener_filter_destroy(filter);
+  }
+
+  assert!(ON_ACCEPT_CALLED.load(std::sync::atomic::Ordering::SeqCst));
+  assert!(ON_DATA_CALLED.load(std::sync::atomic::Ordering::SeqCst));
+  assert!(ON_CLOSE_CALLED.load(std::sync::atomic::Ordering::SeqCst));
+}
