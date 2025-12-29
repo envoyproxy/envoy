@@ -744,6 +744,13 @@ envoy.filters.listener.tls_inspector:
   status: stable
   type_urls:
   - envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
+envoy.filters.listener.dynamic_modules:
+  categories:
+  - envoy.filters.listener
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.listener.dynamic_modules.v3.DynamicModuleListenerFilter
 envoy.filters.network.connection_limit:
   categories:
   - envoy.filters.network
