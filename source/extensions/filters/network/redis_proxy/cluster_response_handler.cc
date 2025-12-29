@@ -345,6 +345,12 @@ void ArrayAppendAggregateResponseHandler::processAggregatedResponses(
   sendSuccessResponse(request, std::move(response));
 }
 
+// Algorithm: Process HELLO responses from multiple shards
+// - On first valid array response: build a reference map and sanitize the 'id' field
+// - On subsequent responses: validate against the reference map immediately
+// Skip 'id' field comparisons since it's shard-specific. For 'proto' field,
+// return error on mismatch as protocol version must be consistent across shards.
+// For other fields, log warnings but don't fail the request.
 void HelloResponseHandler::processAggregatedResponses(ClusterScopeCmdRequest& request) {
   // Helper to check if two RespValues are equal
   auto valuesEqual = [](const Common::Redis::RespValue& v1, const Common::Redis::RespValue& v2) {
@@ -357,16 +363,33 @@ void HelloResponseHandler::processAggregatedResponses(ClusterScopeCmdRequest& re
     return true;
   };
 
-  // Find first valid array response and build map for all key value pairs for validation
   size_t first_response_index = 0;
-  bool found_first = false;
   absl::flat_hash_map<std::string, const Common::Redis::RespValue*> first_response_map;
 
+  // iterate through all shard responses to validate the responses
+  // Error out if there is any protocol support inconsistency
+  // Sanitize 'id' to be filled later by the client implementation
+  // Log warnings for other inconsistencies
   for (size_t idx = 0; idx < pending_responses_.size(); ++idx) {
     auto& resp = pending_responses_[idx];
-    if (resp && resp->type() == Common::Redis::RespType::Array && !resp->asArray().empty()) {
+    if (!resp) {
+      continue;
+    }
+
+    if (resp->type() != Common::Redis::RespType::Array) {
+      if (!first_response_map.empty()) {
+        ENVOY_LOG(warn, "HELLO: shard returned non-array response, skipping validation");
+      }
+      continue;
+    }
+
+    if (resp->asArray().empty()) {
+      continue;
+    }
+
+    // First valid array response: build reference map and sanitize
+    if (first_response_map.empty()) {
       first_response_index = idx;
-      found_first = true;
       auto& arr = resp->asArray();
       for (size_t i = 0; i + 1 < arr.size(); i += 2) {
         if (arr[i].type() == Common::Redis::RespType::BulkString) {
@@ -374,42 +397,27 @@ void HelloResponseHandler::processAggregatedResponses(ClusterScopeCmdRequest& re
           first_response_map.emplace(key, &arr[i + 1]);
           // Sanitize id field in first response
           if (key == "id") {
+            // This will be filled by the client id of envoy filter in client command implementation
             arr[i + 1].type(Common::Redis::RespType::Null);
-            ENVOY_LOG(debug, "HELLO: sanitized id field to null");
+            ENVOY_LOG(debug, "HELLO: sanitized client id field to null");
           }
         }
       }
-      break;
-    }
-  }
-
-  // If no array response found, forward first valid response
-  if (!found_first) {
-    sendSuccessResponse(request, std::move(pending_responses_[0]));
-    return;
-  }
-
-  // Validate key-value consistency across all responses
-  for (const auto& resp : pending_responses_) {
-    if (!resp)
-      continue;
-
-    if (resp->type() != Common::Redis::RespType::Array) {
-      ENVOY_LOG(warn, "HELLO: shard returned non-array response, skipping validation");
       continue;
     }
 
-    if (resp.get() == pending_responses_[first_response_index].get())
-      continue; // Skip the first response
-
-    const auto& arr2 = resp->asArray();
-    for (size_t i = 0; i + 1 < arr2.size(); i += 2) {
-      if (arr2[i].type() != Common::Redis::RespType::BulkString)
+    // Subsequent responses: validate against reference map
+    const auto& arr = resp->asArray();
+    for (size_t i = 0; i + 1 < arr.size(); i += 2) {
+      if (arr[i].type() != Common::Redis::RespType::BulkString) {
+        ENVOY_LOG(warn, "HELLO: non-bulkstring key in response, skipping");
         continue;
+      }
 
-      const std::string& key = arr2[i].asString();
-      if (key == "id")
+      const std::string& key = arr[i].asString();
+      if (key == "id") {
         continue; // Skip id field comparison
+      }
 
       auto it = first_response_map.find(key);
       if (it == first_response_map.end()) {
@@ -417,15 +425,21 @@ void HelloResponseHandler::processAggregatedResponses(ClusterScopeCmdRequest& re
         continue;
       }
 
-      if (!valuesEqual(*it->second, arr2[i + 1])) {
+      if (!valuesEqual(*it->second, arr[i + 1])) {
         if (key == "proto") {
-          ENVOY_LOG(error, "HELLO: protocol version mismatch");
-          sendErrorResponse(request, "ERR inconsistent responses across shards");
+          ENVOY_LOG(error, "HELLO: protocol version mismatch across shards");
+          sendErrorResponse(request, "ERR inconsistent RESP proto across shards");
           return;
         }
         ENVOY_LOG(warn, "HELLO: value mismatch for key '{}'", key);
       }
     }
+  }
+
+  // If no valid array response found, return error
+  if (first_response_map.empty()) {
+    sendErrorResponse(request, "ERR no valid HELLO response received from any shard");
+    return;
   }
 
   // All validations passed, send the first response (already sanitized)

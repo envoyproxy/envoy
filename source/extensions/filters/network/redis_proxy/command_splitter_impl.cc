@@ -1071,7 +1071,6 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
   // Handle HELLO command: only support HELLO [protover]
   // Additional options like AUTH, SETNAME are not supported yet
   if (command_name == Common::Redis::SupportedCommands::hello()) {
-
     if (request->asArray().size() > 2) {
       callbacks.onResponse(Common::Redis::Utility::makeError(
           "ERR HELLO options like AUTH and SETNAME are not supported"));
