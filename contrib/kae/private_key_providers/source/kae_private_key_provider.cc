@@ -11,6 +11,7 @@
 
 #include "source/common/config/datasource.h"
 
+#include "absl/cleanup/cleanup.h"
 #include "contrib/kae/private_key_providers/source/kae.h"
 #include "openssl/ssl.h"
 
@@ -70,8 +71,13 @@ ssl_private_key_result_t privateKeySignInternal(SSL* ssl, KaePrivateKeyConnectio
   uint8_t* msg;
   size_t msg_len;
   int prefix_allocated = 0;
-  KaeContext* kae_ctx = nullptr;
   int padding = RSA_NO_PADDING;
+
+  absl::Cleanup msg_cleanup = [&] {
+    if (prefix_allocated) {
+      OPENSSL_free(msg);
+    }
+  };
 
   if (ops == nullptr) {
     return ssl_private_key_failure;
@@ -81,42 +87,42 @@ ssl_private_key_result_t privateKeySignInternal(SSL* ssl, KaePrivateKeyConnectio
   EVP_PKEY* rsa_pkey = ops->getPrivateKey();
 
   if (rsa_pkey == nullptr) {
-    goto error;
+    return ssl_private_key_failure;
   }
   if (EVP_PKEY_id(rsa_pkey) != SSL_get_signature_algorithm_key_type(signature_algorithm)) {
-    goto error;
+    return ssl_private_key_failure;
   }
 
   rsa = EVP_PKEY_get0_RSA(rsa_pkey);
   if (rsa == nullptr) {
-    goto error;
+    return ssl_private_key_failure;
   }
   md = SSL_get_signature_algorithm_digest(signature_algorithm);
   if (md == nullptr) {
-    goto error;
+    return ssl_private_key_failure;
   }
 
   // Create KAE context which will be used for this particular signing/decryption.
-  kae_ctx = new KaeContext(kae_handle);
-  if (kae_ctx == nullptr || !kae_ctx->init()) {
-    goto error;
+  auto kae_ctx = std::make_unique<KaeContext>(kae_handle);
+  if (kae_ctx.get() == nullptr || !kae_ctx->init()) {
+    return ssl_private_key_failure;
   }
 
   // The fd will become readable when the KAE operation has been completed.
-  ops->registerCallback(kae_ctx);
+  ops->registerCallback(kae_ctx.get());
 
   if (ssl) {
     // Associate the SSL instance with the KAE Context. The SSL instance might be nullptr if this is
     // called from a test context.
-    if (!SSL_set_ex_data(ssl, KaeManager::contextIndex(), kae_ctx)) {
-      goto error;
+    if (!SSL_set_ex_data(ssl, KaeManager::contextIndex(), kae_ctx.get())) {
+      return ssl_private_key_failure;
     }
   }
 
   // Calculate the digest for signing.
   if (!EVP_DigestInit_ex(ctx.get(), md, nullptr) || !EVP_DigestUpdate(ctx.get(), in, in_len) ||
       !EVP_DigestFinal_ex(ctx.get(), hash, &hash_len)) {
-    goto error;
+    return ssl_private_key_failure;
   }
 
   // Add RSA padding to the the hash. Supported types are PSS and PKCS1.
@@ -124,37 +130,29 @@ ssl_private_key_result_t privateKeySignInternal(SSL* ssl, KaePrivateKeyConnectio
     msg_len = RSA_size(rsa);
     msg = static_cast<uint8_t*>(OPENSSL_malloc(msg_len));
     if (!msg) {
-      goto error;
+      return ssl_private_key_failure;
     }
     prefix_allocated = 1;
     if (!RSA_padding_add_PKCS1_PSS_mgf1(rsa, msg, hash, md, nullptr, -1)) {
-      goto error;
+      return ssl_private_key_failure;
     }
     padding = RSA_NO_PADDING;
   } else {
     if (!RSA_add_pkcs1_prefix(&msg, &msg_len, &prefix_allocated, EVP_MD_type(md), hash, hash_len)) {
-      goto error;
+      return ssl_private_key_failure;
     }
     padding = RSA_PKCS1_PADDING;
   }
 
   // Start KAE decryption (signing) operation.
   if (!kae_ctx->decrypt(msg_len, msg, rsa, padding)) {
-    goto error;
+    return ssl_private_key_failure;
   }
 
-  if (prefix_allocated) {
-    OPENSSL_free(msg);
-  }
+  // kae_ctx will be deleted in complete function
+  kae_ctx.release();
 
   return ssl_private_key_retry;
-
-error:
-  if (prefix_allocated) {
-    OPENSSL_free(msg);
-  }
-  delete kae_ctx;
-  return ssl_private_key_failure;
 }
 
 ssl_private_key_result_t privateKeySign(SSL* ssl, uint8_t* out, size_t* out_len, size_t max_out,
@@ -172,7 +170,6 @@ ssl_private_key_result_t privateKeyDecryptInternal(SSL* ssl, KaePrivateKeyConnec
                                                    size_t*, size_t, const uint8_t* in,
                                                    size_t in_len) {
   RSA* rsa;
-  KaeContext* kae_ctx = nullptr;
 
   if (ops == nullptr) {
     return ssl_private_key_failure;
@@ -183,40 +180,38 @@ ssl_private_key_result_t privateKeyDecryptInternal(SSL* ssl, KaePrivateKeyConnec
 
   // Check if the SSL instance has correct data attached to it.
   if (!rsa_pkey) {
-    goto error;
+    return ssl_private_key_failure;
   }
 
   rsa = EVP_PKEY_get0_RSA(rsa_pkey);
   if (rsa == nullptr) {
-    goto error;
+    return ssl_private_key_failure;
   }
 
   // Create KAE context which will be used for this particular signing/decryption.
-  kae_ctx = new KaeContext(kae_handle);
-  if (kae_ctx == nullptr || !kae_ctx->init()) {
-    goto error;
+  auto kae_ctx = std::make_unique<KaeContext>(kae_handle);
+  if (kae_ctx.get() == nullptr || !kae_ctx->init()) {
+    return ssl_private_key_failure;
   }
 
   // The fd will become readable when the KAE operation has been completed.
-  ops->registerCallback(kae_ctx);
+  ops->registerCallback(kae_ctx.get());
 
   // Associate the SSL instance with the KAE Context.
   if (ssl) {
-    if (!SSL_set_ex_data(ssl, KaeManager::contextIndex(), kae_ctx)) {
-      goto error;
+    if (!SSL_set_ex_data(ssl, KaeManager::contextIndex(), kae_ctx.get())) {
+      return ssl_private_key_failure;
     }
   }
 
   // Start KAE decryption (signing) operation.
   if (!kae_ctx->decrypt(in_len, in, rsa, RSA_NO_PADDING)) {
-    goto error;
+    return ssl_private_key_failure;
   }
 
-  return ssl_private_key_retry;
+  kae_ctx.release();
 
-error:
-  delete kae_ctx;
-  return ssl_private_key_failure;
+  return ssl_private_key_retry;
 }
 
 ssl_private_key_result_t privateKeyDecrypt(SSL* ssl, uint8_t* out, size_t* out_len, size_t max_out,
