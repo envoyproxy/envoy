@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <chrono>
 #include <cstdint>
 #include <memory>
@@ -21,13 +22,13 @@ namespace Extensions {
 namespace PrivateKeyMethodProvider {
 namespace Kae {
 
-#define RSA_BLOCK_SIZE (4096)
-#define RSA_BLOCK_NUM (16)
-#define BIT_BYTES_SHIFT (3)
-#define RSA1024BITS 1024
-#define RSA2048BITS 2048
-#define RSA3072BITS 3072
-#define RSA4096BITS 4096
+static constexpr size_t RSA_BLOCK_SIZE = 4096;
+static constexpr size_t RSA_BLOCK_NUM = 16;
+static constexpr size_t BIT_BYTES_SHIFT = 3;
+static constexpr size_t RSA1024BITS = 1024;
+static constexpr size_t RSA2048BITS = 2048;
+static constexpr size_t RSA3072BITS = 3072;
+static constexpr size_t RSA4096BITS = 4096;
 
 const int KAE_BUFFER_SIZE = 1024;
 /**
@@ -142,7 +143,7 @@ private:
   KaeHandle& handle_;
   wcrypto_rsa_op_data* op_data_{};
   int last_status_{WD_STATUS_BUSY};
-  unsigned char decrypted_data_[KAE_BUFFER_SIZE];
+  std::array<unsigned char, KAE_BUFFER_SIZE> decrypted_data_;
   int decrypted_data_length_{0};
   // Pipe for passing the message that the operation is completed.
   int read_fd_{-1};

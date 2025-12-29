@@ -1,4 +1,5 @@
 #include "contrib/kae/private_key_providers/source/kae.h"
+#include "kae.h"
 
 #include <openssl/bn.h>
 #include <openssl/crypto.h>
@@ -168,7 +169,7 @@ bool KaeHandle::initKaeInstance(LibUadkCryptoSharedPtr libuadk) {
   // Init Rsa Ctx
   rsa_setup_.is_crt = true;
   rsa_setup_.cb = static_cast<wcrypto_cb>(rsaCb);
-  rsa_setup_.key_bits = 2048;
+  rsa_setup_.key_bits = RSA2048BITS;
   rsa_setup_.br.alloc = kaeWdAllocBlk;
   rsa_setup_.br.free = kaeWdFreeBlk;
   rsa_setup_.br.iova_map = kaeDmaMap;
@@ -456,7 +457,7 @@ wcrypto_rsa_op_data* KaeContext::getOpData() { return op_data_; }
 
 int KaeContext::getDecryptedDataLength() { return decrypted_data_length_; }
 
-unsigned char* KaeContext::getDecryptedData() { return decrypted_data_; }
+unsigned char* KaeContext::getDecryptedData() { return decrypted_data_.data(); }
 
 void KaeContext::setOpStatus(int status) { last_status_ = status; }
 
@@ -468,7 +469,7 @@ bool KaeContext::copyDecryptedData(unsigned char* bytes, int len) {
     return false;
   }
 
-  memcpy(decrypted_data_, bytes, len); // NOLINT(safe-memcpy)
+  memcpy(decrypted_data_.data(), bytes, len); // NOLINT(safe-memcpy)
   decrypted_data_length_ = len;
   return true;
 }
