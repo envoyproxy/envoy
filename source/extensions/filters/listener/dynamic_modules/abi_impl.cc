@@ -1,4 +1,7 @@
+#include <chrono>
+
 #include "envoy/network/listen_socket.h"
+#include "envoy/stream_info/stream_info.h"
 
 #include "source/common/network/address_impl.h"
 #include "source/common/network/utility.h"
@@ -133,6 +136,34 @@ bool envoy_dynamic_module_callback_listener_filter_get_remote_address(
   return true;
 }
 
+bool envoy_dynamic_module_callback_listener_filter_get_direct_remote_address(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* address_out, uint32_t* port_out) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  auto* callbacks = filter->callbacks();
+
+  if (callbacks == nullptr) {
+    address_out->ptr = nullptr;
+    address_out->length = 0;
+    *port_out = 0;
+    return false;
+  }
+
+  const auto& address = callbacks->socket().connectionInfoProvider().directRemoteAddress();
+  if (address == nullptr || address->ip() == nullptr) {
+    address_out->ptr = nullptr;
+    address_out->length = 0;
+    *port_out = 0;
+    return false;
+  }
+
+  const std::string& addr_str = address->ip()->addressAsString();
+  address_out->ptr = const_cast<char*>(addr_str.c_str());
+  address_out->length = addr_str.size();
+  *port_out = address->ip()->port();
+  return true;
+}
+
 bool envoy_dynamic_module_callback_listener_filter_get_local_address(
     envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer* address_out, uint32_t* port_out) {
@@ -159,6 +190,114 @@ bool envoy_dynamic_module_callback_listener_filter_get_local_address(
   address_out->length = addr_str.size();
   *port_out = address->ip()->port();
   return true;
+}
+
+bool envoy_dynamic_module_callback_listener_filter_get_direct_local_address(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* address_out, uint32_t* port_out) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  auto* callbacks = filter->callbacks();
+
+  if (callbacks == nullptr) {
+    address_out->ptr = nullptr;
+    address_out->length = 0;
+    *port_out = 0;
+    return false;
+  }
+
+  const auto& address = callbacks->socket().connectionInfoProvider().directLocalAddress();
+  if (address == nullptr || address->ip() == nullptr) {
+    address_out->ptr = nullptr;
+    address_out->length = 0;
+    *port_out = 0;
+    return false;
+  }
+
+  const std::string& addr_str = address->ip()->addressAsString();
+  address_out->ptr = const_cast<char*>(addr_str.c_str());
+  address_out->length = addr_str.size();
+  *port_out = address->ip()->port();
+  return true;
+}
+
+bool envoy_dynamic_module_callback_listener_filter_get_original_dst(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* address_out, uint32_t* port_out) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  auto* callbacks = filter->callbacks();
+
+  if (callbacks == nullptr) {
+    address_out->ptr = nullptr;
+    address_out->length = 0;
+    *port_out = 0;
+    return false;
+  }
+
+  if (callbacks->socket().addressType() != Network::Address::Type::Ip) {
+    address_out->ptr = nullptr;
+    address_out->length = 0;
+    *port_out = 0;
+    return false;
+  }
+
+  // Avoid calling getOriginalDst on an invalid handle.
+  if (callbacks->socket().ioHandle().fdDoNotUse() < 0) {
+    address_out->ptr = nullptr;
+    address_out->length = 0;
+    *port_out = 0;
+    return false;
+  }
+
+  const auto original_dst = Network::Utility::getOriginalDst(callbacks->socket());
+  if (original_dst == nullptr || original_dst->ip() == nullptr) {
+    address_out->ptr = nullptr;
+    address_out->length = 0;
+    *port_out = 0;
+    return false;
+  }
+
+  // Cache the address in the filter to ensure lifetime extends beyond this function.
+  filter->cachedOriginalDst() = original_dst;
+
+  const std::string& addr_str = original_dst->ip()->addressAsString();
+  address_out->ptr = const_cast<char*>(addr_str.c_str());
+  address_out->length = addr_str.size();
+  *port_out = original_dst->ip()->port();
+  return true;
+}
+
+envoy_dynamic_module_type_address_type
+envoy_dynamic_module_callback_listener_filter_get_address_type(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  auto* callbacks = filter->callbacks();
+
+  if (callbacks == nullptr) {
+    return envoy_dynamic_module_type_address_type_Unknown;
+  }
+
+  switch (callbacks->socket().addressType()) {
+  case Network::Address::Type::Ip:
+    return envoy_dynamic_module_type_address_type_Ip;
+  case Network::Address::Type::Pipe:
+    return envoy_dynamic_module_type_address_type_Pipe;
+  case Network::Address::Type::EnvoyInternal:
+    return envoy_dynamic_module_type_address_type_EnvoyInternal;
+  }
+
+  return envoy_dynamic_module_type_address_type_Unknown;
+}
+
+bool envoy_dynamic_module_callback_listener_filter_is_local_address_restored(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  auto* callbacks = filter->callbacks();
+
+  if (callbacks == nullptr) {
+    return false;
+  }
+
+  return callbacks->socket().connectionInfoProvider().localAddressRestored();
 }
 
 bool envoy_dynamic_module_callback_listener_filter_set_remote_address(
@@ -225,6 +364,15 @@ void envoy_dynamic_module_callback_listener_filter_continue_filter_chain(
   auto* callbacks = filter->callbacks();
   if (callbacks != nullptr) {
     callbacks->continueFilterChain(success);
+  }
+}
+
+void envoy_dynamic_module_callback_listener_filter_use_original_dst(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr, bool use_original_dst) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  auto* callbacks = filter->callbacks();
+  if (callbacks != nullptr) {
+    callbacks->useOriginalDst(use_original_dst);
   }
 }
 
@@ -306,6 +454,32 @@ bool envoy_dynamic_module_callback_listener_filter_get_filter_state(
   value_out->ptr = const_cast<char*>(value.data());
   value_out->length = value.size();
   return true;
+}
+
+void envoy_dynamic_module_callback_listener_filter_set_downstream_transport_failure_reason(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer reason) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  auto* callbacks = filter->callbacks();
+  if (callbacks == nullptr || reason.ptr == nullptr || reason.length == 0) {
+    return;
+  }
+
+  callbacks->streamInfo().setDownstreamTransportFailureReason(
+      absl::string_view(reason.ptr, reason.length));
+}
+
+uint64_t envoy_dynamic_module_callback_listener_filter_get_connection_start_time_ms(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  auto* callbacks = filter->callbacks();
+  if (callbacks == nullptr) {
+    return 0;
+  }
+
+  const auto start_time = callbacks->streamInfo().startTime();
+  const auto duration = start_time.time_since_epoch();
+  return std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
 }
 
 } // extern "C"
