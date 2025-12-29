@@ -81,7 +81,7 @@ StatsAccessLog::StatsAccessLog(const envoy::extensions::access_loggers::stats::v
       }()) {}
 
 StatsAccessLog::Common::Common(
-    const envoy::extensions::access_loggers::stats::v3::Config::Common& cfg,
+    const envoy::extensions::access_loggers::stats::v3::Config::Stat& cfg,
     Stats::StatNamePool& pool, const std::vector<Formatter::CommandParserPtr>& commands,
     Server::Configuration::GenericFactoryContext& context) {
   name_ = pool.add(cfg.name());

@@ -41,7 +41,7 @@ private:
 
   class Common {
   public:
-    Common(const envoy::extensions::access_loggers::stats::v3::Config::Common& cfg,
+    Common(const envoy::extensions::access_loggers::stats::v3::Config::Stat& cfg,
            Stats::StatNamePool& pool, const std::vector<Formatter::CommandParserPtr>& commands,
            Server::Configuration::GenericFactoryContext& context);
 
