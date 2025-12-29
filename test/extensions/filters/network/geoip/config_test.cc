@@ -75,17 +75,15 @@ TEST_F(GeoipConfigTest, FilterIsNotTerminal) {
   EXPECT_FALSE(factory.isTerminalFilterByProto(proto_config, context_.serverFactoryContext()));
 }
 
-TEST_F(GeoipConfigTest, CreateFilterFactoryWithClientIpConfig) {
+TEST_F(GeoipConfigTest, CreateFilterFactoryWithClientIp) {
   initializeProviderFactory();
-  // Use a static IP address in the formatter (plain text format works with mock context).
+  // Use a static IP address in the client_ip field.
   const std::string config_yaml = R"EOF(
     provider:
         name: "envoy.geoip_providers.dummy"
         typed_config:
           "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
-    client_ip_config:
-        text_format_source:
-          inline_string: "192.168.1.100"
+    client_ip: "192.168.1.100"
 )EOF";
 
   envoy::extensions::filters::network::geoip::v3::Geoip proto_config;

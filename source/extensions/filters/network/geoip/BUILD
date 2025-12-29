@@ -38,10 +38,9 @@ envoy_cc_extension(
         "//envoy/geoip:geoip_provider_driver_interface",
         "//envoy/registry",
         "//source/common/config:utility_lib",
-        "//source/common/formatter:substitution_format_string_lib",
+        "//source/common/formatter:substitution_formatter_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/network/common:factory_base_lib",
-        "//source/server:generic_factory_context_lib",
         "@envoy_api//envoy/extensions/filters/network/geoip/v3:pkg_cc_proto",
     ],
 )

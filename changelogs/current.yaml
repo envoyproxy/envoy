@@ -562,8 +562,8 @@ new_features:
     ``x-forwarded-for`` header or downstream connection source address.
 - area: geoip
   change: |
-    Added :ref:`client_ip_config <envoy_v3_api_field_extensions.filters.network.geoip.v3.Geoip.client_ip_config>`
-    to the network geoip filter, enabling dynamic client IP extraction using command operators. This allows
+    Added :ref:`client_ip <envoy_v3_api_field_extensions.filters.network.geoip.v3.Geoip.client_ip>`
+    to the network geoip filter, enabling dynamic client IP extraction using format specifiers. This allows
     flexible extraction of client IP from filter state, dynamic metadata, or other sources for geolocation lookups.
 - area: ext_authz
   change: |

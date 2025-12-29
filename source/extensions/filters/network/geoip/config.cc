@@ -3,10 +3,9 @@
 #include "envoy/registry/registry.h"
 
 #include "source/common/config/utility.h"
-#include "source/common/formatter/substitution_format_string.h"
+#include "source/common/formatter/substitution_formatter.h"
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/network/geoip/geoip_filter.h"
-#include "source/server/generic_factory_context.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -20,14 +19,11 @@ absl::StatusOr<Network::FilterFactoryCb> GeoipFilterFactory::createFilterFactory
 
   // Create client IP formatter if configured.
   Formatter::FormatterConstSharedPtr client_ip_formatter;
-  if (proto_config.has_client_ip_config()) {
-    Server::GenericFactoryContextImpl generic_context(context.serverFactoryContext(),
-                                                      context.messageValidationVisitor());
-    auto formatter_or_error = Formatter::SubstitutionFormatStringUtils::fromProtoConfig(
-        proto_config.client_ip_config(), generic_context);
+  if (!proto_config.client_ip().empty()) {
+    auto formatter_or_error = Formatter::FormatterImpl::create(proto_config.client_ip(), false);
     if (!formatter_or_error.ok()) {
-      return absl::InvalidArgumentError(fmt::format("Failed to parse client_ip_config: {}",
-                                                    formatter_or_error.status().message()));
+      return absl::InvalidArgumentError(
+          fmt::format("Failed to parse client_ip: {}", formatter_or_error.status().message()));
     }
     client_ip_formatter = std::move(formatter_or_error.value());
   }

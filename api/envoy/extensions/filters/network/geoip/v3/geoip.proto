@@ -3,7 +3,6 @@ syntax = "proto3";
 package envoy.extensions.filters.network.geoip.v3;
 
 import "envoy/config/core/v3/extension.proto";
-import "envoy/config/core/v3/substitution_format_string.proto";
 
 import "xds/annotations/v3/status.proto";
 
@@ -41,28 +40,23 @@ message Geoip {
 
   // Configuration for dynamically extracting the client IP address used for geolocation lookups.
   //
-  // This field accepts a :ref:`SubstitutionFormatString <envoy_v3_api_msg_config.core.v3.SubstitutionFormatString>`
-  // that is evaluated at connection time to produce the client IP address.
-  // The formatted result must be a valid IPv4 or IPv6 address string.
-  //
-  // This allows flexible extraction of the client IP using any available
-  // :ref:`command operator <config_access_log_command_operators>`. For example:
+  // This field accepts the same :ref:`format specifiers <config_access_log_format>` as used for
+  // :ref:`HTTP access logging <config_access_log>` to extract the client IP.
+  // The formatted result must be a valid IPv4 or IPv6 address string. For example:
   //
   // * ``%FILTER_STATE(my.custom.client.ip:PLAIN)%`` - Read from filter state populated by a preceding filter.
   // * ``%DYNAMIC_METADATA(namespace:key)%`` - Read from dynamic metadata.
+  // * ``%REQ(X-Forwarded-For)%`` - Extract from request header (if applicable in context).
   //
-  // If not set, the filter uses the downstream connection's remote address.
+  // If not specified, defaults to the downstream connection's remote address.
+  // If specified but the result is empty, ``-``, or not a valid IP address, the filter
+  // falls back to the downstream connection's remote address.
   //
-  // If set but the formatted result is empty or not a valid IP address, the filter
-  // falls back to using the downstream connection source address.
-  //
-  // Example configuration using filter state:
+  // Example reading from filter state:
   //
   // .. code-block:: yaml
   //
-  //   client_ip_config:
-  //     text_format_source:
-  //       inline_string: "%FILTER_STATE(my.custom.client.ip:PLAIN)%"
+  //   client_ip: "%FILTER_STATE(my.custom.client.ip:PLAIN)%"
   //
-  config.core.v3.SubstitutionFormatString client_ip_config = 3;
+  string client_ip = 3;
 }

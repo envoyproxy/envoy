@@ -1,11 +1,10 @@
 #include "envoy/extensions/filters/network/geoip/v3/geoip.pb.h"
 
-#include "source/common/formatter/substitution_format_string.h"
+#include "source/common/formatter/substitution_formatter.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/common/stream_info/filter_state_impl.h"
 #include "source/extensions/filters/network/geoip/geoip_filter.h"
-#include "source/server/generic_factory_context.h"
 
 #include "test/extensions/filters/http/geoip/mocks.h"
 #include "test/mocks/event/mocks.h"
@@ -95,12 +94,9 @@ public:
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
   }
 
-  // Create a simple formatter that returns a static IP address.
-  Formatter::FormatterConstSharedPtr createStaticIpFormatter(const std::string& ip) {
-    envoy::config::core::v3::SubstitutionFormatString format_config;
-    format_config.mutable_text_format_source()->set_inline_string(ip);
-    auto formatter_or_error =
-        Formatter::SubstitutionFormatStringUtils::fromProtoConfig(format_config, context_);
+  // Create a simple formatter that returns a static string.
+  Formatter::FormatterConstSharedPtr createFormatterFromString(const std::string& format_str) {
+    auto formatter_or_error = Formatter::FormatterImpl::create(format_str, false);
     EXPECT_TRUE(formatter_or_error.ok());
     return std::move(formatter_or_error.value());
   }
@@ -120,7 +116,6 @@ public:
   }
 
   NiceMock<Stats::MockStore> stats_;
-  NiceMock<Server::Configuration::MockGenericFactoryContext> context_;
   GeoipFilterConfigSharedPtr config_;
   std::shared_ptr<GeoipFilter> filter_;
   std::unique_ptr<DummyGeoipProviderFactory> dummy_factory_;
@@ -290,7 +285,7 @@ TEST_F(GeoipFilterTest, AsyncCallbackStoresFilterState) {
 TEST_F(GeoipFilterTest, UsesClientIpFromFormatterWhenConfigured) {
   initializeProviderFactory();
   // Create a formatter that returns a static IP address.
-  auto formatter = createStaticIpFormatter("5.6.7.8");
+  auto formatter = createFormatterFromString("5.6.7.8");
   initializeFilter(BasicGeoipConfig, std::move(formatter));
 
   // Set the connection remote address (this should be ignored when formatter is configured).
@@ -314,7 +309,7 @@ TEST_F(GeoipFilterTest, UsesClientIpFromFormatterWhenConfigured) {
 TEST_F(GeoipFilterTest, UsesClientIpFromFormatterWithIpv6) {
   initializeProviderFactory();
   // Create a formatter that returns an IPv6 address.
-  auto formatter = createStaticIpFormatter("2001:db8::1");
+  auto formatter = createFormatterFromString("2001:db8::1");
   initializeFilter(BasicGeoipConfig, std::move(formatter));
 
   // Set the connection remote address (this should be ignored).
@@ -336,7 +331,7 @@ TEST_F(GeoipFilterTest, UsesClientIpFromFormatterWithIpv6) {
 TEST_F(GeoipFilterTest, FallsBackToConnectionAddressWhenFormatterReturnsInvalidIp) {
   initializeProviderFactory();
   // Create a formatter that returns an invalid IP.
-  auto formatter = createStaticIpFormatter("not-a-valid-ip");
+  auto formatter = createFormatterFromString("not-a-valid-ip");
   initializeFilter(BasicGeoipConfig, std::move(formatter));
 
   // Set the connection remote address (this should be used as fallback).
@@ -383,7 +378,7 @@ TEST_F(GeoipFilterTest, UsesConnectionAddressWhenNoFormatterConfigured) {
 
 TEST_F(GeoipFilterTest, ClientIpFormatterAccessor) {
   initializeProviderFactory();
-  auto formatter = createStaticIpFormatter("1.2.3.4");
+  auto formatter = createFormatterFromString("1.2.3.4");
   initializeFilter(BasicGeoipConfig, std::move(formatter));
 
   // Verify the accessor returns a non-null formatter.

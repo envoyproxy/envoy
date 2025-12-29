@@ -123,9 +123,7 @@ name: envoy.filters.network.geoip
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.network.geoip.v3.Geoip
   stat_prefix: ""
-  client_ip_config:
-    text_format_source:
-      inline_string: "%FILTER_STATE(test.geoip.client_ip:PLAIN)%"
+  client_ip: "%FILTER_STATE(test.geoip.client_ip:PLAIN)%"
   provider:
     name: envoy.geoip_providers.maxmind
     typed_config:
@@ -171,9 +169,7 @@ name: envoy.filters.network.geoip
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.network.geoip.v3.Geoip
   stat_prefix: ""
-  client_ip_config:
-    text_format_source:
-      inline_string: "2.125.160.216"
+  client_ip: "2.125.160.216"
   provider:
     name: envoy.geoip_providers.maxmind
     typed_config:
@@ -217,9 +213,7 @@ name: envoy.filters.network.geoip
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.network.geoip.v3.Geoip
   stat_prefix: ""
-  client_ip_config:
-    text_format_source:
-      inline_string: "%FILTER_STATE(nonexistent.filter.state.key:PLAIN)%"
+  client_ip: "%FILTER_STATE(nonexistent.filter.state.key:PLAIN)%"
   provider:
     name: envoy.geoip_providers.maxmind
     typed_config:

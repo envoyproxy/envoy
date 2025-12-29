@@ -56,9 +56,10 @@ For most deployments, this is sufficient since Envoy can obtain the correct clie
 
 However, in advanced scenarios where the client IP needs to be extracted from another source,
 you can configure
-:ref:`client_ip_config <envoy_v3_api_field_extensions.filters.network.geoip.v3.Geoip.client_ip_config>`.
-This field accepts a :ref:`SubstitutionFormatString <envoy_v3_api_msg_config.core.v3.SubstitutionFormatString>`
-that is evaluated at connection time to produce the client IP address.
+:ref:`client_ip <envoy_v3_api_field_extensions.filters.network.geoip.v3.Geoip.client_ip>`.
+This field accepts the same :ref:`format specifiers <config_access_log_format>` as used for
+:ref:`HTTP access logging <config_access_log>`. The format string is evaluated at connection
+time to produce the client IP address.
 
 This is useful for scenarios such as:
 
@@ -85,19 +86,16 @@ If a preceding filter has stored the client IP in filter state, you can read it 
           format_string:
             text_format_source:
               inline_string: "192.0.2.1"
-    # Then use the geoip filter with the formatter to read from filter state.
+    # Then use the geoip filter to read from filter state.
     - name: envoy.filters.network.geoip
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.filters.network.geoip.v3.Geoip
-        client_ip_config:
-          text_format_source:
-            inline_string: "%FILTER_STATE(my.custom.client.ip:PLAIN)%"
+        client_ip: "%FILTER_STATE(my.custom.client.ip:PLAIN)%"
         provider:
           # ... provider configuration ...
 
-The formatted result must be a valid IPv4 or IPv6 address string. If the formatter returns an
-empty result or an invalid IP address, the filter falls back to using the downstream connection
-source address.
+If the result is empty, ``-``, or not a valid IP address, the filter falls back to the
+downstream connection's remote address.
 
 Accessing Geolocation Data
 --------------------------
