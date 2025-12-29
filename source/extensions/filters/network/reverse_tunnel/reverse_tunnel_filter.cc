@@ -427,6 +427,12 @@ void ReverseTunnelFilter::processAcceptedConnection(absl::string_view node_id,
     ENVOY_CONN_LOG(debug, "reverse_tunnel: successfully registered wrapped socket for reuse",
                    connection);
   }
+
+  // Report the connection to the extension -> reporter.
+  if (auto extension = socket_manager->getUpstreamExtension()) {
+    extension->reportConnection(std::string(node_id), std::string(cluster_id),
+                                std::string(tenant_id));
+  }
 }
 
 } // namespace ReverseTunnel

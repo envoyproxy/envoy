@@ -33,7 +33,7 @@ jobs:
     runs-on: ubuntu-22.04
     if: github.repository == 'envoyproxy/envoy'
     steps:
-    - uses: envoyproxy/toolshed/gh-actions/bind-mounts@actions-v0.3.35
+    - uses: envoyproxy/toolshed/gh-actions/bind-mounts@cb93f5b06def5199bf739b007615f7a257bb0165  # v0.3.37
       if: |
         ! github.event.repository.private
       with:
@@ -48,7 +48,7 @@ jobs:
       if: |
         env.BUILD_TARGETS != ''
         && github.event.repository.private
-      uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.3.35
+      uses: envoyproxy/toolshed/gh-actions/diskspace@cb93f5b06def5199bf739b007615f7a257bb0165  # v0.3.37
       with:
         to_remove: |
           /usr/local/.ghcup

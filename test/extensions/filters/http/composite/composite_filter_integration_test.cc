@@ -846,5 +846,158 @@ TEST_P(CompositeFilterSeverContextIntegrationTest, BasicFlowDualFilterInUpstream
   serverContextBasicFlowTest(0);
 }
 
+// Tests that a filter chain with multiple filters is executed in order.
+class CompositeFilterChainIntegrationTest
+    : public testing::TestWithParam<CompositeFilterTestParams>,
+      public HttpIntegrationTest {
+public:
+  CompositeFilterChainIntegrationTest()
+      : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam().version),
+        downstream_filter_(GetParam().is_downstream), is_dual_factory_(GetParam().is_dual_factory),
+        proto_type_(is_dual_factory_ ? proto_type_dual_ : proto_type_downstream_) {}
+
+  void prependCompositeFilterChain(const std::string& name = "composite-filter-chain") {
+    config_helper_.prependFilter(absl::StrFormat(R"EOF(
+      name: %s
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.common.matching.v3.ExtensionWithMatcher
+        extension_config:
+          name: composite
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.Composite
+        xds_matcher:
+          matcher_tree:
+            input:
+              name: request-headers
+              typed_config:
+                "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+                header_name: match-header
+            exact_match_map:
+              map:
+                match:
+                  action:
+                    name: composite-action
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.ExecuteFilterAction
+                      filter_chain:
+                        typed_config:
+                          - name: add-header-filter
+                            typed_config:
+                              "@type": type.googleapis.com/google.protobuf.Struct
+                          - name: set-response-code
+                            typed_config:
+                              "@type": type.googleapis.com/test.integration.filters.%s
+                              prefix: "/respond-directly"
+                              code: 418
+    )EOF",
+                                                 name, proto_type_),
+                                 downstream_filter_);
+  }
+
+  const Http::TestRequestHeaderMapImpl match_request_headers_ = {{":method", "GET"},
+                                                                 {":path", "/somepath"},
+                                                                 {":scheme", "http"},
+                                                                 {"match-header", "match"},
+                                                                 {":authority", "blah"}};
+
+  const Http::TestRequestHeaderMapImpl match_request_headers_respond_directly_ = {
+      {":method", "GET"},
+      {":path", "/respond-directly"},
+      {":scheme", "http"},
+      {"match-header", "match"},
+      {":authority", "blah"}};
+
+  void initialize() override {
+    if (!downstream_filter_) {
+      setUpstreamProtocol(Http::CodecType::HTTP2);
+    }
+    HttpIntegrationTest::initialize();
+  }
+
+  static std::vector<CompositeFilterTestParams> getValuesForFilterChainTest() {
+    std::vector<CompositeFilterTestParams> ret;
+    for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
+      for (bool is_dual_factory : {true, false}) {
+        CompositeFilterTestParams params;
+        params.version = ip_version;
+        params.is_downstream = true; // Filter chains only supported for downstream.
+        params.is_dual_factory = is_dual_factory;
+        ret.push_back(params);
+      }
+    }
+    return ret;
+  }
+
+  static std::string
+  FilterChainTestParamsToString(const ::testing::TestParamInfo<CompositeFilterTestParams>& params) {
+    return absl::StrCat(
+        (params.param.version == Network::Address::IpVersion::v4 ? "IPv4_" : "IPv6_"),
+        (params.param.is_dual_factory ? "DualFactory" : "DownstreamFactory"));
+  }
+
+  const std::string proto_type_dual_ = "SetResponseCodeFilterConfigDual";
+  const std::string proto_type_downstream_ = "SetResponseCodeFilterConfig";
+  bool downstream_filter_{true};
+  bool is_dual_factory_{false};
+  std::string proto_type_;
+};
+
+INSTANTIATE_TEST_SUITE_P(
+    IpVersions, CompositeFilterChainIntegrationTest,
+    testing::ValuesIn(CompositeFilterChainIntegrationTest::getValuesForFilterChainTest()),
+    CompositeFilterChainIntegrationTest::FilterChainTestParamsToString);
+
+// Verifies that a filter chain executes all filters in order. When the path matches
+// /respond-directly, the second filter should respond with 418.
+TEST_P(CompositeFilterChainIntegrationTest, TestFilterChainExecutesInOrder) {
+  prependCompositeFilterChain();
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  {
+    // Request that doesn't match the filter chain's second filter prefix.
+    // Should reach upstream and get 200. First filter should add x-header-to-add header.
+    auto response = codec_client_->makeRequestWithBody(match_request_headers_, 1024);
+    waitForNextUpstreamRequest();
+    // Verify the first filter (add-header-filter) ran by checking for the header it adds.
+    EXPECT_FALSE(
+        upstream_request_->headers().get(Http::LowerCaseString("x-header-to-add")).empty());
+    EXPECT_EQ("value", upstream_request_->headers()
+                           .get(Http::LowerCaseString("x-header-to-add"))[0]
+                           ->value()
+                           .getStringView());
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_THAT(response->headers(), Http::HttpStatusIs("200"));
+  }
+
+  {
+    // Request that matches the filter chain's second filter prefix.
+    // Should get 418 from the set-response-code filter. First filter still runs before second.
+    auto response =
+        codec_client_->makeRequestWithBody(match_request_headers_respond_directly_, 1024);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_THAT(response->headers(), Http::HttpStatusIs("418"));
+  }
+}
+
+// Verifies that a request without the match header doesn't trigger the filter chain.
+TEST_P(CompositeFilterChainIntegrationTest, TestNoMatchBypassesFilterChain) {
+  prependCompositeFilterChain();
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Request without match header should reach upstream even with matching path.
+  // The filter chain should not be triggered, so x-header-to-add won't be present.
+  auto response = codec_client_->makeRequestWithBody(default_request_headers_, 1024);
+  waitForNextUpstreamRequest();
+
+  // Verify the filter chain was not triggered by checking that the header is absent.
+  EXPECT_TRUE(upstream_request_->headers().get(Http::LowerCaseString("x-header-to-add")).empty());
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_THAT(response->headers(), Http::HttpStatusIs("200"));
+}
+
 } // namespace
 } // namespace Envoy

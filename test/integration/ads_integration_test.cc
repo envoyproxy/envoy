@@ -744,9 +744,6 @@ TEST_P(AdsIntegrationTest, CdsEdsReplacementWarming) {
 // Validate that an update to a Cluster that doesn't receive updated ClusterLoadAssignment
 // uses the previous (cached) cluster load assignment.
 TEST_P(AdsIntegrationTest, CdsKeepEdsAfterWarmingFailure) {
-  // TODO(adisuissa): this test should be kept after the runtime guard is deprecated
-  // (only the runtime guard should be removed).
-  config_helper_.addRuntimeOverride("envoy.restart_features.use_eds_cache_for_ads", "true");
   initialize();
   EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "", {}, {}, {}, true));
   envoy::config::cluster::v3::Cluster cluster = buildCluster("cluster_0");
@@ -818,9 +815,6 @@ TEST_P(AdsIntegrationTest, CdsKeepEdsAfterWarmingFailure) {
 // that don't receive updated ClusterLoadAssignment use the previous (cached) cluster
 // load assignment.
 TEST_P(AdsIntegrationTest, DoubleClustersCachedLoadAssignment) {
-  // TODO(adisuissa): this test should be kept after the runtime guard is deprecated
-  // (only the runtime guard should be removed).
-  config_helper_.addRuntimeOverride("envoy.restart_features.use_eds_cache_for_ads", "true");
   initialize();
   EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "", {}, {}, {}, true));
   envoy::config::cluster::v3::Cluster cluster0 = buildCluster("cluster_0");

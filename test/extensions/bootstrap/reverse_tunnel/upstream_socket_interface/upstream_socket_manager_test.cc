@@ -6,9 +6,11 @@
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/upstream_socket_manager.h"
 
 #include "test/mocks/event/mocks.h"
+#include "test/mocks/reverse_tunnel_reporting_service/reporter.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
+#include "test/test_common/registry.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -1065,6 +1067,51 @@ TEST_F(TestUpstreamSocketManager, GetNodeWithSocketComprehensiveMixedCalls) {
   // Call with node2 should still return node2 as-is.
   result = socket_manager_->getNodeWithSocket(node2);
   EXPECT_EQ(result, node2);
+}
+
+// Checks that the dead socket is reported to the extension.
+// Inject a mock reporter and expect that it receives the data about the dead socket.
+TEST_F(TestUpstreamSocketManager, MarkSocketDeadCallsReportDisconnection) {
+  socket_manager_.reset();
+
+  envoy::extensions::bootstrap::reverse_tunnel::upstream_socket_interface::v3::
+      UpstreamReverseConnectionSocketInterface config_with_reporter;
+
+  // Add the mock reporter to the config.
+  auto* reporter_cfg = config_with_reporter.mutable_reporter_config();
+  reporter_cfg->set_name(MOCK_REPORTER);
+  Protobuf::StringValue noop_config;
+  reporter_cfg->mutable_typed_config()->PackFrom(noop_config);
+
+  NiceMock<MockReporterFactory> reporter_factory;
+  Registry::InjectFactory<ReverseTunnelReporterFactory> reporter_injector(reporter_factory);
+
+  EXPECT_CALL(context_, messageValidationVisitor())
+      .WillRepeatedly(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
+
+  NiceMock<MockReverseTunnelReporter>* reporter_ptr = nullptr;
+  EXPECT_CALL(reporter_factory, createReporter()).WillOnce(Invoke([&]() {
+    auto reporter = std::make_unique<NiceMock<MockReverseTunnelReporter>>();
+    reporter_ptr = reporter.get();
+    return reporter;
+  }));
+
+  extension_ = std::make_unique<ReverseTunnelAcceptorExtension>(*socket_interface_, context_,
+                                                                config_with_reporter);
+  socket_manager_ = std::make_unique<UpstreamSocketManager>(dispatcher_, extension_.get());
+
+  const int fd = 200;
+  const std::string node_id = "node";
+  const std::string cluster_id = "cluster";
+
+  auto socket = createMockSocket(fd);
+  socket_manager_->addConnectionSocket(node_id, cluster_id, std::move(socket),
+                                       std::chrono::seconds(30), /*rebalanced=*/false);
+
+  ASSERT_NE(reporter_ptr, nullptr);
+  EXPECT_CALL(*reporter_ptr,
+              reportDisconnectionEvent(testing::Eq(node_id), testing::Eq(cluster_id)));
+  socket_manager_->markSocketDead(fd);
 }
 
 // Socket Rebalancing Tests.
