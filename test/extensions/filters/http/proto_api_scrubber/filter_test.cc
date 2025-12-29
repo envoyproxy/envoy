@@ -12,6 +12,7 @@
 #include "source/extensions/filters/http/proto_api_scrubber/filter_config.h"
 
 #include "test/extensions/filters/http/grpc_field_extraction/message_converter/message_converter_test_lib.h"
+#include "test/extensions/filters/http/proto_api_scrubber/scrubber_test.pb.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/matcher/mocks.h"
 #include "test/mocks/server/factory_context.h"
@@ -46,6 +47,8 @@ using ::Envoy::Http::MockStreamEncoderFilterCallbacks;
 using ::Envoy::Http::TestRequestHeaderMapImpl;
 using ::Envoy::Http::TestResponseHeaderMapImpl;
 using ::Envoy::Protobuf::Struct;
+using ::test::extensions::filters::http::proto_api_scrubber::ScrubRequest;
+using ::test::extensions::filters::http::proto_api_scrubber::SensitiveMessage;
 using ::testing::_;
 using ::testing::Eq;
 using ::testing::HasSubstr;
@@ -68,6 +71,8 @@ public:
               (const std::string& method_name, const std::string& field_mask), (const, override));
   MOCK_METHOD(MatchTreeHttpMatchingDataSharedPtr, getResponseFieldMatcher,
               (const std::string& method_name, const std::string& field_mask), (const, override));
+  MOCK_METHOD(MatchTreeHttpMatchingDataSharedPtr, getMessageFieldMatcher,
+              (const std::string& message_name, const std::string& field_name), (const, override));
   MOCK_METHOD(absl::StatusOr<const Protobuf::Type*>, getRequestType,
               (const std::string& method_name), (const, override));
   MOCK_METHOD(absl::StatusOr<const Protobuf::Type*>, getResponseType,
@@ -76,6 +81,9 @@ public:
 
   MOCK_METHOD(absl::StatusOr<const Protobuf::MethodDescriptor*>, getMethodDescriptor,
               (const std::string& method_name), (const, override));
+
+  MOCK_METHOD(const Protobuf::Type*, getParentType, (const Protobuf::Field* field),
+              (const, override));
 
   // Delegate non-mocked calls to the real object
   MockProtoApiScrubberFilterConfig() : ProtoApiScrubberFilterConfig() {
@@ -99,8 +107,15 @@ public:
     ON_CALL(*this, getMethodMatcher(_)).WillByDefault([this](const std::string& method_name) {
       return real_config_->getMethodMatcher(method_name);
     });
+    ON_CALL(*this, getMessageFieldMatcher(_, _))
+        .WillByDefault([this](const std::string& message_name, const std::string& field_name) {
+          return real_config_->getMessageFieldMatcher(message_name, field_name);
+        });
     ON_CALL(*this, getMethodDescriptor(_)).WillByDefault([this](const std::string& method_name) {
       return real_config_->getMethodDescriptor(method_name);
+    });
+    ON_CALL(*this, getParentType(_)).WillByDefault([this](const Protobuf::Field* field) {
+      return real_config_->getParentType(field);
     });
   }
 
@@ -127,6 +142,8 @@ inline constexpr const char kApiKeysDescriptorRelativePath[] = "test/proto/apike
 inline constexpr char kRemoveFieldActionType[] =
     "type.googleapis.com/envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction";
 inline constexpr const char kBookstoreDescriptorRelativePath[] = "test/proto/bookstore.descriptor";
+inline constexpr const char kScrubberTestDescriptorRelativePath[] =
+    "test/extensions/filters/http/proto_api_scrubber/scrubber_test.descriptor";
 
 class ProtoApiScrubberFilterTest : public ::testing::Test {
 protected:
@@ -251,6 +268,72 @@ protected:
     *(*field_map)[field_path].mutable_matcher() = matcher;
   }
 
+  void addMessageFieldRestriction(ProtoApiScrubberConfig& config, const std::string& message_type,
+                                  const std::string& field_name, bool match_result,
+                                  const std::string& action_type_url) {
+    constexpr absl::string_view matcher_template = R"pb(
+      matcher_list: {
+        matchers: {
+          predicate: {
+            single_predicate: {
+              input: {
+                name: "request"
+                typed_config: {
+                  [type.googleapis.com/xds.type.matcher.v3.HttpAttributesCelMatchInput] { }
+                }
+              }
+              custom_match: {
+                 name: "cel"
+                typed_config: {
+                  [type.googleapis.com/xds.type.matcher.v3.CelMatcher] {
+                    expr_match: {
+                      cel_expr_parsed: {
+                        expr: {
+                          id: 1
+                          const_expr: {
+                            bool_value: $0
+                          }
+                        }
+                        source_info: {
+                          syntax_version: "cel1"
+                          location: "inline_expression"
+                          positions: {
+                            key: 1
+                            value: 0
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+          on_match: {
+            action: {
+              name: "remove"
+              typed_config: {
+                [$1] { }
+              }
+            }
+          }
+        }
+      }
+    )pb";
+
+    std::string matcher_str =
+        absl::Substitute(matcher_template, match_result ? "true" : "false", action_type_url);
+
+    xds::type::matcher::v3::Matcher matcher;
+    if (!Envoy::Protobuf::TextFormat::ParseFromString(matcher_str, &matcher)) {
+      FAIL() << "Failed to parse generated matcher config.";
+    }
+
+    auto& message_config =
+        (*config.mutable_restrictions()->mutable_message_restrictions())[message_type];
+    *(*message_config.mutable_field_restrictions())[field_name].mutable_matcher() = matcher;
+  }
+
   /**
    * Replaces the existing 'filter_' and 'filter_config_' with a new one based on
    * the provided proto. This overrides the default setup done in the constructor.
@@ -322,6 +405,16 @@ protected:
     apikeys::ApiKey response;
     Envoy::Protobuf::TextFormat::ParseFromString(pb, &response);
     return response;
+  }
+
+  ScrubRequest makeScrubRequestWithAny(absl::string_view sensitive_secret) {
+    ScrubRequest request;
+    SensitiveMessage sensitive_msg;
+    sensitive_msg.set_secret(std::string(sensitive_secret));
+    sensitive_msg.set_public_field("public_data");
+
+    request.mutable_any_field()->PackFrom(sensitive_msg);
+    return request;
   }
 
   // Helper to construct a gRPC frame containing a nested message that claims to be
@@ -912,6 +1005,57 @@ TEST_F(ProtoApiScrubberScrubbingTest, RequestScrubbingFailsOnTruncatedNestedMess
   ASSERT_TRUE(decoder.decode(bad_data, frames).ok());
 
   EXPECT_EQ(createTruncatedPayload(0x12), frames[0].data_->toString());
+}
+
+// Tests that a field inside `Any` message gets scrubbed based on message-type restrictions.
+TEST_F(ProtoApiScrubberScrubbingTest, ScrubRequestAnyField) {
+  ProtoApiScrubberConfig proto_config;
+  proto_config.set_filtering_mode(ProtoApiScrubberConfig::OVERRIDE);
+
+  std::string method_name =
+      "/test.extensions.filters.http.proto_api_scrubber.ScrubberTestService/Scrub";
+  std::string sensitive_message_type =
+      "test.extensions.filters.http.proto_api_scrubber.SensitiveMessage";
+  std::string sensitive_field = "secret";
+
+  // Add restriction for SensitiveMessage.secret field
+  addMessageFieldRestriction(proto_config, sensitive_message_type, sensitive_field, true,
+                             kRemoveFieldActionType);
+
+  // Reload the filter with the config and descriptor set containing ScrubberTestMessage and
+  // SensitiveMessage
+  ASSERT_TRUE(reloadFilter(proto_config, kScrubberTestDescriptorRelativePath).ok());
+
+  // Prepare request
+  TestRequestHeaderMapImpl req_headers = TestRequestHeaderMapImpl{
+      {":method", "POST"}, {":path", method_name}, {"content-type", "application/grpc"}};
+
+  std::string secret_value = "this_is_secret";
+  ScrubRequest request = makeScrubRequestWithAny(secret_value);
+  Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
+
+  // Pre-check
+  SensitiveMessage inner_message;
+  request.any_field().UnpackTo(&inner_message);
+  EXPECT_EQ(inner_message.secret(), secret_value);
+
+  // Run filter
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(req_headers, true));
+  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(*request_data, true));
+
+  // Verify scrubbing
+  ScrubRequest scrubbed_request;
+  std::vector<Envoy::Grpc::Frame> frames;
+  Envoy::Grpc::Decoder decoder;
+  EXPECT_TRUE(decoder.decode(*request_data, frames).ok());
+  EXPECT_EQ(frames.size(), 1);
+  EXPECT_TRUE(scrubbed_request.ParseFromString(frames[0].data_->toString()));
+
+  SensitiveMessage scrubbed_inner;
+  scrubbed_request.any_field().UnpackTo(&scrubbed_inner);
+
+  EXPECT_EQ(scrubbed_inner.secret(), "");                  // Field should be cleared
+  EXPECT_EQ(scrubbed_inner.public_field(), "public_data"); // Other field preserved
 }
 
 using ProtoApiScrubberResponsePassThroughTest = ProtoApiScrubberFilterTest;
