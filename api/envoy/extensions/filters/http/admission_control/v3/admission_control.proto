@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.extensions.filters.http.admission_control.v3;
 
 import "envoy/config/core/v3/base.proto";
+import "envoy/config/route/v3/route_components.proto";
 import "envoy/type/v3/range.proto";
 
 import "google/protobuf/duration.proto";
@@ -19,7 +20,52 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: Admission Control]
 // [#extension: envoy.filters.http.admission_control]
 
+// Configuration for a single admission control rule. Each rule specifies matching conditions
+// and admission control parameters for requests that match those conditions.
 // [#next-free-field: 8]
+message AdmissionControlRule {
+  // Specifies a set of headers that the filter should match on. The admission control filter
+  // will only be applied to requests that match all the specified headers. If not specified,
+  // the rule will match all requests.
+  repeated config.route.v3.HeaderMatcher headers = 1;
+
+  // Defines how a request is considered a success/failure.
+  oneof evaluation_criteria {
+    option (validate.required) = true;
+
+    AdmissionControl.SuccessCriteria success_criteria = 2;
+  }
+
+  // The sliding time window over which the success rate is calculated. The window is rounded to the
+  // nearest second. Defaults to 30s.
+  google.protobuf.Duration sampling_window = 3;
+
+  // Rejection probability is defined by the formula::
+  //
+  //     max(0, (rq_count -  rq_success_count / sr_threshold) / (rq_count + 1)) ^ (1 / aggression)
+  //
+  // The aggression dictates how heavily the admission controller will throttle requests upon SR
+  // dropping at or below the threshold. A value of 1 will result in a linear increase in
+  // rejection probability as SR drops. Any values less than 1.0, will be set to 1.0. If the
+  // message is unspecified, the aggression is 1.0.
+  config.core.v3.RuntimeDouble aggression = 4;
+
+  // Dictates the success rate at which the rejection probability is non-zero. As success rate drops
+  // below this threshold, rejection probability will increase. Any success rate above the threshold
+  // results in a rejection probability of 0. Defaults to 95%.
+  config.core.v3.RuntimePercent sr_threshold = 5;
+
+  // If the average RPS of the sampling window is below this threshold, the request
+  // will not be rejected, even if the success rate is lower than sr_threshold.
+  // Defaults to 0.
+  config.core.v3.RuntimeUInt32 rps_threshold = 6;
+
+  // The probability of rejection will never exceed this value, even if the failure rate is rising.
+  // Defaults to 80%.
+  config.core.v3.RuntimePercent max_rejection_probability = 7;
+}
+
+// [#next-free-field: 10]
 message AdmissionControl {
   // Default method of specifying what constitutes a successful request. All status codes that
   // indicate a successful request must be explicitly specified if not relying on the default
@@ -100,4 +146,10 @@ message AdmissionControl {
   // The probability of rejection will never exceed this value, even if the failure rate is rising.
   // Defaults to 80%.
   config.core.v3.RuntimePercent max_rejection_probability = 7;
+
+  // Specifies a list of admission control rules. Each rule can have its own matching conditions and
+  // admission control parameters. Rules are evaluated in order, and the first matching rule will be
+  // applied. If no rules match (or if ``rules`` is empty), the filter will fall back to the global
+  // configuration (fields 2–8).
+  repeated AdmissionControlRule rules = 9;
 }

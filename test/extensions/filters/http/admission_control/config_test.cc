@@ -37,9 +37,37 @@ public:
         context_.server_factory_context_.threadLocal());
     auto evaluator_or = SuccessCriteriaEvaluator::create(proto.success_criteria());
     EXPECT_TRUE(evaluator_or.ok());
-    auto evaluator = std::move(evaluator_or.value());
+    std::shared_ptr<ResponseEvaluator> evaluator = std::move(evaluator_or.value());
+
+    auto global = std::make_shared<AdmissionControlRuleConfig>(
+        std::move(tls), std::move(evaluator), std::vector<Http::HeaderUtility::HeaderDataPtr>{},
+        proto.has_aggression() ? std::make_unique<Runtime::Double>(proto.aggression(), runtime_)
+                               : nullptr,
+        proto.has_sr_threshold()
+            ? std::make_unique<Runtime::Percentage>(proto.sr_threshold(), runtime_)
+            : nullptr,
+        proto.has_rps_threshold()
+            ? std::make_unique<Runtime::UInt32>(proto.rps_threshold(), runtime_)
+            : nullptr,
+        proto.has_max_rejection_probability()
+            ? std::make_unique<Runtime::Percentage>(proto.max_rejection_probability(), runtime_)
+            : nullptr);
+    std::vector<AdmissionControlRuleConfigSharedPtr> rules;
+    for (const auto& rule_proto : proto.rules()) {
+      auto rule_tls = ThreadLocal::TypedSlot<ThreadLocalControllerImpl>::makeUnique(
+          context_.server_factory_context_.threadLocal());
+      auto rule_evaluator_or = SuccessCriteriaEvaluator::create(rule_proto.success_criteria());
+      EXPECT_TRUE(rule_evaluator_or.ok());
+      std::shared_ptr<ResponseEvaluator> rule_evaluator = std::move(rule_evaluator_or.value());
+      auto rule_filter_headers = Http::HeaderUtility::buildHeaderDataVector(
+          rule_proto.headers(), context_.server_factory_context_);
+      rules.push_back(std::make_shared<AdmissionControlRuleConfig>(
+          rule_proto, runtime_, std::move(rule_tls), std::move(rule_evaluator),
+          std::move(rule_filter_headers)));
+    }
+
     return std::make_shared<AdmissionControlFilterConfig>(proto, runtime_, random_, scope_,
-                                                          std::move(tls), std::move(evaluator));
+                                                          std::move(global), std::move(rules));
   }
 
 protected:
@@ -136,9 +164,11 @@ success_criteria:
   grpc_criteria:
 )EOF";
 
-  auto config = makeConfig(yaml);
+  auto filter_config = makeConfig(yaml);
+  Http::TestRequestHeaderMapImpl headers{};
+  auto config = filter_config->findMatchingRule(headers);
 
-  EXPECT_FALSE(config->filterEnabled());
+  EXPECT_FALSE(filter_config->filterEnabled());
   EXPECT_EQ(4.2, config->aggression());
   EXPECT_EQ(0.92, config->successRateThreshold());
   EXPECT_EQ(5, config->rpsThreshold());
@@ -155,9 +185,11 @@ success_criteria:
   http_criteria:
   grpc_criteria:
 )EOF";
-  auto config = makeConfig(yaml);
+  auto filter_config = makeConfig(yaml);
+  Http::TestRequestHeaderMapImpl headers{};
+  auto config = filter_config->findMatchingRule(headers);
 
-  EXPECT_TRUE(config->filterEnabled());
+  EXPECT_TRUE(filter_config->filterEnabled());
   EXPECT_EQ(1.0, config->aggression());
   EXPECT_EQ(0.95, config->successRateThreshold());
   EXPECT_EQ(0, config->rpsThreshold());
@@ -190,10 +222,12 @@ success_criteria:
   grpc_criteria:
 )EOF";
 
-  auto config = makeConfig(yaml);
+  auto filter_config = makeConfig(yaml);
+  Http::TestRequestHeaderMapImpl headers{};
+  auto config = filter_config->findMatchingRule(headers);
 
   EXPECT_CALL(runtime_.snapshot_, getBoolean("foo.enabled", false)).WillOnce(Return(true));
-  EXPECT_TRUE(config->filterEnabled());
+  EXPECT_TRUE(filter_config->filterEnabled());
   EXPECT_CALL(runtime_.snapshot_, getDouble("foo.aggression", 4.2)).WillOnce(Return(1.3));
   EXPECT_EQ(1.3, config->aggression());
   EXPECT_CALL(runtime_.snapshot_, getDouble("foo.sr_threshold", 92)).WillOnce(Return(24.0));
@@ -219,6 +253,173 @@ success_criteria:
   EXPECT_EQ(0.7, config->maxRejectionProbability());
 }
 
+TEST_F(AdmissionControlConfigTest, BasicTestRuleConfig) {
+  const std::string yaml = R"EOF(
+enabled:
+  default_value: false
+  runtime_key: "global.enabled"
+sampling_window: 100s
+sr_threshold:
+  default_value:
+    value: 100
+  runtime_key: "global.sr_threshold"
+aggression:
+  default_value: 1.1
+  runtime_key: "global.aggression"
+rps_threshold:
+  default_value: 1
+  runtime_key: "global.rps_threshold"
+max_rejection_probability:
+  default_value:
+    value: 100.0
+  runtime_key: "global.max_rejection_probability"
+success_criteria:
+  http_criteria:
+  grpc_criteria:
+rules:
+  - headers:
+    - name: "x-service"
+      string_match:
+        exact: "api"
+    success_criteria:
+      http_criteria:
+      grpc_criteria:
+    sr_threshold:
+      default_value:
+        value: 90.0
+      runtime_key: "rule1.sr_threshold"
+    rps_threshold:
+      default_value: 2
+      runtime_key: "rule2.rps_threshold"
+    aggression:
+      default_value: 1.2
+      runtime_key: "rule1.aggression"
+    max_rejection_probability:
+      default_value:
+        value: 90.0
+      runtime_key: "rule1.max_rejection_probability"
+  - headers:
+    - name: "x-service"
+      string_match:
+        exact: "web"
+    success_criteria:
+      http_criteria:
+      grpc_criteria:
+    sr_threshold:
+      default_value:
+        value: 80.0
+      runtime_key: "rule2.sr_threshold"
+    rps_threshold:
+      default_value: 2
+      runtime_key: "rule2.rps_threshold"
+    aggression:
+      default_value: 2.2
+      runtime_key: rule2.aggression
+    max_rejection_probability:
+      default_value:
+        value: 80.0
+      runtime_key: "rule2.max_rejection_probability"
+    )EOF";
+
+  auto filter_config = makeConfig(yaml);
+  Http::TestRequestHeaderMapImpl rule1_headers{{"x-service", "api"}};
+  auto config = filter_config->findMatchingRule(rule1_headers);
+  EXPECT_EQ(1.2, config->aggression());
+  EXPECT_EQ(2, config->rpsThreshold());
+  EXPECT_EQ(0.90, config->successRateThreshold());
+  EXPECT_EQ(0.90, config->maxRejectionProbability());
+
+  Http::TestRequestHeaderMapImpl rule1_headers2{{"x-service", "web"}};
+  config = filter_config->findMatchingRule(rule1_headers2);
+  EXPECT_EQ(2.2, config->aggression());
+  EXPECT_EQ(2, config->rpsThreshold());
+  EXPECT_EQ(0.80, config->successRateThreshold());
+  EXPECT_EQ(0.80, config->maxRejectionProbability());
+
+  Http::TestRequestHeaderMapImpl global_headers{{"x-service", "other"}};
+  config = filter_config->findMatchingRule(global_headers);
+  EXPECT_EQ(1.1, config->aggression());
+  EXPECT_EQ(1, config->rpsThreshold());
+  EXPECT_EQ(1.0, config->successRateThreshold());
+  EXPECT_EQ(1.0, config->maxRejectionProbability());
+}
+
+TEST_F(AdmissionControlConfigTest, BasicTestRuleProtoConfig) {
+  AdmissionControlFilterFactory admission_control_filter_factory;
+  const std::string yaml = R"EOF(
+enabled:
+  default_value: false
+  runtime_key: "global.enabled"
+sampling_window: 100s
+sr_threshold:
+  default_value:
+    value: 100
+  runtime_key: "global.sr_threshold"
+aggression:
+  default_value: 1.1
+  runtime_key: "global.aggression"
+rps_threshold:
+  default_value: 1
+  runtime_key: "global.rps_threshold"
+max_rejection_probability:
+  default_value:
+    value: 100.0
+  runtime_key: "global.max_rejection_probability"
+success_criteria:
+  http_criteria:
+  grpc_criteria:
+rules:
+  - headers:
+    - name: "x-service"
+      string_match:
+        exact: "api"
+    success_criteria:
+      http_criteria:
+      grpc_criteria:
+    sr_threshold:
+      default_value:
+        value: 90.0
+      runtime_key: "rule1.sr_threshold"
+    rps_threshold:
+      default_value: 2
+      runtime_key: "rule2.rps_threshold"
+    aggression:
+      default_value: 1.2
+      runtime_key: "rule1.aggression"
+    max_rejection_probability:
+      default_value:
+        value: 90.0
+      runtime_key: "rule1.max_rejection_probability"
+  - headers:
+    - name: "x-service"
+      string_match:
+        exact: "web"
+    success_criteria:
+      http_criteria:
+      grpc_criteria:
+    sr_threshold:
+      default_value:
+        value: 80.0
+      runtime_key: "rule2.sr_threshold"
+    rps_threshold:
+      default_value: 2
+      runtime_key: "rule2.rps_threshold"
+    aggression:
+      default_value: 2.2
+      runtime_key: rule2.aggression
+    max_rejection_probability:
+      default_value:
+        value: 80.0
+      runtime_key: "rule2.max_rejection_probability"
+    )EOF";
+
+  AdmissionControlProto proto;
+  TestUtility::loadFromYamlAndValidate(yaml, proto);
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  auto status_or = admission_control_filter_factory.createFilterFactoryFromProtoTyped(
+      proto, "whatever", dual_info_, factory_context.serverFactoryContext());
+  EXPECT_TRUE(status_or.ok());
+}
 } // namespace
 } // namespace AdmissionControl
 } // namespace HttpFilters
