@@ -14,6 +14,16 @@ namespace Extensions {
 namespace DynamicModules {
 namespace ListenerFilters {
 
+#ifdef SOL_IP
+// Helper action to set sockaddr in arg2 for getSocketOption mocking.
+ACTION_P(SetArg2Sockaddr, val) {
+  const sockaddr_in& sin = reinterpret_cast<const sockaddr_in&>(val);
+  (static_cast<sockaddr_in*>(arg2))->sin_addr = sin.sin_addr;
+  (static_cast<sockaddr_in*>(arg2))->sin_family = sin.sin_family;
+  (static_cast<sockaddr_in*>(arg2))->sin_port = sin.sin_port;
+}
+#endif // SOL_IP
+
 // A simple mock implementation of ListenerFilterBuffer for testing.
 class MockListenerFilterBuffer : public Network::ListenerFilterBuffer {
 public:
@@ -547,6 +557,10 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetOriginalDstNonIpAddress) {
   callbacks_.socket_.connection_info_provider_ =
       std::make_shared<Network::ConnectionInfoSetterImpl>(pipe, pipe);
 
+  // Mock addressType to return Pipe so the non-IP check is triggered.
+  ON_CALL(callbacks_.socket_, addressType())
+      .WillByDefault(testing::Return(Network::Address::Type::Pipe));
+
   envoy_dynamic_module_type_envoy_buffer address_out = {nullptr, 0};
   uint32_t port_out = 0;
   bool found = envoy_dynamic_module_callback_listener_filter_get_original_dst(
@@ -557,6 +571,48 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetOriginalDstNonIpAddress) {
   EXPECT_EQ(0, address_out.length);
   EXPECT_EQ(0, port_out);
 }
+
+#ifdef SOL_IP
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetOriginalDstSuccessIpv4) {
+  auto address = Network::Utility::parseInternetAddressNoThrow("10.0.0.3", 8443);
+  callbacks_.socket_.connection_info_provider_ =
+      std::make_shared<Network::ConnectionInfoSetterImpl>(address, address);
+
+  // Mock addressType to return IP.
+  ON_CALL(callbacks_.socket_, addressType())
+      .WillByDefault(testing::Return(Network::Address::Type::Ip));
+
+  // Mock ioHandle to return a valid fd.
+  EXPECT_CALL(callbacks_.socket_.io_handle_, fdDoNotUse()).WillRepeatedly(testing::Return(5));
+
+  // Mock ipVersion for getOriginalDst.
+  EXPECT_CALL(callbacks_.socket_, ipVersion())
+      .WillRepeatedly(testing::Return(Network::Address::IpVersion::v4));
+
+  // Mock getSocketOption to return a valid SO_ORIGINAL_DST address.
+  sockaddr_storage storage;
+  auto& sin = reinterpret_cast<sockaddr_in&>(storage);
+  sin.sin_family = AF_INET;
+  sin.sin_port = htons(9527);
+  sin.sin_addr.s_addr = inet_addr("12.34.56.78");
+
+  EXPECT_CALL(callbacks_.socket_, getSocketOption(testing::Eq(SOL_IP), testing::Eq(SO_ORIGINAL_DST),
+                                                  testing::_, testing::_))
+      .WillOnce(testing::DoAll(testing::SetArg2Sockaddr(storage),
+                               testing::Return(Api::SysCallIntResult{0, 0})));
+
+  envoy_dynamic_module_type_envoy_buffer address_out = {nullptr, 0};
+  uint32_t port_out = 0;
+  bool found = envoy_dynamic_module_callback_listener_filter_get_original_dst(
+      filterPtr(), &address_out, &port_out);
+
+  EXPECT_TRUE(found);
+  EXPECT_NE(nullptr, address_out.ptr);
+  EXPECT_GT(address_out.length, 0);
+  EXPECT_EQ("12.34.56.78", std::string(address_out.ptr, address_out.length));
+  EXPECT_EQ(9527, port_out);
+}
+#endif // SOL_IP
 
 // =============================================================================
 // Tests for get_address_type and is_local_address_restored.
