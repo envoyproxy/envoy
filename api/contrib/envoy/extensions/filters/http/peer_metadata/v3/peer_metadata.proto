@@ -78,6 +78,6 @@ message Config {
   bool shared_with_upstream = 5;
 
   // Additional labels to be added to the peer metadata to help your understand the traffic.
-  // e.g. `role`, `location` etc.
+  // e.g. ``role``, ``location`` etc.
   repeated string additional_labels = 6;
 }
