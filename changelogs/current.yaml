@@ -53,6 +53,9 @@ minor_behavior_changes:
 - area: tap
   change: |
     Add sequence number per event in transport socket streamed trace.
+- area: tap
+  change: |
+    Change the last sequence number from sentinel value to the previous sequence number plus one.
 - area: ext_proc
   change: |
     Use a hard-coded set of error messages when a :ref:`HeaderMutation
