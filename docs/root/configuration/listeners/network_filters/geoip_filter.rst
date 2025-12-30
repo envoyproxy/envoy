@@ -44,6 +44,59 @@ A sample filter configuration:
     :linenos:
     :caption: geoip-network-filter.yaml
 
+Dynamic Client IP Override
+--------------------------
+
+By default, the filter uses the downstream connection's remote address for geolocation lookups.
+For most deployments, this is sufficient since Envoy can obtain the correct client IP through:
+
+* Direct client connections (remote address is the client IP)
+* PROXY protocol (listener filter updates the connection's remote address)
+* Original destination filter (preserves the original destination)
+
+However, in advanced scenarios where the client IP needs to be extracted from another source,
+you can configure
+:ref:`client_ip <envoy_v3_api_field_extensions.filters.network.geoip.v3.Geoip.client_ip>`.
+This field accepts the same :ref:`format specifiers <config_access_log_format>` as used for
+:ref:`HTTP access logging <config_access_log>`. The format string is evaluated at connection
+time to produce the client IP address.
+
+This is useful for scenarios such as:
+
+* Reading client IP from filter state populated by a custom filter that parses application-layer
+  protocol headers
+* Extracting client IP from dynamic metadata set by another filter
+
+Example using filter state
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+If a preceding filter has stored the client IP in filter state, you can read it using the
+``FILTER_STATE`` formatter:
+
+.. code-block:: yaml
+
+  filter_chains:
+  - filters:
+    # First, a custom filter sets the client IP in filter state.
+    - name: envoy.filters.network.set_filter_state
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.network.set_filter_state.v3.Config
+        on_new_connection:
+        - object_key: my.custom.client.ip
+          format_string:
+            text_format_source:
+              inline_string: "192.0.2.1"
+    # Then use the geoip filter to read from filter state.
+    - name: envoy.filters.network.geoip
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.network.geoip.v3.Geoip
+        client_ip: "%FILTER_STATE(my.custom.client.ip:PLAIN)%"
+        provider:
+          # ... provider configuration ...
+
+If the result is empty, ``-``, or not a valid IP address, the filter falls back to the
+downstream connection's remote address.
+
 Accessing Geolocation Data
 --------------------------
 

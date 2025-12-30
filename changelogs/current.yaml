@@ -52,10 +52,10 @@ minor_behavior_changes:
     setting the runtime guard ``envoy.reloadable_features.get_header_tag_from_header_map`` to ``false``.
 - area: tap
   change: |
-    Add sequence number per event in transport socket streamed trace.
+    Added sequence number per event in transport socket streamed trace.
 - area: tap
   change: |
-    Change the last sequence number from sentinel value to the previous sequence number plus one.
+    Changed the last sequence number from sentinel value to the previous sequence number plus one.
 - area: ext_proc
   change: |
     Use a hard-coded set of error messages when a :ref:`HeaderMutation
@@ -100,22 +100,22 @@ minor_behavior_changes:
     setting the runtime guard ``envoy.reloadable_features.wasm_use_effective_ctx_for_foreign_functions`` to ``false``.
 - area: ext_proc
   change: |
-    added immediate_responses_sent counter for ext proc in :ref:'FilterStats
-    <envoy_v3_api_msg_extensions.filters.http.ext_proc.v3.ExternalProcessor.ExtProcFilterStats>'.
+    Added ``immediate_responses_sent`` counter to the ext_proc filter stats in the
+    ``http.<stat_prefix>.ext_proc.`` namespace.
 - area: http
   change: |
-    Now the :ref:`route level body buffer limit
-    <envoy_v3_api_field_config.route.v3.Route.request_body_buffer_limit>` will be applied to requests when
-    the route is matched. Previously, it will only be applied when the router filter is reached.
+    The :ref:`route level body buffer limit
+    <envoy_v3_api_field_config.route.v3.Route.request_body_buffer_limit>` is now applied to requests when
+    the route is matched. Previously, it was only applied when the router filter is reached.
 - area: http
   change: |
-    Now the retrying of async HTTP client calls will respect the set buffer limits and the retry will be ignored
+    Retrying of async HTTP client calls now respects the set buffer limits and the retry will be ignored
     if the buffer limit is exceeded. This behavior can be reverted by setting the runtime guard
     ``envoy.reloadable_features.http_async_client_retry_respect_buffer_limits`` to ``false``.
 - area: ext_proc
   change: |
-    added server_half_closed counter for ext proc in :ref:'FilterStats
-    <envoy_v3_api_msg_extensions.filters.http.ext_proc.v3.ExternalProcessor.ExtProcFilterStats>'.
+    Added ``server_half_closed`` counter to the ext_proc filter stats in the
+    ``http.<stat_prefix>.ext_proc.`` namespace.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -267,9 +267,17 @@ new_features:
   change: |
     Added support for configuring a chain of filters in the composite filter's :ref:`ExecuteFilterAction
     <envoy_v3_api_msg_extensions.filters.http.composite.v3.ExecuteFilterAction>` via the ``filter_chain`` field.
+- area: composite filter
+  change: |
+    Added support for named filter chains in the :ref:`Composite
+    <envoy_v3_api_msg_extensions.filters.http.composite.v3.Composite>` filter config via the
+    ``named_filter_chains`` field. These pre-compiled filter chains can be referenced from match
+    actions using the ``filter_chain_name`` field in :ref:`ExecuteFilterAction
+    <envoy_v3_api_msg_extensions.filters.http.composite.v3.ExecuteFilterAction>`. This improves
+    scalability by allowing filter chains to be defined once and referenced across many match actions.
 - area: server
   change: |
-    Add new command-line option ``--file-flush-min-size-kb <integer>`` to configure the minimum size in kilobytes for log file flushing.
+    Added command-line option ``--file-flush-min-size-kb <integer>`` to configure the minimum size in kilobytes for log file flushing.
 - area: network_filter
   change: |
     Added :ref:`geoip network filter <config_network_filters_geoip>` to perform geolocation lookups
@@ -377,7 +385,7 @@ new_features:
     Added :ref:`enable_huffman_encoding
     <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.enable_huffman_encoding>` which controls
     whether to use huffman encoding when sending headers. This is useful in scenarios where the
-    bandwidth saved from huffman encoding is not worth the cpu cost. e.g. for localhost, sidecar
+    bandwidth saved from huffman encoding is not worth the CPU cost, e.g., for localhost, sidecar
     traffic.
 - area: logging
   change: |
@@ -563,6 +571,11 @@ new_features:
     Added :ref:`custom_header_config <envoy_v3_api_field_extensions.filters.http.geoip.v3.Geoip.custom_header_config>`
     to allow extracting the client IP address from a custom request header which can be used instead of
     ``x-forwarded-for`` header or downstream connection source address.
+- area: geoip
+  change: |
+    Added :ref:`client_ip <envoy_v3_api_field_extensions.filters.network.geoip.v3.Geoip.client_ip>`
+    to the network geoip filter, enabling dynamic client IP extraction using format specifiers. This allows
+    flexible extraction of client IP from filter state, dynamic metadata, or other sources for geolocation lookups.
 - area: ext_authz
   change: |
     Added support for :ref:`metadata_context_namespaces
@@ -620,9 +633,9 @@ new_features:
     Added ``LISTENER_FILTER_CHAIN`` to the ``METADATA`` command operator to allow access to listener filter chain metadata.
 - area: ext_proc
   change: |
-    Added per HTTP event :ref:'procesing effects <envoy.filters.http.ext_proc.ProcessingEffect' in the
-    ExtProcLoggingInfo in the FilterState. This new data will be automatically collected and can be accesses via
-    method processingEffects.
+    Added per HTTP event processing effects in the ``ExtProcLoggingInfo`` filter state. This new data tracks
+    the processing effects (mutation applied, rejected, etc.) for headers, body, and trailers and can be
+    accessed via the ``processingEffects`` method.
 - area: network
   change: |
     Fixed socket address proto translations to preserve network namespace filepath information.

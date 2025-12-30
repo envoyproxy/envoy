@@ -275,6 +275,7 @@ absl::StatusOr<Envoy::Http::FilterFactoryCb> MatchDelegateConfig::createFilterFa
   auto& factory =
       Config::Utility::getAndCheckFactory<Server::Configuration::NamedHttpFilterConfigFactory>(
           proto_config.extension_config());
+
   Envoy::Http::Matching::HttpFilterActionContext action_context{
       .is_downstream_ = true,
       .stat_prefix_ = prefix,
@@ -292,6 +293,7 @@ absl::StatusOr<Envoy::Http::FilterFactoryCb> MatchDelegateConfig::createFilterFa
   auto& factory =
       Config::Utility::getAndCheckFactory<Server::Configuration::UpstreamHttpFilterConfigFactory>(
           proto_config.extension_config());
+
   Envoy::Http::Matching::HttpFilterActionContext action_context{
       .is_downstream_ = false,
       .stat_prefix_ = prefix,

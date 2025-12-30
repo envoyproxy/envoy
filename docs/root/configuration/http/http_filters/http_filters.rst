@@ -57,6 +57,7 @@ HTTP filters
   oauth2_filter
   on_demand_updates_filter
   original_src_filter
+  proto_api_scrubber_filter
   proto_message_extraction_filter
   rate_limit_filter
   rate_limit_quota_filter
