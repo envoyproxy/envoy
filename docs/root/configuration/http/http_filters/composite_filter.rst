@@ -3,6 +3,9 @@
 Composite Filter
 ================
 
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.composite.v3.Composite``.
+* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.composite.v3.Composite>`
+
 The composite filter allows delegating filter actions to a filter specified by a
 :ref:`match result <arch_overview_matching_api>`. The purpose of this is to allow different filters
 or filter configurations to be selected based on the incoming request, allowing for more dynamic
@@ -18,18 +21,21 @@ Delegation can fail if the filter factory attempted to use a callback not suppor
 composite filter. In either case, the ``<stat_prefix>.composite.delegation_error`` stat will be
 incremented.
 
-This filter adds a map of the delegated filter name (of the action that is matched )and the root config filter name to the filter state with key
-``envoy.extensions.filters.http.composite.matched_actions``
+This filter adds a map of the delegated filter name (of the action that is matched) and the root config filter name to the filter state with key
+``envoy.extensions.filters.http.composite.matched_actions``.
 This filter state is not emitted when the filter is configured in the upstream filter chain.
 
-Contains a map of pairs `FILTER_CONFIG_NAME:ACTION_NAME`:
+Contains a map of pairs ``FILTER_CONFIG_NAME:ACTION_NAME``:
 
-  * ``FILTER_CONFIG_NAME``: root filter config name;
+  * ``FILTER_CONFIG_NAME``: root filter config name.
   * ``ACTION_NAME``: delegated filter name of the action that is matched.
 
 
-Sample Envoy configuration
---------------------------
+Configuration Examples
+----------------------
+
+Single Filter Delegation
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Here's a sample Envoy configuration that makes use of the composite filter to inject a different
 latency via the :ref:`fault filter <config_http_filters_fault_injection>`. It uses the header
@@ -41,6 +47,73 @@ instantiated.
 .. literalinclude:: _include/composite.yaml
     :language: yaml
 
+Filter Chain Delegation
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+The composite filter can also delegate to a chain of filters rather than a single filter. When
+using :ref:`filter_chain <envoy_v3_api_field_extensions.filters.http.composite.v3.ExecuteFilterAction.filter_chain>`,
+multiple HTTP filters are executed in sequence for request processing (decoding) and in reverse order
+for response processing (encoding), similar to how the main HTTP filter chain operates.
+
+This is useful when you need to apply multiple filter operations as a group based on request matching criteria.
+For example, you might want to apply header manipulation, rate limiting, and authentication together for certain routes.
+
+The following example shows a composite filter configured with a filter chain that includes both
+header manipulation and fault injection filters:
+
+.. code-block:: yaml
+
+  http_filters:
+  - name: composite
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.common.matching.v3.ExtensionWithMatcher
+      extension_config:
+        name: composite
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.Composite
+      xds_matcher:
+        matcher_tree:
+          input:
+            name: request-headers
+            typed_config:
+              "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+              header_name: x-api-version
+          exact_match_map:
+            map:
+              "v2":
+                action:
+                  name: composite-action
+                  typed_config:
+                    "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.ExecuteFilterAction
+                    filter_chain:
+                      typed_config:
+                      - name: envoy.filters.http.header_to_metadata
+                        typed_config:
+                          "@type": type.googleapis.com/envoy.extensions.filters.http.header_to_metadata.v3.Config
+                          request_rules:
+                          - header: x-user-id
+                            on_header_present:
+                              metadata_namespace: envoy.lb
+                              key: user
+                              type: STRING
+                      - name: envoy.filters.http.fault
+                        typed_config:
+                          "@type": type.googleapis.com/envoy.extensions.filters.http.fault.v3.HTTPFault
+                          delay:
+                            fixed_delay: 1s
+                            percentage:
+                              numerator: 50
+                              denominator: HUNDRED
+  - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+
+.. note::
+
+  When ``filter_chain`` is set in :ref:`ExecuteFilterAction
+  <envoy_v3_api_msg_extensions.filters.http.composite.v3.ExecuteFilterAction>`, it takes precedence
+  over both ``typed_config`` and ``dynamic_config`` fields.
+
 Statistics
 ----------
 
@@ -50,5 +123,5 @@ The composite filter outputs statistics in the ``<stat_prefix>.composite.*`` nam
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
-  delegation_success, Counter, Number of requests that successfully created a delegated filter
-  delegation_error, Counter, Number of requests that attempted to create a delegated filter but failed
+  delegation_success, Counter, Number of requests that successfully created a delegated filter or filter chain
+  delegation_error, Counter, Number of requests that attempted to create a delegated filter or filter chain but failed

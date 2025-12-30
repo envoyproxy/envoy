@@ -342,6 +342,7 @@ private:
     void refreshIdleAndFlushTimeouts();
     void refreshAccessLogFlushTimer();
     void refreshTracing();
+    void refreshBufferLimit();
 
     void setRequestDecorator(RequestHeaderMap& headers);
     void setResponseDecorator(ResponseHeaderMap& headers);

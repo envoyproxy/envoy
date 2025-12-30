@@ -16,6 +16,7 @@
 #include "source/extensions/filters/http/ext_proc/http_client/http_client_impl.h"
 #include "source/extensions/filters/http/ext_proc/mutation_utils.h"
 #include "source/extensions/filters/http/ext_proc/on_processing_response.h"
+#include "source/extensions/filters/http/ext_proc/processing_effect.h"
 #include "source/extensions/filters/http/ext_proc/processing_request_modifier.h"
 
 #include "absl/strings/str_format.h"
@@ -73,7 +74,17 @@ constexpr absl::string_view ResponseTrailerLatencyUsField = "response_trailer_la
 constexpr absl::string_view ResponseTrailerCallStatusField = "response_trailer_call_status";
 constexpr absl::string_view BytesSentField = "bytes_sent";
 constexpr absl::string_view BytesReceivedField = "bytes_received";
+constexpr absl::string_view FailedOpenField = "failed_open";
 constexpr absl::string_view GrpcStatusBeforeFirstCallField = "grpc_status_before_first_call";
+constexpr absl::string_view RequestHeaderProcessingEffectField = "request_header_processing_effect";
+constexpr absl::string_view ResponseHeaderProcessingEffectField =
+    "response_header_processing_effect";
+constexpr absl::string_view RequestBodyProcessingEffectField = "request_body_processing_effect";
+constexpr absl::string_view ResponseBodyProcessingEffectField = "response_body_processing_effect";
+constexpr absl::string_view RequestTrailerProcessingEffectField =
+    "request_trailer_processing_effect";
+constexpr absl::string_view ResponseTrailerProcessingEffectField =
+    "response_trailer_processing_effect";
 
 absl::optional<ProcessingMode> initProcessingMode(const ExtProcPerRoute& config) {
   if (!config.disabled() && config.has_overrides() && config.overrides().has_processing_mode()) {
@@ -359,6 +370,46 @@ ExtProcLoggingInfo::grpcCalls(envoy::config::core::v3::TrafficDirection traffic_
              : encoding_processor_grpc_calls_;
 }
 
+// Handles the potential cases on when to update the effect field.
+ProcessingEffect::Effect updateProcessingEffect(ProcessingEffect::Effect current_effect,
+                                                ProcessingEffect::Effect new_effect) {
+  if (new_effect != ProcessingEffect::Effect::None) {
+    // Do nothing. Default value is None and we want to log the most recent effect that is not none.
+    return new_effect;
+  }
+  return current_effect;
+}
+
+void ExtProcLoggingInfo::recordProcessingEffect(
+    ProcessorState::CallbackState callback_state,
+    envoy::config::core::v3::TrafficDirection traffic_direction,
+    ProcessingEffect::Effect processing_effect) {
+  ASSERT(callback_state != ProcessorState::CallbackState::Idle);
+  switch (callback_state) {
+  case ProcessorState::CallbackState::HeadersCallback:
+    processingEffects(traffic_direction).header_effect_ = updateProcessingEffect(
+        processingEffects(traffic_direction).header_effect_, processing_effect);
+    break;
+  case ProcessorState::CallbackState::TrailersCallback:
+    processingEffects(traffic_direction).trailer_effect_ = updateProcessingEffect(
+        processingEffects(traffic_direction).trailer_effect_, processing_effect);
+    break;
+  default:
+    // Fall through for body callbacks
+    processingEffects(traffic_direction).body_effect_ = updateProcessingEffect(
+        processingEffects(traffic_direction).body_effect_, processing_effect);
+    break;
+  }
+}
+
+ExtProcLoggingInfo::ProcessingEffects&
+ExtProcLoggingInfo::processingEffects(envoy::config::core::v3::TrafficDirection traffic_direction) {
+  ASSERT(traffic_direction != envoy::config::core::v3::TrafficDirection::UNSPECIFIED);
+  return traffic_direction == envoy::config::core::v3::TrafficDirection::INBOUND
+             ? decoding_processor_effects_
+             : encoding_processor_effects_;
+}
+
 ProtobufTypes::MessagePtr ExtProcLoggingInfo::serializeAsProto() const {
   auto struct_msg = std::make_unique<Protobuf::Struct>();
 
@@ -416,8 +467,21 @@ ProtobufTypes::MessagePtr ExtProcLoggingInfo::serializeAsProto() const {
       static_cast<double>(bytes_sent_));
   (*struct_msg->mutable_fields())[BytesReceivedField].set_number_value(
       static_cast<double>(bytes_received_));
+  (*struct_msg->mutable_fields())[FailedOpenField].set_bool_value(failed_open_);
   (*struct_msg->mutable_fields())[GrpcStatusBeforeFirstCallField].set_number_value(
       static_cast<double>(static_cast<int>(grpc_status_before_first_call_)));
+  (*struct_msg->mutable_fields())[ResponseTrailerProcessingEffectField].set_number_value(
+      static_cast<int>(encoding_processor_effects_.trailer_effect_));
+  (*struct_msg->mutable_fields())[ResponseHeaderProcessingEffectField].set_number_value(
+      static_cast<int>(encoding_processor_effects_.header_effect_));
+  (*struct_msg->mutable_fields())[ResponseBodyProcessingEffectField].set_number_value(
+      static_cast<int>(encoding_processor_effects_.body_effect_));
+  (*struct_msg->mutable_fields())[RequestHeaderProcessingEffectField].set_number_value(
+      static_cast<int>(decoding_processor_effects_.header_effect_));
+  (*struct_msg->mutable_fields())[RequestTrailerProcessingEffectField].set_number_value(
+      static_cast<int>(decoding_processor_effects_.trailer_effect_));
+  (*struct_msg->mutable_fields())[RequestBodyProcessingEffectField].set_number_value(
+      static_cast<int>(decoding_processor_effects_.body_effect_));
   return struct_msg;
 }
 
@@ -472,6 +536,9 @@ ExtProcLoggingInfo::getField(absl::string_view field_name) const {
   if (field_name == RequestHeaderCallStatusField && decoding_processor_grpc_calls_.header_stats_) {
     return static_cast<int64_t>(decoding_processor_grpc_calls_.header_stats_->call_status_);
   }
+  if (field_name == RequestHeaderProcessingEffectField) {
+    return static_cast<int64_t>(decoding_processor_effects_.header_effect_);
+  }
   if (field_name == RequestBodyCallCountField && decoding_processor_grpc_calls_.body_stats_) {
     return static_cast<int64_t>(decoding_processor_grpc_calls_.body_stats_->call_count_);
   }
@@ -484,6 +551,9 @@ ExtProcLoggingInfo::getField(absl::string_view field_name) const {
   if (field_name == RequestBodyLastCallStatusField && decoding_processor_grpc_calls_.body_stats_) {
     return static_cast<int64_t>(decoding_processor_grpc_calls_.body_stats_->last_call_status_);
   }
+  if (field_name == RequestBodyProcessingEffectField) {
+    return static_cast<int64_t>(decoding_processor_effects_.body_effect_);
+  }
   if (field_name == RequestTrailerLatencyUsField && decoding_processor_grpc_calls_.trailer_stats_) {
     return static_cast<int64_t>(decoding_processor_grpc_calls_.trailer_stats_->latency_.count());
   }
@@ -491,11 +561,17 @@ ExtProcLoggingInfo::getField(absl::string_view field_name) const {
       decoding_processor_grpc_calls_.trailer_stats_) {
     return static_cast<int64_t>(decoding_processor_grpc_calls_.trailer_stats_->call_status_);
   }
+  if (field_name == RequestTrailerProcessingEffectField) {
+    return static_cast<int64_t>(decoding_processor_effects_.trailer_effect_);
+  }
   if (field_name == ResponseHeaderLatencyUsField && encoding_processor_grpc_calls_.header_stats_) {
     return static_cast<int64_t>(encoding_processor_grpc_calls_.header_stats_->latency_.count());
   }
   if (field_name == ResponseHeaderCallStatusField && encoding_processor_grpc_calls_.header_stats_) {
     return static_cast<int64_t>(encoding_processor_grpc_calls_.header_stats_->call_status_);
+  }
+  if (field_name == ResponseHeaderProcessingEffectField) {
+    return static_cast<int64_t>(encoding_processor_effects_.header_effect_);
   }
   if (field_name == ResponseBodyCallCountField && encoding_processor_grpc_calls_.body_stats_) {
     return static_cast<int64_t>(encoding_processor_grpc_calls_.body_stats_->call_count_);
@@ -509,6 +585,9 @@ ExtProcLoggingInfo::getField(absl::string_view field_name) const {
   if (field_name == ResponseBodyLastCallStatusField && encoding_processor_grpc_calls_.body_stats_) {
     return static_cast<int64_t>(encoding_processor_grpc_calls_.body_stats_->last_call_status_);
   }
+  if (field_name == ResponseBodyProcessingEffectField) {
+    return static_cast<int64_t>(encoding_processor_effects_.body_effect_);
+  }
   if (field_name == ResponseTrailerLatencyUsField &&
       encoding_processor_grpc_calls_.trailer_stats_) {
     return static_cast<int64_t>(encoding_processor_grpc_calls_.trailer_stats_->latency_.count());
@@ -517,11 +596,17 @@ ExtProcLoggingInfo::getField(absl::string_view field_name) const {
       encoding_processor_grpc_calls_.trailer_stats_) {
     return static_cast<int64_t>(encoding_processor_grpc_calls_.trailer_stats_->call_status_);
   }
+  if (field_name == ResponseTrailerProcessingEffectField) {
+    return static_cast<int64_t>(encoding_processor_effects_.trailer_effect_);
+  }
   if (field_name == BytesSentField) {
     return static_cast<int64_t>(bytes_sent_);
   }
   if (field_name == BytesReceivedField) {
     return static_cast<int64_t>(bytes_received_);
+  }
+  if (field_name == FailedOpenField) {
+    return failed_open_;
   }
   if (field_name == GrpcStatusBeforeFirstCallField) {
     return static_cast<int64_t>(grpc_status_before_first_call_);
@@ -626,6 +711,11 @@ void Filter::onComplete(ProcessingResponse& response) {
   onReceiveMessage(std::move(resp_ptr));
 }
 
+void Filter::logFailOpen() {
+  stats_.failure_mode_allowed_.inc();
+  logging_info_->setFailedOpen();
+}
+
 void Filter::onError() {
   ENVOY_STREAM_LOG(debug, "Received Error response from server", *decoder_callbacks_);
   stats_.http_not_ok_resp_received_.inc();
@@ -640,7 +730,7 @@ void Filter::onError() {
     // The user would like a none-200-ok response to not cause message processing to fail.
     // Close the external processing.
     processing_complete_ = true;
-    stats_.failure_mode_allowed_.inc();
+    logFailOpen();
     clearAsyncState();
   } else {
     // Return an error and stop processing the current stream.
@@ -1818,7 +1908,7 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
       // When a message is received out of order,and fail open is configured,
       // ignore it and also ignore the stream for the rest of this filter
       // instance's lifetime to protect us from a malformed server.
-      stats_.failure_mode_allowed_.inc();
+      logFailOpen();
       closeStream();
       clearAsyncState(processing_status.raw_code());
       processing_complete_ = true;
@@ -1846,10 +1936,10 @@ void Filter::onGrpcError(Grpc::Status::GrpcStatus status, const std::string& mes
     return;
   }
 
+  stats_.server_half_closed_.inc();
   if (failureModeAllow()) {
     onGrpcCloseWithStatus(status);
-    stats_.failure_mode_allowed_.inc();
-
+    logFailOpen();
   } else {
     processing_complete_ = true;
     // Since the stream failed, there is no need to handle timeouts, so
@@ -1876,6 +1966,7 @@ void Filter::onGrpcCloseWithStatus(Grpc::Status::GrpcStatus status) {
 
   processing_complete_ = true;
   stats_.streams_closed_.inc();
+  stats_.server_half_closed_.inc();
   // Successful close. We can ignore the stream for the rest of our request
   // and response processing.
   closeStream();
@@ -1893,7 +1984,7 @@ void Filter::onMessageTimeout() {
     // the external processor for the rest of the request.
     processing_complete_ = true;
     closeStream();
-    stats_.failure_mode_allowed_.inc();
+    logFailOpen();
     clearAsyncState(Grpc::Status::DeadlineExceeded);
 
   } else {
@@ -1946,9 +2037,10 @@ void Filter::sendImmediateResponse(const ImmediateResponse& response) {
           : absl::nullopt;
   const auto mutate_headers = [this, &response](Http::ResponseHeaderMap& headers) {
     if (response.has_headers()) {
+      ProcessingEffect::Effect imm_resp_effect = ProcessingEffect::Effect::None;
       const absl::Status mut_status = MutationUtils::applyHeaderMutations(
           response.headers(), headers, false, config().mutationChecker(),
-          stats_.rejected_header_mutations_);
+          stats_.rejected_header_mutations_, imm_resp_effect);
       if (!mut_status.ok()) {
         ENVOY_LOG_EVERY_POW_2(error, "Immediate response mutations failed with {}",
                               mut_status.message());

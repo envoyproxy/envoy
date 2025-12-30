@@ -195,6 +195,7 @@ For details on each command's usage see the official
   CLUSTER KEYSLOT, Generic
   CLUSTER NODES, Generic
   RANDOMKEY, Generic
+  OBJECT, Generic
   GEOADD, Geo
   GEODIST, Geo
   GEOHASH, Geo

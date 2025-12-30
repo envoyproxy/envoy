@@ -69,7 +69,7 @@ void DelegatingLogSink::set_formatter(std::unique_ptr<spdlog::formatter> formatt
 }
 
 void DelegatingLogSink::setShouldEscape(bool should_escape) {
-  absl::MutexLock lock(&format_mutex_);
+  absl::MutexLock lock(format_mutex_);
   should_escape_ = should_escape;
 }
 
