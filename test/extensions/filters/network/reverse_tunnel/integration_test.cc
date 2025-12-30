@@ -183,10 +183,10 @@ typed_config:
 
   std::string downstream_handshake_request_path_ =
       std::string(Extensions::Bootstrap::ReverseConnection::ReverseConnectionUtility::
-                      kDefaultReverseTunnelRequestPath);
+                      DEFAULT_REVERSE_TUNNEL_REQUEST_PATH);
   std::string upstream_request_path_ =
       std::string(Extensions::Bootstrap::ReverseConnection::ReverseConnectionUtility::
-                      kDefaultReverseTunnelRequestPath);
+                      DEFAULT_REVERSE_TUNNEL_REQUEST_PATH);
 
   // Set log level to debug for this test class.
   LogLevelSetter log_level_setter_ = LogLevelSetter(spdlog::level::trace);

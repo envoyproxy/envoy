@@ -96,7 +96,7 @@ ReverseTunnelFilterConfig::ReverseTunnelFilterConfig(
       request_path_(
           proto_config.request_path().empty()
               ? std::string(::Envoy::Extensions::Bootstrap::ReverseConnection::
-                                ReverseConnectionUtility::kDefaultReverseTunnelRequestPath)
+                                ReverseConnectionUtility::DEFAULT_REVERSE_TUNNEL_REQUEST_PATH)
               : proto_config.request_path()),
       request_method_string_([&proto_config]() -> std::string {
         envoy::config::core::v3::RequestMethod method = proto_config.request_method();
