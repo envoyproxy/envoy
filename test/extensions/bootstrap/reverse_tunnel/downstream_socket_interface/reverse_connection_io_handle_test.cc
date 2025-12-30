@@ -374,7 +374,7 @@ TEST_F(ReverseConnectionIOHandleTest, RequestPathDefaultsAndOverrides) {
   auto default_config = createDefaultTestConfig();
   io_handle_ = createTestIOHandle(default_config);
   ASSERT_NE(io_handle_, nullptr);
-  EXPECT_EQ(io_handle_->requestPath(), ReverseConnectionUtility::kDefaultReverseTunnelRequestPath);
+  EXPECT_EQ(io_handle_->requestPath(), ReverseConnectionUtility::DEFAULT_REVERSE_TUNNEL_REQUEST_PATH);
 
   ReverseConnectionSocketConfig custom_config = createDefaultTestConfig();
   custom_config.request_path = "/custom/handshake";

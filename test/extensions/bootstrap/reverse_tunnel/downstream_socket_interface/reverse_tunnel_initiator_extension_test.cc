@@ -131,7 +131,7 @@ TEST_F(ReverseTunnelInitiatorExtensionTest, InitializeWithCustomStatPrefix) {
 
 TEST_F(ReverseTunnelInitiatorExtensionTest, HandshakeRequestPathDefaults) {
   EXPECT_EQ(extension_->handshakeRequestPath(),
-            ReverseConnectionUtility::kDefaultReverseTunnelRequestPath);
+            ReverseConnectionUtility::DEFAULT_REVERSE_TUNNEL_REQUEST_PATH);
 }
 
 TEST_F(ReverseTunnelInitiatorExtensionTest, HandshakeRequestPathOverride) {
