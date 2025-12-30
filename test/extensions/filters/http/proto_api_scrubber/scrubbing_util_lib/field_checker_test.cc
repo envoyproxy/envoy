@@ -389,7 +389,7 @@ TEST_F(FieldCheckerTest, MessageLevelFieldRestriction) {
   Protobuf::Field field;
   field.set_name(field_name);
 
-  NiceMock<MockProtoApiScrubberFilterConfig> mock_filter_config;
+  NiceMock<MockProtoApiScrubberFilterConfig> mock_filter_config(stats_store_, time_system_);
   NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
 
   ON_CALL(mock_filter_config, getMethodDescriptor(testing::_))
@@ -1050,7 +1050,7 @@ TEST_F(FieldCheckerTest, UnsupportedScrubberContext) {
 
 TEST_F(FieldCheckerTest, ConstructorPropagatesHeadersAndTrailersToMatchTree) {
   NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
-  NiceMock<MockProtoApiScrubberFilterConfig> mock_config;
+  NiceMock<MockProtoApiScrubberFilterConfig> mock_config(stats_store_, time_system_);
   std::string method = "method";
   std::string field_name = "target_field";
   Http::TestRequestHeaderMapImpl request_headers{{"x-req-header", "true"}};
