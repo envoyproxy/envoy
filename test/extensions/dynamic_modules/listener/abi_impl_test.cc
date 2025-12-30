@@ -1,3 +1,4 @@
+#include <chrono>
 #include <vector>
 
 #include "source/common/network/address_impl.h"
@@ -12,6 +13,16 @@ namespace Envoy {
 namespace Extensions {
 namespace DynamicModules {
 namespace ListenerFilters {
+
+#ifdef SOL_IP
+// Helper action to set sockaddr in arg2 for getSocketOption mocking.
+ACTION_P(SetArg2Sockaddr, val) {
+  const sockaddr_in& sin = reinterpret_cast<const sockaddr_in&>(val);
+  (static_cast<sockaddr_in*>(arg2))->sin_addr = sin.sin_addr;
+  (static_cast<sockaddr_in*>(arg2))->sin_family = sin.sin_family;
+  (static_cast<sockaddr_in*>(arg2))->sin_port = sin.sin_port;
+}
+#endif // SOL_IP
 
 // A simple mock implementation of ListenerFilterBuffer for testing.
 class MockListenerFilterBuffer : public Network::ListenerFilterBuffer {
@@ -387,6 +398,288 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetLocalAddressNullCallbacks)
   EXPECT_EQ(0, port_out);
 }
 
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetLocalAddressNonIp) {
+  Network::Address::InstanceConstSharedPtr pipe =
+      *Network::Address::PipeInstance::create("/tmp/test.sock");
+  callbacks_.socket_.connection_info_provider_ =
+      std::make_shared<Network::ConnectionInfoSetterImpl>(pipe, pipe);
+
+  envoy_dynamic_module_type_envoy_buffer address_out = {nullptr, 0};
+  uint32_t port_out = 0;
+  bool found = envoy_dynamic_module_callback_listener_filter_get_local_address(
+      filterPtr(), &address_out, &port_out);
+
+  EXPECT_FALSE(found);
+  EXPECT_EQ(nullptr, address_out.ptr);
+  EXPECT_EQ(0, address_out.length);
+  EXPECT_EQ(0, port_out);
+}
+
+// =============================================================================
+// Tests for get_direct_remote_address / get_direct_local_address.
+// =============================================================================
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetDirectRemoteAddressUsesDirectAddress) {
+  auto remote_address = Network::Utility::parseInternetAddressNoThrow("10.0.0.2", 443);
+  auto direct_remote = Network::Utility::parseInternetAddressNoThrow("192.168.1.10", 15000);
+  callbacks_.socket_.connection_info_provider_ =
+      std::make_shared<Network::ConnectionInfoSetterImpl>(remote_address, remote_address);
+  callbacks_.socket_.connection_info_provider_->setDirectRemoteAddressForTest(direct_remote);
+
+  envoy_dynamic_module_type_envoy_buffer address_out = {nullptr, 0};
+  uint32_t port_out = 0;
+  bool found = envoy_dynamic_module_callback_listener_filter_get_direct_remote_address(
+      filterPtr(), &address_out, &port_out);
+
+  EXPECT_TRUE(found);
+  EXPECT_EQ(direct_remote->ip()->port(), port_out);
+  EXPECT_EQ(direct_remote->ip()->addressAsString(),
+            std::string(address_out.ptr, address_out.length));
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetDirectRemoteAddressNullCallbacks) {
+  auto filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
+  filter->initializeInModuleFilter();
+
+  envoy_dynamic_module_type_envoy_buffer address_out = {nullptr, 0};
+  uint32_t port_out = 0;
+  bool found = envoy_dynamic_module_callback_listener_filter_get_direct_remote_address(
+      static_cast<void*>(filter.get()), &address_out, &port_out);
+
+  EXPECT_FALSE(found);
+  EXPECT_EQ(nullptr, address_out.ptr);
+  EXPECT_EQ(0, address_out.length);
+  EXPECT_EQ(0, port_out);
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetDirectRemoteAddressNonIp) {
+  Network::Address::InstanceConstSharedPtr pipe =
+      *Network::Address::PipeInstance::create("/tmp/test.sock");
+  callbacks_.socket_.connection_info_provider_ =
+      std::make_shared<Network::ConnectionInfoSetterImpl>(pipe, pipe);
+
+  envoy_dynamic_module_type_envoy_buffer address_out = {nullptr, 0};
+  uint32_t port_out = 0;
+  bool found = envoy_dynamic_module_callback_listener_filter_get_direct_remote_address(
+      filterPtr(), &address_out, &port_out);
+
+  EXPECT_FALSE(found);
+  EXPECT_EQ(nullptr, address_out.ptr);
+  EXPECT_EQ(0, address_out.length);
+  EXPECT_EQ(0, port_out);
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetDirectLocalAddressUsesDirectAddress) {
+  auto local_address = Network::Utility::parseInternetAddressNoThrow("127.0.0.1", 8080);
+  callbacks_.socket_.connection_info_provider_ =
+      std::make_shared<Network::ConnectionInfoSetterImpl>(local_address, local_address);
+
+  envoy_dynamic_module_type_envoy_buffer address_out = {nullptr, 0};
+  uint32_t port_out = 0;
+  bool found = envoy_dynamic_module_callback_listener_filter_get_direct_local_address(
+      filterPtr(), &address_out, &port_out);
+
+  EXPECT_TRUE(found);
+  EXPECT_EQ(8080, port_out);
+  EXPECT_EQ(local_address->ip()->addressAsString(),
+            std::string(address_out.ptr, address_out.length));
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetDirectLocalAddressNullCallbacks) {
+  auto filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
+  filter->initializeInModuleFilter();
+
+  envoy_dynamic_module_type_envoy_buffer address_out = {nullptr, 0};
+  uint32_t port_out = 0;
+  bool found = envoy_dynamic_module_callback_listener_filter_get_direct_local_address(
+      static_cast<void*>(filter.get()), &address_out, &port_out);
+
+  EXPECT_FALSE(found);
+  EXPECT_EQ(nullptr, address_out.ptr);
+  EXPECT_EQ(0, address_out.length);
+  EXPECT_EQ(0, port_out);
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetDirectLocalAddressNonIp) {
+  Network::Address::InstanceConstSharedPtr pipe =
+      *Network::Address::PipeInstance::create("/tmp/test.sock");
+  callbacks_.socket_.connection_info_provider_ =
+      std::make_shared<Network::ConnectionInfoSetterImpl>(pipe, pipe);
+
+  envoy_dynamic_module_type_envoy_buffer address_out = {nullptr, 0};
+  uint32_t port_out = 0;
+  bool found = envoy_dynamic_module_callback_listener_filter_get_direct_local_address(
+      filterPtr(), &address_out, &port_out);
+
+  EXPECT_FALSE(found);
+  EXPECT_EQ(nullptr, address_out.ptr);
+  EXPECT_EQ(0, address_out.length);
+  EXPECT_EQ(0, port_out);
+}
+
+// =============================================================================
+// Tests for get_original_dst.
+// =============================================================================
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetOriginalDstReturnsFalseWhenUnavailable) {
+  auto address = Network::Utility::parseInternetAddressNoThrow("10.0.0.3", 8443);
+  callbacks_.socket_.connection_info_provider_ =
+      std::make_shared<Network::ConnectionInfoSetterImpl>(address, address);
+
+  envoy_dynamic_module_type_envoy_buffer address_out = {nullptr, 0};
+  uint32_t port_out = 0;
+  bool found = envoy_dynamic_module_callback_listener_filter_get_original_dst(
+      filterPtr(), &address_out, &port_out);
+
+  EXPECT_FALSE(found);
+  EXPECT_EQ(nullptr, address_out.ptr);
+  EXPECT_EQ(0, port_out);
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetOriginalDstNullCallbacks) {
+  auto filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
+  filter->initializeInModuleFilter();
+
+  envoy_dynamic_module_type_envoy_buffer address_out = {nullptr, 0};
+  uint32_t port_out = 0;
+  bool found = envoy_dynamic_module_callback_listener_filter_get_original_dst(
+      static_cast<void*>(filter.get()), &address_out, &port_out);
+
+  EXPECT_FALSE(found);
+  EXPECT_EQ(nullptr, address_out.ptr);
+  EXPECT_EQ(0, address_out.length);
+  EXPECT_EQ(0, port_out);
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetOriginalDstNonIpAddress) {
+  Network::Address::InstanceConstSharedPtr pipe =
+      *Network::Address::PipeInstance::create("/tmp/test.sock");
+  callbacks_.socket_.connection_info_provider_ =
+      std::make_shared<Network::ConnectionInfoSetterImpl>(pipe, pipe);
+
+  // Mock addressType to return Pipe so the non-IP check is triggered.
+  ON_CALL(callbacks_.socket_, addressType())
+      .WillByDefault(testing::Return(Network::Address::Type::Pipe));
+
+  envoy_dynamic_module_type_envoy_buffer address_out = {nullptr, 0};
+  uint32_t port_out = 0;
+  bool found = envoy_dynamic_module_callback_listener_filter_get_original_dst(
+      filterPtr(), &address_out, &port_out);
+
+  EXPECT_FALSE(found);
+  EXPECT_EQ(nullptr, address_out.ptr);
+  EXPECT_EQ(0, address_out.length);
+  EXPECT_EQ(0, port_out);
+}
+
+#ifdef SOL_IP
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetOriginalDstSuccessIpv4) {
+  auto address = Network::Utility::parseInternetAddressNoThrow("10.0.0.3", 8443);
+  callbacks_.socket_.connection_info_provider_ =
+      std::make_shared<Network::ConnectionInfoSetterImpl>(address, address);
+
+  // Set up mock IoHandle to return a valid fd.
+  auto mock_io_handle = std::make_unique<NiceMock<Network::MockIoHandle>>();
+  auto* mock_io_handle_ptr = mock_io_handle.get();
+  EXPECT_CALL(*mock_io_handle_ptr, fdDoNotUse()).WillRepeatedly(testing::Return(5));
+  EXPECT_CALL(callbacks_.socket_, ioHandle())
+      .WillRepeatedly(testing::ReturnRef(*mock_io_handle_ptr));
+  callbacks_.socket_.io_handle_ = std::move(mock_io_handle);
+
+  // Mock addressType to return IP.
+  ON_CALL(callbacks_.socket_, addressType())
+      .WillByDefault(testing::Return(Network::Address::Type::Ip));
+
+  // Mock ipVersion for getOriginalDst.
+  EXPECT_CALL(callbacks_.socket_, ipVersion())
+      .WillRepeatedly(testing::Return(Network::Address::IpVersion::v4));
+
+  // Mock getSocketOption to return a valid SO_ORIGINAL_DST address.
+  sockaddr_storage storage;
+  auto& sin = reinterpret_cast<sockaddr_in&>(storage);
+  sin.sin_family = AF_INET;
+  sin.sin_port = htons(9527);
+  sin.sin_addr.s_addr = inet_addr("12.34.56.78");
+
+  EXPECT_CALL(callbacks_.socket_, getSocketOption(testing::Eq(SOL_IP), testing::Eq(SO_ORIGINAL_DST),
+                                                  testing::_, testing::_))
+      .WillOnce(
+          testing::DoAll(SetArg2Sockaddr(storage), testing::Return(Api::SysCallIntResult{0, 0})));
+
+  envoy_dynamic_module_type_envoy_buffer address_out = {nullptr, 0};
+  uint32_t port_out = 0;
+  bool found = envoy_dynamic_module_callback_listener_filter_get_original_dst(
+      filterPtr(), &address_out, &port_out);
+
+  EXPECT_TRUE(found);
+  EXPECT_NE(nullptr, address_out.ptr);
+  EXPECT_GT(address_out.length, 0);
+  EXPECT_EQ("12.34.56.78", std::string(address_out.ptr, address_out.length));
+  EXPECT_EQ(9527, port_out);
+}
+#endif // SOL_IP
+
+// =============================================================================
+// Tests for get_address_type and is_local_address_restored.
+// =============================================================================
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetAddressTypePipe) {
+  ON_CALL(callbacks_.socket_, addressType())
+      .WillByDefault(testing::Return(Network::Address::Type::Pipe));
+  auto type = envoy_dynamic_module_callback_listener_filter_get_address_type(filterPtr());
+  EXPECT_EQ(envoy_dynamic_module_type_address_type_Pipe, type);
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetAddressTypeIp) {
+  ON_CALL(callbacks_.socket_, addressType())
+      .WillByDefault(testing::Return(Network::Address::Type::Ip));
+  auto type = envoy_dynamic_module_callback_listener_filter_get_address_type(filterPtr());
+  EXPECT_EQ(envoy_dynamic_module_type_address_type_Ip, type);
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetAddressTypeEnvoyInternal) {
+  ON_CALL(callbacks_.socket_, addressType())
+      .WillByDefault(testing::Return(Network::Address::Type::EnvoyInternal));
+  auto type = envoy_dynamic_module_callback_listener_filter_get_address_type(filterPtr());
+  EXPECT_EQ(envoy_dynamic_module_type_address_type_EnvoyInternal, type);
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetAddressTypeNullCallbacks) {
+  auto filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
+  filter->initializeInModuleFilter();
+
+  auto type = envoy_dynamic_module_callback_listener_filter_get_address_type(
+      static_cast<void*>(filter.get()));
+  EXPECT_EQ(envoy_dynamic_module_type_address_type_Unknown, type);
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, IsLocalAddressRestoredTrueAfterRestore) {
+  auto local_address = Network::Utility::parseInternetAddressNoThrow("127.0.0.1", 80);
+  auto restored = Network::Utility::parseInternetAddressNoThrow("127.0.0.2", 81);
+  callbacks_.socket_.connection_info_provider_ =
+      std::make_shared<Network::ConnectionInfoSetterImpl>(local_address, local_address);
+  callbacks_.socket_.connection_info_provider_->restoreLocalAddress(restored);
+
+  EXPECT_TRUE(envoy_dynamic_module_callback_listener_filter_is_local_address_restored(filterPtr()));
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, IsLocalAddressRestoredFalseBeforeRestore) {
+  auto local_address = Network::Utility::parseInternetAddressNoThrow("127.0.0.1", 80);
+  callbacks_.socket_.connection_info_provider_ =
+      std::make_shared<Network::ConnectionInfoSetterImpl>(local_address, local_address);
+
+  EXPECT_FALSE(
+      envoy_dynamic_module_callback_listener_filter_is_local_address_restored(filterPtr()));
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, IsLocalAddressRestoredNullCallbacks) {
+  auto filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
+  filter->initializeInModuleFilter();
+
+  EXPECT_FALSE(envoy_dynamic_module_callback_listener_filter_is_local_address_restored(
+      static_cast<void*>(filter.get())));
+}
+
 // =============================================================================
 // Tests for set_remote_address.
 // =============================================================================
@@ -498,6 +791,19 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, ContinueFilterChainNullCallba
   // Should not crash.
   envoy_dynamic_module_callback_listener_filter_continue_filter_chain(
       static_cast<void*>(filter.get()), true);
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, UseOriginalDst) {
+  EXPECT_CALL(callbacks_, useOriginalDst(true));
+  envoy_dynamic_module_callback_listener_filter_use_original_dst(filterPtr(), true);
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, UseOriginalDstNullCallbacks) {
+  auto filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
+  filter->initializeInModuleFilter();
+
+  envoy_dynamic_module_callback_listener_filter_use_original_dst(static_cast<void*>(filter.get()),
+                                                                 false);
 }
 
 // =============================================================================
@@ -682,6 +988,57 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetFilterStateNullKey) {
   EXPECT_FALSE(found);
   EXPECT_EQ(0, result_buf.length);
   EXPECT_EQ(nullptr, result_buf.ptr);
+}
+
+// =============================================================================
+// Tests for stream info helpers.
+// =============================================================================
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDownstreamTransportFailureReason) {
+  EXPECT_CALL(callbacks_.stream_info_,
+              setDownstreamTransportFailureReason(absl::string_view("tls_error")));
+
+  char reason[] = "tls_error";
+  envoy_dynamic_module_type_module_buffer reason_buf = {reason, 9};
+  envoy_dynamic_module_callback_listener_filter_set_downstream_transport_failure_reason(filterPtr(),
+                                                                                        reason_buf);
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDownstreamTransportFailureReasonNull) {
+  envoy_dynamic_module_type_module_buffer reason_buf = {nullptr, 5};
+  envoy_dynamic_module_callback_listener_filter_set_downstream_transport_failure_reason(filterPtr(),
+                                                                                        reason_buf);
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest,
+       SetDownstreamTransportFailureReasonNullCallbacks) {
+  auto filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
+  filter->initializeInModuleFilter();
+
+  char reason[] = "tls_error";
+  envoy_dynamic_module_type_module_buffer reason_buf = {reason, 9};
+  envoy_dynamic_module_callback_listener_filter_set_downstream_transport_failure_reason(
+      static_cast<void*>(filter.get()), reason_buf);
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetConnectionStartTimeMs) {
+  const std::chrono::system_clock::time_point start_time =
+      std::chrono::system_clock::from_time_t(123);
+  EXPECT_CALL(callbacks_.stream_info_, startTime()).WillOnce(testing::Return(start_time));
+
+  const uint64_t millis =
+      envoy_dynamic_module_callback_listener_filter_get_connection_start_time_ms(filterPtr());
+  EXPECT_EQ(123000, millis);
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetConnectionStartTimeMsNullCallbacks) {
+  auto filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
+  filter->initializeInModuleFilter();
+
+  const uint64_t millis =
+      envoy_dynamic_module_callback_listener_filter_get_connection_start_time_ms(
+          static_cast<void*>(filter.get()));
+  EXPECT_EQ(0, millis);
 }
 
 } // namespace ListenerFilters
