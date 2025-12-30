@@ -20,10 +20,8 @@ Design and Resources
 
 For detailed technical specifications and the evolution of this filter's capabilities, refer to the following design documents:
 
-* `Proto API Scrubber Foundation RFC <https://docs.google.com/document/d/1jgRe5mhucFRgmKYf-Ukk20jW8kusIo53U5bcF74GkK8>`_:
-  The original proposal defining the filter's motivation, its comparison to existing filters (like PME and gRPC Field Extraction), and the foundational implementation for field-level scrubbing.
-* `Message and Method Level Filtering Extension <https://docs.google.com/document/d/1ewm0_kmA3eIQ-DIYY4RnBAGK4OxlxFeXX_nuds7EjBE>`_:
-  An extension doc detailing the hierarchical restriction model. It introduces **Early Rejection** (denying requests at the header phase), global message-level restrictions, and deep inspection support for ``google.protobuf.Any`` types.
+* `Proto API Scrubber Foundation RFC <https://docs.google.com/document/d/1jgRe5mhucFRgmKYf-Ukk20jW8kusIo53U5bcF74GkK8>`_: The original proposal defining the filter's motivation, its comparison to existing filters (like PME and gRPC Field Extraction), and the foundational implementation for field-level scrubbing.
+* `Message and Method Level Filtering Extension <https://docs.google.com/document/d/1ewm0_kmA3eIQ-DIYY4RnBAGK4OxlxFeXX_nuds7EjBE>`_: An extension doc detailing the hierarchical restriction model. It introduces **Early Rejection** (denying requests at the header phase), global message-level restrictions, and deep inspection support for ``google.protobuf.Any`` types.
 
 Configuration
 -------------
@@ -43,7 +41,7 @@ How it Works
 2. **Transcoding**: The filter buffers the gRPC stream, decodes the Protobuf payload, and traverses the message structure.
 3. **Matching & Scrubbing**:
 
-   * The filter checks the configured **Restrictions**.
+   * The filter evaluates restrictions in a top-down hierarchy: **Method-level** (early rejection), **Message-level** (global scrubbing), and finally **Field-level** (fine-grained control).
    * For every target field or message, it evaluates the associated **Matcher**.
    * If a Matcher evaluates to ``true`` and triggers a ``RemoveFieldAction``, the data is removed (scrubbed) from the payload.
    * For **Map** fields: The filter preserves the map keys but can scrub the map values.
@@ -52,20 +50,20 @@ How it Works
 
 4. **Re-encoding**: The modified message is re-serialized and sent downstream or upstream.
 
-Restrictions hierarchy
+Restrictions Hierarchy
 ----------------------
 
 The filter supports a hierarchy of restrictions:
 
 1. **Method Restrictions**: Rules applied to a specific gRPC service method (e.g., ``/package.Service/Method``).
 
-   * **Method Level**: Can block the entire method execution (returns 403 Forbidden).
+   * **Method Level**: Can block the entire method execution (returns 403 Forbidden) via early rejection.
    * **Field Level**: Targets specific fields within the Request or Response message of that method.
 
 2. **Message Restrictions**: Rules applied to a specific Protobuf Message Type (e.g., ``package.SensitiveData``).
 
    * These rules apply globally whenever this message type is encountered, including inside nested fields or ``google.protobuf.Any`` payloads.
-   * **Message Level**: Can scrub the entire message instance.
+   * **Message Level**: Can scrub the entire message instance (clearing all its fields).
    * **Field Level**: Targets specific fields within this message type.
 
 Field Masking Reference
@@ -91,16 +89,16 @@ When defining restrictions, the "key" used in the configuration identifies which
      - ``outer_field.inner_field``
    * - **Enum Values**
      - Path to the enum field followed by the string value name.
-     - ``status.HIDDEN`` (targets the specific value ``HIDDEN`` in the ``status`` enum field).
+     - ``status.HIDDEN`` (targets the specific value ``HIDDEN`` in the ``status`` enum field)
    * - **Arrays**
      - Use the field name to target all child fields.
-     - ``items.id`` targets the ``id`` field of every element in the ``items`` array.
+     - ``items.id`` targets the ``id`` field of every element in the ``items`` array
    * - **Maps**
      - Use the ``.value`` suffix to target values.
-     - ``tags.value`` targets all map values. Map keys are always preserved.
-   * - **google.protobuf.Any Type**
+     - ``tags.value`` targets all map values. Map keys are always preserved
+   * - **Any Type**
      - Target the underlying type via **Message Restrictions**.
-     - A restriction on ``package.SecretType`` applies even when nested inside an ``Any`` field.
+     - A restriction on ``package.SecretType`` applies even when nested inside an ``Any`` field
 
 Matcher Reference
 -----------------
@@ -119,7 +117,7 @@ Matches a request attribute against an exact string.
       input:
         name: envoy.matching.inputs.request_headers
         typed_config:
-          "@type": [type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput](https://type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput)
+          "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
           header_name: "x-user-role"
       value_match:
         exact: "guest"
@@ -136,7 +134,7 @@ Matches a request attribute against a regular expression.
       input:
         name: envoy.matching.inputs.request_headers
         typed_config:
-          "@type": [type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput](https://type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput)
+          "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
           header_name: "user-agent"
       value_match:
         safe_regex:
@@ -155,11 +153,11 @@ Evaluates a Common Expression Language (CEL) expression. Note that this filter r
       input:
         name: envoy.matching.inputs.cel_data_input
         typed_config:
-          "@type": [type.googleapis.com/xds.type.matcher.v3.HttpAttributesCelMatchInput](https://type.googleapis.com/xds.type.matcher.v3.HttpAttributesCelMatchInput)
+          "@type": type.googleapis.com/xds.type.matcher.v3.HttpAttributesCelMatchInput
       custom_match:
         name: envoy.matching.matchers.cel_matcher
         typed_config:
-          "@type": [type.googleapis.com/xds.type.matcher.v3.CelMatcher](https://type.googleapis.com/xds.type.matcher.v3.CelMatcher)
+          "@type": type.googleapis.com/xds.type.matcher.v3.CelMatcher
           expr_match:
             cel_expr_parsed:
               expr:
@@ -216,7 +214,7 @@ In this scenario, we remove the ``raw_credit_card_data`` field from the ``GetTra
 
   name: envoy.filters.http.proto_api_scrubber
   typed_config:
-    "@type": [type.googleapis.com/envoy.extensions.filters.http.proto_api_scrubber.v3.ProtoApiScrubberConfig](https://type.googleapis.com/envoy.extensions.filters.http.proto_api_scrubber.v3.ProtoApiScrubberConfig)
+    "@type": type.googleapis.com/envoy.extensions.filters.http.proto_api_scrubber.v3.ProtoApiScrubberConfig
     descriptor_set:
       filename: "/etc/envoy/descriptors/bank.pb"
     filtering_mode: OVERRIDE
@@ -232,13 +230,12 @@ In this scenario, we remove the ``raw_credit_card_data`` field from the ``GetTra
                   matchers:
                   - predicate:
                       # This CEL expression evaluates true if role is NOT admin.
-                      # Structure follows cel_expr_parsed schema.
                       single_predicate: { ... }
                     on_match:
                       action:
                         name: remove
                         typed_config:
-                          "@type": [type.googleapis.com/envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction](https://type.googleapis.com/envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction)
+                          "@type": type.googleapis.com/envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction
 
 Example 2: Scrubbing a Specific Enum Value
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -262,7 +259,7 @@ Remove the ``category`` field only if its value is ``INTERNAL``.
                   on_match:
                     action:
                       typed_config:
-                        "@type": [type.googleapis.com/envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction](https://type.googleapis.com/envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction)
+                        "@type": type.googleapis.com/envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction
 
 Example 3: Message-Level Scrubbing (Handling ``google.protobuf.Any``)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -287,12 +284,12 @@ The filter will automatically unpack the ``Any`` field, check its type, and appl
                   on_match:
                     action:
                       typed_config:
-                        "@type": [type.googleapis.com/envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction](https://type.googleapis.com/envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction)
+                        "@type": type.googleapis.com/envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction
 
 Example 4: Blocking a Method entirely
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-You can block a method entirely based on a condition. If the matcher evaluates to true, the request is rejected immediately with a 403 Forbidden.
+You can block a method entirely based on a condition. If the matcher evaluates to true, the request is rejected immediately via early rejection with a 403 Forbidden.
 
 .. code-block:: yaml
 
@@ -308,19 +305,19 @@ You can block a method entirely based on a condition. If the matcher evaluates t
                     input:
                       name: request-header-match
                       typed_config:
-                        "@type": [type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput](https://type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput)
+                        "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
                         header_name: "x-block-method"
                     value_match:
                       exact: "true"
                 on_match:
                   action:
                     typed_config:
-                      "@type": [type.googleapis.com/envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction](https://type.googleapis.com/envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction)
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction
 
 Response Code Details
 ---------------------
 
-The Proto API Scrubber filter emits the following `Response Code Details <config_access_log_format_response_code_details>`_ which can be used for observability and debugging:
+The filter populates the following `Response Code Details <config_access_log_format_response_code_details>`_ for observability and debugging:
 
 .. list-table::
    :header-rows: 1
@@ -333,7 +330,7 @@ The Proto API Scrubber filter emits the following `Response Code Details <config
      - The gRPC method specified in the ``:path`` header could not be found in the configured descriptor set.
    * - ``proto_api_scrubber_Forbidden{METHOD_BLOCKED}``
      - 403 (Forbidden)
-     - A method-level restriction matcher evaluated to true, blocking the request.
+     - A method-level restriction matcher evaluated to true, triggering an early rejection of the request.
    * - ``proto_api_scrubber_FAILED_PRECONDITION{REQUEST_BUFFER_CONVERSION_FAIL}``
      - 400 (Bad Request)
      - Failed to convert the internal Envoy buffer to a Protobuf message stream (e.g., message too large).
