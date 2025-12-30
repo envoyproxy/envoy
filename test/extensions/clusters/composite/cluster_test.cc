@@ -58,8 +58,8 @@ public:
   std::shared_ptr<Cluster> cluster_;
 };
 
-// Test basic cluster creation with default FAIL overflow option.
-TEST_F(CompositeClusterTest, BasicCreationWithDefaultOverflow) {
+// Test basic cluster creation.
+TEST_F(CompositeClusterTest, BasicCreation) {
   const std::string yaml = R"EOF(
 name: composite_cluster
 connect_timeout: 0.25s
@@ -77,54 +77,7 @@ cluster_type:
   EXPECT_EQ(2, cluster_->clusters_->size());
   EXPECT_EQ("primary", (*cluster_->clusters_)[0]);
   EXPECT_EQ("secondary", (*cluster_->clusters_)[1]);
-  EXPECT_EQ(envoy::extensions::clusters::composite::v3::ClusterConfig::FAIL,
-            cluster_->overflow_option_);
   EXPECT_EQ(Upstream::Cluster::InitializePhase::Secondary, cluster_->initializePhase());
-}
-
-// Test configuration with USE_LAST_CLUSTER overflow option.
-TEST_F(CompositeClusterTest, UseLastClusterOverflowOption) {
-  const std::string yaml = R"EOF(
-name: composite_cluster
-connect_timeout: 0.25s
-lb_policy: CLUSTER_PROVIDED
-cluster_type:
-  name: envoy.clusters.composite
-  typed_config:
-    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
-    clusters:
-    - name: primary
-    - name: secondary
-    - name: tertiary
-    overflow_option: USE_LAST_CLUSTER
-)EOF";
-
-  initialize(yaml);
-  EXPECT_EQ(3, cluster_->clusters_->size());
-  EXPECT_EQ(envoy::extensions::clusters::composite::v3::ClusterConfig::USE_LAST_CLUSTER,
-            cluster_->overflow_option_);
-}
-
-// Test configuration with ROUND_ROBIN overflow option.
-TEST_F(CompositeClusterTest, RoundRobinOverflowOption) {
-  const std::string yaml = R"EOF(
-name: composite_cluster
-connect_timeout: 0.25s
-lb_policy: CLUSTER_PROVIDED
-cluster_type:
-  name: envoy.clusters.composite
-  typed_config:
-    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
-    clusters:
-    - name: cluster_a
-    - name: cluster_b
-    overflow_option: ROUND_ROBIN
-)EOF";
-
-  initialize(yaml);
-  EXPECT_EQ(2, cluster_->clusters_->size());
-  EXPECT_EQ(envoy::extensions::clusters::composite::v3::ClusterConfig::ROUND_ROBIN,
-            cluster_->overflow_option_);
 }
 
 // Test attempt count extraction from LoadBalancerContext.
@@ -144,8 +97,8 @@ cluster_type:
 
   initialize(yaml);
 
-  CompositeClusterLoadBalancer lb(cluster_->info(), cluster_->cluster_manager_, cluster_->clusters_,
-                                  cluster_->overflow_option_);
+  CompositeClusterLoadBalancer lb(cluster_->info(), cluster_->cluster_manager_,
+                                  cluster_->clusters_);
 
   // Test with null context.
   EXPECT_EQ(0, lb.getAttemptCount(nullptr));
@@ -169,8 +122,8 @@ cluster_type:
   EXPECT_EQ(0, lb.getAttemptCount(&context_null));
 }
 
-// Test cluster index mapping with FAIL overflow option.
-TEST_F(CompositeClusterTest, ClusterIndexMappingWithFailOverflow) {
+// Test cluster index mapping.
+TEST_F(CompositeClusterTest, ClusterIndexMapping) {
   const std::string yaml = R"EOF(
 name: composite_cluster
 connect_timeout: 0.25s
@@ -182,13 +135,12 @@ cluster_type:
     clusters:
     - name: primary
     - name: secondary
-    overflow_option: FAIL
 )EOF";
 
   initialize(yaml);
 
-  CompositeClusterLoadBalancer lb(cluster_->info(), cluster_->cluster_manager_, cluster_->clusters_,
-                                  cluster_->overflow_option_);
+  CompositeClusterLoadBalancer lb(cluster_->info(), cluster_->cluster_manager_,
+                                  cluster_->clusters_);
 
   // Test invalid attempt 0.
   EXPECT_FALSE(lb.mapAttemptToClusterIndex(0).has_value());
@@ -197,79 +149,9 @@ cluster_type:
   EXPECT_EQ(0, lb.mapAttemptToClusterIndex(1).value()); // First attempt -> first cluster.
   EXPECT_EQ(1, lb.mapAttemptToClusterIndex(2).value()); // Second attempt -> second cluster.
 
-  // Test overflow with FAIL behavior.
+  // Test overflow - should fail when attempts exceed available clusters.
   EXPECT_FALSE(lb.mapAttemptToClusterIndex(3).has_value());
   EXPECT_FALSE(lb.mapAttemptToClusterIndex(10).has_value());
-}
-
-// Test cluster index mapping with USE_LAST_CLUSTER overflow option.
-TEST_F(CompositeClusterTest, ClusterIndexMappingWithUseLastClusterOverflow) {
-  const std::string yaml = R"EOF(
-name: composite_cluster
-connect_timeout: 0.25s
-lb_policy: CLUSTER_PROVIDED
-cluster_type:
-  name: envoy.clusters.composite
-  typed_config:
-    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
-    clusters:
-    - name: primary
-    - name: secondary
-    overflow_option: USE_LAST_CLUSTER
-)EOF";
-
-  initialize(yaml);
-
-  CompositeClusterLoadBalancer lb(cluster_->info(), cluster_->cluster_manager_, cluster_->clusters_,
-                                  cluster_->overflow_option_);
-
-  // Test invalid attempt 0.
-  EXPECT_FALSE(lb.mapAttemptToClusterIndex(0).has_value());
-
-  // Test normal mapping (1-based attempts).
-  EXPECT_EQ(0, lb.mapAttemptToClusterIndex(1).value());
-  EXPECT_EQ(1, lb.mapAttemptToClusterIndex(2).value());
-
-  // Test overflow with USE_LAST_CLUSTER behavior.
-  EXPECT_EQ(1, lb.mapAttemptToClusterIndex(3).value());  // Overflow uses last cluster.
-  EXPECT_EQ(1, lb.mapAttemptToClusterIndex(10).value()); // Still uses last cluster.
-}
-
-// Test cluster index mapping with ROUND_ROBIN overflow option.
-TEST_F(CompositeClusterTest, ClusterIndexMappingWithRoundRobinOverflow) {
-  const std::string yaml = R"EOF(
-name: composite_cluster
-connect_timeout: 0.25s
-lb_policy: CLUSTER_PROVIDED
-cluster_type:
-  name: envoy.clusters.composite
-  typed_config:
-    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
-    clusters:
-    - name: cluster_0
-    - name: cluster_1
-    - name: cluster_2
-    overflow_option: ROUND_ROBIN
-)EOF";
-
-  initialize(yaml);
-
-  CompositeClusterLoadBalancer lb(cluster_->info(), cluster_->cluster_manager_, cluster_->clusters_,
-                                  cluster_->overflow_option_);
-
-  // Test invalid attempt 0.
-  EXPECT_FALSE(lb.mapAttemptToClusterIndex(0).has_value());
-
-  // Test normal mapping (1-based attempts).
-  EXPECT_EQ(0, lb.mapAttemptToClusterIndex(1).value()); // Attempt 1 -> cluster 0.
-  EXPECT_EQ(1, lb.mapAttemptToClusterIndex(2).value()); // Attempt 2 -> cluster 1.
-  EXPECT_EQ(2, lb.mapAttemptToClusterIndex(3).value()); // Attempt 3 -> cluster 2.
-
-  // Test overflow with ROUND_ROBIN behavior.
-  EXPECT_EQ(0, lb.mapAttemptToClusterIndex(4).value()); // Attempt 4 -> cluster 0 (wraps around).
-  EXPECT_EQ(1, lb.mapAttemptToClusterIndex(5).value()); // Attempt 5 -> cluster 1.
-  EXPECT_EQ(2, lb.mapAttemptToClusterIndex(6).value()); // Attempt 6 -> cluster 2.
-  EXPECT_EQ(0, lb.mapAttemptToClusterIndex(7).value()); // Attempt 7 -> cluster 0.
 }
 
 // Test getClusterByIndex with bounds checking.
@@ -289,8 +171,8 @@ cluster_type:
 
   initialize(yaml);
 
-  CompositeClusterLoadBalancer lb(cluster_->info(), cluster_->cluster_manager_, cluster_->clusters_,
-                                  cluster_->overflow_option_);
+  CompositeClusterLoadBalancer lb(cluster_->info(), cluster_->cluster_manager_,
+                                  cluster_->clusters_);
 
   // Test out of bounds index.
   EXPECT_EQ(nullptr, lb.getClusterByIndex(2));
@@ -317,8 +199,8 @@ cluster_type:
 
   initialize(yaml);
 
-  CompositeClusterLoadBalancer lb(cluster_->info(), cluster_->cluster_manager_, cluster_->clusters_,
-                                  cluster_->overflow_option_);
+  CompositeClusterLoadBalancer lb(cluster_->info(), cluster_->cluster_manager_,
+                                  cluster_->clusters_);
 
   NiceMock<Upstream::MockLoadBalancerContext> context;
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
@@ -354,8 +236,8 @@ cluster_type:
 
   initialize(yaml);
 
-  CompositeClusterLoadBalancer lb(cluster_->info(), cluster_->cluster_manager_, cluster_->clusters_,
-                                  cluster_->overflow_option_);
+  CompositeClusterLoadBalancer lb(cluster_->info(), cluster_->cluster_manager_,
+                                  cluster_->clusters_);
 
   // Test cluster removal for cluster in our list and unknown cluster.
   lb.onClusterRemoval("primary");
@@ -479,8 +361,8 @@ cluster_type:
 
   initialize(yaml);
 
-  CompositeClusterLoadBalancer lb(cluster_->info(), cluster_->cluster_manager_, cluster_->clusters_,
-                                  cluster_->overflow_option_);
+  CompositeClusterLoadBalancer lb(cluster_->info(), cluster_->cluster_manager_,
+                                  cluster_->clusters_);
 
   // Test onClusterAddOrUpdate for clusters in our list.
   NiceMock<Upstream::MockThreadLocalCluster> mock_cluster;
@@ -512,11 +394,10 @@ cluster_type:
     "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
     clusters:
     - name: target_cluster
-    overflow_option: FAIL
 )EOF");
 
   CompositeClusterLoadBalancer lb(cluster_->info(), server_context_.cluster_manager_,
-                                  cluster_->clusters_, cluster_->overflow_option_);
+                                  cluster_->clusters_);
 
   // Set up mocks for successful delegation.
   NiceMock<Upstream::MockLoadBalancerContext> context;
@@ -550,11 +431,10 @@ cluster_type:
     "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
     clusters:
     - name: peek_target
-    overflow_option: FAIL
 )EOF");
 
   CompositeClusterLoadBalancer lb(cluster_->info(), server_context_.cluster_manager_,
-                                  cluster_->clusters_, cluster_->overflow_option_);
+                                  cluster_->clusters_);
 
   NiceMock<Upstream::MockLoadBalancerContext> context;
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
@@ -583,11 +463,10 @@ cluster_type:
     "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
     clusters:
     - name: select_target
-    overflow_option: FAIL
 )EOF");
 
   CompositeClusterLoadBalancer lb(cluster_->info(), server_context_.cluster_manager_,
-                                  cluster_->clusters_, cluster_->overflow_option_);
+                                  cluster_->clusters_);
 
   NiceMock<Upstream::MockLoadBalancerContext> context;
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
@@ -612,41 +491,6 @@ cluster_type:
   EXPECT_TRUE(connection_result.has_value());
 }
 
-// Test member update callback triggered.
-TEST_F(CompositeClusterTest, MemberUpdateCallbackTriggered) {
-  initialize(R"EOF(
-name: member_update_cluster
-cluster_type:
-  name: envoy.clusters.composite
-  typed_config:
-    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
-    clusters:
-    - name: callback_cluster
-    overflow_option: FAIL
-)EOF");
-
-  NiceMock<Upstream::MockThreadLocalCluster> mock_cluster;
-  NiceMock<Upstream::MockPrioritySet> priority_set;
-  auto cluster_info = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
-  Envoy::Common::CallbackHandlePtr callback_handle;
-
-  EXPECT_CALL(server_context_.cluster_manager_, getThreadLocalCluster("callback_cluster"))
-      .WillRepeatedly(Return(&mock_cluster));
-  EXPECT_CALL(mock_cluster, prioritySet()).WillRepeatedly(ReturnRef(priority_set));
-  EXPECT_CALL(mock_cluster, info()).WillRepeatedly(Return(cluster_info));
-  std::string callback_cluster_name = "callback_cluster";
-  EXPECT_CALL(*cluster_info, name()).WillRepeatedly(ReturnRef(callback_cluster_name));
-  EXPECT_CALL(priority_set, addMemberUpdateCb(_))
-      .WillOnce([&](Upstream::PrioritySet::MemberUpdateCb cb) {
-        Upstream::HostVector added_hosts, removed_hosts;
-        cb(added_hosts, removed_hosts);
-        return nullptr;
-      });
-
-  CompositeClusterLoadBalancer lb(cluster_->info(), server_context_.cluster_manager_,
-                                  cluster_->clusters_, cluster_->overflow_option_);
-}
-
 // Test factory create method.
 TEST_F(CompositeClusterTest, FactoryCreateMethod) {
   ClusterFactory factory;
@@ -663,7 +507,6 @@ TEST_F(CompositeClusterTest, FactoryCreateMethod) {
   envoy::extensions::clusters::composite::v3::ClusterConfig typed_config;
   auto* entry = typed_config.add_clusters();
   entry->set_name("factory_cluster_1");
-  typed_config.set_overflow_option(envoy::extensions::clusters::composite::v3::ClusterConfig::FAIL);
   cluster_type->mutable_typed_config()->PackFrom(typed_config);
 
   auto result = factory.create(cluster_config, factory_context);
@@ -722,13 +565,12 @@ cluster_type:
     clusters:
     - name: missing_cluster_0
     - name: missing_cluster_1
-    overflow_option: FAIL
 )EOF";
 
   initialize(yaml);
 
-  CompositeClusterLoadBalancer lb(cluster_->info(), cluster_->cluster_manager_, cluster_->clusters_,
-                                  cluster_->overflow_option_);
+  CompositeClusterLoadBalancer lb(cluster_->info(), cluster_->cluster_manager_,
+                                  cluster_->clusters_);
 
   // Mock context for attempt 1 (should map to cluster index 0).
   NiceMock<Upstream::MockLoadBalancerContext> mock_context;
@@ -745,10 +587,12 @@ cluster_type:
   EXPECT_EQ(nullptr, result.host);
 }
 
-// Test default case in switch statement for overflow option.
-TEST_F(CompositeClusterTest, OverflowOptionDefaultCase) {
-  initialize(R"EOF(
-name: default_case_cluster
+// Test overflow behavior when attempts exceed available clusters.
+TEST_F(CompositeClusterTest, OverflowBehavior) {
+  const std::string yaml = R"EOF(
+name: overflow_cluster
+connect_timeout: 0.25s
+lb_policy: CLUSTER_PROVIDED
 cluster_type:
   name: envoy.clusters.composite
   typed_config:
@@ -756,16 +600,23 @@ cluster_type:
     clusters:
     - name: cluster1
     - name: cluster2
-    overflow_option: FAIL
-)EOF");
+)EOF";
 
-  CompositeClusterLoadBalancer lb(
-      cluster_->info(), server_context_.cluster_manager_, cluster_->clusters_,
-      static_cast<envoy::extensions::clusters::composite::v3::ClusterConfig::OverflowOption>(999));
+  initialize(yaml);
 
-  // Test overflow condition to trigger default case.
-  auto index_opt = lb.mapAttemptToClusterIndex(10);
-  EXPECT_FALSE(index_opt.has_value()); // Should default to FAIL behavior.
+  CompositeClusterLoadBalancer lb(cluster_->info(), cluster_->cluster_manager_,
+                                  cluster_->clusters_);
+
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+
+  EXPECT_CALL(context, requestStreamInfo()).WillRepeatedly(Return(&stream_info));
+
+  // Test attempt 3 which exceeds available clusters (only have 2).
+  EXPECT_CALL(stream_info, attemptCount()).WillRepeatedly(Return(absl::optional<uint32_t>(3)));
+
+  auto result = lb.chooseHost(&context);
+  EXPECT_EQ(nullptr, result.host);
 }
 
 } // namespace Composite

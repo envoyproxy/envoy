@@ -520,7 +520,7 @@ new_features:
 - area: cluster
   change: |
     Added :ref:`composite cluster <arch_overview_composite_cluster>` extension that enables retry-aware cluster selection.
-    This cluster type allows retries to automatically fall back to different sub-clusters based on retry attempt count,
-    with configurable overflow options (``FAIL``, ``USE_LAST_CLUSTER``, ``ROUND_ROBIN``).
+    This cluster type allows retries to automatically fall back to different sub-clusters based on retry attempt count.
+    Requests fail when retry attempts exceed the number of configured clusters.
 
 deprecated:

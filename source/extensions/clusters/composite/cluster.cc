@@ -23,40 +23,13 @@ Cluster::Cluster(const envoy::config::cluster::v3::Cluster& cluster,
           clusters->push_back(entry.name());
         }
         return clusters;
-      }()),
-      overflow_option_(config.overflow_option()) {}
+      }()) {}
 
 CompositeClusterLoadBalancer::CompositeClusterLoadBalancer(
     const Upstream::ClusterInfoConstSharedPtr& parent_info,
-    Upstream::ClusterManager& cluster_manager, const ClusterSetConstSharedPtr& clusters,
-    envoy::extensions::clusters::composite::v3::ClusterConfig::OverflowOption overflow_option)
-    : parent_info_(parent_info), cluster_manager_(cluster_manager), clusters_(clusters),
-      overflow_option_(overflow_option) {
-  for (const auto& cluster : *clusters_) {
-    auto tlc = cluster_manager_.getThreadLocalCluster(cluster);
-    // It is possible when initializing the cluster, the included cluster doesn't exist. e.g., the
-    // cluster could be added dynamically by xDS.
-    if (tlc == nullptr) {
-      continue;
-    }
-
-    // Add callback for clusters initialized before composite cluster.
-    addMemberUpdateCallbackForCluster(*tlc);
-  }
-  refresh();
+    Upstream::ClusterManager& cluster_manager, const ClusterSetConstSharedPtr& clusters)
+    : parent_info_(parent_info), cluster_manager_(cluster_manager), clusters_(clusters) {
   handle_ = cluster_manager_.addThreadLocalClusterUpdateCallbacks(*this);
-}
-
-void CompositeClusterLoadBalancer::addMemberUpdateCallbackForCluster(
-    Upstream::ThreadLocalCluster& thread_local_cluster) {
-  member_update_cbs_[thread_local_cluster.info()->name()] =
-      thread_local_cluster.prioritySet().addMemberUpdateCb(
-          [this, target_cluster_info = thread_local_cluster.info()](const Upstream::HostVector&,
-                                                                    const Upstream::HostVector&) {
-            ENVOY_LOG(debug, "member update for cluster '{}' in composite cluster '{}'",
-                      target_cluster_info->name(), parent_info_->name());
-            refresh();
-          });
 }
 
 uint32_t
@@ -89,24 +62,8 @@ CompositeClusterLoadBalancer::mapAttemptToClusterIndex(uint32_t attempt_count) c
     return cluster_index;
   }
 
-  // Handle overflow based on configuration.
-  switch (overflow_option_) {
-  case envoy::extensions::clusters::composite::v3::ClusterConfig::FAIL:
-    // Return nullopt to signal failure.
-    return absl::nullopt;
-
-  case envoy::extensions::clusters::composite::v3::ClusterConfig::USE_LAST_CLUSTER:
-    // Use the last cluster in the list.
-    return clusters_->size() - 1;
-
-  case envoy::extensions::clusters::composite::v3::ClusterConfig::ROUND_ROBIN:
-    // Round-robin through all clusters.
-    return cluster_index % clusters_->size();
-
-  default:
-    // Default to FAIL behavior for unknown values.
-    return absl::nullopt;
-  }
+  // Attempts exceed available clusters - fail the request.
+  return absl::nullopt;
 }
 
 Upstream::ThreadLocalCluster*
@@ -126,32 +83,19 @@ CompositeClusterLoadBalancer::getClusterByIndex(size_t cluster_index) const {
   return tlc;
 }
 
-void CompositeClusterLoadBalancer::refresh(OptRef<const std::string> excluded_cluster) {
-  UNREFERENCED_PARAMETER(excluded_cluster);
-  // For composite cluster, we don't need to linearize priorities like the regular aggregate
-  // cluster since each sub-cluster handles its own priorities independently.
-  ENVOY_LOG(debug, "refreshing composite cluster '{}'", parent_info_->name());
-}
-
 void CompositeClusterLoadBalancer::onClusterAddOrUpdate(
     absl::string_view cluster_name, Upstream::ThreadLocalClusterCommand& get_cluster) {
+  UNREFERENCED_PARAMETER(get_cluster);
   if (std::find(clusters_->begin(), clusters_->end(), cluster_name) != clusters_->end()) {
-    ENVOY_LOG(debug, "adding or updating cluster '{}' for composite cluster '{}'", cluster_name,
+    ENVOY_LOG(debug, "cluster '{}' added or updated for composite cluster '{}'", cluster_name,
               parent_info_->name());
-    auto& cluster = get_cluster();
-    refresh();
-    addMemberUpdateCallbackForCluster(cluster);
   }
 }
 
 void CompositeClusterLoadBalancer::onClusterRemoval(const std::string& cluster_name) {
-  // The onClusterRemoval callback is called before the thread local cluster is removed. There
-  // will be a dangling pointer to the thread local cluster if the deleted cluster is not skipped
-  // when we refresh the load balancer.
   if (std::find(clusters_->begin(), clusters_->end(), cluster_name) != clusters_->end()) {
-    ENVOY_LOG(debug, "removing cluster '{}' from composite cluster '{}'", cluster_name,
+    ENVOY_LOG(debug, "cluster '{}' removed from composite cluster '{}'", cluster_name,
               parent_info_->name());
-    refresh(cluster_name);
   }
 }
 

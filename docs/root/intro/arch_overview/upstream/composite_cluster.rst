@@ -41,14 +41,13 @@ The following example shows a composite cluster with three sub-clusters:
       - name: primary_cluster
       - name: secondary_cluster
       - name: fallback_cluster
-      overflow_option: USE_LAST_CLUSTER
 
 In this configuration:
 
 - Initial requests (attempt 1) go to ``primary_cluster``.
 - First retries (attempt 2) go to ``secondary_cluster``.
 - Second retries (attempt 3) go to ``fallback_cluster``.
-- Subsequent retries continue to use ``fallback_cluster`` due to ``USE_LAST_CLUSTER`` overflow option.
+- Further retry attempts (attempt 4+) will fail with no host available.
 
 Cluster selection
 -----------------
@@ -58,29 +57,10 @@ The composite cluster uses a sequential selection strategy based on retry attemp
 * **Initial request** (attempt 1): Uses the first cluster.
 * **First retry** (attempt 2): Uses the second cluster.
 * **Second retry** (attempt 3): Uses the third cluster.
-* **Further retries**: Handled according to the overflow option.
+* **Further retries**: Fail with no host available.
 
-Overflow handling
------------------
-
-When retry attempts exceed the number of configured clusters, the behavior is controlled by the
-``overflow_option``:
-
-FAIL
-~~~~
-
-Further retry attempts fail with no host available. This is the default behavior.
-
-USE_LAST_CLUSTER
-~~~~~~~~~~~~~~~~
-
-Continue using the last cluster in the list for all subsequent retry attempts.
-
-ROUND_ROBIN
-~~~~~~~~~~~
-
-Round-robin through all available clusters for overflow attempts. For example, with 3 clusters,
-the 4th attempt uses the first cluster (index 0), the 5th uses the second cluster (index 1), etc.
+When retry attempts exceed the number of configured clusters, requests fail with no host available.
+Configure the number of retries in your retry policy to match your cluster configuration.
 
 Retry policy coordination
 -------------------------
@@ -120,8 +100,9 @@ Comparison with aggregate cluster
 +------------------+---------------------------+-------------------------------+
 | Primary use case | Health-based failover     | Retry progression             |
 +------------------+---------------------------+-------------------------------+
-| Overflow handling| Health-dependent          | Configurable (FAIL/LAST/RR)   |
+| Overflow handling| Health-dependent          | Fails request                 |
 +------------------+---------------------------+-------------------------------+
 | Predictability   | Health-dependent          | Fully deterministic           |
 +------------------+---------------------------+-------------------------------+
+
 

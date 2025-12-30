@@ -31,7 +31,6 @@ public:
 
   Upstream::ClusterManager& cluster_manager_;
   const ClusterSetConstSharedPtr clusters_;
-  const envoy::extensions::clusters::composite::v3::ClusterConfig::OverflowOption overflow_option_;
 
 protected:
   Cluster(const envoy::config::cluster::v3::Cluster& cluster,
@@ -46,16 +45,14 @@ private:
   void startPreInit() override { onPreInitComplete(); }
 };
 
-// Load balancer used by each worker thread. It will be refreshed when clusters, hosts or priorities
-// are updated.
+// Load balancer used by each worker thread.
 class CompositeClusterLoadBalancer : public Upstream::LoadBalancer,
                                      Upstream::ClusterUpdateCallbacks,
                                      Logger::Loggable<Logger::Id::upstream> {
 public:
-  CompositeClusterLoadBalancer(
-      const Upstream::ClusterInfoConstSharedPtr& parent_info,
-      Upstream::ClusterManager& cluster_manager, const ClusterSetConstSharedPtr& clusters,
-      envoy::extensions::clusters::composite::v3::ClusterConfig::OverflowOption overflow_option);
+  CompositeClusterLoadBalancer(const Upstream::ClusterInfoConstSharedPtr& parent_info,
+                               Upstream::ClusterManager& cluster_manager,
+                               const ClusterSetConstSharedPtr& clusters);
 
   // Upstream::ClusterUpdateCallbacks
   void onClusterAddOrUpdate(absl::string_view cluster_name,
@@ -73,23 +70,18 @@ public:
   // Extract retry attempt count from LoadBalancerContext.
   uint32_t getAttemptCount(Upstream::LoadBalancerContext* context) const;
 
-  // Map attempt count to cluster index based on configuration.
-  // Returns nullopt when no cluster is available (overflow with FAIL option).
+  // Map attempt count to cluster index.
+  // Returns nullopt when attempt count exceeds the number of available clusters.
   absl::optional<size_t> mapAttemptToClusterIndex(uint32_t attempt_count) const;
 
   // Get cluster by index.
   Upstream::ThreadLocalCluster* getClusterByIndex(size_t cluster_index) const;
 
 private:
-  void addMemberUpdateCallbackForCluster(Upstream::ThreadLocalCluster& thread_local_cluster);
-  void refresh(OptRef<const std::string> excluded_cluster = OptRef<const std::string>());
-
   Upstream::ClusterInfoConstSharedPtr parent_info_;
   Upstream::ClusterManager& cluster_manager_;
   const ClusterSetConstSharedPtr clusters_;
-  const envoy::extensions::clusters::composite::v3::ClusterConfig::OverflowOption overflow_option_;
   Upstream::ClusterUpdateCallbacksHandlePtr handle_;
-  absl::flat_hash_map<std::string, Envoy::Common::CallbackHandlePtr> member_update_cbs_;
 };
 
 // Load balancer factory created by the main thread and will be called in each worker thread to
@@ -100,8 +92,8 @@ public:
 
   // Upstream::LoadBalancerFactory
   Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams) override {
-    return std::make_unique<CompositeClusterLoadBalancer>(
-        cluster_.info(), cluster_.cluster_manager_, cluster_.clusters_, cluster_.overflow_option_);
+    return std::make_unique<CompositeClusterLoadBalancer>(cluster_.info(), cluster_.cluster_manager_,
+                                                          cluster_.clusters_);
   }
 
   const Cluster& cluster_;

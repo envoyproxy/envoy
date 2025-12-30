@@ -59,7 +59,6 @@ public:
       composite_config.add_clusters()->set_name("cluster_0");
       composite_config.add_clusters()->set_name("cluster_1");
       composite_config.add_clusters()->set_name("cluster_2");
-      composite_config.set_overflow_option(overflow_option_);
 
       composite_cluster->mutable_cluster_type()->mutable_typed_config()->PackFrom(composite_config);
     });
@@ -90,18 +89,11 @@ public:
     test_server_->waitForGaugeGe("cluster_manager.active_clusters", 4);
   }
 
-  void setOverflowOption(
-      envoy::extensions::clusters::composite::v3::ClusterConfig::OverflowOption option) {
-    overflow_option_ = option;
-  }
-
   void setNumRetries(uint32_t retries) { num_retries_ = retries; }
 
   void setEnableAttemptCountHeaders(bool enable) { enable_attempt_count_headers_ = enable; }
 
 private:
-  envoy::extensions::clusters::composite::v3::ClusterConfig::OverflowOption overflow_option_{
-      envoy::extensions::clusters::composite::v3::ClusterConfig::FAIL};
   uint32_t num_retries_{3};
   bool enable_attempt_count_headers_{false};
 };
@@ -186,9 +178,8 @@ TEST_P(CompositeClusterIntegrationTest, SuccessfulFirstAttempt) {
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_2.upstream_rq_total")->value());
 }
 
-// Verifies that requests fail when retries exceed available clusters with FAIL behavior.
-TEST_P(CompositeClusterIntegrationTest, FailOverflowOption) {
-  setOverflowOption(envoy::extensions::clusters::composite::v3::ClusterConfig::FAIL);
+// Verifies that requests fail when retries exceed available clusters.
+TEST_P(CompositeClusterIntegrationTest, OverflowFails) {
   setNumRetries(5); // More retries than clusters.
   initialize();
 
@@ -222,105 +213,7 @@ TEST_P(CompositeClusterIntegrationTest, FailOverflowOption) {
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_2.upstream_rq_total")->value());
 }
 
-// Verifies that overflow retries continue to use the last cluster.
-TEST_P(CompositeClusterIntegrationTest, UseLastClusterOverflowOption) {
-  setOverflowOption(envoy::extensions::clusters::composite::v3::ClusterConfig::USE_LAST_CLUSTER);
-  setNumRetries(5); // More retries than clusters.
-  initialize();
-
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
-  auto response = codec_client_->makeRequestWithBody(
-      Http::TestRequestHeaderMapImpl{{":method", "GET"},
-                                     {":path", "/test"},
-                                     {":scheme", "http"},
-                                     {":authority", "test.example.com"}},
-      0);
-
-  // First 3 attempts go to different clusters.
-  for (int i = 0; i < 3; ++i) {
-    ASSERT_TRUE(fake_upstreams_[i]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-    ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
-    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, true);
-    ASSERT_TRUE(fake_upstream_connection_->close());
-    fake_upstream_connection_.reset();
-  }
-
-  // 4th attempt should go to cluster_2 again (last cluster).
-  ASSERT_TRUE(fake_upstreams_[2]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
-  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, true);
-  ASSERT_TRUE(fake_upstream_connection_->close());
-  fake_upstream_connection_.reset();
-
-  // 5th attempt should go to cluster_2 again - return 200.
-  ASSERT_TRUE(fake_upstreams_[2]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
-  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
-
-  ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().getStatusValue());
-
-  // Verify cluster usage - cluster_2 should have been used 3 times.
-  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_rq_total")->value());
-  EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.upstream_rq_total")->value());
-  EXPECT_EQ(3, test_server_->counter("cluster.cluster_2.upstream_rq_total")->value());
-}
-
-// Verifies that overflow retries round-robin through clusters.
-TEST_P(CompositeClusterIntegrationTest, RoundRobinOverflowOption) {
-  setOverflowOption(envoy::extensions::clusters::composite::v3::ClusterConfig::ROUND_ROBIN);
-  setNumRetries(5); // More retries than clusters.
-  initialize();
-
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
-  auto response = codec_client_->makeRequestWithBody(
-      Http::TestRequestHeaderMapImpl{{":method", "GET"},
-                                     {":path", "/test"},
-                                     {":scheme", "http"},
-                                     {":authority", "test.example.com"}},
-      0);
-
-  // First 3 attempts go to different clusters.
-  for (int i = 0; i < 3; ++i) {
-    ASSERT_TRUE(fake_upstreams_[i]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-    ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
-    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, true);
-    ASSERT_TRUE(fake_upstream_connection_->close());
-    fake_upstream_connection_.reset();
-  }
-
-  // 4th attempt should go to cluster_0 (round-robin wraps around).
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
-  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, true);
-  ASSERT_TRUE(fake_upstream_connection_->close());
-  fake_upstream_connection_.reset();
-
-  // 5th attempt should go to cluster_1 - return 200.
-  ASSERT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
-  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
-
-  ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().getStatusValue());
-
-  // Verify cluster usage - cluster_0 and cluster_1 used twice, cluster_2 once.
-  EXPECT_EQ(2, test_server_->counter("cluster.cluster_0.upstream_rq_total")->value());
-  EXPECT_EQ(2, test_server_->counter("cluster.cluster_1.upstream_rq_total")->value());
-  EXPECT_EQ(1, test_server_->counter("cluster.cluster_2.upstream_rq_total")->value());
-}
-
-// This test specifically verifies the fix for the 1-based retry attempt indexing.
+// This test specifically verifies the 1-based retry attempt indexing.
 TEST_P(CompositeClusterIntegrationTest, AttemptCountVerification) {
   setNumRetries(2);
   setEnableAttemptCountHeaders(true);
