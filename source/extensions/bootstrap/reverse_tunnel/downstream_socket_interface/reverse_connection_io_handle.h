@@ -81,7 +81,8 @@ struct ReverseConnectionSocketConfig {
   std::string src_cluster_id; // Cluster identifier of local envoy instance.
   std::string src_node_id;    // Node identifier of local envoy instance.
   std::string src_tenant_id;  // Tenant identifier of local envoy instance.
-  std::string request_path{std::string(ReverseConnectionUtility::kDefaultReverseTunnelRequestPath)};
+  std::string request_path{
+      std::string(ReverseConnectionUtility::DEFAULT_REVERSE_TUNNEL_REQUEST_PATH)};
   // TODO(basundhara-c): Add support for multiple remote clusters using the same
   // ReverseConnectionIOHandle. Currently, each ReverseConnectionIOHandle handles
   // reverse connections for a single upstream cluster since a different ReverseConnectionAddress

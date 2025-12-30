@@ -42,7 +42,7 @@ public:
       handshake_request_path_ = config.http_handshake().request_path();
     } else {
       handshake_request_path_ =
-          std::string(ReverseConnectionUtility::kDefaultReverseTunnelRequestPath);
+          std::string(ReverseConnectionUtility::DEFAULT_REVERSE_TUNNEL_REQUEST_PATH);
     }
     ENVOY_LOG(debug,
               "ReverseTunnelInitiatorExtension: creating downstream reverse connection "
