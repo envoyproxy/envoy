@@ -88,7 +88,7 @@ public:
   MOCK_METHOD(const Protobuf::Type*, getParentType, (const Protobuf::Field* field),
               (const, override));
 
-  // Constructor initializes base class with stats and time source.
+  // Delegate non-mocked calls to the real object
   MockProtoApiScrubberFilterConfig(ProtoApiScrubberStats stats, TimeSource& time_source)
       : ProtoApiScrubberFilterConfig(stats, time_source) {
     ON_CALL(*this, getRequestType(_)).WillByDefault([this](const std::string& method_name) {
@@ -192,7 +192,6 @@ protected:
               .fileReadToEnd(Envoy::TestEnvironment::runfilesPath(descriptor_path))
               .value();
     }
-    // Initialize stats.
     ProtoApiScrubberStats stats(*stats_store_.rootScope(), "proto_api_scrubber.");
     mock_filter_config_ =
         std::make_shared<NiceMock<MockProtoApiScrubberFilterConfig>>(stats, time_system_);
@@ -1305,7 +1304,8 @@ TEST_F(MethodLevelRestrictionTest, MethodBlockedByMatcher) {
                              "proto_api_scrubber_Forbidden{METHOD_BLOCKED}"));
 
   // Verify Trace Tag.
-  EXPECT_CALL(mock_decoder_callbacks_.active_span_, setTag("proto_scrubber.outcome", "blocked"));
+  EXPECT_CALL(mock_decoder_callbacks_.active_span_,
+              setTag("proto_api_scrubber.outcome", "blocked"));
 
   EXPECT_EQ(Envoy::Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(req_headers, false));
@@ -1430,16 +1430,19 @@ TEST_F(MethodLevelRestrictionTest, MethodAllowedWithFieldRestrictions) {
 
 class ObservabilityTest : public ProtoApiScrubberFilterTest {};
 
+// Tests that the filter increments the 'total_requests_checked' counter upon receiving a valid gRPC
+// request.
 TEST_F(ObservabilityTest, DecodeHeadersIncrementsTotalRequests) {
   TestRequestHeaderMapImpl headers{{":method", "POST"},
                                    {":path", "/apikeys.ApiKeys/CreateApiKey"},
                                    {"content-type", "application/grpc"}};
 
   EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
-
   EXPECT_EQ(1, mock_filter_config_->stats().total_requests_checked_.value());
 }
 
+// Tests that blocking a request via method-level rules increments the 'method_blocked' counter and
+// sets the trace tag.
 TEST_F(ObservabilityTest, MethodLevelBlockingUpdatesStatsAndTrace) {
   std::string method_name = "/bookstore.Bookstore/CreateShelf";
 
@@ -1451,32 +1454,34 @@ TEST_F(ObservabilityTest, MethodLevelBlockingUpdatesStatsAndTrace) {
 
   EXPECT_CALL(*mock_filter_config_, getMethodMatcher(method_name))
       .WillOnce(Return(mock_match_tree));
-  // Return Match to simulate block
+
+  // Return Match to simulate block.
   EXPECT_CALL(*mock_match_tree, match(_, _)).WillOnce(Return(Matcher::MatchResult(mock_action)));
 
   TestRequestHeaderMapImpl headers{
       {":method", "POST"}, {":path", method_name}, {"content-type", "application/grpc"}};
 
-  // 1. Verify Trace Tag
-  EXPECT_CALL(mock_decoder_callbacks_.active_span_, setTag("proto_scrubber.outcome", "blocked"));
+  // Verify Trace Tag.
+  EXPECT_CALL(mock_decoder_callbacks_.active_span_,
+              setTag("proto_api_scrubber.outcome", "blocked"));
 
-  // 2. Verify 403
+  // Verify 403.
   EXPECT_CALL(mock_decoder_callbacks_, sendLocalReply(Http::Code::Forbidden, _, _, _, _));
-
   EXPECT_EQ(Envoy::Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(headers, false));
 
-  // 3. Verify Stat
+  // Verify Stat.
   EXPECT_EQ(1, mock_filter_config_->stats().method_blocked_.value());
 }
 
-TEST_F(ObservabilityTest, ScrubbingSuccessRecordsLatencyHistogram) {
+// Tests that successful scrubbing of a request records the processing latency in the histogram.
+TEST_F(ObservabilityTest, RequestScrubbingRecordsLatency) {
   TestRequestHeaderMapImpl headers{{":method", "POST"},
                                    {":path", "/apikeys.ApiKeys/CreateApiKey"},
                                    {"content-type", "application/grpc"}};
   EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
 
-  // Valid empty message
+  // Valid empty message.
   Envoy::Buffer::OwnedImpl data;
   char grpc_frame[] = {0, 0, 0, 0, 0};
   data.add(grpc_frame, 5);
@@ -1487,6 +1492,7 @@ TEST_F(ObservabilityTest, ScrubbingSuccessRecordsLatencyHistogram) {
   EXPECT_TRUE(mock_filter_config_->stats().request_scrubbing_latency_.used());
 }
 
+// Tests that successful scrubbing of a response records the processing latency in the histogram.
 TEST_F(ObservabilityTest, ResponseScrubbingRecordsLatency) {
   TestRequestHeaderMapImpl req_headers{{":method", "POST"},
                                        {":path", "/apikeys.ApiKeys/CreateApiKey"},
@@ -1497,12 +1503,14 @@ TEST_F(ObservabilityTest, ResponseScrubbingRecordsLatency) {
   EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue,
             filter_->encodeHeaders(resp_headers, false));
 
+  // Valid empty message.
   Envoy::Buffer::OwnedImpl data;
   char grpc_frame[] = {0, 0, 0, 0, 0};
   data.add(grpc_frame, 5);
 
   EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->encodeData(data, true));
 
+  // Verify Histogram was used (recorded a value).
   EXPECT_TRUE(mock_filter_config_->stats().response_scrubbing_latency_.used());
 }
 

@@ -134,9 +134,8 @@ bool ProtoApiScrubberFilter::checkMethodLevelRestrictions(Envoy::Http::RequestHe
     ENVOY_STREAM_LOG(debug, "Method-level restriction matched for {}, blocking request.",
                      *decoder_callbacks_, method_name_);
 
-    // Observability: Increment blocked counter and set trace tag.
     filter_config_.stats().method_blocked_.inc();
-    decoder_callbacks_->activeSpan().setTag("proto_scrubber.outcome", "blocked");
+    decoder_callbacks_->activeSpan().setTag("proto_api_scrubber.outcome", "blocked");
 
     rejectRequest(Status::PermissionDenied, "Method not allowed",
                   formatError(kRcDetailFilterProtoApiScrubber,
@@ -163,9 +162,7 @@ ProtoApiScrubberFilter::decodeHeaders(Envoy::Http::RequestHeaderMap& headers, bo
     return Envoy::Http::FilterHeadersStatus::Continue;
   }
 
-  // Observability: Track total requests checked.
   filter_config_.stats().total_requests_checked_.inc();
-
   is_valid_grpc_request_ = true;
   const auto* path_header = headers.Path();
   // The :path pseudo-header is mandatory for HTTP/2 requests.
@@ -295,7 +292,8 @@ Http::FilterDataStatus ProtoApiScrubberFilter::decodeData(Buffer::Instance& data
 
     if (!status.ok()) {
       filter_config_.stats().request_scrubbing_failed_.inc();
-      decoder_callbacks_->activeSpan().setTag("proto_scrubber.request_error", status.ToString());
+      decoder_callbacks_->activeSpan().setTag("proto_api_scrubber.request_error",
+                                              status.ToString());
 
       ENVOY_STREAM_LOG(warn, "Scrubbing failed with error: {}. The request will not be modified.",
                        *decoder_callbacks_, status.ToString());
@@ -407,7 +405,7 @@ Http::FilterDataStatus ProtoApiScrubberFilter::encodeData(Buffer::Instance& data
 
     if (!response_scrubber_or_status.ok()) {
       filter_config_.stats().response_scrubbing_failed_.inc();
-      encoder_callbacks_->activeSpan().setTag("proto_scrubber.response_error",
+      encoder_callbacks_->activeSpan().setTag("proto_api_scrubber.response_error",
                                               response_scrubber_or_status.ToString());
 
       ENVOY_STREAM_LOG(warn,

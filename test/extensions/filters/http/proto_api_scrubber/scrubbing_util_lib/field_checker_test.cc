@@ -31,7 +31,6 @@ namespace ProtoApiScrubber {
 // mocked so that matching scenarios can be tested.
 class MockProtoApiScrubberFilterConfig : public ProtoApiScrubberFilterConfig {
 public:
-  // Update: Constructor accepts dependencies to allow base class initialization
   MockProtoApiScrubberFilterConfig(Stats::Store& store, TimeSource& time_source)
       : ProtoApiScrubberFilterConfig(ProtoApiScrubberStats(*store.rootScope(), "mock_prefix."),
                                      time_source) {}
@@ -155,12 +154,10 @@ protected:
     // config initialization. This mock setup ensures that test API is propagated properly to the
     // filter.
     ON_CALL(server_factory_context_, api()).WillByDefault(testing::ReturnRef(*api_));
+    ON_CALL(server_factory_context_, timeSource()).WillByDefault(testing::ReturnRef(time_system_));
+    ON_CALL(factory_context_, scope()).WillByDefault(testing::ReturnRef(*stats_store_.rootScope()));
     ON_CALL(factory_context_, serverFactoryContext())
         .WillByDefault(testing::ReturnRef(server_factory_context_));
-
-    // Wire up dependencies for real config creation.
-    ON_CALL(factory_context_, scope()).WillByDefault(testing::ReturnRef(*stats_store_.rootScope()));
-    ON_CALL(server_factory_context_, timeSource()).WillByDefault(testing::ReturnRef(time_system_));
   }
 
   // Helper to load descriptors (shared by all configs).

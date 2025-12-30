@@ -49,9 +49,7 @@ using StringPairToMatchTreeMap =
 using TypeFinder = std::function<const Envoy::Protobuf::Type*(const std::string&)>;
 } // namespace
 
-/**
- * All stats for the Proto API Scrubber filter. @see stats_macros.h
- */
+// All stats for the Proto API Scrubber filter. @see stats_macros.h for more details on stats.
 #define ALL_PROTO_API_SCRUBBER_STATS(COUNTER, GAUGE, HISTOGRAM)                                    \
   COUNTER(request_scrubbing_failed)                                                                \
   COUNTER(response_scrubbing_failed)                                                               \
@@ -68,8 +66,6 @@ struct ProtoApiScrubberStats {
   ALL_PROTO_API_SCRUBBER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT,
                                GENERATE_HISTOGRAM_STRUCT)
 
-  // Constructor using helper methods for readability.
-  // Note: GENERATE_COUNTER_STRUCT appends an underscore to the member name.
   ProtoApiScrubberStats(Envoy::Stats::Scope& scope, absl::string_view prefix)
       : request_scrubbing_failed_(makeCounter(scope, prefix, "request_scrubbing_failed")),
         response_scrubbing_failed_(makeCounter(scope, prefix, "response_scrubbing_failed")),
@@ -216,12 +212,15 @@ public:
 
   FilteringMode filteringMode() const { return filtering_mode_; }
 
+  // Returns the filter statistics helper.
   const ProtoApiScrubberStats& stats() const { return stats_; }
 
+  // Returns the time source used for latency measurements.
   TimeSource& timeSource() const { return time_source_; }
 
 protected:
-  // Constructor initializes stats and time source.
+  // Protected constructor to make sure that this class is used in a factory fashion using the
+  // public `create` method.
   ProtoApiScrubberFilterConfig(ProtoApiScrubberStats stats, TimeSource& time_source)
       : stats_(stats), time_source_(time_source) {}
 
@@ -349,7 +348,10 @@ private:
   absl::flat_hash_map<std::string, const Protobuf::Type*> request_type_cache_;
   absl::flat_hash_map<std::string, const Protobuf::Type*> response_type_cache_;
 
+  // The stats helper used to record filter metrics.
   ProtoApiScrubberStats stats_;
+
+  // The time source used for measuring latency.
   TimeSource& time_source_;
 };
 

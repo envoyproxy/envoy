@@ -599,7 +599,6 @@ TEST_F(ProtoApiScrubberFilterConfigTest, StatsInitialization) {
   // Verify that the stats were created in the store with the correct prefix.
   // The Counters are lazily instantiated in Envoy usually, but since the struct constructor
   // calls POOL_COUNTER_PREFIX, they should be present in the map.
-
   // Just verify we can access the stats object and it points to valid counters.
   EXPECT_NE(&filter_config_->stats().total_requests_checked_, nullptr);
   EXPECT_EQ(filter_config_->stats().total_requests_checked_.name(),

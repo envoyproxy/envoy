@@ -940,37 +940,37 @@ TEST_P(ProtoApiScrubberIntegrationTest, RejectsInvalidPathFormat) {
   ASSERT_TRUE(grpc_status != nullptr);
   EXPECT_EQ("3", grpc_status->value().getStringView()); // 3 = Invalid Argument
 
-  // Verify Stats
+  // Verify Stats for invalid method name.
   test_server_->waitForCounterGe("proto_api_scrubber.invalid_method_name", 1);
 }
 
 // Tests that the request is rejected if a method-level block rule matches.
 TEST_P(ProtoApiScrubberIntegrationTest, RejectsBlockedMethod) {
-  // Construct the config programmatically
+  // Construct the config programmatically.
   ProtoApiScrubberConfig config;
   config.set_filtering_mode(ProtoApiScrubberConfig::OVERRIDE);
   config.mutable_descriptor_set()->mutable_data_source()->set_filename(apikeysDescriptorPath());
 
-  // Create the CEL matcher for "true" (always match -> block)
+  // Create the CEL matcher for "true" (always match -> block).
   auto matcher_predicate = buildCelPredicate("true");
 
-  // Create the full Matcher object
+  // Create the full Matcher object.
   xds::type::matcher::v3::Matcher matcher;
   auto* matcher_entry = matcher.mutable_matcher_list()->add_matchers();
   *matcher_entry->mutable_predicate() = matcher_predicate;
 
-  // Use RemoveFieldAction as a placeholder action since the logic only checks for a match
+  // Use RemoveFieldAction as a placeholder action since the logic only checks for a match.
   envoy::extensions::filters::http::proto_api_scrubber::v3::RemoveFieldAction remove_action;
   matcher_entry->mutable_on_match()->mutable_action()->mutable_typed_config()->PackFrom(
       remove_action);
   matcher_entry->mutable_on_match()->mutable_action()->set_name("block_action");
 
-  // Set up the restriction map
+  // Set up the restriction map.
   auto& method_restrictions = *config.mutable_restrictions()->mutable_method_restrictions();
   auto& restriction = method_restrictions[kCreateApiKeyMethod];
   *restriction.mutable_method_restriction()->mutable_matcher() = matcher;
 
-  // Wrap in Any and convert to JSON for Envoy config
+  // Wrap in Any and convert to JSON for Envoy config.
   Protobuf::Any any_config;
   any_config.PackFrom(config);
   std::string typed_config = fmt::format(R"EOF(
@@ -985,12 +985,12 @@ TEST_P(ProtoApiScrubberIntegrationTest, RejectsBlockedMethod) {
   auto response = sendGrpcRequest(request_proto, kCreateApiKeyMethod);
   ASSERT_TRUE(response->waitForEndStream());
 
-  // Check 403 / Permission Denied
+  // Verify 403 / Permission Denied.
   auto grpc_status = response->headers().GrpcStatus();
   ASSERT_TRUE(grpc_status != nullptr);
   EXPECT_EQ("7", grpc_status->value().getStringView()); // 7 = Permission Denied
 
-  // Verify Stats
+  // Verify Stats for blocked method.
   test_server_->waitForCounterGe("proto_api_scrubber.method_blocked", 1);
 }
 
