@@ -102,6 +102,12 @@ public:
   virtual CertificateSelectionCallbackPtr createCertificateSelectionCallback() PURE;
 
   /**
+   * Attach additional certificate selection data to the TLS socket connection.
+   */
+  virtual void
+  setCertSelectionHandle(Ssl::SelectionHandleConstSharedPtr cert_selection_handle) PURE;
+
+  /**
    * Called after the cert selection completes either synchronously or asynchronously.
    * @param selected_ctx selected Ssl::TlsContext, it's empty when selection failed.
    * @param async true if the validation is completed asynchronously.

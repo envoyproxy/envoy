@@ -108,6 +108,19 @@ public:
   getMessageMatcher(const std::string& message_name) const;
 
   /**
+   * Returns the match tree associated with a specific field within a message type.
+   * This allows defining restrictions that apply whenever a specific message type is encountered,
+   * regardless of where it appears (e.g. inside an Any field).
+   *
+   * @param message_name The fully qualified message name (e.g., "package.MyMessage").
+   * @param field_name The name of the field within that message.
+   * @return A MatchTreeHttpMatchingDataSharedPtr if a restriction is configured.
+   * Returns `nullptr` otherwise.
+   */
+  virtual MatchTreeHttpMatchingDataSharedPtr
+  getMessageFieldMatcher(const std::string& message_name, const std::string& field_name) const;
+
+  /**
    * Resolves the human-readable name of a specific enum value.
    *
    * @param enum_type_name The fully qualified name of the enum type (e.g., "package.Status").
@@ -122,6 +135,16 @@ public:
   // corresponding `Protobuf::Type*`.
   virtual const TypeFinder& getTypeFinder() const { return *type_finder_; };
 
+  /**
+   * Returns the parent Type for a given Field pointer.
+   * This map is pre-computed during initialization to allow recovering context when
+   * traversing dynamic types (e.g., Any).
+   *
+   * @param field The field pointer to look up.
+   * @return The parent Type pointer, or nullptr if not found.
+   */
+  virtual const Envoy::Protobuf::Type* getParentType(const Envoy::Protobuf::Field* field) const;
+
   // Returns the request type of the method.
   virtual absl::StatusOr<const Protobuf::Type*>
   getRequestType(const std::string& method_name) const;
@@ -129,6 +152,11 @@ public:
   // Returns the response type of the method.
   virtual absl::StatusOr<const Protobuf::Type*>
   getResponseType(const std::string& method_name) const;
+
+  // Returns method descriptor by looking up the `descriptor_pool_`.
+  // If the method doesn't exist in the `descriptor_pool`, it returns absl::InvalidArgument error.
+  virtual absl::StatusOr<const MethodDescriptor*>
+  getMethodDescriptor(const std::string& method_name) const;
 
   FilteringMode filteringMode() const { return filtering_mode_; }
 
@@ -163,12 +191,48 @@ private:
   absl::Status initialize(const ProtoApiScrubberConfig& proto_config,
                           Envoy::Server::Configuration::FactoryContext& context);
 
-  // Initializes the descriptor pool from the provided 'data_source'.
-  absl::Status initializeDescriptorPool(Api::Api& api,
-                                        const ::envoy::config::core::v3::DataSource& data_source);
+  // Loads and parses the descriptor set from the data source.
+  // Returns the parsed FileDescriptorSet and populates the internal descriptor_pool_.
+  absl::StatusOr<Envoy::Protobuf::FileDescriptorSet>
+  loadDescriptorSet(Api::Api& api, const ::envoy::config::core::v3::DataSource& data_source);
 
   // Initializes the type utilities (e.g., type helper, type finder, etc.).
   void initializeTypeUtils();
+
+  // Traverses the FileDescriptorSet and pre-computes the Field* -> Parent Type* map.
+  // This must be called after initializeTypeUtils().
+  void buildFieldParentMap(const Envoy::Protobuf::FileDescriptorSet& descriptor_set);
+
+  // Recursive helper for buildFieldParentMap.
+  void populateMapForMessage(const Envoy::Protobuf::DescriptorProto& msg,
+                             const std::string& package_prefix);
+
+  /**
+   * Helper method to resolve a Protobuf type from its name and populate the type cache.
+   *
+   * This handles normalizing the fully qualified type name (handling leading dots
+   * or prepending the package prefix), constructing the type URL, looking it up
+   * via the type finder, and storing the result in the provided cache map.
+   * If the type cannot be resolved, an error is logged.
+   *
+   * @param raw_type_name   The type name as defined in the method descriptor (e.g. "MyMessage" or
+   * ".pkg.Msg").
+   * @param package_prefix  The package scope of the file (e.g. "my.package.") to use if the type is
+   * relative.
+   * @param method_key      The unique string key for the method (e.g.
+   * "/my.package.Service/Method").
+   * @param cache           The specific cache map to populate (request_type_cache_ or
+   * response_type_cache_).
+   * @param type_category   A label (e.g. "Request" or "Response") used for error logging.
+   */
+  void resolveAndCacheType(const std::string& raw_type_name, const std::string& package_prefix,
+                           const std::string& method_key,
+                           absl::flat_hash_map<std::string, const Envoy::Protobuf::Type*>& cache,
+                           absl::string_view type_category);
+
+  // Pre-computes the request and response types for all methods in the descriptor set.
+  // This allows O(1) access to types during request and response processing.
+  void precomputeTypeCache(const Envoy::Protobuf::FileDescriptorSet& descriptor_set);
 
   // Initializes the method's request and response restrictions using the restrictions configured
   // in the proto config.
@@ -189,10 +253,6 @@ private:
   initializeMessageRestrictions(const Map<std::string, MessageRestrictions>& message_configs,
                                 Envoy::Server::Configuration::FactoryContext& context);
 
-  // Returns method descriptor by looking up the `descriptor_pool_`.
-  // If the method doesn't exist in the `descriptor_pool`, it returns absl::InvalidArgument error.
-  absl::StatusOr<const MethodDescriptor*> getMethodDescriptor(const std::string& method_name) const;
-
   FilteringMode filtering_mode_;
 
   std::unique_ptr<const Envoy::Protobuf::DescriptorPool> descriptor_pool_;
@@ -209,28 +269,36 @@ private:
   // A map from message_name to the respective match tree for message-level restrictions.
   absl::flat_hash_map<std::string, MatchTreeHttpMatchingDataSharedPtr> message_level_restrictions_;
 
+  // A map from {message_name, field_name} to the respective match tree for fields within a message.
+  StringPairToMatchTreeMap message_field_restrictions_;
+
+  // A global map used to recover the parent Type context from a Field pointer.
+  // This is read-only after initialization.
+  absl::flat_hash_map<const Envoy::Protobuf::Field*, const Envoy::Protobuf::Type*>
+      field_to_parent_type_map_;
+
   // An instance of `google::grpc::transcoding::TypeHelper` which can be used for type resolution.
   std::unique_ptr<const TypeHelper> type_helper_;
 
   // A lambda function which resolves type URL string to the corresponding `Protobuf::Type*`.
   // Internally, it uses `type_helper_` for type resolution.
   std::unique_ptr<const TypeFinder> type_finder_;
+
+  // Caches for request and response types to avoid repeated lookups and string manipulations.
+  // These are populated during initialization and read-only afterwards, so no mutex is required.
+  absl::flat_hash_map<std::string, const Protobuf::Type*> request_type_cache_;
+  absl::flat_hash_map<std::string, const Protobuf::Type*> response_type_cache_;
 };
 
 // A class to validate the input type specified for the unified matcher in the config.
 class MatcherInputValidatorVisitor : public Matcher::MatchTreeValidationVisitor<HttpMatchingData> {
 public:
   // Validates whether the input type for the matcher is in the list of supported input types.
-  // Currently, only CEL input type (i.e., HttpAttributesCelMatchInput) is supported.
+  // ProtoApiScrubber filter supports all types of data inputs and hence, it returns
+  // `absl::OkStatus()` by default.
   absl::Status performDataInputValidation(const Matcher::DataInputFactory<HttpMatchingData>&,
-                                          absl::string_view type_url) override {
-    if (type_url == TypeUtil::descriptorFullNameToTypeUrl(
-                        HttpAttributesCelMatchInput::descriptor()->full_name())) {
-      return absl::OkStatus();
-    }
-
-    return absl::InvalidArgumentError(
-        fmt::format("ProtoApiScrubber filter does not support matching on '{}'", type_url));
+                                          absl::string_view) override {
+    return absl::OkStatus();
   }
 };
 

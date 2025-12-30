@@ -1045,7 +1045,7 @@ public:
    * @return The StatName for str.
    */
   StatName add(absl::string_view str) {
-    absl::MutexLock lock(&mutex_);
+    absl::MutexLock lock(mutex_);
     return pool_.add(str);
   }
 

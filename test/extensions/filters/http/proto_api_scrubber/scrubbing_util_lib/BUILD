@@ -11,8 +11,12 @@ envoy_package()
 envoy_cc_test(
     name = "field_checker_test",
     srcs = ["field_checker_test.cc"],
-    data = ["//test/proto:apikeys_proto_descriptor"],
+    data = [
+        "//test/extensions/filters/http/proto_api_scrubber:scrubber_test_proto_descriptor",
+        "//test/proto:apikeys_proto_descriptor",
+    ],
     deps = [
+        "//envoy/common:optref_lib",
         "//source/common/protobuf",
         "//source/extensions/filters/http/proto_api_scrubber/scrubbing_util_lib",
         "//source/extensions/matching/http/cel_input:cel_input_lib",

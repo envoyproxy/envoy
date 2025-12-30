@@ -15,11 +15,13 @@
 namespace ReverseConnection = Envoy::Extensions::Bootstrap::ReverseConnection;
 
 #include "test/mocks/event/mocks.h"
+#include "test/mocks/reverse_tunnel_reporting_service/reporter.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/server/overload_manager.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -1402,6 +1404,59 @@ TEST_F(ReverseTunnelFilterUnitTest, ProcessAcceptedConnectionDuplicatedHandleNot
       makeHttpRequestWithRtHeaders("GET", "/reverse_connections/request", "dup-closed", "c", "t"));
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(request, false));
   EXPECT_THAT(written, testing::HasSubstr("200 OK"));
+}
+
+TEST_F(ReverseTunnelFilterUnitTest, ProcessAcceptedConnectionReportsConnectionEvent) {
+  auto* reporter_cfg = upstream_config_.mutable_reporter_config();
+  reporter_cfg->set_name(Bootstrap::ReverseConnection::MOCK_REPORTER);
+  Protobuf::StringValue reporter_payload;
+  reporter_cfg->mutable_typed_config()->PackFrom(reporter_payload);
+
+  NiceMock<Bootstrap::ReverseConnection::MockReporterFactory> reporter_factory;
+  Registry::InjectFactory<Bootstrap::ReverseConnection::ReverseTunnelReporterFactory>
+      reporter_injector(reporter_factory);
+
+  std::string node_id = "node";
+  std::string cluster_id = "cluster";
+  std::string tenant_id = "tenant";
+
+  EXPECT_CALL(context_, messageValidationVisitor())
+      .WillRepeatedly(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
+
+  EXPECT_CALL(reporter_factory, createReporter()).WillOnce(Invoke([&]() {
+    auto reporter =
+        std::make_unique<NiceMock<Bootstrap::ReverseConnection::MockReverseTunnelReporter>>();
+    EXPECT_CALL(*reporter, reportConnectionEvent(testing::Eq(node_id), testing::Eq(cluster_id),
+                                                 testing::Eq(tenant_id)));
+    return reporter;
+  }));
+
+  setupUpstreamExtension();
+  setupUpstreamThreadLocalSlot();
+
+  auto mock_socket = std::make_unique<Network::MockConnectionSocket>();
+  auto mock_io_handle = std::make_unique<Network::MockIoHandle>();
+  auto dup_io_handle = std::make_unique<Network::MockIoHandle>();
+
+  EXPECT_CALL(*dup_io_handle, resetFileEvents());
+  EXPECT_CALL(*dup_io_handle, fdDoNotUse()).WillRepeatedly(testing::Return(100));
+  EXPECT_CALL(*dup_io_handle, isOpen()).WillRepeatedly(testing::Return(true));
+  EXPECT_CALL(*mock_io_handle, duplicate())
+      .WillOnce(testing::Return(testing::ByMove(std::move(dup_io_handle))));
+  EXPECT_CALL(*mock_socket, ioHandle()).WillRepeatedly(testing::ReturnRef(*mock_io_handle));
+  EXPECT_CALL(*mock_socket, isOpen()).WillRepeatedly(testing::Return(true));
+
+  static Network::ConnectionSocketPtr stored_mock_socket;
+  static std::unique_ptr<Network::MockIoHandle> stored_io_handle;
+  stored_io_handle = std::move(mock_io_handle);
+  stored_mock_socket = std::move(mock_socket);
+
+  EXPECT_CALL(callbacks_.connection_, getSocket())
+      .WillRepeatedly(testing::ReturnRef(stored_mock_socket));
+
+  Buffer::OwnedImpl request(makeHttpRequestWithRtHeaders("GET", "/reverse_connections/request",
+                                                         node_id, cluster_id, tenant_id));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(request, false));
 }
 
 // Test systematic HTTP error patterns to trigger codec dispatch error paths.

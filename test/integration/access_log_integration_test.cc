@@ -22,6 +22,77 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, AccessLogIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
+// Test COALESCE formatter returning the first available value.
+TEST_P(AccessLogIntegrationTest, CoalesceFormatterFirstValueAvailable) {
+  // The default :authority header is "sni.lyft.com".
+  useAccessLog(
+      R"(host=%COALESCE({"operators": [{"command": "REQ", "param": ":authority"}, {"command": "REQ", "param": "host"}]})%)");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  std::string log = waitForAccessLog(access_log_name_);
+  // The :authority header (sni.lyft.com) should be logged since it's the first available value.
+  EXPECT_THAT(log, HasSubstr("host=sni.lyft.com"));
+}
+
+// Test COALESCE formatter with fallback when first operator returns null.
+TEST_P(AccessLogIntegrationTest, CoalesceFormatterFallback) {
+  // Use a header that won't be present as first operator, fallback to :authority.
+  useAccessLog(
+      R"(host=%COALESCE({"operators": [{"command": "REQ", "param": "x-custom-host"}, {"command": "REQ", "param": ":authority"}]})%)");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  std::string log = waitForAccessLog(access_log_name_);
+  // x-custom-host is not present, so should fallback to :authority (sni.lyft.com).
+  EXPECT_THAT(log, HasSubstr("host=sni.lyft.com"));
+}
+
+// Test COALESCE formatter combined with other formatters in the same log line.
+TEST_P(AccessLogIntegrationTest, CoalesceFormatterWithOtherFormatters) {
+  useAccessLog(
+      R"(method=%REQ(:METHOD)% host=%COALESCE({"operators": [{"command": "REQ", "param": ":authority"}]})% protocol=%PROTOCOL%)");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  std::string log = waitForAccessLog(access_log_name_);
+  EXPECT_THAT(log, HasSubstr("method=GET"));
+  EXPECT_THAT(log, HasSubstr("host=sni.lyft.com"));
+  EXPECT_THAT(log, HasSubstr("protocol=HTTP/1.1"));
+}
+
+// Test COALESCE formatter with max_length truncation.
+TEST_P(AccessLogIntegrationTest, CoalesceFormatterMaxLength) {
+  // The default :authority header is "sni.lyft.com", truncated to 3 chars should be "sni".
+  useAccessLog(R"(host=%COALESCE({"operators": [{"command": "REQ", "param": ":authority"}]}):3%)");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  std::string log = waitForAccessLog(access_log_name_);
+  // :authority is "sni.lyft.com", truncated to 3 chars should be "sni".
+  EXPECT_THAT(log, HasSubstr("host=sni"));
+}
+
 TEST_P(AccessLogIntegrationTest, DownstreamDisconnectBeforeHeadersResponseCode) {
   useAccessLog("RESPONSE_CODE=%RESPONSE_CODE%;CEL_METHOD=%CEL(request.headers[':method'])%");
   testRouterDownstreamDisconnectBeforeRequestComplete();

@@ -45,10 +45,26 @@ public:
   addUpdateCallback(std::function<absl::Status()> callback) PURE;
 
   /**
+   * Add secret remove callback into the secret provider, which is triggered
+   * when the server explicitly removes a resource. Once the resource is
+   * removed, no futher updates are expected. It is safe to call this method
+   * by main thread and callback is safe to be invoked on main thread.
+   * @param callback callback that is executed by secret provider.
+   * @return CallbackHandle the handle which can remove that update callback.
+   */
+  ABSL_MUST_USE_RESULT virtual Common::CallbackHandlePtr
+  addRemoveCallback(std::function<absl::Status()> callback) PURE;
+
+  /**
    * @return const Init::Target* A shared init target that can be used by multiple init managers.
    * nullptr if the provider isn't dynamic.
    */
   virtual const Init::Target* initTarget() { return nullptr; }
+
+  /**
+   * Start initializating the provider (when not using the init manager).
+   */
+  virtual void start() PURE;
 };
 
 using TlsCertificatePtr =
