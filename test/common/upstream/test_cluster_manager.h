@@ -186,7 +186,8 @@ public:
   OdCdsApiHandlePtr createOdCdsApiHandle(OdCdsApiSharedPtr odcds) {
     // For tests, generate a unique key based on the pointer address.
     uint64_t subscription_key = reinterpret_cast<uint64_t>(odcds.get());
-    odcds_subscriptions_.emplace(subscription_key, odcds);
+    odcds_subscriptions_.emplace(subscription_key,
+                                 std::make_unique<OdCdsSubscriptionEntry>(std::move(odcds)));
     return ClusterManagerImpl::OdCdsApiHandleImpl::create(*this, subscription_key);
   }
 

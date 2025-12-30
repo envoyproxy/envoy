@@ -1553,10 +1553,8 @@ ClusterManagerImpl::allocateOdCdsApi(OdCdsCreationFunction creation_function,
                                      OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
                                      ProtobufMessage::ValidationVisitor& validation_visitor) {
   // Generate a unique key for this subscription based on config and locator.
-  // This enables reuse of subscriptions with the same configuration. Subscriptions
-  // persist for the lifetime of ClusterManagerImpl and are cleaned up when it is destroyed.
-  // Note: A future optimization could clean up unused subscriptions earlier,
-  // allowing unnecessary connections to be closed.
+  // This enables reuse of subscriptions with the same configuration.
+  // Reference counting enables cleanup when the last handle is destroyed.
   uint64_t config_hash = MessageUtil::hash(odcds_config);
   if (odcds_resources_locator.has_value()) {
     config_hash = absl::HashOf(config_hash, MessageUtil::hash(*odcds_resources_locator));
@@ -1564,6 +1562,7 @@ ClusterManagerImpl::allocateOdCdsApi(OdCdsCreationFunction creation_function,
 
   auto it = odcds_subscriptions_.find(config_hash);
   if (it != odcds_subscriptions_.end()) {
+    it->second->ref_count.fetch_add(1, std::memory_order_relaxed);
     return OdCdsApiHandleImpl::create(*this, config_hash);
   }
 
@@ -1571,8 +1570,36 @@ ClusterManagerImpl::allocateOdCdsApi(OdCdsCreationFunction creation_function,
       creation_function(odcds_config, odcds_resources_locator, xds_manager_, *this, *this,
                         *stats_.rootScope(), validation_visitor, context_);
   RETURN_IF_NOT_OK_REF(odcds_or_error.status());
-  odcds_subscriptions_.emplace(config_hash, std::move(*odcds_or_error));
+  odcds_subscriptions_.emplace(
+      config_hash, std::make_unique<OdCdsSubscriptionEntry>(std::move(*odcds_or_error)));
   return OdCdsApiHandleImpl::create(*this, config_hash);
+}
+
+ClusterManagerImpl::OdCdsApiHandleImpl::~OdCdsApiHandleImpl() {
+  if (parent_.shutdown_.load()) {
+    return;
+  }
+
+  if (parent_.dispatcher_.isThreadSafe()) {
+    parent_.releaseOdCdsSubscription(subscription_key_);
+  } else {
+    parent_.dispatcher_.post([subscription_key = subscription_key_, &parent = parent_] {
+      parent.releaseOdCdsSubscription(subscription_key);
+    });
+  }
+}
+
+void ClusterManagerImpl::releaseOdCdsSubscription(uint64_t subscription_key) {
+  auto it = odcds_subscriptions_.find(subscription_key);
+  if (it == odcds_subscriptions_.end()) {
+    return;
+  }
+
+  if (it->second->ref_count.fetch_sub(1, std::memory_order_acq_rel) == 1) {
+    ENVOY_LOG(debug, "cm odcds: removing subscription with key {} (no more references)",
+              subscription_key);
+    odcds_subscriptions_.erase(it);
+  }
 }
 
 ClusterDiscoveryCallbackHandlePtr
@@ -1617,7 +1644,7 @@ ClusterManagerImpl::requestOnDemandClusterDiscovery(uint64_t subscription_key, s
       });
       return;
     }
-    OdCdsApiSharedPtr odcds = it->second;
+    OdCdsApiSharedPtr odcds = it->second->subscription;
 
     // Check for the cluster here too. It might have been added between the time when this closure
     // was posted and when it is being executed.
