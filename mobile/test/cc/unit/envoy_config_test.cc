@@ -67,6 +67,7 @@ TEST(TestConfig, ConfigIsApplied) {
   EngineBuilder engine_builder;
   engine_builder.addQuicConnectionOption("10AF")
       .addQuicConnectionOption("MPQC")
+      .addQuicClientConnectionOption("1RTT")
       .addQuicHint("www.abc.com", 443)
       .addQuicHint("www.def.com", 443)
       .addQuicCanonicalSuffix(".opq.com")
@@ -99,6 +100,7 @@ TEST(TestConfig, ConfigIsApplied) {
       "connection_idle_interval { nanos: 222000000 }",
       "connection_keepalive { timeout { seconds: 333 }",
       "connection_options: \"AKDU,BWRS,5RTO,EVMB,10AF,MPQC\"",
+      "client_connection_options: \"1RTT\"",
       "hostname: \"www.abc.com\"",
       "hostname: \"www.def.com\"",
       "canonical_suffixes: \".opq.com\"",
