@@ -310,46 +310,58 @@ void Filter::StreamFilterWrapper::onStreamComplete() {
 }
 
 // DelegatedFilterChain implementation.
-// For decode operations, iterate filters in order from first to last.
-// For encode operations, iterate filters in reverse order from last to first.
+// For decode operations, filters are called in order from first to last.
+// For encode operations, filters are called in reverse order from last to first.
+//
+// When a filter returns StopIteration, it has already processed the current frame. On
+// subsequent calls, we resume from the next filter in sequence. Index tracking enables this
+// resumption without re-processing filters that have already handled the frame.
 Http::FilterHeadersStatus DelegatedFilterChain::decodeHeaders(Http::RequestHeaderMap& headers,
                                                               bool end_stream) {
-  for (auto& filter : filters_) {
-    auto status = filter->decodeHeaders(headers, end_stream);
+  for (size_t i = decode_headers_index_; i < filters_.size(); ++i) {
+    auto status = filters_[i]->decodeHeaders(headers, end_stream);
     if (status != Http::FilterHeadersStatus::Continue) {
+      decode_headers_index_ = i + 1;
       return status;
     }
   }
+  decode_headers_index_ = 0;
   return Http::FilterHeadersStatus::Continue;
 }
 
 Http::FilterDataStatus DelegatedFilterChain::decodeData(Buffer::Instance& data, bool end_stream) {
-  for (auto& filter : filters_) {
-    auto status = filter->decodeData(data, end_stream);
+  for (size_t i = decode_data_index_; i < filters_.size(); ++i) {
+    auto status = filters_[i]->decodeData(data, end_stream);
     if (status != Http::FilterDataStatus::Continue) {
+      decode_data_index_ = i + 1;
       return status;
     }
   }
+  decode_data_index_ = 0;
   return Http::FilterDataStatus::Continue;
 }
 
 Http::FilterTrailersStatus DelegatedFilterChain::decodeTrailers(Http::RequestTrailerMap& trailers) {
-  for (auto& filter : filters_) {
-    auto status = filter->decodeTrailers(trailers);
+  for (size_t i = decode_trailers_index_; i < filters_.size(); ++i) {
+    auto status = filters_[i]->decodeTrailers(trailers);
     if (status != Http::FilterTrailersStatus::Continue) {
+      decode_trailers_index_ = i + 1;
       return status;
     }
   }
+  decode_trailers_index_ = 0;
   return Http::FilterTrailersStatus::Continue;
 }
 
 Http::FilterMetadataStatus DelegatedFilterChain::decodeMetadata(Http::MetadataMap& metadata_map) {
-  for (auto& filter : filters_) {
-    auto status = filter->decodeMetadata(metadata_map);
+  for (size_t i = decode_metadata_index_; i < filters_.size(); ++i) {
+    auto status = filters_[i]->decodeMetadata(metadata_map);
     if (status != Http::FilterMetadataStatus::Continue) {
+      decode_metadata_index_ = i + 1;
       return status;
     }
   }
+  decode_metadata_index_ = 0;
   return Http::FilterMetadataStatus::Continue;
 }
 
@@ -368,59 +380,99 @@ void DelegatedFilterChain::decodeComplete() {
 
 Http::Filter1xxHeadersStatus
 DelegatedFilterChain::encode1xxHeaders(Http::ResponseHeaderMap& headers) {
-  // Encode operations iterate in reverse order.
-  for (auto it = filters_.rbegin(); it != filters_.rend(); ++it) {
-    auto status = (*it)->encode1xxHeaders(headers);
+  if (filters_.empty()) {
+    return Http::Filter1xxHeadersStatus::Continue;
+  }
+  // Encode iterates in reverse. encode_1xx_headers_index_ tracks how many filters we've processed.
+  for (size_t i = filters_.size() - 1 - encode_1xx_headers_index_;; --i) {
+    auto status = filters_[i]->encode1xxHeaders(headers);
     if (status != Http::Filter1xxHeadersStatus::Continue) {
+      encode_1xx_headers_index_ = filters_.size() - i;
       return status;
     }
+    if (i == 0) {
+      break;
+    }
   }
+  encode_1xx_headers_index_ = 0;
   return Http::Filter1xxHeadersStatus::Continue;
 }
 
 Http::FilterHeadersStatus DelegatedFilterChain::encodeHeaders(Http::ResponseHeaderMap& headers,
                                                               bool end_stream) {
-  // Encode operations iterate in reverse order.
-  for (auto it = filters_.rbegin(); it != filters_.rend(); ++it) {
-    auto status = (*it)->encodeHeaders(headers, end_stream);
+  if (filters_.empty()) {
+    return Http::FilterHeadersStatus::Continue;
+  }
+  // Encode iterates in reverse. encode_headers_index_ tracks how many filters we've processed.
+  for (size_t i = filters_.size() - 1 - encode_headers_index_;; --i) {
+    auto status = filters_[i]->encodeHeaders(headers, end_stream);
     if (status != Http::FilterHeadersStatus::Continue) {
+      encode_headers_index_ = filters_.size() - i;
       return status;
     }
+    if (i == 0) {
+      break;
+    }
   }
+  encode_headers_index_ = 0;
   return Http::FilterHeadersStatus::Continue;
 }
 
 Http::FilterDataStatus DelegatedFilterChain::encodeData(Buffer::Instance& data, bool end_stream) {
-  // Encode operations iterate in reverse order.
-  for (auto it = filters_.rbegin(); it != filters_.rend(); ++it) {
-    auto status = (*it)->encodeData(data, end_stream);
+  if (filters_.empty()) {
+    return Http::FilterDataStatus::Continue;
+  }
+  // Encode iterates in reverse. encode_data_index_ tracks how many filters we've processed.
+  for (size_t i = filters_.size() - 1 - encode_data_index_;; --i) {
+    auto status = filters_[i]->encodeData(data, end_stream);
     if (status != Http::FilterDataStatus::Continue) {
+      encode_data_index_ = filters_.size() - i;
       return status;
     }
+    if (i == 0) {
+      break;
+    }
   }
+  encode_data_index_ = 0;
   return Http::FilterDataStatus::Continue;
 }
 
 Http::FilterTrailersStatus
 DelegatedFilterChain::encodeTrailers(Http::ResponseTrailerMap& trailers) {
-  // Encode operations iterate in reverse order.
-  for (auto it = filters_.rbegin(); it != filters_.rend(); ++it) {
-    auto status = (*it)->encodeTrailers(trailers);
+  if (filters_.empty()) {
+    return Http::FilterTrailersStatus::Continue;
+  }
+  // Encode iterates in reverse. encode_trailers_index_ tracks how many filters we've processed.
+  for (size_t i = filters_.size() - 1 - encode_trailers_index_;; --i) {
+    auto status = filters_[i]->encodeTrailers(trailers);
     if (status != Http::FilterTrailersStatus::Continue) {
+      encode_trailers_index_ = filters_.size() - i;
       return status;
     }
+    if (i == 0) {
+      break;
+    }
   }
+  encode_trailers_index_ = 0;
   return Http::FilterTrailersStatus::Continue;
 }
 
 Http::FilterMetadataStatus DelegatedFilterChain::encodeMetadata(Http::MetadataMap& metadata_map) {
-  // Encode operations iterate in reverse order.
-  for (auto it = filters_.rbegin(); it != filters_.rend(); ++it) {
-    auto status = (*it)->encodeMetadata(metadata_map);
+  if (filters_.empty()) {
+    return Http::FilterMetadataStatus::Continue;
+  }
+  // Encode iterates in reverse. encode_metadata_index_ tracks how many filters we've processed.
+  for (size_t i = filters_.size() - 1 - encode_metadata_index_;; --i) {
+    auto status = filters_[i]->encodeMetadata(metadata_map);
     if (status != Http::FilterMetadataStatus::Continue) {
+      encode_metadata_index_ = filters_.size() - i;
       return status;
     }
+    if (i == 0) {
+      break;
+    }
   }
+  encode_metadata_index_ = 0;
   return Http::FilterMetadataStatus::Continue;
 }
 
