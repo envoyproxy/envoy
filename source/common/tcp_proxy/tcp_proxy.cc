@@ -40,6 +40,8 @@
 #include "source/common/stream_info/uint64_accessor_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
 
+#include "absl/container/flat_hash_set.h"
+
 namespace Envoy {
 namespace TcpProxy {
 
@@ -194,6 +196,8 @@ Config::SharedConfig::SharedConfig(
     proxy_protocol_tlvs_ =
         parseTLVs(config.proxy_protocol_tlvs(), context, dynamic_tlv_formatters_);
   }
+
+  merge_proxy_protocol_tlvs_ = config.merge_proxy_protocol_tlvs();
 }
 
 Config::Config(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config,
@@ -674,9 +678,12 @@ Network::FilterStatus Filter::establishUpstreamConnection() {
 
   auto& downstream_connection = read_callbacks_->connection();
   auto& filter_state = downstream_connection.streamInfo().filterState();
-  if (!filter_state->hasData<Network::ProxyProtocolFilterState>(
-          Network::ProxyProtocolFilterState::key())) {
-    // Evaluate dynamic TLVs with the connection's stream info.
+
+  const auto* existing_state = filter_state->getDataReadOnly<Network::ProxyProtocolFilterState>(
+      Network::ProxyProtocolFilterState::key());
+
+  if (existing_state == nullptr) {
+    // No downstream proxy protocol state exists - create new state with tcp_proxy TLVs.
     const auto tlvs = config_->sharedConfig()->evaluateDynamicTLVs(getStreamInfo());
     filter_state->setData(
         Network::ProxyProtocolFilterState::key(),
@@ -685,7 +692,39 @@ Network::FilterStatus Filter::establishUpstreamConnection() {
             downstream_connection.connectionInfoProvider().localAddress(), tlvs}),
         StreamInfo::FilterState::StateType::ReadOnly,
         StreamInfo::FilterState::LifeSpan::Connection);
+  } else if (config_->sharedConfig()->mergeProxyProtocolTlvs()) {
+    // Downstream proxy protocol state exists and merge is enabled.
+    // Merge tcp_proxy TLVs with downstream TLVs (tcp_proxy TLVs take precedence).
+    const auto& existing_data = existing_state->value();
+    const auto tcp_proxy_tlvs = config_->sharedConfig()->evaluateDynamicTLVs(getStreamInfo());
+
+    Network::ProxyProtocolTLVVector merged_tlvs;
+    absl::flat_hash_set<uint8_t> seen_types;
+
+    // Add tcp_proxy TLVs first (they take precedence).
+    for (const auto& tlv : tcp_proxy_tlvs) {
+      merged_tlvs.push_back(tlv);
+      seen_types.insert(tlv.type);
+    }
+
+    // Add downstream TLVs that don't conflict with tcp_proxy TLVs.
+    for (const auto& tlv : existing_data.tlv_vector_) {
+      if (!seen_types.contains(tlv.type)) {
+        merged_tlvs.push_back(tlv);
+        seen_types.insert(tlv.type);
+      }
+    }
+
+    // Update filter state with merged TLVs, preserving downstream addresses and version.
+    // Use Mutable state type to match the existing state (set by proxy_protocol listener filter).
+    filter_state->setData(
+        Network::ProxyProtocolFilterState::key(),
+        std::make_shared<Network::ProxyProtocolFilterState>(Network::ProxyProtocolDataWithVersion{
+            {existing_data.src_addr_, existing_data.dst_addr_, merged_tlvs}, existing_data.version_}),
+        StreamInfo::FilterState::StateType::Mutable,
+        StreamInfo::FilterState::LifeSpan::Connection);
   }
+  // else: Downstream state exists but merge is disabled - keep existing state as-is.
   transport_socket_options_ =
       Network::TransportSocketOptionsUtility::fromFilterState(*filter_state);
 

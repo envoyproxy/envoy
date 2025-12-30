@@ -57,7 +57,7 @@ enum UpstreamConnectMode {
   ON_DOWNSTREAM_TLS_HANDSHAKE = 2;
 }
 
-// [#next-free-field: 23]
+// [#next-free-field: 24]
 message TcpProxy {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.tcp_proxy.v2.TcpProxy";
@@ -328,9 +328,7 @@ message TcpProxy {
   // This field only takes effect when the TCP proxy filter is creating new ``PROXY`` protocol state and an
   // upstream proxy protocol transport socket is configured in the cluster. If the connection already
   // contains ``PROXY`` protocol state (including any TLVs) parsed by a downstream proxy protocol listener
-  // upstream proxy protocol transport socket is configured in the cluster. If the connection already
-  // contains PROXY protocol state (including any TLVs) parsed by a downstream proxy protocol listener
-  // filter, the TLVs specified here are ignored.
+  // filter, the TLVs specified here are ignored unless ``merge_proxy_protocol_tlvs`` is set to true.
   //
   // .. note::
   //   To ensure the specified TLVs are allowed in the upstream ``PROXY`` protocol header, you must also
@@ -338,6 +336,23 @@ message TcpProxy {
   //   :ref:`core.v3.ProxyProtocolConfig.pass_through_tlvs <envoy_v3_api_field_config.core.v3.ProxyProtocolConfig.pass_through_tlvs>`
   //   for details.
   repeated config.core.v3.TlvEntry proxy_protocol_tlvs = 19;
+
+  // When set to true and the connection already contains ``PROXY`` protocol state
+  // (including TLVs) from a downstream proxy protocol listener filter, the TLVs
+  // specified in ``proxy_protocol_tlvs`` are merged with the downstream TLVs.
+  //
+  // **Precedence behavior**:
+  //
+  // - TLVs specified in ``proxy_protocol_tlvs`` take precedence over downstream TLVs
+  //   with the same type.
+  // - This allows adding or overriding specific TLV values while preserving
+  //   other downstream TLVs.
+  // - The source/destination addresses from the downstream ``PROXY`` protocol state
+  //   are preserved (not modified).
+  //
+  // When set to false (default), the ``proxy_protocol_tlvs`` are ignored if
+  // downstream ``PROXY`` protocol state already exists.
+  bool merge_proxy_protocol_tlvs = 23;
 
   // Specifies when to establish the upstream connection.
   //

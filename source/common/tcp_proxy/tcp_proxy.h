@@ -263,6 +263,7 @@ public:
     const Network::ProxyProtocolTLVVector& proxyProtocolTLVs() const {
       return proxy_protocol_tlvs_;
     }
+    bool mergeProxyProtocolTlvs() const { return merge_proxy_protocol_tlvs_; }
 
     // Evaluate dynamic TLV formatters and combine with static TLVs.
     Network::ProxyProtocolTLVVector
@@ -297,6 +298,7 @@ public:
     BackOffStrategyPtr backoff_strategy_;
     Network::ProxyProtocolTLVVector proxy_protocol_tlvs_;
     std::vector<TlvFormatter> dynamic_tlv_formatters_;
+    bool merge_proxy_protocol_tlvs_{false};
   };
 
   using SharedConfigSharedPtr = std::shared_ptr<SharedConfig>;
