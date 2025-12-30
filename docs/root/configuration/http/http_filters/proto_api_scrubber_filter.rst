@@ -18,10 +18,12 @@ This filter supports:
 Design and Resources
 --------------------
 
-For more in-depth information regarding the motivation, architecture decisions, and performance characteristics of this filter, please refer to the following design documents:
+For detailed technical specifications and the evolution of this filter's capabilities, refer to the following design documents:
 
-* `Proto API Scrubber Design Proposal <https://docs.google.com/document/d/1jgRe5mhucFRgmKYf-Ukk20jW8kusIo53U5bcF74GkK8>`_: Covers the initial design, use cases, and technical requirements for deep gRPC inspection.
-* `Implementation and Performance Analysis <https://docs.google.com/document/d/1ewm0_kmA3eIQ-DIYY4RnBAGK4OxlxFeXX_nuds7EjBE>`_: Details the transcoding implementation, buffering strategies, and benchmark results.
+* `Proto API Scrubber Foundation RFC <https://docs.google.com/document/d/1jgRe5mhucFRgmKYf-Ukk20jW8kusIo53U5bcF74GkK8>`_:
+  The original proposal defining the filter's motivation, its comparison to existing filters (like PME and gRPC Field Extraction), and the foundational implementation for field-level scrubbing.
+* `Message and Method Level Filtering Extension <https://docs.google.com/document/d/1ewm0_kmA3eIQ-DIYY4RnBAGK4OxlxFeXX_nuds7EjBE>`_:
+  An extension doc detailing the hierarchical restriction model. It introduces **Early Rejection** (denying requests at the header phase), global message-level restrictions, and deep inspection support for ``google.protobuf.Any`` types.
 
 Configuration
 -------------
