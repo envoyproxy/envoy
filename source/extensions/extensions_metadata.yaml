@@ -615,6 +615,13 @@ envoy.filters.http.proto_message_extraction:
   status: alpha
   type_urls:
   - envoy.extensions.filters.http.proto_message_extraction.v3.ProtoMessageExtractionConfig
+envoy.filters.http.proto_api_scrubber:
+  categories:
+  - envoy.filters.http
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.http.proto_api_scrubber.v3.ProtoApiScrubberConfig
 envoy.filters.http.ratelimit:
   categories:
   - envoy.filters.http
