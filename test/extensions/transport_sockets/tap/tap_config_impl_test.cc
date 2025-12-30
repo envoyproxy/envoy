@@ -169,7 +169,7 @@ socket_streamed_trace_segment:
   event:
     timestamp: 1970-01-01T00:00:02Z
     closed: {}
-    seq_num: 18446744073709551615
+    seq_num: 12
 )EOF")));
   time_system_.setSystemTime(std::chrono::seconds(2));
   tapper_->closeSocket(Network::ConnectionEvent::RemoteClose);
@@ -269,7 +269,7 @@ socket_streamed_trace_segment:
         socket_address:
           address: 10.0.0.3
           port_value: 50000
-    seq_num: 18446744073709551615
+    seq_num: 12
 )EOF")));
   time_system_.setSystemTime(std::chrono::seconds(2));
   tapper_->closeSocket(Network::ConnectionEvent::RemoteClose);
@@ -370,7 +370,7 @@ socket_streamed_trace_segment:
         socket_address:
           address: 10.0.0.3
           port_value: 50000
-    seq_num: 18446744073709551615
+    seq_num: 12
 )EOF")));
   time_system_.setSystemTime(std::chrono::seconds(2));
   tapper_->closeSocket(Network::ConnectionEvent::RemoteClose);
@@ -484,7 +484,7 @@ socket_streamed_trace_segment:
           socket_address:
             address: 10.0.0.3
             port_value: 50000
-      seq_num: 18446744073709551615
+      seq_num: 109
 )EOF")));
   time_system_.setSystemTime(std::chrono::seconds(2));
   tapper_->closeSocket(Network::ConnectionEvent::RemoteClose);
@@ -587,7 +587,7 @@ socket_streamed_trace_segment:
           socket_address:
             address: 10.0.0.3
             port_value: 50000
-      seq_num: 18446744073709551615
+      seq_num: 108
 )EOF")));
   time_system_.setSystemTime(std::chrono::seconds(2));
   tapper_->closeSocket(Network::ConnectionEvent::RemoteClose);
@@ -693,7 +693,7 @@ socket_streamed_trace_segment:
           socket_address:
             address: 10.0.0.3
             port_value: 50000
-      seq_num: 18446744073709551615
+      seq_num: 110
 )EOF")));
   time_system_.setSystemTime(std::chrono::seconds(2));
   tapper_->closeSocket(Network::ConnectionEvent::RemoteClose);
@@ -785,7 +785,7 @@ socket_streamed_trace_segment:
           socket_address:
             address: 10.0.0.3
             port_value: 50000
-      seq_num: 18446744073709551615
+      seq_num: 109
 )EOF")));
   tapper_->onRead(Buffer::OwnedImpl("Test transport socket tap buffered data onRead submit"), 53);
   time_system_.setSystemTime(std::chrono::seconds(2));

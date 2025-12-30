@@ -1,4 +1,5 @@
 #include <cstddef>
+#include <cstdint>
 
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/message_impl.h"
@@ -24,8 +25,6 @@ void bodyBufferToModule(const Buffer::Instance& buffer,
   }
 }
 
-} // namespace
-
 static Stats::StatNameTagVector
 buildTagsForModuleMetric(DynamicModuleHttpFilter& filter, const Stats::StatNameVec& label_names,
                          envoy_dynamic_module_type_module_buffer* label_values,
@@ -42,24 +41,36 @@ buildTagsForModuleMetric(DynamicModuleHttpFilter& filter, const Stats::StatNameV
   return tags;
 }
 
-extern "C" {
-
 using HeadersMapOptConstRef = OptRef<const Http::HeaderMap>;
 using HeadersMapOptRef = OptRef<Http::HeaderMap>;
 
-bool getHeaderValueImpl(HeadersMapOptConstRef map, envoy_dynamic_module_type_buffer_module_ptr key,
-                        size_t key_length,
-                        envoy_dynamic_module_type_buffer_envoy_ptr* result_buffer_ptr,
-                        size_t* result_buffer_length_ptr, size_t index, size_t* optional_size) {
+HeadersMapOptRef getHeaderMapByType(DynamicModuleHttpFilter* filter,
+                                    envoy_dynamic_module_type_http_header_type header_type) {
+  switch (header_type) {
+  case envoy_dynamic_module_type_http_header_type_RequestHeader:
+    return filter->requestHeaders();
+  case envoy_dynamic_module_type_http_header_type_RequestTrailer:
+    return filter->requestTrailers();
+  case envoy_dynamic_module_type_http_header_type_ResponseHeader:
+    return filter->responseHeaders();
+  case envoy_dynamic_module_type_http_header_type_ResponseTrailer:
+    return filter->responseTrailers();
+  default:
+    return {};
+  }
+}
+
+bool getHeaderValueImpl(HeadersMapOptConstRef map, envoy_dynamic_module_type_module_buffer key,
+                        envoy_dynamic_module_type_envoy_buffer* result, size_t index,
+                        size_t* optional_size) {
   if (!map.has_value()) {
-    *result_buffer_ptr = nullptr;
-    *result_buffer_length_ptr = 0;
+    *result = {.ptr = nullptr, .length = 0};
     if (optional_size != nullptr) {
       *optional_size = 0;
     }
     return false;
   }
-  absl::string_view key_view(key, key_length);
+  absl::string_view key_view(key.ptr, key.length);
 
   // TODO: we might want to avoid copying the key here by trusting the key is already lower case.
   const auto values = map->get(Envoy::Http::LowerCaseString(key_view));
@@ -68,34 +79,94 @@ bool getHeaderValueImpl(HeadersMapOptConstRef map, envoy_dynamic_module_type_buf
   }
 
   if (index >= values.size()) {
-    *result_buffer_ptr = nullptr;
-    *result_buffer_length_ptr = 0;
+    *result = {.ptr = nullptr, .length = 0};
     return false;
   }
 
   const auto value = values[index]->value().getStringView();
-  *result_buffer_ptr = const_cast<char*>(value.data());
-  *result_buffer_length_ptr = value.size();
+  *result = {.ptr = const_cast<char*>(value.data()), .length = value.size()};
+  return true;
+}
+
+bool addHeaderValueImpl(HeadersMapOptRef map, envoy_dynamic_module_type_module_buffer key,
+                        envoy_dynamic_module_type_module_buffer value) {
+  if (!map.has_value()) {
+    return false;
+  }
+  if (value.ptr == nullptr || value.length == 0) {
+    return false;
+  }
+  absl::string_view key_view(key.ptr, key.length);
+  absl::string_view value_view(value.ptr, value.length);
+  map->addCopy(Envoy::Http::LowerCaseString(key_view), value_view);
+  return true;
+}
+
+bool setHeaderValueImpl(HeadersMapOptRef map, envoy_dynamic_module_type_module_buffer key,
+                        envoy_dynamic_module_type_module_buffer value) {
+  if (!map.has_value()) {
+    return false;
+  }
+  absl::string_view key_view(key.ptr, key.length);
+  if (value.ptr == nullptr || value.length == 0) {
+    map->remove(Envoy::Http::LowerCaseString(key_view));
+    return true;
+  }
+  absl::string_view value_view(value.ptr, value.length);
+  // TODO: we might want to avoid copying the key here by trusting the key is already lower case.
+  map->setCopy(Envoy::Http::LowerCaseString(key_view), value_view);
+  return true;
+}
+
+bool getHeadersImpl(HeadersMapOptConstRef map,
+                    envoy_dynamic_module_type_envoy_http_header* result_headers) {
+  if (!map) {
+    return false;
+  }
+  size_t i = 0;
+  map->iterate([&i, &result_headers](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+    auto& key = header.key();
+    result_headers[i].key_ptr = const_cast<char*>(key.getStringView().data());
+    result_headers[i].key_length = key.size();
+    auto& value = header.value();
+    result_headers[i].value_ptr = const_cast<char*>(value.getStringView().data());
+    result_headers[i].value_length = value.size();
+    i++;
+    return Http::HeaderMap::Iterate::Continue;
+  });
   return true;
 }
 
 bool headerAsAttribute(HeadersMapOptConstRef map, const Envoy::Http::LowerCaseString& header,
-                       envoy_dynamic_module_type_buffer_envoy_ptr* result_buffer_ptr,
-                       size_t* result_buffer_length_ptr) {
+                       envoy_dynamic_module_type_envoy_buffer* result) {
   if (!map.has_value()) {
     return false;
   }
   auto lower_header = header.get();
-  envoy_dynamic_module_type_buffer_envoy_ptr key_ptr = const_cast<char*>(lower_header.data());
-  return getHeaderValueImpl(map, key_ptr, lower_header.size(), result_buffer_ptr,
-                            result_buffer_length_ptr, 0, nullptr);
+  return getHeaderValueImpl(map, {.ptr = lower_header.data(), .length = lower_header.size()},
+                            result, 0, nullptr);
+}
+
+const Buffer::Instance* getBufferByType(DynamicModuleHttpFilter* filter,
+                                        envoy_dynamic_module_type_http_body_type body_type) {
+  switch (body_type) {
+  case envoy_dynamic_module_type_http_body_type_ReceivedRequestBody:
+    return filter->current_request_body_;
+  case envoy_dynamic_module_type_http_body_type_BufferedRequestBody:
+    return filter->decoder_callbacks_->decodingBuffer();
+  case envoy_dynamic_module_type_http_body_type_ReceivedResponseBody:
+    return filter->current_response_body_;
+  case envoy_dynamic_module_type_http_body_type_BufferedResponseBody:
+    return filter->encoder_callbacks_->encodingBuffer();
+  default:
+    return nullptr;
+  }
 }
 
 bool getSslInfo(
     OptRef<const Network::Connection> connection,
     std::function<OptRef<const std::string>(const Ssl::ConnectionInfoConstSharedPtr)> get_san_func,
-    envoy_dynamic_module_type_buffer_envoy_ptr* result_buffer_ptr,
-    size_t* result_buffer_length_ptr) {
+    envoy_dynamic_module_type_envoy_buffer* result) {
   if (!connection.has_value() || !connection->ssl()) {
     return false;
   }
@@ -105,20 +176,23 @@ bool getSslInfo(
     return false;
   }
   const std::string& attribute = ssl_attribute.value();
-  *result_buffer_ptr = const_cast<char*>(attribute.data());
-  *result_buffer_length_ptr = attribute.size();
+  *result = {attribute.data(), attribute.size()};
   return true;
 }
+
+} // namespace
+
+extern "C" {
 
 envoy_dynamic_module_type_metrics_result
 envoy_dynamic_module_callback_http_filter_config_define_counter(
     envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
-    envoy_dynamic_module_type_buffer_module_ptr name, size_t name_length, size_t* counter_id_ptr) {
+    envoy_dynamic_module_type_module_buffer name, size_t* counter_id_ptr) {
   auto filter_config = static_cast<DynamicModuleHttpFilterConfig*>(filter_config_envoy_ptr);
   if (filter_config->stat_creation_frozen_) {
     return envoy_dynamic_module_type_metrics_result_Frozen;
   }
-  absl::string_view name_view(name, name_length);
+  absl::string_view name_view(name.ptr, name.length);
   Stats::StatName main_stat_name = filter_config->stat_name_pool_.add(name_view);
   Stats::Counter& c =
       Stats::Utility::counterFromStatNames(*filter_config->stats_scope_, {main_stat_name});
@@ -129,14 +203,14 @@ envoy_dynamic_module_callback_http_filter_config_define_counter(
 envoy_dynamic_module_type_metrics_result
 envoy_dynamic_module_callback_http_filter_config_define_counter_vec(
     envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
-    envoy_dynamic_module_type_buffer_module_ptr name, size_t name_length,
+    envoy_dynamic_module_type_module_buffer name,
     envoy_dynamic_module_type_module_buffer* label_names, size_t label_names_length,
     size_t* counter_id_ptr) {
   auto filter_config = static_cast<DynamicModuleHttpFilterConfig*>(filter_config_envoy_ptr);
   if (filter_config->stat_creation_frozen_) {
     return envoy_dynamic_module_type_metrics_result_Frozen;
   }
-  absl::string_view name_view(name, name_length);
+  absl::string_view name_view(name.ptr, name.length);
   Stats::StatName main_stat_name = filter_config->stat_name_pool_.add(name_view);
   Stats::StatNameVec label_names_vec;
   for (size_t i = 0; i < label_names_length; i++) {
@@ -181,12 +255,12 @@ envoy_dynamic_module_callback_http_filter_increment_counter_vec(
 envoy_dynamic_module_type_metrics_result
 envoy_dynamic_module_callback_http_filter_config_define_gauge(
     envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
-    envoy_dynamic_module_type_buffer_module_ptr name, size_t name_length, size_t* gauge_id_ptr) {
+    envoy_dynamic_module_type_module_buffer name, size_t* gauge_id_ptr) {
   auto filter_config = static_cast<DynamicModuleHttpFilterConfig*>(filter_config_envoy_ptr);
   if (filter_config->stat_creation_frozen_) {
     return envoy_dynamic_module_type_metrics_result_Frozen;
   }
-  absl::string_view name_view(name, name_length);
+  absl::string_view name_view(name.ptr, name.length);
   Stats::StatName main_stat_name = filter_config->stat_name_pool_.add(name_view);
   Stats::Gauge::ImportMode import_mode =
       Stats::Gauge::ImportMode::Accumulate; // TODO: make this configurable?
@@ -199,14 +273,14 @@ envoy_dynamic_module_callback_http_filter_config_define_gauge(
 envoy_dynamic_module_type_metrics_result
 envoy_dynamic_module_callback_http_filter_config_define_gauge_vec(
     envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
-    envoy_dynamic_module_type_buffer_module_ptr name, size_t name_length,
+    envoy_dynamic_module_type_module_buffer name,
     envoy_dynamic_module_type_module_buffer* label_names, size_t label_names_length,
     size_t* gauge_id_ptr) {
   auto filter_config = static_cast<DynamicModuleHttpFilterConfig*>(filter_config_envoy_ptr);
   if (filter_config->stat_creation_frozen_) {
     return envoy_dynamic_module_type_metrics_result_Frozen;
   }
-  absl::string_view name_view(name, name_length);
+  absl::string_view name_view(name.ptr, name.length);
   Stats::StatName main_stat_name = filter_config->stat_name_pool_.add(name_view);
   Stats::Gauge::ImportMode import_mode =
       Stats::Gauge::ImportMode::Accumulate; // TODO: make this configurable?
@@ -311,13 +385,12 @@ envoy_dynamic_module_type_metrics_result envoy_dynamic_module_callback_http_filt
 envoy_dynamic_module_type_metrics_result
 envoy_dynamic_module_callback_http_filter_config_define_histogram(
     envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
-    envoy_dynamic_module_type_buffer_module_ptr name, size_t name_length,
-    size_t* histogram_id_ptr) {
+    envoy_dynamic_module_type_module_buffer name, size_t* histogram_id_ptr) {
   auto filter_config = static_cast<DynamicModuleHttpFilterConfig*>(filter_config_envoy_ptr);
   if (filter_config->stat_creation_frozen_) {
     return envoy_dynamic_module_type_metrics_result_Frozen;
   }
-  absl::string_view name_view(name, name_length);
+  absl::string_view name_view(name.ptr, name.length);
   Stats::StatName main_stat_name = filter_config->stat_name_pool_.add(name_view);
   Stats::Histogram::Unit unit =
       Stats::Histogram::Unit::Unspecified; // TODO: make this configurable?
@@ -330,14 +403,14 @@ envoy_dynamic_module_callback_http_filter_config_define_histogram(
 envoy_dynamic_module_type_metrics_result
 envoy_dynamic_module_callback_http_filter_config_define_histogram_vec(
     envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
-    envoy_dynamic_module_type_buffer_module_ptr name, size_t name_length,
+    envoy_dynamic_module_type_module_buffer name,
     envoy_dynamic_module_type_module_buffer* label_names, size_t label_names_length,
     size_t* histogram_id_ptr) {
   auto filter_config = static_cast<DynamicModuleHttpFilterConfig*>(filter_config_envoy_ptr);
   if (filter_config->stat_creation_frozen_) {
     return envoy_dynamic_module_type_metrics_result_Frozen;
   }
-  absl::string_view name_view(name, name_length);
+  absl::string_view name_view(name.ptr, name.length);
   Stats::StatName main_stat_name = filter_config->stat_name_pool_.add(name_view);
   Stats::Histogram::Unit unit =
       Stats::Histogram::Unit::Unspecified; // TODO: make this configurable?
@@ -381,242 +454,57 @@ envoy_dynamic_module_callback_http_filter_record_histogram_value_vec(
   return envoy_dynamic_module_type_metrics_result_Success;
 }
 
-bool envoy_dynamic_module_callback_http_get_request_header(
+bool envoy_dynamic_module_callback_http_get_header(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_buffer_module_ptr key, size_t key_length,
-    envoy_dynamic_module_type_buffer_envoy_ptr* result_buffer_ptr, size_t* result_buffer_length_ptr,
+    envoy_dynamic_module_type_http_header_type header_type,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result,
     size_t index, size_t* optional_size) {
   DynamicModuleHttpFilter* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
-  return getHeaderValueImpl(filter->requestHeaders(), key, key_length, result_buffer_ptr,
-                            result_buffer_length_ptr, index, optional_size);
+  return getHeaderValueImpl(getHeaderMapByType(filter, header_type), key, result, index,
+                            optional_size);
 }
 
-bool envoy_dynamic_module_callback_http_get_request_trailer(
+bool envoy_dynamic_module_callback_http_add_header(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_buffer_module_ptr key, size_t key_length,
-    envoy_dynamic_module_type_buffer_envoy_ptr* result_buffer_ptr, size_t* result_buffer_length_ptr,
-    size_t index, size_t* optional_size) {
+    envoy_dynamic_module_type_http_header_type header_type,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value) {
   DynamicModuleHttpFilter* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
-  return getHeaderValueImpl(filter->requestTrailers(), key, key_length, result_buffer_ptr,
-                            result_buffer_length_ptr, index, optional_size);
+  return addHeaderValueImpl(getHeaderMapByType(filter, header_type), key, value);
 }
 
-bool envoy_dynamic_module_callback_http_get_response_header(
+bool envoy_dynamic_module_callback_http_set_header(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_buffer_module_ptr key, size_t key_length,
-    envoy_dynamic_module_type_buffer_envoy_ptr* result_buffer_ptr, size_t* result_buffer_length_ptr,
-    size_t index, size_t* optional_size) {
+    envoy_dynamic_module_type_http_header_type header_type,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value) {
   DynamicModuleHttpFilter* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
-  return getHeaderValueImpl(filter->responseHeaders(), key, key_length, result_buffer_ptr,
-                            result_buffer_length_ptr, index, optional_size);
+  return setHeaderValueImpl(getHeaderMapByType(filter, header_type), key, value);
 }
 
-bool envoy_dynamic_module_callback_http_get_response_trailer(
+bool envoy_dynamic_module_callback_http_get_headers_size(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_buffer_module_ptr key, size_t key_length,
-    envoy_dynamic_module_type_buffer_envoy_ptr* result_buffer_ptr, size_t* result_buffer_length_ptr,
-    size_t index, size_t* optional_size) {
+    envoy_dynamic_module_type_http_header_type header_type, size_t* size) {
   DynamicModuleHttpFilter* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
-  return getHeaderValueImpl(filter->responseTrailers(), key, key_length, result_buffer_ptr,
-                            result_buffer_length_ptr, index, optional_size);
-}
-
-bool addHeaderValueImpl(HeadersMapOptRef map, envoy_dynamic_module_type_buffer_module_ptr key,
-                        size_t key_length, envoy_dynamic_module_type_buffer_module_ptr value,
-                        size_t value_length) {
-  if (!map.has_value()) {
-    return false;
-  }
-  if (value == nullptr) {
-    return false;
-  }
-  absl::string_view key_view(key, key_length);
-  absl::string_view value_view(value, value_length);
-  map->addCopy(Envoy::Http::LowerCaseString(key_view), value_view);
-  return true;
-}
-
-bool envoy_dynamic_module_callback_http_add_request_header(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_buffer_module_ptr key, size_t key_length,
-    envoy_dynamic_module_type_buffer_module_ptr value, size_t value_length) {
-  DynamicModuleHttpFilter* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
-  return addHeaderValueImpl(filter->requestHeaders(), key, key_length, value, value_length);
-}
-
-bool envoy_dynamic_module_callback_http_add_request_trailer(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_buffer_module_ptr key, size_t key_length,
-    envoy_dynamic_module_type_buffer_module_ptr value, size_t value_length) {
-  DynamicModuleHttpFilter* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
-  return addHeaderValueImpl(filter->requestTrailers(), key, key_length, value, value_length);
-}
-
-bool envoy_dynamic_module_callback_http_add_response_header(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_buffer_module_ptr key, size_t key_length,
-    envoy_dynamic_module_type_buffer_module_ptr value, size_t value_length) {
-  DynamicModuleHttpFilter* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
-  return addHeaderValueImpl(filter->responseHeaders(), key, key_length, value, value_length);
-}
-
-bool envoy_dynamic_module_callback_http_add_response_trailer(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_buffer_module_ptr key, size_t key_length,
-    envoy_dynamic_module_type_buffer_module_ptr value, size_t value_length) {
-  DynamicModuleHttpFilter* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
-  return addHeaderValueImpl(filter->responseTrailers(), key, key_length, value, value_length);
-}
-
-bool setHeaderValueImpl(HeadersMapOptRef map, envoy_dynamic_module_type_buffer_module_ptr key,
-                        size_t key_length, envoy_dynamic_module_type_buffer_module_ptr value,
-                        size_t value_length) {
-  if (!map.has_value()) {
-    return false;
-  }
-  absl::string_view key_view(key, key_length);
-  if (value == nullptr) {
-    map->remove(Envoy::Http::LowerCaseString(key_view));
-    return true;
-  }
-  absl::string_view value_view(value, value_length);
-  // TODO: we might want to avoid copying the key here by trusting the key is already lower case.
-  map->setCopy(Envoy::Http::LowerCaseString(key_view), value_view);
-  return true;
-}
-
-bool envoy_dynamic_module_callback_http_set_request_header(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_buffer_module_ptr key, size_t key_length,
-    envoy_dynamic_module_type_buffer_module_ptr value, size_t value_length) {
-  DynamicModuleHttpFilter* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
-  return setHeaderValueImpl(filter->requestHeaders(), key, key_length, value, value_length);
-}
-
-bool envoy_dynamic_module_callback_http_set_request_trailer(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_buffer_module_ptr key, size_t key_length,
-    envoy_dynamic_module_type_buffer_module_ptr value, size_t value_length) {
-  DynamicModuleHttpFilter* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
-  return setHeaderValueImpl(filter->requestTrailers(), key, key_length, value, value_length);
-}
-
-bool envoy_dynamic_module_callback_http_set_response_header(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_buffer_module_ptr key, size_t key_length,
-    envoy_dynamic_module_type_buffer_module_ptr value, size_t value_length) {
-  DynamicModuleHttpFilter* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
-  return setHeaderValueImpl(filter->responseHeaders(), key, key_length, value, value_length);
-}
-
-bool envoy_dynamic_module_callback_http_set_response_trailer(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_buffer_module_ptr key, size_t key_length,
-    envoy_dynamic_module_type_buffer_module_ptr value, size_t value_length) {
-  DynamicModuleHttpFilter* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
-  return setHeaderValueImpl(filter->responseTrailers(), key, key_length, value, value_length);
-}
-
-bool envoy_dynamic_module_callback_http_get_request_headers_size(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t* size) {
-  DynamicModuleHttpFilter* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
-  RequestHeaderMapOptRef request_headers = filter->requestHeaders();
-  if (!request_headers.has_value()) {
+  HeadersMapOptConstRef headers_map = getHeaderMapByType(filter, header_type);
+  if (!headers_map.has_value()) {
     *size = 0;
     return false;
   }
-  *size = request_headers->size();
+  *size = headers_map->size();
   return true;
 }
 
-bool envoy_dynamic_module_callback_http_get_request_trailers_size(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t* size) {
-  DynamicModuleHttpFilter* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
-  RequestTrailerMapOptRef request_trailers = filter->requestTrailers();
-  if (!request_trailers.has_value()) {
-    *size = 0;
-    return false;
-  }
-  *size = request_trailers->size();
-  return true;
-}
-
-bool envoy_dynamic_module_callback_http_get_response_headers_size(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t* size) {
-  DynamicModuleHttpFilter* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
-  ResponseHeaderMapOptRef response_headers = filter->responseHeaders();
-  if (!response_headers.has_value()) {
-    *size = 0;
-    return false;
-  }
-  *size = response_headers->size();
-  return true;
-}
-
-bool envoy_dynamic_module_callback_http_get_response_trailers_size(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t* size) {
-  DynamicModuleHttpFilter* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
-  ResponseTrailerMapOptRef response_trailers = filter->responseTrailers();
-  if (!response_trailers.has_value()) {
-    *size = 0;
-    return false;
-  }
-  *size = response_trailers->size();
-  return true;
-}
-
-bool getHeadersImpl(HeadersMapOptConstRef map,
-                    envoy_dynamic_module_type_envoy_http_header* result_headers) {
-  if (!map) {
-    return false;
-  }
-  size_t i = 0;
-  map->iterate([&i, &result_headers](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
-    auto& key = header.key();
-    result_headers[i].key_ptr = const_cast<char*>(key.getStringView().data());
-    result_headers[i].key_length = key.size();
-    auto& value = header.value();
-    result_headers[i].value_ptr = const_cast<char*>(value.getStringView().data());
-    result_headers[i].value_length = value.size();
-    i++;
-    return Http::HeaderMap::Iterate::Continue;
-  });
-  return true;
-}
-
-bool envoy_dynamic_module_callback_http_get_request_headers(
+bool envoy_dynamic_module_callback_http_get_headers(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_header_type header_type,
     envoy_dynamic_module_type_envoy_http_header* result_headers) {
   DynamicModuleHttpFilter* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
-  return getHeadersImpl(filter->requestHeaders(), result_headers);
-}
-
-bool envoy_dynamic_module_callback_http_get_request_trailers(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_envoy_http_header* result_headers) {
-  DynamicModuleHttpFilter* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
-  return getHeadersImpl(filter->requestTrailers(), result_headers);
-}
-
-bool envoy_dynamic_module_callback_http_get_response_headers(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_envoy_http_header* result_headers) {
-  DynamicModuleHttpFilter* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
-  return getHeadersImpl(filter->responseHeaders(), result_headers);
-}
-
-bool envoy_dynamic_module_callback_http_get_response_trailers(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_envoy_http_header* result_headers) {
-  DynamicModuleHttpFilter* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
-  return getHeadersImpl(filter->responseTrailers(), result_headers);
+  return getHeadersImpl(getHeaderMapByType(filter, header_type), result_headers);
 }
 
 void envoy_dynamic_module_callback_http_send_response(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, uint32_t status_code,
     envoy_dynamic_module_type_module_http_header* headers_vector, size_t headers_vector_size,
-    envoy_dynamic_module_type_buffer_module_ptr body_ptr, size_t body_length,
-    envoy_dynamic_module_type_buffer_module_ptr details, size_t details_length) {
+    envoy_dynamic_module_type_module_buffer body, envoy_dynamic_module_type_module_buffer details) {
   DynamicModuleHttpFilter* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
   if (filter->isDestroyed()) {
     return;
@@ -634,17 +522,13 @@ void envoy_dynamic_module_callback_http_send_response(
       }
     };
   }
-  const absl::string_view body =
-      body_ptr ? absl::string_view(static_cast<const char*>(body_ptr), body_length) : "";
-
-  absl::string_view details_view;
-  if (details != nullptr && details_length != 0) {
-    details_view = absl::string_view(static_cast<const char*>(details), details_length);
-  } else {
+  absl::string_view body_view{body.ptr, body.length};
+  absl::string_view details_view{details.ptr, details.length};
+  if (details_view.empty()) {
     details_view = "dynamic_module";
   }
 
-  filter->sendLocalReply(static_cast<Http::Code>(status_code), body, modify_headers, 0,
+  filter->sendLocalReply(static_cast<Http::Code>(status_code), body_view, modify_headers, 0,
                          details_view);
 }
 
@@ -671,13 +555,13 @@ void envoy_dynamic_module_callback_http_send_response_headers(
 
 void envoy_dynamic_module_callback_http_send_response_data(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_buffer_module_ptr data, size_t length, bool end_stream) {
+    envoy_dynamic_module_type_module_buffer data, bool end_stream) {
   DynamicModuleHttpFilter* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
   if (filter->isDestroyed()) {
     return;
   }
 
-  Buffer::OwnedImpl buffer(static_cast<const char*>(data), length);
+  Buffer::OwnedImpl buffer(absl::string_view{data.ptr, data.length});
   filter->decoder_callbacks_->encodeData(buffer, end_stream);
 }
 
@@ -701,22 +585,152 @@ void envoy_dynamic_module_callback_http_send_response_trailers(
   filter->decoder_callbacks_->encodeTrailers(std::move(trailers));
 }
 
+bool envoy_dynamic_module_callback_http_get_body_size(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_body_type body_type, size_t* size) {
+  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  auto buffer = getBufferByType(filter, body_type);
+  if (!buffer) {
+    *size = 0;
+    return false;
+  }
+  *size = buffer->length();
+  return true;
+}
+
+bool envoy_dynamic_module_callback_http_get_body_chunks(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_body_type body_type,
+    envoy_dynamic_module_type_envoy_buffer* result_buffer_vector) {
+  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  auto buffer = getBufferByType(filter, body_type);
+  if (!buffer) {
+    return false;
+  }
+  bodyBufferToModule(*buffer, result_buffer_vector);
+  return true;
+}
+
+bool envoy_dynamic_module_callback_http_get_body_chunks_size(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_body_type body_type, size_t* size) {
+  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  auto buffer = getBufferByType(filter, body_type);
+  if (!buffer) {
+    *size = 0;
+    return false;
+  }
+  *size = buffer->getRawSlices(std::nullopt).size();
+  return true;
+}
+
+bool envoy_dynamic_module_callback_http_append_body(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_body_type body_type,
+    envoy_dynamic_module_type_module_buffer data) {
+  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  absl::string_view data_view{data.ptr, data.length};
+
+  switch (body_type) {
+  case envoy_dynamic_module_type_http_body_type_ReceivedRequestBody: {
+    if (auto buffer = filter->current_request_body_; buffer != nullptr) {
+      buffer->add(data_view);
+      return true;
+    }
+    return false;
+  }
+  case envoy_dynamic_module_type_http_body_type_BufferedRequestBody: {
+    if (auto buffer = filter->decoder_callbacks_->decodingBuffer(); buffer != nullptr) {
+      filter->decoder_callbacks_->modifyDecodingBuffer(
+          [data_view](Buffer::Instance& buffer) { buffer.add(data_view); });
+    } else {
+      Buffer::OwnedImpl owned_buffer;
+      owned_buffer.add(data_view);
+      filter->decoder_callbacks_->addDecodedData(owned_buffer, true);
+    }
+    return true;
+  }
+  case envoy_dynamic_module_type_http_body_type_ReceivedResponseBody: {
+    if (auto buffer = filter->current_response_body_; buffer != nullptr) {
+      buffer->add(data_view);
+      return true;
+    }
+    return false;
+  }
+  case envoy_dynamic_module_type_http_body_type_BufferedResponseBody: {
+    if (auto buffer = filter->encoder_callbacks_->encodingBuffer(); buffer != nullptr) {
+      filter->encoder_callbacks_->modifyEncodingBuffer(
+          [data_view](Buffer::Instance& buffer) { buffer.add(data_view); });
+    } else {
+      Buffer::OwnedImpl owned_buffer;
+      owned_buffer.add(data_view);
+      filter->encoder_callbacks_->addEncodedData(owned_buffer, true);
+    }
+    return true;
+  }
+  }
+  return false;
+}
+
+bool envoy_dynamic_module_callback_http_drain_body(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_body_type body_type, size_t number_of_bytes) {
+  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+
+  switch (body_type) {
+  case envoy_dynamic_module_type_http_body_type_ReceivedRequestBody: {
+    if (auto buffer = filter->current_request_body_; buffer != nullptr) {
+      const auto size = std::min<uint64_t>(buffer->length(), number_of_bytes);
+      buffer->drain(size);
+      return true;
+    }
+    return false;
+  }
+  case envoy_dynamic_module_type_http_body_type_BufferedRequestBody: {
+    if (auto buffer = filter->decoder_callbacks_->decodingBuffer(); buffer != nullptr) {
+      filter->decoder_callbacks_->modifyDecodingBuffer([number_of_bytes](Buffer::Instance& buffer) {
+        auto size = std::min<uint64_t>(buffer.length(), number_of_bytes);
+        buffer.drain(size);
+      });
+      return true;
+    }
+    return false;
+  }
+  case envoy_dynamic_module_type_http_body_type_ReceivedResponseBody: {
+    if (auto buffer = filter->current_response_body_; buffer != nullptr) {
+      const auto size = std::min<uint64_t>(buffer->length(), number_of_bytes);
+      buffer->drain(size);
+      return true;
+    }
+    return false;
+  }
+  case envoy_dynamic_module_type_http_body_type_BufferedResponseBody: {
+    if (auto buffer = filter->encoder_callbacks_->encodingBuffer(); buffer != nullptr) {
+      filter->encoder_callbacks_->modifyEncodingBuffer([number_of_bytes](Buffer::Instance& buffer) {
+        auto size = std::min<uint64_t>(buffer.length(), number_of_bytes);
+        buffer.drain(size);
+      });
+      return true;
+    }
+    return false;
+  }
+  }
+  return false;
+}
+
 /**
  * Helper to get the metadata namespace from the metadata.
  * @param metadata is the metadata to search in.
- * @param namespace_ptr is the namespace of the metadata.
- * @param namespace_length is the length of the namespace.
+ * @param ns is the namespace of the metadata.
  * @return the metadata namespace if it exists, nullptr otherwise.
  *
  * This will be reused by all envoy_dynamic_module_type_metadata_source where
  * each variant differs in the returned type of the metadata. For example, route metadata will
  * return OptRef vs upstream host metadata will return a shared pointer.
  */
-const Protobuf::Struct*
-getMetadataNamespaceImpl(const envoy::config::core::v3::Metadata& metadata,
-                         envoy_dynamic_module_type_buffer_module_ptr namespace_ptr,
-                         size_t namespace_length) {
-  absl::string_view namespace_view(static_cast<const char*>(namespace_ptr), namespace_length);
+const Protobuf::Struct* getMetadataNamespaceImpl(const envoy::config::core::v3::Metadata& metadata,
+                                                 envoy_dynamic_module_type_module_buffer ns) {
+  absl::string_view namespace_view{ns.ptr, ns.length};
   auto metadata_namespace = metadata.filter_metadata().find(namespace_view);
   if (metadata_namespace == metadata.filter_metadata().end()) {
     ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
@@ -738,8 +752,7 @@ getMetadataNamespaceImpl(const envoy::config::core::v3::Metadata& metadata,
 const Protobuf::Struct*
 getMetadataNamespace(envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
                      envoy_dynamic_module_type_metadata_source metadata_source,
-                     envoy_dynamic_module_type_buffer_module_ptr namespace_ptr,
-                     size_t namespace_length) {
+                     envoy_dynamic_module_type_module_buffer ns) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
   auto* callbacks = filter->callbacks();
   if (!callbacks) {
@@ -751,19 +764,19 @@ getMetadataNamespace(envoy_dynamic_module_type_http_filter_envoy_ptr filter_envo
 
   switch (metadata_source) {
   case envoy_dynamic_module_type_metadata_source_Dynamic: {
-    return getMetadataNamespaceImpl(stream_info.dynamicMetadata(), namespace_ptr, namespace_length);
+    return getMetadataNamespaceImpl(stream_info.dynamicMetadata(), ns);
   }
   case envoy_dynamic_module_type_metadata_source_Route: {
     auto route = stream_info.route();
     if (route) {
-      return getMetadataNamespaceImpl(route->metadata(), namespace_ptr, namespace_length);
+      return getMetadataNamespaceImpl(route->metadata(), ns);
     }
     break;
   }
   case envoy_dynamic_module_type_metadata_source_Cluster: {
     auto clusterInfo = callbacks->clusterInfo();
     if (clusterInfo) {
-      return getMetadataNamespaceImpl(clusterInfo->metadata(), namespace_ptr, namespace_length);
+      return getMetadataNamespaceImpl(clusterInfo->metadata(), ns);
     }
     break;
   }
@@ -774,7 +787,7 @@ getMetadataNamespace(envoy_dynamic_module_type_http_filter_envoy_ptr filter_envo
       if (hostInfo) {
         Upstream::MetadataConstSharedPtr md = hostInfo->metadata();
         if (md) {
-          return getMetadataNamespaceImpl(*md, namespace_ptr, namespace_length);
+          return getMetadataNamespaceImpl(*md, ns);
         }
       }
     }
@@ -787,7 +800,7 @@ getMetadataNamespace(envoy_dynamic_module_type_http_filter_envoy_ptr filter_envo
       if (hostInfo) {
         Upstream::MetadataConstSharedPtr md = hostInfo->localityMetadata();
         if (md) {
-          return getMetadataNamespaceImpl(*md, namespace_ptr, namespace_length);
+          return getMetadataNamespaceImpl(*md, ns);
         }
       }
     }
@@ -810,8 +823,7 @@ getMetadataNamespace(envoy_dynamic_module_type_http_filter_envoy_ptr filter_envo
  */
 Protobuf::Struct*
 getDynamicMetadataNamespace(envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-                            envoy_dynamic_module_type_buffer_module_ptr namespace_ptr,
-                            size_t namespace_length) {
+                            envoy_dynamic_module_type_module_buffer ns) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
   auto stream_info = filter->streamInfo();
   if (!stream_info) {
@@ -820,7 +832,7 @@ getDynamicMetadataNamespace(envoy_dynamic_module_type_http_filter_envoy_ptr filt
     return nullptr;
   }
   auto metadata = stream_info->dynamicMetadata().mutable_filter_metadata();
-  absl::string_view namespace_view(static_cast<const char*>(namespace_ptr), namespace_length);
+  absl::string_view namespace_view{ns.ptr, ns.length};
   auto metadata_namespace = metadata->find(namespace_view);
   if (metadata_namespace == metadata->end()) {
     metadata_namespace = metadata->emplace(namespace_view, Protobuf::Struct{}).first;
@@ -842,14 +854,13 @@ getDynamicMetadataNamespace(envoy_dynamic_module_type_http_filter_envoy_ptr filt
 const Protobuf::Value*
 getMetadataValue(envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
                  envoy_dynamic_module_type_metadata_source metadata_source,
-                 envoy_dynamic_module_type_buffer_module_ptr namespace_ptr, size_t namespace_length,
-                 envoy_dynamic_module_type_buffer_module_ptr key_ptr, size_t key_length) {
-  auto metadata_namespace =
-      getMetadataNamespace(filter_envoy_ptr, metadata_source, namespace_ptr, namespace_length);
+                 envoy_dynamic_module_type_module_buffer ns,
+                 envoy_dynamic_module_type_module_buffer key) {
+  auto metadata_namespace = getMetadataNamespace(filter_envoy_ptr, metadata_source, ns);
   if (!metadata_namespace) {
     return nullptr;
   }
-  absl::string_view key_view(static_cast<const char*>(key_ptr), key_length);
+  absl::string_view key_view(key.ptr, key.length);
   auto key_metadata = metadata_namespace->fields().find(key_view);
   if (key_metadata == metadata_namespace->fields().end()) {
     ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
@@ -861,15 +872,14 @@ getMetadataValue(envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_pt
 
 bool envoy_dynamic_module_callback_http_set_dynamic_metadata_number(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_buffer_module_ptr namespace_ptr, size_t namespace_length,
-    envoy_dynamic_module_type_buffer_module_ptr key_ptr, size_t key_length, double value) {
-  auto metadata_namespace =
-      getDynamicMetadataNamespace(filter_envoy_ptr, namespace_ptr, namespace_length);
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    double value) {
+  auto metadata_namespace = getDynamicMetadataNamespace(filter_envoy_ptr, ns);
   if (!metadata_namespace) {
     // If stream info is not available, we cannot guarantee that the namespace is created.
     return false;
   }
-  absl::string_view key_view(static_cast<const char*>(key_ptr), key_length);
+  absl::string_view key_view{key.ptr, key.length};
   Protobuf::Struct metadata_value;
   (*metadata_value.mutable_fields())[key_view].set_number_value(value);
   metadata_namespace->MergeFrom(metadata_value);
@@ -879,18 +889,16 @@ bool envoy_dynamic_module_callback_http_set_dynamic_metadata_number(
 bool envoy_dynamic_module_callback_http_get_metadata_number(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_metadata_source metadata_source,
-    envoy_dynamic_module_type_buffer_module_ptr namespace_ptr, size_t namespace_length,
-    envoy_dynamic_module_type_buffer_module_ptr key_ptr, size_t key_length, double* result) {
-  const auto key_metadata = getMetadataValue(filter_envoy_ptr, metadata_source, namespace_ptr,
-                                             namespace_length, key_ptr, key_length);
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    double* result) {
+  const auto key_metadata = getMetadataValue(filter_envoy_ptr, metadata_source, ns, key);
   if (!key_metadata) {
     return false;
   }
   if (!key_metadata->has_number_value()) {
     ENVOY_LOG_TO_LOGGER(
         Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), error,
-        fmt::format("key {} is not a number",
-                    absl::string_view(static_cast<const char*>(key_ptr), key_length)));
+        fmt::format("key {} is not a number", absl::string_view(key.ptr, key.length)));
     return false;
   }
   *result = key_metadata->number_value();
@@ -899,17 +907,15 @@ bool envoy_dynamic_module_callback_http_get_metadata_number(
 
 bool envoy_dynamic_module_callback_http_set_dynamic_metadata_string(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_buffer_module_ptr namespace_ptr, size_t namespace_length,
-    envoy_dynamic_module_type_buffer_module_ptr key_ptr, size_t key_length,
-    envoy_dynamic_module_type_buffer_module_ptr value_ptr, size_t value_length) {
-  auto metadata_namespace =
-      getDynamicMetadataNamespace(filter_envoy_ptr, namespace_ptr, namespace_length);
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    envoy_dynamic_module_type_module_buffer value) {
+  auto metadata_namespace = getDynamicMetadataNamespace(filter_envoy_ptr, ns);
   if (!metadata_namespace) {
     // If stream info is not available, we cannot guarantee that the namespace is created.
     return false;
   }
-  absl::string_view key_view(static_cast<const char*>(key_ptr), key_length);
-  absl::string_view value_view(static_cast<const char*>(value_ptr), value_length);
+  absl::string_view key_view(key.ptr, key.length);
+  absl::string_view value_view(value.ptr, value.length);
   Protobuf::Struct metadata_value;
   (*metadata_value.mutable_fields())[key_view].set_string_value(value_view);
   metadata_namespace->MergeFrom(metadata_value);
@@ -919,31 +925,26 @@ bool envoy_dynamic_module_callback_http_set_dynamic_metadata_string(
 bool envoy_dynamic_module_callback_http_get_metadata_string(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_metadata_source metadata_source,
-    envoy_dynamic_module_type_buffer_module_ptr namespace_ptr, size_t namespace_length,
-    envoy_dynamic_module_type_buffer_module_ptr key_ptr, size_t key_length,
-    envoy_dynamic_module_type_buffer_envoy_ptr* result, size_t* result_length) {
-  const auto key_metadata = getMetadataValue(filter_envoy_ptr, metadata_source, namespace_ptr,
-                                             namespace_length, key_ptr, key_length);
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    envoy_dynamic_module_type_envoy_buffer* result) {
+  const auto key_metadata = getMetadataValue(filter_envoy_ptr, metadata_source, ns, key);
   if (!key_metadata) {
     return false;
   }
   if (!key_metadata->has_string_value()) {
     ENVOY_LOG_TO_LOGGER(
         Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), error,
-        fmt::format("key {} is not a string",
-                    absl::string_view(static_cast<const char*>(key_ptr), key_length)));
+        fmt::format("key {} is not a string", absl::string_view(key.ptr, key.length)));
     return false;
   }
-  const auto& value = key_metadata->string_value();
-  *result = const_cast<char*>(value.data());
-  *result_length = value.size();
+  const std::string& value = key_metadata->string_value();
+  *result = {value.data(), value.size()};
   return true;
 }
 
 bool envoy_dynamic_module_callback_http_set_filter_state_bytes(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_buffer_module_ptr key_ptr, size_t key_length,
-    envoy_dynamic_module_type_buffer_module_ptr value_ptr, size_t value_length) {
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
   auto stream_info = filter->streamInfo();
   if (!stream_info) {
@@ -951,8 +952,8 @@ bool envoy_dynamic_module_callback_http_set_filter_state_bytes(
                         "stream info is not available");
     return false;
   }
-  absl::string_view key_view(static_cast<const char*>(key_ptr), key_length);
-  absl::string_view value_view(static_cast<const char*>(value_ptr), value_length);
+  absl::string_view key_view(key.ptr, key.length);
+  absl::string_view value_view(value.ptr, value.length);
   stream_info->filterState()->setData(key_view,
                                       std::make_unique<Router::StringAccessorImpl>(value_view),
                                       StreamInfo::FilterState::StateType::ReadOnly);
@@ -961,8 +962,7 @@ bool envoy_dynamic_module_callback_http_set_filter_state_bytes(
 
 bool envoy_dynamic_module_callback_http_get_filter_state_bytes(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_buffer_module_ptr key_ptr, size_t key_length,
-    envoy_dynamic_module_type_buffer_envoy_ptr* result, size_t* result_length) {
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
   auto stream_info = filter->streamInfo();
   if (!stream_info) {
@@ -970,7 +970,7 @@ bool envoy_dynamic_module_callback_http_get_filter_state_bytes(
                         "stream info is not available");
     return false;
   }
-  absl::string_view key_view(static_cast<const char*>(key_ptr), key_length);
+  absl::string_view key_view(key.ptr, key.length);
   auto filter_state = stream_info->filterState()->getDataReadOnly<Router::StringAccessor>(key_view);
   if (!filter_state) {
     ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
@@ -978,260 +978,7 @@ bool envoy_dynamic_module_callback_http_get_filter_state_bytes(
     return false;
   }
   absl::string_view str = filter_state->asString();
-  *result = const_cast<char*>(str.data());
-  *result_length = str.size();
-  return true;
-}
-
-bool envoy_dynamic_module_callback_http_get_received_request_body_size(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t* size) {
-  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
-  auto buffer = filter->current_request_body_;
-  if (!buffer) {
-    return false;
-  }
-  // See the comment on current_request_body_ for when we reach this line.
-  *size = buffer->length();
-  return true;
-}
-
-bool envoy_dynamic_module_callback_http_get_buffered_request_body_size(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t* size) {
-  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
-  auto buffer = filter->decoder_callbacks_->decodingBuffer();
-  if (!buffer) {
-    return false;
-  }
-  *size = buffer->length();
-  return true;
-}
-
-bool envoy_dynamic_module_callback_http_get_received_response_body_size(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t* size) {
-  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
-  auto buffer = filter->current_response_body_;
-  if (!buffer) {
-    return false;
-  }
-  // See the comment on current_response_body_ for when we reach this line.
-  *size = buffer->length();
-  return true;
-}
-
-bool envoy_dynamic_module_callback_http_get_buffered_response_body_size(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t* size) {
-  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
-  auto buffer = filter->encoder_callbacks_->encodingBuffer();
-  if (!buffer) {
-    return false;
-  }
-  *size = buffer->length();
-  return true;
-}
-
-bool envoy_dynamic_module_callback_http_get_received_request_body_chunks(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_envoy_buffer* result_buffer_vector) {
-  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
-  auto buffer = filter->current_request_body_;
-  if (!buffer) {
-    return false;
-  }
-  // See the comment on current_request_body_ for when we reach this.
-  bodyBufferToModule(*buffer, result_buffer_vector);
-  return true;
-}
-
-bool envoy_dynamic_module_callback_http_get_buffered_request_body_chunks(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_envoy_buffer* result_buffer_vector) {
-  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
-  auto buffer = filter->decoder_callbacks_->decodingBuffer();
-  if (!buffer) {
-    return false;
-  }
-  bodyBufferToModule(*buffer, result_buffer_vector);
-  return true;
-}
-
-bool envoy_dynamic_module_callback_http_get_received_request_body_chunks_size(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t* size) {
-  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
-  auto buffer = filter->current_request_body_;
-  if (!buffer) {
-    return false;
-  }
-  // See the comment on current_request_body_ for when we reach this line.
-  *size = buffer->getRawSlices(std::nullopt).size();
-  return true;
-}
-
-bool envoy_dynamic_module_callback_http_get_buffered_request_body_chunks_size(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t* size) {
-  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
-  auto buffer = filter->decoder_callbacks_->decodingBuffer();
-  if (!buffer) {
-    return false;
-  }
-  *size = buffer->getRawSlices(std::nullopt).size();
-  return true;
-}
-
-bool envoy_dynamic_module_callback_http_append_received_request_body(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_buffer_module_ptr data, size_t length) {
-  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
-  auto buffer = filter->current_request_body_;
-  if (!buffer) {
-    return false;
-  }
-  buffer->add(absl::string_view(static_cast<const char*>(data), length));
-  return true;
-}
-
-bool envoy_dynamic_module_callback_http_append_buffered_request_body(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_buffer_module_ptr data, size_t length) {
-  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
-  auto buffer = filter->decoder_callbacks_->decodingBuffer();
-  if (!buffer) {
-    Buffer::OwnedImpl buffer;
-    buffer.add(data, length);
-    filter->decoder_callbacks_->addDecodedData(buffer, true);
-  } else {
-    filter->decoder_callbacks_->modifyDecodingBuffer([data, length](Buffer::Instance& buffer) {
-      buffer.add(absl::string_view(static_cast<const char*>(data), length));
-    });
-  }
-  return true;
-}
-
-bool envoy_dynamic_module_callback_http_drain_received_request_body(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t number_of_bytes) {
-  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
-  auto buffer = filter->current_request_body_;
-  if (!buffer) {
-    return false;
-  }
-  auto size = std::min<uint64_t>(filter->current_request_body_->length(), number_of_bytes);
-  filter->current_request_body_->drain(size);
-  return true;
-}
-
-bool envoy_dynamic_module_callback_http_drain_buffered_request_body(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t number_of_bytes) {
-  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
-  auto buffer = filter->decoder_callbacks_->decodingBuffer();
-  if (!buffer) {
-    return false;
-  }
-  filter->decoder_callbacks_->modifyDecodingBuffer([number_of_bytes](Buffer::Instance& buffer) {
-    auto size = std::min<uint64_t>(buffer.length(), number_of_bytes);
-    buffer.drain(size);
-  });
-  return true;
-}
-
-bool envoy_dynamic_module_callback_http_get_received_response_body_chunks(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_envoy_buffer* result_buffer_vector) {
-  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
-  auto buffer = filter->current_response_body_;
-  if (!buffer) {
-    return false;
-  }
-  // See the comment on current_response_body_ for when we reach this.
-  bodyBufferToModule(*buffer, result_buffer_vector);
-  return true;
-}
-
-bool envoy_dynamic_module_callback_http_get_buffered_response_body_chunks(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_envoy_buffer* result_buffer_vector) {
-  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
-  auto buffer = filter->encoder_callbacks_->encodingBuffer();
-  if (!buffer) {
-    return false;
-  }
-  bodyBufferToModule(*buffer, result_buffer_vector);
-  return true;
-}
-
-bool envoy_dynamic_module_callback_http_get_received_response_body_chunks_size(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t* size) {
-  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
-  auto buffer = filter->current_response_body_;
-  if (!buffer) {
-    return false;
-  }
-  // See the comment on current_response_body_ for when we reach this line.
-  *size = buffer->getRawSlices(std::nullopt).size();
-  return true;
-}
-
-bool envoy_dynamic_module_callback_http_get_buffered_response_body_chunks_size(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t* size) {
-  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
-  auto buffer = filter->encoder_callbacks_->encodingBuffer();
-  if (!buffer) {
-    return false;
-  }
-  *size = buffer->getRawSlices(std::nullopt).size();
-  return true;
-}
-
-bool envoy_dynamic_module_callback_http_append_received_response_body(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_buffer_module_ptr data, size_t length) {
-  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
-  auto buffer = filter->current_response_body_;
-  if (!buffer) {
-    return false;
-  }
-  buffer->add(absl::string_view(static_cast<const char*>(data), length));
-  return true;
-}
-
-bool envoy_dynamic_module_callback_http_append_buffered_response_body(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_buffer_module_ptr data, size_t length) {
-  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
-  auto buffer = filter->encoder_callbacks_->encodingBuffer();
-  if (!buffer) {
-    Buffer::OwnedImpl buffer;
-    buffer.add(data, length);
-    filter->encoder_callbacks_->addEncodedData(buffer, true);
-  } else {
-    filter->encoder_callbacks_->modifyEncodingBuffer([data, length](Buffer::Instance& buffer) {
-      buffer.add(absl::string_view(static_cast<const char*>(data), length));
-    });
-  }
-  return true;
-}
-
-bool envoy_dynamic_module_callback_http_drain_received_response_body(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t number_of_bytes) {
-  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
-  auto buffer = filter->current_response_body_;
-  if (!buffer) {
-    return false;
-  }
-  auto size = std::min<uint64_t>(filter->current_response_body_->length(), number_of_bytes);
-  filter->current_response_body_->drain(size);
-  return true;
-}
-
-bool envoy_dynamic_module_callback_http_drain_buffered_response_body(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t number_of_bytes) {
-  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
-  auto buffer = filter->encoder_callbacks_->encodingBuffer();
-  if (!buffer) {
-    return false;
-  }
-  filter->encoder_callbacks_->modifyEncodingBuffer([number_of_bytes](Buffer::Instance& buffer) {
-    auto size = std::min<uint64_t>(buffer.length(), number_of_bytes);
-    buffer.drain(size);
-  });
+  *result = {str.data(), str.size()};
   return true;
 }
 
@@ -1257,7 +1004,7 @@ envoy_dynamic_module_callback_get_most_specific_route_config(
 bool envoy_dynamic_module_callback_http_filter_get_attribute_string(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_attribute_id attribute_id,
-    envoy_dynamic_module_type_buffer_envoy_ptr* result, size_t* result_length) {
+    envoy_dynamic_module_type_envoy_buffer* result) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
   bool ok = false;
   switch (attribute_id) {
@@ -1267,8 +1014,7 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_string(
       const auto protocol = stream_info->protocol();
       if (protocol.has_value()) {
         const auto& protocol_string_ref = Http::Utility::getProtocolString(protocol.value());
-        *result = const_cast<char*>(protocol_string_ref.data());
-        *result_length = protocol_string_ref.size();
+        *result = {protocol_string_ref.data(), protocol_string_ref.size()};
         ok = true;
       }
     }
@@ -1280,8 +1026,7 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_string(
       auto upstream_host = upstream_info->upstreamHost();
       if (upstream_host != nullptr && upstream_host->address() != nullptr) {
         auto addr = upstream_host->address()->asStringView();
-        *result = const_cast<char*>(addr.data());
-        *result_length = addr.size();
+        *result = {addr.data(), addr.size()};
         ok = true;
       }
     }
@@ -1292,8 +1037,7 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_string(
     if (stream_info) {
       const auto addressProvider =
           stream_info->downstreamAddressProvider().remoteAddress()->asStringView();
-      *result = const_cast<char*>(addressProvider.data());
-      *result_length = addressProvider.size();
+      *result = {addressProvider.data(), addressProvider.size()};
       ok = true;
     }
     break;
@@ -1303,8 +1047,7 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_string(
     if (stream_info) {
       const auto addressProvider =
           stream_info->downstreamAddressProvider().localAddress()->asStringView();
-      *result = const_cast<char*>(addressProvider.data());
-      *result_length = addressProvider.size();
+      *result = {addressProvider.data(), addressProvider.size()};
       ok = true;
     }
     break;
@@ -1316,8 +1059,7 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_string(
       if (stream_id_provider.has_value()) {
         const absl::optional<absl::string_view> request_id = stream_id_provider->toStringView();
         if (request_id.has_value()) {
-          *result = const_cast<char*>(request_id->data());
-          *result_length = request_id->size();
+          *result = {request_id->data(), request_id->size()};
           ok = true;
         }
       }
@@ -1325,33 +1067,28 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_string(
     break;
   }
   case envoy_dynamic_module_type_attribute_id_RequestPath: {
-    ok = headerAsAttribute(filter->requestHeaders(), Envoy::Http::Headers::get().Path, result,
-                           result_length);
+    ok = headerAsAttribute(filter->requestHeaders(), Envoy::Http::Headers::get().Path, result);
     break;
   }
   case envoy_dynamic_module_type_attribute_id_RequestHost: {
-    ok = headerAsAttribute(filter->requestHeaders(), Envoy::Http::Headers::get().Host, result,
-                           result_length);
+    ok = headerAsAttribute(filter->requestHeaders(), Envoy::Http::Headers::get().Host, result);
     break;
   }
   case envoy_dynamic_module_type_attribute_id_RequestMethod: {
-    ok = headerAsAttribute(filter->requestHeaders(), Envoy::Http::Headers::get().Method, result,
-                           result_length);
+    ok = headerAsAttribute(filter->requestHeaders(), Envoy::Http::Headers::get().Method, result);
     break;
   }
   case envoy_dynamic_module_type_attribute_id_RequestScheme: {
-    ok = headerAsAttribute(filter->requestHeaders(), Envoy::Http::Headers::get().Scheme, result,
-                           result_length);
+    ok = headerAsAttribute(filter->requestHeaders(), Envoy::Http::Headers::get().Scheme, result);
     break;
   }
   case envoy_dynamic_module_type_attribute_id_RequestReferer: {
     ok = headerAsAttribute(filter->requestHeaders(), Envoy::Http::CustomHeaders::get().Referer,
-                           result, result_length);
+                           result);
     break;
   }
   case envoy_dynamic_module_type_attribute_id_RequestUserAgent: {
-    ok = headerAsAttribute(filter->requestHeaders(), Envoy::Http::Headers::get().UserAgent, result,
-                           result_length);
+    ok = headerAsAttribute(filter->requestHeaders(), Envoy::Http::Headers::get().UserAgent, result);
     break;
   }
   case envoy_dynamic_module_type_attribute_id_RequestUrlPath: {
@@ -1360,12 +1097,10 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_string(
       const absl::string_view path = headers->getPathValue();
       size_t query_offset = path.find('?');
       if (query_offset == absl::string_view::npos) {
-        *result = const_cast<char*>(path.data());
-        *result_length = path.size();
+        *result = {path.data(), path.length()};
       } else {
         const auto url_path = path.substr(0, query_offset);
-        *result = const_cast<char*>(url_path.data());
-        *result_length = url_path.length();
+        *result = {url_path.data(), url_path.length()};
       }
       ok = true;
     }
@@ -1380,8 +1115,7 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_string(
         auto query = path.substr(query_offset + 1);
         const auto fragment_offset = query.find('#');
         query = query.substr(0, fragment_offset);
-        *result = const_cast<char*>(query.data());
-        *result_length = query.length();
+        *result = {query.data(), query.length()};
         ok = true;
       }
     }
@@ -1391,8 +1125,7 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_string(
     const auto stream_info = filter->streamInfo();
     if (stream_info) {
       const auto& route_name = stream_info->getRouteName();
-      *result = const_cast<char*>(route_name.data());
-      *result_length = route_name.size();
+      *result = {route_name.data(), route_name.size()};
       ok = true;
     }
     break;
@@ -1403,28 +1136,28 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_string(
         [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> OptRef<const std::string> {
           return ssl->tlsVersion();
         },
-        result, result_length);
+        result);
   case envoy_dynamic_module_type_attribute_id_ConnectionSubjectLocalCertificate:
     return getSslInfo(
         filter->connection(),
         [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> OptRef<const std::string> {
           return ssl->subjectLocalCertificate();
         },
-        result, result_length);
+        result);
   case envoy_dynamic_module_type_attribute_id_ConnectionSubjectPeerCertificate:
     return getSslInfo(
         filter->connection(),
         [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> OptRef<const std::string> {
           return ssl->subjectPeerCertificate();
         },
-        result, result_length);
+        result);
   case envoy_dynamic_module_type_attribute_id_ConnectionSha256PeerCertificateDigest:
     return getSslInfo(
         filter->connection(),
         [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> OptRef<const std::string> {
           return ssl->sha256PeerCertificateDigest();
         },
-        result, result_length);
+        result);
   case envoy_dynamic_module_type_attribute_id_ConnectionDnsSanLocalCertificate:
     return getSslInfo(
         filter->connection(),
@@ -1434,7 +1167,7 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_string(
           }
           return ssl->dnsSansLocalCertificate().front();
         },
-        result, result_length);
+        result);
   case envoy_dynamic_module_type_attribute_id_ConnectionDnsSanPeerCertificate:
     return getSslInfo(
         filter->connection(),
@@ -1444,7 +1177,7 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_string(
           }
           return ssl->dnsSansPeerCertificate().front();
         },
-        result, result_length);
+        result);
   case envoy_dynamic_module_type_attribute_id_ConnectionUriSanLocalCertificate:
     return getSslInfo(
         filter->connection(),
@@ -1454,7 +1187,7 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_string(
           }
           return ssl->uriSanLocalCertificate().front();
         },
-        result, result_length);
+        result);
   case envoy_dynamic_module_type_attribute_id_ConnectionUriSanPeerCertificate:
     return getSslInfo(
         filter->connection(),
@@ -1464,7 +1197,7 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_string(
           }
           return ssl->uriSanPeerCertificate().front();
         },
-        result, result_length);
+        result);
   default:
     ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), error,
                         "Unsupported attribute ID {} as string",
@@ -1544,24 +1277,23 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_int(
 
 bool envoy_dynamic_module_callback_http_add_custom_flag(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_buffer_module_ptr flag_ptr, size_t flag_length) {
+    envoy_dynamic_module_type_module_buffer flag) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
-  absl::string_view flag_name_view(static_cast<const char*>(flag_ptr), flag_length);
+  absl::string_view flag_name_view(flag.ptr, flag.length);
   filter->decoder_callbacks_->streamInfo().addCustomFlag(flag_name_view);
   return true;
 }
 
 envoy_dynamic_module_type_http_callout_init_result
 envoy_dynamic_module_callback_http_filter_http_callout(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, uint32_t callout_id,
-    envoy_dynamic_module_type_buffer_module_ptr cluster_name, size_t cluster_name_length,
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, uint64_t* callout_id,
+    envoy_dynamic_module_type_module_buffer cluster_name,
     envoy_dynamic_module_type_module_http_header* headers, size_t headers_size,
-    envoy_dynamic_module_type_buffer_module_ptr body, size_t body_size,
-    uint64_t timeout_milliseconds) {
+    envoy_dynamic_module_type_module_buffer body, uint64_t timeout_milliseconds) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
 
   // Try to get the cluster from the cluster manager for the given cluster name.
-  absl::string_view cluster_name_view(cluster_name, cluster_name_length);
+  absl::string_view cluster_name_view(cluster_name.ptr, cluster_name.length);
 
   // Construct the request message, starting with the headers, checking for required headers, and
   // adding the body if present.
@@ -1578,9 +1310,9 @@ envoy_dynamic_module_callback_http_filter_http_callout(
       message->headers().Host() == nullptr) {
     return envoy_dynamic_module_type_http_callout_init_result_MissingRequiredHeaders;
   }
-  if (body_size > 0) {
-    message->body().add(absl::string_view(static_cast<const char*>(body), body_size));
-    message->headers().setContentLength(body_size);
+  if (body.length > 0) {
+    message->body().add(absl::string_view(static_cast<const char*>(body.ptr), body.length));
+    message->headers().setContentLength(body.length);
   }
   return filter->sendHttpCallout(callout_id, cluster_name_view, std::move(message),
                                  timeout_milliseconds);
@@ -1588,16 +1320,14 @@ envoy_dynamic_module_callback_http_filter_http_callout(
 
 envoy_dynamic_module_type_http_callout_init_result
 envoy_dynamic_module_callback_http_filter_start_http_stream(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_http_stream_envoy_ptr* stream_ptr_out,
-    envoy_dynamic_module_type_buffer_module_ptr cluster_name, size_t cluster_name_length,
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, uint64_t* stream_id_out,
+    envoy_dynamic_module_type_module_buffer cluster_name,
     envoy_dynamic_module_type_module_http_header* headers, size_t headers_size,
-    envoy_dynamic_module_type_buffer_module_ptr body, size_t body_size, bool end_stream,
-    uint64_t timeout_milliseconds) {
+    envoy_dynamic_module_type_module_buffer body, bool end_stream, uint64_t timeout_milliseconds) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
 
   // Try to get the cluster from the cluster manager for the given cluster name.
-  absl::string_view cluster_name_view(cluster_name, cluster_name_length);
+  absl::string_view cluster_name_view(cluster_name.ptr, cluster_name.length);
 
   // Construct the request message, starting with the headers, checking for required headers, and
   // adding the body if present.
@@ -1614,37 +1344,34 @@ envoy_dynamic_module_callback_http_filter_start_http_stream(
       message->headers().Host() == nullptr) {
     return envoy_dynamic_module_type_http_callout_init_result_MissingRequiredHeaders;
   }
-  if (body_size > 0) {
-    message->body().add(absl::string_view(static_cast<const char*>(body), body_size));
+  if (body.length > 0) {
+    message->body().add(absl::string_view(body.ptr, body.length));
   }
-  return filter->startHttpStream(stream_ptr_out, cluster_name_view, std::move(message), end_stream,
+  return filter->startHttpStream(stream_id_out, cluster_name_view, std::move(message), end_stream,
                                  timeout_milliseconds);
 }
 
 void envoy_dynamic_module_callback_http_filter_reset_http_stream(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_http_stream_envoy_ptr stream_ptr) {
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, uint64_t stream_id) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
-  filter->resetHttpStream(stream_ptr);
+  filter->resetHttpStream(stream_id);
 }
 
 bool envoy_dynamic_module_callback_http_stream_send_data(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_http_stream_envoy_ptr stream_ptr,
-    envoy_dynamic_module_type_buffer_module_ptr data, size_t data_length, bool end_stream) {
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, uint64_t stream_id,
+    envoy_dynamic_module_type_module_buffer data, bool end_stream) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
 
   // Create a buffer and send the data.
   Buffer::OwnedImpl buffer;
-  if (data_length > 0) {
-    buffer.add(absl::string_view(static_cast<const char*>(data), data_length));
+  if (data.length > 0) {
+    buffer.add(absl::string_view(data.ptr, data.length));
   }
-  return filter->sendStreamData(stream_ptr, buffer, end_stream);
+  return filter->sendStreamData(stream_id, buffer, end_stream);
 }
 
 bool envoy_dynamic_module_callback_http_stream_send_trailers(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_http_stream_envoy_ptr stream_ptr,
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, uint64_t stream_id,
     envoy_dynamic_module_type_module_http_header* trailers, size_t trailers_size) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
 
@@ -1658,7 +1385,7 @@ bool envoy_dynamic_module_callback_http_stream_send_trailers(
     trailer_map->addCopy(Http::LowerCaseString(key), value);
   }
 
-  return filter->sendStreamTrailers(stream_ptr, std::move(trailer_map));
+  return filter->sendStreamTrailers(stream_id, std::move(trailer_map));
 }
 
 envoy_dynamic_module_type_http_filter_scheduler_module_ptr
@@ -1700,8 +1427,8 @@ bool envoy_dynamic_module_callback_log_enabled(envoy_dynamic_module_type_log_lev
 }
 
 void envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level level,
-                                       const char* message_ptr, size_t message_length) {
-  absl::string_view message_view(static_cast<const char*>(message_ptr), message_length);
+                                       envoy_dynamic_module_type_module_buffer message) {
+  absl::string_view message_view(message.ptr, message.length);
   spdlog::logger& logger = Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules);
   switch (level) {
   case envoy_dynamic_module_type_log_level_Debug:
