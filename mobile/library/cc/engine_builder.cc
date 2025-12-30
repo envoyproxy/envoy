@@ -234,6 +234,11 @@ EngineBuilder& EngineBuilder::addQuicConnectionOption(std::string option) {
   return *this;
 }
 
+EngineBuilder& EngineBuilder::addQuicClientConnectionOption(std::string option) {
+  quic_client_connection_options_.push_back(std::move(option));
+  return *this;
+}
+
 EngineBuilder& EngineBuilder::setHttp3ConnectionOptions(std::string options) {
   http3_connection_options_ = std::move(options);
   return *this;
@@ -871,10 +876,16 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
                                       ->mutable_quic_protocol_options();
     if (!quic_connection_options_.empty()) {
       quic_protocol_options->set_connection_options(absl::StrJoin(quic_connection_options_, ","));
-    } else {
+    } else if (!http3_connection_options_.empty()) {
       quic_protocol_options->set_connection_options(http3_connection_options_);
+    }
+    if (!quic_client_connection_options_.empty()) {
+      quic_protocol_options->set_client_connection_options(
+        absl::StrJoin(quic_client_connection_options_, ","));
+    } else if (!http3_client_connection_options_.empty()) {
       quic_protocol_options->set_client_connection_options(http3_client_connection_options_);
     }
+    quic_protocol_options->set_client_connection_options(http3_client_connection_options_);
     quic_protocol_options->mutable_initial_stream_window_size()->set_value(
         initial_stream_window_size_);
     quic_protocol_options->mutable_initial_connection_window_size()->set_value(
