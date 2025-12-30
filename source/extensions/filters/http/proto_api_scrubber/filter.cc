@@ -270,7 +270,7 @@ Http::FilterDataStatus ProtoApiScrubberFilter::decodeData(Buffer::Instance& data
     }
 
     auto buf_convert_status =
-        request_msg_converter_->convertBackToBuffer(std::move(stream_message));
+        convertMessageToBuffer(*request_msg_converter_, std::move(stream_message));
 
     if (!buf_convert_status.ok()) {
       const absl::Status& status = buf_convert_status.status();
@@ -384,7 +384,8 @@ Http::FilterDataStatus ProtoApiScrubberFilter::encodeData(Buffer::Instance& data
     }
 
     auto buf_convert_status =
-        response_msg_converter_->convertBackToBuffer(std::move(stream_message));
+        convertMessageToBuffer(*response_msg_converter_, std::move(stream_message));
+
     if (!buf_convert_status.ok()) {
       const absl::Status& status = buf_convert_status.status();
       ENVOY_STREAM_LOG(error, "Failed to convert scrubbed message back to envoy buffer: {}",

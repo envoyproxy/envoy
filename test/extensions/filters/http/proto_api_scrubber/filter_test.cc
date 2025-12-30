@@ -41,6 +41,8 @@ using ::apikeys::CreateApiKeyRequest;
 using ::bookstore::CreateShelfRequest;
 using ::envoy::extensions::filters::http::proto_api_scrubber::v3::ProtoApiScrubberConfig;
 using ::Envoy::Extensions::HttpFilters::GrpcFieldExtraction::checkSerializedData;
+using ::Envoy::Extensions::HttpFilters::GrpcFieldExtraction::MessageConverter;
+using ::Envoy::Extensions::HttpFilters::GrpcFieldExtraction::StreamMessage;
 using ::Envoy::Grpc::Status;
 using ::Envoy::Http::MockStreamDecoderFilterCallbacks;
 using ::Envoy::Http::MockStreamEncoderFilterCallbacks;
@@ -138,6 +140,26 @@ public:
               (override));
 };
 
+// Test Filter subclass to allow overriding of message conversion logic.
+class TestProtoApiScrubberFilter : public ProtoApiScrubberFilter {
+public:
+  using ProtoApiScrubberFilter::ProtoApiScrubberFilter;
+
+  // Flag to simulate conversion failures in tests.
+  bool fail_conversion_ = false;
+
+protected:
+  // Override the conversion wrapper to trigger failures on demand.
+  absl::StatusOr<Envoy::Buffer::InstancePtr>
+  convertMessageToBuffer(MessageConverter& converter,
+                         std::unique_ptr<StreamMessage> message) override {
+    if (fail_conversion_) {
+      return absl::ResourceExhaustedError("Fake Buffer Limit Exceeded");
+    }
+    return ProtoApiScrubberFilter::convertMessageToBuffer(converter, std::move(message));
+  }
+};
+
 inline constexpr const char kApiKeysDescriptorRelativePath[] = "test/proto/apikeys.descriptor";
 inline constexpr char kRemoveFieldActionType[] =
     "type.googleapis.com/envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction";
@@ -171,7 +193,7 @@ protected:
   }
 
   void setupFilter() {
-    filter_ = std::make_unique<ProtoApiScrubberFilter>(*mock_filter_config_);
+    filter_ = std::make_unique<TestProtoApiScrubberFilter>(*mock_filter_config_);
     filter_->setDecoderFilterCallbacks(mock_decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(mock_encoder_callbacks_);
   }
@@ -463,7 +485,7 @@ protected:
   testing::NiceMock<MockStreamEncoderFilterCallbacks> mock_encoder_callbacks_;
   NiceMock<Server::Configuration::MockFactoryContext> mock_factory_context_;
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
-  std::unique_ptr<ProtoApiScrubberFilter> filter_;
+  std::unique_ptr<TestProtoApiScrubberFilter> filter_;
 };
 
 // Following tests validate that the filter is not executed for requests with invalid headers.
@@ -997,7 +1019,9 @@ TEST_F(ProtoApiScrubberScrubbingTest, RequestScrubbingFailsOnTruncatedNestedMess
   Envoy::Buffer::OwnedImpl bad_data = createTruncatedNestedMessageFrame(0x12);
 
   // Execute the action
-  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(bad_data, true));
+  EXPECT_LOG_CONTAINS(
+      "warn", "Scrubbing failed with error: ",
+      EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(bad_data, true)));
 
   // Verify Fail-Open (data matches expected payload unmodified)
   Envoy::Grpc::Decoder decoder;
@@ -1210,7 +1234,9 @@ TEST_F(ProtoApiScrubberResponseScrubbingTest, ResponseScrubbingFailsOnTruncatedN
   Envoy::Buffer::OwnedImpl bad_data = createTruncatedNestedMessageFrame(0x22);
 
   // Execute the action
-  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->encodeData(bad_data, true));
+  EXPECT_LOG_CONTAINS(
+      "warn", "Response scrubbing failed with error: ",
+      EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->encodeData(bad_data, true)));
 
   // Verify that data matches expected payload (unmodified)
   Envoy::Grpc::Decoder decoder;
@@ -1371,6 +1397,76 @@ TEST_F(MethodLevelRestrictionTest, MethodAllowedWithFieldRestrictions) {
   expected_request.mutable_shelf()->clear_theme(); // Theme should be scrubbed.
 
   checkSerializedData<CreateShelfRequest>(*request_data, {expected_request});
+}
+
+using ProtoApiScrubberBufferConversionTest = ProtoApiScrubberFilterTest;
+
+// This test verifies that the filter handles request buffer conversion failures gracefully.
+TEST_F(ProtoApiScrubberBufferConversionTest, RequestBufferConversionFailure) {
+  ProtoApiScrubberConfig proto_config;
+  proto_config.set_filtering_mode(ProtoApiScrubberConfig::OVERRIDE);
+  std::string method_name = "/apikeys.ApiKeys/CreateApiKey";
+
+  // Configure a simple scrubbing rule
+  addRestriction(proto_config, method_name, "key.display_name", FieldType::Request, true,
+                 kRemoveFieldActionType);
+  ASSERT_TRUE(reloadFilter(proto_config).ok());
+
+  // Trigger conversion failure in test.
+  filter_->fail_conversion_ = true;
+
+  // 1. Setup Request
+  TestRequestHeaderMapImpl req_headers = TestRequestHeaderMapImpl{
+      {":method", "POST"}, {":path", method_name}, {"content-type", "application/grpc"}};
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(req_headers, true));
+
+  CreateApiKeyRequest request = makeCreateApiKeyRequest();
+  Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
+
+  // Expect the filter to handle the error by sending a Local Reply.
+  EXPECT_CALL(mock_decoder_callbacks_,
+              sendLocalReply(Envoy::Http::Code::TooManyRequests, // Mapped from ResourceExhausted
+                             Eq("Fake Buffer Limit Exceeded"), _,
+                             Eq(Envoy::Grpc::Status::ResourceExhausted),
+                             testing::HasSubstr("REQUEST_BUFFER_CONVERSION_FAIL")));
+
+  EXPECT_EQ(Envoy::Http::FilterDataStatus::StopIterationNoBuffer,
+            filter_->decodeData(*request_data, true));
+}
+
+// This test verifies that the filter handles response buffer conversion failures gracefully.
+TEST_F(ProtoApiScrubberBufferConversionTest, ResponseBufferConversionFailure) {
+  ProtoApiScrubberConfig proto_config;
+  proto_config.set_filtering_mode(ProtoApiScrubberConfig::OVERRIDE);
+  std::string method_name = "/apikeys.ApiKeys/CreateApiKey";
+
+  addRestriction(proto_config, method_name, "create_time.seconds", FieldType::Response, true,
+                 kRemoveFieldActionType);
+  ASSERT_TRUE(reloadFilter(proto_config).ok());
+
+  // Trigger conversion failure in test.
+  filter_->fail_conversion_ = true;
+
+  TestRequestHeaderMapImpl req_headers = TestRequestHeaderMapImpl{
+      {":method", "POST"}, {":path", method_name}, {"content-type", "application/grpc"}};
+  filter_->decodeHeaders(req_headers, true);
+
+  TestResponseHeaderMapImpl resp_headers =
+      TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/grpc"}};
+  filter_->encodeHeaders(resp_headers, false);
+
+  ApiKey response = makeCreateApiKeyResponse();
+  Envoy::Buffer::InstancePtr response_data = Envoy::Grpc::Common::serializeToGrpcFrame(response);
+
+  // Expect the filter to handle the error by sending a Local Reply.
+  EXPECT_CALL(mock_encoder_callbacks_,
+              sendLocalReply(Envoy::Http::Code::TooManyRequests, // Mapped from ResourceExhausted
+                             Eq("Fake Buffer Limit Exceeded"), _,
+                             Eq(Envoy::Grpc::Status::ResourceExhausted),
+                             testing::HasSubstr("RESPONSE_BUFFER_CONVERSION_FAIL")));
+
+  EXPECT_EQ(Envoy::Http::FilterDataStatus::StopIterationNoBuffer,
+            filter_->encodeData(*response_data, true));
 }
 
 } // namespace
