@@ -881,7 +881,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     }
     if (!quic_client_connection_options_.empty()) {
       quic_protocol_options->set_client_connection_options(
-        absl::StrJoin(quic_client_connection_options_, ","));
+          absl::StrJoin(quic_client_connection_options_, ","));
     } else {
       quic_protocol_options->set_client_connection_options(http3_client_connection_options_);
     }
