@@ -44,10 +44,6 @@ std::ostream& operator<<(std::ostream& os, Connection::State connection_state) {
   return os;
 }
 
-absl::string_view ipVersionAsString(Network::Address::IpVersion ip_version) {
-  return ip_version == Network::Address::IpVersion::v4 ? "v4" : "v6";
-}
-
 } // namespace
 
 void ConnectionImplUtility::updateBufferStats(uint64_t delta, uint64_t new_total,
