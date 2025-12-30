@@ -4,7 +4,6 @@ package envoy.extensions.filters.http.proto_api_scrubber.v3;
 
 import "envoy/config/core/v3/base.proto";
 
-import "xds/annotations/v3/status.proto";
 import "xds/type/matcher/v3/matcher.proto";
 
 import "udpa/annotations/status.proto";
@@ -14,10 +13,8 @@ option java_outer_classname = "ConfigProto";
 option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/proto_api_scrubber/v3;proto_api_scrubberv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
-option (xds.annotations.v3.file_status).work_in_progress = true;
 
 // [#protodoc-title: Proto API Scrubber]
-// [#not-implemented-hide:] Implementation in progress.
 // [#extension: envoy.filters.http.proto_api_scrubber]
 
 // ProtoApiScrubber filter supports filtering of the request and
@@ -26,7 +23,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // The filter evaluates the configured restriction for each field
 // to produce the filtered output using the configured actions.
 // This filter currently supports only field level restrictions.
-// Restriction support for other proto elements (eg, message
+// Restriction support for other proto elements (e.g., message
 // level restriction, method level restriction, etc.) are planned to be
 // implemented in future. The design doc for this filter is available
 // `here <https://docs.google.com/document/d/1jgRe5mhucFRgmKYf-Ukk20jW8kusIo53U5bcF74GkK8>`_
@@ -64,8 +61,7 @@ message Restrictions {
   map<string, MethodRestrictions> method_restrictions = 1;
 
   // Specifies the message restrictions.
-  // Key - Fully qualified message name e.g.,
-  //       ``endpoints.examples.bookstore.Book``.
+  // Key - Fully qualified message name e.g., ``endpoints.examples.bookstore.Book``.
   // Value - Message restrictions.
   map<string, MessageRestrictions> message_restrictions = 2;
 }
@@ -74,13 +70,13 @@ message Restrictions {
 // for the request and response fields.
 message MethodRestrictions {
   // Restrictions that apply to request fields of the method.
-  // Key - field mask like path of the field eg, foo.bar.baz
+  // Key - field mask like path of the field e.g., foo.bar.baz
   // Value - Restrictions map containing the mapping from restriction name to
   // the restriction values.
   map<string, RestrictionConfig> request_field_restrictions = 1;
 
   // Restrictions that apply to response fields of the method.
-  // Key - field mask like path of the field eg, foo.bar.baz
+  // Key - field mask like path of the field e.g., foo.bar.baz
   // Value - Restrictions map containing the mapping from restriction name to
   // the restriction values.
   map<string, RestrictionConfig> response_field_restrictions = 2;
@@ -89,6 +85,7 @@ message MethodRestrictions {
   // rule takes precedence for the method itself over field-level or
   // message-level rules. The 'matcher' within RestrictionConfig will determine
   // if the method is denied/scrubbed. If the matcher evaluates to true:
+  //
   // - The request is **denied**, and further processing is stopped.
   // - The implementation should generate an immediate error response
   //   (e.g., an HTTP 403 Forbidden status) and send it to the client.

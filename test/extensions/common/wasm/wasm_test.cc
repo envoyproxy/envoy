@@ -1549,7 +1549,7 @@ vm_config:
     // Create second context and reload the wasm vm will be reload automatically.
     createContext();
     EXPECT_NE(nullptr, context_.get());
-    Wasm* context_wasm = context_->wasm();
+    Wasm* context_wasm = context_->envoyWasm();
 
     EXPECT_NE(nullptr, context_wasm);
     EXPECT_NE(initial_wasm, context_wasm);

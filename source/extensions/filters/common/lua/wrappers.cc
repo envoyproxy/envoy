@@ -57,7 +57,8 @@ int BufferWrapper::luaGetBytes(lua_State* state) {
     luaL_error(state, "index/length must be >= 0 and (index + length) must be <= buffer size");
   }
 
-  // TODO(mattklein123): Reduce copies here by using Lua direct buffer builds.
+  // Note: Lua buffer API (`luaL_prepbuffsize`) could reduce copies here, but Envoy
+  // uses luajit which does not expose this function.
   std::unique_ptr<char[]> data(new char[length]);
   data_.copyOut(index, length, data.get());
   lua_pushlstring(state, data.get(), length);

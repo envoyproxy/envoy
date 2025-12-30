@@ -130,10 +130,6 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_reresolve_if_no_connections);
 FALSE_RUNTIME_GUARD(envoy_restart_features_xds_failover_support);
 // TODO(abeyad): evaluate and either make this a config knob or remove.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_dns_cache_set_ip_version_to_remove);
-// TODO(abeyad): evaluate and either make this the default or remove.
-FALSE_RUNTIME_GUARD(envoy_reloadable_features_dns_cache_filter_unusable_ip_version);
-// TODO(abeyad): evaluate and make this a config knob or remove.
-FALSE_RUNTIME_GUARD(envoy_reloadable_features_drain_pools_on_network_change);
 // TODO(fredyw): evaluate and either make this a config knob or remove.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_no_tcp_delay);
 // Adding runtime flag to use balsa_parser for http_inspector.
@@ -147,11 +143,6 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_use_canonical_suffix_for_quic_brok
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_use_canonical_suffix_for_srtt);
 // TODO(abeyad): Evaluate and make this a config knob or remove.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_use_canonical_suffix_for_initial_rtt_estimate);
-// TODO(fredyw): Remove after done with debugging.
-FALSE_RUNTIME_GUARD(envoy_reloadable_features_log_ip_families_on_network_error);
-// TODO(abeyad): Flip to true after prod testing. Simple filtering applies to link-local addresses
-// only.
-FALSE_RUNTIME_GUARD(envoy_reloadable_features_mobile_ipv6_probe_simple_filtering);
 // TODO(abeyad): Flip to true after prod testing. Advanced filtering applies to all IP reserved
 // range addresses.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_mobile_ipv6_probe_advanced_filtering);
@@ -160,6 +151,10 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_connection_close_through_filter_ma
 // TODO(adisuissa): flip to true after all xDS types use the new subscription
 // method, and this is tested extensively.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_xdstp_based_config_singleton_subscriptions);
+// TODO(abeyad): Flip to true after prod testing.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_disable_quic_rx_queue_overflow_socket_options);
+// TODO(abeyad): Flip to true after prod testing.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_disable_quic_ip_packet_info_socket_options);
 
 // A flag to set the maximum TLS version for google_grpc client to TLS1.2, when needed for
 // compliance restrictions.

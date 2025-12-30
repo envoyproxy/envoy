@@ -734,6 +734,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
                           Server::Configuration::NamedHttpFilterConfigFactory>
       helper(filter_config_provider_manager_, context_.serverFactoryContext(),
              context_.serverFactoryContext().clusterManager(), context_, stats_prefix_);
+
   SET_AND_RETURN_IF_NOT_OK(
       helper.processFilters(config.http_filters(), "http", "http", filter_factories_),
       creation_status);

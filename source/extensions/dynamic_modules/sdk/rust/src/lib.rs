@@ -3227,6 +3227,57 @@ pub trait EnvoyNetworkFilter {
 
   /// Disable or enable connection close handling for this filter.
   fn disable_close(&mut self, disabled: bool);
+
+  /// Close the connection with termination details.
+  fn close_with_details(
+    &mut self,
+    close_type: abi::envoy_dynamic_module_type_network_connection_close_type,
+    details: &str,
+  );
+
+  /// Get the requested server name (SNI).
+  /// Returns None if SNI is not available.
+  fn get_requested_server_name(&self) -> Option<String>;
+
+  /// Get the direct remote (client) address and port without considering proxy protocol.
+  /// Returns None if the address is not available or not an IP address.
+  fn get_direct_remote_address(&self) -> Option<(String, u32)>;
+
+  /// Get the SSL URI SANs from the peer certificate.
+  /// Returns an empty vector if the connection is not SSL or no URI SANs are present.
+  fn get_ssl_uri_sans(&self) -> Vec<String>;
+
+  /// Get the SSL DNS SANs from the peer certificate.
+  /// Returns an empty vector if the connection is not SSL or no DNS SANs are present.
+  fn get_ssl_dns_sans(&self) -> Vec<String>;
+
+  /// Get the SSL subject from the peer certificate.
+  /// Returns None if the connection is not SSL or subject is not available.
+  fn get_ssl_subject(&self) -> Option<String>;
+
+  /// Set the filter state with the given key and byte value.
+  /// Returns true if the operation is successful.
+  fn set_filter_state_bytes(&mut self, key: &[u8], value: &[u8]) -> bool;
+
+  /// Get the filter state bytes with the given key.
+  /// Returns None if the filter state is not found.
+  fn get_filter_state_bytes<'a>(&'a self, key: &[u8]) -> Option<EnvoyBuffer<'a>>;
+
+  /// Set the string-typed dynamic metadata value with the given namespace and key value.
+  /// Returns true if the operation is successful.
+  fn set_dynamic_metadata_string(&mut self, namespace: &str, key: &str, value: &str) -> bool;
+
+  /// Get the string-typed dynamic metadata value with the given namespace and key value.
+  /// Returns None if the metadata is not found or is the wrong type.
+  fn get_dynamic_metadata_string(&self, namespace: &str, key: &str) -> Option<String>;
+
+  /// Set the number-typed dynamic metadata value with the given namespace and key value.
+  /// Returns true if the operation is successful.
+  fn set_dynamic_metadata_number(&mut self, namespace: &str, key: &str, value: f64) -> bool;
+
+  /// Get the number-typed dynamic metadata value with the given namespace and key value.
+  /// Returns None if the metadata is not found or is the wrong type.
+  fn get_dynamic_metadata_number(&self, namespace: &str, key: &str) -> Option<f64>;
 }
 
 /// The implementation of [`EnvoyNetworkFilterConfig`] for the Envoy network filter configuration.
@@ -3475,6 +3526,280 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
   fn disable_close(&mut self, disabled: bool) {
     unsafe {
       abi::envoy_dynamic_module_callback_network_filter_disable_close(self.raw, disabled);
+    }
+  }
+
+  fn close_with_details(
+    &mut self,
+    close_type: abi::envoy_dynamic_module_type_network_connection_close_type,
+    details: &str,
+  ) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_network_filter_close_with_details(
+        self.raw,
+        close_type,
+        str_to_module_buffer(details),
+      );
+    }
+  }
+
+  fn get_requested_server_name(&self) -> Option<String> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_network_filter_get_requested_server_name(
+        self.raw,
+        &mut result as *mut _ as *mut _,
+      )
+    };
+    if success && !result.ptr.is_null() && result.length > 0 {
+      let sni_str = unsafe {
+        std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+          result.ptr as *const _,
+          result.length,
+        ))
+      };
+      Some(sni_str.to_string())
+    } else {
+      None
+    }
+  }
+
+  fn get_direct_remote_address(&self) -> Option<(String, u32)> {
+    let mut address = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let mut port: u32 = 0;
+    let result = unsafe {
+      abi::envoy_dynamic_module_callback_network_filter_get_direct_remote_address(
+        self.raw,
+        &mut address as *mut _ as *mut _,
+        &mut port,
+      )
+    };
+    if !result || address.length == 0 || address.ptr.is_null() {
+      return None;
+    }
+    let address_str = unsafe {
+      std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+        address.ptr as *const _,
+        address.length,
+      ))
+    };
+    Some((address_str.to_string(), port))
+  }
+
+  fn get_ssl_uri_sans(&self) -> Vec<String> {
+    let mut size: usize = 0;
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_network_filter_get_ssl_uri_sans_size(self.raw, &mut size)
+    };
+    if !success || size == 0 {
+      return Vec::new();
+    }
+
+    let mut sans_buffers: Vec<abi::envoy_dynamic_module_type_envoy_buffer> = vec![
+      abi::envoy_dynamic_module_type_envoy_buffer {
+        ptr: std::ptr::null(),
+        length: 0,
+      };
+      size
+    ];
+    let count = unsafe {
+      abi::envoy_dynamic_module_callback_network_filter_get_ssl_uri_sans(
+        self.raw,
+        sans_buffers.as_mut_ptr(),
+      )
+    };
+    if count == 0 {
+      return Vec::new();
+    }
+
+    sans_buffers
+      .iter()
+      .take(count)
+      .map(|buf| {
+        if !buf.ptr.is_null() && buf.length > 0 {
+          unsafe {
+            std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+              buf.ptr as *const _,
+              buf.length,
+            ))
+            .to_string()
+          }
+        } else {
+          String::new()
+        }
+      })
+      .collect()
+  }
+
+  fn get_ssl_dns_sans(&self) -> Vec<String> {
+    let mut size: usize = 0;
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_network_filter_get_ssl_dns_sans_size(self.raw, &mut size)
+    };
+    if !success || size == 0 {
+      return Vec::new();
+    }
+
+    let mut sans_buffers: Vec<abi::envoy_dynamic_module_type_envoy_buffer> = vec![
+      abi::envoy_dynamic_module_type_envoy_buffer {
+        ptr: std::ptr::null(),
+        length: 0,
+      };
+      size
+    ];
+    let count = unsafe {
+      abi::envoy_dynamic_module_callback_network_filter_get_ssl_dns_sans(
+        self.raw,
+        sans_buffers.as_mut_ptr(),
+      )
+    };
+    if count == 0 {
+      return Vec::new();
+    }
+
+    sans_buffers
+      .iter()
+      .take(count)
+      .map(|buf| {
+        if !buf.ptr.is_null() && buf.length > 0 {
+          unsafe {
+            std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+              buf.ptr as *const _,
+              buf.length,
+            ))
+            .to_string()
+          }
+        } else {
+          String::new()
+        }
+      })
+      .collect()
+  }
+
+  fn get_ssl_subject(&self) -> Option<String> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_network_filter_get_ssl_subject(
+        self.raw,
+        &mut result as *mut _ as *mut _,
+      )
+    };
+    if success && !result.ptr.is_null() && result.length > 0 {
+      let subject_str = unsafe {
+        std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+          result.ptr as *const _,
+          result.length,
+        ))
+      };
+      Some(subject_str.to_string())
+    } else {
+      None
+    }
+  }
+
+  fn set_filter_state_bytes(&mut self, key: &[u8], value: &[u8]) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_network_set_filter_state_bytes(
+        self.raw,
+        bytes_to_module_buffer(key),
+        abi::envoy_dynamic_module_type_module_buffer {
+          ptr: value.as_ptr() as abi::envoy_dynamic_module_type_buffer_module_ptr,
+          length: value.len(),
+        },
+      )
+    }
+  }
+
+  fn get_filter_state_bytes(&self, key: &[u8]) -> Option<EnvoyBuffer> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_network_get_filter_state_bytes(
+        self.raw,
+        bytes_to_module_buffer(key),
+        &mut result as *mut _ as *mut _,
+      )
+    };
+    if success && !result.ptr.is_null() && result.length > 0 {
+      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) })
+    } else {
+      None
+    }
+  }
+
+  fn set_dynamic_metadata_string(&mut self, namespace: &str, key: &str, value: &str) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_network_set_dynamic_metadata_string(
+        self.raw,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        str_to_module_buffer(value),
+      )
+    }
+  }
+
+  fn get_dynamic_metadata_string(&self, namespace: &str, key: &str) -> Option<String> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_network_get_dynamic_metadata_string(
+        self.raw,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        &mut result as *mut _ as *mut _,
+      )
+    };
+    if success && !result.ptr.is_null() && result.length > 0 {
+      let value_str = unsafe {
+        std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+          result.ptr as *const _,
+          result.length,
+        ))
+      };
+      Some(value_str.to_string())
+    } else {
+      None
+    }
+  }
+
+  fn set_dynamic_metadata_number(&mut self, namespace: &str, key: &str, value: f64) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_network_set_dynamic_metadata_number(
+        self.raw,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        value,
+      )
+    }
+  }
+
+  fn get_dynamic_metadata_number(&self, namespace: &str, key: &str) -> Option<f64> {
+    let mut result: f64 = 0.0;
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_network_get_dynamic_metadata_number(
+        self.raw,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        &mut result,
+      )
+    };
+    if success {
+      Some(result)
+    } else {
+      None
     }
   }
 }
