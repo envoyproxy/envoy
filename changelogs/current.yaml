@@ -628,7 +628,7 @@ new_features:
     Added ``LISTENER_FILTER_CHAIN`` to the ``METADATA`` command operator to allow access to listener filter chain metadata.
 - area: ext_proc
   change: |
-    Added per HTTP event processing effects in the ExtProcLoggingInfo filter state. This new data tracks
+    Added per HTTP event processing effects in the ``ExtProcLoggingInfo`` filter state. This new data tracks
     the processing effects (mutation applied, rejected, etc.) for headers, body, and trailers and can be
     accessed via the ``processingEffects`` method.
 - area: network
