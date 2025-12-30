@@ -678,6 +678,16 @@ typedef enum envoy_dynamic_module_type_on_listener_filter_status {
   envoy_dynamic_module_type_on_listener_filter_status_StopIteration,
 } envoy_dynamic_module_type_on_listener_filter_status;
 
+/**
+ * envoy_dynamic_module_type_address_type represents the socket address type.
+ */
+typedef enum envoy_dynamic_module_type_address_type {
+  envoy_dynamic_module_type_address_type_Unknown = 0,
+  envoy_dynamic_module_type_address_type_Ip = 1,
+  envoy_dynamic_module_type_address_type_Pipe = 2,
+  envoy_dynamic_module_type_address_type_EnvoyInternal = 3,
+} envoy_dynamic_module_type_address_type;
+
 // -----------------------------------------------------------------------------
 // ------------------------------- Event Hooks ---------------------------------
 // -----------------------------------------------------------------------------
@@ -2843,6 +2853,20 @@ bool envoy_dynamic_module_callback_listener_filter_get_remote_address(
     envoy_dynamic_module_type_envoy_buffer* address_out, uint32_t* port_out);
 
 /**
+ * envoy_dynamic_module_callback_listener_filter_get_direct_remote_address is called by the module
+ * to get the direct remote address which is the peer address before any listener filter
+ * modification.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param address_out is the output buffer where the address owned by Envoy will be stored.
+ * @param port_out is the output pointer to the port number.
+ * @return true if the address was found and is an IP address, false otherwise.
+ */
+bool envoy_dynamic_module_callback_listener_filter_get_direct_remote_address(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* address_out, uint32_t* port_out);
+
+/**
  * envoy_dynamic_module_callback_listener_filter_get_local_address is called by the module to get
  * the local address.
  *
@@ -2854,6 +2878,54 @@ bool envoy_dynamic_module_callback_listener_filter_get_remote_address(
 bool envoy_dynamic_module_callback_listener_filter_get_local_address(
     envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer* address_out, uint32_t* port_out);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_direct_local_address is called by the module to
+ * get the direct local address (the listener address before any restoration).
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param address_out is the output buffer where the address owned by Envoy will be stored.
+ * @param port_out is the output pointer to the port number.
+ * @return true if the address was found and is an IP address, false otherwise.
+ */
+bool envoy_dynamic_module_callback_listener_filter_get_direct_local_address(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* address_out, uint32_t* port_out);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_original_dst is called by the module to get the
+ * original destination address obtained from the platform (e.g., iptables redirect).
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param address_out is the output buffer where the address owned by Envoy will be stored.
+ * @param port_out is the output pointer to the port number.
+ * @return true if the original destination address was found and is an IP address, false otherwise.
+ */
+bool envoy_dynamic_module_callback_listener_filter_get_original_dst(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* address_out, uint32_t* port_out);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_address_type is called by the module to get the
+ * socket address type.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @return the address type for the current socket.
+ */
+envoy_dynamic_module_type_address_type
+envoy_dynamic_module_callback_listener_filter_get_address_type(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_is_local_address_restored is called by the module
+ * to check whether the local address has been restored to a value different from the listener
+ * address.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @return true if the local address has been restored, false otherwise.
+ */
+bool envoy_dynamic_module_callback_listener_filter_is_local_address_restored(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr);
 
 /**
  * envoy_dynamic_module_callback_listener_filter_set_remote_address is called by the module to set
@@ -2897,6 +2969,16 @@ bool envoy_dynamic_module_callback_listener_filter_restore_local_address(
  */
 void envoy_dynamic_module_callback_listener_filter_continue_filter_chain(
     envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr, bool success);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_use_original_dst is called by the module to control
+ * whether the listener should use the original destination for filter chain matching.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param use_original_dst indicates whether to enable original destination handling.
+ */
+void envoy_dynamic_module_callback_listener_filter_use_original_dst(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr, bool use_original_dst);
 
 /**
  * envoy_dynamic_module_callback_listener_filter_close_socket is called by the module to close
@@ -2953,6 +3035,31 @@ void envoy_dynamic_module_callback_listener_filter_set_filter_state(
 bool envoy_dynamic_module_callback_listener_filter_get_filter_state(
     envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* value_out);
+
+// -----------------------------------------------------------------------------
+// Stream Info Operations
+// -----------------------------------------------------------------------------
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_set_downstream_transport_failure_reason is called
+ * by the module to set the downstream transport failure reason for logging and debugging.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param reason is the reason string owned by the module.
+ */
+void envoy_dynamic_module_callback_listener_filter_set_downstream_transport_failure_reason(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer reason);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_connection_start_time_ms is called by the
+ * module to obtain the connection start time in milliseconds since Unix epoch.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @return the start time in milliseconds since Unix epoch.
+ */
+uint64_t envoy_dynamic_module_callback_listener_filter_get_connection_start_time_ms(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr);
 
 #ifdef __cplusplus
 }

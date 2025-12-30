@@ -1013,6 +1013,7 @@ lowp
 lstat
 ltrim
 lua
+luajit
 lyft
 maglev
 malloc
