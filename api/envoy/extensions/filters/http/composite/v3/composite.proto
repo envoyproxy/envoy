@@ -31,6 +31,13 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // :ref:`ExecuteFilterAction <envoy_v3_api_msg_extensions.filters.http.composite.v3.ExecuteFilterAction>`)
 // which filter configuration to create and delegate to.
 message Composite {
+  // Named filter chain definitions that can be referenced from
+  // :ref:`ExecuteFilterAction.filter_chain_name
+  // <envoy_v3_api_field_extensions.filters.http.composite.v3.ExecuteFilterAction.filter_chain_name>`.
+  // The filter chains are compiled at configuration time and can be referenced by name.
+  // This is useful when the same filter chain needs to be applied across many routes,
+  // as it avoids duplicating the filter chain configuration.
+  map<string, FilterChainConfiguration> named_filter_chains = 1;
 }
 
 // A list of filter configurations to be called in order. Note that this can be used as the type
@@ -58,24 +65,35 @@ message DynamicConfig {
 
 // Composite match action (see :ref:`matching docs <arch_overview_matching_api>` for more info on match actions).
 // This specifies the filter configuration of the filter that the composite filter should delegate filter interactions to.
+// [#next-free-field: 6]
 message ExecuteFilterAction {
   // Filter specific configuration which depends on the filter being
   // instantiated. See the supported filters for further documentation.
-  // Only one of ``typed_config`` or ``dynamic_config`` can be set.
-  // Ignored if ``filter_chain`` is set.
+  // Only one of ``typed_config``, ``dynamic_config``, ``filter_chain``, or ``filter_chain_name``
+  // can be set.
   // [#extension-category: envoy.filters.http]
   config.core.v3.TypedExtensionConfig typed_config = 1
       [(udpa.annotations.field_migrate).oneof_promotion = "config_type"];
 
   // Dynamic configuration of filter obtained via extension configuration discovery service.
-  // Only one of ``typed_config`` or ``dynamic_config`` can be set.
-  // Ignored if ``filter_chain`` is set.
+  // Only one of ``typed_config``, ``dynamic_config``, ``filter_chain``, or ``filter_chain_name``
+  // can be set.
   DynamicConfig dynamic_config = 2
       [(udpa.annotations.field_migrate).oneof_promotion = "config_type"];
 
   // An inlined list of filter configurations. The specified filters will be executed in order.
-  // If this field is set, ``typed_config`` and ``dynamic_config`` are ignored.
+  // Only one of ``typed_config``, ``dynamic_config``, ``filter_chain``, or ``filter_chain_name``
+  // can be set.
   FilterChainConfiguration filter_chain = 4;
+
+  // The name of a filter chain defined in
+  // :ref:`Composite.named_filter_chains
+  // <envoy_v3_api_field_extensions.filters.http.composite.v3.Composite.named_filter_chains>`.
+  // At runtime, if the named filter chain is not found in the Composite filter's configuration,
+  // no filter will be applied for this match (the action is silently skipped).
+  // Only one of ``typed_config``, ``dynamic_config``, ``filter_chain``, or ``filter_chain_name``
+  // can be set.
+  string filter_chain_name = 5;
 
   // Probability of the action execution. If not specified, this is 100%.
   // This allows sampling behavior for the configured actions.

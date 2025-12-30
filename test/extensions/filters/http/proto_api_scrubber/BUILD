@@ -1,9 +1,14 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_benchmark_binary",
     "envoy_cc_test",
     "envoy_package",
     "envoy_proto_descriptor",
     "envoy_proto_library",
+)
+load(
+    "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_test",
 )
 
 licenses(["notice"])  # Apache 2
@@ -56,11 +61,13 @@ envoy_cc_test(
     name = "filter_test",
     srcs = ["filter_test.cc"],
     data = [
+        ":scrubber_test_proto_descriptor",
         "//test/proto:apikeys_proto_descriptor",
         "//test/proto:bookstore_proto_descriptor",
     ],
     rbe_pool = "6gig",
     deps = [
+        ":scrubber_test_proto_cc_proto",
         "//source/common/grpc:common_lib",
         "//source/common/grpc:status_lib",
         "//source/common/http/matching:inputs_lib",
@@ -82,7 +89,7 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "integration_test",
     size = "large",
     srcs = [
@@ -92,8 +99,7 @@ envoy_cc_test(
         ":scrubber_test_proto_descriptor",
         "//test/proto:apikeys_proto_descriptor",
     ],
-    # Following attribute will be enabled once the filter is registered.
-    # extension_names = ["envoy.filters.http.proto_api_scrubber"],
+    extension_names = ["envoy.filters.http.proto_api_scrubber"],
     rbe_pool = "6gig",
     deps = [
         ":scrubber_test_proto_cc_proto",
@@ -113,5 +119,31 @@ envoy_cc_test(
         "@envoy_api//envoy/extensions/filters/http/proto_api_scrubber/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/matching/common_inputs/network/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_benchmark_binary(
+    name = "filter_benchmark_test",
+    srcs = ["filter_benchmark_test.cc"],
+    data = [
+        ":scrubber_test_proto_descriptor",
+    ],
+    deps = [
+        ":scrubber_test_proto_cc_proto",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/common:assert_lib",
+        "//source/common/grpc:common_lib",
+        "//source/common/protobuf:utility_lib",
+        "//source/extensions/filters/http/proto_api_scrubber:filter",
+        "//source/extensions/filters/http/proto_api_scrubber:filter_config",
+        "//source/extensions/matching/http/cel_input:cel_input_lib",
+        "//source/extensions/matching/input_matchers/cel_matcher:config",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/server:server_mocks",
+        "//test/test_common:utility_lib",
+        "@com_github_cncf_xds//xds/type/matcher/v3:pkg_cc_proto",
+        "@com_google_cel_cpp//parser",
+        "@envoy_api//envoy/extensions/filters/http/proto_api_scrubber/v3:pkg_cc_proto",
     ],
 )

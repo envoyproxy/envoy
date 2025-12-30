@@ -71,6 +71,7 @@ RUNTIME_GUARD(envoy_reloadable_features_quic_upstream_reads_fixed_number_packets
 RUNTIME_GUARD(envoy_reloadable_features_quic_upstream_socket_use_address_cache_for_read);
 RUNTIME_GUARD(envoy_reloadable_features_reject_empty_trusted_ca_file);
 RUNTIME_GUARD(envoy_reloadable_features_report_load_when_rq_active_is_non_zero);
+RUNTIME_GUARD(envoy_reloadable_features_reset_ignore_upstream_reason);
 RUNTIME_GUARD(envoy_reloadable_features_reset_with_error);
 RUNTIME_GUARD(envoy_reloadable_features_safe_http2_options);
 RUNTIME_GUARD(envoy_reloadable_features_skip_dns_lookup_for_proxied_requests);
@@ -159,6 +160,10 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_connection_close_through_filter_ma
 // TODO(adisuissa): flip to true after all xDS types use the new subscription
 // method, and this is tested extensively.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_xdstp_based_config_singleton_subscriptions);
+// TODO(abeyad): Flip to true after prod testing.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_disable_quic_rx_queue_overflow_socket_options);
+// TODO(abeyad): Flip to true after prod testing.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_disable_quic_ip_packet_info_socket_options);
 
 // A flag to set the maximum TLS version for google_grpc client to TLS1.2, when needed for
 // compliance restrictions.
