@@ -35,7 +35,8 @@ public:
  * Base class for forward client cert matcher actions that implements the interface.
  */
 template <class ProtoType>
-class ForwardClientCertActionBase : public Matcher::ActionBase<ProtoType, ForwardClientCertActionConfig> {};
+class ForwardClientCertActionBase
+    : public Matcher::ActionBase<ProtoType, ForwardClientCertActionConfig> {};
 
 } // namespace Http
 } // namespace Envoy

@@ -1828,9 +1828,11 @@ on_no_match:
   TestUtility::loadFromYaml(matcher_yaml, matcher_config);
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
-  forward_client_cert_matcher_ = Extensions::NetworkFilters::HttpConnectionManager::createForwardClientCertMatcher(
-      matcher_config, server_factory_context);
-  ON_CALL(Const(config_), forwardClientCertMatcher()).WillByDefault(ReturnRef(forward_client_cert_matcher_));
+  forward_client_cert_matcher_ =
+      Extensions::NetworkFilters::HttpConnectionManager::createForwardClientCertMatcher(
+          matcher_config, server_factory_context);
+  ON_CALL(Const(config_), forwardClientCertMatcher())
+      .WillByDefault(ReturnRef(forward_client_cert_matcher_));
 
   // The client sends an existing XFCC header - with APPEND_FORWARD it should be appended to.
   TestRequestHeaderMapImpl headers{{"x-forwarded-client-cert", "By=test://bar.com/fe"}};
@@ -1891,9 +1893,11 @@ matcher_list:
   TestUtility::loadFromYaml(matcher_yaml, matcher_config);
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
-  forward_client_cert_matcher_ = Extensions::NetworkFilters::HttpConnectionManager::createForwardClientCertMatcher(
-      matcher_config, server_factory_context);
-  ON_CALL(Const(config_), forwardClientCertMatcher()).WillByDefault(ReturnRef(forward_client_cert_matcher_));
+  forward_client_cert_matcher_ =
+      Extensions::NetworkFilters::HttpConnectionManager::createForwardClientCertMatcher(
+          matcher_config, server_factory_context);
+  ON_CALL(Const(config_), forwardClientCertMatcher())
+      .WillByDefault(ReturnRef(forward_client_cert_matcher_));
 
   // Request with path /api - won't match the /mtls prefix.
   TestRequestHeaderMapImpl headers{{":path", "/api"},
