@@ -93,8 +93,11 @@ ReverseTunnelFilterConfig::ReverseTunnelFilterConfig(
                          : std::chrono::milliseconds(2000)),
       auto_close_connections_(
           proto_config.auto_close_connections() ? proto_config.auto_close_connections() : false),
-      request_path_(proto_config.request_path().empty() ? "/reverse_connections/request"
-                                                        : proto_config.request_path()),
+      request_path_(
+          proto_config.request_path().empty()
+              ? std::string(::Envoy::Extensions::Bootstrap::ReverseConnection::
+                                ReverseConnectionUtility::DEFAULT_REVERSE_TUNNEL_REQUEST_PATH)
+              : proto_config.request_path()),
       request_method_string_([&proto_config]() -> std::string {
         envoy::config::core::v3::RequestMethod method = proto_config.request_method();
         if (method == envoy::config::core::v3::METHOD_UNSPECIFIED) {
