@@ -122,7 +122,7 @@ TEST_F(LogicalHostTransportSocketResolutionTest,
   EXPECT_FALSE(needsPerConnectionResolution(options));
 }
 
-// Test that per-connection resolution is not triggered when transport socket options is null.
+// Test that per-connection resolution is not triggered when transport socket options are null.
 TEST_F(LogicalHostTransportSocketResolutionTest, NoPerConnectionResolutionWhenOptionsNull) {
   ON_CALL(*transport_socket_matcher_, usesFilterState()).WillByDefault(Return(true));
   Network::TransportSocketOptionsConstSharedPtr options = nullptr;
