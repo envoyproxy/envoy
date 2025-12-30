@@ -318,7 +318,7 @@ You can block a method entirely based on a condition. If the matcher evaluates t
 Response Code Details
 ---------------------
 
-The filter may reject requests or responses if processing fails. The following `Response Code Details <config_access_log_format_response_code_details>` are used:
+The Proto API Scrubber filter emits the following `Response Code Details <config_access_log_format_response_code_details>`_ which can be used for observability and debugging:
 
 .. list-table::
    :header-rows: 1
