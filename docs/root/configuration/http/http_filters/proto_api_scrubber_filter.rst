@@ -3,13 +3,6 @@
 Proto API Scrubber
 ==================
 
-* gRPC :ref:`architecture overview <arch_overview_grpc>`
-* This filter should be configured with the type URL ``[type.googleapis.com/envoy.extensions.filters.http.proto_api_scrubber.v3.ProtoApiScrubberConfig](https://type.googleapis.com/envoy.extensions.filters.http.proto_api_scrubber.v3.ProtoApiScrubberConfig)``.
-
-.. attention::
-
-  The Proto API Scrubber filter is currently a work-in-progress (WIP) and not ready for production use.
-
 Overview
 --------
 
@@ -22,16 +15,24 @@ This filter supports:
 * **Message-Level Scrubbing**: Scrubbing fields or entire messages based on the Protobuf message type, regardless of where that message appears (including inside ``google.protobuf.Any`` or nested fields).
 * **Deep Inspection**: It handles repeated fields, maps, enums, and recursive message structures.
 
+Design and Resources
+--------------------
+
+For more in-depth information regarding the motivation, architecture decisions, and performance characteristics of this filter, please refer to the following design documents:
+
+* `Proto API Scrubber Design Proposal <https://docs.google.com/document/d/1jgRe5mhucFRgmKYf-Ukk20jW8kusIo53U5bcF74GkK8>`_: Covers the initial design, use cases, and technical requirements for deep gRPC inspection.
+* `Implementation and Performance Analysis <https://docs.google.com/document/d/1ewm0_kmA3eIQ-DIYY4RnBAGK4OxlxFeXX_nuds7EjBE>`_: Details the transcoding implementation, buffering strategies, and benchmark results.
+
 Configuration
 -------------
 
-The filter configuration requires a Protobuf descriptor set to understand the schema of the traffic passing through it.
-
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.proto_api_scrubber.v3.ProtoApiScrubberConfig``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.proto_api_scrubber.v3.ProtoApiScrubberConfig>`
+* The filter configuration requires a Protobuf descriptor set to understand the schema of the traffic passing through it.
 
 .. note::
 
-  The filter relies on the :ref:`Unified Matcher API <arch_overview_matching_api>` to define logic. While the API is extensible, this filter primarily uses standard Envoy inputs (headers, filter state) and Common Expression Language (CEL) to make scrubbing decisions.
+  The filter relies on the :ref:`Unified Matcher API <arch_overview_matching_api>` to define the matching logic. While the API is extensible, this filter primarily uses standard Envoy inputs (headers, filter state, etc.) and matchers (String matcher, Common Expression Language (CEL) matcher, etc.) to make scrubbing decisions.
 
 How it Works
 ------------
@@ -39,12 +40,14 @@ How it Works
 1. **Descriptor Loading**: The filter loads a ``FileDescriptorSet`` provided in the configuration. This allows the filter to decode binary gRPC payloads into structured data.
 2. **Transcoding**: The filter buffers the gRPC stream, decodes the Protobuf payload, and traverses the message structure.
 3. **Matching & Scrubbing**:
+
    * The filter checks the configured **Restrictions**.
    * For every target field or message, it evaluates the associated **Matcher**.
    * If a Matcher evaluates to ``true`` and triggers a ``RemoveFieldAction``, the data is removed (scrubbed) from the payload.
    * For **Map** fields: The filter preserves the map keys but can scrub the map values.
    * For **Enums**: The filter can scrub based on the numeric value or the string name of the enum.
    * For **Any**: The filter unpacks ``google.protobuf.Any`` fields and applies **Message-Level** restrictions to the unpacked content.
+
 4. **Re-encoding**: The modified message is re-serialized and sent downstream or upstream.
 
 Restrictions hierarchy
@@ -53,10 +56,12 @@ Restrictions hierarchy
 The filter supports a hierarchy of restrictions:
 
 1. **Method Restrictions**: Rules applied to a specific gRPC service method (e.g., ``/package.Service/Method``).
+
    * **Method Level**: Can block the entire method execution (returns 403 Forbidden).
    * **Field Level**: Targets specific fields within the Request or Response message of that method.
 
 2. **Message Restrictions**: Rules applied to a specific Protobuf Message Type (e.g., ``package.SensitiveData``).
+
    * These rules apply globally whenever this message type is encountered, including inside nested fields or ``google.protobuf.Any`` payloads.
    * **Message Level**: Can scrub the entire message instance.
    * **Field Level**: Targets specific fields within this message type.
@@ -91,14 +96,14 @@ When defining restrictions, the "key" used in the configuration identifies which
    * - **Maps**
      - Use the ``.value`` suffix to target values.
      - ``tags.value`` targets all map values. Map keys are always preserved.
-   * - **Any Type**
+   * - **google.protobuf.Any Type**
      - Target the underlying type via **Message Restrictions**.
      - A restriction on ``package.SecretType`` applies even when nested inside an ``Any`` field.
 
 Matcher Reference
 -----------------
 
-The filter supports various matchers from the :ref:`Unified Matcher API <arch_overview_matching_api>` to define when a restriction is applied.
+The filter supports various matchers from the :ref:`Unified Matcher API <arch_overview_matching_api>` to define when a restriction is applied. Here are some example matchers' configuration for the filter.
 
 String Matcher (Exact)
 ^^^^^^^^^^^^^^^^^^^^^^
@@ -321,12 +326,9 @@ The filter may reject requests or responses if processing fails. The following `
    * - Detail
      - HTTP Status
      - Description
-   * - ``proto_api_scrubber_INVALID_ARGUMENT{path_header_error}``
-     - 400 (Bad Request)
-     - The request is missing the ``:path`` header or the method name in the path is malformed.
    * - ``proto_api_scrubber_INVALID_ARGUMENT{BAD_REQUEST}``
      - 400 (Bad Request)
-     - The gRPC method specified in the path could not be found in the configured descriptor set.
+     - The gRPC method specified in the ``:path`` header could not be found in the configured descriptor set.
    * - ``proto_api_scrubber_Forbidden{METHOD_BLOCKED}``
      - 403 (Forbidden)
      - A method-level restriction matcher evaluated to true, blocking the request.
@@ -334,5 +336,5 @@ The filter may reject requests or responses if processing fails. The following `
      - 400 (Bad Request)
      - Failed to convert the internal Envoy buffer to a Protobuf message stream (e.g., message too large).
    * - ``proto_api_scrubber_FAILED_PRECONDITION{RESPONSE_BUFFER_CONVERSION_FAIL}``
-     - 500 (Internal Server Error)
+     - 400 (Bad Request)
      - Failed to convert the internal Envoy buffer to a Protobuf message stream on the response path.
