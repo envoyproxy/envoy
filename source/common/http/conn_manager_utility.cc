@@ -419,7 +419,9 @@ Tracing::Reason ConnectionManagerUtility::mutateTracingRequestHeader(
 
 namespace {
 
-// Helper to apply forward client cert logic with the given type and details.
+// Helper functions to apply forward client cert logic.
+
+// Base implementation that takes the forward client cert type and details directly.
 void applyForwardClientCertConfig(
     RequestHeaderMap& request_headers, Network::Connection& connection,
     ForwardClientCertType forward_client_cert,
@@ -516,6 +518,24 @@ void applyForwardClientCertConfig(
   }
 }
 
+// Overload that takes the config and only calls setCurrentClientCertDetails() when needed.
+// This avoids calling setCurrentClientCertDetails() for types that don't need it (Sanitize,
+// ForwardOnly, AlwaysForwardOnly).
+void applyForwardClientCertConfig(RequestHeaderMap& request_headers,
+                                  Network::Connection& connection,
+                                  ConnectionManagerConfig& config) {
+  const auto forward_client_cert = config.forwardClientCert();
+  // Only call setCurrentClientCertDetails() if it's actually needed (AppendForward or SanitizeSet).
+  if (forward_client_cert == ForwardClientCertType::AppendForward ||
+      forward_client_cert == ForwardClientCertType::SanitizeSet) {
+    applyForwardClientCertConfig(request_headers, connection, forward_client_cert,
+                                 config.setCurrentClientCertDetails());
+  } else {
+    applyForwardClientCertConfig(request_headers, connection, forward_client_cert,
+                                 std::vector<ClientCertDetailsType>{});
+  }
+}
+
 } // namespace
 
 void ConnectionManagerUtility::mutateXfccRequestHeader(RequestHeaderMap& request_headers,
@@ -540,8 +560,7 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(RequestHeaderMap& request
   }
 
   // Fall back to static config if no matcher or no match.
-  applyForwardClientCertConfig(request_headers, connection, config.forwardClientCert(),
-                               config.setCurrentClientCertDetails());
+  applyForwardClientCertConfig(request_headers, connection, config);
 }
 
 void ConnectionManagerUtility::mutateResponseHeaders(ResponseHeaderMap& response_headers,
