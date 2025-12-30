@@ -349,6 +349,18 @@ new_features:
     Added :ref:`vhost_header <envoy_v3_api_field_config.route.v3.RouteConfiguration.vhost_header>` to
     :ref:`RouteConfiguration <envoy_v3_api_msg_config.route.v3.RouteConfiguration>` to allow using a different header
     for vhost matching.
+- area: http
+  change: |
+    Added :ref:`forward_client_cert_matcher
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.forward_client_cert_matcher>`
+    to :ref:`HttpConnectionManager <envoy_v3_api_msg_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager>`
+    to enable per-request configuration of forward client cert behavior using the xDS matcher framework. This allows
+    different XFCC header handling based on request properties (e.g., headers, path). If the matcher matches, the
+    matched action's config is used; otherwise, the static
+    :ref:`forward_client_cert_details <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.forward_client_cert_details>`
+    and
+    :ref:`set_current_client_cert_details <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.set_current_client_cert_details>`
+    config is used as fallback.
 - area: http2
   change: |
     Added a parameter to ``sendGoAwayAndClose`` to support graceful closure of HTTP/2 connections.
