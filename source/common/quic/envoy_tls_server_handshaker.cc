@@ -77,8 +77,8 @@ quic::QuicAsyncStatus EnvoyTlsServerHandshaker::EnvoyProofSourceHandle::SelectCe
     const quic::QuicConnectionId& /*original_connection_id*/,
     absl::string_view /*ssl_capabilities*/, const std::string& hostname,
     const SSL_CLIENT_HELLO& client_hello, const std::string& /*alpn*/,
-    std::optional<std::string> /*alps*/, const std::vector<uint8_t>& /*quic_transport_params*/,
-    const std::optional<std::vector<uint8_t>>& /*early_data_context*/,
+    absl::optional<std::string> /*alps*/, const std::vector<uint8_t>& /*quic_transport_params*/,
+    const absl::optional<std::vector<uint8_t>>& /*early_data_context*/,
     const quic::QuicSSLConfig& /*ssl_config*/) {
   if (!handshaker_ || !proof_source_) {
     QUIC_BUG(envoy_select_cert_detached) << "SelectCertificate called on a detached handle";
@@ -153,9 +153,8 @@ quic::QuicAsyncStatus EnvoyTlsServerHandshaker::EnvoyProofSourceHandle::ComputeS
   }
 
   signature_callback_ = new SignatureCallback(this);
-  proof_source_->ComputeTlsSignature(
-      server_address, client_address, hostname, signature_algorithm, in,
-      std::unique_ptr<SignatureCallback>(signature_callback_));
+  proof_source_->ComputeTlsSignature(server_address, client_address, hostname, signature_algorithm,
+                                     in, std::unique_ptr<SignatureCallback>(signature_callback_));
 
   if (signature_callback_) {
     QUIC_DVLOG(1) << "ComputeTlsSignature is pending";

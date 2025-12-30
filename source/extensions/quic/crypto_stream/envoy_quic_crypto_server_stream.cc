@@ -16,8 +16,7 @@ EnvoyQuicCryptoServerStreamFactoryImpl::createEnvoyQuicCryptoServerStream(
     // downstreams. Do not remove them.
     OptRef<const Network::DownstreamTransportSocketFactory> /*transport_socket_factory*/,
     Envoy::Event::Dispatcher& /*dispatcher*/) {
-  if (!Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.quic_session_ticket_support")) {
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_session_ticket_support")) {
     // Use default QUICHE TLS server handshaker when session ticket support is disabled.
     return quic::CreateCryptoServerStream(crypto_config, compressed_certs_cache, session, helper);
   }

@@ -36,12 +36,10 @@ private:
     quic::QuicAsyncStatus SelectCertificate(
         const quic::QuicSocketAddress& server_address,
         const quic::QuicSocketAddress& client_address,
-        const quic::QuicConnectionId& original_connection_id,
-        absl::string_view ssl_capabilities, const std::string& hostname,
-        const SSL_CLIENT_HELLO& client_hello, const std::string& alpn,
-        std::optional<std::string> alps,
-        const std::vector<uint8_t>& quic_transport_params,
-        const std::optional<std::vector<uint8_t>>& early_data_context,
+        const quic::QuicConnectionId& original_connection_id, absl::string_view ssl_capabilities,
+        const std::string& hostname, const SSL_CLIENT_HELLO& client_hello, const std::string& alpn,
+        absl::optional<std::string> alps, const std::vector<uint8_t>& quic_transport_params,
+        const absl::optional<std::vector<uint8_t>>& early_data_context,
         const quic::QuicSSLConfig& ssl_config) override;
 
     quic::QuicAsyncStatus ComputeSignature(const quic::QuicSocketAddress& server_address,
