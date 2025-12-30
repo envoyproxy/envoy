@@ -92,8 +92,8 @@ public:
 
   // Upstream::LoadBalancerFactory
   Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams) override {
-    return std::make_unique<CompositeClusterLoadBalancer>(cluster_.info(), cluster_.cluster_manager_,
-                                                          cluster_.clusters_);
+    return std::make_unique<CompositeClusterLoadBalancer>(
+        cluster_.info(), cluster_.cluster_manager_, cluster_.clusters_);
   }
 
   const Cluster& cluster_;
