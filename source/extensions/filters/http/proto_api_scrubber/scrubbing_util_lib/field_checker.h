@@ -63,13 +63,12 @@ public:
   }
 
   /**
-   * Returns false as it currently doesn't support `google.protobuf.Any` type.
+   * Returns true to indicate this checker supports processing Any fields.
    */
-  bool SupportAny() const override { return false; }
+  bool SupportAny() const override { return true; }
 
   /**
-   * Returns whether the `type` should be included (kInclude), excluded (kExclude)
-   * or traversed further (kPartial).
+   * Checks whether a type should be kept after scrubbing.
    */
   FieldCheckResults CheckType(const Protobuf::Type* type) const override;
 

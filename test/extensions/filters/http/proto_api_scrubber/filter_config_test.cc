@@ -387,6 +387,64 @@ protected:
     return proto_config;
   }
 
+  ProtoApiScrubberConfig getConfigWithMessageFieldRestrictions() {
+    std::string filter_conf_string = R"pb(
+      descriptor_set: {}
+      restrictions: {
+        message_restrictions: {
+          key: "package.MyMessage"
+          value: {
+            field_restrictions: {
+              key: "sensitive_data"
+              value: {
+                matcher: {
+                  matcher_list: {
+                    matchers: {
+                      predicate: {
+                        single_predicate: {
+                          input: {
+                            typed_config: {
+                              [type.googleapis.com/xds.type.matcher.v3
+                                   .HttpAttributesCelMatchInput] {}
+                            }
+                          }
+                          custom_match: {
+                            typed_config: {
+                              [type.googleapis.com/xds.type.matcher.v3.CelMatcher] {
+                                expr_match: {
+                                  parsed_expr: { expr: { const_expr: { bool_value: true } } }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                      on_match: {
+                        action: {
+                          typed_config: {
+                            [type.googleapis.com/envoy.extensions.filters.http
+                                 .proto_api_scrubber.v3.RemoveFieldAction] {}
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    )pb";
+    ProtoApiScrubberConfig proto_config;
+    Protobuf::TextFormat::ParseFromString(filter_conf_string, &proto_config);
+    *proto_config.mutable_descriptor_set()->mutable_data_source()->mutable_inline_bytes() =
+        api_->fileSystem()
+            .fileReadToEnd(Envoy::TestEnvironment::runfilesPath(kApiKeysDescriptorRelativePath))
+            .value();
+    return proto_config;
+  }
+
   ProtoApiScrubberConfig getConfigWithMethodLevelRestriction() {
     std::string filter_conf_string = R"pb(
       descriptor_set : {}
@@ -1244,6 +1302,30 @@ TEST_F(ProtoApiScrubberFilterConfigTest, ParseMessageRestrictions) {
   EXPECT_EQ(matcher3, nullptr);
 }
 
+TEST_F(ProtoApiScrubberFilterConfigTest, ParseMessageFieldRestrictions) {
+  ProtoApiScrubberConfig proto_config = getConfigWithMessageFieldRestrictions();
+  auto filter_config_or_status =
+      ProtoApiScrubberFilterConfig::create(proto_config, factory_context_);
+  ASSERT_THAT(filter_config_or_status, IsOk());
+  filter_config_ = filter_config_or_status.value();
+  ASSERT_NE(filter_config_, nullptr);
+
+  NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
+  Http::Matching::HttpMatchingDataImpl http_matching_data_impl(mock_stream_info);
+
+  auto matcher1 = filter_config_->getMessageFieldMatcher("package.MyMessage", "sensitive_data");
+  ASSERT_NE(matcher1, nullptr);
+  EXPECT_THAT(
+      matcher1->match(http_matching_data_impl),
+      HasActionWithType("envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction"));
+
+  auto matcher2 = filter_config_->getMessageFieldMatcher("package.MyMessage", "public_data");
+  EXPECT_EQ(matcher2, nullptr);
+
+  auto matcher3 = filter_config_->getMessageFieldMatcher("non.existent.Message", "any_field");
+  EXPECT_EQ(matcher3, nullptr);
+}
+
 TEST_F(ProtoApiScrubberFilterConfigTest, ParseMethodLevelRestriction) {
   ProtoApiScrubberConfig proto_config = getConfigWithMethodLevelRestriction();
   auto filter_config_or_status =
@@ -1369,6 +1451,40 @@ TEST_F(ProtoApiScrubberFilterConfigTest, UnsupportedActionType) {
       { auto _ = ProtoApiScrubberFilterConfig::create(proto_config, factory_context_); },
       EnvoyException,
       HasSubstr("Didn't find a registered implementation for 'some_unknown_action'"));
+}
+
+TEST_F(ProtoApiScrubberFilterConfigTest, FieldParentMapPopulation) {
+  // Initialize config with the api keys descriptor.
+  absl::StatusOr<std::shared_ptr<const ProtoApiScrubberFilterConfig>> config_or_status =
+      ProtoApiScrubberFilterConfig::create(proto_config_, factory_context_);
+  ASSERT_EQ(config_or_status.status().code(), absl::StatusCode::kOk);
+  filter_config_ = std::move(config_or_status.value());
+
+  // Resolve a known message type (CreateApiKeyRequest).
+  std::string type_url = "type.googleapis.com/apikeys.CreateApiKeyRequest";
+  const Protobuf::Type* parent_type = filter_config_->getTypeFinder()(type_url);
+  ASSERT_NE(parent_type, nullptr);
+
+  // Find a field inside it (e.g., 'parent').
+  const Protobuf::Field* parent_field = nullptr;
+  for (const auto& field : parent_type->fields()) {
+    if (field.name() == "parent") {
+      parent_field = &field;
+      break;
+    }
+  }
+  ASSERT_NE(parent_field, nullptr);
+
+  // Verify that getParentType returns the correct type for this field pointer.
+  const Protobuf::Type* resolved_parent = filter_config_->getParentType(parent_field);
+  ASSERT_NE(resolved_parent, nullptr);
+  EXPECT_EQ(resolved_parent->name(), "apikeys.CreateApiKeyRequest");
+  // Pointer equality check.
+  EXPECT_EQ(resolved_parent, parent_type);
+
+  // Verify negative case (unregistered field).
+  Protobuf::Field dummy_field;
+  EXPECT_EQ(filter_config_->getParentType(&dummy_field), nullptr);
 }
 
 } // namespace
