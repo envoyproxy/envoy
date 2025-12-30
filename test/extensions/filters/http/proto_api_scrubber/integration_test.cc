@@ -1,9 +1,9 @@
 #include "envoy/extensions/filters/http/proto_api_scrubber/v3/config.pb.h"
 #include "envoy/extensions/matching/common_inputs/network/v3/network_inputs.pb.h"
 #include "envoy/grpc/status.h"
-#include "envoy/type/matcher/v3/http_inputs.pb.h"
 #include "envoy/stats/histogram.h"
 #include "envoy/stats/stats.h"
+#include "envoy/type/matcher/v3/http_inputs.pb.h"
 
 #include "source/common/router/string_accessor_impl.h"
 #include "source/extensions/filters/http/proto_api_scrubber/scrubbing_util_lib/field_checker.h"
@@ -961,7 +961,8 @@ TEST_P(ProtoApiScrubberIntegrationTest, RejectsBlockedMethod) {
 
   // Use RemoveFieldAction as a placeholder action since the logic only checks for a match
   envoy::extensions::filters::http::proto_api_scrubber::v3::RemoveFieldAction remove_action;
-  matcher_entry->mutable_on_match()->mutable_action()->mutable_typed_config()->PackFrom(remove_action);
+  matcher_entry->mutable_on_match()->mutable_action()->mutable_typed_config()->PackFrom(
+      remove_action);
   matcher_entry->mutable_on_match()->mutable_action()->set_name("block_action");
 
   // Set up the restriction map
@@ -974,7 +975,8 @@ TEST_P(ProtoApiScrubberIntegrationTest, RejectsBlockedMethod) {
   any_config.PackFrom(config);
   std::string typed_config = fmt::format(R"EOF(
     name: envoy.filters.http.proto_api_scrubber
-    typed_config: {})EOF", MessageUtil::getJsonStringFromMessageOrError(any_config));
+    typed_config: {})EOF",
+                                         MessageUtil::getJsonStringFromMessageOrError(any_config));
 
   config_helper_.prependFilter(typed_config);
   initialize();
