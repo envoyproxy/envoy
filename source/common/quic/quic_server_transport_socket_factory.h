@@ -38,6 +38,20 @@ public:
 
   bool earlyDataEnabled() const { return enable_early_data_; }
 
+  struct SessionTicketConfig {
+    bool has_keys;
+    bool disable_stateless_resumption;
+    bool handles_session_resumption;
+  };
+
+  SessionTicketConfig getSessionTicketConfig() const {
+    return {!config_->sessionTicketKeys().empty(), config_->disableStatelessSessionResumption(),
+            config_->capabilities().handles_session_resumption};
+  }
+
+  int sessionTicketProcess(SSL* ssl, uint8_t* key_name, uint8_t* iv, EVP_CIPHER_CTX* ctx,
+                           HMAC_CTX* hmac_ctx, int encrypt) const;
+
 protected:
   QuicServerTransportSocketFactory(bool enable_early_data, Stats::Scope& store,
                                    Ssl::ServerContextConfigPtr config,
