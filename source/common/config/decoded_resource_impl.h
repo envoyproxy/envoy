@@ -53,7 +53,7 @@ public:
   DecodedResourceImpl(OpaqueResourceDecoder& resource_decoder,
                       const envoy::service::discovery::v3::Resource& resource)
       : DecodedResourceImpl(
-            resource_decoder, resource.name(), resource.aliases(), resource.resource(),
+            resource_decoder, getResourceName(resource), resource.aliases(), resource.resource(),
             resource.has_resource(), resource.version(),
             resource.has_ttl() ? absl::make_optional(std::chrono::milliseconds(
                                      DurationUtil::durationToMilliseconds(resource.ttl())))
@@ -90,6 +90,14 @@ private:
         name_(name ? *name : resource_decoder.resourceName(*resource_)),
         aliases_(repeatedPtrFieldToVector(aliases)), version_(version), ttl_(ttl),
         metadata_(metadata) {}
+
+  static const std::string&
+  getResourceName(const envoy::service::discovery::v3::Resource& resource) {
+    if (resource.name().empty() && resource.has_resource_name()) {
+      return resource.resource_name().name();
+    }
+    return resource.name();
+  }
 
   const ProtobufTypes::MessagePtr resource_;
   const bool has_resource_;
