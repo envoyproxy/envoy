@@ -306,7 +306,7 @@ absl::StatusOr<std::string> McpRouterFilter::getAuthenticatedSubject() {
     const auto& metadata = decoder_callbacks_->streamInfo().dynamicMetadata();
 
     const auto& value = Config::Metadata::metadataValue(&metadata, metadata_source.filter,
-                                                        metadata_source.path_parts);
+                                                        metadata_source.path_keys);
 
     if (value.kind_case() == Protobuf::Value::KIND_NOT_SET) {
       return absl::NotFoundError("Subject not found in metadata path");
@@ -323,7 +323,8 @@ absl::StatusOr<std::string> McpRouterFilter::getAuthenticatedSubject() {
 }
 
 bool McpRouterFilter::validateSubjectIfRequired() {
-  if (!config_->hasSubjectValidation()) {
+  // Only validate if enforcement is enabled.
+  if (!config_->shouldEnforceValidation()) {
     return true;
   }
 
@@ -547,16 +548,21 @@ void McpRouterFilter::streamData(Buffer::Instance& data, bool end_stream) {
 void McpRouterFilter::handleInitialize() {
   ENVOY_LOG(debug, "Initialize: setting up fanout to {} backends", config_->backends().size());
 
-  // Extract subject for the new session
+  // Extract subject for the new session if session identity is configured.
   std::string subject = "default";
-  if (config_->hasSubjectValidation()) {
+  if (config_->hasSessionIdentity()) {
     auto auth_subject = getAuthenticatedSubject();
     if (!auth_subject.ok()) {
       ENVOY_LOG(warn, "Failed to get subject for session: {}", auth_subject.status().message());
-      sendHttpError(403, "Unable to determine session identity");
-      return;
+      if (config_->shouldEnforceValidation()) {
+        sendHttpError(403, "Unable to determine session identity");
+        return;
+      }
+      // In DISABLED mode, proceed with anonymous session.
+      ENVOY_LOG(debug, "Subject extraction failed, proceeding with anonymous session");
+    } else {
+      subject = *auth_subject;
     }
-    subject = *auth_subject;
   }
 
   initializeFanout([this, subject = std::move(subject)](std::vector<BackendResponse> responses) {

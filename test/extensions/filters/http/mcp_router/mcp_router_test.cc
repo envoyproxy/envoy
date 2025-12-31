@@ -261,67 +261,89 @@ TEST_F(SessionCodecTest, SpecialCharactersInSessionId) {
   EXPECT_EQ(parsed->backend_sessions["backend"], "sess+with/special=chars");
 }
 
-// Verifies subject validation config is disabled by default.
-TEST_F(McpRouterConfigTest, SubjectValidationDisabledByDefault) {
+// Verifies session identity config is disabled by default.
+TEST_F(McpRouterConfigTest, SessionIdentityDisabledByDefault) {
   envoy::extensions::filters::http::mcp_router::v3::McpRouter proto_config;
   auto* server = proto_config.add_servers();
   server->set_name("test");
   server->mutable_mcp_cluster()->set_cluster("test_cluster");
 
   McpRouterConfig config(proto_config, factory_context_);
-  EXPECT_FALSE(config.hasSubjectValidation());
+  EXPECT_FALSE(config.hasSessionIdentity());
+  EXPECT_FALSE(config.shouldEnforceValidation());
 }
 
-// Verifies subject validation config is enabled when configured with header source.
-TEST_F(McpRouterConfigTest, SubjectValidationWithHeaderSource) {
+// Verifies session identity config with header source.
+TEST_F(McpRouterConfigTest, SessionIdentityWithHeaderSource) {
   envoy::extensions::filters::http::mcp_router::v3::McpRouter proto_config;
   auto* server = proto_config.add_servers();
   server->set_name("test");
   server->mutable_mcp_cluster()->set_cluster("test_cluster");
 
-  auto* validation = proto_config.mutable_subject_validation();
-  validation->set_header("x-user-id");
+  auto* identity = proto_config.mutable_session_identity();
+  identity->mutable_subject()->mutable_header()->set_name("x-user-id");
 
   McpRouterConfig config(proto_config, factory_context_);
-  EXPECT_TRUE(config.hasSubjectValidation());
+  EXPECT_TRUE(config.hasSessionIdentity());
   EXPECT_TRUE(absl::holds_alternative<HeaderSubjectSource>(config.subjectSource()));
+  EXPECT_FALSE(config.shouldEnforceValidation()); // DISABLED by default
 }
 
-// Verifies subject validation config is enabled when configured with metadata source.
-TEST_F(McpRouterConfigTest, SubjectValidationWithMetadataSource) {
+// Verifies session identity config with metadata source using MetadataKey.
+TEST_F(McpRouterConfigTest, SessionIdentityWithMetadataSource) {
   envoy::extensions::filters::http::mcp_router::v3::McpRouter proto_config;
   auto* server = proto_config.add_servers();
   server->set_name("test");
   server->mutable_mcp_cluster()->set_cluster("test_cluster");
 
-  auto* validation = proto_config.mutable_subject_validation();
-  auto* metadata = validation->mutable_metadata();
-  metadata->set_filter("envoy.filters.http.jwt_authn");
-  metadata->set_path("payload.sub");
+  auto* identity = proto_config.mutable_session_identity();
+  auto* metadata_key = identity->mutable_subject()->mutable_dynamic_metadata()->mutable_key();
+  metadata_key->set_key("envoy.filters.http.jwt_authn");
+  metadata_key->add_path()->set_key("payload");
+  metadata_key->add_path()->set_key("sub");
 
   McpRouterConfig config(proto_config, factory_context_);
-  EXPECT_TRUE(config.hasSubjectValidation());
+  EXPECT_TRUE(config.hasSessionIdentity());
   EXPECT_TRUE(absl::holds_alternative<MetadataSubjectSource>(config.subjectSource()));
 }
 
-// Verifies metadata path is pre-split into parts.
-TEST_F(McpRouterConfigTest, MetadataPathIsSplit) {
+// Verifies metadata key path is parsed correctly.
+TEST_F(McpRouterConfigTest, MetadataKeyPathParsed) {
   envoy::extensions::filters::http::mcp_router::v3::McpRouter proto_config;
   auto* server = proto_config.add_servers();
   server->set_name("test");
   server->mutable_mcp_cluster()->set_cluster("test_cluster");
 
-  auto* validation = proto_config.mutable_subject_validation();
-  auto* metadata = validation->mutable_metadata();
-  metadata->set_filter("jwt");
-  metadata->set_path("payload.sub");
+  auto* identity = proto_config.mutable_session_identity();
+  auto* metadata_key = identity->mutable_subject()->mutable_dynamic_metadata()->mutable_key();
+  metadata_key->set_key("jwt");
+  metadata_key->add_path()->set_key("payload");
+  metadata_key->add_path()->set_key("sub");
 
   McpRouterConfig config(proto_config, factory_context_);
   const auto& source = absl::get<MetadataSubjectSource>(config.subjectSource());
   EXPECT_EQ(source.filter, "jwt");
-  ASSERT_EQ(source.path_parts.size(), 2);
-  EXPECT_EQ(source.path_parts[0], "payload");
-  EXPECT_EQ(source.path_parts[1], "sub");
+  ASSERT_EQ(source.path_keys.size(), 2);
+  EXPECT_EQ(source.path_keys[0], "payload");
+  EXPECT_EQ(source.path_keys[1], "sub");
+}
+
+// Verifies validation mode ENFORCE is parsed correctly.
+TEST_F(McpRouterConfigTest, ValidationModeEnforce) {
+  envoy::extensions::filters::http::mcp_router::v3::McpRouter proto_config;
+  auto* server = proto_config.add_servers();
+  server->set_name("test");
+  server->mutable_mcp_cluster()->set_cluster("test_cluster");
+
+  auto* identity = proto_config.mutable_session_identity();
+  identity->mutable_subject()->mutable_header()->set_name("x-user-id");
+  identity->mutable_validation()->set_mode(
+      envoy::extensions::filters::http::mcp_router::v3::ValidationPolicy::ENFORCE);
+
+  McpRouterConfig config(proto_config, factory_context_);
+  EXPECT_TRUE(config.hasSessionIdentity());
+  EXPECT_TRUE(config.shouldEnforceValidation());
+  EXPECT_EQ(config.validationMode(), ValidationMode::Enforce);
 }
 
 } // namespace

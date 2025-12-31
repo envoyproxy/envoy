@@ -661,7 +661,7 @@ public:
           fake_upstreams_[0]->localAddress()->ip()->port());
     });
 
-    // MCP router with subject validation
+    // MCP router with session identity and ENFORCE validation
     config_helper_.prependFilter(R"EOF(
       name: envoy.filters.http.mcp_router
       typed_config:
@@ -672,8 +672,12 @@ public:
               cluster: mcp_time_backend
               path: /mcp
               timeout: 5s
-        subject_validation:
-          header: x-user-id
+        session_identity:
+          subject:
+            header:
+              name: x-user-id
+          validation:
+            mode: ENFORCE
     )EOF");
 
     config_helper_.prependFilter(R"EOF(

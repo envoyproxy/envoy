@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.mcp_router.v3;
 
+import "envoy/type/metadata/v3/metadata.proto";
+
 import "google/protobuf/duration.proto";
 
 import "xds/annotations/v3/status.proto";
@@ -33,24 +35,55 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // * :ref:`redirect <envoy_v3_api_field_config.route.v3.Route.redirect>`
 // * :ref:`direct_response <envoy_v3_api_field_config.route.v3.Route.direct_response>`
 //
-// Subject validation configuration.
-message SubjectValidation {
-  oneof subject_source {
-    // Extract subject from dynamic metadata (e.g., JWT filter).
-    MetadataSubjectSource metadata = 1;
 
-    // Extract subject from a request header.
-    string header = 2 [(validate.rules).string = {min_len: 1}];
+// Extract identity from a request header.
+message HeaderSource {
+  // Header name to extract (e.g., "x-user-identity").
+  string name = 1 [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME}];
+}
+
+// Extract identity from dynamic metadata (e.g., populated by JWT or ext_authz filter).
+message DynamicMetadataSource {
+  // The metadata key to retrieve the value from.
+  type.metadata.v3.MetadataKey key = 1 [(validate.rules).message = {required: true}];
+}
+
+// Defines how the subject (user/principal) is extracted from the request.
+message SubjectExtractor {
+  oneof source {
+    option (validate.required) = true;
+
+    // Extract identity from a request header.
+    HeaderSource header = 1;
+
+    // Extract identity from dynamic metadata.
+    DynamicMetadataSource dynamic_metadata = 2;
   }
 }
 
-// Extract subject from dynamic metadata.
-message MetadataSubjectSource {
-  // Filter metadata namespace (e.g., "envoy.filters.http.jwt_authn").
-  string filter = 1 [(validate.rules).string = {min_len: 1}];
+// Specifies how to handle requests where the subject is missing or mismatched.
+message ValidationPolicy {
+  enum Mode {
+    // Bind subject on Initialize if present, but do not validate subsequent requests.
+    // If extraction fails, the session proceeds anonymously.
+    DISABLED = 0;
 
-  // Dot-notation path to the subject field (e.g., "payload.sub").
-  string path = 2 [(validate.rules).string = {min_len: 1}];
+    // Reject the request (403) if the subject cannot be extracted
+    // or if the session subject does not match the request subject.
+    ENFORCE = 1;
+  }
+
+  Mode mode = 1 [(validate.rules).enum = {defined_only: true}];
+}
+
+// Session identity configuration.
+message SessionIdentity {
+  // Defines how the subject (user/principal) is extracted from the request.
+  SubjectExtractor subject = 1 [(validate.rules).message = {required: true}];
+
+  // Specifies how to handle requests where the subject is missing or invalid.
+  // Defaults to DISABLED.
+  ValidationPolicy validation = 2;
 }
 
 message McpRouter {
@@ -89,8 +122,7 @@ message McpRouter {
   // that the client presented to Envoy.
   repeated McpBackend servers = 1;
 
-  // Validates that the session's subject matches the authenticated identity.
-  // On initialize, extracts subject from this source to embed in the session ID.
-  // On subsequent requests, validates the session subject matches. Rejects with 403 on mismatch.
-  SubjectValidation subject_validation = 2;
+  // If set, extracts a request "subject" and binds it into the MCP session.
+  // If not set, sessions are created without identity binding.
+  SessionIdentity session_identity = 2;
 }
