@@ -428,7 +428,7 @@ TEST_F(FieldCheckerTest, GlobalMessageRestriction) {
   field.set_kind(Protobuf::Field::TYPE_MESSAGE);
   field.set_type_url("type.googleapis.com/" + message_type);
 
-  NiceMock<MockProtoApiScrubberFilterConfig> mock_filter_config;
+  NiceMock<MockProtoApiScrubberFilterConfig> mock_filter_config(stats_store_, time_system_);
   NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
 
   ON_CALL(mock_filter_config, getMethodDescriptor(testing::_))
@@ -461,7 +461,7 @@ TEST_F(FieldCheckerTest, GlobalEnumRestriction) {
   field.set_kind(Protobuf::Field::TYPE_ENUM);
   field.set_type_url("type.googleapis.com/" + enum_type);
 
-  NiceMock<MockProtoApiScrubberFilterConfig> mock_filter_config;
+  NiceMock<MockProtoApiScrubberFilterConfig> mock_filter_config(stats_store_, time_system_);
   NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
 
   ON_CALL(mock_filter_config, getMethodDescriptor(testing::_))
@@ -490,7 +490,7 @@ TEST_F(FieldCheckerTest, CheckType_GlobalRestriction) {
   Protobuf::Type type;
   type.set_name(message_type);
 
-  NiceMock<MockProtoApiScrubberFilterConfig> mock_filter_config;
+  NiceMock<MockProtoApiScrubberFilterConfig> mock_filter_config(stats_store_, time_system_);
   NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
 
   ON_CALL(mock_filter_config, getMethodDescriptor(testing::_))
@@ -521,7 +521,7 @@ TEST_F(FieldCheckerTest, EnumTraversals) {
   field.set_kind(Protobuf::Field::TYPE_ENUM);
   field.set_type_url("type.googleapis.com/" + enum_type);
 
-  NiceMock<MockProtoApiScrubberFilterConfig> mock_filter_config;
+  NiceMock<MockProtoApiScrubberFilterConfig> mock_filter_config(stats_store_, time_system_);
   NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
 
   ON_CALL(mock_filter_config, getMethodDescriptor(testing::_))
