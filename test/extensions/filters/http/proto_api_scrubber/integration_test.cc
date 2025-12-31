@@ -239,6 +239,39 @@ public:
                        MessageUtil::getJsonStringFromMessageOrError(any_config));
   }
 
+  // Helper to build config with global message-level restrictions.
+  // This targets: restrictions.message_restrictions[type].config.matcher
+  std::string getGlobalTypeFilterConfig(
+      const std::string& descriptor_path, const std::string& type_name,
+      const xds::type::matcher::v3::Matcher::MatcherList::Predicate& match_predicate =
+          buildCelPredicate("true")) {
+
+    ProtoApiScrubberConfig config;
+    config.set_filtering_mode(ProtoApiScrubberConfig::OVERRIDE);
+    config.mutable_descriptor_set()->mutable_data_source()->set_filename(descriptor_path);
+
+    auto* message_restrictions = config.mutable_restrictions()->mutable_message_restrictions();
+    auto& message_config = (*message_restrictions)[type_name];
+
+    // Create the Matcher object for the Type itself.
+    xds::type::matcher::v3::Matcher matcher_proto;
+    auto* matcher_entry = matcher_proto.mutable_matcher_list()->add_matchers();
+    *matcher_entry->mutable_predicate() = match_predicate;
+    envoy::extensions::filters::http::proto_api_scrubber::v3::RemoveFieldAction remove_action;
+    matcher_entry->mutable_on_match()->mutable_action()->mutable_typed_config()->PackFrom(
+        remove_action);
+    matcher_entry->mutable_on_match()->mutable_action()->set_name("remove_field");
+
+    *message_config.mutable_config()->mutable_matcher() = matcher_proto;
+
+    Protobuf::Any any_config;
+    any_config.PackFrom(config);
+    return fmt::format(R"EOF(
+    name: envoy.filters.http.proto_api_scrubber
+    typed_config: {})EOF",
+                       MessageUtil::getJsonStringFromMessageOrError(any_config));
+  }
+
   template <typename T>
   IntegrationStreamDecoderPtr
   sendGrpcRequest(const T& request_msg, const std::string& method_path,
@@ -611,6 +644,99 @@ TEST_P(ProtoApiScrubberIntegrationTest, ScrubRecursiveMessage) {
       ->set_secret("");
 
   // Check.
+  Buffer::OwnedImpl data;
+  data.add(upstream_request_->body());
+  checkSerializedData<scrubber_test::ScrubRequest>(data, {expected});
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+}
+
+// Tests that a message type is scrubbed globally (standard field).
+// Rule: Scrub 'SensitiveMessage' everywhere.
+TEST_P(ProtoApiScrubberIntegrationTest, ScrubGlobalMessageType) {
+  std::string sensitive_type = "test.extensions.filters.http.proto_api_scrubber.SensitiveMessage";
+  config_helper_.prependFilter(
+      getGlobalTypeFilterConfig(scrubberTestDescriptorPath(), sensitive_type));
+
+  initialize();
+
+  scrubber_test::ScrubRequest request;
+  // Field 'object_map' contains SensitiveMessage as value.
+  auto& sensitive = (*request.mutable_object_map())["key"];
+  sensitive.set_secret("data");
+
+  auto response = sendGrpcRequest(
+      request, "/test.extensions.filters.http.proto_api_scrubber.ScrubberTestService/Scrub");
+  waitForNextUpstreamRequest();
+
+  // The field 'object_map["key"]' is of type SensitiveMessage.
+  // Since the type is restricted globally, the field itself should be removed.
+  scrubber_test::ScrubRequest expected = request;
+  expected.mutable_object_map()->erase("key");
+
+  Buffer::OwnedImpl data;
+  data.add(upstream_request_->body());
+  checkSerializedData<scrubber_test::ScrubRequest>(data, {expected});
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+}
+
+// Tests that a message type is scrubbed globally when inside Any.
+// Rule: Scrub 'SensitiveMessage' everywhere.
+TEST_P(ProtoApiScrubberIntegrationTest, ScrubGlobalMessageType_InsideAny) {
+  std::string sensitive_type = "test.extensions.filters.http.proto_api_scrubber.SensitiveMessage";
+  config_helper_.prependFilter(
+      getGlobalTypeFilterConfig(scrubberTestDescriptorPath(), sensitive_type));
+
+  initialize();
+
+  scrubber_test::ScrubRequest request;
+  scrubber_test::SensitiveMessage sensitive;
+  sensitive.set_secret("data");
+  request.mutable_any_field()->PackFrom(sensitive);
+
+  auto response = sendGrpcRequest(
+      request, "/test.extensions.filters.http.proto_api_scrubber.ScrubberTestService/Scrub");
+  waitForNextUpstreamRequest();
+
+  // The Any field contains a restricted type. The filter should completely remove the Any field
+  // content. (Implementation detail: The ProtoScrubber usually clears the field if CheckType
+  // returns Exclude).
+  scrubber_test::ScrubRequest expected = request;
+  expected.clear_any_field();
+
+  Buffer::OwnedImpl data;
+  data.add(upstream_request_->body());
+  checkSerializedData<scrubber_test::ScrubRequest>(data, {expected});
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+}
+
+// Re-implementing a simple Message Type Global Scrub for Integration consistency
+// since Enum integration relies on proto changes.
+TEST_P(ProtoApiScrubberIntegrationTest, ScrubGlobalMessageType_NestedDeep) {
+  std::string inner_type = "test.extensions.filters.http.proto_api_scrubber.InnerDetails";
+  config_helper_.prependFilter(getGlobalTypeFilterConfig(scrubberTestDescriptorPath(), inner_type));
+
+  initialize();
+
+  scrubber_test::ScrubRequest request;
+  auto& deep = (*request.mutable_deep_map())["k"];
+  // InnerDetails is field 'internal_details' inside SensitiveMessage.
+  deep.mutable_internal_details()->set_deep_secret("secret");
+
+  auto response = sendGrpcRequest(
+      request, "/test.extensions.filters.http.proto_api_scrubber.ScrubberTestService/Scrub");
+  waitForNextUpstreamRequest();
+
+  // The 'internal_details' field is of type InnerDetails.
+  // It should be removed.
+  scrubber_test::ScrubRequest expected = request;
+  (*expected.mutable_deep_map())["k"].clear_internal_details();
+
   Buffer::OwnedImpl data;
   data.add(upstream_request_->body());
   checkSerializedData<scrubber_test::ScrubRequest>(data, {expected});
