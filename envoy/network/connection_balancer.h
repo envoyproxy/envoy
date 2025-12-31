@@ -33,8 +33,16 @@ public:
    */
   virtual void post(Network::ConnectionSocketPtr&& socket) PURE;
 
+  /**
+   * Main call to accept a socket on a worker.
+   * @param hand_off_restored_destination_connections used to select the original destination
+listener.
+   * @param rebalanced indicates whether rebalancing is already done
+   * @param network_namespace file path to the network namespace from the listener address
+   */
   virtual void onAcceptWorker(Network::ConnectionSocketPtr&& socket,
-                              bool hand_off_restored_destination_connections, bool rebalanced) PURE;
+                              bool hand_off_restored_destination_connections, bool rebalanced,
+                              const absl::optional<std::string>& network_namespace) PURE;
 };
 
 /**

@@ -10,6 +10,7 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/tls/ssl_handshaker.h"
+#include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_connection_io_handle.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_tunnel_initiator.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_tunnel_initiator_extension.h"
@@ -90,14 +91,17 @@ protected:
 
   // Helper to create a ReverseConnectionIOHandle with specified configuration.
   std::unique_ptr<ReverseConnectionIOHandle>
-  createTestIOHandle(const ReverseConnectionSocketConfig& config) {
+  createTestIOHandle(const ReverseConnectionSocketConfig& config,
+                     ReverseTunnelInitiatorExtension* extension_override = nullptr) {
     // Create a test socket file descriptor.
     int test_fd = ::socket(AF_INET, SOCK_STREAM, 0);
     EXPECT_GE(test_fd, 0);
 
     // Create the IO handle.
+    ReverseTunnelInitiatorExtension* extension_ptr =
+        extension_override != nullptr ? extension_override : extension_.get();
     return std::make_unique<ReverseConnectionIOHandle>(test_fd, config, cluster_manager_,
-                                                       extension_.get(), *stats_scope_);
+                                                       extension_ptr, *stats_scope_);
   }
 
   // Helper to create a default test configuration.
@@ -364,6 +368,20 @@ TEST_F(ReverseConnectionIOHandleTest, BasicSetup) {
 
   // Verify the IO handle has a valid file descriptor.
   EXPECT_GE(io_handle_->fdDoNotUse(), 0);
+}
+
+TEST_F(ReverseConnectionIOHandleTest, RequestPathDefaultsAndOverrides) {
+  auto default_config = createDefaultTestConfig();
+  io_handle_ = createTestIOHandle(default_config);
+  ASSERT_NE(io_handle_, nullptr);
+  EXPECT_EQ(io_handle_->requestPath(),
+            ReverseConnectionUtility::DEFAULT_REVERSE_TUNNEL_REQUEST_PATH);
+
+  ReverseConnectionSocketConfig custom_config = createDefaultTestConfig();
+  custom_config.request_path = "/custom/handshake";
+  auto custom_handle = createTestIOHandle(custom_config);
+  ASSERT_NE(custom_handle, nullptr);
+  EXPECT_EQ(custom_handle->requestPath(), "/custom/handshake");
 }
 
 // listen() is a no-op for the initiator

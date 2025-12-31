@@ -178,71 +178,106 @@ FieldChecker::normalizePath(const std::vector<std::string>& path) const {
 
 FieldCheckResults FieldChecker::CheckField(const std::vector<std::string>& path,
                                            const Protobuf::Field* field, const int /*field_depth*/,
-                                           const Protobuf::Type* /*parent_type*/) const {
+                                           const Protobuf::Type* parent_type) const {
   // If the field is unknown (i.e., not present in the descriptor), it should be preserved.
   if (field == nullptr) {
     return FieldCheckResults::kInclude;
   }
 
-  const auto& norm = normalizePath(path);
+  // If the field itself holds a message or enum, check if that type is globally restricted.
+  if (field->kind() == Protobuf::Field::TYPE_MESSAGE ||
+      field->kind() == Protobuf::Field::TYPE_ENUM) {
+    absl::string_view type_name = Envoy::TypeUtil::typeUrlToDescriptorFullName(field->type_url());
+    MatchTreeHttpMatchingDataSharedPtr type_matcher =
+        filter_config_ptr_->getMessageMatcher(std::string(type_name));
 
-  // Explicitly preserve Map Keys.
-  // We identify if we are at a map key using the normalized path metadata.
-  if (norm.is_map_entry && field->number() == 1) {
-    return FieldCheckResults::kInclude;
-  }
-
-  // Optimized Mask Construction:
-  // If the field is NOT an Enum, we can avoid creating a new std::string copy.
-  // We use the cached string reference directly.
-  const std::string* field_mask_ptr = &norm.mask;
-  std::string modified_mask; // Storage for modified mask if needed (Enum case).
-
-  if (field->kind() == Protobuf::Field::TYPE_ENUM) {
-    // Enums require value translation (int -> name), so we must create a copy.
-    modified_mask = norm.mask;
-    absl::string_view last_segment = path.back();
-    if (auto name_or_status = resolveEnumName(last_segment, field);
-        name_or_status.ok() && !name_or_status.value().empty()) {
-      size_t last_dot = modified_mask.find_last_of('.');
-      if (last_dot != std::string::npos) {
-        modified_mask.replace(last_dot + 1, std::string::npos, name_or_status.value());
-      } else {
-        modified_mask = std::string(name_or_status.value());
+    if (type_matcher != nullptr) {
+      absl::StatusOr<Matcher::MatchResult> match_result = tryMatch(type_matcher);
+      // If the matcher says "Remove", we exclude this field entirely.
+      if (matchResultStatusToFieldCheckResult(match_result, type_name) ==
+          FieldCheckResults::kExclude) {
+        return FieldCheckResults::kExclude;
       }
-    } else {
-      ENVOY_LOG(warn, "Enum translation skipped for value '{}': {}", last_segment,
-                name_or_status.status().ToString());
     }
-    field_mask_ptr = &modified_mask;
   }
 
-  MatchTreeHttpMatchingDataSharedPtr match_tree;
+  // Recover the parent_type from the filter config if the caller didn't provide it
+  // (e.g. ProtoScrubber library processing Any).
+  const Protobuf::Type* type_context = parent_type;
+  if (type_context == nullptr) {
+    type_context = filter_config_ptr_->getParentType(field);
+  }
 
-  switch (scrubber_context_) {
-  case ScrubberContext::kRequestScrubbing:
-    match_tree = filter_config_ptr_->getRequestFieldMatcher(method_name_, *field_mask_ptr);
-    break;
-  case ScrubberContext::kResponseScrubbing:
-    match_tree = filter_config_ptr_->getResponseFieldMatcher(method_name_, *field_mask_ptr);
-    break;
-  default:
-    ENVOY_LOG(
-        warn,
-        "Error encountered while matching the field `{}`. This field would be preserved. Internal "
-        "error details: Unsupported scrubber context enum value: `{}`. Supported values are: {{{}, "
-        "{}}}.",
-        *field_mask_ptr, static_cast<int>(scrubber_context_),
-        static_cast<int>(ScrubberContext::kRequestScrubbing),
-        static_cast<int>(ScrubberContext::kResponseScrubbing));
-    return FieldCheckResults::kInclude;
+  MatchTreeHttpMatchingDataSharedPtr match_tree = nullptr;
+
+  // Try to find a specific rule for this Message Type. This handles cases where we are scrubbing
+  // inside an `Any` field or a recursive message, where the path has been reset or is relative
+  // to the parent message.
+  if (type_context != nullptr) {
+    match_tree = filter_config_ptr_->getMessageFieldMatcher(type_context->name(), field->name());
+  }
+
+  // If no message-type rule found, fall back to Method-Path based lookup.
+  if (match_tree == nullptr) {
+    const auto& norm = normalizePath(path);
+
+    // Explicitly preserve Map Keys.
+    // We identify if we are at a map key using the normalized path metadata.
+    if (norm.is_map_entry && field->number() == 1) {
+      return FieldCheckResults::kInclude;
+    }
+
+    // Optimized Mask Construction:
+    // If the field is NOT an Enum, we can avoid creating a new std::string copy.
+    // We use the cached string reference directly.
+    const std::string* field_mask_ptr = &norm.mask;
+    std::string modified_mask; // Storage for modified mask if needed (Enum case).
+
+    if (field->kind() == Protobuf::Field::TYPE_ENUM) {
+      // Enums require value translation (int -> name), so we must create a copy.
+      modified_mask = norm.mask;
+      absl::string_view last_segment = path.back();
+      if (auto name_or_status = resolveEnumName(last_segment, field);
+          name_or_status.ok() && !name_or_status.value().empty()) {
+        size_t last_dot = modified_mask.find_last_of('.');
+        if (last_dot != std::string::npos) {
+          modified_mask.replace(last_dot + 1, std::string::npos, name_or_status.value());
+        } else {
+          modified_mask = std::string(name_or_status.value());
+        }
+      } else {
+        ENVOY_LOG(warn, "Enum translation skipped for value '{}': {}", last_segment,
+                  name_or_status.status().ToString());
+      }
+      field_mask_ptr = &modified_mask;
+    }
+
+    switch (scrubber_context_) {
+    case ScrubberContext::kRequestScrubbing:
+      match_tree = filter_config_ptr_->getRequestFieldMatcher(method_name_, *field_mask_ptr);
+      break;
+    case ScrubberContext::kResponseScrubbing:
+      match_tree = filter_config_ptr_->getResponseFieldMatcher(method_name_, *field_mask_ptr);
+      break;
+    default:
+      ENVOY_LOG(warn,
+                "Error encountered while matching the field `{}`. This field would be preserved. "
+                "Internal "
+                "error details: Unsupported scrubber context enum value: `{}`. Supported values "
+                "are: {{{}, "
+                "{}}}.",
+                *field_mask_ptr, static_cast<int>(scrubber_context_),
+                static_cast<int>(ScrubberContext::kRequestScrubbing),
+                static_cast<int>(ScrubberContext::kResponseScrubbing));
+      return FieldCheckResults::kInclude;
+    }
   }
 
   // If there's a match tree configured for the field, evaluate the match, convert the match result
   // to FieldCheckResults and return it.
   if (match_tree != nullptr) {
     absl::StatusOr<Matcher::MatchResult> match_result = tryMatch(match_tree);
-    return matchResultStatusToFieldCheckResult(match_result, *field_mask_ptr);
+    return matchResultStatusToFieldCheckResult(match_result, field->name());
   }
 
   // If there's no match tree configured for the field, check the field type to see if it needs to
@@ -251,7 +286,11 @@ FieldCheckResults FieldChecker::CheckField(const std::vector<std::string>& path,
   // that the `proto_scrubber` library traverses the child fields of this field. Currently, only
   // message type is supported by FieldChecker. Support for other non-primitive types will be added
   // in the future.
-  if (field->kind() == Protobuf::Field_Kind_TYPE_MESSAGE) {
+  //
+  // Returning kPartial for ENUM is required to trigger value-level inspection (the library calls
+  // CheckField again with the enum value in the path).
+  if (field->kind() == Protobuf::Field_Kind_TYPE_MESSAGE ||
+      field->kind() == Protobuf::Field_Kind_TYPE_ENUM) {
     return FieldCheckResults::kPartial;
   }
 
@@ -305,8 +344,25 @@ FieldChecker::tryMatch(MatchTreeHttpMatchingDataSharedPtr match_tree) const {
   return match_result;
 }
 
-FieldCheckResults FieldChecker::CheckType(const Protobuf::Type*) const {
-  return FieldCheckResults::kInclude;
+FieldCheckResults FieldChecker::CheckType(const Protobuf::Type* type) const {
+  if (type == nullptr) {
+    return FieldCheckResults::kPartial;
+  }
+
+  // Check if there is a message-level restriction for this specific type.
+  // This handles scrubbing the entire payload of an Any field if the type matches.
+  auto match_tree = filter_config_ptr_->getMessageMatcher(type->name());
+  if (match_tree != nullptr) {
+    absl::StatusOr<Matcher::MatchResult> match_result = tryMatch(match_tree);
+
+    if (matchResultStatusToFieldCheckResult(match_result, type->name()) ==
+        FieldCheckResults::kExclude) {
+      return FieldCheckResults::kExclude;
+    }
+  }
+
+  // Always return kPartial to force the ProtoScrubber to unpack and inspect the Any message.
+  return FieldCheckResults::kPartial;
 }
 
 } // namespace ProtoApiScrubber

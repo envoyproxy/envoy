@@ -168,8 +168,11 @@ MuxDemux::multicast(const AsyncClient::StreamOptions& options,
 
   auto multistream = std::unique_ptr<MultiStream>(new MultiStream(shared_from_this()));
   for (const Callbacks& callback : callbacks) {
-    absl::Status status = multistream->addStream(options, callback.cluster_name, callback.callbacks,
-                                                 factory_context_);
+    // Use per-backend options if provided, otherwise fall back to the default options.
+    const AsyncClient::StreamOptions& effective_options =
+        callback.options.has_value() ? callback.options.value() : options;
+    absl::Status status = multistream->addStream(effective_options, callback.cluster_name,
+                                                 callback.callbacks, factory_context_);
     if (!status.ok()) {
       return status;
     }
