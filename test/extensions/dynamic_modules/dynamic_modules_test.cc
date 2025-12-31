@@ -146,6 +146,51 @@ TEST(CreateDynamicModulesByName, EnvVarNotSet) {
               testing::HasSubstr("ENVOY_DYNAMIC_MODULES_SEARCH_PATH is not set"));
 }
 
+TEST_P(DynamicModuleTestLanguages, InitModuleCallback) {
+  TestEnvironment::setEnvVar(
+      "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
+      TestEnvironment::substitute(
+          "{{ test_rundir }}/test/extensions/dynamic_modules/test_data/rust"),
+      1);
+
+  bool called = false;
+  auto initModuleCallback = [&](DynamicModulePtr& module_ptr) -> absl::Status {
+    called = true;
+    using GetSomeVariableFuncType = int (*)(void);
+    const auto getSomeVariable =
+        module_ptr->getFunctionPointer<GetSomeVariableFuncType>("getSomeVariable");
+    if (!getSomeVariable.ok()) {
+      return absl::InvalidArgumentError("Failed to get function pointer");
+    }
+    if (getSomeVariable.value()() != 1) {
+      return absl::InvalidArgumentError("Unexpected variable value");
+    }
+    return absl::OkStatus();
+  };
+  absl::StatusOr<DynamicModulePtr> module = newDynamicModuleByName("no_op", false, false, initModuleCallback);
+  EXPECT_TRUE(module.ok());
+  EXPECT_TRUE(called);
+  TestEnvironment::unsetEnvVar("ENVOY_DYNAMIC_MODULES_SEARCH_PATH");
+}
+
+TEST_P(DynamicModuleTestLanguages, InitModuleCallbackFailed) {
+  TestEnvironment::setEnvVar(
+      "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
+      TestEnvironment::substitute(
+          "{{ test_rundir }}/test/extensions/dynamic_modules/test_data/rust"),
+      1);
+
+  auto initModuleCallback = [&](DynamicModulePtr& _) -> absl::Status {
+    return absl::InvalidArgumentError("Init module callback failed");
+  };
+  absl::StatusOr<DynamicModulePtr> module = newDynamicModuleByName("no_op", false, false, initModuleCallback);
+  EXPECT_FALSE(module.ok());
+  EXPECT_EQ(module.status().code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_THAT(module.status().message(),
+              testing::HasSubstr("Init module callback failed"));
+  TestEnvironment::unsetEnvVar("ENVOY_DYNAMIC_MODULES_SEARCH_PATH");
+}
+
 } // namespace DynamicModules
 } // namespace Extensions
 } // namespace Envoy

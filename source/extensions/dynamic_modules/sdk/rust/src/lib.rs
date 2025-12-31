@@ -34,7 +34,7 @@ pub mod abi {
 /// The optional third argument has [`NewHttpFilterPerRouteConfigFunction`] type, and it is called
 /// when the new HTTP filter per-route configuration is created.
 ///
-/// The last argument has [`ServerInitFunction`] type, and it is called when the dynamic module is
+/// The optional fourth argument has [`ServerInitFunction`] type, and it is called when the dynamic module is
 /// loaded and server context is available.
 ///
 /// # Example
@@ -48,7 +48,7 @@ pub mod abi {
 ///   true
 /// }
 ///
-/// fn my_server_init<ESC>(_envoy_server_factory_context: &mut ESC) -> bool {
+/// fn my_server_init(server_factory_context: abi::envoy_dynamic_module_type_server_factory_context_envoy_ptr) -> bool {
 ///   true
 /// }
 ///
@@ -66,7 +66,42 @@ pub mod abi {
 /// ```
 #[macro_export]
 macro_rules! declare_init_functions {
+  ($f:ident, $new_http_filter_config_fn:expr, $new_http_filter_per_route_config_fn:expr) => {
+    __internal_declare_program_init_per_route_function!($f, $new_http_filter_config_fn, $new_http_filter_per_route_config_fn);
+  };
+  ($f:ident, $new_http_filter_config_fn:expr) => {
+    __internal_declare_program_init_function!($f, $new_http_filter_config_fn);
+  };
   ($f:ident, $new_http_filter_config_fn:expr, $new_http_filter_per_route_config_fn:expr, $s:ident) => {
+    __internal_declare_program_init_per_route_function!($f, $new_http_filter_config_fn, $new_http_filter_per_route_config_fn);
+    __internal_declare_server_init_function!($s);
+  };
+  ($f:ident, $new_http_filter_config_fn:expr, $s:ident) => {
+    __internal_declare_program_init_function!($f, $new_http_filter_config_fn);
+    __internal_declare_server_init_function!($s);
+  };
+}
+
+#[macro_export]
+macro_rules! __internal_declare_program_init_function {
+    ($f:ident, $new_http_filter_config_fn:expr) => {
+    #[no_mangle]
+    pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_HTTP_FILTER_CONFIG_FUNCTION
+        .get_or_init(|| $new_http_filter_config_fn);
+      if ($f()) {
+        envoy_proxy_dynamic_modules_rust_sdk::abi::kAbiVersion.as_ptr()
+          as *const ::std::os::raw::c_char
+      } else {
+        ::std::ptr::null()
+      }
+    }
+    };
+}
+
+#[macro_export]
+macro_rules! __internal_declare_program_init_per_route_function {
+    ($f:ident, $new_http_filter_config_fn:expr, $new_http_filter_per_route_config_fn:expr) => {
     #[no_mangle]
     pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
       envoy_proxy_dynamic_modules_rust_sdk::NEW_HTTP_FILTER_CONFIG_FUNCTION
@@ -80,22 +115,7 @@ macro_rules! declare_init_functions {
         ::std::ptr::null()
       }
     }
-    __internal_declare_server_init_function!($s);
-  };
-  ($f:ident, $new_http_filter_config_fn:expr, $s:ident) => {
-    #[no_mangle]
-    pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
-      envoy_proxy_dynamic_modules_rust_sdk::NEW_HTTP_FILTER_CONFIG_FUNCTION
-        .get_or_init(|| $new_http_filter_config_fn);
-      if ($f()) {
-        envoy_proxy_dynamic_modules_rust_sdk::abi::kAbiVersion.as_ptr()
-          as *const ::std::os::raw::c_char
-      } else {
-        ::std::ptr::null()
-      }
-    }
-    __internal_declare_server_init_function!($s);
-  };
+    };
 }
 
 /// Internal macro to declare the server init function.
@@ -106,15 +126,10 @@ macro_rules! declare_init_functions {
 macro_rules! __internal_declare_server_init_function {
     ($f:ident) => {
     #[no_mangle]
-    pub extern "C" fn envoy_dynamic_module_on_server_init(abi::envoy_dynamic_module_type_server_factory_context_envoy_ptr server_factory_context_ptr) -> bool {
-      ret ($f)(server_factory_context_ptr)
+    pub extern "C" fn envoy_dynamic_module_on_server_init(server_factory_context_ptr: abi::envoy_dynamic_module_type_server_factory_context_envoy_ptr) -> bool {
+      ($f)(server_factory_context_ptr)
     }
     };
-}
-
-#[no_mangle]
-pub extern "C" fn envoy_dynamic_module_on_server_init() -> bool {
-  return
 }
 
 /// Log a trace message to Envoy's logging system with [dynamic_modules] Id. Messages won't be
@@ -1376,9 +1391,7 @@ pub trait EnvoyHttpFilter {
   ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
 
   /// Get the index of the current worker thread.
-  fn get_worker_index(
-    &mut self,
-  ) -> u32;
+  fn get_worker_index(&self) -> u32;
 }
 
 /// This implements the [`EnvoyHttpFilter`] trait with the given raw pointer to the Envoy HTTP
@@ -2496,6 +2509,14 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     })?;
     Ok(())
   }
+
+  fn get_worker_index(
+    &self,
+  ) -> u32 {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_get_worker_index(self.raw_ptr)
+    }
+  }
 }
 
 impl EnvoyHttpFilterImpl {
@@ -2639,14 +2660,6 @@ impl EnvoyHttpFilterImpl {
       results.push(unsafe { EnvoyBuffer::new_from_raw(result_ptr, result_size) });
     }
     results
-  }
-
-  fn get_worker_index(
-    &mut self,
-  ) -> u32; {
-    unsafe {
-      abi::envoy_dynamic_module_callback_http_filter_get_worker_index(self.raw_ptr)
-    }
   }
 }
 

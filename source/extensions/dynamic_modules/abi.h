@@ -2269,11 +2269,11 @@ envoy_dynamic_module_callback_get_most_specific_route_config(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
 
 /**
- * envoy_dynamic_module_callback_http_get_worker_index is called by the module to get the worker
+ * envoy_dynamic_module_callback_http_filter_get_worker_index is called by the module to get the worker
  * index assigned to the current HTTP filter. This can be used by the module to manage
  * worker-specific resources or perform worker-specific logic.
  */
-uint32_t envoy_dynamic_module_callback_http_get_worker_index(
+uint32_t envoy_dynamic_module_callback_http_filter_get_worker_index(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
 
 // ------------------- Misc Callbacks for Server Context -------------------------
