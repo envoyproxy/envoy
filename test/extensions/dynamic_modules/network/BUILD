@@ -23,6 +23,7 @@ envoy_cc_test(
         "//source/extensions/filters/network/dynamic_modules:filter_lib",
         "//test/extensions/dynamic_modules:util",
         "//test/mocks/network:network_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
     ],
 )
 
@@ -56,8 +57,10 @@ envoy_cc_test(
         "//source/extensions/filters/network/dynamic_modules:config",
         "//source/extensions/filters/network/dynamic_modules:filter_lib",
         "//test/extensions/dynamic_modules:util",
+        "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/ssl:ssl_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
     ],
 )
 

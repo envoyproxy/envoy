@@ -1198,6 +1198,82 @@ void envoy_dynamic_module_on_network_filter_event(
 void envoy_dynamic_module_on_network_filter_destroy(
     envoy_dynamic_module_type_network_filter_module_ptr filter_module_ptr);
 
+/**
+ * envoy_dynamic_module_on_network_filter_http_callout_done is called when the HTTP callout
+ * response is received initiated by a network filter.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object of the
+ * corresponding network filter.
+ * @param filter_module_ptr is the pointer to the in-module network filter created by
+ * envoy_dynamic_module_on_network_filter_new.
+ * @param callout_id is the ID of the callout. This is used to differentiate between multiple
+ * calls.
+ * @param result is the result of the callout.
+ * @param headers is the headers of the response.
+ * @param headers_size is the size of the headers.
+ * @param body_chunks is the body of the response.
+ * @param body_chunks_size is the size of the body.
+ *
+ * headers and body_chunks are owned by Envoy, and they are guaranteed to be valid until the end of
+ * this event hook. They may be null if the callout fails or the response is empty.
+ */
+void envoy_dynamic_module_on_network_filter_http_callout_done(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_network_filter_module_ptr filter_module_ptr, uint64_t callout_id,
+    envoy_dynamic_module_type_http_callout_result result,
+    envoy_dynamic_module_type_envoy_http_header* headers, size_t headers_size,
+    envoy_dynamic_module_type_envoy_buffer* body_chunks, size_t body_chunks_size);
+
+// -----------------------------------------------------------------------------
+// Socket Options
+// -----------------------------------------------------------------------------
+
+typedef enum envoy_dynamic_module_type_socket_option_state {
+  envoy_dynamic_module_type_socket_option_state_Prebind = 0,
+  envoy_dynamic_module_type_socket_option_state_Bound = 1,
+  envoy_dynamic_module_type_socket_option_state_Listening = 2,
+} envoy_dynamic_module_type_socket_option_state;
+
+typedef enum envoy_dynamic_module_type_socket_option_value_type {
+  envoy_dynamic_module_type_socket_option_value_type_Int = 0,
+  envoy_dynamic_module_type_socket_option_value_type_Bytes = 1,
+} envoy_dynamic_module_type_socket_option_value_type;
+
+typedef struct envoy_dynamic_module_type_socket_option {
+  int64_t level;
+  int64_t name;
+  envoy_dynamic_module_type_socket_option_state state;
+  envoy_dynamic_module_type_socket_option_value_type value_type;
+  int64_t int_value;
+  envoy_dynamic_module_type_envoy_buffer byte_value;
+} envoy_dynamic_module_type_socket_option;
+
+bool envoy_dynamic_module_callback_network_set_socket_option_int(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, int64_t level,
+    int64_t name, envoy_dynamic_module_type_socket_option_state state, int64_t value);
+
+bool envoy_dynamic_module_callback_network_set_socket_option_bytes(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, int64_t level,
+    int64_t name, envoy_dynamic_module_type_socket_option_state state,
+    envoy_dynamic_module_type_module_buffer value);
+
+bool envoy_dynamic_module_callback_network_get_socket_option_int(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, int64_t level,
+    int64_t name, envoy_dynamic_module_type_socket_option_state state, int64_t* value_out);
+
+bool envoy_dynamic_module_callback_network_get_socket_option_bytes(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, int64_t level,
+    int64_t name, envoy_dynamic_module_type_socket_option_state state,
+    envoy_dynamic_module_type_envoy_buffer* value_out);
+
+size_t envoy_dynamic_module_callback_network_get_socket_options_size(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr);
+
+bool envoy_dynamic_module_callback_network_get_socket_options(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_socket_option* options_out, size_t options_size,
+    size_t* options_written);
+
 // =============================================================================
 // ------------------------------ Listener Filter Event Hooks ------------------
 // =============================================================================
@@ -2740,6 +2816,33 @@ bool envoy_dynamic_module_callback_network_get_dynamic_metadata_number(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer filter_namespace,
     envoy_dynamic_module_type_module_buffer key, double* result);
+
+// -----------------------------------------------------------------------------
+// HTTP Callouts
+// -----------------------------------------------------------------------------
+
+/**
+ * envoy_dynamic_module_callback_network_filter_send_http_callout is called by the module to
+ * initiate an HTTP callout. The callout is initiated by the network filter and the response is
+ * received in envoy_dynamic_module_on_network_filter_http_callout_done.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object of the
+ * corresponding network filter.
+ * @param callout_id_out is a pointer to a variable where the callout ID will be stored. This can be
+ * arbitrary and is used to differentiate between multiple calls from the same filter.
+ * @param cluster_name is the name of the cluster to which the callout is sent.
+ * @param headers is the headers of the request. It must contain :method, :path and host headers.
+ * @param headers_size is the size of the headers.
+ * @param body is the body of the request.
+ * @param timeout_milliseconds is the timeout for the callout in milliseconds.
+ * @return envoy_dynamic_module_type_http_callout_init_result is the result of the callout.
+ */
+envoy_dynamic_module_type_http_callout_init_result
+envoy_dynamic_module_callback_network_filter_send_http_callout(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, uint64_t* callout_id_out,
+    envoy_dynamic_module_type_module_buffer cluster_name,
+    envoy_dynamic_module_type_module_http_header* headers, size_t headers_size,
+    envoy_dynamic_module_type_module_buffer body, uint64_t timeout_milliseconds);
 
 // =============================================================================
 // ----------------------------- Listener Filter Callbacks ---------------------
