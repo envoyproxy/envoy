@@ -314,6 +314,70 @@ You can block a method entirely based on a condition. If the matcher evaluates t
                     typed_config:
                       "@type": type.googleapis.com/envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction
 
+Observability
+-------------
+
+The filter outputs statistics in the ``http.<stat_prefix>.proto_api_scrubber.`` namespace.
+
+Statistics
+^^^^^^^^^^
+
+.. list-table::
+   :header-rows: 1
+   :widths: 40 20 40
+
+   * - Name
+     - Type
+     - Description
+   * - ``total_requests``
+     - Counter
+     - Total number of HTTP requests processed by the filter, regardless of protocol or content-type.
+   * - ``total_requests_checked``
+     - Counter
+     - Total number of valid gRPC requests inspected by the filter logic.
+   * - ``method_blocked``
+     - Counter
+     - Total requests rejected due to method-level restrictions.
+   * - ``request_scrubbing_failed``
+     - Counter
+     - Total requests where the scrubbing operation failed (e.g., malformed proto payload).
+   * - ``response_scrubbing_failed``
+     - Counter
+     - Total responses where the scrubbing operation failed.
+   * - ``request_buffer_conversion_error``
+     - Counter
+     - Errors encountered when converting Envoy buffers to Protobuf messages for requests.
+   * - ``response_buffer_conversion_error``
+     - Counter
+     - Errors encountered when converting Envoy buffers to Protobuf messages for responses.
+   * - ``invalid_method_name``
+     - Counter
+     - Requests rejected because the gRPC method name in the ``:path`` header was invalid or malformed.
+   * - ``request_scrubbing_latency``
+     - Histogram
+     - Time in milliseconds spent traversing and scrubbing the request payload.
+   * - ``response_scrubbing_latency``
+     - Histogram
+     - Time in milliseconds spent traversing and scrubbing the response payload.
+
+Tracing
+^^^^^^^
+
+The filter sets the following tags on the active span to provide visibility into scrubbing operations:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 70
+
+   * - Tag Name
+     - Description
+   * - ``proto_api_scrubber.outcome``
+     - Set to ``blocked`` if the request was denied by a method-level restriction.
+   * - ``proto_api_scrubber.request_error``
+     - Contains the error message if the request scrubbing process failed.
+   * - ``proto_api_scrubber.response_error``
+     - Contains the error message if the response scrubbing process failed.
+
 Response Code Details
 ---------------------
 

@@ -591,6 +591,20 @@ protected:
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
 };
 
+TEST_F(ProtoApiScrubberFilterConfigTest, StatsInitialization) {
+  auto config_or_status = ProtoApiScrubberFilterConfig::create(proto_config_, factory_context_);
+  ASSERT_THAT(config_or_status, IsOk());
+  filter_config_ = std::move(config_or_status.value());
+
+  // Verify that the stats were created in the store with the correct prefix.
+  // The Counters are lazily instantiated in Envoy usually, but since the struct constructor
+  // calls POOL_COUNTER_PREFIX, they should be present in the map.
+  // Just verify we can access the stats object and it points to valid counters.
+  EXPECT_NE(&filter_config_->stats().total_requests_checked_, nullptr);
+  EXPECT_EQ(filter_config_->stats().total_requests_checked_.name(),
+            "proto_api_scrubber.total_requests_checked");
+}
+
 // Tests whether the match trees are initialized properly for each field mask.
 TEST_F(ProtoApiScrubberFilterConfigTest, MatchTreeValidation) {
   NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;

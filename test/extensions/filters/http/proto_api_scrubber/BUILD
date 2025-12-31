@@ -71,6 +71,7 @@ envoy_cc_test(
         "//source/common/grpc:common_lib",
         "//source/common/grpc:status_lib",
         "//source/common/http/matching:inputs_lib",
+        "//source/common/stats:isolated_store_lib",
         "//source/extensions/filters/http/proto_api_scrubber:filter",
         "//source/extensions/filters/http/proto_api_scrubber:filter_config",
         "//source/extensions/matching/http/cel_input:cel_input_lib",
