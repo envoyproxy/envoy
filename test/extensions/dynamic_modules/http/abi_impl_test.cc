@@ -20,7 +20,7 @@ namespace HttpFilters {
 class DynamicModuleHttpFilterTest : public testing::Test {
 public:
   void SetUp() override {
-    filter_ = std::make_unique<DynamicModuleHttpFilter>(nullptr, symbol_table_, 0);
+    filter_ = std::make_unique<DynamicModuleHttpFilter>(nullptr, symbol_table_, 3);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
   }
@@ -1731,6 +1731,19 @@ TEST(ABIImpl, Stats) {
       filter_config.get(), const_cast<char*>(histogram_vec_name.data()), histogram_vec_name.size(),
       histogram_vec_labels.data(), histogram_vec_labels.size(), &histogram_vec_id);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Frozen);
+}
+
+TEST_F(DynamicModuleHttpFilterTest, GetConcurrency) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  ON_CALL(context.options_, concurrency()).WillByDefault(testing::Return(1));
+  uint32_t concurrency = envoy_dynamic_module_callback_server_factory_context_get_concurrency(&context);
+  EXPECT_EQ(concurrency, 1);
+}
+
+TEST_F(DynamicModuleHttpFilterTest, GetWorkerIndex) {
+  uint32_t worker_index = envoy_dynamic_module_callback_http_filter_get_worker_index(
+      filter_.get());
+  EXPECT_EQ(worker_index, 3);
 }
 
 } // namespace HttpFilters

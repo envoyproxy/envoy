@@ -500,6 +500,9 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BodyCallbacksFilter {
     // Plus we need to set the content length.
     envoy_filter.set_request_header("content-length", b"16");
 
+    let worker_id = envoy_filter.get_worker_index();
+    assert_eq!(worker_id, 0);
+
     envoy_dynamic_module_type_on_http_filter_request_body_status::Continue
   }
 
@@ -559,6 +562,9 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BodyCallbacksFilter {
     envoy_filter.append_received_response_body(b"new_response_body");
     // Plus we need to set the content length.
     envoy_filter.set_response_header("content-length", b"17");
+
+    let worker_id = envoy_filter.get_worker_index();
+    assert_eq!(worker_id, 0);
 
     envoy_dynamic_module_type_on_http_filter_response_body_status::Continue
   }
