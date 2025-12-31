@@ -191,9 +191,6 @@ FALSE_RUNTIME_GUARD(envoy_restart_features_use_cached_grpc_client_for_xds);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_http_11_proxy_connect_legacy_format);
 // TODO(tsaarni): Flip to true after prod testing or remove.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_fixed_heap_use_allocated);
-// TODO(yavlasov): Enabling by default will be hugely disruptive to existing traffic.
-// Replace with a config option (default off) post CVE release.
-FALSE_RUNTIME_GUARD(envoy_reloadable_features_reject_early_connect_data);
 // Flip back to true once performance aligns with nghttp2 and
 // https://github.com/envoyproxy/envoy/issues/40070 is resolved.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_http2_use_oghttp2);
