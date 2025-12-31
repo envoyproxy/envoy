@@ -81,10 +81,6 @@ private:
     std::function<void(OTelLogRequestCallbacks*)> deletion_;
   };
 
-  void initMessageRoot(
-      const envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig&
-          config,
-      const LocalInfo::LocalInfo& local_info);
   // Extensions::AccessLoggers::GrpcCommon::GrpcAccessLogger
   void addEntry(opentelemetry::proto::logs::v1::LogRecord&& entry) override;
   // Non used addEntry method (the above is used for both TCP and HTTP).

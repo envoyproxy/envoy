@@ -27,6 +27,7 @@ directories:
   source/exe: 94.4  # increased by #32346, need coverage for terminate_handler and hot restart failures
   source/extensions/api_listeners: 55.0  # Many IS_ENVOY_BUG are not covered.
   source/extensions/api_listeners/default_api_listener: 67.8  # Many IS_ENVOY_BUG are not covered.
+  source/extensions/access_loggers/open_telemetry: 96.4  # Serialization failure path is untestable
   source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface: 96.3
   source/extensions/common/aws: 98.5
   source/extensions/common/aws/credential_providers: 100.0

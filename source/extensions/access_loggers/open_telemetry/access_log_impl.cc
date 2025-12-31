@@ -7,7 +7,6 @@
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
 #include "envoy/extensions/access_loggers/open_telemetry/v3/logs_service.pb.h"
 
-#include "source/common/common/assert.h"
 #include "source/common/config/utility.h"
 #include "source/common/formatter/substitution_formatter.h"
 #include "source/common/http/headers.h"
@@ -15,6 +14,7 @@
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/stream_info/utility.h"
+#include "source/extensions/access_loggers/open_telemetry/otlp_log_utils.h"
 #include "source/extensions/access_loggers/open_telemetry/substitution_formatter.h"
 
 #include "opentelemetry/proto/collector/logs/v1/logs_service.pb.h"
@@ -22,33 +22,10 @@
 #include "opentelemetry/proto/logs/v1/logs.pb.h"
 #include "opentelemetry/proto/resource/v1/resource.pb.h"
 
-// Used to pack/unpack the body AnyValue to a KeyValueList.
-const char BODY_KEY[] = "body";
-
 namespace Envoy {
 namespace Extensions {
 namespace AccessLoggers {
 namespace OpenTelemetry {
-
-namespace {
-
-// Packing the body "AnyValue" to a "KeyValueList" with a single key and the body as value.
-::opentelemetry::proto::common::v1::KeyValueList
-packBody(const ::opentelemetry::proto::common::v1::AnyValue& body) {
-  ::opentelemetry::proto::common::v1::KeyValueList output;
-  auto* kv = output.add_values();
-  kv->set_key(BODY_KEY);
-  *kv->mutable_value() = body;
-  return output;
-}
-
-::opentelemetry::proto::common::v1::AnyValue
-unpackBody(const ::opentelemetry::proto::common::v1::KeyValueList& value) {
-  ASSERT(value.values().size() == 1 && value.values(0).key() == BODY_KEY);
-  return value.values(0).value();
-}
-
-} // namespace
 
 Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
     referer_handle(Http::CustomHeaders::get().Referer);
@@ -62,7 +39,9 @@ AccessLog::AccessLog(
     ThreadLocal::SlotAllocator& tls, GrpcAccessLoggerCacheSharedPtr access_logger_cache,
     const std::vector<Formatter::CommandParserPtr>& commands)
     : Common::ImplBase(std::move(filter)), tls_slot_(tls.allocateSlot()),
-      access_logger_cache_(std::move(access_logger_cache)) {
+      access_logger_cache_(std::move(access_logger_cache)),
+      filter_state_objects_to_log_(getFilterStateObjectsToLog(config)),
+      custom_tags_(getCustomTags(config)) {
 
   THROW_IF_NOT_OK(Envoy::Config::Utility::checkTransportVersion(config.common_config()));
   tls_slot_->set([this, config](Event::Dispatcher&) {
@@ -85,7 +64,7 @@ void AccessLog::emitLog(const Formatter::Context& log_context,
                                    stream_info.startTime().time_since_epoch())
                                    .count());
 
-  // Unpacking the body "KeyValueList" to "AnyValue".
+  // Unpacks the body "KeyValueList" to "AnyValue".
   if (body_formatter_) {
     const auto formatted_body = unpackBody(body_formatter_->format(log_context, stream_info));
     *log_entry.mutable_body() = formatted_body;
@@ -93,23 +72,15 @@ void AccessLog::emitLog(const Formatter::Context& log_context,
   const auto formatted_attributes = attributes_formatter_->format(log_context, stream_info);
   *log_entry.mutable_attributes() = formatted_attributes.values();
 
-  // Setting the trace id if available.
-  // OpenTelemetry trace id is a [16]byte array, backend(e.g. OTel-collector) will reject the
-  // request if the length is not 16. Some trace provider(e.g. zipkin) may return it as a 64-bit hex
-  // string. In this case, we need to convert it to a 128-bit hex string, padding left with zeros.
-  std::string trace_id_hex =
+  // Sets trace context (trace_id, span_id) if available.
+  const std::string trace_id_hex =
       log_context.activeSpan().has_value() ? log_context.activeSpan()->getTraceId() : "";
-  if (trace_id_hex.size() == 32) {
-    *log_entry.mutable_trace_id() = absl::HexStringToBytes(trace_id_hex);
-  } else if (trace_id_hex.size() == 16) {
-    auto trace_id = absl::StrCat(Hex::uint64ToHex(0), trace_id_hex);
-    *log_entry.mutable_trace_id() = absl::HexStringToBytes(trace_id);
-  }
-  std::string span_id_hex =
+  const std::string span_id_hex =
       log_context.activeSpan().has_value() ? log_context.activeSpan()->getSpanId() : "";
-  if (!span_id_hex.empty()) {
-    *log_entry.mutable_span_id() = absl::HexStringToBytes(span_id_hex);
-  }
+  populateTraceContext(log_entry, trace_id_hex, span_id_hex);
+
+  addFilterStateToAttributes(stream_info, filter_state_objects_to_log_, log_entry);
+  addCustomTagsToAttributes(custom_tags_, log_context, stream_info, log_entry);
 
   tls_slot_->getTyped<ThreadLocalLogger>().logger_->log(std::move(log_entry));
 }
