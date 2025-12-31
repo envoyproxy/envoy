@@ -89,7 +89,15 @@ DynamicModuleConfigFactory::createRouteSpecificFilterConfigTyped(
     auto init_server_function =
         module_ptr->getFunctionPointer<decltype(&envoy_dynamic_module_on_server_init)>(
             "envoy_dynamic_module_on_server_init");
-    RETURN_IF_NOT_OK_REF(init_server_function.status());
+
+    // Make init_server_function optional - if the function is not found it should not block module loading.
+    if (!init_server_function.ok()) {
+      ENVOY_LOG_TO_LOGGER(
+          Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+          "Failed to get function pointer for envoy_dynamic_module_on_server_init: {}",
+          init_server_function.status().message());
+      return absl::OkStatus();
+    }
 
     auto success = (*init_server_function.value())(&context);
     if (!success) {

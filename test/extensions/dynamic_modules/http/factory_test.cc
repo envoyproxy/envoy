@@ -45,7 +45,10 @@ filter_config:
   auto result = factory.createFilterFactoryFromProto(proto_config, "", context);
   EXPECT_TRUE(result.ok());
   auto factory_cb = result.value();
-  Http::MockFilterChainFactoryCallbacks callbacks;
+  NiceMock<Http::MockFilterChainFactoryCallbacks> callbacks;
+
+  NiceMock<Event::MockDispatcher> dispatcher{"worker_0"};
+  ON_CALL(callbacks, dispatcher()).WillByDefault(ReturnRef(dispatcher));
 
   EXPECT_CALL(callbacks, addStreamFilter(testing::_));
   factory_cb(callbacks);
@@ -77,7 +80,10 @@ filter_name: foo
   auto result = factory.createFilterFactoryFromProto(proto_config, "", context);
   EXPECT_TRUE(result.ok());
   auto factory_cb = result.value();
-  Http::MockFilterChainFactoryCallbacks callbacks;
+  NiceMock<Http::MockFilterChainFactoryCallbacks> callbacks;
+
+  NiceMock<Event::MockDispatcher> dispatcher{"worker_0"};
+  ON_CALL(callbacks, dispatcher()).WillByDefault(ReturnRef(dispatcher));
 
   EXPECT_CALL(callbacks, addStreamFilter(testing::_));
   factory_cb(callbacks);
@@ -112,7 +118,10 @@ filter_config:
   auto result = factory.createFilterFactoryFromProto(proto_config, "", context);
   EXPECT_TRUE(result.ok());
   auto factory_cb = result.value();
-  Http::MockFilterChainFactoryCallbacks callbacks;
+  NiceMock<Http::MockFilterChainFactoryCallbacks> callbacks;
+
+  NiceMock<Event::MockDispatcher> dispatcher{"worker_0"};
+  ON_CALL(callbacks, dispatcher()).WillByDefault(ReturnRef(dispatcher));
 
   EXPECT_CALL(callbacks, addStreamFilter(testing::_));
   factory_cb(callbacks);
