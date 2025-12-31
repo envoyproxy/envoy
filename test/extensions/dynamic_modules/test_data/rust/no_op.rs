@@ -13,8 +13,6 @@ fn init() -> bool {
 fn init_server(
   _server_factory_context: abi::envoy_dynamic_module_type_server_factory_context_envoy_ptr,
 ) -> bool {
-  // let concurrency = unsafe { get_server_concurrency(server_factory_context) };
-  // assert_eq!(concurrency, 1);
   true
 }
 

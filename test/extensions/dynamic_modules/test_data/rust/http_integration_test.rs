@@ -8,8 +8,18 @@ declare_init_functions!(
   new_http_filter_config_fn,
   new_http_filter_per_route_config_fn
 );
+declare_server_init_function!(init_server);
 
 fn init() -> bool {
+  true
+}
+
+/// This implements the [`envoy_proxy_dynamic_modules_rust_sdk::ServerInitFunction`] signature.
+fn init_server(
+  server_factory_context: abi::envoy_dynamic_module_type_server_factory_context_envoy_ptr,
+) -> bool {
+  let concurrency = unsafe { get_server_concurrency(server_factory_context) };
+  assert_eq!(concurrency, 1);
   true
 }
 
@@ -204,6 +214,10 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeadersHttpFilter {
     let new_values = envoy_filter.get_request_header_values("new");
     assert_eq!(new_values.len(), 0);
 
+    // Test worker id.
+    let worker_id = envoy_filter.get_worker_index();
+    assert_eq!(worker_id, 0);
+
     envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
   }
 
@@ -242,6 +256,10 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeadersHttpFilter {
     assert!(new_value.is_none());
     let new_values = envoy_filter.get_request_trailer_values("new");
     assert_eq!(new_values.len(), 0);
+
+    // Test worker id.
+    let worker_id = envoy_filter.get_worker_index();
+    assert_eq!(worker_id, 0);
 
     envoy_dynamic_module_type_on_http_filter_request_trailers_status::Continue
   }
@@ -283,6 +301,10 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeadersHttpFilter {
     let new_values = envoy_filter.get_response_header_values("new");
     assert_eq!(new_values.len(), 0);
 
+    // Test worker id.
+    let worker_id = envoy_filter.get_worker_index();
+    assert_eq!(worker_id, 0);
+
     envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
   }
 
@@ -321,6 +343,10 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeadersHttpFilter {
     assert!(new_value.is_none());
     let new_values = envoy_filter.get_response_trailer_values("new");
     assert_eq!(new_values.len(), 0);
+
+    // Test worker id.
+    let worker_id = envoy_filter.get_worker_index();
+    assert_eq!(worker_id, 0);
 
     envoy_dynamic_module_type_on_http_filter_response_trailers_status::Continue
   }
