@@ -52,6 +52,7 @@ envoy_extension_cc_test(
         "envoy.bootstrap.reverse_tunnel.upstream_socket_interface",
         "envoy.bootstrap.reverse_tunnel.downstream_socket_interface",
         "envoy.resolvers.reverse_connection",
+        "envoy.transport_sockets.tls",
     ],
     rbe_pool = "6gig",
     deps = [
@@ -64,8 +65,10 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/router:config",
         "//source/extensions/filters/network/http_connection_manager:config",
         "//source/extensions/filters/network/reverse_tunnel:config",
+        "//source/extensions/transport_sockets/tls:config",
         "//test/integration:http_integration_lib",
         "//test/integration:integration_lib",
+        "//test/test_common:environment_lib",
         "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
@@ -73,6 +76,8 @@ envoy_extension_cc_test(
         "@envoy_api//envoy/extensions/filters/http/lua/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/reverse_tunnel/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/internal_upstream/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/upstreams/http/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )
