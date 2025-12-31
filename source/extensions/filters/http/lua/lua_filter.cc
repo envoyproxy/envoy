@@ -688,7 +688,7 @@ int StreamHandleWrapper::luaConnection(lua_State* state) {
     connection_wrapper_.pushStack();
   } else {
     connection_wrapper_.reset(
-        Filters::Common::Lua::ConnectionWrapper::create(state, callbacks_.connection()), true);
+        Filters::Common::Lua::ConnectionWrapper::create(state, callbacks_.streamInfo()), true);
   }
   return 1;
 }
