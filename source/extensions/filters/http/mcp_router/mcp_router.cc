@@ -385,23 +385,22 @@ void McpRouterFilter::initializeFanout(AggregationCallback callback) {
           }
         });
 
+    // Create per-backend StreamOptions with the backend-specific timeout.
+    Http::AsyncClient::StreamOptions backend_options;
+    backend_options.setTimeout(backend.timeout);
+
     stream_callbacks_.push_back(stream_cb);
     mux_callbacks.push_back({
         .cluster_name = backend.cluster_name,
         .callbacks = std::weak_ptr<Http::AsyncClient::StreamCallbacks>(stream_cb),
+        .options = backend_options,
     });
   }
 
-  // TODO(botengyao): MuxDemux::multicast uses a single StreamOptions for all backends,
-  // so per-backend timeouts are not currently supported. Using max timeout as a workaround.
-  Http::AsyncClient::StreamOptions options;
-  std::chrono::milliseconds max_timeout{0};
-  for (const auto& backend : config_->backends()) {
-    max_timeout = std::max(max_timeout, backend.timeout);
-  }
-  options.setTimeout(max_timeout);
+  // Default options (used as fallback if per-backend options are not set).
+  Http::AsyncClient::StreamOptions default_options;
 
-  auto multistream_or = muxdemux_->multicast(options, mux_callbacks);
+  auto multistream_or = muxdemux_->multicast(default_options, mux_callbacks);
   if (!multistream_or.ok()) {
     ENVOY_LOG(error, "Failed to start multicast: {}", multistream_or.status().message());
     sendHttpError(500, "Failed to start fanout");
@@ -449,9 +448,11 @@ void McpRouterFilter::initializeSingleBackend(const McpBackendConfig& backend,
   mux_callbacks.push_back({
       .cluster_name = backend.cluster_name,
       .callbacks = std::weak_ptr<Http::AsyncClient::StreamCallbacks>(stream_cb),
+      .options = options,
   });
 
-  auto multistream_or = muxdemux_->multicast(options, mux_callbacks);
+  Http::AsyncClient::StreamOptions default_options;
+  auto multistream_or = muxdemux_->multicast(default_options, mux_callbacks);
   if (!multistream_or.ok()) {
     ENVOY_LOG(error, "Failed to start multicast for cluster '{}': {}", backend.cluster_name,
               multistream_or.status().message());

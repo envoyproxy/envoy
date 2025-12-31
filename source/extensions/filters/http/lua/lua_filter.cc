@@ -5,6 +5,7 @@
 #include <atomic>
 #include <cstdint>
 #include <functional>
+#include <limits>
 #include <memory>
 
 #include "envoy/http/codes.h"
@@ -139,18 +140,19 @@ void buildHeadersFromTable(Http::HeaderMap& headers, lua_State* state, int table
   while (lua_next(state, table_index) != 0) {
     // Uses 'key' (at index -2) and 'value' (at index -1).
     const char* key = luaL_checkstring(state, -2);
+    const Http::LowerCaseString lower_key(key);
     // Check if the current value is a table, we iterate through the table and add each element of
     // it as a header entry value for the current key.
     if (lua_istable(state, -1)) {
       lua_pushnil(state);
       while (lua_next(state, -2) != 0) {
         const char* value = luaL_checkstring(state, -1);
-        headers.addCopy(Http::LowerCaseString(key), value);
+        headers.addCopy(lower_key, value);
         lua_pop(state, 1);
       }
     } else {
       const char* value = luaL_checkstring(state, -1);
-      headers.addCopy(Http::LowerCaseString(key), value);
+      headers.addCopy(lower_key, value);
     }
     // Removes 'value'; keeps 'key' for next iteration. This is the input for lua_next() so that
     // it can push the next key/value pair onto the stack.
@@ -461,10 +463,16 @@ void StreamHandleWrapper::onSuccess(const Http::AsyncClient::Request&,
     });
   }
 
-  // TODO(mattklein123): Avoid double copy here.
   if (response->body().length() > 0) {
-    lua_pushlstring(coroutine_.luaState(), response->bodyAsString().data(),
-                    response->body().length());
+    const uint64_t body_length = response->body().length();
+    if (body_length <= std::numeric_limits<uint32_t>::max()) {
+      // Use linearize(uint32_t size) to get contiguous data, avoiding extra copy.
+      void* data = response->body().linearize(static_cast<uint32_t>(body_length));
+      lua_pushlstring(coroutine_.luaState(), static_cast<const char*>(data), body_length);
+    } else {
+      // Body exceeds linearize() limit, fall back to bodyAsString().
+      lua_pushlstring(coroutine_.luaState(), response->bodyAsString().data(), body_length);
+    }
   } else {
     lua_pushnil(coroutine_.luaState());
   }

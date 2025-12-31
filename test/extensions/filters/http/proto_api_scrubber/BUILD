@@ -6,6 +6,10 @@ load(
     "envoy_proto_descriptor",
     "envoy_proto_library",
 )
+load(
+    "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_test",
+)
 
 licenses(["notice"])  # Apache 2
 
@@ -67,6 +71,7 @@ envoy_cc_test(
         "//source/common/grpc:common_lib",
         "//source/common/grpc:status_lib",
         "//source/common/http/matching:inputs_lib",
+        "//source/common/stats:isolated_store_lib",
         "//source/extensions/filters/http/proto_api_scrubber:filter",
         "//source/extensions/filters/http/proto_api_scrubber:filter_config",
         "//source/extensions/matching/http/cel_input:cel_input_lib",
@@ -85,7 +90,7 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "integration_test",
     size = "large",
     srcs = [
@@ -95,8 +100,7 @@ envoy_cc_test(
         ":scrubber_test_proto_descriptor",
         "//test/proto:apikeys_proto_descriptor",
     ],
-    # Following attribute will be enabled once the filter is registered.
-    # extension_names = ["envoy.filters.http.proto_api_scrubber"],
+    extension_names = ["envoy.filters.http.proto_api_scrubber"],
     rbe_pool = "6gig",
     deps = [
         ":scrubber_test_proto_cc_proto",

@@ -184,8 +184,25 @@ FieldCheckResults FieldChecker::CheckField(const std::vector<std::string>& path,
     return FieldCheckResults::kInclude;
   }
 
+  // If the field itself holds a message or enum, check if that type is globally restricted.
+  if (field->kind() == Protobuf::Field::TYPE_MESSAGE ||
+      field->kind() == Protobuf::Field::TYPE_ENUM) {
+    absl::string_view type_name = Envoy::TypeUtil::typeUrlToDescriptorFullName(field->type_url());
+    MatchTreeHttpMatchingDataSharedPtr type_matcher =
+        filter_config_ptr_->getMessageMatcher(std::string(type_name));
+
+    if (type_matcher != nullptr) {
+      absl::StatusOr<Matcher::MatchResult> match_result = tryMatch(type_matcher);
+      // If the matcher says "Remove", we exclude this field entirely.
+      if (matchResultStatusToFieldCheckResult(match_result, type_name) ==
+          FieldCheckResults::kExclude) {
+        return FieldCheckResults::kExclude;
+      }
+    }
+  }
+
   // Recover the parent_type from the filter config if the caller didn't provide it
-  // (e.g. ProtoScrubber library).
+  // (e.g. ProtoScrubber library processing Any).
   const Protobuf::Type* type_context = parent_type;
   if (type_context == nullptr) {
     type_context = filter_config_ptr_->getParentType(field);
@@ -269,7 +286,11 @@ FieldCheckResults FieldChecker::CheckField(const std::vector<std::string>& path,
   // that the `proto_scrubber` library traverses the child fields of this field. Currently, only
   // message type is supported by FieldChecker. Support for other non-primitive types will be added
   // in the future.
-  if (field->kind() == Protobuf::Field_Kind_TYPE_MESSAGE) {
+  //
+  // Returning kPartial for ENUM is required to trigger value-level inspection (the library calls
+  // CheckField again with the enum value in the path).
+  if (field->kind() == Protobuf::Field_Kind_TYPE_MESSAGE ||
+      field->kind() == Protobuf::Field_Kind_TYPE_ENUM) {
     return FieldCheckResults::kPartial;
   }
 
@@ -323,7 +344,23 @@ FieldChecker::tryMatch(MatchTreeHttpMatchingDataSharedPtr match_tree) const {
   return match_result;
 }
 
-FieldCheckResults FieldChecker::CheckType(const Protobuf::Type*) const {
+FieldCheckResults FieldChecker::CheckType(const Protobuf::Type* type) const {
+  if (type == nullptr) {
+    return FieldCheckResults::kPartial;
+  }
+
+  // Check if there is a message-level restriction for this specific type.
+  // This handles scrubbing the entire payload of an Any field if the type matches.
+  auto match_tree = filter_config_ptr_->getMessageMatcher(type->name());
+  if (match_tree != nullptr) {
+    absl::StatusOr<Matcher::MatchResult> match_result = tryMatch(match_tree);
+
+    if (matchResultStatusToFieldCheckResult(match_result, type->name()) ==
+        FieldCheckResults::kExclude) {
+      return FieldCheckResults::kExclude;
+    }
+  }
+
   // Always return kPartial to force the ProtoScrubber to unpack and inspect the Any message.
   return FieldCheckResults::kPartial;
 }
