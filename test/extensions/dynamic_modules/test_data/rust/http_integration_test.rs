@@ -669,12 +669,14 @@ impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for HttpCalloutsFilterConfig {
   fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
     Box::new(HttpCalloutsFilter {
       cluster_name: self.cluster_name.clone(),
+      callout_handle: 0,
     })
   }
 }
 
 struct HttpCalloutsFilter {
   cluster_name: String,
+  callout_handle: u64,
 }
 
 impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HttpCalloutsFilter {
@@ -683,8 +685,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HttpCalloutsFilter {
     envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> envoy_dynamic_module_type_on_http_filter_request_headers_status {
-    let result = envoy_filter.send_http_callout(
-      1234,
+    let (result, handle) = envoy_filter.send_http_callout(
       &self.cluster_name,
       vec![
         (":path", b"/"),
@@ -696,30 +697,15 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HttpCalloutsFilter {
     );
     if result != envoy_dynamic_module_type_http_callout_init_result::Success {
       envoy_filter.send_response(500, vec![("foo", b"bar")], None, None);
-    } else {
-      // Try sending the same callout id, which should fail.
-      assert_eq!(
-        envoy_filter.send_http_callout(
-          1234,
-          &self.cluster_name,
-          vec![
-            (":path", b"/"),
-            (":method", b"GET"),
-            ("host", b"example.com"),
-          ],
-          None,
-          1000,
-        ),
-        abi::envoy_dynamic_module_type_http_callout_init_result::DuplicateCalloutId
-      );
     }
+    self.callout_handle = handle;
     envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
   }
 
   fn on_http_callout_done(
     &mut self,
     envoy_filter: &mut EHF,
-    callout_id: u32,
+    callout_id: u64,
     result: abi::envoy_dynamic_module_type_http_callout_result,
     response_headers: Option<&[(EnvoyBuffer, EnvoyBuffer)]>,
     response_body: Option<&[EnvoyBuffer]>,
@@ -732,7 +718,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HttpCalloutsFilter {
       result,
       envoy_dynamic_module_type_http_callout_result::Success
     );
-    assert_eq!(callout_id, 1234);
+    assert_eq!(callout_id, self.callout_handle);
     assert!(response_headers.is_some());
     assert!(response_body.is_some());
     let response_headers = response_headers.unwrap();
@@ -1246,7 +1232,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for HttpStreamBasicConfig {
   fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
     Box::new(HttpStreamBasicFilter {
       cluster_name: self.cluster_name.clone(),
-      stream_handle: std::ptr::null_mut(),
+      stream_handle: 0,
       received_headers: false,
       received_data: false,
       stream_completed: false,
@@ -1256,7 +1242,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for HttpStreamBasicConfig {
 
 struct HttpStreamBasicFilter {
   cluster_name: String,
-  stream_handle: envoy_dynamic_module_type_http_stream_envoy_ptr,
+  stream_handle: u64,
   received_headers: bool,
   received_data: bool,
   stream_completed: bool,
@@ -1298,7 +1284,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HttpStreamBasicFilter {
   fn on_http_stream_headers(
     &mut self,
     _envoy_filter: &mut EHF,
-    stream_handle: envoy_dynamic_module_type_http_stream_envoy_ptr,
+    stream_handle: u64,
     response_headers: &[(EnvoyBuffer, EnvoyBuffer)],
     _end_stream: bool,
   ) {
@@ -1319,7 +1305,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HttpStreamBasicFilter {
   fn on_http_stream_data(
     &mut self,
     _envoy_filter: &mut EHF,
-    stream_handle: envoy_dynamic_module_type_http_stream_envoy_ptr,
+    stream_handle: u64,
     _response_data: &[EnvoyBuffer],
     _end_stream: bool,
   ) {
@@ -1327,11 +1313,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HttpStreamBasicFilter {
     self.received_data = true;
   }
 
-  fn on_http_stream_complete(
-    &mut self,
-    envoy_filter: &mut EHF,
-    stream_handle: envoy_dynamic_module_type_http_stream_envoy_ptr,
-  ) {
+  fn on_http_stream_complete(&mut self, envoy_filter: &mut EHF, stream_handle: u64) {
     assert_eq!(stream_handle, self.stream_handle);
     self.stream_completed = true;
 
@@ -1361,7 +1343,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for HttpStreamBidirectionalConf
   fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
     Box::new(HttpStreamBidirectionalFilter {
       cluster_name: self.cluster_name.clone(),
-      stream_handle: std::ptr::null_mut(),
+      stream_handle: 0,
       data_chunks_sent: 0,
       trailers_sent: false,
       received_headers: false,
@@ -1374,7 +1356,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for HttpStreamBidirectionalConf
 
 struct HttpStreamBidirectionalFilter {
   cluster_name: String,
-  stream_handle: envoy_dynamic_module_type_http_stream_envoy_ptr,
+  stream_handle: u64,
   data_chunks_sent: usize,
   trailers_sent: bool,
   received_headers: bool,
@@ -1430,7 +1412,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HttpStreamBidirectionalFilter {
   fn on_http_stream_headers(
     &mut self,
     _envoy_filter: &mut EHF,
-    stream_handle: envoy_dynamic_module_type_http_stream_envoy_ptr,
+    stream_handle: u64,
     _response_headers: &[(EnvoyBuffer, EnvoyBuffer)],
     _end_stream: bool,
   ) {
@@ -1441,7 +1423,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HttpStreamBidirectionalFilter {
   fn on_http_stream_data(
     &mut self,
     _envoy_filter: &mut EHF,
-    stream_handle: envoy_dynamic_module_type_http_stream_envoy_ptr,
+    stream_handle: u64,
     _response_data: &[EnvoyBuffer],
     _end_stream: bool,
   ) {
@@ -1452,18 +1434,14 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HttpStreamBidirectionalFilter {
   fn on_http_stream_trailers(
     &mut self,
     _envoy_filter: &mut EHF,
-    stream_handle: envoy_dynamic_module_type_http_stream_envoy_ptr,
+    stream_handle: u64,
     _response_trailers: &[(EnvoyBuffer, EnvoyBuffer)],
   ) {
     assert_eq!(stream_handle, self.stream_handle);
     self.received_trailers = true;
   }
 
-  fn on_http_stream_complete(
-    &mut self,
-    envoy_filter: &mut EHF,
-    stream_handle: envoy_dynamic_module_type_http_stream_envoy_ptr,
-  ) {
+  fn on_http_stream_complete(&mut self, envoy_filter: &mut EHF, stream_handle: u64) {
     assert_eq!(stream_handle, self.stream_handle);
     self.stream_completed = true;
 
@@ -1505,14 +1483,14 @@ impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for UpstreamResetConfig {
   fn new_http_filter(&self, _envoy_filter_config: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
     Box::new(UpstreamResetFilter {
       cluster_name: self.cluster_name.clone(),
-      stream_handle: std::ptr::null_mut(),
+      stream_handle: 0,
     })
   }
 }
 
 struct UpstreamResetFilter {
   cluster_name: String,
-  stream_handle: envoy_dynamic_module_type_http_stream_envoy_ptr,
+  stream_handle: u64,
 }
 
 impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for UpstreamResetFilter {
@@ -1546,7 +1524,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for UpstreamResetFilter {
   fn on_http_stream_headers(
     &mut self,
     _envoy_filter: &mut EHF,
-    _stream_handle: envoy_dynamic_module_type_http_stream_envoy_ptr,
+    _stream_handle: u64,
     _headers: &[(EnvoyBuffer, EnvoyBuffer)],
     _end_stream: bool,
   ) {
@@ -1556,7 +1534,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for UpstreamResetFilter {
   fn on_http_stream_data(
     &mut self,
     _envoy_filter: &mut EHF,
-    _stream_handle: envoy_dynamic_module_type_http_stream_envoy_ptr,
+    _stream_handle: u64,
     _data: &[EnvoyBuffer],
     _end_stream: bool,
   ) {
@@ -1566,24 +1544,20 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for UpstreamResetFilter {
   fn on_http_stream_trailers(
     &mut self,
     _envoy_filter: &mut EHF,
-    _stream_handle: envoy_dynamic_module_type_http_stream_envoy_ptr,
+    _stream_handle: u64,
     _trailers: &[(EnvoyBuffer, EnvoyBuffer)],
   ) {
     // Not expected in this test.
   }
 
-  fn on_http_stream_complete(
-    &mut self,
-    _envoy_filter: &mut EHF,
-    _stream_handle: envoy_dynamic_module_type_http_stream_envoy_ptr,
-  ) {
+  fn on_http_stream_complete(&mut self, _envoy_filter: &mut EHF, _stream_handle: u64) {
     // Not expected in this test (should get reset instead).
   }
 
   fn on_http_stream_reset(
     &mut self,
     envoy_filter: &mut EHF,
-    stream_handle: envoy_dynamic_module_type_http_stream_envoy_ptr,
+    stream_handle: u64,
     _reason: envoy_dynamic_module_type_http_stream_reset_reason,
   ) {
     assert_eq!(stream_handle, self.stream_handle);

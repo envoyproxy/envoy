@@ -86,7 +86,8 @@ public:
 
   Network::UpstreamTransportSocketFactory&
   resolveTransportSocketFactory(const Network::Address::InstanceConstSharedPtr&,
-                                const envoy::config::core::v3::Metadata*) const override {
+                                const envoy::config::core::v3::Metadata*,
+                                Network::TransportSocketOptionsConstSharedPtr) const override {
     IS_ENVOY_BUG("unexpected call to resolveTransportSocketFactory");
     Network::UpstreamTransportSocketFactory* ptr = nullptr;
     return *ptr;
