@@ -10,7 +10,11 @@ fn init() -> bool {
 }
 
 /// This implements the [`envoy_proxy_dynamic_modules_rust_sdk::ServerInitFunction`] signature.
-fn init_server(_server_factory_context: abi::envoy_dynamic_module_type_server_factory_context_envoy_ptr) -> bool {
+fn init_server(
+  _server_factory_context: abi::envoy_dynamic_module_type_server_factory_context_envoy_ptr,
+) -> bool {
+  // let concurrency = unsafe { get_server_concurrency(server_factory_context) };
+  // assert_eq!(concurrency, 1);
   true
 }
 

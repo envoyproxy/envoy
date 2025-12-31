@@ -43,3 +43,21 @@ name = "http_integration_test"
 path = "http_integration_test.rs"
 crate-type = ["cdylib"]
 test = true
+
+[[example]]
+name = "server_init_fail"
+path = "server_init_fail.rs"
+crate-type = ["cdylib"]
+test = true
+
+[[example]]
+name = "init_callback"
+path = "init_callback.rs"
+crate-type = ["cdylib"]
+test = true
+
+[[example]]
+name = "init_callback_fail"
+path = "init_callback_fail.rs"
+crate-type = ["cdylib"]
+test = true

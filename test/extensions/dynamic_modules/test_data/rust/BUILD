@@ -20,3 +20,9 @@ test_program(name = "http")
 test_program(name = "http_integration_test")
 
 test_program(name = "http_stream_callouts_test")
+
+test_program(name = "server_init_fail")
+
+test_program(name = "init_callback")
+
+test_program(name = "init_callback_fail")

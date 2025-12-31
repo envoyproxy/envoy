@@ -40,6 +40,7 @@ filter_config:
   NiceMock<Server::Configuration::MockFactoryContext> context;
   Api::ApiPtr api = Api::createApiForTest();
   EXPECT_CALL(context.server_factory_context_, api()).WillRepeatedly(testing::ReturnRef(*api));
+  ON_CALL(context.server_factory_context_.options_, concurrency()).WillByDefault(testing::Return(1));
 
   Envoy::Server::Configuration::DynamicModuleConfigFactory factory;
   auto result = factory.createFilterFactoryFromProto(proto_config, "", context);
@@ -75,6 +76,7 @@ filter_name: foo
   NiceMock<Server::Configuration::MockFactoryContext> context;
   Api::ApiPtr api = Api::createApiForTest();
   EXPECT_CALL(context.server_factory_context_, api()).WillRepeatedly(testing::ReturnRef(*api));
+  ON_CALL(context.server_factory_context_.options_, concurrency()).WillByDefault(testing::Return(1));
 
   Envoy::Server::Configuration::DynamicModuleConfigFactory factory;
   auto result = factory.createFilterFactoryFromProto(proto_config, "", context);
@@ -113,6 +115,7 @@ filter_config:
   NiceMock<Server::Configuration::MockFactoryContext> context;
   Api::ApiPtr api = Api::createApiForTest();
   EXPECT_CALL(context.server_factory_context_, api()).WillRepeatedly(testing::ReturnRef(*api));
+  ON_CALL(context.server_factory_context_.options_, concurrency()).WillByDefault(testing::Return(1));
 
   Envoy::Server::Configuration::DynamicModuleConfigFactory factory;
   auto result = factory.createFilterFactoryFromProto(proto_config, "", context);
@@ -243,6 +246,7 @@ filter_config:
     envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilterPerRoute proto_config;
     TestUtility::loadFromYamlAndValidate(yaml, proto_config);
     NiceMock<Server::Configuration::MockServerFactoryContext> context;
+    ON_CALL(context.options_, concurrency()).WillByDefault(testing::Return(1));
 
     auto result = factory.createRouteSpecificFilterConfig(
         proto_config, context, ProtobufMessage::getNullValidationVisitor());

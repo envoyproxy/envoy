@@ -92,15 +92,17 @@ macro_rules! declare_init_functions {
 /// Declare the init server function for the dynamic module.
 /// The argument has [`ServerInitFunction`] type, and it is called when the dynamic module is
 /// loaded and server context is available.
-/// 
+///
 /// # Example
 ///
 /// ```
 /// use envoy_proxy_dynamic_modules_rust_sdk::*;
 ///
 /// declare_server_init_function!(my_server_init);
-/// 
-/// fn my_server_init(server_factory_context: abi::envoy_dynamic_module_type_server_factory_context_envoy_ptr) -> bool {
+///
+/// fn my_server_init(
+///   server_factory_context: abi::envoy_dynamic_module_type_server_factory_context_envoy_ptr,
+/// ) -> bool {
 ///   true
 /// }
 /// ```
@@ -108,10 +110,26 @@ macro_rules! declare_init_functions {
 macro_rules! declare_server_init_function {
   ($f:ident) => {
     #[no_mangle]
-    pub extern "C" fn envoy_dynamic_module_on_server_init(server_factory_context_ptr: abi::envoy_dynamic_module_type_server_factory_context_envoy_ptr) -> bool {
+    pub extern "C" fn envoy_dynamic_module_on_server_init(
+      server_factory_context_ptr: abi::envoy_dynamic_module_type_server_factory_context_envoy_ptr,
+    ) -> bool {
       ($f)(server_factory_context_ptr)
     }
   };
+}
+
+/// Get the concurrency from the server context options.
+/// # Safety
+///
+/// * `server_factory_context_ptr` must be a valid handle passed to [`ServerInitFunction`].
+pub unsafe fn get_server_concurrency(
+  server_factory_context_ptr: abi::envoy_dynamic_module_type_server_factory_context_envoy_ptr,
+) -> u32 {
+  unsafe {
+    abi::envoy_dynamic_module_callback_server_factory_context_get_concurrency(
+      server_factory_context_ptr,
+    )
+  }
 }
 
 /// Log a trace message to Envoy's logging system with [dynamic_modules] Id. Messages won't be
@@ -228,9 +246,7 @@ pub type ProgramInitFunction = fn() -> bool;
 /// This is called when the dynamic module is loaded and server context is available.
 /// It must return true on success, and false on failure. When it returns false, the server
 /// initialization will fail.
-pub type ServerInitFunction<ESC> = fn(
-  envoy_server_factory_context: &mut ESC,
-) -> bool;
+pub type ServerInitFunction<ESC> = fn(envoy_server_factory_context: &mut ESC) -> bool;
 
 /// The function signature for the new HTTP filter configuration function.
 ///
@@ -2492,12 +2508,8 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     Ok(())
   }
 
-  fn get_worker_index(
-    &self,
-  ) -> u32 {
-    unsafe {
-      abi::envoy_dynamic_module_callback_http_filter_get_worker_index(self.raw_ptr)
-    }
+  fn get_worker_index(&self) -> u32 {
+    unsafe { abi::envoy_dynamic_module_callback_http_filter_get_worker_index(self.raw_ptr) }
   }
 }
 

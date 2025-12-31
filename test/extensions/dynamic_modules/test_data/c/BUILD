@@ -48,3 +48,9 @@ test_program(name = "no_http_filter_response_trailers")
 test_program(name = "program_global")
 
 test_program(name = "program_child")
+
+test_program(name = "server_init_fail")
+
+test_program(name = "init_callback")
+
+test_program(name = "init_callback_fail")
