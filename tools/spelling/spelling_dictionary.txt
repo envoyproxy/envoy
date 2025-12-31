@@ -1621,3 +1621,10 @@ RSP
 EWMA
 ja3
 ja4
+HBONE
+waypoint
+ztunnel
+UID
+UIDs
+configurability
+WDS

@@ -1,0 +1,83 @@
+syntax = "proto3";
+
+package io.istio.http.peer_metadata;
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.io.istio.http.peer_metadata";
+option java_outer_classname = "PeerMetadataProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/contrib/io/istio/http/peer_metadata";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Peer metadata HTTP filter]
+//
+// Peer metadata HTTP filter for deriving and propagating peer telemetry attributes.
+// [#extension: envoy.filters.http.peer_metadata]
+
+// Peer metadata provider filter. This filter encapsulates the discovery of the
+// peer telemetry attributes for consumption by the telemetry filters.
+// [#next-free-field: 7]
+message Config {
+  // DEPRECATED.
+  // This method uses `baggage` header encoding.
+  message Baggage {
+  }
+
+  // This method uses the workload metadata xDS. Requires that the bootstrap extension is enabled.
+  // For downstream discovery, the remote address is the lookup key in xDS.
+  // For upstream discovery:
+  //
+  // * If the upstream host address is an IP, this IP is used as the lookup key;
+  // * If the upstream host address is internal, uses the
+  //   "filter_metadata.tunnel.destination" dynamic metadata value as the lookup key.
+  //
+  message WorkloadDiscovery {
+  }
+
+  // This method uses Istio HTTP metadata exchange headers, e.g. `x-envoy-peer-metadata`. Removes these headers if found.
+  message IstioHeaders {
+    // Strip x-envoy-peer-metadata and x-envoy-peer-metadata-id headers on HTTP requests to services outside the mesh.
+    // Detects upstream clusters with `istio` and `external` filter metadata fields
+    bool skip_external_clusters = 1;
+  }
+
+  // An exhaustive list of the derivation methods.
+  message DiscoveryMethod {
+    oneof method_specifier {
+      Baggage baggage = 1;
+
+      WorkloadDiscovery workload_discovery = 2;
+
+      IstioHeaders istio_headers = 3;
+    }
+  }
+
+  // An exhaustive list of the metadata propagation methods.
+  message PropagationMethod {
+    oneof method_specifier {
+      IstioHeaders istio_headers = 1;
+    }
+  }
+
+  // The order of the derivation of the downstream peer metadata, in the precedence order.
+  // First successful lookup wins.
+  repeated DiscoveryMethod downstream_discovery = 1;
+
+  // The order of the derivation of the upstream peer metadata, in the precedence order.
+  // First successful lookup wins.
+  repeated DiscoveryMethod upstream_discovery = 2;
+
+  // Downstream injection of the metadata via a response header.
+  repeated PropagationMethod downstream_propagation = 3;
+
+  // Upstream injection of the metadata via a request header.
+  repeated PropagationMethod upstream_propagation = 4;
+
+  // True to enable sharing with the upstream.
+  bool shared_with_upstream = 5;
+
+  // Additional labels to be added to the peer metadata to help your understand the traffic.
+  // e.g. ``role``, ``location`` etc.
+  repeated string additional_labels = 6;
+}

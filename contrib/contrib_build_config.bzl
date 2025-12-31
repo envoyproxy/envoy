@@ -16,6 +16,9 @@ CONTRIB_EXTENSIONS = {
     "envoy.filters.http.language":                              "//contrib/language/filters/http/source:config_lib",
     "envoy.filters.http.peak_ewma":                             "//contrib/peak_ewma/filters/http/source:config",
     "envoy.filters.http.sxg":                                   "//contrib/sxg/filters/http/source:config",
+    "envoy.filters.http.peer_metadata":                         "//contrib/istio/filters/http/peer_metadata/source:config",
+    "envoy.filters.http.istio_stats":                           "//contrib/istio/filters/http/istio_stats/source:istio_stats",
+    "envoy.filters.http.alpn":                                  "//contrib/istio/filters/http/alpn/source:config_lib",
 
     #
     # Network filters
@@ -28,6 +31,7 @@ CONTRIB_EXTENSIONS = {
     "envoy.filters.network.postgres_proxy":                     "//contrib/postgres_proxy/filters/network/source:config",
     "envoy.filters.network.rocketmq_proxy":                     "//contrib/rocketmq_proxy/filters/network/source:config",
     "envoy.filters.network.golang":                             "//contrib/golang/filters/network/source:config",
+    "envoy.filters.network.metadata_exchange":                  "//contrib/istio/filters/network/metadata_exchange/source:config",
 
     #
     # Listener filters

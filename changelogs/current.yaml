@@ -640,6 +640,9 @@ new_features:
 - area: access_log
   change: |
     Added ``LISTENER_FILTER_CHAIN`` to the ``METADATA`` command operator to allow access to listener filter chain metadata.
+- area: filters
+  change: |
+    Migrated all extensions in the ``istio/proxy`` to the main Envoy repository's contrib directory.
 - area: ext_proc
   change: |
     Added per HTTP event processing effects in the ``ExtProcLoggingInfo`` filter state. This new data tracks
