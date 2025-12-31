@@ -183,10 +183,8 @@ protected:
   }
 
   void onIdleTimeout() {
-    if (connected_) {
-      host_->cluster().trafficStats()->upstream_cx_idle_timeout_.inc();
-      close();
-    }
+    host_->cluster().trafficStats()->upstream_cx_idle_timeout_.inc();
+    close();
   }
 
   void disableIdleTimer() {
@@ -196,6 +194,9 @@ protected:
   }
 
   void enableIdleTimer() {
+    if (!connected_) {
+      return;
+    }
     if (idle_timer_ != nullptr) {
       idle_timer_->enableTimer(idle_timeout_.value());
     }
