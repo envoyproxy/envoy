@@ -1577,7 +1577,6 @@ Current supported substitution commands include:
     .. warning::
 
       This operator is deprecated. Please use :ref:`PATH <config_access_log_format_path>` instead.
-      See :ref:`access log formats <config_access_log_format>` for more details.
 
   TCP/UDP
     Not implemented. It will appear as ``"-"`` in the access logs.
