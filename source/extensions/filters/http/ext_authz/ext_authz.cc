@@ -313,7 +313,6 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
   }
 
   // Check if we need to use a per-route service override (gRPC or HTTP).
-  Filters::Common::ExtAuthz::Client* client_to_use = client_.get();
   if (maybe_merged_per_route_config) {
     if (maybe_merged_per_route_config->grpcService().has_value()) {
       const auto& grpc_service = maybe_merged_per_route_config->grpcService().value();
@@ -321,9 +320,9 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
                        *decoder_callbacks_);
 
       // Create a new gRPC client for this route.
-      per_route_client_ = createPerRouteGrpcClient(grpc_service);
-      if (per_route_client_ != nullptr) {
-        client_to_use = per_route_client_.get();
+      auto per_route_client = createPerRouteGrpcClient(grpc_service);
+      if (per_route_client != nullptr) {
+        client_ = std::move(per_route_client);
         ENVOY_STREAM_LOG(debug, "ext_authz filter: successfully created per-route gRPC client.",
                          *decoder_callbacks_);
       } else {
@@ -338,9 +337,9 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
                        *decoder_callbacks_);
 
       // Create a new HTTP client for this route.
-      per_route_client_ = createPerRouteHttpClient(http_service);
-      if (per_route_client_ != nullptr) {
-        client_to_use = per_route_client_.get();
+      auto per_route_client = createPerRouteHttpClient(http_service);
+      if (per_route_client != nullptr) {
+        client_ = std::move(per_route_client);
         ENVOY_STREAM_LOG(debug, "ext_authz filter: successfully created per-route HTTP client.",
                          *decoder_callbacks_);
       } else {
@@ -386,8 +385,8 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
                                                // going to invoke check call.
   cluster_ = decoder_callbacks_->clusterInfo();
   initiating_call_ = true;
-  client_to_use->check(*this, check_request_, decoder_callbacks_->activeSpan(),
-                       decoder_callbacks_->streamInfo());
+  client_->check(*this, check_request_, decoder_callbacks_->activeSpan(),
+                 decoder_callbacks_->streamInfo());
   initiating_call_ = false;
 }
 

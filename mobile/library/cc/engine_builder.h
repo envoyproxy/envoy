@@ -157,7 +157,11 @@ public:
   EngineBuilder& enableBrotliDecompression(bool brotli_decompression_on);
   EngineBuilder& enableSocketTagging(bool socket_tagging_on);
   EngineBuilder& enableHttp3(bool http3_on);
+  EngineBuilder& addQuicConnectionOption(std::string option);
+  EngineBuilder& addQuicClientConnectionOption(std::string option);
+  // Deprecated, use addQuicConnectionOption() instead.
   EngineBuilder& setHttp3ConnectionOptions(std::string options);
+  // Deprecated, use addQuicClientConnectionOption() instead.
   EngineBuilder& setHttp3ClientConnectionOptions(std::string options);
   EngineBuilder& addQuicHint(std::string host, int port);
   EngineBuilder& addQuicCanonicalSuffix(std::string suffix);
@@ -304,6 +308,9 @@ private:
   bool enable_http3_ = true;
   std::string http3_connection_options_ = "";
   std::string http3_client_connection_options_ = "";
+  // EVMB is to distinguish Envoy Mobile client connections.
+  std::vector<std::string> quic_connection_options_{"AKDU", "BWRS", "5RTO", "EVMB"};
+  std::vector<std::string> quic_client_connection_options_;
   std::vector<std::pair<std::string, int>> quic_hints_;
   std::vector<std::string> quic_suffixes_;
   int num_timeouts_to_trigger_port_migration_ = 0;

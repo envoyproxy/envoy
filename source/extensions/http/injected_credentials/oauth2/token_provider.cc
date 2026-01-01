@@ -29,6 +29,18 @@ std::string oauthScopesList(const Protobuf::RepeatedPtrField<std::string>& auth_
   }
   return absl::StrJoin(scopes, " ");
 }
+
+// Transforms the proto list of 'endpoint_params' into a map of string key-value pairs.
+std::map<std::string, std::string> endpointParamsMap(
+    const Protobuf::RepeatedPtrField<
+        envoy::extensions::http::injected_credentials::oauth2::v3::OAuth2::EndpointParameter>&
+        endpoint_params_protos) {
+  std::map<std::string, std::string> params;
+  for (const auto& param : endpoint_params_protos) {
+    params[param.name()] = param.value();
+  }
+  return params;
+}
 } // namespace
 
 // TokenProvider Constructor
@@ -38,7 +50,8 @@ TokenProvider::TokenProvider(Common::SecretReaderConstSharedPtr secret_reader,
                              const std::string& stats_prefix, Stats::Scope& scope)
     : secret_reader_(secret_reader), tls_(tls.allocateSlot()),
       client_id_(proto_config.client_credentials().client_id()),
-      oauth_scopes_(oauthScopesList(proto_config.scopes())), dispatcher_(&dispatcher),
+      oauth_scopes_(oauthScopesList(proto_config.scopes())),
+      endpoint_params_(endpointParamsMap(proto_config.endpoint_params())), dispatcher_(&dispatcher),
       stats_(generateStats(stats_prefix + "oauth2.", scope)),
       retry_interval_(
           proto_config.token_fetch_retry_interval().seconds() > 0
@@ -69,8 +82,8 @@ void TokenProvider::asyncGetAccessToken() {
     stats_.token_fetch_failed_on_client_secret_.inc();
     return;
   }
-  auto result =
-      oauth2_client_->asyncGetAccessToken(client_id_, secret_reader_->credential(), oauth_scopes_);
+  auto result = oauth2_client_->asyncGetAccessToken(client_id_, secret_reader_->credential(),
+                                                    oauth_scopes_, endpoint_params_);
   if (result == OAuth2Client::GetTokenResult::NotDispatchedAlreadyInFlight) {
     return;
   }

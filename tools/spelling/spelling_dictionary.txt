@@ -1013,6 +1013,7 @@ lowp
 lstat
 ltrim
 lua
+luajit
 lyft
 maglev
 malloc
@@ -1618,3 +1619,12 @@ NXDOMAIN
 DNAT
 RSP
 EWMA
+ja3
+ja4
+HBONE
+waypoint
+ztunnel
+UID
+UIDs
+configurability
+WDS

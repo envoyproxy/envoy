@@ -124,10 +124,13 @@ public:
     return logical_host_->lastHcPassTime();
   }
   uint32_t priority() const override { return logical_host_->priority(); }
-  Network::UpstreamTransportSocketFactory&
-  resolveTransportSocketFactory(const Network::Address::InstanceConstSharedPtr& dest_address,
-                                const envoy::config::core::v3::Metadata* metadata) const override {
-    return logical_host_->resolveTransportSocketFactory(dest_address, metadata);
+  Network::UpstreamTransportSocketFactory& resolveTransportSocketFactory(
+      const Network::Address::InstanceConstSharedPtr& dest_address,
+      const envoy::config::core::v3::Metadata* metadata,
+      Network::TransportSocketOptionsConstSharedPtr transport_socket_options =
+          nullptr) const override {
+    return logical_host_->resolveTransportSocketFactory(dest_address, metadata,
+                                                        transport_socket_options);
   }
   OptRef<HostLbPolicyData> lbPolicyData() const override { return logical_host_->lbPolicyData(); }
 

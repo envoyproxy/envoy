@@ -225,7 +225,6 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeaderCallbacksFilter {
     assert_eq!(all_headers[4].0.as_slice(), b"multi");
     assert_eq!(all_headers[4].1.as_slice(), b"value3");
 
-
     let downstream_port =
       envoy_filter.get_attribute_int(abi::envoy_dynamic_module_type_attribute_id::SourcePort);
     assert_eq!(downstream_port, Some(1234));
@@ -297,7 +296,6 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeaderCallbacksFilter {
     assert_eq!(all_trailers[3].1.as_slice(), b"value");
     assert_eq!(all_trailers[4].0.as_slice(), b"multi");
     assert_eq!(all_trailers[4].1.as_slice(), b"value3");
-
 
     abi::envoy_dynamic_module_type_on_http_filter_request_trailers_status::Continue
   }
@@ -409,7 +407,6 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeaderCallbacksFilter {
     assert_eq!(all_trailers[3].1.as_slice(), b"value");
     assert_eq!(all_trailers[4].0.as_slice(), b"multi");
     assert_eq!(all_trailers[4].1.as_slice(), b"value3");
-
 
     abi::envoy_dynamic_module_type_on_http_filter_response_trailers_status::Continue
   }

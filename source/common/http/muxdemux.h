@@ -112,6 +112,7 @@ public:
   struct Callbacks {
     std::string cluster_name;
     std::weak_ptr<AsyncClient::StreamCallbacks> callbacks;
+    absl::optional<AsyncClient::StreamOptions> options;
   };
 
   static std::shared_ptr<MuxDemux> create(Server::Configuration::FactoryContext& context) {

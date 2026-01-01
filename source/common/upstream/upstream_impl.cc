@@ -85,16 +85,6 @@ std::string addressToString(Network::Address::InstanceConstSharedPtr address) {
   return address->asString();
 }
 
-Network::TcpKeepaliveConfig
-parseTcpKeepaliveConfig(const envoy::config::cluster::v3::Cluster& config) {
-  const envoy::config::core::v3::TcpKeepalive& options =
-      config.upstream_connection_options().tcp_keepalive();
-  return Network::TcpKeepaliveConfig{
-      PROTOBUF_GET_WRAPPED_OR_DEFAULT(options, keepalive_probes, absl::optional<uint32_t>()),
-      PROTOBUF_GET_WRAPPED_OR_DEFAULT(options, keepalive_time, absl::optional<uint32_t>()),
-      PROTOBUF_GET_WRAPPED_OR_DEFAULT(options, keepalive_interval, absl::optional<uint32_t>())};
-}
-
 absl::StatusOr<ProtocolOptionsConfigConstSharedPtr>
 createProtocolOptionsConfig(const std::string& name, const Protobuf::Any& typed_config,
                             Server::Configuration::ProtocolOptionsFactoryContext& factory_context) {
@@ -210,9 +200,10 @@ buildBaseSocketOptions(const envoy::config::cluster::v3::Cluster& cluster_config
                                    Network::SocketOptionFactory::buildIpFreebindOptions());
   }
   if (cluster_config.upstream_connection_options().has_tcp_keepalive()) {
-    Network::Socket::appendOptions(base_options,
-                                   Network::SocketOptionFactory::buildTcpKeepaliveOptions(
-                                       parseTcpKeepaliveConfig(cluster_config)));
+    Network::Socket::appendOptions(
+        base_options,
+        Network::SocketOptionFactory::buildTcpKeepaliveOptions(Network::parseTcpKeepaliveConfig(
+            cluster_config.upstream_connection_options().tcp_keepalive())));
   }
 
   return base_options;
@@ -517,9 +508,10 @@ HostDescription::SharedConstAddressVector HostDescriptionImplBase::makeAddressLi
 
 Network::UpstreamTransportSocketFactory& HostDescriptionImplBase::resolveTransportSocketFactory(
     const Network::Address::InstanceConstSharedPtr& dest_address,
-    const envoy::config::core::v3::Metadata* endpoint_metadata) const {
-  auto match =
-      cluster_->transportSocketMatcher().resolve(endpoint_metadata, locality_metadata_.get());
+    const envoy::config::core::v3::Metadata* endpoint_metadata,
+    Network::TransportSocketOptionsConstSharedPtr transport_socket_options) const {
+  auto match = cluster_->transportSocketMatcher().resolve(
+      endpoint_metadata, locality_metadata_.get(), transport_socket_options);
   match.stats_.total_match_count_.inc();
   ENVOY_LOG(debug, "transport socket match, socket {} selected for host with address {}",
             match.name_, dest_address ? dest_address->asString() : "empty");
@@ -530,9 +522,17 @@ Network::UpstreamTransportSocketFactory& HostDescriptionImplBase::resolveTranspo
 Host::CreateConnectionData HostImplBase::createConnection(
     Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
     Network::TransportSocketOptionsConstSharedPtr transport_socket_options) const {
-  return createConnection(dispatcher, cluster(), address(), addressListOrNull(),
-                          transportSocketFactory(), options, transport_socket_options,
-                          shared_from_this());
+  const bool needs_per_connection_resolution =
+      cluster().transportSocketMatcher().usesFilterState() && transport_socket_options &&
+      !transport_socket_options->downstreamSharedFilterStateObjects().empty();
+
+  Network::UpstreamTransportSocketFactory& factory =
+      needs_per_connection_resolution
+          ? resolveTransportSocketFactory(address(), metadata().get(), transport_socket_options)
+          : transportSocketFactory();
+
+  return createConnection(dispatcher, cluster(), address(), addressListOrNull(), factory, options,
+                          transport_socket_options, shared_from_this());
 }
 
 void HostImplBase::setEdsHealthFlag(envoy::config::core::v3::HealthStatus health_status) {
@@ -565,8 +565,9 @@ Host::CreateConnectionData HostImplBase::createHealthCheckConnection(
     Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
     const envoy::config::core::v3::Metadata* metadata) const {
   Network::UpstreamTransportSocketFactory& factory =
-      (metadata != nullptr) ? resolveTransportSocketFactory(healthCheckAddress(), metadata)
-                            : transportSocketFactory();
+      (metadata != nullptr)
+          ? resolveTransportSocketFactory(healthCheckAddress(), metadata, transport_socket_options)
+          : transportSocketFactory();
   return createConnection(dispatcher, cluster(), healthCheckAddress(), {}, factory, nullptr,
                           transport_socket_options, shared_from_this());
 }

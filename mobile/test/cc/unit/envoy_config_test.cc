@@ -65,8 +65,8 @@ bool socketAddressesEqual(
 
 TEST(TestConfig, ConfigIsApplied) {
   EngineBuilder engine_builder;
-  engine_builder.setHttp3ConnectionOptions("5RTO")
-      .setHttp3ClientConnectionOptions("MPQC")
+  engine_builder.addQuicConnectionOption("10AF")
+      .addQuicConnectionOption("MPQC")
       .addQuicHint("www.abc.com", 443)
       .addQuicHint("www.def.com", 443)
       .addQuicCanonicalSuffix(".opq.com")
@@ -98,8 +98,7 @@ TEST(TestConfig, ConfigIsApplied) {
       "dns_failure_refresh_rate { base_interval { seconds: 789 } max_interval { seconds: 987 } }",
       "connection_idle_interval { nanos: 222000000 }",
       "connection_keepalive { timeout { seconds: 333 }",
-      "connection_options: \"5RTO\"",
-      "client_connection_options: \"MPQC\"",
+      "connection_options: \"AKDU,BWRS,5RTO,EVMB,10AF,MPQC\"",
       "hostname: \"www.abc.com\"",
       "hostname: \"www.def.com\"",
       "canonical_suffixes: \".opq.com\"",

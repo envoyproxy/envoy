@@ -1,0 +1,108 @@
+syntax = "proto3";
+
+package stats;
+
+import "google/protobuf/duration.proto";
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.stats";
+option java_outer_classname = "IstioStatsProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/contrib/stats";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Istio stats HTTP filter]
+//
+// Istio stats HTTP filter for collecting and reporting metrics.
+// [#extension: envoy.filters.http.istio_stats]
+
+enum MetricType {
+  COUNTER = 0;
+  GAUGE = 1;
+  HISTOGRAM = 2;
+}
+
+// Specifies the proxy deployment type.
+enum Reporter {
+  // Default value is inferred from the listener direction, as either client or
+  // server sidecar.
+  UNSPECIFIED = 0;
+
+  // Shared server gateway, e.g. "waypoint".
+  SERVER_GATEWAY = 1;
+}
+
+// Metric instance configuration overrides.
+// The metric value and the metric type are optional and permit changing the
+// reported value for an existing metric.
+// The standard metrics are optimized and reported through a "fast-path".
+// The customizations allow full configurability, at the cost of a "slower"
+// path.
+// [#next-free-field: 6]
+message MetricConfig {
+  // (Optional) Collection of tag names and tag expressions to include in the
+  // metric. Conflicts are resolved by the tag name by overriding previously
+  // supplied values.
+  map<string, string> dimensions = 1;
+
+  // (Optional) Metric name to restrict the override to a metric. If not
+  // specified, applies to all.
+  string name = 2;
+
+  // (Optional) A list of tags to remove.
+  repeated string tags_to_remove = 3;
+
+  // NOT IMPLEMENTED. (Optional) Conditional enabling the override.
+  string match = 4;
+
+  // (Optional) If this is set to true, the metric(s) selected by this
+  // configuration will not be generated or reported.
+  bool drop = 5;
+}
+
+message MetricDefinition {
+  // Metric name.
+  string name = 1;
+
+  // Metric value expression.
+  string value = 2;
+
+  // Metric type.
+  MetricType type = 3;
+}
+
+// [#next-free-field: 13]
+message PluginConfig {
+  reserved 1, 2, 3, 4, 5;
+
+  reserved "debug", "max_peer_cache_size", "stat_prefix", "field_separator", "value_separator";
+
+  // Optional: Disable using host header as a fallback if destination service is
+  // not available from the control plane. Disable the fallback if the host
+  // header originates outsides the mesh, like at ingress.
+  bool disable_host_header_fallback = 6;
+
+  // Optional. Allows configuration of the time between calls out to for TCP
+  // metrics reporting. The default duration is `5s`.
+  google.protobuf.Duration tcp_reporting_duration = 7;
+
+  // Metric overrides.
+  repeated MetricConfig metrics = 8;
+
+  // Metric definitions.
+  repeated MetricDefinition definitions = 9;
+
+  // Proxy deployment type.
+  Reporter reporter = 10;
+
+  // Metric scope rotation interval. Set to 0 to disable the metric scope rotation.
+  // Defaults to 0.
+  // DEPRECATED.
+  google.protobuf.Duration rotation_interval = 11;
+
+  // Metric expiry graceful deletion interval. No-op if the metric rotation is disabled.
+  // Defaults to 5m. Must be >=1s.
+  // DEPRECATED.
+  google.protobuf.Duration graceful_deletion_interval = 12;
+}

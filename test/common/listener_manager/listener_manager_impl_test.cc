@@ -6413,6 +6413,190 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, LiteralSockoptListenerEnabled) {
   EXPECT_EQ(1U, manager_->listeners().size());
 }
 
+TEST_P(ListenerManagerImplWithRealFiltersTest, ListenerKeepaliveEnabled) {
+  if (!ENVOY_SOCKET_SO_KEEPALIVE.hasValue()) {
+    GTEST_SKIP() << "Keepalive is not supported on this platform.";
+  }
+
+  const envoy::config::listener::v3::Listener listener = parseListenerFromV3Yaml(R"EOF(
+    name: SockoptsListener
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1111 }
+    additional_addresses:
+    - address:
+        socket_address: { address: 127.0.0.1, port_value: 2222 }
+    enable_reuse_port: false
+    filter_chains:
+    - filters: []
+      name: foo
+    tcp_keepalive: {}
+  )EOF");
+
+  // Second address.
+  expectCreateListenSocket(envoy::config::core::v3::SocketOption::STATE_PREBIND,
+                           /* expected_num_options */ 1,
+                           ListenerComponentFactory::BindType::NoReusePort);
+
+  // First address.
+  expectCreateListenSocket(envoy::config::core::v3::SocketOption::STATE_PREBIND,
+                           /* expected_num_options */ 1,
+                           ListenerComponentFactory::BindType::NoReusePort);
+
+  expectSetsockopt(/* expected_sockopt_level */ ENVOY_SOCKET_SO_KEEPALIVE.level(),
+                   /* expected_sockopt_name */ ENVOY_SOCKET_SO_KEEPALIVE.option(),
+                   /* expected_value */ 1,
+                   /* expected_num_calls */ 2);
+  addOrUpdateListener(listener);
+  EXPECT_EQ(1U, manager_->listeners().size());
+}
+
+TEST_P(ListenerManagerImplWithRealFiltersTest, ListenerKeepaliveEnabledWithOpts) {
+  if (!ENVOY_SOCKET_SO_KEEPALIVE.hasValue()) {
+    GTEST_SKIP() << "Keepalive is not supported on this platform.";
+  }
+
+  const envoy::config::listener::v3::Listener listener = parseListenerFromV3Yaml(R"EOF(
+    name: SockoptsListener
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1111 }
+    additional_addresses:
+    - address:
+        socket_address: { address: 127.0.0.1, port_value: 2222 }
+    enable_reuse_port: false
+    filter_chains:
+    - filters: []
+      name: foo
+    tcp_keepalive:
+      keepalive_probes: 3
+      keepalive_time: 4
+      keepalive_interval: 5
+  )EOF");
+
+  // Second address.
+  expectCreateListenSocket(envoy::config::core::v3::SocketOption::STATE_PREBIND,
+                           /* expected_num_options */ 4,
+                           ListenerComponentFactory::BindType::NoReusePort);
+
+  // First address.
+  expectCreateListenSocket(envoy::config::core::v3::SocketOption::STATE_PREBIND,
+                           /* expected_num_options */ 4,
+                           ListenerComponentFactory::BindType::NoReusePort);
+
+  expectSetsockopt(/* expected_sockopt_level */ ENVOY_SOCKET_SO_KEEPALIVE.level(),
+                   /* expected_sockopt_name */ ENVOY_SOCKET_SO_KEEPALIVE.option(),
+                   /* expected_value */ 1,
+                   /* expected_num_calls */ 2);
+
+  expectSetsockopt(/* expected_sockopt_level */ ENVOY_SOCKET_TCP_KEEPCNT.level(),
+                   /* expected_sockopt_name */ ENVOY_SOCKET_TCP_KEEPCNT.option(),
+                   /* expected_value */ 3,
+                   /* expected_num_calls */ 2);
+  expectSetsockopt(/* expected_sockopt_level */ ENVOY_SOCKET_TCP_KEEPIDLE.level(),
+                   /* expected_sockopt_name */ ENVOY_SOCKET_TCP_KEEPIDLE.option(),
+                   /* expected_value */ 4,
+                   /* expected_num_calls */ 2);
+  expectSetsockopt(/* expected_sockopt_level */ ENVOY_SOCKET_TCP_KEEPINTVL.level(),
+                   /* expected_sockopt_name */ ENVOY_SOCKET_TCP_KEEPINTVL.option(),
+                   /* expected_value */ 5,
+                   /* expected_num_calls */ 2);
+  addOrUpdateListener(listener);
+  EXPECT_EQ(1U, manager_->listeners().size());
+}
+
+TEST_P(ListenerManagerImplWithRealFiltersTest, ListenerKeepaliveOnAdditionalAddressEnabled) {
+  if (!ENVOY_SOCKET_SO_KEEPALIVE.hasValue()) {
+    GTEST_SKIP() << "Keepalive is not supported on this platform.";
+  }
+
+  const envoy::config::listener::v3::Listener listener = parseListenerFromV3Yaml(R"EOF(
+    name: SockoptsListener
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1111 }
+    additional_addresses:
+    - address:
+        socket_address: { address: 127.0.0.1, port_value: 2222 }
+      tcp_keepalive:
+        keepalive_probes: 3
+        keepalive_time: 4
+        keepalive_interval: 5
+    enable_reuse_port: false
+    filter_chains:
+    - filters: []
+      name: foo
+    tcp_keepalive: {}
+  )EOF");
+
+  // Second address.
+  expectCreateListenSocket(envoy::config::core::v3::SocketOption::STATE_PREBIND,
+                           /* expected_num_options */ 4,
+                           ListenerComponentFactory::BindType::NoReusePort);
+
+  // First address.
+  expectCreateListenSocket(envoy::config::core::v3::SocketOption::STATE_PREBIND,
+                           /* expected_num_options */ 1,
+                           ListenerComponentFactory::BindType::NoReusePort);
+
+  // First & Second address option.
+  expectSetsockopt(/* expected_sockopt_level */ ENVOY_SOCKET_SO_KEEPALIVE.level(),
+                   /* expected_sockopt_name */ ENVOY_SOCKET_SO_KEEPALIVE.option(),
+                   /* expected_value */ 1,
+                   /* expected_num_calls */ 2);
+
+  // Second address options.
+  expectSetsockopt(/* expected_sockopt_level */ ENVOY_SOCKET_TCP_KEEPCNT.level(),
+                   /* expected_sockopt_name */ ENVOY_SOCKET_TCP_KEEPCNT.option(),
+                   /* expected_value */ 3);
+  expectSetsockopt(/* expected_sockopt_level */ ENVOY_SOCKET_TCP_KEEPIDLE.level(),
+                   /* expected_sockopt_name */ ENVOY_SOCKET_TCP_KEEPIDLE.option(),
+                   /* expected_value */ 4);
+  expectSetsockopt(/* expected_sockopt_level */ ENVOY_SOCKET_TCP_KEEPINTVL.level(),
+                   /* expected_sockopt_name */ ENVOY_SOCKET_TCP_KEEPINTVL.option(),
+                   /* expected_value */ 5);
+  addOrUpdateListener(listener);
+  EXPECT_EQ(1U, manager_->listeners().size());
+}
+
+TEST_P(ListenerManagerImplWithRealFiltersTest, ListenerKeepaliveAdditionalAddressOverrideDisable) {
+  if (!ENVOY_SOCKET_SO_KEEPALIVE.hasValue()) {
+    GTEST_SKIP() << "Keepalive is not supported on this platform.";
+  }
+
+  const envoy::config::listener::v3::Listener listener = parseListenerFromV3Yaml(R"EOF(
+    name: SockoptsListener
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1111 }
+    additional_addresses:
+    - address:
+        socket_address: { address: 127.0.0.1, port_value: 2222 }
+      tcp_keepalive:
+        keepalive_probes: 0
+    enable_reuse_port: false
+    filter_chains:
+    - filters: []
+      name: foo
+    tcp_keepalive: {}
+  )EOF");
+
+  // Second address.
+  expectCreateListenSocket(envoy::config::core::v3::SocketOption::STATE_PREBIND,
+                           /* expected_num_options */ 0,
+                           ListenerComponentFactory::BindType::NoReusePort);
+
+  // First address.
+  expectCreateListenSocket(envoy::config::core::v3::SocketOption::STATE_PREBIND,
+                           /* expected_num_options */ 1,
+                           ListenerComponentFactory::BindType::NoReusePort);
+
+  // First address options.
+  expectSetsockopt(/* expected_sockopt_level */ ENVOY_SOCKET_SO_KEEPALIVE.level(),
+                   /* expected_sockopt_name */ ENVOY_SOCKET_SO_KEEPALIVE.option(),
+                   /* expected_value */ 1,
+                   /* expected_num_calls */ 1);
+
+  addOrUpdateListener(listener);
+  EXPECT_EQ(1U, manager_->listeners().size());
+}
+
 TEST_P(ListenerManagerImplWithRealFiltersTest,
        LiteralSockoptListenerEnabledWithMultiAddressesNoOverrideOpts) {
   const envoy::config::listener::v3::Listener listener = parseListenerFromV3Yaml(R"EOF(
