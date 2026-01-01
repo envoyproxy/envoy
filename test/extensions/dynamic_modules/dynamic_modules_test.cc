@@ -181,7 +181,7 @@ TEST_P(DynamicModuleTestLanguages, InitModuleCallbackFailed) {
           "{{ test_rundir }}/test/extensions/dynamic_modules/test_data/rust"),
       1);
 
-  auto initModuleCallback = [&](DynamicModulePtr& _) -> absl::Status {
+  auto initModuleCallback = [&](DynamicModulePtr&) -> absl::Status {
     return absl::InvalidArgumentError("Init module callback failed");
   };
   absl::StatusOr<DynamicModulePtr> module =

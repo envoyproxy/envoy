@@ -724,7 +724,7 @@ typedef enum envoy_dynamic_module_type_address_type {
  * @return envoy_dynamic_module_type_abi_version_module_ptr is the ABI version of the dynamic
  * module. Null means the error and the module will be unloaded immediately.
  */
-envoy_dynamic_module_type_abi_version_module_ptr envoy_dynamic_module_on_program_init();
+envoy_dynamic_module_type_abi_version_module_ptr envoy_dynamic_module_on_program_init(void);
 
 /**
  * envoy_dynamic_module_on_server_init is called by the main thread exactly after the module is
