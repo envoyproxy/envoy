@@ -1,0 +1,147 @@
+// NOLINT(namespace-envoy)
+#include "source/extensions/filters/udp/dynamic_modules/abi_impl.h"
+
+#include "envoy/network/address.h"
+
+#include "source/common/network/utility.h"
+#include "source/extensions/filters/udp/dynamic_modules/filter.h"
+
+using Envoy::Extensions::UdpFilters::DynamicModules::DynamicModuleUdpListenerFilter;
+
+extern "C" {
+
+bool envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data(
+    envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* chunks_out, size_t chunks_cap,
+    size_t* chunks_size_out) {
+  auto* filter = static_cast<DynamicModuleUdpListenerFilter*>(filter_envoy_ptr);
+  auto* data = filter->current_data();
+  if (!data) {
+    if (chunks_size_out) {
+      *chunks_size_out = 0;
+    }
+    return false;
+  }
+
+  const auto& buffer = data->buffer_;
+  uint64_t num_slices = buffer->getRawSlices().size();
+  if (chunks_size_out) {
+    *chunks_size_out = num_slices;
+  }
+  if (chunks_cap < num_slices) {
+    return false;
+  }
+
+  size_t i = 0;
+  for (const auto& slice : buffer->getRawSlices()) {
+    chunks_out[i].ptr = static_cast<const char*>(slice.mem_);
+    chunks_out[i].length = slice.len_;
+    i++;
+  }
+  return true;
+}
+
+bool envoy_dynamic_module_callback_udp_listener_filter_set_datagram_data(
+    envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer data) {
+  auto* filter = static_cast<DynamicModuleUdpListenerFilter*>(filter_envoy_ptr);
+  auto* current_data = filter->current_data();
+  if (!current_data) {
+    return false;
+  }
+
+  current_data->buffer_->drain(current_data->buffer_->length());
+  if (data.ptr != nullptr && data.length > 0) {
+    current_data->buffer_->add(data.ptr, data.length);
+  }
+  return true;
+}
+
+bool envoy_dynamic_module_callback_udp_listener_filter_get_peer_address(
+    envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* address_out, uint32_t* port_out) {
+  auto* filter = static_cast<DynamicModuleUdpListenerFilter*>(filter_envoy_ptr);
+  auto* current_data = filter->current_data();
+  if (!current_data || !current_data->addresses_.peer_) {
+    return false;
+  }
+
+  const auto& addr = *current_data->addresses_.peer_;
+  if (addr.type() != Envoy::Network::Address::Type::Ip) {
+    return false;
+  }
+
+  const std::string& ip_str = addr.ip()->addressAsString();
+  address_out->ptr = const_cast<char*>(ip_str.data());
+  address_out->length = ip_str.size();
+  *port_out = addr.ip()->port();
+  return true;
+}
+
+bool envoy_dynamic_module_callback_udp_listener_filter_get_local_address(
+    envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* address_out, uint32_t* port_out) {
+  auto* filter = static_cast<DynamicModuleUdpListenerFilter*>(filter_envoy_ptr);
+  auto* current_data = filter->current_data();
+  const Envoy::Network::Address::Instance* addr = nullptr;
+
+  if (current_data && current_data->addresses_.local_) {
+    addr = current_data->addresses_.local_.get();
+  } else if (filter->callbacks()) {
+    addr = filter->callbacks()->udpListener().localAddress().get();
+  }
+
+  if (!addr || addr->type() != Envoy::Network::Address::Type::Ip) {
+    return false;
+  }
+
+  const std::string& ip_str = addr->ip()->addressAsString();
+  address_out->ptr = const_cast<char*>(ip_str.data());
+  address_out->length = ip_str.size();
+  *port_out = addr->ip()->port();
+  return true;
+}
+
+void envoy_dynamic_module_callback_udp_listener_filter_send_datagram(
+    envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer data,
+    envoy_dynamic_module_type_module_buffer peer_address, uint32_t peer_port) {
+  auto* filter = static_cast<DynamicModuleUdpListenerFilter*>(filter_envoy_ptr);
+
+  Envoy::Buffer::OwnedImpl buffer;
+  if (data.ptr && data.length > 0) {
+    buffer.add(data.ptr, data.length);
+  }
+
+  Envoy::Network::Address::InstanceConstSharedPtr peer_addr;
+  if (peer_address.ptr && peer_address.length > 0) {
+    std::string ip_str(peer_address.ptr, peer_address.length);
+    peer_addr = Envoy::Network::Utility::parseInternetAddressNoThrow(ip_str, peer_port);
+    if (!peer_addr) {
+      return;
+    }
+  } else {
+    if (filter->current_data()) {
+      peer_addr = filter->current_data()->addresses_.peer_;
+    }
+  }
+
+  if (!peer_addr) {
+    return;
+  }
+
+  const Envoy::Network::Address::Instance* local_addr = nullptr;
+  if (filter->current_data()) {
+    local_addr = filter->current_data()->addresses_.local_.get();
+  }
+  if (!local_addr && filter->callbacks()) {
+    local_addr = filter->callbacks()->udpListener().localAddress().get();
+  }
+
+  if (local_addr && filter->callbacks()) {
+    Envoy::Network::UdpSendData udp_data{local_addr->ip(), *peer_addr, buffer};
+    filter->callbacks()->udpListener().send(udp_data);
+  }
+}
+
+} // extern "C"
