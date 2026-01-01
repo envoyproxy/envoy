@@ -1021,7 +1021,8 @@ TEST(DynamicModulesTest, StartHttpStreamAndNoCluster) {
   EXPECT_TRUE(filter_config_or_status.ok());
 
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
-                                                          stats_scope->symbolTable());
+                                                          stats_scope->symbolTable(),
+                                                          0);
   filter->initializeInModuleFilter();
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
   filter->setDecoderFilterCallbacks(decoder_callbacks);
@@ -1059,7 +1060,8 @@ TEST(DynamicModulesTest, StartHttpStreamMissingRequiredHeaders) {
   EXPECT_TRUE(filter_config_or_status.ok());
 
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
-                                                          stats_scope->symbolTable());
+                                                          stats_scope->symbolTable(),
+                                                          0);
   filter->initializeInModuleFilter();
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
   filter->setDecoderFilterCallbacks(decoder_callbacks);
