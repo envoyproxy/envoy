@@ -54,6 +54,7 @@ private:
 };
 
 using DynamicModulePtr = std::unique_ptr<DynamicModule>;
+using DynamicModuleSharedPtr = std::shared_ptr<DynamicModule>;
 
 /**
  * Creates a new DynamicModule. This is mainly exposed for testing purposes. Use
