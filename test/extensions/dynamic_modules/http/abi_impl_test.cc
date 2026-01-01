@@ -1736,13 +1736,13 @@ TEST(ABIImpl, Stats) {
 TEST_F(DynamicModuleHttpFilterTest, GetConcurrency) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   ON_CALL(context.options_, concurrency()).WillByDefault(testing::Return(1));
-  uint32_t concurrency = envoy_dynamic_module_callback_server_factory_context_get_concurrency(&context);
+  uint32_t concurrency =
+      envoy_dynamic_module_callback_server_factory_context_get_concurrency(&context);
   EXPECT_EQ(concurrency, 1);
 }
 
 TEST_F(DynamicModuleHttpFilterTest, GetWorkerIndex) {
-  uint32_t worker_index = envoy_dynamic_module_callback_http_filter_get_worker_index(
-      filter_.get());
+  uint32_t worker_index = envoy_dynamic_module_callback_http_filter_get_worker_index(filter_.get());
   EXPECT_EQ(worker_index, 3);
 }
 
