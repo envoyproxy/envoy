@@ -1086,6 +1086,31 @@ pub trait EnvoyHttpFilter {
   /// modifying the request headers, etc that affect the routing decision.
   fn clear_route_cache(&mut self);
 
+  /// Set an arbitrary socket option using setsockopt().
+  ///
+  /// WARNING: This provides direct access to setsockopt(). Incorrect usage can break
+  /// the connection or interfere with Envoy's operation.
+  ///
+  /// # Arguments
+  /// * `level` - The socket level (e.g., libc::SOL_SOCKET, libc::IPPROTO_TCP).
+  /// * `optname` - The option name (e.g., libc::SO_REUSEADDR, libc::TCP_NODELAY).
+  /// * `optval` - A byte slice containing the option value.
+  ///
+  /// # Returns
+  /// `true` if the socket option was set successfully, `false` otherwise.
+  fn set_socket_option(&mut self, level: i32, optname: i32, optval: &[u8]) -> bool;
+
+  /// Get a socket option value using getsockopt().
+  ///
+  /// # Arguments
+  /// * `level` - The socket level (e.g., libc::SOL_SOCKET, libc::IPPROTO_TCP).
+  /// * `optname` - The option name (e.g., libc::SO_REUSEADDR, libc::TCP_NODELAY).
+  /// * `optval` - A mutable byte slice to store the option value.
+  ///
+  /// # Returns
+  /// `Some(len)` with the actual length of the option value if successful, `None` otherwise.
+  fn get_socket_option(&self, level: i32, optname: i32, optval: &mut [u8]) -> Option<usize>;
+
   /// Get the value of the attribute with the given ID as a string.
   ///
   /// If the attribute is not found, not supported or is the wrong type, this returns `None`.
@@ -1954,6 +1979,36 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
 
   fn clear_route_cache(&mut self) {
     unsafe { abi::envoy_dynamic_module_callback_http_clear_route_cache(self.raw_ptr) }
+  }
+
+  fn set_socket_option(&mut self, level: i32, optname: i32, optval: &[u8]) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_set_socket_option(
+        self.raw_ptr,
+        level,
+        optname,
+        optval.as_ptr() as *const std::ffi::c_void,
+        optval.len(),
+      )
+    }
+  }
+
+  fn get_socket_option(&self, level: i32, optname: i32, optval: &mut [u8]) -> Option<usize> {
+    let mut optlen = optval.len();
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_socket_option(
+        self.raw_ptr,
+        level,
+        optname,
+        optval.as_mut_ptr() as *mut std::ffi::c_void,
+        &mut optlen,
+      )
+    };
+    if success {
+      Some(optlen)
+    } else {
+      None
+    }
   }
 
   fn remove_request_header(&mut self, key: &str) -> bool {
