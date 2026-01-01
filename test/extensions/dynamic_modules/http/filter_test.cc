@@ -39,8 +39,7 @@ TEST_P(DynamicModuleTestLanguages, Nop) {
   EXPECT_TRUE(filter_config_or_status.ok());
 
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
-                                                          stats_store.symbolTable(),
-                                                          0);
+                                                          stats_store.symbolTable(), 0);
   filter->initializeInModuleFilter();
 
   // The followings are mostly for coverage at the moment.
@@ -102,8 +101,7 @@ TEST(DynamicModulesTest, StatsCallbacks) {
   EXPECT_TRUE(filter_config_or_status.ok());
 
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
-                                                          stats_scope.symbolTable(),
-                                                          0);
+                                                          stats_scope.symbolTable(), 0);
   filter->initializeInModuleFilter();
 
   Stats::CounterOptConstRef counter =
@@ -223,8 +221,7 @@ TEST(DynamicModulesTest, HeaderCallbacks) {
   EXPECT_TRUE(filter_config_or_status.ok());
 
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
-                                                          stats_store.symbolTable(),
-                                                          0);
+                                                          stats_store.symbolTable(), 0);
   filter->initializeInModuleFilter();
 
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
@@ -287,8 +284,7 @@ TEST(DynamicModulesTest, DynamicMetadataCallbacks) {
   EXPECT_TRUE(filter_config_or_status.ok());
 
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
-                                                          stats_scope->symbolTable(),
-                                                          0);
+                                                          stats_scope->symbolTable(), 0);
   filter->initializeInModuleFilter();
 
   auto route = std::make_shared<NiceMock<Router::MockRoute>>();
@@ -372,8 +368,7 @@ TEST(DynamicModulesTest, FilterStateCallbacks) {
   EXPECT_TRUE(filter_config_or_status.ok());
 
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
-                                                          stats_scope->symbolTable(),
-                                                          0);
+                                                          stats_scope->symbolTable(), 0);
   filter->initializeInModuleFilter();
 
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
@@ -451,8 +446,7 @@ TEST(DynamicModulesTest, BodyCallbacks) {
   EXPECT_TRUE(filter_config_or_status.ok());
 
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
-                                                          stats_scope->symbolTable(),
-                                                          0);
+                                                          stats_scope->symbolTable(), 0);
   filter->initializeInModuleFilter();
 
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
@@ -531,8 +525,7 @@ TEST(DynamicModulesTest, HttpFilterHttpCallout_non_existing_cluster) {
 
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
-                                                          stats_scope->symbolTable(),
-                                                          0);
+                                                          stats_scope->symbolTable(), 0);
   filter->initializeInModuleFilter();
   filter->setDecoderFilterCallbacks(callbacks);
   EXPECT_CALL(callbacks, sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
@@ -586,8 +579,7 @@ TEST(DynamicModulesTest, HttpFilterHttpCallout_immediate_failing_cluster) {
 
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
-                                                          stats_scope->symbolTable(),
-                                                          0);
+                                                          stats_scope->symbolTable(), 0);
   filter->initializeInModuleFilter();
   filter->setDecoderFilterCallbacks(callbacks);
   EXPECT_CALL(callbacks, sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
@@ -645,8 +637,7 @@ TEST(DynamicModulesTest, HttpFilterHttpCallout_success) {
 
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
-                                                          stats_scope->symbolTable(),
-                                                          0);
+                                                          stats_scope->symbolTable(), 0);
   filter->initializeInModuleFilter();
   filter->setDecoderFilterCallbacks(callbacks);
   EXPECT_CALL(callbacks, sendLocalReply(Http::Code::OK, _, _, _, _));
@@ -710,8 +701,7 @@ TEST(DynamicModulesTest, HttpFilterHttpCallout_resetting) {
           }));
 
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
-                                                          stats_scope->symbolTable(),
-                                                          0);
+                                                          stats_scope->symbolTable(), 0);
   filter->initializeInModuleFilter();
 
   TestRequestHeaderMapImpl headers{{}};
@@ -757,8 +747,7 @@ TEST(DynamicModulesTest, HttpFilterPerFilterConfigLifetimes) {
   EXPECT_TRUE(dynamic_module_for_route.ok());
 
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
-                                                          stats_scope->symbolTable(),
-                                                          0);
+                                                          stats_scope->symbolTable(), 0);
 
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks;
@@ -903,8 +892,7 @@ TEST(DynamicModulesTest, HttpFilterHttpStreamCalloutOnComplete) {
   EXPECT_TRUE(filter_config_or_status.ok());
 
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
-                                                          stats_scope->symbolTable(),
-                                                          0);
+                                                          stats_scope->symbolTable(), 0);
   filter->initializeInModuleFilter();
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
   filter->setDecoderFilterCallbacks(decoder_callbacks);
@@ -956,8 +944,7 @@ TEST(DynamicModulesTest, StartHttpStreamDoesNotSetContentLength) {
   EXPECT_TRUE(filter_config_or_status.ok());
 
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
-                                                          stats_scope->symbolTable(),
-                                                          0);
+                                                          stats_scope->symbolTable(), 0);
   filter->initializeInModuleFilter();
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
   filter->setDecoderFilterCallbacks(decoder_callbacks);
@@ -1021,8 +1008,7 @@ TEST(DynamicModulesTest, StartHttpStreamAndNoCluster) {
   EXPECT_TRUE(filter_config_or_status.ok());
 
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
-                                                          stats_scope->symbolTable(),
-                                                          0);
+                                                          stats_scope->symbolTable(), 0);
   filter->initializeInModuleFilter();
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
   filter->setDecoderFilterCallbacks(decoder_callbacks);
@@ -1060,8 +1046,7 @@ TEST(DynamicModulesTest, StartHttpStreamMissingRequiredHeaders) {
   EXPECT_TRUE(filter_config_or_status.ok());
 
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
-                                                          stats_scope->symbolTable(),
-                                                          0);
+                                                          stats_scope->symbolTable(), 0);
   filter->initializeInModuleFilter();
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
   filter->setDecoderFilterCallbacks(decoder_callbacks);
@@ -1099,8 +1084,7 @@ TEST(DynamicModulesTest, StartHttpStreamHandlesInlineResetDuringHeaders) {
   EXPECT_TRUE(filter_config_or_status.ok());
 
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
-                                                          stats_scope->symbolTable(),
-                                                          0);
+                                                          stats_scope->symbolTable(), 0);
   filter->initializeInModuleFilter();
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
   filter->setDecoderFilterCallbacks(decoder_callbacks);
@@ -1155,8 +1139,7 @@ TEST(DynamicModulesTest, HttpStreamCalloutDeferredDeleteOnDestroy) {
   EXPECT_TRUE(filter_config_or_status.ok());
 
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
-                                                          stats_scope->symbolTable(),
-                                                          0);
+                                                          stats_scope->symbolTable(), 0);
   filter->initializeInModuleFilter();
 
   NiceMock<Event::MockDispatcher> dispatcher;
@@ -1213,8 +1196,7 @@ TEST(DynamicModulesTest, HttpFilterHttpStreamCalloutOnReset) {
   EXPECT_TRUE(filter_config_or_status.ok());
 
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
-                                                          stats_scope->symbolTable(),
-                                                          0);
+                                                          stats_scope->symbolTable(), 0);
   filter->initializeInModuleFilter();
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
   filter->setDecoderFilterCallbacks(decoder_callbacks);

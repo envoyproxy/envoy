@@ -167,7 +167,8 @@ TEST_P(DynamicModuleTestLanguages, InitModuleCallback) {
     }
     return absl::OkStatus();
   };
-  absl::StatusOr<DynamicModulePtr> module = newDynamicModuleByName("init_callback", false, false, initModuleCallback);
+  absl::StatusOr<DynamicModulePtr> module =
+      newDynamicModuleByName("init_callback", false, false, initModuleCallback);
   EXPECT_TRUE(module.ok());
   EXPECT_TRUE(called);
   TestEnvironment::unsetEnvVar("ENVOY_DYNAMIC_MODULES_SEARCH_PATH");
@@ -183,11 +184,11 @@ TEST_P(DynamicModuleTestLanguages, InitModuleCallbackFailed) {
   auto initModuleCallback = [&](DynamicModulePtr& _) -> absl::Status {
     return absl::InvalidArgumentError("Init module callback failed");
   };
-  absl::StatusOr<DynamicModulePtr> module = newDynamicModuleByName("init_callback_fail", false, false, initModuleCallback);
+  absl::StatusOr<DynamicModulePtr> module =
+      newDynamicModuleByName("init_callback_fail", false, false, initModuleCallback);
   EXPECT_FALSE(module.ok());
   EXPECT_EQ(module.status().code(), absl::StatusCode::kInvalidArgument);
-  EXPECT_THAT(module.status().message(),
-              testing::HasSubstr("Init module callback failed"));
+  EXPECT_THAT(module.status().message(), testing::HasSubstr("Init module callback failed"));
   TestEnvironment::unsetEnvVar("ENVOY_DYNAMIC_MODULES_SEARCH_PATH");
 }
 

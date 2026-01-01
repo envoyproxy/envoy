@@ -17,7 +17,8 @@ absl::StatusOr<Http::FilterFactoryCb> DynamicModuleConfigFactory::createFilterFa
         module_ptr->getFunctionPointer<decltype(&envoy_dynamic_module_on_server_init)>(
             "envoy_dynamic_module_on_server_init");
 
-    // Make init_server_function optional - if the function is not found it should not block module loading.
+    // Make init_server_function optional - if the function is not found it should not block module
+    // loading.
     if (!init_server_function.ok()) {
       ENVOY_LOG_TO_LOGGER(
           Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
@@ -90,7 +91,8 @@ DynamicModuleConfigFactory::createRouteSpecificFilterConfigTyped(
         module_ptr->getFunctionPointer<decltype(&envoy_dynamic_module_on_server_init)>(
             "envoy_dynamic_module_on_server_init");
 
-    // Make init_server_function optional - if the function is not found it should not block module loading.
+    // Make init_server_function optional - if the function is not found it should not block module
+    // loading.
     if (!init_server_function.ok()) {
       ENVOY_LOG_TO_LOGGER(
           Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
