@@ -1,18 +1,23 @@
 --- a/python/private/toolchain_aliases.bzl
 +++ b/python/private/toolchain_aliases.bzl
-@@ -43,6 +43,11 @@
+@@ -43,6 +43,16 @@
              visibility = ["//visibility:private"],
          )
  
-+    # Use first platform as default for unsupported platforms (e.g., WASI).
++    # Use a sensible default platform for unsupported target platforms (e.g., WASI).
++    # Prefer x86_64-unknown-linux-gnu as it's the most common CI/exec platform.
 +    # This allows builds to proceed when Python is transitively depended on
 +    # but not actually used in the target configuration.
-+    default_platform = platforms[0] if platforms else None
++    default_platform = None
++    if "x86_64-unknown-linux-gnu" in platforms:
++        default_platform = "x86_64-unknown-linux-gnu"
++    elif platforms:
++        default_platform = platforms[0]
 +
      prefix = name
      for name in [
          "files",
-@@ -52,29 +57,39 @@
+@@ -52,29 +62,39 @@
          "python_headers",
          "python_runtimes",
      ]:
