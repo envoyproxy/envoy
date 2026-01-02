@@ -3,11 +3,13 @@
 #include <iterator>
 #include <memory>
 #include <sys/socket.h>
+#include <unistd.h>
 
 #include "source/extensions/filters/http/dynamic_modules/filter.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/network/io_handle.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
@@ -1620,8 +1622,8 @@ TEST_F(DynamicModuleHttpFilterTest, GetSocketOptionNoConnection) {
 
   int optval = 0;
   size_t optlen = sizeof(optval);
-  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_socket_option(filter_.get(), SOL_SOCKET,
-                                                                    SO_REUSEADDR, &optval, &optlen));
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_socket_option(
+      filter_.get(), SOL_SOCKET, SO_REUSEADDR, &optval, &optlen));
 }
 
 TEST_F(DynamicModuleHttpFilterTest, SetSocketOptionNoTransportSocketCallbacks) {
@@ -1645,8 +1647,8 @@ TEST_F(DynamicModuleHttpFilterTest, GetSocketOptionNoTransportSocketCallbacks) {
 
   int optval = 0;
   size_t optlen = sizeof(optval);
-  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_socket_option(filter_.get(), SOL_SOCKET,
-                                                                    SO_REUSEADDR, &optval, &optlen));
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_socket_option(
+      filter_.get(), SOL_SOCKET, SO_REUSEADDR, &optval, &optlen));
 }
 
 TEST_F(DynamicModuleHttpFilterTest, SetSocketOptionNoCallbacks) {
@@ -1666,6 +1668,89 @@ TEST_F(DynamicModuleHttpFilterTest, GetSocketOptionNoCallbacks) {
   size_t optlen = sizeof(optval);
   EXPECT_FALSE(envoy_dynamic_module_callback_http_get_socket_option(
       &filter_without_callbacks, SOL_SOCKET, SO_REUSEADDR, &optval, &optlen));
+}
+
+// A mock connection that also implements TransportSocketCallbacks to allow testing
+// the socket option APIs with a real file descriptor.
+class MockConnectionWithTransportSocketCallbacks : public Network::MockConnection,
+                                                   public Network::TransportSocketCallbacks {
+public:
+  MockConnectionWithTransportSocketCallbacks(Network::IoHandle& io_handle)
+      : io_handle_(io_handle) {}
+
+  // TransportSocketCallbacks implementation
+  Network::IoHandle& ioHandle() override { return io_handle_; }
+  const Network::IoHandle& ioHandle() const override { return io_handle_; }
+  Network::Connection& connection() override { return *this; }
+  bool shouldDrainReadBuffer() override { return false; }
+  void setTransportSocketIsReadable() override {}
+  void raiseEvent(Network::ConnectionEvent) override {}
+  void flushWriteBuffer() override {}
+
+private:
+  Network::IoHandle& io_handle_;
+};
+
+TEST_F(DynamicModuleHttpFilterTest, SetSocketOptionWithRealSocket) {
+  // Create a real socket to test the setsockopt syscall
+  int sock_fd = ::socket(AF_INET, SOCK_STREAM, 0);
+  ASSERT_GE(sock_fd, 0) << "Failed to create socket";
+
+  // Create a mock IoHandle that returns the real socket fd
+  NiceMock<Network::MockIoHandle> mock_io_handle;
+  EXPECT_CALL(mock_io_handle, fdDoNotUse()).WillRepeatedly(testing::Return(sock_fd));
+
+  // Create a connection that implements TransportSocketCallbacks
+  MockConnectionWithTransportSocketCallbacks connection(mock_io_handle);
+  EXPECT_CALL(decoder_callbacks_, connection())
+      .WillRepeatedly(
+          testing::Return(makeOptRef(dynamic_cast<const Network::Connection&>(connection))));
+
+  // Test successful setsockopt
+  int optval = 1;
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_set_socket_option(
+      filter_.get(), SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval)));
+
+  // Test failed setsockopt with invalid option
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_set_socket_option(filter_.get(), -1, -1, &optval,
+                                                                    sizeof(optval)));
+
+  ::close(sock_fd);
+}
+
+TEST_F(DynamicModuleHttpFilterTest, GetSocketOptionWithRealSocket) {
+  // Create a real socket to test the getsockopt syscall
+  int sock_fd = ::socket(AF_INET, SOCK_STREAM, 0);
+  ASSERT_GE(sock_fd, 0) << "Failed to create socket";
+
+  // First set an option so we can verify getting it
+  int set_val = 1;
+  ASSERT_EQ(::setsockopt(sock_fd, SOL_SOCKET, SO_REUSEADDR, &set_val, sizeof(set_val)), 0);
+
+  // Create a mock IoHandle that returns the real socket fd
+  NiceMock<Network::MockIoHandle> mock_io_handle;
+  EXPECT_CALL(mock_io_handle, fdDoNotUse()).WillRepeatedly(testing::Return(sock_fd));
+
+  // Create a connection that implements TransportSocketCallbacks
+  MockConnectionWithTransportSocketCallbacks connection(mock_io_handle);
+  EXPECT_CALL(decoder_callbacks_, connection())
+      .WillRepeatedly(
+          testing::Return(makeOptRef(dynamic_cast<const Network::Connection&>(connection))));
+
+  // Test successful getsockopt
+  int optval = 0;
+  size_t optlen = sizeof(optval);
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_socket_option(filter_.get(), SOL_SOCKET,
+                                                                   SO_REUSEADDR, &optval, &optlen));
+  EXPECT_EQ(optval, 1);
+
+  // Test failed getsockopt with invalid option
+  optval = 0;
+  optlen = sizeof(optval);
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_socket_option(filter_.get(), -1, -1, &optval,
+                                                                    &optlen));
+
+  ::close(sock_fd);
 }
 
 } // namespace HttpFilters
