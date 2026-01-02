@@ -14,7 +14,7 @@ envoy_mobile_android_test(
         "//test/jni:libenvoy_jni_with_test_extensions.so",
     ] + select({
         "@platforms//os:macos": [
-            "//test/jni:libenvoy_jni_with_test_extensions_jnilib",
+            "//test/jni:libenvoy_jni_with_test_extensions.jnilib",
         ],
         "//conditions:default": [],
     }),
@@ -58,7 +58,7 @@ envoy_mobile_android_test(
         "//test/jni:libenvoy_jni_with_test_extensions.so",
     ] + select({
         "@platforms//os:macos": [
-            "//test/jni:libenvoy_jni_with_test_extensions_jnilib",
+            "//test/jni:libenvoy_jni_with_test_extensions.jnilib",
         ],
         "//conditions:default": [],
     }),
@@ -83,7 +83,7 @@ envoy_mobile_android_test(
         "//test/jni:libenvoy_jni_with_test_extensions.so",
     ] + select({
         "@platforms//os:macos": [
-            "//test/jni:libenvoy_jni_with_test_extensions_jnilib",
+            "//test/jni:libenvoy_jni_with_test_extensions.jnilib",
         ],
         "//conditions:default": [],
     }),
@@ -108,7 +108,7 @@ envoy_mobile_android_test(
         "//test/jni:libenvoy_jni_with_test_extensions.so",
     ] + select({
         "@platforms//os:macos": [
-            "//test/jni:libenvoy_jni_with_test_extensions_jnilib",
+            "//test/jni:libenvoy_jni_with_test_extensions.jnilib",
         ],
         "//conditions:default": [],
     }),
