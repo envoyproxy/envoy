@@ -32,6 +32,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, assign) BOOL enableDrainPostDnsRefresh;
 @property (nonatomic, assign) BOOL enforceTrustChainVerification;
 @property (nonatomic, assign) BOOL enablePlatformCertificateValidation;
+@property (nonatomic, assign) BOOL enableNetworkChangeMonitor;
 @property (nonatomic, strong, nullable) NSString *upstreamTlsSni;
 @property (nonatomic, assign) BOOL respectSystemProxySettings;
 @property (nonatomic, assign) UInt32 h2ConnectionKeepaliveIdleIntervalMilliseconds;
@@ -70,6 +71,7 @@ NS_ASSUME_NONNULL_BEGIN
                         enableDrainPostDnsRefresh:(BOOL)enableDrainPostDnsRefresh
                     enforceTrustChainVerification:(BOOL)enforceTrustChainVerification
               enablePlatformCertificateValidation:(BOOL)enablePlatformCertificateValidation
+                       enableNetworkChangeMonitor:(BOOL)enableNetworkChangeMonitor
                                    upstreamTlsSni:(nullable NSString *)upstreamTlsSni
                        respectSystemProxySettings:(BOOL)respectSystemProxySettings
     h2ConnectionKeepaliveIdleIntervalMilliseconds:
