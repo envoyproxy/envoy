@@ -149,6 +149,12 @@ EngineBuilder& EngineBuilder::addDnsPreresolveHostnames(const std::vector<std::s
   return *this;
 }
 
+EngineBuilder& EngineBuilder::setDnsResolver(
+    const envoy::config::core::v3::TypedExtensionConfig& dns_resolver_config) {
+  dns_resolver_config_ = dns_resolver_config;
+  return *this;
+}
+
 EngineBuilder& EngineBuilder::setAdditionalSocketOptions(
     const std::vector<envoy::config::core::v3::SocketOption>& socket_options) {
   socket_options_ = socket_options;
@@ -221,6 +227,16 @@ EngineBuilder& EngineBuilder::enableSocketTagging(bool socket_tagging_on) {
 
 EngineBuilder& EngineBuilder::enableHttp3(bool http3_on) {
   enable_http3_ = http3_on;
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::addQuicConnectionOption(std::string option) {
+  quic_connection_options_.push_back(std::move(option));
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::addQuicClientConnectionOption(std::string option) {
+  quic_client_connection_options_.push_back(std::move(option));
   return *this;
 }
 
@@ -665,24 +681,28 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
         ->PackFrom(kv_config);
   }
 
+  if (dns_resolver_config_.has_value()) {
+    *dns_cache_config->mutable_typed_dns_resolver_config() = *dns_resolver_config_;
+  } else {
 #if defined(__APPLE__)
-  envoy::extensions::network::dns_resolver::apple::v3::AppleDnsResolverConfig resolver_config;
-  dns_cache_config->mutable_typed_dns_resolver_config()->set_name(
-      "envoy.network.dns_resolver.apple");
-  dns_cache_config->mutable_typed_dns_resolver_config()->mutable_typed_config()->PackFrom(
-      resolver_config);
+    envoy::extensions::network::dns_resolver::apple::v3::AppleDnsResolverConfig resolver_config;
+    dns_cache_config->mutable_typed_dns_resolver_config()->set_name(
+        "envoy.network.dns_resolver.apple");
+    dns_cache_config->mutable_typed_dns_resolver_config()->mutable_typed_config()->PackFrom(
+        resolver_config);
 #else
-  envoy::extensions::network::dns_resolver::getaddrinfo::v3::GetAddrInfoDnsResolverConfig
-      resolver_config;
-  if (dns_num_retries_.has_value()) {
-    resolver_config.mutable_num_retries()->set_value(*dns_num_retries_);
-  }
-  resolver_config.mutable_num_resolver_threads()->set_value(getaddrinfo_num_threads_);
-  dns_cache_config->mutable_typed_dns_resolver_config()->set_name(
-      "envoy.network.dns_resolver.getaddrinfo");
-  dns_cache_config->mutable_typed_dns_resolver_config()->mutable_typed_config()->PackFrom(
-      resolver_config);
+    envoy::extensions::network::dns_resolver::getaddrinfo::v3::GetAddrInfoDnsResolverConfig
+        resolver_config;
+    if (dns_num_retries_.has_value()) {
+      resolver_config.mutable_num_retries()->set_value(*dns_num_retries_);
+    }
+    resolver_config.mutable_num_resolver_threads()->set_value(getaddrinfo_num_threads_);
+    dns_cache_config->mutable_typed_dns_resolver_config()->set_name(
+        "envoy.network.dns_resolver.getaddrinfo");
+    dns_cache_config->mutable_typed_dns_resolver_config()->mutable_typed_config()->PackFrom(
+        resolver_config);
 #endif
+  }
 
   for (const auto& [host, port] : dns_preresolve_hostnames_) {
     envoy::config::core::v3::SocketAddress* address = dns_cache_config->add_preresolve_hostnames();
@@ -882,7 +902,17 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     auto* quic_protocol_options = alpn_options.mutable_auto_config()
                                       ->mutable_http3_protocol_options()
                                       ->mutable_quic_protocol_options();
-    quic_protocol_options->set_connection_options(http3_connection_options_);
+    if (!quic_connection_options_.empty()) {
+      quic_protocol_options->set_connection_options(absl::StrJoin(quic_connection_options_, ","));
+    } else {
+      quic_protocol_options->set_connection_options(http3_connection_options_);
+    }
+    if (!quic_client_connection_options_.empty()) {
+      quic_protocol_options->set_client_connection_options(
+          absl::StrJoin(quic_client_connection_options_, ","));
+    } else {
+      quic_protocol_options->set_client_connection_options(http3_client_connection_options_);
+    }
     quic_protocol_options->set_client_connection_options(http3_client_connection_options_);
     quic_protocol_options->mutable_initial_stream_window_size()->set_value(
         initial_stream_window_size_);

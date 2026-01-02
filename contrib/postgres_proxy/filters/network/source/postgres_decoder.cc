@@ -220,7 +220,7 @@ Decoder::Result DecoderImpl::onDataInit(Buffer::Instance& data, bool) {
   const auto msgParser = f();
   // Run the validation.
   message_len_ = data.peekBEInt<uint32_t>(0);
-  if (message_len_ > MAX_STARTUP_PACKET_LENGTH) {
+  if (message_len_ > Postgres::Protocol::MAX_STARTUP_PACKET_LENGTH) {
     // Message does not conform to the expected format. Move to out-of-sync state.
     data.drain(data.length());
     state_ = State::OutOfSyncState;
@@ -242,13 +242,12 @@ Decoder::Result DecoderImpl::onDataInit(Buffer::Instance& data, bool) {
 
   Decoder::Result result = Decoder::Result::ReadyForNext;
   uint32_t code = data.peekBEInt<uint32_t>(4);
-  // Startup message with 1234 in the most significant 16 bits
-  // indicate request to encrypt.
-  if (code >= 0x04d20000) {
+  // Startup message with 1234 in the most significant 16 bits indicate request to encrypt.
+  if (code >= Postgres::Protocol::ENCRYPTION_REQUEST_BASE_CODE) {
     encrypted_ = true;
-    // Handler for SSLRequest (Int32(80877103) = 0x04d2162f)
+    // Handler for SSLRequest.
     // See details in https://www.postgresql.org/docs/current/protocol-message-formats.html.
-    if (code == 0x04d2162f) {
+    if (code == Postgres::Protocol::SSL_REQUEST_CODE) {
       // Notify the filter that `SSLRequest` message was decoded.
       // If the filter returns true, it means to pass the message upstream
       // to the server. If it returns false it means, that filter will try
@@ -276,10 +275,8 @@ Decoder::Result DecoderImpl::onDataInit(Buffer::Instance& data, bool) {
       temp_storage_.add(data.linearize(data.length()), data.length());
       // Send SSL request to upstream.
       Buffer::OwnedImpl ssl_request;
-      uint32_t len = 8;
-      ssl_request.writeBEInt<uint32_t>(len);
-      uint32_t ssl_code = 0x04d2162f;
-      ssl_request.writeBEInt<uint32_t>(ssl_code);
+      ssl_request.writeBEInt<uint32_t>(Postgres::Protocol::SSL_REQUEST_MESSAGE_SIZE);
+      ssl_request.writeBEInt<uint32_t>(Postgres::Protocol::SSL_REQUEST_CODE);
 
       callbacks_->sendUpstream(ssl_request);
       result = Decoder::Result::Stopped;

@@ -19,6 +19,7 @@
 #include "test/mocks/server/instance.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -438,6 +439,7 @@ public:
     ON_CALL(Const(stream_info_), route()).WillByDefault(testing::Return(route_));
   }
 
+  TestScopedRuntime scoped_runtime_;
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
   std::unique_ptr<RateLimitPolicy> rate_limit_entry_;
   absl::Status creation_status_;
@@ -1401,6 +1403,628 @@ actions:
   rate_limit_entry_->populateDescriptors(header, stream_info_, "", descriptors_);
 
   EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"my_param", "hello world"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyTest, GenericKeyValidationInvalidFormat) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_formatter_for_ratelimit_action_descriptor_value",
+        "true"}});
+  const std::string yaml = R"EOF(
+actions:
+- generic_key:
+    descriptor_value: "%INVALID_COMMAND%"
+  )EOF";
+
+  absl::Status creation_status;
+  RateLimitPolicy policy(parseRateLimitFromV3Yaml(yaml), factory_context_, creation_status);
+
+  EXPECT_FALSE(creation_status.ok());
+}
+
+TEST_F(RateLimitPolicyTest, HeaderValueMatchValidationInvalidFormat) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_formatter_for_ratelimit_action_descriptor_value",
+        "true"}});
+  const std::string yaml = R"EOF(
+actions:
+- header_value_match:
+    descriptor_value: "%INVALID_COMMAND%"
+    headers:
+    - name: x-header-name
+      string_match:
+        exact: test_value
+  )EOF";
+
+  absl::Status creation_status;
+  RateLimitPolicy policy(parseRateLimitFromV3Yaml(yaml), factory_context_, creation_status);
+
+  EXPECT_FALSE(creation_status.ok());
+}
+
+TEST_F(RateLimitPolicyTest, QueryParameterValueMatchValidationInvalidFormat) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_formatter_for_ratelimit_action_descriptor_value",
+        "true"}});
+  const std::string yaml = R"EOF(
+actions:
+- query_parameter_value_match:
+    descriptor_value: "%INVALID_COMMAND%"
+    query_parameters:
+    - name: x-parameter-name
+      string_match:
+        exact: test_value
+  )EOF";
+
+  absl::Status creation_status;
+  RateLimitPolicy policy(parseRateLimitFromV3Yaml(yaml), factory_context_, creation_status);
+
+  EXPECT_FALSE(creation_status.ok());
+}
+
+TEST_F(RateLimitPolicyTest, GenericKeyWithMultipleFormatters) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_formatter_for_ratelimit_action_descriptor_value",
+        "true"}});
+  const std::string yaml = R"EOF(
+actions:
+- generic_key:
+    descriptor_value: "%REQ(header1)%%REQ(header2)%"
+  )EOF";
+
+  setupTest(yaml);
+  headers_.setCopy(Http::LowerCaseString("header1"), "value1");
+  headers_.setCopy(Http::LowerCaseString("header2"), "value2");
+
+  rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
+
+  // Multiple formatters should concatenate their results
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"generic_key", "value1value2"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyTest, HeaderValueMatchWithMultipleFormatters) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_formatter_for_ratelimit_action_descriptor_value",
+        "true"}});
+  const std::string yaml = R"EOF(
+actions:
+- header_value_match:
+    descriptor_value: "%REQ(header1)%%REQ(header2)%"
+    headers:
+    - name: x-header-name
+      string_match:
+        exact: test_value
+  )EOF";
+
+  setupTest(yaml);
+  headers_.setCopy(Http::LowerCaseString("x-header-name"), "test_value");
+  headers_.setCopy(Http::LowerCaseString("header1"), "value1");
+  headers_.setCopy(Http::LowerCaseString("header2"), "value2");
+
+  rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
+
+  // Multiple formatters should concatenate their results
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"header_match", "value1value2"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyTest, QueryParameterValueMatchWithMultipleFormatters) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_formatter_for_ratelimit_action_descriptor_value",
+        "true"}});
+  const std::string yaml = R"EOF(
+actions:
+- query_parameter_value_match:
+    descriptor_value: "%REQ(header1)%%REQ(header2)%"
+    query_parameters:
+    - name: x-parameter-name
+      string_match:
+        exact: test_value
+  )EOF";
+
+  setupTest(yaml);
+  Http::TestRequestHeaderMapImpl header{{":path", "/?x-parameter-name=test_value"}};
+  header.setCopy(Http::LowerCaseString("header1"), "value1");
+  header.setCopy(Http::LowerCaseString("header2"), "value2");
+
+  rate_limit_entry_->populateDescriptors(header, stream_info_, "", descriptors_);
+
+  // Multiple formatters should concatenate their results
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"query_match", "value1value2"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyTest, GenericKeyWithDefaultValuePlainString) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_formatter_for_ratelimit_action_descriptor_value",
+        "true"}});
+  const std::string yaml = R"EOF(
+actions:
+- generic_key:
+    descriptor_key: "user_key"
+    descriptor_value: "static_value"
+    default_value: "should_not_be_used"
+  )EOF";
+
+  setupTest(yaml);
+
+  rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
+
+  // When descriptor_value is a plain string, it should always be used
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"user_key", "static_value"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyTest, HitsAddendWithInvalidStringValue) {
+  const std::string yaml = R"EOF(
+actions:
+- remote_address: {}
+- destination_cluster: {}
+hits_addend:
+  format: "%REQ(x-invalid-hits)%"
+  )EOF";
+
+  ProtoRateLimit rate_limit;
+  TestUtility::loadFromYaml(yaml, rate_limit);
+
+  absl::Status creation_status;
+  RateLimitPolicy policy(rate_limit, factory_context_, creation_status);
+  EXPECT_TRUE(creation_status.ok());
+
+  std::vector<Envoy::RateLimit::Descriptor> descriptors;
+
+  // Test with invalid string value (non-numeric)
+  headers_.setCopy(Http::LowerCaseString("x-invalid-hits"), "not_a_number");
+  policy.populateDescriptors(headers_, stream_info_, "", descriptors);
+
+  // Should not add descriptor when hits_addend is invalid
+  EXPECT_TRUE(descriptors.empty());
+}
+
+TEST_F(RateLimitPolicyTest, GenericKeyWithSubstitution) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_formatter_for_ratelimit_action_descriptor_value",
+        "true"}});
+  const std::string yaml = R"EOF(
+actions:
+- generic_key:
+    descriptor_key: "user_key"
+    descriptor_value: "%REQ(x-custom-header)%"
+  )EOF";
+
+  setupTest(yaml);
+  headers_.setCopy(Http::LowerCaseString("x-custom-header"), "my_value");
+
+  rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
+
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"user_key", "my_value"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyTest, HeaderValueMatchWithSubstitution) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_formatter_for_ratelimit_action_descriptor_value",
+        "true"}});
+  const std::string yaml = R"EOF(
+actions:
+- header_value_match:
+    descriptor_value: "%REQ(x-user-id)%"
+    headers:
+    - name: x-header-name
+      string_match:
+        exact: test_value
+  )EOF";
+
+  setupTest(yaml);
+  headers_.setCopy(Http::LowerCaseString("x-header-name"), "test_value");
+  headers_.setCopy(Http::LowerCaseString("x-user-id"), "user123");
+
+  rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
+
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"header_match", "user123"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyTest, QueryParameterValueMatchWithSubstitution) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_formatter_for_ratelimit_action_descriptor_value",
+        "true"}});
+  const std::string yaml = R"EOF(
+actions:
+- query_parameter_value_match:
+    descriptor_value: "%REQ(x-session-id)%"
+    query_parameters:
+    - name: x-parameter-name
+      string_match:
+        exact: test_value
+  )EOF";
+
+  setupTest(yaml);
+  Http::TestRequestHeaderMapImpl header{{":path", "/?x-parameter-name=test_value"}};
+  header.setCopy(Http::LowerCaseString("x-session-id"), "session456");
+
+  rate_limit_entry_->populateDescriptors(header, stream_info_, "", descriptors_);
+
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"query_match", "session456"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyTest, GenericKeyWithPlainStringNoSubstitution) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_formatter_for_ratelimit_action_descriptor_value",
+        "true"}});
+  const std::string yaml = R"EOF(
+actions:
+- generic_key:
+    descriptor_key: my_key
+    descriptor_value: "plain_static_value"
+  )EOF";
+
+  setupTest(yaml);
+
+  rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
+
+  // Plain string value should work without substitution
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"my_key", "plain_static_value"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyTest, HeaderValueMatchWithPlainStringNoSubstitution) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_formatter_for_ratelimit_action_descriptor_value",
+        "true"}});
+  const std::string yaml = R"EOF(
+actions:
+- header_value_match:
+    descriptor_value: "static_match_value"
+    headers:
+    - name: x-header-name
+      string_match:
+        exact: test_value
+  )EOF";
+
+  setupTest(yaml);
+  headers_.setCopy(Http::LowerCaseString("x-header-name"), "test_value");
+
+  rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
+
+  // Plain string value should work without substitution
+  EXPECT_THAT(
+      std::vector<Envoy::RateLimit::Descriptor>({{{{"header_match", "static_match_value"}}}}),
+      testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyTest, QueryParameterValueMatchWithPlainStringNoSubstitution) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_formatter_for_ratelimit_action_descriptor_value",
+        "true"}});
+  const std::string yaml = R"EOF(
+actions:
+- query_parameter_value_match:
+    descriptor_value: "static_query_value"
+    query_parameters:
+    - name: x-parameter-name
+      string_match:
+        exact: test_value
+  )EOF";
+
+  setupTest(yaml);
+  Http::TestRequestHeaderMapImpl header{{":path", "/?x-parameter-name=test_value"}};
+
+  rate_limit_entry_->populateDescriptors(header, stream_info_, "", descriptors_);
+
+  // Plain string value should work without substitution
+  EXPECT_THAT(
+      std::vector<Envoy::RateLimit::Descriptor>({{{{"query_match", "static_query_value"}}}}),
+      testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyTest, GenericKeyPartialEmptyWithDefault) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_formatter_for_ratelimit_action_descriptor_value",
+        "true"}});
+  const std::string yaml = R"EOF(
+actions:
+- generic_key:
+    descriptor_value: "%REQ(header1)%%REQ(missing-header)%%REQ(header2)%"
+    default_value: "default_val"
+  )EOF";
+
+  setupTest(yaml);
+  headers_.setCopy(Http::LowerCaseString("header1"), "value1");
+  headers_.setCopy(Http::LowerCaseString("header2"), "value2");
+
+  rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
+
+  // Even though one formatter returns empty, the final concatenated result is not empty
+  // so the actual concatenated value should be used instead of default
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"generic_key", "value1value2"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyTest, GenericKeyAllEmptyWithDefault) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_formatter_for_ratelimit_action_descriptor_value",
+        "true"}});
+  const std::string yaml = R"EOF(
+actions:
+- generic_key:
+    descriptor_value: "%REQ(missing1)%%REQ(missing2)%"
+    default_value: "default_val"
+  )EOF";
+
+  setupTest(yaml);
+
+  rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
+
+  // All formatters return empty, so default_value should be used
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"generic_key", "default_val"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyTest, GenericKeyAllEmptyNoDefault) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_formatter_for_ratelimit_action_descriptor_value",
+        "true"}});
+  const std::string yaml = R"EOF(
+actions:
+- generic_key:
+    descriptor_value: "%REQ(missing1)%%REQ(missing2)%"
+  )EOF";
+
+  setupTest(yaml);
+
+  rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
+
+  // All formatters return empty and no default_value, so descriptor should be skipped
+  EXPECT_TRUE(descriptors_.empty());
+}
+
+TEST_F(RateLimitPolicyTest, GenericKeyMixedStaticAndDynamicFormatters) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_formatter_for_ratelimit_action_descriptor_value",
+        "true"}});
+  const std::string yaml = R"EOF(
+actions:
+- generic_key:
+    descriptor_value: "%REQ(header1)%_static_value_%REQ(header2)%"
+  )EOF";
+
+  setupTest(yaml);
+  headers_.setCopy(Http::LowerCaseString("header1"), "dynamic1");
+  headers_.setCopy(Http::LowerCaseString("header2"), "dynamic2");
+
+  rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
+
+  // Multiple formatters with static text should concatenate properly
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>(
+                  {{{{"generic_key", "dynamic1_static_value_dynamic2"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyTest, GenericKeyFormatterDisabled) {
+  const std::string yaml = R"EOF(
+actions:
+- generic_key:
+    descriptor_value: "%REQ(header1)%_static_value_%REQ(header2)%"
+  )EOF";
+
+  setupTest(yaml);
+  headers_.setCopy(Http::LowerCaseString("header1"), "dynamic1");
+  headers_.setCopy(Http::LowerCaseString("header2"), "dynamic2");
+
+  rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
+
+  // With formatter disabled (default), descriptor_value should be used as literal string
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>(
+                  {{{{"generic_key", "%REQ(header1)%_static_value_%REQ(header2)%"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyTest, HeaderValueMatchPartialEmptyWithDefault) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_formatter_for_ratelimit_action_descriptor_value",
+        "true"}});
+  const std::string yaml = R"EOF(
+actions:
+- header_value_match:
+    descriptor_value: "%REQ(header1)%%REQ(missing-header)%%REQ(header2)%"
+    default_value: "default_val"
+    headers:
+    - name: x-header-name
+      string_match:
+        exact: test_value
+  )EOF";
+
+  setupTest(yaml);
+  headers_.setCopy(Http::LowerCaseString("x-header-name"), "test_value");
+  headers_.setCopy(Http::LowerCaseString("header1"), "value1");
+  headers_.setCopy(Http::LowerCaseString("header2"), "value2");
+
+  rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
+
+  // Even though one formatter returns empty, the final concatenated result is not empty
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"header_match", "value1value2"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyTest, HeaderValueMatchAllEmptyWithDefault) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_formatter_for_ratelimit_action_descriptor_value",
+        "true"}});
+  const std::string yaml = R"EOF(
+actions:
+- header_value_match:
+    descriptor_value: "%REQ(missing1)%%REQ(missing2)%"
+    default_value: "default_val"
+    headers:
+    - name: x-header-name
+      string_match:
+        exact: test_value
+  )EOF";
+
+  setupTest(yaml);
+  headers_.setCopy(Http::LowerCaseString("x-header-name"), "test_value");
+
+  rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
+
+  // All formatters return empty, so default_value should be used
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"header_match", "default_val"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyTest, HeaderValueMatchMixedStaticAndDynamicFormatters) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_formatter_for_ratelimit_action_descriptor_value",
+        "true"}});
+  const std::string yaml = R"EOF(
+actions:
+- header_value_match:
+    descriptor_value: "%REQ(header1)%_static_value_%REQ(header2)%"
+    headers:
+    - name: x-header-name
+      string_match:
+        exact: test_value
+  )EOF";
+
+  setupTest(yaml);
+  headers_.setCopy(Http::LowerCaseString("x-header-name"), "test_value");
+  headers_.setCopy(Http::LowerCaseString("header1"), "dynamic1");
+  headers_.setCopy(Http::LowerCaseString("header2"), "dynamic2");
+
+  rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
+
+  // Multiple formatters with static text should concatenate properly
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>(
+                  {{{{"header_match", "dynamic1_static_value_dynamic2"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyTest, HeaderValueMatchFormatterDisabled) {
+  const std::string yaml = R"EOF(
+actions:
+- header_value_match:
+    descriptor_value: "%REQ(header1)%_static_value_%REQ(header2)%"
+    headers:
+    - name: x-header-name
+      string_match:
+        exact: test_value
+  )EOF";
+
+  setupTest(yaml);
+  headers_.setCopy(Http::LowerCaseString("x-header-name"), "test_value");
+  headers_.setCopy(Http::LowerCaseString("header1"), "dynamic1");
+  headers_.setCopy(Http::LowerCaseString("header2"), "dynamic2");
+
+  rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
+
+  // With formatter disabled (default), descriptor_value should be used as literal string
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>(
+                  {{{{"header_match", "%REQ(header1)%_static_value_%REQ(header2)%"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyTest, QueryParameterValueMatchPartialEmptyWithDefault) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_formatter_for_ratelimit_action_descriptor_value",
+        "true"}});
+  const std::string yaml = R"EOF(
+actions:
+- query_parameter_value_match:
+    descriptor_value: "%REQ(header1)%%REQ(missing-header)%%REQ(header2)%"
+    default_value: "default_val"
+    query_parameters:
+    - name: x-parameter-name
+      string_match:
+        exact: test_value
+  )EOF";
+
+  setupTest(yaml);
+  Http::TestRequestHeaderMapImpl header{{":path", "/?x-parameter-name=test_value"}};
+  header.setCopy(Http::LowerCaseString("header1"), "value1");
+  header.setCopy(Http::LowerCaseString("header2"), "value2");
+
+  rate_limit_entry_->populateDescriptors(header, stream_info_, "", descriptors_);
+
+  // Even though one formatter returns empty, the final concatenated result is not empty
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"query_match", "value1value2"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyTest, QueryParameterValueMatchAllEmptyWithDefault) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_formatter_for_ratelimit_action_descriptor_value",
+        "true"}});
+  const std::string yaml = R"EOF(
+actions:
+- query_parameter_value_match:
+    descriptor_value: "%REQ(missing1)%%REQ(missing2)%"
+    default_value: "default_val"
+    query_parameters:
+    - name: x-parameter-name
+      string_match:
+        exact: test_value
+  )EOF";
+
+  setupTest(yaml);
+  Http::TestRequestHeaderMapImpl header{{":path", "/?x-parameter-name=test_value"}};
+
+  rate_limit_entry_->populateDescriptors(header, stream_info_, "", descriptors_);
+
+  // All formatters return empty, so default_value should be used
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"query_match", "default_val"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyTest, QueryParameterValueMatchMixedStaticAndDynamicFormatters) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_formatter_for_ratelimit_action_descriptor_value",
+        "true"}});
+  const std::string yaml = R"EOF(
+actions:
+- query_parameter_value_match:
+    descriptor_value: "%REQ(header1)%_static_value_%REQ(header2)%"
+    query_parameters:
+    - name: x-parameter-name
+      string_match:
+        exact: test_value
+  )EOF";
+
+  setupTest(yaml);
+  Http::TestRequestHeaderMapImpl header{{":path", "/?x-parameter-name=test_value"}};
+  header.setCopy(Http::LowerCaseString("header1"), "dynamic1");
+  header.setCopy(Http::LowerCaseString("header2"), "dynamic2");
+
+  rate_limit_entry_->populateDescriptors(header, stream_info_, "", descriptors_);
+
+  // Multiple formatters with static text should concatenate properly
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>(
+                  {{{{"query_match", "dynamic1_static_value_dynamic2"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyTest, QueryParameterValueMatchFormatterDisabled) {
+  const std::string yaml = R"EOF(
+actions:
+- query_parameter_value_match:
+    descriptor_value: "%REQ(header1)%_static_value_%REQ(header2)%"
+    query_parameters:
+    - name: x-parameter-name
+      string_match:
+        exact: test_value
+  )EOF";
+
+  setupTest(yaml);
+  Http::TestRequestHeaderMapImpl header{{":path", "/?x-parameter-name=test_value"}};
+  header.setCopy(Http::LowerCaseString("header1"), "dynamic1");
+  header.setCopy(Http::LowerCaseString("header2"), "dynamic2");
+
+  rate_limit_entry_->populateDescriptors(header, stream_info_, "", descriptors_);
+
+  // With formatter disabled (default), descriptor_value should be used as literal string
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>(
+                  {{{{"query_match", "%REQ(header1)%_static_value_%REQ(header2)%"}}}}),
               testing::ContainerEq(descriptors_));
 }
 

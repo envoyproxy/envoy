@@ -21,7 +21,7 @@ platform(
         docker_network = "standard",
         docker_privileged = True,
     ),
-    parents = ["//bazel/rbe/toolchains/configs/linux/clang/config:platform"],
+    parents = ["//bazel/platforms:linux_x64"],
 )
 
 platform(
@@ -34,5 +34,5 @@ platform(
     ) | {
         "Pool": "arm",
     },
-    parents = ["//bazel/rbe/toolchains/configs/linux/clang/config:platform-arm64"],
+    parents = ["//bazel/platforms:linux_arm64"],
 )

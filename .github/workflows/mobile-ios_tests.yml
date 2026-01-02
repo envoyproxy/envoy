@@ -40,6 +40,7 @@ jobs:
 
   tests:
     permissions:
+      actions: read
       contents: read
       packages: read
     uses: ./.github/workflows/_run.yml

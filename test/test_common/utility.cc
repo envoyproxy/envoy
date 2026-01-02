@@ -437,13 +437,13 @@ bool TestUtility::gaugesZeroed(
 }
 
 void ConditionalInitializer::setReady() {
-  absl::MutexLock lock(&mutex_);
+  absl::MutexLock lock(mutex_);
   EXPECT_FALSE(ready_);
   ready_ = true;
 }
 
 void ConditionalInitializer::waitReady() {
-  absl::MutexLock lock(&mutex_);
+  absl::MutexLock lock(mutex_);
   if (ready_) {
     ready_ = false;
     return;
@@ -455,7 +455,7 @@ void ConditionalInitializer::waitReady() {
 }
 
 void ConditionalInitializer::wait() {
-  absl::MutexLock lock(&mutex_);
+  absl::MutexLock lock(mutex_);
   mutex_.Await(absl::Condition(&ready_));
   EXPECT_TRUE(ready_);
 }

@@ -53,6 +53,7 @@ envoy_cc_library(
         ":cc_wkt_protos",
         "//envoy/common:base_includes",
         "@com_google_protobuf//:protobuf",
+        "@com_google_protoconverter//:all",
     ],
 )
 

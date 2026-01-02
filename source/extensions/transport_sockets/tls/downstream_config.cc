@@ -21,11 +21,11 @@ DownstreamSslSocketFactory::createTransportSocketFactory(
           MessageUtil::downcastAndValidate<
               const envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext&>(
               message, context.messageValidationVisitor()),
-          context, false);
+          context, server_names, false);
   RETURN_IF_NOT_OK(server_config_or_error.status());
   return ServerSslSocketFactory::create(std::move(server_config_or_error.value()),
                                         context.serverFactoryContext().sslContextManager(),
-                                        context.statsScope(), server_names);
+                                        context.statsScope());
 }
 
 ProtobufTypes::MessagePtr DownstreamSslSocketFactory::createEmptyConfigProto() {

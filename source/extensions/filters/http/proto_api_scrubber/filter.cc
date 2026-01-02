@@ -1,15 +1,34 @@
 #include "source/extensions/filters/http/proto_api_scrubber/filter.h"
 
+#include <chrono>
+#include <cstddef>
+#include <memory>
+#include <optional>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include "envoy/buffer/buffer.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
+#include "envoy/matcher/matcher.h"
 
+#include "source/common/buffer/buffer_impl.h"
 #include "source/common/grpc/common.h"
 #include "source/common/grpc/status.h"
+#include "source/common/http/codes.h"
+#include "source/common/http/matching/data_impl.h"
 #include "source/extensions/filters/http/grpc_field_extraction/message_converter/message_converter.h"
 #include "source/extensions/filters/http/grpc_field_extraction/message_converter/message_converter_utility.h"
 #include "source/extensions/filters/http/grpc_field_extraction/message_converter/stream_message.h"
+#include "source/extensions/filters/http/proto_api_scrubber/filter_config.h"
+#include "source/extensions/filters/http/proto_api_scrubber/scrubbing_util_lib/field_checker.h"
 
 #include "absl/log/check.h"
+#include "absl/status/status.h"
+#include "absl/strings/str_cat.h"
+#include "absl/strings/str_split.h"
+#include "absl/strings/string_view.h"
 #include "proto_field_extraction/message_data/cord_message_data.h"
 #include "proto_processing_lib/proto_scrubber/field_checker_interface.h"
 #include "proto_processing_lib/proto_scrubber/proto_scrubber.h"
@@ -26,6 +45,7 @@ using ::Envoy::Extensions::HttpFilters::GrpcFieldExtraction::MessageConverter;
 using ::Envoy::Extensions::HttpFilters::GrpcFieldExtraction::StreamMessage;
 using ::Envoy::Grpc::Status;
 using ::Envoy::Grpc::Utility;
+using ::Envoy::Http::Matching::HttpMatchingDataImpl;
 using proto_processing_lib::proto_scrubber::FieldCheckerInterface;
 using proto_processing_lib::proto_scrubber::ProtoScrubber;
 using proto_processing_lib::proto_scrubber::ScrubberContext;
@@ -33,6 +53,7 @@ using proto_processing_lib::proto_scrubber::ScrubberContext;
 const char kRcDetailFilterProtoApiScrubber[] = "proto_api_scrubber";
 const char kRcDetailErrorRequestBufferConversion[] = "REQUEST_BUFFER_CONVERSION_FAIL";
 const char kRcDetailErrorResponseBufferConversion[] = "RESPONSE_BUFFER_CONVERSION_FAIL";
+const char kRcDetailMethodBlocked[] = "METHOD_BLOCKED";
 const char kRcDetailErrorTypeBadRequest[] = "BAD_REQUEST";
 const char kPathValidationError[] = "Error in `:path` header validation.";
 
@@ -85,9 +106,53 @@ absl::Status validateMethodName(absl::string_view method_name) {
 
 } // namespace
 
+bool ProtoApiScrubberFilter::checkMethodLevelRestrictions(Envoy::Http::RequestHeaderMap& headers) {
+  ENVOY_STREAM_LOG(trace, "Checking method-level restrictions for method: {}", *decoder_callbacks_,
+                   method_name_);
+
+  auto method_matcher = filter_config_.getMethodMatcher(method_name_);
+  if (method_matcher == nullptr) {
+    ENVOY_STREAM_LOG(trace, "No method-level restriction found for method: {}", *decoder_callbacks_,
+                     method_name_);
+    return false; // No specific rule, allow.
+  }
+
+  HttpMatchingDataImpl matching_data(decoder_callbacks_->streamInfo());
+  matching_data.onRequestHeaders(headers);
+
+  auto match_result = method_matcher->match(matching_data);
+
+  // 'Envoy::Matcher::MatchResult' is the struct type, 'MatchState::UnableToMatch' is the value.
+  if (match_result.isInsufficientData()) {
+    ENVOY_STREAM_LOG(warn,
+                     "Method-level matcher evaluation for {} was not complete. Allowing request.",
+                     *decoder_callbacks_, method_name_);
+    return false; // Fail open on matcher issues.
+  }
+
+  if (match_result.isMatch()) {
+    ENVOY_STREAM_LOG(debug, "Method-level restriction matched for {}, blocking request.",
+                     *decoder_callbacks_, method_name_);
+
+    filter_config_.stats().method_blocked_.inc();
+    decoder_callbacks_->activeSpan().setTag("proto_api_scrubber.outcome", "blocked");
+
+    rejectRequest(Status::PermissionDenied, "Method not allowed",
+                  formatError(kRcDetailFilterProtoApiScrubber,
+                              Envoy::Http::CodeUtility::toString(Http::Code::Forbidden),
+                              kRcDetailMethodBlocked));
+    return true; // Block the request.
+  }
+
+  ENVOY_STREAM_LOG(trace, "Method-level restriction did not match for {}. Allowing headers.",
+                   *decoder_callbacks_, method_name_);
+  return false; // No match, allow.
+}
+
 Http::FilterHeadersStatus
 ProtoApiScrubberFilter::decodeHeaders(Envoy::Http::RequestHeaderMap& headers, bool) {
   ENVOY_STREAM_LOG(trace, "Called ProtoApiScrubber Filter : {}", *decoder_callbacks_, __func__);
+  filter_config_.stats().total_requests_.inc();
 
   if (!Envoy::Grpc::Common::isGrpcRequestHeaders(headers)) {
     ENVOY_STREAM_LOG(debug,
@@ -97,17 +162,25 @@ ProtoApiScrubberFilter::decodeHeaders(Envoy::Http::RequestHeaderMap& headers, bo
     return Envoy::Http::FilterHeadersStatus::Continue;
   }
 
+  filter_config_.stats().total_requests_checked_.inc();
   is_valid_grpc_request_ = true;
-  auto path_header = headers.Path()->value().getStringView();
-  if (absl::Status status = validateMethodName(path_header); !status.ok()) {
-    rejectRequest(status.raw_code(), status.message(),
+  absl::string_view path = headers.Path()->value().getStringView();
+  if (absl::Status status = validateMethodName(path); !status.ok()) {
+    filter_config_.stats().invalid_method_name_.inc();
+    rejectRequest(static_cast<Envoy::Grpc::Status::GrpcStatus>(status.code()), status.message(),
                   formatError(kRcDetailFilterProtoApiScrubber,
                               absl::StatusCodeToString(status.code()), kPathValidationError));
     return Envoy::Http::FilterHeadersStatus::StopIteration;
   }
 
-  method_name_ = std::string(path_header);
+  method_name_ = std::string(path);
 
+  // Perform method-level restriction check.
+  if (checkMethodLevelRestrictions(headers)) {
+    return Envoy::Http::FilterHeadersStatus::StopIteration; // Request was rejected.
+  }
+
+  // If not blocked, proceed to set up for data phase.
   auto cord_message_data_factory = std::make_unique<CreateMessageDataFunc>(
       []() { return std::make_unique<Protobuf::field_extraction::CordMessageData>(); });
 
@@ -130,7 +203,16 @@ Http::FilterDataStatus ProtoApiScrubberFilter::decodeData(Buffer::Instance& data
   // Move the data to internal gRPC buffer messages representation.
   auto messages = request_msg_converter_->accumulateMessages(data, end_stream);
   if (const absl::Status& status = messages.status(); !status.ok()) {
-    rejectRequest(status.raw_code(), status.message(),
+    filter_config_.stats().request_buffer_conversion_error_.inc();
+
+    // Correctly use the status code from the error for rejectRequest.
+    Envoy::Grpc::Status::GrpcStatus grpc_status = Status::WellKnownGrpcStatus::Internal;
+    if (status.code() == absl::StatusCode::kFailedPrecondition) {
+      grpc_status = Status::WellKnownGrpcStatus::FailedPrecondition;
+    } else if (status.code() == absl::StatusCode::kResourceExhausted) {
+      grpc_status = Status::WellKnownGrpcStatus::ResourceExhausted;
+    }
+    rejectRequest(grpc_status, status.message(),
                   formatError(kRcDetailFilterProtoApiScrubber,
                               absl::StatusCodeToString(status.code()),
                               kRcDetailErrorRequestBufferConversion));
@@ -139,7 +221,8 @@ Http::FilterDataStatus ProtoApiScrubberFilter::decodeData(Buffer::Instance& data
 
   if (messages->empty()) {
     ENVOY_STREAM_LOG(debug, "not a complete msg", *decoder_callbacks_);
-    return Http::FilterDataStatus::StopIterationNoBuffer;
+    return end_stream ? Http::FilterDataStatus::Continue
+                      : Http::FilterDataStatus::StopIterationAndBuffer;
   }
 
   // Scrub each message individually, one by one.
@@ -152,12 +235,13 @@ Http::FilterDataStatus ProtoApiScrubberFilter::decodeData(Buffer::Instance& data
         createRequestProtoScrubber();
 
     if (!request_scrubber_or_status.ok()) {
+      filter_config_.stats().request_scrubbing_failed_.inc();
       const absl::Status& status = request_scrubber_or_status.status();
 
       ENVOY_STREAM_LOG(error, "Unable to scrub request payload. Error details: {}",
                        *decoder_callbacks_, status.ToString());
 
-      rejectRequest(status.raw_code(), status.message(),
+      rejectRequest(static_cast<Envoy::Grpc::Status::GrpcStatus>(status.code()), status.message(),
                     formatError(kRcDetailFilterProtoApiScrubber,
                                 absl::StatusCodeToString(status.code()),
                                 kRcDetailErrorTypeBadRequest));
@@ -165,10 +249,11 @@ Http::FilterDataStatus ProtoApiScrubberFilter::decodeData(Buffer::Instance& data
       return Envoy::Http::FilterDataStatus::StopIterationNoBuffer;
     }
 
-    // Move the created scrubber into the MEMBER variable
+    // Move the created scrubber into the MEMBER variable.
     request_scrubber_ = std::move(request_scrubber_or_status).value();
   }
 
+  Buffer::OwnedImpl newData;
   for (size_t msg_idx = 0; msg_idx < messages->size(); ++msg_idx) {
     std::unique_ptr<StreamMessage> stream_message = std::move(messages->at(msg_idx));
 
@@ -184,22 +269,45 @@ Http::FilterDataStatus ProtoApiScrubberFilter::decodeData(Buffer::Instance& data
       // stream end.
       ASSERT(msg_idx == messages->size() - 1);
 
-      // Skip the empty message
+      // Skip the empty message.
       continue;
     }
 
-    auto status = request_scrubber_->Scrub(stream_message->message());
-    if (!status.ok()) {
+    auto start_time = filter_config_.timeSource().monotonicTime();
+    auto request_scrubber_or_status = request_scrubber_->Scrub(stream_message->message());
+    auto end_time = filter_config_.timeSource().monotonicTime();
+    auto latency_ms =
+        std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
+    filter_config_.stats().request_scrubbing_latency_.recordValue(latency_ms);
+
+    if (!request_scrubber_or_status.ok()) {
+      filter_config_.stats().request_scrubbing_failed_.inc();
+      decoder_callbacks_->activeSpan().setTag("proto_api_scrubber.request_error",
+                                              request_scrubber_or_status.ToString());
+
       ENVOY_STREAM_LOG(warn, "Scrubbing failed with error: {}. The request will not be modified.",
-                       *decoder_callbacks_, status.ToString());
+                       *decoder_callbacks_, request_scrubber_or_status.ToString());
     }
 
     auto buf_convert_status =
-        request_msg_converter_->convertBackToBuffer(std::move(stream_message));
-    RELEASE_ASSERT(buf_convert_status.ok(), "failed to convert message back to envoy buffer");
+        convertMessageToBuffer(*request_msg_converter_, std::move(stream_message));
 
-    data.move(*buf_convert_status.value());
+    if (!buf_convert_status.ok()) {
+      const absl::Status& status = buf_convert_status.status();
+      ENVOY_STREAM_LOG(error, "Failed to convert scrubbed message back to envoy buffer: {}",
+                       *encoder_callbacks_, status.ToString());
+
+      // Send a local reply if response conversion failed.
+      rejectRequest(status.raw_code(), status.message(),
+                    formatError(kRcDetailFilterProtoApiScrubber,
+                                absl::StatusCodeToString(status.code()),
+                                kRcDetailErrorRequestBufferConversion));
+      return Envoy::Http::FilterDataStatus::StopIterationNoBuffer;
+    }
+
+    newData.move(*buf_convert_status.value());
   }
+  data.move(newData);
 
   ENVOY_STREAM_LOG(trace, "Scrubbing completed successfully.", *decoder_callbacks_);
   return Envoy::Http::FilterDataStatus::Continue;
@@ -238,6 +346,7 @@ Http::FilterDataStatus ProtoApiScrubberFilter::encodeData(Buffer::Instance& data
   // Move the data to internal gRPC buffer messages representation.
   auto messages = response_msg_converter_->accumulateMessages(data, end_stream);
   if (const absl::Status& status = messages.status(); !status.ok()) {
+    filter_config_.stats().response_buffer_conversion_error_.inc();
     rejectResponse(status.raw_code(), status.message(),
                    formatError(kRcDetailFilterProtoApiScrubber,
                                absl::StatusCodeToString(status.code()),
@@ -259,6 +368,8 @@ Http::FilterDataStatus ProtoApiScrubberFilter::encodeData(Buffer::Instance& data
     absl::StatusOr<std::unique_ptr<ProtoScrubber>> response_scrubber_or_status =
         createResponseProtoScrubber();
     if (!response_scrubber_or_status.ok()) {
+      filter_config_.stats().response_scrubbing_failed_.inc();
+
       const absl::Status& status = response_scrubber_or_status.status();
       ENVOY_STREAM_LOG(error, "Unable to scrub request payload. Error details: {}",
                        *encoder_callbacks_, status.ToString());
@@ -287,8 +398,18 @@ Http::FilterDataStatus ProtoApiScrubberFilter::encodeData(Buffer::Instance& data
       continue;
     }
 
+    auto start_time = filter_config_.timeSource().monotonicTime();
     auto response_scrubber_or_status = response_scrubber_->Scrub(stream_message->message());
+    auto end_time = filter_config_.timeSource().monotonicTime();
+    auto latency_ms =
+        std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
+    filter_config_.stats().response_scrubbing_latency_.recordValue(latency_ms);
+
     if (!response_scrubber_or_status.ok()) {
+      filter_config_.stats().response_scrubbing_failed_.inc();
+      encoder_callbacks_->activeSpan().setTag("proto_api_scrubber.response_error",
+                                              response_scrubber_or_status.ToString());
+
       ENVOY_STREAM_LOG(warn,
                        "Response scrubbing failed with error: {}. The response will not be "
                        "modified.",
@@ -296,8 +417,11 @@ Http::FilterDataStatus ProtoApiScrubberFilter::encodeData(Buffer::Instance& data
     }
 
     auto buf_convert_status =
-        response_msg_converter_->convertBackToBuffer(std::move(stream_message));
+        convertMessageToBuffer(*response_msg_converter_, std::move(stream_message));
+
     if (!buf_convert_status.ok()) {
+      filter_config_.stats().response_buffer_conversion_error_.inc();
+
       const absl::Status& status = buf_convert_status.status();
       ENVOY_STREAM_LOG(error, "Failed to convert scrubbed message back to envoy buffer: {}",
                        *encoder_callbacks_, status.ToString());
@@ -325,7 +449,9 @@ ProtoApiScrubberFilter::createRequestProtoScrubber() {
   RETURN_IF_NOT_OK(request_type_or_status.status());
 
   request_match_tree_field_checker_ = std::make_unique<FieldChecker>(
-      ScrubberContext::kRequestScrubbing, &decoder_callbacks_->streamInfo(), method_name_,
+      ScrubberContext::kRequestScrubbing, &decoder_callbacks_->streamInfo(),
+      decoder_callbacks_->requestHeaders(), OptRef<const Http::ResponseHeaderMap>{},
+      decoder_callbacks_->requestTrailers(), OptRef<const Http::ResponseTrailerMap>{}, method_name_,
       &filter_config_);
 
   return std::make_unique<ProtoScrubber>(
@@ -341,7 +467,9 @@ ProtoApiScrubberFilter::createResponseProtoScrubber() {
   RETURN_IF_NOT_OK(response_type_or_status.status());
 
   response_match_tree_field_checker_ = std::make_unique<FieldChecker>(
-      ScrubberContext::kResponseScrubbing, &encoder_callbacks_->streamInfo(), method_name_,
+      ScrubberContext::kResponseScrubbing, &encoder_callbacks_->streamInfo(),
+      decoder_callbacks_->requestHeaders(), encoder_callbacks_->responseHeaders(),
+      decoder_callbacks_->requestTrailers(), encoder_callbacks_->responseTrailers(), method_name_,
       &filter_config_);
 
   return std::make_unique<ProtoScrubber>(

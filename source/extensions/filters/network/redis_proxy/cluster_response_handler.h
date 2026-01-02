@@ -109,7 +109,7 @@ private:
 };
 
 /**
- * Handler for array merging (CONFIG GET, SLOWLOG GET)
+ * Handler for array merging (CONFIG GET, SLOWLOG GET, KEYS)
  */
 class ArrayMergeAggregateResponseHandler : public BaseAggregateResponseHandler {
 public:
@@ -120,6 +120,19 @@ private:
   void processAggregatedResponses(ClusterScopeCmdRequest& request) override;
 };
 
+/**
+ * Handler for appending entire arrays (ROLE)
+ * Unlike ArrayMerge which flattens array elements, this preserves array structure
+ * by appending complete arrays from each shard into a parent array.
+ */
+class ArrayAppendAggregateResponseHandler : public BaseAggregateResponseHandler {
+public:
+  explicit ArrayAppendAggregateResponseHandler(uint32_t shard_count)
+      : BaseAggregateResponseHandler(shard_count) {}
+
+private:
+  void processAggregatedResponses(ClusterScopeCmdRequest& request) override;
+};
 /**
  * Factory class for creating appropriate response handlers
  */

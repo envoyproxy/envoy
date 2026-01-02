@@ -10,6 +10,8 @@ Extensions
   accesslog/filters
   formatter/formatter
   accesslog/accesslog
+  certificate_mappers/certificate_mappers
+  certificate_selectors/certificate_selectors
   cluster/cluster
   common/common
   compression/compression
@@ -50,3 +52,4 @@ Extensions
   watchdog/watchdog
   load_balancing_policies/load_balancing_policies
   cluster_specifier/cluster_specifier
+  local_address_selectors/local_address_selectors

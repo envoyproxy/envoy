@@ -7,6 +7,8 @@
 #include <initializer_list>
 #include <memory>
 
+#include "quiche/quic/test_tools/quic_connection_peer.h"
+
 namespace Envoy {
 
 using Extensions::TransportSockets::Tls::ContextImplPeer;
@@ -1871,7 +1873,8 @@ TEST_P(QuicHttpIntegrationTest, SendDisableActiveMigration) {
   ASSERT_TRUE(quic_connection_->waitForHandshakeDone());
 
   // Validate the setting was transmitted.
-  EXPECT_TRUE(quic_session->config()->DisableConnectionMigration());
+  EXPECT_TRUE(
+      quic::test::QuicConnectionPeer::ConnectionMigrationDisabled(quic_session->connection()));
 
   Http::TestRequestHeaderMapImpl request_headers{
       {":method", "GET"},
@@ -1917,7 +1920,8 @@ TEST_P(QuicHttpIntegrationTest, UnsetSendDisableActiveMigration) {
   ASSERT_TRUE(quic_connection_->waitForHandshakeDone());
 
   // Validate the setting was not transmitted.
-  EXPECT_FALSE(quic_session->config()->DisableConnectionMigration());
+  EXPECT_FALSE(
+      quic::test::QuicConnectionPeer::ConnectionMigrationDisabled(quic_session->connection()));
 
   Http::TestRequestHeaderMapImpl request_headers{
       {":method", "GET"},

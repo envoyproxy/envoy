@@ -8,7 +8,7 @@
 namespace Envoy {
 namespace Upstream {
 
-class TestUpstreamLocalAddressSelector : public UpstreamLocalAddressSelector {
+class TestUpstreamLocalAddressSelector : public UpstreamLocalAddressSelectorBase {
 public:
   TestUpstreamLocalAddressSelector(
       std::vector<::Envoy::Upstream::UpstreamLocalAddress> upstream_local_addresses,

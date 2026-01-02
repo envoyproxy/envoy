@@ -14,6 +14,7 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
+#include "source/extensions/filters/http/ext_proc/processing_effect.h"
 
 #include "absl/status/status.h"
 #include "matching_utils.h"
@@ -166,10 +167,12 @@ public:
   virtual const Http::RequestOrResponseHeaderMap* responseHeaders() const PURE;
   const Http::HeaderMap* responseTrailers() const { return trailers_; }
 
+  const absl::optional<MonotonicTime>& getCallStartTime() const { return call_start_time_; }
   void onStartProcessorCall(Event::TimerCb cb, std::chrono::milliseconds timeout,
                             CallbackState callback_state);
   void onFinishProcessorCall(Grpc::Status::GrpcStatus call_status,
                              CallbackState next_state = CallbackState::Idle);
+  void logMutation(CallbackState callback_state, ProcessingEffect::Effect processing_effect);
   void stopMessageTimer();
   bool restartMessageTimer(const uint32_t message_timeout_ms);
 
@@ -315,7 +318,8 @@ private:
       const envoy::service::ext_proc::v3::CommonResponse& common_response);
   void sendBufferedDataInStreamedMode(bool end_stream);
   absl::Status
-  processHeaderMutation(const envoy::service::ext_proc::v3::CommonResponse& common_response);
+  processHeaderMutation(const envoy::service::ext_proc::v3::CommonResponse& common_response,
+                        ProcessingEffect::Effect& processing_effect);
   void clearStreamingChunk() { chunk_queue_.clear(); }
   CallbackState getCallbackStateAfterHeaderResp(
       const envoy::service::ext_proc::v3::CommonResponse& common_response) const;
@@ -411,7 +415,8 @@ private:
    *         or an error status on failure
    */
   absl::Status processHeaderMutationIfAvailable(
-      const envoy::service::ext_proc::v3::CommonResponse& common_response);
+      const envoy::service::ext_proc::v3::CommonResponse& common_response,
+      ProcessingEffect::Effect& effect);
 
   /**
    * Validates content length against body mutation size. Content-length header is only
@@ -431,7 +436,8 @@ private:
    * @param common_response The common response containing body mutations to apply
    */
   void
-  applyBufferedBodyMutation(const envoy::service::ext_proc::v3::CommonResponse& common_response);
+  applyBufferedBodyMutation(const envoy::service::ext_proc::v3::CommonResponse& common_response,
+                            ProcessingEffect::Effect& effect);
 
   /**
    * Finalizes body response processing by handling trailers and continuation.

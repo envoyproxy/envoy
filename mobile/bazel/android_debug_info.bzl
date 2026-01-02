@@ -9,6 +9,9 @@ But even if we could create those we'd need to get them out of the build
 somehow, this rule provides a separate --output_group for this
 """
 
+load("@rules_cc//cc/common:cc_common.bzl", "cc_common")
+load("@rules_cc//cc/common:cc_info.bzl", "CcInfo")
+
 def _impl(ctx):
     library_outputs = []
     objdump_outputs = []

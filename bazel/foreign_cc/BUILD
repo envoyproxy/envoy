@@ -28,10 +28,9 @@ config_setting(
 configure_make(
     name = "liburing",
     configure_in_place = True,
-    env = select({
+    env = {"ENABLE_SHARED": "0"} | select({
         "//bazel:clang_build": {
             "AR": "$(AR)",
-            "LD": "$(LD)",
             "RANLIB": "$(AR) -s",
         },
         "//conditions:default": {},
@@ -41,10 +40,7 @@ configure_make(
         "nocompdb",
         "skip_on_windows",
     ],
-    targets = [
-        "library",
-        "install",
-    ],
+    targets = ["install"],
 )
 
 envoy_cc_library(
@@ -192,12 +188,6 @@ configure_make(
         "//bazel/foreign_cc:parallel_builds_enabled": {
             "MAKEFLAGS": "-j ARFLAGS=r",
         },
-        "//bazel:engflow_rbe_x86_64": {
-            "MAKEFLAGS": "-j ARFLAGS=r",
-        },
-        "//bazel:engflow_rbe_aarch64": {
-            "MAKEFLAGS": "-j ARFLAGS=r",
-        },
         "//conditions:default": {
             "MAKEFLAGS": "-j1 ARFLAGS=r",
         },
@@ -233,8 +223,6 @@ envoy_cmake(
     name = "libsxg",
     build_args = select({
         "//bazel/foreign_cc:parallel_builds_enabled": ["-j"],
-        "//bazel:engflow_rbe_x86_64": ["-j"],
-        "//bazel:engflow_rbe_aarch64": ["-j"],
         "//conditions:default": ["-j1"],
     }),
     cache_entries = {
@@ -274,8 +262,6 @@ envoy_cmake(
     name = "ares",
     build_args = select({
         "//bazel/foreign_cc:parallel_builds_enabled": ["-j"],
-        "//bazel:engflow_rbe_x86_64": ["-j"],
-        "//bazel:engflow_rbe_aarch64": ["-j"],
         "//conditions:default": ["-j1"],
     }),
     cache_entries = {
@@ -318,8 +304,6 @@ envoy_cmake(
     name = "event",
     build_args = select({
         "//bazel/foreign_cc:parallel_builds_enabled": ["-j"],
-        "//bazel:engflow_rbe_x86_64": ["-j"],
-        "//bazel:engflow_rbe_aarch64": ["-j"],
         "//conditions:default": ["-j1"],
     }),
     cache_entries = {
@@ -375,8 +359,6 @@ envoy_cmake(
     name = "nghttp2",
     build_args = select({
         "//bazel/foreign_cc:parallel_builds_enabled": ["-j"],
-        "//bazel:engflow_rbe_x86_64": ["-j"],
-        "//bazel:engflow_rbe_aarch64": ["-j"],
         "//conditions:default": ["-j1"],
     }),
     cache_entries = {
@@ -413,8 +395,6 @@ envoy_cmake(
     name = "wamr",
     build_args = select({
         "//bazel/foreign_cc:parallel_builds_enabled": ["-j"],
-        "//bazel:engflow_rbe_x86_64": ["-j"],
-        "//bazel:engflow_rbe_aarch64": ["-j"],
         "//conditions:default": ["-j1"],
     }),
     cache_entries = {
@@ -462,7 +442,7 @@ envoy_cmake(
         "Ninja",
     ],
     lib_source = "@com_github_wamr//:all",
-    out_static_libs = ["libvmlib.a"],
+    out_static_libs = ["libiwasm.a"],
     tags = ["skip_on_windows"],
 )
 
@@ -470,8 +450,6 @@ envoy_cmake(
     name = "maxmind",
     build_args = select({
         "//bazel/foreign_cc:parallel_builds_enabled": ["-j"],
-        "//bazel:engflow_rbe_x86_64": ["-j"],
-        "//bazel:engflow_rbe_aarch64": ["-j"],
         "//conditions:default": ["-j1"],
     }),
     cache_entries = {

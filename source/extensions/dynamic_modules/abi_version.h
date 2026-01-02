@@ -6,7 +6,7 @@ namespace DynamicModules {
 #endif
 // This is the ABI version calculated as a sha256 hash of the ABI header files. When the ABI
 // changes, this value must change, and the correctness of this value is checked by the test.
-const char* kAbiVersion = "e7c1b3b48b6ef759ad0766916b5124ea01ca7117db79bc5b13d8cdd294deb9fc";
+const char* kAbiVersion = "3fe64075e0a96694bcfc55111b047d3c9a62c46482f9e7c91159e12b9211ba96";
 
 #ifdef __cplusplus
 } // namespace DynamicModules
