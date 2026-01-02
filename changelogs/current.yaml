@@ -225,6 +225,11 @@ bug_fixes:
   change: |
     Fixed the gRPC ext_authz client to respect ``status_on_error`` configuration when gRPC calls fail.
     Previously, gRPC call failures always returned 403 Forbidden regardless of the configured error status.
+- area: proto_api_scrubber
+  change: |
+    Fixed a crash in the :ref:`Proto API Scrubber <config_http_filters_proto_api_scrubber>` filter when internal buffer
+    conversion fails. The filter now gracefully rejects the traffic with a local reply and error detail
+    ``proto_api_scrubber_FAILED_PRECONDITION`` instead of terminating the process.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -659,5 +664,19 @@ new_features:
     :ref:`endpoint_params <envoy_v3_api_field_extensions.http.injected_credentials.oauth2.v3.OAuth2.endpoint_params>`.
     This allows passing custom parameters required by authorization servers (such as Logto or EntraID) that expect
     additional body parameters during the token exchange.
+- area: proto_api_scrubber
+  change: |
+    Enabled the :ref:`Proto API Scrubber <config_http_filters_proto_api_scrubber>` HTTP filter. This filter allows
+    scrubbing of gRPC request and response payloads based on configured restrictions and is robust to untrusted
+    downstream traffic.
+- area: proto_api_scrubber
+  change: |
+    Added support for message and enum level restrictions in the
+    :ref:`Proto API Scrubber <config_http_filters_proto_api_scrubber>` filter.
+- area: proto_api_scrubber
+  change: |
+    Added comprehensive metrics and tracing tags to the
+    :ref:`Proto API Scrubber <config_http_filters_proto_api_scrubber>` filter. This includes counters for requests,
+    blocks, and failures, latency histograms, and span tags for scrubbing outcomes.
 
 deprecated:
