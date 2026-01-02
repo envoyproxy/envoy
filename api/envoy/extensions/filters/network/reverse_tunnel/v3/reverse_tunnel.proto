@@ -114,17 +114,16 @@ message ReverseTunnel {
   // using format strings. Requests that fail validation are rejected with HTTP ``403 Forbidden``.
   Validation validation = 5;
 
-  // Optional name for this reverse tunnel filter.
+  // Optional cluster name for this reverse tunnel filter.
   // This can be used to identify the cluster and for cluster matching validation.
-  // If not specified, no name is assigned to the filter.
-  string name = 6 [(validate.rules).string = {max_len: 255 ignore_empty: true}];
+  // If not specified, this defaults to ``responder-envoy``.
+  string cluster_name = 6 [(validate.rules).string = {max_len: 255 ignore_empty: true}];
 
   // Whether to enforce that the ``x-envoy-reverse-tunnel-upstream-cluster-name`` header
-  // matches the configured reverse tunnel filter name.
+  // matches the configured reverse tunnel filter cluster name.
   // When enabled, incoming reverse tunnel requests must have an upstream cluster name
-  // that matches the ``name`` field. Requests with mismatched cluster names are rejected
+  // that matches the ``cluster_name`` field. Requests with mismatched cluster names are rejected
   // with HTTP ``400 Bad Request``.
-  // This field is only effective when ``name`` is configured.
   // Defaults to ``false``.
   bool enforce_cluster_match = 7;
 }

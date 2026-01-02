@@ -51,8 +51,8 @@ public:
   void emitValidationMetadata(absl::string_view node_id, absl::string_view cluster_id,
                               bool validation_passed, StreamInfo::StreamInfo& stream_info) const;
 
-  // Returns the configured listener name.
-  const std::string& name() const { return name_; }
+  // Returns the configured cluster name.
+  const std::string& clusterName() const { return cluster_name_; }
 
   // Returns whether cluster match enforcement is enabled.
   bool enforceClusterMatch() const { return enforce_cluster_match_; }
@@ -74,8 +74,8 @@ private:
   const bool emit_dynamic_metadata_{false};
   const std::string dynamic_metadata_namespace_;
 
-  // Listener identification and cluster matching.
-  const std::string name_;
+  // Filter identification and cluster matching.
+  const std::string cluster_name_;
   const bool enforce_cluster_match_{false};
 };
 
