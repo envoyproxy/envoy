@@ -2,6 +2,7 @@ builtin:
 - envoy.request_id.uuid
 - envoy.upstreams.tcp.generic
 - envoy.upstreams.tcp.tcp_protocol_options
+- envoy.transport_sockets.quic
 - envoy.transport_sockets.tls
 - envoy.upstreams.http.http_protocol_options
 - envoy.upstreams.http.generic
