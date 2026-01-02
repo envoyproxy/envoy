@@ -84,9 +84,10 @@ uint16_t InstanceImpl::shardSize() { return tls_->getTyped<ThreadLocalPool>().sh
 // failing due to InstanceImpl going away.
 Common::Redis::Client::PoolRequest*
 InstanceImpl::makeRequest(const std::string& key, RespVariant&& request, PoolCallbacks& callbacks,
-                          Common::Redis::Client::Transaction& transaction) {
+                          Common::Redis::Client::Transaction& transaction,
+                          bool is_blocking_command) {
   return tls_->getTyped<ThreadLocalPool>().makeRequest(key, std::move(request), callbacks,
-                                                       transaction);
+                                                       transaction, is_blocking_command);
 }
 
 // This method is always called from a InstanceSharedPtr we don't have to worry about tls_->getTyped
@@ -103,9 +104,11 @@ InstanceImpl::makeRequestToHost(const std::string& host_address,
 Common::Redis::Client::PoolRequest*
 InstanceImpl::makeRequestToShard(uint16_t shard_index, RespVariant&& request,
                                  PoolCallbacks& callbacks,
-                                 Common::Redis::Client::Transaction& transaction) {
+                                 Common::Redis::Client::Transaction& transaction,
+                                 bool is_blocking_command) {
   return tls_->getTyped<ThreadLocalPool>().makeRequestToShard(shard_index, std::move(request),
-                                                              callbacks, transaction);
+                                                              callbacks, transaction,
+                                                              is_blocking_command);
 }
 
 InstanceImpl::ThreadLocalPool::ThreadLocalPool(
@@ -324,7 +327,8 @@ uint16_t InstanceImpl::ThreadLocalPool::shardSize() {
 Common::Redis::Client::PoolRequest*
 InstanceImpl::ThreadLocalPool::makeRequest(const std::string& key, RespVariant&& request,
                                            PoolCallbacks& callbacks,
-                                           Common::Redis::Client::Transaction& transaction) {
+                                           Common::Redis::Client::Transaction& transaction,
+                                           bool is_blocking_command) {
   if (cluster_ == nullptr) {
     ASSERT(client_map_.empty());
     ASSERT(host_set_member_update_cb_handle_ == nullptr);
@@ -341,13 +345,14 @@ InstanceImpl::ThreadLocalPool::makeRequest(const std::string& key, RespVariant&&
     return nullptr;
   }
 
-  return makeRequestToHost(host, std::move(request), callbacks, transaction);
+  return makeRequestToHost(host, std::move(request), callbacks, transaction, is_blocking_command);
 }
 
 Common::Redis::Client::PoolRequest*
 InstanceImpl::ThreadLocalPool::makeRequestToShard(uint16_t shard_index, RespVariant&& request,
                                                   PoolCallbacks& callbacks,
-                                                  Common::Redis::Client::Transaction& transaction) {
+                                                  Common::Redis::Client::Transaction& transaction,
+                                                  bool is_blocking_command) {
   if (cluster_ == nullptr) {
     ASSERT(client_map_.empty());
     ASSERT(host_set_member_update_cb_handle_ == nullptr);
@@ -364,7 +369,7 @@ InstanceImpl::ThreadLocalPool::makeRequestToShard(uint16_t shard_index, RespVari
     ENVOY_LOG(debug, "host not found: '{}'", shard_index);
     return nullptr;
   }
-  return makeRequestToHost(host, std::move(request), callbacks, transaction);
+  return makeRequestToHost(host, std::move(request), callbacks, transaction, is_blocking_command);
 }
 
 Common::Redis::Client::PoolRequest* InstanceImpl::ThreadLocalPool::makeRequestToHost(
@@ -446,7 +451,8 @@ Common::Redis::Client::PoolRequest* InstanceImpl::ThreadLocalPool::makeRequestTo
 Common::Redis::Client::PoolRequest*
 InstanceImpl::ThreadLocalPool::makeRequestToHost(Upstream::HostConstSharedPtr& host,
                                                  RespVariant&& request, PoolCallbacks& callbacks,
-                                                 Common::Redis::Client::Transaction& transaction) {
+                                                 Common::Redis::Client::Transaction& transaction,
+                                                 bool is_blocking_command) {
   uint32_t client_idx = transaction.current_client_idx_;
   // If there is an active transaction, establish a new connection if necessary.
   if (transaction.active_ && !transaction.connection_established_) {
@@ -475,9 +481,17 @@ InstanceImpl::ThreadLocalPool::makeRequestToHost(Upstream::HostConstSharedPtr& h
       client_map_.erase(host);
       return nullptr;
     }
+    // Set blocking client flag before making the request
+    if (is_blocking_command) {
+      client->redis_client_->setBlockingClient(true);
+    }
     pending_request.request_handler_ = client->redis_client_->makeRequest(
         getRequest(pending_request.incoming_request_), pending_request);
   } else {
+    // Set blocking client flag for transaction clients too
+    if (is_blocking_command) {
+      transaction.clients_[client_idx]->setBlockingClient(true);
+    }
     pending_request.request_handler_ = transaction.clients_[client_idx]->makeRequest(
         getRequest(pending_request.incoming_request_), pending_request);
   }

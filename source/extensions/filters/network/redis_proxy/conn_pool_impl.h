@@ -73,10 +73,12 @@ public:
   // RedisProxy::ConnPool::Instance
   Common::Redis::Client::PoolRequest*
   makeRequest(const std::string& key, RespVariant&& request, PoolCallbacks& callbacks,
-              Common::Redis::Client::Transaction& transaction) override;
+              Common::Redis::Client::Transaction& transaction,
+              bool is_blocking_command = false) override;
   Common::Redis::Client::PoolRequest*
   makeRequestToShard(uint16_t shard_index, RespVariant&& request, PoolCallbacks& callbacks,
-                     Common::Redis::Client::Transaction& transaction) override;
+                     Common::Redis::Client::Transaction& transaction,
+                     bool is_blocking_command = false) override;
   /**
    * Makes a redis request based on IP address and TCP port of the upstream host (e.g.,
    * moved/ask cluster redirection). This is now only kept mostly for testing.
@@ -165,16 +167,18 @@ private:
     uint16_t shardSize();
     Common::Redis::Client::PoolRequest*
     makeRequest(const std::string& key, RespVariant&& request, PoolCallbacks& callbacks,
-                Common::Redis::Client::Transaction& transaction);
+                Common::Redis::Client::Transaction& transaction, bool is_blocking_command = false);
     Common::Redis::Client::PoolRequest*
     makeRequestToHost(Upstream::HostConstSharedPtr& host, RespVariant&& request,
-                      PoolCallbacks& callbacks, Common::Redis::Client::Transaction& transaction);
+                      PoolCallbacks& callbacks, Common::Redis::Client::Transaction& transaction,
+                      bool is_blocking_command = false);
     Common::Redis::Client::PoolRequest*
     makeRequestToHost(const std::string& host_address, const Common::Redis::RespValue& request,
                       Common::Redis::Client::ClientCallbacks& callbacks);
     Common::Redis::Client::PoolRequest*
     makeRequestToShard(uint16_t shard_index, RespVariant&& request, PoolCallbacks& callbacks,
-                       Common::Redis::Client::Transaction& transaction);
+                       Common::Redis::Client::Transaction& transaction,
+                       bool is_blocking_command = false);
     void onClusterAddOrUpdateNonVirtual(absl::string_view cluster_name,
                                         Upstream::ThreadLocalClusterCommand& get_cluster);
     void onHostsAdded(const std::vector<Upstream::HostSharedPtr>& hosts_added);

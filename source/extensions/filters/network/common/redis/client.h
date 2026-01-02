@@ -102,6 +102,13 @@ public:
   virtual PoolRequest* makeRequest(const RespValue& request, ClientCallbacks& callbacks) PURE;
 
   /**
+   * Mark this client as a blocking client (for commands like BLPOP).
+   * Blocking clients do not have operation timeouts enabled.
+   * @param is_blocking true if this client is for blocking commands.
+   */
+  virtual void setBlockingClient(bool is_blocking) PURE;
+
+  /**
    * Initialize the connection. Issue the auth command and readonly command as needed.
    * @param auth password for upstream host.
    */

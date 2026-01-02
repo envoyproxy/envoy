@@ -130,8 +130,8 @@ ClientImpl::ClientImpl(
       connect_or_op_timer_(dispatcher.createTimer([this]() { onConnectOrOpTimeout(); })),
       flush_timer_(dispatcher.createTimer([this]() { flushBufferAndResetTimer(); })),
       time_source_(dispatcher.timeSource()), redis_command_stats_(redis_command_stats),
-      scope_(scope), is_transaction_client_(is_transaction_client), aws_iam_config_(aws_iam_config),
-      aws_iam_authenticator_(aws_iam_authenticator) {
+      scope_(scope), is_transaction_client_(is_transaction_client), is_blocking_client_(false),
+      aws_iam_config_(aws_iam_config), aws_iam_authenticator_(aws_iam_authenticator) {
 
   Upstream::ClusterTrafficStats& traffic_stats = *host->cluster().trafficStats();
   traffic_stats.upstream_cx_total_.inc();
@@ -192,7 +192,8 @@ PoolRequest* ClientImpl::makeRequest(const RespValue& request, ClientCallbacks& 
   //   time for example if TLS is being used.
   // - This is the first request on the pipeline. Otherwise the timeout would effectively start on
   //   the last operation.
-  if (connected_ && pending_requests_.size() == 1) {
+  // - This is not a blocking client (for commands like BLPOP that manage their own timeouts).
+  if (connected_ && pending_requests_.size() == 1 && !is_blocking_client_) {
     connect_or_op_timer_->enableTimer(config_->opTimeout());
   }
 
@@ -278,7 +279,10 @@ void ClientImpl::onEvent(Network::ConnectionEvent event) {
   } else if (event == Network::ConnectionEvent::Connected) {
     connected_ = true;
     ASSERT(!pending_requests_.empty());
-    connect_or_op_timer_->enableTimer(config_->opTimeout());
+    // Only enable op timeout for non-blocking clients
+    if (!is_blocking_client_) {
+      connect_or_op_timer_->enableTimer(config_->opTimeout());
+    }
   }
 
   if (event == Network::ConnectionEvent::RemoteClose && !connected_) {
@@ -328,10 +332,12 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
 
   // If there are no remaining ops in the pipeline we need to disable the timer.
   // Otherwise we boost the timer since we are receiving responses and there are more to flush
-  // out.
+  // out. Don't enable timer for blocking clients.
   if (pending_requests_.empty()) {
     connect_or_op_timer_->disableTimer();
-  } else {
+    // Reset blocking client flag when all requests are complete
+    is_blocking_client_ = false;
+  } else if (!is_blocking_client_) {
     connect_or_op_timer_->enableTimer(config_->opTimeout());
   }
 

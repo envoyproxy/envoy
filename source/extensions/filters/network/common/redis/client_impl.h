@@ -117,6 +117,13 @@ public:
 
   void queueRequests(bool enable_queue) { queue_enabled_ = enable_queue; }
 
+  /*
+   * Mark this client as a blocking client (for commands like BLPOP).
+   * Blocking clients do not have operation timeouts enabled.
+   * @param is_blocking true if this client is for blocking commands.
+   */
+  void setBlockingClient(bool is_blocking) override { is_blocking_client_ = is_blocking; }
+
   PoolRequest* makeRequestImmediate(const RespValue& request, ClientCallbacks& callbacks);
 
 private:
@@ -175,6 +182,7 @@ private:
   const RedisCommandStatsSharedPtr redis_command_stats_;
   Stats::Scope& scope_;
   bool is_transaction_client_;
+  bool is_blocking_client_;
   bool queue_enabled_{false};
   absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config_;
   absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>

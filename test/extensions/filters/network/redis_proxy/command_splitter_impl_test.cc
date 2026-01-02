@@ -414,7 +414,7 @@ TEST_P(RedisSingleServerRequestTest, NoUpstream) {
 };
 
 INSTANTIATE_TEST_SUITE_P(RedisSingleServerRequestTest, RedisSingleServerRequestTest,
-                         testing::Values("get", "set", "incr", "zadd"));
+                         testing::Values("get", "set", "incr", "zadd", "blpop"));
 
 INSTANTIATE_TEST_SUITE_P(RedisSimpleRequestCommandHandlerMixedCaseTests,
                          RedisSingleServerRequestTest, testing::Values("INCR", "inCrBY"));

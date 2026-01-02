@@ -222,6 +222,34 @@ private:
 };
 
 /**
+ * BlockingRequest handles blocking Redis commands like BLPOP, BRPOP, etc.
+ * These commands have a timeout parameter (in seconds) as the last argument.
+ * 
+ * Blocking commands bypass Envoy's op_timeout to allow them to wait longer than
+ * the configured operation timeout. The is_blocking_client flag prevents the
+ * operation timer from being enabled for these requests.
+ * 
+ * Supported commands:
+ * - BLPOP key [key ...] timeout
+ * - BRPOP key [key ...] timeout (future)
+ * - BRPOPLPUSH source destination timeout (future)
+ * 
+ * This handler validates the timeout parameter and provides clear error messages.
+ */
+class BlockingRequest : public SingleServerRequest {
+public:
+  static SplitRequestPtr create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
+                                SplitCallbacks& callbacks, CommandStats& command_stats,
+                                TimeSource& time_source, bool delay_command_latency,
+                                const StreamInfo::StreamInfo& stream_info);
+
+private:
+  BlockingRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source,
+                  bool delay_command_latency)
+      : SingleServerRequest(callbacks, command_stats, time_source, delay_command_latency) {}
+};
+
+/**
  * TransactionRequest handles commands that are part of a Redis transaction.
  * This includes MULTI, EXEC, DISCARD, and also all the commands that are
  * part of the transaction.
@@ -536,6 +564,7 @@ private:
   CommandHandlerFactory<SimpleRequest> simple_command_handler_;
   CommandHandlerFactory<EvalRequest> eval_command_handler_;
   CommandHandlerFactory<ObjectRequest> object_command_handler_;
+  // Note: BLPOP handler is handled specially in makeRequest() to pass dispatcher
   CommandHandlerFactory<MGETRequest> mget_handler_;
   CommandHandlerFactory<MSETRequest> mset_handler_;
   CommandHandlerFactory<ScanRequest> scan_handler_;

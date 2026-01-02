@@ -7,6 +7,8 @@
 #include "source/extensions/filters/network/common/redis/supported_commands.h"
 #include "source/extensions/filters/network/redis_proxy/cluster_response_handler.h"
 
+#include "absl/strings/numbers.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -26,24 +28,27 @@ ConnPool::DoNothingPoolCallbacks null_pool_callbacks;
  * @param incoming_request supplies the request.
  * @param callbacks supplies the request completion callbacks.
  * @param transaction supplies the transaction info of the current connection.
+ * @param is_blocking_command true if this is a blocking command (like BLPOP) that should not timeout.
  * @return PoolRequest* a handle to the active request or nullptr if the request could not be made
  *         for some reason.
  */
 Common::Redis::Client::PoolRequest* makeSingleServerRequest(
     const RouteSharedPtr& route, const std::string& command, const std::string& key,
     Common::Redis::RespValueConstSharedPtr incoming_request, ConnPool::PoolCallbacks& callbacks,
-    Common::Redis::Client::Transaction& transaction) {
+    Common::Redis::Client::Transaction& transaction, bool is_blocking_command = false) {
   // If a transaction is active, clients_[0] is the primary connection to the cluster.
   // The subsequent clients in the array are used for mirroring.
   transaction.current_client_idx_ = 0;
   auto handler = route->upstream(command)->makeRequest(key, ConnPool::RespVariant(incoming_request),
-                                                       callbacks, transaction);
+                                                       callbacks, transaction, is_blocking_command);
+  
   if (handler) {
     for (auto& mirror_policy : route->mirrorPolicies()) {
       transaction.current_client_idx_++;
       if (mirror_policy->shouldMirror(command)) {
+        // Mirror requests should not be blocking
         mirror_policy->upstream()->makeRequest(key, ConnPool::RespVariant(incoming_request),
-                                               null_pool_callbacks, transaction);
+                                               null_pool_callbacks, transaction, false);
       }
     }
   }
@@ -267,6 +272,53 @@ SplitRequestPtr ObjectRequest::create(Router& router,
     request_ptr->handle_ = makeSingleServerRequest(
         route, base_request->asArray()[0].asString(), base_request->asArray()[2].asString(),
         base_request, *request_ptr, callbacks.transaction());
+  }
+
+  if (!request_ptr->handle_) {
+    command_stats.error_.inc();
+    callbacks.onResponse(Common::Redis::Utility::makeError(Response::get().NoUpstreamHost));
+    return nullptr;
+  }
+
+  return request_ptr;
+}
+
+SplitRequestPtr BlockingRequest::create(Router& router,
+                                        Common::Redis::RespValuePtr&& incoming_request,
+                                        SplitCallbacks& callbacks, CommandStats& command_stats,
+                                        TimeSource& time_source, bool delay_command_latency,
+                                        const StreamInfo::StreamInfo& stream_info) {
+  // Blocking commands like BLPOP look like: BLPOP key [key ...] timeout
+  // Minimum: BLPOP key timeout (3 arguments)
+  if (incoming_request->asArray().size() < 3) {
+    onWrongNumberOfArguments(callbacks, *incoming_request);
+    command_stats.error_.inc();
+    return nullptr;
+  }
+
+  // Extract and validate the timeout parameter (last argument)
+  const std::string& timeout_str = incoming_request->asArray().back().asString();
+  double timeout_seconds = 0;
+
+  // Try to parse the timeout as a number
+  if (!absl::SimpleAtod(timeout_str, &timeout_seconds) || timeout_seconds < 0) {
+    callbacks.onResponse(Common::Redis::Utility::makeError(
+        "ERR timeout is not a float or out of range"));
+    command_stats.error_.inc();
+    return nullptr;
+  }
+
+  std::unique_ptr<BlockingRequest> request_ptr{
+      new BlockingRequest(callbacks, command_stats, time_source, delay_command_latency)};
+
+  const auto route = router.upstreamPool(incoming_request->asArray()[1].asString(), stream_info);
+  if (route) {
+    Common::Redis::RespValueSharedPtr base_request = std::move(incoming_request);
+    // Hash on the first key (index 1)
+    // Pass is_blocking_command=true to bypass operation timeout
+    request_ptr->handle_ = makeSingleServerRequest(
+        route, base_request->asArray()[0].asString(), base_request->asArray()[1].asString(),
+        base_request, *request_ptr, callbacks.transaction(), true);
   }
 
   if (!request_ptr->handle_) {
@@ -987,6 +1039,11 @@ InstanceImpl::InstanceImpl(RouterPtr&& router, Stats::Scope& scope, const std::s
     addHandler(scope, stat_prefix, command, latency_in_micros, object_command_handler_);
   }
 
+  // BLPOP is registered but handled specially in makeRequest() to pass dispatcher
+  for (const std::string& command : Common::Redis::SupportedCommands::blockingCommands()) {
+    addHandler(scope, stat_prefix, command, latency_in_micros, simple_command_handler_);
+  }
+
   for (const std::string& command :
        Common::Redis::SupportedCommands::hashMultipleSumResultCommands()) {
     addHandler(scope, stat_prefix, command, latency_in_micros, split_keys_sum_result_handler_);
@@ -1173,9 +1230,16 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
                                             handler->command_stats_, time_source_, has_delay_fault,
                                             stream_info);
   } else {
-    request_ptr = handler->handler_.get().startRequest(
-        std::move(request), has_delay_fault ? *delay_fault_ptr : callbacks, handler->command_stats_,
-        time_source_, has_delay_fault, stream_info);
+    // Special handling for blocking commands (BLPOP, BRPOP, etc.) which need timeout validation
+    if (Common::Redis::SupportedCommands::isBlockingCommand(command_name)) {
+      request_ptr = BlockingRequest::create(
+          *router_, std::move(request), has_delay_fault ? *delay_fault_ptr : callbacks,
+          handler->command_stats_, time_source_, has_delay_fault, stream_info);
+    } else {
+      request_ptr = handler->handler_.get().startRequest(
+          std::move(request), has_delay_fault ? *delay_fault_ptr : callbacks,
+          handler->command_stats_, time_source_, has_delay_fault, stream_info);
+    }
   }
 
   // Complete delay, if any. The delay fault takes ownership of the wrapped request.
