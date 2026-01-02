@@ -19,6 +19,8 @@ public:
   // This is only supported for UUID format ids.
   absl::optional<uint64_t> toInteger() const override;
 
+  absl::optional<uint32_t> getCodecStreamId() const override;
+
 private:
   const std::string id_;
 };

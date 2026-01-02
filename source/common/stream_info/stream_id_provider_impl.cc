@@ -18,5 +18,7 @@ absl::optional<uint64_t> StreamIdProviderImpl::toInteger() const {
   return value;
 }
 
+absl::optional<uint32_t> StreamIdProviderImpl::getCodecStreamId() const { return absl::nullopt; }
+
 } // namespace StreamInfo
 } // namespace Envoy

@@ -569,6 +569,7 @@ private:
     // StreamInfo::StreamIdProvider
     absl::optional<absl::string_view> toStringView() const override;
     absl::optional<uint64_t> toInteger() const override;
+    absl::optional<uint32_t> getCodecStreamId() const override;
 
     ActiveStream& parent_;
   };

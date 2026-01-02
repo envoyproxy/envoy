@@ -335,6 +335,23 @@ TEST_F(EnvoyQuicServerSessionTest, NewStream) {
   stream->OnStreamHeaderList(/*fin=*/true, headers.uncompressed_header_bytes(), headers);
 }
 
+TEST_F(EnvoyQuicServerSessionTest, ProtocolStreamId) {
+  installReadFilter();
+
+  quic::QuicStreamId stream_id = 0;
+  for (int i = 0; i < 10; ++i) {
+    Http::MockRequestDecoder request_decoder;
+    setupRequestDecoderMock(request_decoder);
+    EXPECT_CALL(http_connection_callbacks_, newStream(_, false))
+        .WillOnce(testing::ReturnRef(request_decoder));
+    EXPECT_CALL(request_decoder, accessLogHandlers());
+    auto stream =
+        reinterpret_cast<EnvoyQuicServerStream*>(envoy_quic_session_.GetOrCreateStream(stream_id));
+    EXPECT_EQ(stream_id, stream->codecStreamId());
+    stream_id += 4;
+  }
+}
+
 TEST_F(EnvoyQuicServerSessionTest, DoesNotCrashWithDestroyedRequestDecoder) {
   installReadFilter();
 

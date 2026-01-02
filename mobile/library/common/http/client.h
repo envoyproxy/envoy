@@ -280,6 +280,8 @@ private:
     // ScopeTrackedObject
     void dumpState(std::ostream& os, int indent_level = 0) const override;
 
+    absl::optional<uint32_t> codecStreamId() const override { return absl::nullopt; }
+
     void setResponseDetails(absl::string_view response_details) {
       response_details_ = response_details;
     }

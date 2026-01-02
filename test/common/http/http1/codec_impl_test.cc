@@ -1209,6 +1209,27 @@ TEST_F(Http1ServerConnectionImplTest, SimpleGet) {
   EXPECT_EQ(Protocol::Http11, codec_->protocol());
 }
 
+TEST_F(Http1ServerConnectionImplTest, ProtocolStreamId) {
+  initialize();
+
+  InSequence sequence;
+
+  MockRequestDecoder decoder;
+  Http::ResponseEncoder* response_encoder = nullptr;
+  EXPECT_CALL(callbacks_, newStream(_, _))
+      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+        response_encoder = &encoder;
+        return decoder;
+      }));
+
+  TestRequestHeaderMapImpl expected_headers{{":path", "/"}, {":method", "GET"}};
+  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true));
+
+  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\n");
+  auto status = codec_->dispatch(buffer);
+  EXPECT_EQ(absl::nullopt, response_encoder->getStream().codecStreamId());
+}
+
 // Test that if the stream is not created at the time an error is detected, it
 // is created as part of sending the protocol error.
 TEST_F(Http1ServerConnectionImplTest, BadRequestNoStream) {
