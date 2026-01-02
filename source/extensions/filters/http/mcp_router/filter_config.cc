@@ -5,10 +5,56 @@ namespace Extensions {
 namespace HttpFilters {
 namespace McpRouter {
 
+namespace {
+SessionIdentityConfig
+parseSessionIdentity(const envoy::extensions::filters::http::mcp_router::v3::McpRouter& config) {
+  SessionIdentityConfig result;
+
+  if (!config.has_session_identity()) {
+    return result;
+  }
+
+  const auto& identity = config.session_identity();
+  const auto& subject = identity.subject();
+
+  switch (subject.source_case()) {
+  case envoy::extensions::filters::http::mcp_router::v3::SubjectExtractor::kHeader: {
+    result.subject_source = HeaderSubjectSource{subject.header().name()};
+    break;
+  }
+  case envoy::extensions::filters::http::mcp_router::v3::SubjectExtractor::kDynamicMetadata: {
+    const auto& metadata_key = subject.dynamic_metadata().key();
+    std::vector<std::string> path_keys;
+    path_keys.reserve(metadata_key.path().size());
+    for (const auto& segment : metadata_key.path()) {
+      path_keys.push_back(segment.key());
+    }
+    result.subject_source = MetadataSubjectSource{metadata_key.key(), std::move(path_keys)};
+    break;
+  }
+  default:
+    break;
+  }
+
+  if (identity.has_validation()) {
+    switch (identity.validation().mode()) {
+    case envoy::extensions::filters::http::mcp_router::v3::ValidationPolicy::ENFORCE:
+      result.validation_mode = ValidationMode::Enforce;
+      break;
+    default:
+      result.validation_mode = ValidationMode::Disabled;
+      break;
+    }
+  }
+
+  return result;
+}
+} // namespace
+
 McpRouterConfig::McpRouterConfig(
     const envoy::extensions::filters::http::mcp_router::v3::McpRouter& proto_config,
     Server::Configuration::FactoryContext& context)
-    : factory_context_(context) {
+    : factory_context_(context), session_identity_(parseSessionIdentity(proto_config)) {
   for (const auto& server : proto_config.servers()) {
     McpBackendConfig backend;
     const auto& mcp_cluster = server.mcp_cluster();
