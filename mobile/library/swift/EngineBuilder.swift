@@ -1,3 +1,4 @@
+// swiftlint:disable type_body_length
 @_implementationOnly import EnvoyEngine
 import Foundation
 
@@ -24,6 +25,7 @@ open class EngineBuilder: NSObject {
   private var enableInterfaceBinding: Bool = false
   private var enforceTrustChainVerification: Bool = true
   private var enablePlatformCertificateValidation: Bool = false
+  private var enableNetworkChangeMonitor: Bool = false
   private var upstreamTlsSni: String?
   private var respectSystemProxySettings: Bool = false
   private var enableDrainPostDnsRefresh: Bool = false
@@ -280,6 +282,17 @@ open class EngineBuilder: NSObject {
   public func enablePlatformCertificateValidation(
     _ enablePlatformCertificateValidation: Bool) -> Self {
     self.enablePlatformCertificateValidation = enablePlatformCertificateValidation
+    return self
+  }
+
+  /// Specify whether to enable the iOS network change monitor.
+  ///
+  /// - parameter enableNetworkChangeMonitor: whether to enable the network change monitor.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func enableNetworkChangeMonitor(_ enableNetworkChangeMonitor: Bool) -> Self {
+    self.enableNetworkChangeMonitor = enableNetworkChangeMonitor
     return self
   }
 
@@ -563,6 +576,7 @@ open class EngineBuilder: NSObject {
       enableDrainPostDnsRefresh: self.enableDrainPostDnsRefresh,
       enforceTrustChainVerification: self.enforceTrustChainVerification,
       enablePlatformCertificateValidation: self.enablePlatformCertificateValidation,
+      enableNetworkChangeMonitor: self.enableNetworkChangeMonitor,
       upstreamTlsSni: self.upstreamTlsSni,
       respectSystemProxySettings: self.respectSystemProxySettings,
       h2ConnectionKeepaliveIdleIntervalMilliseconds:
