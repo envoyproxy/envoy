@@ -1,9 +1,10 @@
+#include <sys/socket.h>
+#include <unistd.h>
+
 #include <cstddef>
 #include <cstdint>
 #include <iterator>
 #include <memory>
-#include <sys/socket.h>
-#include <unistd.h>
 
 #include "source/extensions/filters/http/dynamic_modules/filter.h"
 
