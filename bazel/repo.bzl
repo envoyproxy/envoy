@@ -1,5 +1,28 @@
 # `@envoy_repo` repository rule for managing the repo and querying its metadata.
 
+def _get_yq_platform(repository_ctx):
+    """Determine the yq platform string based on the host OS and architecture."""
+    os_name = repository_ctx.os.name.lower()
+    arch = repository_ctx.os.arch
+
+    if "linux" in os_name:
+        os_key = "linux"
+    elif "mac" in os_name or "darwin" in os_name:
+        os_key = "darwin"
+    elif "windows" in os_name:
+        os_key = "windows"
+    else:
+        fail("Unsupported OS for yq: " + os_name)
+
+    if arch == "amd64" or arch == "x86_64":
+        arch_key = "amd64"
+    elif arch == "aarch64" or arch == "arm64":
+        arch_key = "arm64"
+    else:
+        fail("Unsupported architecture for yq: " + arch)
+
+    return os_key + "_" + arch_key
+
 CONTAINERS = """
 
 REPO = "{repo}"
@@ -66,8 +89,11 @@ def _envoy_repo_impl(repository_ctx):
     """
 
     # parse container information for use in RBE
+    # Use the platform-specific yq repo directly to avoid symlink resolution issues in Bazel 8
+    yq_platform = _get_yq_platform(repository_ctx)
+    yq_path = repository_ctx.path(Label("@yq_{}//:yq".format(yq_platform)))
     json_result = repository_ctx.execute([
-        repository_ctx.path(repository_ctx.attr.yq),
+        yq_path,
         repository_ctx.path(repository_ctx.attr.envoy_ci_config),
         "-ojson",
     ])
@@ -261,7 +287,6 @@ _envoy_repo = repository_rule(
         "envoy_version": attr.label(default = "@envoy//:VERSION.txt"),
         "envoy_api_version": attr.label(default = "@envoy//:API_VERSION.txt"),
         "envoy_ci_config": attr.label(default = "@envoy//:.github/config.yml"),
-        "yq": attr.label(default = "@yq"),
     },
     environ = ["BAZEL_LLVM_PATH"],
 )
