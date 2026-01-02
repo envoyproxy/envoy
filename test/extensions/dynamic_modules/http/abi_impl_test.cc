@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <iterator>
 #include <memory>
+#include <sys/socket.h>
 
 #include "source/extensions/filters/http/dynamic_modules/filter.h"
 
@@ -1602,6 +1603,69 @@ TEST(ABIImpl, Stats) {
       filter_config.get(), {histogram_vec_name.data(), histogram_vec_name.size()},
       histogram_vec_labels.data(), histogram_vec_labels.size(), &histogram_vec_id);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Frozen);
+}
+
+TEST_F(DynamicModuleHttpFilterTest, SetSocketOptionNoConnection) {
+  // Test with no connection - should return false
+  EXPECT_CALL(decoder_callbacks_, connection()).WillRepeatedly(testing::Return(absl::nullopt));
+
+  int optval = 1;
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_set_socket_option(
+      filter_.get(), SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval)));
+}
+
+TEST_F(DynamicModuleHttpFilterTest, GetSocketOptionNoConnection) {
+  // Test with no connection - should return false
+  EXPECT_CALL(decoder_callbacks_, connection()).WillRepeatedly(testing::Return(absl::nullopt));
+
+  int optval = 0;
+  size_t optlen = sizeof(optval);
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_socket_option(filter_.get(), SOL_SOCKET,
+                                                                    SO_REUSEADDR, &optval, &optlen));
+}
+
+TEST_F(DynamicModuleHttpFilterTest, SetSocketOptionNoTransportSocketCallbacks) {
+  // Test with connection that doesn't support TransportSocketCallbacks
+  const Network::MockConnection connection;
+  EXPECT_CALL(decoder_callbacks_, connection())
+      .WillRepeatedly(
+          testing::Return(makeOptRef(dynamic_cast<const Network::Connection&>(connection))));
+
+  int optval = 1;
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_set_socket_option(
+      filter_.get(), SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval)));
+}
+
+TEST_F(DynamicModuleHttpFilterTest, GetSocketOptionNoTransportSocketCallbacks) {
+  // Test with connection that doesn't support TransportSocketCallbacks
+  const Network::MockConnection connection;
+  EXPECT_CALL(decoder_callbacks_, connection())
+      .WillRepeatedly(
+          testing::Return(makeOptRef(dynamic_cast<const Network::Connection&>(connection))));
+
+  int optval = 0;
+  size_t optlen = sizeof(optval);
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_socket_option(filter_.get(), SOL_SOCKET,
+                                                                    SO_REUSEADDR, &optval, &optlen));
+}
+
+TEST_F(DynamicModuleHttpFilterTest, SetSocketOptionNoCallbacks) {
+  // Test with filter that has no callbacks set
+  DynamicModuleHttpFilter filter_without_callbacks(nullptr, symbol_table_);
+
+  int optval = 1;
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_set_socket_option(
+      &filter_without_callbacks, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval)));
+}
+
+TEST_F(DynamicModuleHttpFilterTest, GetSocketOptionNoCallbacks) {
+  // Test with filter that has no callbacks set
+  DynamicModuleHttpFilter filter_without_callbacks(nullptr, symbol_table_);
+
+  int optval = 0;
+  size_t optlen = sizeof(optval);
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_socket_option(
+      &filter_without_callbacks, SOL_SOCKET, SO_REUSEADDR, &optval, &optlen));
 }
 
 } // namespace HttpFilters
