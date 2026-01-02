@@ -4,6 +4,10 @@
 #include "library/common/internal_engine.h"
 #include "library/common/types/c_types.h"
 
+#if defined(__APPLE__)
+#include "library/cc/apple/apple_network_change_monitor.h"
+#endif
+
 namespace Envoy {
 namespace Platform {
 
@@ -26,6 +30,15 @@ StreamClientSharedPtr Engine::streamClient() {
 std::string Engine::dumpStats() { return engine_->dumpStats(); }
 
 envoy_status_t Engine::terminate() { return engine_->terminate(); }
+
+void Engine::initializeNetworkChangeMonitor() {
+#if defined(__APPLE__)
+  network_change_monitor_ = std::make_unique<AppleNetworkChangeMonitor>(*this);
+#endif
+  if (network_change_monitor_ != nullptr) {
+    network_change_monitor_->start();
+  }
+}
 
 void Engine::onDefaultNetworkChangeEvent(int network) {
   engine_->onDefaultNetworkChangeEvent(network);
