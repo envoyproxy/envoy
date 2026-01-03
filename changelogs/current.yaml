@@ -666,8 +666,8 @@ new_features:
     additional body parameters during the token exchange.
 - area: reverse_tunnel
   change: |
-    Added ``cluster_name`` and ``enforce_cluster_match`` fields to validate reverse tunnel initiations against 
-    the ``x-envoy-reverse-tunnel-upstream-cluster-name`` header. If initiator envoy's upstream cluster name does not 
+    Added ``cluster_name`` and ``enforce_cluster_match`` fields to validate reverse tunnel initiations against
+    the ``x-envoy-reverse-tunnel-upstream-cluster-name`` header. If initiator envoy's upstream cluster name does not
     match ``cluster_name`` while ``enforce_cluster_match`` is true, connection is rejected with a ``400 Bad Request``.
 - area: proto_api_scrubber
   change: |
