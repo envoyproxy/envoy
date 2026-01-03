@@ -277,6 +277,14 @@ removed_config_or_runtime:
     <envoy_v3_api_field_extensions.filters.http.router.v3.Router.reject_connect_request_early_data>`.
 
 new_features:
+- area: tcp_proxy
+  change: |
+    Added :ref:`merge_proxy_protocol_tlvs
+    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.merge_proxy_protocol_tlvs>`
+    configuration option to the TCP proxy filter. When set to ``true``, TLVs specified in
+    ``proxy_protocol_tlvs`` are merged with existing downstream proxy protocol TLVs instead of
+    being ignored. TCP proxy TLVs take precedence over downstream TLVs with the same type,
+    allowing users to add or override specific TLV values while preserving other downstream TLVs.
 - area: composite filter
   change: |
     Added support for configuring a chain of filters in the composite filter's :ref:`ExecuteFilterAction
