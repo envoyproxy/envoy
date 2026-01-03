@@ -49,18 +49,19 @@ void PerSocketTapperImpl::closeSocket(Network::ConnectionEvent) {
   }
 
   if (config_->streaming()) {
+    seq_num++;
     if (shouldSendStreamedMsgByConfiguredSize()) {
       makeStreamedTraceIfNeeded();
       auto& event =
           *streamed_trace_->mutable_socket_streamed_trace_segment()->mutable_events()->add_events();
-      initStreamingEvent(event, MaxSeqNum);
+      initStreamingEvent(event, seq_num);
       event.mutable_closed();
       // submit directly and don't check current_streamed_rx_tx_bytes_ any more
       submitStreamedDataPerConfiguredSize();
     } else {
       TapCommon::TraceWrapperPtr trace = makeTraceSegment();
       auto& event = *trace->mutable_socket_streamed_trace_segment()->mutable_event();
-      initStreamingEvent(event, MaxSeqNum);
+      initStreamingEvent(event, seq_num);
       event.mutable_closed();
       sink_handle_->submitTrace(std::move(trace));
     }

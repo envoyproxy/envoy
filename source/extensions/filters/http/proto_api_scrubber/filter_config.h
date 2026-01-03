@@ -4,11 +4,14 @@
 #include <string>
 #include <utility>
 
+#include "envoy/common/time.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/http/proto_api_scrubber/v3/config.pb.h"
 #include "envoy/extensions/filters/http/proto_api_scrubber/v3/matcher_actions.pb.h"
 #include "envoy/matcher/matcher.h"
 #include "envoy/server/factory_context.h"
+#include "envoy/stats/scope.h"
+#include "envoy/stats/stats_macros.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/http/utility.h"
@@ -18,6 +21,7 @@
 #include "absl/container/flat_hash_map.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "grpc_transcoding/type_helper.h"
 #include "xds/type/matcher/v3/http_inputs.pb.h"
@@ -44,6 +48,54 @@ using StringPairToMatchTreeMap =
     absl::flat_hash_map<std::pair<std::string, std::string>, MatchTreeHttpMatchingDataSharedPtr>;
 using TypeFinder = std::function<const Envoy::Protobuf::Type*(const std::string&)>;
 } // namespace
+
+// All stats for the Proto API Scrubber filter. @see stats_macros.h for more details on stats.
+#define ALL_PROTO_API_SCRUBBER_STATS(COUNTER, GAUGE, HISTOGRAM)                                    \
+  COUNTER(request_scrubbing_failed)                                                                \
+  COUNTER(response_scrubbing_failed)                                                               \
+  COUNTER(method_blocked)                                                                          \
+  COUNTER(request_buffer_conversion_error)                                                         \
+  COUNTER(response_buffer_conversion_error)                                                        \
+  COUNTER(invalid_method_name)                                                                     \
+  COUNTER(total_requests)                                                                          \
+  COUNTER(total_requests_checked)                                                                  \
+  HISTOGRAM(request_scrubbing_latency, Milliseconds)                                               \
+  HISTOGRAM(response_scrubbing_latency, Milliseconds)
+
+struct ProtoApiScrubberStats {
+  ALL_PROTO_API_SCRUBBER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT,
+                               GENERATE_HISTOGRAM_STRUCT)
+
+  ProtoApiScrubberStats(Envoy::Stats::Scope& scope, absl::string_view prefix)
+      : request_scrubbing_failed_(makeCounter(scope, prefix, "request_scrubbing_failed")),
+        response_scrubbing_failed_(makeCounter(scope, prefix, "response_scrubbing_failed")),
+        method_blocked_(makeCounter(scope, prefix, "method_blocked")),
+        request_buffer_conversion_error_(
+            makeCounter(scope, prefix, "request_buffer_conversion_error")),
+        response_buffer_conversion_error_(
+            makeCounter(scope, prefix, "response_buffer_conversion_error")),
+        invalid_method_name_(makeCounter(scope, prefix, "invalid_method_name")),
+        total_requests_(makeCounter(scope, prefix, "total_requests")),
+        total_requests_checked_(makeCounter(scope, prefix, "total_requests_checked")),
+        request_scrubbing_latency_(makeHistogram(scope, prefix, "request_scrubbing_latency",
+                                                 Stats::Histogram::Unit::Milliseconds)),
+        response_scrubbing_latency_(makeHistogram(scope, prefix, "response_scrubbing_latency",
+                                                  Stats::Histogram::Unit::Milliseconds)) {}
+
+private:
+  static Stats::Counter& makeCounter(Envoy::Stats::Scope& scope, absl::string_view prefix,
+                                     absl::string_view name) {
+    return scope.counterFromStatName(
+        Stats::StatNameManagedStorage(absl::StrCat(prefix, name), scope.symbolTable()).statName());
+  }
+
+  static Stats::Histogram& makeHistogram(Envoy::Stats::Scope& scope, absl::string_view prefix,
+                                         absl::string_view name, Stats::Histogram::Unit unit) {
+    return scope.histogramFromStatName(
+        Stats::StatNameManagedStorage(absl::StrCat(prefix, name), scope.symbolTable()).statName(),
+        unit);
+  }
+};
 
 // The config for Proto API Scrubber filter. As a thread-safe class, it should be constructed only
 // once and shared among filters for better performance.
@@ -108,6 +160,19 @@ public:
   getMessageMatcher(const std::string& message_name) const;
 
   /**
+   * Returns the match tree associated with a specific field within a message type.
+   * This allows defining restrictions that apply whenever a specific message type is encountered,
+   * regardless of where it appears (e.g. inside an Any field).
+   *
+   * @param message_name The fully qualified message name (e.g., "package.MyMessage").
+   * @param field_name The name of the field within that message.
+   * @return A MatchTreeHttpMatchingDataSharedPtr if a restriction is configured.
+   * Returns `nullptr` otherwise.
+   */
+  virtual MatchTreeHttpMatchingDataSharedPtr
+  getMessageFieldMatcher(const std::string& message_name, const std::string& field_name) const;
+
+  /**
    * Resolves the human-readable name of a specific enum value.
    *
    * @param enum_type_name The fully qualified name of the enum type (e.g., "package.Status").
@@ -121,6 +186,16 @@ public:
   // Returns a constant reference to the type finder which resolves type URL string to the
   // corresponding `Protobuf::Type*`.
   virtual const TypeFinder& getTypeFinder() const { return *type_finder_; };
+
+  /**
+   * Returns the parent Type for a given Field pointer.
+   * This map is pre-computed during initialization to allow recovering context when
+   * traversing dynamic types (e.g., Any).
+   *
+   * @param field The field pointer to look up.
+   * @return The parent Type pointer, or nullptr if not found.
+   */
+  virtual const Envoy::Protobuf::Type* getParentType(const Envoy::Protobuf::Field* field) const;
 
   // Returns the request type of the method.
   virtual absl::StatusOr<const Protobuf::Type*>
@@ -137,10 +212,17 @@ public:
 
   FilteringMode filteringMode() const { return filtering_mode_; }
 
+  // Returns the filter statistics helper.
+  const ProtoApiScrubberStats& stats() const { return stats_; }
+
+  // Returns the time source used for latency measurements.
+  TimeSource& timeSource() const { return time_source_; }
+
 protected:
   // Protected constructor to make sure that this class is used in a factory fashion using the
   // public `create` method.
-  ProtoApiScrubberFilterConfig() = default;
+  ProtoApiScrubberFilterConfig(ProtoApiScrubberStats stats, TimeSource& time_source)
+      : stats_(stats), time_source_(time_source) {}
 
 private:
   friend class MockProtoApiScrubberFilterConfig;
@@ -168,13 +250,21 @@ private:
   absl::Status initialize(const ProtoApiScrubberConfig& proto_config,
                           Envoy::Server::Configuration::FactoryContext& context);
 
-  // Initializes the descriptor pool from the provided 'data_source'.
-  // Returns the parsed FileDescriptorSet which is needed for pre-computing the type cache.
+  // Loads and parses the descriptor set from the data source.
+  // Returns the parsed FileDescriptorSet and populates the internal descriptor_pool_.
   absl::StatusOr<Envoy::Protobuf::FileDescriptorSet>
-  initializeDescriptorPool(Api::Api& api, const ::envoy::config::core::v3::DataSource& data_source);
+  loadDescriptorSet(Api::Api& api, const ::envoy::config::core::v3::DataSource& data_source);
 
   // Initializes the type utilities (e.g., type helper, type finder, etc.).
   void initializeTypeUtils();
+
+  // Traverses the FileDescriptorSet and pre-computes the Field* -> Parent Type* map.
+  // This must be called after initializeTypeUtils().
+  void buildFieldParentMap(const Envoy::Protobuf::FileDescriptorSet& descriptor_set);
+
+  // Recursive helper for buildFieldParentMap.
+  void populateMapForMessage(const Envoy::Protobuf::DescriptorProto& msg,
+                             const std::string& package_prefix);
 
   /**
    * Helper method to resolve a Protobuf type from its name and populate the type cache.
@@ -238,6 +328,14 @@ private:
   // A map from message_name to the respective match tree for message-level restrictions.
   absl::flat_hash_map<std::string, MatchTreeHttpMatchingDataSharedPtr> message_level_restrictions_;
 
+  // A map from {message_name, field_name} to the respective match tree for fields within a message.
+  StringPairToMatchTreeMap message_field_restrictions_;
+
+  // A global map used to recover the parent Type context from a Field pointer.
+  // This is read-only after initialization.
+  absl::flat_hash_map<const Envoy::Protobuf::Field*, const Envoy::Protobuf::Type*>
+      field_to_parent_type_map_;
+
   // An instance of `google::grpc::transcoding::TypeHelper` which can be used for type resolution.
   std::unique_ptr<const TypeHelper> type_helper_;
 
@@ -249,6 +347,12 @@ private:
   // These are populated during initialization and read-only afterwards, so no mutex is required.
   absl::flat_hash_map<std::string, const Protobuf::Type*> request_type_cache_;
   absl::flat_hash_map<std::string, const Protobuf::Type*> response_type_cache_;
+
+  // The stats helper used to record filter metrics.
+  ProtoApiScrubberStats stats_;
+
+  // The time source used for measuring latency.
+  TimeSource& time_source_;
 };
 
 // A class to validate the input type specified for the unified matcher in the config.

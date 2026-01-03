@@ -129,11 +129,10 @@ std::string RCConnectionWrapper::connect(const std::string& src_tenant_id,
   const Http::LowerCaseString& tenant_hdr =
       ::Envoy::Extensions::Bootstrap::ReverseConnection::reverseTunnelTenantIdHeader();
 
-  auto headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>({
-      {Http::Headers::get().Method, Http::Headers::get().MethodValues.Get},
-      {Http::Headers::get().Path, "/reverse_connections/request"},
-      {Http::Headers::get().Host, host_value},
-  });
+  auto headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>(
+      {{Http::Headers::get().Method, Http::Headers::get().MethodValues.Get},
+       {Http::Headers::get().Path, parent_.requestPath()},
+       {Http::Headers::get().Host, host_value}});
   headers->addCopy(node_hdr, std::string(node_id));
   headers->addCopy(cluster_hdr, std::string(cluster_id));
   headers->addCopy(tenant_hdr, std::string(tenant_id));
