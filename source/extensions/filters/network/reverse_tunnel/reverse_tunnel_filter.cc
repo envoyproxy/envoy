@@ -113,7 +113,8 @@ ReverseTunnelFilterConfig::ReverseTunnelFilterConfig(
           proto_config.has_validation() &&
                   !proto_config.validation().dynamic_metadata_namespace().empty()
               ? proto_config.validation().dynamic_metadata_namespace()
-              : "envoy.filters.network.reverse_tunnel") {}
+              : "envoy.filters.network.reverse_tunnel"),
+      required_cluster_name_(proto_config.required_cluster_name()) {}
 
 bool ReverseTunnelFilterConfig::validateIdentifiers(
     absl::string_view node_id, absl::string_view cluster_id,
@@ -317,6 +318,37 @@ void ReverseTunnelFilter::RequestDecoderImpl::processIfComplete(bool end_stream)
   const absl::string_view node_id = node_vals[0]->value().getStringView();
   const absl::string_view cluster_id = cluster_vals[0]->value().getStringView();
   const absl::string_view tenant_id = tenant_vals[0]->value().getStringView();
+
+  // Check for upstream cluster name header and validate if required.
+  if (!parent_.config_->requiredClusterName().empty()) {
+    const auto upstream_cluster_vals = headers_->get(
+        Extensions::Bootstrap::ReverseConnection::reverseTunnelUpstreamClusterNameHeader());
+
+    if (upstream_cluster_vals.empty()) {
+      parent_.stats_.parse_error_.inc();
+      ENVOY_CONN_LOG(
+          debug, "reverse_tunnel: missing upstream cluster name header when enforcement is enabled",
+          parent_.read_callbacks_->connection());
+      sendLocalReply(Http::Code::BadRequest, "Missing upstream cluster name header", nullptr,
+                     absl::nullopt, "reverse_tunnel_missing_cluster_name_header");
+      parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
+      return;
+    }
+
+    const absl::string_view upstream_cluster_name =
+        upstream_cluster_vals[0]->value().getStringView();
+    if (upstream_cluster_name != parent_.config_->requiredClusterName()) {
+      parent_.stats_.validation_failed_.inc();
+      ENVOY_CONN_LOG(debug,
+                     "reverse_tunnel: upstream cluster name mismatch. Expected: '{}', Actual: '{}'",
+                     parent_.read_callbacks_->connection(), parent_.config_->requiredClusterName(),
+                     upstream_cluster_name);
+      sendLocalReply(Http::Code::BadRequest, "Cluster name mismatch", nullptr, absl::nullopt,
+                     "reverse_tunnel_cluster_mismatch");
+      parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
+      return;
+    }
+  }
 
   // Validate node_id and cluster_id if validation is configured.
   auto& connection = parent_.read_callbacks_->connection();
