@@ -1730,12 +1730,11 @@ TEST_F(ReverseTunnelFilterUnitTest, CodecInitializationCoverage) {
   EXPECT_EQ(Network::FilterStatus::StopIteration, test_filter->onData(data2, false));
 }
 
-// Test cluster match enforcement accepts matching name.
-TEST_F(ReverseTunnelFilterUnitTest, ClusterMatchEnforcementAcceptsMatchingName) {
-  // Configure filter with name and enforce_cluster_match enabled.
+// Test cluster name validation accepts matching name.
+TEST_F(ReverseTunnelFilterUnitTest, ClusterNameValidationAcceptsMatchingName) {
+  // Configure filter with required_cluster_name.
   envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
-  cfg.set_cluster_name("my-upstream-cluster");
-  cfg.set_enforce_cluster_match(true);
+  cfg.set_required_cluster_name("my-upstream-cluster");
 
   auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
   ASSERT_TRUE(config_or_error.ok());
@@ -1773,12 +1772,11 @@ TEST_F(ReverseTunnelFilterUnitTest, ClusterMatchEnforcementAcceptsMatchingName) 
   EXPECT_EQ(1, accepted->value());
 }
 
-// Test cluster match enforcement rejects mismatched cluster name.
-TEST_F(ReverseTunnelFilterUnitTest, ClusterMatchEnforcementRejectsMismatchedName) {
-  // Configure filter with name and enforce_cluster_match enabled.
+// Test cluster name validation rejects mismatched cluster name.
+TEST_F(ReverseTunnelFilterUnitTest, ClusterNameValidationRejectsMismatchedName) {
+  // Configure filter with required_cluster_name.
   envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
-  cfg.set_cluster_name("my-upstream-cluster");
-  cfg.set_enforce_cluster_match(true);
+  cfg.set_required_cluster_name("my-upstream-cluster");
 
   auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
   ASSERT_TRUE(config_or_error.ok());
@@ -1813,12 +1811,11 @@ TEST_F(ReverseTunnelFilterUnitTest, ClusterMatchEnforcementRejectsMismatchedName
   EXPECT_EQ(1, validation_failed->value());
 }
 
-// Test cluster match enforcement rejects missing cluster name header.
-TEST_F(ReverseTunnelFilterUnitTest, ClusterMatchEnforcementRejectsMissingHeader) {
-  // Configure filter with name and enforce_cluster_match enabled.
+// Test cluster name validation rejects missing cluster name header.
+TEST_F(ReverseTunnelFilterUnitTest, ClusterNameValidationRejectsMissingHeader) {
+  // Configure filter with required_cluster_name.
   envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
-  cfg.set_cluster_name("my-upstream-cluster");
-  cfg.set_enforce_cluster_match(true);
+  cfg.set_required_cluster_name("my-upstream-cluster");
 
   auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
   ASSERT_TRUE(config_or_error.ok());
@@ -1852,12 +1849,10 @@ TEST_F(ReverseTunnelFilterUnitTest, ClusterMatchEnforcementRejectsMissingHeader)
   EXPECT_EQ(1, parse_error->value());
 }
 
-// Test cluster match enforcement is disabled when enforce_cluster_match is false.
-TEST_F(ReverseTunnelFilterUnitTest, ClusterMatchNotEnforcedWhenDisabled) {
-  // Configure filter with name but enforce_cluster_match disabled.
+// Test cluster name validation is disabled when required_cluster_name is not set.
+TEST_F(ReverseTunnelFilterUnitTest, ClusterNameValidationDisabledWhenNotSet) {
+  // Configure filter without required_cluster_name.
   envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
-  cfg.set_cluster_name("my-upstream-cluster");
-  cfg.set_enforce_cluster_match(false);
 
   auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
   ASSERT_TRUE(config_or_error.ok());
@@ -1891,111 +1886,6 @@ TEST_F(ReverseTunnelFilterUnitTest, ClusterMatchNotEnforcedWhenDisabled) {
   EXPECT_THAT(written, testing::HasSubstr("200 OK"));
   auto accepted = TestUtility::findCounter(stats_store_, "reverse_tunnel.handshake.accepted");
   EXPECT_EQ(1, accepted->value());
-}
-
-// Test configuration with name field.
-TEST_F(ReverseTunnelFilterUnitTest, ConfigurationWithName) {
-  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel proto_config;
-  proto_config.set_cluster_name("test-cluster");
-  proto_config.set_enforce_cluster_match(true);
-
-  auto config_or_error = ReverseTunnelFilterConfig::create(proto_config, factory_context_);
-  ASSERT_TRUE(config_or_error.ok());
-  auto config = config_or_error.value();
-  EXPECT_EQ("test-cluster", config->clusterName());
-  EXPECT_TRUE(config->enforceClusterMatch());
-}
-
-// Test default cluster name when enforce_cluster_match is true but cluster_name is empty.
-TEST_F(ReverseTunnelFilterUnitTest, DefaultClusterNameWhenEnforceMatchTrueButNameEmpty) {
-  // Configure filter with enforce_cluster_match=true but no cluster_name.
-  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
-  cfg.set_enforce_cluster_match(true);
-
-  auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
-  ASSERT_TRUE(config_or_error.ok());
-  auto config = config_or_error.value();
-
-  // Should use default cluster name "responder-envoy"
-  EXPECT_EQ("responder-envoy", config->clusterName());
-  EXPECT_TRUE(config->enforceClusterMatch());
-}
-
-// Test cluster match enforcement with default cluster name.
-TEST_F(ReverseTunnelFilterUnitTest, ClusterMatchEnforcementWithDefaultName) {
-  // Configure filter with enforce_cluster_match=true but no cluster_name.
-  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
-  cfg.set_enforce_cluster_match(true);
-
-  auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
-  ASSERT_TRUE(config_or_error.ok());
-  auto local_config = config_or_error.value();
-
-  ReverseTunnelFilter filter(local_config, *stats_store_.rootScope(), overload_manager_);
-  filter.initializeReadFilterCallbacks(callbacks_);
-
-  auto socket = std::make_unique<Network::MockConnectionSocket>();
-  EXPECT_CALL(*socket, isOpen()).WillRepeatedly(testing::Return(false));
-
-  static Network::ConnectionSocketPtr stored_socket_default;
-  stored_socket_default = std::move(socket);
-  EXPECT_CALL(callbacks_.connection_, getSocket())
-      .WillRepeatedly(testing::ReturnRef(stored_socket_default));
-
-  // Capture writes to connection.
-  std::string written;
-  EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
-      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
-        written.append(data.toString());
-        data.drain(data.length());
-      }));
-
-  // Send request with the default cluster name "responder-envoy".
-  Buffer::OwnedImpl request(makeHttpRequestWithAllHeaders(
-      "GET", "/reverse_connections/request", "node1", "cluster1", "tenant1", "responder-envoy"));
-  EXPECT_EQ(Network::FilterStatus::StopIteration, filter.onData(request, false));
-
-  // Should accept with 200 OK since it matches the default.
-  EXPECT_THAT(written, testing::HasSubstr("200 OK"));
-  auto accepted = TestUtility::findCounter(stats_store_, "reverse_tunnel.handshake.accepted");
-  EXPECT_EQ(1, accepted->value());
-}
-
-// Test cluster match enforcement rejects wrong name when using default.
-TEST_F(ReverseTunnelFilterUnitTest, ClusterMatchEnforcementRejectsWrongNameWithDefault) {
-  // Configure filter with enforce_cluster_match=true but no cluster_name.
-  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
-  cfg.set_enforce_cluster_match(true);
-
-  auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
-  ASSERT_TRUE(config_or_error.ok());
-  auto local_config = config_or_error.value();
-
-  ReverseTunnelFilter filter(local_config, *stats_store_.rootScope(), overload_manager_);
-  filter.initializeReadFilterCallbacks(callbacks_);
-
-  // Capture writes to connection.
-  std::string written;
-  EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
-      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
-        written.append(data.toString());
-        data.drain(data.length());
-      }));
-
-  // Expect connection to be closed.
-  EXPECT_CALL(callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
-
-  // Send request with wrong cluster name (not matching the default).
-  Buffer::OwnedImpl request(makeHttpRequestWithAllHeaders(
-      "GET", "/reverse_connections/request", "node1", "cluster1", "tenant1", "wrong-cluster"));
-  EXPECT_EQ(Network::FilterStatus::StopIteration, filter.onData(request, false));
-
-  // Should reject with 400 Bad Request.
-  EXPECT_THAT(written, testing::HasSubstr("400 Bad Request"));
-  EXPECT_THAT(written, testing::HasSubstr("Cluster name mismatch"));
-  auto validation_failed =
-      TestUtility::findCounter(stats_store_, "reverse_tunnel.handshake.validation_failed");
-  EXPECT_EQ(1, validation_failed->value());
 }
 
 } // namespace

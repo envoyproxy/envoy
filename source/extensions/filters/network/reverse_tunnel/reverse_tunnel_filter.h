@@ -51,11 +51,8 @@ public:
   void emitValidationMetadata(absl::string_view node_id, absl::string_view cluster_id,
                               bool validation_passed, StreamInfo::StreamInfo& stream_info) const;
 
-  // Returns the configured cluster name.
-  const std::string& clusterName() const { return cluster_name_; }
-
-  // Returns whether cluster match enforcement is enabled.
-  bool enforceClusterMatch() const { return enforce_cluster_match_; }
+  // Returns the required cluster name for validation.
+  const std::string& requiredClusterName() const { return required_cluster_name_; }
 
 private:
   ReverseTunnelFilterConfig(
@@ -74,9 +71,8 @@ private:
   const bool emit_dynamic_metadata_{false};
   const std::string dynamic_metadata_namespace_;
 
-  // Filter identification and cluster matching.
-  const std::string cluster_name_;
-  const bool enforce_cluster_match_{false};
+  // Required cluster name for validation (empty means no validation).
+  const std::string required_cluster_name_;
 };
 
 using ReverseTunnelFilterConfigSharedPtr = std::shared_ptr<ReverseTunnelFilterConfig>;

@@ -114,16 +114,7 @@ ReverseTunnelFilterConfig::ReverseTunnelFilterConfig(
                   !proto_config.validation().dynamic_metadata_namespace().empty()
               ? proto_config.validation().dynamic_metadata_namespace()
               : "envoy.filters.network.reverse_tunnel"),
-      cluster_name_([&proto_config]() -> std::string {
-        if (proto_config.enforce_cluster_match() && proto_config.cluster_name().empty()) {
-          ENVOY_LOG(warn, "reverse_tunnel: cluster_name is not set but enforce_cluster_match is "
-                          "true, using default cluster name 'responder-envoy'");
-        }
-        return (proto_config.enforce_cluster_match() && proto_config.cluster_name().empty())
-                   ? "responder-envoy"
-                   : proto_config.cluster_name();
-      }()),
-      enforce_cluster_match_(proto_config.enforce_cluster_match()) {}
+      required_cluster_name_(proto_config.required_cluster_name()) {}
 
 bool ReverseTunnelFilterConfig::validateIdentifiers(
     absl::string_view node_id, absl::string_view cluster_id,
@@ -328,8 +319,8 @@ void ReverseTunnelFilter::RequestDecoderImpl::processIfComplete(bool end_stream)
   const absl::string_view cluster_id = cluster_vals[0]->value().getStringView();
   const absl::string_view tenant_id = tenant_vals[0]->value().getStringView();
 
-  // Check for upstream cluster name header and validate if enforcement is enabled.
-  if (parent_.config_->enforceClusterMatch()) {
+  // Check for upstream cluster name header and validate if required.
+  if (!parent_.config_->requiredClusterName().empty()) {
     const auto upstream_cluster_vals = headers_->get(
         Extensions::Bootstrap::ReverseConnection::reverseTunnelUpstreamClusterNameHeader());
 
@@ -346,11 +337,11 @@ void ReverseTunnelFilter::RequestDecoderImpl::processIfComplete(bool end_stream)
 
     const absl::string_view upstream_cluster_name =
         upstream_cluster_vals[0]->value().getStringView();
-    if (upstream_cluster_name != parent_.config_->clusterName()) {
+    if (upstream_cluster_name != parent_.config_->requiredClusterName()) {
       parent_.stats_.validation_failed_.inc();
       ENVOY_CONN_LOG(debug,
                      "reverse_tunnel: upstream cluster name mismatch. Expected: '{}', Actual: '{}'",
-                     parent_.read_callbacks_->connection(), parent_.config_->clusterName(),
+                     parent_.read_callbacks_->connection(), parent_.config_->requiredClusterName(),
                      upstream_cluster_name);
       sendLocalReply(Http::Code::BadRequest, "Cluster name mismatch", nullptr, absl::nullopt,
                      "reverse_tunnel_cluster_mismatch");
