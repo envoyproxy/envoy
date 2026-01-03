@@ -199,6 +199,104 @@ typed_config:
   EXPECT_EQ(1UL, test_server_->counter("http.config_test.credential_injector.injected")->value());
 }
 
+// Inject credential with header_value_prefix (Bearer scheme)
+TEST_P(CredentialInjectorIntegrationTestAllProtocols, InjectCredentialWithBearerPrefix) {
+  TestEnvironment::writeStringToFileForTest("raw_token.yaml", R"EOF(
+resources:
+  - "@type": "type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.Secret"
+    name: raw_token
+    generic_secret:
+      secret:
+        inline_string: "myToken123")EOF",
+                                            false);
+  const std::string filter_config =
+      R"EOF(
+name: envoy.filters.http.credential_injector
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.credential_injector.v3.CredentialInjector
+  overwrite: false
+  credential:
+    name: bearer_auth
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.http.injected_credentials.generic.v3.Generic
+      header: Authorization
+      header_value_prefix: "Bearer "
+      credential:
+        name: raw_token
+        sds_config:
+          path_config_source:
+            path: "{{ test_tmpdir }}/raw_token.yaml"
+)EOF";
+  config_helper_.prependFilter(TestEnvironment::substitute(filter_config));
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  waitForNextUpstreamRequest();
+
+  EXPECT_EQ("Bearer myToken123", upstream_request_->headers()
+                                     .get(Http::LowerCaseString("Authorization"))[0]
+                                     ->value()
+                                     .getStringView());
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  EXPECT_EQ(1UL, test_server_->counter("http.config_test.credential_injector.injected")->value());
+}
+
+// Inject credential with header_value_prefix (custom prefix and custom header)
+TEST_P(CredentialInjectorIntegrationTestAllProtocols, InjectCredentialWithCustomPrefix) {
+  TestEnvironment::writeStringToFileForTest("api_key.yaml", R"EOF(
+resources:
+  - "@type": "type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.Secret"
+    name: api_key
+    generic_secret:
+      secret:
+        inline_string: "abc123xyz")EOF",
+                                            false);
+  const std::string filter_config =
+      R"EOF(
+name: envoy.filters.http.credential_injector
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.credential_injector.v3.CredentialInjector
+  overwrite: false
+  credential:
+    name: api_key_auth
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.http.injected_credentials.generic.v3.Generic
+      header: X-API-Key
+      header_value_prefix: "ApiKey "
+      credential:
+        name: api_key
+        sds_config:
+          path_config_source:
+            path: "{{ test_tmpdir }}/api_key.yaml"
+)EOF";
+  config_helper_.prependFilter(TestEnvironment::substitute(filter_config));
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  waitForNextUpstreamRequest();
+
+  EXPECT_EQ("ApiKey abc123xyz", upstream_request_->headers()
+                                    .get(Http::LowerCaseString("X-API-Key"))[0]
+                                    ->value()
+                                    .getStringView());
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  EXPECT_EQ(1UL, test_server_->counter("http.config_test.credential_injector.injected")->value());
+}
+
 } // namespace
 } // namespace CredentialInjector
 } // namespace HttpFilters
