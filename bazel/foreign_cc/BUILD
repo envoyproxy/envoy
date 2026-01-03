@@ -103,7 +103,10 @@ cc_library(
 
 configure_make(
     name = "luajit",
-    configure_command = "luajit_build.sh",
+    configure_command = select({
+        "//bazel:windows_x86_64": "luajit_build_win.sh",
+        "//conditions:default": "luajit_build.sh",
+    }),
     env = select({
         # This shouldn't be needed! See
         # https://github.com/envoyproxy/envoy/issues/6084
@@ -444,6 +447,28 @@ envoy_cmake(
     lib_source = "@com_github_wamr//:all",
     out_static_libs = ["libiwasm.a"],
     tags = ["skip_on_windows"],
+)
+
+configure_make(
+    name = "dlfcn_win32_build",
+    configure_in_place = True,
+    configure_options = [
+        "--disable-shared",
+        "--enable-static",
+    ],
+    lib_source = "@com_github_dlfcn_win32//:all",
+    out_static_libs = select({
+        "//bazel:windows_x86_64": ["libdl.a"],
+        "//conditions:default": [],
+    }),
+)
+
+cc_library(
+    name = "dlfcn_win32",
+    deps = select({
+        "//bazel:windows_x86_64": [":dlfcn_win32_build"],
+        "//conditions:default": [],
+    }),
 )
 
 envoy_cmake(

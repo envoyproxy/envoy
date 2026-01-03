@@ -32,9 +32,10 @@ SignalEventImpl::SignalEventImpl(DispatcherImpl& dispatcher, signal_t signal_num
 
   read_handle_->initializeFileEvent(
       dispatcher,
-      [this](uint32_t events) -> void {
+      [this](uint32_t events) -> absl::Status {
         ASSERT(events == Event::FileReadyType::Read);
         cb_();
+        return absl::OkStatus();
       },
       Event::FileTriggerType::Level, Event::FileReadyType::Read);
   eventBridgeHandlersSingleton::get()[signal_num] = write_handle;

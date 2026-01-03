@@ -18,7 +18,10 @@ envoy_cc_library(
     deps = [
         ":abi_version_lib",
         "//envoy/common:exception_lib",
-    ],
+    ] + select({
+        "//bazel:windows_x86_64": ["//bazel/foreign_cc:dlfcn_win32"],
+        "//conditions:default": [],
+    }),
 )
 
 envoy_cc_library(
@@ -27,3 +30,5 @@ envoy_cc_library(
         "abi_version.h",
     ],
 )
+
+exports_files(["abi.h"])

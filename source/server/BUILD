@@ -239,6 +239,7 @@ envoy_cc_library(
         "//envoy/filesystem:filesystem_interface",
         "//source/common/common:logger_lib",
         "//source/common/filesystem:filesystem_lib",
+        "//source/common/singleton:threadsafe_singleton",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:optional",
     ],
