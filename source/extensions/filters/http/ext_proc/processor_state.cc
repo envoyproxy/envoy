@@ -638,6 +638,46 @@ bool ProcessorState::handleDuplexStreamedBodyResponse(const CommonResponse& comm
   return end_of_stream;
 }
 
+bool ProcessorState::isLastResponseAfterHeaderResp() {
+  if (callbackState() != ProcessorState::CallbackState::Idle) {
+    return false;
+  }
+  if (hasNoBody()) {
+    return true;
+  }
+  if (bodyMode() == ProcessingMode::NONE && !sendTrailers()) {
+    return true;
+  }
+  if (bodyMode() == ProcessingMode::NONE && sendTrailers()) {
+    if (completeBodyAvailable() && (responseTrailers() == nullptr)) {
+      return true;
+    }
+  }
+  if (bodyMode() != ProcessingMode::NONE && !sendTrailers()) {
+    if (responseTrailers() != nullptr) {
+      // If callback state is idle, and trailers are already received,
+      // then there is no more body chunks to send.
+      return true;
+    }
+  }
+  return false;
+}
+
+bool ProcessorState::isLastResponseAfterBodyResp(bool is_last_body_resp) {
+  if (callbackState() != ProcessorState::CallbackState::Idle) {
+    return false;
+  }
+  if (is_last_body_resp) {
+    return true;
+  }
+  if (!sendTrailers() && responseTrailers() != nullptr) {
+    // If callback state is idle, and trailers are already received,
+    // then there is no more body chunks to send.
+    return true;
+  }
+  return false;
+}
+
 void DecodingProcessorState::setProcessingModeInternal(const ProcessingMode& mode) {
   // Account for the different default behaviors of headers and trailers --
   // headers are sent by default and trailers are not.

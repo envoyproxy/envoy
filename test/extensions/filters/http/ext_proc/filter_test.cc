@@ -2010,6 +2010,7 @@ TEST_F(HttpFilterTest, PostStreamingBodies) {
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
   EXPECT_TRUE(last_request_.has_protocol_config());
   processRequestHeaders(false, absl::nullopt);
+  EXPECT_EQ(0, config_->stats().streams_closed_.value());
   // Test content-length header is removed in request in streamed mode.
   EXPECT_EQ(request_headers_.ContentLength(), nullptr);
 
@@ -2044,6 +2045,7 @@ TEST_F(HttpFilterTest, PostStreamingBodies) {
   EXPECT_EQ(0, config_->stats().streams_closed_.value());
   EXPECT_FALSE(last_request_.has_protocol_config());
   processResponseHeaders(false, absl::nullopt);
+  EXPECT_EQ(0, config_->stats().streams_closed_.value());
   // Test content-length header is removed in response in streamed mode.
   EXPECT_EQ(response_headers_.ContentLength(), nullptr);
 
@@ -2061,6 +2063,7 @@ TEST_F(HttpFilterTest, PostStreamingBodies) {
     got_response_body.move(resp_chunk);
     EXPECT_FALSE(last_request_.has_protocol_config());
     processResponseBody(absl::nullopt, false);
+    EXPECT_EQ(0, config_->stats().streams_closed_.value());
   }
   EXPECT_EQ(0, config_->stats().streams_closed_.value());
 
@@ -5656,6 +5659,171 @@ TEST_F(HttpFilterTest, CloseStreamOnRequestHeaders) {
   EXPECT_EQ(1, config_->stats().stream_msgs_received_.value());
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
   filter_->onDestroy();
+}
+
+TEST_F(HttpFilterTest, CloseStreamOnRequestHeadersNoTrailers) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_header_mode: SEND
+    response_header_mode: SKIP
+    request_body_mode: NONE
+    response_body_mode: NONE
+    request_trailer_mode: SEND
+    response_trailer_mode: SKIP
+  )EOF");
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  Buffer::OwnedImpl req_data("foo");
+  EXPECT_EQ(FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(req_data, true));
+  processRequestHeaders(true, [](const HttpHeaders&, ProcessingResponse&, HeadersResponse&) {});
+  EXPECT_EQ(1, config_->stats().stream_msgs_sent_.value());
+  EXPECT_EQ(1, config_->stats().stream_msgs_received_.value());
+  // The next response should be the last, so expect the stream to be closed.
+  EXPECT_EQ(1, config_->stats().streams_closed_.value());
+  filter_->onDestroy();
+  // And not closing again.
+  EXPECT_EQ(1, config_->stats().streams_closed_.value());
+}
+
+TEST_F(HttpFilterTest, CloseStreamOnRequestHeadersWithTrailers) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_header_mode: SEND
+    response_header_mode: SKIP
+    request_body_mode: STREAMED
+    response_body_mode: NONE
+    request_trailer_mode: SKIP
+    response_trailer_mode: SKIP
+  )EOF");
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers_));
+  processRequestHeaders(true, [](const HttpHeaders&, ProcessingResponse&, HeadersResponse&) {});
+  EXPECT_EQ(1, config_->stats().stream_msgs_sent_.value());
+  EXPECT_EQ(1, config_->stats().stream_msgs_received_.value());
+  EXPECT_EQ(1, config_->stats().streams_closed_.value());
+  filter_->onDestroy();
+  EXPECT_EQ(1, config_->stats().streams_closed_.value());
+}
+
+TEST_F(HttpFilterTest, CloseStreamOnRequestBodyWithTrailers) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_header_mode: SKIP
+    response_header_mode: SKIP
+    request_body_mode: STREAMED
+    response_body_mode: NONE
+    request_trailer_mode: SKIP
+    response_trailer_mode: SKIP
+  )EOF");
+
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+  Buffer::OwnedImpl req_data("foo");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, false));
+  EXPECT_EQ(FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers_));
+  auto response = std::make_unique<ProcessingResponse>();
+  auto* body_response = response->mutable_request_body();
+  body_response->mutable_response()->mutable_body_mutation()->set_body("bar");
+  stream_callbacks_->onReceiveMessage(std::move(response));
+  EXPECT_EQ(1, config_->stats().stream_msgs_sent_.value());
+  EXPECT_EQ(1, config_->stats().stream_msgs_received_.value());
+  EXPECT_EQ(1, config_->stats().streams_closed_.value());
+  filter_->onDestroy();
+  EXPECT_EQ(1, config_->stats().streams_closed_.value());
+}
+
+TEST_F(HttpFilterTest, CloseStreamOnResponseBodyWithTrailers) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_header_mode: SKIP
+    response_header_mode: SKIP
+    request_body_mode: NONE
+    response_body_mode: STREAMED
+    request_trailer_mode: SKIP
+    response_trailer_mode: SKIP
+  )EOF");
+
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, true));
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
+  Buffer::OwnedImpl response_data("foo");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(response_data, false));
+  EXPECT_EQ(FilterTrailersStatus::StopIteration, filter_->encodeTrailers(response_trailers_));
+  auto response = std::make_unique<ProcessingResponse>();
+  auto* body_response = response->mutable_response_body();
+  body_response->mutable_response()->mutable_body_mutation()->set_body("bar");
+  stream_callbacks_->onReceiveMessage(std::move(response));
+  EXPECT_EQ(1, config_->stats().stream_msgs_sent_.value());
+  EXPECT_EQ(1, config_->stats().stream_msgs_received_.value());
+  EXPECT_EQ(1, config_->stats().streams_closed_.value());
+  filter_->onDestroy();
+  EXPECT_EQ(1, config_->stats().streams_closed_.value());
+}
+
+TEST_F(HttpFilterTest, CloseStreamOnResponseHeadersNoTrailers) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_header_mode: SKIP
+    response_header_mode: SEND
+    request_body_mode: NONE
+    response_body_mode: NONE
+    request_trailer_mode: SKIP
+    response_trailer_mode: SEND
+  )EOF");
+
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, true));
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+  Buffer::OwnedImpl response_data("foo");
+  EXPECT_EQ(FilterDataStatus::StopIterationAndWatermark, filter_->encodeData(response_data, true));
+  auto response = std::make_unique<ProcessingResponse>();
+  response->mutable_response_headers();
+  stream_callbacks_->onReceiveMessage(std::move(response));
+  EXPECT_EQ(1, config_->stats().stream_msgs_sent_.value());
+  EXPECT_EQ(1, config_->stats().stream_msgs_received_.value());
+  EXPECT_EQ(1, config_->stats().streams_closed_.value());
+  filter_->onDestroy();
+  EXPECT_EQ(1, config_->stats().streams_closed_.value());
+}
+
+TEST_F(HttpFilterTest, CloseStreamOnResponseHeadersWithTrailers) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_header_mode: SKIP
+    response_header_mode: SEND
+    request_body_mode: NONE
+    response_body_mode: STREAMED
+    request_trailer_mode: SKIP
+    response_trailer_mode: SKIP
+  )EOF");
+
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, true));
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+  EXPECT_EQ(FilterTrailersStatus::StopIteration, filter_->encodeTrailers(response_trailers_));
+  auto response = std::make_unique<ProcessingResponse>();
+  response->mutable_response_headers();
+  stream_callbacks_->onReceiveMessage(std::move(response));
+  EXPECT_EQ(1, config_->stats().stream_msgs_sent_.value());
+  EXPECT_EQ(1, config_->stats().stream_msgs_received_.value());
+  EXPECT_EQ(1, config_->stats().streams_closed_.value());
+  filter_->onDestroy();
+  EXPECT_EQ(1, config_->stats().streams_closed_.value());
 }
 
 TEST_F(HttpFilterTest, ClusterMetadataOptionsOverride) {
