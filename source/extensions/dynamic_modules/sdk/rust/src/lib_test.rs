@@ -348,9 +348,7 @@ fn test_envoy_dynamic_module_on_listener_filter_new_destroy() {
   );
   assert!(!result.is_null());
 
-  unsafe {
-    envoy_dynamic_module_on_listener_filter_destroy(result);
-  }
+  envoy_dynamic_module_on_listener_filter_destroy(result);
 
   assert!(DROPPED.load(std::sync::atomic::Ordering::SeqCst));
 }
@@ -492,9 +490,7 @@ fn test_envoy_dynamic_module_on_network_filter_config_destroy() {
     &new_fn,
   );
 
-  unsafe {
-    envoy_dynamic_module_on_network_filter_config_destroy(config_ptr);
-  }
+  envoy_dynamic_module_on_network_filter_config_destroy(config_ptr);
   // Now that the drop is called, DROPPED must be set to true.
   assert!(DROPPED.load(std::sync::atomic::Ordering::SeqCst));
 }
@@ -526,9 +522,7 @@ fn test_envoy_dynamic_module_on_network_filter_new_destroy() {
   );
   assert!(!result.is_null());
 
-  unsafe {
-    envoy_dynamic_module_on_network_filter_destroy(result);
-  }
+  envoy_dynamic_module_on_network_filter_destroy(result);
 
   assert!(DROPPED.load(std::sync::atomic::Ordering::SeqCst));
 }
@@ -594,26 +588,24 @@ fn test_envoy_dynamic_module_on_network_filter_callbacks() {
     &mut filter_config,
   );
 
-  unsafe {
-    assert_eq!(
-      envoy_dynamic_module_on_network_filter_new_connection(std::ptr::null_mut(), filter),
-      abi::envoy_dynamic_module_type_on_network_filter_data_status::Continue
-    );
-    assert_eq!(
-      envoy_dynamic_module_on_network_filter_read(std::ptr::null_mut(), filter, 100, false),
-      abi::envoy_dynamic_module_type_on_network_filter_data_status::Continue
-    );
-    assert_eq!(
-      envoy_dynamic_module_on_network_filter_write(std::ptr::null_mut(), filter, 100, false),
-      abi::envoy_dynamic_module_type_on_network_filter_data_status::Continue
-    );
-    envoy_dynamic_module_on_network_filter_event(
-      std::ptr::null_mut(),
-      filter,
-      abi::envoy_dynamic_module_type_network_connection_event::RemoteClose,
-    );
-    envoy_dynamic_module_on_network_filter_destroy(filter);
-  }
+  assert_eq!(
+    envoy_dynamic_module_on_network_filter_new_connection(std::ptr::null_mut(), filter),
+    abi::envoy_dynamic_module_type_on_network_filter_data_status::Continue
+  );
+  assert_eq!(
+    envoy_dynamic_module_on_network_filter_read(std::ptr::null_mut(), filter, 100, false),
+    abi::envoy_dynamic_module_type_on_network_filter_data_status::Continue
+  );
+  assert_eq!(
+    envoy_dynamic_module_on_network_filter_write(std::ptr::null_mut(), filter, 100, false),
+    abi::envoy_dynamic_module_type_on_network_filter_data_status::Continue
+  );
+  envoy_dynamic_module_on_network_filter_event(
+    std::ptr::null_mut(),
+    filter,
+    abi::envoy_dynamic_module_type_network_connection_event::RemoteClose,
+  );
+  envoy_dynamic_module_on_network_filter_destroy(filter);
 
   assert!(ON_NEW_CONNECTION_CALLED.load(std::sync::atomic::Ordering::SeqCst));
   assert!(ON_READ_CALLED.load(std::sync::atomic::Ordering::SeqCst));
