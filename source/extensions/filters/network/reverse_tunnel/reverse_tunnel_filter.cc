@@ -116,8 +116,8 @@ ReverseTunnelFilterConfig::ReverseTunnelFilterConfig(
               : "envoy.filters.network.reverse_tunnel"),
       cluster_name_([&proto_config]() -> std::string {
         if (proto_config.enforce_cluster_match() && proto_config.cluster_name().empty()) {
-          ENVOY_LOG(warn, "cluster_name is not set but enforce_cluster_match is true, using "
-                          "default cluster name 'responder-envoy'");
+          ENVOY_LOG(warn, "reverse_tunnel: cluster_name is not set but enforce_cluster_match is "
+                          "true, using default cluster name 'responder-envoy'");
         }
         return (proto_config.enforce_cluster_match() && proto_config.cluster_name().empty())
                    ? "responder-envoy"
@@ -329,7 +329,7 @@ void ReverseTunnelFilter::RequestDecoderImpl::processIfComplete(bool end_stream)
   const absl::string_view tenant_id = tenant_vals[0]->value().getStringView();
 
   // Check for upstream cluster name header and validate if enforcement is enabled.
-  if (parent_.config_->enforceClusterMatch() && !parent_.config_->clusterName().empty()) {
+  if (parent_.config_->enforceClusterMatch()) {
     const auto upstream_cluster_vals = headers_->get(
         Extensions::Bootstrap::ReverseConnection::reverseTunnelUpstreamClusterNameHeader());
 
