@@ -114,9 +114,6 @@ on:
       rbe-google:
         type: boolean
         default: false
-      repo-fetch-depth:
-        type: number
-        default: 1
       report-pre:
         type: string
         default: |
@@ -327,7 +324,6 @@ jobs:
       with:
         branch: ${{ fromJSON(inputs.request).request.target-branch }}
         config: |
-          fetch-depth: ${{ inputs.repo-fetch-depth }}
           # WARNING: This allows untrusted code to run!!!
           #  If this is set to run untrusted code, then anything before or after in the job should be regarded as
           #  compromisable.
