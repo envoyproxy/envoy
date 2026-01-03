@@ -13,6 +13,7 @@
 #include "source/common/quic/envoy_quic_dispatcher.h"
 #include "source/common/quic/envoy_quic_proof_source_factory_interface.h"
 #include "source/common/quic/envoy_quic_server_preferred_address_config_factory.h"
+#include "source/common/quic/envoy_quic_server_proof_verifier.h"
 #include "source/common/runtime/runtime_protos.h"
 #include "source/server/active_udp_listener.h"
 
@@ -106,6 +107,8 @@ private:
   // This is an equivalent of max_connections_to_accept_per_socket_event for TCP
   // listeners.
   uint32_t max_sessions_per_event_loop_;
+  // Raw pointer to the server proof verifier for filter chain updates. Owned by crypto_config_.
+  EnvoyQuicServerProofVerifier* server_proof_verifier_{nullptr};
 };
 
 using ActiveQuicListenerPtr = std::unique_ptr<ActiveQuicListener>;

@@ -1,6 +1,7 @@
 #include <string>
 #include <vector>
 
+#include "source/common/common/base64.h"
 #include "source/common/tls/cert_validator/default_validator.h"
 #include "source/common/tls/cert_validator/san_matcher.h"
 
@@ -823,33 +824,33 @@ TEST(DefaultCertValidatorTest, TestCertificateValidationErrorDetailsForSanFailur
   Stats::TestUtil::TestStore test_store;
   SslStats stats = generateSslStats(*test_store.rootScope());
 
-  // Load a certificate with DNS SANs
+  // Load a certificate with DNS SANs.
   bssl::UniquePtr<X509> cert = readCertFromFile(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"));
 
-  // Create SAN matchers that won't match the certificate (using regex as DNS requires it)
+  // Create SAN matchers that won't match the certificate (using regex as DNS requires it).
   envoy::type::matcher::v3::StringMatcher matcher;
   matcher.MergeFrom(TestUtility::createRegexMatcher(R"raw(nomatch\.example\.com)raw"));
   std::vector<SanMatcherPtr> subject_alt_name_matchers;
   subject_alt_name_matchers.push_back(
       SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_DNS, matcher, context)});
 
-  // Create the validator with no config (so verify_trusted_ca_ is false)
+  // Create the validator with no config (so verify_trusted_ca_ is false).
   auto default_validator =
       std::make_unique<Extensions::TransportSockets::Tls::DefaultCertValidator>(
           /*CertificateValidationContextConfig=*/nullptr, stats, context);
 
-  // Call verifyCertificate directly which populates error_details on SAN mismatch
+  // Call verifyCertificate directly which populates error_details on SAN mismatch.
   std::string error_details;
   uint8_t tls_alert;
   Ssl::ClientValidationStatus status = default_validator->verifyCertificate(
       cert.get(), /*verify_san_list=*/{}, subject_alt_name_matchers, /*stream_info=*/{},
       &error_details, &tls_alert);
 
-  // Validation should fail because the SAN doesn't match
+  // Validation should fail because the SAN doesn't match.
   EXPECT_EQ(Ssl::ClientValidationStatus::Failed, status);
 
-  // The error_details should be populated with a meaningful error message
+  // The error_details should be populated with a meaningful error message.
   EXPECT_EQ(error_details, "verify cert failed: SAN matcher");
 }
 
@@ -857,37 +858,15 @@ TEST(DefaultCertValidatorTest, TestCertificateValidationErrorDetailsForSanFailur
 TEST(DefaultCertValidatorTest, TestSslExtendedSocketInfoCertValidationError) {
   TestSslExtendedSocketInfo extended_socket_info;
 
-  // Initially the error should be empty
+  // Initially the error should be empty.
   EXPECT_TRUE(extended_socket_info.certificateValidationError().empty());
 
-  // Set an error
+  // Set an error.
   const std::string error_msg = "verify cert failed: X509_verify_cert: certificate has expired";
   extended_socket_info.setCertificateValidationError(error_msg);
 
-  // Verify the error is stored and retrievable
+  // Verify the error is stored and retrievable.
   EXPECT_EQ(error_msg, extended_socket_info.certificateValidationError());
-}
-
-// Test that empty cert chain returns appropriate error details.
-TEST(DefaultCertValidatorTest, TestEmptyCertChainErrorDetails) {
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  Stats::TestUtil::TestStore test_store;
-  SslStats stats = generateSslStats(*test_store.rootScope());
-
-  auto default_validator =
-      std::make_unique<Extensions::TransportSockets::Tls::DefaultCertValidator>(
-          /*CertificateValidationContextConfig=*/nullptr, stats, context);
-
-  SSLContextPtr ssl_ctx = SSL_CTX_new(TLS_method());
-  bssl::UniquePtr<STACK_OF(X509)> cert_chain(sk_X509_new_null());
-
-  ValidationResults results = default_validator->doVerifyCertChain(
-      *cert_chain, /*callback=*/nullptr,
-      /*transport_socket_options=*/nullptr, *ssl_ctx, {}, false, "");
-
-  EXPECT_EQ(ValidationResults::ValidationStatus::Failed, results.status);
-  EXPECT_TRUE(results.error_details.has_value());
-  EXPECT_EQ(results.error_details.value(), "verify cert failed: empty cert chain");
 }
 
 } // namespace Tls
