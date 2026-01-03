@@ -85,6 +85,19 @@ public:
 
 private:
   std::vector<Http::StreamFilterSharedPtr> filters_;
+  // Track the index of the last filter processed for each operation type.
+  // When a filter returns StopIteration, we save the index. On the next call,
+  // we resume from the next filter.
+  size_t decode_headers_index_{0};
+  size_t decode_data_index_{0};
+  size_t decode_trailers_index_{0};
+  size_t decode_metadata_index_{0};
+  // For encode operations, we track from the end in reverse order.
+  size_t encode_1xx_headers_index_{0};
+  size_t encode_headers_index_{0};
+  size_t encode_data_index_{0};
+  size_t encode_trailers_index_{0};
+  size_t encode_metadata_index_{0};
 };
 
 class Filter : public Http::StreamFilter,
