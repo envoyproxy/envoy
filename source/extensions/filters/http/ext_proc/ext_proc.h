@@ -571,6 +571,8 @@ public:
   void onProcessBodyResponse(const envoy::service::ext_proc::v3::BodyResponse& response,
                              absl::Status status,
                              envoy::config::core::v3::TrafficDirection traffic_direction);
+  void onProcessStreamingImmediateResponse(
+      const envoy::service::ext_proc::v3::StreamedImmediateResponse& response, absl::Status status);
 
 private:
   void mergePerRouteConfig();
@@ -626,6 +628,7 @@ private:
                    envoy::service::ext_proc::v3::ProcessingRequest&& req, bool end_stream);
 
   void encodeProtocolConfig(envoy::service::ext_proc::v3::ProcessingRequest& req);
+  void finishProcessing();
 
   // For FULL_DUPLEX_STREAMED body mode, once the data is received and sent to
   // the ext_proc server, Envoy only supports fail close.
@@ -644,6 +647,8 @@ private:
   // For other body modes like BUFFERED or BUFFERED_PARTIAL, it is ignored.
   void closeGrpcStreamIfLastRespReceived(const ProcessingResponse& response,
                                          const bool is_last_body_resp);
+  absl::Status handleStreamingImmediateResponse(
+      const envoy::service::ext_proc::v3::StreamedImmediateResponse& response);
 
   const FilterConfigSharedPtr config_;
   const ClientBasePtr client_;

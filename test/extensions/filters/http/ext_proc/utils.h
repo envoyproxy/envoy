@@ -85,6 +85,9 @@ public:
   afterReceivingImmediateResponse(const envoy::service::ext_proc::v3::ImmediateResponse& response,
                                   absl::Status processing_status,
                                   Envoy::StreamInfo::StreamInfo&) override;
+  void afterProcessingStreamingImmediateResponse(
+      const envoy::service::ext_proc::v3::StreamedImmediateResponse& response,
+      absl::Status processing_status, Envoy::StreamInfo::StreamInfo&) override;
 
 private:
   Envoy::Protobuf::Struct
@@ -116,6 +119,8 @@ private:
     }
     return struct_metadata;
   }
+  Envoy::Protobuf::Struct makeStreamedImmediateResponseMetadata(
+      const envoy::service::ext_proc::v3::StreamedImmediateResponse& response);
 };
 
 class TestOnProcessingResponseFactory : public OnProcessingResponseFactory {
