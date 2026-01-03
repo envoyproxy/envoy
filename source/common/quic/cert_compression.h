@@ -1,30 +1,29 @@
 #pragma once
 
-#include "source/common/common/logger.h"
-
-#include "openssl/ssl.h"
+#include "source/common/runtime/runtime_features.h"
+#include "source/common/tls/cert_compression.h"
 
 namespace Envoy {
 namespace Quic {
 
-/**
- * Support for certificate compression and decompression in QUIC TLS handshakes. This often
- * needed for the ServerHello to fit in the initial response and not need an additional round trip
- * between client and server.
- */
+// QUIC wrapper for TLS certificate compression.
 class CertCompression : protected Logger::Loggable<Logger::Id::quic> {
 public:
-  // Registers compression and decompression functions on `ssl_ctx` if enabled.
-  static void registerSslContext(SSL_CTX* ssl_ctx);
+  using Algorithm = Extensions::TransportSockets::Tls::CertCompression::Algorithm;
 
-  // Callbacks for `SSL_CTX_add_cert_compression_alg`.
-  static int compressZlib(SSL* ssl, CBB* out, const uint8_t* in, size_t in_len);
-  static int decompressZlib(SSL*, CRYPTO_BUFFER** out, size_t uncompressed_len, const uint8_t* in,
-                            size_t in_len);
+  static void registerSslContext(SSL_CTX* ssl_ctx, Stats::Scope* scope = nullptr) {
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.tls_support_certificate_compression")) {
+      Extensions::TransportSockets::Tls::CertCompression::registerAlgorithms(
+          ssl_ctx, {Algorithm::Brotli, Algorithm::Zstd, Algorithm::Zlib}, scope);
+    } else {
+      Extensions::TransportSockets::Tls::CertCompression::registerAlgorithms(
+          ssl_ctx, {Algorithm::Zlib}, scope);
+    }
+  }
 
-  // Defined return values for callbacks from `SSL_CTX_add_cert_compression_alg`.
-  static constexpr int SUCCESS = 1;
-  static constexpr int FAILURE = 0;
+  static constexpr int SUCCESS = Extensions::TransportSockets::Tls::CertCompression::SUCCESS;
+  static constexpr int FAILURE = Extensions::TransportSockets::Tls::CertCompression::FAILURE;
 };
 
 } // namespace Quic

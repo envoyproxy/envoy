@@ -116,7 +116,7 @@ void EnvoyQuicProofSource::updateFilterChainManager(
 }
 
 void EnvoyQuicProofSource::OnNewSslCtx(SSL_CTX* ssl_ctx) {
-  CertCompression::registerSslContext(ssl_ctx);
+  CertCompression::registerSslContext(ssl_ctx, &stats_scope_);
 }
 
 } // namespace Quic

@@ -65,7 +65,8 @@ ActiveQuicListener::ActiveQuicListener(
       absl::string_view(reinterpret_cast<char*>(random_seed_), sizeof(random_seed_)),
       quic::QuicRandom::GetInstance(),
       proof_source_factory.createQuicProofSource(
-          listen_socket_, listener_config.filterChainManager(), stats_, dispatcher.timeSource()),
+          listen_socket_, listener_config.filterChainManager(), stats_, dispatcher.timeSource(),
+          listener_config.listenerScope()),
       quic::KeyExchangeSource::Default());
   auto connection_helper = std::make_unique<EnvoyQuicConnectionHelper>(dispatcher_);
   crypto_config_->AddDefaultConfig(random, connection_helper->GetClock(),
