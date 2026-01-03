@@ -397,18 +397,16 @@ fn test_envoy_dynamic_module_on_listener_filter_callbacks() {
     &mut filter_config,
   );
 
-  unsafe {
-    assert_eq!(
-      envoy_dynamic_module_on_listener_filter_on_accept(std::ptr::null_mut(), filter),
-      abi::envoy_dynamic_module_type_on_listener_filter_status::Continue
-    );
-    assert_eq!(
-      envoy_dynamic_module_on_listener_filter_on_data(std::ptr::null_mut(), filter),
-      abi::envoy_dynamic_module_type_on_listener_filter_status::Continue
-    );
-    envoy_dynamic_module_on_listener_filter_on_close(std::ptr::null_mut(), filter);
-    envoy_dynamic_module_on_listener_filter_destroy(filter);
-  }
+  assert_eq!(
+    envoy_dynamic_module_on_listener_filter_on_accept(std::ptr::null_mut(), filter),
+    abi::envoy_dynamic_module_type_on_listener_filter_status::Continue
+  );
+  assert_eq!(
+    envoy_dynamic_module_on_listener_filter_on_data(std::ptr::null_mut(), filter),
+    abi::envoy_dynamic_module_type_on_listener_filter_status::Continue
+  );
+  envoy_dynamic_module_on_listener_filter_on_close(std::ptr::null_mut(), filter);
+  envoy_dynamic_module_on_listener_filter_destroy(filter);
 
   assert!(ON_ACCEPT_CALLED.load(std::sync::atomic::Ordering::SeqCst));
   assert!(ON_DATA_CALLED.load(std::sync::atomic::Ordering::SeqCst));
@@ -490,7 +488,9 @@ fn test_envoy_dynamic_module_on_network_filter_config_destroy() {
     &new_fn,
   );
 
-  envoy_dynamic_module_on_network_filter_config_destroy(config_ptr);
+  unsafe {
+    envoy_dynamic_module_on_network_filter_config_destroy(config_ptr);
+  }
   // Now that the drop is called, DROPPED must be set to true.
   assert!(DROPPED.load(std::sync::atomic::Ordering::SeqCst));
 }
