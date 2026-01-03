@@ -40,12 +40,17 @@ filter_config:
   NiceMock<Server::Configuration::MockFactoryContext> context;
   Api::ApiPtr api = Api::createApiForTest();
   EXPECT_CALL(context.server_factory_context_, api()).WillRepeatedly(testing::ReturnRef(*api));
+  ON_CALL(context.server_factory_context_.options_, concurrency())
+      .WillByDefault(testing::Return(1));
 
   Envoy::Server::Configuration::DynamicModuleConfigFactory factory;
   auto result = factory.createFilterFactoryFromProto(proto_config, "", context);
   EXPECT_TRUE(result.ok());
   auto factory_cb = result.value();
-  Http::MockFilterChainFactoryCallbacks callbacks;
+  NiceMock<Http::MockFilterChainFactoryCallbacks> callbacks;
+
+  NiceMock<Event::MockDispatcher> dispatcher{"worker_0"};
+  ON_CALL(callbacks, dispatcher()).WillByDefault(ReturnRef(dispatcher));
 
   EXPECT_CALL(callbacks, addStreamFilter(testing::_));
   factory_cb(callbacks);
@@ -72,12 +77,17 @@ filter_name: foo
   NiceMock<Server::Configuration::MockFactoryContext> context;
   Api::ApiPtr api = Api::createApiForTest();
   EXPECT_CALL(context.server_factory_context_, api()).WillRepeatedly(testing::ReturnRef(*api));
+  ON_CALL(context.server_factory_context_.options_, concurrency())
+      .WillByDefault(testing::Return(1));
 
   Envoy::Server::Configuration::DynamicModuleConfigFactory factory;
   auto result = factory.createFilterFactoryFromProto(proto_config, "", context);
   EXPECT_TRUE(result.ok());
   auto factory_cb = result.value();
-  Http::MockFilterChainFactoryCallbacks callbacks;
+  NiceMock<Http::MockFilterChainFactoryCallbacks> callbacks;
+
+  NiceMock<Event::MockDispatcher> dispatcher{"worker_0"};
+  ON_CALL(callbacks, dispatcher()).WillByDefault(ReturnRef(dispatcher));
 
   EXPECT_CALL(callbacks, addStreamFilter(testing::_));
   factory_cb(callbacks);
@@ -107,12 +117,17 @@ filter_config:
   NiceMock<Server::Configuration::MockFactoryContext> context;
   Api::ApiPtr api = Api::createApiForTest();
   EXPECT_CALL(context.server_factory_context_, api()).WillRepeatedly(testing::ReturnRef(*api));
+  ON_CALL(context.server_factory_context_.options_, concurrency())
+      .WillByDefault(testing::Return(1));
 
   Envoy::Server::Configuration::DynamicModuleConfigFactory factory;
   auto result = factory.createFilterFactoryFromProto(proto_config, "", context);
   EXPECT_TRUE(result.ok());
   auto factory_cb = result.value();
-  Http::MockFilterChainFactoryCallbacks callbacks;
+  NiceMock<Http::MockFilterChainFactoryCallbacks> callbacks;
+
+  NiceMock<Event::MockDispatcher> dispatcher{"worker_0"};
+  ON_CALL(callbacks, dispatcher()).WillByDefault(ReturnRef(dispatcher));
 
   EXPECT_CALL(callbacks, addStreamFilter(testing::_));
   factory_cb(callbacks);
@@ -234,6 +249,7 @@ filter_config:
     envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilterPerRoute proto_config;
     TestUtility::loadFromYamlAndValidate(yaml, proto_config);
     NiceMock<Server::Configuration::MockServerFactoryContext> context;
+    ON_CALL(context.options_, concurrency()).WillByDefault(testing::Return(1));
 
     auto result = factory.createRouteSpecificFilterConfig(
         proto_config, context, ProtobufMessage::getNullValidationVisitor());

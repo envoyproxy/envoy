@@ -21,7 +21,7 @@ namespace HttpFilters {
 class DynamicModuleHttpFilterTest : public testing::Test {
 public:
   void SetUp() override {
-    filter_ = std::make_unique<DynamicModuleHttpFilter>(nullptr, symbol_table_);
+    filter_ = std::make_unique<DynamicModuleHttpFilter>(nullptr, symbol_table_, 3);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
   }
@@ -453,7 +453,7 @@ TEST_F(DynamicModuleHttpFilterTest, AddCustomFlag) {
 
 TEST(ABIImpl, metadata) {
   Stats::SymbolTableImpl symbol_table;
-  DynamicModuleHttpFilter filter{nullptr, symbol_table};
+  DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
   const std::string namespace_str = "foo";
   const std::string key_str = "key";
   double value = 42;
@@ -583,7 +583,7 @@ TEST(ABIImpl, metadata) {
 
 TEST(ABIImpl, filter_state) {
   Stats::SymbolTableImpl symbol_table;
-  DynamicModuleHttpFilter filter{nullptr, symbol_table};
+  DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
   const std::string key_str = "key";
   const std::string value_str = "value";
 
@@ -626,7 +626,7 @@ bufferVectorToString(const std::vector<envoy_dynamic_module_type_envoy_buffer>& 
 
 TEST(ABIImpl, RequestBody) {
   Stats::SymbolTableImpl symbol_table;
-  DynamicModuleHttpFilter filter{nullptr, symbol_table};
+  DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
   Http::MockStreamDecoderFilterCallbacks callbacks;
   StreamInfo::MockStreamInfo stream_info;
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
@@ -736,7 +736,7 @@ TEST(ABIImpl, RequestBody) {
 
 TEST(ABIImpl, BufferedRequestBody) {
   Stats::SymbolTableImpl symbol_table;
-  DynamicModuleHttpFilter filter{nullptr, symbol_table};
+  DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
   Http::MockStreamDecoderFilterCallbacks callbacks;
   StreamInfo::MockStreamInfo stream_info;
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
@@ -843,7 +843,7 @@ TEST(ABIImpl, BufferedRequestBody) {
 
 TEST(ABIImpl, ResponseBody) {
   Stats::SymbolTableImpl symbol_table;
-  DynamicModuleHttpFilter filter{nullptr, symbol_table};
+  DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
   Http::MockStreamEncoderFilterCallbacks callbacks;
   StreamInfo::MockStreamInfo stream_info;
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
@@ -953,7 +953,7 @@ TEST(ABIImpl, ResponseBody) {
 
 TEST(ABIImpl, BufferedResponseBody) {
   Stats::SymbolTableImpl symbol_table;
-  DynamicModuleHttpFilter filter{nullptr, symbol_table};
+  DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
   Http::MockStreamEncoderFilterCallbacks callbacks;
   StreamInfo::MockStreamInfo stream_info;
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
@@ -1060,7 +1060,7 @@ TEST(ABIImpl, BufferedResponseBody) {
 
 TEST(ABIImpl, ClearRouteCache) {
   Stats::SymbolTableImpl symbol_table;
-  DynamicModuleHttpFilter filter{nullptr, symbol_table};
+  DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
   Http::MockStreamDecoderFilterCallbacks callbacks;
   StreamInfo::MockStreamInfo stream_info;
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
@@ -1074,8 +1074,8 @@ TEST(ABIImpl, ClearRouteCache) {
 
 TEST(ABIImpl, GetAttributes) {
   Stats::SymbolTableImpl symbol_table;
-  DynamicModuleHttpFilter filter_without_callbacks{nullptr, symbol_table};
-  DynamicModuleHttpFilter filter{nullptr, symbol_table};
+  DynamicModuleHttpFilter filter_without_callbacks{nullptr, symbol_table, 0};
+  DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
   Http::MockStreamDecoderFilterCallbacks callbacks;
   StreamInfo::MockStreamInfo stream_info;
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
@@ -1330,7 +1330,7 @@ TEST(ABIImpl, GetAttributes) {
 
 TEST(ABIImpl, HttpCallout) {
   Stats::SymbolTableImpl symbol_table;
-  DynamicModuleHttpFilter filter{nullptr, symbol_table};
+  DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
   const std::string cluster{"some_cluster"};
   uint64_t callout_id = 0;
   EXPECT_EQ(envoy_dynamic_module_callback_http_filter_http_callout(&filter, &callout_id,
@@ -1375,7 +1375,7 @@ TEST(ABIImpl, Stats) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   auto filter_config = std::make_shared<DynamicModuleHttpFilterConfig>(
       "some_name", "some_config", nullptr, stats_scope, context);
-  DynamicModuleHttpFilter filter{filter_config, stats_scope.symbolTable()};
+  DynamicModuleHttpFilter filter{filter_config, stats_scope.symbolTable(), 0};
 
   const std::string counter_name{"some_counter"};
   size_t counter_id;
@@ -1602,6 +1602,19 @@ TEST(ABIImpl, Stats) {
       filter_config.get(), {histogram_vec_name.data(), histogram_vec_name.size()},
       histogram_vec_labels.data(), histogram_vec_labels.size(), &histogram_vec_id);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Frozen);
+}
+
+TEST_F(DynamicModuleHttpFilterTest, GetConcurrency) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  ON_CALL(context.options_, concurrency()).WillByDefault(testing::Return(1));
+  uint32_t concurrency =
+      envoy_dynamic_module_callback_server_factory_context_get_concurrency(&context);
+  EXPECT_EQ(concurrency, 1);
+}
+
+TEST_F(DynamicModuleHttpFilterTest, GetWorkerIndex) {
+  uint32_t worker_index = envoy_dynamic_module_callback_http_filter_get_worker_index(filter_.get());
+  EXPECT_EQ(worker_index, 3);
 }
 
 } // namespace HttpFilters
