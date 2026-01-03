@@ -456,7 +456,7 @@ new_features:
     <arch_overview_wasm_foreign_functions>` for details.
 - area: redis
   change: |
-    Moved the implementation of KEYS,SELECT,ROLE to the cluster scope command framework.
+    Added support for hello command.
 - area: overload management
   change: |
     The fixed heap resource monitor can calculate memory pressure as currently allocated memory divided by maximum heap
