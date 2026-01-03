@@ -3062,7 +3062,7 @@ uint64_t envoy_dynamic_module_callback_listener_filter_get_connection_start_time
     envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr);
 
 /**
- * envoy_dynamic_module_callback_listener_filter_get_dynamic_metadata is called by the
+ * envoy_dynamic_module_callback_listener_filter_get_dynamic_metadata_string is called by the
  * module to retrieve a string-typed dynamic metadata value.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
@@ -3072,13 +3072,13 @@ uint64_t envoy_dynamic_module_callback_listener_filter_get_connection_start_time
  * not a string type, value_out->ptr will be set to nullptr and value_out->length will be 0.
  * @return true if the metadata was found and is a string type, false otherwise.
  */
-bool envoy_dynamic_module_callback_listener_filter_get_dynamic_metadata(
+bool envoy_dynamic_module_callback_listener_filter_get_dynamic_metadata_string(
     envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer filter_namespace,
     envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* value_out);
 
 /**
- * envoy_dynamic_module_callback_listener_filter_set_dynamic_typed_metadata is called by the
+ * envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string is called by the
  * module to set a string-typed dynamic metadata value.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
@@ -3087,7 +3087,7 @@ bool envoy_dynamic_module_callback_listener_filter_get_dynamic_metadata(
  * @param value is the string value to set.
  * @return true if the operation was successful, false otherwise.
  */
-bool envoy_dynamic_module_callback_listener_filter_set_dynamic_typed_metadata(
+bool envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string(
     envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer filter_namespace,
     envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value);

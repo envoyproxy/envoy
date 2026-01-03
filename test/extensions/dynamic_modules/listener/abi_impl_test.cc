@@ -1060,7 +1060,7 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetDynamicMetadataSuccess) {
   envoy_dynamic_module_type_module_buffer key_buf = {key, 4};
   envoy_dynamic_module_type_envoy_buffer value_out = {nullptr, 0};
 
-  bool found = envoy_dynamic_module_callback_listener_filter_get_dynamic_metadata(
+  bool found = envoy_dynamic_module_callback_listener_filter_get_dynamic_metadata_string(
       filterPtr(), ns_buf, key_buf, &value_out);
 
   EXPECT_TRUE(found);
@@ -1078,7 +1078,7 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetDynamicMetadataNamespaceNo
   envoy_dynamic_module_type_module_buffer key_buf = {key, 4};
   envoy_dynamic_module_type_envoy_buffer value_out = {nullptr, 0};
 
-  bool found = envoy_dynamic_module_callback_listener_filter_get_dynamic_metadata(
+  bool found = envoy_dynamic_module_callback_listener_filter_get_dynamic_metadata_string(
       filterPtr(), ns_buf, key_buf, &value_out);
 
   EXPECT_FALSE(found);
@@ -1101,7 +1101,7 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetDynamicMetadataKeyNotFound
   envoy_dynamic_module_type_module_buffer key_buf = {key, 11};
   envoy_dynamic_module_type_envoy_buffer value_out = {nullptr, 0};
 
-  bool found = envoy_dynamic_module_callback_listener_filter_get_dynamic_metadata(
+  bool found = envoy_dynamic_module_callback_listener_filter_get_dynamic_metadata_string(
       filterPtr(), ns_buf, key_buf, &value_out);
 
   EXPECT_FALSE(found);
@@ -1119,7 +1119,7 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetDynamicMetadataNullCallbac
   envoy_dynamic_module_type_module_buffer key_buf = {key, 4};
   envoy_dynamic_module_type_envoy_buffer value_out = {nullptr, 0};
 
-  bool found = envoy_dynamic_module_callback_listener_filter_get_dynamic_metadata(
+  bool found = envoy_dynamic_module_callback_listener_filter_get_dynamic_metadata_string(
       static_cast<void*>(filter.get()), ns_buf, key_buf, &value_out);
 
   EXPECT_FALSE(found);
@@ -1137,7 +1137,7 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicTypedMetadataSucces
 
   EXPECT_CALL(callbacks_, setDynamicMetadata(testing::_, testing::_));
 
-  bool success = envoy_dynamic_module_callback_listener_filter_set_dynamic_typed_metadata(
+  bool success = envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string(
       filterPtr(), ns_buf, key_buf, value_buf);
 
   EXPECT_TRUE(success);
@@ -1154,7 +1154,7 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicTypedMetadataNullCa
   envoy_dynamic_module_type_module_buffer key_buf = {key, 4};
   envoy_dynamic_module_type_module_buffer value_buf = {value, 6};
 
-  bool success = envoy_dynamic_module_callback_listener_filter_set_dynamic_typed_metadata(
+  bool success = envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string(
       static_cast<void*>(filter.get()), ns_buf, key_buf, value_buf);
 
   EXPECT_FALSE(success);

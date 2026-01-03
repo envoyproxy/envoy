@@ -2477,7 +2477,7 @@ impl EnvoyHttpFilterImpl {
     // At this point, we assume at least one value is present.
     results.push(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) });
     // So, we iterate from 1 to count - 1.
-    for i in 1 .. count {
+    for i in 1..count {
       let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
         ptr: std::ptr::null(),
         length: 0,
@@ -4086,11 +4086,11 @@ pub trait EnvoyListenerFilter {
 
   /// Get the string-typed dynamic metadata value with the given namespace and key value.
   /// Returns None if the metadata is not found or is the wrong type.
-  fn get_dynamic_metadata(&self, namespace: &str, key: &str) -> Option<String>;
+  fn get_dynamic_metadata_string(&self, namespace: &str, key: &str) -> Option<String>;
 
   /// Set the string-typed dynamic metadata value with the given namespace and key value.
   /// Returns true if the operation is successful.
-  fn set_dynamic_metadata(&mut self, namespace: &str, key: &str, value: &str) -> bool;
+  fn set_dynamic_metadata_string(&mut self, namespace: &str, key: &str, value: &str) -> bool;
 
   /// Get the maximum number of bytes to read from the socket.
   /// This is used to determine the buffer size for reading data.
@@ -4303,13 +4303,13 @@ impl EnvoyListenerFilter for EnvoyListenerFilterImpl {
     }
   }
 
-  fn get_dynamic_metadata(&self, namespace: &str, key: &str) -> Option<String> {
+  fn get_dynamic_metadata_string(&self, namespace: &str, key: &str) -> Option<String> {
     let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
       ptr: std::ptr::null(),
       length: 0,
     };
     let success = unsafe {
-      abi::envoy_dynamic_module_callback_listener_filter_get_dynamic_metadata(
+      abi::envoy_dynamic_module_callback_listener_filter_get_dynamic_metadata_string(
         self.raw,
         str_to_module_buffer(namespace),
         str_to_module_buffer(key),
@@ -4329,9 +4329,9 @@ impl EnvoyListenerFilter for EnvoyListenerFilterImpl {
     }
   }
 
-  fn set_dynamic_metadata(&mut self, namespace: &str, key: &str, value: &str) -> bool {
+  fn set_dynamic_metadata_string(&mut self, namespace: &str, key: &str, value: &str) -> bool {
     unsafe {
-      abi::envoy_dynamic_module_callback_listener_filter_set_dynamic_typed_metadata(
+      abi::envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string(
         self.raw,
         str_to_module_buffer(namespace),
         str_to_module_buffer(key),

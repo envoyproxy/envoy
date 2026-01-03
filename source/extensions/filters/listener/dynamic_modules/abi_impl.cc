@@ -482,7 +482,7 @@ uint64_t envoy_dynamic_module_callback_listener_filter_get_connection_start_time
   return std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
 }
 
-bool envoy_dynamic_module_callback_listener_filter_get_dynamic_metadata(
+bool envoy_dynamic_module_callback_listener_filter_get_dynamic_metadata_string(
     envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer filter_namespace,
     envoy_dynamic_module_type_module_buffer key,
@@ -525,7 +525,7 @@ bool envoy_dynamic_module_callback_listener_filter_get_dynamic_metadata(
   return true;
 }
 
-bool envoy_dynamic_module_callback_listener_filter_set_dynamic_typed_metadata(
+bool envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string(
     envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer filter_namespace,
     envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value) {
