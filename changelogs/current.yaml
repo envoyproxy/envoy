@@ -667,7 +667,7 @@ new_features:
 - area: reverse_tunnel
   change: |
     Added ``required_cluster_name`` field to validate reverse tunnel initiations against the
-    ``x-envoy-reverse-tunnel-upstream-cluster-name`` header. If initiator envoy's upstream cluster name does not match 
+    ``x-envoy-reverse-tunnel-upstream-cluster-name`` header. If initiator envoy's upstream cluster name does not match
     ``required_cluster_name``, connection is rejected with a ``400 Bad Request``.
 - area: proto_api_scrubber
   change: |
