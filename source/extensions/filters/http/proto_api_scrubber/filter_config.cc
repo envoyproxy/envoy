@@ -67,8 +67,11 @@ getMatcher(Envoy::Server::Configuration::ServerFactoryContext& server_factory_co
 absl::StatusOr<std::shared_ptr<const ProtoApiScrubberFilterConfig>>
 ProtoApiScrubberFilterConfig::create(const ProtoApiScrubberConfig& proto_config,
                                      Server::Configuration::FactoryContext& context) {
+  ProtoApiScrubberStats stats(context.scope(), "proto_api_scrubber.");
   std::shared_ptr<ProtoApiScrubberFilterConfig> filter_config_ptr =
-      std::shared_ptr<ProtoApiScrubberFilterConfig>(new ProtoApiScrubberFilterConfig());
+      std::shared_ptr<ProtoApiScrubberFilterConfig>(
+          new ProtoApiScrubberFilterConfig(stats, context.serverFactoryContext().timeSource()));
+
   RETURN_IF_ERROR(filter_config_ptr->initialize(proto_config, context));
   return filter_config_ptr;
 }

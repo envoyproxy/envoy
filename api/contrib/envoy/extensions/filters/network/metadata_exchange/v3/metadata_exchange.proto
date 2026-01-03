@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package envoy.tcp.metadataexchange.config;
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.tcp.metadataexchange.config";
+option java_outer_classname = "MetadataExchangeProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/contrib/envoy/tcp/metadataexchange/config";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Metadata exchange TCP filter]
+//
+// Metadata exchange TCP filter for deriving and propagating peer telemetry attributes.
+// [#extension: envoy.filters.network.metadata_exchange]
+
+// [#protodoc-title: MetadataExchange protocol match and data transfer]
+// MetadataExchange protocol match and data transfer
+message MetadataExchange {
+  // Protocol that Alpn should support on the server.
+  // [#comment:TODO(GargNupur): Make it a list.]
+  string protocol = 1;
+
+  // If true, will attempt to use WDS in case the prefix peer metadata is not available.
+  bool enable_discovery = 2;
+
+  // Additional labels to be added to the peer metadata to help your understand the traffic.
+  // e.g. ``role``, ``location`` etc.
+  repeated string additional_labels = 3;
+}

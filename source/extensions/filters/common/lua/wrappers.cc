@@ -404,7 +404,10 @@ int SslConnectionWrapper::luaTlsVersion(lua_State* state) {
 }
 
 int ConnectionWrapper::luaSsl(lua_State* state) {
-  const auto& ssl = connection_->ssl();
+  ENVOY_LOG_MISC(warn, "connection():ssl() is deprecated and will be removed in a future release. "
+                       "Use streamInfo():downstreamSslConnection() instead.");
+
+  const auto& ssl = stream_info_.downstreamAddressProvider().sslConnection();
   if (ssl != nullptr) {
     if (ssl_connection_wrapper_.get() != nullptr) {
       ssl_connection_wrapper_.pushStack();
