@@ -221,6 +221,9 @@ bug_fixes:
   change: |
     Fixed transport socket matcher to correctly use downstream connection filter state for matching and optimized the
     selection path to avoid per-connection resolution overhead when filter state input is not used.
+- area: http
+  change: |
+    Fixed upstream client to not close connection when idle timeout fires before the connection is established.
 - area: ext_authz
   change: |
     Fixed the gRPC ext_authz client to respect ``status_on_error`` configuration when gRPC calls fail.

@@ -269,6 +269,21 @@ TEST_F(CodecClientTest, IdleTimerClientLocalCloseWithActiveRequests) {
   EXPECT_EQ(client_->idleTimer(), nullptr);
 }
 
+// Test that idle timeout closes the connection and increments stats when connected.
+TEST_F(CodecClientTest, IdleTimeoutWhenConnected) {
+  initialize();
+
+  // Connect the connection first.
+  connection_cb_->onEvent(Network::ConnectionEvent::Connected);
+
+  // Trigger idle timeout - it should close the connection and increment stats.
+  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush));
+  client_->triggerIdleTimeout();
+
+  // Verify idle timeout stat was incremented.
+  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_idle_timeout_.value());
+}
+
 TEST_F(CodecClientTest, ProtocolError) {
   initialize();
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Return(codecProtocolError("protocol error")));

@@ -36,7 +36,6 @@ CodecClient::CodecClient(CodecType type, Network::ClientConnectionPtr&& connecti
 
   if (idle_timeout_) {
     idle_timer_ = dispatcher.createTimer([this]() -> void { onIdleTimeout(); });
-    enableIdleTimer();
   }
 
   // We just universally set no delay on connections. Theoretically we might at some point want
@@ -53,6 +52,7 @@ void CodecClient::connect() {
   if (!connection_->connecting()) {
     ASSERT(connection_->state() == Network::Connection::State::Open);
     connected_ = true;
+    enableIdleTimer();
   } else {
     ENVOY_CONN_LOG(debug, "connecting", *connection_);
     connection_->connect();
@@ -95,6 +95,7 @@ void CodecClient::onEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::Connected) {
     ENVOY_CONN_LOG(debug, "connected", *connection_);
     connected_ = true;
+    enableIdleTimer();
     return;
   }
 
