@@ -54,6 +54,7 @@ directories:
   source/extensions/filters/network/mongo_proxy: 96.1
   source/extensions/filters/network/reverse_tunnel: 92.0
   source/extensions/filters/network/sni_cluster: 88.9
+  source/extensions/filters/udp/dns_filter: 95.9
   source/extensions/formatter/cel: 100.0
   source/extensions/internal_redirect: 86.2
   source/extensions/internal_redirect/safe_cross_scheme: 81.3

@@ -353,7 +353,8 @@ DnsLookupResponseCode DnsFilter::getResponseForQuery(DnsQueryContextPtr& context
     // Try to resolve the query locally. If forwarding the query externally is disabled we will
     // always attempt to resolve with the configured domains
     const bool forward_queries = config_->forwardQueries();
-    if (isKnownDomain(query->name_) || !forward_queries) {
+    const bool is_known = isKnownDomain(query->name_);
+    if (is_known || !forward_queries) {
       // Determine whether the name is a cluster. Move on to the next query if successful
       if (resolveViaClusters(context, *query)) {
         continue;
@@ -361,6 +362,11 @@ DnsLookupResponseCode DnsFilter::getResponseForQuery(DnsQueryContextPtr& context
 
       // Determine whether we an answer this query with the static configuration
       if (resolveViaConfiguredHosts(context, *query)) {
+        continue;
+      }
+
+      if (is_known && getEndpointConfigForDomain(query->name_) != nullptr) {
+        context->known_domain_without_records_ = true;
         continue;
       }
     }
@@ -583,9 +589,9 @@ bool DnsFilter::resolveConfiguredDomain(DnsQueryContextPtr& context, const DnsQu
       ASSERT(configured_address != nullptr);
       ENVOY_LOG(trace, "using local address {} for domain [{}]",
                 configured_address->ip()->addressAsString(), query.name_);
-      ++hosts_found;
       const std::chrono::seconds ttl = getDomainTTL(query.name_);
       if (message_parser_.storeDnsAnswerRecord(context, query, ttl, configured_address)) {
+        ++hosts_found;
         incrementLocalQueryTypeAnswerCount(query.type_);
       }
     }
