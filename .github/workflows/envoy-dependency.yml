@@ -146,7 +146,7 @@ jobs:
           path: envoy
           fetch-depth: 0
         token: ${{ steps.appauth.outputs.token }}
-    - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3  # v6.0.0
+    - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
       name: Checkout Envoy build tools repository
       with:
         repository: envoyproxy/envoy-build-tools
@@ -255,7 +255,7 @@ jobs:
       issues: write
     steps:
     - name: Checkout repository
-      uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3  # v6.0.0
+      uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
     - name: Run dependency checker
       run: |
         TODAY_DATE=$(date -u -I"date")
