@@ -14,6 +14,7 @@ envoy_mobile_swift_test(
         "GRPCStreamTests.swift",
         "HeadersBuilderTests.swift",
         "HeadersContainerTests.swift",
+        "NetworkChangeMonitorTests.swift",
         "PulseClientImplTests.swift",
         "RequestHeadersBuilderTests.swift",
         "ResponseHeadersTests.swift",
