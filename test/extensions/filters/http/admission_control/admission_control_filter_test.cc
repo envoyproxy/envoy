@@ -5,9 +5,12 @@
 #include "envoy/grpc/status.h"
 
 #include "source/common/common/enum_to_int.h"
+#include "source/common/http/header_utility.h"
+#include "source/common/protobuf/utility.h"
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/extensions/filters/http/admission_control/admission_control.h"
 #include "source/extensions/filters/http/admission_control/evaluators/response_evaluator.h"
+#include "source/extensions/filters/http/admission_control/evaluators/success_criteria_evaluator.h"
 #include "source/extensions/filters/http/admission_control/thread_local_controller.h"
 
 #include "test/mocks/runtime/mocks.h"
@@ -46,16 +49,47 @@ public:
   MOCK_METHOD(bool, isGrpcSuccess, (uint32_t status), (const));
 };
 
+class TestRuleConfig : public AdmissionControlRuleConfig {
+public:
+  TestRuleConfig(const AdmissionControlRuleProto& rule_config, Runtime::Loader& runtime,
+                 ThreadLocal::TypedSlotPtr<ThreadLocalControllerImpl>&& tls,
+                 MockThreadLocalController& controller,
+                 std::shared_ptr<ResponseEvaluator> evaluator,
+                 std::vector<Http::HeaderUtility::HeaderDataPtr>&& filter_headers)
+      : AdmissionControlRuleConfig(rule_config, runtime, std::move(tls), std::move(evaluator),
+                                   std::move(filter_headers)),
+        controller_(controller) {}
+
+  TestRuleConfig(ThreadLocal::TypedSlotPtr<ThreadLocalControllerImpl>&& tls,
+                 std::shared_ptr<ResponseEvaluator> evaluator,
+                 std::vector<Http::HeaderUtility::HeaderDataPtr>&& filter_headers,
+                 std::unique_ptr<Runtime::Double>&& aggression,
+                 std::unique_ptr<Runtime::Percentage>&& sr_threshold,
+                 std::unique_ptr<Runtime::UInt32>&& rps_threshold,
+                 std::unique_ptr<Runtime::Percentage>&& max_rejection_probability,
+                 MockThreadLocalController& controller)
+      : AdmissionControlRuleConfig(std::move(tls), evaluator, std::move(filter_headers),
+                                   std::move(aggression), std::move(sr_threshold),
+                                   std::move(rps_threshold), std::move(max_rejection_probability)),
+        controller_(controller) {}
+
+  ThreadLocalController& getController() const override { return controller_; }
+
+private:
+  MockThreadLocalController& controller_;
+};
+
 class TestConfig : public AdmissionControlFilterConfig {
 public:
   TestConfig(const AdmissionControlProto& proto_config, Runtime::Loader& runtime,
              Random::RandomGenerator& random, Stats::Scope& scope,
-             ThreadLocal::TypedSlotPtr<ThreadLocalControllerImpl>&& tls,
-             MockThreadLocalController& controller, std::shared_ptr<ResponseEvaluator> evaluator)
-      : AdmissionControlFilterConfig(proto_config, runtime, random, scope, std::move(tls),
-                                     std::move(evaluator)),
+             AdmissionControlRuleConfigSharedPtr&& global,
+             std::vector<AdmissionControlRuleConfigSharedPtr>&& rules,
+             MockThreadLocalController& controller)
+      : AdmissionControlFilterConfig(proto_config, runtime, random, scope, std::move(global),
+                                     std::move(rules)),
         controller_(controller) {}
-  ThreadLocalController& getController() const override { return controller_; }
+  ThreadLocalController& getController() { return controller_; }
 
 private:
   MockThreadLocalController& controller_;
@@ -68,12 +102,66 @@ public:
   std::shared_ptr<AdmissionControlFilterConfig> makeConfig(const std::string& yaml) {
     AdmissionControlProto proto;
     TestUtility::loadFromYamlAndValidate(yaml, proto);
-    auto tls = ThreadLocal::TypedSlot<ThreadLocalControllerImpl>::makeUnique(
-        context_.server_factory_context_.threadLocal());
     evaluator_ = std::make_shared<MockResponseEvaluator>();
+    rule_controller_.clear();
+    rule_evaluator_.clear();
 
-    return std::make_shared<TestConfig>(proto, runtime_, random_, scope_, std::move(tls),
-                                        controller_, evaluator_);
+    // Create global rule config from proto config
+    static constexpr std::chrono::seconds defaultSamplingWindow{30};
+    auto global_tls = ThreadLocal::TypedSlot<ThreadLocalControllerImpl>::makeUnique(
+        context_.server_factory_context_.threadLocal());
+    const auto global_sampling_window = std::chrono::seconds(
+        PROTOBUF_GET_MS_OR_DEFAULT(proto, sampling_window, 1000 * defaultSamplingWindow.count()) /
+        1000);
+    // Use mock controller for global rule via wrapper
+    global_tls->set([global_sampling_window, this](Event::Dispatcher&) {
+      return std::make_shared<ThreadLocalControllerImpl>(time_system_, global_sampling_window);
+    });
+
+    auto global = std::make_shared<TestRuleConfig>(
+        std::move(global_tls), evaluator_, std::vector<Http::HeaderUtility::HeaderDataPtr>{},
+        proto.has_aggression() ? std::make_unique<Runtime::Double>(proto.aggression(), runtime_)
+                               : nullptr,
+        proto.has_sr_threshold()
+            ? std::make_unique<Runtime::Percentage>(proto.sr_threshold(), runtime_)
+            : nullptr,
+        proto.has_rps_threshold()
+            ? std::make_unique<Runtime::UInt32>(proto.rps_threshold(), runtime_)
+            : nullptr,
+        proto.has_max_rejection_probability()
+            ? std::make_unique<Runtime::Percentage>(proto.max_rejection_probability(), runtime_)
+            : nullptr,
+        controller_);
+
+    std::vector<AdmissionControlRuleConfigSharedPtr> rules;
+    if (!proto.rules().empty()) {
+      for (const auto& rule_proto : proto.rules()) {
+        // Create a thread-local controller for each rule
+        auto rule_tls = ThreadLocal::TypedSlot<ThreadLocalControllerImpl>::makeUnique(
+            context_.server_factory_context_.threadLocal());
+        const auto rule_sampling_window =
+            std::chrono::seconds(PROTOBUF_GET_MS_OR_DEFAULT(rule_proto, sampling_window,
+                                                            1000 * defaultSamplingWindow.count()) /
+                                 1000);
+        rule_tls->set([rule_sampling_window, this](Event::Dispatcher&) {
+          return std::make_shared<ThreadLocalControllerImpl>(time_system_, rule_sampling_window);
+        });
+        auto rule_evaluator = std::make_shared<MockResponseEvaluator>();
+
+        // Create a mock controller for each rule
+        rule_controller_.push_back(std::make_unique<NiceMock<MockThreadLocalController>>());
+
+        auto rule_filter_headers = Http::HeaderUtility::buildHeaderDataVector(
+            rule_proto.headers(), context_.server_factory_context_);
+        rules.push_back(std::make_shared<TestRuleConfig>(rule_proto, runtime_, std::move(rule_tls),
+                                                         *rule_controller_.back(), rule_evaluator,
+                                                         std::move(rule_filter_headers)));
+        rule_evaluator_.push_back(rule_evaluator);
+      }
+    }
+
+    return std::make_shared<AdmissionControlFilterConfig>(proto, runtime_, random_, scope_,
+                                                          std::move(global), std::move(rules));
   }
 
   void setupFilter(std::shared_ptr<AdmissionControlFilterConfig> config) {
@@ -136,6 +224,8 @@ protected:
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<MockThreadLocalController> controller_;
   std::shared_ptr<MockResponseEvaluator> evaluator_;
+  std::vector<std::unique_ptr<NiceMock<MockThreadLocalController>>> rule_controller_;
+  std::vector<std::shared_ptr<MockResponseEvaluator>> rule_evaluator_;
   const std::string default_yaml_{R"EOF(
 enabled:
   default_value: true
@@ -151,7 +241,7 @@ max_rejection_probability:
 success_criteria:
   http_criteria:
   grpc_criteria:
-)EOF"};
+    )EOF"};
 };
 
 // Ensure the filter can be disabled/enabled via runtime.
@@ -473,6 +563,104 @@ success_criteria:
   verifyProbabilities(0, 0.1);
 }
 
+// Test rule matching with headers - verify rule configuration is read correctly.
+TEST_F(AdmissionControlTest, RuleMatchingWithHeaders) {
+  const std::string yaml = R"EOF(
+enabled:
+  default_value: true
+  runtime_key: "foo.enabled"
+sampling_window: 10s
+success_criteria:
+  http_criteria:
+  grpc_criteria:
+rps_threshold:
+  default_value: 0
+  runtime_key: "global.rps_threshold"
+rules:
+  - headers:
+    - name: "x-service"
+      string_match:
+        exact: "api"
+    success_criteria:
+      http_criteria:
+      grpc_criteria:
+    sr_threshold:
+      default_value:
+        value: 100.0
+      runtime_key: "rule1.sr_threshold"
+    rps_threshold:
+      default_value: 0
+      runtime_key: "rule2.rps_threshold"
+    aggression:
+      default_value: 1.0
+      runtime_key: "rule1.aggression"
+    max_rejection_probability:
+      default_value:
+        value: 50.0
+      runtime_key: "rule1.max_rejection_probability"
+  - headers:
+    - name: "x-service"
+      string_match:
+        exact: "web"
+    success_criteria:
+      http_criteria:
+      grpc_criteria:
+    sr_threshold:
+      default_value:
+        value: 100.0
+      runtime_key: "rule2.sr_threshold"
+    rps_threshold:
+      default_value: 0
+      runtime_key: "rule2.rps_threshold"
+    max_rejection_probability:
+      default_value:
+        value: 100.0
+      runtime_key: "rule2.max_rejection_probability"
+)EOF";
+
+  // rule1
+  auto config = makeConfig(yaml);
+  setupFilter(config);
+
+  Http::TestRequestHeaderMapImpl request_headers{{"x-service", "api"}};
+  // rule1 pass
+  EXPECT_CALL(*rule_evaluator_[0], isHttpSuccess(200)).WillRepeatedly(Return(true));
+  EXPECT_CALL(*rule_controller_[0], requestCounts()).WillRepeatedly(Return(RequestData(1, 1)));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+
+  // rule1 reject
+  EXPECT_CALL(*rule_evaluator_[0], isHttpSuccess(500)).WillRepeatedly(Return(false));
+  EXPECT_CALL(*rule_controller_[0], requestCounts()).WillRepeatedly(Return(RequestData(100, 0)));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, true));
+
+  // rule2
+  config = makeConfig(yaml);
+  setupFilter(config);
+  EXPECT_CALL(*rule_evaluator_[1], isHttpSuccess(300)).WillRepeatedly(Return(true));
+  EXPECT_CALL(*rule_controller_[1], requestCounts()).WillRepeatedly(Return(RequestData(1, 1)));
+  Http::TestRequestHeaderMapImpl request_headers2{{"x-service", "web"}};
+
+  // rule2 pass
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers2, true));
+  sampleHttpRequest("300");
+
+  EXPECT_CALL(*rule_evaluator_[1], isHttpSuccess(200)).WillRepeatedly(Return(false));
+  EXPECT_CALL(*rule_controller_[1], requestCounts()).WillRepeatedly(Return(RequestData(100, 0)));
+  // rule2 reject
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers2, true));
+
+  config = makeConfig(yaml);
+  setupFilter(config);
+  // global
+  Http::TestRequestHeaderMapImpl request_headers3{{"x-service", "other"}};
+  EXPECT_CALL(*evaluator_, isHttpSuccess(200)).WillRepeatedly(Return(true));
+  EXPECT_CALL(controller_, requestCounts()).WillRepeatedly(Return(RequestData(100, 100)));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers3, true));
+  sampleHttpRequest("200");
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers3, true));
+}
 } // namespace
 } // namespace AdmissionControl
 } // namespace HttpFilters

@@ -19,6 +19,7 @@
 #include "source/common/grpc/common.h"
 #include "source/common/grpc/status.h"
 #include "source/common/http/codes.h"
+#include "source/common/http/header_utility.h"
 #include "source/common/runtime/runtime_protos.h"
 #include "source/extensions/filters/http/admission_control/evaluators/response_evaluator.h"
 #include "source/extensions/filters/http/admission_control/thread_local_controller.h"
@@ -46,6 +47,50 @@ struct AdmissionControlStats {
 
 using AdmissionControlProto =
     envoy::extensions::filters::http::admission_control::v3::AdmissionControl;
+using AdmissionControlRuleProto =
+    envoy::extensions::filters::http::admission_control::v3::AdmissionControlRule;
+
+/**
+ * Configuration for a single admission control rule.
+ */
+class AdmissionControlRuleConfig {
+public:
+  AdmissionControlRuleConfig(const AdmissionControlRuleProto& rule_config, Runtime::Loader& runtime,
+                             ThreadLocal::TypedSlotPtr<ThreadLocalControllerImpl>&& tls,
+                             std::shared_ptr<ResponseEvaluator> response_evaluator,
+                             std::vector<Http::HeaderUtility::HeaderDataPtr>&& filter_headers);
+
+  AdmissionControlRuleConfig(ThreadLocal::TypedSlotPtr<ThreadLocalControllerImpl>&& tls,
+                             std::shared_ptr<ResponseEvaluator> response_evaluator,
+                             std::vector<Http::HeaderUtility::HeaderDataPtr>&& filter_headers,
+                             std::unique_ptr<Runtime::Double>&& aggression,
+                             std::unique_ptr<Runtime::Percentage>&& sr_threshold,
+                             std::unique_ptr<Runtime::UInt32>&& rps_threshold,
+                             std::unique_ptr<Runtime::Percentage>&& max_rejection_probability);
+
+  virtual ~AdmissionControlRuleConfig() = default;
+
+  const std::vector<Http::HeaderUtility::HeaderDataPtr>& filterHeaders() const {
+    return filter_headers_;
+  }
+  double aggression() const;
+  double successRateThreshold() const;
+  uint32_t rpsThreshold() const;
+  double maxRejectionProbability() const;
+  ResponseEvaluator& responseEvaluator() const { return *response_evaluator_; }
+  virtual ThreadLocalController& getController() const { return **tls_; }
+
+private:
+  const std::vector<Http::HeaderUtility::HeaderDataPtr> filter_headers_;
+  const ThreadLocal::TypedSlotPtr<ThreadLocalControllerImpl> tls_;
+  std::unique_ptr<Runtime::Double> aggression_;
+  std::unique_ptr<Runtime::Percentage> sr_threshold_;
+  std::unique_ptr<Runtime::UInt32> rps_threshold_;
+  std::unique_ptr<Runtime::Percentage> max_rejection_probability_;
+  std::shared_ptr<ResponseEvaluator> response_evaluator_;
+};
+
+using AdmissionControlRuleConfigSharedPtr = std::shared_ptr<const AdmissionControlRuleConfig>;
 
 /**
  * Configuration for the admission control filter.
@@ -54,31 +99,24 @@ class AdmissionControlFilterConfig {
 public:
   AdmissionControlFilterConfig(const AdmissionControlProto& proto_config, Runtime::Loader& runtime,
                                Random::RandomGenerator& random, Stats::Scope& scope,
-                               ThreadLocal::TypedSlotPtr<ThreadLocalControllerImpl>&& tls,
-                               std::shared_ptr<ResponseEvaluator> response_evaluator);
-  virtual ~AdmissionControlFilterConfig() = default;
+                               AdmissionControlRuleConfigSharedPtr&& global,
+                               std::vector<AdmissionControlRuleConfigSharedPtr>&& rules);
 
-  virtual ThreadLocalController& getController() const { return **tls_; }
+  virtual ~AdmissionControlFilterConfig() = default;
 
   Random::RandomGenerator& random() const { return random_; }
   bool filterEnabled() const { return admission_control_feature_.enabled(); }
   Stats::Scope& scope() const { return scope_; }
-  double aggression() const;
-  double successRateThreshold() const;
-  uint32_t rpsThreshold() const;
-  double maxRejectionProbability() const;
-  ResponseEvaluator& responseEvaluator() const { return *response_evaluator_; }
+
+  const AdmissionControlRuleConfig* findMatchingRule(const Http::RequestHeaderMap& headers) const;
 
 private:
   Random::RandomGenerator& random_;
   Stats::Scope& scope_;
-  const ThreadLocal::TypedSlotPtr<ThreadLocalControllerImpl> tls_;
   Runtime::FeatureFlag admission_control_feature_;
-  std::unique_ptr<Runtime::Double> aggression_;
-  std::unique_ptr<Runtime::Percentage> sr_threshold_;
-  std::unique_ptr<Runtime::UInt32> rps_threshold_;
-  std::unique_ptr<Runtime::Percentage> max_rejection_probability_;
-  std::shared_ptr<ResponseEvaluator> response_evaluator_;
+
+  const AdmissionControlRuleConfigSharedPtr global_;
+  const std::vector<AdmissionControlRuleConfigSharedPtr> rules_;
 };
 
 using AdmissionControlFilterConfigSharedPtr = std::shared_ptr<const AdmissionControlFilterConfig>;
@@ -93,7 +131,7 @@ public:
                          const std::string& stats_prefix);
 
   // Http::StreamDecoderFilter
-  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override;
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override;
 
   // Http::StreamEncoderFilter
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
@@ -105,16 +143,20 @@ private:
     return {ALL_ADMISSION_CONTROL_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
   }
 
-  bool shouldRejectRequest() const;
+  bool shouldRejectRequest(const AdmissionControlRuleConfig* rule_config) const;
 
-  void recordSuccess() {
+  void recordSuccess(const AdmissionControlRuleConfig* rule_config) {
     stats_.rq_success_.inc();
-    config_->getController().recordSuccess();
+    if (rule_config != nullptr) {
+      rule_config->getController().recordSuccess();
+    }
   }
 
-  void recordFailure() {
+  void recordFailure(const AdmissionControlRuleConfig* rule_config) {
     stats_.rq_failure_.inc();
-    config_->getController().recordFailure();
+    if (rule_config != nullptr) {
+      rule_config->getController().recordFailure();
+    }
   }
 
   const AdmissionControlFilterConfigSharedPtr config_;
@@ -123,6 +165,8 @@ private:
 
   // If false, the filter will forego recording a request success or failure during encoding.
   bool record_request_{true};
+
+  const AdmissionControlRuleConfig* matched_rule_config_{nullptr};
 };
 
 } // namespace AdmissionControl

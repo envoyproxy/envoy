@@ -26,6 +26,15 @@ AdmissionControlFilterFactory::createFilterFactoryFromProtoTyped(
     return absl::InvalidArgumentError("Success rate threshold cannot be less than 1.0%.");
   }
 
+  if (!config.rules().empty()) {
+    for (const auto& rule : config.rules()) {
+      if (rule.has_sr_threshold() && rule.sr_threshold().default_value().value() < 1.0) {
+        return absl::InvalidArgumentError(
+            "Success rate threshold cannot be less than 1.0% in rule.");
+      }
+    }
+  }
+
   const std::string prefix = stats_prefix + "admission_control.";
 
   // Create the thread-local controller.
@@ -50,10 +59,68 @@ AdmissionControlFilterFactory::createFilterFactoryFromProtoTyped(
     return absl::InvalidArgumentError("Evaluation criteria not set");
   }
 
+  // Create rules from proto config
+  std::vector<AdmissionControlRuleConfigSharedPtr> rules;
+  if (!config.rules().empty()) {
+    // Use new multi-rule configuration
+    for (const auto& rule_proto : config.rules()) {
+      // Create a thread-local controller for each rule
+      auto rule_tls =
+          ThreadLocal::TypedSlot<ThreadLocalControllerImpl>::makeUnique(context.threadLocal());
+      const auto rule_sampling_window =
+          std::chrono::seconds(PROTOBUF_GET_MS_OR_DEFAULT(rule_proto, sampling_window,
+                                                          1000 * defaultSamplingWindow.count()) /
+                               1000);
+      rule_tls->set([rule_sampling_window, &context](Event::Dispatcher&) {
+        return std::make_shared<ThreadLocalControllerImpl>(context.timeSource(),
+                                                           rule_sampling_window);
+      });
+
+      // Create response evaluator for this rule
+      std::shared_ptr<ResponseEvaluator> rule_evaluator;
+      switch (rule_proto.evaluation_criteria_case()) {
+      case AdmissionControlRuleProto::EvaluationCriteriaCase::kSuccessCriteria: {
+        absl::StatusOr<std::unique_ptr<SuccessCriteriaEvaluator>> evaluator_or =
+            SuccessCriteriaEvaluator::create(rule_proto.success_criteria());
+        RETURN_IF_NOT_OK(evaluator_or.status());
+        rule_evaluator = std::move(evaluator_or.value());
+        break;
+      }
+      case AdmissionControlRuleProto::EvaluationCriteriaCase::EVALUATION_CRITERIA_NOT_SET:
+        return absl::InvalidArgumentError("Evaluation criteria not set for admission control rule");
+      }
+
+      // Create filter headers for this rule
+      auto rule_filter_headers =
+          Http::HeaderUtility::buildHeaderDataVector(rule_proto.headers(), context);
+
+      rules.push_back(std::make_shared<AdmissionControlRuleConfig>(
+          rule_proto, context.runtime(), std::move(rule_tls), std::move(rule_evaluator),
+          std::move(rule_filter_headers)));
+    }
+  }
+
+  auto global = std::make_shared<AdmissionControlRuleConfig>(
+      std::move(tls), std::move(response_evaluator),
+      std::vector<Http::HeaderUtility::HeaderDataPtr>{},
+      config.has_aggression()
+          ? std::make_unique<Runtime::Double>(config.aggression(), context.runtime())
+          : nullptr,
+      config.has_sr_threshold()
+          ? std::make_unique<Runtime::Percentage>(config.sr_threshold(), context.runtime())
+          : nullptr,
+      config.has_rps_threshold()
+          ? std::make_unique<Runtime::UInt32>(config.rps_threshold(), context.runtime())
+          : nullptr,
+      config.has_max_rejection_probability()
+          ? std::make_unique<Runtime::Percentage>(config.max_rejection_probability(),
+                                                  context.runtime())
+          : nullptr);
+
   AdmissionControlFilterConfigSharedPtr filter_config =
       std::make_shared<AdmissionControlFilterConfig>(
           config, context.runtime(), context.api().randomGenerator(), dual_info.scope,
-          std::move(tls), std::move(response_evaluator));
+          std::move(global), std::move(rules));
 
   return [filter_config, prefix](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<AdmissionControlFilter>(filter_config, prefix));
