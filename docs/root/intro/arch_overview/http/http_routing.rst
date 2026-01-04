@@ -32,6 +32,10 @@ Path, prefix and header matching
     and for more complex matching rules.
 
     Match routes according to :ref:`arbitrary headers <envoy_v3_api_msg_config.route.v3.HeaderMatcher>`.
+Cookie matching
+    Match based on specific HTTP cookies via
+    :ref:`cookies <envoy_v3_api_field_config.route.v3.RouteMatch.cookies>` without
+    parsing the ``Cookie`` header manually.
 Path, prefix and host rewriting
     Rewrite the :ref:`prefix <envoy_v3_api_field_config.route.v3.RedirectAction.prefix_rewrite>`, or
     :ref:`path using a regular expression and capture groups <envoy_v3_api_field_config.route.v3.RouteAction.regex_rewrite>`.

@@ -56,6 +56,7 @@
 
 #include "absl/container/inlined_vector.h"
 #include "absl/strings/match.h"
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Router {
@@ -629,6 +630,11 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
         std::make_unique<ConfigUtility::QueryParameterMatcher>(query_parameter, factory_context));
   }
 
+  for (const auto& cookie_matcher : route.match().cookies()) {
+    config_cookie_matchers_.push_back(
+        std::make_unique<ConfigUtility::CookieMatcher>(cookie_matcher, factory_context));
+  }
+
   if (!route.route().hash_policy().empty()) {
     hash_policy_ = THROW_OR_RETURN_VALUE(
         Http::HashPolicyImpl::create(route.route().hash_policy(), factory_context.regexEngine()),
@@ -855,6 +861,13 @@ bool RouteEntryImplBase::matchRoute(const Http::RequestHeaderMap& headers,
         Http::Utility::QueryParamsMulti::parseQueryString(headers.getPathValue());
     matches &= ConfigUtility::matchQueryParams(query_parameters, config_query_parameters_);
     if (!matches) {
+      return false;
+    }
+  }
+
+  if (!config_cookie_matchers_.empty()) {
+    const auto cookies = Http::Utility::parseCookies(headers);
+    if (!ConfigUtility::matchCookies(cookies, config_cookie_matchers_)) {
       return false;
     }
   }
