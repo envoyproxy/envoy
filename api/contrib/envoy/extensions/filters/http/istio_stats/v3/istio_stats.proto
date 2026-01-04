@@ -84,7 +84,7 @@ message PluginConfig {
   bool disable_host_header_fallback = 6;
 
   // Optional. Allows configuration of the time between calls out to for TCP
-  // metrics reporting. The default duration is `5s`.
+  // metrics reporting. The default duration is ``5s``.
   google.protobuf.Duration tcp_reporting_duration = 7;
 
   // Metric overrides.

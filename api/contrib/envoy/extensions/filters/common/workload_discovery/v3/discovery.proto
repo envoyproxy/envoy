@@ -56,7 +56,7 @@ enum TunnelProtocol {
 
 // Workload represents a workload - an endpoint (or collection behind a hostname).
 // The xds primary key is "uid" as defined on the workload below.
-// Secondary (alias) keys are the unique `network/IP` pairs that the workload can be reached at.
+// Secondary (alias) keys are the unique ``network/IP`` pairs that the workload can be reached at.
 // [#next-free-field: 26]
 message Workload {
   reserved 15;
@@ -155,7 +155,7 @@ message Workload {
   // A list of authorization policies applicable to this workload.
   // NOTE: this *only* includes Selector based policies. Namespace and global polices
   // are returned out of band.
-  // Authorization policies are only valid for workloads with `addresses` rather than `hostname`.
+  // Authorization policies are only valid for workloads with ``addresses`` rather than ``hostname``.
   repeated string authorization_policies = 16;
 
   WorkloadStatus status = 17;
