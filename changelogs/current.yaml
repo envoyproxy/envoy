@@ -678,5 +678,13 @@ new_features:
     Added comprehensive metrics and tracing tags to the
     :ref:`Proto API Scrubber <config_http_filters_proto_api_scrubber>` filter. This includes counters for requests,
     blocks, and failures, latency histograms, and span tags for scrubbing outcomes.
+- area: network_filter
+  change: |
+    Added support for
+    ``on_downstream_tls_handshake`` (see
+    :ref:`envoy_v3_api_field_extensions.filters.network.set_filter_state.v3.Config.on_downstream_tls_handshake`)
+    to the :ref:`set_filter_state network filter <config_network_filters_set_filter_state>`, allowing
+    connection filter state to be populated after the downstream TLS handshake completes (for example, using downstream
+    peer certificate SANs).
 
 deprecated:
