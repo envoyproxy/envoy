@@ -103,6 +103,9 @@ public:
   const std::vector<ClientCertDetailsType>& setCurrentClientCertDetails() const override {
     return parent_.setCurrentClientCertDetails();
   }
+  const Matcher::MatchTreePtr<HttpMatchingData>& forwardClientCertMatcher() const override {
+    return parent_.forwardClientCertMatcher();
+  }
   const Network::Address::Instance& localAddress() override { return parent_.localAddress(); }
   const absl::optional<std::string>& userAgent() override { return parent_.userAgent(); }
   Tracing::TracerSharedPtr tracer() override { return parent_.tracer(); }

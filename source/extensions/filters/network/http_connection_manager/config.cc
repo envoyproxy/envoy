@@ -32,7 +32,9 @@
 #include "source/common/http/request_id_extension_impl.h"
 #include "source/common/http/utility.h"
 #include "source/common/local_reply/local_reply.h"
+#include "source/common/matcher/matcher.h"
 #include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/network/http_connection_manager/forward_client_cert_details.h"
 
 #ifdef ENVOY_ENABLE_QUIC
 #include "source/common/quic/server_connection_factory.h"
@@ -629,6 +631,12 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   }
   if (set_current_client_cert_details.dns()) {
     set_current_client_cert_details_.push_back(Http::ClientCertDetailsType::DNS);
+  }
+
+  // Initialize the forward client cert matcher if configured.
+  if (config.has_forward_client_cert_matcher()) {
+    forward_client_cert_matcher_ = createForwardClientCertMatcher(
+        config.forward_client_cert_matcher(), context_.serverFactoryContext());
   }
 
   if (config.has_add_user_agent() && config.add_user_agent().value()) {

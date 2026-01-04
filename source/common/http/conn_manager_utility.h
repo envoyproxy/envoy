@@ -142,7 +142,8 @@ private:
                         ConnectionManagerConfig& config);
   static void mutateXfccRequestHeader(RequestHeaderMap& request_headers,
                                       Network::Connection& connection,
-                                      ConnectionManagerConfig& config);
+                                      ConnectionManagerConfig& config,
+                                      const StreamInfo::StreamInfo& stream_info);
   static void sanitizeTEHeader(RequestHeaderMap& request_headers);
   static void cleanInternalHeaders(RequestHeaderMap& request_headers, bool edge_request,
                                    const std::vector<Http::LowerCaseString>& internal_only_headers);

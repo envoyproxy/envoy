@@ -819,8 +819,51 @@ message HttpConnectionManager {
   // value.
   SetCurrentClientCertDetails set_current_client_cert_details = 17;
 
-  // The matcher for forwarding client cert details.
-  // [#not-implemented-hide:]
+  // The matcher for forwarding client cert details. This allows per-request configuration
+  // of forward client cert behavior based on request properties. If a matcher is configured
+  // and matches a request, the matched action's forward client cert config will be used.
+  // If the matcher is not configured or doesn't match, the static
+  // :ref:`forward_client_cert_details
+  // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.forward_client_cert_details>`
+  // and
+  // :ref:`set_current_client_cert_details
+  // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.set_current_client_cert_details>`
+  // config will be used as fallback.
+  //
+  // Example: If the x-forwarded-client-cert header contains "trusted-client", use APPEND_FORWARD,
+  // otherwise use SANITIZE_SET:
+  //
+  // .. code-block:: yaml
+  //
+  //   forward_client_cert_matcher:
+  //     matcher_list:
+  //       matchers:
+  //       - predicate:
+  //           single_predicate:
+  //             input:
+  //               name: envoy.matching.inputs.request_headers
+  //               typed_config:
+  //                 "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+  //                 header_name: "x-forwarded-client-cert"
+  //             value_match:
+  //               string_match:
+  //                 contains: "trusted-client"
+  //         on_match:
+  //           action:
+  //             name: forward_client_cert
+  //             typed_config:
+  //               "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.ForwardClientCertConfig
+  //               forward_client_cert_details: APPEND_FORWARD
+  //               set_current_client_cert_details:
+  //                 uri: true
+  //     on_no_match:
+  //       action:
+  //         name: forward_client_cert
+  //         typed_config:
+  //           "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.ForwardClientCertConfig
+  //           forward_client_cert_details: SANITIZE_SET
+  //           set_current_client_cert_details:
+  //             uri: true
   xds.type.matcher.v3.Matcher forward_client_cert_matcher = 60;
 
   // If proxy_100_continue is true, Envoy will proxy incoming "Expect:
