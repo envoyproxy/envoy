@@ -1,6 +1,20 @@
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_file")
 
-def envoy_mobile_repositories():
+def envoy_mobile_repositories(bzlmod = False):
+    """Load Envoy Mobile specific dependencies.
+
+    This function loads mobile-specific dependencies for both WORKSPACE and bzlmod modes.
+    When bzlmod=True, dependencies already available in BCR are skipped.
+
+    Args:
+        bzlmod: If True, skip dependencies already in BCR (loaded via bazel_dep)
+    """
+
+    # Dependencies already in BCR when bzlmod=True:
+    # - rules_android, rules_android_ndk, rules_apple, rules_java
+    # - rules_jvm_external, rules_kotlin, rules_proto_grpc, rules_swift
+    # - rules_detekt
+
     http_archive(
         name = "google_bazel_common",
         sha256 = "d8c9586b24ce4a5513d972668f94b62eb7d705b92405d4bc102131f294751f1d",
@@ -10,8 +24,9 @@ def envoy_mobile_repositories():
 
     upstream_envoy_overrides()
     swift_repos()
-    kotlin_repos()
-    android_repos()
+    if not bzlmod:
+        kotlin_repos()  # Most kotlin/android deps are in BCR for bzlmod
+        android_repos()  # Android rules are in BCR for bzlmod
 
 def upstream_envoy_overrides():
     # Workaround old NDK version breakages https://github.com/envoyproxy/envoy-mobile/issues/934
@@ -56,6 +71,8 @@ def swift_repos():
     )
 
 def kotlin_repos():
+    # Note: rules_java, rules_jvm_external, rules_kotlin, rules_proto_grpc, and rules_detekt
+    # are already in BCR and loaded via bazel_dep in bzlmod mode
     http_archive(
         name = "rules_java",
         sha256 = "c0ee60f8757f140c157fc2c7af703d819514de6e025ebf70386d38bdd85fce83",
@@ -106,6 +123,8 @@ def kotlin_repos():
     )
 
 def android_repos():
+    # Note: rules_android and rules_android_ndk are already in BCR
+    # and loaded via bazel_dep in bzlmod mode
     http_archive(
         name = "rules_android",
         urls = ["https://github.com/bazelbuild/rules_android/archive/refs/tags/v0.1.1.zip"],
