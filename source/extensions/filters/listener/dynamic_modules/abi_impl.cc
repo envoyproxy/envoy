@@ -482,6 +482,79 @@ uint64_t envoy_dynamic_module_callback_listener_filter_get_connection_start_time
   return std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
 }
 
+bool envoy_dynamic_module_callback_listener_filter_get_dynamic_metadata_string(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_namespace,
+    envoy_dynamic_module_type_module_buffer key,
+    envoy_dynamic_module_type_envoy_buffer* value_out) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  auto* callbacks = filter->callbacks();
+
+  if (callbacks == nullptr || filter_namespace.ptr == nullptr || key.ptr == nullptr) {
+    value_out->ptr = nullptr;
+    value_out->length = 0;
+    return false;
+  }
+
+  std::string ns(filter_namespace.ptr, filter_namespace.length);
+  std::string key_str(key.ptr, key.length);
+
+  const auto& metadata = callbacks->dynamicMetadata();
+  const auto& fields = metadata.filter_metadata();
+  auto ns_it = fields.find(ns);
+
+  if (ns_it == fields.end()) {
+    value_out->ptr = nullptr;
+    value_out->length = 0;
+    return false;
+  }
+
+  const auto& ns_fields = ns_it->second.fields();
+  auto field_it = ns_fields.find(key_str);
+
+  if (field_it == ns_fields.end() ||
+      field_it->second.kind_case() != Protobuf::Value::kStringValue) {
+    value_out->ptr = nullptr;
+    value_out->length = 0;
+    return false;
+  }
+
+  const std::string& value = field_it->second.string_value();
+  value_out->ptr = const_cast<char*>(value.c_str());
+  value_out->length = value.size();
+  return true;
+}
+
+bool envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_namespace,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  auto* callbacks = filter->callbacks();
+
+  if (callbacks == nullptr || filter_namespace.ptr == nullptr || key.ptr == nullptr ||
+      value.ptr == nullptr) {
+    return false;
+  }
+
+  std::string ns(filter_namespace.ptr, filter_namespace.length);
+  std::string key_str(key.ptr, key.length);
+  std::string value_str(value.ptr, value.length);
+
+  Protobuf::Struct metadata;
+  auto& fields = *metadata.mutable_fields();
+  fields[key_str].set_string_value(value_str);
+
+  callbacks->setDynamicMetadata(ns, metadata);
+  return true;
+}
+
+size_t envoy_dynamic_module_callback_listener_filter_max_read_bytes(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  return filter->maxReadBytes();
+}
+
 } // extern "C"
 
 } // namespace ListenerFilters

@@ -3933,3 +3933,521 @@ pub extern "C" fn envoy_dynamic_module_on_network_filter_destroy(
   let _ =
     unsafe { Box::from_raw(filter_ptr as *mut Box<dyn NetworkFilter<EnvoyNetworkFilterImpl>>) };
 }
+
+// =============================================================================
+// Listener Filter Support
+// =============================================================================
+
+/// Declare the init functions for the dynamic module with listener filter support only.
+///
+/// The first argument has [`ProgramInitFunction`] type, and it is called when the dynamic module is
+/// loaded.
+///
+/// The second argument has [`NewListenerFilterConfigFunction`] type, and it is called when the new
+/// listener filter configuration is created.
+#[macro_export]
+macro_rules! declare_listener_filter_init_functions {
+  ($f:ident, $new_listener_filter_config_fn:expr) => {
+    #[no_mangle]
+    pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_LISTENER_FILTER_CONFIG_FUNCTION
+        .get_or_init(|| $new_listener_filter_config_fn);
+      if ($f()) {
+        envoy_proxy_dynamic_modules_rust_sdk::abi::kAbiVersion.as_ptr()
+          as *const ::std::os::raw::c_char
+      } else {
+        ::std::ptr::null()
+      }
+    }
+  };
+}
+
+/// The function signature for the new listener filter configuration function.
+///
+/// This is called when a new listener filter configuration is created, and it must return a new
+/// [`ListenerFilterConfig`] object. Returning `None` will cause the listener filter configuration
+/// to be rejected.
+///
+/// The first argument `envoy_filter_config` is a mutable reference to an
+/// [`EnvoyListenerFilterConfig`] object that provides access to Envoy operations.
+/// The second argument `name` is the name of the filter configuration as specified in the Envoy
+/// config.
+/// The third argument `config` is the raw configuration bytes.
+pub type NewListenerFilterConfigFunction<EC, ELF> =
+  fn(
+    envoy_filter_config: &mut EC,
+    name: &str,
+    config: &[u8],
+  ) -> Option<Box<dyn ListenerFilterConfig<ELF>>>;
+
+/// The global init function for listener filter configurations. This is set via the
+/// `declare_listener_filter_init_functions` macro, and is not intended to be set directly.
+pub static NEW_LISTENER_FILTER_CONFIG_FUNCTION: OnceLock<
+  NewListenerFilterConfigFunction<EnvoyListenerFilterConfigImpl, EnvoyListenerFilterImpl>,
+> = OnceLock::new();
+
+/// The trait that represents the Envoy listener filter configuration.
+/// This is used in [`NewListenerFilterConfigFunction`] to pass the Envoy filter configuration
+/// to the dynamic module.
+#[automock]
+pub trait EnvoyListenerFilterConfig {}
+
+/// The trait that represents the configuration for an Envoy listener filter configuration.
+/// This has one to one mapping with the [`EnvoyListenerFilterConfig`] object.
+///
+/// The object is created when the corresponding Envoy listener filter config is created, and it is
+/// dropped when the corresponding Envoy listener filter config is destroyed. Therefore, the
+/// implementation is recommended to implement the [`Drop`] trait to handle the necessary cleanup.
+///
+/// Implementations must also be `Sync` since they are accessed from worker threads.
+pub trait ListenerFilterConfig<ELF: EnvoyListenerFilter>: Sync {
+  /// This is called from a worker thread when a new connection is accepted.
+  fn new_listener_filter(&self, _envoy: &mut ELF) -> Box<dyn ListenerFilter<ELF>>;
+}
+
+/// The trait that corresponds to an Envoy listener filter for each accepted connection
+/// created via the [`ListenerFilterConfig::new_listener_filter`] method.
+///
+/// All the event hooks are called on the same thread as the one that the [`ListenerFilter`] is
+/// created via the [`ListenerFilterConfig::new_listener_filter`] method.
+pub trait ListenerFilter<ELF: EnvoyListenerFilter> {
+  /// This is called when a new connection is accepted on the listener.
+  ///
+  /// This must return [`abi::envoy_dynamic_module_type_on_listener_filter_status`] to
+  /// indicate the status of the connection acceptance processing.
+  fn on_accept(
+    &mut self,
+    _envoy_filter: &mut ELF,
+  ) -> abi::envoy_dynamic_module_type_on_listener_filter_status {
+    abi::envoy_dynamic_module_type_on_listener_filter_status::Continue
+  }
+
+  /// This is called when data is available to be read from the connection.
+  ///
+  /// This must return [`abi::envoy_dynamic_module_type_on_listener_filter_status`] to
+  /// indicate the status of the data processing.
+  fn on_data(
+    &mut self,
+    _envoy_filter: &mut ELF,
+  ) -> abi::envoy_dynamic_module_type_on_listener_filter_status {
+    abi::envoy_dynamic_module_type_on_listener_filter_status::Continue
+  }
+
+  /// This is called when the listener filter is destroyed for each accepted connection.
+  fn on_close(&mut self, _envoy_filter: &mut ELF) {}
+}
+
+/// The trait that represents the Envoy listener filter.
+/// This is used in [`ListenerFilter`] to interact with the underlying Envoy listener filter object.
+#[automock]
+#[allow(clippy::needless_lifetimes)] // Explicit lifetime specifiers are needed for mockall.
+pub trait EnvoyListenerFilter {
+  /// Get the current buffer chunk available for reading.
+  /// Returns None if no buffer is available.
+  fn get_buffer_chunk<'a>(&'a self) -> Option<EnvoyBuffer<'a>>;
+
+  /// Drain bytes from the beginning of the buffer.
+  fn drain_buffer(&mut self, length: usize);
+
+  /// Get the remote (client) address and port.
+  /// Returns None if the address is not available or not an IP address.
+  fn get_remote_address(&self) -> Option<(String, u32)>;
+
+  /// Get the local address and port.
+  /// Returns None if the address is not available or not an IP address.
+  fn get_local_address(&self) -> Option<(String, u32)>;
+
+  /// Get the direct remote (client) address and port without considering proxy protocol.
+  /// Returns None if the address is not available or not an IP address.
+  fn get_direct_remote_address(&self) -> Option<(String, u32)>;
+
+  /// Get the direct local address and port without considering proxy protocol.
+  /// Returns None if the address is not available or not an IP address.
+  fn get_direct_local_address(&self) -> Option<(String, u32)>;
+
+  /// Get the original destination address and port (e.g., from SO_ORIGINAL_DST).
+  /// Returns None if not available.
+  fn get_original_dst(&self) -> Option<(String, u32)>;
+
+  /// Get the address type of the remote address.
+  fn get_address_type(&self) -> abi::envoy_dynamic_module_type_address_type;
+
+  /// Check if the local address has been restored (e.g., by original_dst filter).
+  fn is_local_address_restored(&self) -> bool;
+
+  /// Indicate to Envoy that the original destination address should be used.
+  fn use_original_dst(&mut self);
+
+  /// Set the downstream transport failure reason.
+  fn set_downstream_transport_failure_reason(&mut self, reason: &str);
+
+  /// Get the connection start time in milliseconds since epoch.
+  fn get_connection_start_time_ms(&self) -> u64;
+
+  /// Get the string-typed dynamic metadata value with the given namespace and key value.
+  /// Returns None if the metadata is not found or is the wrong type.
+  fn get_dynamic_metadata_string(&self, namespace: &str, key: &str) -> Option<String>;
+
+  /// Set the string-typed dynamic metadata value with the given namespace and key value.
+  /// Returns true if the operation is successful.
+  fn set_dynamic_metadata_string(&mut self, namespace: &str, key: &str, value: &str) -> bool;
+
+  /// Get the maximum number of bytes to read from the socket.
+  /// This is used to determine the buffer size for reading data.
+  fn max_read_bytes(&self) -> usize;
+}
+
+/// The implementation of [`EnvoyListenerFilterConfig`] for the Envoy listener filter
+/// configuration.
+pub struct EnvoyListenerFilterConfigImpl {
+  raw: abi::envoy_dynamic_module_type_listener_filter_config_envoy_ptr,
+}
+
+impl EnvoyListenerFilterConfigImpl {
+  pub fn new(raw: abi::envoy_dynamic_module_type_listener_filter_config_envoy_ptr) -> Self {
+    Self { raw }
+  }
+}
+
+impl EnvoyListenerFilterConfig for EnvoyListenerFilterConfigImpl {}
+
+/// The implementation of [`EnvoyListenerFilter`] for the Envoy listener filter.
+pub struct EnvoyListenerFilterImpl {
+  raw: abi::envoy_dynamic_module_type_listener_filter_envoy_ptr,
+}
+
+impl EnvoyListenerFilterImpl {
+  pub fn new(raw: abi::envoy_dynamic_module_type_listener_filter_envoy_ptr) -> Self {
+    Self { raw }
+  }
+}
+
+impl EnvoyListenerFilter for EnvoyListenerFilterImpl {
+  fn get_buffer_chunk(&self) -> Option<EnvoyBuffer<'_>> {
+    let mut chunk = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_get_buffer_chunk(
+        self.raw,
+        &mut chunk as *mut _ as *mut _,
+      )
+    };
+    if success && !chunk.ptr.is_null() && chunk.length > 0 {
+      Some(unsafe { EnvoyBuffer::new_from_raw(chunk.ptr as *const _, chunk.length) })
+    } else {
+      None
+    }
+  }
+
+  fn drain_buffer(&mut self, length: usize) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_drain_buffer(self.raw, length);
+    }
+  }
+
+  fn get_remote_address(&self) -> Option<(String, u32)> {
+    let mut address = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let mut port: u32 = 0;
+    let result = unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_get_remote_address(
+        self.raw,
+        &mut address as *mut _ as *mut _,
+        &mut port,
+      )
+    };
+    if !result || address.length == 0 || address.ptr.is_null() {
+      return None;
+    }
+    let address_str = unsafe {
+      std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+        address.ptr as *const _,
+        address.length,
+      ))
+    };
+    Some((address_str.to_string(), port))
+  }
+
+  fn get_local_address(&self) -> Option<(String, u32)> {
+    let mut address = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let mut port: u32 = 0;
+    let result = unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_get_local_address(
+        self.raw,
+        &mut address as *mut _ as *mut _,
+        &mut port,
+      )
+    };
+    if !result || address.length == 0 || address.ptr.is_null() {
+      return None;
+    }
+    let address_str = unsafe {
+      std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+        address.ptr as *const _,
+        address.length,
+      ))
+    };
+    Some((address_str.to_string(), port))
+  }
+
+  fn get_direct_remote_address(&self) -> Option<(String, u32)> {
+    let mut address = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let mut port: u32 = 0;
+    let result = unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_get_direct_remote_address(
+        self.raw,
+        &mut address as *mut _ as *mut _,
+        &mut port,
+      )
+    };
+    if !result || address.length == 0 || address.ptr.is_null() {
+      return None;
+    }
+    let address_str = unsafe {
+      std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+        address.ptr as *const _,
+        address.length,
+      ))
+    };
+    Some((address_str.to_string(), port))
+  }
+
+  fn get_direct_local_address(&self) -> Option<(String, u32)> {
+    let mut address = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let mut port: u32 = 0;
+    let result = unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_get_direct_local_address(
+        self.raw,
+        &mut address as *mut _ as *mut _,
+        &mut port,
+      )
+    };
+    if !result || address.length == 0 || address.ptr.is_null() {
+      return None;
+    }
+    let address_str = unsafe {
+      std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+        address.ptr as *const _,
+        address.length,
+      ))
+    };
+    Some((address_str.to_string(), port))
+  }
+
+  fn get_original_dst(&self) -> Option<(String, u32)> {
+    let mut address = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let mut port: u32 = 0;
+    let result = unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_get_original_dst(
+        self.raw,
+        &mut address as *mut _ as *mut _,
+        &mut port,
+      )
+    };
+    if !result || address.length == 0 || address.ptr.is_null() {
+      return None;
+    }
+    let address_str = unsafe {
+      std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+        address.ptr as *const _,
+        address.length,
+      ))
+    };
+    Some((address_str.to_string(), port))
+  }
+
+  fn get_address_type(&self) -> abi::envoy_dynamic_module_type_address_type {
+    unsafe { abi::envoy_dynamic_module_callback_listener_filter_get_address_type(self.raw) }
+  }
+
+  fn is_local_address_restored(&self) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_is_local_address_restored(self.raw)
+    }
+  }
+
+  fn use_original_dst(&mut self) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_use_original_dst(self.raw, true);
+    }
+  }
+
+  fn set_downstream_transport_failure_reason(&mut self, reason: &str) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_set_downstream_transport_failure_reason(
+        self.raw,
+        str_to_module_buffer(reason),
+      );
+    }
+  }
+
+  fn get_connection_start_time_ms(&self) -> u64 {
+    unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_get_connection_start_time_ms(self.raw)
+    }
+  }
+
+  fn get_dynamic_metadata_string(&self, namespace: &str, key: &str) -> Option<String> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_get_dynamic_metadata_string(
+        self.raw,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        &mut result as *mut _ as *mut _,
+      )
+    };
+    if success && !result.ptr.is_null() && result.length > 0 {
+      let value_str = unsafe {
+        std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+          result.ptr as *const _,
+          result.length,
+        ))
+      };
+      Some(value_str.to_string())
+    } else {
+      None
+    }
+  }
+
+  fn set_dynamic_metadata_string(&mut self, namespace: &str, key: &str, value: &str) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string(
+        self.raw,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        str_to_module_buffer(value),
+      )
+    }
+  }
+
+  fn max_read_bytes(&self) -> usize {
+    unsafe { abi::envoy_dynamic_module_callback_listener_filter_max_read_bytes(self.raw) }
+  }
+}
+
+// Listener Filter Event Hook Implementations
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_on_listener_filter_config_new(
+  envoy_filter_config_ptr: abi::envoy_dynamic_module_type_listener_filter_config_envoy_ptr,
+  name_ptr: *const i8,
+  name_size: usize,
+  config_ptr: *const i8,
+  config_size: usize,
+) -> abi::envoy_dynamic_module_type_listener_filter_config_module_ptr {
+  let mut envoy_filter_config = EnvoyListenerFilterConfigImpl::new(envoy_filter_config_ptr);
+  let name = unsafe {
+    std::str::from_utf8_unchecked(std::slice::from_raw_parts(name_ptr as *const _, name_size))
+  };
+  let config = unsafe { std::slice::from_raw_parts(config_ptr as *const _, config_size) };
+  init_listener_filter_config(
+    &mut envoy_filter_config,
+    name,
+    config,
+    NEW_LISTENER_FILTER_CONFIG_FUNCTION
+      .get()
+      .expect("NEW_LISTENER_FILTER_CONFIG_FUNCTION must be set"),
+  )
+}
+
+fn init_listener_filter_config<EC: EnvoyListenerFilterConfig, ELF: EnvoyListenerFilter>(
+  envoy_filter_config: &mut EC,
+  name: &str,
+  config: &[u8],
+  new_listener_filter_config_fn: &NewListenerFilterConfigFunction<EC, ELF>,
+) -> abi::envoy_dynamic_module_type_listener_filter_config_module_ptr {
+  let listener_filter_config = new_listener_filter_config_fn(envoy_filter_config, name, config);
+  match listener_filter_config {
+    Some(config) => wrap_into_c_void_ptr!(config),
+    None => std::ptr::null(),
+  }
+}
+
+#[no_mangle]
+unsafe extern "C" fn envoy_dynamic_module_on_listener_filter_config_destroy(
+  filter_config_ptr: abi::envoy_dynamic_module_type_listener_filter_config_module_ptr,
+) {
+  drop_wrapped_c_void_ptr!(
+    filter_config_ptr,
+    ListenerFilterConfig<EnvoyListenerFilterImpl>
+  );
+}
+
+#[no_mangle]
+unsafe extern "C" fn envoy_dynamic_module_on_listener_filter_new(
+  filter_config_ptr: abi::envoy_dynamic_module_type_listener_filter_config_module_ptr,
+  envoy_filter_ptr: abi::envoy_dynamic_module_type_listener_filter_envoy_ptr,
+) -> abi::envoy_dynamic_module_type_listener_filter_module_ptr {
+  let mut envoy_filter = EnvoyListenerFilterImpl::new(envoy_filter_ptr);
+  let filter_config = {
+    let raw = filter_config_ptr as *const *const dyn ListenerFilterConfig<EnvoyListenerFilterImpl>;
+    &**raw
+  };
+  envoy_dynamic_module_on_listener_filter_new_impl(&mut envoy_filter, filter_config)
+}
+
+fn envoy_dynamic_module_on_listener_filter_new_impl(
+  envoy_filter: &mut EnvoyListenerFilterImpl,
+  filter_config: &dyn ListenerFilterConfig<EnvoyListenerFilterImpl>,
+) -> abi::envoy_dynamic_module_type_listener_filter_module_ptr {
+  let filter = filter_config.new_listener_filter(envoy_filter);
+  wrap_into_c_void_ptr!(filter)
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_on_listener_filter_on_accept(
+  envoy_ptr: abi::envoy_dynamic_module_type_listener_filter_envoy_ptr,
+  filter_ptr: abi::envoy_dynamic_module_type_listener_filter_module_ptr,
+) -> abi::envoy_dynamic_module_type_on_listener_filter_status {
+  let filter = filter_ptr as *mut Box<dyn ListenerFilter<EnvoyListenerFilterImpl>>;
+  let filter = unsafe { &mut *filter };
+  filter.on_accept(&mut EnvoyListenerFilterImpl::new(envoy_ptr))
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_on_listener_filter_on_data(
+  envoy_ptr: abi::envoy_dynamic_module_type_listener_filter_envoy_ptr,
+  filter_ptr: abi::envoy_dynamic_module_type_listener_filter_module_ptr,
+) -> abi::envoy_dynamic_module_type_on_listener_filter_status {
+  let filter = filter_ptr as *mut Box<dyn ListenerFilter<EnvoyListenerFilterImpl>>;
+  let filter = unsafe { &mut *filter };
+  filter.on_data(&mut EnvoyListenerFilterImpl::new(envoy_ptr))
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_on_listener_filter_on_close(
+  envoy_ptr: abi::envoy_dynamic_module_type_listener_filter_envoy_ptr,
+  filter_ptr: abi::envoy_dynamic_module_type_listener_filter_module_ptr,
+) {
+  let filter = filter_ptr as *mut Box<dyn ListenerFilter<EnvoyListenerFilterImpl>>;
+  let filter = unsafe { &mut *filter };
+  filter.on_close(&mut EnvoyListenerFilterImpl::new(envoy_ptr));
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_on_listener_filter_destroy(
+  filter_ptr: abi::envoy_dynamic_module_type_listener_filter_module_ptr,
+) {
+  let _ =
+    unsafe { Box::from_raw(filter_ptr as *mut Box<dyn ListenerFilter<EnvoyListenerFilterImpl>>) };
+}
