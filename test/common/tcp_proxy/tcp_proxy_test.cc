@@ -3230,7 +3230,7 @@ TEST_P(TcpProxyTest, LegacyFilterStateWithNewApi) {
   EXPECT_NE(nullptr, filter_.get());
 }
 
-// Test that merge_proxy_protocol_tlvs merges tcp_proxy TLVs with existing downstream TLVs.
+// Test that merge config option merges tcp_proxy TLV entries with existing downstream ones.
 TEST_P(TcpProxyTest, MergeProxyProtocolTlvsWithDownstreamState) {
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
   auto* tlv = config.add_proxy_protocol_tlvs();
@@ -3337,7 +3337,7 @@ TEST_P(TcpProxyTest, NoMergeProxyProtocolTlvsWhenDisabled) {
   auto* tlv = config.add_proxy_protocol_tlvs();
   tlv->set_type(0xF1);
   tlv->set_value("should_be_ignored");
-  // merge_proxy_protocol_tlvs defaults to false
+  // The merge config option defaults to false.
 
   // Set up existing downstream proxy protocol state.
   Network::ProxyProtocolTLVVector downstream_tlvs;
