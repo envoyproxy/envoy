@@ -43,12 +43,19 @@ Http::FilterHeadersStatus AsyncExampleFilter::decodeHeaders(Http::RequestHeaderM
 
 Http::FilterDataStatus AsyncExampleFilter::decodeData(Buffer::Instance& data, bool) {
   ENVOY_LOG(error, "decodeData {}", dataDebugString(data));
-  if (!async_complete_ && delay_timer_ && !delay_timer_->enabled()) {
+
+  if (delay_timer_ && !delay_timer_->enabled()) {
     ENVOY_LOG(error, "Starting async delay for {} ms", config_->delay().count());
+    async_complete_ = false;
+    decoder_callbacks_->onDecoderFilterAboveWriteBufferHighWatermark();
     delay_timer_->enableTimer(config_->delay());
-    return Http::FilterDataStatus::StopIterationAndWatermark;
   }
-  return Http::FilterDataStatus::Continue;
+
+  if (async_complete_) {
+    return Http::FilterDataStatus::Continue;
+  }
+
+  return Http::FilterDataStatus::StopIterationAndWatermark;
 }
 
 Http::FilterTrailersStatus AsyncExampleFilter::decodeTrailers(Http::RequestTrailerMap&) {
@@ -57,11 +64,14 @@ Http::FilterTrailersStatus AsyncExampleFilter::decodeTrailers(Http::RequestTrail
 
 void AsyncExampleFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
   decoder_callbacks_ = &callbacks;
+  ENVOY_LOG(error, "setDecoderFilterCallbacks decoder buffer limit {}",
+            callbacks.decoderBufferLimit());
 }
 
 void AsyncExampleFilter::onTimer() {
-  ENVOY_LOG(error, "Async delay finished, resuming decoding");
+  ENVOY_LOG(error, "Async delay finished, resuming decoding ...");
   async_complete_ = true;
+  decoder_callbacks_->onDecoderFilterBelowWriteBufferLowWatermark();
   decoder_callbacks_->continueDecoding();
 }
 

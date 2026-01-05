@@ -12,7 +12,7 @@ namespace {
 class AsyncExampleIntegrationTest : public HttpIntegrationTest,
                                     public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  AsyncExampleIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
+  AsyncExampleIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, GetParam()) {}
 
   void initializeFilter() {
     config_helper_.addConfigModifier(
@@ -56,22 +56,20 @@ TEST_P(AsyncExampleIntegrationTest, DecodeDataPauseAndResume) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
-const std::string Body(int count) {
-  std::string body;
-  body.reserve(count * 10);
-  for (int i = 0; i < count; ++i) {
-    absl::StrAppend(&body, " ", i);
-  }
-
-  return body;
-}
-
 TEST_P(AsyncExampleIntegrationTest, LargeBodyAsyncTest) {
   initializeFilter();
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  std::string body = Body(1000);
+  std::string body;
+  for (int i = 0; i < 100000; ++i) {
+    body += std::to_string(i) + " ";
+  }
+  // Remove last space
+  if (!body.empty()) {
+    body.pop_back();
+  }
+
   auto response = codec_client_->makeRequestWithBody(
       Http::TestRequestHeaderMapImpl{
           {":method", "POST"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}},

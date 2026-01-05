@@ -23,6 +23,7 @@ public:
     timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
     // MockTimer constructor sets up EXPECT_CALL for createTimer_
     filter_ = std::make_unique<AsyncExampleFilter>(config_, dispatcher_);
+    EXPECT_CALL(callbacks_, decoderBufferLimit()).WillRepeatedly(Return(1024));
     filter_->setDecoderFilterCallbacks(callbacks_);
   }
 
@@ -37,10 +38,12 @@ TEST_F(AsyncExampleFilterTest, DecodeDataPausesAndResumes) {
   Buffer::OwnedImpl data("hello");
   
   // First call should pause
-  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(1000), _));
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(5), _));
+  EXPECT_CALL(callbacks_, onDecoderFilterAboveWriteBufferHighWatermark());
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data, false));
 
   // Simulate timer firing
+  EXPECT_CALL(callbacks_, onDecoderFilterBelowWriteBufferLowWatermark());
   EXPECT_CALL(callbacks_, continueDecoding());
   timer_->invokeCallback();
 
