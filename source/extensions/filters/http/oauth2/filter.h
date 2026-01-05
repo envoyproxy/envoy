@@ -338,6 +338,7 @@ public:
   void finishRefreshAccessTokenFlow();
   void updateTokens(const std::string& access_token, const std::string& id_token,
                     const std::string& refresh_token, std::chrono::seconds expires_in);
+  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
 
 private:
   friend class OAuth2Test;
