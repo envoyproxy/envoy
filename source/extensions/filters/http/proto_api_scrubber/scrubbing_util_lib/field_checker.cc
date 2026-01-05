@@ -336,11 +336,17 @@ FieldCheckResults FieldChecker::matchResultStatusToFieldCheckResult(
 
 absl::StatusOr<Matcher::MatchResult>
 FieldChecker::tryMatch(MatchTreeHttpMatchingDataSharedPtr match_tree) const {
+  auto it = match_result_cache_.find(getMatchTreeRawPtr(match_tree));
+  if (it != match_result_cache_.end()) {
+    return it->second;
+  }
+
   Matcher::MatchResult match_result = match_tree->match(matching_data_);
   if (!match_result.isComplete()) {
     return absl::InternalError("Matching couldn't complete due to insufficient data.");
   }
 
+  match_result_cache_.emplace(getMatchTreeRawPtr(match_tree), match_result);
   return match_result;
 }
 
