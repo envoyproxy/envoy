@@ -730,18 +730,13 @@ pub extern "C" fn envoy_dynamic_module_callback_network_get_socket_options_size(
 pub extern "C" fn envoy_dynamic_module_callback_network_get_socket_options(
   _filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
   options_out: *mut abi::envoy_dynamic_module_type_socket_option,
-  options_size: usize,
-  options_written: *mut usize,
-) -> bool {
-  if options_out.is_null() || options_written.is_null() {
-    return false;
+) {
+  if options_out.is_null() {
+    return;
   }
   let options = STORED_OPTIONS.lock().unwrap();
   let mut written = 0usize;
   for opt in options.iter() {
-    if written >= options_size {
-      break;
-    }
     unsafe {
       let out = options_out.add(written);
       (*out).level = opt.level;
@@ -769,10 +764,6 @@ pub extern "C" fn envoy_dynamic_module_callback_network_get_socket_options(
     }
     written += 1;
   }
-  unsafe {
-    *options_written = written;
-  }
-  true
 }
 
 #[test]

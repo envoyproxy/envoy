@@ -3973,22 +3973,12 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
       };
       size
     ];
-    let mut written: usize = 0;
-    let ok = unsafe {
-      abi::envoy_dynamic_module_callback_network_get_socket_options(
-        self.raw,
-        options.as_mut_ptr(),
-        options.len(),
-        &mut written,
-      )
+    unsafe {
+      abi::envoy_dynamic_module_callback_network_get_socket_options(self.raw, options.as_mut_ptr())
     };
-    if !ok || written == 0 {
-      return Vec::new();
-    }
 
     options
       .into_iter()
-      .take(written)
       .map(|opt| {
         let value = match opt.value_type {
           abi::envoy_dynamic_module_type_socket_option_value_type::Int => {
@@ -4048,7 +4038,7 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
     };
 
     let result = unsafe {
-      abi::envoy_dynamic_module_callback_network_filter_send_http_callout(
+      abi::envoy_dynamic_module_callback_network_filter_http_callout(
         self.raw,
         &mut callout_id,
         str_to_module_buffer(cluster_name),

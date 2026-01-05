@@ -551,7 +551,7 @@ bool envoy_dynamic_module_callback_network_get_dynamic_metadata_number(
 }
 
 envoy_dynamic_module_type_http_callout_init_result
-envoy_dynamic_module_callback_network_filter_send_http_callout(
+envoy_dynamic_module_callback_network_filter_http_callout(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, uint64_t* callout_id_out,
     envoy_dynamic_module_type_module_buffer cluster_name,
     envoy_dynamic_module_type_module_http_header* headers, size_t headers_size,
@@ -700,16 +700,12 @@ size_t envoy_dynamic_module_callback_network_get_socket_options_size(
   return filter->socketOptionCount();
 }
 
-bool envoy_dynamic_module_callback_network_get_socket_options(
+void envoy_dynamic_module_callback_network_get_socket_options(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_socket_option* options_out, size_t options_size,
-    size_t* options_written) {
-  if (options_out == nullptr || options_written == nullptr) {
-    return false;
-  }
+    envoy_dynamic_module_type_socket_option* options_out) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
-  filter->copySocketOptions(options_out, options_size, *options_written);
-  return true;
+  size_t options_written = 0;
+  filter->copySocketOptions(options_out, filter->socketOptionCount(), options_written);
 }
 
 } // extern "C"

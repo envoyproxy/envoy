@@ -1233,10 +1233,7 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, ListSocketOptions) {
   EXPECT_EQ(2, size);
 
   std::vector<envoy_dynamic_module_type_socket_option> options(size);
-  size_t written = 0;
-  EXPECT_TRUE(envoy_dynamic_module_callback_network_get_socket_options(filterPtr(), options.data(),
-                                                                       options.size(), &written));
-  EXPECT_EQ(2, written);
+  envoy_dynamic_module_callback_network_get_socket_options(filterPtr(), options.data());
 
   // Verify first option (int).
   EXPECT_EQ(10, options[0].level);
@@ -1302,7 +1299,7 @@ TEST_F(DynamicModuleNetworkFilterHttpCalloutTest, SendHttpCalloutClusterNotFound
       {.key_ptr = "host", .key_length = 4, .value_ptr = "example.com", .value_length = 11},
   };
 
-  auto result = envoy_dynamic_module_callback_network_filter_send_http_callout(
+  auto result = envoy_dynamic_module_callback_network_filter_http_callout(
       filterPtr(), &callout_id, {"nonexistent_cluster", 19}, headers.data(), headers.size(),
       {nullptr, 0}, 5000);
 
@@ -1318,7 +1315,7 @@ TEST_F(DynamicModuleNetworkFilterHttpCalloutTest, SendHttpCalloutMissingRequired
       {.key_ptr = "host", .key_length = 4, .value_ptr = "example.com", .value_length = 11},
   };
 
-  auto result = envoy_dynamic_module_callback_network_filter_send_http_callout(
+  auto result = envoy_dynamic_module_callback_network_filter_http_callout(
       filterPtr(), &callout_id, {"test_cluster", 12}, headers.data(), headers.size(), {nullptr, 0},
       5000);
 
@@ -1342,7 +1339,7 @@ TEST_F(DynamicModuleNetworkFilterHttpCalloutTest, SendHttpCalloutCannotCreateReq
       {.key_ptr = "host", .key_length = 4, .value_ptr = "example.com", .value_length = 11},
   };
 
-  auto result = envoy_dynamic_module_callback_network_filter_send_http_callout(
+  auto result = envoy_dynamic_module_callback_network_filter_http_callout(
       filterPtr(), &callout_id, {"test_cluster", 12}, headers.data(), headers.size(), {nullptr, 0},
       5000);
 
@@ -1374,7 +1371,7 @@ TEST_F(DynamicModuleNetworkFilterHttpCalloutTest, SendHttpCalloutSuccess) {
   const char* body_data = R"({"key": "value"})";
   envoy_dynamic_module_type_module_buffer body = {body_data, strlen(body_data)};
 
-  auto result = envoy_dynamic_module_callback_network_filter_send_http_callout(
+  auto result = envoy_dynamic_module_callback_network_filter_http_callout(
       filterPtr(), &callout_id, {"test_cluster", 12}, headers.data(), headers.size(), body, 5000);
 
   EXPECT_EQ(envoy_dynamic_module_type_http_callout_init_result_Success, result);
@@ -1406,7 +1403,7 @@ TEST_F(DynamicModuleNetworkFilterHttpCalloutTest, SendHttpCalloutSuccessWithCall
       {.key_ptr = "host", .key_length = 4, .value_ptr = "example.com", .value_length = 11},
   };
 
-  auto result = envoy_dynamic_module_callback_network_filter_send_http_callout(
+  auto result = envoy_dynamic_module_callback_network_filter_http_callout(
       filterPtr(), &callout_id, {"test_cluster", 12}, headers.data(), headers.size(), {nullptr, 0},
       5000);
 
@@ -1448,7 +1445,7 @@ TEST_F(DynamicModuleNetworkFilterHttpCalloutTest, SendHttpCalloutFailureReset) {
       {.key_ptr = "host", .key_length = 4, .value_ptr = "example.com", .value_length = 11},
   };
 
-  auto result = envoy_dynamic_module_callback_network_filter_send_http_callout(
+  auto result = envoy_dynamic_module_callback_network_filter_http_callout(
       filterPtr(), &callout_id, {"test_cluster", 12}, headers.data(), headers.size(), {nullptr, 0},
       5000);
 
@@ -1484,7 +1481,7 @@ TEST_F(DynamicModuleNetworkFilterHttpCalloutTest, SendHttpCalloutFailureExceedRe
       {.key_ptr = "host", .key_length = 4, .value_ptr = "example.com", .value_length = 11},
   };
 
-  auto result = envoy_dynamic_module_callback_network_filter_send_http_callout(
+  auto result = envoy_dynamic_module_callback_network_filter_http_callout(
       filterPtr(), &callout_id, {"test_cluster", 12}, headers.data(), headers.size(), {nullptr, 0},
       5000);
 
@@ -1520,7 +1517,7 @@ TEST_F(DynamicModuleNetworkFilterHttpCalloutTest, OnBeforeFinalizeUpstreamSpanNo
       {.key_ptr = "host", .key_length = 4, .value_ptr = "example.com", .value_length = 11},
   };
 
-  auto result = envoy_dynamic_module_callback_network_filter_send_http_callout(
+  auto result = envoy_dynamic_module_callback_network_filter_http_callout(
       filterPtr(), &callout_id, {"test_cluster", 12}, headers.data(), headers.size(), {nullptr, 0},
       5000);
 
@@ -1595,7 +1592,7 @@ TEST_F(DynamicModuleNetworkFilterHttpCalloutTest, FilterDestructionCancelsPendin
       {.key_ptr = "host", .key_length = 4, .value_ptr = "example.com", .value_length = 11},
   };
 
-  auto result = envoy_dynamic_module_callback_network_filter_send_http_callout(
+  auto result = envoy_dynamic_module_callback_network_filter_http_callout(
       filterPtr(), &callout_id, {"test_cluster", 12}, headers.data(), headers.size(), {nullptr, 0},
       5000);
 
