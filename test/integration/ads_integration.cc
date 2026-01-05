@@ -133,6 +133,18 @@ AdsIntegrationTestBase::buildRouteConfig(const std::string& name, const std::str
   return ConfigHelper::buildRouteConfig(name, cluster);
 }
 
+envoy::config::route::v3::RouteConfiguration
+AdsIntegrationTestBase::buildRouteConfigWithVhds(const std::string& name,
+                                                 const bool& use_singleton_subscription) {
+  return ConfigHelper::buildRouteConfigWithVhdsOverAds(name, use_singleton_subscription);
+}
+
+envoy::config::route::v3::VirtualHost
+AdsIntegrationTestBase::buildVirtualHost(const std::string& name, const std::string& domain,
+                                         const std::string& prefix, const std::string& cluster) {
+  return ConfigHelper::buildVirtualHost(name, domain, prefix, cluster);
+}
+
 void AdsIntegrationTestBase::makeSingleRequest() {
   registerTestServerPorts({"http"});
   testRouterHeaderOnlyRequestAndResponse();

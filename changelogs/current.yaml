@@ -658,6 +658,9 @@ new_features:
     Fixed socket address proto translations to preserve network namespace filepath information.
     Previously, listeners in the non-default namespaces would lose this information when passed through
     proto translation, causing admin ``/listeners`` endpoint (and other consumers) to fail to display the namespace.
+- area: vhds
+  change: |
+    Added support for subscribing to a singleton resource (identified by the route name) when initiating a vhds subscription.
 - area: oauth2
   change: |
     Added support for additional parameters in the OAuth2 token request body via

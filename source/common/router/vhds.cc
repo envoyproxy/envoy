@@ -29,7 +29,10 @@ absl::StatusOr<VhdsSubscriptionPtr> VhdsSubscription::createVhdsSubscription(
                                   .config_source()
                                   .api_config_source()
                                   .api_type();
-  if (config_source != envoy::config::core::v3::ApiConfigSource::DELTA_GRPC) {
+  if (config_source != envoy::config::core::v3::ApiConfigSource::DELTA_GRPC &&
+      !(config_update_info->protobufConfigurationCast().vhds().config_source().has_ads() &&
+        factory_context.bootstrap().dynamic_resources().ads_config().api_type() ==
+            envoy::config::core::v3::ApiConfigSource::DELTA_GRPC)) {
     return absl::InvalidArgumentError("vhds: only 'DELTA_GRPC' is supported as an api_type.");
   }
 
@@ -61,7 +64,8 @@ VhdsSubscription::VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
       route_config_provider_(route_config_provider) {
   const auto resource_name = getResourceName();
   Envoy::Config::SubscriptionOptions options;
-  options.use_namespace_matching_ = true;
+  options.use_namespace_matching_ =
+      !config_update_info_->protobufConfigurationCast().vhds().use_singleton_subscription();
   absl::StatusOr<Envoy::Config::SubscriptionPtr> status_or =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
           config_update_info_->protobufConfigurationCast().vhds().config_source(),

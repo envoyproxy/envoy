@@ -154,5 +154,13 @@ TEST_P(VhdsIntegrationTest, RdsUpdateWithoutVHDSChangesDoesNotRestartVHDS) {
   ASSERT_TRUE(codec_client_->waitForDisconnect());
 }
 
+// Tests that singleton subscriptions work for VHDS.
+TEST_P(VhdsIntegrationTest, SingletonVhdsSubscription) {
+  useSingletonVhds();
+  testRouterHeaderOnlyRequestAndResponse(nullptr, 1, "/", "sni.lyft.com");
+  cleanupUpstreamAndDownstream();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+}
+
 } // namespace
 } // namespace Envoy
