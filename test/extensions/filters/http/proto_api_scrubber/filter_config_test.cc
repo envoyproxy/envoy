@@ -1504,7 +1504,7 @@ TEST_F(ProtoApiScrubberFilterConfigTest, FieldParentMapPopulation) {
   EXPECT_EQ(filter_config_->getParentType(&dummy_field), nullptr);
 }
 
-// Verifies that identical matchers are deduplicated and share the same pointer.
+// Verifies that identical matchers share the same pointer.
 TEST_F(ProtoApiScrubberFilterConfigTest, MatcherDeduplication) {
   ProtoApiScrubberConfig config;
   *config.mutable_descriptor_set()->mutable_data_source()->mutable_inline_bytes() =
