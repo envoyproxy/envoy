@@ -533,7 +533,7 @@ TEST_P(LocalRateLimitFilterIntegrationTest, ShadowModeTest) {
 
   // Since shadow mode is true, should be allowed.
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  sendAndVerifyRequest("foo","200", 0);
+  sendAndVerifyRequest("foo", "200", 0);
   cleanupUpstreamAndDownstream();
 
   // The next request with a different cluster, 'bar', should be allowed.
