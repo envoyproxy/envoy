@@ -3383,8 +3383,8 @@ TEST_P(TcpProxyTest, MergeProxyProtocolTlvsWithDynamicTlv) {
   // Set dynamic metadata.
   filter_callbacks_.connection_.stream_info_.metadata_.mutable_filter_metadata()->insert(
       {"envoy.test", Protobuf::Struct()});
-  auto& test_struct =
-      (*filter_callbacks_.connection_.stream_info_.metadata_.mutable_filter_metadata())["envoy.test"];
+  auto& test_struct = (*filter_callbacks_.connection_.stream_info_.metadata_
+                            .mutable_filter_metadata())["envoy.test"];
   (*test_struct.mutable_fields())["key"].set_string_value("dynamic_value");
 
   // Set up existing downstream proxy protocol state.

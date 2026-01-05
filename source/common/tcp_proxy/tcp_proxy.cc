@@ -720,9 +720,9 @@ Network::FilterStatus Filter::establishUpstreamConnection() {
     filter_state->setData(
         Network::ProxyProtocolFilterState::key(),
         std::make_shared<Network::ProxyProtocolFilterState>(Network::ProxyProtocolDataWithVersion{
-            {existing_data.src_addr_, existing_data.dst_addr_, merged_tlvs}, existing_data.version_}),
-        StreamInfo::FilterState::StateType::Mutable,
-        StreamInfo::FilterState::LifeSpan::Connection);
+            {existing_data.src_addr_, existing_data.dst_addr_, merged_tlvs},
+            existing_data.version_}),
+        StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
   }
   // else: Downstream state exists but merge is disabled - keep existing state as-is.
   transport_socket_options_ =
