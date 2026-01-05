@@ -89,6 +89,13 @@ envoy.bootstrap.wasm:
   status: alpha
   type_urls:
   - envoy.extensions.wasm.v3.WasmService
+envoy.bootstrap.virtual_ip_cache:
+  categories:
+  - envoy.bootstrap
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.wildcard.virtual_ip_cache.v3.VirtualIpCache
 envoy.bootstrap.reverse_tunnel.downstream_socket_interface:
   categories:
   - envoy.bootstrap
@@ -786,6 +793,13 @@ envoy.filters.network.ext_proc:
   status: wip
   type_urls:
   - envoy.extensions.filters.network.ext_proc.v3.NetworkExternalProcessor
+envoy.filters.network.hostname_lookup:
+  categories:
+  - envoy.filters.network
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.wildcard.hostname_lookup.v3.HostnameLookup
 envoy.filters.network.reverse_tunnel:
   categories:
   - envoy.filters.network
@@ -917,6 +931,13 @@ envoy.filters.udp.dns_filter:
   status: stable
   type_urls:
   - envoy.extensions.filters.udp.dns_filter.v3.DnsFilterConfig
+envoy.filters.udp_listener.dns_gateway:
+  categories:
+  - envoy.filters.udp_listener
+  security_posture: robust_to_untrusted_downstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.wildcard.dns_gateway.v3.DnsGateway
 envoy.filters.udp_listener.udp_proxy:
   categories:
   - envoy.filters.udp_listener

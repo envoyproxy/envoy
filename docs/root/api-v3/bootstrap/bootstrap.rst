@@ -9,6 +9,7 @@ Bootstrap
   ../extensions/bootstrap/internal_listener/v3/internal_listener.proto
   ../extensions/bootstrap/reverse_tunnel/downstream_socket_interface/v3/downstream_reverse_connection_socket_interface.proto
   ../extensions/bootstrap/reverse_tunnel/upstream_socket_interface/v3/upstream_reverse_connection_socket_interface.proto
+  ../extensions/wildcard/virtual_ip_cache/v3/virtual_ip_cache.proto
   ../config/metrics/v3/metrics_service.proto
   ../config/overload/v3/overload.proto
   ../config/ratelimit/v3/rls.proto

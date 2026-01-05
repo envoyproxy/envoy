@@ -430,6 +430,11 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/path/uri_template_lib @wbpcode @yanjunxiang-google
 /*/extensions/path/uri_template_lib/proto @wbpcode @yanjunxiang-google
 
+# wildcard
+/*/extensions/wildcard/dns_gateway @UNOWNED
+/*/extensions/wildcard/hostname_lookup @UNOWNED
+/*/extensions/wildcard/virtual_ip_cache @UNOWNED
+
 # mobile
 /mobile/ @RyanTheOptimist @abeyad @danzh2010
 

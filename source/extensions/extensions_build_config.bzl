@@ -61,6 +61,13 @@ EXTENSIONS = {
     "envoy.bootstrap.wasm":                             "//source/extensions/bootstrap/wasm:config",
 
     #
+    # Wildcard
+    #
+    "envoy.filters.udp_listener.dns_gateway":           "//source/extensions/wildcard/dns_gateway:config",
+    "envoy.filters.network.hostname_lookup":            "//source/extensions/wildcard/hostname_lookup:config",
+    "envoy.bootstrap.virtual_ip_cache":                "//source/extensions/wildcard/virtual_ip_cache:config",
+
+    #
     # Reverse Connection
     #
 

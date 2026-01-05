@@ -82,3 +82,6 @@ directories:
   source/extensions/health_checkers/grpc: 92.3
   source/extensions/config_subscription/rest: 94.9
   source/extensions/matching/input_matchers/cel_matcher: 100.0
+  source/extensions/wildcard/dns_gateway: 0.0
+  source/extensions/wildcard/hostname_lookup: 0.0
+  source/extensions/wildcard/virtual_ip_cache: 0.0
