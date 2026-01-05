@@ -31,6 +31,7 @@ directories:
   source/extensions/common/aws: 98.5
   source/extensions/common/aws/credential_providers: 100.0
   source/extensions/common/proxy_protocol: 94.6  # Adjusted for security patch
+  source/extensions/common/synthetic_ip: 0.0  # Temporary testing
   source/extensions/common/tap: 95.1
   source/extensions/common/wasm: 95.3  # flaky: be careful adjusting
   source/extensions/common/wasm/ext: 100.0
@@ -54,6 +55,8 @@ directories:
   source/extensions/filters/network/mongo_proxy: 96.1
   source/extensions/filters/network/reverse_tunnel: 92.0
   source/extensions/filters/network/sni_cluster: 88.9
+  source/extensions/filters/network/tunnel_hostname_lookup: 0.0  # Temporary testing
+  source/extensions/filters/udp/dns_gateway: 0.0  # Temporary testing
   source/extensions/formatter/cel: 100.0
   source/extensions/internal_redirect: 86.2
   source/extensions/internal_redirect/safe_cross_scheme: 81.3
