@@ -100,6 +100,12 @@ private:
   // Optimized helper to walk the type descriptor and normalize map keys in the path.
   const NormalizationResult& normalizePath(const std::vector<std::string>& path) const;
 
+  // Helper to get the raw pointer from the shared pointer to use as a key in the cache.
+  const Matcher::MatchTree<HttpMatchingData>*
+  getMatchTreeRawPtr(const MatchTreeHttpMatchingDataSharedPtr& match_tree) const {
+    return match_tree.get();
+  }
+
   ScrubberContext scrubber_context_;
   Http::Matching::HttpMatchingDataImpl matching_data_;
   std::string method_name_;
@@ -109,6 +115,10 @@ private:
 
   // Cache normalized results.
   mutable absl::flat_hash_map<std::vector<std::string>, NormalizationResult> path_cache_;
+
+  // Cache to store match results.
+  mutable absl::flat_hash_map<const Matcher::MatchTree<HttpMatchingData>*, Matcher::MatchResult>
+      match_result_cache_;
 };
 
 } // namespace ProtoApiScrubber

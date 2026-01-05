@@ -55,6 +55,7 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
         "@com_github_cncf_xds//xds/type/matcher/v3:pkg_cc_proto",
         "@com_google_absl//absl/status",
+        "@envoy_api//envoy/extensions/filters/http/proto_api_scrubber/v3:pkg_cc_proto",
     ],
 )
 

@@ -614,6 +614,11 @@ OAuth2Filter::OAuth2Filter(FilterConfigSharedPtr config,
   oauth_client_->setCallbacks(*this);
 }
 
+void OAuth2Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
+  PassThroughDecoderFilter::setDecoderFilterCallbacks(callbacks);
+  oauth_client_->setDecoderFilterCallbacks(callbacks);
+}
+
 /**
  * primary cases:
  * 1) pass through header is matching
@@ -726,7 +731,8 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
     // Check if we can update the access token via a refresh token.
     if (config_->useRefreshToken() && validator_->canUpdateTokenByRefreshToken()) {
 
-      ENVOY_LOG(debug, "Trying to update the access token using the refresh token");
+      ENVOY_STREAM_LOG(debug, "Trying to update the access token using the refresh token",
+                       *decoder_callbacks_);
 
       // try to update access token by refresh token
       oauth_client_->asyncRefreshAccessToken(validator_->refreshToken(), config_->clientId(),
@@ -736,7 +742,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
     }
 
     if (canRedirectToOAuthServer(headers)) {
-      ENVOY_LOG(debug, "redirecting to OAuth server", path_str);
+      ENVOY_STREAM_LOG(debug, "redirecting to OAuth server: {}", *decoder_callbacks_, path_str);
       redirectToOAuthServer(headers);
       return Http::FilterHeadersStatus::StopIteration;
     } else {
@@ -805,10 +811,10 @@ bool OAuth2Filter::canSkipOAuth(Http::RequestHeaderMap& headers) const {
     if (config_->forwardBearerToken() && !validator_->token().empty()) {
       setBearerToken(headers, validator_->token());
     }
-    ENVOY_LOG(debug, "skipping oauth flow due to valid hmac cookie");
+    ENVOY_STREAM_LOG(debug, "skipping oauth flow due to valid hmac cookie", *decoder_callbacks_);
     return true;
   }
-  ENVOY_LOG(debug, "can not skip oauth flow");
+  ENVOY_STREAM_LOG(debug, "can not skip oauth flow", *decoder_callbacks_);
   return false;
 }
 
@@ -871,8 +877,8 @@ std::string OAuth2Filter::decryptToken(const std::string& encrypted_token) const
 
   DecryptResult decrypt_result = decrypt(encrypted_token, config_->hmacSecret());
   if (decrypt_result.error.has_value()) {
-    ENVOY_LOG(error, "failed to decrypt token: {}, error: {}", encrypted_token,
-              decrypt_result.error.value());
+    ENVOY_STREAM_LOG(error, "failed to decrypt token: {}, error: {}", *decoder_callbacks_,
+                     encrypted_token, decrypt_result.error.value());
     // There are two cases:
     // 1. The token is a legacy unencrypted token.
     // In this case, we return the token as-is to allow the request to proceed.
@@ -887,7 +893,7 @@ std::string OAuth2Filter::decryptToken(const std::string& encrypted_token) const
 bool OAuth2Filter::canRedirectToOAuthServer(Http::RequestHeaderMap& headers) const {
   for (const auto& matcher : config_->denyRedirectMatchers()) {
     if (matcher->matchesHeaders(headers)) {
-      ENVOY_LOG(debug, "redirect is denied for this request");
+      ENVOY_STREAM_LOG(debug, "redirect is denied for this request", *decoder_callbacks_);
       return false;
     }
   }
@@ -1122,12 +1128,16 @@ OAuth2Filter::getExpiresTimeForRefreshToken(const std::string& refresh_token,
         const auto expiration_epoch = expiration_from_jwt - now;
         return std::to_string(expiration_epoch.count());
       } else {
-        ENVOY_LOG(debug, "The expiration time in the refresh token is less than the current time");
+        ENVOY_STREAM_LOG(debug,
+                         "The expiration time in the refresh token is less than the current time",
+                         *decoder_callbacks_);
         return "0";
       }
     }
-    ENVOY_LOG(debug, "The refresh token is not a JWT or exp claim is omitted. The lifetime of the "
-                     "refresh token will be taken from filter configuration");
+    ENVOY_STREAM_LOG(debug,
+                     "The refresh token is not a JWT or exp claim is omitted. The lifetime of the "
+                     "refresh token will be taken from filter configuration",
+                     *decoder_callbacks_);
     const std::chrono::seconds default_refresh_token_expires_in =
         config_->defaultRefreshTokenExpiresIn();
     return std::to_string(default_refresh_token_expires_in.count());
@@ -1149,13 +1159,16 @@ std::string OAuth2Filter::getExpiresTimeForIdToken(const std::string& id_token,
         const auto expiration_epoch = expiration_from_jwt - now;
         return std::to_string(expiration_epoch.count());
       } else {
-        ENVOY_LOG(debug, "The expiration time in the id token is less than the current time");
+        ENVOY_STREAM_LOG(debug, "The expiration time in the id token is less than the current time",
+                         *decoder_callbacks_);
         return "0";
       }
     }
-    ENVOY_LOG(debug, "The id token is not a JWT or exp claim is omitted, even though it is "
+    ENVOY_STREAM_LOG(debug,
+                     "The id token is not a JWT or exp claim is omitted, even though it is "
                      "required by the OpenID Connect 1.0 specification. "
-                     "The lifetime of the id token will be aligned with the access token");
+                     "The lifetime of the id token will be aligned with the access token",
+                     *decoder_callbacks_);
     return std::to_string(expires_in.count());
   }
   return std::to_string(expires_in.count());
@@ -1369,7 +1382,8 @@ void OAuth2Filter::addFlowCookieDeletionHeaders(Http::ResponseHeaderMap& headers
 }
 
 void OAuth2Filter::sendUnauthorizedResponse(const std::string& details) {
-  ENVOY_LOG(warn, "Responding with 401 Unauthorized. Cause: {}", details);
+  ENVOY_STREAM_LOG(warn, "Responding with 401 Unauthorized. Cause: {}", *decoder_callbacks_,
+                   details);
   config_->stats().oauth_failure_.inc();
   decoder_callbacks_->sendLocalReply(
       Http::Code::Unauthorized, UnauthorizedBodyMessage,
