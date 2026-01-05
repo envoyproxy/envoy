@@ -92,6 +92,23 @@ struct DelegatingFactoryCallbacks : public Envoy::Http::FilterChainFactoryCallba
     delegated_callbacks_.addAccessLogHandler(std::move(handler));
   }
 
+  absl::string_view filterConfigName() const override {
+    return delegated_callbacks_.filterConfigName();
+  }
+  void setFilterConfigName(absl::string_view name) override {
+    return delegated_callbacks_.setFilterConfigName(name);
+  }
+  OptRef<const Router::Route> route() const override { return delegated_callbacks_.route(); }
+  absl::optional<bool> filterDisabled(absl::string_view config_name) const override {
+    return delegated_callbacks_.filterDisabled(config_name);
+  }
+  const StreamInfo::StreamInfo& streamInfo() const override {
+    return delegated_callbacks_.streamInfo();
+  }
+  Envoy::Http::RequestHeaderMapOptRef requestHeaders() const override {
+    return delegated_callbacks_.requestHeaders();
+  }
+
   Envoy::Http::FilterChainFactoryCallbacks& delegated_callbacks_;
   Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> match_tree_;
 };
