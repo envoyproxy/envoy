@@ -55,19 +55,16 @@ createPersistentQuicInfoForCluster(Event::Dispatcher& dispatcher,
     quic_info->migration_config_.migrate_session_early = true;
     if (quic_config.connection_migration().has_migrate_idle_connections()) {
       quic_info->migration_config_.migrate_idle_session = true;
-      quic_info->migration_config_.idle_migration_period = quic::QuicTime::Delta::FromSeconds(
-          DurationUtil::durationToSeconds(quic_config.connection_migration()
-                                              .migrate_idle_connections()
-                                              .max_idle_time_before_migration()));
+      quic_info->migration_config_.idle_migration_period =
+          quic::QuicTime::Delta::FromSeconds(PROTOBUF_GET_SECONDS_OR_DEFAULT(
+              quic_config.connection_migration().migrate_idle_connections(),
+              max_idle_time_before_migration, 30));
     } else {
       quic_info->migration_config_.migrate_idle_session = false;
     }
-    if (quic_config.connection_migration().has_max_time_on_non_default_network()) {
-      // Override the QUICHE default value 128s.
-      quic_info->migration_config_.max_time_on_non_default_network =
-          quic::QuicTime::Delta::FromSeconds(DurationUtil::durationToSeconds(
-              quic_config.connection_migration().max_time_on_non_default_network()));
-    }
+    quic_info->migration_config_.max_time_on_non_default_network =
+        quic::QuicTime::Delta::FromSeconds(PROTOBUF_GET_SECONDS_OR_DEFAULT((
+            quic_config.connection_migration(), max_time_on_non_default_network, 128));
   }
   envoy::config::core::v3::TypedExtensionConfig client_writer_config;
   if (quic_config.has_client_packet_writer()) {

@@ -465,7 +465,6 @@ public class CronetHttp3Test {
       // Disable dns refreshment so that the engine will attempt immediate draining.
       disableDnsRefreshOnNetworkChange = true;
     }
-    drainOnNetworkChange = true;
     useAndroidNetworkMonitorV2 = true;
     enableQuicConnectionMigration = true;
     setUp(true);
@@ -527,6 +526,8 @@ public class CronetHttp3Test {
 
     postStats = cronvoyEngine.getEnvoyEngine().dumpStats();
     assertTrue(postStats, postStats.contains("cluster.base.upstream_cx_http3_total: 1"));
+    // The TCP connection is idle now and should be closed during draining.
+    assertTrue(postStats, postStats.contains("cluster.base.upstream_cx_destroy: 1"));
   }
 
   @Test
