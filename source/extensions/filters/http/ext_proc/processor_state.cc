@@ -638,7 +638,7 @@ bool ProcessorState::handleDuplexStreamedBodyResponse(const CommonResponse& comm
   return end_of_stream;
 }
 
-bool ProcessorState::isLastResponseAfterHeaderResp() {
+bool ProcessorState::isLastResponseAfterHeaderResp() const {
   if (callbackState() != ProcessorState::CallbackState::Idle) {
     return false;
   }
@@ -663,7 +663,7 @@ bool ProcessorState::isLastResponseAfterHeaderResp() {
   return false;
 }
 
-bool ProcessorState::isLastResponseAfterBodyResp(bool is_last_body_resp) {
+bool ProcessorState::isLastResponseAfterBodyResp(bool is_last_body_resp) const {
   if (callbackState() != ProcessorState::CallbackState::Idle) {
     return false;
   }
