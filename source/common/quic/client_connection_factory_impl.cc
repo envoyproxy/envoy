@@ -63,7 +63,7 @@ createPersistentQuicInfoForCluster(Event::Dispatcher& dispatcher,
       quic_info->migration_config_.migrate_idle_session = false;
     }
     quic_info->migration_config_.max_time_on_non_default_network =
-        quic::QuicTime::Delta::FromSeconds(PROTOBUF_GET_SECONDS_OR_DEFAULT((
+        quic::QuicTime::Delta::FromSeconds(PROTOBUF_GET_SECONDS_OR_DEFAULT(
             quic_config.connection_migration(), max_time_on_non_default_network, 128));
   }
   envoy::config::core::v3::TypedExtensionConfig client_writer_config;
