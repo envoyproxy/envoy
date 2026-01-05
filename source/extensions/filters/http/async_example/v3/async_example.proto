@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.async_example.v3;
+
+import "google/protobuf/duration.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.async_example.v3";
+option java_outer_classname = "AsyncExampleProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/async_example/v3;async_examplev3";
+
+// [#protodoc-title: Async Example]
+// Async Example :ref:`configuration overview <config_http_filters_async_example>`.
+// [#extension: envoy.filters.http.async_example]
+
+message AsyncExample {
+  // duration of the delay
+  google.protobuf.Duration delay = 1;
+}
