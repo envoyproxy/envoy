@@ -8,12 +8,10 @@ envoy_dynamic_module_type_abi_version_module_ptr envoy_dynamic_module_on_program
 }
 
 void envoy_dynamic_module_on_http_filter_per_route_config_destroy(
-    envoy_dynamic_module_type_http_filter_per_route_config_module_ptr filter_config_ptr){
-}
+    envoy_dynamic_module_type_http_filter_per_route_config_module_ptr filter_config_ptr) {}
 
 envoy_dynamic_module_type_http_filter_per_route_config_module_ptr
-envoy_dynamic_module_on_http_filter_per_route_config_new(const char* name_ptr, size_t name_size,
-                                                         const char* config_ptr,
-                                                         size_t config_size) {
+envoy_dynamic_module_on_http_filter_per_route_config_new(
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config) {
   return 0;
 }

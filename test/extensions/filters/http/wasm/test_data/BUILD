@@ -1,3 +1,4 @@
+load("@com_google_protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
 load("@com_google_protobuf//bazel:proto_library.bzl", "proto_library")
 load(
     "//bazel:envoy_build_system.bzl",
@@ -159,8 +160,8 @@ envoy_wasm_cc_binary(
         ":test_cc_proto",
         "//source/extensions/common/wasm/ext:declare_property_cc_proto",
         "//source/extensions/common/wasm/ext:envoy_proxy_wasm_api_lib",
-        "//source/extensions/common/wasm/ext:verify_signature_cc_proto",
         "//source/extensions/common/wasm/ext:sign_cc_proto",
+        "//source/extensions/common/wasm/ext:verify_signature_cc_proto",
         "@proxy_wasm_cpp_sdk//contrib:contrib_lib",
     ],
 )

@@ -4,6 +4,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/http/ext_proc/ext_proc.h"
 #include "source/extensions/filters/http/ext_proc/mutation_utils.h"
+#include "source/extensions/filters/http/ext_proc/processing_effect.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -64,6 +65,14 @@ void ProcessorState::stopMessageTimer() {
   }
 }
 
+void ProcessorState::logMutation(CallbackState callback_state,
+                                 ProcessingEffect::Effect processing_effect) {
+  ExtProcLoggingInfo* logging_info = filter_.loggingInfo();
+  if (logging_info != nullptr) {
+    logging_info->recordProcessingEffect(callback_state, trafficDirection(), processing_effect);
+  }
+}
+
 // Server sends back response to stop the original timer and start a new timer.
 // Do not change call_start_time_ since that call has not been responded yet.
 // Do not change callback_state_ either.
@@ -110,13 +119,14 @@ void ProcessorState::sendBufferedDataInStreamedMode(bool end_stream) {
   }
 }
 
-absl::Status ProcessorState::processHeaderMutation(const CommonResponse& common_response) {
+absl::Status ProcessorState::processHeaderMutation(const CommonResponse& common_response,
+                                                   ProcessingEffect::Effect& processing_effect) {
   ENVOY_STREAM_LOG(debug, "Applying header mutations", *filter_callbacks_);
   const auto mut_status = MutationUtils::applyHeaderMutations(
       common_response.header_mutation(), *headers_,
       common_response.status() == CommonResponse::CONTINUE_AND_REPLACE,
       filter_.config().mutationChecker(), filter_.stats().rejected_header_mutations_,
-      shouldRemoveContentLength());
+      processing_effect, shouldRemoveContentLength());
   return mut_status;
 }
 
@@ -156,7 +166,9 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
 
   // Process header mutation if present
   if (common_response.has_header_mutation()) {
-    const auto mut_status = processHeaderMutation(common_response);
+    ProcessingEffect::Effect header_processing_effect = ProcessingEffect::Effect::None;
+    const auto mut_status = processHeaderMutation(common_response, header_processing_effect);
+    logMutation(callback_state_, header_processing_effect);
     if (!mut_status.ok()) {
       filter_.onProcessHeadersResponse(response, mut_status, trafficDirection());
       return mut_status;
@@ -185,16 +197,19 @@ absl::Status ProcessorState::handleHeaderContinueAndReplace(const HeadersRespons
     // the original one.
     headers_->removeContentLength();
     body_replaced_ = true;
-
+    ProcessingEffect::Effect body_processing_effect = ProcessingEffect::Effect::None;
     if (bufferedData() == nullptr) {
       Buffer::OwnedImpl new_body;
-      MutationUtils::applyBodyMutations(common_response.body_mutation(), new_body);
+      body_processing_effect =
+          MutationUtils::applyBodyMutations(common_response.body_mutation(), new_body);
       addBufferedData(new_body);
     } else {
-      modifyBufferedData([&common_response](Buffer::Instance& buf) {
-        MutationUtils::applyBodyMutations(common_response.body_mutation(), buf);
+      modifyBufferedData([&common_response, &body_processing_effect](Buffer::Instance& buf) {
+        body_processing_effect =
+            MutationUtils::applyBodyMutations(common_response.body_mutation(), buf);
       });
     }
+    logMutation(CallbackState::BufferedBodyCallback, body_processing_effect);
   }
 
   // In case any data left over in the chunk queue, clear them.
@@ -358,9 +373,13 @@ bool ProcessorState::isValidBodyCallbackState() const {
 
 absl::StatusOr<bool>
 ProcessorState::handleBufferedBodyCallback(const CommonResponse& common_response) {
+
   // Handle header mutations if present
   if (common_response.has_header_mutation()) {
-    const absl::Status mutation_status = processHeaderMutationIfAvailable(common_response);
+    ProcessingEffect::Effect header_processing_effect = ProcessingEffect::Effect::None;
+    const absl::Status mutation_status =
+        processHeaderMutationIfAvailable(common_response, header_processing_effect);
+    logMutation(CallbackState::HeadersCallback, header_processing_effect);
     if (!mutation_status.ok()) {
       return mutation_status;
     }
@@ -372,7 +391,9 @@ ProcessorState::handleBufferedBodyCallback(const CommonResponse& common_response
     if (!validation_status.ok()) {
       return validation_status;
     }
-    applyBufferedBodyMutation(common_response);
+    ProcessingEffect::Effect body_processing_effect = ProcessingEffect::Effect::None;
+    applyBufferedBodyMutation(common_response, body_processing_effect);
+    logMutation(callback_state_, body_processing_effect);
   }
 
   clearWatermark();
@@ -415,16 +436,22 @@ ProcessorState::handleBufferedPartialBodyCallback(const CommonResponse& common_r
 
   // Process header mutations if present
   if (common_response.has_header_mutation()) {
-    const absl::Status mutation_status = processHeaderMutationIfAvailable(common_response);
+    ProcessingEffect::Effect header_processing_effect = ProcessingEffect::Effect::None;
+    const absl::Status mutation_status =
+        processHeaderMutationIfAvailable(common_response, header_processing_effect);
+    logMutation(CallbackState::HeadersCallback, header_processing_effect);
     if (!mutation_status.ok()) {
       return mutation_status;
     }
   }
 
   // Apply body mutations and process data
+  ProcessingEffect::Effect body_processing_effect = ProcessingEffect::Effect::None;
   if (common_response.has_body_mutation()) {
-    MutationUtils::applyBodyMutations(common_response.body_mutation(), chunk_data);
+    body_processing_effect =
+        MutationUtils::applyBodyMutations(common_response.body_mutation(), chunk_data);
   }
+  logMutation(callback_state_, body_processing_effect);
 
   // Process chunk data
   if (chunk_data.length() > 0) {
@@ -432,7 +459,6 @@ ProcessorState::handleBufferedPartialBodyCallback(const CommonResponse& common_r
                      *filter_callbacks_, chunk_data.length());
     injectDataToFilterChain(chunk_data, chunk->end_stream);
   }
-
   onFinishProcessorCall(Grpc::Status::Ok);
 
   if (chunkQueue().receivedData().length() > 0) {
@@ -447,10 +473,11 @@ ProcessorState::handleBufferedPartialBodyCallback(const CommonResponse& common_r
   return true;
 }
 
-absl::Status
-ProcessorState::processHeaderMutationIfAvailable(const CommonResponse& common_response) {
+absl::Status ProcessorState::processHeaderMutationIfAvailable(const CommonResponse& common_response,
+                                                              ProcessingEffect::Effect& effect) {
   if (headers_ != nullptr) {
-    return processHeaderMutation(common_response);
+    absl::Status mut_status = processHeaderMutation(common_response, effect);
+    return mut_status;
   }
   ENVOY_STREAM_LOG(debug, "Response had header mutations but headers aren't available",
                    *filter_callbacks_);
@@ -475,11 +502,12 @@ absl::Status ProcessorState::validateContentLength(const CommonResponse& common_
   return absl::OkStatus();
 }
 
-void ProcessorState::applyBufferedBodyMutation(const CommonResponse& common_response) {
+void ProcessorState::applyBufferedBodyMutation(const CommonResponse& common_response,
+                                               ProcessingEffect::Effect& effect) {
   ENVOY_STREAM_LOG(debug, "Applying body response to buffered data. State = {}", *filter_callbacks_,
                    static_cast<int>(callback_state_));
-  modifyBufferedData([&common_response](Buffer::Instance& data) {
-    MutationUtils::applyBodyMutations(common_response.body_mutation(), data);
+  modifyBufferedData([&common_response, &effect](Buffer::Instance& data) {
+    effect = MutationUtils::applyBodyMutations(common_response.body_mutation(), data);
   });
 }
 
@@ -501,9 +529,11 @@ absl::Status ProcessorState::handleTrailersResponse(const TrailersResponse& resp
     ENVOY_STREAM_LOG(debug, "Applying response to buffered trailers, body_mode_ {}",
                      *filter_callbacks_, ProcessingMode::BodySendMode_Name(body_mode_));
     if (response.has_header_mutation() && trailers_ != nullptr) {
+      ProcessingEffect::Effect processing_effect = ProcessingEffect::Effect::None;
       auto mut_status = MutationUtils::applyHeaderMutations(
           response.header_mutation(), *trailers_, false, filter_.config().mutationChecker(),
-          filter_.stats().rejected_header_mutations_);
+          filter_.stats().rejected_header_mutations_, processing_effect);
+      logMutation(callback_state_, processing_effect);
       if (!mut_status.ok()) {
         filter_.onProcessTrailersResponse(response, mut_status, trafficDirection());
         return mut_status;
@@ -556,9 +586,12 @@ bool ProcessorState::handleStreamedBodyResponse(const CommonResponse& common_res
   QueuedChunkPtr chunk = dequeueStreamingChunk(chunk_data);
   ENVOY_BUG(chunk != nullptr, "Bad streamed body callback state");
   if (common_response.has_body_mutation()) {
+    ProcessingEffect::Effect processing_effect;
     ENVOY_STREAM_LOG(debug, "Applying body response to chunk of data. Size = {}",
                      *filter_callbacks_, chunk->length);
-    MutationUtils::applyBodyMutations(common_response.body_mutation(), chunk_data);
+    processing_effect =
+        MutationUtils::applyBodyMutations(common_response.body_mutation(), chunk_data);
+    logMutation(callback_state_, processing_effect);
   }
   bool should_continue = chunk->end_stream;
   ENVOY_STREAM_LOG(trace, "Injecting {} bytes of data to filter stream", *filter_callbacks_,
@@ -590,6 +623,8 @@ bool ProcessorState::handleDuplexStreamedBodyResponse(const CommonResponse& comm
                    "end_of_stream is {}",
                    *filter_callbacks_, buffer.length(), end_of_stream);
   injectDataToFilterChain(buffer, end_of_stream);
+  // Assume mutations are applied in FULL_DUPLEX_STREAMED_MODE.
+  logMutation(callback_state_, ProcessingEffect::Effect::MutationApplied);
 
   if (end_of_stream) {
     onFinishProcessorCall(Grpc::Status::Ok);

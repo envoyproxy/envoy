@@ -57,6 +57,10 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/transport_sockets/tls @RyanTheOptimist @ggreenway @botengyao
 # tls SPIFFE certificate validator extension
 /*/extensions/transport_sockets/tls/cert_validator/spiffe @mathetake @botengyao @tyxia
+# On demand secret provider
+/*/extensions/transport_sockets/tls/cert_selectors/on_demand @kyessenov @tonya11en
+/*/extensions/transport_sockets/tls/cert_mappers/static_name @kyessenov @tonya11en
+/*/extensions/transport_sockets/tls/cert_mappers/sni @kyessenov @tonya11en
 # proxy protocol socket extension
 /*/extensions/transport_sockets/proxy_protocol @botengyao @wez470
 # common transport socket
@@ -87,13 +91,13 @@ extensions/filters/common/original_src @klarose @mattklein123
 # UDP packet writer
 /*/extensions/udp_packet_writer/ @danzh2010 @ryantheoptimist
 # redis cluster extension
-/*/extensions/clusters/redis @msukalski @henryyyang @mattklein123
+/*/extensions/clusters/redis @msukalski @henryyyang @mattklein123 @nezdolik @dinesh-murugiah
 # reverse conn cluster extension
 /*/extensions/clusters/reverse_connection @agrawroh @basundhara-c @botengyao @yanavlasov
-/*/extensions/common/redis @msukalski @henryyyang @mattklein123
-/*/extensions/health_checkers/redis @mattklein123 @UNOWNED
-/*/extensions/filters/network/redis_proxy @mattklein123 @UNOWNED
-/*/extensions/filters/network/common/redis @mattklein123 @UNOWNED
+/*/extensions/common/redis @msukalski @henryyyang @mattklein123 @nezdolik @dinesh-murugiah
+/*/extensions/health_checkers/redis @mattklein123 @nezdolik @dinesh-murugiah
+/*/extensions/filters/network/redis_proxy @mattklein123 @nezdolik @dinesh-murugiah
+/*/extensions/filters/network/common/redis @mattklein123 @nezdolik @dinesh-murugiah
 # dynamic forward proxy
 /*/extensions/clusters/dynamic_forward_proxy @mattklein123 @ryantheoptimist
 /*/extensions/common/dynamic_forward_proxy @mattklein123 @ryantheoptimist
@@ -338,7 +342,7 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 # Header to metadata
 /*/extensions/filters/http/header_to_metadata @zuercher @JuniorHsu
 # Json to metadata
-/*/extensions/filters/http/json_to_metadata @JuniorHsu @kbaichoo
+/*/extensions/filters/http/json_to_metadata @cqi1217 @JuniorHsu @kbaichoo
 # zookeeper
 /*/extensions/filters/network/zookeeper_proxy @JuniorHsu @Winbobob @mattklein123
 # Custom response filter
@@ -382,6 +386,8 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/health_check/event_sinks/file @botengyao @yanavlasov
 # IP Geolocation
 /*/extensions/filters/http/geoip @nezdolik @ravenblackx
+# IP Geolocation Network Filter
+/*/extensions/filters/network/geoip @agrawroh @nezdolik @ravenblackx @wbpcode
 /*/extensions/geoip_providers/common @nezdolik @ravenblackx
 # Maxmind geolocation provider
 /*/extensions/geoip_providers/maxmind @nezdolik @ravenblackx
@@ -391,8 +397,10 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 # Generic proxy and related extensions
 /*/extensions/filters/network/generic_proxy/ @wbpcode @UNOWNED
 # Dynamic Modules
-/*/extensions/dynamic_modules @mattklein123 @mathetake @marc-barry
-/*/extensions/filters/http/dynamic_modules @mattklein123 @mathetake @marc-barry
+/*/extensions/dynamic_modules @mattklein123 @mathetake @wbpcode @agrawroh
+/*/extensions/filters/http/dynamic_modules @mattklein123 @mathetake @wbpcode @agrawroh
+/*/extensions/filters/network/dynamic_modules @agrawroh @mathetake @wbpcode
+/*/extensions/filters/listener/dynamic_modules @agrawroh @mathetake @wbpcode
 # Linux network namespace override
 /*/extensions/local_address_selectors/filter_state_override @tonya11en @kyessenov
 
@@ -456,3 +464,5 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /contrib/tap_sinks/ @coolg92003 @yiyibaoguo
 /contrib/peak_ewma/filters/http/ @rroblak @UNOWNED
 /contrib/peak_ewma/load_balancing_policies/ @rroblak @UNOWNED
+/contrib/kae/ @Misakokoro @UNOWNED
+/contrib/istio @kyessenov @wbpcode

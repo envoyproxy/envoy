@@ -64,7 +64,7 @@ config_env() {
     docker buildx create --use --name envoy-builder --platform "${DOCKER_PLATFORM}" --driver-opt "image=moby/buildkit:${BUILDKIT_VERSION}"
 }
 
-BUILD_TYPES=("" "-debug" "-contrib" "-contrib-debug" "-distroless" "-tools")
+BUILD_TYPES=("" "-debug" "-contrib" "-contrib-debug" "-contrib-distroless" "-distroless" "-tools")
 
 if [[ "$DOCKER_PLATFORM" == "linux/amd64" ]]; then
     BUILD_TYPES+=("-google-vrp")

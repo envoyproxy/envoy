@@ -73,7 +73,11 @@ default_envoy_build_config = repository_rule(
 
 # Bazel native C++ dependencies. For the dependencies that doesn't provide autoconf/automake builds.
 def _cc_deps():
-    external_http_archive("grpc_httpjson_transcoding")
+    external_http_archive(
+        name = "grpc_httpjson_transcoding",
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel:grpc_httpjson_transcoding.patch"],
+    )
     external_http_archive(
         name = "com_google_protoconverter",
         patch_args = ["-p1"],
@@ -158,6 +162,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_unicode_org_icu()
     _com_github_intel_ipp_crypto_crypto_mb()
     _numactl()
+    _uadk()
     _com_github_intel_qatlib()
     _com_github_intel_qatzip()
     _com_github_qat_zstd()
@@ -207,7 +212,9 @@ def envoy_dependencies(skip_targets = []):
     external_http_archive("bazel_features")
     external_http_archive("bazel_toolchains")
     external_http_archive("bazel_compdb")
-    external_http_archive("envoy_examples")
+    external_http_archive(
+        name = "envoy_examples",
+    )
     external_http_archive("envoy_toolshed")
 
     _com_github_maxmind_libmaxminddb()
@@ -392,6 +399,14 @@ def _numactl():
         build_file = "@envoy//bazel/external:numactl.BUILD",
     )
 
+def _uadk():
+    external_http_archive(
+        name = "uadk",
+        patches = ["@envoy//bazel/foreign_cc:uadk.patch"],
+        patch_args = ["-p1"],
+        build_file_content = BUILD_ALL_CONTENT,
+    )
+
 def _com_github_intel_qatlib():
     external_http_archive(
         name = "com_github_intel_qatlib",
@@ -537,7 +552,10 @@ def _com_github_nghttp2_nghttp2():
         # This patch cannot be picked up due to ABI rules. Discussion at;
         # https://github.com/nghttp2/nghttp2/pull/1395
         # https://github.com/envoyproxy/envoy/pull/8572#discussion_r334067786
-        patches = ["@envoy//bazel/foreign_cc:nghttp2.patch"],
+        patches = [
+            "@envoy//bazel/foreign_cc:nghttp2.patch",
+            "@envoy//bazel/foreign_cc:nghttp2_huffman.patch",
+        ],
     )
 
 def _com_github_msgpack_cpp():
@@ -579,8 +597,6 @@ def _com_github_skyapm_cpp2sky():
     )
     external_http_archive(
         name = "skywalking_data_collect_protocol",
-        patches = ["@envoy//bazel:skywalking_data_collect_protocol.patch"],
-        patch_args = ["-p1"],
     )
 
 def _com_github_nlohmann_json():
@@ -646,6 +662,9 @@ def _com_google_protobuf():
         "com_google_protobuf",
         patches = ["@envoy//bazel:protobuf.patch"],
         patch_args = ["-p1"],
+        repo_mapping = {
+            "@abseil-cpp": "@com_google_absl",
+        },
     )
 
 def _v8():

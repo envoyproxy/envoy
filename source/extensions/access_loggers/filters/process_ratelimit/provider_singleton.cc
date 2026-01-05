@@ -25,31 +25,39 @@ createRateLimiterImpl(const envoy::type::v3::TokenBucket& token_bucket,
 
 void RateLimiterProviderSingleton::RateLimiterWrapper::setLimiter(
     LocalRateLimiterSharedPtr limiter) {
-  ENVOY_BUG(init_target_ != nullptr,
-            "init_target_ should not be null if the limiter is set from callback");
   limiter_slot_.runOnAllThreads(
       [limiter, cancelled = cancelled_](OptRef<ThreadLocalLimiter> thread_local_limiter) {
+        // While the `ThreadLocal::TypedSlot` guarantees that the cleanup task is
+        // sequenced after this callback (so `thread_local_limiter` is valid), we
+        // check `cancelled` to avoid updating the limiter if the wrapper is
+        // being destroyed.
         if (!cancelled->load()) {
           thread_local_limiter->limiter = limiter;
         }
-      },
-      [init_target = init_target_.get(), cancelled = cancelled_]() {
-        if (!cancelled->load()) {
-          init_target->ready();
-        }
       });
+
+  // init_target_ can be null if the wrapper is initialized with an existing limiter.
+  if (init_target_ != nullptr) {
+    // The init_target_ is used to wait for the rate limiter to be set from
+    // subscription callback. Once the limiter setter lambda has been set in all
+    // worker threads queues, we can notify worker threads to continue.
+    init_target_->ready();
+  }
 }
 
 RateLimiterProviderSingleton::RateLimiterWrapperPtr RateLimiterProviderSingleton::getRateLimiter(
-    Server::Configuration::ServerFactoryContext& factory_context, absl::string_view key,
+    Server::Configuration::GenericFactoryContext& factory_context, absl::string_view key,
     const envoy::config::core::v3::ConfigSource& config_source, intptr_t setter_key,
     SetRateLimiterCb setter) {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
-  auto provider = factory_context.singletonManager().getTyped<RateLimiterProviderSingleton>(
-      SINGLETON_MANAGER_REGISTERED_NAME(local_ratelimit_provider),
-      [&factory_context, &config_source] {
-        return std::make_shared<RateLimiterProviderSingleton>(factory_context, config_source);
-      });
+  auto provider = factory_context.serverFactoryContext()
+                      .singletonManager()
+                      .getTyped<RateLimiterProviderSingleton>(
+                          SINGLETON_MANAGER_REGISTERED_NAME(local_ratelimit_provider),
+                          [&factory_context, &config_source] {
+                            return std::make_shared<RateLimiterProviderSingleton>(
+                                factory_context.serverFactoryContext(), config_source);
+                          });
 
   // Find the subscription for the given key.
   auto it = provider->subscriptions_.find(key);
@@ -70,8 +78,9 @@ RateLimiterProviderSingleton::RateLimiterWrapperPtr RateLimiterProviderSingleton
 
   // If the limiter is already created, return it.
   if (auto limiter = subscription->getLimiter()) {
-    return std::make_unique<RateLimiterWrapper>(factory_context.threadLocal(), provider,
-                                                subscription, limiter, nullptr);
+    return std::make_unique<RateLimiterWrapper>(
+        factory_context.serverFactoryContext().threadLocal(), provider, subscription, limiter,
+        nullptr);
   }
 
   auto init_target =
@@ -83,8 +92,9 @@ RateLimiterProviderSingleton::RateLimiterWrapperPtr RateLimiterProviderSingleton
 
   // Otherwise, return a wrapper with a null limiter. The limiter will be
   // set when the config is received.
-  return std::make_unique<RateLimiterWrapper>(factory_context.threadLocal(), provider, subscription,
-                                              nullptr, std::move(init_target));
+  return std::make_unique<RateLimiterWrapper>(factory_context.serverFactoryContext().threadLocal(),
+                                              provider, subscription, nullptr,
+                                              std::move(init_target));
 }
 
 std::shared_ptr<LocalRateLimiterImpl>

@@ -193,8 +193,7 @@ class EnvoyConfigurationTest {
     assertThat(resolvedTemplate).contains("canonical_suffixes");
     assertThat(resolvedTemplate).contains(".opq.com");
     assertThat(resolvedTemplate).contains(".xyz.com");
-    assertThat(resolvedTemplate).contains("connection_options: \"5RTO\"");
-    assertThat(resolvedTemplate).contains("client_connection_options: \"MPQC\"");
+    assertThat(resolvedTemplate).contains("connection_options: \"AKDU,BWRS,5RTO,EVMB\"");
     assertThat(resolvedTemplate).doesNotContain("connection_keepalive { initial_interval {")
 
     // Per Host Limits

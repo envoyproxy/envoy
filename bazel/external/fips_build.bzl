@@ -86,7 +86,7 @@ def _create_build_config(prefix, lib, arch, arch_alias):
     """Create the config_setting_group combination."""
     conditions = ["@platforms//cpu:%s" % arch]
     if lib == "libc++":
-        conditions += ["@envoy//bazel:libc++_enabled"]
+        conditions.append("@envoy//bazel:libc++_enabled")
     selects.config_setting_group(
         name = "%s_%s_%s" % (prefix, arch, lib),
         match_all = conditions,
