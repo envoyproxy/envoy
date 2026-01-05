@@ -52,6 +52,11 @@ bug_fixes:
 - area: network
   change: |
     Fixed a crash in ``Utility::getAddressWithPort`` when called with a scoped IPv6 address (e.g., ``fe80::1%eth0``).
+- area: rbac
+  change: |
+    Fixed RBAC header matcher to validate each header value individually instead of concatenating multiple header values
+    into a single string. This prevents potential bypasses when requests contain multiple values for the same header.
+    The new behavior is enabled by the runtime guard ``envoy.reloadable_features.rbac_match_headers_individually``.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
