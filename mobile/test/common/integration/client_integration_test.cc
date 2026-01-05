@@ -416,7 +416,6 @@ TEST_P(ClientIntegrationTest, HandleNetworkChangeEventsAndroid) {
 
 TEST_P(ClientIntegrationTest, Http3IdleConnectionClosedUponNetworkChangeEventsAndroid) {
   builder_.enableQuicConnectionMigration(true);
-  builder_.addRuntimeGuard("drain_pools_on_network_change", true);
   builder_.addRuntimeGuard("decouple_explicit_drain_pools_and_dns_refresh", true);
   builder_.addRuntimeGuard("mobile_use_network_observer_registry", true);
   // Refreshing DNS cache will revert the overridden lyft.com entry with actual
@@ -499,7 +498,6 @@ TEST_P(ClientIntegrationTest, Http3IdleConnectionClosedUponNetworkChangeEventsAn
 
 TEST_P(ClientIntegrationTest, Http3ConnectionMigrationUponNetworkChangeEventsAndroid) {
   builder_.enableQuicConnectionMigration(true);
-  builder_.addRuntimeGuard("drain_pools_on_network_change", true);
   builder_.addRuntimeGuard("decouple_explicit_drain_pools_and_dns_refresh", true);
   builder_.addRuntimeGuard("mobile_use_network_observer_registry", true);
   initialize();
