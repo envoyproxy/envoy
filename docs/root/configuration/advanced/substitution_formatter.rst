@@ -584,6 +584,11 @@ Current supported substitution commands include:
   Remote port of the upstream connection.
   IP addresses are the only address type with a port component.
 
+``%UPSTREAM_REMOTE_ADDRESS_ENDPOINT_ID%``
+  The endpoint ID of the Envoy internal address used to establish an upstream connection through an
+  :ref:`internal listener <config_internal_listener>`. Envoy internal addresses are the only address
+  type with an endpoint ID component.
+
 .. _config_access_log_format_upstream_transport_failure_reason:
 
 ``%UPSTREAM_TRANSPORT_FAILURE_REASON%``
@@ -725,6 +730,26 @@ Current supported substitution commands include:
   .. note::
 
     This is always the listener port even if the downstream local address has been inferred from
+    :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>`.
+
+``%DOWNSTREAM_LOCAL_ADDRESS_ENDPOINT_ID%``
+  The endpoint ID of the local Envoy internal address on a downstream connection through an
+  :ref:`internal listener <config_internal_listener>`. Envoy internal addresses are the only address
+  type with an endpoint ID component.
+
+  .. note::
+
+    This may not be the endpoint ID if the downstream local address has been inferred from the
+    :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>`.
+
+``%DOWNSTREAM_DIRECT_LOCAL_ADDRESS_ENDPOINT_ID%``
+  The endpoint ID of the direct local Envoy internal address on a downstream connection through an
+  :ref:`internal listener <config_internal_listener>`. Envoy internal addresses are the only address
+  type with an endpoint ID component.
+
+  .. note::
+
+    This is always the endpoint ID even if the downstream local address has been inferred from the
     :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>`.
 
 .. _config_access_log_format_connection_id:
