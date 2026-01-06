@@ -1692,7 +1692,11 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "dlfcn-win32-{version}",
         urls = ["https://github.com/dlfcn-win32/dlfcn-win32/archive/refs/tags/v{version}.tar.gz"],
         use_category = ["dataplane_ext"],
-        extensions = ["envoy.filters.http.dynamic_modules"],
+        extensions = [
+            "envoy.filters.http.dynamic_modules",
+            "envoy.filters.listener.dynamic_modules",
+            "envoy.filters.network.dynamic_modules",
+        ],
         release_date = "2025-03-04",
         cpe = "N/A",
         license = "MIT",
