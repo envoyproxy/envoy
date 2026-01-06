@@ -465,4 +465,4 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /contrib/peak_ewma/filters/http/ @rroblak @UNOWNED
 /contrib/peak_ewma/load_balancing_policies/ @rroblak @UNOWNED
 /contrib/kae/ @Misakokoro @UNOWNED
-/contrib/istio @kyessenov @wbpcode
+/contrib/istio @kyessenov @wbpcode @keithmattix @krinkinmu @zirain

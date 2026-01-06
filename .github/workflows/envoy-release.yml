@@ -60,14 +60,14 @@ jobs:
     steps:
     - id: appauth
       name: App auth
-      uses: envoyproxy/toolshed/gh-actions/appauth@cb93f5b06def5199bf739b007615f7a257bb0165  # v0.3.37
+      uses: envoyproxy/toolshed/actions/appauth@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
       with:
         app_id: ${{ secrets.ENVOY_CI_PUBLISH_APP_ID }}
         key: ${{ secrets.ENVOY_CI_PUBLISH_APP_KEY }}
 
     - id: checkout
       name: Checkout Envoy repository
-      uses: envoyproxy/toolshed/gh-actions/github/checkout@cb93f5b06def5199bf739b007615f7a257bb0165  # v0.3.37
+      uses: envoyproxy/toolshed/actions/github/checkout@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
       with:
         committer-name: ${{ env.COMMITTER_NAME }}
         committer-email: ${{ env.COMMITTER_EMAIL }}
@@ -88,10 +88,10 @@ jobs:
       name: Check changelog summary
     - if: ${{ inputs.author }}
       name: Validate signoff email
-      uses: envoyproxy/toolshed/gh-actions/email/validate@cb93f5b06def5199bf739b007615f7a257bb0165  # v0.3.37
+      uses: envoyproxy/toolshed/actions/email/validate@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
       with:
         email: ${{ inputs.author }}
-    - uses: envoyproxy/toolshed/gh-actions/github/run@cb93f5b06def5199bf739b007615f7a257bb0165  # v0.3.37
+    - uses: envoyproxy/toolshed/actions/github/run@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
       name: Create release
       with:
         source: |
@@ -116,7 +116,7 @@ jobs:
       name: Release version
       id: release
     - name: Create a PR
-      uses: envoyproxy/toolshed/gh-actions/github/pr@cb93f5b06def5199bf739b007615f7a257bb0165  # v0.3.37
+      uses: envoyproxy/toolshed/actions/github/pr@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
       with:
         base: ${{ github.ref_name }}
         commit: false
@@ -142,19 +142,19 @@ jobs:
     steps:
     - id: appauth
       name: App auth
-      uses: envoyproxy/toolshed/gh-actions/appauth@cb93f5b06def5199bf739b007615f7a257bb0165  # v0.3.37
+      uses: envoyproxy/toolshed/actions/appauth@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
       with:
         app_id: ${{ secrets.ENVOY_CI_PUBLISH_APP_ID }}
         key: ${{ secrets.ENVOY_CI_PUBLISH_APP_KEY }}
     - id: checkout
       name: Checkout Envoy repository
-      uses: envoyproxy/toolshed/gh-actions/github/checkout@cb93f5b06def5199bf739b007615f7a257bb0165  # v0.3.37
+      uses: envoyproxy/toolshed/actions/github/checkout@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
       with:
         committer-name: ${{ env.COMMITTER_NAME }}
         committer-email: ${{ env.COMMITTER_EMAIL }}
         strip-prefix: release/
         token: ${{ steps.appauth.outputs.token }}
-    - uses: envoyproxy/toolshed/gh-actions/github/run@cb93f5b06def5199bf739b007615f7a257bb0165  # v0.3.37
+    - uses: envoyproxy/toolshed/actions/github/run@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
       name: Re-open branch
       with:
         command: >-
@@ -169,7 +169,7 @@ jobs:
       name: Dev version
       id: dev
     - name: Create a PR
-      uses: envoyproxy/toolshed/gh-actions/github/pr@cb93f5b06def5199bf739b007615f7a257bb0165  # v0.3.37
+      uses: envoyproxy/toolshed/actions/github/pr@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
       with:
         base: ${{ github.ref_name }}
         commit: false
@@ -193,20 +193,20 @@ jobs:
     steps:
     - id: appauth
       name: App auth
-      uses: envoyproxy/toolshed/gh-actions/appauth@cb93f5b06def5199bf739b007615f7a257bb0165  # v0.3.37
+      uses: envoyproxy/toolshed/actions/appauth@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
       with:
         app_id: ${{ secrets.ENVOY_CI_PUBLISH_APP_ID }}
         key: ${{ secrets.ENVOY_CI_PUBLISH_APP_KEY }}
 
     - id: checkout
       name: Checkout Envoy repository
-      uses: envoyproxy/toolshed/gh-actions/github/checkout@cb93f5b06def5199bf739b007615f7a257bb0165  # v0.3.37
+      uses: envoyproxy/toolshed/actions/github/checkout@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
       with:
         committer-name: ${{ env.COMMITTER_NAME }}
         committer-email: ${{ env.COMMITTER_EMAIL }}
         strip-prefix: release/
         token: ${{ steps.appauth.outputs.token }}
-    - uses: envoyproxy/toolshed/gh-actions/github/run@cb93f5b06def5199bf739b007615f7a257bb0165  # v0.3.37
+    - uses: envoyproxy/toolshed/actions/github/run@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
       name: Sync version histories
       with:
         command: >-
@@ -216,7 +216,7 @@ jobs:
           --
           --signoff="${{ env.COMMITTER_NAME }} <${{ env.COMMITTER_EMAIL }}>"
     - name: Create a PR
-      uses: envoyproxy/toolshed/gh-actions/github/pr@cb93f5b06def5199bf739b007615f7a257bb0165  # v0.3.37
+      uses: envoyproxy/toolshed/actions/github/pr@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
       with:
         append-commit-message: true
         base: ${{ github.ref_name }}
@@ -243,13 +243,13 @@ jobs:
     steps:
     - id: appauth
       name: App auth
-      uses: envoyproxy/toolshed/gh-actions/appauth@cb93f5b06def5199bf739b007615f7a257bb0165  # v0.3.37
+      uses: envoyproxy/toolshed/actions/appauth@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
       with:
         app_id: ${{ secrets.ENVOY_CI_PUBLISH_APP_ID }}
         key: ${{ secrets.ENVOY_CI_PUBLISH_APP_KEY }}
     - id: checkout
       name: Checkout Envoy repository
-      uses: envoyproxy/toolshed/gh-actions/github/checkout@cb93f5b06def5199bf739b007615f7a257bb0165  # v0.3.37
+      uses: envoyproxy/toolshed/actions/github/checkout@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
       with:
         config: |
           fetch-depth: 0
@@ -279,13 +279,13 @@ jobs:
     steps:
     - id: appauth
       name: App auth
-      uses: envoyproxy/toolshed/gh-actions/appauth@cb93f5b06def5199bf739b007615f7a257bb0165  # v0.3.37
+      uses: envoyproxy/toolshed/actions/appauth@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
       with:
         app_id: ${{ secrets.ENVOY_CI_PUBLISH_APP_ID }}
         key: ${{ secrets.ENVOY_CI_PUBLISH_APP_KEY }}
 
     - name: Checkout repository
-      uses: envoyproxy/toolshed/gh-actions/github/checkout@cb93f5b06def5199bf739b007615f7a257bb0165  # v0.3.37
+      uses: envoyproxy/toolshed/actions/github/checkout@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
       with:
         committer-name: ${{ env.COMMITTER_NAME }}
         committer-email: ${{ env.COMMITTER_EMAIL }}
