@@ -41,8 +41,8 @@ newDynamicModuleHttpPerRouteConfig(const absl::string_view per_route_config_name
   RETURN_IF_NOT_OK_REF(destroy.status());
 
   const void* filter_config_envoy_ptr =
-      (*constructor.value())(per_route_config_name.data(), per_route_config_name.size(),
-                             filter_config.data(), filter_config.size());
+      (*constructor.value())({per_route_config_name.data(), per_route_config_name.size()},
+                             {filter_config.data(), filter_config.size()});
   if (filter_config_envoy_ptr == nullptr) {
     return absl::InvalidArgumentError("Failed to initialize per-route dynamic module");
   }
@@ -145,9 +145,9 @@ absl::StatusOr<DynamicModuleHttpFilterConfigSharedPtr> newDynamicModuleHttpFilte
   auto config = std::make_shared<DynamicModuleHttpFilterConfig>(
       filter_name, filter_config, std::move(dynamic_module), stats_scope, context);
 
-  const void* filter_config_envoy_ptr =
-      (*constructor.value())(static_cast<void*>(config.get()), filter_name.data(),
-                             filter_name.size(), filter_config.data(), filter_config.size());
+  const void* filter_config_envoy_ptr = (*constructor.value())(
+      static_cast<void*>(config.get()), {filter_name.data(), filter_name.size()},
+      {filter_config.data(), filter_config.size()});
   if (filter_config_envoy_ptr == nullptr) {
     return absl::InvalidArgumentError("Failed to initialize dynamic module");
   }

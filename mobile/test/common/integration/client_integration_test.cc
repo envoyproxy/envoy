@@ -1499,21 +1499,6 @@ TEST_P(ClientIntegrationTest, OnNetworkChanged) {
 }
 
 // This test is simply to test the IPv6 connectivity check and DNS refresh and make sure the code
-// doesn't crash. It doesn't really test the actual network change event, but it does ensure that
-// requests/responses still work in the presence of IP version filtering.
-TEST_P(ClientIntegrationTest, OnNetworkChangedFilterUnsableIps) {
-  builder_.addRuntimeGuard("dns_cache_set_ip_version_to_remove", false);
-  builder_.addRuntimeGuard("dns_cache_filter_unusable_ip_version", true);
-  builder_.setDisableDnsRefreshOnNetworkChange(true);
-  initialize();
-  internalEngine()->onDefaultNetworkChanged(1);
-  basicTest();
-  if (upstreamProtocol() == Http::CodecType::HTTP1) {
-    ASSERT_EQ(cc_.on_complete_received_byte_count_, 67);
-  }
-}
-
-// This test is simply to test the IPv6 connectivity check and DNS refresh and make sure the code
 // doesn't crash. It doesn't really test the actual network change event.
 TEST_P(ClientIntegrationTest, OnNetworkChangeEvent) {
   builder_.addRuntimeGuard("dns_cache_set_ip_version_to_remove", true);

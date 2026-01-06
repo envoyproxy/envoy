@@ -73,6 +73,10 @@ void SdsApi::onWatchUpdate() {
       resolveSecret(files);
       THROW_IF_NOT_OK(update_callback_manager_.runCallbacks());
       files_hash_ = new_hash;
+      secret_data_.last_updated_ = time_source_.systemTime();
+      // Signal initialization complete. This should be safe to call multiple times and is
+      // necessary when we are recovering from initial load failure.
+      init_target_.ready();
     }
   }
   END_TRY
@@ -102,6 +106,9 @@ absl::Status SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef
     validateConfig(secret);
     secret_hash_ = new_hash;
     setSecret(secret);
+    // Update version_info from xDS before attempting file loads. This would ensure that version
+    // tracking is available even if files don't exist yet.
+    secret_data_.version_info_ = version_info;
 
     // Set up per-file watchers before loadFiles() so that if loadFiles() fails, the watches
     // are still setup for the next auto-recovery when files appear later.
@@ -133,9 +140,9 @@ absl::Status SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef
     files_hash_ = getHashForFiles(files);
     resolveSecret(files);
     THROW_IF_NOT_OK(update_callback_manager_.runCallbacks());
+    // Update last_updated only after successful file load and callbacks.
+    secret_data_.last_updated_ = time_source_.systemTime();
   }
-  secret_data_.last_updated_ = time_source_.systemTime();
-  secret_data_.version_info_ = version_info;
   init_target_.ready();
   return absl::OkStatus();
 }

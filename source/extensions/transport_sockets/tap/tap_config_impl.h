@@ -66,7 +66,6 @@ private:
   // Add sequence number to allow the receiver to reconstruct byte order and
   // determine completeness, similar to TCP sequence numbers.
   uint64_t seq_num{};
-  static constexpr uint64_t MaxSeqNum = std::numeric_limits<uint64_t>::max();
   SocketTapConfigSharedPtr config_;
   Extensions::Common::Tap::PerTapSinkHandleManagerPtr sink_handle_;
   const Network::Connection& connection_;

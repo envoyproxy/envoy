@@ -1,12 +1,15 @@
 #include "envoy/extensions/filters/http/proto_api_scrubber/v3/config.pb.h"
 #include "envoy/extensions/matching/common_inputs/network/v3/network_inputs.pb.h"
 #include "envoy/grpc/status.h"
+#include "envoy/stats/histogram.h"
+#include "envoy/stats/stats.h"
 #include "envoy/type/matcher/v3/http_inputs.pb.h"
 
 #include "source/common/router/string_accessor_impl.h"
 #include "source/extensions/filters/http/proto_api_scrubber/scrubbing_util_lib/field_checker.h"
 
 #include "test/extensions/filters/http/grpc_field_extraction/message_converter/message_converter_test_lib.h"
+#include "test/extensions/filters/http/proto_api_scrubber/scrubber_test.pb.h"
 #include "test/integration/http_protocol_integration.h"
 #include "test/proto/apikeys.pb.h"
 #include "test/test_common/registry.h"
@@ -24,12 +27,19 @@ namespace HttpFilters {
 namespace ProtoApiScrubber {
 namespace {
 
+namespace scrubber_test = test::extensions::filters::http::proto_api_scrubber;
+
 using envoy::extensions::filters::http::proto_api_scrubber::v3::ProtoApiScrubberConfig;
 using envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter;
 using ::Envoy::Extensions::HttpFilters::GrpcFieldExtraction::checkSerializedData;
 
 std::string apikeysDescriptorPath() {
   return TestEnvironment::runfilesPath("test/proto/apikeys.descriptor");
+}
+
+std::string scrubberTestDescriptorPath() {
+  return TestEnvironment::runfilesPath(
+      "test/extensions/filters/http/proto_api_scrubber/scrubber_test.descriptor");
 }
 
 const std::string kCreateApiKeyMethod = "/apikeys.ApiKeys/CreateApiKey";
@@ -138,26 +148,26 @@ public:
     return predicate;
   }
 
-  // Helper to build the configuration with a generic predicate.
-  std::string
-  getFilterConfig(const std::string& descriptor_path, const std::string& method_name = "",
-                  const std::string& field_to_scrub = "",
-                  RestrictionType type = RestrictionType::Request,
-                  const xds::type::matcher::v3::Matcher::MatcherList::Predicate& match_predicate =
-                      buildCelPredicate("true")) {
-    std::string full_config_text;
-    if (method_name.empty() || field_to_scrub.empty()) {
-      full_config_text = fmt::format(R"pb(
-      filtering_mode: OVERRIDE
-      descriptor_set {{ data_source {{ filename: "{0}" }} }}
-    )pb",
-                                     descriptor_path);
-    } else {
-      std::string restriction_key = (type == RestrictionType::Request)
-                                        ? "request_field_restrictions"
-                                        : "response_field_restrictions";
+  // Helper to build config with multiple fields to scrub.
+  std::string getMultiFieldFilterConfig(
+      const std::string& descriptor_path, const std::string& method_name,
+      const std::vector<std::string>& fields_to_scrub,
+      RestrictionType type = RestrictionType::Request,
+      const xds::type::matcher::v3::Matcher::MatcherList::Predicate& match_predicate =
+          buildCelPredicate("true")) {
 
-      // Build the Matcher
+    ProtoApiScrubberConfig config;
+    config.set_filtering_mode(ProtoApiScrubberConfig::OVERRIDE);
+    config.mutable_descriptor_set()->mutable_data_source()->set_filename(descriptor_path);
+
+    if (!method_name.empty() && !fields_to_scrub.empty()) {
+      auto* method_restrictions = config.mutable_restrictions()->mutable_method_restrictions();
+      auto& method_config = (*method_restrictions)[method_name];
+      auto* restrictions_map = (type == RestrictionType::Request)
+                                   ? method_config.mutable_request_field_restrictions()
+                                   : method_config.mutable_response_field_restrictions();
+
+      // Create the Matcher object once.
       xds::type::matcher::v3::Matcher matcher_proto;
       auto* matcher_entry = matcher_proto.mutable_matcher_list()->add_matchers();
       *matcher_entry->mutable_predicate() = match_predicate;
@@ -166,40 +176,98 @@ public:
           remove_action);
       matcher_entry->mutable_on_match()->mutable_action()->set_name("remove_field");
 
-      std::string matcher_text;
-      Protobuf::TextFormat::PrintToString(matcher_proto, &matcher_text);
-      full_config_text = fmt::format(R"pb(
-      filtering_mode: OVERRIDE
-      descriptor_set {{
-        data_source {{ filename: "{0}" }}
-      }}
-      restrictions {{
-        method_restrictions {{
-          key: "{1}"
-          value {{
-            {2} {{
-              key: "{3}"
-              value {{
-                matcher {{ {4} }}
-              }}
-            }}
-          }}
-        }}
-      }}
-    )pb",
-                                     descriptor_path, // {0}
-                                     method_name,     // {1}
-                                     restriction_key, // {2}
-                                     field_to_scrub,  // {3}
-                                     matcher_text     // {4} Inject the Generic Matcher
-      );
+      // Apply to all requested fields.
+      for (const auto& field : fields_to_scrub) {
+        *(*restrictions_map)[field].mutable_matcher() = matcher_proto;
+      }
     }
 
-    ProtoApiScrubberConfig filter_config_proto;
-    Protobuf::TextFormat::ParseFromString(full_config_text, &filter_config_proto);
+    Protobuf::Any any_config;
+    any_config.PackFrom(config);
+    return fmt::format(R"EOF(
+    name: envoy.filters.http.proto_api_scrubber
+    typed_config: {})EOF",
+                       MessageUtil::getJsonStringFromMessageOrError(any_config));
+  }
+
+  // Helper to build the configuration with a generic predicate.
+  std::string
+  getFilterConfig(const std::string& descriptor_path, const std::string& method_name = "",
+                  const std::string& field_to_scrub = "",
+                  RestrictionType type = RestrictionType::Request,
+                  const xds::type::matcher::v3::Matcher::MatcherList::Predicate& match_predicate =
+                      buildCelPredicate("true")) {
+    std::vector<std::string> fields;
+    if (!field_to_scrub.empty()) {
+      fields.push_back(field_to_scrub);
+    }
+    return getMultiFieldFilterConfig(descriptor_path, method_name, fields, type, match_predicate);
+  }
+
+  // Helper to build config with message-level field restrictions.
+  std::string getMessageLevelFilterConfig(
+      const std::string& descriptor_path, const std::string& message_type,
+      const std::string& field_to_scrub,
+      const xds::type::matcher::v3::Matcher::MatcherList::Predicate& match_predicate =
+          buildCelPredicate("true")) {
+
+    ProtoApiScrubberConfig config;
+    config.set_filtering_mode(ProtoApiScrubberConfig::OVERRIDE);
+    config.mutable_descriptor_set()->mutable_data_source()->set_filename(descriptor_path);
+
+    if (!message_type.empty() && !field_to_scrub.empty()) {
+      auto* message_restrictions = config.mutable_restrictions()->mutable_message_restrictions();
+      auto& message_config = (*message_restrictions)[message_type];
+
+      // Create the Matcher object.
+      xds::type::matcher::v3::Matcher matcher_proto;
+      auto* matcher_entry = matcher_proto.mutable_matcher_list()->add_matchers();
+      *matcher_entry->mutable_predicate() = match_predicate;
+      envoy::extensions::filters::http::proto_api_scrubber::v3::RemoveFieldAction remove_action;
+      matcher_entry->mutable_on_match()->mutable_action()->mutable_typed_config()->PackFrom(
+          remove_action);
+      matcher_entry->mutable_on_match()->mutable_action()->set_name("remove_field");
+
+      // Apply to the specific field in the message.
+      *(*message_config.mutable_field_restrictions())[field_to_scrub].mutable_matcher() =
+          matcher_proto;
+    }
 
     Protobuf::Any any_config;
-    any_config.PackFrom(filter_config_proto);
+    any_config.PackFrom(config);
+    return fmt::format(R"EOF(
+    name: envoy.filters.http.proto_api_scrubber
+    typed_config: {})EOF",
+                       MessageUtil::getJsonStringFromMessageOrError(any_config));
+  }
+
+  // Helper to build config with global message-level restrictions.
+  // This targets: restrictions.message_restrictions[type].config.matcher
+  std::string getGlobalTypeFilterConfig(
+      const std::string& descriptor_path, const std::string& type_name,
+      const xds::type::matcher::v3::Matcher::MatcherList::Predicate& match_predicate =
+          buildCelPredicate("true")) {
+
+    ProtoApiScrubberConfig config;
+    config.set_filtering_mode(ProtoApiScrubberConfig::OVERRIDE);
+    config.mutable_descriptor_set()->mutable_data_source()->set_filename(descriptor_path);
+
+    auto* message_restrictions = config.mutable_restrictions()->mutable_message_restrictions();
+    auto& message_config = (*message_restrictions)[type_name];
+
+    // Create the Matcher object for the Type itself.
+    xds::type::matcher::v3::Matcher matcher_proto;
+    auto* matcher_entry = matcher_proto.mutable_matcher_list()->add_matchers();
+    *matcher_entry->mutable_predicate() = match_predicate;
+    envoy::extensions::filters::http::proto_api_scrubber::v3::RemoveFieldAction remove_action;
+    matcher_entry->mutable_on_match()->mutable_action()->mutable_typed_config()->PackFrom(
+        remove_action);
+    matcher_entry->mutable_on_match()->mutable_action()->set_name("remove_field");
+
+    *message_config.mutable_config()->mutable_matcher() = matcher_proto;
+
+    Protobuf::Any any_config;
+    any_config.PackFrom(config);
     return fmt::format(R"EOF(
     name: envoy.filters.http.proto_api_scrubber
     typed_config: {})EOF",
@@ -256,12 +324,435 @@ apikeys::CreateApiKeyRequest makeCreateApiKeyRequest(absl::string_view pb = R"pb
   return request;
 }
 
+// Consolidated Map Scrubbing Test covering all map scenarios.
+TEST_P(ProtoApiScrubberIntegrationTest, ScrubAllMapTypes) {
+  config_helper_.prependFilter(getMultiFieldFilterConfig(
+      scrubberTestDescriptorPath(),
+      "/test.extensions.filters.http.proto_api_scrubber.ScrubberTestService/Scrub",
+      {
+          "tags.value",                    // String to String map: value should be scrubbed.
+          "int_map.value",                 // String to Int map: value should be scrubbed.
+                                           // String to Int map: value kept (Implicit).
+          "deep_map.value.secret",         // String to Object map: partial field scrubbed.
+          "object_map.value.secret",       // String to Object map: all fields scrubbed (A).
+          "object_map.value.public_field", // String to Object map: all fields scrubbed (B).
+          "object_map.value.other_info",   // String to Object map: all fields scrubbed (C).
+          "full_scrub_map.value",          // String to Object map: object itself scrubbed.
+          "deep_map.value.internal_details.deep_secret" // 2-Level Deep Nesting in Map.
+      },
+      RestrictionType::Request, buildCelPredicate("true")));
+
+  initialize();
+
+  scrubber_test::ScrubRequest request;
+
+  // String to String (Scrubbed).
+  (*request.mutable_tags())["key_scrub"] = "secret";
+
+  // String to Int (Scrubbed).
+  (*request.mutable_int_map())["key_scrub"] = 123;
+
+  // String to Int (Kept).
+  (*request.mutable_safe_int_map())["key_safe"] = 456;
+
+  // String to Object (Partial Scrub).
+  // deep_map rules only target "secret". "public_field" and "other_info" are untouched.
+  auto& partial = (*request.mutable_deep_map())["k_partial"];
+  partial.set_secret("sensitive");
+  partial.set_public_field("safe");
+
+  // String to Object (All Fields Scrubbed -> Empty Message).
+  // object_map rules target ALL fields ("secret", "public_field", "other_info").
+  // The 'value' message itself is kept, but it becomes empty.
+  auto& all_fields = (*request.mutable_object_map())["k_empty_res"];
+  all_fields.set_secret("sensitive");
+  all_fields.set_public_field("sensitive_too");
+  all_fields.set_other_info("info");
+
+  // String to Object (Object Scrubbed).
+  // full_scrub_map rule targets "value" directly.
+  auto& obj_scrub = (*request.mutable_full_scrub_map())["k_object"];
+  obj_scrub.set_secret("sensitive");
+
+  // 2-Level Deep Nesting (Map Value -> Message -> Message -> Field).
+  // deep_map.value.internal_details.deep_secret is scrubbed.
+  // deep_map.value.internal_details.deep_public is kept.
+  auto& deep_nested = (*request.mutable_deep_map())["k_deep_nested"];
+  deep_nested.mutable_internal_details()->set_deep_secret("secret_cvv");
+  deep_nested.mutable_internal_details()->set_deep_public("public_name");
+
+  auto response = sendGrpcRequest(
+      request, "/test.extensions.filters.http.proto_api_scrubber.ScrubberTestService/Scrub");
+  waitForNextUpstreamRequest();
+
+  // Verification.
+  scrubber_test::ScrubRequest expected = request;
+
+  // String to String: Value scrubbed -> Entry Removed.
+  expected.mutable_tags()->erase("key_scrub");
+
+  // String to Int: Value scrubbed -> Entry Removed.
+  expected.mutable_int_map()->erase("key_scrub");
+
+  // String to Int: Kept. (No change).
+
+  // Partial Scrub: 'secret' removed. 'public_field' remains.
+  auto& partial_exp = (*expected.mutable_deep_map())["k_partial"];
+  partial_exp.set_secret("");
+  // public_field remains "safe".
+
+  // All Fields Scrubbed (Effectively).
+  // All 3 fields scrubbed.
+  // Result: Key + Empty Message -> Entry KEPT.
+  auto& all_fields_exp = (*expected.mutable_object_map())["k_empty_res"];
+  all_fields_exp.set_secret("");
+  all_fields_exp.set_public_field("");
+  all_fields_exp.set_other_info("");
+
+  // Object Scrubbed: Value message excluded -> Entry REMOVED.
+  expected.mutable_full_scrub_map()->erase("k_object");
+
+  // 2-Level Deep Nesting Verification.
+  auto& deep_nested_exp = (*expected.mutable_deep_map())["k_deep_nested"];
+  deep_nested_exp.mutable_internal_details()->set_deep_secret(""); // Scrubbed
+  // deep_public remains "public_name"
+
+  Buffer::OwnedImpl data;
+  data.add(upstream_request_->body());
+  checkSerializedData<scrubber_test::ScrubRequest>(data, {expected});
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+}
+
+// Tests that fields inside a google.protobuf.Any are scrubbed using message-level restrictions.
+TEST_P(ProtoApiScrubberIntegrationTest, ScrubAnyField_MessageLevel) {
+  std::string sensitive_type = "test.extensions.filters.http.proto_api_scrubber.SensitiveMessage";
+  // Configure to scrub "secret" field whenever "SensitiveMessage" is encountered.
+  config_helper_.prependFilter(
+      getMessageLevelFilterConfig(scrubberTestDescriptorPath(), sensitive_type, "secret"));
+
+  initialize();
+
+  // Create request with Any field packed with SensitiveMessage
+  scrubber_test::ScrubRequest request;
+  scrubber_test::SensitiveMessage sensitive;
+  sensitive.set_secret("my_secret");
+  sensitive.set_public_field("public_data");
+  request.mutable_any_field()->PackFrom(sensitive);
+
+  auto response = sendGrpcRequest(
+      request, "/test.extensions.filters.http.proto_api_scrubber.ScrubberTestService/Scrub");
+  waitForNextUpstreamRequest();
+
+  // Construct expected request
+  scrubber_test::ScrubRequest expected_request = request;
+  scrubber_test::SensitiveMessage expected_sensitive;
+  expected_sensitive.set_public_field("public_data");
+  // "secret" is NOT set (scrubbed)
+  expected_request.mutable_any_field()->PackFrom(expected_sensitive);
+
+  Buffer::OwnedImpl data;
+  data.add(upstream_request_->body());
+  checkSerializedData<scrubber_test::ScrubRequest>(data, {expected_request});
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+}
+
+// Tests nested/recursive Any scrubbing.
+// Structure: Any -> SensitiveMessage (outer) -> Nested Any -> SensitiveMessage (inner).
+// Rule: Scrub 'secret' from SensitiveMessage.
+TEST_P(ProtoApiScrubberIntegrationTest, ScrubNestedAny_DeepRecursion) {
+  std::string sensitive_type = "test.extensions.filters.http.proto_api_scrubber.SensitiveMessage";
+  // Configure to scrub "secret" field whenever "SensitiveMessage" is encountered.
+  config_helper_.prependFilter(
+      getMessageLevelFilterConfig(scrubberTestDescriptorPath(), sensitive_type, "secret"));
+
+  initialize();
+
+  // Create Inner SensitiveMessage.
+  scrubber_test::SensitiveMessage inner_sensitive;
+  inner_sensitive.set_secret("inner_secret"); // Should be scrubbed.
+  inner_sensitive.set_public_field("inner_public");
+
+  // Create Outer SensitiveMessage containing Inner in 'nested_any'.
+  scrubber_test::SensitiveMessage outer_sensitive;
+  outer_sensitive.set_secret("outer_secret"); // Should be scrubbed.
+  outer_sensitive.set_public_field("outer_public");
+  outer_sensitive.mutable_nested_any()->PackFrom(inner_sensitive);
+
+  // Create Request containing Outer in 'any_field'.
+  scrubber_test::ScrubRequest request;
+  request.mutable_any_field()->PackFrom(outer_sensitive);
+
+  auto response = sendGrpcRequest(
+      request, "/test.extensions.filters.http.proto_api_scrubber.ScrubberTestService/Scrub");
+  waitForNextUpstreamRequest();
+
+  // Construct Expected Output.
+  scrubber_test::SensitiveMessage expected_inner;
+  expected_inner.set_public_field("inner_public");
+  // secret cleared.
+
+  scrubber_test::SensitiveMessage expected_outer;
+  expected_outer.set_public_field("outer_public");
+  // secret cleared.
+  expected_outer.mutable_nested_any()->PackFrom(expected_inner);
+
+  scrubber_test::ScrubRequest expected_request;
+  expected_request.mutable_any_field()->PackFrom(expected_outer);
+
+  Buffer::OwnedImpl data;
+  data.add(upstream_request_->body());
+  checkSerializedData<scrubber_test::ScrubRequest>(data, {expected_request});
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+}
+
+// Tests path collision: Top level field (scrubbed) vs Nested field in Any (kept).
+// Both have field name "duplicate_field".
+// Method Restriction: Scrub "duplicate_field" (This applies to the top-level field).
+// Message Restriction: Keep "duplicate_field" in SensitiveMessage (inside Any).
+TEST_P(ProtoApiScrubberIntegrationTest, ScrubPathCollision_TopLevelVsAny) {
+  ProtoApiScrubberConfig config;
+  config.set_filtering_mode(ProtoApiScrubberConfig::OVERRIDE);
+  config.mutable_descriptor_set()->mutable_data_source()->set_filename(
+      scrubberTestDescriptorPath());
+
+  std::string method_name =
+      "/test.extensions.filters.http.proto_api_scrubber.ScrubberTestService/Scrub";
+
+  // Method Restriction: Scrub "duplicate_field".
+  // This rule matches the path "duplicate_field" from the root.
+  // When inside Any, the path resets to "duplicate_field" as well.
+  // So we expect this to potentially match BOTH if we don't have a specific message rule override.
+  auto* method_restrictions = config.mutable_restrictions()->mutable_method_restrictions();
+  auto& method_config = (*method_restrictions)[method_name];
+  auto* req_map = method_config.mutable_request_field_restrictions();
+
+  // Matcher for TRUE (Scrub).
+  xds::type::matcher::v3::Matcher scrub_matcher;
+  {
+    auto* entry = scrub_matcher.mutable_matcher_list()->add_matchers();
+    *entry->mutable_predicate() = buildCelPredicate("true");
+    envoy::extensions::filters::http::proto_api_scrubber::v3::RemoveFieldAction remove_action;
+    entry->mutable_on_match()->mutable_action()->mutable_typed_config()->PackFrom(remove_action);
+    entry->mutable_on_match()->mutable_action()->set_name("remove_field");
+  }
+  *(*req_map)["duplicate_field"].mutable_matcher() = scrub_matcher;
+
+  // Message Restriction: Keep "duplicate_field" in SensitiveMessage.
+  // We define a rule that does NOT return RemoveFieldAction.
+  // A matcher with predicate "false" returns no action, which implies "Keep".
+  std::string sensitive_type = "test.extensions.filters.http.proto_api_scrubber.SensitiveMessage";
+  auto* message_restrictions = config.mutable_restrictions()->mutable_message_restrictions();
+  auto& message_config = (*message_restrictions)[sensitive_type];
+
+  xds::type::matcher::v3::Matcher keep_matcher;
+  {
+    auto* entry = keep_matcher.mutable_matcher_list()->add_matchers();
+    *entry->mutable_predicate() = buildCelPredicate("false"); // Never matches -> No action -> Keep
+    envoy::extensions::filters::http::proto_api_scrubber::v3::RemoveFieldAction remove_action;
+    entry->mutable_on_match()->mutable_action()->mutable_typed_config()->PackFrom(remove_action);
+    entry->mutable_on_match()->mutable_action()->set_name("keep_field");
+  }
+  *(*message_config.mutable_field_restrictions())["duplicate_field"].mutable_matcher() =
+      keep_matcher;
+
+  Protobuf::Any any_config;
+  any_config.PackFrom(config);
+  std::string yaml_config = fmt::format(R"EOF(
+    name: envoy.filters.http.proto_api_scrubber
+    typed_config: {})EOF",
+                                        MessageUtil::getJsonStringFromMessageOrError(any_config));
+
+  config_helper_.prependFilter(yaml_config);
+
+  initialize();
+
+  // Construct Request.
+  scrubber_test::ScrubRequest request;
+  request.set_duplicate_field("top_level_value"); // Should be scrubbed.
+
+  scrubber_test::SensitiveMessage sensitive;
+  sensitive.set_duplicate_field("nested_value"); // Should be kept.
+  request.mutable_any_field()->PackFrom(sensitive);
+
+  auto response = sendGrpcRequest(request, method_name);
+  waitForNextUpstreamRequest();
+
+  // Verification.
+  scrubber_test::ScrubRequest expected_request = request;
+  expected_request.set_duplicate_field(""); // Top level scrubbed.
+
+  // Nested kept (SensitiveMessage.duplicate_field remains "nested_value").
+  // (Note: `expected_request` copied `request`, so it already has the populated Any field).
+
+  Buffer::OwnedImpl data;
+  data.add(upstream_request_->body());
+  checkSerializedData<scrubber_test::ScrubRequest>(data, {expected_request});
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+}
+
+// Tests recursive scrubbing of messages.
+// Recursive path: root -> recursive_child -> recursive_child.
+// Rule: Scrub 'secret' from SensitiveMessage.
+TEST_P(ProtoApiScrubberIntegrationTest, ScrubRecursiveMessage) {
+  std::string sensitive_type = "test.extensions.filters.http.proto_api_scrubber.SensitiveMessage";
+  // Rule: Scrub 'secret' in 'SensitiveMessage'.
+  config_helper_.prependFilter(
+      getMessageLevelFilterConfig(scrubberTestDescriptorPath(), sensitive_type, "secret"));
+
+  initialize();
+
+  scrubber_test::ScrubRequest request;
+
+  // Level 1.
+  auto& l1 = (*request.mutable_deep_map())["root"];
+  l1.set_secret("secret_1");
+  l1.set_public_field("public_1");
+
+  // Level 2.
+  auto* l2 = l1.mutable_recursive_child();
+  l2->set_secret("secret_2");
+  l2->set_public_field("public_2");
+
+  // Level 3.
+  auto* l3 = l2->mutable_recursive_child();
+  l3->set_secret("secret_3");
+  l3->set_public_field("public_3");
+
+  auto response = sendGrpcRequest(
+      request, "/test.extensions.filters.http.proto_api_scrubber.ScrubberTestService/Scrub");
+  waitForNextUpstreamRequest();
+
+  // Verification.
+  scrubber_test::ScrubRequest expected = request;
+
+  // L1 Scrubbed.
+  (*expected.mutable_deep_map())["root"].set_secret("");
+
+  // L2 Scrubbed.
+  (*expected.mutable_deep_map())["root"].mutable_recursive_child()->set_secret("");
+
+  // L3 Scrubbed.
+  (*expected.mutable_deep_map())["root"]
+      .mutable_recursive_child()
+      ->mutable_recursive_child()
+      ->set_secret("");
+
+  // Check.
+  Buffer::OwnedImpl data;
+  data.add(upstream_request_->body());
+  checkSerializedData<scrubber_test::ScrubRequest>(data, {expected});
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+}
+
+// Tests that a message type is scrubbed globally (standard field).
+// Rule: Scrub 'SensitiveMessage' everywhere.
+TEST_P(ProtoApiScrubberIntegrationTest, ScrubGlobalMessageType) {
+  std::string sensitive_type = "test.extensions.filters.http.proto_api_scrubber.SensitiveMessage";
+  config_helper_.prependFilter(
+      getGlobalTypeFilterConfig(scrubberTestDescriptorPath(), sensitive_type));
+
+  initialize();
+
+  scrubber_test::ScrubRequest request;
+  // Field 'object_map' contains SensitiveMessage as value.
+  auto& sensitive = (*request.mutable_object_map())["key"];
+  sensitive.set_secret("data");
+
+  auto response = sendGrpcRequest(
+      request, "/test.extensions.filters.http.proto_api_scrubber.ScrubberTestService/Scrub");
+  waitForNextUpstreamRequest();
+
+  // The field 'object_map["key"]' is of type SensitiveMessage.
+  // Since the type is restricted globally, the field itself should be removed.
+  scrubber_test::ScrubRequest expected = request;
+  expected.mutable_object_map()->erase("key");
+
+  Buffer::OwnedImpl data;
+  data.add(upstream_request_->body());
+  checkSerializedData<scrubber_test::ScrubRequest>(data, {expected});
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+}
+
+// Tests that a message type is scrubbed globally when inside Any.
+// Rule: Scrub 'SensitiveMessage' everywhere.
+TEST_P(ProtoApiScrubberIntegrationTest, ScrubGlobalMessageType_InsideAny) {
+  std::string sensitive_type = "test.extensions.filters.http.proto_api_scrubber.SensitiveMessage";
+  config_helper_.prependFilter(
+      getGlobalTypeFilterConfig(scrubberTestDescriptorPath(), sensitive_type));
+
+  initialize();
+
+  scrubber_test::ScrubRequest request;
+  scrubber_test::SensitiveMessage sensitive;
+  sensitive.set_secret("data");
+  request.mutable_any_field()->PackFrom(sensitive);
+
+  auto response = sendGrpcRequest(
+      request, "/test.extensions.filters.http.proto_api_scrubber.ScrubberTestService/Scrub");
+  waitForNextUpstreamRequest();
+
+  // The Any field contains a restricted type. The filter should completely remove the Any field
+  // content. (Implementation detail: The ProtoScrubber usually clears the field if CheckType
+  // returns Exclude).
+  scrubber_test::ScrubRequest expected = request;
+  expected.clear_any_field();
+
+  Buffer::OwnedImpl data;
+  data.add(upstream_request_->body());
+  checkSerializedData<scrubber_test::ScrubRequest>(data, {expected});
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+}
+
+// Re-implementing a simple Message Type Global Scrub for Integration consistency
+// since Enum integration relies on proto changes.
+TEST_P(ProtoApiScrubberIntegrationTest, ScrubGlobalMessageType_NestedDeep) {
+  std::string inner_type = "test.extensions.filters.http.proto_api_scrubber.InnerDetails";
+  config_helper_.prependFilter(getGlobalTypeFilterConfig(scrubberTestDescriptorPath(), inner_type));
+
+  initialize();
+
+  scrubber_test::ScrubRequest request;
+  auto& deep = (*request.mutable_deep_map())["k"];
+  // InnerDetails is field 'internal_details' inside SensitiveMessage.
+  deep.mutable_internal_details()->set_deep_secret("secret");
+
+  auto response = sendGrpcRequest(
+      request, "/test.extensions.filters.http.proto_api_scrubber.ScrubberTestService/Scrub");
+  waitForNextUpstreamRequest();
+
+  // The 'internal_details' field is of type InnerDetails.
+  // It should be removed.
+  scrubber_test::ScrubRequest expected = request;
+  (*expected.mutable_deep_map())["k"].clear_internal_details();
+
+  Buffer::OwnedImpl data;
+  data.add(upstream_request_->body());
+  checkSerializedData<scrubber_test::ScrubRequest>(data, {expected});
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+}
+
 // ============================================================================
-// TEST GROUP 1: PASS THROUGH
+// TEST GROUP 1: PASS THROUGH & METRICS
 // ============================================================================
 
 // Tests that the simple non-streaming request passes through without modification if there are no
-// restrictions configured in the filter config.
+// restrictions configured in the filter config. Also verifies stats.
 TEST_P(ProtoApiScrubberIntegrationTest, UnaryRequestPassesThrough) {
   config_helper_.prependFilter(getFilterConfig(apikeysDescriptorPath()));
   initialize();
@@ -280,6 +771,9 @@ TEST_P(ProtoApiScrubberIntegrationTest, UnaryRequestPassesThrough) {
 
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   ASSERT_TRUE(response->waitForEndStream());
+
+  // Verify Stats
+  test_server_->waitForCounterGe("proto_api_scrubber.total_requests_checked", 1);
 }
 
 // Tests that the streaming request passes through without modification if there are no restrictions
@@ -528,7 +1022,7 @@ TEST_P(ProtoApiScrubberIntegrationTest, ScrubNestedField_StringMatcher_FilterSta
 }
 
 // ============================================================================
-// TEST GROUP 3: VALIDATION & REJECTION
+// TEST GROUP 3: VALIDATION, REJECTION & METRICS
 // ============================================================================
 
 // Tests that the request is rejected if the called gRPC method doesn't exist in the descriptor
@@ -547,6 +1041,9 @@ TEST_P(ProtoApiScrubberIntegrationTest, RejectsMethodNotInDescriptor) {
   auto grpc_status = response->headers().GrpcStatus();
   ASSERT_TRUE(grpc_status != nullptr);
   EXPECT_EQ("3", grpc_status->value().getStringView()); // 3 = Invalid Argument
+
+  // Verify Stats: Scrubbing failed because method not found implies no type info found.
+  test_server_->waitForCounterGe("proto_api_scrubber.request_scrubbing_failed", 1);
 }
 
 // Tests that the request is rejected if the gRPC `:path` header is in invalid format.
@@ -568,6 +1065,59 @@ TEST_P(ProtoApiScrubberIntegrationTest, RejectsInvalidPathFormat) {
   auto grpc_status = response->headers().GrpcStatus();
   ASSERT_TRUE(grpc_status != nullptr);
   EXPECT_EQ("3", grpc_status->value().getStringView()); // 3 = Invalid Argument
+
+  // Verify Stats for invalid method name.
+  test_server_->waitForCounterGe("proto_api_scrubber.invalid_method_name", 1);
+}
+
+// Tests that the request is rejected if a method-level block rule matches.
+TEST_P(ProtoApiScrubberIntegrationTest, RejectsBlockedMethod) {
+  // Construct the config programmatically.
+  ProtoApiScrubberConfig config;
+  config.set_filtering_mode(ProtoApiScrubberConfig::OVERRIDE);
+  config.mutable_descriptor_set()->mutable_data_source()->set_filename(apikeysDescriptorPath());
+
+  // Create the CEL matcher for "true" (always match -> block).
+  auto matcher_predicate = buildCelPredicate("true");
+
+  // Create the full Matcher object.
+  xds::type::matcher::v3::Matcher matcher;
+  auto* matcher_entry = matcher.mutable_matcher_list()->add_matchers();
+  *matcher_entry->mutable_predicate() = matcher_predicate;
+
+  // Use RemoveFieldAction as a placeholder action since the logic only checks for a match.
+  envoy::extensions::filters::http::proto_api_scrubber::v3::RemoveFieldAction remove_action;
+  matcher_entry->mutable_on_match()->mutable_action()->mutable_typed_config()->PackFrom(
+      remove_action);
+  matcher_entry->mutable_on_match()->mutable_action()->set_name("block_action");
+
+  // Set up the restriction map.
+  auto& method_restrictions = *config.mutable_restrictions()->mutable_method_restrictions();
+  auto& restriction = method_restrictions[kCreateApiKeyMethod];
+  *restriction.mutable_method_restriction()->mutable_matcher() = matcher;
+
+  // Wrap in Any and convert to JSON for Envoy config.
+  Protobuf::Any any_config;
+  any_config.PackFrom(config);
+  std::string typed_config = fmt::format(R"EOF(
+    name: envoy.filters.http.proto_api_scrubber
+    typed_config: {})EOF",
+                                         MessageUtil::getJsonStringFromMessageOrError(any_config));
+
+  config_helper_.prependFilter(typed_config);
+  initialize();
+
+  auto request_proto = makeCreateApiKeyRequest();
+  auto response = sendGrpcRequest(request_proto, kCreateApiKeyMethod);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  // Verify 403 / Permission Denied.
+  auto grpc_status = response->headers().GrpcStatus();
+  ASSERT_TRUE(grpc_status != nullptr);
+  EXPECT_EQ("7", grpc_status->value().getStringView()); // 7 = Permission Denied
+
+  // Verify Stats for blocked method.
+  test_server_->waitForCounterGe("proto_api_scrubber.method_blocked", 1);
 }
 
 } // namespace

@@ -18,6 +18,11 @@ void ExecuteFilterAction::createFilters(Http::FilterChainFactoryCallbacks& callb
     return;
   }
 
+  // Named filter chain lookup is handled by the Filter at runtime.
+  if (is_named_filter_chain_lookup_) {
+    return;
+  }
+
   // Handle single filter mode.
   if (auto config_value = config_provider_(); config_value.has_value()) {
     (*config_value)(callbacks);
@@ -43,14 +48,24 @@ ExecuteFilterActionFactory::createAction(const Protobuf::Message& config,
       const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction&>(
       config, validation_visitor);
 
-  // Filter chain takes priority over typed_config and dynamic_config.
+  // Priority order: filter_chain > filter_chain_name > dynamic_config > typed_config
   if (composite_action.has_filter_chain()) {
     return createFilterChainAction(composite_action, context, validation_visitor);
   }
 
-  if (composite_action.has_dynamic_config() && composite_action.has_typed_config()) {
-    throw EnvoyException(
-        fmt::format("Error: Only one of `dynamic_config` or `typed_config` can be set."));
+  if (!composite_action.filter_chain_name().empty()) {
+    // Create an action that just stores the name. The actual filter chain lookup
+    // will happen at runtime in the Composite filter.
+    ASSERT(context.server_factory_context_ != absl::nullopt);
+    Envoy::Runtime::Loader& runtime = context.server_factory_context_->runtime();
+
+    return std::make_shared<ExecuteFilterAction>(
+        composite_action.filter_chain_name(),
+        composite_action.has_sample_percent()
+            ? absl::make_optional<envoy::config::core::v3::RuntimeFractionalPercent>(
+                  composite_action.sample_percent())
+            : absl::nullopt,
+        runtime);
   }
 
   if (composite_action.has_dynamic_config()) {
@@ -61,6 +76,7 @@ ExecuteFilterActionFactory::createAction(const Protobuf::Message& config,
     }
   }
 
+  // Default to static action (typed_config).
   if (context.is_downstream_) {
     return createStaticActionDownstream(composite_action, context, validation_visitor);
   } else {
@@ -181,7 +197,7 @@ Matcher::ActionConstSharedPtr ExecuteFilterActionFactory::createFilterChainActio
     ProtobufMessage::ValidationVisitor& validation_visitor) {
   const auto& filter_chain_config = composite_action.filter_chain();
   if (filter_chain_config.typed_config().empty()) {
-    throw EnvoyException("Error: filter_chain must contain at least one filter.");
+    throw EnvoyException("filter_chain must contain at least one filter.");
   }
 
   FilterFactoryCbList filter_factories;

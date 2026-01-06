@@ -339,8 +339,7 @@ Socket::OptionsSharedPtr ConnectivityManagerImpl::getUpstreamSocketOptions(int n
 
   auto options = std::make_shared<Socket::Options>();
   if (!Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.decouple_explicit_drain_pools_and_dns_refresh") ||
-      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.drain_pools_on_network_change")) {
+          "envoy.reloadable_features.decouple_explicit_drain_pools_and_dns_refresh")) {
     // Envoy uses the hash signature of overridden socket options to choose a connection pool.
     // Setting a dummy socket option is a hack that allows us to select a different
     // connection pool without materially changing the socket configuration when
