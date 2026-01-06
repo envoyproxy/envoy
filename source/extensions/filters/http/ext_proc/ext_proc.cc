@@ -1696,8 +1696,8 @@ ProcessingMode effectiveModeOverride(const ProcessingMode& target_override,
 // response path). This means no further body chunks or trailers are expected in this direction.
 // For now, such check is only done for STREAMED or FULL_DUPLEX_STREAMED body mode. For any
 // other body mode, it always return false.
-bool isLastBodyResponse(ProcessorState& state,
-                        const envoy::service::ext_proc::v3::BodyResponse& body_response) {
+bool eosSeenInBody(ProcessorState& state,
+                   const envoy::service::ext_proc::v3::BodyResponse& body_response) {
   switch (state.bodyMode()) {
   case ProcessingMode::BUFFERED:
   case ProcessingMode::BUFFERED_PARTIAL:
@@ -1726,7 +1726,7 @@ bool isLastBodyResponse(ProcessorState& state,
 } // namespace
 
 void Filter::closeGrpcStreamIfLastRespReceived(const ProcessingResponse& response,
-                                               const bool is_last_body_resp) {
+                                               const bool eos_seen_in_body) {
   // Bail out if the gRPC stream has already been closed. This can happen in scenarios
   // like immediate responses or rejected header mutations.
   if (stream_ == nullptr || !Runtime::runtimeFeatureEnabled(
@@ -1743,7 +1743,7 @@ void Filter::closeGrpcStreamIfLastRespReceived(const ProcessingResponse& respons
     break;
   case ProcessingResponse::ResponseCase::kRequestBody:
     if (encoding_state_.noExternalProcess()) {
-      last_response = decoding_state_.isLastResponseAfterBodyResp(is_last_body_resp);
+      last_response = decoding_state_.isLastResponseAfterBodyResp(eos_seen_in_body);
     }
     break;
   case ProcessingResponse::ResponseCase::kRequestTrailers:
@@ -1755,7 +1755,7 @@ void Filter::closeGrpcStreamIfLastRespReceived(const ProcessingResponse& respons
     last_response = encoding_state_.isLastResponseAfterHeaderResp();
     break;
   case ProcessingResponse::ResponseCase::kResponseBody:
-    last_response = encoding_state_.isLastResponseAfterBodyResp(is_last_body_resp);
+    last_response = encoding_state_.isLastResponseAfterBodyResp(eos_seen_in_body);
     break;
   case ProcessingResponse::ResponseCase::kResponseTrailers:
     last_response = true;
@@ -1827,7 +1827,7 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
   ENVOY_STREAM_LOG(debug, "Received {} response", *decoder_callbacks_,
                    responseCaseToString(response->response_case()));
 
-  bool is_last_body_resp = false;
+  bool eos_seen_in_body = false;
   absl::Status processing_status;
   switch (response->response_case()) {
   case ProcessingResponse::ResponseCase::kRequestHeaders:
@@ -1839,12 +1839,12 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
     processing_status = encoding_state_.handleHeadersResponse(response->response_headers());
     break;
   case ProcessingResponse::ResponseCase::kRequestBody:
-    is_last_body_resp = isLastBodyResponse(decoding_state_, response->request_body());
+    eos_seen_in_body = eosSeenInBody(decoding_state_, response->request_body());
     setDecoderDynamicMetadata(*response);
     processing_status = decoding_state_.handleBodyResponse(response->request_body());
     break;
   case ProcessingResponse::ResponseCase::kResponseBody:
-    is_last_body_resp = isLastBodyResponse(encoding_state_, response->response_body());
+    eos_seen_in_body = eosSeenInBody(encoding_state_, response->response_body());
     setEncoderDynamicMetadata(*response);
     processing_status = encoding_state_.handleBodyResponse(response->response_body());
     break;
@@ -1916,7 +1916,7 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
   }
 
   // Close the gRPC stream if no more external processing needed.
-  closeGrpcStreamIfLastRespReceived(*response, is_last_body_resp);
+  closeGrpcStreamIfLastRespReceived(*response, eos_seen_in_body);
 }
 
 void Filter::onGrpcError(Grpc::Status::GrpcStatus status, const std::string& message) {

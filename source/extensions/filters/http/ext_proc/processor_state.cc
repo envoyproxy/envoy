@@ -663,11 +663,11 @@ bool ProcessorState::isLastResponseAfterHeaderResp() const {
   return false;
 }
 
-bool ProcessorState::isLastResponseAfterBodyResp(bool is_last_body_resp) const {
+bool ProcessorState::isLastResponseAfterBodyResp(bool eos_seen_in_body) const {
   if (callbackState() != ProcessorState::CallbackState::Idle) {
     return false;
   }
-  if (is_last_body_resp) {
+  if (eos_seen_in_body) {
     return true;
   }
   if (!sendTrailers() && responseTrailers() != nullptr) {

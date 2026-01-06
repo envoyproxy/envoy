@@ -258,7 +258,7 @@ public:
 
   // Check whether this is the last response from the ext_proc server after
   // a body response is received.
-  bool isLastResponseAfterBodyResp(bool is_last_body_resp) const;
+  bool isLastResponseAfterBodyResp(bool eos_seen_in_body) const;
 
 protected:
   void setBodyMode(
