@@ -23,11 +23,10 @@ DynamicModuleUdpListenerFilterConfigFactory::createFilterFactoryFromProto(
     throw EnvoyException(std::string(dynamic_module_or_error.status().message()));
   }
 
-  auto dynamic_module = std::shared_ptr<Extensions::DynamicModules::DynamicModule>(
-      std::move(dynamic_module_or_error.value()));
+  auto dynamic_module = std::move(dynamic_module_or_error.value());
 
-  auto filter_config =
-      std::make_shared<DynamicModuleUdpListenerFilterConfig>(proto_config, dynamic_module);
+  auto filter_config = std::make_shared<DynamicModuleUdpListenerFilterConfig>(
+      proto_config, std::move(dynamic_module));
 
   return [filter_config](Network::UdpListenerFilterManager& filter_manager,
                          Network::UdpReadFilterCallbacks& callbacks) -> void {

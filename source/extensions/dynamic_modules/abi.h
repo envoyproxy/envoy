@@ -3190,12 +3190,28 @@ void envoy_dynamic_module_on_udp_listener_filter_destroy(
 // Callbacks
 
 /**
- * envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data is called by the module to
- * get the current datagram data.
+ * envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks_size is called by the
+ * module to get the number of chunks in the current datagram data. Combined with
+ * envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks, this can be used to
+ * iterate over all chunks in the datagram. This is only valid during the
+ * envoy_dynamic_module_on_udp_listener_filter_on_data callback.
  */
-bool envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data(
+bool envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks_size(
     envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_envoy_buffer* chunks_out, size_t chunks_cap, size_t* chunks_size_out);
+    size_t* chunks_size_out);
+
+/**
+ * envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks is called by the
+ * module to get the current datagram data as chunks. The module must ensure the provided buffer
+ * array has enough capacity to store all chunks, which can be obtained via
+ * envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks_size. This is only
+ * valid during the envoy_dynamic_module_on_udp_listener_filter_on_data callback.
+ *
+ * @return the total length of all chunks, or 0 if the datagram is not available.
+ */
+size_t envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks(
+    envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* chunks_out);
 
 /**
  * envoy_dynamic_module_callback_udp_listener_filter_set_datagram_data is called by the module to

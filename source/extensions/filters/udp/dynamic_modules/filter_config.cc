@@ -11,7 +11,7 @@ namespace DynamicModules {
 DynamicModuleUdpListenerFilterConfig::DynamicModuleUdpListenerFilterConfig(
     const envoy::extensions::filters::udp::dynamic_modules::v3::DynamicModuleUdpListenerFilter&
         config,
-    Extensions::DynamicModules::DynamicModuleSharedPtr dynamic_module)
+    Extensions::DynamicModules::DynamicModulePtr dynamic_module)
     : filter_name_(config.filter_name()),
       filter_config_(MessageUtil::getJsonStringFromMessageOrError(config.filter_config())),
       dynamic_module_(std::move(dynamic_module)) {

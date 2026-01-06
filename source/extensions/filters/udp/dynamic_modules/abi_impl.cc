@@ -8,37 +8,52 @@
 
 using Envoy::Extensions::UdpFilters::DynamicModules::DynamicModuleUdpListenerFilter;
 
+namespace {
+
+void fillBufferChunks(const Envoy::Buffer::Instance& buffer,
+                      envoy_dynamic_module_type_envoy_buffer* result_buffer_vector) {
+  Envoy::Buffer::RawSliceVector raw_slices = buffer.getRawSlices();
+  size_t counter = 0;
+  for (const auto& slice : raw_slices) {
+    result_buffer_vector[counter].ptr = static_cast<char*>(slice.mem_);
+    result_buffer_vector[counter].length = slice.len_;
+    counter++;
+  }
+}
+
+} // namespace
+
 extern "C" {
 
-bool envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data(
+bool envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks_size(
     envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_envoy_buffer* chunks_out, size_t chunks_cap,
     size_t* chunks_size_out) {
   auto* filter = static_cast<DynamicModuleUdpListenerFilter*>(filter_envoy_ptr);
   auto* data = filter->current_data();
-  if (!data) {
-    if (chunks_size_out) {
+  if (!data || !data->buffer_) {
+    if (chunks_size_out != nullptr) {
       *chunks_size_out = 0;
     }
     return false;
   }
 
-  const auto& buffer = data->buffer_;
-  uint64_t num_slices = buffer->getRawSlices().size();
-  if (chunks_size_out) {
-    *chunks_size_out = num_slices;
-  }
-  if (chunks_cap < num_slices) {
-    return false;
-  }
-
-  size_t i = 0;
-  for (const auto& slice : buffer->getRawSlices()) {
-    chunks_out[i].ptr = static_cast<const char*>(slice.mem_);
-    chunks_out[i].length = slice.len_;
-    i++;
+  if (chunks_size_out != nullptr) {
+    *chunks_size_out = data->buffer_->getRawSlices().size();
   }
   return true;
+}
+
+size_t envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks(
+    envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* chunks_out) {
+  auto* filter = static_cast<DynamicModuleUdpListenerFilter*>(filter_envoy_ptr);
+  auto* data = filter->current_data();
+  if (!data || !data->buffer_) {
+    return 0;
+  }
+
+  fillBufferChunks(*data->buffer_, chunks_out);
+  return data->buffer_->length();
 }
 
 bool envoy_dynamic_module_callback_udp_listener_filter_set_datagram_data(

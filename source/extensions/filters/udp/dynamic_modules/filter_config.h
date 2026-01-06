@@ -15,13 +15,13 @@ public:
   DynamicModuleUdpListenerFilterConfig(
       const envoy::extensions::filters::udp::dynamic_modules::v3::DynamicModuleUdpListenerFilter&
           config,
-      Extensions::DynamicModules::DynamicModuleSharedPtr dynamic_module);
+      Extensions::DynamicModules::DynamicModulePtr dynamic_module);
 
   ~DynamicModuleUdpListenerFilterConfig();
 
   const std::string filter_name_;
   const std::string filter_config_;
-  const Extensions::DynamicModules::DynamicModuleSharedPtr dynamic_module_;
+  Extensions::DynamicModules::DynamicModulePtr dynamic_module_;
 
   envoy_dynamic_module_type_udp_listener_filter_config_module_ptr in_module_config_{nullptr};
 
