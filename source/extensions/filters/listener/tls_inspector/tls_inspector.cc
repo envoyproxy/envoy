@@ -87,6 +87,10 @@ Config::Config(
                 client_hello, TLSEXT_TYPE_application_layer_protocol_negotiation, &data, &len)) {
           filter->onALPN(data, len);
         }
+        if (SSL_early_callback_ctx_extension_get(client_hello, TLSEXT_TYPE_server_name, &data,
+                                                 &len)) {
+          filter->onSNI(data, len);
+        }
         return ssl_select_cert_success;
       });
   SSL_CTX_set_tlsext_servername_callback(
@@ -138,11 +142,40 @@ void Filter::onALPN(const unsigned char* data, unsigned int len) {
   alpn_found_ = true;
 }
 
+void Filter::onSNI(const unsigned char* data, unsigned int len) {
+  // Parse SNI extension early in select_certificate_cb to capture server name even if
+  // subsequent handshake processing fails. This ensures requested server name is available
+  // for access logging on TLS handshake errors.
+  CBS wire, list;
+  CBS_init(&wire, reinterpret_cast<const uint8_t*>(data), static_cast<size_t>(len));
+  if (!CBS_get_u16_length_prefixed(&wire, &list) || CBS_len(&wire) != 0 || CBS_len(&list) < 1) {
+    // Don't produce errors, let the real TLS stack do it.
+    return;
+  }
+  while (CBS_len(&list) > 0) {
+    uint8_t type;
+    CBS name;
+    if (!CBS_get_u8(&list, &type) || !CBS_get_u16_length_prefixed(&list, &name)) {
+      // Don't produce errors, let the real TLS stack do it.
+      return;
+    }
+    if (type == TLSEXT_NAMETYPE_host_name && CBS_len(&name) > 0) {
+      onServername(
+          absl::string_view(reinterpret_cast<const char*>(CBS_data(&name)), CBS_len(&name)));
+      return;
+    }
+  }
+}
+
 void Filter::onServername(absl::string_view name) {
+  if (sni_found_) {
+    return;
+  }
   if (!name.empty()) {
     config_->stats().sni_found_.inc();
     cb_->socket().setRequestedServerName(name);
     ENVOY_LOG(debug, "tls:onServerName(), requestedServerName: {}", name);
+    sni_found_ = true;
   } else {
     config_->stats().sni_not_found_.inc();
   }
