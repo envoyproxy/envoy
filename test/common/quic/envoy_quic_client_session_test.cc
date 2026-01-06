@@ -353,6 +353,11 @@ TEST_P(EnvoyQuicClientSessionTest, OnGoAwayFrame) {
   envoy_quic_session_->OnHttp3GoAway(4u);
 }
 
+TEST_P(EnvoyQuicClientSessionTest, StartDraining) {
+  EXPECT_CALL(http_connection_callbacks_, onGoAway(Http::GoAwayErrorCode::NoError));
+  envoy_quic_session_->startDraining();
+}
+
 TEST_P(EnvoyQuicClientSessionTest, ConnectionClose) {
   std::string error_details("dummy details");
   quic::QuicErrorCode error(quic::QUIC_INVALID_FRAME_DATA);
