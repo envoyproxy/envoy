@@ -227,10 +227,10 @@ message ProcessingResponse {
   // [#not-implemented-hide:]
   // Used only in ``FULL_DUPLEX_STREAMED`` and ``GRPC`` body send modes.
   // Instructs the data plane to stop sending body data and to send a
-  // half-close on the ext_proc stream.  The ext_proc server should then echo
+  // half-close on the ext_proc stream. The ext_proc server should then echo
   // back all subsequent body contents as-is until it sees the client's
   // half-close, at which point the ext_proc server can terminate the stream
-  // with an OK status.  This provides a safe way for the ext_proc server
+  // with an OK status. This provides a safe way for the ext_proc server
   // to indicate that it does not need to see the rest of the stream;
   // without this, the ext_proc server could not terminate the stream
   // early, because it would wind up dropping any body contents that the

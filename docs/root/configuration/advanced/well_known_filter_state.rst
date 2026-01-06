@@ -109,7 +109,23 @@ configuration with a :ref:`factory lookup key
 <envoy_v3_api_field_extensions.filters.common.set_filter_state.v3.FilterStateValue.factory_key>`.
 
 ``envoy.string``
-  A special generic string object factory. Accepts any string as its value.
+  A generic string object factory for creating filter state entries with custom key names.
+  Use this as the :ref:`factory_key
+  <envoy_v3_api_field_extensions.filters.common.set_filter_state.v3.FilterStateValue.factory_key>`
+  when your ``object_key`` is a custom name not listed in this document.
+
+  Example configuration:
+
+  .. code-block:: yaml
+
+    object_key: my.custom.key
+    factory_key: envoy.string
+    format_string:
+      text_format_source:
+        inline_string: "my-value"
+
+  This creates a filter state entry named ``my.custom.key`` containing the string ``my-value``.
+  The value can be accessed in access logs using ``%FILTER_STATE(my.custom.key)%``.
 
 ``envoy.network.ip``
   A factory to create IP addresses from ``IPv4`` and ``IPv6`` address strings.

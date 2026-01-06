@@ -115,11 +115,9 @@ public:
   bool createQuicListenerFilterChain(Network::QuicListenerFilterManager&) override { return true; }
 
   // Http::FilterChainFactory
-  bool createFilterChain(Http::FilterChainManager& manager,
-                         const Http::FilterChainOptions&) const override;
+  bool createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) const override;
   bool createUpgradeFilterChain(absl::string_view, const Http::FilterChainFactory::UpgradeMap*,
-                                Http::FilterChainManager&,
-                                const Http::FilterChainOptions&) const override {
+                                Http::FilterChainFactoryCallbacks&) const override {
     return false;
   }
 
@@ -511,9 +509,9 @@ private:
   AdminListenerPtr listener_;
   const AdminInternalAddressConfig internal_address_config_;
   const LocalReply::LocalReplyPtr local_reply_;
-  const std::vector<Http::OriginalIPDetectionSharedPtr> detection_extensions_{};
-  const std::vector<Http::EarlyHeaderMutationPtr> early_header_mutations_{};
-  const absl::optional<std::string> scheme_{};
+  const std::vector<Http::OriginalIPDetectionSharedPtr> detection_extensions_;
+  const std::vector<Http::EarlyHeaderMutationPtr> early_header_mutations_;
+  const absl::optional<std::string> scheme_;
   const bool scheme_match_upstream_ = false;
   const bool ignore_global_conn_limit_;
   std::unique_ptr<HttpConnectionManagerProto::ProxyStatusConfig> proxy_status_config_;

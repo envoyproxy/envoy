@@ -244,8 +244,14 @@ createConnectionSocket(const Network::Address::InstanceConstSharedPtr& peer_addr
     ENVOY_LOG_MISC(error, "Failed to create quic socket");
     return connection_socket;
   }
-  connection_socket->addOptions(Network::SocketOptionFactory::buildIpPacketInfoOptions());
-  connection_socket->addOptions(Network::SocketOptionFactory::buildRxQueueOverFlowOptions());
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.disable_quic_ip_packet_info_socket_options")) {
+    connection_socket->addOptions(Network::SocketOptionFactory::buildIpPacketInfoOptions());
+  }
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.disable_quic_rx_queue_overflow_socket_options")) {
+    connection_socket->addOptions(Network::SocketOptionFactory::buildRxQueueOverFlowOptions());
+  }
   connection_socket->addOptions(Network::SocketOptionFactory::buildIpRecvTosOptions());
   if (Api::OsSysCallsSingleton::get().supportsUdpGro()) {
     connection_socket->addOptions(Network::SocketOptionFactory::buildUdpGroOptions());

@@ -3,6 +3,7 @@
 #include "source/common/common/random_generator.h"
 #include "source/common/config/metadata.h"
 #include "source/common/http/header_utility.h"
+#include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 #include "source/common/json/json_utility.h"
 #include "source/common/runtime/runtime_features.h"
@@ -606,6 +607,103 @@ absl::optional<std::string> EnvironmentFormatter::format(const StreamInfo::Strea
 }
 Protobuf::Value EnvironmentFormatter::formatValue(const StreamInfo::StreamInfo&) const {
   return str_;
+}
+
+RequestedServerNameFormatter::RequestedServerNameFormatter(absl::string_view source,
+                                                           absl::string_view option) {
+
+  HostFormatterSource host_source = SNI;
+  HostFormatterOption option_enum = OriginalHostOrHost;
+
+  if (source == "SNI_ONLY") {
+    host_source = SNI;
+  } else if (source == "SNI_FIRST") {
+    host_source = SNIFirst;
+  } else if (source == "HOST_FIRST") {
+    host_source = HostFirst;
+  } else if (source.empty()) {
+    host_source = SNI;
+  } else {
+    throw EnvoyException(fmt::format("Invalid REQUESTED_SERVER_NAME option: '{}', only "
+                                     "'SNI_ONLY'/'SNI_FIRST'/'HOST_FIRST' are allowed",
+                                     source));
+  }
+
+  if (option == "ORIG_OR_HOST") {
+    option_enum = OriginalHostOrHost;
+  } else if (option == "HOST") {
+    option_enum = HostOnly;
+  } else if (option == "ORIG") {
+    option_enum = OriginalHostOnly;
+  } else if (option.empty()) {
+    option_enum = OriginalHostOrHost;
+  } else {
+    throw EnvoyException(fmt::format("Invalid REQUESTED_SERVER_NAME option: '{}', only "
+                                     "'ORIG_OR_HOST'/'HOST'/'ORIG' are allowed",
+                                     option));
+  }
+  source_ = host_source;
+  option_ = option_enum;
+}
+
+absl::optional<std::string>
+RequestedServerNameFormatter::format(const StreamInfo::StreamInfo& stream_info) const {
+  absl::optional<std::string> result;
+  switch (source_) {
+  case SNI:
+    result = getSNIFromStreamInfo(stream_info);
+    break;
+  case SNIFirst:
+    result = getSNIFromStreamInfo(stream_info);
+    if (!result.has_value()) {
+      result = getHostFromHeaders(stream_info);
+    }
+    break;
+  case HostFirst:
+    result = getHostFromHeaders(stream_info);
+    if (!result.has_value()) {
+      result = getSNIFromStreamInfo(stream_info);
+    }
+    break;
+  }
+  return result;
+}
+
+absl::optional<std::string> RequestedServerNameFormatter::getSNIFromStreamInfo(
+    const StreamInfo::StreamInfo& stream_info) const {
+  absl::optional<std::string> result;
+  if (!stream_info.downstreamAddressProvider().requestedServerName().empty()) {
+    result = StringUtil::sanitizeInvalidHostname(
+        stream_info.downstreamAddressProvider().requestedServerName());
+  }
+  return result;
+}
+
+absl::optional<std::string>
+RequestedServerNameFormatter::getHostFromHeaders(const StreamInfo::StreamInfo& stream_info) const {
+  absl::optional<std::string> result;
+  const auto& headers = stream_info.getRequestHeaders();
+  if (headers != nullptr) {
+    switch (option_) {
+    case HostOnly:
+      result = headers->Host()->value().getStringView();
+      break;
+    case OriginalHostOnly:
+      result = headers->EnvoyOriginalHost()->value().getStringView();
+      break;
+    case OriginalHostOrHost:
+      result = headers->EnvoyOriginalHost() != nullptr
+                   ? headers->EnvoyOriginalHost()->value().getStringView()
+                   : headers->Host()->value().getStringView();
+      break;
+    }
+  }
+  return result;
+}
+
+Protobuf::Value
+RequestedServerNameFormatter::formatValue(const StreamInfo::StreamInfo& stream_info) const {
+  return ValueUtil::optionalStringValue(format(stream_info));
 }
 
 // StreamInfo std::string formatter provider.
@@ -1474,17 +1572,12 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                   });
             }}},
           {"REQUESTED_SERVER_NAME",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](absl::string_view, absl::optional<size_t>) {
-              return std::make_unique<StreamInfoStringFormatterProvider>(
-                  [](const StreamInfo::StreamInfo& stream_info) {
-                    absl::optional<std::string> result;
-                    if (!stream_info.downstreamAddressProvider().requestedServerName().empty()) {
-                      result = StringUtil::sanitizeInvalidHostname(
-                          stream_info.downstreamAddressProvider().requestedServerName());
-                    }
-                    return result;
-                  });
+           {CommandSyntaxChecker::PARAMS_OPTIONAL,
+            [](absl::string_view format, absl::optional<size_t>) {
+              absl::string_view fallback;
+              absl::string_view option;
+              SubstitutionFormatUtils::parseSubcommand(format, ':', fallback, option);
+              return std::make_unique<RequestedServerNameFormatter>(fallback, option);
             }}},
           {"ROUTE_NAME",
            {CommandSyntaxChecker::COMMAND_ONLY,

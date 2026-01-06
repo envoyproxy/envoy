@@ -122,7 +122,7 @@ message ProcessingMode {
     // :ref:`StreamedBodyResponse <envoy_v3_api_msg_service.ext_proc.v3.StreamedBodyResponse>`
     // field, but the number of messages sent by the ext_proc server
     // does not need to equal the number of messages sent by the data
-    // plane.  This allows the ext_proc server to change the number of
+    // plane. This allows the ext_proc server to change the number of
     // messages sent on the stream.
     // In this mode, the client will send body and trailers to the server as
     // they arrive.

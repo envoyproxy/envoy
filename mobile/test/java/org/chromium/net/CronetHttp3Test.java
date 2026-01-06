@@ -74,7 +74,6 @@ public class CronetHttp3Test {
   // A URL which will point to the IP and port of the test servers.
   private String testServerUrl;
   // Optional reloadable flags to set.
-  private boolean drainOnNetworkChange = false;
   private boolean resetBrokennessOnNetworkChange = false;
   private boolean disableDnsRefreshOnNetworkChange = false;
   private boolean useAndroidNetworkMonitorV2 = false;
@@ -116,8 +115,6 @@ public class CronetHttp3Test {
     // Set up the Envoy engine.
     NativeCronvoyEngineBuilderImpl nativeCronetEngineBuilder =
         new NativeCronvoyEngineBuilderImpl(ApplicationProvider.getApplicationContext());
-    nativeCronetEngineBuilder.addRuntimeGuard("drain_pools_on_network_change",
-                                              drainOnNetworkChange);
     nativeCronetEngineBuilder.setDisableDnsRefreshOnNetworkChange(disableDnsRefreshOnNetworkChange);
 
     if (setUpLogging) {
@@ -327,55 +324,12 @@ public class CronetHttp3Test {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  public void networkChangeNoDrains() throws Exception {
-    if (!JniLibrary.runtimeFeatureEnabled(
-            "envoy.reloadable_features.decouple_explicit_drain_pools_and_dns_refresh")) {
-      // Disable dns refreshment so that the engine will attempt immediate draining.
-      disableDnsRefreshOnNetworkChange = true;
-    }
-    drainOnNetworkChange = false;
-    setUp(printEnvoyLogs);
-
-    // Do the initial handshake dance
-    doInitialHttp2Request();
-
-    // Do an HTTP/3 request
-    TestUrlRequestCallback get1Callback = doBasicGetRequest();
-    assertEquals(200, get1Callback.mResponseInfo.getHttpStatusCode());
-    assertEquals("h3", get1Callback.mResponseInfo.getNegotiatedProtocol());
-
-    // There should be one HTTP/3 connection
-    String postStats = cronvoyEngine.getEnvoyEngine().dumpStats();
-    assertTrue(postStats, postStats.contains("cluster.base.upstream_cx_http3_total: 1"));
-
-    // Force a network change
-    cronvoyEngine.getEnvoyEngine().onDefaultNetworkUnavailable();
-    cronvoyEngine.getEnvoyEngine().onDefaultNetworkChanged(2);
-    cronvoyEngine.getEnvoyEngine().onDefaultNetworkAvailable();
-
-    // Do another HTTP/3 request
-    TestUrlRequestCallback get2Callback = doBasicGetRequest();
-    assertEquals(200, get2Callback.mResponseInfo.getHttpStatusCode());
-    assertEquals("h3", get2Callback.mResponseInfo.getNegotiatedProtocol());
-
-    // There should be 2 HTTP/3 connections because the 2nd request was hashed to a different
-    // connection pool. But the 1st HTTP/3 connection which is idle now shouldn't have been drained
-    // or closed.
-    postStats = cronvoyEngine.getEnvoyEngine().dumpStats();
-    assertTrue(postStats, postStats.contains("cluster.base.upstream_cx_http3_total: 2"));
-    assertFalse(postStats, postStats.contains("cluster.base.upstream_cx_destroy"));
-  }
-
-  @Test
-  @SmallTest
-  @Feature({"Cronet"})
   public void networkChangeWithDrains() throws Exception {
     if (!JniLibrary.runtimeFeatureEnabled(
             "envoy.reloadable_features.decouple_explicit_drain_pools_and_dns_refresh")) {
       // Disable dns refreshment so that the engine will attempt immediate draining.
       disableDnsRefreshOnNetworkChange = true;
     }
-    drainOnNetworkChange = true;
     setUp(printEnvoyLogs);
 
     // Do the initial handshake dance
@@ -418,7 +372,6 @@ public class CronetHttp3Test {
       // Disable dns refreshment so that the engine will attempt immediate draining.
       disableDnsRefreshOnNetworkChange = true;
     }
-    drainOnNetworkChange = true;
     useAndroidNetworkMonitorV2 = true;
     setUp(printEnvoyLogs);
 
@@ -508,7 +461,6 @@ public class CronetHttp3Test {
       // Disable dns refreshment so that the engine will attempt immediate draining.
       disableDnsRefreshOnNetworkChange = true;
     }
-    drainOnNetworkChange = true;
     useAndroidNetworkMonitorV2 = true;
     setUp(printEnvoyLogs);
 
@@ -589,7 +541,6 @@ public class CronetHttp3Test {
       // Disable dns refreshment so that the engine will attempt immediate draining.
       disableDnsRefreshOnNetworkChange = true;
     }
-    drainOnNetworkChange = true;
     useAndroidNetworkMonitorV2 = true;
     setUp(printEnvoyLogs);
 

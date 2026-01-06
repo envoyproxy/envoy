@@ -52,6 +52,7 @@ struct GrpcInitializeConfigOpts {
   // In timeout tests we expect zero response bytes.
   bool stats_expect_response_bytes = true;
   bool enforce_response_header_limits = false;
+  uint32_t status_on_error_code = 0;
 };
 
 struct WaitForSuccessfulUpstreamResponseOpts {
@@ -151,6 +152,11 @@ public:
 
       if (opts.enforce_response_header_limits) {
         proto_config_.set_enforce_response_header_limits(true);
+      }
+
+      if (opts.status_on_error_code > 0) {
+        proto_config_.mutable_status_on_error()->set_code(
+            static_cast<envoy::type::v3::StatusCode>(opts.status_on_error_code));
       }
 
       // Add labels and verify they are passed.
@@ -1263,6 +1269,30 @@ TEST_P(ExtAuthzGrpcIntegrationTest, TimeoutFailClosed) {
   ASSERT_TRUE(response_->waitForEndStream());
   EXPECT_TRUE(response_->complete());
   EXPECT_EQ("403", response_->headers().getStatusValue()); // Unauthorized status.
+
+  cleanup();
+}
+
+// Test that gRPC call failure respects status_on_error configuration.
+// When the gRPC call fails (e.g., timeout), the filter should use the configured
+// status_on_error (503) instead of the default (403).
+TEST_P(ExtAuthzGrpcIntegrationTest, GrpcCallFailureUsesStatusOnError) {
+  GrpcInitializeConfigOpts opts;
+  opts.stats_expect_response_bytes = false;
+  opts.failure_mode_allow = false;
+  opts.timeout_ms = 1;
+  opts.status_on_error_code = 503;
+  ext_authz_grpc_status_ = LoggingTestFilterConfig::UNAVAILABLE;
+  initializeConfig(opts);
+
+  setDownstreamProtocol(Http::CodecType::HTTP1);
+  HttpIntegrationTest::initialize();
+
+  initiateClientConnection(0);
+
+  ASSERT_TRUE(response_->waitForEndStream());
+  EXPECT_TRUE(response_->complete());
+  EXPECT_EQ("503", response_->headers().getStatusValue());
 
   cleanup();
 }

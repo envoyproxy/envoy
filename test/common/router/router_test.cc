@@ -223,8 +223,8 @@ public:
 
 TEST_F(RouterTest, SenselessTestForCoverage) {
   config_->timeSource();
-  Http::MockFilterChainManager mock_manager;
-  config_->createUpgradeFilterChain("", nullptr, mock_manager, Http::EmptyFilterChainOptions{});
+  Http::MockFilterChainFactoryCallbacks callbacks;
+  config_->createUpgradeFilterChain("", nullptr, callbacks);
 
   router_->route();
   router_->timeSource();
@@ -1493,6 +1493,22 @@ TEST_F(RouterTest, AllDebugConfig) {
   EXPECT_EQ(0U,
             callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_total_.value());
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
+}
+
+TEST_F(RouterTest, DebugConfigFactory) {
+  // Test creating DebugConfig with "true"
+  auto debug_config_true = DebugConfigFactory().createFromBytes("true");
+  EXPECT_NE(debug_config_true, nullptr);
+  EXPECT_TRUE(dynamic_cast<DebugConfig*>(debug_config_true.get())->do_not_forward_);
+
+  // Test creating DebugConfig with "false"
+  auto debug_config_false = DebugConfigFactory().createFromBytes("false");
+  EXPECT_NE(debug_config_false, nullptr);
+  EXPECT_FALSE(dynamic_cast<DebugConfig*>(debug_config_false.get())->do_not_forward_);
+
+  // Test factory name
+  DebugConfigFactory factory;
+  EXPECT_EQ(factory.name(), "envoy.router.debug_config");
 }
 
 TEST_F(RouterTest, NoRetriesOverflow) {

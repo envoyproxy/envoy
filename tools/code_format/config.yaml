@@ -314,6 +314,9 @@ paths:
     include:
     - api/bazel/cc_proto_descriptor_library/file_descriptor_generator.cc
     - contrib/config/source/kv_store_xds_delegate.cc
+    - contrib/istio/filters/network/metadata_exchange/source/metadata_exchange.cc
+    - contrib/istio/filters/network/metadata_exchange/test/metadata_exchange_test.cc
+    - contrib/istio/filters/http/peer_metadata/source/peer_metadata.cc
     - source/common/protobuf/utility.h
     - source/common/protobuf/utility.cc
     - source/extensions/filters/http/grpc_json_transcoder/json_transcoder_filter.cc

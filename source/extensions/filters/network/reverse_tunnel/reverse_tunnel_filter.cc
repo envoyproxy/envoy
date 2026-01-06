@@ -93,8 +93,11 @@ ReverseTunnelFilterConfig::ReverseTunnelFilterConfig(
                          : std::chrono::milliseconds(2000)),
       auto_close_connections_(
           proto_config.auto_close_connections() ? proto_config.auto_close_connections() : false),
-      request_path_(proto_config.request_path().empty() ? "/reverse_connections/request"
-                                                        : proto_config.request_path()),
+      request_path_(
+          proto_config.request_path().empty()
+              ? std::string(::Envoy::Extensions::Bootstrap::ReverseConnection::
+                                ReverseConnectionUtility::DEFAULT_REVERSE_TUNNEL_REQUEST_PATH)
+              : proto_config.request_path()),
       request_method_string_([&proto_config]() -> std::string {
         envoy::config::core::v3::RequestMethod method = proto_config.request_method();
         if (method == envoy::config::core::v3::METHOD_UNSPECIFIED) {
@@ -426,6 +429,12 @@ void ReverseTunnelFilter::processAcceptedConnection(absl::string_view node_id,
                                         std::move(wrapped_socket), ping_seconds);
     ENVOY_CONN_LOG(debug, "reverse_tunnel: successfully registered wrapped socket for reuse",
                    connection);
+  }
+
+  // Report the connection to the extension -> reporter.
+  if (auto extension = socket_manager->getUpstreamExtension()) {
+    extension->reportConnection(std::string(node_id), std::string(cluster_id),
+                                std::string(tenant_id));
   }
 }
 

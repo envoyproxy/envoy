@@ -308,16 +308,26 @@ envoy_cc_fuzz_test(
 envoy_cc_test(
     name = "router_ratelimit_test",
     srcs = ["router_ratelimit_test.cc"],
+    copts = select({
+        "//bazel:windows_x86_64": [],
+        "//conditions:default": [
+            "-DUSE_CEL_PARSER",
+        ],
+    }),
     rbe_pool = "6gig",
+    tags = ["skip_on_windows"],
     deps = [
+        "//source/common/formatter:http_speicific_formatter_extension_lib",
         "//source/common/http:header_map_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/router:config_lib",
         "//source/common/router:router_ratelimit_lib",
+        "//source/extensions/formatter/cel:config",
         "//test/mocks/http:http_mocks",
         "//test/mocks/ratelimit:ratelimit_mocks",
         "//test/mocks/router:router_mocks",
         "//test/mocks/server:instance_mocks",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],
