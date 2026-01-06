@@ -53,8 +53,6 @@ constexpr absl::string_view LOGGING_SET_LEVEL = "logging/setLevel";
 
 // Lifecycle
 constexpr absl::string_view INITIALIZE = "initialize";
-constexpr absl::string_view INITIALIZED = "initialized";
-constexpr absl::string_view SHUTDOWN = "shutdown";
 
 // Sampling
 constexpr absl::string_view SAMPLING_CREATE_MESSAGE = "sampling/createMessage";
@@ -77,6 +75,19 @@ constexpr absl::string_view NOTIFICATION_MESSAGE = "notifications/message";
 constexpr absl::string_view NOTIFICATION_CANCELLED = "notifications/cancelled";
 constexpr absl::string_view NOTIFICATION_INITIALIZED = "notifications/initialized";
 } // namespace Methods
+
+// Method group names for classification
+namespace MethodGroups {
+constexpr absl::string_view LIFECYCLE = "lifecycle";
+constexpr absl::string_view TOOL = "tool";
+constexpr absl::string_view RESOURCE = "resource";
+constexpr absl::string_view PROMPT = "prompt";
+constexpr absl::string_view NOTIFICATION = "notification";
+constexpr absl::string_view LOGGING = "logging";
+constexpr absl::string_view SAMPLING = "sampling";
+constexpr absl::string_view COMPLETION = "completion";
+constexpr absl::string_view UNKNOWN = "unknown";
+} // namespace MethodGroups
 } // namespace McpConstants
 
 /**
@@ -90,6 +101,13 @@ public:
     AttributeExtractionRule(const std::string& p) : path(p) {}
   };
 
+  // Method config entry for user-configured rules
+  struct MethodConfigEntry {
+    std::string method_pattern; // Method pattern (exact or with trailing "*" for prefix)
+    std::string group;          // Group name, empty means use built-in
+    std::vector<AttributeExtractionRule> extraction_rules;
+  };
+
   // Create from proto configuration
   static McpParserConfig
   fromProto(const envoy::extensions::filters::http::mcp::v3::ParserConfig& proto);
@@ -97,20 +115,34 @@ public:
   // Get extraction policy for a specific method
   const std::vector<AttributeExtractionRule>& getFieldsForMethod(const std::string& method) const;
 
-  // Add method configuration
+  // Add method configuration (for defaults)
   void addMethodConfig(absl::string_view method, std::vector<AttributeExtractionRule> fields);
 
   // Get all global fields to always extract
   const absl::flat_hash_set<std::string>& getAlwaysExtract() const { return always_extract_; }
+
+  // Get the group metadata key (empty if disabled)
+  const std::string& groupMetadataKey() const { return group_metadata_key_; }
+
+  // Get the method group for a given method name
+  // Returns the group name based on user config first, then built-in groups
+  std::string getMethodGroup(const std::string& method) const;
 
   // Create default config (minimal extraction)
   static McpParserConfig createDefault();
 
 private:
   void initializeDefaults();
+  std::string getBuiltInMethodGroup(const std::string& method) const;
 
-  // Per-method field policies
+  // Per-method field policies for defaults
   absl::flat_hash_map<std::string, std::vector<AttributeExtractionRule>> method_fields_;
+
+  // User-configured method configs
+  std::vector<MethodConfigEntry> method_configs_;
+
+  // Method group configuration
+  std::string group_metadata_key_;
 
   // Global fields to always extract
   absl::flat_hash_set<std::string> always_extract_;
