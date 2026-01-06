@@ -47,28 +47,43 @@ bool isApiNameValid(absl::string_view api_name) {
                       [](const absl::string_view s) { return s.empty(); });
 }
 
-// Creates and returns a CEL matcher.
+} // namespace
+
 MatchTreeHttpMatchingDataSharedPtr
-getMatcher(Envoy::Server::Configuration::ServerFactoryContext& server_factory_context,
-           const xds::type::matcher::v3::Matcher& matcher) {
+ProtoApiScrubberFilterConfig::getOrCreateMatcher(const xds::type::matcher::v3::Matcher& matcher,
+                                                 Server::Configuration::FactoryContext& context) {
+  // Use MessageUtil::hash for deterministic key generation.
+  uint64_t key = MessageUtil::hash(matcher);
+
+  if (auto it = unique_matchers_.find(key); it != unique_matchers_.end()) {
+    // Return existing matcher if configuration is identical.
+    return it->second;
+  }
+
   ProtoApiScrubberRemoveFieldAction remove_field_action;
   MatcherInputValidatorVisitor validation_visitor;
   Matcher::MatchTreeFactory<HttpMatchingData, ProtoApiScrubberRemoveFieldAction> matcher_factory(
-      remove_field_action, server_factory_context, validation_visitor);
+      remove_field_action, context.serverFactoryContext(), validation_visitor);
   Matcher::MatchTreeFactoryCb<HttpMatchingData> match_tree_factory_cb =
       matcher_factory.create(matcher);
 
-  // Call the match tree factory callback to return the underlying match_tree.
-  return match_tree_factory_cb();
-}
+  auto match_tree = match_tree_factory_cb();
 
-} // namespace
+  // Use try_emplace with std::move to handle unique_ptr -> shared_ptr conversion.
+  auto result = unique_matchers_.try_emplace(key, std::move(match_tree));
+
+  // Return the stored shared pointer.
+  return result.first->second;
+}
 
 absl::StatusOr<std::shared_ptr<const ProtoApiScrubberFilterConfig>>
 ProtoApiScrubberFilterConfig::create(const ProtoApiScrubberConfig& proto_config,
                                      Server::Configuration::FactoryContext& context) {
+  ProtoApiScrubberStats stats(context.scope(), "proto_api_scrubber.");
   std::shared_ptr<ProtoApiScrubberFilterConfig> filter_config_ptr =
-      std::shared_ptr<ProtoApiScrubberFilterConfig>(new ProtoApiScrubberFilterConfig());
+      std::shared_ptr<ProtoApiScrubberFilterConfig>(
+          new ProtoApiScrubberFilterConfig(stats, context.serverFactoryContext().timeSource()));
+
   RETURN_IF_ERROR(filter_config_ptr->initialize(proto_config, context));
   return filter_config_ptr;
 }
@@ -85,11 +100,9 @@ ProtoApiScrubberFilterConfig::initialize(const ProtoApiScrubberConfig& proto_con
   filtering_mode_ = filtering_mode;
 
   // Initialize proto descriptor pool.
-  auto descriptor_set_or_status = initializeDescriptorPool(
+  absl::StatusOr<Envoy::Protobuf::FileDescriptorSet> descriptor_set_or_error = loadDescriptorSet(
       context.serverFactoryContext().api(), proto_config.descriptor_set().data_source());
-  RETURN_IF_ERROR(descriptor_set_or_status.status());
-
-  const Envoy::Protobuf::FileDescriptorSet& descriptor_set = descriptor_set_or_status.value();
+  RETURN_IF_ERROR(descriptor_set_or_error.status());
 
   if (proto_config.has_restrictions()) {
     for (const auto& method_restriction_pair : proto_config.restrictions().method_restrictions()) {
@@ -109,8 +122,14 @@ ProtoApiScrubberFilterConfig::initialize(const ProtoApiScrubberConfig& proto_con
         initializeMessageRestrictions(proto_config.restrictions().message_restrictions(), context));
   }
 
+  // Clear temporary deduplication map to free memory after init.
+  unique_matchers_.clear();
+
   initializeTypeUtils();
-  precomputeTypeCache(descriptor_set);
+  precomputeTypeCache(descriptor_set_or_error.value());
+
+  // Pre-compute the Field* -> Type* map for O(1) lock-free lookup during request processing.
+  buildFieldParentMap(descriptor_set_or_error.value());
 
   ENVOY_LOG(trace, "Filter config initialized successfully.");
   return absl::OkStatus();
@@ -121,7 +140,7 @@ absl::Status ProtoApiScrubberFilterConfig::initializeMethodLevelRestrictions(
     Envoy::Server::Configuration::FactoryContext& context) {
   if (method_config.has_method_restriction()) {
     method_level_restrictions_[method_name] =
-        getMatcher(context.serverFactoryContext(), method_config.method_restriction().matcher());
+        getOrCreateMatcher(method_config.method_restriction().matcher(), context);
   }
   return absl::OkStatus();
 }
@@ -138,14 +157,20 @@ absl::Status ProtoApiScrubberFilterConfig::initializeMessageRestrictions(
     }
     if (message_config.has_config()) {
       message_level_restrictions_[message_name] =
-          getMatcher(context.serverFactoryContext(), message_config.config().matcher());
+          getOrCreateMatcher(message_config.config().matcher(), context);
+    }
+
+    for (const auto& field_restriction : message_config.field_restrictions()) {
+      absl::string_view field_mask = field_restriction.first;
+      RETURN_IF_ERROR(validateFieldMask(field_mask));
+      message_field_restrictions_[std::make_pair(message_name, std::string(field_mask))] =
+          getOrCreateMatcher(field_restriction.second.matcher(), context);
     }
   }
   return absl::OkStatus();
 }
 
-absl::StatusOr<Envoy::Protobuf::FileDescriptorSet>
-ProtoApiScrubberFilterConfig::initializeDescriptorPool(
+absl::StatusOr<Envoy::Protobuf::FileDescriptorSet> ProtoApiScrubberFilterConfig::loadDescriptorSet(
     Api::Api& api, const ::envoy::config::core::v3::DataSource& data_source) {
   Envoy::Protobuf::FileDescriptorSet descriptor_set;
 
@@ -186,8 +211,8 @@ ProtoApiScrubberFilterConfig::initializeDescriptorPool(
                       kConfigInitializationError, file.name()));
     }
   }
-
   descriptor_pool_ = std::move(pool);
+
   return descriptor_set;
 }
 
@@ -295,7 +320,7 @@ absl::Status ProtoApiScrubberFilterConfig::initializeMethodFieldRestrictions(
     absl::string_view field_mask = restriction.first;
     RETURN_IF_ERROR(validateFieldMask(field_mask));
     field_restrictions[std::make_pair(std::string(method_name), std::string(field_mask))] =
-        getMatcher(context.serverFactoryContext(), restriction.second.matcher());
+        getOrCreateMatcher(restriction.second.matcher(), context);
   }
 
   return absl::OkStatus();
@@ -358,6 +383,16 @@ ProtoApiScrubberFilterConfig::getMessageMatcher(const std::string& message_name)
   return nullptr;
 }
 
+MatchTreeHttpMatchingDataSharedPtr
+ProtoApiScrubberFilterConfig::getMessageFieldMatcher(const std::string& message_name,
+                                                     const std::string& field_name) const {
+  if (auto it = message_field_restrictions_.find(std::make_pair(message_name, field_name));
+      it != message_field_restrictions_.end()) {
+    return it->second;
+  }
+  return nullptr;
+}
+
 void ProtoApiScrubberFilterConfig::initializeTypeUtils() {
   type_helper_ =
       std::make_unique<const TypeHelper>(Envoy::Protobuf::util::NewTypeResolverForDescriptorPool(
@@ -367,6 +402,42 @@ void ProtoApiScrubberFilterConfig::initializeTypeUtils() {
       [this](absl::string_view type_url) -> const ::Envoy::Protobuf::Type* {
         return type_helper_->Info()->GetTypeByTypeUrl(type_url);
       });
+}
+
+const Envoy::Protobuf::Type*
+ProtoApiScrubberFilterConfig::getParentType(const Envoy::Protobuf::Field* field) const {
+  auto it = field_to_parent_type_map_.find(field);
+  return (it != field_to_parent_type_map_.end()) ? it->second : nullptr;
+}
+
+void ProtoApiScrubberFilterConfig::buildFieldParentMap(
+    const Envoy::Protobuf::FileDescriptorSet& descriptor_set) {
+  for (const auto& file : descriptor_set.file()) {
+    std::string package_prefix = file.package();
+    for (const auto& msg : file.message_type()) {
+      populateMapForMessage(msg, package_prefix);
+    }
+  }
+}
+
+void ProtoApiScrubberFilterConfig::populateMapForMessage(
+    const Envoy::Protobuf::DescriptorProto& msg, const std::string& package_prefix) {
+  std::string full_name =
+      package_prefix.empty() ? msg.name() : absl::StrCat(package_prefix, ".", msg.name());
+  std::string type_url = absl::StrCat(Envoy::Grpc::Common::typeUrlPrefix(), "/", full_name);
+
+  const auto* type = (*type_finder_)(type_url);
+  // We only index types that are successfully resolved by TypeHelper.
+  if (type != nullptr) {
+    for (const auto& field : type->fields()) {
+      field_to_parent_type_map_[&field] = type;
+    }
+  }
+
+  // Recurse for nested messages.
+  for (const auto& nested : msg.nested_type()) {
+    populateMapForMessage(nested, full_name);
+  }
 }
 
 void ProtoApiScrubberFilterConfig::resolveAndCacheType(

@@ -37,7 +37,6 @@ cargo_build_script(
     }),
     data = [
         "//source/extensions/dynamic_modules:abi.h",
-        "//source/extensions/dynamic_modules:abi_version.h",
     ] + select({
         "@envoy_repo//:use_local_llvm": [],
         "@platforms//os:linux": [

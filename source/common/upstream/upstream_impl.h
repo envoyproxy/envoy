@@ -951,18 +951,16 @@ public:
   upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_protocol) const override;
 
   // Http::FilterChainFactory
-  bool createFilterChain(Http::FilterChainManager& manager,
-                         const Http::FilterChainOptions& options) const override {
+  bool createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) const override {
     if (http_filter_factories_.empty()) {
       return false;
     }
 
-    Http::FilterChainUtility::createFilterChainForFactories(manager, options,
-                                                            http_filter_factories_);
+    Http::FilterChainUtility::createFilterChainForFactories(callbacks, http_filter_factories_);
     return true;
   }
-  bool createUpgradeFilterChain(absl::string_view, const UpgradeMap*, Http::FilterChainManager&,
-                                const Http::FilterChainOptions&) const override {
+  bool createUpgradeFilterChain(absl::string_view, const UpgradeMap*,
+                                Http::FilterChainFactoryCallbacks&) const override {
     // Upgrade filter chains not yet supported for upstream HTTP filters.
     return false;
   }

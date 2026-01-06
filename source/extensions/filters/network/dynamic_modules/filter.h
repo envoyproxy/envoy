@@ -1,5 +1,9 @@
 #pragma once
 
+#include <string>
+#include <vector>
+
+#include "envoy/http/async_client.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 
@@ -17,6 +21,7 @@ namespace NetworkFilters {
  */
 class DynamicModuleNetworkFilter : public Network::Filter,
                                    public Network::ConnectionCallbacks,
+                                   public std::enable_shared_from_this<DynamicModuleNetworkFilter>,
                                    public Logger::Loggable<Logger::Id::dynamic_modules> {
 public:
   DynamicModuleNetworkFilter(DynamicModuleNetworkFilterConfigSharedPtr config);
@@ -81,6 +86,51 @@ public:
    */
   Network::Connection& connection() { return read_callbacks_->connection(); }
 
+  /**
+   * Sends an HTTP callout to the specified cluster with the given message.
+   */
+  envoy_dynamic_module_type_http_callout_init_result
+  sendHttpCallout(uint64_t* callout_id_out, absl::string_view cluster_name,
+                  Http::RequestMessagePtr&& message, uint64_t timeout_milliseconds);
+
+  /**
+   * Store an integer socket option for the current connection and Surface it back to modules.
+   */
+  void storeSocketOptionInt(int64_t level, int64_t name,
+                            envoy_dynamic_module_type_socket_option_state state, int64_t value);
+
+  /**
+   * Store a bytes socket option for the current connection and Surface it back to modules.
+   */
+  void storeSocketOptionBytes(int64_t level, int64_t name,
+                              envoy_dynamic_module_type_socket_option_state state,
+                              absl::string_view value);
+
+  /**
+   * Retrieve an integer socket option by level/name/state.
+   */
+  bool tryGetSocketOptionInt(int64_t level, int64_t name,
+                             envoy_dynamic_module_type_socket_option_state state,
+                             int64_t& value_out) const;
+
+  /**
+   * Retrieve a bytes socket option by level/name/state.
+   */
+  bool tryGetSocketOptionBytes(int64_t level, int64_t name,
+                               envoy_dynamic_module_type_socket_option_state state,
+                               absl::string_view& value_out) const;
+
+  /**
+   * Number of socket options stored for this connection.
+   */
+  size_t socketOptionCount() const { return socket_options_.size(); }
+
+  /**
+   * Fill provided buffer with stored socket options up to options_size.
+   */
+  void copySocketOptions(envoy_dynamic_module_type_socket_option* options_out, size_t options_size,
+                         size_t& options_written) const;
+
 private:
   /**
    * Helper to get the `this` pointer as a void pointer.
@@ -104,6 +154,49 @@ private:
   Buffer::Instance* current_write_buffer_ = nullptr;
 
   bool destroyed_ = false;
+
+  /**
+   * This implementation of the AsyncClient::Callbacks is used to handle the response from the HTTP
+   * callout from the parent network filter.
+   */
+  class HttpCalloutCallback : public Http::AsyncClient::Callbacks {
+  public:
+    HttpCalloutCallback(std::shared_ptr<DynamicModuleNetworkFilter> filter, uint64_t id)
+        : filter_(std::move(filter)), callout_id_(id) {}
+    ~HttpCalloutCallback() override = default;
+
+    void onSuccess(const Http::AsyncClient::Request& request,
+                   Http::ResponseMessagePtr&& response) override;
+    void onFailure(const Http::AsyncClient::Request& request,
+                   Http::AsyncClient::FailureReason reason) override;
+    void onBeforeFinalizeUpstreamSpan(Envoy::Tracing::Span&,
+                                      const Http::ResponseHeaderMap*) override {};
+    // This is the request object that is used to send the HTTP callout. It is used to cancel the
+    // callout if the filter is destroyed before the callout is completed.
+    Http::AsyncClient::Request* request_ = nullptr;
+
+  private:
+    const std::weak_ptr<DynamicModuleNetworkFilter> filter_;
+    const uint64_t callout_id_{};
+  };
+
+  uint64_t getNextCalloutId() { return next_callout_id_++; }
+
+  uint64_t next_callout_id_ = 1; // 0 is reserved as an invalid id.
+
+  absl::flat_hash_map<uint64_t, std::unique_ptr<DynamicModuleNetworkFilter::HttpCalloutCallback>>
+      http_callouts_;
+
+  struct StoredSocketOption {
+    int64_t level;
+    int64_t name;
+    envoy_dynamic_module_type_socket_option_state state;
+    bool is_int;
+    int64_t int_value;
+    std::string byte_value;
+  };
+
+  std::vector<StoredSocketOption> socket_options_;
 };
 
 using DynamicModuleNetworkFilterSharedPtr = std::shared_ptr<DynamicModuleNetworkFilter>;

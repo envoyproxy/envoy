@@ -63,13 +63,12 @@ public:
   }
 
   /**
-   * Returns false as it currently doesn't support `google.protobuf.Any` type.
+   * Returns true to indicate this checker supports processing Any fields.
    */
-  bool SupportAny() const override { return false; }
+  bool SupportAny() const override { return true; }
 
   /**
-   * Returns whether the `type` should be included (kInclude), excluded (kExclude)
-   * or traversed further (kPartial).
+   * Checks whether a type should be kept after scrubbing.
    */
   FieldCheckResults CheckType(const Protobuf::Type* type) const override;
 
@@ -101,6 +100,12 @@ private:
   // Optimized helper to walk the type descriptor and normalize map keys in the path.
   const NormalizationResult& normalizePath(const std::vector<std::string>& path) const;
 
+  // Helper to get the raw pointer from the shared pointer to use as a key in the cache.
+  const Matcher::MatchTree<HttpMatchingData>*
+  getMatchTreeRawPtr(const MatchTreeHttpMatchingDataSharedPtr& match_tree) const {
+    return match_tree.get();
+  }
+
   ScrubberContext scrubber_context_;
   Http::Matching::HttpMatchingDataImpl matching_data_;
   std::string method_name_;
@@ -110,6 +115,10 @@ private:
 
   // Cache normalized results.
   mutable absl::flat_hash_map<std::vector<std::string>, NormalizationResult> path_cache_;
+
+  // Cache to store match results.
+  mutable absl::flat_hash_map<const Matcher::MatchTree<HttpMatchingData>*, Matcher::MatchResult>
+      match_result_cache_;
 };
 
 } // namespace ProtoApiScrubber

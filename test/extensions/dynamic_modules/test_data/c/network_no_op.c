@@ -17,7 +17,7 @@ envoy_dynamic_module_type_abi_version_module_ptr envoy_dynamic_module_on_program
 envoy_dynamic_module_type_network_filter_config_module_ptr
 envoy_dynamic_module_on_network_filter_config_new(
     envoy_dynamic_module_type_network_filter_config_envoy_ptr filter_config_envoy_ptr,
-    const char* name_ptr, size_t name_size, const char* config_ptr, size_t config_size) {
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config) {
   return &some_variable;
 }
 
@@ -63,4 +63,20 @@ void envoy_dynamic_module_on_network_filter_event(
 void envoy_dynamic_module_on_network_filter_destroy(
     envoy_dynamic_module_type_network_filter_module_ptr filter_module_ptr) {
   assert(filter_module_ptr == &some_variable + 1);
+}
+
+void envoy_dynamic_module_on_network_filter_http_callout_done(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_network_filter_module_ptr filter_module_ptr, uint64_t callout_id,
+    envoy_dynamic_module_type_http_callout_result result,
+    envoy_dynamic_module_type_envoy_http_header* headers, size_t headers_count,
+    envoy_dynamic_module_type_envoy_buffer* body_chunks, size_t body_chunks_count) {
+  (void)filter_envoy_ptr;
+  (void)filter_module_ptr;
+  (void)callout_id;
+  (void)result;
+  (void)headers;
+  (void)headers_count;
+  (void)body_chunks;
+  (void)body_chunks_count;
 }

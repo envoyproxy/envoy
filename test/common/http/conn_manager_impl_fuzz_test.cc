@@ -77,16 +77,10 @@ public:
     encoder_filter_ = new NiceMock<MockStreamEncoderFilter>();
 
     EXPECT_CALL(filter_factory_, createFilterChain(_))
-        .WillOnce(Invoke([this](FilterChainManager& manager) -> bool {
-          FilterFactoryCb decoder_filter_factory = [this](FilterChainFactoryCallbacks& callbacks) {
-            callbacks.addStreamDecoderFilter(StreamDecoderFilterSharedPtr{decoder_filter_});
-          };
-          FilterFactoryCb encoder_filter_factory = [this](FilterChainFactoryCallbacks& callbacks) {
-            callbacks.addStreamEncoderFilter(StreamEncoderFilterSharedPtr{encoder_filter_});
-          };
-
-          manager.applyFilterFactoryCb({}, decoder_filter_factory);
-          manager.applyFilterFactoryCb({}, encoder_filter_factory);
+        .WillOnce(Invoke([this](FilterChainFactoryCallbacks& callbacks) -> bool {
+          callbacks.setFilterConfigName("");
+          callbacks.addStreamDecoderFilter(StreamDecoderFilterSharedPtr{decoder_filter_});
+          callbacks.addStreamEncoderFilter(StreamEncoderFilterSharedPtr{encoder_filter_});
           return true;
         }));
     EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_))
@@ -95,12 +89,11 @@ public:
           callbacks.streamInfo().setResponseCodeDetails("");
         }));
     EXPECT_CALL(*encoder_filter_, setEncoderFilterCallbacks(_));
-    EXPECT_CALL(filter_factory_, createUpgradeFilterChain(_, _, _, _))
-        .WillRepeatedly(
-            Invoke([&](absl::string_view, const Http::FilterChainFactory::UpgradeMap*,
-                       FilterChainManager& manager, const Http::FilterChainOptions&) -> bool {
-              return filter_factory_.createFilterChain(manager);
-            }));
+    EXPECT_CALL(filter_factory_, createUpgradeFilterChain(_, _, _))
+        .WillRepeatedly(Invoke([&](absl::string_view, const Http::FilterChainFactory::UpgradeMap*,
+                                   FilterChainFactoryCallbacks& callbacks) -> bool {
+          return filter_factory_.createFilterChain(callbacks);
+        }));
   }
 
   Http::ForwardClientCertType
@@ -304,7 +297,7 @@ public:
   Http::DefaultInternalAddressConfig internal_address_config_;
   bool normalize_path_{true};
   LocalReply::LocalReplyPtr local_reply_;
-  std::vector<Http::OriginalIPDetectionSharedPtr> ip_detection_extensions_{};
+  std::vector<Http::OriginalIPDetectionSharedPtr> ip_detection_extensions_;
   std::vector<Http::EarlyHeaderMutationPtr> early_header_mutations_;
   std::unique_ptr<HttpConnectionManagerProto::ProxyStatusConfig> proxy_status_config_;
 };

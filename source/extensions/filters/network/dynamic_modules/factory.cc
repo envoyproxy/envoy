@@ -12,7 +12,7 @@ namespace Configuration {
 
 absl::StatusOr<Network::FilterFactoryCb>
 DynamicModuleNetworkFilterConfigFactory::createFilterFactoryFromProtoTyped(
-    const FilterConfig& proto_config, FactoryContext& /*context*/) {
+    const FilterConfig& proto_config, FactoryContext& context) {
 
   const auto& module_config = proto_config.dynamic_module_config();
   auto dynamic_module = Extensions::DynamicModules::newDynamicModuleByName(
@@ -33,7 +33,8 @@ DynamicModuleNetworkFilterConfigFactory::createFilterFactoryFromProtoTyped(
       Envoy::Extensions::DynamicModules::NetworkFilters::DynamicModuleNetworkFilterConfigSharedPtr>
       filter_config =
           Envoy::Extensions::DynamicModules::NetworkFilters::newDynamicModuleNetworkFilterConfig(
-              proto_config.filter_name(), config, std::move(dynamic_module.value()));
+              proto_config.filter_name(), config, std::move(dynamic_module.value()),
+              context.serverFactoryContext().clusterManager());
 
   if (!filter_config.ok()) {
     return absl::InvalidArgumentError("Failed to create filter config: " +

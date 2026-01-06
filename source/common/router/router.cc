@@ -87,6 +87,7 @@ FilterConfig::FilterConfig(Stats::StatName stat_prefix,
           config.has_upstream_log_options()
               ? config.upstream_log_options().flush_upstream_log_on_upstream_stream()
               : false,
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, reject_connect_request_early_data, false),
           config.strict_check_headers(), context.serverFactoryContext().api().timeSource(),
           context.serverFactoryContext().httpContext(),
           context.serverFactoryContext().routerContext()) {
@@ -865,12 +866,9 @@ bool Filter::continueDecodeHeaders(Upstream::ThreadLocalCluster* cluster,
             // Calculate effective buffer limit for shadow streams using the same logic as main
             // request. A buffer limit of 1 is set in the case that the effective limit == 0,
             // because a buffer limit of zero on async clients is interpreted as no buffer limit.
-            .setBufferLimit([this]() -> uint32_t {
-              uint64_t effective_limit = calculateEffectiveBufferLimit();
-              // Convert to uint32_t for AsyncClient, clamping to max uint32_t if needed
-              uint32_t shadow_limit = static_cast<uint32_t>(std::min(
-                  effective_limit, static_cast<uint64_t>(std::numeric_limits<uint32_t>::max())));
-              return shadow_limit == 0 ? 1 : shadow_limit;
+            .setBufferLimit([this]() -> uint64_t {
+              const uint64_t effective_limit = calculateEffectiveBufferLimit();
+              return effective_limit == 0 ? 1 : effective_limit;
             }())
             .setDiscardResponseBody(true)
             .setFilterConfig(config_)
@@ -980,7 +978,6 @@ bool Filter::isEarlyConnectData() {
 }
 
 Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
-  ENVOY_STREAM_LOG(debug, "router decoding data: {}", *callbacks_, data.length());
   if (data.length() > 0 && isEarlyConnectData()) {
     callbacks_->sendLocalReply(Http::Code::BadRequest, "", nullptr, absl::nullopt,
                                StreamInfo::ResponseCodeDetails::get().EarlyConnectData);
