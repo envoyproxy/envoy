@@ -306,6 +306,24 @@ TEST_F(CompositeClusterTest, LoadBalancerContextDelegation) {
   EXPECT_EQ(1, wrapper.selectedClusterIndex());
 }
 
+TEST_F(CompositeClusterTest, LoadBalancerContextAsyncHostSelectionDelegates) {
+  NiceMock<Upstream::MockLoadBalancerContext> mock_context;
+  CompositeLoadBalancerContext wrapper(&mock_context, 5);
+
+  auto expected_host = std::make_shared<NiceMock<Upstream::MockHost>>();
+  const Upstream::Host* expected_host_raw = expected_host.get();
+  std::string expected_details = "async-selection-details";
+
+  EXPECT_CALL(mock_context, onAsyncHostSelection(_, _))
+      .WillOnce([expected_host_raw, &expected_details](Upstream::HostConstSharedPtr&& received_host,
+                                                       std::string&& received_details) {
+        EXPECT_EQ(expected_host_raw, received_host.get());
+        EXPECT_EQ(expected_details, received_details);
+      });
+
+  wrapper.onAsyncHostSelection(expected_host, std::move(expected_details));
+}
+
 // Test load balancer context wrapper with null context (owned context path).
 TEST_F(CompositeClusterTest, LoadBalancerContextWithNullContext) {
   CompositeLoadBalancerContext wrapper(nullptr, 0);
@@ -451,6 +469,63 @@ cluster_type:
 
   auto result = lb.peekAnotherHost(&context);
   EXPECT_EQ(mock_host, result);
+}
+
+TEST_F(CompositeClusterTest, PeekAnotherHostReturnsNullptrWhenAttemptExceedsClusters) {
+  const std::string yaml = R"EOF(
+name: overflow_peek_cluster
+connect_timeout: 0.25s
+lb_policy: CLUSTER_PROVIDED
+cluster_type:
+  name: envoy.clusters.composite
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
+    clusters:
+    - name: primary
+    - name: secondary
+)EOF";
+
+  initialize(yaml);
+
+  CompositeClusterLoadBalancer lb(cluster_->info(), cluster_->cluster_manager_,
+                                  cluster_->clusters_);
+
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+
+  EXPECT_CALL(context, requestStreamInfo()).WillRepeatedly(Return(&stream_info));
+  EXPECT_CALL(stream_info, attemptCount()).WillRepeatedly(Return(absl::optional<uint32_t>(3)));
+
+  EXPECT_EQ(nullptr, lb.peekAnotherHost(&context));
+}
+
+TEST_F(CompositeClusterTest, PeekAnotherHostReturnsNullptrWhenClusterUnavailable) {
+  const std::string yaml = R"EOF(
+name: missing_peek_cluster
+connect_timeout: 0.25s
+lb_policy: CLUSTER_PROVIDED
+cluster_type:
+  name: envoy.clusters.composite
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
+    clusters:
+    - name: missing_cluster
+)EOF";
+
+  initialize(yaml);
+
+  CompositeClusterLoadBalancer lb(cluster_->info(), cluster_->cluster_manager_,
+                                  cluster_->clusters_);
+
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+
+  EXPECT_CALL(context, requestStreamInfo()).WillRepeatedly(Return(&stream_info));
+  EXPECT_CALL(stream_info, attemptCount()).WillRepeatedly(Return(absl::optional<uint32_t>(1)));
+  EXPECT_CALL(server_context_.cluster_manager_, getThreadLocalCluster("missing_cluster"))
+      .WillOnce(Return(nullptr));
+
+  EXPECT_EQ(nullptr, lb.peekAnotherHost(&context));
 }
 
 // Test selectExistingConnection with successful delegation.
