@@ -678,5 +678,8 @@ new_features:
     Added comprehensive metrics and tracing tags to the
     :ref:`Proto API Scrubber <config_http_filters_proto_api_scrubber>` filter. This includes counters for requests,
     blocks, and failures, latency histograms, and span tags for scrubbing outcomes.
+- area: ratelimit
+  change: |
+    Added support for shadow mode in local rate limit filter.
 
 deprecated:
