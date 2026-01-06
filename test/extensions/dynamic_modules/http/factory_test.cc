@@ -231,7 +231,8 @@ filter_config:
       {"no_http_filter_per_route_config_destroy",
        symbol_err("envoy_dynamic_module_on_http_filter_per_route_config_destroy")},
       {"http_filter_per_route_config_new_fail", "Failed to initialize per-route dynamic module"},
-      {"server_init_fail", "Failed to load dynamic module: Dynamic module envoy_dynamic_module_on_server_init failed"},
+      {"server_init_fail",
+       "Failed to load dynamic module: Dynamic module envoy_dynamic_module_on_server_init failed"},
   };
 
   for (const auto& test_case : per_route_test_cases) {
@@ -291,7 +292,9 @@ filter_config:
   auto result = factory.createFilterFactoryFromProto(proto_config, "", context);
   EXPECT_FALSE(result.ok());
   EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
-  EXPECT_THAT(result.status().message(), testing::HasSubstr("Failed to load dynamic module: Dynamic module envoy_dynamic_module_on_server_init failed"));
+  EXPECT_THAT(result.status().message(),
+              testing::HasSubstr("Failed to load dynamic module: Dynamic module "
+                                 "envoy_dynamic_module_on_server_init failed"));
 }
 
 } // namespace HttpFilters
