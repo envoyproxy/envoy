@@ -197,7 +197,7 @@ Config::SharedConfig::SharedConfig(
         parseTLVs(config.proxy_protocol_tlvs(), context, dynamic_tlv_formatters_);
   }
 
-  merge_proxy_protocol_tlvs_ = config.merge_proxy_protocol_tlvs();
+  merge_with_downstream_tlvs_ = config.merge_with_downstream_tlvs();
 }
 
 Config::Config(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config,
@@ -692,7 +692,7 @@ Network::FilterStatus Filter::establishUpstreamConnection() {
             downstream_connection.connectionInfoProvider().localAddress(), tlvs}),
         StreamInfo::FilterState::StateType::ReadOnly,
         StreamInfo::FilterState::LifeSpan::Connection);
-  } else if (config_->sharedConfig()->mergeProxyProtocolTlvs()) {
+  } else if (config_->sharedConfig()->mergeWithDownstreamTlvs()) {
     // Downstream proxy protocol state exists and merge is enabled.
     // Merge tcp_proxy TLVs with downstream TLVs (tcp_proxy TLVs take precedence).
     const auto& existing_data = existing_state->value();

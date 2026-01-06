@@ -3231,12 +3231,12 @@ TEST_P(TcpProxyTest, LegacyFilterStateWithNewApi) {
 }
 
 // Test that merge config option merges tcp_proxy TLV entries with existing downstream ones.
-TEST_P(TcpProxyTest, MergeProxyProtocolTlvsWithDownstreamState) {
+TEST_P(TcpProxyTest, MergeWithDownstreamTlvsWithDownstreamState) {
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
   auto* tlv = config.add_proxy_protocol_tlvs();
   tlv->set_type(0xF1);
   tlv->set_value("tcp_proxy_value");
-  config.set_merge_proxy_protocol_tlvs(true);
+  config.set_merge_with_downstream_tlvs(true);
 
   // Set up existing downstream proxy protocol state (simulating proxy_protocol listener filter).
   Network::ProxyProtocolTLVVector downstream_tlvs;
@@ -3285,12 +3285,12 @@ TEST_P(TcpProxyTest, MergeProxyProtocolTlvsWithDownstreamState) {
 }
 
 // Test that tcp_proxy TLVs override downstream TLVs with the same type when merging.
-TEST_P(TcpProxyTest, MergeProxyProtocolTlvsPrecedence) {
+TEST_P(TcpProxyTest, MergeWithDownstreamTlvsPrecedence) {
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
   auto* tlv = config.add_proxy_protocol_tlvs();
   tlv->set_type(0xE1); // Same type as downstream TLV
   tlv->set_value("overridden");
-  config.set_merge_proxy_protocol_tlvs(true);
+  config.set_merge_with_downstream_tlvs(true);
 
   // Set up existing downstream proxy protocol state with a conflicting TLV type.
   Network::ProxyProtocolTLVVector downstream_tlvs;
@@ -3332,7 +3332,7 @@ TEST_P(TcpProxyTest, MergeProxyProtocolTlvsPrecedence) {
 }
 
 // Test that tcp_proxy TLVs are ignored when downstream state exists and merge is disabled.
-TEST_P(TcpProxyTest, NoMergeProxyProtocolTlvsWhenDisabled) {
+TEST_P(TcpProxyTest, NoMergeWithDownstreamTlvsWhenDisabled) {
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
   auto* tlv = config.add_proxy_protocol_tlvs();
   tlv->set_type(0xF1);
@@ -3372,13 +3372,13 @@ TEST_P(TcpProxyTest, NoMergeProxyProtocolTlvsWhenDisabled) {
 }
 
 // Test that merge with dynamic TLVs works correctly.
-TEST_P(TcpProxyTest, MergeProxyProtocolTlvsWithDynamicTlv) {
+TEST_P(TcpProxyTest, MergeWithDownstreamTlvsWithDynamicTlv) {
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
   auto* tlv = config.add_proxy_protocol_tlvs();
   tlv->set_type(0xF2);
   tlv->mutable_format_string()->mutable_text_format_source()->set_inline_string(
       "%DYNAMIC_METADATA(envoy.test:key)%");
-  config.set_merge_proxy_protocol_tlvs(true);
+  config.set_merge_with_downstream_tlvs(true);
 
   // Set dynamic metadata.
   filter_callbacks_.connection_.stream_info_.metadata_.mutable_filter_metadata()->insert(

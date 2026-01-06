@@ -167,8 +167,8 @@ When the downstream connection already contains ``PROXY`` protocol state (parsed
 ``proxy_protocol_tlvs`` configured in the TCP proxy filter are ignored by default.
 
 To merge the TCP proxy TLVs with the downstream TLVs, set
-:ref:`merge_proxy_protocol_tlvs
-<envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.merge_proxy_protocol_tlvs>`
+:ref:`merge_with_downstream_tlvs
+<envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.merge_with_downstream_tlvs>`
 to ``true``. When enabled:
 
 * TLVs specified in ``proxy_protocol_tlvs`` take precedence over downstream TLVs with the same type.
