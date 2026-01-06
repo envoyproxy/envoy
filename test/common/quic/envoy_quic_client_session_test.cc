@@ -355,7 +355,7 @@ TEST_P(EnvoyQuicClientSessionTest, OnGoAwayFrame) {
 
 TEST_P(EnvoyQuicClientSessionTest, StartDraining) {
   EXPECT_CALL(http_connection_callbacks_, onGoAway(Http::GoAwayErrorCode::NoError));
-  envoy_quic_session_->startDraining();
+  envoy_quic_session_->StartDraining();
 }
 
 TEST_P(EnvoyQuicClientSessionTest, ConnectionClose) {

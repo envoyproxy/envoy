@@ -576,6 +576,73 @@ TEST_P(ClientIntegrationTest, Http3ConnectionMigrationUponNetworkChangeEventsAnd
   EXPECT_EQ(1, getCounterValue("cluster.base.upstream_cx_http3_total"));
 }
 
+// Tests that when the current network is disconnected, the connection migrates to another available
+// network. And idle connections are closed when the old network connects again and became the
+// default.
+TEST_P(ClientIntegrationTest, Http3ConnectionMigrationUponNetworkDisconnectedAndroid) {
+  builder_.enableQuicConnectionMigration(true);
+  builder_.addRuntimeGuard("decouple_explicit_drain_pools_and_dns_refresh", true);
+  builder_.addRuntimeGuard("mobile_use_network_observer_registry", true);
+  initialize();
+
+  if (getCodecType() != Http::CodecType::HTTP3 || version_ != Network::Address::IpVersion::v4) {
+    // This test relies on a 2nd v4 loopback address.
+    return;
+  }
+  Buffer::OwnedImpl request_data = Buffer::OwnedImpl("request body");
+  default_request_headers_.addCopy(AutonomousStream::EXPECT_REQUEST_SIZE_BYTES,
+                                   std::to_string(request_data.length()));
+
+  EnvoyStreamCallbacks stream_callbacks1 = createDefaultStreamCallbacks();
+  stream_callbacks1.on_data_ = [this](const Buffer::Instance&, uint64_t, bool, envoy_stream_intel) {
+    cc_.on_data_calls_++;
+  };
+
+  stream_ = createNewStream(std::move(stream_callbacks1));
+  stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
+                       false);
+  // Wait for the upstream connection to be established.
+  ASSERT_TRUE(waitForCounterGe("cluster.base.upstream_cx_http3_total", 1));
+  ASSERT_TRUE(waitForCounterGe("cluster.base.upstream_rq_total", 1));
+
+  absl::Notification probing_socket_created;
+  EXPECT_CALL(helper_handle_->mock_helper(), bindSocketToNetwork(_, 2))
+      .WillOnce(Invoke([&](Network::ConnectionSocket& socket, int64_t) {
+        // Mock binding to the unknown network with a new address.
+        socket.ioHandle().bind(
+            std::make_shared<const Network::Address::Ipv4Instance>("127.0.0.2", 0, nullptr));
+        probing_socket_created.Notify();
+      }));
+  // The current WIFI network is disconnected, and the connection should migrate to the unknown
+  // network.
+  internalEngine()->onNetworkDisconnectAndroid(1);
+  // Wait for the device to migrate to the 2nd network.
+  probing_socket_created.WaitForNotificationWithTimeout(absl::Seconds(10));
+
+  // Continue sending more request body.
+  stream_->sendData(std::make_unique<Buffer::OwnedImpl>(std::move(request_data)));
+
+  stream_->close(Http::Utility::createRequestTrailerMapPtr());
+
+  terminal_callback_.waitReady();
+
+  ASSERT_EQ(cc_.on_headers_calls_, 1);
+  ASSERT_EQ(cc_.status_, "200");
+  ASSERT_GE(cc_.on_data_calls_, 1);
+  ASSERT_EQ(cc_.on_complete_calls_, 1);
+  ASSERT_EQ(3, last_stream_final_intel_.upstream_protocol);
+  ASSERT_EQ(0, last_stream_final_intel_.socket_reused);
+
+  // The old WIFI network appears again and becomes the default network. The idle connection should
+  // be closed.
+  internalEngine()->onNetworkConnectAndroid(ConnectionType::CONNECTION_WIFI, 1);
+  internalEngine()->onDefaultNetworkChangedAndroid(ConnectionType::CONNECTION_WIFI, 1);
+
+  ASSERT_TRUE(waitForCounterGe("http3.upstream.tx.quic_connection_close_error_code_QUIC_CONNECTION_"
+                               "MIGRATION_NO_MIGRATABLE_STREAMS",
+                               1));
+}
+
 TEST_P(ClientIntegrationTest, LargeResponse) {
   initialize();
   std::string data(1024 * 32, 'a');
