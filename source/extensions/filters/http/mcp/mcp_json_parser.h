@@ -115,7 +115,7 @@ public:
   // Get extraction policy for a specific method
   const std::vector<AttributeExtractionRule>& getFieldsForMethod(const std::string& method) const;
 
-  // Add method configuration (for defaults)
+  // Add method configuration
   void addMethodConfig(absl::string_view method, std::vector<AttributeExtractionRule> fields);
 
   // Get all global fields to always extract
@@ -135,7 +135,7 @@ private:
   void initializeDefaults();
   std::string getBuiltInMethodGroup(const std::string& method) const;
 
-  // Per-method field policies for defaults
+  // Per-method field policies
   absl::flat_hash_map<std::string, std::vector<AttributeExtractionRule>> method_fields_;
 
   // User-configured method configs
