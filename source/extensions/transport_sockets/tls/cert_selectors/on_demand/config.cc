@@ -40,7 +40,7 @@ absl::Status AsyncContextConfig::loadCert() {
   return absl::OkStatus();
 }
 
-const Ssl::TlsContext& AsyncContext::tlsContext() const { return tls_contexts_[0]; }
+const Ssl::TlsContext& ServerAsyncContext::tlsContext() const { return tls_contexts_[0]; }
 
 void Handle::notify(AsyncContextConstSharedPtr cert_ctx) {
   ASSERT(cb_);
@@ -110,7 +110,7 @@ absl::Status SecretManager::updateCertificate(absl::string_view secret_name,
                                               const Ssl::TlsCertificateConfig& cert_config) {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
   absl::Status creation_status = absl::OkStatus();
-  auto cert_context = std::make_shared<AsyncContext>(*stats_scope_, factory_context_, tls_config_,
+  auto cert_context = std::make_shared<ServerAsyncContext>(*stats_scope_, factory_context_, tls_config_,
                                                      cert_config, creation_status);
   RETURN_IF_NOT_OK(creation_status);
 
@@ -138,7 +138,7 @@ absl::Status SecretManager::updateAll() {
     // Refresh only if there is a certificate present and skip notifying.
     if (cert_config) {
       absl::Status creation_status = absl::OkStatus();
-      entry.cert_context_ = std::make_shared<AsyncContext>(
+      entry.cert_context_ = std::make_shared<ServerAsyncContext>(
           *stats_scope_, factory_context_, tls_config_, *cert_config, creation_status);
       setContext(secret_name, entry.cert_context_);
       RETURN_IF_NOT_OK(creation_status);
@@ -292,8 +292,19 @@ OnDemandTlsCertificateSelectorConfigFactory::createTlsCertificateSelectorFactory
                                                                  std::move(secret_manager));
 }
 
+absl::StatusOr<Ssl::UpstreamTlsCertificateSelectorFactoryPtr>
+UpstreamOnDemandTlsCertificateSelectorConfigFactory::createUpstreamTlsCertificateSelectorFactory(
+    const Protobuf::Message& /* config */,
+    Server::Configuration::GenericFactoryContext& /* factory_context */,
+    const Ssl::ClientContextConfig& /* tls_context*/ ) {
+  return absl::UnimplementedError("");
+}
+
 REGISTER_FACTORY(OnDemandTlsCertificateSelectorConfigFactory,
                  Ssl::TlsCertificateSelectorConfigFactory);
+
+REGISTER_FACTORY(UpstreamOnDemandTlsCertificateSelectorConfigFactory,
+                 Ssl::UpstreamTlsCertificateSelectorConfigFactory);
 
 } // namespace OnDemand
 } // namespace CertificateSelectors

@@ -303,7 +303,7 @@ message CommonTlsContext {
   //
   // For the upstream TLS socket, select a TLS certificate based on TLS server hello and the
   // transport socket options.
-  // [#extension-category: envoy.tls.certificate_selectors]
+  // [#extension-category: envoy.tls.certificate_selectors,envoy.tls.upstream_certificate_selectors]
   config.core.v3.TypedExtensionConfig custom_tls_certificate_selector = 16;
 
   // Certificate provider for fetching TLS certificates.

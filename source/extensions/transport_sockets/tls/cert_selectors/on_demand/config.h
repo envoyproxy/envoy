@@ -57,9 +57,26 @@ private:
 };
 using AsyncContextConfigConstPtr = std::unique_ptr<AsyncContextConfig>;
 
-class AsyncContext : public Extensions::TransportSockets::Tls::ServerContextImpl {
+class AsyncContext {
 public:
-  AsyncContext(Stats::Scope& scope, Server::Configuration::ServerFactoryContext& factory_context,
+  virtual ~AsyncContext() = default;
+
+  /**
+   * @return OCSP policy for the certificate, only needed by the server TLS context.
+   */
+  virtual Ssl::ServerContextConfig::OcspStaplePolicy ocspStaplePolicy() const PURE;
+
+  /**
+   * @return the low-level TLS context stored in this context.
+   */
+  virtual const Ssl::TlsContext& tlsContext() const PURE;
+};
+
+
+class ServerAsyncContext: public Extensions::TransportSockets::Tls::ServerContextImpl,
+                          public AsyncContext {
+public:
+  ServerAsyncContext(Stats::Scope& scope, Server::Configuration::ServerFactoryContext& factory_context,
                const Ssl::ServerContextConfig& tls_config,
                const Ssl::TlsCertificateConfig& cert_config, absl::Status& creation_status)
       : ServerContextImpl(
@@ -67,14 +84,10 @@ public:
             std::vector<std::reference_wrapper<const Ssl::TlsCertificateConfig>>{cert_config},
             false, factory_context, /** used by quic */ nullptr, creation_status) {}
 
-  Ssl::ServerContextConfig::OcspStaplePolicy ocspStaplePolicy() const {
+  Ssl::ServerContextConfig::OcspStaplePolicy ocspStaplePolicy() const override {
     return ocsp_staple_policy_;
   }
-
-  /**
-   * @return the low-level TLS context stored in this context.
-   */
-  const Ssl::TlsContext& tlsContext() const;
+  const Ssl::TlsContext& tlsContext() const override;
 };
 
 class Handle : public Ssl::SelectionHandle {
@@ -223,8 +236,7 @@ private:
   std::shared_ptr<SecretManager> secret_manager_;
 };
 
-class OnDemandTlsCertificateSelectorConfigFactory
-    : public Ssl::TlsCertificateSelectorConfigFactory {
+class OnDemandTlsCertificateSelectorConfigFactory: public Ssl::TlsCertificateSelectorConfigFactory {
 public:
   absl::StatusOr<Ssl::TlsCertificateSelectorFactoryPtr>
   createTlsCertificateSelectorFactory(const Protobuf::Message& proto_config,
@@ -240,6 +252,23 @@ public:
 };
 
 DECLARE_FACTORY(OnDemandTlsCertificateSelectorConfigFactory);
+
+class UpstreamOnDemandTlsCertificateSelectorConfigFactory: public Ssl::UpstreamTlsCertificateSelectorConfigFactory {
+public:
+  absl::StatusOr<Ssl::UpstreamTlsCertificateSelectorFactoryPtr>
+  createUpstreamTlsCertificateSelectorFactory(
+      const Protobuf::Message& config,
+      Server::Configuration::GenericFactoryContext& factory_context,
+      const Ssl::ClientContextConfig& tls_context) override;
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<ConfigProto>();
+  }
+
+  std::string name() const override { return "envoy.tls.upstream_certificate_selectors.on_demand_secret"; }
+};
+
+DECLARE_FACTORY(UpstreamOnDemandTlsCertificateSelectorConfigFactory);
 
 } // namespace OnDemand
 } // namespace CertificateSelectors
