@@ -1276,6 +1276,47 @@ public:
    * @param return the worker thread's dispatcher.
    */
   virtual Event::Dispatcher& dispatcher() PURE;
+
+  /**
+   * @return absl::string_view the latest configured name of the filter in the filter chain.
+   */
+  virtual absl::string_view filterConfigName() const PURE;
+
+  /**
+   * Set the configured name of the filter in the filter chain. This name is used to identify
+   * the filter self and look up filter-specific configuration in various places (e.g., route
+   * configuration).
+   *
+   * NOTE: This method should be called for each filter before adding the filter to the filter
+   * chain via addStreamDecoderFilter(), addStreamEncoderFilter(), or addStreamFilter().
+   *
+   * @param name the name to be used for looking up filter-specific configuration.
+   */
+  virtual void setFilterConfigName(absl::string_view name) PURE;
+
+  /**
+   * @return OptRef<const Router::Route> the route selected for this stream, if any.
+   */
+  virtual OptRef<const Router::Route> route() const PURE;
+
+  /**
+   * Check whether the filter chain is disabled for this stream.
+   * @param name the name of the filter chain to check.
+   *
+   * @return absl::optional<bool> whether the filter chain is disabled for this stream.
+   */
+  virtual absl::optional<bool> filterDisabled(absl::string_view name) const PURE;
+
+  /**
+   * @return const StreamInfo::StreamInfo& the stream info for this stream.
+   */
+  virtual const StreamInfo::StreamInfo& streamInfo() const PURE;
+
+  /**
+   * @return RequestHeaderMapOptRef the request headers for this stream.
+   */
+  virtual RequestHeaderMapOptRef requestHeaders() const PURE;
 };
+
 } // namespace Http
 } // namespace Envoy
