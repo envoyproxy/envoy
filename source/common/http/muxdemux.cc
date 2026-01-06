@@ -167,6 +167,7 @@ MuxDemux::multicast(const AsyncClient::StreamOptions& options,
   }
 
   auto multistream = std::unique_ptr<MultiStream>(new MultiStream(shared_from_this()));
+  multistream->callbacks_facades_.reserve(callbacks.size());
   for (const Callbacks& callback : callbacks) {
     // Use per-backend options if provided, otherwise fall back to the default options.
     const AsyncClient::StreamOptions& effective_options =
