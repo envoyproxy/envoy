@@ -1210,6 +1210,54 @@ TEST_F(FieldCheckerTest, ConstructorPropagatesHeadersAndTrailersToMatchTree) {
   field_checker.CheckField({field_name}, &field);
 }
 
+// Verifies that the match result is cached for duplicate matchers.
+TEST_F(FieldCheckerTest, MatchResultIsCached) {
+  const std::string method_name = "example.v1.Service/GetFoo";
+
+  // Two fields that map to the SAME matching rule (simulated by returning same Mock object).
+  const std::string field_name_1 = "field_one";
+  const std::string field_name_2 = "field_two";
+
+  Protobuf::Field field1;
+  field1.set_name(field_name_1);
+
+  Protobuf::Field field2;
+  field2.set_name(field_name_2);
+
+  NiceMock<MockProtoApiScrubberFilterConfig> mock_filter_config(stats_store_, time_system_);
+  NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
+
+  auto mock_match_tree = std::make_shared<NiceMock<MockMatchTree>>();
+  auto remove_action = std::make_shared<NiceMock<MockAction>>();
+
+  ON_CALL(*remove_action, typeUrl())
+      .WillByDefault(testing::Return(kRemoveFieldActionTypeWithoutPrefix));
+
+  // EXPECTATION: match() should be called EXACTLY ONCE.
+  // If caching fails, this expectation will fail because match() would be called twice.
+  EXPECT_CALL(*mock_match_tree, match(testing::_, testing::_))
+      .WillOnce(testing::Return(Matcher::MatchResult(remove_action)));
+
+  // Setup Config to return the SAME match tree instance for both fields.
+  // This simulates the behavior of the deduplication logic we added in FilterConfig.
+  ON_CALL(mock_filter_config, getRequestFieldMatcher(method_name, field_name_1))
+      .WillByDefault(testing::Return(mock_match_tree));
+  ON_CALL(mock_filter_config, getRequestFieldMatcher(method_name, field_name_2))
+      .WillByDefault(testing::Return(mock_match_tree));
+
+  ON_CALL(mock_filter_config, getMethodDescriptor(testing::_))
+      .WillByDefault(testing::Return(absl::NotFoundError("Method not found")));
+
+  FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info, {}, {}, {}, {},
+                             method_name, &mock_filter_config);
+
+  // First Call: Should trigger match() and cache the result.
+  EXPECT_EQ(field_checker.CheckField({field_name_1}, &field1), FieldCheckResults::kExclude);
+
+  // Second Call (Different field, same matcher): Should hit cache, NOT match().
+  EXPECT_EQ(field_checker.CheckField({field_name_2}, &field2), FieldCheckResults::kExclude);
+}
+
 TEST_F(FieldCheckerTest, IncludesType) {
   ProtoApiScrubberConfig config;
   initializeFilterConfig(config);
