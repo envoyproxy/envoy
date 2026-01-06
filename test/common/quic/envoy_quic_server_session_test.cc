@@ -1231,6 +1231,32 @@ TEST_F(EnvoyQuicServerSessionTest, SetSocketOption) {
   EXPECT_FALSE(envoy_quic_session_.setSocketOption(sockopt_name, sockopt_val));
 }
 
+TEST_F(EnvoyQuicServerSessionTest, RealClientConnectionsStats) {
+  installReadFilter();
+
+  Http::MockRequestDecoder request_decoder;
+  Http::MockStreamCallbacks stream_callbacks;
+  setupRequestDecoderMock(request_decoder);
+  EXPECT_CALL(request_decoder, accessLogHandlers());
+  auto stream =
+      dynamic_cast<EnvoyQuicServerStream*>(createNewStream(request_decoder, stream_callbacks));
+  EXPECT_EQ(1U, TestUtility::findGauge(listener_config_.listenerScope().store(),
+                                       "http3.downstream.real_client_connections_total")
+                    ->value());
+  EXPECT_EQ(1U, TestUtility::findGauge(listener_config_.listenerScope().store(),
+                                       "http3.downstream.real_client_connections_in_use")
+                    ->value());
+
+  EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::LocalReset, _));
+  stream->resetStream(Http::StreamResetReason::LocalReset);
+  EXPECT_EQ(1U, TestUtility::findGauge(listener_config_.listenerScope().store(),
+                                       "http3.downstream.real_client_connections_total")
+                    ->value());
+  EXPECT_EQ(0U, TestUtility::findGauge(listener_config_.listenerScope().store(),
+                                       "http3.downstream.real_client_connections_in_use")
+                    ->value());
+}
+
 class EnvoyQuicServerSessionTestWillNotInitialize : public EnvoyQuicServerSessionTest {
   void SetUp() override {}
   void TearDown() override {
