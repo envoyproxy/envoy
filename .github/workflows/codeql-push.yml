@@ -33,7 +33,7 @@ jobs:
     runs-on: ubuntu-22.04
     if: github.repository == 'envoyproxy/envoy'
     steps:
-    - uses: envoyproxy/toolshed/gh-actions/bind-mounts@cb93f5b06def5199bf739b007615f7a257bb0165  # v0.3.37
+    - uses: envoyproxy/toolshed/actions/bind-mounts@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
       if: |
         ! github.event.repository.private
       with:
@@ -48,14 +48,14 @@ jobs:
       if: |
         env.BUILD_TARGETS != ''
         && github.event.repository.private
-      uses: envoyproxy/toolshed/gh-actions/diskspace@cb93f5b06def5199bf739b007615f7a257bb0165  # v0.3.37
+      uses: envoyproxy/toolshed/actions/diskspace@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
       with:
         to_remove: |
           /usr/local/.ghcup
           /usr/local/lib/android
 
     - name: Checkout repository
-      uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3  # v6.0.0
+      uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
       with:
         fetch-depth: 2
 
@@ -88,7 +88,7 @@ jobs:
         echo "MINIMAL_BUILD_TARGET=//source/common/common:assert_lib" > $GITHUB_ENV
 
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@cf1bb45a277cb3c205638b2cd5c984db1c46a412  # codeql-bundle-v4.31.7
+      uses: github/codeql-action/init@5d4e8d1aca955e8d8589aabd499c5cae939e33c7  # codeql-bundle-v4.31.9
       with:
         languages: cpp
         trap-caching: false
@@ -129,4 +129,4 @@ jobs:
 
     - name: Perform CodeQL Analysis
       # if: ${{ env.BUILD_TARGETS != '' }}
-      uses: github/codeql-action/analyze@cf1bb45a277cb3c205638b2cd5c984db1c46a412  # codeql-bundle-v4.31.7
+      uses: github/codeql-action/analyze@5d4e8d1aca955e8d8589aabd499c5cae939e33c7  # codeql-bundle-v4.31.9

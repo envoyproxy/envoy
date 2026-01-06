@@ -9,7 +9,9 @@ def test_program(name):
         srcs = [name + ".c"],
         hdrs = [
             "//source/extensions/dynamic_modules:abi.h",
-            "//source/extensions/dynamic_modules:abi_version.h",
+        ],
+        deps = [
+            "//source/extensions/dynamic_modules:abi_version_lib",
         ],
         linkopts = [
             "-shared",

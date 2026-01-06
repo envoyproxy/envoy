@@ -4,11 +4,14 @@
 #include <string>
 #include <utility>
 
+#include "envoy/common/time.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/http/proto_api_scrubber/v3/config.pb.h"
 #include "envoy/extensions/filters/http/proto_api_scrubber/v3/matcher_actions.pb.h"
 #include "envoy/matcher/matcher.h"
 #include "envoy/server/factory_context.h"
+#include "envoy/stats/scope.h"
+#include "envoy/stats/stats_macros.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/http/utility.h"
@@ -18,6 +21,8 @@
 #include "absl/container/flat_hash_map.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/str_cat.h"
+#include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
 #include "grpc_transcoding/type_helper.h"
 #include "xds/type/matcher/v3/http_inputs.pb.h"
@@ -44,6 +49,54 @@ using StringPairToMatchTreeMap =
     absl::flat_hash_map<std::pair<std::string, std::string>, MatchTreeHttpMatchingDataSharedPtr>;
 using TypeFinder = std::function<const Envoy::Protobuf::Type*(const std::string&)>;
 } // namespace
+
+// All stats for the Proto API Scrubber filter. @see stats_macros.h for more details on stats.
+#define ALL_PROTO_API_SCRUBBER_STATS(COUNTER, GAUGE, HISTOGRAM)                                    \
+  COUNTER(request_scrubbing_failed)                                                                \
+  COUNTER(response_scrubbing_failed)                                                               \
+  COUNTER(method_blocked)                                                                          \
+  COUNTER(request_buffer_conversion_error)                                                         \
+  COUNTER(response_buffer_conversion_error)                                                        \
+  COUNTER(invalid_method_name)                                                                     \
+  COUNTER(total_requests)                                                                          \
+  COUNTER(total_requests_checked)                                                                  \
+  HISTOGRAM(request_scrubbing_latency, Milliseconds)                                               \
+  HISTOGRAM(response_scrubbing_latency, Milliseconds)
+
+struct ProtoApiScrubberStats {
+  ALL_PROTO_API_SCRUBBER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT,
+                               GENERATE_HISTOGRAM_STRUCT)
+
+  ProtoApiScrubberStats(Envoy::Stats::Scope& scope, absl::string_view prefix)
+      : request_scrubbing_failed_(makeCounter(scope, prefix, "request_scrubbing_failed")),
+        response_scrubbing_failed_(makeCounter(scope, prefix, "response_scrubbing_failed")),
+        method_blocked_(makeCounter(scope, prefix, "method_blocked")),
+        request_buffer_conversion_error_(
+            makeCounter(scope, prefix, "request_buffer_conversion_error")),
+        response_buffer_conversion_error_(
+            makeCounter(scope, prefix, "response_buffer_conversion_error")),
+        invalid_method_name_(makeCounter(scope, prefix, "invalid_method_name")),
+        total_requests_(makeCounter(scope, prefix, "total_requests")),
+        total_requests_checked_(makeCounter(scope, prefix, "total_requests_checked")),
+        request_scrubbing_latency_(makeHistogram(scope, prefix, "request_scrubbing_latency",
+                                                 Stats::Histogram::Unit::Milliseconds)),
+        response_scrubbing_latency_(makeHistogram(scope, prefix, "response_scrubbing_latency",
+                                                  Stats::Histogram::Unit::Milliseconds)) {}
+
+private:
+  static Stats::Counter& makeCounter(Envoy::Stats::Scope& scope, absl::string_view prefix,
+                                     absl::string_view name) {
+    return scope.counterFromStatName(
+        Stats::StatNameManagedStorage(absl::StrCat(prefix, name), scope.symbolTable()).statName());
+  }
+
+  static Stats::Histogram& makeHistogram(Envoy::Stats::Scope& scope, absl::string_view prefix,
+                                         absl::string_view name, Stats::Histogram::Unit unit) {
+    return scope.histogramFromStatName(
+        Stats::StatNameManagedStorage(absl::StrCat(prefix, name), scope.symbolTable()).statName(),
+        unit);
+  }
+};
 
 // The config for Proto API Scrubber filter. As a thread-safe class, it should be constructed only
 // once and shared among filters for better performance.
@@ -160,13 +213,28 @@ public:
 
   FilteringMode filteringMode() const { return filtering_mode_; }
 
+  // Returns the filter statistics helper.
+  const ProtoApiScrubberStats& stats() const { return stats_; }
+
+  // Returns the time source used for measuring latency.
+  TimeSource& timeSource() const { return time_source_; }
+
 protected:
   // Protected constructor to make sure that this class is used in a factory fashion using the
   // public `create` method.
-  ProtoApiScrubberFilterConfig() = default;
+  ProtoApiScrubberFilterConfig(ProtoApiScrubberStats stats, TimeSource& time_source)
+      : stats_(stats), time_source_(time_source) {}
 
 private:
   friend class MockProtoApiScrubberFilterConfig;
+
+  // Helper method to look up or create a MatchTree.
+  // This allows deduplication of identical matchers in the configuration, ensuring that
+  // if multiple fields share the same matcher config, they share the same MatchTree pointer.
+  // This is critical for efficient caching in FieldChecker.
+  MatchTreeHttpMatchingDataSharedPtr
+  getOrCreateMatcher(const xds::type::matcher::v3::Matcher& matcher,
+                     Server::Configuration::FactoryContext& context);
 
   // Validates the filtering mode. Currently, only FilteringMode::OVERRIDE is supported.
   // For any unsupported FilteringMode, it returns absl::InvalidArgument.
@@ -240,7 +308,7 @@ private:
   initializeMethodFieldRestrictions(absl::string_view method_name,
                                     StringPairToMatchTreeMap& field_restrictions,
                                     const Map<std::string, RestrictionConfig>& restrictions,
-                                    Server::Configuration::FactoryContext& context);
+                                    Envoy::Server::Configuration::FactoryContext& context);
 
   // Initializes the method-level restrictions.
   absl::Status
@@ -272,6 +340,9 @@ private:
   // A map from {message_name, field_name} to the respective match tree for fields within a message.
   StringPairToMatchTreeMap message_field_restrictions_;
 
+  // Map to deduplicate matchers. Key is the hash of the Matcher proto.
+  absl::flat_hash_map<uint64_t, MatchTreeHttpMatchingDataSharedPtr> unique_matchers_;
+
   // A global map used to recover the parent Type context from a Field pointer.
   // This is read-only after initialization.
   absl::flat_hash_map<const Envoy::Protobuf::Field*, const Envoy::Protobuf::Type*>
@@ -288,6 +359,12 @@ private:
   // These are populated during initialization and read-only afterwards, so no mutex is required.
   absl::flat_hash_map<std::string, const Protobuf::Type*> request_type_cache_;
   absl::flat_hash_map<std::string, const Protobuf::Type*> response_type_cache_;
+
+  // The stats helper used to record filter metrics.
+  ProtoApiScrubberStats stats_;
+
+  // The time source used for measuring latency.
+  TimeSource& time_source_;
 };
 
 // A class to validate the input type specified for the unified matcher in the config.

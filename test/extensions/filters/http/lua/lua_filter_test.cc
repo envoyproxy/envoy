@@ -106,9 +106,8 @@ public:
 
   void setupSecureConnection(const bool secure) {
     ssl_ = std::make_shared<NiceMock<Envoy::Ssl::MockConnectionInfo>>();
-    EXPECT_CALL(decoder_callbacks_, connection())
-        .WillOnce(Return(OptRef<const Network::Connection>{connection_}));
-    EXPECT_CALL(Const(connection_), ssl()).WillOnce(Return(secure ? ssl_ : nullptr));
+    EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
+    stream_info_.downstream_connection_info_provider_->setSslConnection(secure ? ssl_ : nullptr);
   }
 
   void setupMetadata(const std::string& yaml) {
@@ -2773,6 +2772,7 @@ TEST_F(LuaHttpFilterTest, SetGetDynamicMetadata) {
 }
 
 // Check the connection.
+// Note: connection():ssl() is deprecated. Use streamInfo():downstreamSslConnection() instead.
 TEST_F(LuaHttpFilterTest, CheckConnection) {
   const std::string SCRIPT{R"EOF(
     function envoy_on_request(request_handle)

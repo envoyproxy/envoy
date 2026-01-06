@@ -53,16 +53,16 @@ jobs:
     steps:
     - id: appauth
       name: Appauth
-      uses: envoyproxy/toolshed/gh-actions/appauth@cb93f5b06def5199bf739b007615f7a257bb0165  # v0.3.37
+      uses: envoyproxy/toolshed/actions/appauth@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
       with:
         app_id: ${{ secrets.ENVOY_CI_DEP_APP_ID }}
         key: ${{ secrets.ENVOY_CI_DEP_APP_KEY }}
     - id: checkout
       name: Checkout Envoy repository
-      uses: envoyproxy/toolshed/gh-actions/github/checkout@cb93f5b06def5199bf739b007615f7a257bb0165  # v0.3.37
+      uses: envoyproxy/toolshed/actions/github/checkout@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
       with:
         token: ${{ steps.appauth.outputs.token }}
-    - uses: envoyproxy/toolshed/gh-actions/bson@cb93f5b06def5199bf739b007615f7a257bb0165  # v0.3.37
+    - uses: envoyproxy/toolshed/actions/bson@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
       id: update
       name: Update dependency (${{ inputs.dependency }})
       with:
@@ -97,13 +97,13 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    - uses: envoyproxy/toolshed/gh-actions/upload/diff@cb93f5b06def5199bf739b007615f7a257bb0165  # v0.3.37
+    - uses: envoyproxy/toolshed/actions/upload/diff@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
       name: Upload diff
       with:
         name: ${{ inputs.dependency }}-${{ steps.update.outputs.output }}
     - name: Create a PR
       if: ${{ inputs.pr }}
-      uses: envoyproxy/toolshed/gh-actions/github/pr@cb93f5b06def5199bf739b007615f7a257bb0165  # v0.3.37
+      uses: envoyproxy/toolshed/actions/github/pr@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
       with:
         base: main
         body: |
@@ -134,11 +134,11 @@ jobs:
     steps:
     - id: appauth
       name: Appauth
-      uses: envoyproxy/toolshed/gh-actions/appauth@cb93f5b06def5199bf739b007615f7a257bb0165  # v0.3.37
+      uses: envoyproxy/toolshed/actions/appauth@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
       with:
         app_id: ${{ secrets.ENVOY_CI_DEP_APP_ID }}
         key: ${{ secrets.ENVOY_CI_DEP_APP_KEY }}
-    - uses: envoyproxy/toolshed/gh-actions/github/checkout@cb93f5b06def5199bf739b007615f7a257bb0165  # v0.3.37
+    - uses: envoyproxy/toolshed/actions/github/checkout@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
       id: checkout
       name: Checkout Envoy repository
       with:
@@ -146,7 +146,7 @@ jobs:
           path: envoy
           fetch-depth: 0
         token: ${{ steps.appauth.outputs.token }}
-    - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3  # v6.0.0
+    - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
       name: Checkout Envoy build tools repository
       with:
         repository: envoyproxy/envoy-build-tools
@@ -185,7 +185,7 @@ jobs:
 
     - name: Check Docker SHAs
       id: build-images
-      uses: envoyproxy/toolshed/gh-actions/docker/shas@cb93f5b06def5199bf739b007615f7a257bb0165  # v0.3.37
+      uses: envoyproxy/toolshed/actions/docker/shas@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
       with:
         images: |
            sha: docker.io/envoyproxy/envoy-build:devtools-${{ steps.build-tools.outputs.tag }}
@@ -226,7 +226,7 @@ jobs:
       name: Update SHAs
       working-directory: envoy
     - name: Create a PR
-      uses: envoyproxy/toolshed/gh-actions/github/pr@cb93f5b06def5199bf739b007615f7a257bb0165  # v0.3.37
+      uses: envoyproxy/toolshed/actions/github/pr@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
       with:
         base: main
         body: Created by Envoy dependency bot
@@ -255,7 +255,7 @@ jobs:
       issues: write
     steps:
     - name: Checkout repository
-      uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3  # v6.0.0
+      uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
     - name: Run dependency checker
       run: |
         TODAY_DATE=$(date -u -I"date")

@@ -212,7 +212,9 @@ def envoy_dependencies(skip_targets = []):
     external_http_archive("bazel_features")
     external_http_archive("bazel_toolchains")
     external_http_archive("bazel_compdb")
-    external_http_archive("envoy_examples")
+    external_http_archive(
+        name = "envoy_examples",
+    )
     external_http_archive("envoy_toolshed")
 
     _com_github_maxmind_libmaxminddb()
