@@ -89,20 +89,8 @@ Config::Config(
         }
 
         const char* servername = SSL_get_servername(client_hello->ssl, TLSEXT_NAMETYPE_host_name);
-        if (servername != nullptr) {
-          filter->onServername(absl::string_view(servername));
-        }
-        return ssl_select_cert_success;
-      });
-  SSL_CTX_set_tlsext_servername_callback(
-      ssl_ctx_.get(), [](SSL* ssl, int* out_alert, void*) -> int {
-        Filter* filter = static_cast<Filter*>(SSL_get_app_data(ssl));
-        filter->onServername(
-            absl::NullSafeStringView(SSL_get_servername(ssl, TLSEXT_NAMETYPE_host_name)));
-
-        // Return an error to stop the handshake; we have what we wanted already.
-        *out_alert = SSL_AD_USER_CANCELLED;
-        return SSL_TLSEXT_ERR_ALERT_FATAL;
+        filter->onServername(absl::NullSafeStringView(servername));
+        return ssl_select_cert_error;
       });
 }
 
@@ -144,14 +132,10 @@ void Filter::onALPN(const unsigned char* data, unsigned int len) {
 }
 
 void Filter::onServername(absl::string_view name) {
-  if (sni_found_) {
-    return;
-  }
   if (!name.empty()) {
     config_->stats().sni_found_.inc();
     cb_->socket().setRequestedServerName(name);
     ENVOY_LOG(debug, "tls:onServerName(), requestedServerName: {}", name);
-    sni_found_ = true;
   } else {
     config_->stats().sni_not_found_.inc();
   }

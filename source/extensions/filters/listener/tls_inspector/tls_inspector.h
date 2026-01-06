@@ -120,7 +120,6 @@ private:
   bssl::UniquePtr<SSL> ssl_;
   uint64_t read_{0};
   bool alpn_found_{false};
-  bool sni_found_{false};
   bool clienthello_success_{false};
   // We dynamically adjust the number of bytes requested by the filter up to the
   // maxConfigReadBytes.
