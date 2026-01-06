@@ -1896,11 +1896,11 @@ void ActiveStreamEncoderFilter::onEncoderFilterBelowWriteBufferLowWatermark() {
   parent_.callLowWatermarkCallbacks();
 }
 
-void ActiveStreamEncoderFilter::setEncoderBufferLimit(uint32_t limit) {
+void ActiveStreamEncoderFilter::setEncoderBufferLimit(uint64_t limit) {
   parent_.setBufferLimit(limit);
 }
 
-uint32_t ActiveStreamEncoderFilter::encoderBufferLimit() { return parent_.buffer_limit_; }
+uint64_t ActiveStreamEncoderFilter::encoderBufferLimit() { return parent_.buffer_limit_; }
 
 void ActiveStreamEncoderFilter::continueEncoding() { commonContinue(); }
 

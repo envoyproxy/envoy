@@ -368,8 +368,8 @@ public:
   MOCK_METHOD(const ScopeTrackedObject&, scope, ());
   MOCK_METHOD(void, onEncoderFilterAboveWriteBufferHighWatermark, ());
   MOCK_METHOD(void, onEncoderFilterBelowWriteBufferLowWatermark, ());
-  MOCK_METHOD(void, setEncoderBufferLimit, (uint32_t));
-  MOCK_METHOD(uint32_t, encoderBufferLimit, ());
+  MOCK_METHOD(void, setEncoderBufferLimit, (uint64_t));
+  MOCK_METHOD(uint64_t, encoderBufferLimit, ());
   MOCK_METHOD(void, restoreContextOnContinue, (ScopeTrackedObjectStack&));
   MOCK_METHOD(const Router::RouteSpecificFilterConfig*, mostSpecificPerFilterConfig, (), (const));
   MOCK_METHOD(Router::RouteSpecificFilterConfigs, perFilterConfigs, (), (const));
