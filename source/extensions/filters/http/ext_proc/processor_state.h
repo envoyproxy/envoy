@@ -253,11 +253,11 @@ public:
                      const Filters::Common::Expr::Activation& activation) const PURE;
 
   // Check whether this is the last response from the ext_proc server after
-  // the header response is received.
+  // the header response is received and processed.
   bool isLastResponseAfterHeaderResp() const;
 
   // Check whether this is the last response from the ext_proc server after
-  // a body response is received.
+  // a body response is received and processed.
   bool isLastResponseAfterBodyResp(bool eos_seen_in_body) const;
 
 protected:
