@@ -266,6 +266,15 @@ Utility::extractDownstreamAddressJustPort(const Network::Address::Instance& addr
   return {};
 }
 
+const std::string
+Utility::formatDownstreamAddressJustEndpointId(const Network::Address::Instance& address) {
+  std::string endpoint_id;
+  if (address.type() == Network::Address::Type::EnvoyInternal) {
+    endpoint_id = address.envoyInternalAddress()->endpointId();
+  }
+  return endpoint_id;
+}
+
 const absl::optional<Http::Code>
 ProxyStatusUtils::recommendedHttpStatusCode(const ProxyStatusError proxy_status) {
   // This switch statement was derived from the mapping from proxy error type to
