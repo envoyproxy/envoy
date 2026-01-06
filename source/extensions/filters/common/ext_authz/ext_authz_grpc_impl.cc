@@ -16,55 +16,62 @@ namespace Filters {
 namespace Common {
 namespace ExtAuthz {
 
+namespace {
+
+void processHeaderMutations(
+    const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption>& headers,
+    UnsafeHeaderVector& to_append, UnsafeHeaderVector& to_set, UnsafeHeaderVector& to_add,
+    UnsafeHeaderVector& to_add_if_absent, UnsafeHeaderVector& to_overwrite_if_exists,
+    bool& saw_invalid_append_actions) {
+  for (const auto& header : headers) {
+    if (header.has_append()) {
+      if (header.append().value()) {
+        to_append.emplace_back(header.header().key(), header.header().value());
+      } else {
+        to_set.emplace_back(header.header().key(), header.header().value());
+      }
+    } else {
+      switch (header.append_action()) {
+      case Router::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD:
+        to_add.emplace_back(header.header().key(), header.header().value());
+        break;
+      case Router::HeaderValueOption::ADD_IF_ABSENT:
+        to_add_if_absent.emplace_back(header.header().key(), header.header().value());
+        break;
+      case Router::HeaderValueOption::OVERWRITE_IF_EXISTS:
+        to_overwrite_if_exists.emplace_back(header.header().key(), header.header().value());
+        break;
+      case Router::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD:
+        to_set.emplace_back(header.header().key(), header.header().value());
+        break;
+      default:
+        saw_invalid_append_actions = true;
+        break;
+      }
+    }
+  }
+}
+
+} // namespace
+
 void copyHeaderFieldIntoResponse(
     ResponsePtr& response,
     const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption>& headers) {
-  for (const auto& header : headers) {
-    if (header.append().value()) {
-      response->headers_to_append.emplace_back(header.header().key(), header.header().value());
-    } else {
-      response->headers_to_set.emplace_back(header.header().key(), header.header().value());
-    }
-  }
+  processHeaderMutations(headers, response->headers_to_append, response->headers_to_set,
+                         response->headers_to_add, response->headers_to_add_if_absent,
+                         response->headers_to_overwrite_if_exists,
+                         response->saw_invalid_append_actions);
 }
 
 void copyOkResponseMutations(ResponsePtr& response,
                              const envoy::service::auth::v3::OkHttpResponse& ok_response) {
   copyHeaderFieldIntoResponse(response, ok_response.headers());
 
-  for (const auto& header : ok_response.response_headers_to_add()) {
-    if (header.has_append()) {
-      if (header.append().value()) {
-        response->response_headers_to_add.emplace_back(header.header().key(),
-                                                       header.header().value());
-      } else {
-        response->response_headers_to_set.emplace_back(header.header().key(),
-                                                       header.header().value());
-      }
-    } else {
-      switch (header.append_action()) {
-      case Router::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD:
-        response->response_headers_to_add.emplace_back(header.header().key(),
-                                                       header.header().value());
-        break;
-      case Router::HeaderValueOption::ADD_IF_ABSENT:
-        response->response_headers_to_add_if_absent.emplace_back(header.header().key(),
-                                                                 header.header().value());
-        break;
-      case Router::HeaderValueOption::OVERWRITE_IF_EXISTS:
-        response->response_headers_to_overwrite_if_exists.emplace_back(header.header().key(),
-                                                                       header.header().value());
-        break;
-      case Router::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD:
-        response->response_headers_to_set.emplace_back(header.header().key(),
-                                                       header.header().value());
-        break;
-      default:
-        response->saw_invalid_append_actions = true;
-        break;
-      }
-    }
-  }
+  processHeaderMutations(ok_response.response_headers_to_add(), response->response_headers_to_add,
+                         response->response_headers_to_set, response->response_headers_to_add,
+                         response->response_headers_to_add_if_absent,
+                         response->response_headers_to_overwrite_if_exists,
+                         response->saw_invalid_append_actions);
 
   response->headers_to_remove = std::vector<std::string>{ok_response.headers_to_remove().begin(),
                                                          ok_response.headers_to_remove().end()};

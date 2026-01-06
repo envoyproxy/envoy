@@ -447,6 +447,7 @@ private:
   void addErrorResponseHeaders(
       Http::HeaderMap& response_headers,
       const std::vector<std::pair<std::string, std::string>>& headers_to_set,
+      const std::vector<std::pair<std::string, std::string>>& headers_to_add,
       const std::vector<std::pair<std::string, std::string>>& headers_to_append);
 
   // Create a new gRPC client for per-route gRPC service configuration.

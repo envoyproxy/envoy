@@ -139,7 +139,21 @@ MATCHER_P(AuthzOkResponse, response, "") {
     return false;
   }
 
+  if (!TestCommon::compareHeaderVector(response.headers_to_set, arg->headers_to_set)) {
+    return false;
+  }
+
   if (!TestCommon::compareHeaderVector(response.headers_to_add, arg->headers_to_add)) {
+    return false;
+  }
+
+  if (!TestCommon::compareHeaderVector(response.headers_to_add_if_absent,
+                                       arg->headers_to_add_if_absent)) {
+    return false;
+  }
+
+  if (!TestCommon::compareHeaderVector(response.headers_to_overwrite_if_exists,
+                                       arg->headers_to_overwrite_if_exists)) {
     return false;
   }
 
@@ -150,6 +164,16 @@ MATCHER_P(AuthzOkResponse, response, "") {
 
   if (!TestCommon::compareHeaderVector(response.response_headers_to_set,
                                        arg->response_headers_to_set)) {
+    return false;
+  }
+
+  if (!TestCommon::compareHeaderVector(response.response_headers_to_add_if_absent,
+                                       arg->response_headers_to_add_if_absent)) {
+    return false;
+  }
+
+  if (!TestCommon::compareHeaderVector(response.response_headers_to_overwrite_if_exists,
+                                       arg->response_headers_to_overwrite_if_exists)) {
     return false;
   }
 

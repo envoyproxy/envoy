@@ -6347,6 +6347,200 @@ TEST_F(HttpFilterTest, MultipleSetCookieHeadersOnSuccess) {
   EXPECT_EQ(1U, config_->stats().ok_.value());
 }
 
+TEST_P(HttpFilterTestParam, RequestHeadersAppendActions) {
+  prepareCheck();
+  request_headers_.addCopy("append-if-exists-or-add", "initial");
+  request_headers_.addCopy("overwrite-if-exists", "initial");
+  request_headers_.addCopy("overwrite-if-exists-or-add", "initial");
+
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                           const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                           const StreamInfo::StreamInfo&) -> void {
+        Filters::Common::ExtAuthz::Response response{};
+        response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+
+        response.headers_to_add = {{"append-if-exists-or-add", "added"}, {"new-header", "added"}};
+        response.headers_to_add_if_absent = {{"add-if-absent", "added"},
+                                             {"append-if-exists-or-add", "ignored"}};
+        response.headers_to_overwrite_if_exists = {{"overwrite-if-exists", "overwritten"},
+                                                   {"new-header-2", "ignored"}};
+        response.headers_to_set = {{"overwrite-if-exists-or-add", "overwritten"},
+                                   {"new-header-3", "set"}};
+
+        callbacks.onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+      }));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+
+  // Check append-if-exists-or-add.
+  auto entries = request_headers_.get(Http::LowerCaseString("append-if-exists-or-add"));
+  EXPECT_EQ(2, entries.size());
+  EXPECT_EQ("initial", entries[0]->value().getStringView());
+  EXPECT_EQ("added", entries[1]->value().getStringView());
+
+  // Check headers_to_add for "new-header".
+  entries = request_headers_.get(Http::LowerCaseString("new-header"));
+  EXPECT_EQ(1, entries.size());
+  EXPECT_EQ("added", entries[0]->value().getStringView());
+
+  // Check headers_to_add_if_absent for "add-if-absent".
+  entries = request_headers_.get(Http::LowerCaseString("add-if-absent"));
+  EXPECT_EQ(1, entries.size());
+  EXPECT_EQ("added", entries[0]->value().getStringView());
+
+  // Check headers_to_add_if_absent for "append-if-exists-or-add". It should be ignored.
+  entries = request_headers_.get(Http::LowerCaseString("append-if-exists-or-add"));
+  EXPECT_EQ(2, entries.size());
+
+  // Check headers_to_overwrite_if_exists for "overwrite-if-exists".
+  entries = request_headers_.get(Http::LowerCaseString("overwrite-if-exists"));
+  EXPECT_EQ(1, entries.size());
+  EXPECT_EQ("overwritten", entries[0]->value().getStringView());
+
+  // Check headers_to_overwrite_if_exists for "new-header-2". It should be ignored.
+  entries = request_headers_.get(Http::LowerCaseString("new-header-2"));
+  EXPECT_TRUE(entries.empty());
+
+  // Check headers_to_set for "overwrite-if-exists-or-add".
+  entries = request_headers_.get(Http::LowerCaseString("overwrite-if-exists-or-add"));
+  EXPECT_EQ(1, entries.size());
+  EXPECT_EQ("overwritten", entries[0]->value().getStringView());
+
+  // Check headers_to_set for "new-header-3".
+  entries = request_headers_.get(Http::LowerCaseString("new-header-3"));
+  EXPECT_EQ(1, entries.size());
+  EXPECT_EQ("set", entries[0]->value().getStringView());
+
+  EXPECT_EQ(1U, config_->stats().ok_.value());
+}
+
+TEST_F(HttpFilterTest, ErrorResponseAddsHeadersToAdd) {
+  InSequence s;
+
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  failure_mode_allow: false
+  )EOF");
+
+  ON_CALL(decoder_filter_callbacks_, connection())
+      .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
+  connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
+
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(
+          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
+
+  EXPECT_CALL(decoder_filter_callbacks_, encodeHeaders_(_, _))
+      .WillOnce(Invoke([&](const Http::ResponseHeaderMap& headers, bool) -> void {
+        EXPECT_EQ(headers.getStatusValue(), std::to_string(enumToInt(Http::Code::Forbidden)));
+        const auto added = headers.get(Http::LowerCaseString("x-error-added"));
+        ASSERT_FALSE(added.empty());
+        EXPECT_EQ(added[0]->value().getStringView(), "value");
+      }));
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::Error;
+  response.status_code = Http::Code::Forbidden;
+  response.headers_to_add.emplace_back("x-error-added", "value");
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+
+  EXPECT_EQ(1U, config_->stats().error_.value());
+}
+
+TEST_F(HttpFilterTest, DeniedResponseAddsHeadersToAdd) {
+  InSequence s;
+
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  )EOF");
+
+  ON_CALL(decoder_filter_callbacks_, connection())
+      .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
+  connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
+
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(
+          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
+
+  EXPECT_CALL(decoder_filter_callbacks_, encodeHeaders_(_, _))
+      .WillOnce(Invoke([&](const Http::ResponseHeaderMap& headers, bool) -> void {
+        EXPECT_EQ(headers.getStatusValue(), std::to_string(enumToInt(Http::Code::Forbidden)));
+        const auto added = headers.get(Http::LowerCaseString("x-denied-added"));
+        ASSERT_FALSE(added.empty());
+        EXPECT_EQ(added[0]->value().getStringView(), "value");
+      }));
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
+  response.status_code = Http::Code::Forbidden;
+  response.headers_to_add.emplace_back("x-denied-added", "value");
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+
+  EXPECT_EQ(1U, config_->stats().denied_.value());
+}
+
+TEST_F(HttpFilterTest, DeniedResponseInvalidHeadersToAddRejectedWithValidation) {
+  InSequence s;
+
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  validate_mutations: true
+  )EOF");
+
+  ON_CALL(decoder_filter_callbacks_, connection())
+      .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
+  connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
+
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(
+          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
+
+  // Invalid headers_to_add should cause a rejection.
+  EXPECT_CALL(decoder_filter_callbacks_, encodeHeaders_(_, _))
+      .WillOnce(Invoke([&](const Http::ResponseHeaderMap& headers, bool) -> void {
+        // Should get 500 Internal Server Error from rejection.
+        EXPECT_EQ(headers.getStatusValue(),
+                  std::to_string(enumToInt(Http::Code::InternalServerError)));
+      }));
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
+  response.status_code = Http::Code::Forbidden;
+  response.headers_to_add.emplace_back("invalid\nheader", "value");
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+
+  // Invalid stat should be incremented.
+  EXPECT_EQ(1U, config_->stats().invalid_.value());
+}
+
 } // namespace
 } // namespace ExtAuthz
 } // namespace HttpFilters

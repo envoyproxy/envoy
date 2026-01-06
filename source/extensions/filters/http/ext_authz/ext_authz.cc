@@ -671,6 +671,8 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
     // cache.
     if (config_->clearRouteCache() &&
         (!response->headers_to_set.empty() || !response->headers_to_append.empty() ||
+         !response->headers_to_add.empty() || !response->headers_to_add_if_absent.empty() ||
+         !response->headers_to_overwrite_if_exists.empty() ||
          !response->headers_to_remove.empty() || !response->query_parameters_to_set.empty() ||
          !response->query_parameters_to_remove.empty())) {
       ENVOY_STREAM_LOG(debug, "ext_authz is clearing route cache", *decoder_callbacks_);
@@ -679,95 +681,99 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
 
     ENVOY_STREAM_LOG(trace,
                      "ext_authz filter added header(s) to the request:", *decoder_callbacks_);
-    for (const auto& [key, value] : response->headers_to_set) {
-      CheckResult check_result = validateAndCheckDecoderHeaderMutation(
-          Filters::Common::MutationRules::CheckOperation::SET, key, value);
-      switch (check_result) {
-      case CheckResult::OK:
-        ENVOY_STREAM_LOG(trace, "'{}':'{}'", *decoder_callbacks_, key, value);
-        request_headers_->setCopy(Http::LowerCaseString(key), value);
-        if (!headersWithinLimits(*request_headers_)) {
-          stats_.request_header_limits_reached_.inc();
-          rejectResponse();
-          return;
-        }
-        break;
-      case CheckResult::IGNORE:
-        ENVOY_STREAM_LOG(trace, "Ignoring invalid header to set '{}':'{}'.", *decoder_callbacks_,
-                         key, value);
-        break;
-      case CheckResult::FAIL:
-        ENVOY_STREAM_LOG(trace, "Rejecting invalid header to set '{}':'{}'.", *decoder_callbacks_,
-                         key, value);
-        rejectResponse();
-        return;
-      }
-    }
-    for (const auto& [key, value] : response->headers_to_add) {
-      CheckResult check_result = validateAndCheckDecoderHeaderMutation(
-          Filters::Common::MutationRules::CheckOperation::SET, key, value);
-      switch (check_result) {
-      case CheckResult::OK:
-        ENVOY_STREAM_LOG(trace, "'{}':'{}'", *decoder_callbacks_, key, value);
-        request_headers_->addCopy(Http::LowerCaseString(key), value);
-        if (!headersWithinLimits(*request_headers_)) {
-          stats_.request_header_limits_reached_.inc();
-          rejectResponse();
-          return;
-        }
-        break;
-      case CheckResult::IGNORE:
-        ENVOY_STREAM_LOG(trace, "Ignoring invalid header to add '{}':'{}'.", *decoder_callbacks_,
-                         key, value);
-        break;
-      case CheckResult::FAIL:
-        ENVOY_STREAM_LOG(trace, "Rejecting invalid header to add '{}':'{}'.", *decoder_callbacks_,
-                         key, value);
-        rejectResponse();
-        return;
-      }
-    }
-    for (const auto& [key, value] : response->headers_to_append) {
-      CheckResult check_result = validateAndCheckDecoderHeaderMutation(
-          Filters::Common::MutationRules::CheckOperation::APPEND, key, value);
-      switch (check_result) {
-      case CheckResult::OK: {
-        ENVOY_STREAM_LOG(trace, "'{}':'{}'", *decoder_callbacks_, key, value);
-        Http::LowerCaseString lowercase_key(key);
-        const auto header_to_modify = request_headers_->get(lowercase_key);
-        // TODO(dio): Add a flag to allow appending non-existent headers, without setting it
-        // first (via `headers_to_add`). For example, given:
-        // 1. Original headers {"original": "true"}
-        // 2. Response headers from the authorization servers {{"append": "1"}, {"append":
-        // "2"}}
-        //
-        // Currently it is not possible to add {{"append": "1"}, {"append": "2"}} (the
-        // intended combined headers: {{"original": "true"}, {"append": "1"}, {"append":
-        // "2"}}) to the request to upstream server by only sets `headers_to_append`.
-        if (!header_to_modify.empty()) {
-          ENVOY_STREAM_LOG(trace, "'{}':'{}'", *decoder_callbacks_, key, value);
-          // The current behavior of appending is by combining entries with the same key,
-          // into one entry. The value of that combined entry is separated by ",".
-          // TODO(dio): Consider to use addCopy instead.
-          request_headers_->appendCopy(lowercase_key, value);
+    auto process_headers =
+        [&](const Filters::Common::ExtAuthz::UnsafeHeaderVector& headers,
+            Filters::Common::MutationRules::CheckOperation check_op, absl::string_view op_name,
+            std::function<void(Http::LowerCaseString, absl::string_view)> mutate) -> bool {
+      for (const auto& [key, value] : headers) {
+        CheckResult check_result = validateAndCheckDecoderHeaderMutation(check_op, key, value);
+        switch (check_result) {
+        case CheckResult::OK:
+          mutate(Http::LowerCaseString(key), value);
           if (!headersWithinLimits(*request_headers_)) {
             stats_.request_header_limits_reached_.inc();
             rejectResponse();
-            return;
+            return false;
           }
+          break;
+        case CheckResult::IGNORE:
+          ENVOY_STREAM_LOG(trace, "Ignoring invalid header to {} '{}':'{}'.", *decoder_callbacks_,
+                           op_name, key, value);
+          break;
+        case CheckResult::FAIL:
+          ENVOY_STREAM_LOG(trace, "Rejecting invalid header to {} '{}':'{}'.", *decoder_callbacks_,
+                           op_name, key, value);
+          rejectResponse();
+          return false;
         }
-        break;
       }
-      case CheckResult::IGNORE:
-        ENVOY_STREAM_LOG(trace, "Ignoring invalid header to append '{}':'{}'.", *decoder_callbacks_,
-                         key, value);
-        break;
-      case CheckResult::FAIL:
-        ENVOY_STREAM_LOG(trace, "Rejecting invalid header to append '{}':'{}'.",
-                         *decoder_callbacks_, key, value);
-        rejectResponse();
-        return;
-      }
+      return true;
+    };
+
+    if (!process_headers(response->headers_to_set,
+                         Filters::Common::MutationRules::CheckOperation::SET, "set",
+                         [&](auto k, auto v) {
+                           ENVOY_STREAM_LOG(trace, "'{}':'{}'", *decoder_callbacks_, k.get(), v);
+                           request_headers_->setCopy(k, v);
+                         })) {
+      return;
+    }
+
+    if (!process_headers(response->headers_to_add,
+                         Filters::Common::MutationRules::CheckOperation::SET, "add",
+                         [&](auto k, auto v) {
+                           ENVOY_STREAM_LOG(trace, "'{}':'{}'", *decoder_callbacks_, k.get(), v);
+                           request_headers_->addCopy(k, v);
+                         })) {
+      return;
+    }
+
+    if (!process_headers(response->headers_to_append,
+                         Filters::Common::MutationRules::CheckOperation::APPEND, "append",
+                         [&](auto k, auto v) {
+                           const auto header_to_modify = request_headers_->get(k);
+                           // TODO(dio): Add a flag to allow appending non-existent headers, without
+                           // setting it first (via `headers_to_add`). For example, given:
+                           // 1. Original headers {"original": "true"}
+                           // 2. Response headers from the authorization servers {{"append": "1"},
+                           // {"append": "2"}}
+                           //
+                           // Currently it is not possible to add {{"append": "1"}, {"append": "2"}}
+                           // (the intended combined headers: {{"original": "true"}, {"append":
+                           // "1"}, {"append": "2"}}) to the request to upstream server by only sets
+                           // `headers_to_append`.
+                           if (!header_to_modify.empty()) {
+                             ENVOY_STREAM_LOG(trace, "'{}':'{}'", *decoder_callbacks_, k.get(), v);
+                             // The current behavior of appending is by combining entries with the
+                             // same key, into one entry. The value of that combined entry is
+                             // separated by ",".
+                             // TODO(dio): Consider to use addCopy instead.
+                             request_headers_->appendCopy(k, v);
+                           }
+                         })) {
+      return;
+    }
+
+    if (!process_headers(response->headers_to_add_if_absent,
+                         Filters::Common::MutationRules::CheckOperation::APPEND, "add if absent",
+                         [&](auto k, auto v) {
+                           if (request_headers_->get(k).empty()) {
+                             ENVOY_STREAM_LOG(trace, "'{}':'{}'", *decoder_callbacks_, k.get(), v);
+                             request_headers_->addCopy(k, v);
+                           }
+                         })) {
+      return;
+    }
+
+    if (!process_headers(response->headers_to_overwrite_if_exists,
+                         Filters::Common::MutationRules::CheckOperation::SET, "overwrite if exists",
+                         [&](auto k, auto v) {
+                           if (!request_headers_->get(k).empty()) {
+                             ENVOY_STREAM_LOG(trace, "'{}':'{}'", *decoder_callbacks_, k.get(), v);
+                             request_headers_->setCopy(k, v);
+                           }
+                         })) {
+      return;
     }
 
     ENVOY_STREAM_LOG(trace,
@@ -970,6 +976,15 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
           return;
         }
       }
+      for (const auto& [key, value] : response->headers_to_add) {
+        if (!Http::HeaderUtility::headerNameIsValid(key) ||
+            !Http::HeaderUtility::headerValueIsValid(value)) {
+          ENVOY_STREAM_LOG(trace, "Rejected invalid header '{}':'{}'.", *decoder_callbacks_, key,
+                           value);
+          rejectResponse();
+          return;
+        }
+      }
     }
 
     if (config_->maxDeniedResponseBodyBytes() > 0 &&
@@ -985,18 +1000,32 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
         StreamInfo::CoreResponseFlag::UnauthorizedExternalService);
     decoder_callbacks_->sendLocalReply(
         response->status_code, response->body,
-        [&headers = response->headers_to_set, &callbacks = *decoder_callbacks_,
-         this](Http::HeaderMap& response_headers) -> void {
+        [&headers_to_set = response->headers_to_set, &headers_to_add = response->headers_to_add,
+         &callbacks = *decoder_callbacks_, this](Http::HeaderMap& response_headers) -> void {
           ENVOY_STREAM_LOG(trace,
                            "ext_authz filter added header(s) to the local response:", callbacks);
           // Firstly, remove all headers requested by the ext_authz filter, to ensure that they will
           // override existing headers.
-          for (const auto& [key, _] : headers) {
+          for (const auto& [key, _] : headers_to_set) {
             response_headers.remove(Http::LowerCaseString(key));
           }
           // Then set all of the requested headers, allowing the same header to be set multiple
           // times, e.g. `Set-Cookie`.
-          for (const auto& [key, value] : headers) {
+          for (const auto& [key, value] : headers_to_set) {
+            if (config_->enforceResponseHeaderLimits() &&
+                response_headers.size() >= response_headers.maxHeadersCount()) {
+              stats_.omitted_response_headers_.inc();
+              ENVOY_LOG_EVERY_POW_2(
+                  warn,
+                  "Some ext_authz response headers weren't added because the header map was full.");
+              break;
+            }
+            ENVOY_STREAM_LOG(trace, " '{}':'{}'", callbacks, key, value);
+            response_headers.addCopy(Http::LowerCaseString(key), value);
+          }
+          // Handle headers_to_add from APPEND_IF_EXISTS_OR_ADD, which is default for
+          // append_action.
+          for (const auto& [key, value] : headers_to_add) {
             if (config_->enforceResponseHeaderLimits() &&
                 response_headers.size() >= response_headers.maxHeadersCount()) {
               stats_.omitted_response_headers_.inc();
@@ -1059,8 +1088,10 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
           status_code, response->body,
           [&headers_to_set = response->headers_to_set,
            &headers_to_append = response->headers_to_append,
+           &headers_to_add = response->headers_to_add,
            this](Http::HeaderMap& response_headers) -> void {
-            addErrorResponseHeaders(response_headers, headers_to_set, headers_to_append);
+            addErrorResponseHeaders(response_headers, headers_to_set, headers_to_add,
+                                    headers_to_append);
           },
           absl::nullopt, Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzError);
     }
@@ -1155,6 +1186,27 @@ bool Filter::validateAndClearInvalidErrorResponseAttributes(
                        *decoder_callbacks_);
       // Fall back to generic error by clearing all custom attributes.
       response->headers_to_set.clear();
+      response->headers_to_add.clear();
+      response->headers_to_append.clear();
+      response->body.clear();
+      response->status_code = static_cast<Http::Code>(0); // Clear custom status.
+      return false;
+    }
+  }
+
+  // Validate headers_to_add.
+  for (const auto& [key, value] : response->headers_to_add) {
+    if (!Http::HeaderUtility::headerNameIsValid(key) ||
+        !Http::HeaderUtility::headerValueIsValid(value)) {
+      ENVOY_STREAM_LOG(trace, "Rejected invalid error header '{}':'{}'.", *decoder_callbacks_, key,
+                       value);
+      ENVOY_STREAM_LOG(info,
+                       "Custom error response from ext_authz will be ignored due to invalid "
+                       "header. Falling back to generic error response.",
+                       *decoder_callbacks_);
+      // Fall back to generic error by clearing all custom attributes.
+      response->headers_to_set.clear();
+      response->headers_to_add.clear();
       response->headers_to_append.clear();
       response->body.clear();
       response->status_code = static_cast<Http::Code>(0); // Clear custom status.
@@ -1174,6 +1226,7 @@ bool Filter::validateAndClearInvalidErrorResponseAttributes(
                        *decoder_callbacks_);
       // Fall back to generic error by clearing all custom attributes.
       response->headers_to_set.clear();
+      response->headers_to_add.clear();
       response->headers_to_append.clear();
       response->body.clear();
       response->status_code = static_cast<Http::Code>(0); // Clear custom status.
@@ -1198,6 +1251,7 @@ bool Filter::canAddResponseHeader(Http::HeaderMap& response_headers) {
 void Filter::addErrorResponseHeaders(
     Http::HeaderMap& response_headers,
     const std::vector<std::pair<std::string, std::string>>& headers_to_set,
+    const std::vector<std::pair<std::string, std::string>>& headers_to_add,
     const std::vector<std::pair<std::string, std::string>>& headers_to_append) {
   ENVOY_STREAM_LOG(trace,
                    "ext_authz filter added header(s) to the error response:", *decoder_callbacks_);
@@ -1207,6 +1261,15 @@ void Filter::addErrorResponseHeaders(
     response_headers.remove(Http::LowerCaseString(key));
   }
   for (const auto& [key, value] : headers_to_set) {
+    if (!canAddResponseHeader(response_headers)) {
+      break;
+    }
+    ENVOY_STREAM_LOG(trace, " '{}':'{}'", *decoder_callbacks_, key, value);
+    response_headers.addCopy(Http::LowerCaseString(key), value);
+  }
+
+  // Handle headers_to_add from APPEND_IF_EXISTS_OR_ADD, which is default for append_action.
+  for (const auto& [key, value] : headers_to_add) {
     if (!canAddResponseHeader(response_headers)) {
       break;
     }

@@ -404,8 +404,12 @@ using HeaderValuePair = std::pair<const Http::LowerCaseString, const std::string
 TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithAddedAuthzHeaders) {
   const auto expected_headers = TestCommon::makeHeaderValueOption(
       {{":status", "200", false}, {"x-downstream-ok", "1", false}, {"x-upstream-ok", "1", false}});
+  // The default config has allowed_upstream_headers with prefix: "X-", so both
+  // x-downstream-ok and x-upstream-ok would match and get added to headers_to_set.
   const auto authz_response = TestCommon::makeAuthzResponse(
-      CheckStatus::OK, Http::Code::OK, EMPTY_STRING, TestCommon::makeHeaderValueOption({}),
+      CheckStatus::OK, Http::Code::OK, EMPTY_STRING,
+      TestCommon::makeHeaderValueOption(
+          {{"x-downstream-ok", "1", false}, {"x-upstream-ok", "1", false}}),
       // By default, the value of envoy.config.core.v3.HeaderValueOption.append is true.
       TestCommon::makeHeaderValueOption({{"x-downstream-ok", "1", true}}));
   auto check_response = TestCommon::makeMessageResponse(expected_headers);

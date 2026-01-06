@@ -97,6 +97,12 @@ struct Response {
   // (using "addCopy") to the request to the upstream server.
   UnsafeHeaderVector headers_to_add{};
   // A set of HTTP headers returned by the authorization server, will be optionally added
+  // (using "addCopy") to the request to the upstream server only if the headers were not present.
+  UnsafeHeaderVector headers_to_add_if_absent{};
+  // A set of HTTP headers returned by the authorization server, will be optionally set (using
+  // "setCopy") to the request to the upstream server only if the headers were present.
+  UnsafeHeaderVector headers_to_overwrite_if_exists{};
+  // A set of HTTP headers returned by the authorization server, will be optionally added
   // (using "addCopy") to the response sent back to the downstream client on OK auth
   // responses.
   UnsafeHeaderVector response_headers_to_add{};
