@@ -106,7 +106,6 @@ private:
   ParseState parseClientHello(const void* data, size_t len, uint64_t bytes_already_processed);
   ParseState onRead();
   void onALPN(const unsigned char* data, unsigned int len);
-  void onSNI(const unsigned char* data, unsigned int len);
   void onServername(absl::string_view name);
   void createJA3Hash(const SSL_CLIENT_HELLO* ssl_client_hello);
   void createJA4Hash(const SSL_CLIENT_HELLO* ssl_client_hello);
