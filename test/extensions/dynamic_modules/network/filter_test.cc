@@ -3,6 +3,7 @@
 
 #include "test/extensions/dynamic_modules/util.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {
@@ -16,13 +17,14 @@ public:
     auto dynamic_module = newDynamicModule(testSharedObjectPath("network_no_op", "c"), false);
     EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
-    auto filter_config_or_status =
-        newDynamicModuleNetworkFilterConfig("test_filter", "", std::move(dynamic_module.value()));
+    auto filter_config_or_status = newDynamicModuleNetworkFilterConfig(
+        "test_filter", "", std::move(dynamic_module.value()), cluster_manager_);
     EXPECT_TRUE(filter_config_or_status.ok()) << filter_config_or_status.status().message();
     filter_config_ = filter_config_or_status.value();
   }
 
   DynamicModuleNetworkFilterConfigSharedPtr filter_config_;
+  NiceMock<Upstream::MockClusterManager> cluster_manager_;
 };
 
 TEST_F(DynamicModuleNetworkFilterTest, BasicDataFlow) {
@@ -238,8 +240,9 @@ TEST(DynamicModuleNetworkFilterConfigTest, ConfigInitialization) {
   auto dynamic_module = newDynamicModule(testSharedObjectPath("network_no_op", "c"), false);
   EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
+  NiceMock<Upstream::MockClusterManager> cluster_manager;
   auto filter_config_or_status = newDynamicModuleNetworkFilterConfig(
-      "test_filter", "some_config", std::move(dynamic_module.value()));
+      "test_filter", "some_config", std::move(dynamic_module.value()), cluster_manager);
   EXPECT_TRUE(filter_config_or_status.ok());
 
   auto config = filter_config_or_status.value();
@@ -258,8 +261,9 @@ TEST(DynamicModuleNetworkFilterConfigTest, MissingSymbols) {
   auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", "c"), false);
   EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
-  auto filter_config_or_status =
-      newDynamicModuleNetworkFilterConfig("test_filter", "", std::move(dynamic_module.value()));
+  NiceMock<Upstream::MockClusterManager> cluster_manager;
+  auto filter_config_or_status = newDynamicModuleNetworkFilterConfig(
+      "test_filter", "", std::move(dynamic_module.value()), cluster_manager);
   EXPECT_FALSE(filter_config_or_status.ok());
 }
 
@@ -269,8 +273,9 @@ TEST(DynamicModuleNetworkFilterConfigTest, ConfigInitializationFailure) {
       newDynamicModule(testSharedObjectPath("network_config_new_fail", "c"), false);
   EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
-  auto filter_config_or_status =
-      newDynamicModuleNetworkFilterConfig("test_filter", "", std::move(dynamic_module.value()));
+  NiceMock<Upstream::MockClusterManager> cluster_manager;
+  auto filter_config_or_status = newDynamicModuleNetworkFilterConfig(
+      "test_filter", "", std::move(dynamic_module.value()), cluster_manager);
   EXPECT_FALSE(filter_config_or_status.ok());
   EXPECT_THAT(filter_config_or_status.status().message(),
               testing::HasSubstr("Failed to initialize"));
@@ -281,8 +286,9 @@ TEST(DynamicModuleNetworkFilterConfigTest, StopIterationStatus) {
       newDynamicModule(testSharedObjectPath("network_stop_iteration", "c"), false);
   EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
-  auto filter_config_or_status =
-      newDynamicModuleNetworkFilterConfig("test_filter", "", std::move(dynamic_module.value()));
+  NiceMock<Upstream::MockClusterManager> cluster_manager;
+  auto filter_config_or_status = newDynamicModuleNetworkFilterConfig(
+      "test_filter", "", std::move(dynamic_module.value()), cluster_manager);
   EXPECT_TRUE(filter_config_or_status.ok());
   auto config = filter_config_or_status.value();
 

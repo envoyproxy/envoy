@@ -1,5 +1,7 @@
 #include "source/extensions/filters/http/ext_proc/mutation_utils.h"
 
+#include <cstdint>
+
 #include "envoy/http/header_map.h"
 
 #include "source/common/http/header_utility.h"
@@ -85,6 +87,12 @@ absl::Status MutationUtils::responseHeaderSizeCheck(const Http::HeaderMap& heade
                                                     Counter& rejected_mutations) {
   const uint32_t remove_size = mutation.remove_headers().size();
   const uint32_t set_size = mutation.set_headers().size();
+  return responseHeaderSizeCheck(headers, set_size, remove_size, rejected_mutations);
+}
+
+absl::Status MutationUtils::responseHeaderSizeCheck(const Http::HeaderMap& headers,
+                                                    uint32_t set_size, uint32_t remove_size,
+                                                    Stats::Counter& rejected_mutations) {
   const uint32_t max_request_headers_count = headers.maxHeadersCount();
   bool count_exceeded = false;
 
@@ -275,6 +283,72 @@ ProcessingEffect::Effect MutationUtils::applyBodyMutations(const BodyMutation& m
 }
 
 bool MutationUtils::isValidHttpStatus(int code) { return (code >= 200); }
+
+absl::Status
+MutationUtils::protoToHeaders(const envoy::config::core::v3::HeaderMap& headers_proto,
+                              Http::HeaderMap& headers,
+                              const Filters::Common::MutationRules::Checker& rule_checker,
+                              Stats::Counter& rejected_mutations) {
+  const auto result =
+      responseHeaderSizeCheck(headers, headers_proto.headers_size(), 0, rejected_mutations);
+  if (!result.ok()) {
+    return result;
+  }
+
+  for (const auto& header : headers_proto.headers()) {
+    bool invalid_character = false;
+    const absl::string_view header_value = header.raw_value();
+    if (!Http::HeaderUtility::headerNameIsValid(header.key())) {
+      ENVOY_LOG_PERIODIC(error, std::chrono::seconds(10),
+                         "set_headers contain invalid character in key, may not be appended.");
+      invalid_character = true;
+    }
+    if (!Http::HeaderUtility::headerValueIsValid(header_value)) {
+      ENVOY_LOG_PERIODIC(error, std::chrono::seconds(10),
+                         "set_headers contain invalid character in value, may not be appended.");
+      invalid_character = true;
+    }
+    if (invalid_character) {
+      rejected_mutations.inc();
+      return absl::InvalidArgumentError(kInvalidCharacterInSetMsg);
+    }
+
+    const LowerCaseString header_name(header.key());
+    // Special case for the :status header, which is required in HTTP response.
+    if (header_name == Http::Headers::get().Status) {
+      uint64_t response_code = 0;
+      if (!absl::SimpleAtoi(header_value, &response_code) || !isValidHttpStatus(response_code)) {
+        rejected_mutations.inc();
+        ENVOY_LOG_PERIODIC(error, std::chrono::seconds(10), "invalid :status header value {}.",
+                           header_value);
+        return absl::InvalidArgumentError(kSetFailedMsg);
+      }
+      headers.setCopy(header_name, header_value);
+      continue;
+    }
+
+    const auto check_op = CheckOperation::SET;
+    auto check_result = rule_checker.check(check_op, header_name, header_value);
+    switch (check_result) {
+    case CheckResult::OK:
+      ENVOY_LOG(trace, "Setting header {}", header.key());
+      headers.setCopy(header_name, header_value);
+      break;
+    case CheckResult::IGNORE:
+      ENVOY_LOG(debug, "Header {} may not be modified per rules", header_name);
+      rejected_mutations.inc();
+      break;
+    case CheckResult::FAIL:
+      ENVOY_LOG_PERIODIC(error, std::chrono::seconds(10),
+                         "Header {} may not be modified. Returning error", header_name);
+      rejected_mutations.inc();
+      return absl::InvalidArgumentError(kSetFailedMsg);
+    }
+  }
+
+  // After header mutation, check the ending headers are not exceeding the HCM limit.
+  return headerMutationResultCheck(headers, rejected_mutations);
+}
 
 } // namespace ExternalProcessing
 } // namespace HttpFilters

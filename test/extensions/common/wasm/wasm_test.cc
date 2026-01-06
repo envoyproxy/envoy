@@ -1360,9 +1360,10 @@ public:
   void setupContext() {
     WasmCommonContextTest::setupContext();
     ON_CALL(filter_factory_, createFilterChain(_))
-        .WillByDefault(Invoke([this](Http::FilterChainManager& manager) -> bool {
+        .WillByDefault(Invoke([this](Http::FilterChainFactoryCallbacks& callbacks) -> bool {
           auto factory = createWasmFilter();
-          manager.applyFilterFactoryCb({}, factory);
+          callbacks.setFilterConfigName("");
+          factory(callbacks);
           return true;
         }));
     ON_CALL(filter_manager_callbacks_, requestHeaders())

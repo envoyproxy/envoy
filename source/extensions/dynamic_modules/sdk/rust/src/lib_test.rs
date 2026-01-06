@@ -1,3 +1,4 @@
+#![allow(clippy::unnecessary_cast)]
 use crate::*;
 #[cfg(test)]
 use std::sync::atomic::AtomicBool; // This is used for testing the drop, not for the actual concurrency.
@@ -611,4 +612,227 @@ fn test_envoy_dynamic_module_on_network_filter_callbacks() {
   assert!(ON_READ_CALLED.load(std::sync::atomic::Ordering::SeqCst));
   assert!(ON_WRITE_CALLED.load(std::sync::atomic::Ordering::SeqCst));
   assert!(ON_EVENT_CALLED.load(std::sync::atomic::Ordering::SeqCst));
+}
+
+// =============================================================================
+// Socket option FFI stubs for testing.
+// =============================================================================
+
+#[derive(Clone)]
+struct StoredOption {
+  level: i64,
+  name: i64,
+  state: abi::envoy_dynamic_module_type_socket_option_state,
+  value: Option<Vec<u8>>,
+  int_value: Option<i64>,
+}
+
+static STORED_OPTIONS: std::sync::Mutex<Vec<StoredOption>> = std::sync::Mutex::new(Vec::new());
+
+fn reset_socket_options() {
+  STORED_OPTIONS.lock().unwrap().clear();
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_network_set_socket_option_int(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+  level: i64,
+  name: i64,
+  state: abi::envoy_dynamic_module_type_socket_option_state,
+  value: i64,
+) -> bool {
+  STORED_OPTIONS.lock().unwrap().push(StoredOption {
+    level,
+    name,
+    state,
+    value: None,
+    int_value: Some(value),
+  });
+  true
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_network_set_socket_option_bytes(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+  level: i64,
+  name: i64,
+  state: abi::envoy_dynamic_module_type_socket_option_state,
+  value: abi::envoy_dynamic_module_type_module_buffer,
+) -> bool {
+  let slice = unsafe { std::slice::from_raw_parts(value.ptr as *const u8, value.length) };
+  STORED_OPTIONS.lock().unwrap().push(StoredOption {
+    level,
+    name,
+    state,
+    value: Some(slice.to_vec()),
+    int_value: None,
+  });
+  true
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_network_get_socket_option_int(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+  level: i64,
+  name: i64,
+  state: abi::envoy_dynamic_module_type_socket_option_state,
+  value_out: *mut i64,
+) -> bool {
+  let options = STORED_OPTIONS.lock().unwrap();
+  options.iter().any(|opt| {
+    if opt.level == level && opt.name == name && opt.state == state {
+      if let Some(v) = opt.int_value {
+        if !value_out.is_null() {
+          unsafe {
+            *value_out = v;
+          }
+        }
+        return true;
+      }
+    }
+    false
+  })
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_network_get_socket_option_bytes(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+  level: i64,
+  name: i64,
+  state: abi::envoy_dynamic_module_type_socket_option_state,
+  value_out: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+) -> bool {
+  let options = STORED_OPTIONS.lock().unwrap();
+  options.iter().any(|opt| {
+    if opt.level == level && opt.name == name && opt.state == state {
+      if let Some(ref bytes) = opt.value {
+        if !value_out.is_null() {
+          unsafe {
+            (*value_out).ptr = bytes.as_ptr() as *const _;
+            (*value_out).length = bytes.len();
+          }
+        }
+        return true;
+      }
+    }
+    false
+  })
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_network_get_socket_options_size(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+) -> usize {
+  STORED_OPTIONS.lock().unwrap().len()
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_network_get_socket_options(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+  options_out: *mut abi::envoy_dynamic_module_type_socket_option,
+) {
+  if options_out.is_null() {
+    return;
+  }
+  let options = STORED_OPTIONS.lock().unwrap();
+  let mut written = 0usize;
+  for opt in options.iter() {
+    unsafe {
+      let out = options_out.add(written);
+      (*out).level = opt.level;
+      (*out).name = opt.name;
+      (*out).state = opt.state;
+      match opt.int_value {
+        Some(v) => {
+          (*out).value_type = abi::envoy_dynamic_module_type_socket_option_value_type::Int;
+          (*out).int_value = v;
+          (*out).byte_value.ptr = std::ptr::null();
+          (*out).byte_value.length = 0;
+        },
+        None => {
+          (*out).value_type = abi::envoy_dynamic_module_type_socket_option_value_type::Bytes;
+          if let Some(ref bytes) = opt.value {
+            (*out).byte_value.ptr = bytes.as_ptr() as *const _;
+            (*out).byte_value.length = bytes.len();
+          } else {
+            (*out).byte_value.ptr = std::ptr::null();
+            (*out).byte_value.length = 0;
+          }
+          (*out).int_value = 0;
+        },
+      }
+    }
+    written += 1;
+  }
+}
+
+#[test]
+fn test_socket_option_int_round_trip() {
+  reset_socket_options();
+  let mut filter = EnvoyNetworkFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+  assert!(filter.set_socket_option_int(
+    1,
+    2,
+    abi::envoy_dynamic_module_type_socket_option_state::Prebind,
+    42
+  ));
+  let value = filter.get_socket_option_int(
+    1,
+    2,
+    abi::envoy_dynamic_module_type_socket_option_state::Prebind,
+  );
+  assert_eq!(Some(42), value);
+}
+
+#[test]
+fn test_socket_option_bytes_round_trip() {
+  reset_socket_options();
+  let mut filter = EnvoyNetworkFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+  assert!(filter.set_socket_option_bytes(
+    3,
+    4,
+    abi::envoy_dynamic_module_type_socket_option_state::Bound,
+    b"bytes-val",
+  ));
+  let value = filter.get_socket_option_bytes(
+    3,
+    4,
+    abi::envoy_dynamic_module_type_socket_option_state::Bound,
+  );
+  assert_eq!(Some(b"bytes-val".to_vec()), value);
+}
+
+#[test]
+fn test_socket_option_list() {
+  reset_socket_options();
+  let mut filter = EnvoyNetworkFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+  assert!(filter.set_socket_option_int(
+    5,
+    6,
+    abi::envoy_dynamic_module_type_socket_option_state::Prebind,
+    11
+  ));
+  assert!(filter.set_socket_option_bytes(
+    7,
+    8,
+    abi::envoy_dynamic_module_type_socket_option_state::Listening,
+    b"data",
+  ));
+
+  let options = filter.get_socket_options();
+  assert_eq!(2, options.len());
+  match &options[0].value {
+    SocketOptionValue::Int(v) => assert_eq!(&11, v),
+    _ => panic!("expected int"),
+  }
+  match &options[1].value {
+    SocketOptionValue::Bytes(bytes) => assert_eq!(b"data".to_vec(), *bytes),
+    _ => panic!("expected bytes"),
+  }
 }
