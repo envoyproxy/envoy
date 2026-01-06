@@ -54,11 +54,14 @@ public:
 
   int selectTlsContext(SSL*);
 
-private:
-  ClientContextImpl(Stats::Scope& scope, const Envoy::Ssl::ClientContextConfig& config,
-                    Server::Configuration::CommonFactoryContext& factory_context,
-                    absl::Status& creation_status);
+protected:
+  ClientContextImpl(
+      Stats::Scope& scope, const Envoy::Ssl::ClientContextConfig& config,
+      const std::vector<std::reference_wrapper<const Ssl::TlsCertificateConfig>>& tls_certificates,
+      bool add_selector, Server::Configuration::CommonFactoryContext& factory_context,
+      absl::Status& creation_status);
 
+private:
   int newSessionKey(SSL_SESSION* session);
 
   const std::string server_name_indication_;

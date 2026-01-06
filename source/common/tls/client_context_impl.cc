@@ -48,18 +48,19 @@ absl::StatusOr<std::unique_ptr<ClientContextImpl>>
 ClientContextImpl::create(Stats::Scope& scope, const Envoy::Ssl::ClientContextConfig& config,
                           Server::Configuration::CommonFactoryContext& factory_context) {
   absl::Status creation_status = absl::OkStatus();
-  auto ret = std::unique_ptr<ClientContextImpl>(
-      new ClientContextImpl(scope, config, factory_context, creation_status));
+  auto ret = std::unique_ptr<ClientContextImpl>(new ClientContextImpl(
+      scope, config, config.tlsCertificates(), true, factory_context, creation_status));
   RETURN_IF_NOT_OK(creation_status);
   return ret;
 }
 
-ClientContextImpl::ClientContextImpl(Stats::Scope& scope,
-                                     const Envoy::Ssl::ClientContextConfig& config,
-                                     Server::Configuration::CommonFactoryContext& factory_context,
-                                     absl::Status& creation_status)
-    : ContextImpl(scope, config, config.tlsCertificates(), factory_context,
-                  nullptr /* additional_init */, creation_status),
+ClientContextImpl::ClientContextImpl(
+    Stats::Scope& scope, const Envoy::Ssl::ClientContextConfig& config,
+    const std::vector<std::reference_wrapper<const Ssl::TlsCertificateConfig>>& tls_certificates,
+    bool add_selector, Server::Configuration::CommonFactoryContext& factory_context,
+    absl::Status& creation_status)
+    : ContextImpl(scope, config, tls_certificates, factory_context, nullptr /* additional_init */,
+                  creation_status),
       server_name_indication_(config.serverNameIndication()),
       auto_host_sni_(config.autoHostServerNameIndication()),
       allow_renegotiation_(config.allowRenegotiation()),
@@ -77,7 +78,12 @@ ClientContextImpl::ClientContextImpl(Stats::Scope& scope,
   }
 
   // This should be guaranteed during configuration ingestion for client contexts.
-  ASSERT(tls_contexts_.size() == 1);
+  if (tls_contexts_.size() != 1) {
+    creation_status =
+        absl::InvalidArgumentError("Client TLS context supports only a single certificate");
+    return;
+  }
+
   if (!parsed_alpn_protocols_.empty()) {
     for (auto& ctx : tls_contexts_) {
       const int rc = SSL_CTX_set_alpn_protos(ctx.ssl_ctx_.get(), parsed_alpn_protocols_.data(),
@@ -98,15 +104,17 @@ ClientContextImpl::ClientContextImpl(Stats::Scope& scope,
         });
   }
 
-  if (auto factory = config.tlsCertificateSelectorFactory(); factory) {
-    tls_certificate_selector_ = factory->createUpstreamTlsCertificateSelector(*this);
-    SSL_CTX_set_cert_cb(
-        tls_contexts_[0].ssl_ctx_.get(),
-        [](SSL* ssl, void*) -> int {
-          return static_cast<ClientContextImpl*>(SSL_CTX_get_app_data(SSL_get_SSL_CTX(ssl)))
-              ->selectTlsContext(ssl);
-        },
-        nullptr);
+  if (add_selector) {
+    if (auto factory = config.tlsCertificateSelectorFactory(); factory) {
+      tls_certificate_selector_ = factory->createUpstreamTlsCertificateSelector(*this);
+      SSL_CTX_set_cert_cb(
+          tls_contexts_[0].ssl_ctx_.get(),
+          [](SSL* ssl, void*) -> int {
+            return static_cast<ClientContextImpl*>(SSL_CTX_get_app_data(SSL_get_SSL_CTX(ssl)))
+                ->selectTlsContext(ssl);
+          },
+          nullptr);
+    }
   }
 }
 

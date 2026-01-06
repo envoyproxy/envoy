@@ -346,9 +346,9 @@ public:
    */
   virtual absl::StatusOr<UpstreamTlsCertificateSelectorFactoryPtr>
   createUpstreamTlsCertificateSelectorFactory(
-      const Protobuf::Message& config,
+      const Protobuf::Message& proto_config,
       Server::Configuration::GenericFactoryContext& factory_context,
-      const ClientContextConfig& tls_context) PURE;
+      const ClientContextConfig& tls_config) PURE;
 
   std::string category() const override { return "envoy.tls.upstream_certificate_selectors"; }
 };
