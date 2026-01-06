@@ -610,7 +610,11 @@ new_features:
     the specified string matchers will be accessible. All other paths will return 403 Forbidden.
 - area: attributes
   change: |
-    Added :ref:`attributes <arch_overview_attributes>` for looking up request or response header bytes.
+    added :ref:`attributes <arch_overview_attributes>` for looking up request or response headers bytes.
+- area: ext_proc
+  change: |
+    Added :ref:`StreamedImmediateResponse <envoy_v3_api_msg_service.ext_proc.v3.StreamedImmediateResponse>` for streaming local
+    responses.
 - area: json_to_metadata
   change: |
     Added support for per-route configuration override in the ``json_to_metadata`` http filter. Routes can now
