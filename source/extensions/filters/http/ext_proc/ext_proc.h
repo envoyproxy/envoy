@@ -51,7 +51,8 @@ namespace ExternalProcessing {
   COUNTER(clear_route_cache_disabled)                                                              \
   COUNTER(clear_route_cache_upstream_ignored)                                                      \
   COUNTER(http_not_ok_resp_received)                                                               \
-  COUNTER(immediate_responses_sent)
+  COUNTER(immediate_responses_sent)                                                                \
+  COUNTER(server_half_closed)
 
 struct ExtProcFilterStats {
   ALL_EXT_PROC_FILTER_STATS(GENERATE_COUNTER_STRUCT)
@@ -102,6 +103,7 @@ public:
   void recordGrpcCall(std::chrono::microseconds latency, Grpc::Status::GrpcStatus call_status,
                       ProcessorState::CallbackState callback_state,
                       envoy::config::core::v3::TrafficDirection traffic_direction);
+  void setFailedOpen() { failed_open_ = true; }
   void recordGrpcStatusBeforeFirstCall(Grpc::Status::GrpcStatus call_status) {
     grpc_status_before_first_call_ = call_status;
   }
@@ -163,6 +165,8 @@ private:
   Upstream::HostDescriptionConstSharedPtr upstream_host_;
   // The status details of the underlying HTTP/2 stream. Envoy gRPC only.
   std::string http_response_code_details_;
+  // True if the stream failed open.
+  bool failed_open_{false};
   // The gRPC status when the openStream() operation fails.
   Grpc::Status::GrpcStatus grpc_status_before_first_call_ = Grpc::Status::Ok;
 };
@@ -573,6 +577,7 @@ private:
   StreamOpenState openStream();
   void closeStream();
   void halfCloseAndWaitForRemoteClose();
+  void logFailOpen();
 
   void recordGrpcStatusBeforeFirstCall(Grpc::Status::GrpcStatus call_status);
   void onFinishProcessorCalls(Grpc::Status::GrpcStatus call_status);

@@ -32,6 +32,7 @@ struct ResponseValues {
   const std::string UpstreamFailure = "upstream failure";
   const std::string UpstreamProtocolError = "upstream protocol error";
   const std::string AuthRequiredError = "NOAUTH Authentication required.";
+  const std::string UnsupportedProtocol = "NOPROTO unsupported protocol version";
 };
 
 using Response = ConstSingleton<ResponseValues>;
@@ -201,6 +202,23 @@ public:
 private:
   EvalRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source,
               bool delay_command_latency)
+      : SingleServerRequest(callbacks, command_stats, time_source, delay_command_latency) {}
+};
+
+/**
+ * ObjectRequest hashes the third argument as the key.
+ * OBJECT subcommand key [arguments] -> [0]=OBJECT, [1]=subcommand, [2]=key
+ */
+class ObjectRequest : public SingleServerRequest {
+public:
+  static SplitRequestPtr create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
+                                SplitCallbacks& callbacks, CommandStats& command_stats,
+                                TimeSource& time_source, bool delay_command_latency,
+                                const StreamInfo::StreamInfo& stream_info);
+
+private:
+  ObjectRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source,
+                bool delay_command_latency)
       : SingleServerRequest(callbacks, command_stats, time_source, delay_command_latency) {}
 };
 
@@ -518,6 +536,7 @@ private:
   RouterPtr router_;
   CommandHandlerFactory<SimpleRequest> simple_command_handler_;
   CommandHandlerFactory<EvalRequest> eval_command_handler_;
+  CommandHandlerFactory<ObjectRequest> object_command_handler_;
   CommandHandlerFactory<MGETRequest> mget_handler_;
   CommandHandlerFactory<MSETRequest> mset_handler_;
   CommandHandlerFactory<ScanRequest> scan_handler_;

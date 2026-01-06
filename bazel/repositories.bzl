@@ -214,7 +214,9 @@ def envoy_dependencies(skip_targets = []):
     external_http_archive("bazel_features")
     external_http_archive("bazel_toolchains")
     external_http_archive("bazel_compdb")
-    external_http_archive("envoy_examples")
+    external_http_archive(
+        name = "envoy_examples",
+    )
     external_http_archive("envoy_toolshed")
 
     _com_github_dlfcn_win32()
@@ -553,7 +555,10 @@ def _com_github_nghttp2_nghttp2():
         # This patch cannot be picked up due to ABI rules. Discussion at;
         # https://github.com/nghttp2/nghttp2/pull/1395
         # https://github.com/envoyproxy/envoy/pull/8572#discussion_r334067786
-        patches = ["@envoy//bazel/foreign_cc:nghttp2.patch"],
+        patches = [
+            "@envoy//bazel/foreign_cc:nghttp2.patch",
+            "@envoy//bazel/foreign_cc:nghttp2_huffman.patch",
+        ],
     )
 
 def _com_github_msgpack_cpp():

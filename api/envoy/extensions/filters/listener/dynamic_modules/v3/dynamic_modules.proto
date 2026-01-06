@@ -1,0 +1,73 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.listener.dynamic_modules.v3;
+
+import "envoy/extensions/dynamic_modules/v3/dynamic_modules.proto";
+
+import "google/protobuf/any.proto";
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.listener.dynamic_modules.v3";
+option java_outer_classname = "DynamicModulesProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/listener/dynamic_modules/v3;dynamic_modulesv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Listener filter for dynamic modules]
+// [#extension: envoy.filters.listener.dynamic_modules]
+
+// Configuration of the listener filter for dynamic modules. This filter allows loading shared object
+// files that can be loaded via dlopen by the listener filter.
+//
+// A module can be loaded by multiple listener filters, hence the program can be structured in a way
+// that the module is loaded only once and shared across multiple filters providing multiple
+// functionalities.
+//
+// Unlike network filters which operate on established TCP connections, listener filters
+// work with raw accepted sockets BEFORE a Connection object is created. The filter can:
+//
+// * Inspect initial bytes to detect protocols (TLS, HTTP, PostgreSQL, etc.).
+// * Set socket properties (SNI, ALPN, transport protocol, fingerprints).
+// * Modify connection addresses (original destination restoration).
+// * Set dynamic metadata and filter state for downstream filters.
+// * Rate limit incoming connections.
+//
+message DynamicModuleListenerFilter {
+  // Specifies the shared-object level configuration.
+  envoy.extensions.dynamic_modules.v3.DynamicModuleConfig dynamic_module_config = 1;
+
+  // The name for this filter configuration. This can be used to distinguish between different
+  // filter implementations inside a dynamic module. For example, a module can have completely
+  // different filter implementations (TLS inspector, rate limiter, proxy protocol parser).
+  // When Envoy receives this configuration, it passes the ``filter_name`` to the dynamic module's
+  // listener filter config init function together with the ``filter_config``. That way a module
+  // can decide which in-module filter implementation to use based on the name at load time.
+  string filter_name = 2;
+
+  // The configuration for the filter chosen by ``filter_name``. This is passed to the module's
+  // listener filter initialization function. Together with the ``filter_name``, the module can
+  // decide which in-module filter implementation to use and fine-tune the behavior of the filter.
+  //
+  // For example, if a module has two filter implementations, one for TLS inspection and one for
+  // rate limiting, ``filter_name`` is used to choose either TLS or rate limiting. The ``filter_config``
+  // can be used to configure the TLS inspection options or the rate limiting parameters.
+  //
+  // ``google.protobuf.Struct`` is serialized as JSON before passing it to the module.
+  // ``google.protobuf.BytesValue`` and ``google.protobuf.StringValue`` are passed directly
+  // without the wrapper.
+  //
+  // .. code-block:: yaml
+  //
+  //  # Passing a string value
+  //  filter_config:
+  //    "@type": "type.googleapis.com/google.protobuf.StringValue"
+  //    value: hello
+  //
+  //  # Passing raw bytes
+  //  filter_config:
+  //    "@type": "type.googleapis.com/google.protobuf.BytesValue"
+  //    value: aGVsbG8=  # echo -n "hello" | base64
+  //
+  google.protobuf.Any filter_config = 3;
+}

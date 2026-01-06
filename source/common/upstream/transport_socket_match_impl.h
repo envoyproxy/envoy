@@ -83,6 +83,8 @@ public:
     return true;
   }
 
+  bool usesFilterState() const override { return uses_filter_state_; }
+
 protected:
   TransportSocketMatcherImpl(
       const Protobuf::RepeatedPtrField<envoy::config::cluster::v3::Cluster::TransportSocketMatch>&
@@ -153,6 +155,7 @@ private:
   // Mutable because stats counters need to be incremented in the const resolve() method.
   mutable absl::flat_hash_map<std::string, TransportSocketMatchStats> matcher_stats_by_name_;
   std::unique_ptr<Matcher::MatchTree<Upstream::TransportSocketMatchingData>> matcher_;
+  bool uses_filter_state_{false};
 };
 
 // Import action classes from the extension.
