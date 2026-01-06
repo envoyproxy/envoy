@@ -39,7 +39,7 @@ def api_dependencies(bzlmod = False):
         name = "com_envoyproxy_protoc_gen_validate",
     )
     external_http_archive(
-        name = "com_google_googleapis",
+        name = "googleapis",
     )
     external_http_archive(
         name = "com_github_cncf_xds",

@@ -1,4 +1,4 @@
-load("@com_google_googleapis//:repository_rules.bzl", "switched_rules_by_language")
+load("@googleapis//:repository_rules.bzl", "switched_rules_by_language")
 load("@envoy_api//bazel:envoy_http_archive.bzl", "envoy_http_archive")
 load("@envoy_api//bazel:external_deps.bzl", "load_repository_locations")
 load(":repository_locations.bzl", "PROTOC_VERSIONS", "REPOSITORY_LOCATIONS_SPEC")
@@ -243,7 +243,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_wasmtime()
 
     switched_rules_by_language(
-        name = "com_google_googleapis_imports",
+        name = "com_googleapi_googleapis_imports",
         cc = True,
         go = True,
         python = True,

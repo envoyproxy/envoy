@@ -141,8 +141,8 @@ EXTERNAL_DEPS_MAP = {
     "grpc_transcoding": "@grpc_httpjson_transcoding//src:transcoding",
     "path_matcher": "@grpc_httpjson_transcoding//src:path_matcher",
     # Google APIs
-    "api_httpbody_protos": "@com_google_googleapis//google/api:httpbody_cc_proto",
-    "http_api_protos": "@com_google_googleapis//google/api:annotations_cc_proto",
+    "api_httpbody_protos": "@googleapis//google/api:httpbody_cc_proto",
+    "http_api_protos": "@googleapis//google/api:annotations_cc_proto",
     # nghttp2
     "nghttp2": "@envoy//bazel/foreign_cc:nghttp2",
     # gRPC

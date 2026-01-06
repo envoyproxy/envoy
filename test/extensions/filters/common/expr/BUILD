@@ -74,7 +74,7 @@ envoy_proto_library(
     srcs = ["evaluator_fuzz.proto"],
     deps = [
         "//test/fuzz:common_proto",
-        "@com_google_googleapis//google/api/expr/v1alpha1:syntax_proto",
+        "@googleapis//google/api/expr/v1alpha1:syntax_proto",
     ],
 )
 

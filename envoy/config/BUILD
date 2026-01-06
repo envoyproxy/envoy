@@ -144,7 +144,7 @@ envoy_cc_library(
         "//envoy/api:api_interface",
         "//envoy/protobuf:message_validator_interface",
         "//source/common/protobuf",
-        "@com_google_googleapis//google/rpc:status_cc_proto",
+        "@googleapis//google/rpc:status_cc_proto",
     ],
 )
 

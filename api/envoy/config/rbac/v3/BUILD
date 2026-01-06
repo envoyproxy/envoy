@@ -12,7 +12,7 @@ api_proto_package(
         "//envoy/type/matcher/v3:pkg",
         "//envoy/type/v3:pkg",
         "@com_github_cncf_xds//udpa/annotations:pkg",
-        "@com_google_googleapis//google/api/expr/v1alpha1:checked_proto",
-        "@com_google_googleapis//google/api/expr/v1alpha1:syntax_proto",
+        "@googleapis//google/api/expr/v1alpha1:checked_proto",
+        "@googleapis//google/api/expr/v1alpha1:syntax_proto",
     ],
 )

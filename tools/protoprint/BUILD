@@ -28,7 +28,7 @@ py_binary(
         "//tools/type_whisperer:api_type_db_proto_py_proto",
         "@com_github_cncf_xds//udpa/annotations:pkg_py_proto",
         "@com_github_cncf_xds//xds/annotations/v3:pkg_py_proto",
-        "@com_google_googleapis//google/api:annotations_py_proto",
+        "@googleapis//google/api:annotations_py_proto",
         "@com_google_protobuf//:protobuf_python",
         "@envoy_api//envoy/annotations:pkg_py_proto",
     ],

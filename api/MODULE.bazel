@@ -10,7 +10,7 @@ bazel_dep(name = "abseil-cpp", version = "20250814.1", repo_name = "com_google_a
 bazel_dep(name = "bazel_skylib", version = "1.8.2")
 bazel_dep(name = "cel-spec", version = "0.25.1", repo_name = "dev_cel")
 bazel_dep(name = "gazelle", version = "0.47.0", repo_name = "bazel_gazelle")
-bazel_dep(name = "googleapis", version = "0.0.0-20251003-2193a2bf", repo_name = "com_google_googleapis")
+bazel_dep(name = "googleapis", version = "0.0.0-20251003-2193a2bf")
 bazel_dep(name = "googleapis-cc", version = "1.0.0")
 bazel_dep(name = "googleapis-go", version = "1.0.0")
 bazel_dep(name = "googleapis-java", version = "1.0.0")

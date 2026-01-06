@@ -74,7 +74,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         license = "Apache-2.0",
         license_url = "https://github.com/openzipkin/zipkin-api/blob/{version}/LICENSE",
     ),
-    com_google_googleapis = dict(
+    googleapis = dict(
         # TODO(dio): Consider writing a Starlark macro for importing Google API proto.
         project_name = "Google APIs",
         project_desc = "Public interface definitions of Google APIs",
