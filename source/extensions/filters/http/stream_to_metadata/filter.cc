@@ -1,10 +1,12 @@
 #include "source/extensions/filters/http/stream_to_metadata/filter.h"
 
+#include <functional>
 #include <string>
 
 #include "source/common/common/utility.h"
 #include "source/common/http/utility.h"
 #include "source/common/json/json_loader.h"
+#include "source/common/protobuf/utility.h"
 
 #include "absl/strings/match.h"
 #include "absl/strings/strip.h"
@@ -38,14 +40,14 @@ FilterConfig::FilterConfig(
     Stats::Scope& scope)
     : stats_{ALL_STREAM_TO_METADATA_FILTER_STATS(
           POOL_COUNTER_PREFIX(scope, "stream_to_metadata.resp"))},
-      format_(config.response_rules().format()), rules_([&config]() {
+      format_(config.response_rules().format()), rules_(std::invoke([&config]() {
         Rules rules;
         for (const auto& rule : config.response_rules().rules()) {
           rules.emplace_back(rule);
         }
         return rules;
-      }()),
-      allowed_content_types_([&config]() {
+      })),
+      allowed_content_types_(std::invoke([&config]() {
         absl::flat_hash_set<std::string> types;
         if (config.response_rules().allowed_content_types().empty()) {
           types.insert(std::string(DefaultSseContentType));
@@ -55,7 +57,7 @@ FilterConfig::FilterConfig(
           }
         }
         return types;
-      }()),
+      })),
       max_event_size_(config.response_rules().has_max_event_size()
                           ? config.response_rules().max_event_size().value()
                           : 8192) {}
@@ -77,7 +79,7 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
       config_->stats().mismatched_content_type_.inc();
     }
   } else {
-    ENVOY_LOG(trace, "No Content-Type header found");
+    ENVOY_LOG(trace, "Missing Content-Type header (SSE streams require text/event-stream)");
     config_->stats().mismatched_content_type_.inc();
   }
 
@@ -335,7 +337,7 @@ Filter::extractValueFromJson(const Json::ObjectSharedPtr& json_obj,
 }
 
 void Filter::writeMetadata(const Json::ValueType& value, const MetadataDescriptor& descriptor) {
-  if (descriptor.preserve_existing_metadata_value()) {
+  if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(descriptor, preserve_existing_metadata_value, false)) {
     const auto& filter_metadata =
         encoder_callbacks_->streamInfo().dynamicMetadata().filter_metadata();
     const auto entry_it = filter_metadata.find(descriptor.metadata_namespace());

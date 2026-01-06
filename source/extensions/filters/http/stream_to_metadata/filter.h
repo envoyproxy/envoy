@@ -83,9 +83,9 @@ private:
 };
 
 /**
- * HTTP Stream to Metadata Filter for SSE responses.
- * This filter parses Server-Sent Events (SSE) streams, extracts JSON data from
- * the 'data' fields, and writes selected values to dynamic metadata.
+ * HTTP Stream to Metadata Filter.
+ * Extracts values from streaming HTTP response bodies and writes them to dynamic metadata.
+ * Currently supports parsing Server-Sent Events (SSE) format with JSON path selectors.
  */
 class Filter : public Http::PassThroughEncoderFilter, Logger::Loggable<Logger::Id::filter> {
 public:

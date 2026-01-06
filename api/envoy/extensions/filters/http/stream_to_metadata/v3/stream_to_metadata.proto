@@ -59,9 +59,10 @@ message StreamToMetadata {
     // The value's type — defaults to PROTOBUF_VALUE.
     ValueType type = 3 [(validate.rules).enum = {defined_only: true}];
 
-    // If true, do not overwrite existing metadata value for this key.
-    // Default is false (overwrite existing values).
-    bool preserve_existing_metadata_value = 4;
+    // If set to true, do not overwrite existing metadata value for this key.
+    // If not set or set to false, overwrite existing values.
+    // Default (not set) is false (overwrite existing values).
+    google.protobuf.BoolValue preserve_existing_metadata_value = 4;
   }
 
   // Specifies a path to a value within a JSON object using a sequence of keys.

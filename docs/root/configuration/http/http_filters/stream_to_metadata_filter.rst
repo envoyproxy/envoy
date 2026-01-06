@@ -1,19 +1,19 @@
 .. _config_http_filters_stream_to_metadata:
 
 Stream-To-Metadata Filter
-==========================
+=========================
 * This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.stream_to_metadata.v3.StreamToMetadata``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.stream_to_metadata.v3.StreamToMetadata>`
 
 The Stream-To-Metadata filter extracts values from streaming HTTP bodies and writes them to dynamic metadata.
-Currently, the filter processes response bodies only. This is particularly useful for observability, rate limiting,
-and routing decisions based on values that only appear in streaming responses.
+Currently, the filter processes response bodies only. This is particularly useful for observability and rate limiting
+based on values that only appear in streaming responses.
 
 The filter is configured with rules that specify:
 
-* Which streaming format to parse (currently only Server-Sent Events / SSE is supported)
+* The streaming format to parse (currently only Server-Sent Events (SSE) is supported)
 * A selector path to extract values from JSON payloads within the stream
-* Where to write the extracted values in dynamic metadata
+* The namespace(s) for extracted values in dynamic metadata to be written to.
 
 When a rule matches, the extracted value is written to the configured metadata namespace and key.
 The metadata can then be used for rate limiting decisions, consumed from logs, custom routing, or other purposes.
@@ -96,7 +96,9 @@ Key Configuration Options
   Configuration for processing response streams. Contains:
 
 **response_rules.format**
-  The streaming format to parse. Currently only ``SERVER_SENT_EVENTS`` is supported.
+  The streaming format to parse. Currently only :ref:`SERVER_SENT_EVENTS
+  <envoy_v3_api_enum_value_extensions.filters.http.stream_to_metadata.v3.StreamToMetadata.Format.SERVER_SENT_EVENTS>`
+  is supported.
 
 **response_rules.rules**
   A list of rules to apply. Each rule contains:
@@ -111,7 +113,8 @@ Key Configuration Options
     - ``metadata_namespace``: The metadata namespace (e.g., ``envoy.lb``)
     - ``key``: The metadata key
     - ``type``: The value type (``PROTOBUF_VALUE``, ``STRING``, or ``NUMBER``)
-    - ``preserve_existing_metadata_value``: If true, don't overwrite existing metadata (default: false)
+    - ``preserve_existing_metadata_value``: If set to true, don't overwrite existing metadata for this key.
+      If not set or set to false, overwrite existing values. Default is false (overwrite)
 
   * **stop_processing_on_match**: If true, stop processing the stream after this rule
     matches (picks FIRST occurrence). If false (default), continue processing the entire stream.
