@@ -1754,11 +1754,11 @@ void Filter::closeGrpcStreamIfLastRespReceived(const ProcessingResponse& respons
     last_response = true;
     break;
   case ProcessingResponse::ResponseCase::kStreamedImmediateResponse:
-    // Leave it as it is for now for streamed immediate response.
+    // Streamed immediate response handling closes the stream automatically
+    // once EoS is seen.
     break;
   case ProcessingResponse::ResponseCase::kImmediateResponse:
-    // Immediate response currently may close the stream immediately.
-    // Leave it as it is for now.
+    // Immediate response handling closes the stream immediately.
     break;
   default:
     break;
