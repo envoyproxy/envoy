@@ -254,7 +254,7 @@ NetworkExtProcFilter::StreamOpenState NetworkExtProcFilter::openStream() {
       client_->start(*this, config_with_hash_key_, options, watermark_callbacks_);
 
   if (stream_object == nullptr) {
-    ENVOY_CONN_LOG(error, "Failed to create gRPC stream to external processor",
+    ENVOY_CONN_LOG(debug, "Failed to create gRPC stream to external processor",
                    read_callbacks_->connection());
     stats_.stream_open_failures_.inc();
     return StreamOpenState::Error;
@@ -303,7 +303,7 @@ const std::chrono::milliseconds& NetworkExtProcFilter::getMessageTimeout() {
 
 void NetworkExtProcFilter::sendRequest(Buffer::Instance& data, bool end_stream, bool is_read) {
   if (stream_ == nullptr) {
-    ENVOY_CONN_LOG(error, "Cannot send request: stream is null", read_callbacks_->connection());
+    ENVOY_CONN_LOG(debug, "Cannot send request: stream is null", read_callbacks_->connection());
     return;
   }
 
@@ -406,7 +406,7 @@ void NetworkExtProcFilter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&
 
 void NetworkExtProcFilter::onGrpcError(Grpc::Status::GrpcStatus status,
                                        const std::string& message) {
-  ENVOY_CONN_LOG(error, "ext_proc: gRPC error: {}, message: {}", read_callbacks_->connection(),
+  ENVOY_CONN_LOG(warn, "ext_proc: gRPC error: {}, message: {}", read_callbacks_->connection(),
                  status, message);
   // Mark processing as complete to avoid further gRPC calls
   processing_complete_ = true;
