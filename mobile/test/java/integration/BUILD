@@ -12,12 +12,7 @@ envoy_mobile_android_test(
     ],
     native_deps = [
         "//test/jni:libenvoy_jni_with_test_extensions.so",
-    ] + select({
-        "@platforms//os:macos": [
-            "//test/jni:libenvoy_jni_with_test_extensions_jnilib",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
     native_lib_name = "envoy_jni_with_test_extensions",
     test_class = "test.java.integration.AndroidEngineStartUpTest",
     deps = [
@@ -32,12 +27,7 @@ envoy_mobile_android_test(
     ],
     native_deps = [
         "//test/jni:libenvoy_jni_with_test_extensions.so",
-    ] + select({
-        "@platforms//os:macos": [
-            "//test/jni:libenvoy_jni_with_test_extensions_jnilib",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
     native_lib_name = "envoy_jni_with_test_extensions",
     test_class = "test.java.integration.AndroidEngineFlowTest",
     deps = [
@@ -53,12 +43,7 @@ envoy_mobile_android_test(
     ],
     native_deps = [
         "//test/jni:libenvoy_jni_with_test_extensions.so",
-    ] + select({
-        "@platforms//os:macos": [
-            "//test/jni:libenvoy_jni_with_test_extensions_jnilib",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
     native_lib_name = "envoy_jni_with_test_extensions",
     test_class = "test.java.integration.AndroidEngineExplicitFlowTest",
     deps = [
@@ -74,12 +59,7 @@ envoy_mobile_android_test(
     ],
     native_deps = [
         "//test/jni:libenvoy_jni_with_test_extensions.so",
-    ] + select({
-        "@platforms//os:macos": [
-            "//test/jni:libenvoy_jni_with_test_extensions_jnilib",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
     native_lib_name = "envoy_jni_with_test_extensions",
     test_class = "test.java.integration.AndroidEngineSocketTagTest",
     deps = [

@@ -12,12 +12,7 @@ envoy_mobile_android_test(
     ],
     native_deps = [
         "//test/jni:libenvoy_jni_with_test_extensions.so",
-    ] + select({
-        "@platforms//os:macos": [
-            "//test/jni:libenvoy_jni_with_test_extensions_jnilib",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
     native_lib_name = "envoy_jni_with_test_extensions",
     test_class = "test.kotlin.integration.EnvoyEngineSimpleIntegrationTest",
     deps = [
@@ -33,12 +28,7 @@ envoy_mobile_android_test(
     ],
     native_deps = [
         "//test/jni:libenvoy_jni_with_test_extensions.so",
-    ] + select({
-        "@platforms//os:macos": [
-            "//test/jni:libenvoy_jni_with_test_extensions_jnilib",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
     native_lib_name = "envoy_jni_with_test_extensions",
     test_class = "test.kotlin.integration.EngineApiTest",
     deps = [
@@ -54,12 +44,7 @@ envoy_mobile_android_test(
     ],
     native_deps = [
         "//test/jni:libenvoy_jni_with_test_extensions.so",
-    ] + select({
-        "@platforms//os:macos": [
-            "//test/jni:libenvoy_jni_with_test_extensions_jnilib",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
     native_lib_name = "envoy_jni_with_test_extensions",
     test_class = "test.kotlin.integration.KeyValueStoreTest",
     deps = [
@@ -76,12 +61,7 @@ envoy_mobile_android_test(
     ],
     native_deps = [
         "//test/jni:libenvoy_jni_with_test_extensions.so",
-    ] + select({
-        "@platforms//os:macos": [
-            "//test/jni:libenvoy_jni_with_test_extensions_jnilib",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
     native_lib_name = "envoy_jni_with_test_extensions",
     test_class = "test.kotlin.integration.SetEventTrackerTest",
     deps = [
@@ -98,12 +78,7 @@ envoy_mobile_android_test(
     ],
     native_deps = [
         "//test/jni:libenvoy_jni_with_test_extensions.so",
-    ] + select({
-        "@platforms//os:macos": [
-            "//test/jni:libenvoy_jni_with_test_extensions_jnilib",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
     native_lib_name = "envoy_jni_with_test_extensions",
     test_class = "test.kotlin.integration.SetLoggerTest",
     deps = [
@@ -120,12 +95,7 @@ envoy_mobile_android_test(
     ],
     native_deps = [
         "//test/jni:libenvoy_jni_with_test_extensions.so",
-    ] + select({
-        "@platforms//os:macos": [
-            "//test/jni:libenvoy_jni_with_test_extensions_jnilib",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
     native_lib_name = "envoy_jni_with_test_extensions",
     test_class = "test.kotlin.integration.CancelStreamTest",
     deps = [
@@ -141,12 +111,7 @@ envoy_mobile_android_test(
     ],
     native_deps = [
         "//test/jni:libenvoy_jni_with_test_extensions.so",
-    ] + select({
-        "@platforms//os:macos": [
-            "//test/jni:libenvoy_jni_with_test_extensions_jnilib",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
     native_lib_name = "envoy_jni_with_test_extensions",
     test_class = "test.kotlin.integration.StreamIdleTimeoutTest",
     deps = [
@@ -162,12 +127,7 @@ envoy_mobile_android_test(
     ],
     native_deps = [
         "//test/jni:libenvoy_jni_with_test_extensions.so",
-    ] + select({
-        "@platforms//os:macos": [
-            "//test/jni:libenvoy_jni_with_test_extensions_jnilib",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
     native_lib_name = "envoy_jni_with_test_extensions",
     test_class = "test.kotlin.integration.CancelGRPCStreamTest",
     deps = [
@@ -183,12 +143,7 @@ envoy_mobile_android_test(
     ],
     native_deps = [
         "//test/jni:libenvoy_jni_with_test_extensions.so",
-    ] + select({
-        "@platforms//os:macos": [
-            "//test/jni:libenvoy_jni_with_test_extensions_jnilib",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
     native_lib_name = "envoy_jni_with_test_extensions",
     test_class = "test.kotlin.integration.ResetConnectivityStateTest",
     deps = [
@@ -204,12 +159,7 @@ envoy_mobile_android_test(
     ],
     native_deps = [
         "//test/jni:libenvoy_jni_with_test_extensions.so",
-    ] + select({
-        "@platforms//os:macos": [
-            "//test/jni:libenvoy_jni_with_test_extensions_jnilib",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
     native_lib_name = "envoy_jni_with_test_extensions",
     test_class = "test.kotlin.integration.GRPCReceiveErrorTest",
     deps = [
@@ -225,12 +175,7 @@ envoy_mobile_android_test(
     ],
     native_deps = [
         "//test/jni:libenvoy_jni_with_test_extensions.so",
-    ] + select({
-        "@platforms//os:macos": [
-            "//test/jni:libenvoy_jni_with_test_extensions_jnilib",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
     native_lib_name = "envoy_jni_with_test_extensions",
     test_class = "test.kotlin.integration.ReceiveDataTest",
     deps = [
@@ -246,12 +191,7 @@ envoy_mobile_android_test(
     ],
     native_deps = [
         "//test/jni:libenvoy_jni_with_test_extensions.so",
-    ] + select({
-        "@platforms//os:macos": [
-            "//test/jni:libenvoy_jni_with_test_extensions_jnilib",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
     native_lib_name = "envoy_jni_with_test_extensions",
     test_class = "test.kotlin.integration.ReceiveErrorTest",
     deps = [
@@ -268,12 +208,7 @@ envoy_mobile_android_test(
     ],
     native_deps = [
         "//test/jni:libenvoy_jni_with_test_extensions.so",
-    ] + select({
-        "@platforms//os:macos": [
-            "//test/jni:libenvoy_jni_with_test_extensions_jnilib",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
     native_lib_name = "envoy_jni_with_test_extensions",
     test_class = "test.kotlin.integration.SendDataTest",
     deps = [
@@ -290,12 +225,7 @@ envoy_mobile_android_test(
     ],
     native_deps = [
         "//test/jni:libenvoy_jni_with_test_extensions.so",
-    ] + select({
-        "@platforms//os:macos": [
-            "//test/jni:libenvoy_jni_with_test_extensions_jnilib",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
     native_lib_name = "envoy_jni_with_test_extensions",
     test_class = "test.kotlin.integration.SendHeadersTest",
     deps = [
@@ -312,12 +242,7 @@ envoy_mobile_android_test(
     ],
     native_deps = [
         "//test/jni:libenvoy_jni_with_test_extensions.so",
-    ] + select({
-        "@platforms//os:macos": [
-            "//test/jni:libenvoy_jni_with_test_extensions_jnilib",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
     native_lib_name = "envoy_jni_with_test_extensions",
     test_class = "test.kotlin.integration.SendTrailersTest",
     deps = [
@@ -334,12 +259,7 @@ envoy_mobile_android_test(
     ],
     native_deps = [
         "//test/jni:libenvoy_jni_with_test_extensions.so",
-    ] + select({
-        "@platforms//os:macos": [
-            "//test/jni:libenvoy_jni_with_test_extensions_jnilib",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
     native_lib_name = "envoy_jni_with_test_extensions",
     test_class = "test.kotlin.integration.ReceiveTrailersTest",
     deps = [
@@ -355,12 +275,7 @@ envoy_mobile_android_test(
     ],
     native_deps = [
         "//test/jni:libenvoy_jni_with_test_extensions.so",
-    ] + select({
-        "@platforms//os:macos": [
-            "//test/jni:libenvoy_jni_with_test_extensions_jnilib",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
     native_lib_name = "envoy_jni_with_test_extensions",
     test_class = "test.kotlin.integration.FilterThrowingExceptionTest",
     deps = [
