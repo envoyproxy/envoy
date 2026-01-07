@@ -30,7 +30,8 @@ std::string SessionCodec::buildCompositeSessionId(
     backend_parts.push_back(absl::StrCat(backend, ":", encoded));
   }
 
-  return absl::StrCat(route, "@", subject, "@", absl::StrJoin(backend_parts, ","));
+  std::string encoded_subject = Base64::encode(subject.data(), subject.size());
+  return absl::StrCat(route, "@", encoded_subject, "@", absl::StrJoin(backend_parts, ","));
 }
 
 // TODO(botengyao): we could add a config option to the previous mcp_filter to get
@@ -44,7 +45,8 @@ SessionCodec::parseCompositeSessionId(const std::string& composite) {
 
   ParsedSession result;
   result.route = parts[0];
-  result.subject = parts[1];
+  // Decode Base64-encoded subject.
+  result.subject = Base64::decode(parts[1]);
 
   if (parts[2].empty()) {
     return absl::InvalidArgumentError("Empty backend sessions");
