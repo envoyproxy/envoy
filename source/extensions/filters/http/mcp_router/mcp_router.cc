@@ -336,8 +336,7 @@ bool McpRouterFilter::validateSubjectIfRequired() {
   }
 
   if (session_subject_ != *auth_subject) {
-    ENVOY_LOG(warn, "Session subject mismatch: session='{}' != auth='{}'", session_subject_,
-              *auth_subject);
+    ENVOY_LOG(warn, "Session subject mismatch: session='{}'", session_subject_);
     sendHttpError(403, "Session identity mismatch");
     return false;
   }
