@@ -40,8 +40,8 @@ configure_make(
         "nocompdb",
         "skip_on_windows",
     ],
-    targets = ["install"],
     target_compatible_with = ["@platforms//os:linux"],
+    targets = ["install"],
 )
 
 envoy_cc_library(
