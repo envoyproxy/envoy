@@ -357,7 +357,7 @@ private:
   int max_concurrent_streams_ = 0;
   bool use_quic_platform_packet_writer_ = false;
 
-  // QUIC connection migration (renamed for clarity).
+  // QUIC connection migration.
   bool enable_quic_connection_migration_ = false;
   bool migrate_idle_quic_connection_ = false;
   int max_idle_time_before_quic_migration_seconds_ = 0;
