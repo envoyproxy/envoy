@@ -1082,7 +1082,8 @@ TEST_F(ProxyProtocolTest, V2DuplicateTLVsInConfigAndMetadataHandledProperlyNoDup
       Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv6Instance("1:2:3::4", 8));
   auto dst_addr = Network::Address::InstanceConstSharedPtr(
       new Network::Address::Ipv6Instance("1:100:200:3::", 2));
-  Network::ProxyProtocolTLVVector tlv_vector{Network::ProxyProtocolTLV{0x5, {'a', 'b', 'c'}}};
+  Network::ProxyProtocolTLVVector tlv_vector{Network::ProxyProtocolTLV{0x5, {'a', 'b', 'c'}},
+                                             Network::ProxyProtocolTLV{0x6, {'a'}}};
   Network::ProxyProtocolData proxy_proto_data{src_addr, dst_addr, tlv_vector};
   Network::TransportSocketOptionsConstSharedPtr socket_options =
       std::make_shared<Network::TransportSocketOptionsImpl>(
@@ -1111,7 +1112,7 @@ TEST_F(ProxyProtocolTest, V2DuplicateTLVsInConfigAndMetadataHandledProperlyNoDup
   EXPECT_CALL(*host, metadata()).WillRepeatedly(Return(metadata));
   transport_callbacks_.connection_.streamInfo().upstreamInfo()->setUpstreamHost(host);
 
-  absl::flat_hash_set<uint8_t> pass_through_tlvs{};
+  absl::flat_hash_set<uint8_t> pass_through_tlvs{0x5};
   // The output buffer will include the host TLVs before the config TLVs.
   std::vector<Envoy::Network::ProxyProtocolTLV> custom_tlvs = {
       {0x98, {'d', '1'}},
@@ -1124,6 +1125,8 @@ TEST_F(ProxyProtocolTest, V2DuplicateTLVsInConfigAndMetadataHandledProperlyNoDup
 
   // Configure duplicate TLVs in the configuration.
   ProxyProtocolConfig config;
+  config.mutable_pass_through_tlvs()->set_match_type(ProxyProtocolPassThroughTLVs::INCLUDE);
+  config.mutable_pass_through_tlvs()->add_tlv_type(0x5);
   config.set_version(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V2);
   auto tlv = config.add_added_tlvs();
   tlv->set_type(0x96);
