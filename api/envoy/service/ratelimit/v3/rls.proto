@@ -226,6 +226,24 @@ message RateLimitResponse {
   // the request will be treated as OVER_LIMIT.
   // [#not-implemented-hide:]
   Quota quota = 7;
-  
+
+  // Enables shadow mode for this rate limit request. When set to true, Envoy will not enforce
+  // rate limiting (i.e., will not reject requests or close connections when over limit) but will
+  // still collect metrics to observe what would have happened if rate limiting were enforced.
+  //
+  // In shadow mode:
+  //
+  // - Requests are never blocked, regardless of the overall_code (OK or OVER_LIMIT).
+  // - Separate shadow metrics are incremented (e.g., shadow_ok, shadow_over_limit) instead of
+  //   the normal rate limit metrics (ok, over_limit).
+  // - No enforcement actions are taken (no 429 responses for HTTP, no connection closes for TCP,
+  //   no local replies for Thrift).
+  // - Dynamic metadata and headers from the response are still processed normally.
+  //
+  // This is useful for safely validating rate limit configuration in production environments
+  // before enabling enforcement. Operators can observe the impact of rate limits through metrics
+  // without risking service disruption from misconfigured limits.
+  //
+  // Defaults to false (normal enforcement mode).
   bool shadow_mode = 8;
 }

@@ -540,7 +540,7 @@ TEST_F(ThriftRateLimitFilterTest, DefaultConfigValueTest) {
 }
 
 TEST_F(ThriftRateLimitFilterTest, ShadowModeOK) {
-  SetUpTest(filter_config_);
+  setupTest(filter_config_);
 
   EXPECT_CALL(*client_, limit(_, "foo", _, _, _, 0))
       .WillOnce(
@@ -549,16 +549,19 @@ TEST_F(ThriftRateLimitFilterTest, ShadowModeOK) {
           })));
   EXPECT_EQ(ThriftProxy::FilterStatus::StopIteration, filter_->messageBegin(request_metadata_));
 
-  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
+  EXPECT_CALL(filter_callbacks_, continueDecoding());
   request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OK, nullptr, nullptr,
                                nullptr, "", nullptr, true);
 
-  EXPECT_EQ(1U, stats_store_.counter("test.ratelimit.shadow_ok").value());
-  EXPECT_EQ(0U, stats_store_.counter("test.ratelimit.ok").value());
+  EXPECT_EQ(1U,
+            cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("ratelimit.shadow_ok")
+                .value());
+  EXPECT_EQ(0U,
+            cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("ratelimit.ok").value());
 }
 
 TEST_F(ThriftRateLimitFilterTest, ShadowModeOverLimit) {
-  SetUpTest(filter_config_);
+  setupTest(filter_config_);
 
   EXPECT_CALL(*client_, limit(_, "foo", _, _, _, 0))
       .WillOnce(
@@ -568,19 +571,22 @@ TEST_F(ThriftRateLimitFilterTest, ShadowModeOverLimit) {
   EXPECT_EQ(ThriftProxy::FilterStatus::StopIteration, filter_->messageBegin(request_metadata_));
 
   // In shadow mode, the request should continue, not be stopped
-  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
+  EXPECT_CALL(filter_callbacks_, continueDecoding());
   // Shadow mode should NOT send a local error
-  EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(_, _)).Times(0);
+  EXPECT_CALL(filter_callbacks_, sendLocalReply(_, _)).Times(0);
 
   request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OverLimit, nullptr, nullptr,
                                nullptr, "", nullptr, true);
 
-  EXPECT_EQ(1U, stats_store_.counter("test.ratelimit.shadow_over_limit").value());
-  EXPECT_EQ(0U, stats_store_.counter("test.ratelimit.over_limit").value());
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("ratelimit.shadow_over_limit")
+                    .value());
+  EXPECT_EQ(0U, cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("ratelimit.over_limit")
+                    .value());
 }
 
 TEST_F(ThriftRateLimitFilterTest, ShadowModeOverLimitWithDynamicMetadata) {
-  SetUpTest(filter_config_);
+  setupTest(filter_config_);
 
   EXPECT_CALL(*client_, limit(_, "foo", _, _, _, 0))
       .WillOnce(
@@ -594,22 +600,24 @@ TEST_F(ThriftRateLimitFilterTest, ShadowModeOverLimitWithDynamicMetadata) {
   auto* fields = dynamic_metadata->mutable_fields();
   (*fields)["name"] = ValueUtil::stringValue("my-limit");
   (*fields)["x"] = ValueUtil::numberValue(3);
-  EXPECT_CALL(decoder_filter_callbacks_, streamInfo()).WillOnce(ReturnRef(stream_info_));
-  EXPECT_CALL(stream_info_, setDynamicMetadata(_, _))
+  EXPECT_CALL(filter_callbacks_.stream_info_, setDynamicMetadata(_, _))
       .WillOnce(Invoke([&dynamic_metadata](const std::string& ns,
                                            const Protobuf::Struct& returned_dynamic_metadata) {
         EXPECT_EQ(ns, "envoy.filters.thrift.rate_limit");
         EXPECT_TRUE(TestUtility::protoEqual(returned_dynamic_metadata, *dynamic_metadata));
       }));
 
-  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
-  EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(_, _)).Times(0);
+  EXPECT_CALL(filter_callbacks_, continueDecoding());
+  EXPECT_CALL(filter_callbacks_, sendLocalReply(_, _)).Times(0);
 
   request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OverLimit, nullptr, nullptr,
                                nullptr, "", std::move(dynamic_metadata), true);
 
-  EXPECT_EQ(1U, stats_store_.counter("test.ratelimit.shadow_over_limit").value());
-  EXPECT_EQ(0U, stats_store_.counter("test.ratelimit.over_limit").value());
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("ratelimit.shadow_over_limit")
+                    .value());
+  EXPECT_EQ(0U, cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("ratelimit.over_limit")
+                    .value());
 }
 
 } // namespace RateLimitFilter
