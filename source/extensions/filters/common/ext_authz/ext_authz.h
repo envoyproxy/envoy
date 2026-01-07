@@ -78,6 +78,29 @@ enum class CheckStatus {
 
 using UnsafeHeader = std::pair<std::string, std::string>;
 using UnsafeHeaderVector = std::vector<UnsafeHeader>;
+
+// Action type for header mutations, matching envoy::config::core::v3::HeaderValueOption.
+enum class HeaderMutationAction {
+  // Appends the value to existing values (comma-separated) via appendCopy().
+  Append,
+  // Overwrites existing header or adds if not present via setCopy().
+  Set,
+  // Adds a new header entry (allows duplicates) via addCopy().
+  Add,
+  // Adds only if the header does not already exist.
+  AddIfAbsent,
+  // Overwrites the header only if it already exists.
+  OverwriteIfExists,
+};
+
+// A single header mutation with its action type, preserving order from the proto.
+struct HeaderMutation {
+  std::string key;
+  std::string value;
+  HeaderMutationAction action;
+};
+using HeaderMutationVector = std::vector<HeaderMutation>;
+
 /**
  * Authorization response object for a RequestCallback.
  *
@@ -87,36 +110,12 @@ using UnsafeHeaderVector = std::vector<UnsafeHeader>;
 struct Response {
   // Call status.
   CheckStatus status;
-  // A set of HTTP headers returned by the authorization server, that will be optionally appended
-  // to the request to the upstream server.
-  UnsafeHeaderVector headers_to_append{};
-  // A set of HTTP headers returned by the authorization server, will be optionally set
-  // (using "setCopy") to the request to the upstream server.
-  UnsafeHeaderVector headers_to_set{};
-  // A set of HTTP headers returned by the authorization server, will be optionally added
-  // (using "addCopy") to the request to the upstream server.
-  UnsafeHeaderVector headers_to_add{};
-  // A set of HTTP headers returned by the authorization server, will be optionally added
-  // (using "addCopy") to the request to the upstream server only if the headers were not present.
-  UnsafeHeaderVector headers_to_add_if_absent{};
-  // A set of HTTP headers returned by the authorization server, will be optionally set (using
-  // "setCopy") to the request to the upstream server only if the headers were present.
-  UnsafeHeaderVector headers_to_overwrite_if_exists{};
-  // A set of HTTP headers returned by the authorization server, will be optionally added
-  // (using "addCopy") to the response sent back to the downstream client on OK auth
-  // responses.
-  UnsafeHeaderVector response_headers_to_add{};
-  // A set of HTTP headers returned by the authorization server, will be optionally set (using
-  // "setCopy") to the response sent back to the downstream client on OK auth responses.
-  UnsafeHeaderVector response_headers_to_set{};
-  // A set of HTTP headers returned by the authorization server, will be optionally added
-  // (using "addCopy") to the response sent back to the downstream client on OK auth
-  // responses only if the headers were not returned from the authz server.
-  UnsafeHeaderVector response_headers_to_add_if_absent{};
-  // A set of HTTP headers returned by the authorization server, will be optionally set (using
-  // "setCopy") to the response sent back to the downstream client on OK auth responses
-  // only if the headers were returned from the authz server.
-  UnsafeHeaderVector response_headers_to_overwrite_if_exists{};
+  // Ordered list of header mutations for upstream request headers.
+  // Mutations are applied in the order they appear in this vector.
+  HeaderMutationVector request_header_mutations{};
+  // Ordered list of header mutations for downstream response headers (on OK auth responses).
+  // Mutations are applied in the order they appear in this vector.
+  HeaderMutationVector response_header_mutations{};
   // Whether the authorization server returned any headers with an invalid append action type.
   bool saw_invalid_append_actions{false};
   // A set of HTTP headers consumed by the authorization server, will be removed

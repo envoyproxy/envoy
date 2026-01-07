@@ -36,15 +36,8 @@ const Http::HeaderMap& lengthZeroHeader() {
 // Static response used for creating authorization ERROR responses.
 const Response& errorResponse() {
   CONSTRUCT_ON_FIRST_USE(Response, Response{CheckStatus::Error,
-                                            UnsafeHeaderVector{},
-                                            UnsafeHeaderVector{},
-                                            UnsafeHeaderVector{},
-                                            UnsafeHeaderVector{},
-                                            UnsafeHeaderVector{},
-                                            UnsafeHeaderVector{},
-                                            UnsafeHeaderVector{},
-                                            UnsafeHeaderVector{},
-                                            UnsafeHeaderVector{},
+                                            HeaderMutationVector{},
+                                            HeaderMutationVector{},
                                             false,
                                             {{}},
                                             Http::Utility::QueryParamsVector{},
@@ -67,8 +60,9 @@ struct SuccessResponse {
     headers_.iterate([this](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
       // UpstreamHeaderMatcher
       if (matchers_->matches(header.key().getStringView())) {
-        response_->headers_to_set.emplace_back(header.key().getStringView(),
-                                               header.value().getStringView());
+        response_->request_header_mutations.push_back({std::string(header.key().getStringView()),
+                                                       std::string(header.value().getStringView()),
+                                                       HeaderMutationAction::Set});
       }
       if (append_matchers_->matches(header.key().getStringView())) {
         // If there is an existing matching key in the current headers, the new entry will be
@@ -76,14 +70,16 @@ struct SuccessResponse {
         // a matching "key" from the authorization response headers {"key": "value2"}, the
         // request to upstream server will have two entries for "key": {"key": "value1", "key":
         // "value2"}.
-        response_->headers_to_add.emplace_back(header.key().getStringView(),
-                                               header.value().getStringView());
+        response_->request_header_mutations.push_back({std::string(header.key().getStringView()),
+                                                       std::string(header.value().getStringView()),
+                                                       HeaderMutationAction::Add});
       }
       if (response_matchers_->matches(header.key().getStringView())) {
         // For HTTP implementation, the response headers from the auth server will, by default, be
         // appended (using addCopy) to the encoded response headers.
-        response_->response_headers_to_add.emplace_back(header.key().getStringView(),
-                                                        header.value().getStringView());
+        response_->response_header_mutations.push_back({std::string(header.key().getStringView()),
+                                                        std::string(header.value().getStringView()),
+                                                        HeaderMutationAction::Add});
       }
       if (to_dynamic_metadata_matchers_->matches(header.key().getStringView())) {
         const std::string key{header.key().getStringView()};
@@ -418,15 +414,8 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
                        config_->clientHeaderOnSuccessMatchers(),
                        config_->dynamicMetadataMatchers(),
                        Response{CheckStatus::OK,
-                                UnsafeHeaderVector{},
-                                UnsafeHeaderVector{},
-                                UnsafeHeaderVector{},
-                                UnsafeHeaderVector{},
-                                UnsafeHeaderVector{},
-                                UnsafeHeaderVector{},
-                                UnsafeHeaderVector{},
-                                UnsafeHeaderVector{},
-                                UnsafeHeaderVector{},
+                                HeaderMutationVector{},
+                                HeaderMutationVector{},
                                 false,
                                 std::move(headers_to_remove),
                                 Http::Utility::QueryParamsVector{},
@@ -444,15 +433,8 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
                          config_->clientHeaderMatchers(),
                          config_->dynamicMetadataMatchers(),
                          Response{CheckStatus::Denied,
-                                  UnsafeHeaderVector{},
-                                  UnsafeHeaderVector{},
-                                  UnsafeHeaderVector{},
-                                  UnsafeHeaderVector{},
-                                  UnsafeHeaderVector{},
-                                  UnsafeHeaderVector{},
-                                  UnsafeHeaderVector{},
-                                  UnsafeHeaderVector{},
-                                  UnsafeHeaderVector{},
+                                  HeaderMutationVector{},
+                                  HeaderMutationVector{},
                                   false,
                                   {{}},
                                   Http::Utility::QueryParamsVector{},

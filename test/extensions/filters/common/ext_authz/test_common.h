@@ -57,7 +57,8 @@ public:
 
   static HeaderValueOptionVector makeHeaderValueOption(KeyValueOptionVector&& headers);
 
-  static bool compareHeaderVector(const UnsafeHeaderVector& lhs, const UnsafeHeaderVector& rhs);
+  static bool compareHeaderMutationVector(const HeaderMutationVector& lhs,
+                                          const HeaderMutationVector& rhs);
   static bool compareQueryParamsVector(const Http::Utility::QueryParamsVector& lhs,
                                        const Http::Utility::QueryParamsVector& rhs);
   static bool compareVectorOfHeaderName(const std::vector<std::string>& lhs,
@@ -67,9 +68,8 @@ public:
 };
 
 MATCHER_P(AuthzErrorResponse, response, "") {
-  // For gRPC transport errors (onFailure), these fields should be empty.
-  // For error_response, headers_to_set and body can be populated.
-  if (!arg->headers_to_append.empty()) {
+  // For gRPC transport errors (onFailure), request_header_mutations should be empty.
+  if (!arg->request_header_mutations.empty()) {
     return false;
   }
   // Status code can be custom for error_response or Forbidden for transport errors.
@@ -89,8 +89,9 @@ MATCHER_P(AuthzErrorResponseWithAttributes, response, "") {
   if (arg->body.compare(response.body)) {
     return false;
   }
-  // Compare headers_to_set.
-  return TestCommon::compareHeaderVector(response.headers_to_set, arg->headers_to_set);
+  // Compare request_header_mutations.
+  return TestCommon::compareHeaderMutationVector(response.request_header_mutations,
+                                                 arg->request_header_mutations);
 }
 
 MATCHER_P(AuthzResponseNoAttributes, response, "") {
@@ -122,8 +123,9 @@ MATCHER_P(AuthzDeniedResponse, response, "") {
   if (arg->body.compare(response.body)) {
     return false;
   }
-  // Compare headers_to_add.
-  return TestCommon::compareHeaderVector(response.headers_to_add, arg->headers_to_add);
+  // Compare request_header_mutations.
+  return TestCommon::compareHeaderMutationVector(response.request_header_mutations,
+                                                 arg->request_header_mutations);
 }
 
 MATCHER_P(AuthzOkResponse, response, "") {
@@ -135,45 +137,13 @@ MATCHER_P(AuthzOkResponse, response, "") {
     return false;
   }
 
-  if (!TestCommon::compareHeaderVector(response.headers_to_append, arg->headers_to_append)) {
+  if (!TestCommon::compareHeaderMutationVector(response.request_header_mutations,
+                                               arg->request_header_mutations)) {
     return false;
   }
 
-  if (!TestCommon::compareHeaderVector(response.headers_to_set, arg->headers_to_set)) {
-    return false;
-  }
-
-  if (!TestCommon::compareHeaderVector(response.headers_to_add, arg->headers_to_add)) {
-    return false;
-  }
-
-  if (!TestCommon::compareHeaderVector(response.headers_to_add_if_absent,
-                                       arg->headers_to_add_if_absent)) {
-    return false;
-  }
-
-  if (!TestCommon::compareHeaderVector(response.headers_to_overwrite_if_exists,
-                                       arg->headers_to_overwrite_if_exists)) {
-    return false;
-  }
-
-  if (!TestCommon::compareHeaderVector(response.response_headers_to_add,
-                                       arg->response_headers_to_add)) {
-    return false;
-  }
-
-  if (!TestCommon::compareHeaderVector(response.response_headers_to_set,
-                                       arg->response_headers_to_set)) {
-    return false;
-  }
-
-  if (!TestCommon::compareHeaderVector(response.response_headers_to_add_if_absent,
-                                       arg->response_headers_to_add_if_absent)) {
-    return false;
-  }
-
-  if (!TestCommon::compareHeaderVector(response.response_headers_to_overwrite_if_exists,
-                                       arg->response_headers_to_overwrite_if_exists)) {
+  if (!TestCommon::compareHeaderMutationVector(response.response_header_mutations,
+                                               arg->response_header_mutations)) {
     return false;
   }
 

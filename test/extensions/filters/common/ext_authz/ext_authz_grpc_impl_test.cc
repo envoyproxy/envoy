@@ -557,16 +557,21 @@ ok_response:
 )EOF",
                             check_response);
 
+  // Response header mutations are processed in order.
   auto expected_authz_response = Response{
       .status = CheckStatus::OK,
-      .response_headers_to_add =
-          UnsafeHeaderVector{{"append-if-exists-or-add", "append-if-exists-or-add-value"}},
-      .response_headers_to_set =
-          UnsafeHeaderVector{{"overwrite-if-exists-or-add", "overwrite-if-exists-or-add-value"}},
-      .response_headers_to_add_if_absent =
-          UnsafeHeaderVector{{"add-if-absent", "add-if-absent-value"}},
-      .response_headers_to_overwrite_if_exists =
-          UnsafeHeaderVector{{"overwrite-if-exists", "overwrite-if-exists-value"}},
+      .response_header_mutations =
+          HeaderMutationVector{
+              {"append-if-exists-or-add", "append-if-exists-or-add-value",
+               HeaderMutationAction::Add},
+              {"add-if-absent", "add-if-absent-value", HeaderMutationAction::AddIfAbsent},
+              {"overwrite-if-exists", "overwrite-if-exists-value",
+               HeaderMutationAction::OverwriteIfExists},
+              {"overwrite-if-exists-or-add", "overwrite-if-exists-or-add-value",
+               HeaderMutationAction::Set},
+              // Invalid actions default to Set.
+              {"invalid-append-action", "invalid-append-action-value", HeaderMutationAction::Set},
+          },
       .saw_invalid_append_actions = true,
       .status_code = Http::Code::OK,
       .grpc_status = Grpc::Status::WellKnownGrpcStatus::Ok,
@@ -618,15 +623,21 @@ ok_response:
 )EOF",
                             check_response);
 
+  // Request header mutations are processed in order.
   auto expected_authz_response = Response{
       .status = CheckStatus::OK,
-      .headers_to_set =
-          UnsafeHeaderVector{{"overwrite-if-exists-or-add", "overwrite-if-exists-or-add-value"}},
-      .headers_to_add =
-          UnsafeHeaderVector{{"append-if-exists-or-add", "append-if-exists-or-add-value"}},
-      .headers_to_add_if_absent = UnsafeHeaderVector{{"add-if-absent", "add-if-absent-value"}},
-      .headers_to_overwrite_if_exists =
-          UnsafeHeaderVector{{"overwrite-if-exists", "overwrite-if-exists-value"}},
+      .request_header_mutations =
+          HeaderMutationVector{
+              {"append-if-exists-or-add", "append-if-exists-or-add-value",
+               HeaderMutationAction::Add},
+              {"add-if-absent", "add-if-absent-value", HeaderMutationAction::AddIfAbsent},
+              {"overwrite-if-exists", "overwrite-if-exists-value",
+               HeaderMutationAction::OverwriteIfExists},
+              {"overwrite-if-exists-or-add", "overwrite-if-exists-or-add-value",
+               HeaderMutationAction::Set},
+              // Invalid actions default to Set.
+              {"invalid-append-action", "invalid-append-action-value", HeaderMutationAction::Set},
+          },
       .saw_invalid_append_actions = true,
       .status_code = Http::Code::OK,
       .grpc_status = Grpc::Status::WellKnownGrpcStatus::Ok,

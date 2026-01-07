@@ -16,6 +16,24 @@ namespace Filters {
 namespace Common {
 namespace ExtAuthz {
 
+namespace {
+const char* headerMutationActionToString(HeaderMutationAction action) {
+  switch (action) {
+  case HeaderMutationAction::Append:
+    return "Append";
+  case HeaderMutationAction::Set:
+    return "Set";
+  case HeaderMutationAction::Add:
+    return "Add";
+  case HeaderMutationAction::AddIfAbsent:
+    return "AddIfAbsent";
+  case HeaderMutationAction::OverwriteIfExists:
+    return "OverwriteIfExists";
+  }
+  return "Unknown";
+}
+} // namespace
+
 // NOLINTNEXTLINE(readability-identifier-naming)
 void PrintTo(const ResponsePtr& ptr, std::ostream* os) {
   if (ptr != nullptr) {
@@ -27,13 +45,17 @@ void PrintTo(const ResponsePtr& ptr, std::ostream* os) {
 
 // NOLINTNEXTLINE(readability-identifier-naming)
 void PrintTo(const Response& response, std::ostream* os) {
-  (*os) << "\n{\n  check_status: " << int(response.status)
-        << "\n  headers_to_append: " << PrintToString(response.headers_to_append)
-        << "\n  headers_to_set: " << PrintToString(response.headers_to_set)
-        << "\n  headers_to_add: " << PrintToString(response.headers_to_add)
-        << "\n  response_headers_to_add: " << PrintToString(response.response_headers_to_add)
-        << "\n  response_headers_to_set: " << PrintToString(response.response_headers_to_set)
-        << "\n  headers_to_remove: " << PrintToString(response.headers_to_remove)
+  (*os) << "\n{\n  check_status: " << int(response.status) << "\n  request_header_mutations: [";
+  for (const auto& mutation : response.request_header_mutations) {
+    (*os) << "\n    {key: " << mutation.key << ", value: " << mutation.value
+          << ", action: " << headerMutationActionToString(mutation.action) << "}";
+  }
+  (*os) << "\n  ]\n  response_header_mutations: [";
+  for (const auto& mutation : response.response_header_mutations) {
+    (*os) << "\n    {key: " << mutation.key << ", value: " << mutation.value
+          << ", action: " << headerMutationActionToString(mutation.action) << "}";
+  }
+  (*os) << "\n  ]\n  headers_to_remove: " << PrintToString(response.headers_to_remove)
         << "\n  query_parameters_to_set: " << PrintToString(response.query_parameters_to_set)
         << "\n  query_parameters_to_remove: " << PrintToString(response.query_parameters_to_remove)
         << "\n  body: " << response.body << "\n  status_code: " << int(response.status_code)
@@ -127,24 +149,30 @@ TestCommon::makeAuthzResponse(CheckStatus status, Http::Code status_code, const 
     authz_response.body = body;
   }
   if (!headers.empty()) {
-    for (auto& header : headers) {
-      if (header.append().value()) {
-        authz_response.headers_to_append.emplace_back(header.header().key(),
-                                                      header.header().value());
+    for (const auto& header : headers) {
+      HeaderMutationAction action;
+      if (header.has_append()) {
+        action = header.append().value() ? HeaderMutationAction::Append : HeaderMutationAction::Set;
       } else {
-        authz_response.headers_to_set.emplace_back(header.header().key(), header.header().value());
+        // Default to Set for backward compatibility when append is not specified.
+        action = HeaderMutationAction::Set;
       }
+      authz_response.request_header_mutations.push_back(
+          {header.header().key(), header.header().value(), action});
     }
   }
   if (!downstream_headers.empty()) {
-    for (auto& header : downstream_headers) {
-      if (header.append().value()) {
-        authz_response.response_headers_to_add.emplace_back(header.header().key(),
-                                                            header.header().value());
+    for (const auto& header : downstream_headers) {
+      HeaderMutationAction action;
+      if (header.has_append()) {
+        // Match gRPC impl behavior: append=true → Append, append=false → Set.
+        action = header.append().value() ? HeaderMutationAction::Append : HeaderMutationAction::Set;
       } else {
-        authz_response.response_headers_to_set.emplace_back(header.header().key(),
-                                                            header.header().value());
+        // Default to Add for HTTP impl and backward compatibility with response headers.
+        action = HeaderMutationAction::Add;
       }
+      authz_response.response_header_mutations.push_back(
+          {header.header().key(), header.header().value(), action});
     }
   }
 
@@ -176,9 +204,19 @@ Http::ResponseMessagePtr TestCommon::makeMessageResponse(const HeaderValueOption
   return response;
 };
 
-bool TestCommon::compareHeaderVector(const UnsafeHeaderVector& lhs, const UnsafeHeaderVector& rhs) {
-  return std::set<UnsafeHeader>(lhs.begin(), lhs.end()) ==
-         std::set<UnsafeHeader>(rhs.begin(), rhs.end());
+bool TestCommon::compareHeaderMutationVector(const HeaderMutationVector& lhs,
+                                             const HeaderMutationVector& rhs) {
+  if (lhs.size() != rhs.size()) {
+    return false;
+  }
+  // Compare in order since order matters for header mutations.
+  for (size_t i = 0; i < lhs.size(); ++i) {
+    if (lhs[i].key != rhs[i].key || lhs[i].value != rhs[i].value ||
+        lhs[i].action != rhs[i].action) {
+      return false;
+    }
+  }
+  return true;
 }
 
 bool TestCommon::compareVectorOfHeaderName(const std::vector<std::string>& lhs,
