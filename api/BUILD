@@ -150,6 +150,7 @@ proto_library(
         "//envoy/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/v3:pkg",
         "//envoy/extensions/clusters/aggregate/v3:pkg",
         "//envoy/extensions/clusters/common/dns/v3:pkg",
+        "//envoy/extensions/clusters/composite/v3:pkg",
         "//envoy/extensions/clusters/dns/v3:pkg",
         "//envoy/extensions/clusters/dynamic_forward_proxy/v3:pkg",
         "//envoy/extensions/clusters/redis/v3:pkg",

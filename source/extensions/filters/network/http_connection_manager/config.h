@@ -138,9 +138,7 @@ public:
       FilterConfigProviderManager& filter_config_provider_manager, absl::Status& creation_status);
 
   // Http::FilterChainFactory
-  bool createFilterChain(
-      Http::FilterChainManager& manager,
-      const Http::FilterChainOptions& = Http::EmptyFilterChainOptions{}) const override;
+  bool createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) const override;
   using FilterFactoriesList = Envoy::Http::FilterChainUtility::FilterFactoriesList;
   struct FilterConfig {
     std::unique_ptr<FilterFactoriesList> filter_factories;
@@ -148,8 +146,7 @@ public:
   };
   bool createUpgradeFilterChain(absl::string_view upgrade_type,
                                 const Http::FilterChainFactory::UpgradeMap* per_route_upgrade_map,
-                                Http::FilterChainManager& manager,
-                                const Http::FilterChainOptions& options) const override;
+                                Http::FilterChainFactoryCallbacks& callbacks) const override;
 
   // Http::ConnectionManagerConfig
   const Http::RequestIDExtensionSharedPtr& requestIDExtension() override {
@@ -356,8 +353,8 @@ private:
   const envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action_;
   LocalReply::LocalReplyPtr local_reply_;
-  std::vector<Http::OriginalIPDetectionSharedPtr> original_ip_detection_extensions_{};
-  std::vector<Http::EarlyHeaderMutationPtr> early_header_mutation_extensions_{};
+  std::vector<Http::OriginalIPDetectionSharedPtr> original_ip_detection_extensions_;
+  std::vector<Http::EarlyHeaderMutationPtr> early_header_mutation_extensions_;
 
   // Default idle timeout is 5 minutes if nothing is specified in the HCM config.
   static const uint64_t StreamIdleTimeoutMs = 5 * 60 * 1000;
