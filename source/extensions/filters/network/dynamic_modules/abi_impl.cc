@@ -1,7 +1,12 @@
 #include <algorithm>
 
+#include "envoy/config/core/v3/socket_option.pb.h"
+#include "envoy/http/message.h"
 #include "envoy/router/string_accessor.h"
 
+#include "source/common/http/message_impl.h"
+#include "source/common/network/socket_option_impl.h"
+#include "source/common/network/upstream_socket_options_filter_state.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/extensions/dynamic_modules/abi.h"
@@ -543,6 +548,164 @@ bool envoy_dynamic_module_callback_network_get_dynamic_metadata_number(
 
   *result = field_it->second.number_value();
   return true;
+}
+
+envoy_dynamic_module_type_http_callout_init_result
+envoy_dynamic_module_callback_network_filter_http_callout(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, uint64_t* callout_id_out,
+    envoy_dynamic_module_type_module_buffer cluster_name,
+    envoy_dynamic_module_type_module_http_header* headers, size_t headers_size,
+    envoy_dynamic_module_type_module_buffer body, uint64_t timeout_milliseconds) {
+  auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
+
+  // Build the request message.
+  Http::RequestMessagePtr message = std::make_unique<Http::RequestMessageImpl>();
+
+  // Add headers.
+  for (size_t i = 0; i < headers_size; i++) {
+    const auto& header = headers[i];
+    message->headers().addCopy(
+        Http::LowerCaseString(std::string(header.key_ptr, header.key_length)),
+        std::string(header.value_ptr, header.value_length));
+  }
+
+  // Add body if present.
+  if (body.length > 0 && body.ptr != nullptr) {
+    message->body().add(body.ptr, body.length);
+  }
+
+  // Validate required headers.
+  if (message->headers().Method() == nullptr || message->headers().Path() == nullptr ||
+      message->headers().Host() == nullptr) {
+    return envoy_dynamic_module_type_http_callout_init_result_MissingRequiredHeaders;
+  }
+
+  // Send the callout.
+  return filter->sendHttpCallout(callout_id_out, std::string(cluster_name.ptr, cluster_name.length),
+                                 std::move(message), timeout_milliseconds);
+}
+
+namespace {
+
+Network::UpstreamSocketOptionsFilterState*
+ensureUpstreamSocketOptionsFilterState(DynamicModuleNetworkFilter& filter) {
+  auto filter_state_shared = filter.connection().streamInfo().filterState();
+  StreamInfo::FilterState& filter_state = *filter_state_shared;
+  const bool has_options = filter_state.hasData<Network::UpstreamSocketOptionsFilterState>(
+      Network::UpstreamSocketOptionsFilterState::key());
+  if (!has_options) {
+    filter_state.setData(Network::UpstreamSocketOptionsFilterState::key(),
+                         std::make_unique<Network::UpstreamSocketOptionsFilterState>(),
+                         StreamInfo::FilterState::StateType::Mutable,
+                         StreamInfo::FilterState::LifeSpan::Connection);
+  }
+  return filter_state.getDataMutable<Network::UpstreamSocketOptionsFilterState>(
+      Network::UpstreamSocketOptionsFilterState::key());
+}
+
+envoy::config::core::v3::SocketOption::SocketState
+mapSocketState(envoy_dynamic_module_type_socket_option_state state) {
+  switch (state) {
+  case envoy_dynamic_module_type_socket_option_state_Prebind:
+    return envoy::config::core::v3::SocketOption::STATE_PREBIND;
+  case envoy_dynamic_module_type_socket_option_state_Bound:
+    return envoy::config::core::v3::SocketOption::STATE_BOUND;
+  case envoy_dynamic_module_type_socket_option_state_Listening:
+    return envoy::config::core::v3::SocketOption::STATE_LISTENING;
+  }
+  return envoy::config::core::v3::SocketOption::STATE_PREBIND;
+}
+
+bool validateSocketState(envoy_dynamic_module_type_socket_option_state state) {
+  return state == envoy_dynamic_module_type_socket_option_state_Prebind ||
+         state == envoy_dynamic_module_type_socket_option_state_Bound ||
+         state == envoy_dynamic_module_type_socket_option_state_Listening;
+}
+
+} // namespace
+
+bool envoy_dynamic_module_callback_network_set_socket_option_int(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, int64_t level,
+    int64_t name, envoy_dynamic_module_type_socket_option_state state, int64_t value) {
+  if (!validateSocketState(state)) {
+    return false;
+  }
+  auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
+  auto* upstream_options = ensureUpstreamSocketOptionsFilterState(*filter);
+
+  auto option = std::make_shared<Network::SocketOptionImpl>(
+      mapSocketState(state),
+      Network::SocketOptionName(static_cast<int>(level), static_cast<int>(name), ""),
+      static_cast<int>(value));
+  Network::Socket::OptionsSharedPtr option_list = std::make_shared<Network::Socket::Options>();
+  option_list->push_back(option);
+  upstream_options->addOption(option_list);
+
+  filter->storeSocketOptionInt(level, name, state, value);
+  return true;
+}
+
+bool envoy_dynamic_module_callback_network_set_socket_option_bytes(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, int64_t level,
+    int64_t name, envoy_dynamic_module_type_socket_option_state state,
+    envoy_dynamic_module_type_module_buffer value) {
+  if (!validateSocketState(state) || value.ptr == nullptr) {
+    return false;
+  }
+  auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
+  auto* upstream_options = ensureUpstreamSocketOptionsFilterState(*filter);
+
+  absl::string_view value_view(value.ptr, value.length);
+  auto option = std::make_shared<Network::SocketOptionImpl>(
+      mapSocketState(state),
+      Network::SocketOptionName(static_cast<int>(level), static_cast<int>(name), ""), value_view);
+  Network::Socket::OptionsSharedPtr option_list = std::make_shared<Network::Socket::Options>();
+  option_list->push_back(option);
+  upstream_options->addOption(option_list);
+
+  filter->storeSocketOptionBytes(level, name, state, value_view);
+  return true;
+}
+
+bool envoy_dynamic_module_callback_network_get_socket_option_int(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, int64_t level,
+    int64_t name, envoy_dynamic_module_type_socket_option_state state, int64_t* value_out) {
+  if (value_out == nullptr || !validateSocketState(state)) {
+    return false;
+  }
+  auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
+  return filter->tryGetSocketOptionInt(level, name, state, *value_out);
+}
+
+bool envoy_dynamic_module_callback_network_get_socket_option_bytes(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, int64_t level,
+    int64_t name, envoy_dynamic_module_type_socket_option_state state,
+    envoy_dynamic_module_type_envoy_buffer* value_out) {
+  if (value_out == nullptr || !validateSocketState(state)) {
+    return false;
+  }
+  auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
+  absl::string_view value_view;
+  if (!filter->tryGetSocketOptionBytes(level, name, state, value_view)) {
+    return false;
+  }
+  value_out->ptr = value_view.data();
+  value_out->length = value_view.size();
+  return true;
+}
+
+size_t envoy_dynamic_module_callback_network_get_socket_options_size(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr) {
+  auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
+  return filter->socketOptionCount();
+}
+
+void envoy_dynamic_module_callback_network_get_socket_options(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_socket_option* options_out) {
+  auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
+  size_t options_written = 0;
+  filter->copySocketOptions(options_out, filter->socketOptionCount(), options_written);
 }
 
 } // extern "C"

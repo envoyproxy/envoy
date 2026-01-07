@@ -774,6 +774,26 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   }
 
   {
+    StreamInfoFormatter upstream_format("UPSTREAM_REMOTE_ADDRESS_ENDPOINT_ID");
+    auto internal_address =
+        std::make_shared<Network::Address::EnvoyInternalInstance>("internal", "1234567890");
+    stream_info.upstreamInfo()->setUpstreamRemoteAddress(internal_address);
+    EXPECT_EQ("1234567890", upstream_format.format({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValue({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("1234567890")));
+
+    // Normal IP address does not have endpoint ID
+    auto ip_address = Network::Address::InstanceConstSharedPtr{
+        new Network::Address::Ipv4Instance("10.0.0.2", 80)};
+    stream_info.upstreamInfo()->setUpstreamRemoteAddress(ip_address);
+    EXPECT_EQ("", upstream_format.format({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValue({}, stream_info), ProtoEq(ValueUtil::nullValue()));
+
+    // Reset to default one.
+    stream_info.upstreamInfo()->setUpstreamRemoteAddress(default_upstream_remote_address);
+  }
+
+  {
     StreamInfoFormatter upstream_format("UPSTREAM_REMOTE_PORT");
 
     // Has valid upstream remote address and it will be used as priority.
@@ -983,6 +1003,41 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     EXPECT_EQ("63443", upstream_format.format({}, stream_info));
     EXPECT_THAT(upstream_format.formatValue({}, stream_info),
                 ProtoEq(ValueUtil::numberValue(63443)));
+  }
+
+  {
+    StreamInfoFormatter downstream_format("DOWNSTREAM_LOCAL_ADDRESS_ENDPOINT_ID");
+    auto internal_address =
+        std::make_shared<Network::Address::EnvoyInternalInstance>("internal", "1234567890");
+    stream_info.downstream_connection_info_provider_->setLocalAddress(internal_address);
+    EXPECT_EQ("1234567890", downstream_format.format({}, stream_info));
+    EXPECT_THAT(downstream_format.formatValue({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("1234567890")));
+
+    // Normal IP address should not have endpoint ID
+    auto ip_address = Network::Address::InstanceConstSharedPtr{
+        new Network::Address::Ipv4Instance("127.1.2.3", 18443)};
+    stream_info.downstream_connection_info_provider_->setLocalAddress(ip_address);
+    EXPECT_EQ("", downstream_format.format({}, stream_info));
+    EXPECT_THAT(downstream_format.formatValue({}, stream_info), ProtoEq(ValueUtil::nullValue()));
+  }
+
+  {
+    StreamInfoFormatter downstream_format("DOWNSTREAM_DIRECT_LOCAL_ADDRESS_ENDPOINT_ID");
+    auto internal_address =
+        std::make_shared<Network::Address::EnvoyInternalInstance>("internal", "1234567890");
+    stream_info.downstream_connection_info_provider_->setDirectLocalAddressForTest(
+        internal_address);
+    EXPECT_EQ("1234567890", downstream_format.format({}, stream_info));
+    EXPECT_THAT(downstream_format.formatValue({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("1234567890")));
+
+    // Normal IP address should not have endpoint ID
+    auto ip_address = Network::Address::InstanceConstSharedPtr{
+        new Network::Address::Ipv4Instance("127.1.2.4", 18444)};
+    stream_info.downstream_connection_info_provider_->setDirectLocalAddressForTest(ip_address);
+    EXPECT_EQ("", downstream_format.format({}, stream_info));
+    EXPECT_THAT(downstream_format.formatValue({}, stream_info), ProtoEq(ValueUtil::nullValue()));
   }
 
   {

@@ -67,35 +67,6 @@ private:
   absl::optional<Protobuf::RepeatedPtrField<std::string>> data_input_allowlist_;
 };
 
-struct DelegatingFactoryCallbacks : public Envoy::Http::FilterChainFactoryCallbacks {
-  DelegatingFactoryCallbacks(Envoy::Http::FilterChainFactoryCallbacks& delegated_callbacks,
-                             Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> match_tree)
-      : delegated_callbacks_(delegated_callbacks), match_tree_(match_tree) {}
-
-  Event::Dispatcher& dispatcher() override { return delegated_callbacks_.dispatcher(); }
-  void addStreamDecoderFilter(Envoy::Http::StreamDecoderFilterSharedPtr filter) override {
-    auto delegating_filter =
-        std::make_shared<DelegatingStreamFilter>(match_tree_, std::move(filter), nullptr);
-    delegated_callbacks_.addStreamDecoderFilter(std::move(delegating_filter));
-  }
-  void addStreamEncoderFilter(Envoy::Http::StreamEncoderFilterSharedPtr filter) override {
-    auto delegating_filter =
-        std::make_shared<DelegatingStreamFilter>(match_tree_, nullptr, std::move(filter));
-    delegated_callbacks_.addStreamEncoderFilter(std::move(delegating_filter));
-  }
-  void addStreamFilter(Envoy::Http::StreamFilterSharedPtr filter) override {
-    auto delegating_filter = std::make_shared<DelegatingStreamFilter>(match_tree_, filter, filter);
-    delegated_callbacks_.addStreamFilter(std::move(delegating_filter));
-  }
-
-  void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) override {
-    delegated_callbacks_.addAccessLogHandler(std::move(handler));
-  }
-
-  Envoy::Http::FilterChainFactoryCallbacks& delegated_callbacks_;
-  Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> match_tree_;
-};
-
 } // namespace Factory
 
 void DelegatingStreamFilter::FilterMatchState::evaluateMatchTree(
@@ -343,7 +314,7 @@ absl::StatusOr<Envoy::Http::FilterFactoryCb> MatchDelegateConfig::createFilterFa
   }
 
   return [filter_factory, match_tree](Envoy::Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    Factory::DelegatingFactoryCallbacks delegating_callbacks(callbacks, match_tree);
+    DelegatingFactoryCallbacks delegating_callbacks(callbacks, match_tree);
     return filter_factory(delegating_callbacks);
   };
 }

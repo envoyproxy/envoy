@@ -41,6 +41,7 @@ directories:
   source/extensions/filters/http/dynamic_forward_proxy: 94.8
   source/extensions/filters/http/dynamic_modules: 95.2
   source/extensions/filters/http/decompressor: 95.9
+  source/extensions/filters/http/ext_proc: 96.4
   source/extensions/filters/http/grpc_json_reverse_transcoder: 94.8
   source/extensions/filters/http/grpc_json_transcoder: 94.0  # TODO(#28232)
   source/extensions/filters/http/ip_tagging: 95.9

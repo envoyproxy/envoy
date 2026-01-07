@@ -54,7 +54,7 @@ using StreamInfoFormatterProviderCreateFunc =
 
 enum class DurationPrecision { Milliseconds, Microseconds, Nanoseconds };
 
-enum class StreamInfoAddressFieldExtractionType { WithPort, WithoutPort, JustPort };
+enum class StreamInfoAddressFieldExtractionType { WithPort, WithoutPort, JustPort, JustEndpointId };
 
 /**
  * Base formatter for formatting Metadata objects

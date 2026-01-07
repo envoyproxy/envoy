@@ -93,6 +93,7 @@ public:
   void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&&) override {}
   void onFailure(const Http::AsyncClient::Request&, Http::AsyncClient::FailureReason) override {}
   void setCallbacks(FilterCallbacks&) override {}
+  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks&) override {}
   void onBeforeFinalizeUpstreamSpan(Envoy::Tracing::Span&,
                                     const Http::ResponseHeaderMap*) override {}
 

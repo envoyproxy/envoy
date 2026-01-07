@@ -644,6 +644,7 @@ buflen
 bugprone
 builtin
 builtins
+bulkstring
 bulkstrings
 bursty
 bytecode
@@ -1203,6 +1204,7 @@ protobufs
 protoc
 protodoc
 protos
+protover
 protoxform
 proxied
 pseudocode
@@ -1343,6 +1345,7 @@ serializer
 serv
 servercert
 setenv
+SETNAME
 setsockopt
 sfixed
 sidestream

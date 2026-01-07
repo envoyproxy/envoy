@@ -56,6 +56,13 @@ private:
   Buffer::OwnedImpl received_data_;
 };
 
+// The result of processing a response from the external processor including the
+// whether the processing is complete.
+struct ProcessingResult {
+  absl::Status status;
+  bool processing_complete{false};
+};
+
 class ProcessorState : public Logger::Loggable<Logger::Id::ext_proc> {
 public:
   // This describes whether the filter is waiting for a response to a gRPC message.
@@ -152,7 +159,14 @@ public:
   }
 
   bool sendHeaders() const { return send_headers_; }
-  bool sendTrailers() const { return send_trailers_; }
+
+  struct SendTrailersResult {
+    bool send_trailers;
+    Http::FilterTrailersStatus status;
+  };
+  virtual SendTrailersResult shouldSendTrailers() const {
+    return {send_trailers_, Http::FilterTrailersStatus::Continue};
+  }
   bool trailersSentToServer() const { return trailers_sent_to_server_; }
   void setTrailersSentToServer(bool b) { trailers_sent_to_server_ = b; }
 
@@ -251,10 +265,60 @@ public:
   virtual Protobuf::Struct
   evaluateAttributes(const ExpressionManager& mgr,
                      const Filters::Common::Expr::Activation& activation) const PURE;
+  /**
+   * @return decode/encodeData status when body processing mode is NONE.
+   */
+  virtual Http::FilterDataStatus getBodyCallbackResultInNoneMode() {
+    return Http::FilterDataStatus::Continue;
+  }
+
+  /**
+   * @return decode/encodeData status when body processing mode is STREAMED or FULL_DUPLEX_STREAMED.
+   */
+  virtual Http::FilterDataStatus getBodyCallbackResultInStreamedMode(bool end_stream);
+
+  /**
+   * @return decode/encodeData status after processing has completed.
+   */
+  virtual Http::FilterDataStatus getBodyCallbackResultWhenProcessingComplete() {
+    return Http::FilterDataStatus::Continue;
+  }
+
+  /**
+   * @return true if the filter state allows it to fail open.
+   */
+  virtual bool canFailOpen() const;
 
 protected:
   void setBodyMode(
       envoy::extensions::filters::http::ext_proc::v3::ProcessingMode_BodySendMode body_mode);
+  CallbackState getCallbackStateAfterHeaderResp(
+      const envoy::service::ext_proc::v3::CommonResponse& common_response) const;
+  CallbackState getCallbackStateAfterHeaderResp() const;
+
+  /**
+   * Handle the header response with CONTINUE action from external processor.
+   * Routes to appropriate handler based on body state and processing mode
+   * (none, buffered, streamed, partial, or full-duplex).
+   *
+   * @param response HeadersResponse with continue action
+   * @return Status of the operation
+   */
+  absl::Status handleHeaderContinue();
+
+  /**
+   * Validates if the current callback state is valid for processing body responses.
+   *
+   * @return true if the callback state is valid for body processing, false otherwise
+   */
+  virtual bool isValidBodyCallbackState() const;
+
+  /**
+   * Validates if the current callback state is valid for processing trailers responses.
+   *
+   * @return true if the callback state is valid for trailers processing, false otherwise
+   */
+  virtual bool isValidTrailersCallbackState() const;
 
   Filter& filter_;
   Http::StreamFilterCallbacks* filter_callbacks_;
@@ -321,8 +385,6 @@ private:
   processHeaderMutation(const envoy::service::ext_proc::v3::CommonResponse& common_response,
                         ProcessingEffect::Effect& processing_effect);
   void clearStreamingChunk() { chunk_queue_.clear(); }
-  CallbackState getCallbackStateAfterHeaderResp(
-      const envoy::service::ext_proc::v3::CommonResponse& common_response) const;
 
   /**
    * Handle the header response with CONTINUE_AND_REPLACE action from external processor.
@@ -332,15 +394,6 @@ private:
    */
   absl::Status
   handleHeaderContinueAndReplace(const envoy::service::ext_proc::v3::HeadersResponse& response);
-
-  /**
-   * Handle the header response with CONTINUE action from external processor.
-   * Routes to appropriate handler based on body state and processing mode
-   * (none, buffered, streamed, partial, or full-duplex).
-   *
-   * @return Status of the operation
-   */
-  absl::Status handleHeaderContinue();
 
   /**
    * Handle the body when the complete body is already available.
@@ -368,13 +421,6 @@ private:
    * @return Status of the operation
    */
   absl::Status handleTrailersAndCleanup();
-
-  /**
-   * Validates if the current callback state is valid for processing body responses.
-   *
-   * @return true if the callback state is valid for body processing, false otherwise
-   */
-  bool isValidBodyCallbackState() const;
 
   /**
    * Handles buffered body callback state by processing header and body mutations if present.
@@ -493,7 +539,7 @@ public:
     return trailers_;
   }
 
-  void continueProcessing() const override { decoder_callbacks_->continueDecoding(); }
+  void continueProcessing() const override;
 
   envoy::service::ext_proc::v3::HttpHeaders*
   mutableHeaders(envoy::service::ext_proc::v3::ProcessingRequest& request) const override {
@@ -530,6 +576,54 @@ public:
                      const Filters::Common::Expr::Activation& activation) const override {
     return mgr.evaluateRequestAttributes(activation);
   }
+  SendTrailersResult shouldSendTrailers() const override {
+    return {send_trailers_, local_response_started_ ? Http::FilterTrailersStatus::StopIteration
+                                                    : Http::FilterTrailersStatus::Continue};
+  }
+
+  /**
+   * Initiate local response streaming.
+   *
+   * @param response_headers Local response headers to be sent to the client
+   * @return ProcessingResult Contains status of the operation.
+   */
+  ProcessingResult
+  startLocalResponse(const ::envoy::service::ext_proc::v3::StreamedImmediateResponse& response);
+
+  /**
+   * Process streaming local body response.
+   *
+   * @param response_body Local response body to be sent to the client.
+   * @return ProcessingResult Contains status of the operation.
+   */
+  ProcessingResult processLocalBodyResponse(
+      const ::envoy::service::ext_proc::v3::StreamedImmediateResponse& response);
+
+  /**
+   * Process streaming local trailers response.
+   *
+   * @param response_trailers Local response trailers to be sent to the client.
+   * @return ProcessingResult Contains status of the operation.
+   */
+  ProcessingResult processLocalTrailersResponse(
+      const ::envoy::service::ext_proc::v3::StreamedImmediateResponse& response);
+
+  Http::FilterDataStatus getBodyCallbackResultInNoneMode() override {
+    // During local response streaming client body should be discarded since only NONE or
+    // FULL_DUPLEX_STREAMED modes are allowed. In the NONE mode server does not want the body and in
+    // the FULL_DUPLEX_STREAMED mode it was already sent to the ext_proc server.
+    return local_response_started_ ? Http::FilterDataStatus::StopIterationNoBuffer
+                                   : Http::FilterDataStatus::Continue;
+  }
+  Http::FilterDataStatus getBodyCallbackResultInStreamedMode(bool end_stream) override;
+  Http::FilterDataStatus getBodyCallbackResultWhenProcessingComplete() override {
+    return local_response_started_ ? Http::FilterDataStatus::StopIterationNoBuffer
+                                   : Http::FilterDataStatus::Continue;
+  }
+  bool isValidBodyCallbackState() const override;
+  bool isValidTrailersCallbackState() const override;
+  bool canFailOpen() const override;
+  bool localResponseStarted() const { return local_response_started_; }
 
 private:
   void setProcessingModeInternal(
@@ -537,8 +631,11 @@ private:
 
   void
   clearRouteCache(const envoy::service::ext_proc::v3::CommonResponse& common_response) override;
+  absl::Status
+  handleLocalResponseHeadersContinue(const ::envoy::service::ext_proc::v3::HttpHeaders& response);
 
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
+  bool local_response_started_{false};
 };
 
 class EncodingProcessorState : public ProcessorState {
@@ -628,15 +725,18 @@ public:
 
   // Check whether external processing is configured in the encoding path.
   bool noExternalProcess() const {
-    return (!send_headers_ && !send_trailers_ &&
-            body_mode_ == envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::NONE);
+    return !local_response_streaming_ && !send_headers_ && !send_trailers_ &&
+           body_mode_ == envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::NONE;
   }
+
+  void setLocalResponseStreaming();
 
 private:
   void setProcessingModeInternal(
       const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode& mode);
 
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
+  bool local_response_streaming_{false};
 };
 
 } // namespace ExternalProcessing

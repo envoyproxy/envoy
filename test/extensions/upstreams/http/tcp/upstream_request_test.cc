@@ -94,10 +94,9 @@ TEST_F(TcpConnPoolTest, Cancel) {
 class TcpUpstreamTest : public ::testing::Test {
 public:
   TcpUpstreamTest() {
-    ON_CALL(*mock_router_filter_.cluster_info_, createFilterChain(_, _))
+    ON_CALL(*mock_router_filter_.cluster_info_, createFilterChain(_))
         .WillByDefault(
-            Invoke([&](Envoy::Http::FilterChainManager&,
-                       const Envoy::Http::FilterChainOptions&) -> bool { return false; }));
+            Invoke([&](Envoy::Http::FilterChainFactoryCallbacks&) -> bool { return false; }));
     EXPECT_CALL(mock_router_filter_, downstreamHeaders())
         .Times(AnyNumber())
         .WillRepeatedly(Return(&request_));
