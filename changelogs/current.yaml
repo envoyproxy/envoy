@@ -30,6 +30,10 @@ behavior_changes:
     Added runtime flag ``envoy.reloadable_features.reject_early_connect_data`` to reject ``CONNECT`` requests that send
     data before Envoy returns a ``200`` response. This non-compliant behavior is common for latency reduction, so the
     option is disabled by default.
+- area: proto_api_scrubber
+  change: |
+    Changed the response status code for blocked methods from ``403 Forbidden`` (gRPC ``PERMISSION_DENIED``) to
+    ``404 Not Found`` (gRPC ``NOT_FOUND``) to prevent method enumeration.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -318,6 +322,10 @@ new_features:
   change: |
     Added :ref:`listener filter <envoy_v3_api_msg_extensions.filters.listener.dynamic_modules.v3.DynamicModuleListenerFilter>`
     support for dynamic modules, enabling connection inspection and protocol detection before connection establishment.
+- area: dynamic modules
+  change: |
+    Added :ref:`UDP listener filter <envoy_v3_api_msg_extensions.filters.udp.dynamic_modules.v3.DynamicModuleUdpListenerFilter>`
+    support for dynamic modules, enabling UDP datagram processing with dynamic modules.
 - area: http filter
   change: |
     Added :ref:`transform http filter <config_http_filters_transform>` to modify request and response bodies in any
@@ -655,6 +663,11 @@ new_features:
     requests to more backend servers. The filter supports fanout to multiple backends for initialize and tools-list requests,
     single-backend routing for tools-call based on tool name prefix, session management with composite session IDs,
     and response aggregation.
+- area: cluster
+  change: |
+    Added :ref:`composite cluster <arch_overview_composite_cluster>` extension that enables retry-aware cluster selection.
+    This cluster type allows retries to automatically fall back to different sub-clusters based on retry attempt count.
+    Requests fail when retry attempts exceed the number of configured clusters.
 - area: access_log
   change: |
     Added ``LISTENER_FILTER_CHAIN`` to the ``METADATA`` command operator to allow access to listener filter chain metadata.

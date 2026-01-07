@@ -137,9 +137,9 @@ bool ProtoApiScrubberFilter::checkMethodLevelRestrictions(Envoy::Http::RequestHe
     filter_config_.stats().method_blocked_.inc();
     decoder_callbacks_->activeSpan().setTag("proto_api_scrubber.outcome", "blocked");
 
-    rejectRequest(Status::PermissionDenied, "Method not allowed",
+    rejectRequest(Status::NotFound, "Method not allowed",
                   formatError(kRcDetailFilterProtoApiScrubber,
-                              Envoy::Http::CodeUtility::toString(Http::Code::Forbidden),
+                              Envoy::Http::CodeUtility::toString(Http::Code::NotFound),
                               kRcDetailMethodBlocked));
     return true; // Block the request.
   }
