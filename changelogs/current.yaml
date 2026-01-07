@@ -650,6 +650,11 @@ new_features:
     requests to more backend servers. The filter supports fanout to multiple backends for initialize and tools-list requests,
     single-backend routing for tools-call based on tool name prefix, session management with composite session IDs,
     and response aggregation.
+- area: cluster
+  change: |
+    Added :ref:`composite cluster <arch_overview_composite_cluster>` extension that enables retry-aware cluster selection.
+    This cluster type allows retries to automatically fall back to different sub-clusters based on retry attempt count.
+    Requests fail when retry attempts exceed the number of configured clusters.
 - area: access_log
   change: |
     Added ``LISTENER_FILTER_CHAIN`` to the ``METADATA`` command operator to allow access to listener filter chain metadata.
