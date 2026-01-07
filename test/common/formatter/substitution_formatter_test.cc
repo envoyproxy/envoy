@@ -2890,7 +2890,7 @@ TEST(SubstitutionFormatterTest, requestHeaderFormatter) {
   }
 }
 
-TEST(SubstitutionFormatterTest, QueryPraameterFormatter) {
+TEST(SubstitutionFormatterTest, QueryParameterFormatter) {
   StreamInfo::MockStreamInfo stream_info;
   Http::TestRequestHeaderMapImpl request_header{{":method", "GET"}, {":path", "/path?x=xxxxxx"}};
 
