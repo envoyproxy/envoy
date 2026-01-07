@@ -48,29 +48,29 @@ message DynamicMetadataSource {
   type.metadata.v3.MetadataKey key = 1 [(validate.rules).message = {required: true}];
 }
 
-// Defines how the subject (user/principal) is extracted from the request.
-message SubjectExtractor {
-  oneof source {
-    option (validate.required) = true;
+// Defines how the identity (user/principal) is extracted from the request.
+// Exactly one of ``header`` or ``dynamic_metadata`` must be set.
+message IdentityExtractor {
+  // Extract identity from a request header.
+  HeaderSource header = 1;
 
-    // Extract identity from a request header.
-    HeaderSource header = 1;
-
-    // Extract identity from dynamic metadata.
-    DynamicMetadataSource dynamic_metadata = 2;
-  }
+  // Extract identity from dynamic metadata.
+  DynamicMetadataSource dynamic_metadata = 2;
 }
 
-// Specifies how to handle requests where the subject is missing or mismatched.
+// Specifies how to handle requests where the identity is missing or mismatched.
 message ValidationPolicy {
   enum Mode {
-    // Bind subject on Initialize if present, but do not validate subsequent requests.
-    // If extraction fails, the session proceeds anonymously.
-    DISABLED = 0;
+    // Not specified. Defaults to DISABLED behavior.
+    MODE_UNSPECIFIED = 0;
 
-    // Reject the request (403) if the subject cannot be extracted
-    // or if the session subject does not match the request subject.
-    ENFORCE = 1;
+    // Bind identity on Initialize if present, but do not validate subsequent requests.
+    // If extraction fails, the session proceeds anonymously.
+    DISABLED = 1;
+
+    // Reject the request (403) if the identity cannot be extracted
+    // or if the session identity does not match the request identity.
+    ENFORCE = 2;
   }
 
   Mode mode = 1 [(validate.rules).enum = {defined_only: true}];
@@ -78,8 +78,8 @@ message ValidationPolicy {
 
 // Session identity configuration.
 message SessionIdentity {
-  // Defines how the subject (user/principal) is extracted from the request.
-  SubjectExtractor subject = 1 [(validate.rules).message = {required: true}];
+  // Defines how the identity (user/principal) is extracted from the request.
+  IdentityExtractor identity = 1 [(validate.rules).message = {required: true}];
 
   // Specifies how to handle requests where the subject is missing or invalid.
   // Defaults to DISABLED.

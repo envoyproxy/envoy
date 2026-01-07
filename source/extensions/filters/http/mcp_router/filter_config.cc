@@ -14,30 +14,24 @@ parseSessionIdentity(const envoy::extensions::filters::http::mcp_router::v3::Mcp
     return result;
   }
 
-  const auto& identity = config.session_identity();
-  const auto& subject = identity.subject();
+  const auto& session_identity = config.session_identity();
+  const auto& identity_extractor = session_identity.identity();
 
-  switch (subject.source_case()) {
-  case envoy::extensions::filters::http::mcp_router::v3::SubjectExtractor::kHeader: {
-    result.subject_source = HeaderSubjectSource{subject.header().name()};
-    break;
-  }
-  case envoy::extensions::filters::http::mcp_router::v3::SubjectExtractor::kDynamicMetadata: {
-    const auto& metadata_key = subject.dynamic_metadata().key();
+  // Exactly one of header or dynamic_metadata must be set.
+  if (identity_extractor.has_header()) {
+    result.subject_source = HeaderSubjectSource{identity_extractor.header().name()};
+  } else if (identity_extractor.has_dynamic_metadata()) {
+    const auto& metadata_key = identity_extractor.dynamic_metadata().key();
     std::vector<std::string> path_keys;
     path_keys.reserve(metadata_key.path().size());
     for (const auto& segment : metadata_key.path()) {
       path_keys.push_back(segment.key());
     }
     result.subject_source = MetadataSubjectSource{metadata_key.key(), std::move(path_keys)};
-    break;
-  }
-  default:
-    break;
   }
 
-  if (identity.has_validation()) {
-    switch (identity.validation().mode()) {
+  if (session_identity.has_validation()) {
+    switch (session_identity.validation().mode()) {
     case envoy::extensions::filters::http::mcp_router::v3::ValidationPolicy::ENFORCE:
       result.validation_mode = ValidationMode::Enforce;
       break;

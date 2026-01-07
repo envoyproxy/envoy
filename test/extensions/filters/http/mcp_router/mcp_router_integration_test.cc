@@ -673,7 +673,7 @@ public:
               path: /mcp
               timeout: 5s
         session_identity:
-          subject:
+          identity:
             header:
               name: x-user-id
           validation:

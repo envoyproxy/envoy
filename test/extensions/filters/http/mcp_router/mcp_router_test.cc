@@ -284,7 +284,7 @@ TEST_F(McpRouterConfigTest, SessionIdentityWithHeaderSource) {
   server->mutable_mcp_cluster()->set_cluster("test_cluster");
 
   auto* identity = proto_config.mutable_session_identity();
-  identity->mutable_subject()->mutable_header()->set_name("x-user-id");
+  identity->mutable_identity()->mutable_header()->set_name("x-user-id");
 
   McpRouterConfig config(proto_config, factory_context_);
   EXPECT_TRUE(config.hasSessionIdentity());
@@ -300,7 +300,7 @@ TEST_F(McpRouterConfigTest, SessionIdentityWithMetadataSource) {
   server->mutable_mcp_cluster()->set_cluster("test_cluster");
 
   auto* identity = proto_config.mutable_session_identity();
-  auto* metadata_key = identity->mutable_subject()->mutable_dynamic_metadata()->mutable_key();
+  auto* metadata_key = identity->mutable_identity()->mutable_dynamic_metadata()->mutable_key();
   metadata_key->set_key("envoy.filters.http.jwt_authn");
   metadata_key->add_path()->set_key("payload");
   metadata_key->add_path()->set_key("sub");
@@ -318,7 +318,7 @@ TEST_F(McpRouterConfigTest, MetadataKeyPathParsed) {
   server->mutable_mcp_cluster()->set_cluster("test_cluster");
 
   auto* identity = proto_config.mutable_session_identity();
-  auto* metadata_key = identity->mutable_subject()->mutable_dynamic_metadata()->mutable_key();
+  auto* metadata_key = identity->mutable_identity()->mutable_dynamic_metadata()->mutable_key();
   metadata_key->set_key("jwt");
   metadata_key->add_path()->set_key("payload");
   metadata_key->add_path()->set_key("sub");
@@ -339,7 +339,7 @@ TEST_F(McpRouterConfigTest, ValidationModeEnforce) {
   server->mutable_mcp_cluster()->set_cluster("test_cluster");
 
   auto* identity = proto_config.mutable_session_identity();
-  identity->mutable_subject()->mutable_header()->set_name("x-user-id");
+  identity->mutable_identity()->mutable_header()->set_name("x-user-id");
   identity->mutable_validation()->set_mode(
       envoy::extensions::filters::http::mcp_router::v3::ValidationPolicy::ENFORCE);
 
@@ -412,7 +412,7 @@ TEST_F(McpRouterFilterTest, MetadataSubjectExtractionSuccess) {
   server->mutable_mcp_cluster()->set_cluster("test_cluster");
 
   auto* identity = proto_config.mutable_session_identity();
-  auto* metadata_key = identity->mutable_subject()->mutable_dynamic_metadata()->mutable_key();
+  auto* metadata_key = identity->mutable_identity()->mutable_dynamic_metadata()->mutable_key();
   metadata_key->set_key("envoy.filters.http.jwt_authn");
   metadata_key->add_path()->set_key("payload");
   metadata_key->add_path()->set_key("sub");
@@ -453,7 +453,7 @@ TEST_F(McpRouterFilterTest, MetadataSubjectExtractionNotFound) {
   server->mutable_mcp_cluster()->set_cluster("test_cluster");
 
   auto* identity = proto_config.mutable_session_identity();
-  auto* metadata_key = identity->mutable_subject()->mutable_dynamic_metadata()->mutable_key();
+  auto* metadata_key = identity->mutable_identity()->mutable_dynamic_metadata()->mutable_key();
   metadata_key->set_key("envoy.filters.http.jwt_authn");
   metadata_key->add_path()->set_key("payload");
   metadata_key->add_path()->set_key("sub");
@@ -491,7 +491,7 @@ TEST_F(McpRouterFilterTest, MetadataSubjectExtractionNotString) {
   server->mutable_mcp_cluster()->set_cluster("test_cluster");
 
   auto* identity = proto_config.mutable_session_identity();
-  auto* metadata_key = identity->mutable_subject()->mutable_dynamic_metadata()->mutable_key();
+  auto* metadata_key = identity->mutable_identity()->mutable_dynamic_metadata()->mutable_key();
   metadata_key->set_key("envoy.filters.http.jwt_authn");
   metadata_key->add_path()->set_key("payload");
   metadata_key->add_path()->set_key("sub");
@@ -531,7 +531,7 @@ TEST_F(McpRouterFilterTest, MetadataSubjectExtractionDisabledModeProceeds) {
   server->mutable_mcp_cluster()->set_cluster("test_cluster");
 
   auto* identity = proto_config.mutable_session_identity();
-  auto* metadata_key = identity->mutable_subject()->mutable_dynamic_metadata()->mutable_key();
+  auto* metadata_key = identity->mutable_identity()->mutable_dynamic_metadata()->mutable_key();
   metadata_key->set_key("envoy.filters.http.jwt_authn");
   metadata_key->add_path()->set_key("payload");
   metadata_key->add_path()->set_key("sub");
