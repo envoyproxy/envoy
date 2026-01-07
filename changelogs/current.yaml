@@ -153,5 +153,9 @@ new_features:
     detects and selects between cgroup v1 and v2 at runtime by checking available cgroup files on
     the system. This enables the resource monitor to work correctly in both cgroup v1 and v2
     environments without configuration changes.
+- area: formatter
+  change: |
+    Added ``QUERY_PARAMS`` support for substitution formatter to log all query params.
+    They can either be logged in their original form or decoded.
 
 deprecated:
