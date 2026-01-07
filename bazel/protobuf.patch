@@ -99,3 +99,48 @@ diff --git a/build_defs/cpp_opts.bzl b/build_defs/cpp_opts.bzl
      ],
  })
 
+diff --git a/src/google/protobuf/BUILD.bazel b/src/google/protobuf/BUILD.bazel
+--- a/src/google/protobuf/BUILD.bazel
++++ b/src/google/protobuf/BUILD.bazel
+@@ -24,6 +24,25 @@ package(
+     ],
+ )
+ 
++# Export Well Known Type proto files for use by genrules and other build rules.
++# This is needed for bzlmod compatibility where file targets need to be explicitly exported.
++exports_files(
++    [
++        "any.proto",
++        "api.proto",
++        "descriptor.proto",
++        "duration.proto",
++        "empty.proto",
++        "field_mask.proto",
++        "source_context.proto",
++        "struct.proto",
++        "timestamp.proto",
++        "type.proto",
++        "wrappers.proto",
++    ],
++    visibility = ["//visibility:public"],
++)
++
+ proto_library(
+     name = "any_proto",
+     srcs = ["any.proto"],
+diff --git a/src/google/protobuf/compiler/BUILD.bazel b/src/google/protobuf/compiler/BUILD.bazel
+--- a/src/google/protobuf/compiler/BUILD.bazel
++++ b/src/google/protobuf/compiler/BUILD.bazel
+@@ -344,11 +344,7 @@ filegroup(
+ 
+ exports_files(
+     srcs = ["plugin.proto"],
+-    visibility = [
+-        "//:__pkg__",
+-        "//python:__pkg__",
+-        "//ruby:__pkg__",
+-    ],
++    visibility = ["//visibility:public"],
+ )
+ 
+ cc_library(
