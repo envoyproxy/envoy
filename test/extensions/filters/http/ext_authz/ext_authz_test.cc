@@ -4198,6 +4198,47 @@ TEST_P(HttpFilterTestParam, OkWithResponseHeadersAndAppendActions) {
   EXPECT_EQ(response_headers.get_("header-to-overwrite-if-exists"), "new-value");
 }
 
+// Covers Append action in encodeHeaders when the header exists and when it does not.
+TEST_P(HttpFilterTestParam, OkResponseHeadersAppendActionsAppendAndAdd) {
+  InSequence s;
+
+  prepareCheck();
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  response.response_header_mutations.push_back(
+      createResponseHeaderMutation("append-existing", "appended", HeaderMutationAction::Append));
+  response.response_header_mutations.push_back(
+      createResponseHeaderMutation("append-new", "added", HeaderMutationAction::Append));
+
+  auto response_ptr = std::make_unique<Filters::Common::ExtAuthz::Response>(response);
+
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                           const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                           const StreamInfo::StreamInfo&) -> void {
+        callbacks.onComplete(std::move(response_ptr));
+      }));
+  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+
+  Buffer::OwnedImpl response_data{};
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"},
+                                                   {"append-existing", "initial"}};
+  Http::TestResponseTrailerMapImpl response_trailers{};
+  Http::MetadataMap response_metadata{};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_data, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers));
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->encodeMetadata(response_metadata));
+
+  // Append to existing should comma-append.
+  EXPECT_EQ(response_headers.get_("append-existing"), "initial,appended");
+  // Append to non-existing should add the header.
+  EXPECT_EQ(response_headers.get_("append-new"), "added");
+}
+
 TEST_P(HttpFilterTestParam, OkWithResponseHeadersAndAppendActionsDoNotTakeEffect) {
   InSequence s;
 
@@ -4243,6 +4284,38 @@ TEST_P(HttpFilterTestParam, ImmediateOkResponseWithUnmodifiedQueryParameters) {
   const Http::Utility::QueryParamsVector add_me{};
   const std::vector<std::string> remove_me{"remove-me"};
   queryParameterTest(original_path, expected_path, add_me, remove_me);
+}
+
+// Validate that invalid header removals are ignored when validate_mutations is enabled.
+TEST_P(HttpFilterTestParam, OkIgnoresInvalidHeaderRemovalWhenValidated) {
+  InSequence s;
+
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  validate_mutations: true
+  )EOF");
+
+  // Add a header that should remain because the removal key is invalid.
+  request_headers_.addCopy("keep-me", "yes");
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  response.headers_to_remove.push_back("invalid\nheader");
+
+  auto response_ptr = std::make_unique<Filters::Common::ExtAuthz::Response>(response);
+
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                           const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                           const StreamInfo::StreamInfo&) -> void {
+        callbacks.onComplete(std::move(response_ptr));
+      }));
+  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(request_headers_.get_("keep-me"), "yes");
 }
 
 TEST_P(HttpFilterTestParam, ImmediateOkResponseWithRepeatedUnmodifiedQueryParameters) {
@@ -6701,7 +6774,6 @@ TEST_F(HttpFilterTest, DeniedResponseInvalidHeadersToAddRejectedWithValidation) 
 }
 
 // Tests that all append_action types are correctly applied to denied response headers.
-// This covers the Append, AddIfAbsent, and OverwriteIfExists cases in the local reply lambda.
 TEST_F(HttpFilterTest, DeniedResponseAppendActionsOnLocalReply) {
   InSequence s;
 
@@ -6730,45 +6802,45 @@ TEST_F(HttpFilterTest, DeniedResponseAppendActionsOnLocalReply) {
       .WillOnce(Invoke([&](Http::ResponseHeaderMap& headers, bool) -> void {
         EXPECT_EQ(headers.getStatusValue(), std::to_string(enumToInt(Http::Code::Forbidden)));
 
-        // Set action: should set header (remove existing + add).
+        // Set action should set header and replace existing.
         auto set_header = headers.get(Http::LowerCaseString("x-set-header"));
         ASSERT_EQ(set_header.size(), 1);
         EXPECT_EQ(set_header[0]->value().getStringView(), "set-value");
 
-        // Add action: should add header.
+        // Add action should add header.
         auto add_header = headers.get(Http::LowerCaseString("x-add-header"));
         ASSERT_EQ(add_header.size(), 1);
         EXPECT_EQ(add_header[0]->value().getStringView(), "add-value");
 
-        // Append action on non-existing header: should add (APPEND_IF_EXISTS_OR_ADD behavior).
+        // Append action on non-existing header should add i.e. APPEND_IF_EXISTS_OR_ADD behavior.
         auto append_new = headers.get(Http::LowerCaseString("x-append-new"));
         ASSERT_EQ(append_new.size(), 1);
         EXPECT_EQ(append_new[0]->value().getStringView(), "append-new-value");
 
-        // Append action on existing header: should append with comma.
+        // Append action on existing header should append with comma.
         // The :status header is set by sendLocalReply, we append to a custom header we first set.
         auto append_existing = headers.get(Http::LowerCaseString("x-append-existing"));
         ASSERT_EQ(append_existing.size(), 1);
         // First Set creates "initial", then Append appends ",appended".
         EXPECT_EQ(append_existing[0]->value().getStringView(), "initial,appended");
 
-        // AddIfAbsent action on non-existing header: should add.
+        // AddIfAbsent action on non-existing header should add.
         auto add_if_absent_new = headers.get(Http::LowerCaseString("x-add-if-absent-new"));
         ASSERT_EQ(add_if_absent_new.size(), 1);
         EXPECT_EQ(add_if_absent_new[0]->value().getStringView(), "added");
 
-        // AddIfAbsent action on existing header: should NOT add (header was set earlier).
+        // AddIfAbsent action on existing header should not add as header was set earlier.
         auto add_if_absent_existing =
             headers.get(Http::LowerCaseString("x-add-if-absent-existing"));
         ASSERT_EQ(add_if_absent_existing.size(), 1);
         EXPECT_EQ(add_if_absent_existing[0]->value().getStringView(), "original");
 
-        // OverwriteIfExists action on non-existing header: should NOT add.
+        // OverwriteIfExists action on non-existing header should not add.
         auto overwrite_non_existing =
             headers.get(Http::LowerCaseString("x-overwrite-non-existing"));
         EXPECT_TRUE(overwrite_non_existing.empty());
 
-        // OverwriteIfExists action on existing header: should overwrite.
+        // OverwriteIfExists action on existing header should overwrite.
         auto overwrite_existing = headers.get(Http::LowerCaseString("x-overwrite-existing"));
         ASSERT_EQ(overwrite_existing.size(), 1);
         EXPECT_EQ(overwrite_existing[0]->value().getStringView(), "overwritten");
@@ -6787,7 +6859,7 @@ TEST_F(HttpFilterTest, DeniedResponseAppendActionsOnLocalReply) {
   response.request_header_mutations.push_back(
       {"x-add-header", "add-value", Filters::Common::ExtAuthz::HeaderMutationAction::Add});
 
-  // 3. Append action on non-existing header (should add).
+  // 3. Append action on non-existing header should add i.e. APPEND_IF_EXISTS_OR_ADD behavior.
   response.request_header_mutations.push_back(
       {"x-append-new", "append-new-value",
        Filters::Common::ExtAuthz::HeaderMutationAction::Append});
@@ -6798,12 +6870,12 @@ TEST_F(HttpFilterTest, DeniedResponseAppendActionsOnLocalReply) {
   response.request_header_mutations.push_back(
       {"x-append-existing", "appended", Filters::Common::ExtAuthz::HeaderMutationAction::Append});
 
-  // 5. AddIfAbsent on non-existing header (should add).
+  // 5. AddIfAbsent on non-existing header should add.
   response.request_header_mutations.push_back(
       {"x-add-if-absent-new", "added",
        Filters::Common::ExtAuthz::HeaderMutationAction::AddIfAbsent});
 
-  // 6. Set up a header, then try AddIfAbsent (should NOT add).
+  // 6. Set up a header, then try AddIfAbsent should not add as header was set earlier.
   response.request_header_mutations.push_back(
       {"x-add-if-absent-existing", "original",
        Filters::Common::ExtAuthz::HeaderMutationAction::Set});
@@ -6811,12 +6883,12 @@ TEST_F(HttpFilterTest, DeniedResponseAppendActionsOnLocalReply) {
       {"x-add-if-absent-existing", "should-not-be-added",
        Filters::Common::ExtAuthz::HeaderMutationAction::AddIfAbsent});
 
-  // 7. OverwriteIfExists on non-existing header (should NOT add).
+  // 7. OverwriteIfExists on non-existing header should not add.
   response.request_header_mutations.push_back(
       {"x-overwrite-non-existing", "should-not-appear",
        Filters::Common::ExtAuthz::HeaderMutationAction::OverwriteIfExists});
 
-  // 8. Set up a header, then OverwriteIfExists (should overwrite).
+  // 8. Set up a header, then OverwriteIfExists should overwrite.
   response.request_header_mutations.push_back(
       {"x-overwrite-existing", "original", Filters::Common::ExtAuthz::HeaderMutationAction::Set});
   response.request_header_mutations.push_back(
@@ -6829,7 +6901,6 @@ TEST_F(HttpFilterTest, DeniedResponseAppendActionsOnLocalReply) {
 }
 
 // Tests that all append_action types are correctly applied to error response headers.
-// This covers the Append, AddIfAbsent, and OverwriteIfExists cases in the error response lambda.
 TEST_F(HttpFilterTest, ErrorResponseAppendActionsOnLocalReply) {
   InSequence s;
 
@@ -6860,43 +6931,43 @@ TEST_F(HttpFilterTest, ErrorResponseAppendActionsOnLocalReply) {
         EXPECT_EQ(headers.getStatusValue(),
                   std::to_string(enumToInt(Http::Code::ServiceUnavailable)));
 
-        // Set action: should set header.
+        // Set action should set header and replace existing.
         auto set_header = headers.get(Http::LowerCaseString("x-error-set"));
         ASSERT_EQ(set_header.size(), 1);
         EXPECT_EQ(set_header[0]->value().getStringView(), "set-value");
 
-        // Add action: should add header.
+        // Add action should add header.
         auto add_header = headers.get(Http::LowerCaseString("x-error-add"));
         ASSERT_EQ(add_header.size(), 1);
         EXPECT_EQ(add_header[0]->value().getStringView(), "add-value");
 
-        // Append action on non-existing header: should add.
+        // Append action on non-existing header should add i.e. APPEND_IF_EXISTS_OR_ADD behavior.
         auto append_new = headers.get(Http::LowerCaseString("x-error-append-new"));
         ASSERT_EQ(append_new.size(), 1);
         EXPECT_EQ(append_new[0]->value().getStringView(), "append-new-value");
 
-        // Append action on existing header: should append with comma.
+        // Append action on existing header should append with comma.
         auto append_existing = headers.get(Http::LowerCaseString("x-error-append-existing"));
         ASSERT_EQ(append_existing.size(), 1);
         EXPECT_EQ(append_existing[0]->value().getStringView(), "initial,appended");
 
-        // AddIfAbsent on non-existing header: should add.
+        // AddIfAbsent on non-existing header should add.
         auto add_if_absent_new = headers.get(Http::LowerCaseString("x-error-add-if-absent-new"));
         ASSERT_EQ(add_if_absent_new.size(), 1);
         EXPECT_EQ(add_if_absent_new[0]->value().getStringView(), "added");
 
-        // AddIfAbsent on existing header: should NOT add.
+        // AddIfAbsent on existing header should not add as header was set earlier.
         auto add_if_absent_existing =
             headers.get(Http::LowerCaseString("x-error-add-if-absent-existing"));
         ASSERT_EQ(add_if_absent_existing.size(), 1);
         EXPECT_EQ(add_if_absent_existing[0]->value().getStringView(), "original");
 
-        // OverwriteIfExists on non-existing header: should NOT add.
+        // OverwriteIfExists on non-existing header should not add.
         auto overwrite_non_existing =
             headers.get(Http::LowerCaseString("x-error-overwrite-non-existing"));
         EXPECT_TRUE(overwrite_non_existing.empty());
 
-        // OverwriteIfExists on existing header: should overwrite.
+        // OverwriteIfExists on existing header should overwrite.
         auto overwrite_existing = headers.get(Http::LowerCaseString("x-error-overwrite-existing"));
         ASSERT_EQ(overwrite_existing.size(), 1);
         EXPECT_EQ(overwrite_existing[0]->value().getStringView(), "overwritten");
@@ -6915,7 +6986,7 @@ TEST_F(HttpFilterTest, ErrorResponseAppendActionsOnLocalReply) {
   response.request_header_mutations.push_back(
       {"x-error-add", "add-value", Filters::Common::ExtAuthz::HeaderMutationAction::Add});
 
-  // 3. Append action on non-existing header (should add).
+  // 3. Append action on non-existing header should add i.e. APPEND_IF_EXISTS_OR_ADD behavior.
   response.request_header_mutations.push_back(
       {"x-error-append-new", "append-new-value",
        Filters::Common::ExtAuthz::HeaderMutationAction::Append});
@@ -6927,12 +6998,12 @@ TEST_F(HttpFilterTest, ErrorResponseAppendActionsOnLocalReply) {
       {"x-error-append-existing", "appended",
        Filters::Common::ExtAuthz::HeaderMutationAction::Append});
 
-  // 5. AddIfAbsent on non-existing header (should add).
+  // 5. AddIfAbsent on non-existing header should add.
   response.request_header_mutations.push_back(
       {"x-error-add-if-absent-new", "added",
        Filters::Common::ExtAuthz::HeaderMutationAction::AddIfAbsent});
 
-  // 6. Set up a header, then try AddIfAbsent (should NOT add).
+  // 6. Set up a header, then try AddIfAbsent should not add as header was set earlier.
   response.request_header_mutations.push_back(
       {"x-error-add-if-absent-existing", "original",
        Filters::Common::ExtAuthz::HeaderMutationAction::Set});
@@ -6940,12 +7011,12 @@ TEST_F(HttpFilterTest, ErrorResponseAppendActionsOnLocalReply) {
       {"x-error-add-if-absent-existing", "should-not-be-added",
        Filters::Common::ExtAuthz::HeaderMutationAction::AddIfAbsent});
 
-  // 7. OverwriteIfExists on non-existing header (should NOT add).
+  // 7. OverwriteIfExists on non-existing header should not add.
   response.request_header_mutations.push_back(
       {"x-error-overwrite-non-existing", "should-not-appear",
        Filters::Common::ExtAuthz::HeaderMutationAction::OverwriteIfExists});
 
-  // 8. Set up a header, then OverwriteIfExists (should overwrite).
+  // 8. Set up a header, then OverwriteIfExists should overwrite.
   response.request_header_mutations.push_back(
       {"x-error-overwrite-existing", "original",
        Filters::Common::ExtAuthz::HeaderMutationAction::Set});
@@ -6956,6 +7027,14 @@ TEST_F(HttpFilterTest, ErrorResponseAppendActionsOnLocalReply) {
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
 
   EXPECT_EQ(1U, config_->stats().error_.value());
+}
+
+// encode1xxHeaders should always continue without mutation.
+TEST_F(HttpFilterTest, Encode1xxHeadersContinue) {
+  Http::TestResponseHeaderMapImpl headers{{":status", "103"}};
+  EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_->encode1xxHeaders(headers));
+  // No mutations should have been applied.
+  EXPECT_EQ(headers.getStatusValue(), "103");
 }
 
 } // namespace
