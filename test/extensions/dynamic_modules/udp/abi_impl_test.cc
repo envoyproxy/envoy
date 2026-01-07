@@ -61,9 +61,11 @@ TEST_F(DynamicModuleUdpListenerFilterAbiCallbackTest, GetDatagramDataWithSingleC
   EXPECT_GE(chunks_size, 1);
 
   std::vector<envoy_dynamic_module_type_envoy_buffer> chunks(chunks_size);
-  size_t returned_length =
-      envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks(filterPtr(),
-                                                                                 chunks.data());
+  ASSERT_TRUE(envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks(
+      filterPtr(), chunks.data()));
+  size_t returned_length = 0;
+  ASSERT_TRUE(envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_size(
+      filterPtr(), &returned_length));
 
   // Verify the data.
   size_t total_length = 0;
@@ -89,9 +91,12 @@ TEST_F(DynamicModuleUdpListenerFilterAbiCallbackTest, GetDatagramDataNoCurrentDa
   EXPECT_FALSE(ok);
   EXPECT_EQ(0, chunks_size);
 
-  size_t length = envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks(
-      filterPtr(), nullptr);
-  EXPECT_EQ(0, length);
+  EXPECT_FALSE(envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks(
+      filterPtr(), nullptr));
+  size_t returned_length = 0;
+  EXPECT_FALSE(envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_size(
+      filterPtr(), &returned_length));
+  EXPECT_EQ(0, returned_length);
 }
 
 TEST_F(DynamicModuleUdpListenerFilterAbiCallbackTest, GetDatagramDataMultipleChunks) {
@@ -111,9 +116,11 @@ TEST_F(DynamicModuleUdpListenerFilterAbiCallbackTest, GetDatagramDataMultipleChu
   EXPECT_GE(chunks_size, 1);
 
   std::vector<envoy_dynamic_module_type_envoy_buffer> chunks(chunks_size);
-  size_t returned_length =
-      envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks(filterPtr(),
-                                                                                 chunks.data());
+  ASSERT_TRUE(envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks(
+      filterPtr(), chunks.data()));
+  size_t returned_length = 0;
+  ASSERT_TRUE(envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_size(
+      filterPtr(), &returned_length));
 
   size_t total_length = 0;
   std::string combined;
@@ -144,8 +151,8 @@ TEST_F(DynamicModuleUdpListenerFilterAbiCallbackTest, GetDatagramDataNullChunksS
   envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks_size(filterPtr(),
                                                                                   &chunks_size);
   std::vector<envoy_dynamic_module_type_envoy_buffer> chunks(chunks_size);
-  envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks(filterPtr(),
-                                                                             chunks.data());
+  ASSERT_TRUE(envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks(
+      filterPtr(), chunks.data()));
 
   filter_->setCurrentDataForTest(nullptr);
 }
@@ -164,9 +171,12 @@ TEST_F(DynamicModuleUdpListenerFilterAbiCallbackTest, GetDatagramDataEmptyBuffer
   EXPECT_TRUE(ok);
   EXPECT_EQ(0, chunks_size);
 
-  size_t length = envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks(
-      filterPtr(), nullptr);
-  EXPECT_EQ(0, length);
+  EXPECT_FALSE(envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks(
+      filterPtr(), nullptr));
+  size_t returned_length = 0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_size(
+      filterPtr(), &returned_length));
+  EXPECT_EQ(0, returned_length);
 
   filter_->setCurrentDataForTest(nullptr);
 }
@@ -434,8 +444,8 @@ TEST_F(DynamicModuleUdpListenerFilterAbiCallbackTest, SendDatagramWithExplicitAd
   envoy_dynamic_module_type_module_buffer data_buf = {response, 13};
   envoy_dynamic_module_type_module_buffer peer_addr_buf = {peer_ip, 11};
 
-  envoy_dynamic_module_callback_udp_listener_filter_send_datagram(filterPtr(), data_buf,
-                                                                  peer_addr_buf, 7777);
+  EXPECT_TRUE(envoy_dynamic_module_callback_udp_listener_filter_send_datagram(filterPtr(), data_buf,
+                                                                              peer_addr_buf, 7777));
 
   filter_->setCurrentDataForTest(nullptr);
 }
@@ -463,8 +473,8 @@ TEST_F(DynamicModuleUdpListenerFilterAbiCallbackTest, SendDatagramToOriginalPeer
   envoy_dynamic_module_type_module_buffer data_buf = {response, 9};
   envoy_dynamic_module_type_module_buffer peer_addr_buf = {nullptr, 0};
 
-  envoy_dynamic_module_callback_udp_listener_filter_send_datagram(filterPtr(), data_buf,
-                                                                  peer_addr_buf, 0);
+  EXPECT_TRUE(envoy_dynamic_module_callback_udp_listener_filter_send_datagram(filterPtr(), data_buf,
+                                                                              peer_addr_buf, 0));
 
   filter_->setCurrentDataForTest(nullptr);
 }
@@ -489,8 +499,8 @@ TEST_F(DynamicModuleUdpListenerFilterAbiCallbackTest, SendDatagramEmptyData) {
   envoy_dynamic_module_type_module_buffer data_buf = {nullptr, 0};
   envoy_dynamic_module_type_module_buffer peer_addr_buf = {nullptr, 0};
 
-  envoy_dynamic_module_callback_udp_listener_filter_send_datagram(filterPtr(), data_buf,
-                                                                  peer_addr_buf, 0);
+  EXPECT_TRUE(envoy_dynamic_module_callback_udp_listener_filter_send_datagram(filterPtr(), data_buf,
+                                                                              peer_addr_buf, 0));
 
   filter_->setCurrentDataForTest(nullptr);
 }
@@ -514,8 +524,8 @@ TEST_F(DynamicModuleUdpListenerFilterAbiCallbackTest, SendDatagramInvalidPeerAdd
   envoy_dynamic_module_type_module_buffer data_buf = {response, 4};
   envoy_dynamic_module_type_module_buffer peer_addr_buf = {invalid_ip, 17};
 
-  envoy_dynamic_module_callback_udp_listener_filter_send_datagram(filterPtr(), data_buf,
-                                                                  peer_addr_buf, 8888);
+  EXPECT_FALSE(envoy_dynamic_module_callback_udp_listener_filter_send_datagram(
+      filterPtr(), data_buf, peer_addr_buf, 8888));
 
   filter_->setCurrentDataForTest(nullptr);
 }
@@ -531,8 +541,8 @@ TEST_F(DynamicModuleUdpListenerFilterAbiCallbackTest, SendDatagramNoPeerAddress)
   envoy_dynamic_module_type_module_buffer data_buf = {response, 4};
   envoy_dynamic_module_type_module_buffer peer_addr_buf = {nullptr, 0};
 
-  envoy_dynamic_module_callback_udp_listener_filter_send_datagram(filterPtr(), data_buf,
-                                                                  peer_addr_buf, 0);
+  EXPECT_FALSE(envoy_dynamic_module_callback_udp_listener_filter_send_datagram(
+      filterPtr(), data_buf, peer_addr_buf, 0));
 }
 
 TEST_F(DynamicModuleUdpListenerFilterAbiCallbackTest, SendDatagramNoCallbacks) {
@@ -552,8 +562,8 @@ TEST_F(DynamicModuleUdpListenerFilterAbiCallbackTest, SendDatagramNoCallbacks) {
   envoy_dynamic_module_type_module_buffer peer_addr_buf = {nullptr, 0};
 
   // Should not crash.
-  envoy_dynamic_module_callback_udp_listener_filter_send_datagram(
-      static_cast<void*>(filter_without_listener.get()), data_buf, peer_addr_buf, 0);
+  EXPECT_FALSE(envoy_dynamic_module_callback_udp_listener_filter_send_datagram(
+      static_cast<void*>(filter_without_listener.get()), data_buf, peer_addr_buf, 0));
 }
 
 TEST_F(DynamicModuleUdpListenerFilterAbiCallbackTest, SendDatagramIpv6) {
@@ -580,8 +590,8 @@ TEST_F(DynamicModuleUdpListenerFilterAbiCallbackTest, SendDatagramIpv6) {
   envoy_dynamic_module_type_module_buffer data_buf = {response, 9};
   envoy_dynamic_module_type_module_buffer peer_addr_buf = {peer_ip, 11};
 
-  envoy_dynamic_module_callback_udp_listener_filter_send_datagram(filterPtr(), data_buf,
-                                                                  peer_addr_buf, 9999);
+  EXPECT_TRUE(envoy_dynamic_module_callback_udp_listener_filter_send_datagram(filterPtr(), data_buf,
+                                                                              peer_addr_buf, 9999));
 
   filter_->setCurrentDataForTest(nullptr);
 }

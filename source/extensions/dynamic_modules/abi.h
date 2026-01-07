@@ -3385,11 +3385,22 @@ bool envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks_
  * envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks_size. This is only
  * valid during the envoy_dynamic_module_on_udp_listener_filter_on_data callback.
  *
- * @return the total length of all chunks, or 0 if the datagram is not available.
+ * @return true if the datagram data is available and chunks_out is populated, false otherwise.
  */
-size_t envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks(
+bool envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks(
     envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer* chunks_out);
+
+/**
+ * envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_size is called by the module
+ * to get the total length in bytes of the current datagram data. This is only valid during the
+ * envoy_dynamic_module_on_udp_listener_filter_on_data callback.
+ *
+ * @param size_out is the output pointer to the total length of the datagram data in bytes.
+ * @return true if the datagram data is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_size(
+    envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr, size_t* size_out);
 
 /**
  * envoy_dynamic_module_callback_udp_listener_filter_set_datagram_data is called by the module to
@@ -3418,8 +3429,10 @@ bool envoy_dynamic_module_callback_udp_listener_filter_get_local_address(
 /**
  * envoy_dynamic_module_callback_udp_listener_filter_send_datagram is called by the module to
  * send a datagram.
+ *
+ * @return true if the datagram was sent, false otherwise.
  */
-void envoy_dynamic_module_callback_udp_listener_filter_send_datagram(
+bool envoy_dynamic_module_callback_udp_listener_filter_send_datagram(
     envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer data,
     envoy_dynamic_module_type_module_buffer peer_address, uint32_t peer_port);

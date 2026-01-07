@@ -43,17 +43,34 @@ bool envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks_
   return true;
 }
 
-size_t envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks(
+bool envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks(
     envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer* chunks_out) {
   auto* filter = static_cast<DynamicModuleUdpListenerFilter*>(filter_envoy_ptr);
   auto* data = filter->current_data();
   if (!data || !data->buffer_) {
-    return 0;
+    return false;
+  }
+
+  if (chunks_out == nullptr) {
+    return false;
   }
 
   fillBufferChunks(*data->buffer_, chunks_out);
-  return data->buffer_->length();
+  return true;
+}
+
+bool envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_size(
+    envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr, size_t* size_out) {
+  auto* filter = static_cast<DynamicModuleUdpListenerFilter*>(filter_envoy_ptr);
+  auto* data = filter->current_data();
+  if (!data || !data->buffer_) {
+    return false;
+  }
+  if (size_out != nullptr) {
+    *size_out = data->buffer_->length();
+  }
+  return true;
 }
 
 bool envoy_dynamic_module_callback_udp_listener_filter_set_datagram_data(
@@ -117,7 +134,7 @@ bool envoy_dynamic_module_callback_udp_listener_filter_get_local_address(
   return true;
 }
 
-void envoy_dynamic_module_callback_udp_listener_filter_send_datagram(
+bool envoy_dynamic_module_callback_udp_listener_filter_send_datagram(
     envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer data,
     envoy_dynamic_module_type_module_buffer peer_address, uint32_t peer_port) {
@@ -133,7 +150,7 @@ void envoy_dynamic_module_callback_udp_listener_filter_send_datagram(
     std::string ip_str(peer_address.ptr, peer_address.length);
     peer_addr = Envoy::Network::Utility::parseInternetAddressNoThrow(ip_str, peer_port);
     if (!peer_addr) {
-      return;
+      return false;
     }
   } else {
     if (filter->current_data()) {
@@ -142,7 +159,7 @@ void envoy_dynamic_module_callback_udp_listener_filter_send_datagram(
   }
 
   if (!peer_addr) {
-    return;
+    return false;
   }
 
   const Envoy::Network::Address::Instance* local_addr = nullptr;
@@ -156,7 +173,9 @@ void envoy_dynamic_module_callback_udp_listener_filter_send_datagram(
   if (local_addr && filter->callbacks()) {
     Envoy::Network::UdpSendData udp_data{local_addr->ip(), *peer_addr, buffer};
     filter->callbacks()->udpListener().send(udp_data);
+    return true;
   }
+  return false;
 }
 
 } // extern "C"
