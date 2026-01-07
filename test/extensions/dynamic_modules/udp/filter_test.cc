@@ -42,7 +42,7 @@ TEST_F(DynamicModuleUdpListenerFilterTest, BasicDataFlow) {
   EXPECT_EQ(Network::FilterStatus::Continue, filter->onData(data));
 
   // Verify buffer is cleared after callbacks.
-  EXPECT_EQ(nullptr, filter->current_data());
+  EXPECT_EQ(nullptr, filter->currentData());
 }
 
 TEST_F(DynamicModuleUdpListenerFilterTest, ReceiveError) {
@@ -111,7 +111,7 @@ TEST_F(DynamicModuleUdpListenerFilterTest, EmptyBuffer) {
   data.addresses_.peer_ = Network::Utility::parseInternetAddressAndPortNoThrow("1.2.3.4:1234");
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter->onData(data));
-  EXPECT_EQ(nullptr, filter->current_data());
+  EXPECT_EQ(nullptr, filter->currentData());
 }
 
 TEST_F(DynamicModuleUdpListenerFilterTest, LargeDataPayload) {
@@ -124,7 +124,7 @@ TEST_F(DynamicModuleUdpListenerFilterTest, LargeDataPayload) {
   data.addresses_.peer_ = Network::Utility::parseInternetAddressAndPortNoThrow("1.2.3.4:1234");
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter->onData(data));
-  EXPECT_EQ(nullptr, filter->current_data());
+  EXPECT_EQ(nullptr, filter->currentData());
 }
 
 TEST_F(DynamicModuleUdpListenerFilterTest, MultipleReceiveErrors) {
@@ -197,14 +197,14 @@ TEST_F(DynamicModuleUdpListenerFilterTest, CurrentDataAccessor) {
   NiceMock<Network::MockUdpReadFilterCallbacks> callbacks;
   auto filter = std::make_unique<DynamicModuleUdpListenerFilter>(callbacks, filter_config_);
 
-  EXPECT_EQ(nullptr, filter->current_data());
+  EXPECT_EQ(nullptr, filter->currentData());
 
   Network::UdpRecvData data;
   data.buffer_ = std::make_unique<Buffer::OwnedImpl>("test");
   data.addresses_.peer_ = Network::Utility::parseInternetAddressAndPortNoThrow("1.2.3.4:1234");
 
   filter->onData(data);
-  EXPECT_EQ(nullptr, filter->current_data());
+  EXPECT_EQ(nullptr, filter->currentData());
 }
 
 class DynamicModuleUdpListenerFilterStopIterationTest : public testing::Test {

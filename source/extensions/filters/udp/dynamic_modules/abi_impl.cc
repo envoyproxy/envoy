@@ -29,7 +29,7 @@ bool envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks_
     envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr,
     size_t* chunks_size_out) {
   auto* filter = static_cast<DynamicModuleUdpListenerFilter*>(filter_envoy_ptr);
-  auto* data = filter->current_data();
+  auto* data = filter->currentData();
   if (!data || !data->buffer_) {
     if (chunks_size_out != nullptr) {
       *chunks_size_out = 0;
@@ -47,7 +47,7 @@ bool envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks(
     envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer* chunks_out) {
   auto* filter = static_cast<DynamicModuleUdpListenerFilter*>(filter_envoy_ptr);
-  auto* data = filter->current_data();
+  auto* data = filter->currentData();
   if (!data || !data->buffer_) {
     return false;
   }
@@ -63,7 +63,7 @@ bool envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks(
 bool envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_size(
     envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr, size_t* size_out) {
   auto* filter = static_cast<DynamicModuleUdpListenerFilter*>(filter_envoy_ptr);
-  auto* data = filter->current_data();
+  auto* data = filter->currentData();
   if (!data || !data->buffer_) {
     return false;
   }
@@ -77,7 +77,7 @@ bool envoy_dynamic_module_callback_udp_listener_filter_set_datagram_data(
     envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer data) {
   auto* filter = static_cast<DynamicModuleUdpListenerFilter*>(filter_envoy_ptr);
-  auto* current_data = filter->current_data();
+  auto* current_data = filter->currentData();
   if (!current_data) {
     return false;
   }
@@ -93,7 +93,7 @@ bool envoy_dynamic_module_callback_udp_listener_filter_get_peer_address(
     envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer* address_out, uint32_t* port_out) {
   auto* filter = static_cast<DynamicModuleUdpListenerFilter*>(filter_envoy_ptr);
-  auto* current_data = filter->current_data();
+  auto* current_data = filter->currentData();
   if (!current_data || !current_data->addresses_.peer_) {
     return false;
   }
@@ -114,7 +114,7 @@ bool envoy_dynamic_module_callback_udp_listener_filter_get_local_address(
     envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer* address_out, uint32_t* port_out) {
   auto* filter = static_cast<DynamicModuleUdpListenerFilter*>(filter_envoy_ptr);
-  auto* current_data = filter->current_data();
+  auto* current_data = filter->currentData();
   const Envoy::Network::Address::Instance* addr = nullptr;
 
   if (current_data && current_data->addresses_.local_) {
@@ -153,8 +153,8 @@ bool envoy_dynamic_module_callback_udp_listener_filter_send_datagram(
       return false;
     }
   } else {
-    if (filter->current_data()) {
-      peer_addr = filter->current_data()->addresses_.peer_;
+    if (filter->currentData()) {
+      peer_addr = filter->currentData()->addresses_.peer_;
     }
   }
 
@@ -163,8 +163,8 @@ bool envoy_dynamic_module_callback_udp_listener_filter_send_datagram(
   }
 
   const Envoy::Network::Address::Instance* local_addr = nullptr;
-  if (filter->current_data()) {
-    local_addr = filter->current_data()->addresses_.local_.get();
+  if (filter->currentData()) {
+    local_addr = filter->currentData()->addresses_.local_.get();
   }
   if (!local_addr && filter->callbacks()) {
     local_addr = filter->callbacks()->udpListener().localAddress().get();

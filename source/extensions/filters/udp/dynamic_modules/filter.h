@@ -25,7 +25,7 @@ public:
     return static_cast<void*>(this);
   }
 
-  Network::UdpRecvData* current_data() { return current_data_; }
+  Network::UdpRecvData* currentData() { return current_data_; }
   Network::UdpReadFilterCallbacks* callbacks() { return read_callbacks_; }
 
 #ifdef ENVOY_ENABLE_FULL_PROTOS
