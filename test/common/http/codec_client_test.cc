@@ -334,8 +334,8 @@ TEST_F(CodecClientTest, IdleTimerEnabledWhenNotConnectedOldBehavior) {
   Network::ClientConnectionPtr connection{connection_};
   Event::MockTimer* idle_timer = new Event::MockTimer();
   // With the flag disabled, idle timer SHOULD be enabled when connection is not yet established
-  // (old behavior). It will be called once in the constructor and once in connect().
-  EXPECT_CALL(*idle_timer, enableTimer(_, _)).Times(2);
+  // (old behavior). It will be called once in the constructor.
+  EXPECT_CALL(*idle_timer, enableTimer(_, _));
   EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Return(idle_timer));
   client_ = std::make_unique<CodecClientForTest>(CodecType::HTTP1, std::move(connection), codec_,
                                                  nullptr, host_, dispatcher_);

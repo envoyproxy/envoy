@@ -64,11 +64,6 @@ void CodecClient::connect() {
   } else {
     ENVOY_CONN_LOG(debug, "connecting", *connection_);
     connection_->connect();
-    // If the runtime flag is disabled, start the idle timer even when connection is still
-    // connecting, restoring the old behavior.
-    if (!enable_idle_timer_only_when_connected_) {
-      enableIdleTimer();
-    }
   }
 }
 
