@@ -71,6 +71,13 @@ cc_binary(
     ],
 )
 
+# For MacOS.
+alias(
+    name = "libenvoy_jni_http_test_server_factory.jnilib",
+    testonly = True,
+    actual = ":libenvoy_jni_http_test_server_factory.so",
+)
+
 # Library which contains JNI functions for the HttpProxyTestServer.
 cc_library(
     name = "jni_http_proxy_test_server_factory_lib",
@@ -105,6 +112,13 @@ cc_binary(
     ],
 )
 
+# For MacOS.
+alias(
+    name = "libenvoy_jni_http_proxy_test_server_factory.jnilib",
+    testonly = True,
+    actual = ":libenvoy_jni_http_proxy_test_server_factory.so",
+)
+
 # Base binary (.so) for testing
 cc_binary(
     name = "libenvoy_jni_with_test_extensions.so",
@@ -114,6 +128,13 @@ cc_binary(
         ":envoy_jni_with_test_extensions_lib",
         "@envoy_mobile_extra_jni_deps//:extra_jni_dep",
     ],
+)
+
+# For MacOS.
+alias(
+    name = "libenvoy_jni_with_test_extensions.jnilib",
+    testonly = True,
+    actual = ":libenvoy_jni_with_test_extensions.so",
 )
 
 ## Targets for local execution
@@ -147,6 +168,13 @@ cc_binary(
     ],
 )
 
+# For MacOS.
+alias(
+    name = "libenvoy_jni_with_test_and_listener_extensions.jnilib",
+    testonly = True,
+    actual = ":libenvoy_jni_with_test_and_listener_extensions.so",
+)
+
 envoy_mobile_so_to_jni_lib(
     name = "libenvoy_jni_with_test_and_listener_extensions_jnilib",
     testonly = True,
@@ -173,6 +201,13 @@ cc_binary(
     ],
 )
 
+# For MacOS.
+alias(
+    name = "libenvoy_jni_helper_test.jnilib",
+    testonly = True,
+    actual = ":libenvoy_jni_helper_test.so",
+)
+
 cc_library(
     name = "jni_utility_test_lib",
     testonly = True,
@@ -194,4 +229,11 @@ cc_binary(
     deps = [
         ":jni_utility_test_lib",
     ],
+)
+
+# For MacOS.
+alias(
+    name = "libenvoy_jni_utility_test.jnilib",
+    testonly = True,
+    actual = ":libenvoy_jni_utility_test.so",
 )
