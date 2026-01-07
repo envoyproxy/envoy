@@ -485,6 +485,11 @@ new_features:
 - area: ratelimit
   change: |
     Added support for substitution formatting in rate limit descriptor values.
+- area: ratelimit
+  change: |
+    Added shadow mode support to HTTP, network, and Thrift proxy rate limit filters. When the rate limit service
+    sets ``shadow_mode`` to ``true`` in the response, Envoy collects metrics (``shadow_ok`` and ``shadow_over_limit``)
+    without enforcing rate limits, allowing safe validation of rate limiting configuration before enforcement.
 - area: redis
   change: |
     Added support for ``redis_proxy`` to use separate credentials for each upstream Redis cluster.
