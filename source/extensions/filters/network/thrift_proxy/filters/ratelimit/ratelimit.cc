@@ -4,7 +4,6 @@
 #include "source/extensions/filters/network/thrift_proxy/app_exception_impl.h"
 #include "source/extensions/filters/network/thrift_proxy/router/router.h"
 #include "source/extensions/filters/network/thrift_proxy/router/router_ratelimit.h"
-#include <cinttypes>
 
 namespace Envoy {
 namespace Extensions {
