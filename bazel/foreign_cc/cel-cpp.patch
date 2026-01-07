@@ -1,15 +1,3 @@
-diff --git a/bazel/cel_proto_transitive_descriptor_set.bzl b/bazel/cel_proto_transitive_descriptor_set.bzl
-index e65e0b4a..18837236 100644
---- a/bazel/cel_proto_transitive_descriptor_set.bzl
-+++ b/bazel/cel_proto_transitive_descriptor_set.bzl
-@@ -30,6 +30,7 @@ def _cel_proto_transitive_descriptor_set(ctx):
-         progress_message = "Joining descriptors.",
-         command = ("< \"$1\" xargs cat >{output}".format(output = output.path)),
-         arguments = [args],
-+        use_default_shell_env = True,
-     )
-     return DefaultInfo(
-         files = depset([output]),
 diff --git a/common/internal/byte_string.cc b/common/internal/byte_string.cc
 index b9f47922..9d096424 100644
 --- a/common/internal/byte_string.cc

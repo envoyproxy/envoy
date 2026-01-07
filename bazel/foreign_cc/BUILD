@@ -41,6 +41,7 @@ configure_make(
         "skip_on_windows",
     ],
     targets = ["install"],
+    target_compatible_with = ["@platforms//os:linux"],
 )
 
 envoy_cc_library(
@@ -461,6 +462,7 @@ configure_make(
         "//bazel:windows_x86_64": ["libdl.a"],
         "//conditions:default": [],
     }),
+    target_compatible_with = ["@platforms//os:windows"],
 )
 
 cc_library(
