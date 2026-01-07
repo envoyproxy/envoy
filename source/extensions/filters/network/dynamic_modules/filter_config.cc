@@ -11,8 +11,8 @@ namespace NetworkFilters {
 
 DynamicModuleNetworkFilterConfig::DynamicModuleNetworkFilterConfig(
     const absl::string_view filter_name, const absl::string_view filter_config,
-    DynamicModulePtr dynamic_module)
-    : filter_name_(filter_name), filter_config_(filter_config),
+    DynamicModulePtr dynamic_module, Envoy::Upstream::ClusterManager& cluster_manager)
+    : cluster_manager_(cluster_manager), filter_name_(filter_name), filter_config_(filter_config),
       dynamic_module_(std::move(dynamic_module)) {}
 
 DynamicModuleNetworkFilterConfig::~DynamicModuleNetworkFilterConfig() {
@@ -21,10 +21,9 @@ DynamicModuleNetworkFilterConfig::~DynamicModuleNetworkFilterConfig() {
   }
 }
 
-absl::StatusOr<DynamicModuleNetworkFilterConfigSharedPtr>
-newDynamicModuleNetworkFilterConfig(const absl::string_view filter_name,
-                                    const absl::string_view filter_config,
-                                    DynamicModulePtr dynamic_module) {
+absl::StatusOr<DynamicModuleNetworkFilterConfigSharedPtr> newDynamicModuleNetworkFilterConfig(
+    const absl::string_view filter_name, const absl::string_view filter_config,
+    DynamicModulePtr dynamic_module, Envoy::Upstream::ClusterManager& cluster_manager) {
 
   // Resolve the symbols for the network filter using graceful error handling.
   auto on_config_new =
@@ -61,8 +60,13 @@ newDynamicModuleNetworkFilterConfig(const absl::string_view filter_name,
       "envoy_dynamic_module_on_network_filter_destroy");
   RETURN_IF_NOT_OK_REF(on_destroy.status());
 
-  auto config = std::make_shared<DynamicModuleNetworkFilterConfig>(filter_name, filter_config,
-                                                                   std::move(dynamic_module));
+  // HTTP callout done is optional - module may not implement async calls.
+  auto on_http_callout_done =
+      dynamic_module->getFunctionPointer<OnNetworkFilterHttpCalloutDoneType>(
+          "envoy_dynamic_module_on_network_filter_http_callout_done");
+
+  auto config = std::make_shared<DynamicModuleNetworkFilterConfig>(
+      filter_name, filter_config, std::move(dynamic_module), cluster_manager);
 
   // Store the resolved function pointers.
   config->on_network_filter_config_destroy_ = on_config_destroy.value();
@@ -72,6 +76,8 @@ newDynamicModuleNetworkFilterConfig(const absl::string_view filter_name,
   config->on_network_filter_write_ = on_write.value();
   config->on_network_filter_event_ = on_event.value();
   config->on_network_filter_destroy_ = on_destroy.value();
+  config->on_network_filter_http_callout_done_ =
+      on_http_callout_done.ok() ? on_http_callout_done.value() : nullptr;
 
   // Create the in-module configuration.
   envoy_dynamic_module_type_envoy_buffer name_buffer = {const_cast<char*>(filter_name.data()),

@@ -1198,6 +1198,156 @@ void envoy_dynamic_module_on_network_filter_event(
 void envoy_dynamic_module_on_network_filter_destroy(
     envoy_dynamic_module_type_network_filter_module_ptr filter_module_ptr);
 
+/**
+ * envoy_dynamic_module_on_network_filter_http_callout_done is called when the HTTP callout
+ * response is received initiated by a network filter.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object of the
+ * corresponding network filter.
+ * @param filter_module_ptr is the pointer to the in-module network filter created by
+ * envoy_dynamic_module_on_network_filter_new.
+ * @param callout_id is the ID of the callout. This is used to differentiate between multiple
+ * calls.
+ * @param result is the result of the callout.
+ * @param headers is the headers of the response.
+ * @param headers_size is the size of the headers.
+ * @param body_chunks is the body of the response.
+ * @param body_chunks_size is the size of the body.
+ *
+ * headers and body_chunks are owned by Envoy, and they are guaranteed to be valid until the end of
+ * this event hook. They may be null if the callout fails or the response is empty.
+ */
+void envoy_dynamic_module_on_network_filter_http_callout_done(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_network_filter_module_ptr filter_module_ptr, uint64_t callout_id,
+    envoy_dynamic_module_type_http_callout_result result,
+    envoy_dynamic_module_type_envoy_http_header* headers, size_t headers_size,
+    envoy_dynamic_module_type_envoy_buffer* body_chunks, size_t body_chunks_size);
+
+// -----------------------------------------------------------------------------
+// Socket Options
+// -----------------------------------------------------------------------------
+
+/**
+ * envoy_dynamic_module_type_socket_option_state represents the socket state at which an option
+ * should be applied.
+ */
+typedef enum envoy_dynamic_module_type_socket_option_state {
+  envoy_dynamic_module_type_socket_option_state_Prebind = 0,
+  envoy_dynamic_module_type_socket_option_state_Bound = 1,
+  envoy_dynamic_module_type_socket_option_state_Listening = 2,
+} envoy_dynamic_module_type_socket_option_state;
+
+/**
+ * envoy_dynamic_module_type_socket_option_value_type represents the type of value stored in a
+ * socket option.
+ */
+typedef enum envoy_dynamic_module_type_socket_option_value_type {
+  envoy_dynamic_module_type_socket_option_value_type_Int = 0,
+  envoy_dynamic_module_type_socket_option_value_type_Bytes = 1,
+} envoy_dynamic_module_type_socket_option_value_type;
+
+/**
+ * envoy_dynamic_module_type_socket_option represents a socket option with its level, name, state,
+ * and value. The value can be either an integer or bytes depending on value_type.
+ */
+typedef struct envoy_dynamic_module_type_socket_option {
+  int64_t level;
+  int64_t name;
+  envoy_dynamic_module_type_socket_option_state state;
+  envoy_dynamic_module_type_socket_option_value_type value_type;
+  int64_t int_value;
+  envoy_dynamic_module_type_envoy_buffer byte_value;
+} envoy_dynamic_module_type_socket_option;
+
+/**
+ * envoy_dynamic_module_callback_network_set_socket_option_int sets an integer socket option with
+ * the given level, name, and state.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param level is the socket option level (e.g., SOL_SOCKET).
+ * @param name is the socket option name (e.g., SO_KEEPALIVE).
+ * @param state is the socket state at which this option should be applied.
+ * @param value is the integer value for the socket option.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_network_set_socket_option_int(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, int64_t level,
+    int64_t name, envoy_dynamic_module_type_socket_option_state state, int64_t value);
+
+/**
+ * envoy_dynamic_module_callback_network_set_socket_option_bytes sets a bytes socket option with
+ * the given level, name, and state.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param level is the socket option level.
+ * @param name is the socket option name.
+ * @param state is the socket state at which this option should be applied.
+ * @param value is the byte buffer value for the socket option.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_network_set_socket_option_bytes(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, int64_t level,
+    int64_t name, envoy_dynamic_module_type_socket_option_state state,
+    envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_network_get_socket_option_int retrieves an integer socket option
+ * value.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param level is the socket option level.
+ * @param name is the socket option name.
+ * @param state is the socket state.
+ * @param value_out is the pointer to store the retrieved integer value.
+ * @return true if the option is found, false otherwise.
+ */
+bool envoy_dynamic_module_callback_network_get_socket_option_int(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, int64_t level,
+    int64_t name, envoy_dynamic_module_type_socket_option_state state, int64_t* value_out);
+
+/**
+ * envoy_dynamic_module_callback_network_get_socket_option_bytes retrieves a bytes socket option
+ * value.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param level is the socket option level.
+ * @param name is the socket option name.
+ * @param state is the socket state.
+ * @param value_out is the pointer to store the retrieved buffer. The buffer is owned by Envoy and
+ * valid until the filter is destroyed.
+ * @return true if the option is found, false otherwise.
+ */
+bool envoy_dynamic_module_callback_network_get_socket_option_bytes(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, int64_t level,
+    int64_t name, envoy_dynamic_module_type_socket_option_state state,
+    envoy_dynamic_module_type_envoy_buffer* value_out);
+
+/**
+ * envoy_dynamic_module_callback_network_get_socket_options_size returns the number of socket
+ * options stored on the connection.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @return the number of socket options.
+ */
+size_t envoy_dynamic_module_callback_network_get_socket_options_size(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_network_get_socket_options gets all socket options stored on the
+ * connection. The caller should first call
+ * envoy_dynamic_module_callback_network_get_socket_options_size to get the size, allocate an array
+ * of that size, and pass the pointer to this function.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param options_out is the pointer to an array of socket options that will be filled. The array
+ * must be pre-allocated by the caller with size equal to the value returned by
+ * envoy_dynamic_module_callback_network_get_socket_options_size.
+ */
+void envoy_dynamic_module_callback_network_get_socket_options(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_socket_option* options_out);
+
 // =============================================================================
 // ------------------------------ Listener Filter Event Hooks ------------------
 // =============================================================================
@@ -2740,6 +2890,34 @@ bool envoy_dynamic_module_callback_network_get_dynamic_metadata_number(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer filter_namespace,
     envoy_dynamic_module_type_module_buffer key, double* result);
+
+// -----------------------------------------------------------------------------
+// HTTP Callouts
+// -----------------------------------------------------------------------------
+
+/**
+ * envoy_dynamic_module_callback_network_filter_http_callout is called by the module to initiate an
+ * HTTP callout. The callout is initiated by the network filter and the response is received in
+ * envoy_dynamic_module_on_network_filter_http_callout_done.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object of the
+ * corresponding network filter.
+ * @param callout_id_out is a pointer to a variable where the callout ID will be stored. This can be
+ * arbitrary and is used to differentiate between multiple calls from the same filter.
+ * @param cluster_name is the name of the cluster to which the callout is sent.
+ * @param headers is the headers of the request. It must contain :method, :path and host headers.
+ * @param headers_size is the size of the headers.
+ * @param body is the body of the request.
+ * @param timeout_milliseconds is the timeout for the callout in milliseconds.
+ * @return envoy_dynamic_module_type_http_callout_init_result is the result of the callout
+ * initialization.
+ */
+envoy_dynamic_module_type_http_callout_init_result
+envoy_dynamic_module_callback_network_filter_http_callout(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, uint64_t* callout_id_out,
+    envoy_dynamic_module_type_module_buffer cluster_name,
+    envoy_dynamic_module_type_module_http_header* headers, size_t headers_size,
+    envoy_dynamic_module_type_module_buffer body, uint64_t timeout_milliseconds);
 
 // =============================================================================
 // ----------------------------- Listener Filter Callbacks ---------------------

@@ -223,8 +223,8 @@ public:
 
 TEST_F(RouterTest, SenselessTestForCoverage) {
   config_->timeSource();
-  Http::MockFilterChainManager mock_manager;
-  config_->createUpgradeFilterChain("", nullptr, mock_manager, Http::EmptyFilterChainOptions{});
+  Http::MockFilterChainFactoryCallbacks callbacks;
+  config_->createUpgradeFilterChain("", nullptr, callbacks);
 
   router_->route();
   router_->timeSource();
