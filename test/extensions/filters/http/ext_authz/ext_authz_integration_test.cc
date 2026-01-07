@@ -758,7 +758,12 @@ attributes:
       }
 
       if (existed) {
+        // Header existed, so it should be overwritten with the new value.
         EXPECT_THAT(upstream_request_->headers(), ContainsHeader(h.first, h.second));
+      } else {
+        // Header did not exist, so OverwriteIfExists should NOT add it.
+        EXPECT_TRUE(upstream_request_->headers().get(Http::LowerCaseString{h.first}).empty())
+            << "Header '" << h.first << "' should not have been added by OverwriteIfExists";
       }
     }
     for (const auto& h : headers_to_overwrite_if_exists_or_add) {
