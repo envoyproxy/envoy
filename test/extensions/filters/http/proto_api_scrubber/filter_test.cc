@@ -1325,9 +1325,8 @@ TEST_F(MethodLevelRestrictionTest, MethodBlockedByMatcher) {
       {":method", "POST"}, {":path", method_name}, {"content-type", "application/grpc"}};
 
   EXPECT_CALL(mock_decoder_callbacks_,
-              sendLocalReply(Http::Code::Forbidden, "Method not allowed", Eq(nullptr),
-                             Eq(Status::PermissionDenied),
-                             "proto_api_scrubber_Forbidden{METHOD_BLOCKED}"));
+              sendLocalReply(Http::Code::NotFound, "Method not allowed", Eq(nullptr),
+                             Eq(Status::NotFound), "proto_api_scrubber_Not Found{METHOD_BLOCKED}"));
 
   // Verify Trace Tag.
   EXPECT_CALL(mock_decoder_callbacks_.active_span_,
@@ -1561,8 +1560,8 @@ TEST_F(ObservabilityTest, MethodLevelBlockingUpdatesStatsAndTrace) {
   EXPECT_CALL(mock_decoder_callbacks_.active_span_,
               setTag("proto_api_scrubber.outcome", "blocked"));
 
-  // Verify 403.
-  EXPECT_CALL(mock_decoder_callbacks_, sendLocalReply(Http::Code::Forbidden, _, _, _, _));
+  // Verify 404.
+  EXPECT_CALL(mock_decoder_callbacks_, sendLocalReply(Http::Code::NotFound, _, _, _, _));
   EXPECT_EQ(Envoy::Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(headers, false));
 
