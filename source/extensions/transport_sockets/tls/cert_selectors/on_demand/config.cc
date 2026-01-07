@@ -252,16 +252,17 @@ Ssl::SelectionResult AsyncSelector::selectTlsContext(const std::string& name,
 
 Ssl::SelectionResult AsyncSelector::selectTlsContext(const SSL_CLIENT_HELLO& ssl_client_hello,
                                                      Ssl::CertificateSelectionCallbackPtr cb) {
-  const std::string name = mapper_(ssl_client_hello);
+  const std::string name = mapper_->deriveFromClientHello(ssl_client_hello);
   const bool client_ocsp_capable = isClientOcspCapable(ssl_client_hello);
   return selectTlsContext(name, client_ocsp_capable, std::move(cb));
 }
 
 Ssl::SelectionResult
-AsyncSelector::selectTlsContext(const SSL&, const Network::TransportSocketOptionsConstSharedPtr&,
+AsyncSelector::selectTlsContext(const SSL& ssl,
+                                const Network::TransportSocketOptionsConstSharedPtr& options,
                                 Ssl::CertificateSelectionCallbackPtr cb) {
-  // TODO: update mapper
-  return selectTlsContext("", false, std::move(cb));
+  const std::string name = mapper_->deriveFromServerHello(ssl, options);
+  return selectTlsContext(name, false, std::move(cb));
 }
 
 std::unique_ptr<AsyncSelector> OnDemandTlsCertificateSelectorFactory::create() {

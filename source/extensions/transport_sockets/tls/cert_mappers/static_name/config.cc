@@ -7,6 +7,21 @@ namespace Tls {
 namespace CertificateMappers {
 namespace StaticName {
 
+namespace {
+class StaticNameMapper : public Ssl::TlsCertificateMapper {
+public:
+  explicit StaticNameMapper(const std::string& name) : name_(name) {}
+  std::string deriveFromClientHello(const SSL_CLIENT_HELLO&) { return name_; }
+  std::string deriveFromServerHello(const SSL&,
+                                    const Network::TransportSocketOptionsConstSharedPtr&) {
+    return name_;
+  }
+
+private:
+  const std::string name_;
+};
+} // namespace
+
 absl::StatusOr<Ssl::TlsCertificateMapperFactory>
 StaticNameMapperFactory::createTlsCertificateMapperFactory(
     const Protobuf::Message& proto_config,
@@ -14,7 +29,7 @@ StaticNameMapperFactory::createTlsCertificateMapperFactory(
   const StaticNameConfigProto& config =
       MessageUtil::downcastAndValidate<const StaticNameConfigProto&>(
           proto_config, factory_context.messageValidationVisitor());
-  return [name = config.name()]() { return [=](const SSL_CLIENT_HELLO&) { return name; }; };
+  return [name = config.name()]() { return std::make_unique<StaticNameMapper>(name); };
 }
 
 REGISTER_FACTORY(StaticNameMapperFactory, Ssl::TlsCertificateMapperConfigFactory);

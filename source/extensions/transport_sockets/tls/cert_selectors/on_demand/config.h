@@ -227,12 +227,13 @@ class AsyncSelector : public Ssl::TlsCertificateSelector,
                       public Ssl::UpstreamTlsCertificateSelector,
                       protected Logger::Loggable<Logger::Id::connection> {
 public:
-  AsyncSelector(Ssl::TlsCertificateMapper&& mapper, std::shared_ptr<SecretManager>& secret_manager)
+  AsyncSelector(Ssl::TlsCertificateMapperPtr&& mapper,
+                std::shared_ptr<SecretManager>& secret_manager)
       : mapper_(std::move(mapper)), secret_manager_(secret_manager) {}
 
   // Ssl::TlsCertificateSelector
   bool providesCertificates() const override { return true; }
-  Ssl::SelectionResult selectTlsContext(const SSL_CLIENT_HELLO&,
+  Ssl::SelectionResult selectTlsContext(const SSL_CLIENT_HELLO& ssl_client_hello,
                                         Ssl::CertificateSelectionCallbackPtr cb) override;
 
   std::pair<const Ssl::TlsContext&, Ssl::OcspStapleAction>
@@ -249,7 +250,7 @@ private:
   Ssl::SelectionResult selectTlsContext(const std::string& name, const bool client_ocsp_capable,
                                         Ssl::CertificateSelectionCallbackPtr cb);
 
-  Ssl::TlsCertificateMapper mapper_;
+  Ssl::TlsCertificateMapperPtr mapper_;
   std::shared_ptr<SecretManager> secret_manager_;
 };
 

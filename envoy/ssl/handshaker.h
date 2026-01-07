@@ -353,8 +353,16 @@ public:
   std::string category() const override { return "envoy.tls.upstream_certificate_selectors"; }
 };
 
-using TlsCertificateMapper = std::function<std::string(const SSL_CLIENT_HELLO&)>;
-using TlsCertificateMapperFactory = std::function<TlsCertificateMapper()>;
+class TlsCertificateMapper {
+public:
+  virtual ~TlsCertificateMapper() = default;
+  virtual std::string deriveFromClientHello(const SSL_CLIENT_HELLO&) PURE;
+  virtual std::string
+  deriveFromServerHello(const SSL&, const Network::TransportSocketOptionsConstSharedPtr&) PURE;
+};
+
+using TlsCertificateMapperPtr = std::unique_ptr<TlsCertificateMapper>;
+using TlsCertificateMapperFactory = std::function<TlsCertificateMapperPtr()>;
 
 class TlsCertificateMapperConfigFactory : public Config::TypedFactory {
 public:
