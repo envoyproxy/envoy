@@ -25,7 +25,9 @@ CodecClient::CodecClient(CodecType type, Network::ClientConnectionPtr&& connecti
                          Upstream::HostDescriptionConstSharedPtr host,
                          Event::Dispatcher& dispatcher)
     : type_(type), host_(host), connection_(std::move(connection)),
-      idle_timeout_(host_->cluster().idleTimeout()) {
+      idle_timeout_(host_->cluster().idleTimeout()),
+      enable_idle_timer_only_when_connected_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.codec_client_enable_idle_timer_only_when_connected")) {
   if (type_ != CodecType::HTTP3) {
     // Make sure upstream connections process data and then the FIN, rather than processing
     // TCP disconnects immediately. (see https://github.com/envoyproxy/envoy/issues/1679 for
@@ -39,8 +41,7 @@ CodecClient::CodecClient(CodecType type, Network::ClientConnectionPtr&& connecti
     idle_timer_ = dispatcher.createTimer([this]() -> void { onIdleTimeout(); });
     // If the runtime flag is disabled, start the idle timer immediately even when connection
     // is not yet established, restoring the old behavior.
-    if (!Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.codec_client_enable_idle_timer_only_when_connected")) {
+    if (!enable_idle_timer_only_when_connected_) {
       enableIdleTimer();
     }
   }
@@ -65,8 +66,7 @@ void CodecClient::connect() {
     connection_->connect();
     // If the runtime flag is disabled, start the idle timer even when connection is still
     // connecting, restoring the old behavior.
-    if (!Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.codec_client_enable_idle_timer_only_when_connected")) {
+    if (!enable_idle_timer_only_when_connected_) {
       enableIdleTimer();
     }
   }
