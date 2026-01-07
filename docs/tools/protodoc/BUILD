@@ -1,4 +1,4 @@
-load("@com_github_grpc_grpc//bazel:python_rules.bzl", "py_proto_library")
+load("@grpc//bazel:python_rules.bzl", "py_proto_library")
 load("@com_google_protobuf//bazel:proto_library.bzl", "proto_library")
 load("@docs_pip3//:requirements.bzl", "requirement")
 load("@envoy//tools/base:envoy_python.bzl", "envoy_jinja_env", "envoy_py_data")
@@ -35,7 +35,7 @@ py_proto_library(
 
 py_proto_library(
     name = "validate_py_pb2",
-    deps = ["@com_envoyproxy_protoc_gen_validate//validate:validate_proto"],
+    deps = ["@protoc-gen-validate//validate:validate_proto"],
 )
 
 envoy_py_data(

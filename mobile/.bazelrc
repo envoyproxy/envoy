@@ -8,6 +8,9 @@ try-import ../.bazelrc
 # global
 #############################################################################
 
+common --noenable_bzlmod
+common --enable_workspace
+
 # Common flags for all builds
 build --define=hot_restart=disabled
 build --define=tcmalloc=disabled
@@ -49,7 +52,7 @@ build --copt -Wno-deprecated-declarations
 build --define=signal_trace=disabled
 
 # Override PGV validation with NOP functions for binary size savings.
-build --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor=nop
+build --@protoc-gen-validate//bazel:template-flavor=nop
 
 # Instrument Envoy Mobile's C++ code for coverage
 coverage --instrumentation_filter="//library/common[/:]"

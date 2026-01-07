@@ -532,12 +532,12 @@ config_setting(
 
 config_setting(
     name = "using_boringssl_fips",
-    flag_values = {":ssl": "@boringssl_fips//:ssl"},
+    flag_values = {":ssl": "@boringssl-fips//:ssl"},
 )
 
 config_setting(
     name = "using_aws_lc",
-    flag_values = {":ssl": "@aws_lc//:ssl"},
+    flag_values = {":ssl": "@aws-lc-fips//:ssl"},
 )
 
 # Convenience grouping for any FIPS SSL library

@@ -20,3 +20,4 @@ def raze_fetch_remote_crates():
         strip_prefix = "protobuf-2.24.1",
         build_file = Label("//bazel/external/cargo/remote:BUILD.protobuf-2.24.1.bazel"),
     )
+    return [struct(repo = "raze__protobuf__2_24_1", is_dev_dep = False)]

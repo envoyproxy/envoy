@@ -19,11 +19,12 @@ envoy_cc_library(
         "//conditions:default": [],
     }),
     tags = ["nocompdb"],
+    target_compatible_with = ["@platforms//os:linux"],
     deps = [
         "//envoy/common/io:io_uring_interface",
         "//envoy/thread_local:thread_local_interface",
     ] + select({
-        "//bazel:liburing_enabled": ["//bazel/foreign_cc:liburing_linux"],
+        "//bazel:liburing_enabled": ["@liburing"],
         "//conditions:default": [],
     }),
 )
@@ -38,6 +39,7 @@ envoy_cc_library(
         "//bazel:liburing_enabled": ["io_uring_worker_impl.h"],
         "//conditions:default": [],
     }),
+    target_compatible_with = ["@platforms//os:linux"],
     deps = [
         ":io_uring_impl_lib",
         "//envoy/common/io:io_uring_interface",
@@ -57,6 +59,7 @@ envoy_cc_library(
         "//bazel:liburing_enabled": ["io_uring_worker_factory_impl.h"],
         "//conditions:default": [],
     }),
+    target_compatible_with = ["@platforms//os:linux"],
     deps = [
         ":io_uring_worker_lib",
         "//envoy/common/io:io_uring_interface",

@@ -2,7 +2,7 @@
 
 set -e
 
-ENVOY_BIN="${TEST_SRCDIR}/envoy/source/exe/envoy-static"
+ENVOY_BIN="${TEST_SRCDIR}/_main/source/exe/envoy-static"
 
 
 if [[ $(uname) == "Darwin" ]]; then

@@ -13,8 +13,11 @@ build --color=yes
 fetch --color=yes
 run --color=yes
 
-common --enable_workspace
-common --noenable_bzlmod
+common --enable_bzlmod
+common --noenable_workspace
+common --registry=https://bcr.bazel.build/
+common --registry=https://raw.githubusercontent.com/envoyproxy/toolshed/d19d00796855aee0939a043544adbb3fa647deea/bazel-registry
+common --registry=https://raw.githubusercontent.com/phlax/bazel-central-registry/b739c7fa56b971d695af9600b88099236dcfef76
 
 build --workspace_status_command="bash get_workspace_status"
 build --incompatible_strict_action_env

@@ -15,8 +15,8 @@ wasm_rust_binary(
     name = "async_call_rust.wasm",
     srcs = ["async_call_rust.rs"],
     deps = [
-        "@proxy_wasm_rust_sdk//:proxy_wasm",
-        "@proxy_wasm_rust_sdk//bazel/cargo/remote:log",
+        "@proxy-wasm-rust-sdk//:proxy_wasm",
+        "@proxy-wasm-rust-sdk//bazel/cargo/remote:log",
     ],
 )
 
@@ -24,8 +24,8 @@ wasm_rust_binary(
     name = "body_rust.wasm",
     srcs = ["body_rust.rs"],
     deps = [
-        "@proxy_wasm_rust_sdk//:proxy_wasm",
-        "@proxy_wasm_rust_sdk//bazel/cargo/remote:log",
+        "@proxy-wasm-rust-sdk//:proxy_wasm",
+        "@proxy-wasm-rust-sdk//bazel/cargo/remote:log",
     ],
 )
 
@@ -33,8 +33,8 @@ wasm_rust_binary(
     name = "close_stream_rust.wasm",
     srcs = ["close_stream_rust.rs"],
     deps = [
-        "@proxy_wasm_rust_sdk//:proxy_wasm",
-        "@proxy_wasm_rust_sdk//bazel/cargo/remote:log",
+        "@proxy-wasm-rust-sdk//:proxy_wasm",
+        "@proxy-wasm-rust-sdk//bazel/cargo/remote:log",
     ],
 )
 
@@ -43,8 +43,8 @@ wasm_rust_binary(
     srcs = ["grpc_call_rust.rs"],
     deps = [
         "//bazel/external/cargo:protobuf",
-        "@proxy_wasm_rust_sdk//:proxy_wasm",
-        "@proxy_wasm_rust_sdk//bazel/cargo/remote:log",
+        "@proxy-wasm-rust-sdk//:proxy_wasm",
+        "@proxy-wasm-rust-sdk//bazel/cargo/remote:log",
     ],
 )
 
@@ -53,8 +53,8 @@ wasm_rust_binary(
     srcs = ["grpc_stream_rust.rs"],
     deps = [
         "//bazel/external/cargo:protobuf",
-        "@proxy_wasm_rust_sdk//:proxy_wasm",
-        "@proxy_wasm_rust_sdk//bazel/cargo/remote:log",
+        "@proxy-wasm-rust-sdk//:proxy_wasm",
+        "@proxy-wasm-rust-sdk//bazel/cargo/remote:log",
     ],
 )
 
@@ -63,8 +63,8 @@ wasm_rust_binary(
     srcs = ["headers_rust.rs"],
     wasi = True,
     deps = [
-        "@proxy_wasm_rust_sdk//:proxy_wasm",
-        "@proxy_wasm_rust_sdk//bazel/cargo/remote:log",
+        "@proxy-wasm-rust-sdk//:proxy_wasm",
+        "@proxy-wasm-rust-sdk//bazel/cargo/remote:log",
     ],
 )
 
@@ -72,8 +72,8 @@ wasm_rust_binary(
     name = "metadata_rust.wasm",
     srcs = ["metadata_rust.rs"],
     deps = [
-        "@proxy_wasm_rust_sdk//:proxy_wasm",
-        "@proxy_wasm_rust_sdk//bazel/cargo/remote:log",
+        "@proxy-wasm-rust-sdk//:proxy_wasm",
+        "@proxy-wasm-rust-sdk//bazel/cargo/remote:log",
     ],
 )
 
@@ -81,8 +81,8 @@ wasm_rust_binary(
     name = "panic_rust.wasm",
     srcs = ["panic_rust.rs"],
     deps = [
-        "@proxy_wasm_rust_sdk//:proxy_wasm",
-        "@proxy_wasm_rust_sdk//bazel/cargo/remote:log",
+        "@proxy-wasm-rust-sdk//:proxy_wasm",
+        "@proxy-wasm-rust-sdk//bazel/cargo/remote:log",
     ],
 )
 
@@ -90,8 +90,8 @@ wasm_rust_binary(
     name = "resume_call_rust.wasm",
     srcs = ["resume_call_rust.rs"],
     deps = [
-        "@proxy_wasm_rust_sdk//:proxy_wasm",
-        "@proxy_wasm_rust_sdk//bazel/cargo/remote:log",
+        "@proxy-wasm-rust-sdk//:proxy_wasm",
+        "@proxy-wasm-rust-sdk//bazel/cargo/remote:log",
     ],
 )
 
@@ -99,8 +99,8 @@ wasm_rust_binary(
     name = "shared_data_rust.wasm",
     srcs = ["shared_data_rust.rs"],
     deps = [
-        "@proxy_wasm_rust_sdk//:proxy_wasm",
-        "@proxy_wasm_rust_sdk//bazel/cargo/remote:log",
+        "@proxy-wasm-rust-sdk//:proxy_wasm",
+        "@proxy-wasm-rust-sdk//bazel/cargo/remote:log",
     ],
 )
 
@@ -108,8 +108,8 @@ wasm_rust_binary(
     name = "shared_queue_rust.wasm",
     srcs = ["shared_queue_rust.rs"],
     deps = [
-        "@proxy_wasm_rust_sdk//:proxy_wasm",
-        "@proxy_wasm_rust_sdk//bazel/cargo/remote:log",
+        "@proxy-wasm-rust-sdk//:proxy_wasm",
+        "@proxy-wasm-rust-sdk//bazel/cargo/remote:log",
     ],
 )
 
@@ -137,7 +137,7 @@ envoy_cc_test_library(
         "//source/extensions/common/wasm/ext:envoy_null_plugin",
         "//source/extensions/common/wasm/ext:sign_cc_proto",
         "@abseil-cpp//absl/container:node_hash_map",
-        "@proxy_wasm_cpp_sdk//contrib:contrib_lib",
+        "@proxy-wasm-cpp-sdk//contrib:contrib_lib",
     ],
 )
 
@@ -162,7 +162,7 @@ envoy_wasm_cc_binary(
         "//source/extensions/common/wasm/ext:envoy_proxy_wasm_api_lib",
         "//source/extensions/common/wasm/ext:sign_cc_proto",
         "//source/extensions/common/wasm/ext:verify_signature_cc_proto",
-        "@proxy_wasm_cpp_sdk//contrib:contrib_lib",
+        "@proxy-wasm-cpp-sdk//contrib:contrib_lib",
     ],
 )
 

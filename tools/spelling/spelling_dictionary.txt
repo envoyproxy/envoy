@@ -4,6 +4,7 @@
 # are allowed for any otherwise correctly spelled word.
 
 Allshard
+bzlmod
 FLUSHALL
 NUMPAT
 PUBSUB
@@ -1671,3 +1672,4 @@ UIDs
 configurability
 WDS
 OIDC
+workspaces

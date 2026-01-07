@@ -370,6 +370,7 @@ ContextImpl::ContextImpl(
       if (!fips_mode) {
         ENVOY_LOG(warn, "FIPS conformance policy applied on a non-FIPS build");
       }
+#ifndef OPENSSL_IS_AWSLC
       for (auto& tls_context : tls_contexts_) {
         int rc = SSL_CTX_set_compliance_policy(tls_context.ssl_ctx_.get(),
                                                ssl_compliance_policy_fips_202205);
@@ -380,6 +381,11 @@ ContextImpl::ContextImpl(
           return;
         }
       }
+#else
+        // AWS-LC doesn't support SSL_CTX_set_compliance_policy
+        // The FIPS mode restrictions are already enforced by AWS-LC's FIPS module
+        ENVOY_LOG(info, "FIPS_202205 compliance policy skipped for AWS-LC (FIPS restrictions enforced by module)");
+#endif
       break;
     default:
       creation_status = absl::InvalidArgumentError("Unknown compliance policy");

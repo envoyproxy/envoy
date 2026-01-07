@@ -18,8 +18,8 @@ envoy_cc_library(
         "envoy_proxy_wasm_api.h",
     ],
     deps = [
-        "@proxy_wasm_cpp_sdk//:api_lib",
-        "@proxy_wasm_cpp_sdk//:common_lib",
+        "@proxy-wasm-cpp-sdk//:api_lib",
+        "@proxy-wasm-cpp-sdk//:common_lib",
     ],
     alwayslink = 1,
 )
@@ -53,7 +53,7 @@ cc_library(
         ":set_envoy_filter_state_cc_proto",
         ":sign_cc_proto",
         ":verify_signature_cc_proto",
-        "@proxy_wasm_cpp_sdk//:proxy_wasm_intrinsics",
+        "@proxy-wasm-cpp-sdk//:proxy_wasm_intrinsics",
     ],
     alwayslink = 1,
 )

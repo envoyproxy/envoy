@@ -1,28 +1,12 @@
-load("@rules_foreign_cc//foreign_cc:defs.bzl", "make")
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_contrib_extension",
     "envoy_contrib_package",
 )
-load(
-    "//contrib:all_contrib_extensions.bzl",
-    "envoy_contrib_linux_x86_64_constraints",
-)
 
 licenses(["notice"])  # Apache 2
 
 envoy_contrib_package()
-
-make(
-    name = "dlb",
-    env = {"DLB_DISABLE_DOMAIN_SERVER": "TRUE"},
-    lib_source = "@dlb//:libdlb",
-    out_static_libs = ["libdlb.a"],
-    postfix_script = "mv libdlb.a $$INSTALLDIR/lib && rm -rf $$INSTALLDIR/include && mkdir -p $$INSTALLDIR/include && cp -L *.h $$INSTALLDIR/include",
-    tags = ["skip_on_windows"],
-    target_compatible_with = envoy_contrib_linux_x86_64_constraints(),
-    targets = ["libdlb.a"],
-)
 
 envoy_cc_contrib_extension(
     name = "connection_balancer",
@@ -49,7 +33,7 @@ envoy_cc_contrib_extension(
         "@envoy_api//contrib/envoy/extensions/network/connection_balance/dlb/v3alpha:pkg_cc_proto",
     ] + select({
         "//bazel:linux_x86_64": [
-            ":dlb",
+            "@dlb",
         ],
         "//conditions:default": [
         ],

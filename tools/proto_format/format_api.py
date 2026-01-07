@@ -239,7 +239,7 @@ def format_api(mode, outfile, printed, build_file):
             tar.extractall(printed_dir)
 
         for label in data["proto_targets"]:
-            _label = label[len('@@envoy_api//'):].replace(':', '/')
+            _label = label[len('@@envoy_api~//'):].replace(':', '/')
             source = printed_dir.joinpath(f"{_label}.proto")
             target = dst_dir.joinpath(_label)
             target.parent.mkdir(exist_ok=True, parents=True)
