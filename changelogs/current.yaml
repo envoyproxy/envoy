@@ -119,6 +119,11 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: proxy_protocol
+  change: |
+    Fixed a bug where Envoy incorrectly removed PROXY protocol v2 TLVs if there were multiple TLVs with the same key. See
+    https://github.com/envoyproxy/envoy/issues/42075 for details. This behavior can be reverted by setting the runtime
+    guard ``envoy.reloadable_features.proxy_protocol_allow_duplicate_tlvs`` to ``false``.
 - area: adaptive concurrency
   change: |
     Fixed a race condition in the gradient controller that allowed more outstanding requests than the concurrency limit,
