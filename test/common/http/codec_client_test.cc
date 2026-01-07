@@ -24,6 +24,7 @@
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -282,6 +283,63 @@ TEST_F(CodecClientTest, IdleTimeoutWhenConnected) {
 
   // Verify idle timeout stat was incremented.
   EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_idle_timeout_.value());
+}
+
+// Test that idle timer is NOT enabled when connection is not yet established (default behavior).
+TEST_F(CodecClientTest, IdleTimerNotEnabledWhenNotConnectedDefault) {
+  TestScopedStaticReloadableFeaturesRuntime scoped_runtime(
+      {{"codec_client_enable_idle_timer_only_when_connected", true}});
+
+  connection_ = new NiceMock<Network::MockClientConnection>();
+
+  EXPECT_CALL(*connection_, connecting()).WillOnce(Return(true));
+  EXPECT_CALL(*connection_, detectEarlyCloseWhenReadDisabled(false));
+  EXPECT_CALL(*connection_, addConnectionCallbacks(_)).WillOnce(SaveArgAddress(&connection_cb_));
+  EXPECT_CALL(*connection_, connect());
+  EXPECT_CALL(*connection_, addReadFilter(_))
+      .WillOnce(Invoke([this](Network::ReadFilterSharedPtr filter) -> void { filter_ = filter; }));
+
+  codec_ = new Http::MockClientConnection();
+  EXPECT_CALL(*codec_, protocol()).WillRepeatedly(Return(Protocol::Http11));
+
+  Network::ClientConnectionPtr connection{connection_};
+  Event::MockTimer* idle_timer = new Event::MockTimer();
+  // With the flag enabled (default), idle timer should NOT be enabled when connection is not yet
+  // established.
+  EXPECT_CALL(*idle_timer, enableTimer(_, _)).Times(0);
+  EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Return(idle_timer));
+  client_ = std::make_unique<CodecClientForTest>(CodecType::HTTP1, std::move(connection), codec_,
+                                                 nullptr, host_, dispatcher_);
+  ON_CALL(*connection_, streamInfo()).WillByDefault(ReturnRef(stream_info_));
+}
+
+// Test that idle timer IS enabled when connection is not yet established (old behavior with flag
+// disabled).
+TEST_F(CodecClientTest, IdleTimerEnabledWhenNotConnectedOldBehavior) {
+  TestScopedStaticReloadableFeaturesRuntime scoped_runtime(
+      {{"codec_client_enable_idle_timer_only_when_connected", false}});
+
+  connection_ = new NiceMock<Network::MockClientConnection>();
+
+  EXPECT_CALL(*connection_, connecting()).WillOnce(Return(true));
+  EXPECT_CALL(*connection_, detectEarlyCloseWhenReadDisabled(false));
+  EXPECT_CALL(*connection_, addConnectionCallbacks(_)).WillOnce(SaveArgAddress(&connection_cb_));
+  EXPECT_CALL(*connection_, connect());
+  EXPECT_CALL(*connection_, addReadFilter(_))
+      .WillOnce(Invoke([this](Network::ReadFilterSharedPtr filter) -> void { filter_ = filter; }));
+
+  codec_ = new Http::MockClientConnection();
+  EXPECT_CALL(*codec_, protocol()).WillRepeatedly(Return(Protocol::Http11));
+
+  Network::ClientConnectionPtr connection{connection_};
+  Event::MockTimer* idle_timer = new Event::MockTimer();
+  // With the flag disabled, idle timer SHOULD be enabled when connection is not yet established
+  // (old behavior). It will be called once in the constructor and once in connect().
+  EXPECT_CALL(*idle_timer, enableTimer(_, _)).Times(2);
+  EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Return(idle_timer));
+  client_ = std::make_unique<CodecClientForTest>(CodecType::HTTP1, std::move(connection), codec_,
+                                                 nullptr, host_, dispatcher_);
+  ON_CALL(*connection_, streamInfo()).WillByDefault(ReturnRef(stream_info_));
 }
 
 TEST_F(CodecClientTest, ProtocolError) {

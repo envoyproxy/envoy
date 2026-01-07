@@ -12,6 +12,7 @@
 #include "source/common/http/http2/codec_impl.h"
 #include "source/common/http/status.h"
 #include "source/common/http/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 #ifdef ENVOY_ENABLE_QUIC
 #include "source/common/quic/client_codec_impl.h"
@@ -36,6 +37,12 @@ CodecClient::CodecClient(CodecType type, Network::ClientConnectionPtr&& connecti
 
   if (idle_timeout_) {
     idle_timer_ = dispatcher.createTimer([this]() -> void { onIdleTimeout(); });
+    // If the runtime flag is disabled, start the idle timer immediately even when connection
+    // is not yet established, restoring the old behavior.
+    if (!Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.codec_client_enable_idle_timer_only_when_connected")) {
+      enableIdleTimer();
+    }
   }
 
   // We just universally set no delay on connections. Theoretically we might at some point want
@@ -56,6 +63,12 @@ void CodecClient::connect() {
   } else {
     ENVOY_CONN_LOG(debug, "connecting", *connection_);
     connection_->connect();
+    // If the runtime flag is disabled, start the idle timer even when connection is still
+    // connecting, restoring the old behavior.
+    if (!Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.codec_client_enable_idle_timer_only_when_connected")) {
+      enableIdleTimer();
+    }
   }
 }
 

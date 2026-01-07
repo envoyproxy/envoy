@@ -194,7 +194,12 @@ protected:
   }
 
   void enableIdleTimer() {
-    if (!connected_) {
+    // Bug fix (default): only enable idle timer when connection is established.
+    // Old behavior (when flag is disabled): enable idle timer even when connection is not yet
+    // established.
+    if (!connected_ &&
+        Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.codec_client_enable_idle_timer_only_when_connected")) {
       return;
     }
     if (idle_timer_ != nullptr) {
