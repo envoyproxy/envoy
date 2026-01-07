@@ -3512,6 +3512,616 @@ bool envoy_dynamic_module_callback_udp_listener_filter_send_datagram(
     envoy_dynamic_module_type_module_buffer data,
     envoy_dynamic_module_type_module_buffer peer_address, uint32_t peer_port);
 
+// -----------------------------------------------------------------------------
+// Access Logger Types
+// -----------------------------------------------------------------------------
+
+/**
+ * envoy_dynamic_module_type_access_logger_config_envoy_ptr is a raw pointer to
+ * the DynamicModuleAccessLogConfig class in Envoy.
+ *
+ * OWNERSHIP: Envoy owns the pointer.
+ */
+typedef void* envoy_dynamic_module_type_access_logger_config_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_access_logger_config_module_ptr is a pointer to an in-module access
+ * logger configuration.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer.
+ */
+typedef const void* envoy_dynamic_module_type_access_logger_config_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_access_logger_envoy_ptr is a raw pointer to the
+ * DynamicModuleAccessLog class in Envoy. This represents a single log event context.
+ *
+ * OWNERSHIP: Envoy owns the pointer. Valid only during the log event callback.
+ */
+typedef void* envoy_dynamic_module_type_access_logger_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_access_logger_module_ptr is a pointer to an in-module access logger
+ * instance. This can be per-thread or global depending on module implementation.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer.
+ */
+typedef const void* envoy_dynamic_module_type_access_logger_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_access_log_type represents the type of access log event.
+ * This corresponds to envoy::data::accesslog::v3::AccessLogType.
+ */
+typedef enum envoy_dynamic_module_type_access_log_type {
+  envoy_dynamic_module_type_access_log_type_NotSet = 0,
+  envoy_dynamic_module_type_access_log_type_TcpUpstreamConnected = 1,
+  envoy_dynamic_module_type_access_log_type_TcpPeriodic = 2,
+  envoy_dynamic_module_type_access_log_type_TcpConnectionEnd = 3,
+  envoy_dynamic_module_type_access_log_type_DownstreamStart = 4,
+  envoy_dynamic_module_type_access_log_type_DownstreamPeriodic = 5,
+  envoy_dynamic_module_type_access_log_type_DownstreamEnd = 6,
+  envoy_dynamic_module_type_access_log_type_UpstreamPoolReady = 7,
+  envoy_dynamic_module_type_access_log_type_UpstreamPeriodic = 8,
+  envoy_dynamic_module_type_access_log_type_UpstreamEnd = 9,
+  envoy_dynamic_module_type_access_log_type_DownstreamTunnelSuccessfullyEstablished = 10,
+  envoy_dynamic_module_type_access_log_type_UdpTunnelUpstreamConnected = 11,
+  envoy_dynamic_module_type_access_log_type_UdpPeriodic = 12,
+  envoy_dynamic_module_type_access_log_type_UdpSessionEnd = 13,
+} envoy_dynamic_module_type_access_log_type;
+
+/**
+ * envoy_dynamic_module_type_response_flag represents a response flag from StreamInfo.
+ * Values correspond to CoreResponseFlag enum.
+ */
+typedef enum envoy_dynamic_module_type_response_flag {
+  envoy_dynamic_module_type_response_flag_FailedLocalHealthCheck = 0,
+  envoy_dynamic_module_type_response_flag_NoHealthyUpstream = 1,
+  envoy_dynamic_module_type_response_flag_UpstreamRequestTimeout = 2,
+  envoy_dynamic_module_type_response_flag_LocalReset = 3,
+  envoy_dynamic_module_type_response_flag_UpstreamRemoteReset = 4,
+  envoy_dynamic_module_type_response_flag_UpstreamConnectionFailure = 5,
+  envoy_dynamic_module_type_response_flag_UpstreamConnectionTermination = 6,
+  envoy_dynamic_module_type_response_flag_UpstreamOverflow = 7,
+  envoy_dynamic_module_type_response_flag_NoRouteFound = 8,
+  envoy_dynamic_module_type_response_flag_DelayInjected = 9,
+  envoy_dynamic_module_type_response_flag_FaultInjected = 10,
+  envoy_dynamic_module_type_response_flag_RateLimited = 11,
+  envoy_dynamic_module_type_response_flag_UnauthorizedExternalService = 12,
+  envoy_dynamic_module_type_response_flag_RateLimitServiceError = 13,
+  envoy_dynamic_module_type_response_flag_DownstreamConnectionTermination = 14,
+  envoy_dynamic_module_type_response_flag_UpstreamRetryLimitExceeded = 15,
+  envoy_dynamic_module_type_response_flag_StreamIdleTimeout = 16,
+  envoy_dynamic_module_type_response_flag_InvalidEnvoyRequestHeaders = 17,
+  envoy_dynamic_module_type_response_flag_DownstreamProtocolError = 18,
+  envoy_dynamic_module_type_response_flag_UpstreamMaxStreamDurationReached = 19,
+  envoy_dynamic_module_type_response_flag_ResponseFromCacheFilter = 20,
+  envoy_dynamic_module_type_response_flag_NoFilterConfigFound = 21,
+  envoy_dynamic_module_type_response_flag_DurationTimeout = 22,
+  envoy_dynamic_module_type_response_flag_UpstreamProtocolError = 23,
+  envoy_dynamic_module_type_response_flag_NoClusterFound = 24,
+  envoy_dynamic_module_type_response_flag_OverloadManager = 25,
+  envoy_dynamic_module_type_response_flag_DnsResolutionFailed = 26,
+  envoy_dynamic_module_type_response_flag_DropOverLoad = 27,
+  envoy_dynamic_module_type_response_flag_DownstreamRemoteReset = 28,
+  envoy_dynamic_module_type_response_flag_UnconditionalDropOverload = 29,
+} envoy_dynamic_module_type_response_flag;
+
+/**
+ * envoy_dynamic_module_type_access_log_header_type represents which header map to access.
+ */
+typedef enum envoy_dynamic_module_type_access_log_header_type {
+  envoy_dynamic_module_type_access_log_header_type_RequestHeaders = 0,
+  envoy_dynamic_module_type_access_log_header_type_ResponseHeaders = 1,
+  envoy_dynamic_module_type_access_log_header_type_ResponseTrailers = 2,
+} envoy_dynamic_module_type_access_log_header_type;
+
+/**
+ * envoy_dynamic_module_type_timing_info contains timing information from StreamInfo.
+ * All durations are in nanoseconds. A value of -1 indicates the timing is not available.
+ */
+typedef struct envoy_dynamic_module_type_timing_info {
+  int64_t start_time_unix_ns;           // Request start time as Unix timestamp in nanoseconds.
+  int64_t request_complete_duration_ns; // Duration from start to request complete.
+  int64_t first_upstream_tx_byte_sent_ns;
+  int64_t last_upstream_tx_byte_sent_ns;
+  int64_t first_upstream_rx_byte_received_ns;
+  int64_t last_upstream_rx_byte_received_ns;
+  int64_t first_downstream_tx_byte_sent_ns;
+  int64_t last_downstream_tx_byte_sent_ns;
+} envoy_dynamic_module_type_timing_info;
+
+/**
+ * envoy_dynamic_module_type_bytes_info contains byte count information.
+ */
+typedef struct envoy_dynamic_module_type_bytes_info {
+  uint64_t bytes_received;      // Total bytes received from downstream.
+  uint64_t bytes_sent;          // Total bytes sent to downstream.
+  uint64_t wire_bytes_received; // Wire bytes received (including TLS overhead).
+  uint64_t wire_bytes_sent;     // Wire bytes sent (including TLS overhead).
+} envoy_dynamic_module_type_bytes_info;
+
+// -----------------------------------------------------------------------------
+// Access Logger Event Hooks
+// -----------------------------------------------------------------------------
+
+/**
+ * envoy_dynamic_module_on_access_logger_config_new is called when a new access logger
+ * configuration is created. This is called on the main thread.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleAccessLogConfig object.
+ * @param name_ptr is the logger name.
+ * @param name_size is the size of the logger name.
+ * @param config_ptr is the configuration for the logger.
+ * @param config_size is the size of the configuration.
+ * @return a pointer to the in-module access logger configuration. Returning nullptr
+ *         indicates a failure to initialize the module, and the configuration will be rejected.
+ */
+envoy_dynamic_module_type_access_logger_config_module_ptr
+envoy_dynamic_module_on_access_logger_config_new(
+    envoy_dynamic_module_type_access_logger_config_envoy_ptr config_envoy_ptr, const char* name_ptr,
+    size_t name_size, const char* config_ptr, size_t config_size);
+
+/**
+ * envoy_dynamic_module_on_access_logger_config_destroy is called when the access logger
+ * configuration is destroyed.
+ *
+ * @param config_module_ptr is a pointer to the in-module access logger configuration.
+ */
+void envoy_dynamic_module_on_access_logger_config_destroy(
+    envoy_dynamic_module_type_access_logger_config_module_ptr config_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_access_logger_new is called to create a new logger instance.
+ * This may be called on any thread (typically per-worker thread for thread-local loggers).
+ *
+ * The module can choose to:
+ * - Return a new instance per call (thread-local pattern, recommended for batching)
+ * - Return the config_module_ptr itself if no per-instance state is needed
+ * - Return a shared instance if the module handles thread safety internally
+ *
+ * @param config_module_ptr is the pointer to the in-module configuration.
+ * @return a pointer to the in-module logger instance. Returning nullptr will cause
+ *         log events to be silently dropped.
+ */
+envoy_dynamic_module_type_access_logger_module_ptr envoy_dynamic_module_on_access_logger_new(
+    envoy_dynamic_module_type_access_logger_config_module_ptr config_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_access_logger_log is called when a log event occurs.
+ * This is the main logging callback where the module should process the log entry.
+ *
+ * The logger_envoy_ptr is only valid during this callback. The module must not store
+ * this pointer or use it after the callback returns.
+ *
+ * @param logger_envoy_ptr is the pointer to the Envoy log context (valid during this call only).
+ * @param logger_module_ptr is the pointer to the in-module logger instance.
+ * @param log_type is the type of access log event.
+ */
+void envoy_dynamic_module_on_access_logger_log(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_access_logger_module_ptr logger_module_ptr,
+    envoy_dynamic_module_type_access_log_type log_type);
+
+/**
+ * envoy_dynamic_module_on_access_logger_destroy is called when the logger instance
+ * is destroyed.
+ *
+ * @param logger_module_ptr is the pointer to the in-module logger instance.
+ */
+void envoy_dynamic_module_on_access_logger_destroy(
+    envoy_dynamic_module_type_access_logger_module_ptr logger_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_access_logger_flush is called before the logger is destroyed
+ * to give the module an opportunity to flush any buffered logs.
+ *
+ * This is called during shutdown when the ThreadLocalLogger is being destroyed.
+ * Modules that buffer log entries should implement this to ensure no logs are lost.
+ *
+ * This is optional. If not implemented by the module, Envoy will skip calling it.
+ *
+ * @param logger_module_ptr is the pointer to the in-module logger instance.
+ */
+void envoy_dynamic_module_on_access_logger_flush(
+    envoy_dynamic_module_type_access_logger_module_ptr logger_module_ptr);
+
+// -----------------------------------------------------------------------------
+// Access Logger Callbacks - Headers
+// -----------------------------------------------------------------------------
+
+/**
+ * Get the number of headers in the specified header map.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param header_type is the type of header map to access.
+ * @param size_out is the output parameter for the number of headers.
+ * @return true if the header map is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_headers_size(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_access_log_header_type header_type, size_t* size_out);
+
+/**
+ * Get all headers from the specified header map.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param header_type is the type of header map to access.
+ * @param result_headers is the output array (must be pre-allocated with correct size).
+ * @return true if successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_headers(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_access_log_header_type header_type,
+    envoy_dynamic_module_type_envoy_http_header* result_headers);
+
+/**
+ * Get a specific header value by key.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param header_type is the type of header map to access.
+ * @param key is the header key to look up.
+ * @param result is the output buffer for the header value.
+ * @param index is the index for multi-value headers (0 for first value).
+ * @param total_count_out is optional output for total number of values with this key.
+ * @return true if the header exists, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_header_value(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_access_log_header_type header_type,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result,
+    size_t index, size_t* total_count_out);
+
+// -----------------------------------------------------------------------------
+// Access Logger Callbacks - Stream Info Basic
+// -----------------------------------------------------------------------------
+
+/**
+ * Get the HTTP response code.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param response_code_out is the output parameter.
+ * @return true if response code is set, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_response_code(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    uint32_t* response_code_out);
+
+/**
+ * Get the response code details string.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if details are available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_response_code_details(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * Check if a specific response flag is set.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param flag is the response flag to check.
+ * @return true if the flag is set, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_has_response_flag(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_response_flag flag);
+
+/**
+ * Get all response flags as a bitmask.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @return bitmask of response flags.
+ */
+uint64_t envoy_dynamic_module_callback_access_logger_get_response_flags(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+/**
+ * Get the protocol (HTTP/1.0, HTTP/1.1, HTTP/2, HTTP/3).
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer for the protocol string.
+ * @return true if protocol is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_protocol(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * Get timing information from StreamInfo.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param timing_out is the output parameter for timing info.
+ */
+void envoy_dynamic_module_callback_access_logger_get_timing_info(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_timing_info* timing_out);
+
+/**
+ * Get byte count information from StreamInfo.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param bytes_out is the output parameter for byte counts.
+ */
+void envoy_dynamic_module_callback_access_logger_get_bytes_info(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_bytes_info* bytes_out);
+
+/**
+ * Get the route name.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if route name is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_route_name(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * Check if this is a health check request.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @return true if this is a health check, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_is_health_check(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+/**
+ * Get the upstream request attempt count.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param count_out is the output parameter.
+ * @return true if attempt count is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_attempt_count(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr, uint32_t* count_out);
+
+// -----------------------------------------------------------------------------
+// Access Logger Callbacks - Address Information
+// -----------------------------------------------------------------------------
+
+/**
+ * Get the downstream remote address (client).
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param address_out is the output buffer for the IP address string.
+ * @param port_out is the output parameter for the port.
+ * @return true if address is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_downstream_remote_address(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* address_out, uint32_t* port_out);
+
+/**
+ * Get the downstream local address (Envoy listener).
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param address_out is the output buffer for the IP address string.
+ * @param port_out is the output parameter for the port.
+ * @return true if address is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_downstream_local_address(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* address_out, uint32_t* port_out);
+
+/**
+ * Get the upstream remote address (backend).
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param address_out is the output buffer for the IP address string.
+ * @param port_out is the output parameter for the port.
+ * @return true if address is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_upstream_remote_address(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* address_out, uint32_t* port_out);
+
+/**
+ * Get the upstream local address (Envoy outbound).
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param address_out is the output buffer for the IP address string.
+ * @param port_out is the output parameter for the port.
+ * @return true if address is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_upstream_local_address(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* address_out, uint32_t* port_out);
+
+// -----------------------------------------------------------------------------
+// Access Logger Callbacks - Upstream Info
+// -----------------------------------------------------------------------------
+
+/**
+ * Get the upstream cluster name.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if cluster name is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_upstream_cluster(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * Get the upstream host address (selected endpoint).
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if host address is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_upstream_host(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * Get the upstream transport failure reason.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if failure reason is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_upstream_transport_failure_reason(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+// -----------------------------------------------------------------------------
+// Access Logger Callbacks - Connection/TLS Info
+// -----------------------------------------------------------------------------
+
+/**
+ * Get the connection ID.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param connection_id_out is the output parameter.
+ * @return true if connection ID is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_connection_id(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    uint64_t* connection_id_out);
+
+/**
+ * Check if mTLS was used.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @return true if mTLS was used, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_is_mtls(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+/**
+ * Get the requested server name (SNI).
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if SNI is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_requested_server_name(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * Get the downstream TLS version.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if TLS version is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_downstream_tls_version(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * Get the downstream peer certificate subject.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if subject is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_downstream_peer_subject(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * Get the downstream peer certificate SHA256 fingerprint.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if fingerprint is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_downstream_peer_cert_digest(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+// -----------------------------------------------------------------------------
+// Access Logger Callbacks - Metadata and Dynamic State
+// -----------------------------------------------------------------------------
+
+/**
+ * Get a value from dynamic metadata by filter name and key path.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param filter_name is the filter namespace in dynamic metadata.
+ * @param path is the key path within the filter namespace (can be nested with dots).
+ * @param result is the output buffer (JSON encoded for complex values).
+ * @return true if value exists, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_dynamic_metadata(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_name,
+    envoy_dynamic_module_type_module_buffer path, envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * Get a value from filter state by key.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param key is the filter state key.
+ * @param result is the output buffer (serialized representation).
+ * @return true if value exists, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_filter_state(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * Get the request ID (x-request-id header value or generated).
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if request ID is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_request_id(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * Get the local reply body (if this was a local response).
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if local reply body exists, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_local_reply_body(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+// -----------------------------------------------------------------------------
+// Access Logger Callbacks - Tracing
+// -----------------------------------------------------------------------------
+
+/**
+ * Get the trace ID from the active span.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if trace ID is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_trace_id(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * Get the span ID from the active span.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if span ID is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_span_id(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * Check if the request was sampled for tracing.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @return true if sampled, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_is_trace_sampled(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
 #ifdef __cplusplus
 }
 #endif
