@@ -322,7 +322,7 @@ def _com_github_bazel_buildtools():
 def _com_github_c_ares_c_ares():
     external_http_archive(
         name = "com_github_c_ares_c_ares",
-        build_file_content = BUILD_ALL_CONTENT,
+        build_file = "@envoy//bazel/external:c-ares.BUILD",
         patch_args = ["-p1"],
         patches = ["@envoy//bazel:c-ares.patch"],
     )
