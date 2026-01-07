@@ -289,6 +289,14 @@ public:
    */
   virtual bool canFailOpen() const;
 
+  // Check whether this is the last response from the ext_proc server after
+  // the header response is received and processed.
+  bool isLastResponseAfterHeaderResp() const;
+
+  // Check whether this is the last response from the ext_proc server after
+  // a body response is received and processed.
+  bool isLastResponseAfterBodyResp(bool eos_seen_in_body) const;
+
 protected:
   void setBodyMode(
       envoy::extensions::filters::http::ext_proc::v3::ProcessingMode_BodySendMode body_mode);
