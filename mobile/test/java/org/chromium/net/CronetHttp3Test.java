@@ -77,6 +77,7 @@ public class CronetHttp3Test {
   private boolean resetBrokennessOnNetworkChange = false;
   private boolean disableDnsRefreshOnNetworkChange = false;
   private boolean useAndroidNetworkMonitorV2 = false;
+  private boolean enableQuicConnectionMigration = false;
   private ConnectivityManager connectivityManager;
 
   @BeforeClass
@@ -123,6 +124,9 @@ public class CronetHttp3Test {
     }
     if (useAndroidNetworkMonitorV2) {
       nativeCronetEngineBuilder.setUseV2NetworkMonitor(useAndroidNetworkMonitorV2);
+      nativeCronetEngineBuilder.setUseQuicPlatformPacketWriter(true);
+      nativeCronetEngineBuilder.setEnableQuicConnectionMigration(enableQuicConnectionMigration);
+      nativeCronetEngineBuilder.setMigrateIdleQuicConnection(true);
     }
     // Make sure the handshake will work despite lack of real certs.
     nativeCronetEngineBuilder.setMockCertVerifierForTesting();
@@ -450,6 +454,80 @@ public class CronetHttp3Test {
     // Stats shouldn't have been changed.
     assertTrue(postStats, postStats.contains("cluster.base.upstream_cx_http3_total: 2"));
     assertTrue(postStats, postStats.contains("cluster.base.upstream_cx_destroy: 2"));
+  }
+
+  @Test
+  @SmallTest
+  @Feature({"Cronet"})
+  public void connectionMigrationFromCellToWifi() throws Exception {
+    if (!JniLibrary.runtimeFeatureEnabled(
+            "envoy.reloadable_features.decouple_explicit_drain_pools_and_dns_refresh")) {
+      // Disable dns refreshment so that the engine will attempt immediate draining.
+      disableDnsRefreshOnNetworkChange = true;
+    }
+    useAndroidNetworkMonitorV2 = true;
+    enableQuicConnectionMigration = true;
+    setUp(true);
+
+    // Do the initial handshake dance
+    doInitialHttp2Request();
+
+    // Do a HTTP/3 request to establish a connection.
+    TestUrlRequestCallback getCallback1 = doBasicGetRequest();
+    assertEquals(200, getCallback1.mResponseInfo.getHttpStatusCode());
+    assertEquals("h3", getCallback1.mResponseInfo.getNegotiatedProtocol());
+
+    // There should be one HTTP/3 connection.
+    String postStats = cronvoyEngine.getEnvoyEngine().dumpStats();
+    assertTrue(postStats.contains("cluster.base.upstream_cx_http3_total: 1"));
+
+    // Change from cell to newly connected WIFI network.
+    NetworkInfo wifiNetworkInfo = ShadowNetworkInfo.newInstance(NetworkInfo.DetailedState.CONNECTED,
+                                                                ConnectivityManager.TYPE_WIFI, 0,
+                                                                true, NetworkInfo.State.CONNECTED);
+    shadowOf(connectivityManager).setActiveNetworkInfo(wifiNetworkInfo);
+    Network wifiNetwork = connectivityManager.getActiveNetwork();
+    NetworkCapabilities networkCapabilities =
+        connectivityManager.getNetworkCapabilities(wifiNetwork);
+    shadowOf(networkCapabilities).addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET);
+    shadowOf(networkCapabilities).addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED);
+    shadowOf(networkCapabilities).addTransportType(NetworkCapabilities.TRANSPORT_WIFI);
+    shadowOf(connectivityManager).setNetworkCapabilities(wifiNetwork, networkCapabilities);
+
+    // Connected to the new network shouldn't be regarded as switching the default.
+    shadowOf(connectivityManager).getNetworkCallbacks().forEach(callback -> {
+      callback.onAvailable(wifiNetwork);
+    });
+
+    // Make another request. It should reuse the existing connection because the new network won't
+    // be regarded as default.
+    TestUrlRequestCallback getCallback2 = doBasicGetRequest();
+    assertEquals(200, getCallback2.mResponseInfo.getHttpStatusCode());
+    assertEquals("h3", getCallback2.mResponseInfo.getNegotiatedProtocol());
+
+    postStats = cronvoyEngine.getEnvoyEngine().dumpStats();
+    // The connection count should STILL be 1, proving reuse.
+    assertTrue(postStats, postStats.contains("cluster.base.upstream_cx_http3_total: 1"));
+    // No connections should have been destroyed.
+    assertFalse(postStats, postStats.contains("cluster.base.upstream_cx_destroy:"));
+
+    // Reported capability change should be regarded as switching the default. With connection
+    // migration enabled, the existing connection shouldn't be drained.
+    shadowOf(connectivityManager).getNetworkCallbacks().forEach(callback -> {
+      LinkProperties link = new LinkProperties();
+      callback.onLinkPropertiesChanged(wifiNetwork, link);
+      callback.onCapabilitiesChanged(wifiNetwork, networkCapabilities);
+    });
+
+    // Do a 3rd HTTP/3 request which should reuse the migrating or migrated connection.
+    TestUrlRequestCallback getCallback3 = doBasicGetRequest();
+    assertEquals(200, getCallback3.mResponseInfo.getHttpStatusCode());
+    assertEquals("h3", getCallback3.mResponseInfo.getNegotiatedProtocol());
+
+    postStats = cronvoyEngine.getEnvoyEngine().dumpStats();
+    assertTrue(postStats, postStats.contains("cluster.base.upstream_cx_http3_total: 1"));
+    // The TCP connection is idle now and should be closed during draining.
+    assertTrue(postStats, postStats.contains("cluster.base.upstream_cx_destroy: 1"));
   }
 
   @Test
