@@ -116,6 +116,10 @@ minor_behavior_changes:
   change: |
     Added ``server_half_closed`` counter to the ext_proc filter stats in the
     ``http.<stat_prefix>.ext_proc.`` namespace.
+- area: tls_inspector
+  change: |
+    Changed TLS inspector to extract SNI during the early select certificate callback. This ensures SNI is
+    populated in access logs even for connections that fail during the subsequent TLS handshake processing.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
