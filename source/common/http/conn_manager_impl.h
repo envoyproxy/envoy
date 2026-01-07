@@ -391,6 +391,12 @@ private:
              state_.is_internally_destroyed_;
     }
 
+    // Computes whether to skip the delay when closing a draining connection.
+    // Returns true if we should use FlushWrite (immediate close after flush),
+    // false if we should use FlushWriteAndDelay (close with delay).
+    // See https://github.com/envoyproxy/envoy/issues/30010 for background.
+    bool shouldSkipDeferredCloseDelay() const;
+
     // Per-stream idle timeout callback.
     void onIdleTimeout();
     // Per-stream request timeout callback.
