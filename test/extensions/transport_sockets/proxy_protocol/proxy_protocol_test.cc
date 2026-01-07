@@ -1082,8 +1082,10 @@ TEST_F(ProxyProtocolTest, V2DuplicateTLVsInConfigAndMetadataHandledProperlyNoDup
       Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv6Instance("1:2:3::4", 8));
   auto dst_addr = Network::Address::InstanceConstSharedPtr(
       new Network::Address::Ipv6Instance("1:100:200:3::", 2));
-  Network::ProxyProtocolTLVVector tlv_vector{Network::ProxyProtocolTLV{0x5, {'a', 'b', 'c'}},
-                                             Network::ProxyProtocolTLV{0x6, {'a'}}};
+  Network::ProxyProtocolTLVVector tlv_vector{
+      Network::ProxyProtocolTLV{0x5, {'a', 'b', 'c'}},
+      Network::ProxyProtocolTLV{0x6, {'a'}}, // This is not passed through.
+      Network::ProxyProtocolTLV{0x98, {1}}}; // This is overridden by a configured TLV.
   Network::ProxyProtocolData proxy_proto_data{src_addr, dst_addr, tlv_vector};
   Network::TransportSocketOptionsConstSharedPtr socket_options =
       std::make_shared<Network::TransportSocketOptionsImpl>(
