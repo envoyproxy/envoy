@@ -589,41 +589,14 @@ TEST_P(ClientIntegrationTest, Http3ConnectionMigrationUponNetworkDisconnectedAnd
     // This test relies on a 2nd v4 loopback address.
     return;
   }
-  Buffer::OwnedImpl request_data = Buffer::OwnedImpl("request body");
-  default_request_headers_.addCopy(AutonomousStream::EXPECT_REQUEST_SIZE_BYTES,
-                                   std::to_string(request_data.length()));
-
+  default_request_headers_.addCopy(AutonomousStream::EXPECT_REQUEST_SIZE_BYTES, "0");
   EnvoyStreamCallbacks stream_callbacks1 = createDefaultStreamCallbacks();
   stream_callbacks1.on_data_ = [this](const Buffer::Instance&, uint64_t, bool, envoy_stream_intel) {
     cc_.on_data_calls_++;
   };
-
   stream_ = createNewStream(std::move(stream_callbacks1));
   stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
-                       false);
-  // Wait for the upstream connection to be established.
-  ASSERT_TRUE(waitForCounterGe("cluster.base.upstream_cx_http3_total", 1));
-  ASSERT_TRUE(waitForCounterGe("cluster.base.upstream_rq_total", 1));
-
-  absl::Notification probing_socket_created;
-  EXPECT_CALL(helper_handle_->mock_helper(), bindSocketToNetwork(_, 2))
-      .WillOnce(Invoke([&](Network::ConnectionSocket& socket, int64_t) {
-        // Mock binding to the unknown network with a new address.
-        socket.ioHandle().bind(
-            std::make_shared<const Network::Address::Ipv4Instance>("127.0.0.2", 0, nullptr));
-        probing_socket_created.Notify();
-      }));
-  // The current WIFI network is disconnected, and the connection should migrate to the unknown
-  // network.
-  internalEngine()->onNetworkDisconnectAndroid(1);
-  // Wait for the device to migrate to the 2nd network.
-  probing_socket_created.WaitForNotificationWithTimeout(absl::Seconds(10));
-
-  // Continue sending more request body.
-  stream_->sendData(std::make_unique<Buffer::OwnedImpl>(std::move(request_data)));
-
-  stream_->close(Http::Utility::createRequestTrailerMapPtr());
-
+                       true);
   terminal_callback_.waitReady();
 
   ASSERT_EQ(cc_.on_headers_calls_, 1);
@@ -633,8 +606,52 @@ TEST_P(ClientIntegrationTest, Http3ConnectionMigrationUponNetworkDisconnectedAnd
   ASSERT_EQ(3, last_stream_final_intel_.upstream_protocol);
   ASSERT_EQ(0, last_stream_final_intel_.socket_reused);
 
-  // The old WIFI network appears again and becomes the default network. The idle connection should
-  // be closed.
+  // Wait for the upstream connection to be established.
+  ASSERT_TRUE(waitForCounterGe("cluster.base.upstream_cx_http3_total", 1));
+  ASSERT_TRUE(waitForCounterGe("cluster.base.upstream_rq_total", 1));
+
+  // Send a new request with body during which network gets disconnected.
+  Buffer::OwnedImpl request_data = Buffer::OwnedImpl("request body");
+  default_request_headers_.setCopy(
+      Envoy::Http::LowerCaseString(AutonomousStream::EXPECT_REQUEST_SIZE_BYTES),
+      std::to_string(request_data.length()));
+  memset(&last_stream_final_intel_, 0, sizeof(envoy_final_stream_intel));
+  ConditionalInitializer terminal_callback;
+  cc_.terminal_callback_ = &terminal_callback;
+  EnvoyStreamCallbacks stream_callbacks2 = createDefaultStreamCallbacks();
+  stream_ = createNewStream(std::move(stream_callbacks2));
+  stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
+                       false);
+
+  absl::Notification new_socket_created;
+  EXPECT_CALL(helper_handle_->mock_helper(), bindSocketToNetwork(_, 2))
+      .WillOnce(Invoke([&](Network::ConnectionSocket& socket, int64_t) {
+        // Mock binding to the unknown network with a new address.
+        socket.ioHandle().bind(
+            std::make_shared<const Network::Address::Ipv4Instance>("127.0.0.2", 0, nullptr));
+        new_socket_created.Notify();
+      }));
+  // The current WIFI network is disconnected, and the connection should migrate to the unknown
+  // network.
+  internalEngine()->onNetworkDisconnectAndroid(1);
+  // Wait for the device to migrate to the 2nd network.
+  new_socket_created.WaitForNotificationWithTimeout(absl::Seconds(10));
+
+  // Continue sending more request body.
+  stream_->sendData(std::make_unique<Buffer::OwnedImpl>(std::move(request_data)));
+
+  stream_->close(Http::Utility::createRequestTrailerMapPtr());
+
+  terminal_callback.waitReady();
+
+  ASSERT_EQ(cc_.on_headers_calls_, 2);
+  ASSERT_EQ(cc_.status_, "200");
+  ASSERT_EQ(cc_.on_complete_calls_, 2);
+  ASSERT_EQ(3, last_stream_final_intel_.upstream_protocol);
+  ASSERT_EQ(1, last_stream_final_intel_.socket_reused);
+
+  // The old WIFI network appears again and becomes the default network. The idle connection on the
+  // unknown network should be closed.
   internalEngine()->onNetworkConnectAndroid(ConnectionType::CONNECTION_WIFI, 1);
   internalEngine()->onDefaultNetworkChangedAndroid(ConnectionType::CONNECTION_WIFI, 1);
 
