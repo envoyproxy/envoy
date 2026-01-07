@@ -322,6 +322,10 @@ new_features:
   change: |
     Added :ref:`listener filter <envoy_v3_api_msg_extensions.filters.listener.dynamic_modules.v3.DynamicModuleListenerFilter>`
     support for dynamic modules, enabling connection inspection and protocol detection before connection establishment.
+- area: dynamic modules
+  change: |
+    Added :ref:`UDP listener filter <envoy_v3_api_msg_extensions.filters.udp.dynamic_modules.v3.DynamicModuleUdpListenerFilter>`
+    support for dynamic modules, enabling UDP datagram processing with dynamic modules.
 - area: http filter
   change: |
     Added :ref:`transform http filter <config_http_filters_transform>` to modify request and response bodies in any

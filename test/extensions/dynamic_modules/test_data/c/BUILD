@@ -7,6 +7,7 @@ package(default_visibility = [
     "//test/extensions/dynamic_modules/http:__pkg__",
     "//test/extensions/dynamic_modules/listener:__pkg__",
     "//test/extensions/dynamic_modules/network:__pkg__",
+    "//test/extensions/dynamic_modules/udp:__pkg__",
 ])
 
 test_program(name = "no_op")
@@ -62,3 +63,15 @@ test_program(name = "listener_no_op")
 test_program(name = "listener_config_new_fail")
 
 test_program(name = "listener_stop_iteration")
+
+test_program(name = "udp_no_op")
+
+test_program(name = "udp_stop_iteration")
+
+test_program(name = "udp_no_config_destroy")
+
+test_program(name = "udp_no_filter_new")
+
+test_program(name = "udp_no_on_data")
+
+test_program(name = "udp_no_filter_destroy")

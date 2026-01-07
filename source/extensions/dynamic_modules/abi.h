@@ -3280,6 +3280,163 @@ bool envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string(
 size_t envoy_dynamic_module_callback_listener_filter_max_read_bytes(
     envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr);
 
+// -----------------------------------------------------------------------------
+// UDP Listener Filter
+// -----------------------------------------------------------------------------
+
+/**
+ * envoy_dynamic_module_type_udp_listener_filter_config_envoy_ptr is a raw pointer to
+ * the DynamicModuleUdpListenerFilterConfig class in Envoy.
+ *
+ * OWNERSHIP: Envoy owns the pointer.
+ */
+typedef void* envoy_dynamic_module_type_udp_listener_filter_config_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_udp_listener_filter_config_module_ptr is a pointer to an in-module UDP
+ * listener filter configuration.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer.
+ */
+typedef const void* envoy_dynamic_module_type_udp_listener_filter_config_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_udp_listener_filter_envoy_ptr is a raw pointer to the
+ * DynamicModuleUdpListenerFilter class in Envoy.
+ *
+ * OWNERSHIP: Envoy owns the pointer.
+ */
+typedef void* envoy_dynamic_module_type_udp_listener_filter_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_udp_listener_filter_module_ptr is a pointer to an in-module UDP
+ * listener filter.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer.
+ */
+typedef const void* envoy_dynamic_module_type_udp_listener_filter_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_on_udp_listener_filter_status represents the status of the UDP
+ * listener filter execution.
+ */
+typedef enum envoy_dynamic_module_type_on_udp_listener_filter_status {
+  envoy_dynamic_module_type_on_udp_listener_filter_status_Continue,
+  envoy_dynamic_module_type_on_udp_listener_filter_status_StopIteration,
+} envoy_dynamic_module_type_on_udp_listener_filter_status;
+
+/**
+ * envoy_dynamic_module_on_udp_listener_filter_config_new is called when a new UDP listener filter
+ * configuration is created.
+ */
+envoy_dynamic_module_type_udp_listener_filter_config_module_ptr
+envoy_dynamic_module_on_udp_listener_filter_config_new(
+    envoy_dynamic_module_type_udp_listener_filter_config_envoy_ptr filter_config_envoy_ptr,
+    const char* name_ptr, size_t name_size, const char* config_ptr, size_t config_size);
+
+/**
+ * envoy_dynamic_module_on_udp_listener_filter_config_destroy is called when the UDP listener filter
+ * configuration is destroyed.
+ */
+void envoy_dynamic_module_on_udp_listener_filter_config_destroy(
+    envoy_dynamic_module_type_udp_listener_filter_config_module_ptr filter_config_ptr);
+
+/**
+ * envoy_dynamic_module_on_udp_listener_filter_new is called when a new UDP listener filter is
+ * created.
+ */
+envoy_dynamic_module_type_udp_listener_filter_module_ptr
+envoy_dynamic_module_on_udp_listener_filter_new(
+    envoy_dynamic_module_type_udp_listener_filter_config_module_ptr filter_config_ptr,
+    envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_on_udp_listener_filter_on_data is called when a UDP packet is received.
+ */
+envoy_dynamic_module_type_on_udp_listener_filter_status
+envoy_dynamic_module_on_udp_listener_filter_on_data(
+    envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_udp_listener_filter_module_ptr filter_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_udp_listener_filter_destroy is called when the UDP listener filter is
+ * destroyed.
+ */
+void envoy_dynamic_module_on_udp_listener_filter_destroy(
+    envoy_dynamic_module_type_udp_listener_filter_module_ptr filter_module_ptr);
+
+// Callbacks
+
+/**
+ * envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks_size is called by the
+ * module to get the number of chunks in the current datagram data. Combined with
+ * envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks, this can be used to
+ * iterate over all chunks in the datagram. This is only valid during the
+ * envoy_dynamic_module_on_udp_listener_filter_on_data callback.
+ */
+bool envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks_size(
+    envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr,
+    size_t* chunks_size_out);
+
+/**
+ * envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks is called by the
+ * module to get the current datagram data as chunks. The module must ensure the provided buffer
+ * array has enough capacity to store all chunks, which can be obtained via
+ * envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks_size. This is only
+ * valid during the envoy_dynamic_module_on_udp_listener_filter_on_data callback.
+ *
+ * @return true if the datagram data is available and chunks_out is populated, false otherwise.
+ */
+bool envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks(
+    envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* chunks_out);
+
+/**
+ * envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_size is called by the module
+ * to get the total length in bytes of the current datagram data. This is only valid during the
+ * envoy_dynamic_module_on_udp_listener_filter_on_data callback.
+ *
+ * @param size_out is the output pointer to the total length of the datagram data in bytes.
+ * @return true if the datagram data is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_size(
+    envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr, size_t* size_out);
+
+/**
+ * envoy_dynamic_module_callback_udp_listener_filter_set_datagram_data is called by the module to
+ * set the current datagram data.
+ */
+bool envoy_dynamic_module_callback_udp_listener_filter_set_datagram_data(
+    envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer data);
+
+/**
+ * envoy_dynamic_module_callback_udp_listener_filter_get_peer_address is called by the module to
+ * get the peer address.
+ */
+bool envoy_dynamic_module_callback_udp_listener_filter_get_peer_address(
+    envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* address_out, uint32_t* port_out);
+
+/**
+ * envoy_dynamic_module_callback_udp_listener_filter_get_local_address is called by the module to
+ * get the local address.
+ */
+bool envoy_dynamic_module_callback_udp_listener_filter_get_local_address(
+    envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* address_out, uint32_t* port_out);
+
+/**
+ * envoy_dynamic_module_callback_udp_listener_filter_send_datagram is called by the module to
+ * send a datagram.
+ *
+ * @return true if the datagram was sent, false otherwise.
+ */
+bool envoy_dynamic_module_callback_udp_listener_filter_send_datagram(
+    envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer data,
+    envoy_dynamic_module_type_module_buffer peer_address, uint32_t peer_port);
+
 #ifdef __cplusplus
 }
 #endif
