@@ -831,9 +831,7 @@ TEST_F(McpFilterTest, MethodGroupWithCustomOverride) {
 
   EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("mcp_proxy", _))
       .WillOnce([&](const std::string&, const Protobuf::Struct& metadata) {
-        const auto& fields = metadata.fields();f
-
-        // Check group is set to custom override
+        const auto& fields = metadata.fields();
         auto group_it = fields.find("group");
         ASSERT_NE(group_it, fields.end());
         EXPECT_EQ(group_it->second.string_value(), "custom_tools");
