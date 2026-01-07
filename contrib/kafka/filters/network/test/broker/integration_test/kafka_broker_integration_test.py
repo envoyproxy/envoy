@@ -313,7 +313,11 @@ class ServicesHolder:
         os.mkdir(kafka_store_dir)
 
         # Find the Kafka server 'bin' directory.
-        kafka_bin_dir = os.path.join('.', 'external', 'kafka_server_binary', 'bin')
+        # Try bzlmod path first, fall back to WORKSPACE path
+        kafka_bin_dir = os.path.join(
+            '.', 'external', '_main~envoy_dependencies_extension~kafka_server_binary', 'bin')
+        if not os.path.isdir(kafka_bin_dir):
+            kafka_bin_dir = os.path.join('.', 'external', 'kafka_server_binary', 'bin')
 
         # Main initialization block:
         # - generate random ports,
@@ -428,28 +432,36 @@ class ServicesHolder:
     This method just locates the Java installation in current directory.
     We cannot hardcode the name, as the dirname changes as per:
     https://github.com/bazelbuild/bazel/blob/master/tools/jdk/BUILD#L491
+    In bzlmod mode, directory names have canonical suffixes with tildes.
     """
 
         external_dir = os.path.join('.', 'external')
         for directory in os.listdir(external_dir):
-            if 'remotejdk11' in directory:
-                result = os.path.join(external_dir, directory, 'bin')
-                print('Using Java: ' + result)
-                return result
+            # Match both WORKSPACE (remotejdk11_...) and bzlmod (remotejdk11...~) names
+            # Also handle directories containing 'jdk' for more flexibility
+            if 'jdk' in directory.lower():
+                candidate = os.path.join(external_dir, directory, 'bin')
+                if os.path.isdir(candidate):
+                    print('Using Java: ' + candidate)
+                    return candidate
         raise Exception('Could not find Java in: ' + external_dir)
 
     @staticmethod
     def find_envoy():
         """
         This method locates envoy binary.
-        It's present at ./source/exe/envoy-static (at least for mac/bazel-asan/bazel-tsan),
-        or at ./external/envoy/source/exe/envoy-static (for bazel-compile_time_options).
+        It's present at ./contrib/exe/envoy-static (at least for mac/bazel-asan/bazel-tsan),
+        or at ./external/envoy/contrib/exe/envoy-static (for bazel-compile_time_options),
+        or at ./external/_main/contrib/exe/envoy-static (for bzlmod mode).
         """
 
         candidate = os.path.join('.', 'contrib', 'exe', 'envoy-static')
         if os.path.isfile(candidate):
             return candidate
         candidate = os.path.join('.', 'external', 'envoy', 'contrib', 'exe', 'envoy-static')
+        if os.path.isfile(candidate):
+            return candidate
+        candidate = os.path.join('.', 'external', '_main', 'contrib', 'exe', 'envoy-static')
         if os.path.isfile(candidate):
             return candidate
         raise Exception("Could not find Envoy")

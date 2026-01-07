@@ -115,7 +115,7 @@ def modify_compile_command(target, args, output_base):
         # By treating external/envoy* as C++ files we are able to use this script from subrepos that
         # depend on Envoy targets.
         if not target["file"].startswith("external/") or target["file"].startswith(
-                "external/envoy"):
+                "external/envoy") or target["file"].startswith("external/_main"):
             # *.h file is treated as C header by default while our headers files are all C++20.
             options = "-x c++ -std=c++20 -fexceptions " + options
 

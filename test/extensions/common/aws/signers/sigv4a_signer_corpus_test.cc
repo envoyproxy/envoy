@@ -23,9 +23,17 @@ namespace Aws {
 
 std::vector<std::string> directoryListing() {
   std::vector<std::string> directories;
-  for (auto const& entry : std::filesystem::directory_iterator(
-           TestEnvironment::runfilesDirectory() +
-           "/external/com_github_awslabs_aws_c_auth/tests/aws-signing-test-suite/v4a")) {
+  // TODO(phlax): Cleanup once bzlmod migration is complete
+  std::string bzlmod_path = TestEnvironment::runfilesDirectory() +
+                            "~envoy_dependencies_extension~com_github_awslabs_aws_"
+                            "c_auth/tests/aws-signing-test-suite/v4a";
+  std::string workspace_path =
+      TestEnvironment::runfilesDirectory() +
+      "/external/com_github_awslabs_aws_c_auth/tests/aws-signing-test-suite/v4a";
+
+  std::string path = std::filesystem::exists(bzlmod_path) ? bzlmod_path : workspace_path;
+
+  for (auto const& entry : std::filesystem::directory_iterator(path)) {
     directories.push_back(entry.path().string());
   }
   return directories;
