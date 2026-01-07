@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package envoy.extensions.wildcard.dns_gateway.v3;
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.wildcard.dns_gateway.v3";
+option java_outer_classname = "DnsGatewayProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/wildcard/dns_gateway/v3;dns_gatewayv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: DNS Gateway Filter]
+// DNS Gateway Filter for virtual IP resolution.
+//
+// This filter intercepts DNS queries for domains (e.g., website.com, ``*.aws.com``)
+// and responds with virtual IP addresses allocated by the virtual ip cache extension.
+//
+// [#extension: envoy.filters.udp_listener.dns_gateway]
+
+message DnsGatewayPolicy {
+  // Domain pattern to match. Supports wildcards (e.g., ``*.azure.com``, ``*.aws.com``).
+  // The wildcard ``*`` can only appear at the beginning followed by a dot.
+  string domain = 1 [(validate.rules).string = {min_len: 1}];
+}
+
+// Configuration for the DNS Gateway Filter.
+message DnsGateway {
+  // List of policies defining domains to intercept.
+  repeated DnsGatewayPolicy policies = 1 [(validate.rules).repeated = {min_items: 1}];
+}

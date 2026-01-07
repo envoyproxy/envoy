@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package envoy.extensions.wildcard.hostname_lookup.v3;
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.wildcard.hostname_lookup.v3";
+option java_outer_classname = "HostnameLookupProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/wildcard/hostname_lookup/v3;hostname_lookupv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Hostname Lookup Filter]
+// Hostname Lookup Filter for virtual IP resolution.
+//
+// Works in conjunction with the DNS Gateway filter.
+//
+// [#extension: envoy.filters.network.hostname_lookup]
+
+message HostnameLookup {
+}
