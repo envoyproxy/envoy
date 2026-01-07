@@ -35,6 +35,7 @@
 // ASAP by filing a bug on github. Overriding non-buggy code is strongly discouraged to avoid the
 // problem of the bugs being found after the old code path has been removed.
 RUNTIME_GUARD(envoy_reloadable_features_async_host_selection);
+RUNTIME_GUARD(envoy_reloadable_features_codec_client_enable_idle_timer_only_when_connected);
 RUNTIME_GUARD(envoy_reloadable_features_decouple_explicit_drain_pools_and_dns_refresh);
 RUNTIME_GUARD(envoy_reloadable_features_dfp_cluster_resolves_hosts);
 RUNTIME_GUARD(envoy_reloadable_features_disallow_quic_client_udp_mmsg);
@@ -76,7 +77,6 @@ RUNTIME_GUARD(envoy_reloadable_features_reset_with_error);
 RUNTIME_GUARD(envoy_reloadable_features_safe_http2_options);
 RUNTIME_GUARD(envoy_reloadable_features_skip_dns_lookup_for_proxied_requests);
 RUNTIME_GUARD(envoy_reloadable_features_tcp_proxy_set_idle_timer_immediately_on_new_connection);
-RUNTIME_GUARD(envoy_reloadable_features_codec_client_enable_idle_timer_only_when_connected);
 RUNTIME_GUARD(envoy_reloadable_features_test_feature_true);
 RUNTIME_GUARD(envoy_reloadable_features_trace_refresh_after_route_refresh);
 RUNTIME_GUARD(envoy_reloadable_features_udp_set_do_not_fragment);
