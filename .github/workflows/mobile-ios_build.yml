@@ -50,14 +50,14 @@ jobs:
     with:
       args: ${{ matrix.args }}
       bind-mount: false
-      command: ./bazelw
+      command: bazel
       container-command:
       docker-ipv6: false
       request: ${{ needs.load.outputs.request }}
       runs-on: macos-15
       source: |
         source ./ci/mac_ci_setup.sh
-        ./bazelw shutdown
+        bazel shutdown
       steps-post: ${{ matrix.steps-post }}
       target: ${{ matrix.target }}
       timeout-minutes: ${{ matrix.timeout-minutes }}
@@ -92,14 +92,14 @@ jobs:
   #       build
   #       ${{ matrix.args || '--config=mobile-ios' }}
   #       ${{ matrix.app }}
-  #     command: ./bazelw
+  #     command: bazel
   #     container-command:
   #     docker-ipv6: false
   #     request: ${{ needs.load.outputs.request }}
   #     runs-on: macos-15
   #     source: |
   #       source ./ci/mac_ci_setup.sh
-  #       ./bazelw shutdown
+  #       bazel shutdown
   #     steps-post: |
   #       - uses: envoyproxy/toolshed/actions/envoy/ios/post@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
   #         with:
@@ -138,7 +138,7 @@ jobs:
   #       build
   #       ${{ matrix.args || '--config=mobile-ios' }}
   #       ${{ matrix.app }}
-  #     command: ./bazelw
+  #     command: bazel
   #     container-command:
   #     docker-ipv6: false
   #     request: ${{ needs.load.outputs.request }}
