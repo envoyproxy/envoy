@@ -30,7 +30,7 @@ for FILE in "$@"; do
     ;;
   *)
 
-    FILENAME="$(echo "$FILE" | sed -e 's/.*examples\///g')"
+    FILENAME="$(echo "$FILE" | sed -e 's/.*example[^/]*\///g')"
     # Configuration filenames may conflict. To avoid this we use the full path.
     cp "$FILE" "$OUT_DIR/${FILENAME//\//_}"
     ;;

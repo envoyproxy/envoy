@@ -12,7 +12,7 @@ if __name__ == "__main__":
     test_srcdir = os.getenv("TEST_SRCDIR")
     # In bzlmod, the main repository is '_main', in WORKSPACE it's 'envoy_api'
     # Try both to support both build systems
-    for workspace_name in ['_main', 'envoy_api']:
+    for workspace_name in ['envoy_api', 'envoy_api~', '_main']:
         candidate_dir = os.path.join(test_srcdir, workspace_name)
         if os.path.isdir(candidate_dir):
             srcdir = candidate_dir

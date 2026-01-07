@@ -36,10 +36,11 @@ envoy_cc_test(
         "example_configs_test_setup.sh",
         "//configs:example_configs",
     ],
-    env = {
-        "EXAMPLE_CONFIGS_TAR_PATH": "envoy/configs/example_configs.tar",
-        "GODEBUG": "cgocheck=0",
-    },
+    # TODO(phlax): Cleanup once bzlmod migration is complete
+    env = {"GODEBUG": "cgocheck=0"} | select({
+        "//bazel:bzlmod_mode": {"EXAMPLE_CONFIGS_TAR_PATH": "_main/configs/example_configs.tar"},
+        "//conditions:default": {"EXAMPLE_CONFIGS_TAR_PATH": "envoy/configs/example_configs.tar"},
+    }),
     rbe_pool = "6gig",
     deps = [
         ":example_configs_test_lib",
