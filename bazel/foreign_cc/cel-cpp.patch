@@ -60,3 +60,27 @@ index 06225796..18f56e59 100644
    ABSL_DCHECK(descriptor_pool != nullptr);
    ABSL_DCHECK(message_factory != nullptr);
    ABSL_DCHECK(arena != nullptr);
+diff --git a/bazel/antlr.bzl b/bazel/antlr.bzl
+--- a/bazel/antlr.bzl
++++ b/bazel/antlr.bzl
+@@ -38,7 +38,7 @@ def antlr_cc_library(name, src, package):
+         srcs = [generated],
+         deps = [
+             generated,
+-            "@antlr4-cpp-runtime//:antlr4-cpp-runtime",
++            "@antlr4_runtimes//:cpp",
+         ],
+         linkstatic = 1,
+     )
+diff --git a/parser/BUILD b/parser/BUILD
+--- a/parser/BUILD
++++ b/parser/BUILD
+@@ -49,7 +49,7 @@ cc_library(
+         "//internal:strings",
+         "//internal:utf8",
+         "//parser/internal:cel_cc_parser",
+-        "@antlr4-cpp-runtime",
++        "@antlr4_runtimes//:cpp",
+         "@com_google_absl//absl/base:core_headers",
+         "@com_google_absl//absl/cleanup",
+         "@com_google_absl//absl/container:btree",
