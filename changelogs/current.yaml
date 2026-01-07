@@ -262,12 +262,13 @@ removed_config_or_runtime:
 new_features:
 - area: tcp_proxy
   change: |
-    Added :ref:`merge_with_downstream_tlvs
-    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.merge_with_downstream_tlvs>`
-    configuration option to the TCP proxy filter. When set to ``true``, TLVs specified in
-    ``proxy_protocol_tlvs`` are merged with existing downstream proxy protocol TLVs instead of
-    being ignored. TCP proxy TLVs take precedence over downstream TLVs with the same type,
-    allowing users to add or override specific TLV values while preserving other downstream TLVs.
+    Added :ref:`downstream_tlv_merge_policy
+    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.downstream_tlv_merge_policy>`
+    configuration option to the TCP proxy filter to control how TLVs specified in ``proxy_protocol_tlvs``
+    are merged with downstream proxy protocol TLVs. The policy supports three modes:
+    ``KEEP_DOWNSTREAM_ONLY`` (default), ``OVERRIDE_DOWNSTREAM_TLVS_BY_TYPE`` (overrides downstream
+    TLVs with matching types), and ``APPEND_TO_DOWNSTREAM_TLVS`` (appends all TLVs, preserving
+    duplicates per PROXY protocol v2 spec).
 - area: composite filter
   change: |
     Added support for configuring a chain of filters in the composite filter's :ref:`ExecuteFilterAction

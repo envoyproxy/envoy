@@ -57,6 +57,31 @@ enum UpstreamConnectMode {
   ON_DOWNSTREAM_TLS_HANDSHAKE = 2;
 }
 
+// Specifies how TLVs specified in ``proxy_protocol_tlvs`` should be merged with
+// downstream PROXY protocol TLVs when downstream PROXY protocol state already exists.
+enum DownstreamTlvMergePolicy {
+  // Keep only the downstream TLVs and ignore the TLVs specified in ``proxy_protocol_tlvs``
+  // if downstream PROXY protocol state already exists. Only the downstream TLVs are forwarded
+  // to the upstream. This is the default behavior for backward compatibility.
+  KEEP_DOWNSTREAM_ONLY = 0;
+
+  // Override downstream TLVs that have the same type as TLVs specified in
+  // ``proxy_protocol_tlvs``. TLVs with non-conflicting types from both sources are preserved.
+  // This allows adding new TLV values or overriding specific downstream TLV values while
+  // preserving other downstream TLVs.
+  //
+  // .. note::
+  //   If multiple TLVs with the same type exist in the downstream state, all of them are
+  //   overridden by the tcp_proxy TLVs of that type.
+  OVERRIDE_DOWNSTREAM_TLVS_BY_TYPE = 1;
+
+  // Append the TLVs specified in ``proxy_protocol_tlvs`` to the downstream TLVs.
+  // This preserves all downstream TLVs and adds the tcp_proxy TLVs to the end.
+  // The PROXY protocol v2 specification allows multiple TLVs with the same type,
+  // so this mode preserves all TLVs from both sources.
+  APPEND_TO_DOWNSTREAM_TLVS = 2;
+}
+
 // [#next-free-field: 24]
 message TcpProxy {
   option (udpa.annotations.versioning).previous_message_type =
@@ -328,7 +353,7 @@ message TcpProxy {
   // This field only takes effect when the TCP proxy filter is creating new ``PROXY`` protocol state and an
   // upstream proxy protocol transport socket is configured in the cluster. If the connection already
   // contains ``PROXY`` protocol state (including any TLVs) parsed by a downstream proxy protocol listener
-  // filter, the TLVs specified here are ignored unless ``merge_with_downstream_tlvs`` is set to true.
+  // filter, the behavior is controlled by ``downstream_tlv_merge_policy``.
   //
   // .. note::
   //   To ensure the specified TLVs are allowed in the upstream ``PROXY`` protocol header, you must also
@@ -337,26 +362,22 @@ message TcpProxy {
   //   for details.
   repeated config.core.v3.TlvEntry proxy_protocol_tlvs = 19;
 
-  // Controls whether TLVs specified in ``proxy_protocol_tlvs`` are merged with downstream
-  // ``PROXY`` protocol TLVs when downstream ``PROXY`` protocol state already exists.
+  // Specifies how TLVs specified in ``proxy_protocol_tlvs`` should be merged with
+  // downstream ``PROXY`` protocol TLVs when downstream ``PROXY`` protocol state already exists.
   //
-  // When set to ``true`` and the connection already contains ``PROXY`` protocol state
-  // (including TLVs) from a downstream proxy protocol listener filter, the TLVs
-  // specified in ``proxy_protocol_tlvs`` are merged with the downstream TLVs.
+  // - ``KEEP_DOWNSTREAM_ONLY`` (default): The TLVs specified in ``proxy_protocol_tlvs`` are
+  //   ignored if downstream ``PROXY`` protocol state already exists. Only the downstream TLVs
+  //   are forwarded to the upstream.
   //
-  // When set to ``false`` (default), the TLVs specified in ``proxy_protocol_tlvs`` are
-  // ignored if downstream ``PROXY`` protocol state already exists. In this case, only
-  // the downstream TLVs are forwarded to the upstream.
-  //
-  // **Precedence behavior**:
-  //
-  // - TLVs specified in ``proxy_protocol_tlvs`` take precedence over downstream TLVs
-  //   with the same type. This allows adding or overriding specific TLV values while
-  //   preserving other downstream TLVs.
-  // - The source/destination addresses from the downstream ``PROXY`` protocol state
+  // - ``OVERRIDE_DOWNSTREAM_TLVS_BY_TYPE``: TLVs specified in ``proxy_protocol_tlvs`` override
+  //   downstream TLVs with the same type. TLVs with non-conflicting types from both sources are
+  //   preserved. The source/destination addresses from the downstream ``PROXY`` protocol state
   //   are preserved (not modified).
-  // - TLVs with types that do not conflict are combined, resulting in a merged set
-  //   of TLVs from both sources.
+  //
+  // - ``APPEND_TO_DOWNSTREAM_TLVS``: The TLVs specified in ``proxy_protocol_tlvs`` are appended
+  //   to the downstream TLVs. This preserves all downstream TLVs and adds the tcp_proxy TLVs.
+  //   The PROXY protocol v2 specification allows multiple TLVs with the same type, so this mode
+  //   preserves all TLVs from both sources.
   //
   // .. note::
   //   This field only takes effect when downstream ``PROXY`` protocol state exists.
@@ -369,7 +390,8 @@ message TcpProxy {
   //   you must also configure passthrough TLVs on the upstream proxy protocol transport.
   //   See :ref:`core.v3.ProxyProtocolConfig.pass_through_tlvs <envoy_v3_api_field_config.core.v3.ProxyProtocolConfig.pass_through_tlvs>`
   //   for details.
-  bool merge_with_downstream_tlvs = 23;
+  DownstreamTlvMergePolicy downstream_tlv_merge_policy = 23
+      [(validate.rules).enum = {defined_only: true}];
 
   // Specifies when to establish the upstream connection.
   //

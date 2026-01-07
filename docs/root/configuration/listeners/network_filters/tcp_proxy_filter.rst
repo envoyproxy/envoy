@@ -166,15 +166,16 @@ When the downstream connection already contains ``PROXY`` protocol state (parsed
 :ref:`proxy protocol listener filter <config_listener_filters_proxy_protocol>`), the
 ``proxy_protocol_tlvs`` configured in the TCP proxy filter are ignored by default.
 
-To merge the TCP proxy TLVs with the downstream TLVs, set
-:ref:`merge_with_downstream_tlvs
-<envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.merge_with_downstream_tlvs>`
-to ``true``. When enabled:
+To control how TCP proxy TLVs interact with downstream TLVs, use
+:ref:`downstream_tlv_merge_policy
+<envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.downstream_tlv_merge_policy>`:
 
-* TLVs specified in ``proxy_protocol_tlvs`` take precedence over downstream TLVs with the same type.
-* This allows adding new TLV values or overriding specific downstream TLV values while preserving
-  other downstream TLVs.
-* The source and destination addresses from the downstream ``PROXY`` protocol state are preserved.
+* ``KEEP_DOWNSTREAM_ONLY`` (default): TCP proxy TLVs are ignored if downstream state exists.
+  Only downstream TLVs are forwarded.
+* ``OVERRIDE_DOWNSTREAM_TLVS_BY_TYPE``: TCP proxy TLVs override downstream TLVs with the same type.
+  Non-conflicting TLVs from both sources are preserved.
+* ``APPEND_TO_DOWNSTREAM_TLVS``: TCP proxy TLVs are appended to downstream TLVs, preserving all
+  TLVs from both sources (allows duplicate types per PROXY protocol v2 spec).
 
 .. note::
 

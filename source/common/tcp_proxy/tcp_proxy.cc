@@ -197,7 +197,7 @@ Config::SharedConfig::SharedConfig(
         parseTLVs(config.proxy_protocol_tlvs(), context, dynamic_tlv_formatters_);
   }
 
-  merge_with_downstream_tlvs_ = config.merge_with_downstream_tlvs();
+  downstream_tlv_merge_policy_ = config.downstream_tlv_merge_policy();
 }
 
 Config::Config(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config,
@@ -692,26 +692,46 @@ Network::FilterStatus Filter::establishUpstreamConnection() {
             downstream_connection.connectionInfoProvider().localAddress(), tlvs}),
         StreamInfo::FilterState::StateType::ReadOnly,
         StreamInfo::FilterState::LifeSpan::Connection);
-  } else if (config_->sharedConfig()->mergeWithDownstreamTlvs()) {
-    // Downstream proxy protocol state exists and merge is enabled.
-    // Merge tcp_proxy TLVs with downstream TLVs (tcp_proxy TLVs take precedence).
+  } else if (config_->sharedConfig()->downstreamTlvMergePolicy() !=
+             envoy::extensions::filters::network::tcp_proxy::v3::KEEP_DOWNSTREAM_ONLY) {
+    // Downstream proxy protocol state exists and merging is enabled.
     const auto& existing_data = existing_state->value();
     const auto tcp_proxy_tlvs = config_->sharedConfig()->evaluateDynamicTLVs(getStreamInfo());
 
     Network::ProxyProtocolTLVVector merged_tlvs;
-    absl::flat_hash_set<uint8_t> seen_types;
 
-    // Add tcp_proxy TLVs first (they take precedence).
-    for (const auto& tlv : tcp_proxy_tlvs) {
-      merged_tlvs.push_back(tlv);
-      seen_types.insert(tlv.type);
-    }
+    if (config_->sharedConfig()->downstreamTlvMergePolicy() ==
+        envoy::extensions::filters::network::tcp_proxy::v3::OVERRIDE_DOWNSTREAM_TLVS_BY_TYPE) {
+      // Override downstream TLVs by type.
+      // Build a set of types present in tcp_proxy TLVs.
+      absl::flat_hash_set<uint8_t> tcp_proxy_tlv_types;
+      for (const auto& tlv : tcp_proxy_tlvs) {
+        tcp_proxy_tlv_types.insert(tlv.type);
+      }
 
-    // Add downstream TLVs that don't conflict with tcp_proxy TLVs.
-    for (const auto& tlv : existing_data.tlv_vector_) {
-      if (!seen_types.contains(tlv.type)) {
+      // Add all tcp_proxy TLVs first (they take precedence).
+      for (const auto& tlv : tcp_proxy_tlvs) {
         merged_tlvs.push_back(tlv);
-        seen_types.insert(tlv.type);
+      }
+
+      // Add downstream TLVs that don't have the same type as tcp_proxy TLVs.
+      // Note: We preserve all downstream TLVs with non-conflicting types, including duplicates.
+      for (const auto& tlv : existing_data.tlv_vector_) {
+        if (!tcp_proxy_tlv_types.contains(tlv.type)) {
+          merged_tlvs.push_back(tlv);
+        }
+      }
+    } else if (config_->sharedConfig()->downstreamTlvMergePolicy() ==
+               envoy::extensions::filters::network::tcp_proxy::v3::APPEND_TO_DOWNSTREAM_TLVS) {
+      // Append tcp_proxy TLVs to downstream TLVs.
+      // Preserve all downstream TLVs.
+      for (const auto& tlv : existing_data.tlv_vector_) {
+        merged_tlvs.push_back(tlv);
+      }
+
+      // Append all tcp_proxy TLVs.
+      for (const auto& tlv : tcp_proxy_tlvs) {
+        merged_tlvs.push_back(tlv);
       }
     }
 
@@ -724,7 +744,8 @@ Network::FilterStatus Filter::establishUpstreamConnection() {
             existing_data.version_}),
         StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
   }
-  // else: Downstream state exists but merge is disabled - keep existing state as-is.
+  // else: Downstream state exists but merge is disabled (KEEP_DOWNSTREAM_ONLY) - keep existing
+  // downstream state as-is.
   transport_socket_options_ =
       Network::TransportSocketOptionsUtility::fromFilterState(*filter_state);
 
