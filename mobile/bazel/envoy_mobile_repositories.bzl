@@ -108,8 +108,8 @@ def kotlin_repos():
 def android_repos():
     http_archive(
         name = "rules_android",
-        urls = ["https://github.com/bazelbuild/rules_android/releases/download/v0.6.6/rules_android-v0.6.6.tar.gz"],
-        sha256 = "f8f8bca6df61ea6070a0a8abc4054940b19c9fdb4fabb864e40d29d124f517f9",
+        urls = ["https://github.com/bazelbuild/rules_android/releases/download/v0.7.0/rules_android-v0.7.0.tar.gz"],
+        sha256 = "ef1a446260b7f620e2aae11d4c96389369eb865ade01fcdd389a8196168b8d9b",
     )
     http_archive(
         name = "rules_android_ndk",
