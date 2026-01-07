@@ -152,7 +152,14 @@ TestCommon::makeAuthzResponse(CheckStatus status, Http::Code status_code, const 
     for (const auto& header : headers) {
       HeaderMutationAction action;
       if (header.has_append()) {
-        action = header.append().value() ? HeaderMutationAction::Append : HeaderMutationAction::Set;
+        if (status == Filters::Common::ExtAuthz::CheckStatus::OK) {
+          // Match gRPC impl behavior for request headers: append=true → Append, append=false → Set.
+          action =
+              header.append().value() ? HeaderMutationAction::Append : HeaderMutationAction::Set;
+        } else {
+          // For Denied/Error, headers are used for local reply (response headers), so use Add.
+          action = header.append().value() ? HeaderMutationAction::Add : HeaderMutationAction::Set;
+        }
       } else {
         // Default to Set for backward compatibility when append is not specified.
         action = HeaderMutationAction::Set;
@@ -165,8 +172,8 @@ TestCommon::makeAuthzResponse(CheckStatus status, Http::Code status_code, const 
     for (const auto& header : downstream_headers) {
       HeaderMutationAction action;
       if (header.has_append()) {
-        // Match gRPC impl behavior: append=true → Append, append=false → Set.
-        action = header.append().value() ? HeaderMutationAction::Append : HeaderMutationAction::Set;
+        // Match gRPC impl behavior: append=true → Add (addCopy), append=false → Set.
+        action = header.append().value() ? HeaderMutationAction::Add : HeaderMutationAction::Set;
       } else {
         // Default to Add for HTTP impl and backward compatibility with response headers.
         action = HeaderMutationAction::Add;
