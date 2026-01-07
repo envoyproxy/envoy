@@ -656,15 +656,17 @@ bool ProcessorState::isLastResponseAfterHeaderResp() const {
   if (hasNoBody()) {
     return true;
   }
-  if (bodyMode() == ProcessingMode::NONE && !shouldSendTrailers().send_trailers) {
+
+  const bool send_trailers = shouldSendTrailers().send_trailers;
+  if (bodyMode() == ProcessingMode::NONE && !send_trailers) {
     return true;
   }
-  if (bodyMode() == ProcessingMode::NONE && shouldSendTrailers().send_trailers) {
+  if (bodyMode() == ProcessingMode::NONE && send_trailers) {
     if (completeBodyAvailable() && (responseTrailers() == nullptr)) {
       return true;
     }
   }
-  if (bodyMode() != ProcessingMode::NONE && !shouldSendTrailers().send_trailers) {
+  if (bodyMode() != ProcessingMode::NONE && !send_trailers) {
     if (responseTrailers() != nullptr) {
       // If callback state is idle, and trailers are already received,
       // then there is no more body chunks to send.
@@ -681,6 +683,7 @@ bool ProcessorState::isLastResponseAfterBodyResp(bool eos_seen_in_body) const {
   if (eos_seen_in_body) {
     return true;
   }
+
   if (!shouldSendTrailers().send_trailers && responseTrailers() != nullptr) {
     // If callback state is idle, and trailers are already received,
     // then there is no more body chunks to send.
