@@ -1,5 +1,7 @@
-/* ares_config.h.  Generated from ares_config.h.in by configure.  */
-/* ares_config.h.in.  Generated from configure.ac by autoheader.  */
+#pragma once
+
+/* ares_config.h. Generated from ares_config.h.in by configure. */
+/* ares_config.h.in. Generated from configure.ac by autoheader. */
 
 /* Define if building universal (internal helper macro) */
 /* #undef AC_APPLE_UNIVERSAL_BUILD */
@@ -17,7 +19,7 @@
 #define CARES_SYMBOL_HIDING 1
 
 /* Definition to make a library symbol externally visible. */
-#define CARES_SYMBOL_SCOPE_EXTERN __attribute__ ((__visibility__ ("default")))
+#define CARES_SYMBOL_SCOPE_EXTERN __attribute__((__visibility__("default")))
 
 /* the signed version of size_t */
 #define CARES_TYPEOF_ARES_SSIZE_T ssize_t
@@ -35,7 +37,7 @@
 #define GETNAMEINFO_QUAL_ARG1 const
 
 /* Define to the type of arg 1 for getnameinfo. */
-#define GETNAMEINFO_TYPE_ARG1 struct sockaddr *
+#define GETNAMEINFO_TYPE_ARG1 struct sockaddr*
 
 /* Define to the type of arg 2 for getnameinfo. */
 #define GETNAMEINFO_TYPE_ARG2 socklen_t
@@ -158,7 +160,7 @@
 /* #undef HAVE_IOCTLSOCKET_CAMEL */
 
 /* Define to 1 if you have a working IoctlSocket camel case FIONBIO function.
-   */
+ */
 /* #undef HAVE_IOCTLSOCKET_CAMEL_FIONBIO */
 
 /* Define to 1 if you have a working ioctlsocket FIONBIO function. */
@@ -384,7 +386,7 @@
 #define RANDOM_FILE "/dev/urandom"
 
 /* Define to the type qualifier pointed by arg 5 for recvfrom. */
-#define RECVFROM_QUAL_ARG5 
+#define RECVFROM_QUAL_ARG5
 
 /* Define to the type of arg 1 for recvfrom. */
 #define RECVFROM_TYPE_ARG1 int
@@ -420,7 +422,7 @@
 #define RECV_TYPE_ARG1 int
 
 /* Define to the type of arg 2 for recv. */
-#define RECV_TYPE_ARG2 void *
+#define RECV_TYPE_ARG2 void*
 
 /* Define to the type of arg 3 for recv. */
 #define RECV_TYPE_ARG3 size_t
@@ -441,7 +443,7 @@
 #define SEND_TYPE_ARG1 int
 
 /* Define to the type of arg 2 for send. */
-#define SEND_TYPE_ARG2 void *
+#define SEND_TYPE_ARG2 void*
 
 /* Define to the type of arg 3 for send. */
 #define SEND_TYPE_ARG3 size_t
@@ -470,13 +472,13 @@
 /* Define WORDS_BIGENDIAN to 1 if your processor stores words with the most
    significant byte first (like Motorola and SPARC, unlike Intel). */
 #if defined AC_APPLE_UNIVERSAL_BUILD
-# if defined __BIG_ENDIAN__
-#  define WORDS_BIGENDIAN 1
-# endif
+#if defined __BIG_ENDIAN__
+#define WORDS_BIGENDIAN 1
+#endif
 #else
-# ifndef WORDS_BIGENDIAN
+#ifndef WORDS_BIGENDIAN
 /* #  undef WORDS_BIGENDIAN */
-# endif
+#endif
 #endif
 
 /* Define to 1 if OS is AIX. */
@@ -484,9 +486,9 @@
 /* #  undef _ALL_SOURCE */
 #endif
 
-/* Enable large inode numbers on Mac OS X 10.5.  */
+/* Enable large inode numbers on Mac OS X 10.5. */
 #ifndef _DARWIN_USE_64_BIT_INODE
-# define _DARWIN_USE_64_BIT_INODE 1
+#define _DARWIN_USE_64_BIT_INODE 1
 #endif
 
 /* Number of bits in a file offset, on hosts where this is settable. */

@@ -1,3 +1,5 @@
+#pragma once
+
 /* Generated from ares_config.h.cmake*/
 
 /* Define if building universal (internal helper macro) */
@@ -28,10 +30,10 @@
 #define GETHOSTNAME_TYPE_ARG2 size_t
 
 /* Define to the type qualifier of arg 1 for getnameinfo. */
-#define GETNAMEINFO_QUAL_ARG1 
+#define GETNAMEINFO_QUAL_ARG1
 
 /* Define to the type of arg 1 for getnameinfo. */
-#define GETNAMEINFO_TYPE_ARG1 struct sockaddr *
+#define GETNAMEINFO_TYPE_ARG1 struct sockaddr*
 
 /* Define to the type of arg 2 for getnameinfo. */
 #define GETNAMEINFO_TYPE_ARG2 socklen_t
@@ -151,7 +153,7 @@
 /* #undef HAVE_IOCTLSOCKET_CAMEL */
 
 /* Define to 1 if you have a working IoctlSocket camel case FIONBIO function.
-   */
+ */
 /* #undef HAVE_IOCTLSOCKET_CAMEL_FIONBIO */
 
 /* Define to 1 if you have a working ioctlsocket FIONBIO function. */
@@ -344,13 +346,13 @@
 /* #undef RANDOM_FILE */
 
 /* Define to the type qualifier pointed by arg 5 for recvfrom. */
-#define RECVFROM_QUAL_ARG5 
+#define RECVFROM_QUAL_ARG5
 
 /* Define to the type of arg 1 for recvfrom. */
 #define RECVFROM_TYPE_ARG1 int
 
 /* Define to the type pointed by arg 2 for recvfrom. */
-#define RECVFROM_TYPE_ARG2 void *
+#define RECVFROM_TYPE_ARG2 void*
 
 /* Define to 1 if the type pointed by arg 2 for recvfrom is void. */
 #define RECVFROM_TYPE_ARG2_IS_VOID 0
@@ -362,13 +364,13 @@
 #define RECVFROM_TYPE_ARG4 int
 
 /* Define to the type pointed by arg 5 for recvfrom. */
-#define RECVFROM_TYPE_ARG5 struct sockaddr *
+#define RECVFROM_TYPE_ARG5 struct sockaddr*
 
 /* Define to 1 if the type pointed by arg 5 for recvfrom is void. */
 #define RECVFROM_TYPE_ARG5_IS_VOID 0
 
 /* Define to the type pointed by arg 6 for recvfrom. */
-#define RECVFROM_TYPE_ARG6 socklen_t *
+#define RECVFROM_TYPE_ARG6 socklen_t*
 
 /* Define to 1 if the type pointed by arg 6 for recvfrom is void. */
 #define RECVFROM_TYPE_ARG6_IS_VOID 0
@@ -380,7 +382,7 @@
 #define RECV_TYPE_ARG1 int
 
 /* Define to the type of arg 2 for recv. */
-#define RECV_TYPE_ARG2 void *
+#define RECV_TYPE_ARG2 void*
 
 /* Define to the type of arg 3 for recv. */
 #define RECV_TYPE_ARG3 size_t
@@ -392,16 +394,16 @@
 #define RECV_TYPE_RETV ssize_t
 
 /* Define as the return type of signal handlers (`int' or `void'). */
-#define RETSIGTYPE 
+#define RETSIGTYPE
 
 /* Define to the type qualifier of arg 2 for send. */
-#define SEND_QUAL_ARG2 
+#define SEND_QUAL_ARG2
 
 /* Define to the type of arg 1 for send. */
 #define SEND_TYPE_ARG1 int
 
 /* Define to the type of arg 2 for send. */
-#define SEND_TYPE_ARG2 void *
+#define SEND_TYPE_ARG2 void*
 
 /* Define to the type of arg 3 for send. */
 #define SEND_TYPE_ARG3 size_t
