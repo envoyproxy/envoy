@@ -23,9 +23,9 @@ configure_make(
         "--host aarch64-linux-gnu ",
         "--target aarch64-linux-gnu",
     ],
-    data = ["@numactl//:numa_archive"],
+    data = ["//bazel/external:numa_archive"],
     env = {
-        "LDFLAGS": "-L$$EXT_BUILD_ROOT/$(BINDIR)/external/numactl/lib",
+        "LDFLAGS": "-L$$EXT_BUILD_ROOT/$(BINDIR)/bazel/external/lib",
     } | select({
         "//bazel:clang_build": {
             "CFLAGS": "-Wno-unused-command-line-argument -Wno-incompatible-pointer-types",
