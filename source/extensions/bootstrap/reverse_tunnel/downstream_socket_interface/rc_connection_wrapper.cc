@@ -11,6 +11,7 @@
 #include "source/common/network/connection_socket_impl.h"
 #include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_connection_io_handle.h"
+#include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_tunnel_initiator_extension.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -128,11 +129,10 @@ std::string RCConnectionWrapper::connect(const std::string& src_tenant_id,
   const Http::LowerCaseString& tenant_hdr =
       ::Envoy::Extensions::Bootstrap::ReverseConnection::reverseTunnelTenantIdHeader();
 
-  auto headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>({
-      {Http::Headers::get().Method, Http::Headers::get().MethodValues.Get},
-      {Http::Headers::get().Path, "/reverse_connections/request"},
-      {Http::Headers::get().Host, host_value},
-  });
+  auto headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>(
+      {{Http::Headers::get().Method, Http::Headers::get().MethodValues.Get},
+       {Http::Headers::get().Path, parent_.requestPath()},
+       {Http::Headers::get().Host, host_value}});
   headers->addCopy(node_hdr, std::string(node_id));
   headers->addCopy(cluster_hdr, std::string(cluster_id));
   headers->addCopy(tenant_hdr, std::string(tenant_id));
@@ -143,7 +143,7 @@ std::string RCConnectionWrapper::connect(const std::string& src_tenant_id,
   const Http::Status encode_status = request_encoder.encodeHeaders(*headers, true);
   if (!encode_status.ok()) {
     ENVOY_LOG(error, "RCConnectionWrapper: encodeHeaders failed: {}", encode_status.message());
-    onHandshakeFailure("HTTP handshake encode failed");
+    onHandshakeFailure(HandshakeFailureReason::encodeError());
   }
 
   return connection_->connectionInfoProvider().localAddress()->asString();
@@ -156,7 +156,7 @@ void RCConnectionWrapper::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bo
     onHandshakeSuccess();
   } else {
     ENVOY_LOG(error, "Received non-200 HTTP response: {}", status);
-    onHandshakeFailure(absl::StrCat("HTTP handshake failed with status ", status));
+    onHandshakeFailure(HandshakeFailureReason::httpStatusError(absl::StrCat(status)));
   }
 }
 
@@ -169,15 +169,36 @@ void RCConnectionWrapper::dispatchHttp1(Buffer::Instance& buffer) {
   }
 }
 
+ReverseTunnelInitiatorExtension* RCConnectionWrapper::getDownstreamExtension() const {
+  return parent_.getDownstreamExtension();
+}
+
 void RCConnectionWrapper::onHandshakeSuccess() {
   std::string message = "reverse connection accepted";
   ENVOY_LOG(debug, "handshake succeeded: {}", message);
+
+  // Track handshake success stats.
+  auto* extension = getDownstreamExtension();
+  if (extension) {
+    extension->incrementHandshakeStats(cluster_name_, true, "");
+  }
+
   parent_.onConnectionDone(message, this, false);
 }
 
-void RCConnectionWrapper::onHandshakeFailure(const std::string& message) {
-  ENVOY_LOG(debug, "handshake failed: {}", message);
-  parent_.onConnectionDone(message, this, false);
+void RCConnectionWrapper::onHandshakeFailure(const HandshakeFailureReason& reason) {
+  const std::string error_message = reason.getDetailedName();
+  const std::string stats_failure_reason = reason.getNameForStats();
+
+  ENVOY_LOG(trace, "handshake failed: {}", error_message);
+
+  // Track handshake failure stats.
+  auto* extension = getDownstreamExtension();
+  if (extension) {
+    extension->incrementHandshakeStats(cluster_name_, false, stats_failure_reason);
+  }
+
+  parent_.onConnectionDone(error_message, this, false);
 }
 
 void RCConnectionWrapper::shutdown() {

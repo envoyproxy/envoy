@@ -139,8 +139,9 @@ matter expert reviews. Feel free to loop them in as needed.
 # Emeritus code owners
 
 This section lists emeritus code owners who have contributed or maintained some extensions and
-now have left Envoy community. When we add this section, some of code owners have left for a
-while. So, feel free to ping the maintainers if you find any emeritus code owners missing and
-would like to be added to this list.
+now have left Envoy community or become inactive because of various reasons. When we add this
+section, some of code owners have left for a while. So, feel free to ping the maintainers if
+you find any emeritus code owners missing and would like to be added to this list.
 
 * Derek Argueta ([derekargueta](https://github.com/derekargueta))
+* marc-barry ([marc-barry](https://github.com/marc-barry))

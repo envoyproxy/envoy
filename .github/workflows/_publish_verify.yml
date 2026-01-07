@@ -5,13 +5,7 @@ permissions:
 
 on:
   workflow_call:
-    secrets:
-      gcs-cache-key:
-        required: true
     inputs:
-      gcs-cache-bucket:
-        type: string
-        required: true
       request:
         type: string
         required: true
@@ -31,13 +25,13 @@ concurrency:
 jobs:
   examples:
     permissions:
+      actions: read
       contents: read
       packages: read
     name: ${{ matrix.name || matrix.target }}
     uses: ./.github/workflows/_run.yml
     with:
       bazel-extra: ${{ matrix.bazel-extra || '--config=rbe' }}
-      bind-mounts: ${{ matrix.bind-mounts }}
       cache-build-image: ${{ matrix.cache-build-image }}
       cache-build-image-key-suffix: ${{ matrix.arch == 'arm64' && format('-{0}', matrix.arch) || '' }}
       container-command: ${{ matrix.container-command }}
@@ -58,19 +52,6 @@ jobs:
           downloads: |
             oci.arm64: container/build_images
             oci.x64: container/build_images
-          bind-mounts: |
-            - src: /mnt/workspace
-              target: GITHUB_WORKSPACE
-              chown: "runner:runner"
-            - src: /mnt/runner
-              target: RUNNER_TEMP/container/bazel_root
-              chown: "runner:runner"
-            - src: /mnt/docker
-              target: /var/lib/docker
-              rm: true
-              command-pre: sudo systemctl stop docker
-              command-post: sudo systemctl start docker
-
           rbe: false
           source: |
             export NO_BUILD_SETUP=1
@@ -100,6 +81,7 @@ jobs:
 
   distroless:
     permissions:
+      actions: read
       contents: read
       packages: read
     name: ${{ matrix.name || matrix.target }}
@@ -145,9 +127,8 @@ jobs:
               shell: bash
 
   distro:
-    secrets:
-      gcs-cache-key: ${{ secrets.gcs-cache-key }}
     permissions:
+      actions: read
       contents: read
       packages: read
     name: ${{ matrix.name || matrix.target }}
@@ -161,7 +142,6 @@ jobs:
       concurrency-suffix: -${{ matrix.arch || 'x64' }}
       downloads: |
         release.signed: container/release.signed
-      gcs-cache-bucket: ${{ inputs.gcs-cache-bucket }}
       rbe: ${{ matrix.rbe && matrix.rbe || false }}
       request: ${{ inputs.request }}
       runs-on: ${{ matrix.runs-on }}

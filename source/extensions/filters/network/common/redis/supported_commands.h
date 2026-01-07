@@ -62,6 +62,14 @@ struct SupportedCommands {
   }
 
   /**
+   * @return commands which hash on the third argument (subcommand key pattern)
+   * OBJECT subcommand key [arguments] -> key is at index 2
+   */
+  static const absl::flat_hash_set<std::string>& objectCommands() {
+    CONSTRUCT_ON_FIRST_USE(absl::flat_hash_set<std::string>, "object");
+  }
+
+  /**
    * @return commands which are sent to multiple servers and coalesced by summing the responses
    */
   static const absl::flat_hash_set<std::string>& hashMultipleSumResultCommands() {
@@ -74,7 +82,7 @@ struct SupportedCommands {
    */
   static const absl::flat_hash_set<std::string>& ClusterScopeCommands() {
     CONSTRUCT_ON_FIRST_USE(absl::flat_hash_set<std::string>, "script", "flushall", "flushdb",
-                           "slowlog", "config");
+                           "slowlog", "config", "info", "keys", "select", "role", "hello");
   }
 
   /**
@@ -105,6 +113,11 @@ struct SupportedCommands {
   }
 
   /**
+   * @return hello command
+   */
+  static const std::string& hello() { CONSTRUCT_ON_FIRST_USE(std::string, "hello"); }
+
+  /**
    * @return auth command
    */
   static const std::string& auth() { CONSTRUCT_ON_FIRST_USE(std::string, "auth"); }
@@ -125,11 +138,6 @@ struct SupportedCommands {
   static const std::string& mset() { CONSTRUCT_ON_FIRST_USE(std::string, "mset"); }
 
   /**
-   * @return keys command
-   */
-  static const std::string& keys() { CONSTRUCT_ON_FIRST_USE(std::string, "keys"); }
-
-  /**
    * @return ping command
    */
   static const std::string& ping() { CONSTRUCT_ON_FIRST_USE(std::string, "ping"); }
@@ -145,24 +153,14 @@ struct SupportedCommands {
   static const std::string& quit() { CONSTRUCT_ON_FIRST_USE(std::string, "quit"); }
 
   /**
-   * @return select command
-   */
-  static const std::string& select() { CONSTRUCT_ON_FIRST_USE(std::string, "select"); }
-
-  /**
    * @return scan command
    */
   static const std::string& scan() { CONSTRUCT_ON_FIRST_USE(std::string, "scan"); }
 
   /**
-   * @return info command
+   * @return info.shard command
    */
-  static const std::string& info() { CONSTRUCT_ON_FIRST_USE(std::string, "info"); }
-
-  /**
-   * @return role command
-   */
-  static const std::string& role() { CONSTRUCT_ON_FIRST_USE(std::string, "role"); }
+  static const std::string& infoShard() { CONSTRUCT_ON_FIRST_USE(std::string, "info.shard"); }
 
   /**
    * @return commands which alters the state of redis
@@ -197,7 +195,8 @@ struct SupportedCommands {
                            "randomkey", // RANDOMKEY
                            "quit",      // QUIT
                            "role",      // ROLE
-                           "info"       // INFO [section]
+                           "info",      // INFO [section]
+                           "hello"      // HELLO [version]
     );
   }
 

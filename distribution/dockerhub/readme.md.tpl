@@ -14,9 +14,9 @@
 ## Supported tags and respective `Dockerfile` links
 
 {% for version in stable_versions %}
-- [v{{ version }}-latest](https://github.com/envoyproxy/envoy/blob/release/v{{ version }}/ci/Dockerfile-envoy)
+- [v{{ version }}-latest](https://github.com/envoyproxy/envoy/blob/release/v{{ version }}/distribution/docker/Dockerfile-envoy)
 {% endfor %}
-- [dev](https://github.com/envoyproxy/envoy/blob/release/main/ci/Dockerfile-envoy)
+- [dev](https://github.com/envoyproxy/envoy/blob/main/distribution/docker/Dockerfile-envoy)
 
 
 ## Quick reference (cont.)

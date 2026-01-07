@@ -5,9 +5,12 @@ licenses(["notice"])  # Apache 2
 package(default_visibility = [
     "//test/extensions/dynamic_modules:__pkg__",
     "//test/extensions/dynamic_modules/http:__pkg__",
+    "//test/extensions/dynamic_modules/network:__pkg__",
 ])
 
 test_program(name = "no_op")
+
+test_program(name = "network_no_op")
 
 test_program(name = "no_program_init")
 
@@ -18,3 +21,5 @@ test_program(name = "abi_version_mismatch")
 test_program(name = "http")
 
 test_program(name = "http_integration_test")
+
+test_program(name = "http_stream_callouts_test")

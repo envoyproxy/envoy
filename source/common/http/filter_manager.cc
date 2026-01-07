@@ -551,11 +551,6 @@ void ActiveStreamDecoderFilter::requestDataTooLarge() {
   }
 }
 
-void FilterManager::applyFilterFactoryCb(FilterContext context, FilterFactoryCb& factory) {
-  FilterChainFactoryCallbacksImpl callbacks(*this, context);
-  factory(callbacks);
-}
-
 void FilterManager::maybeContinueDecoding(StreamDecoderFilters::Iterator continue_data_entry) {
   if (continue_data_entry != decoder_filters_.end()) {
     // We use the continueDecoding() code since it will correctly handle not calling
@@ -1666,7 +1661,7 @@ void FilterManager::contextOnContinue(ScopeTrackedObjectStack& tracked_object_st
 
 FilterManager::UpgradeResult
 FilterManager::createUpgradeFilterChain(const FilterChainFactory& filter_chain_factory,
-                                        const FilterChainOptionsImpl& options) {
+                                        FilterChainFactoryCallbacksImpl& callbacks) {
   const HeaderEntry* upgrade = nullptr;
   if (filter_manager_callbacks_.requestHeaders()) {
     upgrade = filter_manager_callbacks_.requestHeaders()->Upgrade();
@@ -1684,7 +1679,7 @@ FilterManager::createUpgradeFilterChain(const FilterChainFactory& filter_chain_f
 
   const Router::RouteEntry::UpgradeMap* upgrade_map = filter_manager_callbacks_.upgradeMap();
   return filter_chain_factory.createUpgradeFilterChain(upgrade->value().getStringView(),
-                                                       upgrade_map, *this, options)
+                                                       upgrade_map, callbacks)
              ? UpgradeResult::UpgradeAccepted
              : UpgradeResult::UpgradeRejected;
 }
@@ -1711,13 +1706,13 @@ FilterManager::createFilterChain(const FilterChainFactory& filter_chain_factory)
   OptRef<DownstreamStreamFilterCallbacks> downstream_callbacks =
       filter_manager_callbacks_.downstreamCallbacks();
 
-  FilterChainOptionsImpl options(streamInfo().route());
+  FilterChainFactoryCallbacksImpl callbacks(*this);
 
   UpgradeResult upgrade = UpgradeResult::UpgradeUnneeded;
 
   // Only try the upgrade filter chain for downstream filter chains.
   if (downstream_callbacks.has_value()) {
-    upgrade = createUpgradeFilterChain(filter_chain_factory, options);
+    upgrade = createUpgradeFilterChain(filter_chain_factory, callbacks);
     if (upgrade == UpgradeResult::UpgradeAccepted) {
       // Upgrade filter chain is created. Return the result directly.
       state_.create_chain_result_ = CreateChainResult(true, upgrade);
@@ -1728,7 +1723,7 @@ FilterManager::createFilterChain(const FilterChainFactory& filter_chain_factory)
   }
 
   state_.create_chain_result_ =
-      CreateChainResult(filter_chain_factory.createFilterChain(*this, options), upgrade);
+      CreateChainResult(filter_chain_factory.createFilterChain(callbacks), upgrade);
   return state_.create_chain_result_;
 }
 
@@ -1901,11 +1896,11 @@ void ActiveStreamEncoderFilter::onEncoderFilterBelowWriteBufferLowWatermark() {
   parent_.callLowWatermarkCallbacks();
 }
 
-void ActiveStreamEncoderFilter::setEncoderBufferLimit(uint32_t limit) {
+void ActiveStreamEncoderFilter::setEncoderBufferLimit(uint64_t limit) {
   parent_.setBufferLimit(limit);
 }
 
-uint32_t ActiveStreamEncoderFilter::encoderBufferLimit() { return parent_.buffer_limit_; }
+uint64_t ActiveStreamEncoderFilter::encoderBufferLimit() { return parent_.buffer_limit_; }
 
 void ActiveStreamEncoderFilter::continueEncoding() { commonContinue(); }
 

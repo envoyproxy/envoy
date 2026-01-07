@@ -19,7 +19,8 @@ namespace JwtAuthn {
  *  CreateJwksFetcherCb is a callback interface for creating a JwksFetcher instance.
  */
 using CreateJwksFetcherCb = std::function<Common::JwksFetcherPtr(
-    Upstream::ClusterManager&, const envoy::extensions::filters::http::jwt_authn::v3::RemoteJwks&)>;
+    Upstream::ClusterManager&, Router::RetryPolicyConstSharedPtr retry_policy,
+    const envoy::extensions::filters::http::jwt_authn::v3::RemoteJwks&)>;
 /**
  *  JwksDoneFetched is a callback interface to set a Jwks when fetch is done.
  */
@@ -34,6 +35,7 @@ class JwksAsyncFetcher : public Logger::Loggable<Logger::Id::jwt>,
                          public Common::JwksFetcher::JwksReceiver {
 public:
   JwksAsyncFetcher(const envoy::extensions::filters::http::jwt_authn::v3::RemoteJwks& remote_jwks,
+                   Router::RetryPolicyConstSharedPtr retry_policy,
                    Server::Configuration::FactoryContext& context, CreateJwksFetcherCb fetcher_fn,
                    JwtAuthnFilterStats& stats, JwksDoneFetched done_fn);
 
@@ -53,6 +55,8 @@ private:
 
   // the remote Jwks config
   const envoy::extensions::filters::http::jwt_authn::v3::RemoteJwks& remote_jwks_;
+  // the parsed retry policy
+  const Router::RetryPolicyConstSharedPtr retry_policy_;
   // the factory context
   Server::Configuration::FactoryContext& context_;
   // the jwks fetcher creator function

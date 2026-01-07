@@ -37,6 +37,6 @@ if __name__ == '__main__':
         expected_output = f.read()
     if actual_output != expected_output:
         print('Mismatch')
-        print('Expected: %s' % expected_output)
-        print('Actual: %s' % actual_output)
+        print('Expected:\n %s' % expected_output)
+        print('Actual:\n %s' % actual_output)
         sys.exit(1)

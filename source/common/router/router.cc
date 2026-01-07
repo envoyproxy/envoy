@@ -87,6 +87,7 @@ FilterConfig::FilterConfig(Stats::StatName stat_prefix,
           config.has_upstream_log_options()
               ? config.upstream_log_options().flush_upstream_log_on_upstream_stream()
               : false,
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, reject_connect_request_early_data, false),
           config.strict_check_headers(), context.serverFactoryContext().api().timeSource(),
           context.serverFactoryContext().httpContext(),
           context.serverFactoryContext().routerContext()) {
@@ -715,8 +716,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   // like stream timeout.
   host_selection_cancelable_ = std::move(host_selection_response.cancelable);
   // Configure a callback to be called on asynchronous host selection.
-  on_host_selected_ = ([this, cluster, end_stream](Upstream::HostConstSharedPtr&& host,
-                                                   std::string host_selection_details) -> void {
+  on_host_selected_ = ([this, cluster,
+                        end_stream](Upstream::HostConstSharedPtr&& host,
+                                    absl::string_view host_selection_details) -> void {
     // It should always be safe to call continueDecodeHeaders. In the case the
     // stream had a local reply before host selection completed,
     // the lookup should be canceled.
@@ -864,12 +866,9 @@ bool Filter::continueDecodeHeaders(Upstream::ThreadLocalCluster* cluster,
             // Calculate effective buffer limit for shadow streams using the same logic as main
             // request. A buffer limit of 1 is set in the case that the effective limit == 0,
             // because a buffer limit of zero on async clients is interpreted as no buffer limit.
-            .setBufferLimit([this]() -> uint32_t {
-              uint64_t effective_limit = calculateEffectiveBufferLimit();
-              // Convert to uint32_t for AsyncClient, clamping to max uint32_t if needed
-              uint32_t shadow_limit = static_cast<uint32_t>(std::min(
-                  effective_limit, static_cast<uint64_t>(std::numeric_limits<uint32_t>::max())));
-              return shadow_limit == 0 ? 1 : shadow_limit;
+            .setBufferLimit([this]() -> uint64_t {
+              const uint64_t effective_limit = calculateEffectiveBufferLimit();
+              return effective_limit == 0 ? 1 : effective_limit;
             }())
             .setDiscardResponseBody(true)
             .setFilterConfig(config_)
@@ -959,23 +958,31 @@ void Filter::sendNoHealthyUpstreamResponse(absl::string_view optional_details) {
 uint64_t Filter::calculateEffectiveBufferLimit() const {
   // Use requestBodyBufferLimit() method which handles both legacy and new
   // configurations. If no buffer limit is configured, fall back to connection limit.
-  uint64_t buffer_limit = request_body_buffer_limit_;
-
-  if (buffer_limit != std::numeric_limits<uint64_t>::max()) {
-    return buffer_limit;
+  if (request_body_buffer_limit_ != std::numeric_limits<uint64_t>::max()) {
+    return request_body_buffer_limit_;
   }
 
-  // If no route-level buffer limit is set, use the connection buffer limit.
-  uint32_t current_connection_limit = callbacks_->decoderBufferLimit();
-  if (current_connection_limit != 0) {
-    return static_cast<uint64_t>(current_connection_limit);
+  // If no route-level buffer limit is set, use the stream buffer limit.
+  const uint32_t current_stream_limit = callbacks_->decoderBufferLimit();
+  if (current_stream_limit != 0) {
+    return static_cast<uint64_t>(current_stream_limit);
   }
 
   // If no limits are set at all, return unlimited.
   return std::numeric_limits<uint64_t>::max();
 }
 
+bool Filter::isEarlyConnectData() {
+  return reject_early_connect_data_enabled_ && downstream_headers_ != nullptr &&
+         Http::HeaderUtility::isConnect(*downstream_headers_) && !downstream_response_started_;
+}
+
 Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
+  if (data.length() > 0 && isEarlyConnectData()) {
+    callbacks_->sendLocalReply(Http::Code::BadRequest, "", nullptr, absl::nullopt,
+                               StreamInfo::ResponseCodeDetails::get().EarlyConnectData);
+    return Http::FilterDataStatus::StopIterationNoBuffer;
+  }
   // upstream_requests_.size() cannot be > 1 because that only happens when a per
   // try timeout occurs with hedge_on_per_try_timeout enabled but the per
   // try timeout timer is not started until onRequestComplete(). It could be zero
@@ -983,24 +990,22 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
   // a backoff timer..
   ASSERT(upstream_requests_.size() <= 1);
 
-  bool retry_enabled = retry_state_ && retry_state_->enabled();
-  bool redirect_enabled = route_entry_ && route_entry_->internalRedirectPolicy().enabled();
+  const bool retry_enabled = retry_state_ && retry_state_->enabled();
+  const bool redirect_enabled = route_entry_ && route_entry_->internalRedirectPolicy().enabled();
+  const bool is_redirect_only = redirect_enabled && !retry_enabled;
+  const uint64_t effective_buffer_limit = calculateEffectiveBufferLimit();
+
   bool buffering = retry_enabled || redirect_enabled;
-  uint64_t effective_buffer_limit = calculateEffectiveBufferLimit();
 
   // Check if we would exceed buffer limits, regardless of current buffering state
   // This ensures error details are set even if retry state was cleared due to upstream reset.
-  bool would_exceed_buffer =
+  const bool would_exceed_buffer =
       (getLength(callbacks_->decodingBuffer()) + data.length() > effective_buffer_limit);
 
-  // Handle retry/shadow buffer overflow, excluding redirect-only scenarios.
+  // Handle retry buffer overflow, excluding redirect-only scenarios.
   // For redirect scenarios, buffer overflow should only affect redirect processing, not initial
   // request.
-  bool had_retry_or_shadow = retry_enabled;
-  bool is_redirect_only = redirect_enabled && !retry_enabled;
-
-  if (would_exceed_buffer && had_retry_or_shadow && !is_redirect_only &&
-      !request_buffer_overflowed_) {
+  if (would_exceed_buffer && retry_enabled && !is_redirect_only && !request_buffer_overflowed_) {
     ENVOY_LOG(debug,
               "The request payload has at least {} bytes data which exceeds buffer limit {}. "
               "Giving up on buffering.",
@@ -1134,13 +1139,6 @@ Http::FilterMetadataStatus Filter::decodeMetadata(Http::MetadataMap& metadata_ma
 
 void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
   callbacks_ = &callbacks;
-  // As the decoder filter only pushes back via watermarks once data has reached
-  // it, it can latch the current buffer limit and does not need to update the
-  // limit if another filter increases it.
-  //
-  // Store the connection buffer limit for use in the new buffer limit logic.
-  connection_buffer_limit_ = callbacks_->decoderBufferLimit();
-
   watermark_callbacks_.setDecoderFilterCallbacks(callbacks_);
 }
 
@@ -2234,7 +2232,7 @@ void Filter::doRetry(bool can_send_early_data, bool can_use_http3, TimeoutRetry 
     // as host selection failure).
     continueDoRetry(can_send_early_data, can_use_http3, is_timeout_retry,
                     std::move(host_selection_response.host), *cluster,
-                    std::string(host_selection_response.details));
+                    host_selection_response.details);
   }
 
   ENVOY_STREAM_LOG(debug, "Handling asynchronous host selection for retry\n", *callbacks_);
@@ -2242,8 +2240,8 @@ void Filter::doRetry(bool can_send_early_data, bool can_use_http3, TimeoutRetry 
   // selection is complete.
   host_selection_cancelable_ = std::move(host_selection_response.cancelable);
   on_host_selected_ =
-      ([this, can_send_early_data, can_use_http3, is_timeout_retry,
-        cluster](Upstream::HostConstSharedPtr&& host, std::string host_selection_details) -> void {
+      ([this, can_send_early_data, can_use_http3, is_timeout_retry, cluster](
+           Upstream::HostConstSharedPtr&& host, absl::string_view host_selection_details) -> void {
         continueDoRetry(can_send_early_data, can_use_http3, is_timeout_retry, std::move(host),
                         *cluster, host_selection_details);
       });
@@ -2407,13 +2405,14 @@ void Filter::maybeProcessOrcaLoadReport(const Envoy::Http::HeaderMap& headers_or
         *cluster_->lrsReportMetricNames(), *orca_load_report, upstream_host->loadMetricStats());
   }
   if (host_lb_policy_data.has_value()) {
-    ENVOY_LOG(trace, "orca_load_report for {} report = {}", upstream_host->address()->asString(),
-              (*orca_load_report).DebugString());
+    ENVOY_STREAM_LOG(trace, "orca_load_report for {} report = {}", *callbacks_,
+                     upstream_host->address()->asString(), orca_load_report->DebugString());
     const absl::Status status =
         host_lb_policy_data->onOrcaLoadReport(*orca_load_report, callbacks_->streamInfo());
     if (!status.ok()) {
-      ENVOY_STREAM_LOG(error, "Failed to invoke OrcaLoadReportCallbacks: {}", *callbacks_,
-                       status.message());
+      ENVOY_LOG_PERIODIC(error, std::chrono::seconds(10),
+                         "LB policy onOrcaLoadReport failed: {} for load report {}",
+                         status.message(), orca_load_report->DebugString());
     }
   }
 }

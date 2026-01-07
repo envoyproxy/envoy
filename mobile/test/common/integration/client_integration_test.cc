@@ -1,3 +1,5 @@
+#include "envoy/config/core/v3/extension.pb.h"
+
 #include "source/common/quic/quic_server_transport_socket_factory.h"
 #include "source/common/quic/server_codec_impl.h"
 #include "source/common/tls/cert_validator/default_validator.h"
@@ -11,6 +13,8 @@
 #include "test/common/http/common.h"
 #include "test/common/integration/base_client_integration_test.h"
 #include "test/common/mocks/common/mocks.h"
+#include "test/common/mocks/dns/mock_dns_resolver.h"
+#include "test/common/mocks/dns/mock_dns_resolver.pb.h"
 #include "test/extensions/filters/http/dynamic_forward_proxy/test_resolver.h"
 #include "test/integration/autonomous_upstream.h"
 #include "test/test_common/registry.h"
@@ -276,6 +280,15 @@ TEST_P(ClientIntegrationTest, DisableDnsRefreshOnFailure) {
           found_cache_miss = true;
         }
       });
+
+  // Configure MockDnsResolver with "doesnotexist" as a non-existent domain
+  envoy::config::core::v3::TypedExtensionConfig dns_resolver_config;
+  dns_resolver_config.set_name("envoy.test.mock_dns_resolver");
+  envoy::test::mock_dns_resolver::v3::MockDnsResolverConfig config;
+  config.add_non_existent_domains("doesnotexist");
+  dns_resolver_config.mutable_typed_config()->PackFrom(config);
+  builder_.setDnsResolver(dns_resolver_config);
+
   builder_.setDisableDnsRefreshOnFailure(true);
   initialize();
 
@@ -761,6 +774,14 @@ TEST_P(ClientIntegrationTest, BasicNon2xx) {
 }
 
 TEST_P(ClientIntegrationTest, InvalidDomain) {
+  // Configure MockDnsResolver with "www.doesnotexist.com" as a non-existent domain
+  envoy::config::core::v3::TypedExtensionConfig dns_resolver_config;
+  dns_resolver_config.set_name("envoy.test.mock_dns_resolver");
+  envoy::test::mock_dns_resolver::v3::MockDnsResolverConfig config;
+  config.add_non_existent_domains("www.doesnotexist.com");
+  dns_resolver_config.mutable_typed_config()->PackFrom(config);
+  builder_.setDnsResolver(dns_resolver_config);
+
   initialize();
 
   default_request_headers_.setHost("www.doesnotexist.com");
@@ -808,9 +829,14 @@ TEST_P(ClientIntegrationTest, InvalidDomainFakeResolver) {
 
 TEST_P(ClientIntegrationTest, InvalidDomainReresolveWithNoAddresses) {
   builder_.addRuntimeGuard("reresolve_null_addresses", true);
-  Network::OverrideAddrInfoDnsResolverFactory factory;
-  Registry::InjectFactory<Network::DnsResolverFactory> inject_factory(factory);
-  Registry::InjectFactory<Network::DnsResolverFactory>::forceAllowDuplicates();
+
+  // Configure MockDnsResolver with "www.doesnotexist.com" as a non-existent domain
+  envoy::config::core::v3::TypedExtensionConfig dns_resolver_config;
+  dns_resolver_config.set_name("envoy.test.mock_dns_resolver");
+  envoy::test::mock_dns_resolver::v3::MockDnsResolverConfig config;
+  config.add_non_existent_domains("www.doesnotexist.com");
+  dns_resolver_config.mutable_typed_config()->PackFrom(config);
+  builder_.setDnsResolver(dns_resolver_config);
 
   initialize();
   default_request_headers_.setHost(
@@ -818,9 +844,6 @@ TEST_P(ClientIntegrationTest, InvalidDomainReresolveWithNoAddresses) {
   stream_ = stream_prototype_->start(createDefaultStreamCallbacks(), explicit_flow_control_);
   stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
                        true);
-  // Unblock resolve, but resolve to the bad domain.
-  ASSERT_TRUE(waitForCounterGe("dns_cache.base_dns_cache.dns_query_attempt", 1));
-  Network::TestResolver::unblockResolve();
   terminal_callback_.waitReady();
 
   // The stream should fail.
@@ -830,9 +853,7 @@ TEST_P(ClientIntegrationTest, InvalidDomainReresolveWithNoAddresses) {
   stream_ = createNewStream(createDefaultStreamCallbacks());
   stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
                        true);
-  Network::TestResolver::unblockResolve();
   terminal_callback_.waitReady();
-  EXPECT_LE(2, getCounterValue("dns_cache.base_dns_cache.dns_query_attempt"));
 }
 
 TEST_P(ClientIntegrationTest, ReresolveAndDrain) {
@@ -1469,21 +1490,6 @@ TEST_P(ClientIntegrationTest, TestProxyResolutionApi) {
 // doesn't crash. It doesn't really test the actual network change event.
 TEST_P(ClientIntegrationTest, OnNetworkChanged) {
   builder_.addRuntimeGuard("dns_cache_set_ip_version_to_remove", true);
-  initialize();
-  internalEngine()->onDefaultNetworkChanged(1);
-  basicTest();
-  if (upstreamProtocol() == Http::CodecType::HTTP1) {
-    ASSERT_EQ(cc_.on_complete_received_byte_count_, 67);
-  }
-}
-
-// This test is simply to test the IPv6 connectivity check and DNS refresh and make sure the code
-// doesn't crash. It doesn't really test the actual network change event, but it does ensure that
-// requests/responses still work in the presence of IP version filtering.
-TEST_P(ClientIntegrationTest, OnNetworkChangedFilterUnsableIps) {
-  builder_.addRuntimeGuard("dns_cache_set_ip_version_to_remove", false);
-  builder_.addRuntimeGuard("dns_cache_filter_unusable_ip_version", true);
-  builder_.setDisableDnsRefreshOnNetworkChange(true);
   initialize();
   internalEngine()->onDefaultNetworkChanged(1);
   basicTest();

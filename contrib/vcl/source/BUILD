@@ -39,8 +39,6 @@ envoy_cmake(
     name = "build",
     build_args = select({
         "//bazel/foreign_cc:parallel_builds_enabled": ["-j"],
-        "//bazel:engflow_rbe_x86_64": ["-j"],
-        "//bazel:engflow_rbe_aarch64": ["-j1"],
         "//conditions:default": ["-j1"],
     }),
     build_data = [requirement("ply")],

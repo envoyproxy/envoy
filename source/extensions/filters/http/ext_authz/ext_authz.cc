@@ -313,7 +313,6 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
   }
 
   // Check if we need to use a per-route service override (gRPC or HTTP).
-  Filters::Common::ExtAuthz::Client* client_to_use = client_.get();
   if (maybe_merged_per_route_config) {
     if (maybe_merged_per_route_config->grpcService().has_value()) {
       const auto& grpc_service = maybe_merged_per_route_config->grpcService().value();
@@ -321,9 +320,9 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
                        *decoder_callbacks_);
 
       // Create a new gRPC client for this route.
-      per_route_client_ = createPerRouteGrpcClient(grpc_service);
-      if (per_route_client_ != nullptr) {
-        client_to_use = per_route_client_.get();
+      auto per_route_client = createPerRouteGrpcClient(grpc_service);
+      if (per_route_client != nullptr) {
+        client_ = std::move(per_route_client);
         ENVOY_STREAM_LOG(debug, "ext_authz filter: successfully created per-route gRPC client.",
                          *decoder_callbacks_);
       } else {
@@ -338,9 +337,9 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
                        *decoder_callbacks_);
 
       // Create a new HTTP client for this route.
-      per_route_client_ = createPerRouteHttpClient(http_service);
-      if (per_route_client_ != nullptr) {
-        client_to_use = per_route_client_.get();
+      auto per_route_client = createPerRouteHttpClient(http_service);
+      if (per_route_client != nullptr) {
+        client_ = std::move(per_route_client);
         ENVOY_STREAM_LOG(debug, "ext_authz filter: successfully created per-route HTTP client.",
                          *decoder_callbacks_);
       } else {
@@ -386,8 +385,8 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
                                                // going to invoke check call.
   cluster_ = decoder_callbacks_->clusterInfo();
   initiating_call_ = true;
-  client_to_use->check(*this, check_request_, decoder_callbacks_->activeSpan(),
-                       decoder_callbacks_->streamInfo());
+  client_->check(*this, check_request_, decoder_callbacks_->activeSpan(),
+                 decoder_callbacks_->streamInfo());
   initiating_call_ = false;
 }
 
@@ -1019,6 +1018,19 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       config_->incCounter(cluster_->statsScope(), config_->ext_authz_error_);
     }
     stats_.error_.inc();
+
+    // Validate error response headers and clear custom attributes if invalid.
+    validateAndClearInvalidErrorResponseAttributes(response);
+
+    // Apply max_denied_response_body_bytes limit to error response body as well.
+    if (config_->maxDeniedResponseBodyBytes() > 0 &&
+        response->body.length() > config_->maxDeniedResponseBodyBytes()) {
+      ENVOY_STREAM_LOG(
+          trace, "ext_authz filter is truncating the error response body from {} to {} bytes.",
+          *decoder_callbacks_, response->body.length(), config_->maxDeniedResponseBodyBytes());
+      response->body.resize(config_->maxDeniedResponseBodyBytes());
+    }
+
     if (config_->failureModeAllow()) {
       ENVOY_STREAM_LOG(trace, "ext_authz filter allowed the request with error",
                        *decoder_callbacks_);
@@ -1032,14 +1044,25 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       }
       continueDecoding();
     } else {
+      // Use custom status code from error_response if provided, otherwise use status_on_error.
+      // Status code 0 means not set.
+      const Http::Code status_code = response->status_code != static_cast<Http::Code>(0)
+                                         ? response->status_code
+                                         : config_->statusOnError();
       ENVOY_STREAM_LOG(
           trace, "ext_authz filter rejected the request with an error. Response status code: {}",
-          *decoder_callbacks_, enumToInt(config_->statusOnError()));
+          *decoder_callbacks_, enumToInt(status_code));
       decoder_callbacks_->streamInfo().setResponseFlag(
           StreamInfo::CoreResponseFlag::UnauthorizedExternalService);
+
       decoder_callbacks_->sendLocalReply(
-          config_->statusOnError(), EMPTY_STRING, nullptr, absl::nullopt,
-          Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzError);
+          status_code, response->body,
+          [&headers_to_set = response->headers_to_set,
+           &headers_to_append = response->headers_to_append,
+           this](Http::HeaderMap& response_headers) -> void {
+            addErrorResponseHeaders(response_headers, headers_to_set, headers_to_append);
+          },
+          absl::nullopt, Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzError);
     }
     break;
   }
@@ -1112,6 +1135,93 @@ Filter::PerRouteFlags Filter::getPerRouteFlags(const Router::RouteConstSharedPtr
   }
 
   return PerRouteFlags{false /*skip_check_*/, defaultCheckSettings()};
+}
+
+bool Filter::validateAndClearInvalidErrorResponseAttributes(
+    Filters::Common::ExtAuthz::ResponsePtr& response) {
+  if (!config_->validateMutations()) {
+    return true;
+  }
+
+  // Validate headers_to_set.
+  for (const auto& [key, value] : response->headers_to_set) {
+    if (!Http::HeaderUtility::headerNameIsValid(key) ||
+        !Http::HeaderUtility::headerValueIsValid(value)) {
+      ENVOY_STREAM_LOG(trace, "Rejected invalid error header '{}':'{}'.", *decoder_callbacks_, key,
+                       value);
+      ENVOY_STREAM_LOG(info,
+                       "Custom error response from ext_authz will be ignored due to invalid "
+                       "header. Falling back to generic error response.",
+                       *decoder_callbacks_);
+      // Fall back to generic error by clearing all custom attributes.
+      response->headers_to_set.clear();
+      response->headers_to_append.clear();
+      response->body.clear();
+      response->status_code = static_cast<Http::Code>(0); // Clear custom status.
+      return false;
+    }
+  }
+
+  // Validate headers_to_append.
+  for (const auto& [key, value] : response->headers_to_append) {
+    if (!Http::HeaderUtility::headerNameIsValid(key) ||
+        !Http::HeaderUtility::headerValueIsValid(value)) {
+      ENVOY_STREAM_LOG(trace, "Rejected invalid error header '{}':'{}'.", *decoder_callbacks_, key,
+                       value);
+      ENVOY_STREAM_LOG(info,
+                       "Custom error response from ext_authz will be ignored due to invalid "
+                       "header. Falling back to generic error response.",
+                       *decoder_callbacks_);
+      // Fall back to generic error by clearing all custom attributes.
+      response->headers_to_set.clear();
+      response->headers_to_append.clear();
+      response->body.clear();
+      response->status_code = static_cast<Http::Code>(0); // Clear custom status.
+      return false;
+    }
+  }
+
+  return true;
+}
+
+bool Filter::canAddResponseHeader(Http::HeaderMap& response_headers) {
+  if (config_->enforceResponseHeaderLimits() &&
+      response_headers.size() >= response_headers.maxHeadersCount()) {
+    stats_.omitted_response_headers_.inc();
+    ENVOY_LOG_EVERY_POW_2(warn, "Some ext_authz error response headers weren't added because the "
+                                "header map was full.");
+    return false;
+  }
+  return true;
+}
+
+void Filter::addErrorResponseHeaders(
+    Http::HeaderMap& response_headers,
+    const std::vector<std::pair<std::string, std::string>>& headers_to_set,
+    const std::vector<std::pair<std::string, std::string>>& headers_to_append) {
+  ENVOY_STREAM_LOG(trace,
+                   "ext_authz filter added header(s) to the error response:", *decoder_callbacks_);
+
+  // First, handle headers_to_set which should override existing headers.
+  for (const auto& [key, _] : headers_to_set) {
+    response_headers.remove(Http::LowerCaseString(key));
+  }
+  for (const auto& [key, value] : headers_to_set) {
+    if (!canAddResponseHeader(response_headers)) {
+      break;
+    }
+    ENVOY_STREAM_LOG(trace, " '{}':'{}'", *decoder_callbacks_, key, value);
+    response_headers.addCopy(Http::LowerCaseString(key), value);
+  }
+
+  // Then, handle headers_to_append which should append to existing headers.
+  for (const auto& [key, value] : headers_to_append) {
+    if (!canAddResponseHeader(response_headers)) {
+      break;
+    }
+    ENVOY_STREAM_LOG(trace, " '{}':'{}'", *decoder_callbacks_, key, value);
+    response_headers.addCopy(Http::LowerCaseString(key), value);
+  }
 }
 
 } // namespace ExtAuthz

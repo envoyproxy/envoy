@@ -50,8 +50,7 @@ const unsigned Config::TLS_MAX_SUPPORTED_VERSION = TLS1_3_VERSION;
 
 Config::Config(
     Stats::Scope& scope,
-    const envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector& proto_config,
-    uint32_t max_client_hello_size)
+    const envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector& proto_config)
     : stats_{ALL_TLS_INSPECTOR_STATS(POOL_COUNTER_PREFIX(scope, "tls_inspector."),
                                      POOL_HISTOGRAM_PREFIX(scope, "tls_inspector."))},
       ssl_ctx_(SSL_CTX_new(TLS_with_buffers_method())),
@@ -61,11 +60,12 @@ Config::Config(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, enable_ja4_fingerprinting, false)),
       close_connection_on_client_hello_parsing_errors_(
           proto_config.close_connection_on_client_hello_parsing_errors()),
-      max_client_hello_size_(max_client_hello_size),
+      max_client_hello_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, max_client_hello_size,
+                                                             TLS_MAX_CLIENT_HELLO)),
       initial_read_buffer_size_(
           std::min(PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, initial_read_buffer_size,
-                                                   max_client_hello_size),
-                   max_client_hello_size)) {
+                                                   max_client_hello_size_),
+                   max_client_hello_size_)) {
   if (max_client_hello_size_ > TLS_MAX_CLIENT_HELLO) {
     throw EnvoyException(fmt::format("max_client_hello_size of {} is greater than maximum of {}.",
                                      max_client_hello_size_, size_t(TLS_MAX_CLIENT_HELLO)));
@@ -87,17 +87,10 @@ Config::Config(
                 client_hello, TLSEXT_TYPE_application_layer_protocol_negotiation, &data, &len)) {
           filter->onALPN(data, len);
         }
-        return ssl_select_cert_success;
-      });
-  SSL_CTX_set_tlsext_servername_callback(
-      ssl_ctx_.get(), [](SSL* ssl, int* out_alert, void*) -> int {
-        Filter* filter = static_cast<Filter*>(SSL_get_app_data(ssl));
-        filter->onServername(
-            absl::NullSafeStringView(SSL_get_servername(ssl, TLSEXT_NAMETYPE_host_name)));
 
-        // Return an error to stop the handshake; we have what we wanted already.
-        *out_alert = SSL_AD_USER_CANCELLED;
-        return SSL_TLSEXT_ERR_ALERT_FATAL;
+        const char* servername = SSL_get_servername(client_hello->ssl, TLSEXT_NAMETYPE_host_name);
+        filter->onServername(absl::NullSafeStringView(servername));
+        return ssl_select_cert_error;
       });
 }
 
@@ -236,7 +229,11 @@ ParseState Filter::getParserState(int handshake_status) {
         if (read_ >= maxConfigReadBytes()) {
           setDynamicMetadata(failureReasonClientHelloTooLarge());
           config_->stats().client_hello_too_large_.inc();
+        } else {
+          setDynamicMetadata(failureReasonClientHelloNotDetected());
+          config_->stats().tls_not_found_.inc();
         }
+        setDownstreamTransportFailureReason();
         return ParseState::Error;
       }
       config_->stats().tls_not_found_.inc();

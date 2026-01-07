@@ -14,40 +14,47 @@ option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/dynamic_modules/v3;dynamic_modulesv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: HTTP filter for dynamic modules]
+// [#protodoc-title: Dynamic Modules HTTP Filter]
 // [#extension: envoy.filters.http.dynamic_modules]
 
-// Configuration of the HTTP filter for dynamic modules. This filter allows loading shared object files
-// that can be loaded via dlopen by the HTTP filter.
+// Configuration for the Dynamic Modules HTTP filter. This filter allows loading shared object files
+// that can be loaded via ``dlopen`` to extend the HTTP filter chain.
 //
-// A module can be loaded by multiple HTTP filters, hence the program can be structured in a way that
-// the module is loaded only once and shared across multiple filters providing multiple functionalities.
+// A module can be loaded by multiple HTTP filters; the module is loaded only once and shared across
+// multiple filters.
 //
-// A dynamic module HTTP filter can opt into being a terminal filter with no upstream by setting ``terminal_filter`` to
-// true in the configuration. A terminal dynamic module can use ``send_`` ABI methods to send response headers,
-// body and trailers to the downstream.
+// A dynamic module HTTP filter can opt into being a terminal filter with no upstream by setting
+// :ref:`terminal_filter
+// <envoy_v3_api_field_extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter.terminal_filter>`
+// to ``true``. A terminal dynamic module can use ``send_`` ABI methods to send response headers,
+// body, and trailers to the downstream.
 message DynamicModuleFilter {
   // Specifies the shared-object level configuration.
   envoy.extensions.dynamic_modules.v3.DynamicModuleConfig dynamic_module_config = 1;
 
-  // The name for this filter configuration. This can be used to distinguish between different filter implementations
-  // inside a dynamic module. For example, a module can have completely different filter implementations.
-  // When Envoy receives this configuration, it passes the filter_name to the dynamic module's HTTP filter config init function
-  // together with the filter_config.
-  // That way a module can decide which in-module filter implementation to use based on the name at load time.
+  // The name for this filter configuration.
+  //
+  // This can be used to distinguish between different filter implementations inside a dynamic
+  // module. For example, a module can have completely different filter implementations. When Envoy
+  // receives this configuration, it passes the ``filter_name`` to the dynamic module's HTTP filter
+  // config init function together with the ``filter_config``. That way a module can decide which
+  // in-module filter implementation to use based on the name at load time.
   string filter_name = 2;
 
-  // The configuration for the filter chosen by filter_name. This is passed to the module's HTTP filter initialization function.
-  // Together with the filter_name, the module can decide which in-module filter implementation to use and
+  // The configuration for the filter chosen by ``filter_name``.
+  //
+  // This is passed to the module's HTTP filter initialization function. Together with the
+  // ``filter_name``, the module can decide which in-module filter implementation to use and
   // fine-tune the behavior of the filter.
   //
-  // For example, if a module has two filter implementations, one for logging and one for header manipulation,
-  // filter_name is used to choose either logging or header manipulation. The filter_config can be used to
-  // configure the logging level or the header manipulation behavior.
+  // For example, if a module has two filter implementations, one for logging and one for header
+  // manipulation, ``filter_name`` is used to choose either logging or header manipulation. The
+  // ``filter_config`` can be used to configure the logging level or the header manipulation
+  // behavior.
   //
-  // ``google.protobuf.Struct`` is serialized as JSON before
-  // passing it to the plugin. ``google.protobuf.BytesValue`` and
-  // ``google.protobuf.StringValue`` are passed directly without the wrapper.
+  // ``google.protobuf.Struct`` is serialized as JSON before passing it to the plugin.
+  // ``google.protobuf.BytesValue`` and ``google.protobuf.StringValue`` are passed directly without
+  // the wrapper.
   //
   // .. code-block:: yaml
   //
@@ -63,35 +70,42 @@ message DynamicModuleFilter {
   //
   google.protobuf.Any filter_config = 3;
 
-  // Set true if the dynamic module is a terminal filter to use without an upstream.
+  // If ``true``, the dynamic module is a terminal filter to use without an upstream.
+  //
   // The dynamic module is responsible for creating and sending the response to downstream.
+  //
+  // Defaults to ``false``.
   bool terminal_filter = 4;
 }
 
-// Configuration of the HTTP per-route filter for dynamic modules. This filter allows loading shared object files
-// that can be loaded via dlopen by the HTTP filter.
+// Configuration of the HTTP per-route filter for dynamic modules.
 message DynamicModuleFilterPerRoute {
   // Specifies the shared-object level configuration.
   envoy.extensions.dynamic_modules.v3.DynamicModuleConfig dynamic_module_config = 1;
 
-  // The name for this filter configuration. This can be used to distinguish between different filter implementations
-  // inside a dynamic module. For example, a module can have completely different filter implementations.
-  // When Envoy receives this configuration, it passes the filter_name to the dynamic module's HTTP per-route filter config init function
-  // together with the filter_config.
-  // That way a module can decide which in-module filter implementation to use based on the name at load time.
+  // The name for this filter configuration.
+  //
+  // This can be used to distinguish between different filter implementations inside a dynamic
+  // module. For example, a module can have completely different filter implementations. When Envoy
+  // receives this configuration, it passes the ``per_route_config_name`` to the dynamic module's
+  // HTTP per-route filter config init function together with the ``filter_config``. That way a
+  // module can decide which in-module filter implementation to use based on the name at load time.
   string per_route_config_name = 2;
 
-  // The configuration for the filter chosen by filter_name. This is passed to the module's HTTP per-route filter initialization function.
-  // Together with the filter_name, the module can decide which in-module filter implementation to use and
-  // fine-tune the behavior of the filter on a specific route.
+  // The configuration for the filter chosen by ``per_route_config_name``.
   //
-  // For example, if a module has two filter implementations, one for logging and one for header manipulation,
-  // filter_name is used to choose either logging or header manipulation. The filter_config can be used to
-  // configure the logging level or the header manipulation behavior.
+  // This is passed to the module's HTTP per-route filter initialization function. Together with
+  // the ``per_route_config_name``, the module can decide which in-module filter implementation to
+  // use and fine-tune the behavior of the filter on a specific route.
   //
-  // ``google.protobuf.Struct`` is serialized as JSON before
-  // passing it to the plugin. ``google.protobuf.BytesValue`` and
-  // ``google.protobuf.StringValue`` are passed directly without the wrapper.
+  // For example, if a module has two filter implementations, one for logging and one for header
+  // manipulation, ``per_route_config_name`` is used to choose either logging or header
+  // manipulation. The ``filter_config`` can be used to configure the logging level or the header
+  // manipulation behavior.
+  //
+  // ``google.protobuf.Struct`` is serialized as JSON before passing it to the plugin.
+  // ``google.protobuf.BytesValue`` and ``google.protobuf.StringValue`` are passed directly without
+  // the wrapper.
   //
   // .. code-block:: yaml
   //

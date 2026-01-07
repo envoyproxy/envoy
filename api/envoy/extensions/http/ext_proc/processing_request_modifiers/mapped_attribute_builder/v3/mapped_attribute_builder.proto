@@ -68,4 +68,13 @@ message MappedAttributeBuilder {
   // interpretable by CEL. This allows for the re-mapping of attributes, which is not supported
   // by the native attribute building logic.
   map<string, string> mapped_request_attributes = 1;
+
+  // Similar to ``mapped_request_attributes``, but for response attributes. The
+  // response nomenclature here just indicates that the attributes, whatever they may be, are sent
+  // with a response headers, body, or trailers ext_proc call.
+  // If a value contains a request key, e.g., ``request.host``, then the attribute would
+  // just be sent along in the response. This is useful if a given ext_proc extension is only
+  // enabled for response handling, e.g., ``RESPONSE_HEADERS`` but the backend wants to access request
+  // metadata.
+  map<string, string> mapped_response_attributes = 2;
 }

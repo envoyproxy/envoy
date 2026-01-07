@@ -21,6 +21,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/common/fmt.h"
+#include "source/common/common/matchers.h"
 #include "source/common/common/mutex_tracer_impl.h"
 #include "source/common/common/utility.h"
 #include "source/common/formatter/substitution_formatter.h"
@@ -308,13 +309,14 @@ bool AdminImpl::createNetworkFilterChain(Network::Connection& connection,
   return true;
 }
 
-bool AdminImpl::createFilterChain(Http::FilterChainManager& manager,
-                                  const Http::FilterChainOptions&) const {
-  Http::FilterFactoryCb factory = [this](Http::FilterChainFactoryCallbacks& callbacks) {
-    callbacks.addStreamFilter(std::make_shared<AdminFilter>(*this));
-  };
-  manager.applyFilterFactoryCb({}, factory);
+bool AdminImpl::createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) const {
+  callbacks.setFilterConfigName("");
+  callbacks.addStreamFilter(std::make_shared<AdminFilter>(*this));
   return true;
+}
+
+void AdminImpl::addAllowlistedPath(Matchers::StringMatcherPtr matcher) {
+  allowlisted_paths_.emplace_back(std::move(matcher));
 }
 
 namespace {
@@ -394,6 +396,12 @@ Admin::RequestPtr AdminImpl::makeRequest(AdminStream& admin_stream) const {
   std::string::size_type query_index = path_and_query.find('?');
   if (query_index == std::string::npos) {
     query_index = path_and_query.size();
+  }
+  if (!allowlisted_paths_.empty() && !acceptTargetPath(path_and_query)) {
+    ENVOY_LOG(info, "Request to admin interface path {} is not allowed", path_and_query);
+    Buffer::OwnedImpl error_response;
+    error_response.add(fmt::format("request to path {} not allowed", path_and_query));
+    return Admin::makeStaticTextRequest(error_response, Http::Code::Forbidden);
   }
 
   for (const UrlHandler& handler : handlers_) {

@@ -17,11 +17,22 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // This interface initiates reverse connections to upstream Envoys and provides
 // them as socket connections for downstream requests.
 message DownstreamReverseConnectionSocketInterface {
+  // HTTP handshake settings for initiator envoy initiated reverse tunnels.
+  message HttpHandshakeConfig {
+    // Request path used when issuing the HTTP reverse-connection handshake. Defaults to
+    // "/reverse_connections/request".
+    string request_path = 1;
+  }
+
   // Stat prefix to be used for downstream reverse connection socket interface stats.
   string stat_prefix = 1;
 
   // Enable detailed per-host and per-cluster statistics.
   // When enabled, emits hidden statistics for individual hosts and clusters.
-  // Defaults to false.
+  // Defaults to ``false``.
   bool enable_detailed_stats = 2;
+
+  // Optional HTTP handshake configuration. When unset, the initiator envoy uses the defaults
+  // provided by ``HttpHandshakeConfig``.
+  HttpHandshakeConfig http_handshake = 3;
 }

@@ -1,13 +1,19 @@
 #pragma once
 
+#include <memory>
+#include <string>
+
 #include "envoy/extensions/filters/http/proto_api_scrubber/v3/config.pb.h"
 #include "envoy/http/filter.h"
+#include "envoy/http/header_map.h"
 
+#include "source/common/common/logger.h"
 #include "source/extensions/filters/http/common/factory_base.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 #include "source/extensions/filters/http/grpc_field_extraction/message_converter/message_converter.h"
 #include "source/extensions/filters/http/proto_api_scrubber/filter_config.h"
 
+#include "absl/strings/string_view.h"
 #include "proto_processing_lib/proto_scrubber/proto_scrubber.h"
 #include "proto_processing_lib/proto_scrubber/proto_scrubber_enums.h"
 
@@ -42,6 +48,22 @@ public:
 
   Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override;
 
+protected:
+  /**
+   * Wrapper for converting a StreamMessage back to an Envoy Buffer using the provided converter.
+   * This method exists to be overridden in tests, allowing simulation of conversion failures
+   * (e.g. buffer limits) which are otherwise difficult to trigger with real dependencies.
+   *
+   * @param converter The message converter instance to use.
+   * @param message The stream message to convert.
+   * @return The converted Envoy buffer or an error status.
+   */
+  virtual absl::StatusOr<Buffer::InstancePtr>
+  convertMessageToBuffer(GrpcFieldExtraction::MessageConverter& converter,
+                         std::unique_ptr<GrpcFieldExtraction::StreamMessage> message) {
+    return converter.convertBackToBuffer(std::move(message));
+  }
+
 private:
   // Rejects requests and sends local reply back to the client.
   void rejectRequest(Envoy::Grpc::Status::GrpcStatus grpc_status, absl::string_view error_msg,
@@ -51,6 +73,11 @@ private:
   void rejectResponse(Envoy::Grpc::Status::GrpcStatus grpc_status, absl::string_view error_msg,
                       absl::string_view rc_detail);
 
+  // Checks if the method should be blocked based on method-level restrictions.
+  // Returns true if the request should be blocked, false otherwise.
+  bool checkMethodLevelRestrictions(Envoy::Http::RequestHeaderMap& headers);
+
+  std::shared_ptr<const ProtoApiScrubberFilterConfig> config_;
   bool is_valid_grpc_request_ = false;
 
   // Request message converter which converts Envoy Buffer data to StreamMessage (for scrubbing) and

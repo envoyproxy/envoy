@@ -1731,7 +1731,6 @@ TEST_P(DownstreamProtocolIntegrationTest, EnvoyProxying102DelayBalsaReset) {
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void { hcm.set_proxy_100_continue(true); });
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.http1_balsa_delay_reset", "true");
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -1760,7 +1759,6 @@ TEST_P(DownstreamProtocolIntegrationTest, EnvoyProxying102DelayBalsaResetWaitFor
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void { hcm.set_proxy_100_continue(true); });
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.http1_balsa_delay_reset", "true");
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -1770,31 +1768,6 @@ TEST_P(DownstreamProtocolIntegrationTest, EnvoyProxying102DelayBalsaResetWaitFor
                                      {":scheme", "http"},
                                      {":authority", "sni.lyft.com"},
                                      {"expect", "100-contINUE"}});
-  waitForNextUpstreamRequest();
-  upstream_request_->encode1xxHeaders(Http::TestResponseHeaderMapImpl{{":status", "102"}});
-  response->waitFor1xxHeaders();
-  upstream_request_->encodeHeaders(default_response_headers_, true);
-  ASSERT_TRUE(response->waitForEndStream());
-}
-
-TEST_P(DownstreamProtocolIntegrationTest, EnvoyProxying102NoDelayBalsaReset) {
-  if (GetParam().upstream_protocol != Http::CodecType::HTTP1) {
-    GTEST_SKIP() << "This test is only relevant for HTTP1 upstream with BalsaParser";
-  }
-  config_helper_.addConfigModifier(
-      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-              hcm) -> void { hcm.set_proxy_100_continue(true); });
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.http1_balsa_delay_reset", "false");
-  initialize();
-
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto response = codec_client_->makeHeaderOnlyRequest(
-      Http::TestRequestHeaderMapImpl{{":method", "HEAD"},
-                                     {":path", "/dynamo/url"},
-                                     {":scheme", "http"},
-                                     {":authority", "sni.lyft.com"},
-                                     {"expect", "100-contINUE"}});
-
   waitForNextUpstreamRequest();
   upstream_request_->encode1xxHeaders(Http::TestResponseHeaderMapImpl{{":status", "102"}});
   response->waitFor1xxHeaders();
@@ -2100,9 +2073,11 @@ TEST_P(DownstreamProtocolIntegrationTest, HeadersWithUnderscoresCauseRequestReje
     ASSERT_TRUE(response->waitForReset());
     codec_client_->close();
     ASSERT_TRUE(response->reset());
+    // TODO(wbpcode): We should standardize the reset reason for HTTP/2 and HTTP/3.
     EXPECT_EQ((downstream_protocol_ == Http::CodecType::HTTP3
                    ? Http::StreamResetReason::ProtocolError
-                   : Http::StreamResetReason::RemoteReset),
+               : GetParam().use_universal_header_validator ? Http::StreamResetReason::ProtocolError
+                                                           : Http::StreamResetReason::RemoteReset),
               response->resetReason());
   }
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("unexpected_underscore"));
@@ -2141,9 +2116,11 @@ TEST_P(DownstreamProtocolIntegrationTest, TrailerWithUnderscoresCauseRequestReje
     ASSERT_TRUE(response->waitForReset());
     codec_client_->close();
     ASSERT_TRUE(response->reset());
+    // TODO(wbpcode): We should standardize the reset reason for HTTP/2 and HTTP/3.
     EXPECT_EQ((downstream_protocol_ == Http::CodecType::HTTP3
                    ? Http::StreamResetReason::ProtocolError
-                   : Http::StreamResetReason::RemoteReset),
+               : GetParam().use_universal_header_validator ? Http::StreamResetReason::ProtocolError
+                                                           : Http::StreamResetReason::RemoteReset),
               response->resetReason());
   }
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("unexpected_underscore"));
@@ -2482,10 +2459,7 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLengthAllowed) {
     EXPECT_EQ("400", response->headers().getStatusValue());
   } else {
     ASSERT_TRUE(response->reset());
-    EXPECT_EQ((downstream_protocol_ == Http::CodecType::HTTP3
-                   ? Http::StreamResetReason::ProtocolError
-                   : Http::StreamResetReason::RemoteReset),
-              response->resetReason());
+    EXPECT_EQ(Http::StreamResetReason::ProtocolError, response->resetReason());
   }
 }
 
@@ -2538,10 +2512,7 @@ TEST_P(DownstreamProtocolIntegrationTest, MultipleContentLengthsAllowed) {
     EXPECT_EQ("400", response->headers().getStatusValue());
   } else {
     ASSERT_TRUE(response->reset());
-    EXPECT_EQ((downstream_protocol_ == Http::CodecType::HTTP3
-                   ? Http::StreamResetReason::ProtocolError
-                   : Http::StreamResetReason::RemoteReset),
-              response->resetReason());
+    EXPECT_EQ(Http::StreamResetReason::ProtocolError, response->resetReason());
   }
 }
 
@@ -4934,10 +4905,7 @@ TEST_P(DownstreamProtocolIntegrationTest, ContentLengthSmallerThanPayload) {
     // Inconsistency in content-length header and the actually body length should be treated as a
     // stream error.
     ASSERT_TRUE(response->waitForReset());
-    EXPECT_EQ((downstreamProtocol() == Http::CodecType::HTTP3
-                   ? Http::StreamResetReason::ProtocolError
-                   : Http::StreamResetReason::RemoteReset),
-              response->resetReason());
+    EXPECT_EQ(Http::StreamResetReason::ProtocolError, response->resetReason());
   }
 }
 
@@ -4966,9 +4934,7 @@ TEST_P(DownstreamProtocolIntegrationTest, ContentLengthLargerThanPayload) {
   // Inconsistency in content-length header and the actually body length should be treated as a
   // stream error.
   ASSERT_TRUE(response->waitForReset());
-  EXPECT_EQ((downstreamProtocol() == Http::CodecType::HTTP3 ? Http::StreamResetReason::ProtocolError
-                                                            : Http::StreamResetReason::RemoteReset),
-            response->resetReason());
+  EXPECT_EQ(Http::StreamResetReason::ProtocolError, response->resetReason());
 }
 
 class NoUdpGso : public Api::OsSysCallsImpl {
@@ -5244,10 +5210,7 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidRequestHeaderNameStreamError) {
     test_server_->waitForCounterGe("http.config_test.downstream_rq_4xx", 1);
   } else {
     // H/2 codec does not send 400 on protocol errors
-    EXPECT_EQ((downstream_protocol_ == Http::CodecType::HTTP3
-                   ? Http::StreamResetReason::ProtocolError
-                   : Http::StreamResetReason::RemoteReset),
-              response->resetReason());
+    EXPECT_EQ(Http::StreamResetReason::ProtocolError, response->resetReason());
   }
 }
 
@@ -5792,9 +5755,7 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidTrailerStreamError) {
   ASSERT_TRUE(response->waitForReset());
   codec_client_->close();
   ASSERT_TRUE(response->reset());
-  EXPECT_EQ((downstreamProtocol() == Http::CodecType::HTTP3 ? Http::StreamResetReason::ProtocolError
-                                                            : Http::StreamResetReason::RemoteReset),
-            response->resetReason());
+  EXPECT_EQ(Http::StreamResetReason::ProtocolError, response->resetReason());
   if (!use_universal_header_validator_) {
     // TODO(#24620) UHV does not include the DPE prefix in the downstream protocol error reasons
     if (downstreamProtocol() != Http::CodecType::HTTP3) {

@@ -20,6 +20,8 @@ import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
+import "xds/type/matcher/v3/matcher.proto";
+
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/security.proto";
@@ -37,7 +39,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 // [#extension: envoy.filters.network.http_connection_manager]
 
-// [#next-free-field: 60]
+// [#next-free-field: 61]
 message HttpConnectionManager {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager";
@@ -139,11 +141,13 @@ message HttpConnectionManager {
     UNESCAPE_AND_FORWARD = 4;
   }
 
-  // [#next-free-field: 11]
+  // [#next-free-field: 13]
   message Tracing {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager.Tracing";
 
+    // This OperationName makes no sense and is unnecessary in the current tracing API.
+    // [#not-implemented-hide:]
     enum OperationName {
       // The HTTP listener is used for ingress/incoming requests.
       INGRESS = 0;
@@ -217,6 +221,28 @@ message HttpConnectionManager {
     //
     // The default value is false for now for backward compatibility.
     google.protobuf.BoolValue spawn_upstream_span = 10;
+
+    // The operation name of the span which will be used for tracing.
+    //
+    // The same :ref:`format specifier <config_access_log_format>` as used for
+    // :ref:`HTTP access logging <config_access_log>` applies here, however
+    // unknown specifier values are replaced with the empty string instead of ``-``.
+    //
+    // This field will take precedence over and make following settings ineffective:
+    //
+    // * :ref:`route decorator <envoy_v3_api_field_config.route.v3.Route.decorator>` and
+    // * :ref:`x-envoy-decorator-operation <config_http_filters_router_x-envoy-decorator-operation>`
+    //   header will be ignored.
+    string operation = 11;
+
+    // The operation name of the upstream span which will be used for tracing.
+    // This only takes effect when ``spawn_upstream_span`` is set to true and the upstream
+    // span is created.
+    //
+    // The same :ref:`format specifier <config_access_log_format>` as used for
+    // :ref:`HTTP access logging <config_access_log>` applies here, however
+    // unknown specifier values are replaced with the empty string instead of ``-``.
+    string upstream_operation = 12;
   }
 
   message InternalAddressConfig {
@@ -261,6 +287,15 @@ message HttpConnectionManager {
     // Whether to forward the URI type Subject Alternative Name of the client cert. Defaults to
     // false.
     bool uri = 5;
+  }
+
+  // The configuration for forwarding client cert details.
+  message ForwardClientCertConfig {
+    // How to handle the XFCC header.
+    ForwardClientCertDetails forward_client_cert_details = 1;
+
+    // How to set the current client cert details.
+    SetCurrentClientCertDetails set_current_client_cert_details = 2;
   }
 
   // The configuration for HTTP upgrades.
@@ -783,6 +818,10 @@ message HttpConnectionManager {
   // ``By`` is always set when the client certificate presents the URI type Subject Alternative Name
   // value.
   SetCurrentClientCertDetails set_current_client_cert_details = 17;
+
+  // The matcher for forwarding client cert details.
+  // [#not-implemented-hide:]
+  xds.type.matcher.v3.Matcher forward_client_cert_matcher = 60;
 
   // If proxy_100_continue is true, Envoy will proxy incoming "Expect:
   // 100-continue" headers upstream, and forward "100 Continue" responses

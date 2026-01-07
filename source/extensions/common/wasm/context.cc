@@ -183,22 +183,23 @@ Context::Context(Wasm* wasm, uint32_t root_context_id, PluginHandleSharedPtr plu
       DefaultAllowOnHeadersStopIteration);
 }
 
-Wasm* Context::wasm() const { return static_cast<Wasm*>(wasm_); }
+WasmBase* Context::wasm() const { return wasm_; }
+Wasm* Context::envoyWasm() const { return static_cast<Wasm*>(wasm_); }
 Plugin* Context::plugin() const { return static_cast<Plugin*>(plugin_.get()); }
 Context* Context::rootContext() const { return static_cast<Context*>(root_context()); }
-Upstream::ClusterManager& Context::clusterManager() const { return wasm()->clusterManager(); }
+Upstream::ClusterManager& Context::clusterManager() const { return envoyWasm()->clusterManager(); }
 
 void Context::error(std::string_view message) { ENVOY_LOG(trace, message); }
 
 uint64_t Context::getCurrentTimeNanoseconds() {
   return std::chrono::duration_cast<std::chrono::nanoseconds>(
-             wasm()->time_source_.systemTime().time_since_epoch())
+             envoyWasm()->time_source_.systemTime().time_since_epoch())
       .count();
 }
 
 uint64_t Context::getMonotonicTimeNanoseconds() {
   return std::chrono::duration_cast<std::chrono::nanoseconds>(
-             wasm()->time_source_.monotonicTime().time_since_epoch())
+             envoyWasm()->time_source_.monotonicTime().time_since_epoch())
       .count();
 }
 
@@ -215,12 +216,12 @@ void Context::onCloseTCP() {
 void Context::onResolveDns(uint32_t token, Envoy::Network::DnsResolver::ResolutionStatus status,
                            std::list<Envoy::Network::DnsResponse>&& response) {
   proxy_wasm::DeferAfterCallActions actions(this);
-  if (wasm()->isFailed() || !wasm()->on_resolve_dns_) {
+  if (envoyWasm()->isFailed() || !envoyWasm()->on_resolve_dns_) {
     return;
   }
   if (status != Network::DnsResolver::ResolutionStatus::Completed) {
     buffer_.set("");
-    wasm()->on_resolve_dns_(this, id_, token, 0);
+    envoyWasm()->on_resolve_dns_(this, id_, token, 0);
     return;
   }
   // buffer format:
@@ -249,7 +250,7 @@ void Context::onResolveDns(uint32_t token, Envoy::Network::DnsResolver::Resoluti
     *b++ = 0;
   };
   buffer_.set(std::move(buffer), s);
-  wasm()->on_resolve_dns_(this, id_, token, s);
+  envoyWasm()->on_resolve_dns_(this, id_, token, s);
 }
 
 template <typename I> inline uint32_t align(uint32_t i) {
@@ -263,7 +264,7 @@ template <typename I> inline char* align(char* p) {
 
 void Context::onStatsUpdate(Envoy::Stats::MetricSnapshot& snapshot) {
   proxy_wasm::DeferAfterCallActions actions(this);
-  if (wasm()->isFailed() || !wasm()->on_stats_update_) {
+  if (envoyWasm()->isFailed() || !envoyWasm()->on_stats_update_) {
     return;
   }
   // buffer format:
@@ -349,7 +350,7 @@ void Context::onStatsUpdate(Envoy::Stats::MetricSnapshot& snapshot) {
     }
   }
   buffer_.set(std::move(buffer), counter_block_size + gauge_block_size);
-  wasm()->on_stats_update_(this, id_, counter_block_size + gauge_block_size);
+  envoyWasm()->on_stats_update_(this, id_, counter_block_size + gauge_block_size);
 }
 
 // Native serializer carrying over bit representation from CEL value to the extension.
@@ -534,7 +535,7 @@ Context::findValue(absl::string_view name, Protobuf::Arena* arena, bool last) co
   case PropertyToken::PLUGIN_ROOT_ID:
     return CelValue::CreateStringView(toAbslStringView(root_id()));
   case PropertyToken::PLUGIN_VM_ID:
-    return CelValue::CreateStringView(toAbslStringView(wasm()->vm_id()));
+    return CelValue::CreateStringView(toAbslStringView(envoyWasm()->vm_id()));
   }
   return {};
 }
@@ -704,7 +705,7 @@ WasmResult Context::getHeaderMapValue(WasmHeaderMapType type, std::string_view k
   if (!map) {
     if (access_log_phase_) {
       // Maps might point to nullptr in the access log phase.
-      if (wasm()->abiVersion() == proxy_wasm::AbiVersion::ProxyWasm_0_1_0) {
+      if (envoyWasm()->abiVersion() == proxy_wasm::AbiVersion::ProxyWasm_0_1_0) {
         *value = "";
         return WasmResult::Ok;
       } else {
@@ -717,7 +718,7 @@ WasmResult Context::getHeaderMapValue(WasmHeaderMapType type, std::string_view k
   const Http::LowerCaseString lower_key{std::string(key)};
   const auto entry = map->get(lower_key);
   if (entry.empty()) {
-    if (wasm()->abiVersion() == proxy_wasm::AbiVersion::ProxyWasm_0_1_0) {
+    if (envoyWasm()->abiVersion() == proxy_wasm::AbiVersion::ProxyWasm_0_1_0) {
       *value = "";
       return WasmResult::Ok;
     } else {
@@ -812,7 +813,7 @@ BufferInterface* Context::getBuffer(WasmBufferType type) {
     // Set before the call.
     return &buffer_;
   case WasmBufferType::VmConfiguration:
-    return buffer_.set(wasm()->vm_configuration());
+    return buffer_.set(envoyWasm()->vm_configuration());
   case WasmBufferType::PluginConfiguration:
     if (temp_plugin_) {
       return buffer_.set(temp_plugin_->plugin_configuration_);
@@ -906,7 +907,7 @@ WasmResult Context::httpCall(std::string_view cluster, const Pairs& request_head
     timeout = std::chrono::milliseconds(timeout_milliseconds);
   }
 
-  uint32_t token = wasm()->nextHttpCallId();
+  uint32_t token = envoyWasm()->nextHttpCallId();
   auto& handler = http_request_[token];
   handler.context_ = this;
   handler.token_ = token;
@@ -945,12 +946,12 @@ WasmResult Context::grpcCall(std::string_view grpc_service, std::string_view ser
     }
     service_proto.mutable_envoy_grpc()->set_cluster_name(cluster_name);
   }
-  uint32_t token = wasm()->nextGrpcCallId();
+  uint32_t token = envoyWasm()->nextGrpcCallId();
   auto& handler = grpc_call_request_[token];
   handler.context_ = this;
   handler.token_ = token;
   auto client_or_error = clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
-      service_proto, *wasm()->scope_, true /* skip_cluster_check */);
+      service_proto, *envoyWasm()->scope_, true /* skip_cluster_check */);
   if (!client_or_error.status().ok()) {
     return WasmResult::BadArgument;
   }
@@ -994,12 +995,12 @@ WasmResult Context::grpcStream(std::string_view grpc_service, std::string_view s
     }
     service_proto.mutable_envoy_grpc()->set_cluster_name(cluster_name);
   }
-  uint32_t token = wasm()->nextGrpcStreamId();
+  uint32_t token = envoyWasm()->nextGrpcStreamId();
   auto& handler = grpc_stream_[token];
   handler.context_ = this;
   handler.token_ = token;
   auto client_or_error = clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
-      service_proto, *wasm()->scope_, true /* skip_cluster_check */);
+      service_proto, *envoyWasm()->scope_, true /* skip_cluster_check */);
   if (!client_or_error.status().ok()) {
     return WasmResult::BadArgument;
   }
@@ -1177,12 +1178,12 @@ uint32_t Context::getLogLevel() {
 bool Context::validateConfiguration(std::string_view configuration,
                                     const std::shared_ptr<PluginBase>& plugin_base) {
   auto plugin = std::static_pointer_cast<Plugin>(plugin_base);
-  if (!wasm()->validate_configuration_) {
+  if (!envoyWasm()->validate_configuration_) {
     return true;
   }
   temp_plugin_ = plugin_base;
   auto result =
-      wasm()
+      envoyWasm()
           ->validate_configuration_(this, id_, static_cast<uint32_t>(configuration.size()))
           .u64_ != 0;
   temp_plugin_.reset();
@@ -1193,7 +1194,7 @@ std::string_view Context::getConfiguration() {
   if (temp_plugin_) {
     return temp_plugin_->plugin_configuration_;
   } else {
-    return wasm()->vm_configuration();
+    return envoyWasm()->vm_configuration();
   }
 };
 
@@ -1220,33 +1221,33 @@ WasmResult Context::defineMetric(uint32_t metric_type, std::string_view name,
   }
   auto type = static_cast<MetricType>(metric_type);
   // TODO: Consider rethinking the scoping policy as it does not help in this case.
-  Stats::StatNameManagedStorage storage(toAbslStringView(name), wasm()->scope_->symbolTable());
+  Stats::StatNameManagedStorage storage(toAbslStringView(name), envoyWasm()->scope_->symbolTable());
   Stats::StatName stat_name = storage.statName();
   // We prefix the given name with custom_stat_name_ so that these user-defined
   // custom metrics can be distinguished from native Envoy metrics.
   if (type == MetricType::Counter) {
-    auto id = wasm()->nextCounterMetricId();
+    auto id = envoyWasm()->nextCounterMetricId();
     Stats::Counter* c = &Stats::Utility::counterFromElements(
-        *wasm()->scope_, {wasm()->custom_stat_namespace_, stat_name});
-    wasm()->counters_.emplace(id, c);
+        *envoyWasm()->scope_, {envoyWasm()->custom_stat_namespace_, stat_name});
+    envoyWasm()->counters_.emplace(id, c);
     *metric_id_ptr = id;
     return WasmResult::Ok;
   }
   if (type == MetricType::Gauge) {
-    auto id = wasm()->nextGaugeMetricId();
+    auto id = envoyWasm()->nextGaugeMetricId();
     Stats::Gauge* g = &Stats::Utility::gaugeFromStatNames(
-        *wasm()->scope_, {wasm()->custom_stat_namespace_, stat_name},
+        *envoyWasm()->scope_, {envoyWasm()->custom_stat_namespace_, stat_name},
         Stats::Gauge::ImportMode::Accumulate);
-    wasm()->gauges_.emplace(id, g);
+    envoyWasm()->gauges_.emplace(id, g);
     *metric_id_ptr = id;
     return WasmResult::Ok;
   }
   // (type == MetricType::Histogram) {
-  auto id = wasm()->nextHistogramMetricId();
+  auto id = envoyWasm()->nextHistogramMetricId();
   Stats::Histogram* h = &Stats::Utility::histogramFromStatNames(
-      *wasm()->scope_, {wasm()->custom_stat_namespace_, stat_name},
+      *envoyWasm()->scope_, {envoyWasm()->custom_stat_namespace_, stat_name},
       Stats::Histogram::Unit::Unspecified);
-  wasm()->histograms_.emplace(id, h);
+  envoyWasm()->histograms_.emplace(id, h);
   *metric_id_ptr = id;
   return WasmResult::Ok;
 }
@@ -1254,8 +1255,8 @@ WasmResult Context::defineMetric(uint32_t metric_type, std::string_view name,
 WasmResult Context::incrementMetric(uint32_t metric_id, int64_t offset) {
   auto type = static_cast<MetricType>(metric_id & Wasm::kMetricTypeMask);
   if (type == MetricType::Counter) {
-    auto it = wasm()->counters_.find(metric_id);
-    if (it != wasm()->counters_.end()) {
+    auto it = envoyWasm()->counters_.find(metric_id);
+    if (it != envoyWasm()->counters_.end()) {
       if (offset > 0) {
         it->second->add(offset);
         return WasmResult::Ok;
@@ -1265,8 +1266,8 @@ WasmResult Context::incrementMetric(uint32_t metric_id, int64_t offset) {
     }
     return WasmResult::NotFound;
   } else if (type == MetricType::Gauge) {
-    auto it = wasm()->gauges_.find(metric_id);
-    if (it != wasm()->gauges_.end()) {
+    auto it = envoyWasm()->gauges_.find(metric_id);
+    if (it != envoyWasm()->gauges_.end()) {
       if (offset > 0) {
         it->second->add(offset);
         return WasmResult::Ok;
@@ -1283,20 +1284,20 @@ WasmResult Context::incrementMetric(uint32_t metric_id, int64_t offset) {
 WasmResult Context::recordMetric(uint32_t metric_id, uint64_t value) {
   auto type = static_cast<MetricType>(metric_id & Wasm::kMetricTypeMask);
   if (type == MetricType::Counter) {
-    auto it = wasm()->counters_.find(metric_id);
-    if (it != wasm()->counters_.end()) {
+    auto it = envoyWasm()->counters_.find(metric_id);
+    if (it != envoyWasm()->counters_.end()) {
       it->second->add(value);
       return WasmResult::Ok;
     }
   } else if (type == MetricType::Gauge) {
-    auto it = wasm()->gauges_.find(metric_id);
-    if (it != wasm()->gauges_.end()) {
+    auto it = envoyWasm()->gauges_.find(metric_id);
+    if (it != envoyWasm()->gauges_.end()) {
       it->second->set(value);
       return WasmResult::Ok;
     }
   } else if (type == MetricType::Histogram) {
-    auto it = wasm()->histograms_.find(metric_id);
-    if (it != wasm()->histograms_.end()) {
+    auto it = envoyWasm()->histograms_.find(metric_id);
+    if (it != envoyWasm()->histograms_.end()) {
       it->second->recordValue(value);
       return WasmResult::Ok;
     }
@@ -1307,15 +1308,15 @@ WasmResult Context::recordMetric(uint32_t metric_id, uint64_t value) {
 WasmResult Context::getMetric(uint32_t metric_id, uint64_t* result_uint64_ptr) {
   auto type = static_cast<MetricType>(metric_id & Wasm::kMetricTypeMask);
   if (type == MetricType::Counter) {
-    auto it = wasm()->counters_.find(metric_id);
-    if (it != wasm()->counters_.end()) {
+    auto it = envoyWasm()->counters_.find(metric_id);
+    if (it != envoyWasm()->counters_.end()) {
       *result_uint64_ptr = it->second->value();
       return WasmResult::Ok;
     }
     return WasmResult::NotFound;
   } else if (type == MetricType::Gauge) {
-    auto it = wasm()->gauges_.find(metric_id);
-    if (it != wasm()->gauges_.end()) {
+    auto it = envoyWasm()->gauges_.find(metric_id);
+    if (it != envoyWasm()->gauges_.end()) {
       *result_uint64_ptr = it->second->value();
       return WasmResult::Ok;
     }
@@ -1507,19 +1508,20 @@ WasmResult Context::continueStream(WasmStreamType stream_type) {
   case WasmStreamType::Request:
     if (decoder_callbacks_) {
       // We are in a reentrant call, so defer.
-      wasm()->addAfterVmCallAction([this] { decoder_callbacks_->continueDecoding(); });
+      envoyWasm()->addAfterVmCallAction([this] { decoder_callbacks_->continueDecoding(); });
     }
     break;
   case WasmStreamType::Response:
     if (encoder_callbacks_) {
       // We are in a reentrant call, so defer.
-      wasm()->addAfterVmCallAction([this] { encoder_callbacks_->continueEncoding(); });
+      envoyWasm()->addAfterVmCallAction([this] { encoder_callbacks_->continueEncoding(); });
     }
     break;
   case WasmStreamType::Downstream:
     if (network_read_filter_callbacks_) {
       // We are in a reentrant call, so defer.
-      wasm()->addAfterVmCallAction([this] { network_read_filter_callbacks_->continueReading(); });
+      envoyWasm()->addAfterVmCallAction(
+          [this] { network_read_filter_callbacks_->continueReading(); });
     }
     return WasmResult::Ok;
   case WasmStreamType::Upstream:
@@ -1544,7 +1546,7 @@ WasmResult Context::closeStream(WasmStreamType stream_type) {
         decoder_callbacks_->streamInfo().setResponseCodeDetails(CloseStreamResponseDetails);
       }
       // We are in a reentrant call, so defer.
-      wasm()->addAfterVmCallAction([this] { decoder_callbacks_->resetStream(); });
+      envoyWasm()->addAfterVmCallAction([this] { decoder_callbacks_->resetStream(); });
     }
     return WasmResult::Ok;
   case WasmStreamType::Response:
@@ -1553,13 +1555,13 @@ WasmResult Context::closeStream(WasmStreamType stream_type) {
         encoder_callbacks_->streamInfo().setResponseCodeDetails(CloseStreamResponseDetails);
       }
       // We are in a reentrant call, so defer.
-      wasm()->addAfterVmCallAction([this] { encoder_callbacks_->resetStream(); });
+      envoyWasm()->addAfterVmCallAction([this] { encoder_callbacks_->resetStream(); });
     }
     return WasmResult::Ok;
   case WasmStreamType::Downstream:
     if (network_read_filter_callbacks_) {
       // We are in a reentrant call, so defer.
-      wasm()->addAfterVmCallAction([this] {
+      envoyWasm()->addAfterVmCallAction([this] {
         network_read_filter_callbacks_->connection().close(
             Envoy::Network::ConnectionCloseType::FlushWrite, "wasm_downstream_close");
       });
@@ -1568,7 +1570,7 @@ WasmResult Context::closeStream(WasmStreamType stream_type) {
   case WasmStreamType::Upstream:
     if (network_write_filter_callbacks_) {
       // We are in a reentrant call, so defer.
-      wasm()->addAfterVmCallAction([this] {
+      envoyWasm()->addAfterVmCallAction([this] {
         network_write_filter_callbacks_->connection().close(
             Envoy::Network::ConnectionCloseType::FlushWrite, "wasm_upstream_close");
       });
@@ -1636,10 +1638,10 @@ WasmResult Context::sendLocalResponse(uint32_t response_code, std::string_view b
     // so in theory it could call this and the Context in the VM would be invalid,
     // but because it only gets called after the connections have drained, the call to
     // sendLocalReply() will fail. Net net, this is safe.
-    wasm()->addAfterVmCallAction([this, response_code, body_text = std::string(body_text),
-                                  modify_headers = std::move(modify_headers), grpc_status,
-                                  details = StringUtil::replaceAllEmptySpace(
-                                      absl::string_view(details.data(), details.size()))] {
+    envoyWasm()->addAfterVmCallAction([this, response_code, body_text = std::string(body_text),
+                                       modify_headers = std::move(modify_headers), grpc_status,
+                                       details = StringUtil::replaceAllEmptySpace(
+                                           absl::string_view(details.data(), details.size()))] {
       // C++, Rust and other SDKs use -1 (InvalidCode) as the default value if gRPC code is not set,
       // which should be mapped to nullopt in Envoy to prevent it from sending a grpc-status trailer
       // at all.
@@ -1824,7 +1826,7 @@ void Context::onHttpCallSuccess(uint32_t token, Envoy::Http::ResponseMessagePtr&
   // TODO: convert this into a function in proxy-wasm-cpp-host and use here.
   if (proxy_wasm::current_context_ != nullptr) {
     // We are in a reentrant call, so defer.
-    wasm()->addAfterVmCallAction([this, token, response = response.release()] {
+    envoyWasm()->addAfterVmCallAction([this, token, response = response.release()] {
       onHttpCallSuccess(token, std::unique_ptr<Envoy::Http::ResponseMessage>(response));
     });
     return;
@@ -1837,7 +1839,7 @@ void Context::onHttpCallSuccess(uint32_t token, Envoy::Http::ResponseMessagePtr&
   uint32_t body_size = response->body().length();
   // Deferred "after VM call" actions are going to be executed upon returning from
   // ContextBase::*, which might include deleting Context object via proxy_done().
-  wasm()->addAfterVmCallAction([this, handler] {
+  envoyWasm()->addAfterVmCallAction([this, handler] {
     http_call_response_ = nullptr;
     http_request_.erase(handler);
   });
@@ -1848,7 +1850,7 @@ void Context::onHttpCallSuccess(uint32_t token, Envoy::Http::ResponseMessagePtr&
 void Context::onHttpCallFailure(uint32_t token, Http::AsyncClient::FailureReason reason) {
   if (proxy_wasm::current_context_ != nullptr) {
     // We are in a reentrant call, so defer.
-    wasm()->addAfterVmCallAction([this, token, reason] { onHttpCallFailure(token, reason); });
+    envoyWasm()->addAfterVmCallAction([this, token, reason] { onHttpCallFailure(token, reason); });
     return;
   }
   auto handler = http_request_.find(token);
@@ -1862,7 +1864,7 @@ void Context::onHttpCallFailure(uint32_t token, Http::AsyncClient::FailureReason
   status_message_ = "reset";
   // Deferred "after VM call" actions are going to be executed upon returning from
   // ContextBase::*, which might include deleting Context object via proxy_done().
-  wasm()->addAfterVmCallAction([this, handler] {
+  envoyWasm()->addAfterVmCallAction([this, handler] {
     status_message_ = "";
     http_request_.erase(handler);
   });
@@ -1872,16 +1874,16 @@ void Context::onHttpCallFailure(uint32_t token, Http::AsyncClient::FailureReason
 void Context::onGrpcReceiveWrapper(uint32_t token, ::Envoy::Buffer::InstancePtr response) {
   ASSERT(proxy_wasm::current_context_ == nullptr); // Non-reentrant.
   auto cleanup = [this, token] {
-    if (wasm()->isGrpcCallId(token)) {
+    if (envoyWasm()->isGrpcCallId(token)) {
       grpc_call_request_.erase(token);
     }
   };
-  if (wasm()->on_grpc_receive_) {
+  if (envoyWasm()->on_grpc_receive_) {
     grpc_receive_buffer_ = std::move(response);
     uint32_t response_size = grpc_receive_buffer_->length();
     // Deferred "after VM call" actions are going to be executed upon returning from
     // ContextBase::*, which might include deleting Context object via proxy_done().
-    wasm()->addAfterVmCallAction([this, cleanup] {
+    envoyWasm()->addAfterVmCallAction([this, cleanup] {
       grpc_receive_buffer_.reset();
       cleanup();
     });
@@ -1895,15 +1897,15 @@ void Context::onGrpcCloseWrapper(uint32_t token, const Grpc::Status::GrpcStatus&
                                  const std::string_view message) {
   if (proxy_wasm::current_context_ != nullptr) {
     // We are in a reentrant call, so defer.
-    wasm()->addAfterVmCallAction([this, token, status, message = std::string(message)] {
+    envoyWasm()->addAfterVmCallAction([this, token, status, message = std::string(message)] {
       onGrpcCloseWrapper(token, status, message);
     });
     return;
   }
   auto cleanup = [this, token] {
-    if (wasm()->isGrpcCallId(token)) {
+    if (envoyWasm()->isGrpcCallId(token)) {
       grpc_call_request_.erase(token);
-    } else if (wasm()->isGrpcStreamId(token)) {
+    } else if (envoyWasm()->isGrpcStreamId(token)) {
       auto it = grpc_stream_.find(token);
       if (it != grpc_stream_.end()) {
         if (it->second.local_closed_) {
@@ -1912,12 +1914,12 @@ void Context::onGrpcCloseWrapper(uint32_t token, const Grpc::Status::GrpcStatus&
       }
     }
   };
-  if (wasm()->on_grpc_close_) {
+  if (envoyWasm()->on_grpc_close_) {
     status_code_ = static_cast<uint32_t>(status);
     status_message_ = toAbslStringView(message);
     // Deferred "after VM call" actions are going to be executed upon returning from
     // ContextBase::*, which might include deleting Context object via proxy_done().
-    wasm()->addAfterVmCallAction([this, cleanup] {
+    envoyWasm()->addAfterVmCallAction([this, cleanup] {
       status_message_ = "";
       cleanup();
     });
@@ -1928,7 +1930,7 @@ void Context::onGrpcCloseWrapper(uint32_t token, const Grpc::Status::GrpcStatus&
 }
 
 WasmResult Context::grpcSend(uint32_t token, std::string_view message, bool end_stream) {
-  if (!wasm()->isGrpcStreamId(token)) {
+  if (!envoyWasm()->isGrpcStreamId(token)) {
     return WasmResult::BadArgument;
   }
   auto it = grpc_stream_.find(token);
@@ -1944,7 +1946,7 @@ WasmResult Context::grpcSend(uint32_t token, std::string_view message, bool end_
 }
 
 WasmResult Context::grpcClose(uint32_t token) {
-  if (wasm()->isGrpcCallId(token)) {
+  if (envoyWasm()->isGrpcCallId(token)) {
     auto it = grpc_call_request_.find(token);
     if (it == grpc_call_request_.end()) {
       return WasmResult::NotFound;
@@ -1954,7 +1956,7 @@ WasmResult Context::grpcClose(uint32_t token) {
     }
     grpc_call_request_.erase(token);
     return WasmResult::Ok;
-  } else if (wasm()->isGrpcStreamId(token)) {
+  } else if (envoyWasm()->isGrpcStreamId(token)) {
     auto it = grpc_stream_.find(token);
     if (it == grpc_stream_.end()) {
       return WasmResult::NotFound;
@@ -1973,7 +1975,7 @@ WasmResult Context::grpcClose(uint32_t token) {
 }
 
 WasmResult Context::grpcCancel(uint32_t token) {
-  if (wasm()->isGrpcCallId(token)) {
+  if (envoyWasm()->isGrpcCallId(token)) {
     auto it = grpc_call_request_.find(token);
     if (it == grpc_call_request_.end()) {
       return WasmResult::NotFound;
@@ -1983,7 +1985,7 @@ WasmResult Context::grpcCancel(uint32_t token) {
     }
     grpc_call_request_.erase(token);
     return WasmResult::Ok;
-  } else if (wasm()->isGrpcStreamId(token)) {
+  } else if (envoyWasm()->isGrpcStreamId(token)) {
     auto it = grpc_stream_.find(token);
     if (it == grpc_stream_.end()) {
       return WasmResult::NotFound;
