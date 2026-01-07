@@ -7031,6 +7031,12 @@ TEST_F(HttpFilterTest, ErrorResponseAppendActionsOnLocalReply) {
 
 // encode1xxHeaders should always continue without mutation.
 TEST_F(HttpFilterTest, Encode1xxHeadersContinue) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  )EOF");
+
   Http::TestResponseHeaderMapImpl headers{{":status", "103"}};
   EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_->encode1xxHeaders(headers));
   // No mutations should have been applied.
