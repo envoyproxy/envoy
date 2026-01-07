@@ -4297,6 +4297,8 @@ TEST_P(HttpFilterTestParam, OkIgnoresInvalidHeaderRemovalWhenValidated) {
   validate_mutations: true
   )EOF");
 
+  prepareCheck();
+
   // Add a header that should remain because the removal key is invalid.
   request_headers_.addCopy("keep-me", "yes");
 
