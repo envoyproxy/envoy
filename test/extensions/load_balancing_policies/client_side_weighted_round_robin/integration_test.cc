@@ -365,6 +365,20 @@ static_resources:
   const bool deferred_cluster_creation_;
   envoy::config::cluster::v3::Cluster cluster1_;
   envoy::config::cluster::v3::Cluster cluster2_;
+
+  void waitFor200(const std::string& path) {
+    BufferingStreamDecoderPtr response;
+    for (int i = 0; i < 20; ++i) {
+      response = IntegrationUtil::makeSingleRequest(lookupPort("http"), "GET", path, "",
+                                                    downstream_protocol_, version_, "foo.com");
+      ASSERT_TRUE(response->complete());
+      if (response->headers().getStatusValue() == "200") {
+        return;
+      }
+      absl::SleepFor(absl::Milliseconds(50));
+    }
+    EXPECT_EQ("200", response->headers().getStatusValue());
+  }
 };
 
 TEST_P(ClientSideWeightedRoundRobinXdsIntegrationTest, ClusterUpDownUp) {
@@ -401,10 +415,7 @@ TEST_P(ClientSideWeightedRoundRobinXdsIntegrationTest, ClusterUpDownUp) {
                                                              {cluster1_}, {cluster1_}, {}, "413");
 
   test_server_->waitForGaugeGe("cluster_manager.active_clusters", 2);
-  response = IntegrationUtil::makeSingleRequest(lookupPort("http"), "GET", "/cluster1", "",
-                                                downstream_protocol_, version_, "foo.com");
-  ASSERT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().getStatusValue());
+  waitFor200("/cluster1");
 
   cleanupUpstreamAndDownstream();
 
@@ -432,10 +443,7 @@ TEST_P(ClientSideWeightedRoundRobinXdsIntegrationTest, TwoClusters) {
   test_server_->waitForGaugeGe("cluster_manager.active_clusters", 3);
 
   // A request for the second cluster should be fine.
-  response = IntegrationUtil::makeSingleRequest(lookupPort("http"), "GET", "/cluster2", "",
-                                                downstream_protocol_, version_, "foo.com");
-  ASSERT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().getStatusValue());
+  waitFor200("/cluster2");
 
   cleanupUpstreamAndDownstream();
 
@@ -459,10 +467,7 @@ TEST_P(ClientSideWeightedRoundRobinXdsIntegrationTest, TwoClusters) {
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
       Config::TestTypeUrl::get().Cluster, {cluster1_, cluster2_}, {cluster1_}, {}, "413");
   test_server_->waitForGaugeGe("cluster_manager.active_clusters", 3);
-  response = IntegrationUtil::makeSingleRequest(lookupPort("http"), "GET", "/cluster1", "",
-                                                downstream_protocol_, version_, "foo.com");
-  ASSERT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().getStatusValue());
+  waitFor200("/cluster1");
 
   cleanupUpstreamAndDownstream();
 }

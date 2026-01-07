@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 
+#include "source/common/common/hash.h"
 #include "source/extensions/tracers/opentelemetry/samplers/dynatrace/trace_capture_reason.h"
 
 #include "absl/strings/numbers.h"
@@ -27,6 +28,8 @@ namespace OpenTelemetry {
  * - tag[8]: optional extensions, e.g. trace capture reason
  */
 class DynatraceTag {
+  static constexpr uint64_t CHECKSUM_SEED = 3782874213;
+
 public:
   static DynatraceTag createInvalid() { return {false, false, 0, 0, absl::nullopt}; }
 
@@ -78,13 +81,19 @@ public:
 
   // Returns a DynatraceTag as string.
   std::string asString() const {
-    if (tcr_extension_ && tcr_extension_->isValid()) {
-      return absl::StrCat("fw4;0;0;0;0;", ignored_ ? "1" : "0", ";", sampling_exponent_, ";",
-                          absl::Hex(path_info_), ";8h01", tcr_extension_->bitmaskHex());
+    std::string base = absl::StrCat("fw4;0;0;0;0;", ignored_ ? "1" : "0", ";", sampling_exponent_,
+                                    ";", absl::Hex(path_info_));
+
+    if (!(tcr_extension_ && tcr_extension_->isValid())) {
+      return base;
     }
 
-    return absl::StrCat("fw4;0;0;0;0;", ignored_ ? "1" : "0", ";", sampling_exponent_, ";",
-                        absl::Hex(path_info_));
+    // Calculate a checksum for the extension
+    std::string ext = absl::StrCat(";8h01", tcr_extension_->bitmaskHex());
+    uint64_t hash = MurmurHash::murmurHash2(ext, CHECKSUM_SEED);
+    uint16_t checksum = static_cast<uint16_t>(hash & 0xFFFF);
+    std::string checksum_str = absl::StrCat(";", absl::Hex(checksum, absl::kZeroPad4));
+    return absl::StrCat(base, checksum_str, ext);
   }
 
   // Returns true if parsing was successful.

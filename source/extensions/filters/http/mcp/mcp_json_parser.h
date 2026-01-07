@@ -53,8 +53,6 @@ constexpr absl::string_view LOGGING_SET_LEVEL = "logging/setLevel";
 
 // Lifecycle
 constexpr absl::string_view INITIALIZE = "initialize";
-constexpr absl::string_view INITIALIZED = "initialized";
-constexpr absl::string_view SHUTDOWN = "shutdown";
 
 // Sampling
 constexpr absl::string_view SAMPLING_CREATE_MESSAGE = "sampling/createMessage";

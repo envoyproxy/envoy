@@ -1,3 +1,4 @@
+#![allow(clippy::unnecessary_cast)]
 use crate::*;
 #[cfg(test)]
 use std::sync::atomic::AtomicBool; // This is used for testing the drop, not for the actual concurrency.
@@ -238,6 +239,182 @@ fn test_envoy_dynamic_module_on_http_filter_callbacks() {
 }
 
 // =============================================================================
+// Listener Filter Tests
+// =============================================================================
+
+#[test]
+fn test_envoy_dynamic_module_on_listener_filter_config_new_impl() {
+  struct TestListenerFilterConfig;
+  impl<ELF: EnvoyListenerFilter> ListenerFilterConfig<ELF> for TestListenerFilterConfig {
+    fn new_listener_filter(&self, _envoy: &mut ELF) -> Box<dyn ListenerFilter<ELF>> {
+      Box::new(TestListenerFilter)
+    }
+  }
+
+  struct TestListenerFilter;
+  impl<ELF: EnvoyListenerFilter> ListenerFilter<ELF> for TestListenerFilter {}
+
+  let mut envoy_filter_config = EnvoyListenerFilterConfigImpl {
+    raw: std::ptr::null_mut(),
+  };
+  let mut new_fn: NewListenerFilterConfigFunction<
+    EnvoyListenerFilterConfigImpl,
+    EnvoyListenerFilterImpl,
+  > = |_, _, _| Some(Box::new(TestListenerFilterConfig));
+  let result = init_listener_filter_config(
+    &mut envoy_filter_config,
+    "test_name",
+    b"test_config",
+    &new_fn,
+  );
+  assert!(!result.is_null());
+
+  unsafe {
+    envoy_dynamic_module_on_listener_filter_config_destroy(result);
+  }
+
+  // None should result in null pointer.
+  new_fn = |_, _, _| None;
+  let result = init_listener_filter_config(
+    &mut envoy_filter_config,
+    "test_name",
+    b"test_config",
+    &new_fn,
+  );
+  assert!(result.is_null());
+}
+
+#[test]
+fn test_envoy_dynamic_module_on_listener_filter_config_destroy() {
+  static DROPPED: AtomicBool = AtomicBool::new(false);
+  struct TestListenerFilterConfig;
+  impl<ELF: EnvoyListenerFilter> ListenerFilterConfig<ELF> for TestListenerFilterConfig {
+    fn new_listener_filter(&self, _envoy: &mut ELF) -> Box<dyn ListenerFilter<ELF>> {
+      Box::new(TestListenerFilter)
+    }
+  }
+  impl Drop for TestListenerFilterConfig {
+    fn drop(&mut self) {
+      DROPPED.store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+  }
+
+  struct TestListenerFilter;
+  impl<ELF: EnvoyListenerFilter> ListenerFilter<ELF> for TestListenerFilter {}
+
+  let new_fn: NewListenerFilterConfigFunction<
+    EnvoyListenerFilterConfigImpl,
+    EnvoyListenerFilterImpl,
+  > = |_, _, _| Some(Box::new(TestListenerFilterConfig));
+  let config_ptr = init_listener_filter_config(
+    &mut EnvoyListenerFilterConfigImpl {
+      raw: std::ptr::null_mut(),
+    },
+    "test_name",
+    b"test_config",
+    &new_fn,
+  );
+
+  unsafe {
+    envoy_dynamic_module_on_listener_filter_config_destroy(config_ptr);
+  }
+  // Now that the drop is called, DROPPED must be set to true.
+  assert!(DROPPED.load(std::sync::atomic::Ordering::SeqCst));
+}
+
+#[test]
+fn test_envoy_dynamic_module_on_listener_filter_new_destroy() {
+  static DROPPED: AtomicBool = AtomicBool::new(false);
+  struct TestListenerFilterConfig;
+  impl<ELF: EnvoyListenerFilter> ListenerFilterConfig<ELF> for TestListenerFilterConfig {
+    fn new_listener_filter(&self, _envoy: &mut ELF) -> Box<dyn ListenerFilter<ELF>> {
+      Box::new(TestListenerFilter)
+    }
+  }
+
+  struct TestListenerFilter;
+  impl<ELF: EnvoyListenerFilter> ListenerFilter<ELF> for TestListenerFilter {}
+  impl Drop for TestListenerFilter {
+    fn drop(&mut self) {
+      DROPPED.store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+  }
+
+  let mut filter_config = TestListenerFilterConfig;
+  let result = envoy_dynamic_module_on_listener_filter_new_impl(
+    &mut EnvoyListenerFilterImpl {
+      raw: std::ptr::null_mut(),
+    },
+    &mut filter_config,
+  );
+  assert!(!result.is_null());
+
+  envoy_dynamic_module_on_listener_filter_destroy(result);
+
+  assert!(DROPPED.load(std::sync::atomic::Ordering::SeqCst));
+}
+
+#[test]
+fn test_envoy_dynamic_module_on_listener_filter_callbacks() {
+  struct TestListenerFilterConfig;
+  impl<ELF: EnvoyListenerFilter> ListenerFilterConfig<ELF> for TestListenerFilterConfig {
+    fn new_listener_filter(&self, _envoy: &mut ELF) -> Box<dyn ListenerFilter<ELF>> {
+      Box::new(TestListenerFilter)
+    }
+  }
+
+  static ON_ACCEPT_CALLED: AtomicBool = AtomicBool::new(false);
+  static ON_DATA_CALLED: AtomicBool = AtomicBool::new(false);
+  static ON_CLOSE_CALLED: AtomicBool = AtomicBool::new(false);
+
+  struct TestListenerFilter;
+  impl<ELF: EnvoyListenerFilter> ListenerFilter<ELF> for TestListenerFilter {
+    fn on_accept(
+      &mut self,
+      _envoy_filter: &mut ELF,
+    ) -> abi::envoy_dynamic_module_type_on_listener_filter_status {
+      ON_ACCEPT_CALLED.store(true, std::sync::atomic::Ordering::SeqCst);
+      abi::envoy_dynamic_module_type_on_listener_filter_status::Continue
+    }
+
+    fn on_data(
+      &mut self,
+      _envoy_filter: &mut ELF,
+    ) -> abi::envoy_dynamic_module_type_on_listener_filter_status {
+      ON_DATA_CALLED.store(true, std::sync::atomic::Ordering::SeqCst);
+      abi::envoy_dynamic_module_type_on_listener_filter_status::Continue
+    }
+
+    fn on_close(&mut self, _envoy_filter: &mut ELF) {
+      ON_CLOSE_CALLED.store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+  }
+
+  let mut filter_config = TestListenerFilterConfig;
+  let filter = envoy_dynamic_module_on_listener_filter_new_impl(
+    &mut EnvoyListenerFilterImpl {
+      raw: std::ptr::null_mut(),
+    },
+    &mut filter_config,
+  );
+
+  assert_eq!(
+    envoy_dynamic_module_on_listener_filter_on_accept(std::ptr::null_mut(), filter),
+    abi::envoy_dynamic_module_type_on_listener_filter_status::Continue
+  );
+  assert_eq!(
+    envoy_dynamic_module_on_listener_filter_on_data(std::ptr::null_mut(), filter),
+    abi::envoy_dynamic_module_type_on_listener_filter_status::Continue
+  );
+  envoy_dynamic_module_on_listener_filter_on_close(std::ptr::null_mut(), filter);
+  envoy_dynamic_module_on_listener_filter_destroy(filter);
+
+  assert!(ON_ACCEPT_CALLED.load(std::sync::atomic::Ordering::SeqCst));
+  assert!(ON_DATA_CALLED.load(std::sync::atomic::Ordering::SeqCst));
+  assert!(ON_CLOSE_CALLED.load(std::sync::atomic::Ordering::SeqCst));
+}
+
+// =============================================================================
 // Network Filter Tests
 // =============================================================================
 
@@ -346,9 +523,7 @@ fn test_envoy_dynamic_module_on_network_filter_new_destroy() {
   );
   assert!(!result.is_null());
 
-  unsafe {
-    envoy_dynamic_module_on_network_filter_destroy(result);
-  }
+  envoy_dynamic_module_on_network_filter_destroy(result);
 
   assert!(DROPPED.load(std::sync::atomic::Ordering::SeqCst));
 }
@@ -414,29 +589,250 @@ fn test_envoy_dynamic_module_on_network_filter_callbacks() {
     &mut filter_config,
   );
 
-  unsafe {
-    assert_eq!(
-      envoy_dynamic_module_on_network_filter_new_connection(std::ptr::null_mut(), filter),
-      abi::envoy_dynamic_module_type_on_network_filter_data_status::Continue
-    );
-    assert_eq!(
-      envoy_dynamic_module_on_network_filter_read(std::ptr::null_mut(), filter, 100, false),
-      abi::envoy_dynamic_module_type_on_network_filter_data_status::Continue
-    );
-    assert_eq!(
-      envoy_dynamic_module_on_network_filter_write(std::ptr::null_mut(), filter, 100, false),
-      abi::envoy_dynamic_module_type_on_network_filter_data_status::Continue
-    );
-    envoy_dynamic_module_on_network_filter_event(
-      std::ptr::null_mut(),
-      filter,
-      abi::envoy_dynamic_module_type_network_connection_event::RemoteClose,
-    );
-    envoy_dynamic_module_on_network_filter_destroy(filter);
-  }
+  assert_eq!(
+    envoy_dynamic_module_on_network_filter_new_connection(std::ptr::null_mut(), filter),
+    abi::envoy_dynamic_module_type_on_network_filter_data_status::Continue
+  );
+  assert_eq!(
+    envoy_dynamic_module_on_network_filter_read(std::ptr::null_mut(), filter, 100, false),
+    abi::envoy_dynamic_module_type_on_network_filter_data_status::Continue
+  );
+  assert_eq!(
+    envoy_dynamic_module_on_network_filter_write(std::ptr::null_mut(), filter, 100, false),
+    abi::envoy_dynamic_module_type_on_network_filter_data_status::Continue
+  );
+  envoy_dynamic_module_on_network_filter_event(
+    std::ptr::null_mut(),
+    filter,
+    abi::envoy_dynamic_module_type_network_connection_event::RemoteClose,
+  );
+  envoy_dynamic_module_on_network_filter_destroy(filter);
 
   assert!(ON_NEW_CONNECTION_CALLED.load(std::sync::atomic::Ordering::SeqCst));
   assert!(ON_READ_CALLED.load(std::sync::atomic::Ordering::SeqCst));
   assert!(ON_WRITE_CALLED.load(std::sync::atomic::Ordering::SeqCst));
   assert!(ON_EVENT_CALLED.load(std::sync::atomic::Ordering::SeqCst));
+}
+
+// =============================================================================
+// Socket option FFI stubs for testing.
+// =============================================================================
+
+#[derive(Clone)]
+struct StoredOption {
+  level: i64,
+  name: i64,
+  state: abi::envoy_dynamic_module_type_socket_option_state,
+  value: Option<Vec<u8>>,
+  int_value: Option<i64>,
+}
+
+static STORED_OPTIONS: std::sync::Mutex<Vec<StoredOption>> = std::sync::Mutex::new(Vec::new());
+
+fn reset_socket_options() {
+  STORED_OPTIONS.lock().unwrap().clear();
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_network_set_socket_option_int(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+  level: i64,
+  name: i64,
+  state: abi::envoy_dynamic_module_type_socket_option_state,
+  value: i64,
+) -> bool {
+  STORED_OPTIONS.lock().unwrap().push(StoredOption {
+    level,
+    name,
+    state,
+    value: None,
+    int_value: Some(value),
+  });
+  true
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_network_set_socket_option_bytes(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+  level: i64,
+  name: i64,
+  state: abi::envoy_dynamic_module_type_socket_option_state,
+  value: abi::envoy_dynamic_module_type_module_buffer,
+) -> bool {
+  let slice = unsafe { std::slice::from_raw_parts(value.ptr as *const u8, value.length) };
+  STORED_OPTIONS.lock().unwrap().push(StoredOption {
+    level,
+    name,
+    state,
+    value: Some(slice.to_vec()),
+    int_value: None,
+  });
+  true
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_network_get_socket_option_int(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+  level: i64,
+  name: i64,
+  state: abi::envoy_dynamic_module_type_socket_option_state,
+  value_out: *mut i64,
+) -> bool {
+  let options = STORED_OPTIONS.lock().unwrap();
+  options.iter().any(|opt| {
+    if opt.level == level && opt.name == name && opt.state == state {
+      if let Some(v) = opt.int_value {
+        if !value_out.is_null() {
+          unsafe {
+            *value_out = v;
+          }
+        }
+        return true;
+      }
+    }
+    false
+  })
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_network_get_socket_option_bytes(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+  level: i64,
+  name: i64,
+  state: abi::envoy_dynamic_module_type_socket_option_state,
+  value_out: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+) -> bool {
+  let options = STORED_OPTIONS.lock().unwrap();
+  options.iter().any(|opt| {
+    if opt.level == level && opt.name == name && opt.state == state {
+      if let Some(ref bytes) = opt.value {
+        if !value_out.is_null() {
+          unsafe {
+            (*value_out).ptr = bytes.as_ptr() as *const _;
+            (*value_out).length = bytes.len();
+          }
+        }
+        return true;
+      }
+    }
+    false
+  })
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_network_get_socket_options_size(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+) -> usize {
+  STORED_OPTIONS.lock().unwrap().len()
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_network_get_socket_options(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+  options_out: *mut abi::envoy_dynamic_module_type_socket_option,
+) {
+  if options_out.is_null() {
+    return;
+  }
+  let options = STORED_OPTIONS.lock().unwrap();
+  let mut written = 0usize;
+  for opt in options.iter() {
+    unsafe {
+      let out = options_out.add(written);
+      (*out).level = opt.level;
+      (*out).name = opt.name;
+      (*out).state = opt.state;
+      match opt.int_value {
+        Some(v) => {
+          (*out).value_type = abi::envoy_dynamic_module_type_socket_option_value_type::Int;
+          (*out).int_value = v;
+          (*out).byte_value.ptr = std::ptr::null();
+          (*out).byte_value.length = 0;
+        },
+        None => {
+          (*out).value_type = abi::envoy_dynamic_module_type_socket_option_value_type::Bytes;
+          if let Some(ref bytes) = opt.value {
+            (*out).byte_value.ptr = bytes.as_ptr() as *const _;
+            (*out).byte_value.length = bytes.len();
+          } else {
+            (*out).byte_value.ptr = std::ptr::null();
+            (*out).byte_value.length = 0;
+          }
+          (*out).int_value = 0;
+        },
+      }
+    }
+    written += 1;
+  }
+}
+
+#[test]
+fn test_socket_option_int_round_trip() {
+  reset_socket_options();
+  let mut filter = EnvoyNetworkFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+  assert!(filter.set_socket_option_int(
+    1,
+    2,
+    abi::envoy_dynamic_module_type_socket_option_state::Prebind,
+    42
+  ));
+  let value = filter.get_socket_option_int(
+    1,
+    2,
+    abi::envoy_dynamic_module_type_socket_option_state::Prebind,
+  );
+  assert_eq!(Some(42), value);
+}
+
+#[test]
+fn test_socket_option_bytes_round_trip() {
+  reset_socket_options();
+  let mut filter = EnvoyNetworkFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+  assert!(filter.set_socket_option_bytes(
+    3,
+    4,
+    abi::envoy_dynamic_module_type_socket_option_state::Bound,
+    b"bytes-val",
+  ));
+  let value = filter.get_socket_option_bytes(
+    3,
+    4,
+    abi::envoy_dynamic_module_type_socket_option_state::Bound,
+  );
+  assert_eq!(Some(b"bytes-val".to_vec()), value);
+}
+
+#[test]
+fn test_socket_option_list() {
+  reset_socket_options();
+  let mut filter = EnvoyNetworkFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+  assert!(filter.set_socket_option_int(
+    5,
+    6,
+    abi::envoy_dynamic_module_type_socket_option_state::Prebind,
+    11
+  ));
+  assert!(filter.set_socket_option_bytes(
+    7,
+    8,
+    abi::envoy_dynamic_module_type_socket_option_state::Listening,
+    b"data",
+  ));
+
+  let options = filter.get_socket_options();
+  assert_eq!(2, options.len());
+  match &options[0].value {
+    SocketOptionValue::Int(v) => assert_eq!(&11, v),
+    _ => panic!("expected int"),
+  }
+  match &options[1].value {
+    SocketOptionValue::Bytes(bytes) => assert_eq!(b"data".to_vec(), *bytes),
+    _ => panic!("expected bytes"),
+  }
 }

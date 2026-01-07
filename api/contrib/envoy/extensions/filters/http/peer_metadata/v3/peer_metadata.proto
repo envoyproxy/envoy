@@ -20,7 +20,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#next-free-field: 7]
 message Config {
   // DEPRECATED.
-  // This method uses `baggage` header encoding.
+  // This method uses ``baggage`` header encoding.
   message Baggage {
   }
 
@@ -30,15 +30,15 @@ message Config {
   //
   // * If the upstream host address is an IP, this IP is used as the lookup key;
   // * If the upstream host address is internal, uses the
-  //   "filter_metadata.tunnel.destination" dynamic metadata value as the lookup key.
+  //   ``filter_metadata.tunnel.destination`` dynamic metadata value as the lookup key.
   //
   message WorkloadDiscovery {
   }
 
-  // This method uses Istio HTTP metadata exchange headers, e.g. `x-envoy-peer-metadata`. Removes these headers if found.
+  // This method uses Istio HTTP metadata exchange headers, e.g. ``x-envoy-peer-metadata``. Removes these headers if found.
   message IstioHeaders {
-    // Strip x-envoy-peer-metadata and x-envoy-peer-metadata-id headers on HTTP requests to services outside the mesh.
-    // Detects upstream clusters with `istio` and `external` filter metadata fields
+    // Strip ``x-envoy-peer-metadata`` and ``x-envoy-peer-metadata-id`` headers on HTTP requests to services outside the mesh.
+    // Detects upstream clusters with ``istio`` and ``external`` filter metadata fields
     bool skip_external_clusters = 1;
   }
 

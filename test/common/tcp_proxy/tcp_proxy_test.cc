@@ -1600,6 +1600,18 @@ TEST_P(TcpProxyTest, AccessLogDownstreamAddress) {
   EXPECT_EQ(access_log_data_, "1.1.1.1 1.1.1.2:20000");
 }
 
+// Test that access log fields %DOWNSTREAM_LOCAL_ADDRESS_ENDPOINT_ID% is correctly logged.
+TEST_P(TcpProxyTest, AccessLogDownstreamEndpointId) {
+  auto downstream_local_address = Network::Address::InstanceConstSharedPtr{
+      new Network::Address::EnvoyInternalInstance("downstream", "1234567890")};
+  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
+      downstream_local_address);
+  setup(1, accessLogConfig("%DOWNSTREAM_LOCAL_ADDRESS_ENDPOINT_ID%"));
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+  filter_.reset();
+  EXPECT_EQ(access_log_data_, "1234567890");
+}
+
 // Test that intermediate log entry by field %ACCESS_LOG_TYPE%.
 TEST_P(TcpProxyTest, IntermediateLogEntry) {
   auto config = accessLogConfig("%ACCESS_LOG_TYPE%");

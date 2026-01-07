@@ -101,7 +101,7 @@ jobs:
   #       source ./ci/mac_ci_setup.sh
   #       ./bazelw shutdown
   #     steps-post: |
-  #       - uses: envoyproxy/toolshed/gh-actions/envoy/ios/post@cb93f5b06def5199bf739b007615f7a257bb0165  # v0.3.37
+  #       - uses: envoyproxy/toolshed/actions/envoy/ios/post@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
   #         with:
   #           app: ${{ matrix.app }}
   #           args: ${{ matrix.args || '--config=mobile-ios' }}
@@ -146,7 +146,7 @@ jobs:
   #     source: |
   #       source ./ci/mac_ci_setup.sh
   #     steps-post: |
-  #       - uses: envoyproxy/toolshed/gh-actions/envoy/ios/post@cb93f5b06def5199bf739b007615f7a257bb0165  # v0.3.37
+  #       - uses: envoyproxy/toolshed/actions/envoy/ios/post@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
   #         with:
   #           app: ${{ matrix.app }}
   #           args: ${{ matrix.args || '--config=mobile-ios' }}

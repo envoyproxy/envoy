@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/upstream/cluster_manager.h"
+
 #include "source/common/common/statusor.h"
 #include "source/extensions/dynamic_modules/abi.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
@@ -17,6 +19,8 @@ using OnNetworkFilterReadType = decltype(&envoy_dynamic_module_on_network_filter
 using OnNetworkFilterWriteType = decltype(&envoy_dynamic_module_on_network_filter_write);
 using OnNetworkFilterEventType = decltype(&envoy_dynamic_module_on_network_filter_event);
 using OnNetworkFilterDestroyType = decltype(&envoy_dynamic_module_on_network_filter_destroy);
+using OnNetworkFilterHttpCalloutDoneType =
+    decltype(&envoy_dynamic_module_on_network_filter_http_callout_done);
 
 /**
  * A config to create network filters based on a dynamic module. This will be owned by multiple
@@ -34,11 +38,12 @@ public:
    * @param filter_name the name of the filter.
    * @param filter_config the configuration for the module.
    * @param dynamic_module the dynamic module to use.
-   * @param context the factory context.
+   * @param cluster_manager the cluster manager for async HTTP callouts.
    */
   DynamicModuleNetworkFilterConfig(const absl::string_view filter_name,
                                    const absl::string_view filter_config,
-                                   DynamicModulePtr dynamic_module);
+                                   DynamicModulePtr dynamic_module,
+                                   Envoy::Upstream::ClusterManager& cluster_manager);
 
   ~DynamicModuleNetworkFilterConfig();
 
@@ -55,13 +60,17 @@ public:
   OnNetworkFilterWriteType on_network_filter_write_ = nullptr;
   OnNetworkFilterEventType on_network_filter_event_ = nullptr;
   OnNetworkFilterDestroyType on_network_filter_destroy_ = nullptr;
+  OnNetworkFilterHttpCalloutDoneType on_network_filter_http_callout_done_ = nullptr;
+
+  Envoy::Upstream::ClusterManager& cluster_manager_;
 
 private:
   // Allow the factory function to access private members for initialization.
   friend absl::StatusOr<std::shared_ptr<DynamicModuleNetworkFilterConfig>>
   newDynamicModuleNetworkFilterConfig(const absl::string_view filter_name,
                                       const absl::string_view filter_config,
-                                      DynamicModulePtr dynamic_module);
+                                      DynamicModulePtr dynamic_module,
+                                      Envoy::Upstream::ClusterManager& cluster_manager);
 
   // The name of the filter passed in the constructor.
   const std::string filter_name_;
@@ -80,13 +89,14 @@ using DynamicModuleNetworkFilterConfigSharedPtr = std::shared_ptr<DynamicModuleN
  * @param filter_name the name of the filter.
  * @param filter_config the configuration for the module.
  * @param dynamic_module the dynamic module to use.
- * @param context the factory context.
+ * @param cluster_manager the cluster manager for async HTTP callouts.
  * @return a shared pointer to the new config object or an error if the module could not be loaded.
  */
 absl::StatusOr<DynamicModuleNetworkFilterConfigSharedPtr>
 newDynamicModuleNetworkFilterConfig(const absl::string_view filter_name,
                                     const absl::string_view filter_config,
-                                    Extensions::DynamicModules::DynamicModulePtr dynamic_module);
+                                    Extensions::DynamicModules::DynamicModulePtr dynamic_module,
+                                    Envoy::Upstream::ClusterManager& cluster_manager);
 
 } // namespace NetworkFilters
 } // namespace DynamicModules

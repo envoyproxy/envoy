@@ -885,7 +885,6 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     } else {
       quic_protocol_options->set_client_connection_options(http3_client_connection_options_);
     }
-    quic_protocol_options->set_client_connection_options(http3_client_connection_options_);
     quic_protocol_options->mutable_initial_stream_window_size()->set_value(
         initial_stream_window_size_);
     quic_protocol_options->mutable_initial_connection_window_size()->set_value(
