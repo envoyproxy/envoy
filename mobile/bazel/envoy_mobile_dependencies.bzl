@@ -3,7 +3,7 @@ load("@build_bazel_rules_apple//apple:repositories.bzl", "apple_rules_dependenci
 load("@build_bazel_rules_swift//swift:repositories.bzl", "swift_rules_dependencies")
 load("@robolectric//bazel:robolectric.bzl", "robolectric_repositories")
 load("@rules_detekt//detekt:dependencies.bzl", "rules_detekt_dependencies")
-load("@rules_java//java:repositories.bzl", "rules_java_dependencies")
+load("@rules_java//java:rules_java_deps.bzl", "rules_java_dependencies")
 load("@rules_jvm_external//:defs.bzl", "maven_install")
 load("@rules_kotlin//kotlin:repositories.bzl", "kotlin_repositories")
 load("@rules_proto//proto:repositories.bzl", "rules_proto_dependencies")
