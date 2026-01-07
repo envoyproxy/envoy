@@ -14,7 +14,7 @@ envoy_cc_extension(
     hdrs = ["dns_impl.h"],
     visibility = ["//visibility:public"],
     deps = [
-        "//bazel/foreign_cc:ares",
+        "@com_github_c_ares_c_ares//:ares",
         "//envoy/event:dispatcher_interface",
         "//envoy/event:file_event_interface",
         "//envoy/network:dns_interface",

@@ -27,7 +27,7 @@ envoy_cc_library(
         "dns_parser.h",
     ],
     deps = [
-        "//bazel/foreign_cc:ares",
+        "@com_github_c_ares_c_ares//:ares",
         "//envoy/buffer:buffer_interface",
         "//envoy/event:dispatcher_interface",
         "//envoy/formatter:substitution_formatter_interface",
