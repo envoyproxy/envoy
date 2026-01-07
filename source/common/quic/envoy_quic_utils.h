@@ -178,12 +178,20 @@ Http::StreamResetReason quicErrorCodeToEnvoyLocalResetReason(quic::QuicErrorCode
 // Called when underlying QUIC connection is closed by peer.
 Http::StreamResetReason quicErrorCodeToEnvoyRemoteResetReason(quic::QuicErrorCode error);
 
-// Create a connection socket instance and apply given socket options to the
+// Create a connection socket instance on the given network and apply given socket options to the
 // socket. IP_PKTINFO and SO_RXQ_OVFL is always set if supported.
-Network::ConnectionSocketPtr
-createConnectionSocket(const Network::Address::InstanceConstSharedPtr& peer_addr,
-                       Network::Address::InstanceConstSharedPtr& local_addr,
-                       const Network::ConnectionSocket::OptionsSharedPtr& options);
+// If the local_addr is not null, bind the socket to it.
+// Otherwise if the given network is valid, bind to it using the given
+// custom_bind_func. This is used on Android platforms which have a unique id
+// for each network and has API to bind a socket to a specific handle.
+// Otherwise the platform will automatically pick a network interface.
+Network::ConnectionSocketPtr createConnectionSocket(
+    const Network::Address::InstanceConstSharedPtr& peer_addr,
+    Network::Address::InstanceConstSharedPtr& local_addr,
+    const Network::ConnectionSocket::OptionsSharedPtr& options,
+    quic::QuicNetworkHandle network = quic::kInvalidNetworkHandle,
+    std::function<void(Network::ConnectionSocket&, quic::QuicNetworkHandle)> custom_bind_func =
+        nullptr);
 
 // Convert a cert in string form to X509 object.
 // Return nullptr if the bytes passed cannot be passed.

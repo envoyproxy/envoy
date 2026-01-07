@@ -40,6 +40,7 @@ NO_HTTP3_SKIP_TARGETS = [
     "envoy.quic.server_preferred_address.fixed",
     "envoy.quic.server_preferred_address.datasource",
     "envoy.quic.connection_debug_visitor.basic",
+    "envoy.quic.packet_writer.default",
 ]
 
 # Make all contents of an external repository accessible under a filegroup.  Used for external HTTP
@@ -322,7 +323,7 @@ def _com_github_bazel_buildtools():
 def _com_github_c_ares_c_ares():
     external_http_archive(
         name = "com_github_c_ares_c_ares",
-        build_file_content = BUILD_ALL_CONTENT,
+        build_file = "@envoy//bazel/external:c-ares.BUILD",
         patch_args = ["-p1"],
         patches = ["@envoy//bazel:c-ares.patch"],
     )
