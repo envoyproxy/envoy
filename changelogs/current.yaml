@@ -30,6 +30,10 @@ behavior_changes:
     Added runtime flag ``envoy.reloadable_features.reject_early_connect_data`` to reject ``CONNECT`` requests that send
     data before Envoy returns a ``200`` response. This non-compliant behavior is common for latency reduction, so the
     option is disabled by default.
+- area: proto_api_scrubber
+  change: |
+    Changed the response status code for blocked methods from ``403 Forbidden`` (gRPC ``PERMISSION_DENIED``) to
+    ``404 Not Found`` (gRPC ``NOT_FOUND``) to prevent method enumeration.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
