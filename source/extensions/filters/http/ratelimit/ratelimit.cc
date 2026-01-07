@@ -215,7 +215,8 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
                       Http::ResponseHeaderMapPtr&& response_headers_to_add,
                       Http::RequestHeaderMapPtr&& request_headers_to_add,
                       const std::string& response_body,
-                      Filters::Common::RateLimit::DynamicMetadataPtr&& dynamic_metadata) {
+                      Filters::Common::RateLimit::DynamicMetadataPtr&& dynamic_metadata,
+                      bool shadow_mode) {
   state_ = State::Complete;
   response_headers_to_add_ = std::move(response_headers_to_add);
   Http::HeaderMapPtr req_headers_to_add = std::move(request_headers_to_add);
@@ -228,7 +229,11 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
 
   switch (status) {
   case Filters::Common::RateLimit::LimitStatus::OK:
-    cluster_->statsScope().counterFromStatName(stat_names.ok_).inc();
+    if (shadow_mode) {
+      cluster_->statsScope().counterFromStatName(stat_names.shadow_ok_).inc();
+    } else {
+      cluster_->statsScope().counterFromStatName(stat_names.ok_).inc();
+    }
     break;
   case Filters::Common::RateLimit::LimitStatus::Error:
     ENVOY_LOG_TO_LOGGER(Logger::Registry::getLog(Logger::Id::filter), debug,
@@ -236,25 +241,29 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
     cluster_->statsScope().counterFromStatName(stat_names.error_).inc();
     break;
   case Filters::Common::RateLimit::LimitStatus::OverLimit:
-    cluster_->statsScope().counterFromStatName(stat_names.over_limit_).inc();
-    Http::CodeStats::ResponseStatInfo info{config_->scope(),
-                                           cluster_->statsScope(),
-                                           empty_stat_name,
-                                           enumToInt(config_->rateLimitedStatus()),
-                                           true,
-                                           empty_stat_name,
-                                           empty_stat_name,
-                                           empty_stat_name,
-                                           empty_stat_name,
-                                           empty_stat_name,
-                                           false};
-    httpContext().codeStats().chargeResponseStat(info, false);
-    if (config_->enableXEnvoyRateLimitedHeader()) {
-      if (response_headers_to_add_ == nullptr) {
-        response_headers_to_add_ = Http::ResponseHeaderMapImpl::create();
+    if (shadow_mode) {
+      cluster_->statsScope().counterFromStatName(stat_names.shadow_over_limit_).inc();
+    } else {
+      cluster_->statsScope().counterFromStatName(stat_names.over_limit_).inc();
+      Http::CodeStats::ResponseStatInfo info{config_->scope(),
+                                            cluster_->statsScope(),
+                                            empty_stat_name,
+                                            enumToInt(config_->rateLimitedStatus()),
+                                            true,
+                                            empty_stat_name,
+                                            empty_stat_name,
+                                            empty_stat_name,
+                                            empty_stat_name,
+                                            empty_stat_name,
+                                            false};
+      httpContext().codeStats().chargeResponseStat(info, false);
+      if (config_->enableXEnvoyRateLimitedHeader()) {
+        if (response_headers_to_add_ == nullptr) {
+          response_headers_to_add_ = Http::ResponseHeaderMapImpl::create();
+        }
+        response_headers_to_add_->setReferenceEnvoyRateLimited(
+            Http::Headers::get().EnvoyRateLimitedValues.True);
       }
-      response_headers_to_add_->setReferenceEnvoyRateLimited(
-          Http::Headers::get().EnvoyRateLimitedValues.True);
     }
     break;
   }
@@ -270,7 +279,7 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
     descriptor_statuses = nullptr;
   }
 
-  if (status == Filters::Common::RateLimit::LimitStatus::OverLimit && config_->enforced()) {
+  if (status == Filters::Common::RateLimit::LimitStatus::OverLimit && config_->enforced() && !shadow_mode) {
     state_ = State::Responded;
     callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::RateLimited);
     callbacks_->sendLocalReply(
@@ -378,7 +387,7 @@ void OnStreamDoneCallBack::complete(Filters::Common::RateLimit::LimitStatus,
                                     Filters::Common::RateLimit::DescriptorStatusListPtr&&,
                                     Http::ResponseHeaderMapPtr&&, Http::RequestHeaderMapPtr&&,
                                     const std::string&,
-                                    Filters::Common::RateLimit::DynamicMetadataPtr&&) {
+                                    Filters::Common::RateLimit::DynamicMetadataPtr&&, bool) {
   delete this;
 }
 

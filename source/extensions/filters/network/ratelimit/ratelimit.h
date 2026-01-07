@@ -32,6 +32,8 @@ namespace RateLimitFilter {
   COUNTER(failure_mode_allowed)                                                                    \
   COUNTER(ok)                                                                                      \
   COUNTER(over_limit)                                                                              \
+  COUNTER(shadow_ok)                                                                               \
+  COUNTER(shadow_over_limit)                                                                       \
   COUNTER(total)                                                                                   \
   GAUGE(active, Accumulate)
 
@@ -108,7 +110,8 @@ public:
                 Http::ResponseHeaderMapPtr&& response_headers_to_add,
                 Http::RequestHeaderMapPtr&& request_headers_to_add,
                 const std::string& response_body,
-                Filters::Common::RateLimit::DynamicMetadataPtr&& dynamic_metadata) override;
+                Filters::Common::RateLimit::DynamicMetadataPtr&& dynamic_metadata,
+                bool shadow_mode) override;
 
 private:
   enum class Status { NotStarted, Calling, Complete };

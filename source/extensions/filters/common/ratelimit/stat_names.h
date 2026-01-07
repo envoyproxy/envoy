@@ -18,7 +18,9 @@ struct StatNames {
       : pool_(symbol_table), ok_(pool_.add(createPoolStatName(stat_prefix, "ok"))),
         error_(pool_.add(createPoolStatName(stat_prefix, "error"))),
         failure_mode_allowed_(pool_.add(createPoolStatName(stat_prefix, "failure_mode_allowed"))),
-        over_limit_(pool_.add(createPoolStatName(stat_prefix, "over_limit"))) {}
+        over_limit_(pool_.add(createPoolStatName(stat_prefix, "over_limit"))),
+        shadow_ok_(pool_.add(createPoolStatName(stat_prefix, "shadow_ok"))),
+        shadow_over_limit_(pool_.add(createPoolStatName(stat_prefix, "shadow_over_limit"))) {}
 
   // This generates ratelimit.<optional stat_prefix>.name
   const std::string createPoolStatName(const std::string& stat_prefix, const std::string& name) {
@@ -31,6 +33,8 @@ struct StatNames {
   Stats::StatName error_;
   Stats::StatName failure_mode_allowed_;
   Stats::StatName over_limit_;
+  Stats::StatName shadow_ok_;
+  Stats::StatName shadow_over_limit_;
 };
 
 } // namespace RateLimit

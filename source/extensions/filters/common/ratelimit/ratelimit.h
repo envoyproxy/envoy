@@ -59,7 +59,8 @@ public:
                         Http::ResponseHeaderMapPtr&& response_headers_to_add,
                         Http::RequestHeaderMapPtr&& request_headers_to_add,
                         const std::string& response_body,
-                        DynamicMetadataPtr&& dynamic_metadata) PURE;
+                        DynamicMetadataPtr&& dynamic_metadata,
+                      bool shadow_mode = false) PURE;
 };
 
 /**

@@ -4,6 +4,7 @@
 #include "source/extensions/filters/network/thrift_proxy/app_exception_impl.h"
 #include "source/extensions/filters/network/thrift_proxy/router/router.h"
 #include "source/extensions/filters/network/thrift_proxy/router/router_ratelimit.h"
+#include <cinttypes>
 
 namespace Envoy {
 namespace Extensions {
@@ -62,7 +63,8 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
                       Filters::Common::RateLimit::DescriptorStatusListPtr&& descriptor_statuses,
                       Http::ResponseHeaderMapPtr&& response_headers_to_add,
                       Http::RequestHeaderMapPtr&& request_headers_to_add, const std::string&,
-                      Filters::Common::RateLimit::DynamicMetadataPtr&& dynamic_metadata) {
+                      Filters::Common::RateLimit::DynamicMetadataPtr&& dynamic_metadata,
+                      bool shadow_mode) {
   // TODO(zuercher): Store headers to append to a response. Adding them to a local reply (over
   // limit or error) is a matter of modifying the callbacks to allow it. Adding them to an upstream
   // response requires either response (aka encoder) filters or some other mechanism.
@@ -80,7 +82,11 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
 
   switch (status) {
   case Filters::Common::RateLimit::LimitStatus::OK:
-    cluster_->statsScope().counterFromStatName(stat_names.ok_).inc();
+    if (shadow_mode) {
+      cluster_->statsScope().counterFromStatName(stat_names.shadow_ok_).inc();
+    } else {
+      cluster_->statsScope().counterFromStatName(stat_names.ok_).inc();
+    }
     break;
   case Filters::Common::RateLimit::LimitStatus::Error:
     cluster_->statsScope().counterFromStatName(stat_names.error_).inc();
@@ -96,8 +102,13 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
     cluster_->statsScope().counterFromStatName(stat_names.failure_mode_allowed_).inc();
     break;
   case Filters::Common::RateLimit::LimitStatus::OverLimit:
-    cluster_->statsScope().counterFromStatName(stat_names.over_limit_).inc();
-    if (config_->runtime().snapshot().featureEnabled("ratelimit.thrift_filter_enforcing", 100)) {
+    if (shadow_mode) {
+      cluster_->statsScope().counterFromStatName(stat_names.shadow_over_limit_).inc();
+    } else {
+      cluster_->statsScope().counterFromStatName(stat_names.over_limit_).inc();
+    }
+    if (config_->runtime().snapshot().featureEnabled("ratelimit.thrift_filter_enforcing", 100) &&
+        !shadow_mode) {
       state_ = State::Responded;
       decoder_callbacks_->sendLocalReply(
           ThriftProxy::AppException(ThriftProxy::AppExceptionType::InternalError, "over limit"),

@@ -109,7 +109,8 @@ void Filter::onEvent(Network::ConnectionEvent event) {
 void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
                       Filters::Common::RateLimit::DescriptorStatusListPtr&&,
                       Http::ResponseHeaderMapPtr&&, Http::RequestHeaderMapPtr&&, const std::string&,
-                      Filters::Common::RateLimit::DynamicMetadataPtr&& dynamic_metadata) {
+                      Filters::Common::RateLimit::DynamicMetadataPtr&& dynamic_metadata,
+                      bool shadow_mode) {
   if (dynamic_metadata != nullptr && !dynamic_metadata->fields().empty()) {
     filter_callbacks_->connection().streamInfo().setDynamicMetadata(
         NetworkFilterNames::get().RateLimit, *dynamic_metadata);
@@ -120,18 +121,27 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
 
   switch (status) {
   case Filters::Common::RateLimit::LimitStatus::OK:
-    config_->stats().ok_.inc();
+    if (shadow_mode) {
+      config_->stats().shadow_ok_.inc();
+    } else {
+      config_->stats().ok_.inc();
+    }
     break;
   case Filters::Common::RateLimit::LimitStatus::Error:
     config_->stats().error_.inc();
     break;
   case Filters::Common::RateLimit::LimitStatus::OverLimit:
-    config_->stats().over_limit_.inc();
+    if (shadow_mode) {
+      config_->stats().shadow_over_limit_.inc();
+    } else {
+      config_->stats().over_limit_.inc();
+    }
     break;
   }
 
   if (status == Filters::Common::RateLimit::LimitStatus::OverLimit &&
-      config_->runtime().snapshot().featureEnabled("ratelimit.tcp_filter_enforcing", 100)) {
+      config_->runtime().snapshot().featureEnabled("ratelimit.tcp_filter_enforcing", 100) &&
+      !shadow_mode) {
     config_->stats().cx_closed_.inc();
     filter_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush,
                                           "ratelimit_close_over_limit");

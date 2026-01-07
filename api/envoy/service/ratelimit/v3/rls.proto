@@ -226,4 +226,6 @@ message RateLimitResponse {
   // the request will be treated as OVER_LIMIT.
   // [#not-implemented-hide:]
   Quota quota = 7;
+  
+  bool shadow_mode = 8;
 }
