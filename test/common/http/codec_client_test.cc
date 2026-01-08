@@ -186,6 +186,8 @@ TEST_F(CodecClientTest, DisconnectBeforeHeaders) {
 }
 
 TEST_F(CodecClientTest, IdleTimerWithNoActiveRequests) {
+  TestScopedStaticReloadableFeaturesRuntime scoped_runtime(
+      {{"codec_client_enable_idle_timer_only_when_connected", true}});
   initialize();
   ResponseDecoder* inner_decoder;
   NiceMock<MockRequestEncoder> inner_encoder;
@@ -270,8 +272,28 @@ TEST_F(CodecClientTest, IdleTimerClientLocalCloseWithActiveRequests) {
   EXPECT_EQ(client_->idleTimer(), nullptr);
 }
 
-// Test that idle timeout closes the connection and increments stats when connected.
-TEST_F(CodecClientTest, IdleTimeoutWhenConnected) {
+// Test that idle timeout closes the connection and increments stats when connected (default
+// behavior).
+TEST_F(CodecClientTest, IdleTimeoutWhenConnectedDefault) {
+  TestScopedStaticReloadableFeaturesRuntime scoped_runtime(
+      {{"codec_client_enable_idle_timer_only_when_connected", true}});
+  initialize();
+
+  // Connect the connection first.
+  connection_cb_->onEvent(Network::ConnectionEvent::Connected);
+
+  // Trigger idle timeout - it should close the connection and increment stats.
+  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush));
+  client_->triggerIdleTimeout();
+
+  // Verify idle timeout stat was incremented.
+  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_idle_timeout_.value());
+}
+
+// Test that idle timeout closes the connection and increments stats when connected (old behavior).
+TEST_F(CodecClientTest, IdleTimeoutWhenConnectedOldBehavior) {
+  TestScopedStaticReloadableFeaturesRuntime scoped_runtime(
+      {{"codec_client_enable_idle_timer_only_when_connected", false}});
   initialize();
 
   // Connect the connection first.
