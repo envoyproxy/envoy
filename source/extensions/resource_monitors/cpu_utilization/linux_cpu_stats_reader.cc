@@ -122,8 +122,7 @@ CpuTimes CgroupV1CpuStatsReader::getCpuTimes() {
                                     .count();
 
   // cpu_times is in nanoseconds, cpu_allocated shares is in millicores
-  const double work_time =
-      (cpu_times_value * CONTAINER_MILLICORES_PER_CORE) / cpu_allocated_value;
+  const double work_time = (cpu_times_value * CONTAINER_MILLICORES_PER_CORE) / cpu_allocated_value;
 
   ENVOY_LOG(trace, "cgroupv1 cpu_times_value: {}", cpu_times_value);
   ENVOY_LOG(trace, "cgroupv1 cpu_allocated_value: {}", cpu_allocated_value);
