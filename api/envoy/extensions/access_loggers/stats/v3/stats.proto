@@ -16,18 +16,17 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/acc
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Stats logger]
-// Configuration for an access logger that emits custom Envoy stats according to
-// its configuration. The stats can have tags and values derived from
+// Configuration for an access logger that emits custom Envoy stats according to its
+// configuration. The stats can have tags and values derived from
 // :ref:`command operators <config_access_log_command_operators>`.
 // [#extension: envoy.access_loggers.stats]
 //
 // .. warning::
 //   It is easy to configure and use this extension in ways that create very
-//   large numbers of stats in Envoy, which can cause excessive memory or CPU
-//   use leading to a denial of service in Envoy, or can overwhelm any
-//   configured stat sinks by sending too many unique metrics.
+//   large numbers of stats in Envoy, which can cause excessive memory or CPU use
+//   leading to a denial of service in Envoy, or can overwhelm any configured
+//   stat sinks by sending too many unique metrics.
 
-// [#next-free-field: 6]
 message Config {
   option (xds.annotations.v3.message_status).work_in_progress = true;
 
@@ -36,8 +35,7 @@ message Config {
     // The name of the tag.
     string name = 1 [(validate.rules).string = {min_len: 1}];
 
-    // The value of the tag, using :ref:`command operators
-    // <config_access_log_command_operators>`.
+    // The value of the tag, using :ref:`command operators <config_access_log_command_operators>`.
     string value_format = 2 [(validate.rules).string = {min_len: 1}];
   }
 
@@ -62,9 +60,8 @@ message Config {
 
       Milliseconds = 3;
 
-      // Values are scaled to range 0-1.0, indicating 0%-100%. Values can be
-      // outside this range, but must be positive. Values extremely far out of
-      // this range may overflow.
+      // Values are scaled to range 0-1.0, indicating 0%-100%. Values can be outside this range,
+      // but must be positive. Values extremely far out of this range may overflow.
       Percent = 4;
     }
 
@@ -74,9 +71,8 @@ message Config {
     // The units for this histogram.
     Unit unit = 2 [(validate.rules).enum = {defined_only: true}];
 
-    // The format string for the value of this histogram, using :ref:`command
-    // operators <config_access_log_command_operators>`. This must evaluate to a
-    // positive number.
+    // The format string for the value of this histogram, using :ref:`command operators <config_access_log_command_operators>`.
+    // This must evaluate to a positive number.
     string value_format = 3 [(validate.rules).string = {min_len: 1 prefix: "%" suffix: "%"}];
   }
 
@@ -85,9 +81,8 @@ message Config {
     // The name and tags of this counter.
     Stat stat = 1 [(validate.rules).message = {required: true}];
 
-    // The format string for the value to add to this counter, using
-    // :ref:`command operators <config_access_log_command_operators>`. One of
-    // ``value_format`` or ``value_fixed`` must be configured.
+    // The format string for the value to add to this counter, using :ref:`command operators <config_access_log_command_operators>`.
+    // One of ``value_format`` or ``value_fixed`` must be configured.
     string value_format = 2
         [(validate.rules).string = {prefix: "%" suffix: "%" ignore_empty: true}];
 
@@ -99,6 +94,39 @@ message Config {
   // Configuration for a gauge stat. Gauges can be used to add, subtract, or set
   // values, and are useful for tracking concurrency or other mutable values
   // over time.
+  //
+  // Using the SET operation is straightforward and self-explanatory.
+  // The following example demonstrates how to use an ADD/SUBTRACT pair to track a gauge
+  // by configuring two separate stats access loggers with different filters.
+  //
+  // .. code-block:: yaml
+  //
+  //   http_connection_manager:
+  //     access_log:
+  //     - name: envoy.access_loggers.stats
+  //       filter:
+  //         log_type_filter:
+  //           types: [DownstreamStart]
+  //       typed_config:
+  //         "@type": type.googleapis.com/envoy.extensions.access_loggers.stats.v3.Config
+  //         stat_prefix: "my_prefix"
+  //         gauges:
+  //         - stat:
+  //             name: "http_active_requests"
+  //           operation_type: ADD
+  //           value_fixed: 1
+  //     - name: envoy.access_loggers.stats
+  //       filter:
+  //         log_type_filter:
+  //           types: [DownstreamEnd]
+  //       typed_config:
+  //         "@type": type.googleapis.com/envoy.extensions.access_loggers.stats.v3.Config
+  //         stat_prefix: "my_prefix"
+  //         gauges:
+  //         - stat:
+  //             name: "http_active_requests"
+  //           operation_type: SUBTRACT
+  //           value_fixed: 1
   //
   // .. warning::
   //   Gauges have to be kept in memory for their lifetime because
