@@ -385,7 +385,7 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
 TEST_F(StreamInfoImplTest, CodecStreamId) {
   StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr,
                              FilterState::LifeSpan::FilterChain);
-  EXPECT_EQ(0, stream_info.codecStreamId());
+  EXPECT_EQ(absl::nullopt, stream_info.codecStreamId());
   stream_info.setCodecStreamId(12345);
   EXPECT_EQ(12345, stream_info.codecStreamId());
 }
