@@ -35,7 +35,7 @@ public:
 };
 
 /**
- * Access log Instance that delegates to a dynamic module.
+ * Access log instance that delegates to a dynamic module.
  */
 class DynamicModuleAccessLog : public Common::ImplBase {
 public:
@@ -43,19 +43,12 @@ public:
                          DynamicModuleAccessLogConfigSharedPtr config,
                          ThreadLocal::SlotAllocator& tls);
 
-  // Used by ABI callbacks to access current context.
-  static DynamicModuleAccessLogContext* currentContext();
-
 private:
   void emitLog(const Formatter::Context& context,
                const StreamInfo::StreamInfo& stream_info) override;
 
   DynamicModuleAccessLogConfigSharedPtr config_;
   ThreadLocal::SlotPtr tls_slot_;
-
-  // Thread-local storage for current context during log callback. We use a static thread_local
-  // here to avoid passing pointers through the ABI which simplifies the C function signatures.
-  static thread_local DynamicModuleAccessLogContext* current_context_;
 };
 
 } // namespace DynamicModules

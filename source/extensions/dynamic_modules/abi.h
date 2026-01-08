@@ -3607,15 +3607,6 @@ typedef enum envoy_dynamic_module_type_response_flag {
 } envoy_dynamic_module_type_response_flag;
 
 /**
- * envoy_dynamic_module_type_access_log_header_type represents which header map to access.
- */
-typedef enum envoy_dynamic_module_type_access_log_header_type {
-  envoy_dynamic_module_type_access_log_header_type_RequestHeaders = 0,
-  envoy_dynamic_module_type_access_log_header_type_ResponseHeaders = 1,
-  envoy_dynamic_module_type_access_log_header_type_ResponseTrailers = 2,
-} envoy_dynamic_module_type_access_log_header_type;
-
-/**
  * envoy_dynamic_module_type_timing_info contains timing information from StreamInfo.
  * All durations are in nanoseconds. A value of -1 indicates the timing is not available.
  */
@@ -3649,17 +3640,15 @@ typedef struct envoy_dynamic_module_type_bytes_info {
  * configuration is created. This is called on the main thread.
  *
  * @param config_envoy_ptr is the pointer to the DynamicModuleAccessLogConfig object.
- * @param name_ptr is the logger name.
- * @param name_size is the size of the logger name.
- * @param config_ptr is the configuration for the logger.
- * @param config_size is the size of the configuration.
+ * @param name is the logger name.
+ * @param config is the configuration for the logger.
  * @return a pointer to the in-module access logger configuration. Returning nullptr
  *         indicates a failure to initialize the module, and the configuration will be rejected.
  */
 envoy_dynamic_module_type_access_logger_config_module_ptr
 envoy_dynamic_module_on_access_logger_config_new(
-    envoy_dynamic_module_type_access_logger_config_envoy_ptr config_envoy_ptr, const char* name_ptr,
-    size_t name_size, const char* config_ptr, size_t config_size);
+    envoy_dynamic_module_type_access_logger_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config);
 
 /**
  * envoy_dynamic_module_on_access_logger_config_destroy is called when the access logger
@@ -3680,11 +3669,14 @@ void envoy_dynamic_module_on_access_logger_config_destroy(
  * - Return a shared instance if the module handles thread safety internally
  *
  * @param config_module_ptr is the pointer to the in-module configuration.
+ * @param logger_envoy_ptr is the pointer to the ThreadLocalLogger object. This can be used
+ *        by the module to store a reference for later use in callbacks.
  * @return a pointer to the in-module logger instance. Returning nullptr will cause
  *         log events to be silently dropped.
  */
 envoy_dynamic_module_type_access_logger_module_ptr envoy_dynamic_module_on_access_logger_new(
-    envoy_dynamic_module_type_access_logger_config_module_ptr config_module_ptr);
+    envoy_dynamic_module_type_access_logger_config_module_ptr config_module_ptr,
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
 
 /**
  * envoy_dynamic_module_on_access_logger_log is called when a log event occurs.
@@ -3733,32 +3725,35 @@ void envoy_dynamic_module_on_access_logger_flush(
  * Get the number of headers in the specified header map.
  *
  * @param logger_envoy_ptr is the pointer to the log context.
- * @param header_type is the type of header map to access.
+ * @param header_type is the type of header map to access. Supported types are RequestHeader,
+ *        ResponseHeader, and ResponseTrailer.
  * @param size_out is the output parameter for the number of headers.
  * @return true if the header map is available, false otherwise.
  */
 bool envoy_dynamic_module_callback_access_logger_get_headers_size(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
-    envoy_dynamic_module_type_access_log_header_type header_type, size_t* size_out);
+    envoy_dynamic_module_type_http_header_type header_type, size_t* size_out);
 
 /**
  * Get all headers from the specified header map.
  *
  * @param logger_envoy_ptr is the pointer to the log context.
- * @param header_type is the type of header map to access.
+ * @param header_type is the type of header map to access. Supported types are RequestHeader,
+ *        ResponseHeader, and ResponseTrailer.
  * @param result_headers is the output array (must be pre-allocated with correct size).
  * @return true if successful, false otherwise.
  */
 bool envoy_dynamic_module_callback_access_logger_get_headers(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
-    envoy_dynamic_module_type_access_log_header_type header_type,
+    envoy_dynamic_module_type_http_header_type header_type,
     envoy_dynamic_module_type_envoy_http_header* result_headers);
 
 /**
  * Get a specific header value by key.
  *
  * @param logger_envoy_ptr is the pointer to the log context.
- * @param header_type is the type of header map to access.
+ * @param header_type is the type of header map to access. Supported types are RequestHeader,
+ *        ResponseHeader, and ResponseTrailer.
  * @param key is the header key to look up.
  * @param result is the output buffer for the header value.
  * @param index is the index for multi-value headers (0 for first value).
@@ -3767,7 +3762,7 @@ bool envoy_dynamic_module_callback_access_logger_get_headers(
  */
 bool envoy_dynamic_module_callback_access_logger_get_header_value(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
-    envoy_dynamic_module_type_access_log_header_type header_type,
+    envoy_dynamic_module_type_http_header_type header_type,
     envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result,
     size_t index, size_t* total_count_out);
 

@@ -56,28 +56,31 @@ TEST_F(DynamicModuleAccessLogTest, ConfigHasFunctionPointers) {
 
 TEST_F(DynamicModuleAccessLogTest, ThreadLocalLoggerCreation) {
   // Test that ThreadLocalLogger can be created with the config.
-  auto module_logger = config_->on_logger_new_(config_->in_module_config_);
+  auto tl_logger = std::make_shared<ThreadLocalLogger>(nullptr, config_);
+  auto module_logger = config_->on_logger_new_(config_->in_module_config_, tl_logger.get());
   EXPECT_NE(nullptr, module_logger);
 
-  ThreadLocalLogger tl_logger(module_logger, config_);
-  EXPECT_NE(nullptr, tl_logger.logger_);
-  EXPECT_EQ(config_, tl_logger.config_);
+  tl_logger->logger_ = module_logger;
+  EXPECT_NE(nullptr, tl_logger->logger_);
+  EXPECT_EQ(config_, tl_logger->config_);
 }
 
 TEST_F(DynamicModuleAccessLogTest, ThreadLocalLoggerDestruction) {
   // Test that ThreadLocalLogger properly destroys the module logger.
-  auto module_logger = config_->on_logger_new_(config_->in_module_config_);
+  auto tl_logger = std::make_shared<ThreadLocalLogger>(nullptr, config_);
+  auto module_logger = config_->on_logger_new_(config_->in_module_config_, tl_logger.get());
   EXPECT_NE(nullptr, module_logger);
 
   {
-    ThreadLocalLogger tl_logger(module_logger, config_);
+    tl_logger->logger_ = module_logger;
     // Destructor should call on_logger_flush_ then on_logger_destroy_.
   }
 }
 
 TEST_F(DynamicModuleAccessLogTest, FlushCalledOnDestruction) {
   // Test that flush is called before destroy when logger is destroyed.
-  auto module_logger = config_->on_logger_new_(config_->in_module_config_);
+  auto tl_logger = std::make_shared<ThreadLocalLogger>(nullptr, config_);
+  auto module_logger = config_->on_logger_new_(config_->in_module_config_, tl_logger.get());
   EXPECT_NE(nullptr, module_logger);
 
   static bool flush_called = false;
@@ -98,9 +101,11 @@ TEST_F(DynamicModuleAccessLogTest, FlushCalledOnDestruction) {
   };
 
   {
-    ThreadLocalLogger tl_logger(module_logger, config_);
+    tl_logger->logger_ = module_logger;
     EXPECT_FALSE(flush_called);
     EXPECT_FALSE(destroy_called);
+    // Reset pointer so tl_logger's destructor is called.
+    tl_logger.reset();
   }
 
   EXPECT_TRUE(flush_called);
@@ -110,7 +115,8 @@ TEST_F(DynamicModuleAccessLogTest, FlushCalledOnDestruction) {
 
 TEST_F(DynamicModuleAccessLogTest, FlushNotCalledWhenNull) {
   // Test that flush is skipped when on_logger_flush_ is nullptr.
-  auto module_logger = config_->on_logger_new_(config_->in_module_config_);
+  auto tl_logger = std::make_shared<ThreadLocalLogger>(nullptr, config_);
+  auto module_logger = config_->on_logger_new_(config_->in_module_config_, tl_logger.get());
   EXPECT_NE(nullptr, module_logger);
 
   static bool destroy_called = false;
@@ -122,7 +128,10 @@ TEST_F(DynamicModuleAccessLogTest, FlushNotCalledWhenNull) {
     destroy_called = true;
   };
 
-  { ThreadLocalLogger tl_logger(module_logger, config_); }
+  {
+    tl_logger->logger_ = module_logger;
+    tl_logger.reset();
+  }
 
   // Destroy should still be called even without flush.
   EXPECT_TRUE(destroy_called);
@@ -164,8 +173,9 @@ TEST_F(DynamicModuleAccessLogTest, EmitLog) {
       nullptr, config_, static_cast<ThreadLocal::SlotAllocator&>(tls));
 
   // Set up the mock slot to return a ThreadLocalLogger.
-  auto module_logger = config_->on_logger_new_(config_->in_module_config_);
-  auto tl_logger = std::make_shared<ThreadLocalLogger>(module_logger, config_);
+  auto tl_logger = std::make_shared<ThreadLocalLogger>(nullptr, config_);
+  auto module_logger = config_->on_logger_new_(config_->in_module_config_, tl_logger.get());
+  tl_logger->logger_ = module_logger;
 
   ON_CALL(*slot, get()).WillByDefault(testing::Return(tl_logger));
   // The runOnAllThreads callback in constructor sets up the slot, but for test we mock it.
@@ -174,14 +184,13 @@ TEST_F(DynamicModuleAccessLogTest, EmitLog) {
   Http::TestRequestHeaderMapImpl request_headers;
   Formatter::Context log_context(&request_headers, nullptr, nullptr);
 
-  // Override the logger callback to assert invocation and that the context is set.
+  // Override the logger callback to assert invocation.
   static bool log_called = false;
   log_called = false;
   config_->on_logger_log_ = [](void* ctx, envoy_dynamic_module_type_access_logger_module_ptr logger,
                                envoy_dynamic_module_type_access_log_type) {
     EXPECT_NE(ctx, nullptr);
     EXPECT_NE(logger, nullptr);
-    EXPECT_NE(DynamicModuleAccessLog::currentContext(), nullptr);
     log_called = true;
   };
 

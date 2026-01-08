@@ -351,18 +351,17 @@ macro_rules! declare_access_logger {
     #[no_mangle]
     pub extern "C" fn envoy_dynamic_module_on_access_logger_config_new(
       _config_envoy_ptr: *mut ::std::ffi::c_void,
-      name_ptr: *const ::std::os::raw::c_char,
-      name_size: usize,
-      config_ptr: *const ::std::os::raw::c_char,
-      config_size: usize,
+      name: $crate::abi::envoy_dynamic_module_type_envoy_buffer,
+      config: $crate::abi::envoy_dynamic_module_type_envoy_buffer,
     ) -> *const ::std::ffi::c_void {
-      let name = unsafe {
-        let slice = ::std::slice::from_raw_parts(name_ptr as *const u8, name_size);
+      let name_str = unsafe {
+        let slice = ::std::slice::from_raw_parts(name.ptr as *const u8, name.length);
         ::std::str::from_utf8(slice).unwrap_or("")
       };
-      let config = unsafe { ::std::slice::from_raw_parts(config_ptr as *const u8, config_size) };
+      let config_bytes =
+        unsafe { ::std::slice::from_raw_parts(config.ptr as *const u8, config.length) };
 
-      match <$config_type as $crate::access_log::AccessLoggerConfig>::new(name, config) {
+      match <$config_type as $crate::access_log::AccessLoggerConfig>::new(name_str, config_bytes) {
         Ok(c) => Box::into_raw(Box::new(c)) as *const ::std::ffi::c_void,
         Err(_) => ::std::ptr::null(),
       }
@@ -380,6 +379,7 @@ macro_rules! declare_access_logger {
     #[no_mangle]
     pub extern "C" fn envoy_dynamic_module_on_access_logger_new(
       config_ptr: *const ::std::ffi::c_void,
+      _logger_envoy_ptr: *mut ::std::ffi::c_void,
     ) -> *const ::std::ffi::c_void {
       let config = unsafe { &*(config_ptr as *const $config_type) };
       let logger = config.create_logger();

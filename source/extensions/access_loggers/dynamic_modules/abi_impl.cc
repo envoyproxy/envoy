@@ -16,18 +16,17 @@ namespace {
 
 using HeadersMapOptConstRef = OptRef<const Http::HeaderMap>;
 
-HeadersMapOptConstRef
-getHeaderMapByType(DynamicModuleAccessLogContext* context,
-                   envoy_dynamic_module_type_access_log_header_type header_type) {
+HeadersMapOptConstRef getHeaderMapByType(DynamicModuleAccessLogContext* context,
+                                         envoy_dynamic_module_type_http_header_type header_type) {
   if (!context) {
     return {};
   }
   switch (header_type) {
-  case envoy_dynamic_module_type_access_log_header_type_RequestHeaders:
+  case envoy_dynamic_module_type_http_header_type_RequestHeader:
     return context->log_context_.requestHeaders();
-  case envoy_dynamic_module_type_access_log_header_type_ResponseHeaders:
+  case envoy_dynamic_module_type_http_header_type_ResponseHeader:
     return context->log_context_.responseHeaders();
-  case envoy_dynamic_module_type_access_log_header_type_ResponseTrailers:
+  case envoy_dynamic_module_type_http_header_type_ResponseTrailer:
     return context->log_context_.responseTrailers();
   default:
     return {};
@@ -101,7 +100,7 @@ extern "C" {
 
 bool envoy_dynamic_module_callback_access_logger_get_headers_size(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
-    envoy_dynamic_module_type_access_log_header_type header_type, size_t* size_out) {
+    envoy_dynamic_module_type_http_header_type header_type, size_t* size_out) {
   auto* context = static_cast<DynamicModuleAccessLogContext*>(logger_envoy_ptr);
   HeadersMapOptConstRef map = getHeaderMapByType(context, header_type);
   if (!map.has_value()) {
@@ -114,7 +113,7 @@ bool envoy_dynamic_module_callback_access_logger_get_headers_size(
 
 bool envoy_dynamic_module_callback_access_logger_get_headers(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
-    envoy_dynamic_module_type_access_log_header_type header_type,
+    envoy_dynamic_module_type_http_header_type header_type,
     envoy_dynamic_module_type_envoy_http_header* result_headers) {
   auto* context = static_cast<DynamicModuleAccessLogContext*>(logger_envoy_ptr);
   return getHeadersImpl(getHeaderMapByType(context, header_type), result_headers);
@@ -122,7 +121,7 @@ bool envoy_dynamic_module_callback_access_logger_get_headers(
 
 bool envoy_dynamic_module_callback_access_logger_get_header_value(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
-    envoy_dynamic_module_type_access_log_header_type header_type,
+    envoy_dynamic_module_type_http_header_type header_type,
     envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result,
     size_t index, size_t* total_count_out) {
   auto* context = static_cast<DynamicModuleAccessLogContext*>(logger_envoy_ptr);

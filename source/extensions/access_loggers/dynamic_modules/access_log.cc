@@ -7,8 +7,6 @@ namespace Extensions {
 namespace AccessLoggers {
 namespace DynamicModules {
 
-thread_local DynamicModuleAccessLogContext* DynamicModuleAccessLog::current_context_ = nullptr;
-
 ThreadLocalLogger::ThreadLocalLogger(envoy_dynamic_module_type_access_logger_module_ptr logger,
                                      DynamicModuleAccessLogConfigSharedPtr config)
     : logger_(logger), config_(config) {}
@@ -33,12 +31,14 @@ DynamicModuleAccessLog::DynamicModuleAccessLog(AccessLog::FilterPtr&& filter,
     : Common::ImplBase(std::move(filter)), config_(config), tls_slot_(tls.allocateSlot()) {
 
   tls_slot_->set([config](Event::Dispatcher&) {
-    auto logger = config->on_logger_new_(config->in_module_config_);
-    return std::make_shared<ThreadLocalLogger>(logger, config);
+    // Create a thread-local logger wrapper first, then pass it to the module.
+    auto tl_logger = std::make_shared<ThreadLocalLogger>(nullptr, config);
+    auto logger =
+        config->on_logger_new_(config->in_module_config_, static_cast<void*>(tl_logger.get()));
+    tl_logger->logger_ = logger;
+    return tl_logger;
   });
 }
-
-DynamicModuleAccessLogContext* DynamicModuleAccessLog::currentContext() { return current_context_; }
 
 void DynamicModuleAccessLog::emitLog(const Formatter::Context& context,
                                      const StreamInfo::StreamInfo& stream_info) {
@@ -48,7 +48,6 @@ void DynamicModuleAccessLog::emitLog(const Formatter::Context& context,
   }
 
   DynamicModuleAccessLogContext log_context(context, stream_info);
-  current_context_ = &log_context;
 
   // Convert AccessLogType to ABI enum. The cast is safe because enum values are aligned.
   const auto abi_log_type =
@@ -56,8 +55,6 @@ void DynamicModuleAccessLog::emitLog(const Formatter::Context& context,
 
   // Invoke the module's log callback with the context pointer.
   config_->on_logger_log_(static_cast<void*>(&log_context), tl_logger.logger_, abi_log_type);
-
-  current_context_ = nullptr;
 }
 
 } // namespace DynamicModules

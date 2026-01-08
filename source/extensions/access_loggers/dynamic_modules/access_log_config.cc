@@ -63,9 +63,12 @@ newDynamicModuleAccessLogConfig(const absl::string_view logger_name,
   config->on_logger_flush_ = on_logger_flush.ok() ? on_logger_flush.value() : nullptr;
 
   // Create the in-module configuration.
-  config->in_module_config_ = (*on_config_new.value())(
-      static_cast<void*>(config.get()), config->logger_name_.c_str(), config->logger_name_.size(),
-      config->logger_config_.data(), config->logger_config_.size());
+  envoy_dynamic_module_type_envoy_buffer name_buf = {.ptr = config->logger_name_.data(),
+                                                     .length = config->logger_name_.size()};
+  envoy_dynamic_module_type_envoy_buffer config_buf = {.ptr = config->logger_config_.data(),
+                                                       .length = config->logger_config_.size()};
+  config->in_module_config_ =
+      (*on_config_new.value())(static_cast<void*>(config.get()), name_buf, config_buf);
 
   if (config->in_module_config_ == nullptr) {
     return absl::InvalidArgumentError("Failed to initialize dynamic module access logger config");
