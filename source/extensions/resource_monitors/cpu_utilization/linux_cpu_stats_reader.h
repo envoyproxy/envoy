@@ -24,9 +24,11 @@ class LinuxCpuStatsReader : public CpuStatsReader {
 public:
   explicit LinuxCpuStatsReader(const std::string& cpu_stats_filename = LINUX_CPU_STATS_FILE);
   CpuTimes getCpuTimes() override;
+  absl::StatusOr<double> getUtilization() override;
 
 private:
   const std::string cpu_stats_filename_;
+  CpuTimes previous_cpu_times_{false, false, 0, 0, 0};
 };
 
 /**
@@ -66,11 +68,13 @@ public:
                          const std::string& shares_path, const std::string& usage_path);
 
   CpuTimes getCpuTimes() override;
+  absl::StatusOr<double> getUtilization() override;
 
 private:
   static constexpr double CONTAINER_MILLICORES_PER_CORE = 1000.0;
   const std::string shares_path_;
   const std::string usage_path_;
+  CpuTimes previous_cpu_times_{false, false, 0, 0, 0};
 };
 
 class CgroupV2CpuStatsReader : public LinuxContainerCpuStatsReader,
@@ -84,11 +88,13 @@ public:
                          const std::string& effective_path);
 
   CpuTimes getCpuTimes() override;
+  absl::StatusOr<double> getUtilization() override;
 
 private:
   const std::string stat_path_;
   const std::string max_path_;
   const std::string effective_path_;
+  CpuTimes previous_cpu_times_{false, true, 0, 0, 0};
 };
 
 } // namespace CpuUtilizationMonitor

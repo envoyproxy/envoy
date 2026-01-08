@@ -59,6 +59,38 @@ CpuTimes LinuxCpuStatsReader::getCpuTimes() {
   return {true, false, static_cast<double>(work_time), total_time, 0};
 }
 
+absl::StatusOr<double> LinuxCpuStatsReader::getUtilization() {
+  CpuTimes current_cpu_times = getCpuTimes();
+  
+  if (!current_cpu_times.is_valid) {
+    return absl::InvalidArgumentError("Failed to read CPU times");
+  }
+
+  // For the first call, initialize previous times and return 0
+  if (!previous_cpu_times_.is_valid) {
+    previous_cpu_times_ = current_cpu_times;
+    return 0.0;
+  }
+
+  // Simple calculation: work_delta / total_delta
+  const double work_over_period = current_cpu_times.work_time - previous_cpu_times_.work_time;
+  const int64_t total_over_period = current_cpu_times.total_time - previous_cpu_times_.total_time;
+
+  if (work_over_period < 0 || total_over_period <= 0) {
+    return absl::InvalidArgumentError(
+        fmt::format("Erroneous CPU stats calculation. Work_over_period='{}' cannot "
+                    "be a negative number and total_over_period='{}' must be a positive number.",
+                    work_over_period, total_over_period));
+  }
+
+  const double utilization = work_over_period / total_over_period;
+
+  // Update previous times for next call
+  previous_cpu_times_ = current_cpu_times;
+
+  return utilization;
+}
+
 // Container CPU Stats Reader
 LinuxContainerCpuStatsReader::ContainerStatsReaderPtr
 LinuxContainerCpuStatsReader::create(Filesystem::Instance& fs, TimeSource& time_source) {
@@ -129,6 +161,38 @@ CpuTimes CgroupV1CpuStatsReader::getCpuTimes() {
   ENVOY_LOG(trace, "cgroupv1 current_time: {}", current_time);
 
   return {true, false, work_time, current_time, 0};
+}
+
+absl::StatusOr<double> CgroupV1CpuStatsReader::getUtilization() {
+  CpuTimes current_cpu_times = getCpuTimes();
+  
+  if (!current_cpu_times.is_valid) {
+    return absl::InvalidArgumentError("Failed to read CPU times");
+  }
+
+  // For the first call, initialize previous times and return 0
+  if (!previous_cpu_times_.is_valid) {
+    previous_cpu_times_ = current_cpu_times;
+    return 0.0;
+  }
+
+  // Simple calculation: work_delta / total_delta
+  const double work_over_period = current_cpu_times.work_time - previous_cpu_times_.work_time;
+  const int64_t total_over_period = current_cpu_times.total_time - previous_cpu_times_.total_time;
+
+  if (work_over_period < 0 || total_over_period <= 0) {
+    return absl::InvalidArgumentError(
+        fmt::format("Erroneous CPU stats calculation. Work_over_period='{}' cannot "
+                    "be a negative number and total_over_period='{}' must be a positive number.",
+                    work_over_period, total_over_period));
+  }
+
+  const double utilization = work_over_period / total_over_period;
+
+  // Update previous times for next call
+  previous_cpu_times_ = current_cpu_times;
+
+  return utilization;
 }
 
 CgroupV2CpuStatsReader::CgroupV2CpuStatsReader(Filesystem::Instance& fs, TimeSource& time_source)
@@ -270,6 +334,46 @@ CpuTimes CgroupV2CpuStatsReader::getCpuTimes() {
   ENVOY_LOG(trace, "cgroupv2 current_time: {}", current_time);
 
   return {true, true, cpu_times_value_us, current_time, effective_cores};
+}
+
+absl::StatusOr<double> CgroupV2CpuStatsReader::getUtilization() {
+  CpuTimes current_cpu_times = getCpuTimes();
+  
+  if (!current_cpu_times.is_valid) {
+    return absl::InvalidArgumentError("Failed to read CPU times");
+  }
+
+  // For the first call, initialize previous times and return 0
+  if (!previous_cpu_times_.is_valid) {
+    previous_cpu_times_ = current_cpu_times;
+    return 0.0;
+  }
+
+  // CgroupV2-specific calculation with unit conversions and effective cores
+  const double work_over_period = current_cpu_times.work_time - previous_cpu_times_.work_time;
+  const int64_t total_over_period = current_cpu_times.total_time - previous_cpu_times_.total_time;
+
+  if (work_over_period < 0 || total_over_period <= 0) {
+    return absl::InvalidArgumentError(
+        fmt::format("Erroneous CPU stats calculation. Work_over_period='{}' cannot "
+                    "be a negative number and total_over_period='{}' must be a positive number.",
+                    work_over_period, total_over_period));
+  }
+
+  // Convert nanoseconds to seconds and microseconds to seconds
+  const double total_over_period_seconds = total_over_period / 1000000000.0;
+  const double work_over_period_seconds = work_over_period / 1000000.0;
+  
+  // Calculate utilization considering effective cores
+  const double utilization = work_over_period_seconds / (total_over_period_seconds * current_cpu_times.effective_cores);
+
+  // Clamp to [0.0, 1.0]
+  const double clamped_utilization = std::clamp(utilization, 0.0, 1.0);
+
+  // Update previous times for next call
+  previous_cpu_times_ = current_cpu_times;
+
+  return clamped_utilization;
 }
 
 } // namespace CpuUtilizationMonitor

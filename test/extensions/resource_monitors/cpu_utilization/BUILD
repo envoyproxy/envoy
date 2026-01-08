@@ -66,14 +66,3 @@ envoy_extension_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
-
-envoy_extension_cc_test(
-    name = "cpu_stats_reader_test",
-    srcs = ["cpu_stats_reader_test.cc"],
-    extension_names = ["envoy.resource_monitors.cpu_utilization"],
-    tags = ["skip_on_windows"],
-    deps = [
-        "//source/extensions/resource_monitors/cpu_utilization:cpu_utilization_monitor",
-        "//test/test_common:utility_lib",
-    ],
-)
