@@ -87,6 +87,10 @@ struct HeaderMutation {
   std::string key;
   std::string value;
   HeaderAppendAction append_action;
+  // True if this mutation came from the deprecated 'append' boolean field.
+  // When true and append_action is APPEND_IF_EXISTS_OR_ADD, use appendCopy() instead
+  // of addCopy() for backward compatibility.
+  bool from_deprecated_append{false};
 };
 using HeaderMutationVector = std::vector<HeaderMutation>;
 

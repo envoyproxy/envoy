@@ -611,9 +611,9 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationDeniedAndAllowedClientHeaders) {
   // Response headers from auth server: :method, x-foo, :status, foo
   // - For denied responses, upstreamHeaderMatchers are not applied.
   // - x-foo, :status, foo match clientHeaderMatchers (X- prefix, default :status, Foo exact)
-  //   → local_response_header_mutations with Add
-  // - :method doesn't match any matcher
-  // Note thqt the header iteration order may differ from insertion order. Pseudo-headers
+  //   → local_response_header_mutations with Add.
+  // - :method doesn't match any matcher.
+  // Note that the header iteration order may differ from insertion order. Pseudo-headers
   // like :status are typically iterated first.
   Response authz_response;
   authz_response.status = CheckStatus::Denied;

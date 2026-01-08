@@ -18,24 +18,34 @@ namespace ExtAuthz {
 
 namespace {
 
+// Result of parsing a HeaderValueOption's append action.
+struct AppendActionResult {
+  HeaderAppendAction action;
+  bool from_deprecated_append;
+};
+
 // Converts proto HeaderValueOption to HeaderAppendAction.
 // Handles the deprecated append boolean for backward compatibility.
-// Returns the action and sets saw_invalid if the action is unknown.
-HeaderAppendAction getAppendAction(envoy::config::core::v3::HeaderValueOption& header,
+// Returns the action and whether it came from the deprecated field.
+// Sets saw_invalid if the action is unknown.
+AppendActionResult getAppendAction(envoy::config::core::v3::HeaderValueOption& header,
                                    bool& saw_invalid_append_actions) {
   if (header.has_append()) {
     // Handle deprecated append boolean for backward compatibility.
-    return header.append().value() ? HeaderValueOption::APPEND_IF_EXISTS_OR_ADD
-                                   : HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD;
+    // When from_deprecated_append is true and action is APPEND_IF_EXISTS_OR_ADD,
+    // the filter will use appendCopy() instead of addCopy().
+    return {header.append().value() ? HeaderValueOption::APPEND_IF_EXISTS_OR_ADD
+                                    : HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD,
+            true};
   }
 
   if (!envoy::config::core::v3::HeaderValueOption::HeaderAppendAction_IsValid(
           header.append_action())) {
     saw_invalid_append_actions = true;
-    return HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD;
+    return {HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD, false};
   }
 
-  return header.append_action();
+  return {header.append_action(), false};
 }
 
 // Moves header mutations from proto to the response vector, preserving order.
@@ -45,9 +55,10 @@ void moveHeaderMutations(
     HeaderMutationVector& mutations, bool& saw_invalid_append_actions) {
   mutations.reserve(mutations.size() + headers->size());
   for (auto& header : *headers) {
-    HeaderAppendAction action = getAppendAction(header, saw_invalid_append_actions);
+    AppendActionResult result = getAppendAction(header, saw_invalid_append_actions);
     mutations.push_back({std::move(*header.mutable_header()->mutable_key()),
-                         std::move(*header.mutable_header()->mutable_value()), action});
+                         std::move(*header.mutable_header()->mutable_value()), result.action,
+                         result.from_deprecated_append});
   }
 }
 

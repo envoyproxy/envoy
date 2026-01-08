@@ -84,8 +84,14 @@ void applyHeaderMutation(Http::HeaderMap& headers, const HeaderMutation& mutatio
     headers.setCopy(key, mutation.value);
     break;
   case Filters::Common::ExtAuthz::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD:
-    // Add creates a new entry (allows duplicates).
-    headers.addCopy(key, mutation.value);
+    // For the deprecated 'append' boolean field on response headers, use appendCopy()
+    // which creates comma-separated values for existing headers or adds new headers.
+    // For the new append_action enum, use addCopy() which creates duplicate header entries.
+    if (mutation.from_deprecated_append) {
+      headers.appendCopy(key, mutation.value);
+    } else {
+      headers.addCopy(key, mutation.value);
+    }
     break;
   case Filters::Common::ExtAuthz::HeaderValueOption::ADD_IF_ABSENT:
     if (headers.get(key).empty()) {
@@ -709,8 +715,18 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
           request_headers_->setCopy(lowercase_key, value);
           break;
         case Filters::Common::ExtAuthz::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD:
-          ENVOY_STREAM_LOG(trace, "Add '{}':'{}'", *decoder_callbacks_, key, value);
-          request_headers_->addCopy(lowercase_key, value);
+          // For the deprecated 'append' boolean field, only append to existing headers
+          // and do not add the header if it doesn't exist. For the new append_action
+          // enum, add duplicate header entries via addCopy().
+          if (mutation.from_deprecated_append) {
+            if (!request_headers_->get(lowercase_key).empty()) {
+              ENVOY_STREAM_LOG(trace, "Append '{}':'{}'", *decoder_callbacks_, key, value);
+              request_headers_->appendCopy(lowercase_key, value);
+            }
+          } else {
+            ENVOY_STREAM_LOG(trace, "Add '{}':'{}'", *decoder_callbacks_, key, value);
+            request_headers_->addCopy(lowercase_key, value);
+          }
           break;
         case Filters::Common::ExtAuthz::HeaderValueOption::ADD_IF_ABSENT:
           if (request_headers_->get(lowercase_key).empty()) {

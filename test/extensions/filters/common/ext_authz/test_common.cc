@@ -155,11 +155,13 @@ TestCommon::makeAuthzResponse(CheckStatus status, Http::Code status_code, const 
   if (!headers.empty()) {
     for (const auto& header : headers) {
       HeaderAppendAction action;
+      bool from_deprecated_append = false;
       if (header.has_append()) {
         // Match gRPC impl behavior: append=true → APPEND_IF_EXISTS_OR_ADD,
         // append=false → OVERWRITE_IF_EXISTS_OR_ADD.
         action = header.append().value() ? HeaderValueOption::APPEND_IF_EXISTS_OR_ADD
                                          : HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD;
+        from_deprecated_append = true;
       } else {
         // Default to OVERWRITE_IF_EXISTS_OR_ADD for backward compatibility.
         action = HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD;
@@ -167,28 +169,30 @@ TestCommon::makeAuthzResponse(CheckStatus status, Http::Code status_code, const 
       if (status == Filters::Common::ExtAuthz::CheckStatus::OK) {
         // OK response: headers go to request_header_mutations for upstream request.
         authz_response.request_header_mutations.push_back(
-            {header.header().key(), header.header().value(), action});
+            {header.header().key(), header.header().value(), action, from_deprecated_append});
       } else {
         // Denied/Error response: headers go to local_response_header_mutations for local reply.
         authz_response.local_response_header_mutations.push_back(
-            {header.header().key(), header.header().value(), action});
+            {header.header().key(), header.header().value(), action, from_deprecated_append});
       }
     }
   }
   if (!downstream_headers.empty()) {
     for (const auto& header : downstream_headers) {
       HeaderAppendAction action;
+      bool from_deprecated_append = false;
       if (header.has_append()) {
         // Match gRPC impl behavior: append=true → APPEND_IF_EXISTS_OR_ADD,
         // append=false → OVERWRITE_IF_EXISTS_OR_ADD.
         action = header.append().value() ? HeaderValueOption::APPEND_IF_EXISTS_OR_ADD
                                          : HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD;
+        from_deprecated_append = true;
       } else {
         // Default to APPEND_IF_EXISTS_OR_ADD for response headers (backward compatible with Add).
         action = HeaderValueOption::APPEND_IF_EXISTS_OR_ADD;
       }
       authz_response.response_header_mutations.push_back(
-          {header.header().key(), header.header().value(), action});
+          {header.header().key(), header.header().value(), action, from_deprecated_append});
     }
   }
 
