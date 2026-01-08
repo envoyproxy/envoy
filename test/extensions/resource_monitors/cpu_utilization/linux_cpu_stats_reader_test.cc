@@ -1204,7 +1204,8 @@ TEST(LinuxCpuStatsReaderUtilizationTest, NegativeWorkDeltaReturnsError) {
 
 TEST(LinuxCpuStatsReaderUtilizationTest, ZeroTotalDeltaReturnsError) {
   // Test that zero total delta returns an error
-  // Note: In /proc/stat, total = user + nice + system + idle, so we need all four values to stay the same
+  // Note: In /proc/stat, total = user + nice + system + idle,
+  // so we need all four values to stay the same
   const std::string temp_path = TestEnvironment::temporaryPath("cpu_stats_util4");
   AtomicFileUpdater file_updater(temp_path);
 
