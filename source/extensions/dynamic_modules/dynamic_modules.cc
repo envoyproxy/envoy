@@ -6,8 +6,12 @@
 
 #include "envoy/common/exception.h"
 
+#include "source/common/common/lock_guard.h"
+#include "source/common/common/thread.h"
 #include "source/extensions/dynamic_modules/abi.h"
 #include "source/extensions/dynamic_modules/abi_version.h"
+
+#include "absl/container/flat_hash_map.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -15,21 +19,50 @@ namespace DynamicModules {
 
 constexpr char DYNAMIC_MODULES_SEARCH_PATH[] = "ENVOY_DYNAMIC_MODULES_SEARCH_PATH";
 
+// Track modules loaded with do_not_close=true so we can reuse them across
+// subsequent loads (tests rely on preserving state in that case).
+static Thread::MutexBasicLockable& residentModulesMutex() {
+  static auto* m = new Thread::MutexBasicLockable();
+  return *m;
+}
+
+static absl::flat_hash_map<std::string, void*>& residentModules() {
+  static auto* map = new absl::flat_hash_map<std::string, void*>();
+  return *map;
+}
+
 absl::StatusOr<DynamicModulePtr>
 newDynamicModule(const std::filesystem::path& object_file_absolute_path, const bool do_not_close,
                  const bool load_globally) {
+  // Always check our internal cache first. If the module was previously loaded with
+  // do_not_close=true, it's still resident in memory (via RTLD_NODELETE) and we should reuse it
+  // to avoid calling the init function again.
+  {
+    Thread::LockGuard lock(residentModulesMutex());
+    auto it = residentModules().find(object_file_absolute_path.string());
+    if (it != residentModules().end()) {
+      return std::make_unique<DynamicModule>(it->second);
+    }
+  }
+
+  // When do_not_close=false, also check if the module is already loaded using RTLD_NOLOAD.
+  // This handles the case where a module was loaded without do_not_close and is still in memory.
+  //
+  // When do_not_close=true, skip this check to force a fresh load. This ensures the module is
+  // loaded with RTLD_NODELETE and its state is reset (e.g., for testing scenarios where we need
+  // to reload a module with fresh state).
+  //
   // From the man page of dlopen(3):
-  //
-  // > This can be used to test if the object is already resident (dlopen() returns NULL if it
-  // > is not, or the object's handle if it is resident).
-  //
-  // So we can use RTLD_NOLOAD to check if the module is already loaded to avoid the duplicate call
-  // to the init function.
-  void* handle = dlopen(object_file_absolute_path.c_str(), RTLD_NOLOAD | RTLD_LAZY);
-  if (handle != nullptr) {
-    // This means the module is already loaded, and the return value is the handle of the already
-    // loaded module. We don't need to call the init function again.
-    return std::make_unique<DynamicModule>(handle);
+  // > This can be used to test if the object is already resident. dlopen() returns NULL if it
+  // > is not, or the object's handle if it is resident.
+  void* handle = nullptr;
+  if (!do_not_close) {
+    handle = dlopen(object_file_absolute_path.c_str(), RTLD_NOLOAD | RTLD_LAZY);
+    if (handle != nullptr) {
+      // This means the module is already loaded, and the return value is the handle of the
+      // already loaded module. We don't need to call the init function again.
+      return std::make_unique<DynamicModule>(handle);
+    }
   }
   // RTLD_LAZY is required for not only performance but also simply to load the module, otherwise
   // dlopen results in Invalid argument.
@@ -47,6 +80,11 @@ newDynamicModule(const std::filesystem::path& object_file_absolute_path, const b
   if (handle == nullptr) {
     return absl::InvalidArgumentError(absl::StrCat(
         "Failed to load dynamic module: ", object_file_absolute_path.c_str(), " : ", dlerror()));
+  }
+
+  if (do_not_close) {
+    Thread::LockGuard lock(residentModulesMutex());
+    residentModules()[object_file_absolute_path.string()] = handle;
   }
 
   DynamicModulePtr dynamic_module = std::make_unique<DynamicModule>(handle);

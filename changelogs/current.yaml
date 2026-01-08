@@ -362,6 +362,12 @@ new_features:
     Added scheduler API for HTTP filter configuration in dynamic modules. The configuration scheduler allows modules
     to dispatch asynchronous operations to the main thread, enabling singleton/bootstrap patterns similar to WASM
     filters for initialization and background tasks.
+- area: dynamic modules
+  change: |
+    Added :ref:`bootstrap extension <envoy_v3_api_msg_extensions.bootstrap.dynamic_modules.v3.DynamicModuleBootstrapExtension>`
+    support for dynamic modules, enabling server initialization hooks and per-worker-thread initialization. Bootstrap
+    extensions can perform setup tasks when Envoy starts, access server-level resources, and implement singleton patterns
+    for configuration loading and global state management.
 - area: udp_sink
   change: |
     Enhanced the UDP sink to support tapped messages larger than 64KB.
