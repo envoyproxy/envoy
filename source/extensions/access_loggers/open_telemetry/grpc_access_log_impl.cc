@@ -16,8 +16,6 @@
 #include "opentelemetry/proto/logs/v1/logs.pb.h"
 #include "opentelemetry/proto/resource/v1/resource.pb.h"
 
-const char GRPC_LOG_STATS_PREFIX[] = "access_logs.open_telemetry_access_log.";
-
 namespace Envoy {
 namespace Extensions {
 namespace AccessLoggers {
@@ -41,8 +39,8 @@ GrpcAccessLoggerImpl::GrpcAccessLoggerImpl(
               *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
                   "opentelemetry.proto.collector.logs.v1.LogsService.Export"),
               GrpcCommon::optionalRetryPolicy(config.common_config()), genOTelCallbacksFactory())),
-      stats_({ALL_GRPC_ACCESS_LOGGER_STATS(
-          POOL_COUNTER_PREFIX(scope, absl::StrCat(GRPC_LOG_STATS_PREFIX, config.stat_prefix())))}) {
+      stats_({ALL_GRPC_ACCESS_LOGGER_STATS(POOL_COUNTER_PREFIX(
+          scope, absl::StrCat(OtlpAccessLogStatsPrefix, config.stat_prefix())))}) {
   root_ = initOtlpMessageRoot(message_, config, local_info);
 }
 

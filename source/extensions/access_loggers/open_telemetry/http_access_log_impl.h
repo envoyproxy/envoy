@@ -21,6 +21,7 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/tracing/custom_tag_impl.h"
 #include "source/extensions/access_loggers/common/access_log_base.h"
+#include "source/extensions/access_loggers/open_telemetry/otlp_log_utils.h"
 #include "source/extensions/access_loggers/open_telemetry/substitution_formatter.h"
 
 #include "opentelemetry/proto/collector/logs/v1/logs_service.pb.h"
@@ -77,6 +78,10 @@ private:
   const std::chrono::milliseconds buffer_flush_interval_;
   const uint64_t max_buffer_size_bytes_;
   uint64_t approximate_message_size_bytes_ = 0;
+
+  OtlpAccessLogStats stats_;
+  uint32_t batched_log_entries_ = 0;
+  uint32_t in_flight_log_entries_ = 0;
 };
 
 /**

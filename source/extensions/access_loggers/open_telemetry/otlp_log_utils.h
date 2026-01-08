@@ -7,6 +7,7 @@
 #include "envoy/extensions/access_loggers/open_telemetry/v3/logs_service.pb.h"
 #include "envoy/formatter/http_formatter_context.h"
 #include "envoy/local_info/local_info.h"
+#include "envoy/stats/stats_macros.h"
 #include "envoy/stream_info/filter_state.h"
 #include "envoy/stream_info/stream_info.h"
 
@@ -37,6 +38,16 @@ constexpr absl::string_view BodyKey = "body";
 constexpr size_t TraceIdHexLength = 32;
 // Zipkin-style trace ID length in hex (64-bit = 16 hex chars).
 constexpr size_t ShortTraceIdHexLength = 16;
+
+constexpr absl::string_view OtlpAccessLogStatsPrefix = "access_logs.open_telemetry_access_log.";
+
+#define ALL_OTLP_ACCESS_LOG_STATS(COUNTER)                                                         \
+  COUNTER(logs_written)                                                                            \
+  COUNTER(logs_dropped)
+
+struct OtlpAccessLogStats {
+  ALL_OTLP_ACCESS_LOG_STATS(GENERATE_COUNTER_STRUCT)
+};
 
 // Creates a KeyValue protobuf with a string value.
 opentelemetry::proto::common::v1::KeyValue getStringKeyValue(const std::string& key,

@@ -32,10 +32,12 @@ HttpAccessLoggerImpl::HttpAccessLoggerImpl(
     const envoy::config::core::v3::HttpService& http_service,
     const envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig&
         config,
-    Event::Dispatcher& dispatcher, const LocalInfo::LocalInfo& local_info, Stats::Scope&)
+    Event::Dispatcher& dispatcher, const LocalInfo::LocalInfo& local_info, Stats::Scope& scope)
     : cluster_manager_(cluster_manager), http_service_(http_service),
       buffer_flush_interval_(getBufferFlushInterval(config)),
-      max_buffer_size_bytes_(getBufferSizeBytes(config)) {
+      max_buffer_size_bytes_(getBufferSizeBytes(config)),
+      stats_({ALL_OTLP_ACCESS_LOG_STATS(POOL_COUNTER_PREFIX(
+          scope, absl::StrCat(OtlpAccessLogStatsPrefix, config.stat_prefix())))}) {
 
   // Prepares and stores headers to be used later on each export request.
   for (const auto& header_value_option : http_service_.request_headers_to_add()) {
@@ -55,9 +57,9 @@ HttpAccessLoggerImpl::HttpAccessLoggerImpl(
 
 void HttpAccessLoggerImpl::log(opentelemetry::proto::logs::v1::LogRecord&& entry) {
   approximate_message_size_bytes_ += entry.ByteSizeLong();
+  batched_log_entries_++;
   root_->mutable_log_records()->Add(std::move(entry));
 
-  // Flushes if the buffer size exceeds the threshold.
   if (approximate_message_size_bytes_ >= max_buffer_size_bytes_) {
     flush();
   }
@@ -114,23 +116,30 @@ void HttpAccessLoggerImpl::flush() {
 
   if (in_flight_request != nullptr) {
     active_requests_.add(*in_flight_request);
+    in_flight_log_entries_ = batched_log_entries_;
+  } else {
+    stats_.logs_dropped_.add(batched_log_entries_);
   }
 
-  // Clears the log records for the next batch.
   root_->clear_log_records();
   approximate_message_size_bytes_ = 0;
+  batched_log_entries_ = 0;
 }
 
 void HttpAccessLoggerImpl::onSuccess(const Http::AsyncClient::Request& request,
                                      Http::ResponseMessagePtr&& http_response) {
   active_requests_.remove(request);
   const auto response_code = Http::Utility::getResponseStatus(http_response->headers());
-  if (response_code != enumToInt(Http::Code::OK)) {
+  if (response_code == enumToInt(Http::Code::OK)) {
+    stats_.logs_written_.add(in_flight_log_entries_);
+  } else {
     ENVOY_LOG(error,
               "OTLP HTTP access log exporter received a non-success status code: {} while "
               "exporting the OTLP message",
               response_code);
+    stats_.logs_dropped_.add(in_flight_log_entries_);
   }
+  in_flight_log_entries_ = 0;
 }
 
 void HttpAccessLoggerImpl::onFailure(const Http::AsyncClient::Request& request,
@@ -138,6 +147,8 @@ void HttpAccessLoggerImpl::onFailure(const Http::AsyncClient::Request& request,
   active_requests_.remove(request);
   ENVOY_LOG(warn, "OTLP HTTP access log export request failed. Failure reason: {}",
             enumToInt(reason));
+  stats_.logs_dropped_.add(in_flight_log_entries_);
+  in_flight_log_entries_ = 0;
 }
 
 HttpAccessLoggerCacheImpl::HttpAccessLoggerCacheImpl(Upstream::ClusterManager& cluster_manager,

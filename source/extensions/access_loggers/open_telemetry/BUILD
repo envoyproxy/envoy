@@ -16,6 +16,7 @@ envoy_cc_library(
     deps = [
         "//envoy/formatter:http_formatter_context_interface",
         "//envoy/local_info:local_info_interface",
+        "//envoy/stats:stats_macros",
         "//envoy/stream_info:filter_state_interface",
         "//envoy/stream_info:stream_info_interface",
         "//source/common/common:assert_lib",

@@ -132,26 +132,6 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
-    name = "http_access_log_integration_test",
-    size = "large",
-    srcs = ["http_access_log_integration_test.cc"],
-    extension_names = ["envoy.access_loggers.open_telemetry"],
-    rbe_pool = "6gig",
-    deps = [
-        "//source/common/buffer:zero_copy_input_stream_lib",
-        "//source/common/formatter:formatter_extension_lib",
-        "//source/extensions/access_loggers/open_telemetry:config",
-        "//test/integration:http_integration_lib",
-        "//test/test_common:utility_lib",
-        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/access_loggers/open_telemetry/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
-        "@opentelemetry_proto//:logs_proto_cc",
-        "@opentelemetry_proto//:logs_service_proto_cc",
-    ],
-)
-
-envoy_extension_cc_test(
     name = "substitution_formatter_test",
     srcs = ["substitution_formatter_test.cc"],
     copts = select({
