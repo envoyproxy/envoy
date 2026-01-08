@@ -112,40 +112,6 @@ private:
   bool processSseEvent(absl::string_view event);
 
   /**
-   * Extract the data field value from an SSE event.
-   * Handles multiple data fields per SSE spec (concatenated with newlines).
-   * @param event the complete event content.
-   * @return the concatenated data field value, or empty string if no data fields found.
-   */
-  std::string extractSseDataField(absl::string_view event) const;
-
-  /**
-   * Parse an SSE field line into (field_name, field_value).
-   * Handles SSE spec details like comment lines and optional space after colon.
-   * @param line a single line from an SSE event.
-   * @return pair of (field_name, field_value). Returns ("", "") for comment lines.
-   */
-  std::pair<absl::string_view, absl::string_view> parseSseFieldLine(absl::string_view line) const;
-
-  /**
-   * Find the end of a line in SSE format, handling CRLF, CR, and LF.
-   * @param str the string to search in.
-   * @param end_stream whether the stream has ended.
-   * @return pair of (line_content_end, next_line_start). Returns (npos, npos) if no complete line
-   * ending found.
-   */
-  std::pair<size_t, size_t> findLineEnd(absl::string_view str, bool end_stream) const;
-
-  /**
-   * Find the end of an SSE event (blank line boundary).
-   * @param str the string to search in.
-   * @param end_stream whether the stream has ended.
-   * @return pair of (event_content_end, next_event_start). Returns (npos, npos) if no complete
-   * event found.
-   */
-  std::pair<size_t, size_t> findEventEnd(absl::string_view str, bool end_stream) const;
-
-  /**
    * Apply a rule to extract a value from JSON and write to metadata.
    * @param json_obj the parsed JSON object.
    * @param rule the rule to apply.
