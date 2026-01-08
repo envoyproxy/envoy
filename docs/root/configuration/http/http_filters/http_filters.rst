@@ -32,6 +32,7 @@ HTTP filters
   ext_proc_filter
   fault_filter
   file_system_buffer_filter
+  filter_chain_filter
   gcp_authn_filter
   geoip_filter
   golang_filter
