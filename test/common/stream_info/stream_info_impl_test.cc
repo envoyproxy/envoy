@@ -42,7 +42,7 @@ protected:
   void assertStreamInfoSize(StreamInfoImpl stream_info) {
     ASSERT_TRUE(
         // with --config=docker-msan
-        sizeof(stream_info) == 712 ||
+        sizeof(stream_info) == 720 ||
         // with --config=docker-clang
         sizeof(stream_info) == 736 ||
         // with --config=docker-clang-libc++
