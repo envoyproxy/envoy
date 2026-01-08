@@ -98,7 +98,7 @@ public:
     Filters::Common::ExtAuthz::Response response{};
     response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
     response.request_header_mutations.push_back(
-        {"foo", "bar", Filters::Common::ExtAuthz::HeaderMutationAction::Set});
+        {"foo", "bar", Filters::Common::ExtAuthz::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD});
 
     auto* fields = response.dynamic_metadata.mutable_fields();
     (*fields)["foo"] = ValueUtil::stringValue("ok");

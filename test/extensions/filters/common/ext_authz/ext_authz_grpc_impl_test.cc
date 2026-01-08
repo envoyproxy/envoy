@@ -563,14 +563,15 @@ ok_response:
       .response_header_mutations =
           HeaderMutationVector{
               {"append-if-exists-or-add", "append-if-exists-or-add-value",
-               HeaderMutationAction::Add},
-              {"add-if-absent", "add-if-absent-value", HeaderMutationAction::AddIfAbsent},
+               HeaderValueOption::APPEND_IF_EXISTS_OR_ADD},
+              {"add-if-absent", "add-if-absent-value", HeaderValueOption::ADD_IF_ABSENT},
               {"overwrite-if-exists", "overwrite-if-exists-value",
-               HeaderMutationAction::OverwriteIfExists},
+               HeaderValueOption::OVERWRITE_IF_EXISTS},
               {"overwrite-if-exists-or-add", "overwrite-if-exists-or-add-value",
-               HeaderMutationAction::Set},
-              // Invalid actions default to Set.
-              {"invalid-append-action", "invalid-append-action-value", HeaderMutationAction::Set},
+               HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD},
+              // Invalid actions default to OVERWRITE_IF_EXISTS_OR_ADD.
+              {"invalid-append-action", "invalid-append-action-value",
+               HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD},
           },
       .saw_invalid_append_actions = true,
       .status_code = Http::Code::OK,
@@ -629,14 +630,15 @@ ok_response:
       .request_header_mutations =
           HeaderMutationVector{
               {"append-if-exists-or-add", "append-if-exists-or-add-value",
-               HeaderMutationAction::Add},
-              {"add-if-absent", "add-if-absent-value", HeaderMutationAction::AddIfAbsent},
+               HeaderValueOption::APPEND_IF_EXISTS_OR_ADD},
+              {"add-if-absent", "add-if-absent-value", HeaderValueOption::ADD_IF_ABSENT},
               {"overwrite-if-exists", "overwrite-if-exists-value",
-               HeaderMutationAction::OverwriteIfExists},
+               HeaderValueOption::OVERWRITE_IF_EXISTS},
               {"overwrite-if-exists-or-add", "overwrite-if-exists-or-add-value",
-               HeaderMutationAction::Set},
-              // Invalid actions default to Set.
-              {"invalid-append-action", "invalid-append-action-value", HeaderMutationAction::Set},
+               HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD},
+              // Invalid actions default to OVERWRITE_IF_EXISTS_OR_ADD.
+              {"invalid-append-action", "invalid-append-action-value",
+               HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD},
           },
       .saw_invalid_append_actions = true,
       .status_code = Http::Code::OK,

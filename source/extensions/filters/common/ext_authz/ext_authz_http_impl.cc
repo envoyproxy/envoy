@@ -38,8 +38,9 @@ const Response& errorResponse() {
   CONSTRUCT_ON_FIRST_USE(Response, Response{CheckStatus::Error,
                                             HeaderMutationVector{},
                                             HeaderMutationVector{},
+                                            HeaderMutationVector{},
                                             false,
-                                            {{}},
+                                            {},
                                             Http::Utility::QueryParamsVector{},
                                             {},
                                             EMPTY_STRING,
@@ -57,14 +58,16 @@ struct SuccessResponse {
         response_matchers_(response_matchers),
         to_dynamic_metadata_matchers_(dynamic_metadata_matchers),
         response_(std::make_unique<Response>(response)) {
-    headers_.iterate([this](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
-      // UpstreamHeaderMatcher
-      if (matchers_->matches(header.key().getStringView())) {
-        response_->request_header_mutations.push_back({std::string(header.key().getStringView()),
-                                                       std::string(header.value().getStringView()),
-                                                       HeaderMutationAction::Set});
+    const bool is_ok_response = response_->status == CheckStatus::OK;
+    headers_.iterate([this,
+                      is_ok_response](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+      // UpstreamHeaderMatcher only applies to OK responses for upstream request headers.
+      if (is_ok_response && matchers_->matches(header.key().getStringView())) {
+        response_->request_header_mutations.push_back(
+            {std::string(header.key().getStringView()), std::string(header.value().getStringView()),
+             HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD});
       }
-      if (append_matchers_->matches(header.key().getStringView())) {
+      if (is_ok_response && append_matchers_->matches(header.key().getStringView())) {
         // If there is an existing matching key in the current headers, the new entry will be
         // appended with the same key. For example, given {"key": "value1"} headers, if there is
         // a matching "key" from the authorization response headers {"key": "value2"}, the
@@ -72,14 +75,22 @@ struct SuccessResponse {
         // "value2"}.
         response_->request_header_mutations.push_back({std::string(header.key().getStringView()),
                                                        std::string(header.value().getStringView()),
-                                                       HeaderMutationAction::Add});
+                                                       HeaderValueOption::APPEND_IF_EXISTS_OR_ADD});
       }
       if (response_matchers_->matches(header.key().getStringView())) {
-        // For HTTP implementation, the response headers from the auth server will, by default, be
-        // appended (using addCopy) to the encoded response headers.
-        response_->response_header_mutations.push_back({std::string(header.key().getStringView()),
-                                                        std::string(header.value().getStringView()),
-                                                        HeaderMutationAction::Add});
+        // For OK responses, these headers are appended to the encoded response headers.
+        // For Denied responses, these headers go to the local reply.
+        if (is_ok_response) {
+          response_->response_header_mutations.push_back(
+              {std::string(header.key().getStringView()),
+               std::string(header.value().getStringView()),
+               HeaderValueOption::APPEND_IF_EXISTS_OR_ADD});
+        } else {
+          response_->local_response_header_mutations.push_back(
+              {std::string(header.key().getStringView()),
+               std::string(header.value().getStringView()),
+               HeaderValueOption::APPEND_IF_EXISTS_OR_ADD});
+        }
       }
       if (to_dynamic_metadata_matchers_->matches(header.key().getStringView())) {
         const std::string key{header.key().getStringView()};
@@ -416,6 +427,7 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
                        Response{CheckStatus::OK,
                                 HeaderMutationVector{},
                                 HeaderMutationVector{},
+                                HeaderMutationVector{},
                                 false,
                                 std::move(headers_to_remove),
                                 Http::Utility::QueryParamsVector{},
@@ -435,8 +447,9 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
                          Response{CheckStatus::Denied,
                                   HeaderMutationVector{},
                                   HeaderMutationVector{},
+                                  HeaderMutationVector{},
                                   false,
-                                  {{}},
+                                  {},
                                   Http::Utility::QueryParamsVector{},
                                   {},
                                   message->bodyAsString(),

@@ -25,6 +25,8 @@ namespace {
 constexpr uint32_t kDefaultPerRouteTimeoutMs = 200;
 
 using MetadataProto = ::envoy::config::core::v3::Metadata;
+using Filters::Common::ExtAuthz::HeaderAppendAction;
+using Filters::Common::ExtAuthz::HeaderMutation;
 using Filters::Common::MutationRules::CheckOperation;
 using Filters::Common::MutationRules::CheckResult;
 
@@ -70,6 +72,62 @@ const envoy::extensions::filters::http::ext_authz::v3::CheckSettings& defaultChe
 bool headersWithinLimits(const Http::HeaderMap& headers) {
   return headers.size() <= headers.maxHeadersCount() &&
          headers.byteSize() <= headers.maxHeadersKb() * 1024;
+}
+
+// Applies a single header mutation to the given header map based on its append_action.
+// This is a reusable helper for applying header mutations in encodeHeaders and local replies.
+void applyHeaderMutation(Http::HeaderMap& headers, const HeaderMutation& mutation) {
+  const Http::LowerCaseString key(mutation.key);
+  switch (mutation.append_action) {
+  case Filters::Common::ExtAuthz::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD:
+    // Set removes existing and adds new (equivalent to setCopy).
+    headers.setCopy(key, mutation.value);
+    break;
+  case Filters::Common::ExtAuthz::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD:
+    // Add creates a new entry (allows duplicates).
+    headers.addCopy(key, mutation.value);
+    break;
+  case Filters::Common::ExtAuthz::HeaderValueOption::ADD_IF_ABSENT:
+    if (headers.get(key).empty()) {
+      headers.addCopy(key, mutation.value);
+    }
+    break;
+  case Filters::Common::ExtAuthz::HeaderValueOption::OVERWRITE_IF_EXISTS:
+    if (!headers.get(key).empty()) {
+      headers.setCopy(key, mutation.value);
+    }
+    break;
+  default:
+    // For any unknown action, default to set behavior.
+    headers.setCopy(key, mutation.value);
+    break;
+  }
+}
+
+// Determines the CheckOperation for a given HeaderAppendAction.
+CheckOperation getCheckOperationForAction(Filters::Common::ExtAuthz::HeaderAppendAction action) {
+  switch (action) {
+  case Filters::Common::ExtAuthz::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD:
+    return CheckOperation::APPEND;
+  default:
+    return CheckOperation::SET;
+  }
+}
+
+// Returns a human-readable name for a HeaderAppendAction.
+absl::string_view getActionName(Filters::Common::ExtAuthz::HeaderAppendAction action) {
+  switch (action) {
+  case Filters::Common::ExtAuthz::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD:
+    return "set";
+  case Filters::Common::ExtAuthz::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD:
+    return "add";
+  case Filters::Common::ExtAuthz::HeaderValueOption::ADD_IF_ABSENT:
+    return "add if absent";
+  case Filters::Common::ExtAuthz::HeaderValueOption::OVERWRITE_IF_EXISTS:
+    return "overwrite if exists";
+  default:
+    return "unknown";
+  }
 }
 
 } // namespace
@@ -488,43 +546,9 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
                    *encoder_callbacks_, response_header_mutations_.size());
 
   for (const auto& mutation : response_header_mutations_) {
-    const Http::LowerCaseString key(mutation.key);
-    switch (mutation.action) {
-    case Filters::Common::ExtAuthz::HeaderMutationAction::Set:
-      ENVOY_STREAM_LOG(trace, "Set '{}':'{}'", *encoder_callbacks_, key.get(), mutation.value);
-      headers.setCopy(key, mutation.value);
-      break;
-    case Filters::Common::ExtAuthz::HeaderMutationAction::Add:
-      ENVOY_STREAM_LOG(trace, "Add '{}':'{}'", *encoder_callbacks_, key.get(), mutation.value);
-      headers.addCopy(key, mutation.value);
-      break;
-    case Filters::Common::ExtAuthz::HeaderMutationAction::Append:
-      if (auto header_entry = headers.get(key); !header_entry.empty()) {
-        // Header exists, append to it.
-        ENVOY_STREAM_LOG(trace, "Append '{}':'{}'", *encoder_callbacks_, key.get(), mutation.value);
-        headers.appendCopy(key, mutation.value);
-      } else {
-        // Header doesn't exist, add it. This matches APPEND_IF_EXISTS_OR_ADD behavior.
-        ENVOY_STREAM_LOG(trace, "Append (add) '{}':'{}'", *encoder_callbacks_, key.get(),
-                         mutation.value);
-        headers.addCopy(key, mutation.value);
-      }
-      break;
-    case Filters::Common::ExtAuthz::HeaderMutationAction::AddIfAbsent:
-      if (auto header_entry = headers.get(key); header_entry.empty()) {
-        ENVOY_STREAM_LOG(trace, "AddIfAbsent '{}':'{}'", *encoder_callbacks_, key.get(),
-                         mutation.value);
-        headers.addCopy(key, mutation.value);
-      }
-      break;
-    case Filters::Common::ExtAuthz::HeaderMutationAction::OverwriteIfExists:
-      if (auto header_entry = headers.get(key); !header_entry.empty()) {
-        ENVOY_STREAM_LOG(trace, "OverwriteIfExists '{}':'{}'", *encoder_callbacks_, key.get(),
-                         mutation.value);
-        headers.setCopy(key, mutation.value);
-      }
-      break;
-    }
+    ENVOY_STREAM_LOG(trace, "{} '{}':'{}'", *encoder_callbacks_,
+                     getActionName(mutation.append_action), mutation.key, mutation.value);
+    applyHeaderMutation(headers, mutation);
 
     if (config_->enforceResponseHeaderLimits() && !headersWithinLimits(headers)) {
       responseHeaderLimitsReached();
@@ -615,7 +639,6 @@ CheckResult Filter::validateAndCheckDecoderHeaderMutation(
 void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   state_ = State::Complete;
   using Filters::Common::ExtAuthz::CheckStatus;
-  using Filters::Common::ExtAuthz::HeaderMutationAction;
   Stats::StatName empty_stat_name;
 
   updateLoggingInfo(response->grpc_status);
@@ -673,60 +696,38 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
     for (const auto& mutation : response->request_header_mutations) {
       const std::string& key = mutation.key;
       const std::string& value = mutation.value;
-      CheckOperation check_op;
-      absl::string_view op_name;
-
-      switch (mutation.action) {
-      case HeaderMutationAction::Set:
-      case HeaderMutationAction::OverwriteIfExists:
-        check_op = CheckOperation::SET;
-        op_name = mutation.action == HeaderMutationAction::Set ? "set" : "overwrite if exists";
-        break;
-      case HeaderMutationAction::Add:
-      case HeaderMutationAction::AddIfAbsent:
-        check_op = CheckOperation::SET;
-        op_name = mutation.action == HeaderMutationAction::Add ? "add" : "add if absent";
-        break;
-      case HeaderMutationAction::Append:
-        check_op = CheckOperation::APPEND;
-        op_name = "append";
-        break;
-      }
+      CheckOperation check_op = getCheckOperationForAction(mutation.append_action);
+      absl::string_view op_name = getActionName(mutation.append_action);
 
       CheckResult check_result = validateAndCheckDecoderHeaderMutation(check_op, key, value);
       switch (check_result) {
       case CheckResult::OK: {
         Http::LowerCaseString lowercase_key(key);
-        switch (mutation.action) {
-        case HeaderMutationAction::Set:
+        switch (mutation.append_action) {
+        case Filters::Common::ExtAuthz::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD:
           ENVOY_STREAM_LOG(trace, "Set '{}':'{}'", *decoder_callbacks_, key, value);
           request_headers_->setCopy(lowercase_key, value);
           break;
-        case HeaderMutationAction::Add:
+        case Filters::Common::ExtAuthz::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD:
           ENVOY_STREAM_LOG(trace, "Add '{}':'{}'", *decoder_callbacks_, key, value);
           request_headers_->addCopy(lowercase_key, value);
           break;
-        case HeaderMutationAction::Append:
-          if (auto header_to_modify = request_headers_->get(lowercase_key);
-              !header_to_modify.empty()) {
-            // Header exists, append to it.
-            ENVOY_STREAM_LOG(trace, "Append '{}':'{}'", *decoder_callbacks_, key, value);
-            request_headers_->appendCopy(lowercase_key, value);
-          }
-          // Note: For request headers, append=true only appends to existing headers.
-          // It does NOT add new headers. This is the documented behavior.
-          break;
-        case HeaderMutationAction::AddIfAbsent:
+        case Filters::Common::ExtAuthz::HeaderValueOption::ADD_IF_ABSENT:
           if (request_headers_->get(lowercase_key).empty()) {
             ENVOY_STREAM_LOG(trace, "AddIfAbsent '{}':'{}'", *decoder_callbacks_, key, value);
             request_headers_->addCopy(lowercase_key, value);
           }
           break;
-        case HeaderMutationAction::OverwriteIfExists:
+        case Filters::Common::ExtAuthz::HeaderValueOption::OVERWRITE_IF_EXISTS:
           if (!request_headers_->get(lowercase_key).empty()) {
             ENVOY_STREAM_LOG(trace, "OverwriteIfExists '{}':'{}'", *decoder_callbacks_, key, value);
             request_headers_->setCopy(lowercase_key, value);
           }
+          break;
+        default:
+          // For any unknown action, default to set behavior.
+          ENVOY_STREAM_LOG(trace, "Set (default) '{}':'{}'", *decoder_callbacks_, key, value);
+          request_headers_->setCopy(lowercase_key, value);
           break;
         }
 
@@ -889,9 +890,9 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       }
     }
 
-    // Validate all header mutations.
+    // Validate all local response header mutations.
     if (config_->validateMutations()) {
-      for (const auto& mutation : response->request_header_mutations) {
+      for (const auto& mutation : response->local_response_header_mutations) {
         if (!Http::HeaderUtility::headerNameIsValid(mutation.key) ||
             !Http::HeaderUtility::headerValueIsValid(mutation.value)) {
           ENVOY_STREAM_LOG(trace, "Rejected invalid header '{}':'{}'.", *decoder_callbacks_,
@@ -910,24 +911,22 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       response->body.resize(config_->maxDeniedResponseBodyBytes());
     }
 
-    // setResponseFlag must be called before sendLocalReply
+    // setResponseFlag must be called before sendLocalReply.
     decoder_callbacks_->streamInfo().setResponseFlag(
         StreamInfo::CoreResponseFlag::UnauthorizedExternalService);
 
     // Move mutations to local variables to avoid dangling references in the lambda.
-    auto request_mutations = std::move(response->request_header_mutations);
+    auto local_mutations = std::move(response->local_response_header_mutations);
     FilterConfig* cfg = config_.get();
     ExtAuthzFilterStats& filter_stats = stats_;
 
     decoder_callbacks_->sendLocalReply(
         response->status_code, response->body,
-        [&request_mutations, cfg, &filter_stats](Http::HeaderMap& response_headers) -> void {
+        [&local_mutations, cfg, &filter_stats](Http::HeaderMap& response_headers) -> void {
           ENVOY_LOG(trace, "ext_authz filter added header(s) to the local response:");
 
-          // Process mutations in order, applying each based on its action type.
-          for (const auto& mutation : request_mutations) {
-            Http::LowerCaseString key(mutation.key);
-
+          // Process mutations in order, applying each based on its append_action.
+          for (const auto& mutation : local_mutations) {
             // Check header limits before adding.
             if (cfg->enforceResponseHeaderLimits() &&
                 response_headers.size() >= response_headers.maxHeadersCount()) {
@@ -938,41 +937,9 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
               break;
             }
 
-            switch (mutation.action) {
-            case HeaderMutationAction::Set:
-              // Set removes existing and adds new.
-              response_headers.remove(key);
-              ENVOY_LOG(trace, " Set '{}':'{}'", mutation.key, mutation.value);
-              response_headers.addCopy(key, mutation.value);
-              break;
-            case HeaderMutationAction::Add:
-              ENVOY_LOG(trace, " Add '{}':'{}'", mutation.key, mutation.value);
-              response_headers.addCopy(key, mutation.value);
-              break;
-            case HeaderMutationAction::Append:
-              if (auto header_entry = response_headers.get(key); !header_entry.empty()) {
-                // Header exists, append to it.
-                ENVOY_LOG(trace, " Append '{}':'{}'", mutation.key, mutation.value);
-                response_headers.appendCopy(key, mutation.value);
-              } else {
-                // Header doesn't exist, add it. This matches APPEND_IF_EXISTS_OR_ADD behavior.
-                ENVOY_LOG(trace, " Append (add) '{}':'{}'", mutation.key, mutation.value);
-                response_headers.addCopy(key, mutation.value);
-              }
-              break;
-            case HeaderMutationAction::AddIfAbsent:
-              if (auto header_entry = response_headers.get(key); header_entry.empty()) {
-                ENVOY_LOG(trace, " AddIfAbsent '{}':'{}'", mutation.key, mutation.value);
-                response_headers.addCopy(key, mutation.value);
-              }
-              break;
-            case HeaderMutationAction::OverwriteIfExists:
-              if (auto header_entry = response_headers.get(key); !header_entry.empty()) {
-                ENVOY_LOG(trace, " OverwriteIfExists '{}':'{}'", mutation.key, mutation.value);
-                response_headers.setCopy(key, mutation.value);
-              }
-              break;
-            }
+            ENVOY_LOG(trace, " {} '{}':'{}'", getActionName(mutation.append_action), mutation.key,
+                      mutation.value);
+            applyHeaderMutation(response_headers, mutation);
           }
         },
         absl::nullopt, Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzDenied);
@@ -1022,19 +989,17 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
           StreamInfo::CoreResponseFlag::UnauthorizedExternalService);
 
       // Move mutations to local variables to avoid dangling references in the lambda.
-      auto request_mutations = std::move(response->request_header_mutations);
+      auto local_mutations = std::move(response->local_response_header_mutations);
       FilterConfig* cfg = config_.get();
       ExtAuthzFilterStats& filter_stats = stats_;
 
       decoder_callbacks_->sendLocalReply(
           status_code, response->body,
-          [&request_mutations, cfg, &filter_stats](Http::HeaderMap& response_headers) -> void {
+          [&local_mutations, cfg, &filter_stats](Http::HeaderMap& response_headers) -> void {
             ENVOY_LOG(trace, "ext_authz filter added header(s) to the error response:");
 
-            // Process mutations in order, applying each based on its action type.
-            for (const auto& mutation : request_mutations) {
-              Http::LowerCaseString key(mutation.key);
-
+            // Process mutations in order, applying each based on its append_action.
+            for (const auto& mutation : local_mutations) {
               // Check header limits before adding.
               if (cfg->enforceResponseHeaderLimits() &&
                   response_headers.size() >= response_headers.maxHeadersCount()) {
@@ -1044,40 +1009,9 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
                 break;
               }
 
-              switch (mutation.action) {
-              case HeaderMutationAction::Set:
-                response_headers.remove(key);
-                ENVOY_LOG(trace, " Set '{}':'{}'", mutation.key, mutation.value);
-                response_headers.addCopy(key, mutation.value);
-                break;
-              case HeaderMutationAction::Add:
-                ENVOY_LOG(trace, " Add '{}':'{}'", mutation.key, mutation.value);
-                response_headers.addCopy(key, mutation.value);
-                break;
-              case HeaderMutationAction::Append:
-                if (auto header_entry = response_headers.get(key); !header_entry.empty()) {
-                  // Header exists, append to it.
-                  ENVOY_LOG(trace, " Append '{}':'{}'", mutation.key, mutation.value);
-                  response_headers.appendCopy(key, mutation.value);
-                } else {
-                  // Header doesn't exist, add it. This matches APPEND_IF_EXISTS_OR_ADD behavior.
-                  ENVOY_LOG(trace, " Append (add) '{}':'{}'", mutation.key, mutation.value);
-                  response_headers.addCopy(key, mutation.value);
-                }
-                break;
-              case HeaderMutationAction::AddIfAbsent:
-                if (auto header_entry = response_headers.get(key); header_entry.empty()) {
-                  ENVOY_LOG(trace, " AddIfAbsent '{}':'{}'", mutation.key, mutation.value);
-                  response_headers.addCopy(key, mutation.value);
-                }
-                break;
-              case HeaderMutationAction::OverwriteIfExists:
-                if (auto header_entry = response_headers.get(key); !header_entry.empty()) {
-                  ENVOY_LOG(trace, " OverwriteIfExists '{}':'{}'", mutation.key, mutation.value);
-                  response_headers.setCopy(key, mutation.value);
-                }
-                break;
-              }
+              ENVOY_LOG(trace, " {} '{}':'{}'", getActionName(mutation.append_action), mutation.key,
+                        mutation.value);
+              applyHeaderMutation(response_headers, mutation);
             }
           },
           absl::nullopt, Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzError);
@@ -1161,8 +1095,8 @@ bool Filter::validateAndClearInvalidErrorResponseAttributes(
     return true;
   }
 
-  // Validate all request header mutations.
-  for (const auto& mutation : response->request_header_mutations) {
+  // Validate all local response header mutations.
+  for (const auto& mutation : response->local_response_header_mutations) {
     if (!Http::HeaderUtility::headerNameIsValid(mutation.key) ||
         !Http::HeaderUtility::headerValueIsValid(mutation.value)) {
       ENVOY_STREAM_LOG(trace, "Rejected invalid error header '{}':'{}'.", *decoder_callbacks_,
@@ -1172,7 +1106,7 @@ bool Filter::validateAndClearInvalidErrorResponseAttributes(
                        "header. Falling back to generic error response.",
                        *decoder_callbacks_);
       // Fall back to generic error by clearing all custom attributes.
-      response->request_header_mutations.clear();
+      response->local_response_header_mutations.clear();
       response->body.clear();
       response->status_code = static_cast<Http::Code>(0); // Clear custom status.
       return false;

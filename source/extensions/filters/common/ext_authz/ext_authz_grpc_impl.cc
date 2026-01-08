@@ -18,71 +18,61 @@ namespace ExtAuthz {
 
 namespace {
 
-// Converts proto append_action to our internal HeaderMutationAction enum.
+// Converts proto HeaderValueOption to HeaderAppendAction.
+// Handles the deprecated append boolean for backward compatibility.
 // Returns the action and sets saw_invalid if the action is unknown.
-HeaderMutationAction
-toHeaderMutationAction(const envoy::config::core::v3::HeaderValueOption& header,
-                       bool& saw_invalid_append_actions, bool is_response_header) {
+HeaderAppendAction getAppendAction(envoy::config::core::v3::HeaderValueOption& header,
+                                   bool& saw_invalid_append_actions) {
   if (header.has_append()) {
     // Handle deprecated append boolean for backward compatibility.
-    // For response headers including the local replies, append=true meant adding a new header.
-    // For request headers, append=true meant appending to existing value.
-    if (is_response_header && header.append().value()) {
-      return HeaderMutationAction::Add;
-    }
-    return header.append().value() ? HeaderMutationAction::Append : HeaderMutationAction::Set;
+    return header.append().value() ? HeaderValueOption::APPEND_IF_EXISTS_OR_ADD
+                                   : HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD;
   }
 
-  switch (header.append_action()) {
-  case Router::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD:
-    return HeaderMutationAction::Add;
-  case Router::HeaderValueOption::ADD_IF_ABSENT:
-    return HeaderMutationAction::AddIfAbsent;
-  case Router::HeaderValueOption::OVERWRITE_IF_EXISTS:
-    return HeaderMutationAction::OverwriteIfExists;
-  case Router::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD:
-    return HeaderMutationAction::Set;
-  default:
+  if (!envoy::config::core::v3::HeaderValueOption::HeaderAppendAction_IsValid(
+          header.append_action())) {
     saw_invalid_append_actions = true;
-    // Default to Set for unknown actions.
-    return HeaderMutationAction::Set;
+    return HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD;
   }
+
+  return header.append_action();
 }
 
-// Processes header mutations from proto, preserving order.
-void processHeaderMutations(
-    const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption>& headers,
-    HeaderMutationVector& mutations, bool& saw_invalid_append_actions,
-    bool is_response_header = false) {
-  for (const auto& header : headers) {
-    HeaderMutationAction action =
-        toHeaderMutationAction(header, saw_invalid_append_actions, is_response_header);
-    mutations.push_back({header.header().key(), header.header().value(), action});
+// Moves header mutations from proto to the response vector, preserving order.
+// This is more efficient than copying strings since the proto data is not reused.
+void moveHeaderMutations(
+    Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption>* headers,
+    HeaderMutationVector& mutations, bool& saw_invalid_append_actions) {
+  mutations.reserve(mutations.size() + headers->size());
+  for (auto& header : *headers) {
+    HeaderAppendAction action = getAppendAction(header, saw_invalid_append_actions);
+    mutations.push_back({std::move(*header.mutable_header()->mutable_key()),
+                         std::move(*header.mutable_header()->mutable_value()), action});
   }
 }
 
 } // namespace
 
 void copyOkResponseMutations(ResponsePtr& response,
-                             const envoy::service::auth::v3::OkHttpResponse& ok_response) {
-  // Process upstream request header mutations.
-  processHeaderMutations(ok_response.headers(), response->request_header_mutations,
-                         response->saw_invalid_append_actions, /*is_response_header=*/false);
+                             envoy::service::auth::v3::OkHttpResponse* ok_response) {
+  // Move upstream request header mutations.
+  moveHeaderMutations(ok_response->mutable_headers(), response->request_header_mutations,
+                      response->saw_invalid_append_actions);
 
-  // Process downstream response header mutations.
-  processHeaderMutations(ok_response.response_headers_to_add(), response->response_header_mutations,
-                         response->saw_invalid_append_actions, /*is_response_header=*/true);
+  // Move downstream response header mutations.
+  moveHeaderMutations(ok_response->mutable_response_headers_to_add(),
+                      response->response_header_mutations, response->saw_invalid_append_actions);
 
-  response->headers_to_remove = std::vector<std::string>{ok_response.headers_to_remove().begin(),
-                                                         ok_response.headers_to_remove().end()};
+  response->headers_to_remove = std::vector<std::string>{ok_response->headers_to_remove().begin(),
+                                                         ok_response->headers_to_remove().end()};
 
-  for (const auto& query_parameter : ok_response.query_parameters_to_set()) {
+  for (const auto& query_parameter : ok_response->query_parameters_to_set()) {
     response->query_parameters_to_set.emplace_back(query_parameter.key(), query_parameter.value());
   }
 
   response->query_parameters_to_remove =
-      std::vector<std::string>{ok_response.query_parameters_to_remove().begin(),
-                               ok_response.query_parameters_to_remove().end()};
+      std::vector<std::string>{ok_response->query_parameters_to_remove().begin(),
+                               ok_response->query_parameters_to_remove().end()};
 }
 
 GrpcClientImpl::GrpcClientImpl(const Grpc::RawAsyncClientSharedPtr& async_client,
@@ -121,7 +111,7 @@ void GrpcClientImpl::onSuccess(std::unique_ptr<envoy::service::auth::v3::CheckRe
     span.setTag(TracingConstants::get().TraceStatus, TracingConstants::get().TraceOk);
     authz_response->status = CheckStatus::OK;
     if (response->has_ok_response()) {
-      copyOkResponseMutations(authz_response, response->ok_response());
+      copyOkResponseMutations(authz_response, response->mutable_ok_response());
     }
   } else if (response->has_error_response()) {
     // If error_response is present, treat it as an error and not denial.
@@ -130,15 +120,17 @@ void GrpcClientImpl::onSuccess(std::unique_ptr<envoy::service::auth::v3::CheckRe
 
     // For error responses, don't set a default status_code.
     // Let the filter use status_on_error configuration.
-    const auto& error_response = response->error_response();
-    processHeaderMutations(error_response.headers(), authz_response->request_header_mutations,
-                           authz_response->saw_invalid_append_actions, /*is_response_header=*/true);
+    auto* error_response = response->mutable_error_response();
+    // Move headers to local_response_header_mutations for local reply.
+    moveHeaderMutations(error_response->mutable_headers(),
+                        authz_response->local_response_header_mutations,
+                        authz_response->saw_invalid_append_actions);
 
-    const uint32_t status_code = error_response.status().code();
+    const uint32_t status_code = error_response->status().code();
     if (status_code > 0) {
       authz_response->status_code = static_cast<Http::Code>(status_code);
     }
-    authz_response->body = error_response.body();
+    authz_response->body = error_response->body();
   } else {
     span.setTag(TracingConstants::get().TraceStatus, TracingConstants::get().TraceUnauthz);
     authz_response->status = CheckStatus::Denied;
@@ -146,15 +138,17 @@ void GrpcClientImpl::onSuccess(std::unique_ptr<envoy::service::auth::v3::CheckRe
     // The default HTTP status code for denied response is 403 Forbidden.
     authz_response->status_code = Http::Code::Forbidden;
     if (response->has_denied_response()) {
-      processHeaderMutations(
-          response->denied_response().headers(), authz_response->request_header_mutations,
-          authz_response->saw_invalid_append_actions, /*is_response_header=*/true);
+      auto* denied_response = response->mutable_denied_response();
+      // Move headers to local_response_header_mutations for local reply.
+      moveHeaderMutations(denied_response->mutable_headers(),
+                          authz_response->local_response_header_mutations,
+                          authz_response->saw_invalid_append_actions);
 
-      const uint32_t status_code = response->denied_response().status().code();
+      const uint32_t status_code = denied_response->status().code();
       if (status_code > 0) {
         authz_response->status_code = static_cast<Http::Code>(status_code);
       }
-      authz_response->body = response->denied_response().body();
+      authz_response->body = denied_response->body();
     }
   }
 

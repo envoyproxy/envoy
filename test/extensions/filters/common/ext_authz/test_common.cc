@@ -17,20 +17,19 @@ namespace Common {
 namespace ExtAuthz {
 
 namespace {
-const char* headerMutationActionToString(HeaderMutationAction action) {
+const char* headerAppendActionToString(HeaderAppendAction action) {
   switch (action) {
-  case HeaderMutationAction::Append:
-    return "Append";
-  case HeaderMutationAction::Set:
-    return "Set";
-  case HeaderMutationAction::Add:
-    return "Add";
-  case HeaderMutationAction::AddIfAbsent:
-    return "AddIfAbsent";
-  case HeaderMutationAction::OverwriteIfExists:
-    return "OverwriteIfExists";
+  case HeaderValueOption::APPEND_IF_EXISTS_OR_ADD:
+    return "APPEND_IF_EXISTS_OR_ADD";
+  case HeaderValueOption::ADD_IF_ABSENT:
+    return "ADD_IF_ABSENT";
+  case HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD:
+    return "OVERWRITE_IF_EXISTS_OR_ADD";
+  case HeaderValueOption::OVERWRITE_IF_EXISTS:
+    return "OVERWRITE_IF_EXISTS";
+  default:
+    return "Unknown";
   }
-  return "Unknown";
 }
 } // namespace
 
@@ -48,12 +47,17 @@ void PrintTo(const Response& response, std::ostream* os) {
   (*os) << "\n{\n  check_status: " << int(response.status) << "\n  request_header_mutations: [";
   for (const auto& mutation : response.request_header_mutations) {
     (*os) << "\n    {key: " << mutation.key << ", value: " << mutation.value
-          << ", action: " << headerMutationActionToString(mutation.action) << "}";
+          << ", append_action: " << headerAppendActionToString(mutation.append_action) << "}";
   }
   (*os) << "\n  ]\n  response_header_mutations: [";
   for (const auto& mutation : response.response_header_mutations) {
     (*os) << "\n    {key: " << mutation.key << ", value: " << mutation.value
-          << ", action: " << headerMutationActionToString(mutation.action) << "}";
+          << ", append_action: " << headerAppendActionToString(mutation.append_action) << "}";
+  }
+  (*os) << "\n  ]\n  local_response_header_mutations: [";
+  for (const auto& mutation : response.local_response_header_mutations) {
+    (*os) << "\n    {key: " << mutation.key << ", value: " << mutation.value
+          << ", append_action: " << headerAppendActionToString(mutation.append_action) << "}";
   }
   (*os) << "\n  ]\n  headers_to_remove: " << PrintToString(response.headers_to_remove)
         << "\n  query_parameters_to_set: " << PrintToString(response.query_parameters_to_set)
@@ -150,33 +154,38 @@ TestCommon::makeAuthzResponse(CheckStatus status, Http::Code status_code, const 
   }
   if (!headers.empty()) {
     for (const auto& header : headers) {
-      HeaderMutationAction action;
+      HeaderAppendAction action;
       if (header.has_append()) {
-        if (status == Filters::Common::ExtAuthz::CheckStatus::OK) {
-          // Match gRPC impl behavior for request headers: append=true → Append, append=false → Set.
-          action =
-              header.append().value() ? HeaderMutationAction::Append : HeaderMutationAction::Set;
-        } else {
-          // For Denied/Error, headers are used for local reply (response headers), so use Add.
-          action = header.append().value() ? HeaderMutationAction::Add : HeaderMutationAction::Set;
-        }
+        // Match gRPC impl behavior: append=true → APPEND_IF_EXISTS_OR_ADD,
+        // append=false → OVERWRITE_IF_EXISTS_OR_ADD.
+        action = header.append().value() ? HeaderValueOption::APPEND_IF_EXISTS_OR_ADD
+                                         : HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD;
       } else {
-        // Default to Set for backward compatibility when append is not specified.
-        action = HeaderMutationAction::Set;
+        // Default to OVERWRITE_IF_EXISTS_OR_ADD for backward compatibility.
+        action = HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD;
       }
-      authz_response.request_header_mutations.push_back(
-          {header.header().key(), header.header().value(), action});
+      if (status == Filters::Common::ExtAuthz::CheckStatus::OK) {
+        // OK response: headers go to request_header_mutations for upstream request.
+        authz_response.request_header_mutations.push_back(
+            {header.header().key(), header.header().value(), action});
+      } else {
+        // Denied/Error response: headers go to local_response_header_mutations for local reply.
+        authz_response.local_response_header_mutations.push_back(
+            {header.header().key(), header.header().value(), action});
+      }
     }
   }
   if (!downstream_headers.empty()) {
     for (const auto& header : downstream_headers) {
-      HeaderMutationAction action;
+      HeaderAppendAction action;
       if (header.has_append()) {
-        // Match gRPC impl behavior: append=true → Add (addCopy), append=false → Set.
-        action = header.append().value() ? HeaderMutationAction::Add : HeaderMutationAction::Set;
+        // Match gRPC impl behavior: append=true → APPEND_IF_EXISTS_OR_ADD,
+        // append=false → OVERWRITE_IF_EXISTS_OR_ADD.
+        action = header.append().value() ? HeaderValueOption::APPEND_IF_EXISTS_OR_ADD
+                                         : HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD;
       } else {
-        // Default to Add for HTTP impl and backward compatibility with response headers.
-        action = HeaderMutationAction::Add;
+        // Default to APPEND_IF_EXISTS_OR_ADD for response headers (backward compatible with Add).
+        action = HeaderValueOption::APPEND_IF_EXISTS_OR_ADD;
       }
       authz_response.response_header_mutations.push_back(
           {header.header().key(), header.header().value(), action});
@@ -219,7 +228,7 @@ bool TestCommon::compareHeaderMutationVector(const HeaderMutationVector& lhs,
   // Compare in order since order matters for header mutations.
   for (size_t i = 0; i < lhs.size(); ++i) {
     if (lhs[i].key != rhs[i].key || lhs[i].value != rhs[i].value ||
-        lhs[i].action != rhs[i].action) {
+        lhs[i].append_action != rhs[i].append_action) {
       return false;
     }
   }

@@ -79,25 +79,14 @@ enum class CheckStatus {
 using UnsafeHeader = std::pair<std::string, std::string>;
 using UnsafeHeaderVector = std::vector<UnsafeHeader>;
 
-// Action type for header mutations, matching envoy::config::core::v3::HeaderValueOption.
-enum class HeaderMutationAction {
-  // Appends the value to existing values (comma-separated) via appendCopy().
-  Append,
-  // Overwrites existing header or adds if not present via setCopy().
-  Set,
-  // Adds a new header entry (allows duplicates) via addCopy().
-  Add,
-  // Adds only if the header does not already exist.
-  AddIfAbsent,
-  // Overwrites the header only if it already exists.
-  OverwriteIfExists,
-};
+using HeaderAppendAction = envoy::config::core::v3::HeaderValueOption::HeaderAppendAction;
+using HeaderValueOption = envoy::config::core::v3::HeaderValueOption;
 
 // A single header mutation with its action type, preserving order from the proto.
 struct HeaderMutation {
   std::string key;
   std::string value;
-  HeaderMutationAction action;
+  HeaderAppendAction append_action;
 };
 using HeaderMutationVector = std::vector<HeaderMutation>;
 
@@ -110,12 +99,16 @@ using HeaderMutationVector = std::vector<HeaderMutation>;
 struct Response {
   // Call status.
   CheckStatus status;
-  // Ordered list of header mutations for upstream request headers.
+  // Ordered list of header mutations for upstream request headers on OK responses.
   // Mutations are applied in the order they appear in this vector.
   HeaderMutationVector request_header_mutations{};
-  // Ordered list of header mutations for downstream response headers (on OK auth responses).
+  // Ordered list of header mutations for downstream response headers on OK responses.
   // Mutations are applied in the order they appear in this vector.
   HeaderMutationVector response_header_mutations{};
+  // Ordered list of header mutations for local reply headers on Denied/Error responses.
+  // These headers are sent back to the downstream client as part of the local reply.
+  // Mutations are applied in the order they appear in this vector.
+  HeaderMutationVector local_response_header_mutations{};
   // Whether the authorization server returned any headers with an invalid append action type.
   bool saw_invalid_append_actions{false};
   // A set of HTTP headers consumed by the authorization server, will be removed

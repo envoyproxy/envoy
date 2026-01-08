@@ -89,9 +89,9 @@ MATCHER_P(AuthzErrorResponseWithAttributes, response, "") {
   if (arg->body.compare(response.body)) {
     return false;
   }
-  // Compare request_header_mutations.
-  return TestCommon::compareHeaderMutationVector(response.request_header_mutations,
-                                                 arg->request_header_mutations);
+  // Compare local_response_header_mutations for error responses.
+  return TestCommon::compareHeaderMutationVector(response.local_response_header_mutations,
+                                                 arg->local_response_header_mutations);
 }
 
 MATCHER_P(AuthzResponseNoAttributes, response, "") {
@@ -123,9 +123,9 @@ MATCHER_P(AuthzDeniedResponse, response, "") {
   if (arg->body.compare(response.body)) {
     return false;
   }
-  // Compare request_header_mutations.
-  return TestCommon::compareHeaderMutationVector(response.request_header_mutations,
-                                                 arg->request_header_mutations);
+  // Compare local_response_header_mutations for denied responses.
+  return TestCommon::compareHeaderMutationVector(response.local_response_header_mutations,
+                                                 arg->local_response_header_mutations);
 }
 
 MATCHER_P(AuthzOkResponse, response, "") {
