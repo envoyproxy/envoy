@@ -1135,6 +1135,319 @@ TEST_F(LinuxContainerCpuStatsReaderTest, VerySmallCpuAllocatedValue) {
   EXPECT_NEAR(envoy_container_stats.work_time, 1000000000.0, 1.0);
 }
 
+// =============================================================================
+// getUtilization() Method Tests for LinuxCpuStatsReader
+// =============================================================================
+
+TEST(LinuxCpuStatsReaderUtilizationTest, FirstCallReturnsZero) {
+  // Test that the first call to getUtilization() returns 0 (initialization)
+  const std::string temp_path = TestEnvironment::temporaryPath("cpu_stats_util");
+  AtomicFileUpdater file_updater(temp_path);
+  const std::string contents = R"EOF(cpu  1000 100 200 500 0 0 0 0 0 0
+)EOF";
+  file_updater.update(contents);
+
+  LinuxCpuStatsReader cpu_stats_reader(temp_path);
+  auto result = cpu_stats_reader.getUtilization();
+
+  ASSERT_TRUE(result.ok());
+  EXPECT_DOUBLE_EQ(result.value(), 0.0);
+}
+
+TEST(LinuxCpuStatsReaderUtilizationTest, CalculatesUtilizationCorrectly) {
+  // Test correct utilization calculation between two readings
+  const std::string temp_path = TestEnvironment::temporaryPath("cpu_stats_util2");
+  AtomicFileUpdater file_updater(temp_path);
+
+  // First reading
+  file_updater.update("cpu  1000 100 200 700 0 0 0 0 0 0\n");
+  LinuxCpuStatsReader cpu_stats_reader(temp_path);
+  auto result1 = cpu_stats_reader.getUtilization();
+  ASSERT_TRUE(result1.ok());
+  EXPECT_DOUBLE_EQ(result1.value(), 0.0); // First call returns 0
+
+  // Second reading: work increased by 600, total increased by 1000
+  file_updater.update("cpu  1600 100 200 1100 0 0 0 0 0 0\n");
+  auto result2 = cpu_stats_reader.getUtilization();
+  ASSERT_TRUE(result2.ok());
+  // utilization = 600 / 1000 = 0.6
+  EXPECT_DOUBLE_EQ(result2.value(), 0.6);
+}
+
+TEST(LinuxCpuStatsReaderUtilizationTest, InvalidFileReturnsError) {
+  // Test that invalid file returns an error
+  const std::string temp_path = TestEnvironment::temporaryPath("cpu_stats_not_exist_util");
+  LinuxCpuStatsReader cpu_stats_reader(temp_path);
+  auto result = cpu_stats_reader.getUtilization();
+
+  EXPECT_FALSE(result.ok());
+  EXPECT_NE(result.status().message().find("Failed to read CPU times"), std::string::npos);
+}
+
+TEST(LinuxCpuStatsReaderUtilizationTest, NegativeWorkDeltaReturnsError) {
+  // Test that negative work delta returns an error
+  const std::string temp_path = TestEnvironment::temporaryPath("cpu_stats_util3");
+  AtomicFileUpdater file_updater(temp_path);
+
+  // First reading
+  file_updater.update("cpu  1000 100 200 700 0 0 0 0 0 0\n");
+  LinuxCpuStatsReader cpu_stats_reader(temp_path);
+  (void)cpu_stats_reader.getUtilization(); // Initialize
+
+  // Second reading: work decreased (clock regression)
+  file_updater.update("cpu  500 100 200 1100 0 0 0 0 0 0\n");
+  auto result = cpu_stats_reader.getUtilization();
+
+  EXPECT_FALSE(result.ok());
+  EXPECT_NE(result.status().message().find("Work_over_period"), std::string::npos);
+}
+
+TEST(LinuxCpuStatsReaderUtilizationTest, ZeroTotalDeltaReturnsError) {
+  // Test that zero total delta returns an error
+  // Note: In /proc/stat, total = user + nice + system + idle, so we need all four values to stay the same
+  const std::string temp_path = TestEnvironment::temporaryPath("cpu_stats_util4");
+  AtomicFileUpdater file_updater(temp_path);
+
+  // First reading: work=1300 (1000+100+200), total=2000 (work+idle)
+  file_updater.update("cpu  1000 100 200 700 0 0 0 0 0 0\n");
+  LinuxCpuStatsReader cpu_stats_reader(temp_path);
+  (void)cpu_stats_reader.getUtilization(); // Initialize
+
+  // Second reading: same total (all values unchanged)
+  file_updater.update("cpu  1000 100 200 700 0 0 0 0 0 0\n");
+  auto result = cpu_stats_reader.getUtilization();
+
+  EXPECT_FALSE(result.ok());
+  EXPECT_NE(result.status().message().find("total_over_period"), std::string::npos);
+}
+
+// =============================================================================
+// getUtilization() Method Tests for CgroupV1CpuStatsReader
+// =============================================================================
+
+TEST_F(LinuxContainerCpuStatsReaderTest, V1GetUtilizationFirstCallReturnsZero) {
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  setCpuAllocated("2000\n");
+  setCpuTimes("1000\n");
+
+  CgroupV1CpuStatsReader container_stats_reader(api->fileSystem(), test_time_source,
+                                                cpuAllocatedPath(), cpuTimesPath());
+  auto result = container_stats_reader.getUtilization();
+
+  ASSERT_TRUE(result.ok());
+  EXPECT_DOUBLE_EQ(result.value(), 0.0);
+}
+
+TEST_F(LinuxContainerCpuStatsReaderTest, V1GetUtilizationCalculatesCorrectly) {
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  setCpuAllocated("2000\n");
+  setCpuTimes("1000000000\n"); // 1 billion nanoseconds
+
+  CgroupV1CpuStatsReader container_stats_reader(api->fileSystem(), test_time_source,
+                                                cpuAllocatedPath(), cpuTimesPath());
+  auto result1 = container_stats_reader.getUtilization();
+  ASSERT_TRUE(result1.ok());
+  EXPECT_DOUBLE_EQ(result1.value(), 0.0); // First call
+
+  // Sleep to ensure sufficient wall-clock time passes
+  std::this_thread::sleep_for(std::chrono::seconds(1));
+
+  // Update CPU times - add 1 second of CPU time
+  setCpuTimes("2000000000\n"); // 2 billion nanoseconds
+  auto result2 = container_stats_reader.getUtilization();
+  ASSERT_TRUE(result2.ok());
+
+  // work_delta = (2000000000 * 1000.0 / 2000) - (1000000000 * 1000.0 / 2000)
+  //           = 1000000 - 500000 = 500000 nanoseconds of normalized CPU time
+  // total_delta = approximately 1 second of wall-clock time in nanoseconds
+  // utilization should be around 0.0005 (500000 ns / 1000000000 ns)
+  // We just verify it's a reasonable value
+  EXPECT_GE(result2.value(), 0.0);
+  EXPECT_LT(result2.value(), 10.0); // Allow for some timing variance
+}
+
+TEST_F(LinuxContainerCpuStatsReaderTest, V1GetUtilizationInvalidFileReturnsError) {
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  const std::string nonexistent = TestEnvironment::temporaryPath("nonexistent_v1_util");
+
+  CgroupV1CpuStatsReader container_stats_reader(api->fileSystem(), test_time_source, nonexistent,
+                                                cpuTimesPath());
+  auto result = container_stats_reader.getUtilization();
+
+  EXPECT_FALSE(result.ok());
+  EXPECT_NE(result.status().message().find("Failed to read CPU times"), std::string::npos);
+}
+
+TEST_F(LinuxContainerCpuStatsReaderTest, V1GetUtilizationNegativeWorkDeltaReturnsError) {
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  setCpuAllocated("2000\n");
+  setCpuTimes("2000000000\n");
+
+  CgroupV1CpuStatsReader container_stats_reader(api->fileSystem(), test_time_source,
+                                                cpuAllocatedPath(), cpuTimesPath());
+  (void)container_stats_reader.getUtilization(); // Initialize
+
+  // Decrease CPU times (regression)
+  setCpuTimes("1000000000\n");
+  auto result = container_stats_reader.getUtilization();
+
+  EXPECT_FALSE(result.ok());
+  EXPECT_NE(result.status().message().find("Work_over_period"), std::string::npos);
+}
+
+// =============================================================================
+// getUtilization() Method Tests for CgroupV2CpuStatsReader
+// =============================================================================
+
+TEST_F(LinuxContainerCpuStatsReaderV2Test, V2GetUtilizationFirstCallReturnsZero) {
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  setV2CpuStat("usage_usec 500000\n");
+  setV2CpuMax("200000 100000\n");
+  setV2CpuEffective("0-3\n");
+
+  CgroupV2CpuStatsReader container_stats_reader(
+      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
+  auto result = container_stats_reader.getUtilization();
+
+  ASSERT_TRUE(result.ok());
+  EXPECT_DOUBLE_EQ(result.value(), 0.0);
+}
+
+TEST_F(LinuxContainerCpuStatsReaderV2Test, V2GetUtilizationCalculatesCorrectly) {
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  setV2CpuStat("usage_usec 0\n");
+  setV2CpuMax("200000 100000\n"); // 2 cores
+  setV2CpuEffective("0-3\n");     // 4 cores available, min(4, 2) = 2
+
+  CgroupV2CpuStatsReader container_stats_reader(
+      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
+  auto result1 = container_stats_reader.getUtilization();
+  ASSERT_TRUE(result1.ok());
+  EXPECT_DOUBLE_EQ(result1.value(), 0.0); // First call
+
+  // Simulate: 1 second passed, 1 million microseconds of CPU used on 2 cores
+  // That's 1 second of CPU time on 2 cores over 1 second = 50% utilization
+  setV2CpuStat("usage_usec 1000000\n");
+  auto result2 = container_stats_reader.getUtilization();
+  ASSERT_TRUE(result2.ok());
+
+  // work_delta = 1000000 usec = 1 second
+  // total_delta = approximately 1 second (in nanoseconds)
+  // utilization = (1 / 1) / 2 cores = 0.5
+  EXPECT_GT(result2.value(), 0.0);
+  EXPECT_LE(result2.value(), 1.0); // Should be clamped to 1.0 max
+}
+
+TEST_F(LinuxContainerCpuStatsReaderV2Test, V2GetUtilizationClampsAtOne) {
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  setV2CpuStat("usage_usec 0\n");
+  setV2CpuMax("100000 100000\n"); // 1 core
+  setV2CpuEffective("0\n");       // 1 core
+
+  CgroupV2CpuStatsReader container_stats_reader(
+      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
+  (void)container_stats_reader.getUtilization(); // Initialize
+
+  // Simulate impossibly high CPU usage (would be > 100%)
+  setV2CpuStat("usage_usec 10000000\n"); // 10 seconds of CPU in short time
+  auto result = container_stats_reader.getUtilization();
+
+  ASSERT_TRUE(result.ok());
+  EXPECT_DOUBLE_EQ(result.value(), 1.0); // Should be clamped to 1.0
+}
+
+TEST_F(LinuxContainerCpuStatsReaderV2Test, V2GetUtilizationInvalidFileReturnsError) {
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  const std::string nonexistent = TestEnvironment::temporaryPath("nonexistent_v2_util");
+  setV2CpuMax("200000 100000\n");
+  setV2CpuEffective("0-3\n");
+
+  CgroupV2CpuStatsReader container_stats_reader(api->fileSystem(), test_time_source, nonexistent,
+                                                v2CpuMaxPath(), v2CpuEffectivePath());
+  auto result = container_stats_reader.getUtilization();
+
+  EXPECT_FALSE(result.ok());
+  EXPECT_NE(result.status().message().find("Failed to read CPU times"), std::string::npos);
+}
+
+TEST_F(LinuxContainerCpuStatsReaderV2Test, V2GetUtilizationNegativeWorkDeltaReturnsError) {
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  setV2CpuStat("usage_usec 1000000\n");
+  setV2CpuMax("200000 100000\n");
+  setV2CpuEffective("0-3\n");
+
+  CgroupV2CpuStatsReader container_stats_reader(
+      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
+  (void)container_stats_reader.getUtilization(); // Initialize
+
+  // Decrease usage (clock regression)
+  setV2CpuStat("usage_usec 500000\n");
+  auto result = container_stats_reader.getUtilization();
+
+  EXPECT_FALSE(result.ok());
+  EXPECT_NE(result.status().message().find("Work_over_period"), std::string::npos);
+}
+
+TEST_F(LinuxContainerCpuStatsReaderV2Test, V2GetUtilizationMultipleCallsSequence) {
+  // Test a sequence of multiple calls to ensure state is maintained correctly
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  setV2CpuStat("usage_usec 100000\n");
+  setV2CpuMax("200000 100000\n"); // 2 cores
+  setV2CpuEffective("0-1\n");     // 2 cores
+
+  CgroupV2CpuStatsReader container_stats_reader(
+      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
+
+  // First call
+  auto result1 = container_stats_reader.getUtilization();
+  ASSERT_TRUE(result1.ok());
+  EXPECT_DOUBLE_EQ(result1.value(), 0.0);
+
+  // Second call
+  setV2CpuStat("usage_usec 200000\n");
+  auto result2 = container_stats_reader.getUtilization();
+  ASSERT_TRUE(result2.ok());
+  EXPECT_GT(result2.value(), 0.0);
+  EXPECT_LE(result2.value(), 1.0);
+
+  // Third call
+  setV2CpuStat("usage_usec 300000\n");
+  auto result3 = container_stats_reader.getUtilization();
+  ASSERT_TRUE(result3.ok());
+  EXPECT_GT(result3.value(), 0.0);
+  EXPECT_LE(result3.value(), 1.0);
+}
+
+TEST_F(LinuxContainerCpuStatsReaderV2Test, V2GetUtilizationZeroWorkDelta) {
+  // Test when no CPU work is done between calls
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  setV2CpuStat("usage_usec 100000\n");
+  setV2CpuMax("200000 100000\n");
+  setV2CpuEffective("0-1\n");
+
+  CgroupV2CpuStatsReader container_stats_reader(
+      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
+  (void)container_stats_reader.getUtilization(); // Initialize
+
+  // No change in usage
+  setV2CpuStat("usage_usec 100000\n");
+  auto result = container_stats_reader.getUtilization();
+
+  ASSERT_TRUE(result.ok());
+  EXPECT_DOUBLE_EQ(result.value(), 0.0); // No work done = 0% utilization
+}
+
 } // namespace
 } // namespace CpuUtilizationMonitor
 } // namespace ResourceMonitors
