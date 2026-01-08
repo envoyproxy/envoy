@@ -441,7 +441,7 @@ new_features:
 - area: formatter
   change: |
     Added ``%DOWNSTREAM_DETECTED_CLOSE_TYPE%`` and ``%UPSTREAM_DETECTED_CLOSE_TYPE%`` to expose the detected close type
-    of downstream and upstream connections. The possible values are ``Normal``, ``LocalReset``, and ``RemoteReset``.
+    of downstream and upstream connections. The possible values are ``Undefined``, ``Normal``, ``LocalReset``, and ``RemoteReset``.
 - area: formatter
   change: |
     Added support for the following new access log formatters:
