@@ -32,12 +32,24 @@ bool UpstreamHttp11ConnectSocket::isValidConnectResponse(absl::string_view respo
 UpstreamHttp11ConnectSocket::UpstreamHttp11ConnectSocket(
     Network::TransportSocketPtr&& transport_socket,
     Network::TransportSocketOptionsConstSharedPtr options,
-    std::shared_ptr<const Upstream::HostDescription> host)
+    std::shared_ptr<const Upstream::HostDescription> host,
+    absl::optional<Network::TransportSocketOptions::Http11ProxyInfo> proxy_info)
     : PassthroughSocket(std::move(transport_socket)), options_(options) {
   // If the filter state metadata has populated the relevant entries in the transport socket
   // options, we want to maintain the original behavior of this transport socket.
   if (options_ && options_->http11ProxyInfo()) {
-    handleProxyInfoConnect();
+    handleProxyInfoConnect(options_->http11ProxyInfo().value());
+    return;
+  }
+
+  if (proxy_info.has_value()) {
+    Network::TransportSocketOptions::Http11ProxyInfo actual_info = proxy_info.value();
+    if (actual_info.hostname.empty() && host) {
+      actual_info.hostname = host->hostname().empty() ? host->address()->asStringView()
+                                                      : absl::StrCat(host->hostname(), ":",
+                                                                     host->address()->ip()->port());
+    }
+    handleProxyInfoConnect(actual_info);
     return;
   }
 
@@ -61,11 +73,11 @@ std::string UpstreamHttp11ConnectSocket::formatConnectRequest(absl::string_view 
   return absl::StrCat("CONNECT ", target, " HTTP/1.1\r\n", "Host: ", target, "\r\n\r\n");
 }
 
-inline void UpstreamHttp11ConnectSocket::handleProxyInfoConnect() {
+inline void UpstreamHttp11ConnectSocket::handleProxyInfoConnect(
+    const Network::TransportSocketOptions::Http11ProxyInfo& proxy_info) {
   if (transport_socket_->ssl()) {
     std::string target = absl::StrCat(
-        options_->http11ProxyInfo()->hostname,
-        Http::HeaderUtility::hostHasPort(options_->http11ProxyInfo()->hostname) ? "" : ":443");
+        proxy_info.hostname, Http::HeaderUtility::hostHasPort(proxy_info.hostname) ? "" : ":443");
 
     if (!Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.http_11_proxy_connect_legacy_format")) {
@@ -192,8 +204,9 @@ Network::IoResult UpstreamHttp11ConnectSocket::writeHeader() {
 }
 
 UpstreamHttp11ConnectSocketFactory::UpstreamHttp11ConnectSocketFactory(
-    Network::UpstreamTransportSocketFactoryPtr transport_socket_factory)
-    : PassthroughFactory(std::move(transport_socket_factory)) {}
+    Network::UpstreamTransportSocketFactoryPtr transport_socket_factory,
+    absl::optional<Network::TransportSocketOptions::Http11ProxyInfo> proxy_info)
+    : PassthroughFactory(std::move(transport_socket_factory)), proxy_info_(proxy_info) {}
 
 Network::TransportSocketPtr UpstreamHttp11ConnectSocketFactory::createTransportSocket(
     Network::TransportSocketOptionsConstSharedPtr options,
@@ -202,7 +215,8 @@ Network::TransportSocketPtr UpstreamHttp11ConnectSocketFactory::createTransportS
   if (inner_socket == nullptr) {
     return nullptr;
   }
-  return std::make_unique<UpstreamHttp11ConnectSocket>(std::move(inner_socket), options, host);
+  return std::make_unique<UpstreamHttp11ConnectSocket>(std::move(inner_socket), options, host,
+                                                       proxy_info_);
 }
 
 void UpstreamHttp11ConnectSocketFactory::hashKey(

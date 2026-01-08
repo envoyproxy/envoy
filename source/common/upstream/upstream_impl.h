@@ -443,7 +443,8 @@ protected:
                    HostDescriptionConstSharedPtr host);
   static absl::optional<Network::Address::InstanceConstSharedPtr> maybeGetProxyRedirectAddress(
       const Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
-      HostDescriptionConstSharedPtr host);
+      HostDescriptionConstSharedPtr host,
+      const Network::UpstreamTransportSocketFactory& socket_factory);
 
 private:
   // Helper function to check multiple health flags at once.

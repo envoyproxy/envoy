@@ -490,6 +490,10 @@ new_features:
   change: |
     Added :ref:`access_log <envoy_v3_api_field_extensions.filters.udp.dns_filter.v3.DnsFilterConfig.access_log>` for the
     DNS filter.
+- area: http_11_proxy
+  change: |
+    Added ability to configure a default proxy address that is used when the proxy address is not
+    configured via metadata.
 - area: ratelimit
   change: |
     Added support for substitution formatting in rate limit descriptor values.

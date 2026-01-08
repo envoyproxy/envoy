@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.transport_sockets.http_11_proxy.v3;
 
+import "envoy/config/core/v3/address.proto";
 import "envoy/config/core/v3/base.proto";
 
 import "udpa/annotations/status.proto";
@@ -32,7 +33,14 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // using the key ``envoy.http11_proxy_transport_socket.proxy_address`` and the
 // proxy address in ``config::core::v3::Address`` format.
 //
+// If the ``default_proxy_address`` is set and proxy address is not found in the
+// ``typed_filter_metadata``, the default proxy address is used.
+//
 message Http11ProxyUpstreamTransport {
   // The underlying transport socket being wrapped. Defaults to plaintext (raw_buffer) if unset.
   config.core.v3.TransportSocket transport_socket = 1;
+
+  // Specifies the default proxy address to use if the proxy address is not present in the
+  // ``typed_filter_metadata`` of the upstream connection.
+  config.core.v3.Address default_proxy_address = 2;
 }
