@@ -42,7 +42,7 @@ CpuUtilizationMonitor::CpuUtilizationMonitor(
 void CpuUtilizationMonitor::updateResourceUsage(Server::ResourceUpdateCallbacks& callbacks) {
   // Get utilization directly from the reader (implementation-specific calculation)
   absl::StatusOr<double> utilization_result = cpu_stats_reader_->getUtilization();
-  
+
   if (!utilization_result.ok()) {
     const auto& error = EnvoyException(std::string(utilization_result.status().message()));
     callbacks.onFailure(error);
