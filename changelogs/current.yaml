@@ -654,6 +654,12 @@ new_features:
     correctly handled as they don't have an ``id`` field per the JSON-RPC specification.
 - area: mcp
   change: |
+    Added method group classification to the MCP filter. Methods are classified into built-in groups (lifecycle, tool,
+    resource, prompt, notification, logging, sampling, completion, unknown) and the group is added to dynamic metadata
+    when :ref:`group_metadata_key <envoy_v3_api_field_extensions.filters.http.mcp.v3.ParserConfig.group_metadata_key>`
+    is configured. User-defined groups can override built-in classifications via ``MethodConfig``.
+- area: mcp
+  change: |
     Added :ref:`mcp_router HTTP filter <config_http_filters_mcp_router>` which routes MCP (Model Context Protocol)
     requests to more backend servers. The filter supports fanout to multiple backends for initialize and tools-list requests,
     single-backend routing for tools-call based on tool name prefix, session management with composite session IDs,
