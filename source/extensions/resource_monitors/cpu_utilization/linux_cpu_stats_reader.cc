@@ -12,6 +12,8 @@
 #include "source/common/common/fmt.h"
 #include "source/common/common/thread.h"
 
+#include "absl/strings/numbers.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace ResourceMonitors {
@@ -98,34 +100,36 @@ CpuTimes CgroupV1CpuStatsReader::getCpuTimes() {
     return {false, false, 0, 0, 0};
   }
 
-  TRY_ASSERT_MAIN_THREAD {
-    const double cpu_allocated_value = std::stod(shares_result.value());
-    const double cpu_times_value = std::stod(usage_result.value());
-
-    if (cpu_allocated_value <= 0) {
-      ENVOY_LOG(error, "Invalid CPU shares value: {}", cpu_allocated_value);
-      return {false, false, 0, 0, 0};
-    }
-
-    const uint64_t current_time = std::chrono::duration_cast<std::chrono::nanoseconds>(
-                                      time_source_.monotonicTime().time_since_epoch())
-                                      .count();
-
-    // cpu_times is in nanoseconds, cpu_allocated shares is in millicores
-    const double work_time =
-        (cpu_times_value * CONTAINER_MILLICORES_PER_CORE) / cpu_allocated_value;
-
-    ENVOY_LOG(trace, "cgroupv1 cpu_times_value: {}", cpu_times_value);
-    ENVOY_LOG(trace, "cgroupv1 cpu_allocated_value: {}", cpu_allocated_value);
-    ENVOY_LOG(trace, "cgroupv1 current_time: {}", current_time);
-
-    return {true, false, work_time, current_time, 0};
-  }
-  END_TRY
-  catch (const std::exception& e) {
-    ENVOY_LOG(error, "Failed to parse cgroup v1 CPU stats: {}", e.what());
+  double cpu_allocated_value;
+  if (!absl::SimpleAtod(shares_result.value(), &cpu_allocated_value)) {
+    ENVOY_LOG(error, "Failed to parse CPU shares value: {}", shares_result.value());
     return {false, false, 0, 0, 0};
   }
+
+  double cpu_times_value;
+  if (!absl::SimpleAtod(usage_result.value(), &cpu_times_value)) {
+    ENVOY_LOG(error, "Failed to parse CPU usage value: {}", usage_result.value());
+    return {false, false, 0, 0, 0};
+  }
+
+  if (cpu_allocated_value <= 0) {
+    ENVOY_LOG(error, "Invalid CPU shares value: {}", cpu_allocated_value);
+    return {false, false, 0, 0, 0};
+  }
+
+  const uint64_t current_time = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                    time_source_.monotonicTime().time_since_epoch())
+                                    .count();
+
+  // cpu_times is in nanoseconds, cpu_allocated shares is in millicores
+  const double work_time =
+      (cpu_times_value * CONTAINER_MILLICORES_PER_CORE) / cpu_allocated_value;
+
+  ENVOY_LOG(trace, "cgroupv1 cpu_times_value: {}", cpu_times_value);
+  ENVOY_LOG(trace, "cgroupv1 cpu_allocated_value: {}", cpu_allocated_value);
+  ENVOY_LOG(trace, "cgroupv1 current_time: {}", current_time);
+
+  return {true, false, work_time, current_time, 0};
 }
 
 CgroupV2CpuStatsReader::CgroupV2CpuStatsReader(Filesystem::Instance& fs, TimeSource& time_source)
@@ -159,15 +163,11 @@ CpuTimes CgroupV2CpuStatsReader::getCpuTimes() {
       // Line starts with "usage_usec "
       const size_t pos = line.find_last_of(' ');
       if (pos != std::string::npos) {
-        TRY_ASSERT_MAIN_THREAD {
-          usage_usec = std::stoull(line.substr(pos + 1));
-          found_usage = true;
-        }
-        END_TRY
-        catch (const std::exception&) {
-          ENVOY_LOG(error, "Unexpected format in cpu.stat file {}", stat_path_);
+        if (!absl::SimpleAtoi(line.substr(pos + 1), &usage_usec)) {
+          ENVOY_LOG(error, "Failed to parse usage_usec in cpu.stat file {}", stat_path_);
           return {false, true, 0, 0, 0};
         }
+        found_usage = true;
       }
       break;
     }
@@ -192,30 +192,31 @@ CpuTimes CgroupV2CpuStatsReader::getCpuTimes() {
   range_token.erase(range_token.find_last_not_of(" \n\r\t") + 1);
 
   const size_t dash_pos = range_token.find('-');
-  TRY_ASSERT_MAIN_THREAD {
-    if (dash_pos == std::string::npos) {
-      // Single CPU (e.g., "0" means 1 core)
-      const int single_cpu = std::stoi(range_token);
-      if (single_cpu < 0) {
-        ENVOY_LOG(error, "Invalid CPU value in {}: {}", effective_path_, range_token);
-        return {false, true, 0, 0, 0};
-      }
-      N = 1;
-    } else {
-      // CPU range (e.g., "0-3" means 4 cores)
-      const int range_start = std::stoi(range_token.substr(0, dash_pos));
-      const int range_end = std::stoi(range_token.substr(dash_pos + 1));
-      if (range_start < 0 || range_end < range_start) {
-        ENVOY_LOG(error, "Invalid CPU range in {}: {}", effective_path_, range_token);
-        return {false, true, 0, 0, 0};
-      }
-      N = (range_end - range_start + 1);
+  if (dash_pos == std::string::npos) {
+    // Single CPU (e.g., "0" means 1 core)
+    int single_cpu;
+    if (!absl::SimpleAtoi(range_token, &single_cpu)) {
+      ENVOY_LOG(error, "Failed to parse CPU value in {}: {}", effective_path_, range_token);
+      return {false, true, 0, 0, 0};
     }
-  }
-  END_TRY
-  catch (const std::exception&) {
-    ENVOY_LOG(error, "Unexpected numeric format in {}: {}", effective_path_, range_token);
-    return {false, true, 0, 0, 0};
+    if (single_cpu < 0) {
+      ENVOY_LOG(error, "Invalid CPU value in {}: {}", effective_path_, range_token);
+      return {false, true, 0, 0, 0};
+    }
+    N = 1;
+  } else {
+    // CPU range (e.g., "0-3" means 4 cores)
+    int range_start, range_end;
+    if (!absl::SimpleAtoi(range_token.substr(0, dash_pos), &range_start) ||
+        !absl::SimpleAtoi(range_token.substr(dash_pos + 1), &range_end)) {
+      ENVOY_LOG(error, "Failed to parse CPU range in {}: {}", effective_path_, range_token);
+      return {false, true, 0, 0, 0};
+    }
+    if (range_start < 0 || range_end < range_start) {
+      ENVOY_LOG(error, "Invalid CPU range in {}: {}", effective_path_, range_token);
+      return {false, true, 0, 0, 0};
+    }
+    N = (range_end - range_start + 1);
   }
 
   if (N <= 0) {
@@ -245,21 +246,18 @@ CpuTimes CgroupV2CpuStatsReader::getCpuTimes() {
     ENVOY_LOG(trace, "cgroupv2 max quota found, using N: {}", N);
     effective_cores = static_cast<double>(N);
   } else {
-    TRY_ASSERT_MAIN_THREAD {
-      const int quota = std::stoi(quota_str);
-      const int period = std::stoi(period_str);
-      if (period <= 0) {
-        ENVOY_LOG(error, "Invalid period value in {}: {}", max_path_, period_str);
-        return {false, true, 0, 0, 0};
-      }
-      const double q_cores = static_cast<double>(quota) / static_cast<double>(period);
-      effective_cores = std::min(static_cast<double>(N), q_cores);
-    }
-    END_TRY
-    catch (const std::exception&) {
-      ENVOY_LOG(error, "Unexpected numeric format in {}: {} {}", max_path_, quota_str, period_str);
+    int quota, period;
+    if (!absl::SimpleAtoi(quota_str, &quota) || !absl::SimpleAtoi(period_str, &period)) {
+      ENVOY_LOG(error, "Failed to parse cpu.max values in {}: {} {}", max_path_, quota_str,
+                period_str);
       return {false, true, 0, 0, 0};
     }
+    if (period <= 0) {
+      ENVOY_LOG(error, "Invalid period value in {}: {}", max_path_, period_str);
+      return {false, true, 0, 0, 0};
+    }
+    const double q_cores = static_cast<double>(quota) / static_cast<double>(period);
+    effective_cores = std::min(static_cast<double>(N), q_cores);
   }
 
   // Convert usage from usec to match our time units

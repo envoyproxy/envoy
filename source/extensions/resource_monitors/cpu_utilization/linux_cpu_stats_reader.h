@@ -69,8 +69,8 @@ public:
 
 private:
   static constexpr double CONTAINER_MILLICORES_PER_CORE = 1000.0;
-  std::string shares_path_;
-  std::string usage_path_;
+  const std::string shares_path_;
+  const std::string usage_path_;
 };
 
 class CgroupV2CpuStatsReader : public LinuxContainerCpuStatsReader,
@@ -86,9 +86,9 @@ public:
   CpuTimes getCpuTimes() override;
 
 private:
-  std::string stat_path_;
-  std::string max_path_;
-  std::string effective_path_;
+  const std::string stat_path_;
+  const std::string max_path_;
+  const std::string effective_path_;
 };
 
 } // namespace CpuUtilizationMonitor
