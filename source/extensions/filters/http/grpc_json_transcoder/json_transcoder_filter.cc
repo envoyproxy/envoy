@@ -450,12 +450,12 @@ void JsonTranscoderFilter::initPerRouteConfig() {
 
 void JsonTranscoderFilter::maybeExpandBufferLimits() {
   const uint32_t max_request_size = per_route_config_->max_request_body_size_.value_or(0);
-  if (max_request_size > decoder_callbacks_->decoderBufferLimit()) {
-    decoder_callbacks_->setDecoderBufferLimit(max_request_size);
+  if (max_request_size > decoder_callbacks_->bufferLimit()) {
+    decoder_callbacks_->setBufferLimit(max_request_size);
   }
   const uint32_t max_response_size = per_route_config_->max_response_body_size_.value_or(0);
-  if (max_response_size > encoder_callbacks_->encoderBufferLimit()) {
-    encoder_callbacks_->setEncoderBufferLimit(max_response_size);
+  if (max_response_size > encoder_callbacks_->bufferLimit()) {
+    encoder_callbacks_->setBufferLimit(max_response_size);
   }
 }
 
@@ -1064,7 +1064,7 @@ bool JsonTranscoderFilter::decoderBufferLimitReached(uint64_t buffer_length) {
   // The limit is either the configured maximum request body size, or, if not configured,
   // the default buffer limit.
   const uint32_t max_size =
-      per_route_config_->max_request_body_size_.value_or(decoder_callbacks_->decoderBufferLimit());
+      per_route_config_->max_request_body_size_.value_or(decoder_callbacks_->bufferLimit());
   if (buffer_length > max_size) {
     ENVOY_STREAM_LOG(debug,
                      "Request rejected because the transcoder's internal buffer size exceeds the "
@@ -1086,7 +1086,7 @@ bool JsonTranscoderFilter::encoderBufferLimitReached(uint64_t buffer_length) {
   // The limit is either the configured maximum response body size, or, if not configured,
   // the default buffer limit.
   const uint32_t max_size =
-      per_route_config_->max_response_body_size_.value_or(encoder_callbacks_->encoderBufferLimit());
+      per_route_config_->max_response_body_size_.value_or(encoder_callbacks_->bufferLimit());
   if (buffer_length > max_size) {
     ENVOY_STREAM_LOG(
         debug,

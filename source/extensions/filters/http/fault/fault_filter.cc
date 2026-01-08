@@ -211,7 +211,7 @@ void FaultFilter::maybeSetupResponseRateLimit(const Http::RequestHeaderMap& requ
   config_->stats().response_rl_injected_.inc();
 
   response_limiter_ = std::make_unique<Envoy::Extensions::HttpFilters::Common::StreamRateLimiter>(
-      rate_kbps.value(), encoder_callbacks_->encoderBufferLimit(),
+      rate_kbps.value(), encoder_callbacks_->bufferLimit(),
       [this] { encoder_callbacks_->onEncoderFilterAboveWriteBufferHighWatermark(); },
       [this] { encoder_callbacks_->onEncoderFilterBelowWriteBufferLowWatermark(); },
       [this](Buffer::Instance& data, bool end_stream) {
