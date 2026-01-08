@@ -139,6 +139,19 @@ typedef const void* envoy_dynamic_module_type_http_filter_module_ptr;
 typedef void* envoy_dynamic_module_type_http_filter_scheduler_module_ptr;
 
 /**
+ * envoy_dynamic_module_type_http_filter_config_scheduler_module_ptr is a raw pointer to the
+ * DynamicModuleHttpFilterConfigScheduler class in Envoy.
+ *
+ * OWNERSHIP: The allocation is done by Envoy but the module is responsible for managing the
+ * lifetime of the pointer. Notably, it must be explicitly destroyed by the module
+ * when scheduling the HTTP filter config event is done. The creation of this pointer is done by
+ * envoy_dynamic_module_callback_http_filter_config_scheduler_new and the scheduling and destruction
+ * is done by envoy_dynamic_module_callback_http_filter_config_scheduler_delete. Since its lifecycle
+ * is owned/managed by the module, this has _module_ptr suffix.
+ */
+typedef void* envoy_dynamic_module_type_http_filter_config_scheduler_module_ptr;
+
+/**
  * envoy_dynamic_module_type_buffer_module_ptr is a pointer to a buffer in the module. A buffer
  * represents a contiguous block of memory in bytes.
  *
@@ -1044,6 +1057,21 @@ void envoy_dynamic_module_on_http_filter_http_stream_reset(
 void envoy_dynamic_module_on_http_filter_scheduled(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr, uint64_t event_id);
+
+/**
+ * envoy_dynamic_module_on_http_filter_config_scheduled is called when the HTTP filter
+ * configuration is scheduled to be executed on the main thread with
+ * envoy_dynamic_module_callback_http_filter_config_scheduler_commit callback.
+ *
+ * @param filter_config_envoy_ptr is the pointer to the DynamicModuleHttpFilterConfig object.
+ * @param filter_config_ptr is the pointer to the in-module HTTP filter configuration created by
+ * envoy_dynamic_module_on_http_filter_config_new.
+ * @param event_id is the ID of the event passed to
+ * envoy_dynamic_module_callback_http_filter_config_scheduler_commit.
+ */
+void envoy_dynamic_module_on_http_filter_config_scheduled(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_config_module_ptr filter_config_ptr, uint64_t event_id);
 
 /**
  * envoy_dynamic_module_on_http_filter_downstream_above_write_buffer_high_watermark is called when
@@ -2240,6 +2268,53 @@ envoy_dynamic_module_callback_http_filter_scheduler_new(
  */
 void envoy_dynamic_module_callback_http_filter_scheduler_commit(
     envoy_dynamic_module_type_http_filter_scheduler_module_ptr scheduler_module_ptr,
+    uint64_t event_id);
+
+/**
+ * envoy_dynamic_module_callback_http_filter_config_scheduler_new is called by the module to create
+ * a new HTTP filter configuration scheduler. The scheduler is used to dispatch HTTP filter
+ * configuration operations to the main thread from any thread including the ones managed by the
+ * module.
+ *
+ * @param filter_config_envoy_ptr is the pointer to the DynamicModuleHttpFilterConfig object.
+ * @return envoy_dynamic_module_type_http_filter_config_scheduler_module_ptr is the pointer to the
+ * created HTTP filter configuration scheduler.
+ *
+ * NOTE: it is caller's responsibility to delete the scheduler using
+ * envoy_dynamic_module_callback_http_filter_config_scheduler_delete when it is no longer needed.
+ * See the comment on envoy_dynamic_module_type_http_filter_config_scheduler_module_ptr.
+ */
+envoy_dynamic_module_type_http_filter_config_scheduler_module_ptr
+envoy_dynamic_module_callback_http_filter_config_scheduler_new(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_http_filter_config_scheduler_delete is called by the module to
+ * delete the HTTP filter configuration scheduler created by
+ * envoy_dynamic_module_callback_http_filter_config_scheduler_new.
+ *
+ * @param scheduler_module_ptr is the pointer to the HTTP filter configuration scheduler created by
+ * envoy_dynamic_module_callback_http_filter_config_scheduler_new.
+ */
+void envoy_dynamic_module_callback_http_filter_config_scheduler_delete(
+    envoy_dynamic_module_type_http_filter_config_scheduler_module_ptr scheduler_module_ptr);
+
+/**
+ * envoy_dynamic_module_callback_http_filter_config_scheduler_commit is called by the module to
+ * schedule a generic event to the HTTP filter configuration on the main thread.
+ *
+ * This will eventually end up invoking envoy_dynamic_module_on_http_filter_config_scheduled
+ * event hook on the main thread.
+ *
+ * This can be called multiple times to schedule multiple events to the same filter configuration.
+ *
+ * @param scheduler_module_ptr is the pointer to the HTTP filter configuration scheduler created by
+ * envoy_dynamic_module_callback_http_filter_config_scheduler_new.
+ * @param event_id is the ID of the event. This can be used to differentiate between multiple
+ * events scheduled to the same filter configuration. It can be any module-defined value.
+ */
+void envoy_dynamic_module_callback_http_filter_config_scheduler_commit(
+    envoy_dynamic_module_type_http_filter_config_scheduler_module_ptr scheduler_module_ptr,
     uint64_t event_id);
 
 /**

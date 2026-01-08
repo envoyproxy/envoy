@@ -248,6 +248,13 @@ pub trait HttpFilterConfig<EHF: EnvoyHttpFilter>: Sync {
   fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
     panic!("not implemented");
   }
+
+  /// This is called when the new event is scheduled via the
+  /// [`EnvoyHttpFilterConfigScheduler::commit`] for this [`HttpFilterConfig`].
+  ///
+  /// * `event_id` is the ID of the event that was scheduled with
+  ///   [`EnvoyHttpFilterConfigScheduler::commit`] to distinguish multiple scheduled events.
+  fn on_scheduled(&self, _event_id: u64) {}
 }
 
 /// The trait that corresponds to an Envoy Http filter for each stream
@@ -487,6 +494,11 @@ pub trait EnvoyHttpFilterConfig {
     name: &str,
     labels: &[&str],
   ) -> Result<EnvoyHistogramVecId, envoy_dynamic_module_type_metrics_result>;
+
+  /// Create a new implementation of the [`EnvoyHttpFilterConfigScheduler`] trait.
+  ///
+  /// This can be used to schedule an event to the main thread where the filter config is running.
+  fn new_scheduler(&self) -> Box<dyn EnvoyHttpFilterConfigScheduler>;
 }
 
 pub struct EnvoyHttpFilterConfigImpl {
@@ -611,6 +623,16 @@ impl EnvoyHttpFilterConfig for EnvoyHttpFilterConfigImpl {
       )
     })?;
     Ok(EnvoyHistogramVecId(id))
+  }
+
+  fn new_scheduler(&self) -> Box<dyn EnvoyHttpFilterConfigScheduler> {
+    unsafe {
+      let scheduler_ptr =
+        abi::envoy_dynamic_module_callback_http_filter_config_scheduler_new(self.raw_ptr);
+      Box::new(EnvoyHttpFilterConfigSchedulerImpl {
+        raw_ptr: scheduler_ptr,
+      })
+    }
   }
 }
 
@@ -2558,6 +2580,46 @@ impl EnvoyHttpFilterScheduler for Box<dyn EnvoyHttpFilterScheduler> {
   }
 }
 
+/// This represents a thread-safe object that can be used to schedule a generic event to the
+/// Envoy HTTP filter config on the main thread.
+#[automock]
+pub trait EnvoyHttpFilterConfigScheduler: Send + Sync {
+  /// Commit the scheduled event to the main thread.
+  fn commit(&self, event_id: u64);
+}
+
+struct EnvoyHttpFilterConfigSchedulerImpl {
+  raw_ptr: abi::envoy_dynamic_module_type_http_filter_config_scheduler_module_ptr,
+}
+
+unsafe impl Send for EnvoyHttpFilterConfigSchedulerImpl {}
+unsafe impl Sync for EnvoyHttpFilterConfigSchedulerImpl {}
+
+impl Drop for EnvoyHttpFilterConfigSchedulerImpl {
+  fn drop(&mut self) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_scheduler_delete(self.raw_ptr);
+    }
+  }
+}
+
+impl EnvoyHttpFilterConfigScheduler for EnvoyHttpFilterConfigSchedulerImpl {
+  fn commit(&self, event_id: u64) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_scheduler_commit(
+        self.raw_ptr,
+        event_id,
+      );
+    }
+  }
+}
+
+impl EnvoyHttpFilterConfigScheduler for Box<dyn EnvoyHttpFilterConfigScheduler> {
+  fn commit(&self, event_id: u64) {
+    (**self).commit(event_id);
+  }
+}
+
 #[no_mangle]
 unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_new(
   envoy_filter_config_ptr: abi::envoy_dynamic_module_type_http_filter_config_envoy_ptr,
@@ -2643,6 +2705,17 @@ unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_destroy(
   config_ptr: abi::envoy_dynamic_module_type_http_filter_config_module_ptr,
 ) {
   drop_wrapped_c_void_ptr!(config_ptr, HttpFilterConfig<EnvoyHttpFilterImpl>);
+}
+
+#[no_mangle]
+unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_scheduled(
+  _envoy_ptr: abi::envoy_dynamic_module_type_http_filter_config_envoy_ptr,
+  config_ptr: abi::envoy_dynamic_module_type_http_filter_config_module_ptr,
+  event_id: u64,
+) {
+  let config = config_ptr as *mut *mut dyn HttpFilterConfig<EnvoyHttpFilterImpl>;
+  let config = &**config;
+  config.on_scheduled(event_id);
 }
 
 #[no_mangle]

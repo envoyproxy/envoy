@@ -1409,6 +1409,27 @@ void envoy_dynamic_module_callback_http_filter_scheduler_commit(
   scheduler->commit(event_id);
 }
 
+envoy_dynamic_module_type_http_filter_config_scheduler_module_ptr
+envoy_dynamic_module_callback_http_filter_config_scheduler_new(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr) {
+  auto filter_config = static_cast<DynamicModuleHttpFilterConfig*>(filter_config_envoy_ptr);
+  return new DynamicModuleHttpFilterConfigScheduler(filter_config->weak_from_this(),
+                                                    filter_config->main_thread_dispatcher_);
+}
+
+void envoy_dynamic_module_callback_http_filter_config_scheduler_delete(
+    envoy_dynamic_module_type_http_filter_config_scheduler_module_ptr scheduler_module_ptr) {
+  delete static_cast<DynamicModuleHttpFilterConfigScheduler*>(scheduler_module_ptr);
+}
+
+void envoy_dynamic_module_callback_http_filter_config_scheduler_commit(
+    envoy_dynamic_module_type_http_filter_config_scheduler_module_ptr scheduler_module_ptr,
+    uint64_t event_id) {
+  DynamicModuleHttpFilterConfigScheduler* scheduler =
+      static_cast<DynamicModuleHttpFilterConfigScheduler*>(scheduler_module_ptr);
+  scheduler->commit(event_id);
+}
+
 void envoy_dynamic_module_callback_http_filter_continue_decoding(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr) {
   DynamicModuleHttpFilter* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);

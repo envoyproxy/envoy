@@ -1,7 +1,9 @@
 use abi::*;
 use envoy_proxy_dynamic_modules_rust_sdk::*;
 use std::any::Any;
-use std::vec;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use std::time::Duration;
 
 declare_init_functions!(
   init,
@@ -77,6 +79,19 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
     "upstream_reset" => Some(Box::new(UpstreamResetConfig {
       cluster_name: String::from_utf8(config.to_owned()).unwrap(),
     })),
+    "http_config_scheduler" => {
+      let shared_status = Arc::new(AtomicBool::new(false));
+      let scheduler = envoy_filter_config.new_scheduler();
+
+      // Spawn a thread to simulate async work.
+      std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(100));
+        // Schedule an event with ID 1.
+        scheduler.commit(1);
+      });
+
+      Some(Box::new(ConfigSchedulerConfig { shared_status }))
+    },
     _ => panic!("Unknown filter name: {}", name),
   }
 }
@@ -87,6 +102,43 @@ fn new_http_filter_per_route_config_fn(name: &str, config: &[u8]) -> Option<Box<
       value: String::from_utf8(config.to_owned()).unwrap(),
     })),
     _ => panic!("Unknown filter name: {}", name),
+  }
+}
+
+struct ConfigSchedulerConfig {
+  shared_status: Arc<AtomicBool>,
+}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for ConfigSchedulerConfig {
+  fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    Box::new(ConfigSchedulerFilter {
+      shared_status: self.shared_status.clone(),
+    })
+  }
+
+  fn on_scheduled(&self, event_id: u64) {
+    if event_id == 1 {
+      self.shared_status.store(true, Ordering::SeqCst);
+    }
+  }
+}
+
+struct ConfigSchedulerFilter {
+  shared_status: Arc<AtomicBool>,
+}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for ConfigSchedulerFilter {
+  fn on_request_headers(
+    &mut self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
+    if self.shared_status.load(Ordering::SeqCst) {
+      envoy_filter.set_request_header("x-test-status", b"true");
+    } else {
+      envoy_filter.set_request_header("x-test-status", b"false");
+    }
+    abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
   }
 }
 
