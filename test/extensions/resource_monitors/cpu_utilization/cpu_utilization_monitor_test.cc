@@ -22,11 +22,11 @@ public:
   MockCpuStatsReader() = default;
 
   MOCK_METHOD(CpuTimes, getCpuTimes, ());
-  
+
   // Implement getUtilization() to use getCpuTimes() and calculate utilization
   absl::StatusOr<double> getUtilization() override {
     CpuTimes current_cpu_times = getCpuTimes();
-    
+
     if (!current_cpu_times.is_valid) {
       return absl::InvalidArgumentError("Failed to read CPU times");
     }
@@ -52,7 +52,8 @@ public:
     if (current_cpu_times.is_cgroup_v2) {
       // CgroupV2-specific calculation with unit conversions
       const double total_over_period_seconds = total_over_period / 1000000000.0;
-      utilization = ((work_over_period / 1000000.0) / (total_over_period_seconds * current_cpu_times.effective_cores));
+      utilization = ((work_over_period / 1000000.0) /
+                     (total_over_period_seconds * current_cpu_times.effective_cores));
       utilization = std::clamp(utilization, 0.0, 1.0);
     } else {
       // Simple calculation for Linux host and CgroupV1

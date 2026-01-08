@@ -61,7 +61,7 @@ CpuTimes LinuxCpuStatsReader::getCpuTimes() {
 
 absl::StatusOr<double> LinuxCpuStatsReader::getUtilization() {
   CpuTimes current_cpu_times = getCpuTimes();
-  
+
   if (!current_cpu_times.is_valid) {
     return absl::InvalidArgumentError("Failed to read CPU times");
   }
@@ -165,7 +165,7 @@ CpuTimes CgroupV1CpuStatsReader::getCpuTimes() {
 
 absl::StatusOr<double> CgroupV1CpuStatsReader::getUtilization() {
   CpuTimes current_cpu_times = getCpuTimes();
-  
+
   if (!current_cpu_times.is_valid) {
     return absl::InvalidArgumentError("Failed to read CPU times");
   }
@@ -338,7 +338,7 @@ CpuTimes CgroupV2CpuStatsReader::getCpuTimes() {
 
 absl::StatusOr<double> CgroupV2CpuStatsReader::getUtilization() {
   CpuTimes current_cpu_times = getCpuTimes();
-  
+
   if (!current_cpu_times.is_valid) {
     return absl::InvalidArgumentError("Failed to read CPU times");
   }
@@ -363,9 +363,10 @@ absl::StatusOr<double> CgroupV2CpuStatsReader::getUtilization() {
   // Convert nanoseconds to seconds and microseconds to seconds
   const double total_over_period_seconds = total_over_period / 1000000000.0;
   const double work_over_period_seconds = work_over_period / 1000000.0;
-  
+
   // Calculate utilization considering effective cores
-  const double utilization = work_over_period_seconds / (total_over_period_seconds * current_cpu_times.effective_cores);
+  const double utilization =
+      work_over_period_seconds / (total_over_period_seconds * current_cpu_times.effective_cores);
 
   // Clamp to [0.0, 1.0]
   const double clamped_utilization = std::clamp(utilization, 0.0, 1.0);
