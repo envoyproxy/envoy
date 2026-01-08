@@ -15,13 +15,12 @@ else
 fi
 
 if [[ $OSTYPE == darwin* ]]; then
-  # TODO(#24605): RBE fails with arm64 versions of Bazel on macOS
-  BAZELW_ARCH=amd64 ./bazelw "$@" \
+  bazel "$@" \
     --tls_client_certificate="$certificate" \
     --tls_client_key="$key" \
     --config remote-ci-macos
 else
-  ./bazelw "$@" \
+  bazel "$@" \
     --tls_client_certificate="$certificate" \
     --tls_client_key="$key" \
     --config remote-ci-linux
