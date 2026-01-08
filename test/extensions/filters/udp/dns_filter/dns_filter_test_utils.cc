@@ -189,7 +189,9 @@ bool DnsResponseValidator::validateDnsResponseObject(DnsQueryContextPtr& context
     ENVOY_LOG(trace, "Parsing [{}/{}] questions", index,
               static_cast<int>(context->header_.questions));
 
-    const std::string record_name = parseDnsNameRecord(buffer, available_bytes, offset);
+    uint64_t available_bytes_uint64 = available_bytes;
+    const std::string record_name = parseDnsNameRecord(buffer, available_bytes_uint64, offset);
+    available_bytes = available_bytes_uint64;
     // Read the record type
     uint16_t record_type;
     record_type = buffer->peekBEInt<uint16_t>(offset);
