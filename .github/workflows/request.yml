@@ -8,11 +8,9 @@ permissions:
 on:
   pull_request_target:
     branches:
-    - envoy/*
     - patches/*
   push:
     branches:
-    - envoy/*
     - patches/*
   schedule:
   - cron: '30 6 * * *'
