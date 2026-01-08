@@ -304,6 +304,11 @@ void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
     return;
   }
 
+  if (detected_close_type_ != StreamInfo::DetectedCloseType::RemoteReset &&
+      detected_close_type_ != StreamInfo::DetectedCloseType::LocalReset) {
+    setDetectedCloseType(StreamInfo::DetectedCloseType::Normal);
+  }
+
   // No need for a delayed close (if pending) now that the socket is being closed.
   if (delayed_close_timer_) {
     delayed_close_timer_->disableTimer();

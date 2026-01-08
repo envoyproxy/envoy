@@ -317,9 +317,7 @@ public:
 protected:
   void setDetectedCloseType(StreamInfo::DetectedCloseType close_type) override {
     ConnectionImpl::setDetectedCloseType(close_type);
-    if (stream_info_.upstreamInfo()) {
-      stream_info_.upstreamInfo()->setUpstreamDetectedCloseType(close_type);
-    }
+    stream_info_.upstreamInfo()->setUpstreamDetectedCloseType(close_type);
   }
 
 private:

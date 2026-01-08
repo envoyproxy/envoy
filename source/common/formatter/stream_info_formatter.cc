@@ -26,6 +26,8 @@ const RE2& getSystemTimeFormatNewlinePattern() {
 
 std::string detectedCloseTypeToString(StreamInfo::DetectedCloseType type) {
   switch (type) {
+  case StreamInfo::DetectedCloseType::Undefined:
+    return "Undefined";
   case StreamInfo::DetectedCloseType::LocalReset:
     return "LocalReset";
   case StreamInfo::DetectedCloseType::RemoteReset:

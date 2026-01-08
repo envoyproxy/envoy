@@ -1177,7 +1177,8 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
     if (Runtime::runtimeFeatureEnabled(
             "envoy.restart_features.upstream_http_filters_with_tcp_proxy")) {
       read_callbacks_->connection().dispatcher().deferredDelete(std::move(upstream_));
-    } else {
+    } else if (upstream_) {
+      getStreamInfo().upstreamInfo()->setUpstreamDetectedCloseType(upstream_->detectedCloseType());
       upstream_.reset();
     }
     disableIdleTimer();

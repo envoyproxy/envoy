@@ -260,6 +260,7 @@ using ResponseCodeDetails = ConstSingleton<ResponseCodeDetailValues>;
  * Type of connection close which is detected from the socket.
  */
 enum class DetectedCloseType {
+  Undefined,   // The connection isn't closed or the close type is not detected.
   Normal,      // The normal socket close from Envoy's connection perspective.
   LocalReset,  // The local reset initiated from Envoy.
   RemoteReset, // The peer reset detected by the connection.
