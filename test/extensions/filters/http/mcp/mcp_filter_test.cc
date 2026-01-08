@@ -768,6 +768,78 @@ TEST_F(McpFilterTest, PerRouteMaxBodySizeFallbackToGlobal) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
 }
 
+// Test method group added to dynamic metadata when configured
+TEST_F(McpFilterTest, MethodGroupAddedToMetadata) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.mutable_parser_config()->set_group_metadata_key("method_group");
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+
+  filter_->decodeHeaders(headers, false);
+
+  std::string json =
+      R"({"jsonrpc": "2.0", "method": "tools/call", "params": {"name": "test"}, "id": 1})";
+  Buffer::OwnedImpl buffer(json);
+
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("mcp_proxy", _))
+      .WillOnce([&](const std::string&, const Protobuf::Struct& metadata) {
+        const auto& fields = metadata.fields();
+
+        // Check method_group is set to "tool" (built-in group for tools/call)
+        auto group_it = fields.find("method_group");
+        ASSERT_NE(group_it, fields.end());
+        EXPECT_EQ(group_it->second.string_value(), "tool");
+
+        // Check method is also set
+        auto method_it = fields.find("method");
+        ASSERT_NE(method_it, fields.end());
+        EXPECT_EQ(method_it->second.string_value(), "tools/call");
+      });
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+}
+
+// Test method group with custom override
+TEST_F(McpFilterTest, MethodGroupWithCustomOverride) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  auto* parser_config = proto_config.mutable_parser_config();
+  parser_config->set_group_metadata_key("group");
+
+  auto* method_config = parser_config->add_methods();
+  method_config->set_method("tools/list");
+  method_config->set_group("custom_tools");
+
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+
+  filter_->decodeHeaders(headers, false);
+
+  std::string json = R"({"jsonrpc": "2.0", "method": "tools/list", "id": 1})";
+  Buffer::OwnedImpl buffer(json);
+
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("mcp_proxy", _))
+      .WillOnce([&](const std::string&, const Protobuf::Struct& metadata) {
+        const auto& fields = metadata.fields();
+        auto group_it = fields.find("group");
+        ASSERT_NE(group_it, fields.end());
+        EXPECT_EQ(group_it->second.string_value(), "custom_tools");
+      });
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+}
+
 } // namespace
 } // namespace Mcp
 } // namespace HttpFilters

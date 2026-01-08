@@ -363,6 +363,11 @@ new_features:
     Added support for streamable HTTP callouts in dynamic modules. Modules can create streaming HTTP connections to
     upstream clusters using ``start_http_stream``, send request data and trailers incrementally, and receive streaming
     response headers, data, and trailers through dedicated callbacks.
+- area: dynamic modules
+  change: |
+    Added scheduler API for HTTP filter configuration in dynamic modules. The configuration scheduler allows modules
+    to dispatch asynchronous operations to the main thread, enabling singleton/bootstrap patterns similar to WASM
+    filters for initialization and background tasks.
 - area: udp_sink
   change: |
     Enhanced the UDP sink to support tapped messages larger than 64KB.
@@ -658,6 +663,12 @@ new_features:
     The filter extracts the ``method`` and ``id`` fields from incoming requests and stores them in dynamic metadata
     for use by downstream filters and access logging. Notifications (methods starting with ``notifications/``) are
     correctly handled as they don't have an ``id`` field per the JSON-RPC specification.
+- area: mcp
+  change: |
+    Added method group classification to the MCP filter. Methods are classified into built-in groups (lifecycle, tool,
+    resource, prompt, notification, logging, sampling, completion, unknown) and the group is added to dynamic metadata
+    when :ref:`group_metadata_key <envoy_v3_api_field_extensions.filters.http.mcp.v3.ParserConfig.group_metadata_key>`
+    is configured. User-defined groups can override built-in classifications via ``MethodConfig``.
 - area: mcp
   change: |
     Added :ref:`mcp_router HTTP filter <config_http_filters_mcp_router>` which routes MCP (Model Context Protocol)
