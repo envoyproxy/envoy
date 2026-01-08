@@ -35,12 +35,10 @@ CpuUtilizationMonitor::CpuUtilizationMonitor(
     std::unique_ptr<CpuStatsReader> cpu_stats_reader)
     : cpu_stats_reader_(std::move(cpu_stats_reader)) {
   // Initialize by calling getUtilization() once to establish baseline
-  // The first call will return 0, which we can ignore
   (void)cpu_stats_reader_->getUtilization();
 }
 
 void CpuUtilizationMonitor::updateResourceUsage(Server::ResourceUpdateCallbacks& callbacks) {
-  // Get utilization directly from the reader (implementation-specific calculation)
   absl::StatusOr<double> utilization_result = cpu_stats_reader_->getUtilization();
 
   if (!utilization_result.ok()) {

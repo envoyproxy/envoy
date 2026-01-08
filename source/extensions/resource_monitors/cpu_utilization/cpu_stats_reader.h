@@ -37,9 +37,7 @@ public:
   virtual CpuTimes getCpuTimes() PURE;
 
   /**
-   * Update CPU statistics and calculate current utilization.
-   * Each implementation tracks its own previous state internally and
-   * performs implementation-specific calculation logic.
+   * Performs implementation-specific calculation logic.
    * @return StatusOr containing utilization value (0.0 to 1.0) on success,
    *         or InvalidArgumentError if calculation fails.
    */
