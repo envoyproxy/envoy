@@ -167,6 +167,7 @@ envoy_cc_library(
         "@envoy_api//envoy/extensions/quic/connection_id_generator/v3:pkg_cc_proto_descriptor",
         "@envoy_api//envoy/extensions/quic/crypto_stream/v3:pkg_cc_proto_descriptor",
         "@envoy_api//envoy/extensions/quic/proof_source/v3:pkg_cc_proto_descriptor",
+        "@envoy_api//envoy/extensions/quic/client_writer_factory/v3:pkg_cc_proto_descriptor",
         "@envoy_api//envoy/extensions/regex_engines/v3:pkg_cc_proto_descriptor",
         "@envoy_api//envoy/extensions/request_id/uuid/v3:pkg_cc_proto_descriptor",
         "@envoy_api//envoy/extensions/transport_sockets/http_11_proxy/v3:pkg_cc_proto_descriptor",

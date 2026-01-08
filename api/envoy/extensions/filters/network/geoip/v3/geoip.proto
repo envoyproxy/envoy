@@ -1,0 +1,62 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.network.geoip.v3;
+
+import "envoy/config/core/v3/extension.proto";
+
+import "xds/annotations/v3/status.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.network.geoip.v3";
+option java_outer_classname = "GeoipProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/geoip/v3;geoipv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#protodoc-title: Geoip]
+// Geoip :ref:`configuration overview <config_network_filters_geoip>`.
+// [#extension: envoy.filters.network.geoip]
+
+// The network geolocation filter performs IP geolocation lookups on incoming connections
+// and stores the results in the connection's filter state under the well-known key
+// ``envoy.geoip``. The stored data is a ``GeoipInfo`` object that supports
+// serialization for access logging and field-level access.
+//
+// See :ref:`well known filter state <well_known_filter_state>` for details on accessing
+// the geolocation data.
+message Geoip {
+  // The prefix to use when emitting statistics. This is useful when there are multiple
+  // listeners configured with geoip filters, allowing stats to be grouped per listener.
+  // For example, with ``stat_prefix: "listener_1."``, stats would be emitted as
+  // ``listener_1.geoip.total``.
+  string stat_prefix = 1;
+
+  // Geoip driver specific configuration which depends on the driver being instantiated.
+  // [#extension-category: envoy.geoip_providers]
+  config.core.v3.TypedExtensionConfig provider = 2 [(validate.rules).message = {required: true}];
+
+  // Configuration for dynamically extracting the client IP address used for geolocation lookups.
+  //
+  // This field accepts the same :ref:`format specifiers <config_access_log_format>` as used for
+  // :ref:`HTTP access logging <config_access_log>` to extract the client IP.
+  // The formatted result must be a valid IPv4 or IPv6 address string. For example:
+  //
+  // * ``%FILTER_STATE(my.custom.client.ip:PLAIN)%`` - Read from filter state populated by a preceding filter.
+  // * ``%DYNAMIC_METADATA(namespace:key)%`` - Read from dynamic metadata.
+  // * ``%REQ(X-Forwarded-For)%`` - Extract from request header (if applicable in context).
+  //
+  // If not specified, defaults to the downstream connection's remote address.
+  // If specified but the result is empty, ``-``, or not a valid IP address, the filter
+  // falls back to the downstream connection's remote address.
+  //
+  // Example reading from filter state:
+  //
+  // .. code-block:: yaml
+  //
+  //   client_ip: "%FILTER_STATE(my.custom.client.ip:PLAIN)%"
+  //
+  string client_ip = 3;
+}

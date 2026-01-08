@@ -32,7 +32,8 @@ public:
   // Post socket to Dlb hardware.
   void post(Network::ConnectionSocketPtr&& socket) override;
 
-  void onAcceptWorker(Network::ConnectionSocketPtr&&, bool, bool) override {}
+  void onAcceptWorker(Network::ConnectionSocketPtr&&, bool, bool,
+                      const absl::optional<std::string>&) override {}
 
   // Create Dlb event and callback.
   void setDlbEvent();

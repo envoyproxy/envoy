@@ -1,3 +1,5 @@
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+
 licenses(["notice"])  # Apache 2
 
 exports_files([
@@ -39,4 +41,24 @@ cc_library(
             "@gperftools//:tcmalloc",
         ],
     }),
+)
+
+# Create a proper static library archive from the cc_library.
+cc_static_library(
+    name = "numa_static",
+    target_compatible_with = ["@platforms//os:linux"],
+    deps = ["@numactl//:numa"],
+)
+
+# Create a properly named libnuma.a archive for foreign_cc dependencies.
+# The cc_library above produces Bazel-internal archives, but foreign_cc
+# configure_make rules (like qatlib) expect a traditional libnuma.a file
+# that can be found with -lnuma.
+genrule(
+    name = "numa_archive",
+    srcs = [":numa_static"],
+    outs = ["lib/libnuma.a"],
+    cmd = "mkdir -p $$(dirname $@) && cp $< $@",
+    target_compatible_with = ["@platforms//os:linux"],
+    visibility = ["//visibility:public"],
 )

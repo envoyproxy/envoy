@@ -1363,8 +1363,7 @@ int ConnectionImpl::onFrameSend(int32_t stream_id, size_t length, uint8_t type, 
   case OGHTTP2_RST_STREAM_FRAME_TYPE: {
     ENVOY_CONN_LOG(debug, "sent reset code={}", connection_, error_code);
     stats_.tx_reset_.inc();
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http2_propagate_reset_events") &&
-        stream != nullptr && !stream->local_end_stream_sent_) {
+    if (stream != nullptr && !stream->local_end_stream_sent_) {
       // The RST_STREAM may preempt further DATA frames, and serves as the
       // notification of the end of the stream.
       stream->onResetEncoded(error_code);
@@ -2083,6 +2082,13 @@ ConnectionImpl::Http2Options::Http2Options(
   og_options_.max_header_field_size = max_headers_kb * 1024;
   og_options_.allow_extended_connect = http2_options.allow_connect();
   og_options_.allow_different_host_and_authority = true;
+  if (!PROTOBUF_GET_WRAPPED_OR_DEFAULT(http2_options, enable_huffman_encoding, true)) {
+    if (http2_options.has_hpack_table_size() && http2_options.hpack_table_size().value() == 0) {
+      og_options_.compression_option = http2::adapter::OgHttp2Session::Options::DISABLE_COMPRESSION;
+    } else {
+      og_options_.compression_option = http2::adapter::OgHttp2Session::Options::DISABLE_HUFFMAN;
+    }
+  }
 
 #ifdef ENVOY_ENABLE_UHV
   // UHV - disable header validations in oghttp2
@@ -2111,6 +2117,10 @@ ConnectionImpl::Http2Options::Http2Options(
   if (http2_options.hpack_table_size().value() != NGHTTP2_DEFAULT_HEADER_TABLE_SIZE) {
     nghttp2_option_set_max_deflate_dynamic_table_size(options_,
                                                       http2_options.hpack_table_size().value());
+  }
+
+  if (!PROTOBUF_GET_WRAPPED_OR_DEFAULT(http2_options, enable_huffman_encoding, true)) {
+    nghttp2_option_set_disable_huffman_encoding(options_, 1);
   }
 
   if (http2_options.allow_metadata()) {

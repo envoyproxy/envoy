@@ -6151,12 +6151,11 @@ TEST_F(ClusterInfoImplTest, FilterChain) {
                                                          Network::Address::IpVersion::v4);
 
     auto cluster = makeCluster(yaml);
-    Http::MockFilterChainManager manager;
-    const Http::EmptyFilterChainOptions options;
-    EXPECT_FALSE(cluster->info()->createUpgradeFilterChain("foo", nullptr, manager, options));
+    NiceMock<Http::MockFilterChainFactoryCallbacks> callbacks;
+    EXPECT_FALSE(cluster->info()->createUpgradeFilterChain("foo", nullptr, callbacks));
 
-    EXPECT_CALL(manager, applyFilterFactoryCb(_, _)).Times(0);
-    EXPECT_FALSE(cluster->info()->createFilterChain(manager));
+    EXPECT_CALL(callbacks, setFilterConfigName(_)).Times(0);
+    EXPECT_FALSE(cluster->info()->createFilterChain(callbacks));
   }
 
   {
@@ -6177,12 +6176,11 @@ TEST_F(ClusterInfoImplTest, FilterChain) {
                                                          Network::Address::IpVersion::v4);
 
     auto cluster = makeCluster(yaml);
-    Http::MockFilterChainManager manager;
-    const Http::EmptyFilterChainOptions options;
-    EXPECT_FALSE(cluster->info()->createUpgradeFilterChain("foo", nullptr, manager, options));
+    NiceMock<Http::MockFilterChainFactoryCallbacks> callbacks;
+    EXPECT_FALSE(cluster->info()->createUpgradeFilterChain("foo", nullptr, callbacks));
 
-    EXPECT_CALL(manager, applyFilterFactoryCb(_, _));
-    EXPECT_TRUE(cluster->info()->createFilterChain(manager));
+    EXPECT_CALL(callbacks, setFilterConfigName(_));
+    EXPECT_TRUE(cluster->info()->createFilterChain(callbacks));
   }
 }
 

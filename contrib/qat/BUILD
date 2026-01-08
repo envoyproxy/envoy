@@ -27,14 +27,12 @@ configure_make(
     ],
     # Include the numa_archive genrule output so that libnuma.a is available
     # for the linker to find with -lnuma.
-    data = [
-        "@numactl//:numa_archive",
-    ],
+    data = ["//bazel/external:numa_archive"],
     # Point to the directory containing the libnuma.a archive created by the
     # numa_archive genrule. The cc_library doesn't produce a file that can be
     # found with -lnuma, so we need to use the genrule output.
     env = {
-        "LDFLAGS": "-L$$EXT_BUILD_ROOT/$(BINDIR)/external/numactl/lib",
+        "LDFLAGS": "-L$$EXT_BUILD_ROOT/$(BINDIR)/bazel/external/lib",
     },
     lib_source = "@com_github_intel_qatlib//:all",
     out_static_libs = [

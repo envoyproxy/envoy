@@ -115,11 +115,9 @@ public:
   bool createQuicListenerFilterChain(Network::QuicListenerFilterManager&) override { return true; }
 
   // Http::FilterChainFactory
-  bool createFilterChain(Http::FilterChainManager& manager,
-                         const Http::FilterChainOptions&) const override;
+  bool createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) const override;
   bool createUpgradeFilterChain(absl::string_view, const Http::FilterChainFactory::UpgradeMap*,
-                                Http::FilterChainManager&,
-                                const Http::FilterChainOptions&) const override {
+                                Http::FilterChainFactoryCallbacks&) const override {
     return false;
   }
 
@@ -128,6 +126,13 @@ public:
     return request_id_extension_;
   }
   const AccessLog::InstanceSharedPtrVector& accessLogs() override { return access_logs_; }
+  bool acceptTargetPath(absl::string_view path_name) const {
+    return std::any_of(allowlisted_paths_.begin(), allowlisted_paths_.end(),
+                       [path_name](const Matchers::StringMatcherPtr& matcher) {
+                         return matcher->match(path_name);
+                       });
+  }
+  void addAllowlistedPath(Matchers::StringMatcherPtr matcher);
   bool flushAccessLogOnNewRequest() override { return flush_access_log_on_new_request_; }
   bool flushAccessLogOnTunnelSuccessfullyEstablished() const override { return false; }
   const absl::optional<std::chrono::milliseconds>& accessLogFlushInterval() override {
@@ -461,6 +466,7 @@ private:
   AdminFactoryContext factory_context_;
   Http::RequestIDExtensionSharedPtr request_id_extension_;
   AccessLog::InstanceSharedPtrVector access_logs_;
+  std::vector<Matchers::StringMatcherPtr> allowlisted_paths_;
   const bool flush_access_log_on_new_request_ = false;
   const absl::optional<std::chrono::milliseconds> null_access_log_flush_interval_;
   const std::string profile_path_;
@@ -503,9 +509,9 @@ private:
   AdminListenerPtr listener_;
   const AdminInternalAddressConfig internal_address_config_;
   const LocalReply::LocalReplyPtr local_reply_;
-  const std::vector<Http::OriginalIPDetectionSharedPtr> detection_extensions_{};
-  const std::vector<Http::EarlyHeaderMutationPtr> early_header_mutations_{};
-  const absl::optional<std::string> scheme_{};
+  const std::vector<Http::OriginalIPDetectionSharedPtr> detection_extensions_;
+  const std::vector<Http::EarlyHeaderMutationPtr> early_header_mutations_;
+  const absl::optional<std::string> scheme_;
   const bool scheme_match_upstream_ = false;
   const bool ignore_global_conn_limit_;
   std::unique_ptr<HttpConnectionManagerProto::ProxyStatusConfig> proxy_status_config_;
