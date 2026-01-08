@@ -40,7 +40,11 @@ TEST(CpuTimesV1Test, BasicUtilizationCalculation) {
   CpuTimes previous{true, false, 100.0, 1000, 1.0};
   CpuTimes current{true, false, 200.0, 2000, 1.0};
 
-  double utilization = current.calculateUtilization(previous);
+  double utilization;
+
+  absl::Status status = current.calculateUtilization(previous, utilization);
+
+  ASSERT_TRUE(status.ok());
   EXPECT_DOUBLE_EQ(utilization, 0.1);
 }
 
@@ -49,7 +53,11 @@ TEST(CpuTimesV1Test, FullUtilization) {
   CpuTimes previous{true, false, 0.0, 0, 1.0};
   CpuTimes current{true, false, 1000.0, 1000, 1.0};
 
-  double utilization = current.calculateUtilization(previous);
+  double utilization;
+
+  absl::Status status = current.calculateUtilization(previous, utilization);
+
+  ASSERT_TRUE(status.ok());
   EXPECT_DOUBLE_EQ(utilization, 1.0);
 }
 
@@ -58,7 +66,11 @@ TEST(CpuTimesV1Test, ZeroUtilization) {
   CpuTimes previous{true, false, 0.0, 0, 1.0};
   CpuTimes current{true, false, 0.0, 1000, 1.0};
 
-  double utilization = current.calculateUtilization(previous);
+  double utilization;
+
+  absl::Status status = current.calculateUtilization(previous, utilization);
+
+  ASSERT_TRUE(status.ok());
   EXPECT_DOUBLE_EQ(utilization, 0.0);
 }
 
@@ -67,7 +79,11 @@ TEST(CpuTimesV1Test, HighUtilization) {
   CpuTimes previous{true, false, 0.0, 0, 1.0};
   CpuTimes current{true, false, 950.0, 1000, 1.0};
 
-  double utilization = current.calculateUtilization(previous);
+  double utilization;
+
+  absl::Status status = current.calculateUtilization(previous, utilization);
+
+  ASSERT_TRUE(status.ok());
   EXPECT_DOUBLE_EQ(utilization, 0.95);
 }
 
@@ -76,7 +92,11 @@ TEST(CpuTimesV1Test, LargeTimeValues) {
   CpuTimes previous{true, false, 1000000.0, 10000000, 1.0};
   CpuTimes current{true, false, 2000000.0, 20000000, 1.0};
 
-  double utilization = current.calculateUtilization(previous);
+  double utilization;
+
+  absl::Status status = current.calculateUtilization(previous, utilization);
+
+  ASSERT_TRUE(status.ok());
   EXPECT_DOUBLE_EQ(utilization, 0.1);
 }
 
@@ -85,7 +105,11 @@ TEST(CpuTimesV1Test, SmallTimeIncrement) {
   CpuTimes previous{true, false, 100.0, 1000, 1.0};
   CpuTimes current{true, false, 100.1, 1001, 1.0};
 
-  double utilization = current.calculateUtilization(previous);
+  double utilization;
+
+  absl::Status status = current.calculateUtilization(previous, utilization);
+
+  ASSERT_TRUE(status.ok());
   EXPECT_NEAR(utilization, 0.1, 0.001);
 }
 
@@ -94,7 +118,11 @@ TEST(CpuTimesV1Test, FractionalWorkTime) {
   CpuTimes previous{true, false, 123.456, 1000, 1.0};
   CpuTimes current{true, false, 234.567, 2000, 1.0};
 
-  double utilization = current.calculateUtilization(previous);
+  double utilization;
+
+  absl::Status status = current.calculateUtilization(previous, utilization);
+
+  ASSERT_TRUE(status.ok());
   EXPECT_NEAR(utilization, 0.111111, 0.0001);
 }
 
@@ -110,7 +138,11 @@ TEST(CpuTimesV2Test, BasicUtilizationCalculation) {
   CpuTimes previous{true, true, 0.0, 0, 1.0};
   CpuTimes current{true, true, 500000.0, 1000000000, 1.0};
 
-  double utilization = current.calculateUtilization(previous);
+  double utilization;
+
+  absl::Status status = current.calculateUtilization(previous, utilization);
+
+  ASSERT_TRUE(status.ok());
   EXPECT_DOUBLE_EQ(utilization, 0.5);
 }
 
@@ -119,7 +151,11 @@ TEST(CpuTimesV2Test, FullUtilization) {
   CpuTimes previous{true, true, 0.0, 0, 1.0};
   CpuTimes current{true, true, 1000000.0, 1000000000, 1.0};
 
-  double utilization = current.calculateUtilization(previous);
+  double utilization;
+
+  absl::Status status = current.calculateUtilization(previous, utilization);
+
+  ASSERT_TRUE(status.ok());
   EXPECT_DOUBLE_EQ(utilization, 1.0);
 }
 
@@ -128,7 +164,11 @@ TEST(CpuTimesV2Test, ZeroUtilization) {
   CpuTimes previous{true, true, 0.0, 0, 1.0};
   CpuTimes current{true, true, 0.0, 1000000000, 1.0};
 
-  double utilization = current.calculateUtilization(previous);
+  double utilization;
+
+  absl::Status status = current.calculateUtilization(previous, utilization);
+
+  ASSERT_TRUE(status.ok());
   EXPECT_DOUBLE_EQ(utilization, 0.0);
 }
 
@@ -138,7 +178,11 @@ TEST(CpuTimesV2Test, MultipleEffectiveCores) {
   CpuTimes previous{true, true, 0.0, 0, 2.0};
   CpuTimes current{true, true, 1000000.0, 1000000000, 2.0};
 
-  double utilization = current.calculateUtilization(previous);
+  double utilization;
+
+  absl::Status status = current.calculateUtilization(previous, utilization);
+
+  ASSERT_TRUE(status.ok());
   EXPECT_DOUBLE_EQ(utilization, 0.5);
 }
 
@@ -147,7 +191,11 @@ TEST(CpuTimesV2Test, FourEffectiveCores) {
   CpuTimes previous{true, true, 0.0, 0, 4.0};
   CpuTimes current{true, true, 2000000.0, 1000000000, 4.0};
 
-  double utilization = current.calculateUtilization(previous);
+  double utilization;
+
+  absl::Status status = current.calculateUtilization(previous, utilization);
+
+  ASSERT_TRUE(status.ok());
   EXPECT_DOUBLE_EQ(utilization, 0.5);
 }
 
@@ -157,7 +205,11 @@ TEST(CpuTimesV2Test, FractionalEffectiveCores) {
   CpuTimes previous{true, true, 0.0, 0, 0.5};
   CpuTimes current{true, true, 250000.0, 1000000000, 0.5};
 
-  double utilization = current.calculateUtilization(previous);
+  double utilization;
+
+  absl::Status status = current.calculateUtilization(previous, utilization);
+
+  ASSERT_TRUE(status.ok());
   EXPECT_DOUBLE_EQ(utilization, 0.5);
 }
 
@@ -166,7 +218,11 @@ TEST(CpuTimesV2Test, HighUtilization) {
   CpuTimes previous{true, true, 0.0, 0, 1.0};
   CpuTimes current{true, true, 950000.0, 1000000000, 1.0};
 
-  double utilization = current.calculateUtilization(previous);
+  double utilization;
+
+  absl::Status status = current.calculateUtilization(previous, utilization);
+
+  ASSERT_TRUE(status.ok());
   EXPECT_DOUBLE_EQ(utilization, 0.95);
 }
 
@@ -176,7 +232,11 @@ TEST(CpuTimesV2Test, ClampingAtMaximum) {
   CpuTimes previous{true, true, 0.0, 0, 1.0};
   CpuTimes current{true, true, 1500000.0, 1000000000, 1.0};
 
-  double utilization = current.calculateUtilization(previous);
+  double utilization;
+
+  absl::Status status = current.calculateUtilization(previous, utilization);
+
+  ASSERT_TRUE(status.ok());
   EXPECT_DOUBLE_EQ(utilization, 1.0);
 }
 
@@ -186,7 +246,11 @@ TEST(CpuTimesV2Test, ClampingAtMinimum) {
   CpuTimes previous{true, true, 0.0, 0, 1.0};
   CpuTimes current{true, true, 1.0, 1000000000, 1.0};
 
-  double utilization = current.calculateUtilization(previous);
+  double utilization;
+
+  absl::Status status = current.calculateUtilization(previous, utilization);
+
+  ASSERT_TRUE(status.ok());
   EXPECT_NEAR(utilization, 0.0, 0.000001);
   EXPECT_GE(utilization, 0.0);
 }
@@ -196,7 +260,11 @@ TEST(CpuTimesV2Test, LargeTimeValues) {
   CpuTimes previous{true, true, 1000000000.0, 1000000000000, 2.0};
   CpuTimes current{true, true, 2000000000.0, 2000000000000, 2.0};
 
-  double utilization = current.calculateUtilization(previous);
+  double utilization;
+
+  absl::Status status = current.calculateUtilization(previous, utilization);
+
+  ASSERT_TRUE(status.ok());
   EXPECT_DOUBLE_EQ(utilization, 0.5);
 }
 
@@ -207,7 +275,11 @@ TEST(CpuTimesV2Test, SmallTimeIncrement) {
   CpuTimes previous{true, true, 100000.0, 1000000000, 1.0};
   CpuTimes current{true, true, 100100.0, 1100000000, 1.0};
 
-  double utilization = current.calculateUtilization(previous);
+  double utilization;
+
+  absl::Status status = current.calculateUtilization(previous, utilization);
+
+  ASSERT_TRUE(status.ok());
   EXPECT_NEAR(utilization, 0.001, 0.0001);
 }
 
@@ -220,34 +292,18 @@ TEST(CpuTimesErrorTest, NegativeWorkOverPeriodV1) {
   CpuTimes previous{true, false, 1000.0, 1000, 1.0};
   CpuTimes current{true, false, 500.0, 2000, 1.0};
 
-  EXPECT_THROW(
-      {
-        try {
-          current.calculateUtilization(previous);
-        } catch (const EnvoyException& e) {
-          EXPECT_NE(std::string(e.what()).find("Work_over_period"), std::string::npos);
-          EXPECT_NE(std::string(e.what()).find("negative"), std::string::npos);
-          throw;
-        }
-      },
-      EnvoyException);
+  double utilization;
+  absl::Status status = current.calculateUtilization(previous, utilization);
+  EXPECT_FALSE(status.ok());
 }
 
 TEST(CpuTimesErrorTest, NegativeWorkOverPeriodV2) {
   CpuTimes previous{true, true, 1000000.0, 1000000000, 1.0};
   CpuTimes current{true, true, 500000.0, 2000000000, 1.0};
 
-  EXPECT_THROW(
-      {
-        try {
-          current.calculateUtilization(previous);
-        } catch (const EnvoyException& e) {
-          EXPECT_NE(std::string(e.what()).find("Work_over_period"), std::string::npos);
-          EXPECT_NE(std::string(e.what()).find("negative"), std::string::npos);
-          throw;
-        }
-      },
-      EnvoyException);
+  double utilization;
+  absl::Status status = current.calculateUtilization(previous, utilization);
+  EXPECT_FALSE(status.ok());
 }
 
 // =============================================================================
@@ -259,34 +315,18 @@ TEST(CpuTimesErrorTest, ZeroTotalOverPeriodV1) {
   CpuTimes previous{true, false, 100.0, 1000, 1.0};
   CpuTimes current{true, false, 200.0, 1000, 1.0};
 
-  EXPECT_THROW(
-      {
-        try {
-          current.calculateUtilization(previous);
-        } catch (const EnvoyException& e) {
-          EXPECT_NE(std::string(e.what()).find("total_over_period"), std::string::npos);
-          EXPECT_NE(std::string(e.what()).find("positive"), std::string::npos);
-          throw;
-        }
-      },
-      EnvoyException);
+  double utilization;
+  absl::Status status = current.calculateUtilization(previous, utilization);
+  EXPECT_FALSE(status.ok());
 }
 
 TEST(CpuTimesErrorTest, ZeroTotalOverPeriodV2) {
   CpuTimes previous{true, true, 100000.0, 1000000000, 1.0};
   CpuTimes current{true, true, 200000.0, 1000000000, 1.0};
 
-  EXPECT_THROW(
-      {
-        try {
-          current.calculateUtilization(previous);
-        } catch (const EnvoyException& e) {
-          EXPECT_NE(std::string(e.what()).find("total_over_period"), std::string::npos);
-          EXPECT_NE(std::string(e.what()).find("positive"), std::string::npos);
-          throw;
-        }
-      },
-      EnvoyException);
+  double utilization;
+  absl::Status status = current.calculateUtilization(previous, utilization);
+  EXPECT_FALSE(status.ok());
 }
 
 TEST(CpuTimesErrorTest, NegativeTotalOverPeriodV1) {
@@ -294,32 +334,18 @@ TEST(CpuTimesErrorTest, NegativeTotalOverPeriodV1) {
   CpuTimes previous{true, false, 100.0, 2000, 1.0};
   CpuTimes current{true, false, 200.0, 1000, 1.0};
 
-  EXPECT_THROW(
-      {
-        try {
-          current.calculateUtilization(previous);
-        } catch (const EnvoyException& e) {
-          EXPECT_NE(std::string(e.what()).find("total_over_period"), std::string::npos);
-          throw;
-        }
-      },
-      EnvoyException);
+  double utilization;
+  absl::Status status = current.calculateUtilization(previous, utilization);
+  EXPECT_FALSE(status.ok());
 }
 
 TEST(CpuTimesErrorTest, NegativeTotalOverPeriodV2) {
   CpuTimes previous{true, true, 100000.0, 2000000000, 1.0};
   CpuTimes current{true, true, 200000.0, 1000000000, 1.0};
 
-  EXPECT_THROW(
-      {
-        try {
-          current.calculateUtilization(previous);
-        } catch (const EnvoyException& e) {
-          EXPECT_NE(std::string(e.what()).find("total_over_period"), std::string::npos);
-          throw;
-        }
-      },
-      EnvoyException);
+  double utilization;
+  absl::Status status = current.calculateUtilization(previous, utilization);
+  EXPECT_FALSE(status.ok());
 }
 
 TEST(CpuTimesErrorTest, BothNegativeDeltas) {
@@ -327,16 +353,9 @@ TEST(CpuTimesErrorTest, BothNegativeDeltas) {
   CpuTimes previous{true, false, 2000.0, 3000, 1.0};
   CpuTimes current{true, false, 1000.0, 1000, 1.0};
 
-  EXPECT_THROW(
-      {
-        try {
-          current.calculateUtilization(previous);
-        } catch (const EnvoyException& e) {
-          EXPECT_NE(std::string(e.what()).find("Erroneous CPU stats"), std::string::npos);
-          throw;
-        }
-      },
-      EnvoyException);
+  double utilization;
+  absl::Status status = current.calculateUtilization(previous, utilization);
+  EXPECT_FALSE(status.ok());
 }
 
 TEST(CpuTimesErrorTest, NegativeWorkWithPositiveTotal) {
@@ -345,17 +364,9 @@ TEST(CpuTimesErrorTest, NegativeWorkWithPositiveTotal) {
   CpuTimes previous{true, false, 1000.0, 1000, 1.0};
   CpuTimes current{true, false, 500.0, 2000, 1.0}; // work decreased, total increased
 
-  EXPECT_THROW(
-      {
-        try {
-          current.calculateUtilization(previous);
-        } catch (const EnvoyException& e) {
-          EXPECT_NE(std::string(e.what()).find("Work_over_period"), std::string::npos);
-          EXPECT_NE(std::string(e.what()).find("negative"), std::string::npos);
-          throw;
-        }
-      },
-      EnvoyException);
+  double utilization;
+  absl::Status status = current.calculateUtilization(previous, utilization);
+  EXPECT_FALSE(status.ok());
 }
 
 TEST(CpuTimesErrorTest, PositiveWorkWithNonPositiveTotal) {
@@ -364,16 +375,9 @@ TEST(CpuTimesErrorTest, PositiveWorkWithNonPositiveTotal) {
   CpuTimes previous{true, false, 100.0, 2000, 1.0};
   CpuTimes current{true, false, 200.0, 1000, 1.0}; // work increased, total decreased
 
-  EXPECT_THROW(
-      {
-        try {
-          current.calculateUtilization(previous);
-        } catch (const EnvoyException& e) {
-          EXPECT_NE(std::string(e.what()).find("total_over_period"), std::string::npos);
-          throw;
-        }
-      },
-      EnvoyException);
+  double utilization;
+  absl::Status status = current.calculateUtilization(previous, utilization);
+  EXPECT_FALSE(status.ok());
 }
 
 TEST(CpuTimesErrorTest, PositiveWorkWithZeroTotal) {
@@ -382,17 +386,9 @@ TEST(CpuTimesErrorTest, PositiveWorkWithZeroTotal) {
   CpuTimes previous{true, false, 100.0, 1000, 1.0};
   CpuTimes current{true, false, 200.0, 1000, 1.0}; // work increased, total same (delta=0)
 
-  EXPECT_THROW(
-      {
-        try {
-          current.calculateUtilization(previous);
-        } catch (const EnvoyException& e) {
-          EXPECT_NE(std::string(e.what()).find("total_over_period"), std::string::npos);
-          EXPECT_NE(std::string(e.what()).find("positive"), std::string::npos);
-          throw;
-        }
-      },
-      EnvoyException);
+  double utilization;
+  absl::Status status = current.calculateUtilization(previous, utilization);
+  EXPECT_FALSE(status.ok());
 }
 
 // =============================================================================
@@ -404,7 +400,11 @@ TEST(CpuTimesV2Test, ValueExactlyAtLowerBound) {
   CpuTimes previous{true, true, 0.0, 0, 1.0};
   CpuTimes current{true, true, 0.0, 1000000000, 1.0};
 
-  double utilization = current.calculateUtilization(previous);
+  double utilization;
+
+  absl::Status status = current.calculateUtilization(previous, utilization);
+
+  ASSERT_TRUE(status.ok());
   EXPECT_DOUBLE_EQ(utilization, 0.0);
 }
 
@@ -413,7 +413,11 @@ TEST(CpuTimesV2Test, ValueExactlyAtUpperBound) {
   CpuTimes previous{true, true, 0.0, 0, 1.0};
   CpuTimes current{true, true, 1000000.0, 1000000000, 1.0};
 
-  double utilization = current.calculateUtilization(previous);
+  double utilization;
+
+  absl::Status status = current.calculateUtilization(previous, utilization);
+
+  ASSERT_TRUE(status.ok());
   EXPECT_DOUBLE_EQ(utilization, 1.0);
 }
 
@@ -422,7 +426,11 @@ TEST(CpuTimesV2Test, ValueJustBelowUpperBound) {
   CpuTimes previous{true, true, 0.0, 0, 1.0};
   CpuTimes current{true, true, 999999.0, 1000000000, 1.0};
 
-  double utilization = current.calculateUtilization(previous);
+  double utilization;
+
+  absl::Status status = current.calculateUtilization(previous, utilization);
+
+  ASSERT_TRUE(status.ok());
   EXPECT_NEAR(utilization, 0.999999, 0.000001);
   EXPECT_LT(utilization, 1.0);
 }
@@ -432,7 +440,11 @@ TEST(CpuTimesV2Test, ValueJustAboveZero) {
   CpuTimes previous{true, true, 0.0, 0, 1.0};
   CpuTimes current{true, true, 0.001, 1000000000, 1.0};
 
-  double utilization = current.calculateUtilization(previous);
+  double utilization;
+
+  absl::Status status = current.calculateUtilization(previous, utilization);
+
+  ASSERT_TRUE(status.ok());
   EXPECT_GT(utilization, 0.0);
   EXPECT_LT(utilization, 0.000001);
 }
@@ -442,7 +454,11 @@ TEST(CpuTimesV2Test, ValueWellAboveUpperBound) {
   CpuTimes previous{true, true, 0.0, 0, 1.0};
   CpuTimes current{true, true, 10000000.0, 1000000000, 1.0}; // Would be 10.0 without clamping
 
-  double utilization = current.calculateUtilization(previous);
+  double utilization;
+
+  absl::Status status = current.calculateUtilization(previous, utilization);
+
+  ASSERT_TRUE(status.ok());
   EXPECT_DOUBLE_EQ(utilization, 1.0);
 }
 
@@ -451,7 +467,11 @@ TEST(CpuTimesV1Test, BoundaryValueZero) {
   CpuTimes previous{true, false, 1000.0, 2000, 1.0};
   CpuTimes current{true, false, 1000.0, 3000, 1.0}; // No work done
 
-  double utilization = current.calculateUtilization(previous);
+  double utilization;
+
+  absl::Status status = current.calculateUtilization(previous, utilization);
+
+  ASSERT_TRUE(status.ok());
   EXPECT_DOUBLE_EQ(utilization, 0.0);
 }
 
@@ -460,7 +480,11 @@ TEST(CpuTimesV1Test, BoundaryValueOne) {
   CpuTimes previous{true, false, 0.0, 0, 1.0};
   CpuTimes current{true, false, 1000.0, 1000, 1.0}; // All time is work
 
-  double utilization = current.calculateUtilization(previous);
+  double utilization;
+
+  absl::Status status = current.calculateUtilization(previous, utilization);
+
+  ASSERT_TRUE(status.ok());
   EXPECT_DOUBLE_EQ(utilization, 1.0);
 }
 
@@ -470,7 +494,11 @@ TEST(CpuTimesV1Test, ValueAboveOne) {
   CpuTimes current{true, false, 2000.0, 1000,
                    1.0}; // Work exceeds total (shouldn't happen in practice)
 
-  double utilization = current.calculateUtilization(previous);
+  double utilization;
+
+  absl::Status status = current.calculateUtilization(previous, utilization);
+
+  ASSERT_TRUE(status.ok());
   EXPECT_DOUBLE_EQ(utilization, 2.0);
 }
 
@@ -483,7 +511,11 @@ TEST(CpuTimesEdgeCaseTest, VerySmallUtilizationV1) {
   CpuTimes previous{true, false, 0.0, 0, 1.0};
   CpuTimes current{true, false, 1.0, 100000, 1.0};
 
-  double utilization = current.calculateUtilization(previous);
+  double utilization;
+
+  absl::Status status = current.calculateUtilization(previous, utilization);
+
+  ASSERT_TRUE(status.ok());
   EXPECT_NEAR(utilization, 0.00001, 0.000001);
 }
 
@@ -492,7 +524,11 @@ TEST(CpuTimesEdgeCaseTest, VerySmallUtilizationV2) {
   CpuTimes previous{true, true, 0.0, 0, 1.0};
   CpuTimes current{true, true, 10.0, 1000000000, 1.0};
 
-  double utilization = current.calculateUtilization(previous);
+  double utilization;
+
+  absl::Status status = current.calculateUtilization(previous, utilization);
+
+  ASSERT_TRUE(status.ok());
   EXPECT_NEAR(utilization, 0.00001, 0.000001);
 }
 
@@ -501,7 +537,11 @@ TEST(CpuTimesEdgeCaseTest, ManyEffectiveCores) {
   CpuTimes previous{true, true, 0.0, 0, 16.0};
   CpuTimes current{true, true, 8000000.0, 1000000000, 16.0};
 
-  double utilization = current.calculateUtilization(previous);
+  double utilization;
+
+  absl::Status status = current.calculateUtilization(previous, utilization);
+
+  ASSERT_TRUE(status.ok());
   EXPECT_DOUBLE_EQ(utilization, 0.5);
 }
 
@@ -510,7 +550,11 @@ TEST(CpuTimesEdgeCaseTest, SingleMillicore) {
   CpuTimes previous{true, true, 0.0, 0, 0.001};
   CpuTimes current{true, true, 500.0, 1000000000, 0.001};
 
-  double utilization = current.calculateUtilization(previous);
+  double utilization;
+
+  absl::Status status = current.calculateUtilization(previous, utilization);
+
+  ASSERT_TRUE(status.ok());
   EXPECT_DOUBLE_EQ(utilization, 0.5);
 }
 
@@ -519,7 +563,11 @@ TEST(CpuTimesEdgeCaseTest, VeryHighWorkOnMultipleCoresV2) {
   CpuTimes previous{true, true, 0.0, 0, 4.0};
   CpuTimes current{true, true, 3000000.0, 1000000000, 4.0};
 
-  double utilization = current.calculateUtilization(previous);
+  double utilization;
+
+  absl::Status status = current.calculateUtilization(previous, utilization);
+
+  ASSERT_TRUE(status.ok());
   EXPECT_DOUBLE_EQ(utilization, 0.75);
 }
 
@@ -528,7 +576,11 @@ TEST(CpuTimesEdgeCaseTest, MaxedOutSingleCore) {
   CpuTimes previous{true, true, 0.0, 0, 1.0};
   CpuTimes current{true, true, 999999.0, 1000000000, 1.0};
 
-  double utilization = current.calculateUtilization(previous);
+  double utilization;
+
+  absl::Status status = current.calculateUtilization(previous, utilization);
+
+  ASSERT_TRUE(status.ok());
   EXPECT_NEAR(utilization, 0.999999, 0.000001);
 }
 
@@ -541,7 +593,11 @@ TEST(CpuTimesUnitConversionTest, MicrosecondsToSecondsConversion) {
   CpuTimes previous{true, true, 0.0, 0, 1.0};
   CpuTimes current{true, true, 1000000.0, 1000000000, 1.0};
 
-  double utilization = current.calculateUtilization(previous);
+  double utilization;
+
+  absl::Status status = current.calculateUtilization(previous, utilization);
+
+  ASSERT_TRUE(status.ok());
   EXPECT_DOUBLE_EQ(utilization, 1.0);
 }
 
@@ -550,7 +606,11 @@ TEST(CpuTimesUnitConversionTest, NanosecondsToSecondsConversion) {
   CpuTimes previous{true, true, 0.0, 0, 1.0};
   CpuTimes current{true, true, 500000.0, 1000000000, 1.0};
 
-  double utilization = current.calculateUtilization(previous);
+  double utilization;
+
+  absl::Status status = current.calculateUtilization(previous, utilization);
+
+  ASSERT_TRUE(status.ok());
   EXPECT_DOUBLE_EQ(utilization, 0.5);
 }
 
@@ -561,7 +621,11 @@ TEST(CpuTimesUnitConversionTest, DifferentTimeScales) {
   CpuTimes previous{true, true, 0.0, 0, 1.0};
   CpuTimes current{true, true, 500000.0, 2000000000, 1.0};
 
-  double utilization = current.calculateUtilization(previous);
+  double utilization;
+
+  absl::Status status = current.calculateUtilization(previous, utilization);
+
+  ASSERT_TRUE(status.ok());
   EXPECT_DOUBLE_EQ(utilization, 0.25);
 }
 
@@ -576,14 +640,22 @@ TEST(CpuTimesComparisonTest, V1AndV2DifferentCalculations) {
   // V1: simple ratio (work/total)
   CpuTimes prev_v1{true, false, 0.0, 0, 1.0};
   CpuTimes curr_v1{true, false, 500.0, 1000, 1.0};
-  double util_v1 = curr_v1.calculateUtilization(prev_v1);
+  double util_v1;
+
+  absl::Status status_v1 = curr_v1.calculateUtilization(prev_v1, util_v1);
+
+  ASSERT_TRUE(status_v1.ok());
   EXPECT_DOUBLE_EQ(util_v1, 0.5);
 
   // V2: unit conversion + core accounting
   // If these were v2 values, interpretation would be different
   CpuTimes prev_v2{true, true, 0.0, 0, 1.0};
   CpuTimes curr_v2{true, true, 500.0, 1000, 1.0};
-  double util_v2 = curr_v2.calculateUtilization(prev_v2);
+  double util_v2;
+
+  absl::Status status_v2 = curr_v2.calculateUtilization(prev_v2, util_v2);
+
+  ASSERT_TRUE(status_v2.ok());
 
   // V2 calculation: (500/1000000) / ((1000/1000000000) * 1) = 0.0005 / 0.000001 = 500
   // Then clamped to 1.0
@@ -600,7 +672,11 @@ TEST(CpuTimesStressTest, MaxUint64TotalTime) {
   CpuTimes previous{true, false, 0.0, large_time - 10000, 1.0};
   CpuTimes current{true, false, 5000.0, large_time, 1.0};
 
-  double utilization = current.calculateUtilization(previous);
+  double utilization;
+
+  absl::Status status = current.calculateUtilization(previous, utilization);
+
+  ASSERT_TRUE(status.ok());
   EXPECT_DOUBLE_EQ(utilization, 0.5);
 }
 
@@ -611,7 +687,11 @@ TEST(CpuTimesStressTest, VeryLongRunningSystem) {
   CpuTimes previous{true, true, 100000000.0, base_time, 2.0};
   CpuTimes current{true, true, 101000000.0, base_time + 1000000000, 2.0};
 
-  double utilization = current.calculateUtilization(previous);
+  double utilization;
+
+  absl::Status status = current.calculateUtilization(previous, utilization);
+
+  ASSERT_TRUE(status.ok());
   EXPECT_DOUBLE_EQ(utilization, 0.5);
 }
 

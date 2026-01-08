@@ -12,6 +12,7 @@
 #include "source/common/common/fmt.h"
 #include "source/common/common/logger.h"
 
+#include "absl/status/status.h"
 #include "absl/strings/str_split.h"
 
 namespace Envoy {
@@ -31,15 +32,16 @@ struct CpuTimes {
    * Calculate CPU utilization based on the difference from previous CPU times.
    * This encapsulates the different calculation methods for cgroup v1 and v2.
    * @param previous_cpu_times The previous CpuTimes reading to calculate the delta.
-   * @return The calculated CPU utilization as a fraction (0.0 to 1.0).
-   * @throw EnvoyException if the delta values are invalid (negative work or non-positive total).
+   * @param out_utilization Output parameter to store the calculated utilization (0.0 to 1.0).
+   * @return Status OK if calculation succeeds, or InvalidArgumentError if delta values are invalid.
    */
-  double calculateUtilization(const CpuTimes& previous_cpu_times) const {
+  absl::Status calculateUtilization(const CpuTimes& previous_cpu_times,
+                                    double& out_utilization) const {
     const double work_over_period = work_time - previous_cpu_times.work_time;
     const int64_t total_over_period = total_time - previous_cpu_times.total_time;
 
     if (work_over_period < 0 || total_over_period <= 0) {
-      throw EnvoyException(
+      return absl::InvalidArgumentError(
           fmt::format("Erroneous CPU stats calculation. Work_over_period='{}' cannot "
                       "be a negative number and total_over_period='{}' must be a positive number.",
                       work_over_period, total_over_period));
@@ -49,10 +51,11 @@ struct CpuTimes {
       const double total_over_period_seconds = total_over_period / 1000000000.0;
       const double utilization =
           ((work_over_period / 1000000.0) / (total_over_period_seconds * effective_cores));
-      return std::clamp(utilization, 0.0, 1.0);
+      out_utilization = std::clamp(utilization, 0.0, 1.0);
     } else {
-      return work_over_period / total_over_period;
+      out_utilization = work_over_period / total_over_period;
     }
+    return absl::OkStatus();
   }
 };
 

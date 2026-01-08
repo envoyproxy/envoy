@@ -47,12 +47,10 @@ void CpuUtilizationMonitor::updateResourceUsage(Server::ResourceUpdateCallbacks&
 
   // Calculate utilization (encapsulates cgroup v1 vs v2 differences and validation)
   double current_utilization;
-  TRY_ASSERT_MAIN_THREAD {
-    current_utilization = cpu_times.calculateUtilization(previous_cpu_times_);
-  }
-  END_TRY
-  catch (const EnvoyException& e) {
-    callbacks.onFailure(e);
+  absl::Status status = cpu_times.calculateUtilization(previous_cpu_times_, current_utilization);
+  if (!status.ok()) {
+    const auto& error = EnvoyException(std::string(status.message()));
+    callbacks.onFailure(error);
     return;
   }
 
