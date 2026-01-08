@@ -104,7 +104,6 @@ TEST_F(DynamicModuleAccessLogTest, FlushCalledOnDestruction) {
     tl_logger->logger_ = module_logger;
     EXPECT_FALSE(flush_called);
     EXPECT_FALSE(destroy_called);
-    // Reset pointer so tl_logger's destructor is called.
     tl_logger.reset();
   }
 
