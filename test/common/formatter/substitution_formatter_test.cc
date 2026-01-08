@@ -1161,6 +1161,8 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   }
   {
     StreamInfoFormatter ds_close_type_format("DOWNSTREAM_DETECTED_CLOSE_TYPE");
+    stream_info.setDownstreamDetectedCloseType(StreamInfo::DetectedCloseType::Unspecified);
+    EXPECT_EQ("Unspecified", ds_close_type_format.format({}, stream_info));
     stream_info.setDownstreamDetectedCloseType(StreamInfo::DetectedCloseType::Normal);
     EXPECT_EQ("Normal", ds_close_type_format.format({}, stream_info));
     stream_info.setDownstreamDetectedCloseType(StreamInfo::DetectedCloseType::LocalReset);
@@ -1171,6 +1173,8 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
 
   {
     StreamInfoFormatter us_close_type_format("UPSTREAM_DETECTED_CLOSE_TYPE");
+    stream_info.upstreamInfo()->setUpstreamDetectedCloseType(StreamInfo::DetectedCloseType::Unspecified);
+    EXPECT_EQ("Unspecified", ds_close_type_format.format({}, stream_info));
     stream_info.upstreamInfo()->setUpstreamDetectedCloseType(StreamInfo::DetectedCloseType::Normal);
     EXPECT_EQ("Normal", us_close_type_format.format({}, stream_info));
     stream_info.upstreamInfo()->setUpstreamDetectedCloseType(
