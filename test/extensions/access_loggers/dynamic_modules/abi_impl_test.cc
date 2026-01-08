@@ -53,7 +53,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, HeadersSizeRequestHeaders) {
 
   size_t size = 0;
   EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_headers_size(
-      env_ptr, envoy_dynamic_module_type_access_log_header_type_RequestHeaders, &size));
+      env_ptr, envoy_dynamic_module_type_http_header_type_RequestHeader, &size));
   EXPECT_EQ(2, size);
 }
 
@@ -63,7 +63,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, HeadersSizeResponseHeaders) {
 
   size_t size = 0;
   EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_headers_size(
-      env_ptr, envoy_dynamic_module_type_access_log_header_type_ResponseHeaders, &size));
+      env_ptr, envoy_dynamic_module_type_http_header_type_ResponseHeader, &size));
   EXPECT_EQ(3, size); // content-type, x-custom, x-custom.
 }
 
@@ -73,7 +73,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, HeadersSizeResponseTrailers) {
 
   size_t size = 0;
   EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_headers_size(
-      env_ptr, envoy_dynamic_module_type_access_log_header_type_ResponseTrailers, &size));
+      env_ptr, envoy_dynamic_module_type_http_header_type_ResponseTrailer, &size));
   EXPECT_EQ(1, size);
 }
 
@@ -83,7 +83,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, HeadersSizeNullHeaders) {
 
   size_t size = 99;
   EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_headers_size(
-      env_ptr, envoy_dynamic_module_type_access_log_header_type_RequestHeaders, &size));
+      env_ptr, envoy_dynamic_module_type_http_header_type_RequestHeader, &size));
   EXPECT_EQ(0, size);
 }
 
@@ -93,7 +93,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetHeaders) {
 
   std::vector<envoy_dynamic_module_type_envoy_http_header> headers(2);
   EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_headers(
-      env_ptr, envoy_dynamic_module_type_access_log_header_type_RequestHeaders, headers.data()));
+      env_ptr, envoy_dynamic_module_type_http_header_type_RequestHeader, headers.data()));
 
   // Order isn't guaranteed by map iteration, but for small maps typically consistent.
   // We just verify the contents exist.
@@ -111,7 +111,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetHeadersNull) {
   void* env_ptr = createContext(log_context);
 
   EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_headers(
-      env_ptr, envoy_dynamic_module_type_access_log_header_type_RequestHeaders, nullptr));
+      env_ptr, envoy_dynamic_module_type_http_header_type_RequestHeader, nullptr));
 }
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetHeaderValueFound) {
@@ -123,8 +123,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetHeaderValueFound) {
   size_t count = 0;
 
   EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_header_value(
-      env_ptr, envoy_dynamic_module_type_access_log_header_type_RequestHeaders, key, &result, 0,
-      &count));
+      env_ptr, envoy_dynamic_module_type_http_header_type_RequestHeader, key, &result, 0, &count));
   EXPECT_EQ("req-123", std::string(result.ptr, result.length));
   EXPECT_EQ(1, count);
 }
@@ -139,15 +138,13 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetHeaderValueMultiValue) {
 
   // Get first value.
   EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_header_value(
-      env_ptr, envoy_dynamic_module_type_access_log_header_type_ResponseHeaders, key, &result, 0,
-      &count));
+      env_ptr, envoy_dynamic_module_type_http_header_type_ResponseHeader, key, &result, 0, &count));
   EXPECT_EQ("value1", std::string(result.ptr, result.length));
   EXPECT_EQ(2, count);
 
   // Get second value.
   EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_header_value(
-      env_ptr, envoy_dynamic_module_type_access_log_header_type_ResponseHeaders, key, &result, 1,
-      &count));
+      env_ptr, envoy_dynamic_module_type_http_header_type_ResponseHeader, key, &result, 1, &count));
   EXPECT_EQ("value2", std::string(result.ptr, result.length));
   EXPECT_EQ(2, count);
 }
@@ -161,8 +158,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetHeaderValueNotFound) {
   size_t count = 0;
 
   EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_header_value(
-      env_ptr, envoy_dynamic_module_type_access_log_header_type_RequestHeaders, key, &result, 0,
-      &count));
+      env_ptr, envoy_dynamic_module_type_http_header_type_RequestHeader, key, &result, 0, &count));
   EXPECT_EQ(0, count);
 }
 
@@ -175,8 +171,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetHeaderValueIndexOutOfBounds) {
   size_t count = 0;
 
   EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_header_value(
-      env_ptr, envoy_dynamic_module_type_access_log_header_type_RequestHeaders, key, &result, 1,
-      &count));
+      env_ptr, envoy_dynamic_module_type_http_header_type_RequestHeader, key, &result, 1, &count));
   EXPECT_EQ(1, count);
 }
 
@@ -964,7 +959,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, NullContextResponseCode) {
 TEST_F(DynamicModuleAccessLogAbiTest, NullContextHeadersSize) {
   size_t size = 99;
   EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_headers_size(
-      nullptr, envoy_dynamic_module_type_access_log_header_type_RequestHeaders, &size));
+      nullptr, envoy_dynamic_module_type_http_header_type_RequestHeader, &size));
   EXPECT_EQ(0, size);
 }
 
@@ -983,10 +978,9 @@ TEST_F(DynamicModuleAccessLogAbiTest, NullContextOtherGuards) {
 
   EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_headers(
       nullptr, //
-      envoy_dynamic_module_type_access_log_header_type_RequestHeaders, headers_out));
+      envoy_dynamic_module_type_http_header_type_RequestHeader, headers_out));
   EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_header_value(
-      nullptr, envoy_dynamic_module_type_access_log_header_type_RequestHeaders, key, &buf, 0,
-      nullptr));
+      nullptr, envoy_dynamic_module_type_http_header_type_RequestHeader, key, &buf, 0, nullptr));
   EXPECT_FALSE(
       envoy_dynamic_module_callback_access_logger_get_response_code_details(nullptr, &buf));
   EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_protocol(nullptr, &buf));
