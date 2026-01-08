@@ -1174,7 +1174,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   {
     StreamInfoFormatter us_close_type_format("UPSTREAM_DETECTED_CLOSE_TYPE");
     stream_info.upstreamInfo()->setUpstreamDetectedCloseType(StreamInfo::DetectedCloseType::Unspecified);
-    EXPECT_EQ("Unspecified", ds_close_type_format.format({}, stream_info));
+    EXPECT_EQ("Unspecified", us_close_type_format.format({}, stream_info));
     stream_info.upstreamInfo()->setUpstreamDetectedCloseType(StreamInfo::DetectedCloseType::Normal);
     EXPECT_EQ("Normal", us_close_type_format.format({}, stream_info));
     stream_info.upstreamInfo()->setUpstreamDetectedCloseType(
