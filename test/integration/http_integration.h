@@ -228,7 +228,7 @@ protected:
                                 FakeHttpConnectionPtr& fake_upstream_connection);
 
   // Close |codec_client_| and |fake_upstream_connection_| cleanly.
-  void cleanupUpstreamAndDownstream();
+  virtual void cleanupUpstreamAndDownstream();
 
   // Verifies the response_headers contains the expected_headers, and response body matches given
   // body string.
