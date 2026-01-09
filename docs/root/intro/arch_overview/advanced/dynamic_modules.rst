@@ -52,10 +52,12 @@ Module discovery
 
 A dynamic module is referenced by its name as in the :ref:`configuration API  <envoy_v3_api_msg_extensions.dynamic_modules.v3.DynamicModuleConfig>`.
 The name is used to search for the shared library file in the search path. The search path is configured by the environment variable
-``ENVOY_DYNAMIC_MODULES_SEARCH_PATH``. The actual search path is ``${ENVOY_DYNAMIC_MODULES_SEARCH_PATH}/lib${name}.so``.
+``ENVOY_DYNAMIC_MODULES_SEARCH_PATH``. The actual search path is ``${ENVOY_DYNAMIC_MODULES_SEARCH_PATH}/lib${name}.so``. If
+the environment variable is not set, the current working directory is used instead. After searching in the specified search path,
+the standard library paths such as ``LD_LIBRARY_PATH`` and ``/usr/lib`` are searched as well following the behavior of ``dlopen(3)``.
 
-For example, when the name ``my_module`` is referenced in the configuration and the search path is set to ``/path/to/modules``, Envoy will look for
-``/path/to/modules/libmy_module.so``.
+For example, when the name ``my_module`` is referenced in the configuration and ``ENVOY_DYNAMIC_MODULES_SEARCH_PATH`` is set to ``/path/to/modules``,
+Envoy will first look for ``/path/to/modules/libmy_module.so``, then ``$LD_LIBRARY_PATH/libmy_module.so``, and finally ``/usr/lib/libmy_module.so``, etc.
 
 Safety
 --------------------------
