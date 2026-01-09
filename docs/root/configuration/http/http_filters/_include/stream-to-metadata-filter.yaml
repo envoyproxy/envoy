@@ -22,14 +22,6 @@ static_resources:
                   prefix: "/chat"
                 route:
                   cluster: llm-cluster
-                  rate_limits:
-                  - actions:
-                    - dynamic_metadata:
-                        descriptor_key: tokens
-                        metadata_key:
-                          key: envoy.lb
-                          path:
-                          - key: tokens
           http_filters:
           - name: envoy.filters.http.stream_to_metadata
             typed_config:

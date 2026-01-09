@@ -6,8 +6,8 @@ Stream-To-Metadata Filter
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.stream_to_metadata.v3.StreamToMetadata>`
 
 The Stream-To-Metadata filter extracts values from streaming HTTP bodies and writes them to dynamic metadata.
-Currently, the filter processes response bodies only. This is particularly useful for observability and rate limiting
-based on values that only appear in streaming responses.
+Currently, the filter processes response bodies only. This is particularly useful for observability, logging, and
+custom filters that need to access values that only appear in streaming responses.
 
 The filter is configured with rules that specify:
 
@@ -16,28 +16,40 @@ The filter is configured with rules that specify:
 * The namespace(s) for extracted values in dynamic metadata to be written to.
 
 When a rule matches, the extracted value is written to the configured metadata namespace and key.
-The metadata can then be used for rate limiting decisions, consumed from logs, custom routing, or other purposes.
+The metadata can then be consumed from access logs, used by custom filters, exported to metrics systems, or
+attached to trace spans.
 
 Use Cases
 ---------
 
-**Token-Based Rate Limiting for LLM APIs**
+**Observability and Cost Tracking for LLM APIs**
 
 Large Language Model (LLM) APIs like OpenAI return token usage information at the end of streaming responses.
-This filter can extract the token count and make it available for rate limiting:
+This filter can extract the token count and other metadata, making it available for logging, metrics, and observability:
 
 .. literalinclude:: _include/stream-to-metadata-filter.yaml
     :language: yaml
-    :lines: 33-51
-    :lineno-start: 33
+    :lines: 25-46
+    :lineno-start: 25
     :linenos:
-    :emphasize-lines: 7-14
+    :emphasize-lines: 2-19
 
-In this example, the filter extracts ``total_tokens`` from the JSON path ``usage.total_tokens`` in the
-SSE stream and writes it to metadata namespace ``envoy.lb`` with key ``tokens``. This metadata can then
-be used in rate limit descriptors (shown in lines 26-31).
+In this example, the filter extracts ``total_tokens`` and ``model`` from the SSE stream and writes them to
+the ``envoy.lb`` metadata namespace. This metadata can then be:
 
-**Cost Tracking and Observability**
+* **Logged**: Access logs can reference dynamic metadata using ``%DYNAMIC_METADATA(envoy.lb:tokens)%``
+* **Exported to metrics**: Custom stats sinks can consume the metadata
+* **Used by custom filters**: Downstream filters can read and act on this metadata
+* **Sent to tracing systems**: Metadata can be attached to trace spans
+
+.. note::
+
+  The standard Envoy rate_limit filter executes during the request phase (before the response is received),
+  so it cannot directly consume metadata extracted from response bodies. For token-based rate limiting,
+  you would need a custom filter that reports usage after the response or a quota management system that
+  tracks usage across requests.
+
+**Additional Metadata Extraction**
 
 Extract multiple values from streaming responses for logging and monitoring:
 
@@ -124,11 +136,11 @@ Key Configuration Options
     - ``preserve_existing_metadata_value``: If true, don't overwrite existing metadata. Default false.
 
   * **on_missing**: Metadata to write when the selector path is not found in the JSON.
-    Executes at end-of-stream if ``on_present`` never executed. Useful for rate limiting: write a fallback value (e.g., -1) when token count is missing.
+    Executes at end-of-stream if ``on_present`` never executed. Write a fallback/sentinel value (e.g., -1) to ensure metadata is always present for downstream consumers.
     **Must** have ``value`` set to a fallback. This handles the case where legitimate JSON exists but lacks the expected field.
 
   * **on_error**: Metadata to write when an error occurs (JSON parse failure, no data field, content-type mismatch, etc.).
-    Executes at end-of-stream if ``on_present`` never executed and takes priority over ``on_missing``. Useful for rate limiting: write a safe default (e.g., 0) to avoid blocking on errors.
+    Executes at end-of-stream if ``on_present`` never executed and takes priority over ``on_missing``. Write a safe default (e.g., 0) to ensure metadata is always present even when errors occur.
     **Must** have ``value`` set to a fallback. This handles malformed or missing data.
 
   .. note::
