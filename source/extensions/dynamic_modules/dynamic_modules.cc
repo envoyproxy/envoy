@@ -78,7 +78,7 @@ absl::StatusOr<DynamicModulePtr> newDynamicModuleByName(const absl::string_view 
   // First, try ENVOY_DYNAMIC_MODULES_SEARCH_PATH which falls back to the current directory.
   const char* module_search_path = getenv(DYNAMIC_MODULES_SEARCH_PATH);
   if (!module_search_path) {
-    module_search_path = "";
+    module_search_path = ".";
   }
   const std::filesystem::path file_path =
       std::filesystem::path(module_search_path) / fmt::format("lib{}.so", module_name);
