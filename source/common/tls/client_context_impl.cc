@@ -269,6 +269,7 @@ int ClientContextImpl::selectTlsContext(SSL* ssl) {
              Ssl::CertificateSelectionStatus::Pending,
          "invalid selection result");
 
+  extended_socket_info->setCertSelectionHandle(std::move(result.handle));
   switch (result.status) {
   case Ssl::SelectionResult::SelectionStatus::Success:
     extended_socket_info->onCertificateSelectionCompleted(*result.selected_ctx, result.staple,

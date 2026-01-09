@@ -16,6 +16,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: On-demand secret certificate selector]
 // [#extension: envoy.tls.certificate_selectors.on_demand_secret]
+// [#extension: envoy.tls.upstream_certificate_selectors.on_demand_secret]
 
 // Fetches the secret on-demand while allowing the parent cluster or listener to accept connections
 // without warming. During the handshake, a secret name is derived from the peer hello message, an

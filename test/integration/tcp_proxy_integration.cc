@@ -66,7 +66,8 @@ void BaseTcpProxySslIntegrationTest::ClientSslConnection::waitForUpstreamConnect
 }
 
 void BaseTcpProxySslIntegrationTest::ClientRawConnection::waitForUpstreamConnection() {
-  AssertionResult result = parent_.dataStream()->waitForRawConnection(fake_upstream_connection_);
+  AssertionResult result = parent_.dataStream()->waitForRawConnection(
+      fake_upstream_connection_, TestUtility::DefaultTimeout, *parent_.dispatcher_);
   RELEASE_ASSERT(result, result.message());
 }
 
@@ -111,7 +112,23 @@ void BaseTcpProxySslIntegrationTest::ClientRawConnection::sendAndReceiveTlsData(
   ASSERT_TRUE(fake_upstream_connection_->waitForHalfClose());
   ASSERT_TRUE(fake_upstream_connection_->close());
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
-  parent_.dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
+void BaseTcpProxySslIntegrationTest::ClientSslConnection::close() {
+  ssl_client_->close(Network::ConnectionCloseType::NoFlush);
+}
+
+void BaseTcpProxySslIntegrationTest::ClientRawConnection::close() { tcp_client_.close(); }
+
+void BaseTcpProxySslIntegrationTest::ClientSslConnection::waitForDisconnect() {
+  while (!connect_callbacks_.closed()) {
+    parent_.dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+}
+
+void BaseTcpProxySslIntegrationTest::ClientRawConnection::waitForDisconnect() {
+  tcp_client_.waitForHalfClose();
+  tcp_client_.close();
 }
 
 void BaseTcpProxySslIntegrationTest::setupConnections() {

@@ -172,9 +172,9 @@ private:
   static const unsigned DEFAULT_MAX_VERSION;
 
   const std::string server_name_indication_;
-  const bool auto_host_sni_;
-  const bool allow_renegotiation_;
-  const bool enforce_rsa_key_usage_;
+  const bool auto_host_sni_ : 1;
+  const bool allow_renegotiation_ : 1;
+  const bool enforce_rsa_key_usage_ : 1;
   const size_t max_session_keys_;
   // Certificate selector contains a reference to this context so should be destroyed first.
   Ssl::UpstreamTlsCertificateSelectorFactoryPtr tls_certificate_selector_factory_;

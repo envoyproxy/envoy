@@ -44,6 +44,8 @@ public:
   virtual void waitForUpstreamConnection() PURE;
   virtual void sendAndReceiveTlsData(const std::string& data_to_send_upstream,
                                      const std::string& data_to_send_downstream) PURE;
+  virtual void close() PURE;
+  virtual void waitForDisconnect() PURE;
 };
 
 class BaseTcpProxySslIntegrationTest : public BaseTcpProxyIntegrationTest {
@@ -63,6 +65,8 @@ protected:
     void waitForUpstreamConnection() override;
     void sendAndReceiveTlsData(const std::string& data_to_send_upstream,
                                const std::string& data_to_send_downstream) override;
+    void close() override;
+    void waitForDisconnect() override;
     BaseTcpProxySslIntegrationTest& parent_;
     ConnectionStatusCallbacks connect_callbacks_;
     MockWatermarkBuffer* client_write_buffer_;
@@ -76,9 +80,11 @@ protected:
         : parent_(parent), tcp_client_(*parent.dispatcher_, *parent.mock_buffer_factory_,
                                        parent.lookupPort("tcp_proxy"), parent.version_,
                                        parent.enableHalfClose(), nullptr) {}
+    void close() override;
     void waitForUpstreamConnection() override;
     void sendAndReceiveTlsData(const std::string& data_to_send_upstream,
                                const std::string& data_to_send_downstream) override;
+    void waitForDisconnect() override;
     BaseTcpProxySslIntegrationTest& parent_;
     IntegrationTcpClient tcp_client_;
     FakeRawConnectionPtr fake_upstream_connection_;
