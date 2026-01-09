@@ -601,6 +601,10 @@ TEST_P(OnDemandIntegrationTest, ValidationContextUpdate) {
 }
 
 TEST_P(OnDemandIntegrationTest, ValidationContextUpdateWithPending) {
+  if (upstream_selector_) {
+    GTEST_SKIP() << "Cannot test because upstream selector validates with the CA prior to sending "
+                    "a client cert";
+  }
   mtls_ = true;
   validation_sds_ = true;
   FakeStream* ca_stream = nullptr;
@@ -613,16 +617,11 @@ TEST_P(OnDemandIntegrationTest, ValidationContextUpdateWithPending) {
   // Queue a pending connection, then issue a context config update, and unblock the connection.
   // In this case, the original context might reference an older context config.
   auto conn = createClientConnection();
-  if (upstream_selector_) {
-    conn->waitForUpstreamConnection();
-  }
   waitCertsRequested(1);
   // Fix the CA cert, then send the actual server cert.
   sendSecret(*ca_stream, cacert(), cacert());
   waitSendSdsResponse("server");
-  if (!upstream_selector_) {
-    conn->waitForUpstreamConnection();
-  }
+  conn->waitForUpstreamConnection();
   conn->sendAndReceiveTlsData("hello", "world");
   conn.reset();
 }
