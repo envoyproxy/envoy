@@ -60,7 +60,7 @@ public:
       - selector:
           json_path:
             path: ["usage", "total_tokens"]
-        metadata_descriptors:
+        on_present:
           - metadata_namespace: "envoy.lb"
             key: "tokens"
             type: NUMBER
@@ -73,7 +73,7 @@ public:
       - selector:
           json_path:
             path: ["usage", "total_tokens"]
-        metadata_descriptors:
+        on_present:
           - metadata_namespace: "envoy.lb"
             key: "tokens"
             type: NUMBER
@@ -89,7 +89,7 @@ public:
       - selector:
           json_path:
             path: ["usage", "total_tokens"]
-        metadata_descriptors:
+        on_present:
           - metadata_namespace: "envoy.lb"
             key: "tokens"
             type: NUMBER
@@ -103,14 +103,14 @@ public:
       - selector:
           json_path:
             path: ["usage", "total_tokens"]
-        metadata_descriptors:
+        on_present:
           - metadata_namespace: "envoy.lb"
             key: "tokens"
             type: NUMBER
       - selector:
           json_path:
             path: ["model"]
-        metadata_descriptors:
+        on_present:
           - metadata_namespace: "envoy.lb"
             key: "model_name"
             type: STRING
@@ -124,7 +124,7 @@ public:
       - selector:
           json_path:
             path: ["usage", "total_tokens"]
-        metadata_descriptors:
+        on_present:
           - metadata_namespace: "envoy.lb"
             key: "tokens"
             type: NUMBER
@@ -143,7 +143,7 @@ public:
       {"content-type", "text/event-stream; charset=utf-8"}};
   Buffer::OwnedImpl response_data_;
 
-  const std::string delimiter_ = "\n\n";
+  static constexpr absl::string_view delimiter_ = "\n\n";
 };
 
 TEST_F(StreamToMetadataFilterTest, BadContentType) {
@@ -182,6 +182,38 @@ TEST_F(StreamToMetadataFilterTest, ContentTypeWithParameters) {
 
   EXPECT_EQ(findCounter("stream_to_metadata.resp.success"), 1);
   EXPECT_EQ(findCounter("stream_to_metadata.resp.mismatched_content_type"), 0);
+}
+
+TEST_F(StreamToMetadataFilterTest, BadContentTypeTriggersOnError) {
+  // Create config with on_error to verify it executes when content-type mismatches
+  envoy::extensions::filters::http::stream_to_metadata::v3::StreamToMetadata proto_config;
+  auto* rules = proto_config.mutable_response_rules();
+  rules->set_format(envoy::extensions::filters::http::stream_to_metadata::v3::StreamToMetadata::
+                        SERVER_SENT_EVENTS);
+
+  auto* rule = rules->add_rules();
+  rule->mutable_selector()->mutable_json_path()->add_path("usage");
+  rule->mutable_selector()->mutable_json_path()->add_path("total_tokens");
+
+  auto* on_error = rule->add_on_error();
+  on_error->set_metadata_namespace("envoy.lb");
+  on_error->set_key("tokens");
+  on_error->mutable_value()->set_number_value(-1);
+
+  config_ = std::make_shared<FilterConfig>(proto_config, *stats_store_.rootScope());
+  filter_ = std::make_unique<Filter>(config_);
+  filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+  ON_CALL(encoder_callbacks_, streamInfo()).WillByDefault(ReturnRef(stream_info_));
+
+  // Send response with wrong content-type
+  Http::TestResponseHeaderMapImpl bad_headers{{"content-type", "application/json"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(bad_headers, false));
+  addEncodeDataChunks("data: {\"test\": \"value\"}\n\n", true);
+
+  // on_error should have executed with fallback value
+  auto metadata = getMetadata("envoy.lb", "tokens");
+  EXPECT_EQ(metadata.number_value(), -1);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.mismatched_content_type"), 1);
 }
 
 TEST_F(StreamToMetadataFilterTest, BasicTokenExtraction) {
@@ -499,7 +531,7 @@ TEST_F(StreamToMetadataFilterTest, StringValueType) {
       - selector:
           json_path:
             path: ["model"]
-        metadata_descriptors:
+        on_present:
           - metadata_namespace: "envoy.lb"
             key: "model_name"
             type: STRING
@@ -522,7 +554,7 @@ TEST_F(StreamToMetadataFilterTest, ProtobufValueType) {
       - selector:
           json_path:
             path: ["value"]
-        metadata_descriptors:
+        on_present:
           - metadata_namespace: "envoy.lb"
             key: "test"
             type: PROTOBUF_VALUE
@@ -545,7 +577,7 @@ TEST_F(StreamToMetadataFilterTest, BooleanValue) {
       - selector:
           json_path:
             path: ["enabled"]
-        metadata_descriptors:
+        on_present:
           - metadata_namespace: "envoy.lb"
             key: "flag"
   )EOF";
@@ -567,7 +599,7 @@ TEST_F(StreamToMetadataFilterTest, NestedObjectValue) {
       - selector:
           json_path:
             path: ["usage"]
-        metadata_descriptors:
+        on_present:
           - metadata_namespace: "envoy.lb"
             key: "usage_obj"
             type: STRING
@@ -591,7 +623,7 @@ TEST_F(StreamToMetadataFilterTest, DeepNestedPath) {
       - selector:
           json_path:
             path: ["level1", "level2", "level3", "value"]
-        metadata_descriptors:
+        on_present:
           - metadata_namespace: "envoy.lb"
             key: "deep_value"
   )EOF";
@@ -613,7 +645,7 @@ TEST_F(StreamToMetadataFilterTest, NullValueInJson) {
       - selector:
           json_path:
             path: ["usage"]
-        metadata_descriptors:
+        on_present:
           - metadata_namespace: "envoy.lb"
             key: "value"
   )EOF";
@@ -663,7 +695,7 @@ TEST_F(StreamToMetadataFilterTest, EventExceedsMaxSize) {
       - selector:
           json_path:
             path: ["usage", "total_tokens"]
-        metadata_descriptors:
+        on_present:
           - metadata_namespace: "envoy.lb"
             key: "tokens"
             type: NUMBER
@@ -699,7 +731,7 @@ TEST_F(StreamToMetadataFilterTest, EventWithinMaxSize) {
       - selector:
           json_path:
             path: ["usage", "total_tokens"]
-        metadata_descriptors:
+        on_present:
           - metadata_namespace: "envoy.lb"
             key: "tokens"
             type: NUMBER
@@ -726,7 +758,7 @@ TEST_F(StreamToMetadataFilterTest, MaxSizeDisabled) {
       - selector:
           json_path:
             path: ["usage", "total_tokens"]
-        metadata_descriptors:
+        on_present:
           - metadata_namespace: "envoy.lb"
             key: "tokens"
             type: NUMBER
@@ -761,7 +793,7 @@ TEST_F(StreamToMetadataFilterTest, CustomContentTypes) {
       - selector:
           json_path:
             path: ["value"]
-        metadata_descriptors:
+        on_present:
           - metadata_namespace: "envoy.lb"
             key: "result"
   )EOF";
@@ -786,7 +818,7 @@ TEST_F(StreamToMetadataFilterTest, StringToNumberConversionFailure) {
       - selector:
           json_path:
             path: ["value"]
-        metadata_descriptors:
+        on_present:
           - metadata_namespace: "envoy.lb"
             key: "result"
             type: NUMBER
@@ -814,7 +846,7 @@ TEST_F(StreamToMetadataFilterTest, BoolToNumberConversion) {
       - selector:
           json_path:
             path: ["flag"]
-        metadata_descriptors:
+        on_present:
           - metadata_namespace: "envoy.lb"
             key: "result"
             type: NUMBER
@@ -837,7 +869,7 @@ TEST_F(StreamToMetadataFilterTest, BoolToStringConversion) {
       - selector:
           json_path:
             path: ["flag"]
-        metadata_descriptors:
+        on_present:
           - metadata_namespace: "envoy.lb"
             key: "result"
             type: STRING
@@ -860,7 +892,7 @@ TEST_F(StreamToMetadataFilterTest, NumberToStringConversion) {
       - selector:
           json_path:
             path: ["count"]
-        metadata_descriptors:
+        on_present:
           - metadata_namespace: "envoy.lb"
             key: "result"
             type: STRING
@@ -883,7 +915,7 @@ TEST_F(StreamToMetadataFilterTest, DoubleToStringConversion) {
       - selector:
           json_path:
             path: ["value"]
-        metadata_descriptors:
+        on_present:
           - metadata_namespace: "envoy.lb"
             key: "result"
             type: STRING
@@ -928,7 +960,7 @@ TEST_F(StreamToMetadataFilterTest, StopProcessingOnMatch) {
       - selector:
           json_path:
             path: ["usage", "total_tokens"]
-        metadata_descriptors:
+        on_present:
           - metadata_namespace: "envoy.lb"
             key: "tokens"
             type: NUMBER
@@ -956,7 +988,7 @@ TEST_F(StreamToMetadataFilterTest, IntegerValueExtraction) {
       - selector:
           json_path:
             path: ["count"]
-        metadata_descriptors:
+        on_present:
           - metadata_namespace: "envoy.lb"
             key: "count_num"
             type: NUMBER
@@ -994,7 +1026,7 @@ TEST_F(StreamToMetadataFilterTest, StringToNumberConversionSuccess) {
       - selector:
           json_path:
             path: ["price"]
-        metadata_descriptors:
+        on_present:
           - metadata_namespace: "envoy.lb"
             key: "price_as_number"
             type: NUMBER
@@ -1103,7 +1135,7 @@ TEST_F(StreamToMetadataFilterTest, ConfiguredContentTypeWithParametersNormalized
       - selector:
           json_path:
             path: ["value"]
-        metadata_descriptors:
+        on_present:
           - metadata_namespace: "envoy.lb"
             key: "result"
   )EOF";
@@ -1119,6 +1151,214 @@ TEST_F(StreamToMetadataFilterTest, ConfiguredContentTypeWithParametersNormalized
   EXPECT_EQ(metadata.number_value(), 123);
   EXPECT_EQ(findCounter("stream_to_metadata.resp.success"), 1);
   EXPECT_EQ(findCounter("stream_to_metadata.resp.mismatched_content_type"), 0);
+}
+
+// Test on_missing: writes fallback value when selector path not found
+TEST_F(StreamToMetadataFilterTest, OnMissing) {
+  // Create config programmatically to properly set protobuf Value
+  envoy::extensions::filters::http::stream_to_metadata::v3::StreamToMetadata proto_config;
+  auto* rules = proto_config.mutable_response_rules();
+  rules->set_format(envoy::extensions::filters::http::stream_to_metadata::v3::StreamToMetadata::
+                        SERVER_SENT_EVENTS);
+
+  auto* rule = rules->add_rules();
+  rule->mutable_selector()->mutable_json_path()->add_path("usage");
+  rule->mutable_selector()->mutable_json_path()->add_path("total_tokens");
+
+  auto* on_present = rule->add_on_present();
+  on_present->set_metadata_namespace("envoy.lb");
+  on_present->set_key("tokens");
+  on_present->set_type(
+      envoy::extensions::filters::http::stream_to_metadata::v3::StreamToMetadata::NUMBER);
+
+  auto* on_missing = rule->add_on_missing();
+  on_missing->set_metadata_namespace("envoy.lb");
+  on_missing->set_key("tokens");
+  on_missing->mutable_value()->set_number_value(-1);
+
+  config_ = std::make_shared<FilterConfig>(proto_config, *stats_store_.rootScope());
+  filter_ = std::make_unique<Filter>(config_);
+  filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+  ON_CALL(encoder_callbacks_, streamInfo()).WillByDefault(ReturnRef(stream_info_));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
+
+  // Send event without "usage" field. Should trigger on_missing.
+  addEncodeDataChunks(std::string("data: {\"model\": \"gpt-4\"}") + std::string(delimiter_), true);
+
+  auto metadata = getMetadata("envoy.lb", "tokens");
+  EXPECT_EQ(metadata.number_value(), -1); // Fallback value
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.selector_not_found"), 1);
+}
+
+// Test on_error: writes fallback value when JSON parsing fails
+TEST_F(StreamToMetadataFilterTest, OnErrorJsonParseFails) {
+  const std::string config = R"EOF(
+  response_rules:
+    format: SERVER_SENT_EVENTS
+    rules:
+      - selector:
+          json_path:
+            path: ["usage", "total_tokens"]
+        on_present:
+          - metadata_namespace: "envoy.lb"
+            key: "tokens"
+            type: NUMBER
+        on_error:
+          - metadata_namespace: "envoy.lb"
+            key: "tokens"
+            value:
+              number_value: 0
+  )EOF";
+
+  setupFilter(config);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
+
+  // Send malformed JSON. Should trigger on_error.
+  addEncodeDataChunks(std::string("data: {malformed json}") + std::string(delimiter_), true);
+
+  auto metadata = getMetadata("envoy.lb", "tokens");
+  EXPECT_EQ(metadata.number_value(), 0); // Fallback value
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.invalid_json"), 1);
+}
+
+// Test on_error: writes fallback value when data field is missing
+TEST_F(StreamToMetadataFilterTest, OnErrorNoDataField) {
+  // Create config programmatically to properly set protobuf Value
+  envoy::extensions::filters::http::stream_to_metadata::v3::StreamToMetadata proto_config;
+  auto* rules = proto_config.mutable_response_rules();
+  rules->set_format(envoy::extensions::filters::http::stream_to_metadata::v3::StreamToMetadata::
+                        SERVER_SENT_EVENTS);
+
+  auto* rule = rules->add_rules();
+  rule->mutable_selector()->mutable_json_path()->add_path("usage");
+  rule->mutable_selector()->mutable_json_path()->add_path("total_tokens");
+
+  auto* on_error = rule->add_on_error();
+  on_error->set_metadata_namespace("envoy.lb");
+  on_error->set_key("tokens");
+  on_error->mutable_value()->set_string_value("error");
+
+  config_ = std::make_shared<FilterConfig>(proto_config, *stats_store_.rootScope());
+  filter_ = std::make_unique<Filter>(config_);
+  filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+  ON_CALL(encoder_callbacks_, streamInfo()).WillByDefault(ReturnRef(stream_info_));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
+
+  // Send event with no data field. Should trigger on_error.
+  addEncodeDataChunks(std::string("event: ping") + std::string(delimiter_), true);
+
+  auto metadata = getMetadata("envoy.lb", "tokens");
+  EXPECT_EQ(metadata.string_value(), "error"); // Fallback value
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.no_data_field"), 1);
+}
+
+// Test hardcoded value in on_present: uses descriptor.value instead of extracted
+TEST_F(StreamToMetadataFilterTest, OnPresentWithHardcodedValue) {
+  // Create config programmatically to properly set protobuf Value
+  envoy::extensions::filters::http::stream_to_metadata::v3::StreamToMetadata proto_config;
+  auto* rules = proto_config.mutable_response_rules();
+  rules->set_format(envoy::extensions::filters::http::stream_to_metadata::v3::StreamToMetadata::
+                        SERVER_SENT_EVENTS);
+
+  auto* rule = rules->add_rules();
+  rule->mutable_selector()->mutable_json_path()->add_path("usage");
+  rule->mutable_selector()->mutable_json_path()->add_path("total_tokens");
+
+  auto* on_present = rule->add_on_present();
+  on_present->set_metadata_namespace("envoy.lb");
+  on_present->set_key("tokens");
+  on_present->mutable_value()->set_number_value(999);
+
+  config_ = std::make_shared<FilterConfig>(proto_config, *stats_store_.rootScope());
+  filter_ = std::make_unique<Filter>(config_);
+  filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+  ON_CALL(encoder_callbacks_, streamInfo()).WillByDefault(ReturnRef(stream_info_));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
+
+  // Extracted value is 42, but hardcoded value 999 should be used
+  addEncodeDataChunks(
+      std::string("data: {\"usage\": {\"total_tokens\": 42}}") + std::string(delimiter_), true);
+
+  auto metadata = getMetadata("envoy.lb", "tokens");
+  EXPECT_EQ(metadata.number_value(), 999); // Hardcoded value, not 42
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.success"), 1);
+}
+
+// Test on_error doesn't execute if on_present already executed (even with prior errors)
+TEST_F(StreamToMetadataFilterTest, OnErrorDoesNotOverwriteOnPresent) {
+  const std::string config = R"EOF(
+  response_rules:
+    format: SERVER_SENT_EVENTS
+    rules:
+      - selector:
+          json_path:
+            path: ["usage", "total_tokens"]
+        on_present:
+          - metadata_namespace: "envoy.lb"
+            key: "tokens"
+            type: NUMBER
+        on_error:
+          - metadata_namespace: "envoy.lb"
+            key: "tokens"
+            value:
+              number_value: 0
+  )EOF";
+
+  setupFilter(config);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
+
+  // Event 1: Error (malformed JSON)
+  addEncodeDataChunks(std::string("data: {malformed json}") + std::string(delimiter_), false);
+
+  // Event 2: Success (good value)
+  addEncodeDataChunks(
+      std::string("data: {\"usage\": {\"total_tokens\": 42}}") + std::string(delimiter_), false);
+
+  // Event 3: Error again
+  addEncodeDataChunks(std::string("data: {another error}") + std::string(delimiter_), true);
+
+  // Should have the good value, not the error fallback
+  auto metadata = getMetadata("envoy.lb", "tokens");
+  EXPECT_EQ(metadata.number_value(), 42); // Good value preserved
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.success"), 1);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.invalid_json"), 2);
+}
+
+// Test on_error takes priority over on_missing
+TEST_F(StreamToMetadataFilterTest, OnErrorPriorityOverOnMissing) {
+  const std::string config = R"EOF(
+  response_rules:
+    format: SERVER_SENT_EVENTS
+    rules:
+      - selector:
+          json_path:
+            path: ["usage", "total_tokens"]
+        on_missing:
+          - metadata_namespace: "envoy.lb"
+            key: "tokens"
+            value:
+              number_value: -1
+        on_error:
+          - metadata_namespace: "envoy.lb"
+            key: "tokens"
+            value:
+              number_value: 0
+  )EOF";
+
+  setupFilter(config);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
+
+  // Event 1: Error
+  addEncodeDataChunks(std::string("data: {malformed json}") + std::string(delimiter_), false);
+
+  // Event 2: Valid JSON but missing path
+  addEncodeDataChunks(std::string("data: {\"model\": \"gpt-4\"}") + std::string(delimiter_), true);
+
+  // Should use on_error (priority) not on_missing
+  auto metadata = getMetadata("envoy.lb", "tokens");
+  EXPECT_EQ(metadata.number_value(), 0); // on_error value, not -1
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.invalid_json"), 1);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.selector_not_found"), 1);
 }
 
 } // namespace

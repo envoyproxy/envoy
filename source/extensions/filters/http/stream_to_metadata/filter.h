@@ -113,27 +113,57 @@ private:
 
   /**
    * Apply a rule to extract a value from JSON and write to metadata.
+   * Handles on_present (success), tracks on_missing (path not found) and on_error (errors).
+   * on_missing and on_error are deferred until the end of stream.
    * @param json_obj the parsed JSON object.
-   * @param rule the rule to apply.
-   * @return true if a value was successfully extracted and written.
+   * @param rule_index the index of the rule in config_->rules().
+   * @return true if on_present executed and stop_processing_on_match is true.
    */
-  bool applyRule(const Json::ObjectSharedPtr& json_obj, const Rule& rule);
+  bool applyRule(const Json::ObjectSharedPtr& json_obj, size_t rule_index);
+
+  /**
+   * Write metadata for on_present case (value successfully extracted).
+   * @param extracted_value the value extracted from the stream.
+   * @param descriptors the metadata descriptors from on_present.
+   */
+  void writeOnPresent(const Json::ValueType& extracted_value,
+                      const Protobuf::RepeatedPtrField<MetadataDescriptor>& descriptors);
+
+  /**
+   * Write metadata for on_missing case (selector path not found).
+   * @param descriptors the metadata descriptors from on_missing.
+   */
+  void writeOnMissing(const Protobuf::RepeatedPtrField<MetadataDescriptor>& descriptors);
+
+  /**
+   * Write metadata for on_error case (JSON parse failure, no data field, etc).
+   * @param descriptors the metadata descriptors from on_error.
+   */
+  void writeOnError(const Protobuf::RepeatedPtrField<MetadataDescriptor>& descriptors);
+
+  /**
+   * Finalize all rules: execute on_missing or on_error for rules where on_present never executed.
+   * Called at end of stream or when processing_complete_ is set.
+   */
+  void finalizeRules();
 
   /**
    * Extract a value from JSON using the selector path.
    * @param json_obj the parsed JSON object.
    * @param path the selector path (sequence of keys).
-   * @return the extracted value, or nullptr if not found.
+   * @return the extracted value, or error status if not found.
    */
   absl::StatusOr<Json::ValueType> extractValueFromJson(const Json::ObjectSharedPtr& json_obj,
                                                        const std::vector<std::string>& path) const;
 
   /**
    * Write a value to dynamic metadata.
-   * @param value the value to write.
+   * @param extracted_value optional extracted value from stream. If descriptor.value is not set,
+   *        this will be used. If descriptor.value is set, descriptor.value takes precedence.
    * @param descriptor the metadata descriptor specifying where to write.
    */
-  void writeMetadata(const Json::ValueType& value, const MetadataDescriptor& descriptor);
+  void writeMetadata(const absl::optional<Json::ValueType>& extracted_value,
+                     const MetadataDescriptor& descriptor);
 
   /**
    * Convert a JSON value to a Protobuf Value.
@@ -144,10 +174,21 @@ private:
   absl::StatusOr<Protobuf::Value> convertToProtobufValue(const Json::ValueType& json_value,
                                                          ValueType type) const;
 
+  // Per-rule state tracking for deferred on_missing/on_error
+  struct RuleState {
+    bool has_on_present_executed{false};
+    bool has_error_occurred{false};
+    bool has_missing_occurred{false};
+  };
+
   std::shared_ptr<FilterConfig> config_;
-  bool should_process_{false};
-  bool stop_processing_{false};
+  // Set to true if Content-Type header matches allowed types.
+  bool content_type_matched_{false};
+  // Set to true when a rule with stop_processing_on_match executes. Stops further processing.
+  bool processing_complete_{false};
   std::string buffer_;
+  // State tracking for each rule (indexed by rule position in config_->rules())
+  std::vector<RuleState> rule_states_;
 };
 
 } // namespace StreamToMetadata

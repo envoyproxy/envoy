@@ -20,7 +20,7 @@ TEST(StreamToMetadataConfigTest, ValidConfig) {
       - selector:
           json_path:
             path: ["usage", "total_tokens"]
-        metadata_descriptors:
+        on_present:
           - metadata_namespace: "envoy.lb"
             key: "tokens"
             type: NUMBER
@@ -48,7 +48,7 @@ TEST(StreamToMetadataConfigTest, MultipleMetadataDescriptors) {
       - selector:
           json_path:
             path: ["usage", "total_tokens"]
-        metadata_descriptors:
+        on_present:
           - metadata_namespace: "envoy.lb"
             key: "tokens"
             type: NUMBER
@@ -80,14 +80,14 @@ TEST(StreamToMetadataConfigTest, MultipleRules) {
       - selector:
           json_path:
             path: ["usage", "total_tokens"]
-        metadata_descriptors:
+        on_present:
           - metadata_namespace: "envoy.lb"
             key: "tokens"
             type: NUMBER
       - selector:
           json_path:
             path: ["model"]
-        metadata_descriptors:
+        on_present:
           - metadata_namespace: "envoy.lb"
             key: "model_name"
             type: STRING
@@ -112,7 +112,7 @@ TEST(StreamToMetadataConfigTest, CustomContentTypes) {
       - selector:
           json_path:
             path: ["data"]
-        metadata_descriptors:
+        on_present:
           - metadata_namespace: "envoy.lb"
             key: "value"
     allowed_content_types:
@@ -165,7 +165,7 @@ TEST(StreamToMetadataConfigTest, InvalidConfigEmptyPath) {
       - selector:
           json_path:
             path: []
-        metadata_descriptors:
+        on_present:
           - metadata_namespace: "envoy.lb"
             key: "tokens"
   )EOF";
@@ -174,7 +174,7 @@ TEST(StreamToMetadataConfigTest, InvalidConfigEmptyPath) {
   EXPECT_THROW(TestUtility::loadFromYamlAndValidate(yaml, proto_config), EnvoyException);
 }
 
-TEST(StreamToMetadataConfigTest, InvalidConfigMissingNamespace) {
+TEST(StreamToMetadataConfigTest, EmptyNamespaceDefaultsToFilterName) {
   const std::string yaml = R"EOF(
   response_rules:
     format: SERVER_SENT_EVENTS
@@ -182,12 +182,18 @@ TEST(StreamToMetadataConfigTest, InvalidConfigMissingNamespace) {
       - selector:
           json_path:
             path: ["usage"]
-        metadata_descriptors:
+        on_present:
           - key: "tokens"
   )EOF";
 
+  // Empty namespace is now valid - it defaults to filter name
   envoy::extensions::filters::http::stream_to_metadata::v3::StreamToMetadata proto_config;
-  EXPECT_THROW(TestUtility::loadFromYamlAndValidate(yaml, proto_config), EnvoyException);
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  StreamToMetadataConfig factory;
+  auto cb_or = factory.createFilterFactoryFromProto(proto_config, "stats", context);
+  EXPECT_TRUE(cb_or.ok());
 }
 
 TEST(StreamToMetadataConfigTest, InvalidConfigMissingKey) {
@@ -198,7 +204,7 @@ TEST(StreamToMetadataConfigTest, InvalidConfigMissingKey) {
       - selector:
           json_path:
             path: ["usage"]
-        metadata_descriptors:
+        on_present:
           - metadata_namespace: "envoy.lb"
   )EOF";
 
@@ -216,7 +222,7 @@ TEST(StreamToMetadataConfigTest, InvalidConfigNoJsonPath) {
   auto* rule = rules->add_rules();
   rule->mutable_selector(); // Create empty selector (no json_path)
 
-  auto* descriptor = rule->add_metadata_descriptors();
+  auto* descriptor = rule->add_on_present();
   descriptor->set_metadata_namespace("envoy.lb");
   descriptor->set_key("tokens");
   descriptor->set_type(
@@ -230,6 +236,81 @@ TEST(StreamToMetadataConfigTest, InvalidConfigNoJsonPath) {
   EXPECT_FALSE(result.ok());
   EXPECT_THAT(result.status().message(),
               testing::HasSubstr("Selector must have json_path specified"));
+}
+
+TEST(StreamToMetadataConfigTest, RequiresAtLeastOneAction) {
+  // Create config with no on_present, on_missing, or on_error
+  const std::string yaml = R"EOF(
+  response_rules:
+    format: SERVER_SENT_EVENTS
+    rules:
+      - selector:
+          json_path:
+            path: ["usage", "total_tokens"]
+  )EOF";
+
+  envoy::extensions::filters::http::stream_to_metadata::v3::StreamToMetadata proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  StreamToMetadataConfig factory;
+
+  // Should fail because no on_present, on_missing, or on_error specified
+  auto result = factory.createFilterFactoryFromProto(proto_config, "stats", context);
+  EXPECT_FALSE(result.ok());
+  EXPECT_THAT(
+      result.status().message(),
+      testing::HasSubstr("At least one of on_present, on_missing, or on_error must be specified"));
+}
+
+TEST(StreamToMetadataConfigTest, OnMissingRequiresValue) {
+  // Create config with on_missing but no value set
+  envoy::extensions::filters::http::stream_to_metadata::v3::StreamToMetadata proto_config;
+  auto* rules = proto_config.mutable_response_rules();
+  rules->set_format(envoy::extensions::filters::http::stream_to_metadata::v3::StreamToMetadata::
+                        SERVER_SENT_EVENTS);
+
+  auto* rule = rules->add_rules();
+  rule->mutable_selector()->mutable_json_path()->add_path("usage");
+
+  auto* on_missing = rule->add_on_missing();
+  on_missing->set_metadata_namespace("envoy.lb");
+  on_missing->set_key("tokens");
+  // Note: NOT setting value
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  StreamToMetadataConfig factory;
+
+  // Should fail because on_missing descriptor doesn't have value set
+  auto result = factory.createFilterFactoryFromProto(proto_config, "stats", context);
+  EXPECT_FALSE(result.ok());
+  EXPECT_THAT(result.status().message(),
+              testing::HasSubstr("on_missing descriptor must have value set"));
+}
+
+TEST(StreamToMetadataConfigTest, OnErrorRequiresValue) {
+  // Create config with on_error but no value set
+  envoy::extensions::filters::http::stream_to_metadata::v3::StreamToMetadata proto_config;
+  auto* rules = proto_config.mutable_response_rules();
+  rules->set_format(envoy::extensions::filters::http::stream_to_metadata::v3::StreamToMetadata::
+                        SERVER_SENT_EVENTS);
+
+  auto* rule = rules->add_rules();
+  rule->mutable_selector()->mutable_json_path()->add_path("usage");
+
+  auto* on_error = rule->add_on_error();
+  on_error->set_metadata_namespace("envoy.lb");
+  on_error->set_key("tokens");
+  // Note: NOT setting value
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  StreamToMetadataConfig factory;
+
+  // Should fail because on_error descriptor doesn't have value set
+  auto result = factory.createFilterFactoryFromProto(proto_config, "stats", context);
+  EXPECT_FALSE(result.ok());
+  EXPECT_THAT(result.status().message(),
+              testing::HasSubstr("on_error descriptor must have value set"));
 }
 
 } // namespace

@@ -48,14 +48,14 @@ Extract multiple values from streaming responses for logging and monitoring:
     - selector:
         json_path:
           path: ["usage", "total_tokens"]
-      metadata_descriptors:
+      on_present:
       - metadata_namespace: envoy.audit
         key: tokens
         type: NUMBER
     - selector:
         json_path:
           path: ["model"]
-      metadata_descriptors:
+      on_present:
       - metadata_namespace: envoy.audit
         key: model_name
         type: STRING
@@ -72,9 +72,15 @@ For Server-Sent Events (SSE) format:
    handling CRLF, CR, and LF line endings, and properly managing events split across multiple data chunks
 3. For each complete SSE event, it extracts the value from the ``data`` field(s) and parses it as JSON
 4. It navigates the JSON object using the configured selector path (e.g., ``["usage", "total_tokens"]``)
-5. If a value is found, it writes it to all configured metadata descriptors
-6. By default (``stop_processing_on_match: false``), it processes the entire stream. Set to ``true`` to stop
-   after the first match, which is more efficient when you know the desired value appears early or only once
+5. Based on the result, it writes metadata according to the configured rules:
+
+   * **on_present**: Executes immediately when the selector successfully extracts a value from any event
+   * **on_missing**: Deferred until end-of-stream. Executes only if ``on_present`` never executed and the selector path was not found in at least one event
+   * **on_error**: Deferred until end-of-stream. Executes only if ``on_present`` never executed and an error occurred (JSON parse failure, no data field, content-type mismatch, etc.). Takes priority over ``on_missing`` if both conditions are met
+
+6. The deferred execution of ``on_missing`` and ``on_error`` ensures that early events without the desired field (common in LLM streams) don't prevent later successful extractions
+7. By default (``stop_processing_on_match: false``), it processes the entire stream. Set to ``true`` to stop
+   after the first match (only ``on_present`` triggers this), which is more efficient when you know the desired value appears early or only once
 
 Configuration
 -------------
@@ -107,20 +113,34 @@ Key Configuration Options
 
     - **json_path**: A path through the JSON object (e.g., ``["usage", "total_tokens"]`` extracts
       ``json_object["usage"]["total_tokens"]``)
-  * **metadata_descriptors**: One or more destinations where the extracted value should be written.
-    Each descriptor specifies:
 
-    - ``metadata_namespace``: The metadata namespace (e.g., ``envoy.lb``)
+  * **on_present**: Metadata to write when the selector successfully extracts a value.
+    Executes immediately when a match is found. Each descriptor specifies:
+
+    - ``metadata_namespace``: The metadata namespace (e.g., ``envoy.lb``). If empty, defaults to ``envoy.filters.http.stream_to_metadata``.
     - ``key``: The metadata key
+    - ``value``: Optional hardcoded value. If set, writes this instead of the extracted value.
     - ``type``: The value type (``PROTOBUF_VALUE``, ``STRING``, or ``NUMBER``)
-    - ``preserve_existing_metadata_value``: If set to true, don't overwrite existing metadata for this key.
-      If not set or set to false, overwrite existing values. Default is false (overwrite)
+    - ``preserve_existing_metadata_value``: If true, don't overwrite existing metadata. Default false.
 
-  * **stop_processing_on_match**: If true, stop processing the stream after this rule
-    matches (picks FIRST occurrence). If false (default), continue processing the entire stream.
-    When combined with preserve_existing_metadata_value=false (default), later matches
-    overwrite earlier ones (picks LAST occurrence). Set to true for better performance
-    when you only need the first matching value.
+  * **on_missing**: Metadata to write when the selector path is not found in the JSON.
+    Executes at end-of-stream if ``on_present`` never executed. Useful for rate limiting: write a fallback value (e.g., -1) when token count is missing.
+    **Must** have ``value`` set to a fallback. This handles the case where legitimate JSON exists but lacks the expected field.
+
+  * **on_error**: Metadata to write when an error occurs (JSON parse failure, no data field, content-type mismatch, etc.).
+    Executes at end-of-stream if ``on_present`` never executed and takes priority over ``on_missing``. Useful for rate limiting: write a safe default (e.g., 0) to avoid blocking on errors.
+    **Must** have ``value`` set to a fallback. This handles malformed or missing data.
+
+  .. note::
+
+    At least one of ``on_present``, ``on_missing``, or ``on_error`` must be specified in each rule.
+    The ``on_missing`` and ``on_error`` actions are deferred and only execute at the end of the stream if ``on_present`` never executes.
+    This prevents early error/missing events from overwriting later successful extractions (common in LLM streams where usage data appears in the final event).
+
+  * **stop_processing_on_match**: If true, stop processing the stream after this rule successfully matches (``on_present`` executes).
+    If false (default), continue processing the entire stream. When combined with preserve_existing_metadata_value=false,
+    later matches overwrite earlier ones (picks LAST occurrence). Set to true for better performance when you only need the first matching value.
+    Note: ``on_missing`` and ``on_error`` do not trigger this.
 
 **response_rules.allowed_content_types**
   A list of content types to process. Defaults to ``["text/event-stream"]`` for SSE format.
@@ -148,7 +168,7 @@ Write the same value to multiple metadata namespaces, useful during migrations:
     - selector:
         json_path:
           path: ["usage", "total_tokens"]
-      metadata_descriptors:
+      on_present:
       - metadata_namespace: old.namespace
         key: tokens
         type: NUMBER
@@ -167,11 +187,45 @@ Avoid overwriting previously set metadata values:
     - selector:
         json_path:
           path: ["usage", "total_tokens"]
-      metadata_descriptors:
+      on_present:
       - metadata_namespace: envoy.lb
         key: tokens
         type: NUMBER
         preserve_existing_metadata_value: true
+
+**Using on_present, on_missing, and on_error Together**
+
+Write fallback values when extraction fails to ensure metadata is always available for downstream processing:
+
+.. code-block:: yaml
+
+  response_rules:
+    format: SERVER_SENT_EVENTS
+    rules:
+    - selector:
+        json_path:
+          path: ["usage", "total_tokens"]
+      on_present:
+      - metadata_namespace: envoy.lb
+        key: tokens
+        type: NUMBER
+      on_missing:
+      - metadata_namespace: envoy.lb
+        key: tokens
+        value:
+          number_value: -1
+      on_error:
+      - metadata_namespace: envoy.lb
+        key: tokens
+        value:
+          number_value: 0
+
+In this configuration:
+
+* When the value is successfully extracted, it's written to metadata
+* When the ``usage.total_tokens`` path doesn't exist in any event, ``-1`` is written at end-of-stream as a sentinel value
+* When JSON parsing fails, no data field exists, or content-type mismatches, ``0`` is written at end-of-stream as a safe default
+* The deferred execution ensures that error/missing states don't overwrite a successful extraction from a later event
 
 **Custom Content Types**
 

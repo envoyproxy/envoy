@@ -20,6 +20,26 @@ absl::StatusOr<Http::FilterFactoryCb> StreamToMetadataConfig::createFilterFactor
     if (!rule.selector().has_json_path()) {
       return absl::InvalidArgumentError("Selector must have json_path specified");
     }
+
+    // Require at least one of on_present, on_missing, or on_error to be set
+    if (rule.on_present().empty() && rule.on_missing().empty() && rule.on_error().empty()) {
+      return absl::InvalidArgumentError(
+          "At least one of on_present, on_missing, or on_error must be specified");
+    }
+
+    // Validate that on_missing descriptors have values set
+    for (const auto& descriptor : rule.on_missing()) {
+      if (descriptor.value().kind_case() == 0) {
+        return absl::InvalidArgumentError("on_missing descriptor must have value set");
+      }
+    }
+
+    // Validate that on_error descriptors have values set
+    for (const auto& descriptor : rule.on_error()) {
+      if (descriptor.value().kind_case() == 0) {
+        return absl::InvalidArgumentError("on_error descriptor must have value set");
+      }
+    }
   }
 
   auto config = std::make_shared<FilterConfig>(proto_config, context.scope());

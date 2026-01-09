@@ -40,14 +40,14 @@ static_resources:
                 - selector:
                     json_path:
                       path: ["usage", "total_tokens"]
-                  metadata_descriptors:
+                  on_present:
                   - metadata_namespace: envoy.lb
                     key: tokens
                     type: NUMBER
                 - selector:
                     json_path:
                       path: ["model"]
-                  metadata_descriptors:
+                  on_present:
                   - metadata_namespace: envoy.lb
                     key: model_name
                     type: STRING
