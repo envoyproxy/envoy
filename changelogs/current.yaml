@@ -354,6 +354,12 @@ new_features:
     details.
 - area: dynamic modules
   change: |
+    Added fallback module search path support in dynamic modules. When loading a module by name, Envoy first searches
+    in the directory specified by the ``ENVOY_DYNAMIC_MODULES_SEARCH_PATH`` environment variable. If the variable is
+    not set, Envoy falls back to searching in the current working directory before searching standard library paths
+    such as ``LD_LIBRARY_PATH`` and ``/usr/lib``.
+- area: dynamic modules
+  change: |
     Added support for streamable HTTP callouts in dynamic modules. Modules can create streaming HTTP connections to
     upstream clusters using ``start_http_stream``, send request data and trailers incrementally, and receive streaming
     response headers, data, and trailers through dedicated callbacks.
