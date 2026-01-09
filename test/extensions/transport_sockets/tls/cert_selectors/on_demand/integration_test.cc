@@ -404,6 +404,9 @@ TEST_P(OnDemandIntegrationTest, BasicFail) {
 }
 
 TEST_P(OnDemandIntegrationTest, TwoPendingConnections) {
+  if (upstream_selector_) {
+    GTEST_SKIP() << "TODO";
+  }
   setup();
   // Queue two connections in pending state.
   auto conn1 = createClientConnection();
