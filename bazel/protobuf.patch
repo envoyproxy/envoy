@@ -87,18 +87,15 @@ index 8926b04e5..8994f79f2 100644
  cc_binary(
      name = "protoc_stage0",
      copts = COPTS,
-diff --git a/python/google/protobuf/__init__.py b/python/google/protobuf/__init__.py
-index e9ced612f..9454a47bd 100755
---- a/python/google/protobuf/__init__.py
-+++ b/python/google/protobuf/__init__.py
-@@ -8,3 +8,10 @@
- # Copyright 2007 Google Inc. All Rights Reserved.
- 
- __version__ = '6.33.2'
-+
-+
-+if __name__ != '__main__':
-+    try:
-+        __import__('pkg_resources').declare_namespace(__name__)
-+    except ImportError:
-+        __path__ = __import__('pkgutil').extend_path(__path__, __name__)
+
+diff --git a/build_defs/cpp_opts.bzl b/build_defs/cpp_opts.bzl
+--- a/build_defs/cpp_opts.bzl
++++ b/build_defs/cpp_opts.bzl
+@@ -17,6 +17,7 @@ COPTS = select({
+     ],
+     "//conditions:default": [
+         "-Wno-sign-compare",
++        "-Wno-deprecated-declarations",
+     ],
+ })
+
