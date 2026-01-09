@@ -41,6 +41,6 @@ message Http11ProxyUpstreamTransport {
   config.core.v3.TransportSocket transport_socket = 1;
 
   // Specifies the default proxy address to use if the proxy address is not present in the
-  // ``typed_filter_metadata`` of the upstream connection.
+  // ``typed_filter_metadata`` of the endpoint.
   config.core.v3.Address default_proxy_address = 2;
 }
