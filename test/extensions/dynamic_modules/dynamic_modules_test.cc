@@ -125,7 +125,7 @@ TEST_P(DynamicModuleTestLanguages, ABIVersionMismatch) {
               testing::HasSubstr("ABI version mismatch: got invalid-version-hash, but expected"));
 }
 
-TEST(CreateDynamicModulesByName, ENVOY_DYNAMIC_MODULES_SEARCH_PATH_Set) {
+TEST(CreateDynamicModulesByName, EnvoyDynamicModulesSearchPathSet) {
   TestEnvironment::setEnvVar(
       "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
       TestEnvironment::substitute(
@@ -137,7 +137,7 @@ TEST(CreateDynamicModulesByName, ENVOY_DYNAMIC_MODULES_SEARCH_PATH_Set) {
   TestEnvironment::unsetEnvVar("ENVOY_DYNAMIC_MODULES_SEARCH_PATH");
 }
 
-TEST(CreateDynamicModulesByName, ENVOY_DYNAMIC_MODULES_SEARCH_PATH_notSetFallbackToCwd) {
+TEST(CreateDynamicModulesByName, EnvoyDynamicModulesSearchPathNotSetFallbackToCwd) {
   std::filesystem::path test_lib = testSharedObjectPath("no_op", "c");
   std::filesystem::path staged_lib = TestEnvironment::substitute("{{ test_rundir }}/libfoo.so");
   std::filesystem::copy(test_lib, staged_lib);
@@ -146,7 +146,7 @@ TEST(CreateDynamicModulesByName, ENVOY_DYNAMIC_MODULES_SEARCH_PATH_notSetFallbac
   std::filesystem::remove(staged_lib);
 }
 
-TEST(CreateDynamicModulesByName, dlopenDefaultSearchPath) {
+TEST(CreateDynamicModulesByName, DlopenDefaultSearchPath) {
   TestEnvironment::setEnvVar("ENVOY_DYNAMIC_MODULES_SEARCH_PATH", "/should/not/find/this/path", 1);
 
   std::filesystem::path test_lib = testSharedObjectPath("no_op", "c");
@@ -160,8 +160,7 @@ TEST(CreateDynamicModulesByName, dlopenDefaultSearchPath) {
   std::filesystem::remove(staged_lib);
 }
 
-TEST(CreateDynamicModulesByName, NotFound) {
-  // Without setting the search path, this should fail.
+TEST(CreateDynamicModulesByName, ModuleNotFound) {
   absl::StatusOr<DynamicModulePtr> module = newDynamicModuleByName("no_op", false);
   EXPECT_FALSE(module.ok());
   EXPECT_EQ(module.status().code(), absl::StatusCode::kInvalidArgument);
