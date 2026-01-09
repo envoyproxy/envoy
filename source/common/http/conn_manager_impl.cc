@@ -2150,7 +2150,10 @@ void ConnectionManagerImpl::ActiveStream::onCodecEncodeComplete() {
     // closed. doEndStream() call that created the zombie may have set
     // drain_state_ to Closing, but checkForDeferredClose() couldn't close the
     // connection at that time because streams_ wasn't empty yet.
-    connection_manager_.checkForDeferredClose(skip_delay);
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.http1_close_connection_on_zombie_stream_complete")) {
+      connection_manager_.checkForDeferredClose(skip_delay);
+    }
   }
 }
 
@@ -2169,7 +2172,10 @@ void ConnectionManagerImpl::ActiveStream::onCodecLowLevelReset() {
     // closed. doEndStream() call that created the zombie may have set
     // drain_state_ to Closing, but checkForDeferredClose() couldn't close the
     // connection at that time because streams_ wasn't empty yet.
-    connection_manager_.checkForDeferredClose(skip_delay);
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.http1_close_connection_on_zombie_stream_complete")) {
+      connection_manager_.checkForDeferredClose(skip_delay);
+    }
   }
 }
 

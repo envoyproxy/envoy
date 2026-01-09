@@ -8,6 +8,123 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: adaptive concurrency
+  change: |
+    Fixed a race condition in the gradient controller that allowed more outstanding requests than the concurrency limit,
+    bounded by the number of worker threads.
+- area: http2
+  change: |
+    Fixed a memory leak when an HTTP/2 stream was reset before request headers were sent (for example, if an upstream
+    HTTP filter sent a local reply after the connection was established but before headers were sent).
+- area: http2
+  change: |
+    Optimized HTTP/2 header processing by avoiding allocations and string copies for well-known header names. Common
+    headers (``:method``, ``:path``, ``:status``, ``content-type``, ``user-agent``, etc.) now reference static strings,
+    reducing allocations and improving performance.
+- area: lua
+  change: |
+    Fixed a crash when Lua filters set the response body to a payload larger than the body buffer limit.
+- area: tap
+  change: |
+    Added missing conversion support to ensure tapped messages are handled correctly for multi-event submissions.
+- area: bootstrap
+  change: |
+    Fixed a startup crash when custom :ref:`header_prefix <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.header_prefix>`
+    was set.
+- area: connection pool
+  change: |
+    Fixed a crash in the TCP connection pool during downstream teardown when large requests or responses triggered flow
+    control.
+- area: http
+  change: |
+    Fixed ``shouldDrainConnectionUponCompletion()`` to send ``GOAWAY`` frames for HTTP/2 and HTTP/3 instead of
+    aggressively closing connections, preventing interrupted response bodies and ``ERR_DRAINING`` client errors.
+    HTTP/1.1 behavior is unchanged.
+- area: http
+  change: |
+    Fixed a potential file descriptor leak where HTTP/1.1 connections with zombie streams (waiting for codec completion)
+    would not be properly closed when in draining state. This could occur when a response was sent before the request
+    was fully received, causing connections to remain open indefinitely. This fix is guarded by the runtime flag
+    ``envoy.reloadable_features.http1_close_connection_on_zombie_stream_complete``.
+- area: udp_proxy
+  change: |
+    Fixed cases where addresses could be moved from the data packet being processed.
+- area: composite
+  change: |
+    Fixed per-route configuration for the composite filter to match on response headers and trailers. Previously,
+    matchers using ``HttpResponseHeaderMatchInput`` or ``HttpResponseTrailerMatchInput`` silently failed, skipping the
+    delegated filter.
+- area: router
+  change: |
+    Fixed a regression where router-set headers (for example, ``x-envoy-expected-rq-timeout-ms``,
+    ``x-envoy-attempt-count``) were not accessible in ``request_headers_to_add`` on the initial request. These headers
+    can now be referenced via formatters such as ``%REQ(x-envoy-expected-rq-timeout-ms)%``.
+- area: router
+  change: |
+    Fixed an upstream HTTP filter issue when a route retried on 5xx and the filter returned
+    ``FilterHeadersStatus::StopIteration`` in ``encodeHeaders()``.
+- area: router
+  change: |
+    Fixed a bug where the :ref:`vhost per request buffer limit bytes
+    <envoy_v3_api_field_config.route.v3.VirtualHost.per_request_buffer_limit_bytes>`
+    will take precedence over the :ref:`route per request buffer limit bytes
+    <envoy_v3_api_field_config.route.v3.Route.per_request_buffer_limit_bytes>`.
+- area: ext_proc
+  change: |
+    Fixed missing attributes based on request headers (for example, ``request.host``) when ext_proc was configured to run
+    only on the encode path.
+- area: http_11_proxy
+  change: |
+    Fixed http_11_proxy transport socket buffering of bytes written after the initial HTTP ``CONNECT`` request was sent
+    but before the response was received, which could buffer until connection timeout.
+- area: tcp_proxy
+  change: |
+    Fixed a connection leak in TCP proxy when ``receive_before_connect`` is enabled and the downstream connection closes
+    before the upstream connection is established.
+- area: connection
+  change: |
+    Fixed connection handling to propagate transport failure reasons to ``StreamInfo`` before close events, ensuring
+    ``connection.transport_failure_reason`` and ``DOWNSTREAM_TRANSPORT_FAILURE_REASON`` are populated for all connection
+    types.
+- area: aws
+  change: |
+    Changed web identity token file watching in AWS signing components to pick up rotated tokens.
+- area: dns_resolver
+  change: |
+    Removed unnecessary ``getifaddrs()`` system calls when ``filter_unroutable_families`` is disabled.
+- area: tls
+  change: |
+    Fixed truncation of ``OTHERNAME`` SANs with embedded null octets in TLS certificates, which caused incorrect SAN
+    validation.
+- area: http
+  change: |
+    Fixed a remote ``jwt_auth`` token fetch crash when two or more auth headers were present and
+    ``allow_missing_or_failed`` was set.
+- area: oauth2
+  change: |
+    Fixed a bug in the OAuth2 filter that caused multiple concurrent login flows to interfere with each other. This could
+    lead to incorrect behavior when multiple requests initiated seperate OAuth2 logins at the same time.
+- area: dynamic modules
+  change: |
+    Fixed a soundness bug in the Rust SDK by tightening bounds on the ``HttpFilterConfig`` trait.
+- area: sds
+  change: |
+    Fixed SDS to enable auto-recovery when initial certificate file loading fails. Previously, if certificate
+    files did not exist during initial SDS configuration, no file watch callbacks were set up, preventing
+    automatic recovery when files appeared later.
+- area: upstream
+  change: |
+    Fixed transport socket matcher to correctly use downstream connection filter state for matching and optimized the
+    selection path to avoid per-connection resolution overhead when filter state input is not used.
+- area: ext_authz
+  change: |
+    Fixed the gRPC ext_authz client to respect ``status_on_error`` configuration when gRPC calls fail.
+    Previously, gRPC call failures always returned 403 Forbidden regardless of the configured error status.
+- area: proto_api_scrubber
+  change: |
+    Fixed a crash in the :ref:`Proto API Scrubber <config_http_filters_proto_api_scrubber>` filter when internal buffer
+    conversion fails. The filter now gracefully rejects the traffic with a local reply and error detail
+    ``proto_api_scrubber_FAILED_PRECONDITION`` instead of terminating the process.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
