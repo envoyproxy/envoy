@@ -1222,10 +1222,7 @@ TEST(LinuxCpuStatsReaderUtilizationTest, ZeroTotalDeltaReturnsError) {
   EXPECT_NE(result.status().message().find("total_over_period"), std::string::npos);
 }
 
-// =============================================================================
 // getUtilization() Method Tests for CgroupV1CpuStatsReader
-// =============================================================================
-
 TEST_F(LinuxContainerCpuStatsReaderTest, V1GetUtilizationFirstCallReturnsZero) {
   TimeSource& test_time_source = timeSource();
   Api::ApiPtr api = Api::createApiForTest();
