@@ -54,7 +54,10 @@ cc_library(
         "lib/zstd_errors.h",
     ],
     includes = ["lib"],
-    linkopts = ["-pthread"],
+    linkopts = select({
+        "@platforms//os:windows": [],
+        "//conditions:default": ["-pthread"],
+    }),
     linkstatic = True,
     local_defines = [
         "XXH_NAMESPACE=ZSTD_",

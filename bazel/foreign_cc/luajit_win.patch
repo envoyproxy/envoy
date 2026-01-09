@@ -1,0 +1,63 @@
+diff --git a/luajit_build_win.sh b/luajit_build_win.sh
+new file mode 100755
+index 00000000..c6267893
+--- /dev/null
++++ b/luajit_build_win.sh
+@@ -0,0 +1,38 @@
++#!/bin/bash
++
++set -e
++
++PREFIX=""
++while [[ $# -gt 0 ]]; do
++    case $1 in
++        --prefix=*)
++            PREFIX="${1#*=}"
++            shift
++            ;;
++        --prefix)
++            PREFIX="$2"
++            shift 2
++            ;;
++        *)
++            shift
++            ;;
++    esac
++done
++
++# Copy source tree to a build directory
++SRC_DIR="$(dirname "$(realpath "$0")")"
++BUILD_DIR="$(basename "$SRC_DIR")"
++cp -r "$SRC_DIR" "$BUILD_DIR"
++cd "$BUILD_DIR"
++
++cd src
++./msvcbuild.bat static
++
++mkdir -p "$PREFIX/lib"
++cp lua51.lib "$PREFIX/lib"
++mkdir -p "$PREFIX/include/luajit-2.1"
++for header in lauxlib.h luaconf.h lua.h lua.hpp luajit.h lualib.h; do
++    cp "$header" "$PREFIX/include/luajit-2.1"
++done
++mkdir -p "$PREFIX/bin"
++cp luajit.exe "$PREFIX/bin"
+diff --git a/src/msvcbuild.bat b/src/msvcbuild.bat
+index d6aed170..42604601 100644
+--- a/src/msvcbuild.bat
++++ b/src/msvcbuild.bat
+@@ -18,9 +18,11 @@
+ @rem Add more debug flags here, e.g. DEBUGCFLAGS=/DLUA_USE_ASSERT
+ @set DEBUGCFLAGS=
+ @set LJCOMPILE=cl /nologo /c /O2 /W3 /D_CRT_SECURE_NO_DEPRECATE /D_CRT_STDIO_INLINE=__declspec(dllexport)__inline
+-@set LJDYNBUILD=/DLUA_BUILD_AS_DLL /MD
+-@set LJDYNBUILD_DEBUG=/DLUA_BUILD_AS_DLL /MDd 
+-@set LJCOMPILETARGET=/Zi
++@rem Use MT to match flags set by bazel for static build
++@set LJDYNBUILD=/DLUA_BUILD_AS_DLL /MT
++@set LJDYNBUILD_DEBUG=/DLUA_BUILD_AS_DLL /MTd 
++@rem Avoid incremental link which doesn't work with bazel's deletion of intermediate files
++@set LJCOMPILETARGET=/Z7
+ @set LJLINKTYPE=/DEBUG /RELEASE
+ @set LJLINKTYPE_DEBUG=/DEBUG
+ @set LJLINKTARGET=/OPT:REF /OPT:ICF /INCREMENTAL:NO

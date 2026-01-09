@@ -13,6 +13,8 @@ WINDOWS_SKIP_TARGETS = [
     "envoy.filters.http.sxg",
     "envoy.tracers.dynamic_ot",
     "envoy.tracers.datadog",
+    # Only implemented for Linux.
+    "envoy.resource_monitors.cpu_utilization",
     # Extensions that require CEL.
     "envoy.access_loggers.extension_filters.cel",
     "envoy.rate_limit_descriptors.expr",
@@ -82,7 +84,10 @@ def _cc_deps():
     external_http_archive(
         name = "com_google_protoconverter",
         patch_args = ["-p1"],
-        patches = ["@envoy//bazel:com_google_protoconverter.patch"],
+        patches = [
+            "@envoy//bazel:com_google_protoconverter.patch",
+            "@envoy//bazel:com_google_protoconverter_win.patch",
+        ],
         patch_cmds = [
             "rm src/google/protobuf/stubs/common.cc",
             "rm src/google/protobuf/stubs/common.h",
@@ -218,6 +223,7 @@ def envoy_dependencies(skip_targets = []):
     )
     external_http_archive("envoy_toolshed")
 
+    _com_github_dlfcn_win32()
     _com_github_maxmind_libmaxminddb()
     _thrift()
 
@@ -807,7 +813,10 @@ def _com_github_luajit_luajit():
     external_http_archive(
         name = "com_github_luajit_luajit",
         build_file_content = BUILD_ALL_CONTENT,
-        patches = ["@envoy//bazel/foreign_cc:luajit.patch"],
+        patches = [
+            "@envoy//bazel/foreign_cc:luajit.patch",
+            "@envoy//bazel/foreign_cc:luajit_win.patch",
+        ],
         patch_args = ["-p1"],
     )
 
@@ -932,5 +941,11 @@ def _thrift():
 def _com_github_maxmind_libmaxminddb():
     external_http_archive(
         name = "com_github_maxmind_libmaxminddb",
+        build_file_content = BUILD_ALL_CONTENT,
+    )
+
+def _com_github_dlfcn_win32():
+    external_http_archive(
+        name = "com_github_dlfcn_win32",
         build_file_content = BUILD_ALL_CONTENT,
     )

@@ -77,6 +77,7 @@ envoy_cc_library(
     ],
     deps = [
         "//envoy/common:pure_lib",
+        "//envoy/common:time_interface",
         "//source/common/common:cleanup_lib",
         "//source/common/common:lock_guard_lib",
         "//source/common/common:thread_lib",

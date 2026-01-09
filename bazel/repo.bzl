@@ -65,25 +65,45 @@ def _envoy_repo_impl(repository_ctx):
 
     """
 
-    # parse container information for use in RBE
-    json_result = repository_ctx.execute([
-        repository_ctx.path(repository_ctx.attr.yq),
-        repository_ctx.path(repository_ctx.attr.envoy_ci_config),
-        "-ojson",
-    ])
-    if json_result.return_code != 0:
-        fail("yq failed: {}".format(json_result.stderr))
-    repository_ctx.file("ci-config.json", json_result.stdout)
-    config_data = json.decode(repository_ctx.read("ci-config.json"))
+    repo = ""
+    repo_gcr = ""
+    sha = ""
+    sha_gcc = ""
+    sha_mobile = ""
+    sha_worker = ""
+    tag = ""
+
+    # yq via bazel doesn't work on Windows, but we don't need the real flag_values
+    # there either. For this and other reasons, ideally we could parse YAML directly.
+    # https://github.com/bazelbuild/bazel/issues/24766
+    if repository_ctx.os.name.lower().find("windows") == -1:
+        json_result = repository_ctx.execute([
+            repository_ctx.path(repository_ctx.attr.yq),
+            repository_ctx.path(repository_ctx.attr.envoy_ci_config),
+            "-ojson",
+        ])
+        if json_result.return_code != 0:
+            fail("yq failed: {}".format(json_result.stderr))
+        repository_ctx.file("ci-config.json", json_result.stdout)
+        config_data = json.decode(repository_ctx.read("ci-config.json"))
+        repo = config_data["build-image"]["repo"]
+        repo_gcr = config_data["build-image"]["repo-gcr"]
+        sha = config_data["build-image"]["sha"]
+        sha_gcc = config_data["build-image"]["sha-gcc"]
+        sha_mobile = config_data["build-image"]["sha-mobile"]
+        sha_worker = config_data["build-image"]["sha-worker"]
+        tag = config_data["build-image"]["tag"]
+
     repository_ctx.file("containers.bzl", CONTAINERS.format(
-        repo = config_data["build-image"]["repo"],
-        repo_gcr = config_data["build-image"]["repo-gcr"],
-        sha = config_data["build-image"]["sha"],
-        sha_gcc = config_data["build-image"]["sha-gcc"],
-        sha_mobile = config_data["build-image"]["sha-mobile"],
-        sha_worker = config_data["build-image"]["sha-worker"],
-        tag = config_data["build-image"]["tag"],
+        repo = repo,
+        repo_gcr = repo_gcr,
+        sha = sha,
+        sha_gcc = sha_gcc,
+        sha_mobile = sha_mobile,
+        sha_worker = sha_worker,
+        tag = tag,
     ))
+
     repo_version_path = repository_ctx.path(repository_ctx.attr.envoy_version)
     api_version_path = repository_ctx.path(repository_ctx.attr.envoy_api_version)
     version = repository_ctx.read(repo_version_path).strip()
