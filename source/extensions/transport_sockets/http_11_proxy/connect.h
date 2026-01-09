@@ -56,8 +56,7 @@ private:
   bool need_to_strip_connect_response_{};
 };
 
-class UpstreamHttp11ConnectSocketFactory : public PassthroughFactory,
-                                           public Network::Http11ProxyConfiguration {
+class UpstreamHttp11ConnectSocketFactory : public PassthroughFactory {
 public:
   UpstreamHttp11ConnectSocketFactory(
       Network::UpstreamTransportSocketFactoryPtr transport_socket_factory,
@@ -70,10 +69,12 @@ public:
   void hashKey(std::vector<uint8_t>& key,
                Network::TransportSocketOptionsConstSharedPtr options) const override;
 
-  // Network::Http11ProxyConfiguration
-  absl::optional<Network::TransportSocketOptions::Http11ProxyInfo>
+  OptRef<const Network::TransportSocketOptions::Http11ProxyInfo>
   http11ProxyInfo() const override {
-    return proxy_info_;
+    if (!proxy_info_.has_value()) {
+      return {};
+    }
+    return {proxy_info_.value()};
   }
 
 private:

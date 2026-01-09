@@ -286,19 +286,6 @@ public:
 using TransportSocketOptionsConstSharedPtr = std::shared_ptr<const TransportSocketOptions>;
 
 /**
- * Interface for a factory that provides default HTTP/1.1 proxy configuration.
- */
-class Http11ProxyConfiguration {
-public:
-  virtual ~Http11ProxyConfiguration() = default;
-
-  /**
-   * @return the default Http11ProxyInfo if configured, or nullopt.
-   */
-  virtual absl::optional<TransportSocketOptions::Http11ProxyInfo> http11ProxyInfo() const PURE;
-};
-
-/**
  * A factory for creating transport sockets.
  **/
 class TransportSocketFactoryBase {
@@ -326,6 +313,13 @@ public:
   virtual TransportSocketPtr
   createTransportSocket(TransportSocketOptionsConstSharedPtr options,
                         std::shared_ptr<const Upstream::HostDescription> host) const PURE;
+
+  /**
+   * @return the default Http11ProxyInfo if configured, or nullopt.
+   */
+  virtual OptRef<const TransportSocketOptions::Http11ProxyInfo> http11ProxyInfo() const {
+    return {};
+  }
 
   /**
    * Returns true if the transport socket created by this factory supports some form of ALPN
