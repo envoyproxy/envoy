@@ -32,6 +32,8 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/rust:no_program_init",
         "//test/extensions/dynamic_modules/test_data/rust:program_init_fail",
     ],
+    # This is to test dlopen with the current working directory (rundir in Bazel).
+    env = {"LD_LIBRARY_PATH": "."},
     rbe_pool = "6gig",
     deps = [
         ":util",

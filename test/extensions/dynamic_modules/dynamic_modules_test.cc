@@ -125,7 +125,7 @@ TEST_P(DynamicModuleTestLanguages, ABIVersionMismatch) {
               testing::HasSubstr("ABI version mismatch: got invalid-version-hash, but expected"));
 }
 
-TEST(CreateDynamicModulesByName, OK) {
+TEST(CreateDynamicModulesByName, ENVOY_DYNAMIC_MODULES_SEARCH_PATH_Set) {
   TestEnvironment::setEnvVar(
       "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
       TestEnvironment::substitute(
@@ -133,17 +133,41 @@ TEST(CreateDynamicModulesByName, OK) {
       1);
 
   absl::StatusOr<DynamicModulePtr> module = newDynamicModuleByName("no_op", false);
-  EXPECT_TRUE(module.ok());
+  EXPECT_TRUE(module.ok()) << "Failed to load module: " << module.status().message();
   TestEnvironment::unsetEnvVar("ENVOY_DYNAMIC_MODULES_SEARCH_PATH");
 }
 
-TEST(CreateDynamicModulesByName, EnvVarNotSet) {
+TEST(CreateDynamicModulesByName, ENVOY_DYNAMIC_MODULES_SEARCH_PATH_notSetFallbackToCwd) {
+  std::filesystem::path test_lib = testSharedObjectPath("no_op", "c");
+  std::filesystem::path staged_lib = TestEnvironment::substitute("{{ test_rundir }}/libfoo.so");
+  std::filesystem::copy(test_lib, staged_lib);
+  absl::StatusOr<DynamicModulePtr> module = newDynamicModuleByName("foo", false);
+  EXPECT_TRUE(module.ok()) << "Failed to load module: " << module.status().message();
+  std::filesystem::remove(staged_lib);
+}
+
+TEST(CreateDynamicModulesByName, dlopenDefaultSearchPath) {
+  TestEnvironment::setEnvVar("ENVOY_DYNAMIC_MODULES_SEARCH_PATH", "/should/not/find/this/path", 1);
+
+  std::filesystem::path test_lib = testSharedObjectPath("no_op", "c");
+  std::filesystem::path staged_lib =
+      TestEnvironment::substitute("{{ test_rundir }}/libwhatever.so");
+  std::filesystem::copy(test_lib, staged_lib);
+  absl::StatusOr<DynamicModulePtr> module = newDynamicModuleByName("whatever", false);
+  EXPECT_TRUE(module.ok()) << "Failed to load module: " << module.status().message();
+
+  TestEnvironment::unsetEnvVar("ENVOY_DYNAMIC_MODULES_SEARCH_PATH");
+  std::filesystem::remove(staged_lib);
+}
+
+TEST(CreateDynamicModulesByName, NotFound) {
   // Without setting the search path, this should fail.
   absl::StatusOr<DynamicModulePtr> module = newDynamicModuleByName("no_op", false);
   EXPECT_FALSE(module.ok());
   EXPECT_EQ(module.status().code(), absl::StatusCode::kInvalidArgument);
   EXPECT_THAT(module.status().message(),
-              testing::HasSubstr("ENVOY_DYNAMIC_MODULES_SEARCH_PATH is not set"));
+              testing::HasSubstr(
+                  "Failed to load dynamic module: libno_op.so not found in any search path"));
 }
 
 } // namespace DynamicModules
