@@ -36,9 +36,7 @@ paths:
   # Path prefixes to exclude from checking
   # TODO(alyssawilk) unexclude mobile
   excluded:
-  - .
-  - bazel/external/c-ares/
-  - bazel/external/http_parser/
+  - bazel/external/
   - bazel/rbe/toolchains/configs/
   - bazel-
   - build
