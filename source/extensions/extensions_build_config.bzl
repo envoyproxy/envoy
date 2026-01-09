@@ -21,6 +21,7 @@ EXTENSIONS = {
     #
 
     "envoy.clusters.aggregate":                         "//source/extensions/clusters/aggregate:cluster",
+    "envoy.clusters.composite":                         "//source/extensions/clusters/composite:cluster",
     "envoy.clusters.dns":                               "//source/extensions/clusters/dns:dns_cluster_lib",
     "envoy.clusters.dynamic_forward_proxy":             "//source/extensions/clusters/dynamic_forward_proxy:cluster",
     "envoy.clusters.eds":                               "//source/extensions/clusters/eds:eds_lib",
@@ -229,6 +230,7 @@ EXTENSIONS = {
     "envoy.filters.listener.proxy_protocol":            "//source/extensions/filters/listener/proxy_protocol:config",
     "envoy.filters.listener.tls_inspector":             "//source/extensions/filters/listener/tls_inspector:config",
     "envoy.filters.listener.dynamic_modules":           "//source/extensions/filters/listener/dynamic_modules:config",
+    "envoy.filters.udp_listener.dynamic_modules":       "//source/extensions/filters/udp/dynamic_modules:config",
 
     #
     # Network filters
@@ -475,6 +477,7 @@ EXTENSIONS = {
     "envoy.quic.server_preferred_address.datasource":   "//source/extensions/quic/server_preferred_address:datasource_server_preferred_address_config_factory_config",
     "envoy.quic.connection_debug_visitor.basic":        "//source/extensions/quic/connection_debug_visitor/basic:envoy_quic_connection_debug_visitor_basic",
     "envoy.quic.connection_debug_visitor.quic_stats":   "//source/extensions/quic/connection_debug_visitor/quic_stats:config",
+    "envoy.quic.packet_writer.default":                 "//source/extensions/quic/client_packet_writer:default_quic_client_packet_writer_factory_config",
 
     #
     # UDP packet writers

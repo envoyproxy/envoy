@@ -149,7 +149,8 @@ public:
     if (!quiche_handles_migration_) {
       quic_connection_->setWriterFactory(writer_factory_);
     } else {
-      migration_helper = &quic_connection_->getOrCreateMigrationHelper(writer_factory_, {});
+      migration_helper = &quic_connection_->getOrCreateMigrationHelper(
+          writer_factory_, quic::kInvalidNetworkHandle, {});
     }
 
     OptRef<Http::HttpServerPropertiesCache> cache;
@@ -350,6 +351,11 @@ TEST_P(EnvoyQuicClientSessionTest, OnGoAwayFrame) {
 
   EXPECT_CALL(http_connection_callbacks_, onGoAway(Http::GoAwayErrorCode::NoError));
   envoy_quic_session_->OnHttp3GoAway(4u);
+}
+
+TEST_P(EnvoyQuicClientSessionTest, StartDraining) {
+  EXPECT_CALL(http_connection_callbacks_, onGoAway(Http::GoAwayErrorCode::NoError));
+  envoy_quic_session_->StartDraining();
 }
 
 TEST_P(EnvoyQuicClientSessionTest, ConnectionClose) {

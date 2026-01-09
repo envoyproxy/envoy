@@ -28,6 +28,7 @@ envoy_cc_library(
     hdrs = ["filter_config.h"],
     deps = [
         "//envoy/server:filter_config_interface",
+        "@com_google_absl//absl/types:variant",
         "@envoy_api//envoy/extensions/filters/http/mcp_router/v3:pkg_cc_proto",
     ],
 )
@@ -45,12 +46,14 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:fmt_lib",
         "//source/common/common:logger_lib",
+        "//source/common/config:metadata_lib",
         "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:muxdemux_lib",
         "//source/common/http:utility_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/json:json_streamer_lib",
+        "//source/common/protobuf:utility_lib",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",

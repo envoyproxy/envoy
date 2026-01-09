@@ -139,6 +139,19 @@ typedef const void* envoy_dynamic_module_type_http_filter_module_ptr;
 typedef void* envoy_dynamic_module_type_http_filter_scheduler_module_ptr;
 
 /**
+ * envoy_dynamic_module_type_http_filter_config_scheduler_module_ptr is a raw pointer to the
+ * DynamicModuleHttpFilterConfigScheduler class in Envoy.
+ *
+ * OWNERSHIP: The allocation is done by Envoy but the module is responsible for managing the
+ * lifetime of the pointer. Notably, it must be explicitly destroyed by the module
+ * when scheduling the HTTP filter config event is done. The creation of this pointer is done by
+ * envoy_dynamic_module_callback_http_filter_config_scheduler_new and the scheduling and destruction
+ * is done by envoy_dynamic_module_callback_http_filter_config_scheduler_delete. Since its lifecycle
+ * is owned/managed by the module, this has _module_ptr suffix.
+ */
+typedef void* envoy_dynamic_module_type_http_filter_config_scheduler_module_ptr;
+
+/**
  * envoy_dynamic_module_type_buffer_module_ptr is a pointer to a buffer in the module. A buffer
  * represents a contiguous block of memory in bytes.
  *
@@ -1044,6 +1057,21 @@ void envoy_dynamic_module_on_http_filter_http_stream_reset(
 void envoy_dynamic_module_on_http_filter_scheduled(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr, uint64_t event_id);
+
+/**
+ * envoy_dynamic_module_on_http_filter_config_scheduled is called when the HTTP filter
+ * configuration is scheduled to be executed on the main thread with
+ * envoy_dynamic_module_callback_http_filter_config_scheduler_commit callback.
+ *
+ * @param filter_config_envoy_ptr is the pointer to the DynamicModuleHttpFilterConfig object.
+ * @param filter_config_ptr is the pointer to the in-module HTTP filter configuration created by
+ * envoy_dynamic_module_on_http_filter_config_new.
+ * @param event_id is the ID of the event passed to
+ * envoy_dynamic_module_callback_http_filter_config_scheduler_commit.
+ */
+void envoy_dynamic_module_on_http_filter_config_scheduled(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_config_module_ptr filter_config_ptr, uint64_t event_id);
 
 /**
  * envoy_dynamic_module_on_http_filter_downstream_above_write_buffer_high_watermark is called when
@@ -2243,6 +2271,53 @@ void envoy_dynamic_module_callback_http_filter_scheduler_commit(
     uint64_t event_id);
 
 /**
+ * envoy_dynamic_module_callback_http_filter_config_scheduler_new is called by the module to create
+ * a new HTTP filter configuration scheduler. The scheduler is used to dispatch HTTP filter
+ * configuration operations to the main thread from any thread including the ones managed by the
+ * module.
+ *
+ * @param filter_config_envoy_ptr is the pointer to the DynamicModuleHttpFilterConfig object.
+ * @return envoy_dynamic_module_type_http_filter_config_scheduler_module_ptr is the pointer to the
+ * created HTTP filter configuration scheduler.
+ *
+ * NOTE: it is caller's responsibility to delete the scheduler using
+ * envoy_dynamic_module_callback_http_filter_config_scheduler_delete when it is no longer needed.
+ * See the comment on envoy_dynamic_module_type_http_filter_config_scheduler_module_ptr.
+ */
+envoy_dynamic_module_type_http_filter_config_scheduler_module_ptr
+envoy_dynamic_module_callback_http_filter_config_scheduler_new(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_http_filter_config_scheduler_delete is called by the module to
+ * delete the HTTP filter configuration scheduler created by
+ * envoy_dynamic_module_callback_http_filter_config_scheduler_new.
+ *
+ * @param scheduler_module_ptr is the pointer to the HTTP filter configuration scheduler created by
+ * envoy_dynamic_module_callback_http_filter_config_scheduler_new.
+ */
+void envoy_dynamic_module_callback_http_filter_config_scheduler_delete(
+    envoy_dynamic_module_type_http_filter_config_scheduler_module_ptr scheduler_module_ptr);
+
+/**
+ * envoy_dynamic_module_callback_http_filter_config_scheduler_commit is called by the module to
+ * schedule a generic event to the HTTP filter configuration on the main thread.
+ *
+ * This will eventually end up invoking envoy_dynamic_module_on_http_filter_config_scheduled
+ * event hook on the main thread.
+ *
+ * This can be called multiple times to schedule multiple events to the same filter configuration.
+ *
+ * @param scheduler_module_ptr is the pointer to the HTTP filter configuration scheduler created by
+ * envoy_dynamic_module_callback_http_filter_config_scheduler_new.
+ * @param event_id is the ID of the event. This can be used to differentiate between multiple
+ * events scheduled to the same filter configuration. It can be any module-defined value.
+ */
+void envoy_dynamic_module_callback_http_filter_config_scheduler_commit(
+    envoy_dynamic_module_type_http_filter_config_scheduler_module_ptr scheduler_module_ptr,
+    uint64_t event_id);
+
+/**
  * envoy_dynamic_module_callback_http_filter_scheduler_delete is called by the module to delete
  * the HTTP filter scheduler created by envoy_dynamic_module_callback_http_filter_scheduler_new.
  *
@@ -3279,6 +3354,163 @@ bool envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string(
  */
 size_t envoy_dynamic_module_callback_listener_filter_max_read_bytes(
     envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr);
+
+// -----------------------------------------------------------------------------
+// UDP Listener Filter
+// -----------------------------------------------------------------------------
+
+/**
+ * envoy_dynamic_module_type_udp_listener_filter_config_envoy_ptr is a raw pointer to
+ * the DynamicModuleUdpListenerFilterConfig class in Envoy.
+ *
+ * OWNERSHIP: Envoy owns the pointer.
+ */
+typedef void* envoy_dynamic_module_type_udp_listener_filter_config_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_udp_listener_filter_config_module_ptr is a pointer to an in-module UDP
+ * listener filter configuration.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer.
+ */
+typedef const void* envoy_dynamic_module_type_udp_listener_filter_config_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_udp_listener_filter_envoy_ptr is a raw pointer to the
+ * DynamicModuleUdpListenerFilter class in Envoy.
+ *
+ * OWNERSHIP: Envoy owns the pointer.
+ */
+typedef void* envoy_dynamic_module_type_udp_listener_filter_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_udp_listener_filter_module_ptr is a pointer to an in-module UDP
+ * listener filter.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer.
+ */
+typedef const void* envoy_dynamic_module_type_udp_listener_filter_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_on_udp_listener_filter_status represents the status of the UDP
+ * listener filter execution.
+ */
+typedef enum envoy_dynamic_module_type_on_udp_listener_filter_status {
+  envoy_dynamic_module_type_on_udp_listener_filter_status_Continue,
+  envoy_dynamic_module_type_on_udp_listener_filter_status_StopIteration,
+} envoy_dynamic_module_type_on_udp_listener_filter_status;
+
+/**
+ * envoy_dynamic_module_on_udp_listener_filter_config_new is called when a new UDP listener filter
+ * configuration is created.
+ */
+envoy_dynamic_module_type_udp_listener_filter_config_module_ptr
+envoy_dynamic_module_on_udp_listener_filter_config_new(
+    envoy_dynamic_module_type_udp_listener_filter_config_envoy_ptr filter_config_envoy_ptr,
+    const char* name_ptr, size_t name_size, const char* config_ptr, size_t config_size);
+
+/**
+ * envoy_dynamic_module_on_udp_listener_filter_config_destroy is called when the UDP listener filter
+ * configuration is destroyed.
+ */
+void envoy_dynamic_module_on_udp_listener_filter_config_destroy(
+    envoy_dynamic_module_type_udp_listener_filter_config_module_ptr filter_config_ptr);
+
+/**
+ * envoy_dynamic_module_on_udp_listener_filter_new is called when a new UDP listener filter is
+ * created.
+ */
+envoy_dynamic_module_type_udp_listener_filter_module_ptr
+envoy_dynamic_module_on_udp_listener_filter_new(
+    envoy_dynamic_module_type_udp_listener_filter_config_module_ptr filter_config_ptr,
+    envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_on_udp_listener_filter_on_data is called when a UDP packet is received.
+ */
+envoy_dynamic_module_type_on_udp_listener_filter_status
+envoy_dynamic_module_on_udp_listener_filter_on_data(
+    envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_udp_listener_filter_module_ptr filter_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_udp_listener_filter_destroy is called when the UDP listener filter is
+ * destroyed.
+ */
+void envoy_dynamic_module_on_udp_listener_filter_destroy(
+    envoy_dynamic_module_type_udp_listener_filter_module_ptr filter_module_ptr);
+
+// Callbacks
+
+/**
+ * envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks_size is called by the
+ * module to get the number of chunks in the current datagram data. Combined with
+ * envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks, this can be used to
+ * iterate over all chunks in the datagram. This is only valid during the
+ * envoy_dynamic_module_on_udp_listener_filter_on_data callback.
+ */
+bool envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks_size(
+    envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr,
+    size_t* chunks_size_out);
+
+/**
+ * envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks is called by the
+ * module to get the current datagram data as chunks. The module must ensure the provided buffer
+ * array has enough capacity to store all chunks, which can be obtained via
+ * envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks_size. This is only
+ * valid during the envoy_dynamic_module_on_udp_listener_filter_on_data callback.
+ *
+ * @return true if the datagram data is available and chunks_out is populated, false otherwise.
+ */
+bool envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks(
+    envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* chunks_out);
+
+/**
+ * envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_size is called by the module
+ * to get the total length in bytes of the current datagram data. This is only valid during the
+ * envoy_dynamic_module_on_udp_listener_filter_on_data callback.
+ *
+ * @param size_out is the output pointer to the total length of the datagram data in bytes.
+ * @return true if the datagram data is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_size(
+    envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr, size_t* size_out);
+
+/**
+ * envoy_dynamic_module_callback_udp_listener_filter_set_datagram_data is called by the module to
+ * set the current datagram data.
+ */
+bool envoy_dynamic_module_callback_udp_listener_filter_set_datagram_data(
+    envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer data);
+
+/**
+ * envoy_dynamic_module_callback_udp_listener_filter_get_peer_address is called by the module to
+ * get the peer address.
+ */
+bool envoy_dynamic_module_callback_udp_listener_filter_get_peer_address(
+    envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* address_out, uint32_t* port_out);
+
+/**
+ * envoy_dynamic_module_callback_udp_listener_filter_get_local_address is called by the module to
+ * get the local address.
+ */
+bool envoy_dynamic_module_callback_udp_listener_filter_get_local_address(
+    envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* address_out, uint32_t* port_out);
+
+/**
+ * envoy_dynamic_module_callback_udp_listener_filter_send_datagram is called by the module to
+ * send a datagram.
+ *
+ * @return true if the datagram was sent, false otherwise.
+ */
+bool envoy_dynamic_module_callback_udp_listener_filter_send_datagram(
+    envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer data,
+    envoy_dynamic_module_type_module_buffer peer_address, uint32_t peer_port);
 
 #ifdef __cplusplus
 }

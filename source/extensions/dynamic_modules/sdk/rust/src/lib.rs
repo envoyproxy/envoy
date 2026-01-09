@@ -248,6 +248,13 @@ pub trait HttpFilterConfig<EHF: EnvoyHttpFilter>: Sync {
   fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
     panic!("not implemented");
   }
+
+  /// This is called when the new event is scheduled via the
+  /// [`EnvoyHttpFilterConfigScheduler::commit`] for this [`HttpFilterConfig`].
+  ///
+  /// * `event_id` is the ID of the event that was scheduled with
+  ///   [`EnvoyHttpFilterConfigScheduler::commit`] to distinguish multiple scheduled events.
+  fn on_scheduled(&self, _event_id: u64) {}
 }
 
 /// The trait that corresponds to an Envoy Http filter for each stream
@@ -487,6 +494,11 @@ pub trait EnvoyHttpFilterConfig {
     name: &str,
     labels: &[&str],
   ) -> Result<EnvoyHistogramVecId, envoy_dynamic_module_type_metrics_result>;
+
+  /// Create a new implementation of the [`EnvoyHttpFilterConfigScheduler`] trait.
+  ///
+  /// This can be used to schedule an event to the main thread where the filter config is running.
+  fn new_scheduler(&self) -> Box<dyn EnvoyHttpFilterConfigScheduler>;
 }
 
 pub struct EnvoyHttpFilterConfigImpl {
@@ -611,6 +623,16 @@ impl EnvoyHttpFilterConfig for EnvoyHttpFilterConfigImpl {
       )
     })?;
     Ok(EnvoyHistogramVecId(id))
+  }
+
+  fn new_scheduler(&self) -> Box<dyn EnvoyHttpFilterConfigScheduler> {
+    unsafe {
+      let scheduler_ptr =
+        abi::envoy_dynamic_module_callback_http_filter_config_scheduler_new(self.raw_ptr);
+      Box::new(EnvoyHttpFilterConfigSchedulerImpl {
+        raw_ptr: scheduler_ptr,
+      })
+    }
   }
 }
 
@@ -2558,6 +2580,46 @@ impl EnvoyHttpFilterScheduler for Box<dyn EnvoyHttpFilterScheduler> {
   }
 }
 
+/// This represents a thread-safe object that can be used to schedule a generic event to the
+/// Envoy HTTP filter config on the main thread.
+#[automock]
+pub trait EnvoyHttpFilterConfigScheduler: Send + Sync {
+  /// Commit the scheduled event to the main thread.
+  fn commit(&self, event_id: u64);
+}
+
+struct EnvoyHttpFilterConfigSchedulerImpl {
+  raw_ptr: abi::envoy_dynamic_module_type_http_filter_config_scheduler_module_ptr,
+}
+
+unsafe impl Send for EnvoyHttpFilterConfigSchedulerImpl {}
+unsafe impl Sync for EnvoyHttpFilterConfigSchedulerImpl {}
+
+impl Drop for EnvoyHttpFilterConfigSchedulerImpl {
+  fn drop(&mut self) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_scheduler_delete(self.raw_ptr);
+    }
+  }
+}
+
+impl EnvoyHttpFilterConfigScheduler for EnvoyHttpFilterConfigSchedulerImpl {
+  fn commit(&self, event_id: u64) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_scheduler_commit(
+        self.raw_ptr,
+        event_id,
+      );
+    }
+  }
+}
+
+impl EnvoyHttpFilterConfigScheduler for Box<dyn EnvoyHttpFilterConfigScheduler> {
+  fn commit(&self, event_id: u64) {
+    (**self).commit(event_id);
+  }
+}
+
 #[no_mangle]
 unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_new(
   envoy_filter_config_ptr: abi::envoy_dynamic_module_type_http_filter_config_envoy_ptr,
@@ -2643,6 +2705,17 @@ unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_destroy(
   config_ptr: abi::envoy_dynamic_module_type_http_filter_config_module_ptr,
 ) {
   drop_wrapped_c_void_ptr!(config_ptr, HttpFilterConfig<EnvoyHttpFilterImpl>);
+}
+
+#[no_mangle]
+unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_scheduled(
+  _envoy_ptr: abi::envoy_dynamic_module_type_http_filter_config_envoy_ptr,
+  config_ptr: abi::envoy_dynamic_module_type_http_filter_config_module_ptr,
+  event_id: u64,
+) {
+  let config = config_ptr as *mut *mut dyn HttpFilterConfig<EnvoyHttpFilterImpl>;
+  let config = &**config;
+  config.on_scheduled(event_id);
 }
 
 #[no_mangle]
@@ -4752,4 +4825,352 @@ pub extern "C" fn envoy_dynamic_module_on_listener_filter_destroy(
 ) {
   let _ =
     unsafe { Box::from_raw(filter_ptr as *mut Box<dyn ListenerFilter<EnvoyListenerFilterImpl>>) };
+}
+
+// =============================================================================
+// UDP Listener Filter Support
+// =============================================================================
+
+/// Declare the init functions for the dynamic module with UDP listener filter support only.
+///
+/// The first argument has [`ProgramInitFunction`] type, and it is called when the dynamic module is
+/// loaded.
+///
+/// The second argument has [`NewUdpListenerFilterConfigFunction`] type, and it is called when the
+/// new UDP listener filter configuration is created.
+#[macro_export]
+macro_rules! declare_udp_listener_filter_init_functions {
+  ($f:ident, $new_udp_listener_filter_config_fn:expr) => {
+    #[no_mangle]
+    pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_UDP_LISTENER_FILTER_CONFIG_FUNCTION
+        .get_or_init(|| $new_udp_listener_filter_config_fn);
+      if ($f()) {
+        envoy_proxy_dynamic_modules_rust_sdk::abi::kAbiVersion.as_ptr()
+          as *const ::std::os::raw::c_char
+      } else {
+        ::std::ptr::null()
+      }
+    }
+  };
+}
+
+/// The function signature for the new UDP listener filter configuration function.
+///
+/// This is called when a new UDP listener filter configuration is created, and it must return a new
+/// [`UdpListenerFilterConfig`] object. Returning `None` will cause the filter configuration
+/// to be rejected.
+///
+/// The first argument `envoy_filter_config` is a mutable reference to an
+/// [`EnvoyUdpListenerFilterConfig`] object that provides access to Envoy operations.
+/// The second argument `name` is the name of the filter configuration as specified in the Envoy
+/// config.
+/// The third argument `config` is the raw configuration bytes.
+pub type NewUdpListenerFilterConfigFunction<EC, ELF> =
+  fn(
+    envoy_filter_config: &mut EC,
+    name: &str,
+    config: &[u8],
+  ) -> Option<Box<dyn UdpListenerFilterConfig<ELF>>>;
+
+/// The global init function for UDP listener filter configurations. This is set via the
+/// `declare_udp_listener_filter_init_functions` macro, and is not intended to be set directly.
+pub static NEW_UDP_LISTENER_FILTER_CONFIG_FUNCTION: OnceLock<
+  NewUdpListenerFilterConfigFunction<EnvoyUdpListenerFilterConfigImpl, EnvoyUdpListenerFilterImpl>,
+> = OnceLock::new();
+
+/// The trait that represents the Envoy UDP listener filter configuration.
+/// This is used in [`NewUdpListenerFilterConfigFunction`] to pass the Envoy filter configuration
+/// to the dynamic module.
+#[automock]
+pub trait EnvoyUdpListenerFilterConfig {}
+
+/// The trait that represents the configuration for an Envoy UDP listener filter configuration.
+/// This has one to one mapping with the [`EnvoyUdpListenerFilterConfig`] object.
+///
+/// The object is created when the corresponding Envoy UDP listener filter config is created, and it
+/// is dropped when the corresponding Envoy UDP listener filter config is destroyed. Therefore, the
+/// implementation is recommended to implement the [`Drop`] trait to handle the necessary cleanup.
+///
+/// Implementations must also be `Sync` since they are accessed from worker threads.
+pub trait UdpListenerFilterConfig<ELF: EnvoyUdpListenerFilter>: Sync {
+  /// This is called from a worker thread when a new UDP session/filter is created.
+  fn new_udp_listener_filter(&self, _envoy: &mut ELF) -> Box<dyn UdpListenerFilter<ELF>>;
+}
+
+/// The trait that corresponds to an Envoy UDP listener filter for each accepted connection/session
+/// created via the [`UdpListenerFilterConfig::new_udp_listener_filter`] method.
+pub trait UdpListenerFilter<ELF: EnvoyUdpListenerFilter> {
+  /// This is called when a UDP packet is received.
+  ///
+  /// This must return [`abi::envoy_dynamic_module_type_on_udp_listener_filter_status`] to
+  /// indicate the status of the data processing.
+  fn on_data(
+    &mut self,
+    _envoy_filter: &mut ELF,
+  ) -> abi::envoy_dynamic_module_type_on_udp_listener_filter_status {
+    abi::envoy_dynamic_module_type_on_udp_listener_filter_status::Continue
+  }
+}
+
+/// The trait that represents the Envoy UDP listener filter.
+/// This is used in [`UdpListenerFilter`] to interact with the underlying Envoy UDP listener filter
+/// object.
+#[automock]
+#[allow(clippy::needless_lifetimes)]
+pub trait EnvoyUdpListenerFilter {
+  /// Get the current datagram data as chunks.
+  /// Returns a tuple of (chunks, total_length).
+  fn get_datagram_data<'a>(&'a self) -> (Vec<EnvoyBuffer<'a>>, usize);
+
+  /// Set the current datagram data.
+  /// Returns true if successful.
+  fn set_datagram_data(&mut self, data: &[u8]) -> bool;
+
+  /// Get the peer address and port.
+  /// Returns None if the address is not available or not an IP address.
+  fn get_peer_address(&self) -> Option<(String, u32)>;
+
+  /// Get the local address and port.
+  /// Returns None if the address is not available or not an IP address.
+  fn get_local_address(&self) -> Option<(String, u32)>;
+
+  /// Send a datagram.
+  /// Returns true if successful.
+  fn send_datagram(&mut self, data: &[u8], peer_address: &str, peer_port: u32) -> bool;
+}
+
+/// The implementation of [`EnvoyUdpListenerFilterConfig`] for the Envoy UDP listener filter
+/// configuration.
+pub struct EnvoyUdpListenerFilterConfigImpl {
+  raw: abi::envoy_dynamic_module_type_udp_listener_filter_config_envoy_ptr,
+}
+
+impl EnvoyUdpListenerFilterConfigImpl {
+  pub fn new(raw: abi::envoy_dynamic_module_type_udp_listener_filter_config_envoy_ptr) -> Self {
+    Self { raw }
+  }
+}
+
+impl EnvoyUdpListenerFilterConfig for EnvoyUdpListenerFilterConfigImpl {}
+
+/// The implementation of [`EnvoyUdpListenerFilter`] for the Envoy UDP listener filter.
+pub struct EnvoyUdpListenerFilterImpl {
+  raw: abi::envoy_dynamic_module_type_udp_listener_filter_envoy_ptr,
+}
+
+impl EnvoyUdpListenerFilterImpl {
+  pub fn new(raw: abi::envoy_dynamic_module_type_udp_listener_filter_envoy_ptr) -> Self {
+    Self { raw }
+  }
+}
+
+impl EnvoyUdpListenerFilter for EnvoyUdpListenerFilterImpl {
+  fn get_datagram_data(&self) -> (Vec<EnvoyBuffer<'_>>, usize) {
+    let mut size: usize = 0;
+    let ok = unsafe {
+      abi::envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks_size(
+        self.raw, &mut size,
+      )
+    };
+    if !ok || size == 0 {
+      return (Vec::new(), 0);
+    }
+    let mut buffers = vec![
+      abi::envoy_dynamic_module_type_envoy_buffer {
+        ptr: std::ptr::null(),
+        length: 0,
+      };
+      size
+    ];
+    let ok = unsafe {
+      abi::envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks(
+        self.raw,
+        buffers.as_mut_ptr(),
+      )
+    };
+    if !ok {
+      return (Vec::new(), 0);
+    }
+
+    let mut total_length: usize = 0;
+    let ok_size = unsafe {
+      abi::envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_size(
+        self.raw,
+        &mut total_length,
+      )
+    };
+    if !ok_size {
+      // This shouldn't happen if chunks were retrieved, but for safety:
+      return (Vec::new(), 0);
+    }
+
+    let envoy_buffers: Vec<EnvoyBuffer> = buffers
+      .into_iter()
+      .map(|b| unsafe { EnvoyBuffer::new_from_raw(b.ptr as *const _, b.length) })
+      .collect();
+    (envoy_buffers, total_length)
+  }
+
+  fn set_datagram_data(&mut self, data: &[u8]) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_udp_listener_filter_set_datagram_data(
+        self.raw,
+        bytes_to_module_buffer(data),
+      )
+    }
+  }
+
+  fn get_peer_address(&self) -> Option<(String, u32)> {
+    let mut address = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let mut port: u32 = 0;
+    let result = unsafe {
+      abi::envoy_dynamic_module_callback_udp_listener_filter_get_peer_address(
+        self.raw,
+        &mut address as *mut _ as *mut _,
+        &mut port,
+      )
+    };
+    if !result || address.length == 0 || address.ptr.is_null() {
+      return None;
+    }
+    let address_str = unsafe {
+      std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+        address.ptr as *const _,
+        address.length,
+      ))
+    };
+    Some((address_str.to_string(), port))
+  }
+
+  fn get_local_address(&self) -> Option<(String, u32)> {
+    let mut address = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let mut port: u32 = 0;
+    let result = unsafe {
+      abi::envoy_dynamic_module_callback_udp_listener_filter_get_local_address(
+        self.raw,
+        &mut address as *mut _ as *mut _,
+        &mut port,
+      )
+    };
+    if !result || address.length == 0 || address.ptr.is_null() {
+      return None;
+    }
+    let address_str = unsafe {
+      std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+        address.ptr as *const _,
+        address.length,
+      ))
+    };
+    Some((address_str.to_string(), port))
+  }
+
+  fn send_datagram(&mut self, data: &[u8], peer_address: &str, peer_port: u32) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_udp_listener_filter_send_datagram(
+        self.raw,
+        bytes_to_module_buffer(data),
+        str_to_module_buffer(peer_address),
+        peer_port,
+      )
+    }
+  }
+}
+
+// UDP Listener Filter Event Hook Implementations
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_on_udp_listener_filter_config_new(
+  envoy_filter_config_ptr: abi::envoy_dynamic_module_type_udp_listener_filter_config_envoy_ptr,
+  name_ptr: *const i8,
+  name_size: usize,
+  config_ptr: *const i8,
+  config_size: usize,
+) -> abi::envoy_dynamic_module_type_udp_listener_filter_config_module_ptr {
+  let mut envoy_filter_config = EnvoyUdpListenerFilterConfigImpl::new(envoy_filter_config_ptr);
+  let name = unsafe {
+    std::str::from_utf8_unchecked(std::slice::from_raw_parts(name_ptr as *const _, name_size))
+  };
+  let config = unsafe { std::slice::from_raw_parts(config_ptr as *const _, config_size) };
+  init_udp_listener_filter_config(
+    &mut envoy_filter_config,
+    name,
+    config,
+    NEW_UDP_LISTENER_FILTER_CONFIG_FUNCTION
+      .get()
+      .expect("NEW_UDP_LISTENER_FILTER_CONFIG_FUNCTION must be set"),
+  )
+}
+
+fn init_udp_listener_filter_config<
+  EC: EnvoyUdpListenerFilterConfig,
+  ELF: EnvoyUdpListenerFilter,
+>(
+  envoy_filter_config: &mut EC,
+  name: &str,
+  config: &[u8],
+  new_listener_filter_config_fn: &NewUdpListenerFilterConfigFunction<EC, ELF>,
+) -> abi::envoy_dynamic_module_type_udp_listener_filter_config_module_ptr {
+  let listener_filter_config = new_listener_filter_config_fn(envoy_filter_config, name, config);
+  match listener_filter_config {
+    Some(config) => wrap_into_c_void_ptr!(config),
+    None => std::ptr::null(),
+  }
+}
+
+#[no_mangle]
+unsafe extern "C" fn envoy_dynamic_module_on_udp_listener_filter_config_destroy(
+  filter_config_ptr: abi::envoy_dynamic_module_type_udp_listener_filter_config_module_ptr,
+) {
+  drop_wrapped_c_void_ptr!(
+    filter_config_ptr,
+    UdpListenerFilterConfig<EnvoyUdpListenerFilterImpl>
+  );
+}
+
+#[no_mangle]
+unsafe extern "C" fn envoy_dynamic_module_on_udp_listener_filter_new(
+  filter_config_ptr: abi::envoy_dynamic_module_type_udp_listener_filter_config_module_ptr,
+  envoy_filter_ptr: abi::envoy_dynamic_module_type_udp_listener_filter_envoy_ptr,
+) -> abi::envoy_dynamic_module_type_udp_listener_filter_module_ptr {
+  let mut envoy_filter = EnvoyUdpListenerFilterImpl::new(envoy_filter_ptr);
+  let filter_config = {
+    let raw =
+      filter_config_ptr as *const *const dyn UdpListenerFilterConfig<EnvoyUdpListenerFilterImpl>;
+    &**raw
+  };
+  envoy_dynamic_module_on_udp_listener_filter_new_impl(&mut envoy_filter, filter_config)
+}
+
+fn envoy_dynamic_module_on_udp_listener_filter_new_impl(
+  envoy_filter: &mut EnvoyUdpListenerFilterImpl,
+  filter_config: &dyn UdpListenerFilterConfig<EnvoyUdpListenerFilterImpl>,
+) -> abi::envoy_dynamic_module_type_udp_listener_filter_module_ptr {
+  let filter = filter_config.new_udp_listener_filter(envoy_filter);
+  wrap_into_c_void_ptr!(filter)
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_on_udp_listener_filter_on_data(
+  envoy_ptr: abi::envoy_dynamic_module_type_udp_listener_filter_envoy_ptr,
+  filter_ptr: abi::envoy_dynamic_module_type_udp_listener_filter_module_ptr,
+) -> abi::envoy_dynamic_module_type_on_udp_listener_filter_status {
+  let filter = filter_ptr as *mut Box<dyn UdpListenerFilter<EnvoyUdpListenerFilterImpl>>;
+  let filter = unsafe { &mut *filter };
+  filter.on_data(&mut EnvoyUdpListenerFilterImpl::new(envoy_ptr))
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_on_udp_listener_filter_destroy(
+  filter_ptr: abi::envoy_dynamic_module_type_udp_listener_filter_module_ptr,
+) {
+  let _ = unsafe {
+    Box::from_raw(filter_ptr as *mut Box<dyn UdpListenerFilter<EnvoyUdpListenerFilterImpl>>)
+  };
 }

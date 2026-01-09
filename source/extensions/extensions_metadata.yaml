@@ -145,6 +145,13 @@ envoy.clusters.aggregate:
   status: stable
   type_urls:
   - envoy.extensions.clusters.aggregate.v3.ClusterConfig
+envoy.clusters.composite:
+  categories:
+  - envoy.clusters
+  security_posture: requires_trusted_downstream_and_upstream
+  status: stable
+  type_urls:
+  - envoy.extensions.clusters.composite.v3.ClusterConfig
 envoy.clusters.dynamic_forward_proxy:
   categories:
   - envoy.clusters
@@ -938,6 +945,13 @@ envoy.filters.udp.dns_filter:
   status: stable
   type_urls:
   - envoy.extensions.filters.udp.dns_filter.v3.DnsFilterConfig
+envoy.filters.udp_listener.dynamic_modules:
+  categories:
+  - envoy.filters.udp_listener
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.udp.dynamic_modules.v3.DynamicModuleUdpListenerFilter
 envoy.filters.udp_listener.udp_proxy:
   categories:
   - envoy.filters.udp_listener
@@ -1160,6 +1174,13 @@ envoy.path.rewrite.uri_template.uri_template_rewriter:
   undocumented: true
   type_urls:
   - envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
+envoy.quic.packet_writer.default:
+  categories:
+  - envoy.quic.client_packet_writer
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: stable
+  type_urls:
+  - envoy.extensions.quic.client_writer_factory.v3.DefaultClientWriter
 envoy.quic.proof_source.filter_chain:
   categories:
   - envoy.quic.proof_source
@@ -1474,6 +1495,15 @@ envoy.transport_sockets.internal_upstream:
   status: stable
   type_urls:
   - envoy.extensions.transport_sockets.internal_upstream.v3.InternalUpstreamTransport
+envoy.transport_sockets.quic:
+  categories:
+  - envoy.transport_sockets.downstream
+  - envoy.transport_sockets.upstream
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: stable
+  type_urls:
+  - envoy.extensions.transport_sockets.quic.v3.QuicDownstreamTransport
+  - envoy.extensions.transport_sockets.quic.v3.QuicUpstreamTransport
 envoy.transport_sockets.raw_buffer:
   categories:
   - envoy.transport_sockets.downstream

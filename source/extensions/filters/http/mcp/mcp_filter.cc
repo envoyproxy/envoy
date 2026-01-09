@@ -242,7 +242,16 @@ Http::FilterDataStatus McpFilter::completeParsing() {
   }
 
   // Set dynamic metadata
-  const auto& metadata = parser_->metadata();
+  Protobuf::Struct metadata = parser_->metadata();
+
+  // Add method group if configured
+  const std::string& group_metadata_key = config_->parserConfig().groupMetadataKey();
+  if (!group_metadata_key.empty()) {
+    std::string method_group = config_->parserConfig().getMethodGroup(parser_->getMethod());
+    (*metadata.mutable_fields())[group_metadata_key].set_string_value(method_group);
+    ENVOY_LOG(debug, "MCP filter set method group: {}={}", group_metadata_key, method_group);
+  }
+
   if (!metadata.fields().empty()) {
     decoder_callbacks_->streamInfo().setDynamicMetadata(std::string(MetadataKeys::FilterName),
                                                         metadata);

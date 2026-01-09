@@ -1,6 +1,6 @@
 # This should match the schema defined in external_deps.bzl.
 
-PROTOBUF_VERSION = "33.1"
+PROTOBUF_VERSION = "33.2"
 
 # These names of these deps *must* match the names used in `/bazel/protobuf.patch`,
 # and both must match the names from the protobuf releases (see
@@ -8,12 +8,12 @@ PROTOBUF_VERSION = "33.1"
 # The names change in upcoming versions.
 # The shas are calculated from the downloads on the releases page.
 PROTOC_VERSIONS = dict(
-    linux_aarch_64 = "6018147740548e0e0f764408c87f4cd040e6e1c1203e13aeacaf811892b604f3",
-    linux_x86_64 = "f3340e28a83d1c637d8bafdeed92b9f7db6a384c26bca880a6e5217b40a4328b",
-    linux_ppcle_64 = "01d54870bc5887fc0afc92fd809d12de73e2e8cc42095b20ea0da98b06063c95",
-    osx_aarch_64 = "db7e66ff7f9080614d0f5505a6b0ac488cf89a15621b6a361672d1332ec2e14e",
-    osx_x86_64 = "e20b5f930e886da85e7402776a4959efb1ed60c57e72794bcade765e67abaa82",
-    win64 = "d7a207fb6eec0e4b1b6613be3b7d11905375b6fd1147a071116eb8e9f24ac53b",
+    linux_aarch_64 = "706662a332683aa2fffe1c4ea61588279d31679cd42d91c7d60a69651768edb8",
+    linux_x86_64 = "b24b53f87c151bfd48b112fe4c3a6e6574e5198874f38036aff41df3456b8caf",
+    linux_ppcle_64 = "16b4a36c07daab458bc040523b1f333ddd37e1440fa71634f297a458c7fef4c4",
+    osx_aarch_64 = "5be1427127788c9f7dd7d606c3e69843dd3587327dea993917ffcb77e7234b44",
+    osx_x86_64 = "dba51cfcc85076d56e7de01a647865c5a7f995c3dce427d5215b53e50b7be43f",
+    win64 = "376770cd4073beb63db56fdd339260edb9957b3c4472e05a75f5f9ec8f98d8f5",
 )
 
 REPOSITORY_LOCATIONS_SPEC = dict(
@@ -979,11 +979,11 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         # test/common/json:gen_excluded_unicodes to recompute the ranges
         # excluded from differential fuzzing that are populated in
         # test/common/json/json_sanitizer_test_util.cc.
-        sha256 = "fda132cb0c86400381c0af1fe98bd0f775cb566cb247cdcc105e344e00acc30e",
+        sha256 = "6b6599b54c88d75904b7471f5ca34a725fa0af92e134dd1a32d5b395aa4b4ca8",
         strip_prefix = "protobuf-{version}",
         urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v{version}/protobuf-{version}.tar.gz"],
         use_category = ["dataplane_core", "controlplane"],
-        release_date = "2025-11-12",
+        release_date = "2025-12-05",
         cpe = "cpe:2.3:a:google:protobuf:*",
         license = "Protocol Buffers",
         license_url = "https://github.com/protocolbuffers/protobuf/blob/v{version}/LICENSE",
@@ -1309,12 +1309,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "QUICHE",
         project_desc = "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols",
         project_url = "https://github.com/google/quiche",
-        version = "0309bc70d3de3e8ba340c9121b0a7c71e2da64d3",
-        sha256 = "c64873a5acfaf5621fd8f5f76407628ea89b8f4947da2711a680957045009e3d",
+        version = "1eb9b26af7a84f13ee208803c4704306b2ceec9a",
+        sha256 = "35aaa73ff8eb748fd84a526730a0e4952c8810acd9532754bc773017ea732131",
         urls = ["https://github.com/google/quiche/archive/{version}.tar.gz"],
         strip_prefix = "quiche-{version}",
         use_category = ["controlplane", "dataplane_core"],
-        release_date = "2025-12-29",
+        release_date = "2026-01-07",
         cpe = "N/A",
         license = "BSD-3-Clause",
         license_url = "https://github.com/google/quiche/blob/{version}/LICENSE",
@@ -1698,6 +1698,20 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         license = "Apache-2.0",
         license_url = "https://github.com/maxmind/libmaxminddb/blob/{version}/LICENSE",
     ),
+    thrift = dict(
+        project_name = "Apache Thrift",
+        project_desc = "Apache Thrift Python library",
+        project_url = "https://thrift.apache.org/",
+        version = "0.22.0",
+        sha256 = "c4649c5879dd56c88f1e7a1c03e0fbfcc3b2a2872fb81616bffba5aa8a225a37",
+        strip_prefix = "thrift-{version}/lib/py/",
+        urls = ["https://github.com/apache/thrift/archive/refs/tags/v{version}.tar.gz"],
+        use_category = ["test_only"],
+        release_date = "2025-05-23",
+        cpe = "cpe:2.3:a:apache:thrift:*",
+        license = "Apache-2.0",
+        license_url = "https://github.com/apache/thrift/blob/v{version}/LICENSE",
+    ),
     toolchains_llvm = dict(
         project_name = "LLVM toolchain for Bazel",
         project_desc = "LLVM toolchain for Bazel",
@@ -1808,7 +1822,7 @@ def _compiled_protoc_deps(locations, versions):
             sha256 = sha,
             urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v{version}/protoc-{version}-%s.zip" % platform.replace("_", "-", 1)],
             use_category = ["dataplane_core", "controlplane"],
-            release_date = "2025-11-12",
+            release_date = "2025-12-05",
             cpe = "N/A",
             license = "Protocol Buffers",
             license_url = "https://github.com/protocolbuffers/protobuf/blob/v{version}/LICENSE",
