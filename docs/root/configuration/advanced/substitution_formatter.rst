@@ -599,7 +599,7 @@ Current supported substitution commands include:
 
   TCP/UDP
     Not implemented. It will appear as ``"-"`` in the access logs.
-  
+
 .. _config_access_log_format_upstream_detected_close_type:
 
 %UPSTREAM_DETECTED_CLOSE_TYPE%
