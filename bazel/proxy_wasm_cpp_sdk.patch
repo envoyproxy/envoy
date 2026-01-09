@@ -1,16 +1,24 @@
 diff --git a/bazel/defs.bzl b/bazel/defs.bzl
 --- a/bazel/defs.bzl
 +++ b/bazel/defs.bzl
-@@ -19,7 +19,7 @@ def _optimized_wasm_cc_binary_transition_impl(settings, attr):
-     # This fixes Abseil by not including Emscripten JS stacktraces + symbolization.
-     # TODO(martijneken): Remove after Abseil stops using this define.
-     return {
--        "//command_line_option:copt": ["-O3", "-flto", "-DSTANDALONE_WASM"],
-+        "//command_line_option:copt": ["-O3", "-DSTANDALONE_WASM"],
+@@ -20,6 +20,8 @@ def _optimized_wasm_cc_binary_transition_impl(settings, attr):
+         "//command_line_option:copt": ["-O3", "-flto", "-DSTANDALONE_WASM"],
          "//command_line_option:cxxopt": [],
          "//command_line_option:linkopt": [],
++        # LTO is not compatible with fission (split DWARF), so disable fission.
++        "//command_line_option:fission": "no",
          "//command_line_option:collect_code_coverage": False,
-@@ -103,8 +103,6 @@ def proxy_wasm_cc_binary(
+     }
+
+@@ -30,6 +32,7 @@ _optimized_wasm_cc_binary_transition = transition(
+         "//command_line_option:copt",
+         "//command_line_option:cxxopt",
+         "//command_line_option:linkopt",
++        "//command_line_option:fission",
+         "//command_line_option:collect_code_coverage",
+     ],
+ )
+@@ -103,8 +106,6 @@ def proxy_wasm_cc_binary(
              "-sEXPORTED_FUNCTIONS=_malloc",
              # Allow allocating memory past initial heap size
              "-sALLOW_MEMORY_GROWTH=1",
