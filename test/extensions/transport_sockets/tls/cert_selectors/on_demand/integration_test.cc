@@ -404,9 +404,6 @@ TEST_P(OnDemandIntegrationTest, BasicFail) {
 }
 
 TEST_P(OnDemandIntegrationTest, TwoPendingConnections) {
-  if (upstream_selector_) {
-    GTEST_SKIP() << "TODO";
-  }
   setup();
   // Queue two connections in pending state.
   auto conn1 = createClientConnection();
@@ -423,10 +420,13 @@ TEST_P(OnDemandIntegrationTest, TwoPendingConnections) {
   if (!upstream_selector_) {
     conn1->waitForUpstreamConnection();
     conn2->waitForUpstreamConnection();
+    conn1->sendAndReceiveTlsData("hello", "world");
+    conn1.reset();
+    conn2->sendAndReceiveTlsData("lorem", "ipsum");
+  } else {
+    conn1->close();
+    conn2->close();
   }
-  conn1->sendAndReceiveTlsData("hello", "world");
-  conn1.reset();
-  conn2->sendAndReceiveTlsData("lorem", "ipsum");
   EXPECT_EQ(1, test_server_->gauge(onDemandStat("cert_active"))->value());
 }
 
@@ -601,9 +601,6 @@ TEST_P(OnDemandIntegrationTest, ValidationContextUpdate) {
 }
 
 TEST_P(OnDemandIntegrationTest, ValidationContextUpdateWithPending) {
-  if (upstream_selector_) {
-    GTEST_SKIP() << "TODO";
-  }
   mtls_ = true;
   validation_sds_ = true;
   FakeStream* ca_stream = nullptr;

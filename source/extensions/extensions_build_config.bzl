@@ -610,7 +610,6 @@ EXTENSIONS = {
 
     # Certificate selectors
     "envoy.tls.certificate_selectors.on_demand_secret":                  "//source/extensions/transport_sockets/tls/cert_selectors/on_demand:config",
-    "envoy.tls.upstream_certificate_selectors.on_demand_secret":         "//source/extensions/transport_sockets/tls/cert_selectors/on_demand:config",
 
     # Certificate mappers
     "envoy.tls.certificate_mappers.filter_state_override":        "//source/extensions/transport_sockets/tls/cert_mappers/filter_state_override:config",

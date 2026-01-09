@@ -305,9 +305,7 @@ public:
     return std::make_unique<ConfigProto>();
   }
 
-  std::string name() const override {
-    return "envoy.tls.upstream_certificate_selectors.on_demand_secret";
-  }
+  std::string name() const override { return "envoy.tls.certificate_selectors.on_demand_secret"; }
 };
 
 DECLARE_FACTORY(UpstreamOnDemandTlsCertificateSelectorConfigFactory);
