@@ -234,6 +234,8 @@ public:
                             StatNameTagVector& tags) override;
   const TagVector& fixedTags() override { return tag_producer_->fixedTags(); };
 
+  void ensureOverflowStats(const ScopeStatsLimitSettings& limits);
+
 private:
   friend class ThreadLocalStoreTestingPeer;
 
@@ -458,6 +460,7 @@ private:
     const uint64_t scope_id_;
     ThreadLocalStoreImpl& parent_;
     const bool evictable_{};
+
     const ScopeStatsLimitSettings limits_;
 
   private:

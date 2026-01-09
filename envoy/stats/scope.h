@@ -29,14 +29,14 @@ using ConstScopeSharedPtr = std::shared_ptr<const Scope>;
 using ScopeSharedPtr = std::shared_ptr<Scope>;
 
 // Settings for limiting the number of counters, gauges and histograms allowed
-// in a scope.
+// in a scope. This currently only supports thread local stats.
 struct ScopeStatsLimitSettings {
-  // Max number of counters allowed in this scope.
-  absl::optional<uint64_t> max_counters = absl::nullopt;
-  // Max number of gauges allowed in this scope.
-  absl::optional<uint64_t> max_gauges = absl::nullopt;
-  // Max number of histograms allowed in this scope.
-  absl::optional<uint64_t> max_histograms = absl::nullopt;
+  // Max number of counters allowed in this scope. 0 means no limit.
+  uint32_t max_counters = 0;
+  // Max number of gauges allowed in this scope. 0 means no limit.
+  uint32_t max_gauges = 0;
+  // Max number of histograms allowed in this scope. 0 means no limit.
+  uint32_t max_histograms = 0;
 };
 
 template <class StatType> using IterateFn = std::function<bool(const RefcountPtr<StatType>&)>;
