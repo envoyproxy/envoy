@@ -48,6 +48,7 @@ message StreamToMetadata {
   }
 
   // Describes where to write a value in dynamic metadata.
+  // [#next-free-field: 6]
   message MetadataDescriptor {
     // The namespace in dynamic metadata where the key-value pair will be written.
     // If empty, defaults to "envoy.filters.http.stream_to_metadata".
@@ -96,6 +97,7 @@ message StreamToMetadata {
   }
 
   // A rule describes what value to extract from the stream and where to write it.
+  // [#next-free-field: 6]
   message Rule {
     // Specifies how to extract the value from the stream payload.
     // For SSE format with JSON payloads, use json_path selector which is applied
