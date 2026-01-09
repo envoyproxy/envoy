@@ -110,7 +110,7 @@ private:
   Stats::TimespanPtr conn_length_ms_;
   Event::TimerPtr connect_timer_;
   AsyncTcpClientCallbacks* callbacks_{};
-  StreamInfo::DetectedCloseType detected_close_{StreamInfo::DetectedCloseType::Normal};
+  StreamInfo::DetectedCloseType detected_close_{StreamInfo::DetectedCloseType::Undefined};
   bool closing_{false};
   bool connected_{false};
   bool enable_half_close_{false};
