@@ -3,14 +3,11 @@
 #include <dlfcn.h>
 
 #include <string>
-#include <vector>
 
 #include "envoy/common/exception.h"
 
 #include "source/extensions/dynamic_modules/abi.h"
 #include "source/extensions/dynamic_modules/abi_version.h"
-
-#include "absl/strings/str_split.h"
 
 namespace Envoy {
 namespace Extensions {
