@@ -42,11 +42,11 @@ protected:
   void assertStreamInfoSize(StreamInfoImpl stream_info) {
     ASSERT_TRUE(
         // with --config=docker-msan
-        sizeof(stream_info) == 712 ||
+        sizeof(stream_info) == 720 ||
         // with --config=docker-clang
         sizeof(stream_info) == 736 ||
         // with --config=docker-clang-libc++
-        sizeof(stream_info) == 688)
+        sizeof(stream_info) == 696)
         << "If adding fields to StreamInfoImpl, please check to see if you "
            "need to add them to setFromForRecreateStream or setFrom! Current size "
         << sizeof(stream_info);
@@ -380,6 +380,14 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
     stream_info.setUpstreamInfo(new_info);
     EXPECT_EQ(stream_info.upstreamInfo(), new_info);
   }
+}
+
+TEST_F(StreamInfoImplTest, CodecStreamId) {
+  StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr,
+                             FilterState::LifeSpan::FilterChain);
+  EXPECT_EQ(absl::nullopt, stream_info.codecStreamId());
+  stream_info.setCodecStreamId(12345);
+  EXPECT_EQ(12345, stream_info.codecStreamId());
 }
 
 TEST_F(StreamInfoImplTest, SetFromForRecreateStream) {

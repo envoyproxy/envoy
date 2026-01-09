@@ -61,6 +61,7 @@ TEST_F(HttpConnectionManagerImplTest, HeaderOnlyRequestAndResponse) {
   EXPECT_CALL(*codec_, dispatch(_))
       .Times(2)
       .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
+        EXPECT_CALL(response_encoder_.stream_, codecStreamId()).WillOnce(Return(54321));
         decoder_ = &conn_manager_->newStream(response_encoder_);
 
         // Test not charging stats on the second call.
@@ -71,6 +72,7 @@ TEST_F(HttpConnectionManagerImplTest, HeaderOnlyRequestAndResponse) {
         } else {
           RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
               {":authority", "host"}, {":path", "/healthcheck"}, {":method", "GET"}}};
+          EXPECT_EQ(54321, decoder_->streamInfo().codecStreamId());
           decoder_->decodeHeaders(std::move(headers), true);
         }
 
