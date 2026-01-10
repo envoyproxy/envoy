@@ -250,15 +250,12 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetResponseFlags) {
   EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_has_response_flag(
       env_ptr, envoy_dynamic_module_type_response_flag_RateLimited));
 
-  uint64_t flags = 0;
-  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_response_flags(env_ptr, &flags));
+  uint64_t flags = envoy_dynamic_module_callback_access_logger_get_response_flags(env_ptr);
   EXPECT_EQ(stream_info_.legacyResponseFlags(), flags);
 }
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetResponseFlagsNullContext) {
-  uint64_t flags = 99;
-  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_response_flags(nullptr, &flags));
-  EXPECT_EQ(0, flags);
+  EXPECT_EQ(0, envoy_dynamic_module_callback_access_logger_get_response_flags(nullptr));
 }
 
 TEST_F(DynamicModuleAccessLogAbiTest, HasResponseFlagNullContext) {
@@ -330,7 +327,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetTimingInfo) {
   void* env_ptr = createContext(log_context);
 
   envoy_dynamic_module_type_timing_info timing;
-  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_timing_info(env_ptr, &timing));
+  envoy_dynamic_module_callback_access_logger_get_timing_info(env_ptr, &timing);
 
   // At minimum, start time should be set.
   EXPECT_GE(timing.start_time_unix_ns, 0);
@@ -350,7 +347,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetTimingInfoNoDownstreamOrUpstream) {
   void* env_ptr = createContext(log_context);
 
   envoy_dynamic_module_type_timing_info timing;
-  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_timing_info(env_ptr, &timing));
+  envoy_dynamic_module_callback_access_logger_get_timing_info(env_ptr, &timing);
 
   EXPECT_EQ(-1, timing.first_downstream_tx_byte_sent_ns);
   EXPECT_EQ(-1, timing.last_downstream_tx_byte_sent_ns);
@@ -389,7 +386,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetTimingInfoWithValues) {
   void* env_ptr = createContext(log_context);
 
   envoy_dynamic_module_type_timing_info timing;
-  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_timing_info(env_ptr, &timing));
+  envoy_dynamic_module_callback_access_logger_get_timing_info(env_ptr, &timing);
 
   EXPECT_EQ(5'000'000, timing.request_complete_duration_ns); // 5 ms
   EXPECT_EQ(2'000'000, timing.first_downstream_tx_byte_sent_ns);
@@ -405,7 +402,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetBytesInfo) {
   void* env_ptr = createContext(log_context);
 
   envoy_dynamic_module_type_bytes_info bytes;
-  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_bytes_info(env_ptr, &bytes));
+  envoy_dynamic_module_callback_access_logger_get_bytes_info(env_ptr, &bytes);
 
   // These should be zeroes for our mock.
   EXPECT_EQ(0, bytes.bytes_received);
@@ -422,7 +419,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetBytesInfoWithUpstreamBytesMeter) {
   void* env_ptr = createContext(log_context);
 
   envoy_dynamic_module_type_bytes_info bytes;
-  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_bytes_info(env_ptr, &bytes));
+  envoy_dynamic_module_callback_access_logger_get_bytes_info(env_ptr, &bytes);
 
   EXPECT_EQ(123, bytes.wire_bytes_received);
   EXPECT_EQ(456, bytes.wire_bytes_sent);
@@ -508,17 +505,14 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetConnectionId) {
   Formatter::Context log_context(nullptr, nullptr, nullptr);
   void* env_ptr = createContext(log_context);
 
-  uint64_t conn_id = 0;
-  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_connection_id(env_ptr, &conn_id));
-  EXPECT_EQ(98765, conn_id);
+  EXPECT_EQ(98765, envoy_dynamic_module_callback_access_logger_get_connection_id(env_ptr));
 }
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetConnectionIdMissing) {
   Formatter::Context log_context(nullptr, nullptr, nullptr);
   void* env_ptr = createContext(log_context);
 
-  uint64_t conn_id = 1;
-  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_connection_id(env_ptr, &conn_id));
+  EXPECT_EQ(0, envoy_dynamic_module_callback_access_logger_get_connection_id(env_ptr));
 }
 
 TEST_F(DynamicModuleAccessLogAbiTest, DownstreamTlsFields) {
@@ -775,9 +769,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetConnectionInfo) {
   Formatter::Context log_context(nullptr, nullptr, nullptr);
   void* env_ptr = createContext(log_context);
 
-  uint64_t conn_id;
-  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_connection_id(env_ptr, &conn_id));
-  EXPECT_EQ(12345, conn_id);
+  EXPECT_EQ(12345, envoy_dynamic_module_callback_access_logger_get_connection_id(env_ptr));
 
   envoy_dynamic_module_type_envoy_buffer result;
   EXPECT_TRUE(
@@ -975,7 +967,6 @@ TEST_F(DynamicModuleAccessLogAbiTest, NullContextOtherGuards) {
   envoy_dynamic_module_type_envoy_http_header headers_out[1];
   envoy_dynamic_module_type_module_buffer key = {"k", 1};
   uint32_t port = 0;
-  uint64_t conn_id = 0;
   envoy_dynamic_module_type_bytes_info bytes{};
   envoy_dynamic_module_type_timing_info timing{};
 
@@ -988,9 +979,11 @@ TEST_F(DynamicModuleAccessLogAbiTest, NullContextOtherGuards) {
       envoy_dynamic_module_callback_access_logger_get_response_code_details(nullptr, &buf));
   EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_protocol(nullptr, &buf));
 
-  // These should return false for null context.
-  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_timing_info(nullptr, &timing));
-  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_bytes_info(nullptr, &bytes));
+  // These should populate structs with default values for null context.
+  envoy_dynamic_module_callback_access_logger_get_timing_info(nullptr, &timing);
+  EXPECT_EQ(-1, timing.start_time_unix_ns);
+  envoy_dynamic_module_callback_access_logger_get_bytes_info(nullptr, &bytes);
+  EXPECT_EQ(0, bytes.bytes_received);
 
   EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_route_name(nullptr, &buf));
   EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attempt_count(nullptr, nullptr));
@@ -1009,7 +1002,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, NullContextOtherGuards) {
   EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_upstream_remote_address(
       nullptr, &buf, &port));
 
-  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_connection_id(nullptr, &conn_id));
+  EXPECT_EQ(0, envoy_dynamic_module_callback_access_logger_get_connection_id(nullptr));
   EXPECT_FALSE(
       envoy_dynamic_module_callback_access_logger_get_requested_server_name(nullptr, &buf));
   EXPECT_FALSE(

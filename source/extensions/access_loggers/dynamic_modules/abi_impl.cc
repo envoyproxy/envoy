@@ -168,15 +168,13 @@ bool envoy_dynamic_module_callback_access_logger_has_response_flag(
       StreamInfo::ResponseFlag(static_cast<StreamInfo::CoreResponseFlag>(flag)));
 }
 
-bool envoy_dynamic_module_callback_access_logger_get_response_flags(
-    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr, uint64_t* flags_out) {
+uint64_t envoy_dynamic_module_callback_access_logger_get_response_flags(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr) {
   auto* context = static_cast<DynamicModuleAccessLogContext*>(logger_envoy_ptr);
   if (!context) {
-    *flags_out = 0;
-    return false;
+    return 0;
   }
-  *flags_out = context->stream_info_.legacyResponseFlags();
-  return true;
+  return context->stream_info_.legacyResponseFlags();
 }
 
 bool envoy_dynamic_module_callback_access_logger_get_protocol(
@@ -192,12 +190,21 @@ bool envoy_dynamic_module_callback_access_logger_get_protocol(
   return true;
 }
 
-bool envoy_dynamic_module_callback_access_logger_get_timing_info(
+void envoy_dynamic_module_callback_access_logger_get_timing_info(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_timing_info* timing_out) {
   auto* context = static_cast<DynamicModuleAccessLogContext*>(logger_envoy_ptr);
   if (!context) {
-    return false;
+    // Initialize all fields to -1 for invalid context.
+    timing_out->start_time_unix_ns = -1;
+    timing_out->request_complete_duration_ns = -1;
+    timing_out->first_downstream_tx_byte_sent_ns = -1;
+    timing_out->last_downstream_tx_byte_sent_ns = -1;
+    timing_out->first_upstream_tx_byte_sent_ns = -1;
+    timing_out->last_upstream_tx_byte_sent_ns = -1;
+    timing_out->first_upstream_rx_byte_received_ns = -1;
+    timing_out->last_upstream_rx_byte_received_ns = -1;
+    return;
   }
   const auto& info = context->stream_info_;
   const MonotonicTime start_time = info.startTimeMonotonic();
@@ -239,15 +246,19 @@ bool envoy_dynamic_module_callback_access_logger_get_timing_info(
     timing_out->first_upstream_rx_byte_received_ns = -1;
     timing_out->last_upstream_rx_byte_received_ns = -1;
   }
-  return true;
 }
 
-bool envoy_dynamic_module_callback_access_logger_get_bytes_info(
+void envoy_dynamic_module_callback_access_logger_get_bytes_info(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_bytes_info* bytes_out) {
   auto* context = static_cast<DynamicModuleAccessLogContext*>(logger_envoy_ptr);
   if (!context) {
-    return false;
+    // Initialize all fields to 0 for invalid context.
+    bytes_out->bytes_received = 0;
+    bytes_out->bytes_sent = 0;
+    bytes_out->wire_bytes_received = 0;
+    bytes_out->wire_bytes_sent = 0;
+    return;
   }
   const auto& info = context->stream_info_;
   bytes_out->bytes_received = info.bytesReceived();
@@ -261,7 +272,6 @@ bool envoy_dynamic_module_callback_access_logger_get_bytes_info(
     bytes_out->wire_bytes_received = 0;
     bytes_out->wire_bytes_sent = 0;
   }
-  return true;
 }
 
 bool envoy_dynamic_module_callback_access_logger_get_route_name(
@@ -452,20 +462,18 @@ bool envoy_dynamic_module_callback_access_logger_get_upstream_transport_failure_
 // Access Logger Callbacks - Connection/TLS Info
 // -----------------------------------------------------------------------------
 
-bool envoy_dynamic_module_callback_access_logger_get_connection_id(
-    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
-    uint64_t* connection_id_out) {
+uint64_t envoy_dynamic_module_callback_access_logger_get_connection_id(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr) {
   auto* context = static_cast<DynamicModuleAccessLogContext*>(logger_envoy_ptr);
   if (!context) {
-    return false;
+    return 0;
   }
 
   const auto& provider = context->stream_info_.downstreamAddressProvider();
   if (!provider.connectionID().has_value()) {
-    return false;
+    return 0;
   }
-  *connection_id_out = provider.connectionID().value();
-  return true;
+  return provider.connectionID().value();
 }
 
 bool envoy_dynamic_module_callback_access_logger_is_mtls(

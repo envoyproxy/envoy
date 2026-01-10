@@ -238,16 +238,9 @@ impl LogContext {
     }
   }
 
-  /// Get the connection ID.
-  pub fn connection_id(&self) -> Option<u64> {
-    let mut id = 0;
-    if unsafe {
-      abi::envoy_dynamic_module_callback_access_logger_get_connection_id(self.envoy_ptr, &mut id)
-    } {
-      Some(id)
-    } else {
-      None
-    }
+  /// Get the connection ID, or 0 if not available.
+  pub fn connection_id(&self) -> u64 {
+    unsafe { abi::envoy_dynamic_module_callback_access_logger_get_connection_id(self.envoy_ptr) }
   }
 
   /// Check if mTLS was used for the connection.
