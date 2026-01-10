@@ -219,6 +219,7 @@ def envoy_dependencies(skip_targets = []):
     external_http_archive("envoy_toolshed")
 
     _com_github_maxmind_libmaxminddb()
+    _thrift()
 
     external_http_archive("rules_license")
     external_http_archive("rules_pkg")
@@ -917,6 +918,15 @@ def _foreign_cc_dependencies():
         name = "rules_foreign_cc",
         patches = ["@envoy//bazel:rules_foreign_cc.patch"],
         patch_args = ["-p1"],
+    )
+
+def _thrift():
+    external_http_archive(
+        name = "thrift",
+        build_file = "@envoy//bazel/external:thrift.BUILD",
+        patches = ["@envoy//bazel:thrift.patch"],
+        patch_args = ["-p1"],
+        patch_cmds = ["mv src thrift"],
     )
 
 def _com_github_maxmind_libmaxminddb():

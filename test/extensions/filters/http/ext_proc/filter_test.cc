@@ -153,9 +153,9 @@ protected:
                                              "", is_upstream_filter, builder_, factory_context_);
     filter_ = std::make_unique<Filter>(config_, std::move(client_));
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
-    EXPECT_CALL(encoder_callbacks_, encoderBufferLimit()).WillRepeatedly(Return(BufferSize));
+    EXPECT_CALL(encoder_callbacks_, bufferLimit()).WillRepeatedly(Return(BufferSize));
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
-    EXPECT_CALL(decoder_callbacks_, decoderBufferLimit()).WillRepeatedly(Return(BufferSize));
+    EXPECT_CALL(decoder_callbacks_, bufferLimit()).WillRepeatedly(Return(BufferSize));
     HttpTestUtility::addDefaultHeaders(request_headers_);
     request_headers_.setMethod("POST");
   }
@@ -1680,7 +1680,7 @@ TEST_F(HttpFilterTest, PostFastAndBigRequestPartialBuffering) {
 
   // Now the headers response comes in. Since we are over the watermark we
   // should send the callback.
-  EXPECT_CALL(decoder_callbacks_, decoderBufferLimit()).WillRepeatedly(Return(10000));
+  EXPECT_CALL(decoder_callbacks_, bufferLimit()).WillRepeatedly(Return(10000));
   processRequestHeaders(true, absl::nullopt);
   EXPECT_CALL(decoder_callbacks_, onDecoderFilterBelowWriteBufferLowWatermark());
   EXPECT_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, false));

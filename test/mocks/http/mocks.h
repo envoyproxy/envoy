@@ -269,8 +269,8 @@ public:
   MOCK_METHOD(void, onDecoderFilterBelowWriteBufferLowWatermark, ());
   MOCK_METHOD(void, addDownstreamWatermarkCallbacks, (DownstreamWatermarkCallbacks&));
   MOCK_METHOD(void, removeDownstreamWatermarkCallbacks, (DownstreamWatermarkCallbacks&));
-  MOCK_METHOD(void, setDecoderBufferLimit, (uint64_t));
-  MOCK_METHOD(uint64_t, decoderBufferLimit, ());
+  MOCK_METHOD(void, setBufferLimit, (uint64_t));
+  MOCK_METHOD(uint64_t, bufferLimit, ());
   MOCK_METHOD(bool, recreateStream, (const ResponseHeaderMap* headers));
   MOCK_METHOD(void, sendGoAwayAndClose, (bool graceful));
   MOCK_METHOD(void, addUpstreamSocketOptions, (const Network::Socket::OptionsSharedPtr& options));
@@ -368,8 +368,8 @@ public:
   MOCK_METHOD(const ScopeTrackedObject&, scope, ());
   MOCK_METHOD(void, onEncoderFilterAboveWriteBufferHighWatermark, ());
   MOCK_METHOD(void, onEncoderFilterBelowWriteBufferLowWatermark, ());
-  MOCK_METHOD(void, setEncoderBufferLimit, (uint64_t));
-  MOCK_METHOD(uint64_t, encoderBufferLimit, ());
+  MOCK_METHOD(void, setBufferLimit, (uint64_t));
+  MOCK_METHOD(uint64_t, bufferLimit, ());
   MOCK_METHOD(void, restoreContextOnContinue, (ScopeTrackedObjectStack&));
   MOCK_METHOD(const Router::RouteSpecificFilterConfig*, mostSpecificPerFilterConfig, (), (const));
   MOCK_METHOD(Router::RouteSpecificFilterConfigs, perFilterConfigs, (), (const));

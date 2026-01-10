@@ -597,10 +597,10 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   // the buffer limit to a new larger value.
   uint64_t effective_buffer_limit = calculateEffectiveBufferLimit();
   if (effective_buffer_limit != std::numeric_limits<uint64_t>::max() &&
-      effective_buffer_limit > callbacks_->decoderBufferLimit()) {
+      effective_buffer_limit > callbacks_->bufferLimit()) {
     ENVOY_STREAM_LOG(debug, "Setting new filter manager buffer limit: {}", *callbacks_,
                      effective_buffer_limit);
-    callbacks_->setDecoderBufferLimit(effective_buffer_limit);
+    callbacks_->setBufferLimit(effective_buffer_limit);
   }
 
   // Increment the attempt count from 0 to 1 at the first upstream request.
@@ -963,7 +963,7 @@ uint64_t Filter::calculateEffectiveBufferLimit() const {
   }
 
   // If no route-level buffer limit is set, use the stream buffer limit.
-  const uint32_t current_stream_limit = callbacks_->decoderBufferLimit();
+  const uint32_t current_stream_limit = callbacks_->bufferLimit();
   if (current_stream_limit != 0) {
     return static_cast<uint64_t>(current_stream_limit);
   }
