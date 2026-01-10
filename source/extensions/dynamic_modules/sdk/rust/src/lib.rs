@@ -5432,7 +5432,10 @@ pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_destroy(
 ///
 /// impl BootstrapExtension for MyBootstrapExtension {
 ///   fn on_server_initialized(&mut self, envoy_extension: &mut dyn EnvoyBootstrapExtension) {
-///     envoy_extension.log(2, "Bootstrap extension initialized!");
+///     envoy_extension.log(
+///       abi::envoy_dynamic_module_type_log_level::Info,
+///       "Bootstrap extension initialized!",
+///     );
 ///   }
 /// }
 /// ```
