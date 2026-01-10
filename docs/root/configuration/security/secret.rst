@@ -290,8 +290,9 @@ handshake after receiving the response.
 
 A certificate obtained via the on-demand SDS is configured the same way as a regular TLS certificate
 defined in the context, e.g. all parent settings are applied. If there is a dynamic update to the
-parent TLS context, e.g. a validation context SDS update, on-demand certificates also receive it and
-get updated.
+parent TLS context, e.g. a validation context SDS update, on-demand certificate contexts also
+receive it and get updated. As a consequence, the handshake uses the latest version of the CA secret
+when resuming the handshake.
 
 On-demand SDS should be used with DELTA_GRPC to manage the deletion of the secrets from the data
 plane. A resource removal sent via the xDS response will cancel the data plane subscription for the
@@ -345,7 +346,36 @@ SDS request:
   disable_stateless_session_resumption: true
   disable_stateful_session_resumption: true
 
-The following *upstream* TLS context configuration uses the a filter state value passed from the
+The following *downstream* TLS context configuration is analogous to the one with a regular SDS TLS
+certificate, but does not block the listener from listening until the SDS response arrives. Instead,
+connections are accepted and paused during the TLS handshake, and resumed once the certificate is
+received.
+
+.. validated-code-block:: yaml
+  :type-name: envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
+
+  common_tls_context:
+    custom_tls_certificate_selector:
+      name: on-demand
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_selectors.on_demand_secret.v3.Config
+        config_source:
+          api_config_source:
+            api_type: DELTA_GRPC
+            grpc_services:
+            - envoy_grpc:
+                cluster_name: some_xds_cluster
+        certificate_mapper:
+          name: sni
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.static_name.v3.StaticName
+            name: secret_0
+        prefetch_secret_names:
+        - secret_0
+  disable_stateless_session_resumption: true
+  disable_stateful_session_resumption: true
+
+The following *upstream* TLS context configuration uses a dynamic filter state value passed from the
 downstream listener:
 
 .. validated-code-block:: yaml
@@ -368,8 +398,8 @@ downstream listener:
             "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.filter_state_override.v3.Config
             default_value: "default_secret"
 
-For the upstream filter state override, the value must be written in the downstream filter chain,
-e.g. using the following filter configuration:
+For the *upstream* filter state override configuraton above to work, the value must be written in
+the downstream filter chain, e.g. using the following filter configuration:
 
 .. validated-code-block:: yaml
   :type-name: envoy.config.listener.v3.Filter
