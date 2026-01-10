@@ -9,7 +9,6 @@
 #include "envoy/http/codes.h"
 #include "envoy/upstream/resource_manager.h"
 
-#include "source/common/common/empty_string.h"
 #include "source/common/common/matchers.h"
 #include "source/common/common/utility.h"
 #include "source/common/http/headers.h"
@@ -63,17 +62,9 @@ public:
     bool matches(const absl::optional<absl::string_view>& cookie_value) const;
 
   private:
-    struct RangeMatch {
-      int64_t start;
-      int64_t end;
-    };
-
     const std::string name_;
     const bool invert_match_;
-    const bool treat_missing_as_empty_;
-    absl::optional<bool> present_match_;
-    absl::optional<Matchers::StringMatcherImpl> string_match_;
-    absl::optional<RangeMatch> range_match_;
+    const Matchers::StringMatcherImpl string_match_;
   };
 
   using CookieMatcherPtr = std::unique_ptr<const CookieMatcher>;

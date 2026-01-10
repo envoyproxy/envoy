@@ -9522,20 +9522,9 @@ virtual_hosts:
             - name: session
               string_match:
                 exact: foo
-            - name: version
-              present_match: false
             - name: build
-              range_match:
-                start: 10
-                end: 20
-            - name: optional
               string_match:
-                exact: ""
-              treat_missing_cookie_as_empty: true
-            - name: secret
-              string_match:
-                prefix: bar
-              invert_match: true
+                prefix: "1"
         route: { cluster: cookie-cluster }
       - match:
           prefix: "/"
@@ -9548,60 +9537,47 @@ virtual_hosts:
 
   {
     auto headers = genHeaders("cookie.example.com", "/foo", "GET");
-    headers.addCopy("cookie", "session=foo; build=15; secret=baz");
+    headers.addCopy("cookie", "session=foo; build=123");
 
     EXPECT_EQ("cookie-cluster", config.route(headers, 0)->routeEntry()->clusterName());
   }
 
   {
     auto headers = genHeaders("cookie.example.com", "/foo", "GET");
-    headers.addCopy("cookie", "session=foo; version=blue; build=15; secret=baz");
+    headers.addCopy("cookie", "session=foo; build=999");
 
     EXPECT_EQ("default", config.route(headers, 0)->routeEntry()->clusterName());
   }
 
   {
     auto headers = genHeaders("cookie.example.com", "/foo", "GET");
-    headers.addCopy("cookie", "session=foo; build=5; secret=baz");
+    headers.addCopy("cookie", "session=bar; build=123");
 
     EXPECT_EQ("default", config.route(headers, 0)->routeEntry()->clusterName());
   }
 
   {
     auto headers = genHeaders("cookie.example.com", "/foo", "GET");
-    headers.addCopy("cookie", "session=foo; build=15; secret=baz");
-
-    EXPECT_EQ("cookie-cluster", config.route(headers, 0)->routeEntry()->clusterName());
-  }
-
-  {
-    auto headers = genHeaders("cookie.example.com", "/foo", "GET");
-    headers.addCopy("cookie", "session=foo; build=15; secret=barista");
+    headers.addCopy("cookie", "session=foo");
 
     EXPECT_EQ("default", config.route(headers, 0)->routeEntry()->clusterName());
   }
 }
 
-TEST_F(RouteMatcherTest, CookieMatchMissingCookie) {
+TEST_F(RouteMatcherTest, CookieMatchInvert) {
 
   const std::string yaml = R"EOF(
 virtual_hosts:
-  - name: cookie-missing
+  - name: cookie-invert
     domains: ["*"]
     routes:
       - match:
           prefix: "/"
           cookies:
-            - name: session
+            - name: blocked
               string_match:
-                exact: foo
+                exact: nope
               invert_match: true
-            - name: build
-              range_match:
-                start: 1
-                end: 3
-              invert_match: true
-              treat_missing_cookie_as_empty: true
         route: { cluster: cookie-cluster }
       - match:
           prefix: "/"
@@ -9620,9 +9596,16 @@ virtual_hosts:
 
   {
     auto headers = genHeaders("cookie.example.com", "/foo", "GET");
-    headers.addCopy("cookie", "session=foo; build=2");
+    headers.addCopy("cookie", "blocked=nope");
 
     EXPECT_EQ("default", config.route(headers, 0)->routeEntry()->clusterName());
+  }
+
+  {
+    auto headers = genHeaders("cookie.example.com", "/foo", "GET");
+    headers.addCopy("cookie", "blocked=maybe");
+
+    EXPECT_EQ("cookie-cluster", config.route(headers, 0)->routeEntry()->clusterName());
   }
 }
 

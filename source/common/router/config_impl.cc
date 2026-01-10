@@ -631,7 +631,7 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
   }
 
   for (const auto& cookie_matcher : route.match().cookies()) {
-    config_cookie_matchers_.push_back(
+    config_cookies_.push_back(
         std::make_unique<ConfigUtility::CookieMatcher>(cookie_matcher, factory_context));
   }
 
@@ -865,9 +865,9 @@ bool RouteEntryImplBase::matchRoute(const Http::RequestHeaderMap& headers,
     }
   }
 
-  if (!config_cookie_matchers_.empty()) {
+  if (!config_cookies_.empty()) {
     const auto cookies = Http::Utility::parseCookies(headers);
-    if (!ConfigUtility::matchCookies(cookies, config_cookie_matchers_)) {
+    if (!ConfigUtility::matchCookies(cookies, config_cookies_)) {
       return false;
     }
   }

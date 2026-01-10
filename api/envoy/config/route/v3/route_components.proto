@@ -2841,24 +2841,12 @@ message CookieMatcher {
   // Specifies the cookie name to evaluate.
   string name = 1 [(validate.rules).string = {min_len: 1 max_bytes: 1024}];
 
-  oneof cookie_match_specifier {
-    // Match the cookie value using :ref:`StringMatcher
-    // <envoy_v3_api_msg_type.matcher.v3.StringMatcher>` semantics.
-    type.matcher.v3.StringMatcher string_match = 2 [(validate.rules).message = {required: true}];
-
-    // Match the cookie value as an integer falling within the half-open interval ``[start, end)``.
-    type.v3.Int64Range range_match = 3 [(validate.rules).message = {required: true}];
-
-    // Match solely on the presence or absence of the cookie.
-    bool present_match = 4;
-  }
+  // Match the cookie value using :ref:`StringMatcher
+  // <envoy_v3_api_msg_type.matcher.v3.StringMatcher>` semantics.
+  type.matcher.v3.StringMatcher string_match = 2 [(validate.rules).message = {required: true}];
 
   // Invert the match result.
   bool invert_match = 5;
-
-  // If specified, for any cookie match rule, if the cookie match rule specified cookie
-  // does not exist, this cookie value will be treated as empty.
-  bool treat_missing_cookie_as_empty = 6;
 }
 
 // HTTP Internal Redirect :ref:`architecture overview <arch_overview_internal_redirects>`.
