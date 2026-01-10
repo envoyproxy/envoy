@@ -3,6 +3,7 @@ load("//test/extensions/dynamic_modules/test_data/c:test_data.bzl", "test_progra
 licenses(["notice"])  # Apache 2
 
 package(default_visibility = [
+    "//test/extensions/clusters/dynamic_modules:__pkg__",
     "//test/extensions/dynamic_modules:__pkg__",
     "//test/extensions/dynamic_modules/http:__pkg__",
     "//test/extensions/dynamic_modules/listener:__pkg__",
@@ -75,3 +76,11 @@ test_program(name = "udp_no_filter_new")
 test_program(name = "udp_no_on_data")
 
 test_program(name = "udp_no_filter_destroy")
+
+test_program(name = "cluster_no_op")
+
+test_program(name = "cluster_config_new_fail")
+
+test_program(name = "cluster_new_fail")
+
+test_program(name = "cluster_lb_new_fail")

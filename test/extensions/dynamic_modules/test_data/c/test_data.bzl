@@ -8,6 +8,7 @@ def test_program(name):
         name = _name,
         srcs = [name + ".c"],
         hdrs = [
+            "//source/extensions/clusters/dynamic_modules:abi.h",
             "//source/extensions/dynamic_modules:abi.h",
         ],
         deps = [
