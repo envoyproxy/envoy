@@ -1,8 +1,10 @@
 #pragma once
 
 #include <functional>
+#include <memory>
 
 #include "absl/strings/string_view.h"
+#include "library/cc/network_change_monitor.h"
 #include "library/cc/stream_client.h"
 #include "library/common/types/c_types.h"
 
@@ -15,12 +17,13 @@ namespace Platform {
 class StreamClient;
 using StreamClientSharedPtr = std::shared_ptr<StreamClient>;
 
-class Engine : public std::enable_shared_from_this<Engine> {
+class Engine : public std::enable_shared_from_this<Engine>, public NetworkChangeListener {
 public:
   ~Engine();
 
   std::string dumpStats();
   StreamClientSharedPtr streamClient();
+  void initializeNetworkChangeMonitor();
   void onDefaultNetworkChangeEvent(int network);
   // TODO(abeyad): Remove once migrated to onDefaultNetworkChangeEvent().
   void onDefaultNetworkChanged(int network);
@@ -43,6 +46,7 @@ private:
 
   Envoy::InternalEngine* engine_;
   StreamClientSharedPtr stream_client_;
+  std::unique_ptr<NetworkChangeMonitor> network_change_monitor_;
 };
 
 } // namespace Platform

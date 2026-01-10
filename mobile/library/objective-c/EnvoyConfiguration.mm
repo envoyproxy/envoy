@@ -86,6 +86,7 @@
                         enableDrainPostDnsRefresh:(BOOL)enableDrainPostDnsRefresh
                     enforceTrustChainVerification:(BOOL)enforceTrustChainVerification
               enablePlatformCertificateValidation:(BOOL)enablePlatformCertificateValidation
+                       enableNetworkChangeMonitor:(BOOL)enableNetworkChangeMonitor
                                    upstreamTlsSni:(nullable NSString *)upstreamTlsSni
                        respectSystemProxySettings:(BOOL)respectSystemProxySettings
     h2ConnectionKeepaliveIdleIntervalMilliseconds:
@@ -132,6 +133,7 @@
   self.enableDrainPostDnsRefresh = enableDrainPostDnsRefresh;
   self.enforceTrustChainVerification = enforceTrustChainVerification;
   self.enablePlatformCertificateValidation = enablePlatformCertificateValidation;
+  self.enableNetworkChangeMonitor = enableNetworkChangeMonitor;
   self.upstreamTlsSni = upstreamTlsSni;
   self.respectSystemProxySettings = respectSystemProxySettings;
   self.h2ConnectionKeepaliveIdleIntervalMilliseconds =
@@ -211,6 +213,7 @@
   builder.setAppId([self.appId toCXXString]);
   builder.setDeviceOs("iOS");
   builder.enablePlatformCertificatesValidation(self.enablePlatformCertificateValidation);
+  builder.enableNetworkChangeMonitor(self.enableNetworkChangeMonitor);
   builder.respectSystemProxySettings(self.respectSystemProxySettings);
   builder.enableDnsCache(self.enableDNSCache, self.dnsCacheSaveIntervalSeconds);
   if (self.dnsNumRetries >= 0) {
