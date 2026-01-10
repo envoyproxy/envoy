@@ -120,6 +120,10 @@ size_t Buffer::size() const {
 WasmResult Buffer::copyTo(WasmBase* wasm, size_t start, size_t length, uint64_t ptr_ptr,
                           uint64_t size_ptr) const {
   if (const_buffer_instance_) {
+    // Validate that the requested range is within bounds before allocating.
+    if (start + length > const_buffer_instance_->length()) {
+      return WasmResult::InvalidMemoryAccess;
+    }
     uint64_t pointer;
     auto p = wasm->allocMemory(length, &pointer);
     if (!p) {
