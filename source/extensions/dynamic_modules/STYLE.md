@@ -15,7 +15,7 @@ For all event hooks, the return type could be any reasonable type that fits the 
 
 For callbacks, the return type should be one of the following:
 - For functions that will return single simple values (`number`, `bool`, `enum`, `pointer`), and function calling never fails or zero has no difference as calling failure, return the simple type directly (e.g., `size_t`, `bool`, enum type, pointer type).
-- For functions that will return complex values (structs, arrays), or return multiple values, or need to indicate calling failure, return the value via output parameters and use a `bool` as the return type to indicate success or failure.
+- For functions that will return complex values (structs, arrays), or return multiple values, or need to indicate calling failure, return the value via output parameters and use a `bool` or `enum` as the return type to indicate success or failure.
 
 
 And for both event hooks and callbacks, follow these guidelines:
