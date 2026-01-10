@@ -51,6 +51,17 @@ message SocketOption {
     STATE_LISTENING = 2;
   }
 
+  // The `socket IP version <https://linux.die.net/man/2/socket>`_ to apply the
+  // socket option to.
+  enum SocketIpVersion {
+    // Apply the socket option to all socket IP versions.
+    SOCKET_IP_VERSION_UNSPECIFIED = 0;
+    // Apply the socket option to the IPv4 socket type.
+    SOCKET_IP_VERSION_IPV4 = 1;
+    // Apply the socket option to the IPv6 socket type.
+    SOCKET_IP_VERSION_IPV6 = 2;
+  }
+
   // The `socket type <https://linux.die.net/man/2/socket>`_ to apply the socket option to.
   // Only one field should be set. If multiple fields are set, the precedence order will determine
   // the selected one. If none of the fields is set, the socket option will be applied to all socket types.
@@ -101,6 +112,11 @@ message SocketOption {
   // Apply the socket option to the specified `socket type <https://linux.die.net/man/2/socket>`_.
   // If not specified, the socket option will be applied to all socket types.
   SocketType type = 7;
+
+  // Apply the socket option to the specified `socket Ip version
+  // <https://linux.die.net/man/2/socket>`_. If not specified, the socket option
+  // will be applied to all socket ip versions.
+  SocketIpVersion ip_version = 8;
 }
 
 message SocketOptionsOverride {
