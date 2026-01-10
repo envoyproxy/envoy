@@ -293,11 +293,11 @@ TEST_P(OnDemandIntegrationTest, BasicSuccessWithPrefetch) {
     conn->sendAndReceiveTlsData("hello", "world");
     conn.reset();
   }
-  EXPECT_EQ(1, test_server_->counter("sds.server.update_success")->value());
-  EXPECT_EQ(0, test_server_->counter("sds.server.update_rejected")->value());
   EXPECT_EQ(1, test_server_->counter(onDemandStat("cert_requested"))->value());
   EXPECT_EQ(1, test_server_->gauge(onDemandStat("cert_active"))->value());
+  test_server_->waitForCounterEq("sds.server.update_success", 1);
   test_server_->waitForCounterEq(onDemandStat("cert_updated"), 1);
+  EXPECT_EQ(0, test_server_->counter("sds.server.update_rejected")->value());
 }
 
 TEST_P(OnDemandIntegrationTest, BasicSuccessWithoutPrefetch) {
@@ -330,11 +330,11 @@ TEST_P(OnDemandIntegrationTest, BasicSuccessWithoutPrefetch) {
     conn2->sendAndReceiveTlsData("hello", "world");
     conn2.reset();
   }
-  EXPECT_EQ(1, test_server_->counter("sds.server.update_success")->value());
-  EXPECT_EQ(0, test_server_->counter("sds.server.update_rejected")->value());
   EXPECT_EQ(1, test_server_->counter(onDemandStat("cert_requested"))->value());
-  EXPECT_EQ(1, test_server_->counter(onDemandStat("cert_updated"))->value());
   EXPECT_EQ(1, test_server_->gauge(onDemandStat("cert_active"))->value());
+  test_server_->waitForCounterEq("sds.server.update_success", 1);
+  test_server_->waitForCounterEq(onDemandStat("cert_updated"), 1);
+  EXPECT_EQ(0, test_server_->counter("sds.server.update_rejected")->value());
 }
 
 TEST_P(OnDemandIntegrationTest, BasicSuccessSNI) {
@@ -356,9 +356,9 @@ TEST_P(OnDemandIntegrationTest, BasicSuccessSNI) {
   conn->waitForUpstreamConnection();
   conn->sendAndReceiveTlsData("hello", "world");
   conn.reset();
-  EXPECT_EQ(1, test_server_->counter("sds.server.update_success")->value());
-  EXPECT_EQ(0, test_server_->counter("sds.server.update_rejected")->value());
   EXPECT_EQ(1, test_server_->gauge(onDemandStat("cert_active"))->value());
+  test_server_->waitForCounterEq("sds.server.update_success", 1);
+  EXPECT_EQ(0, test_server_->counter("sds.server.update_rejected")->value());
 }
 
 TEST_P(OnDemandIntegrationTest, BasicSuccessMixed) {
