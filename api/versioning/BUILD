@@ -272,6 +272,7 @@ proto_library(
         "//envoy/extensions/load_balancing_policies/override_host/v3:pkg",
         "//envoy/extensions/load_balancing_policies/pick_first/v3:pkg",
         "//envoy/extensions/load_balancing_policies/random/v3:pkg",
+        "//envoy/extensions/load_balancing_policies/random_subsetting/v3:pkg",
         "//envoy/extensions/load_balancing_policies/ring_hash/v3:pkg",
         "//envoy/extensions/load_balancing_policies/round_robin/v3:pkg",
         "//envoy/extensions/load_balancing_policies/subset/v3:pkg",
