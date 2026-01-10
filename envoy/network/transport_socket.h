@@ -317,7 +317,7 @@ public:
   /**
    * @return the default Http11ProxyInfo if configured, or nullopt.
    */
-  virtual OptRef<const TransportSocketOptions::Http11ProxyInfo> http11ProxyInfo() const {
+  virtual OptRef<const TransportSocketOptions::Http11ProxyInfo> defaultHttp11ProxyInfo() const {
     return {};
   }
 

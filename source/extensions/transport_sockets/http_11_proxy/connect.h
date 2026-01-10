@@ -70,7 +70,7 @@ public:
                Network::TransportSocketOptionsConstSharedPtr options) const override;
 
   OptRef<const Network::TransportSocketOptions::Http11ProxyInfo>
-  http11ProxyInfo() const override {
+  defaultHttp11ProxyInfo() const override {
     if (!proxy_info_.has_value()) {
       return {};
     }

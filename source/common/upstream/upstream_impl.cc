@@ -619,8 +619,8 @@ absl::optional<Network::Address::InstanceConstSharedPtr> HostImplBase::maybeGetP
   }
 
   // Proxy address was not found in the metadata. If a default proxy address is set, return that.
-  if (socket_factory.http11ProxyInfo().has_value()) {
-    return socket_factory.http11ProxyInfo()->proxy_address;
+  if (socket_factory.defaultHttp11ProxyInfo().has_value()) {
+    return socket_factory.defaultHttp11ProxyInfo()->proxy_address;
   }
 
   return absl::nullopt;
