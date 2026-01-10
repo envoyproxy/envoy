@@ -2836,7 +2836,7 @@ message QueryParameterMatcher {
 }
 
 // Cookie matching inspects individual name/value pairs parsed from the ``Cookie`` header.
-// [#next-free-field: 7]
+// [#next-free-field: 4]
 message CookieMatcher {
   // Specifies the cookie name to evaluate.
   string name = 1 [(validate.rules).string = {min_len: 1 max_bytes: 1024}];
@@ -2846,7 +2846,7 @@ message CookieMatcher {
   type.matcher.v3.StringMatcher string_match = 2 [(validate.rules).message = {required: true}];
 
   // Invert the match result.
-  bool invert_match = 5;
+  bool invert_match = 3;
 }
 
 // HTTP Internal Redirect :ref:`architecture overview <arch_overview_internal_redirects>`.
