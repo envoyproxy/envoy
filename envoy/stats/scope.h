@@ -28,6 +28,17 @@ using TextReadoutOptConstRef = absl::optional<std::reference_wrapper<const TextR
 using ConstScopeSharedPtr = std::shared_ptr<const Scope>;
 using ScopeSharedPtr = std::shared_ptr<Scope>;
 
+// Settings for limiting the number of counters, gauges and histograms allowed
+// in a scope. This currently only supports thread local stats.
+struct ScopeStatsLimitSettings {
+  // Max number of counters allowed in this scope. 0 means no limit.
+  uint32_t max_counters = 0;
+  // Max number of gauges allowed in this scope. 0 means no limit.
+  uint32_t max_gauges = 0;
+  // Max number of histograms allowed in this scope. 0 means no limit.
+  uint32_t max_histograms = 0;
+};
+
 template <class StatType> using IterateFn = std::function<bool(const RefcountPtr<StatType>&)>;
 
 /**
@@ -73,8 +84,10 @@ public:
    * @param name supplies the scope's namespace prefix.
    * @param evictable whether unused metrics can be deleted from the scope caches. This requires
    * that the metrics are not stored by reference.
+   * @param limits metric limits for counters, gauges and histograms allowed in this scope.
    */
-  virtual ScopeSharedPtr createScope(const std::string& name, bool evictable = false) PURE;
+  virtual ScopeSharedPtr createScope(const std::string& name, bool evictable = false,
+                                     const ScopeStatsLimitSettings& limits = {}) PURE;
 
   /**
    * Allocate a new scope. NOTE: The implementation should correctly handle overlapping scopes
@@ -84,8 +97,10 @@ public:
    * @param name supplies the scope's namespace prefix.
    * @param evictable whether unused metrics can be deleted from the scope caches. This requires
    * that the metrics are not stored by reference.
+   * @param limits metric limits for counters, gauges and histograms allowed in this scope.
    */
-  virtual ScopeSharedPtr scopeFromStatName(StatName name, bool evictable = false) PURE;
+  virtual ScopeSharedPtr scopeFromStatName(StatName name, bool evictable = false,
+                                           const ScopeStatsLimitSettings& limits = {}) PURE;
 
   /**
    * Creates a Counter from the stat name. Tag extraction will be performed on the name.
