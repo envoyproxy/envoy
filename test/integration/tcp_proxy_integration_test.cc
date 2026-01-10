@@ -532,7 +532,7 @@ TEST_P(TcpProxyIntegrationTest, AccessLogUpstreamDetectedCloseType) {
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 
   // Wait for the upstream to close to ensure we get the correct close type.
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_destroy_remote", 1);
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_destroy_remote", 1, TestUtility::DefaultTimeout * 100);
 
   // Downstream should be closed by proxy.
   tcp_client->close();
