@@ -693,6 +693,10 @@ private:
   // request was incomplete at response completion, the stream is reset.
 
   const bool allow_upstream_half_close_{};
+  // Whether to call checkForDeferredClose() when zombie streams complete.
+  // This fixes a potential FD leak where connections with zombie streams in draining state
+  // would not be properly closed.
+  const bool close_connection_on_zombie_stream_complete_{};
 
   // Whether the connection manager is drained due to premature resets.
   bool drained_due_to_premature_resets_{false};
