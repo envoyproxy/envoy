@@ -438,17 +438,6 @@ private:
   bool
   validateAndClearInvalidErrorResponseAttributes(Filters::Common::ExtAuthz::ResponsePtr& response);
 
-  // Helper to check if we can add more headers to the response, respecting header limits.
-  // Returns true if we can add more headers, false if the limit has been reached.
-  bool canAddResponseHeader(Http::HeaderMap& response_headers);
-
-  // Helper to add error response headers (both set and append) to the response header map,
-  // respecting enforceResponseHeaderLimits().
-  void addErrorResponseHeaders(
-      Http::HeaderMap& response_headers,
-      const std::vector<std::pair<std::string, std::string>>& headers_to_set,
-      const std::vector<std::pair<std::string, std::string>>& headers_to_append);
-
   // Create a new gRPC client for per-route gRPC service configuration.
   Filters::Common::ExtAuthz::ClientPtr
   createPerRouteGrpcClient(const envoy::config::core::v3::GrpcService& grpc_service);
@@ -489,10 +478,8 @@ private:
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
   Http::RequestHeaderMap* request_headers_;
-  Http::HeaderVector response_headers_to_add_{};
-  Http::HeaderVector response_headers_to_set_{};
-  Http::HeaderVector response_headers_to_add_if_absent_{};
-  Http::HeaderVector response_headers_to_overwrite_if_exists_{};
+  // Ordered list of response header mutations to apply during encoding.
+  Filters::Common::ExtAuthz::HeaderMutationVector response_header_mutations_{};
   State state_{State::NotStarted};
   FilterReturn filter_return_{FilterReturn::ContinueDecoding};
   Upstream::ClusterInfoConstSharedPtr cluster_;
