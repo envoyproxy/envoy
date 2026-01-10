@@ -51,40 +51,33 @@ TEST_F(DynamicModuleAccessLogAbiTest, HeadersSizeRequestHeaders) {
   Formatter::Context log_context(&request_headers_, &response_headers_, &response_trailers_);
   void* env_ptr = createContext(log_context);
 
-  size_t size = 0;
-  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_headers_size(
-      env_ptr, envoy_dynamic_module_type_http_header_type_RequestHeader, &size));
-  EXPECT_EQ(2, size);
+  EXPECT_EQ(2, envoy_dynamic_module_callback_access_logger_get_headers_size(
+                   env_ptr, envoy_dynamic_module_type_http_header_type_RequestHeader));
 }
 
 TEST_F(DynamicModuleAccessLogAbiTest, HeadersSizeResponseHeaders) {
   Formatter::Context log_context(&request_headers_, &response_headers_, &response_trailers_);
   void* env_ptr = createContext(log_context);
 
-  size_t size = 0;
-  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_headers_size(
-      env_ptr, envoy_dynamic_module_type_http_header_type_ResponseHeader, &size));
-  EXPECT_EQ(3, size); // content-type, x-custom, x-custom.
+  // 3 headers: content-type, x-custom, x-custom.
+  EXPECT_EQ(3, envoy_dynamic_module_callback_access_logger_get_headers_size(
+                   env_ptr, envoy_dynamic_module_type_http_header_type_ResponseHeader));
 }
 
 TEST_F(DynamicModuleAccessLogAbiTest, HeadersSizeResponseTrailers) {
   Formatter::Context log_context(&request_headers_, &response_headers_, &response_trailers_);
   void* env_ptr = createContext(log_context);
 
-  size_t size = 0;
-  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_headers_size(
-      env_ptr, envoy_dynamic_module_type_http_header_type_ResponseTrailer, &size));
-  EXPECT_EQ(1, size);
+  EXPECT_EQ(1, envoy_dynamic_module_callback_access_logger_get_headers_size(
+                   env_ptr, envoy_dynamic_module_type_http_header_type_ResponseTrailer));
 }
 
 TEST_F(DynamicModuleAccessLogAbiTest, HeadersSizeNullHeaders) {
   Formatter::Context log_context(nullptr, nullptr, nullptr);
   void* env_ptr = createContext(log_context);
 
-  size_t size = 99;
-  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_headers_size(
-      env_ptr, envoy_dynamic_module_type_http_header_type_RequestHeader, &size));
-  EXPECT_EQ(0, size);
+  EXPECT_EQ(0, envoy_dynamic_module_callback_access_logger_get_headers_size(
+                   env_ptr, envoy_dynamic_module_type_http_header_type_RequestHeader));
 }
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetHeaders) {
@@ -252,15 +245,6 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetResponseFlags) {
 
   uint64_t flags = envoy_dynamic_module_callback_access_logger_get_response_flags(env_ptr);
   EXPECT_EQ(stream_info_.legacyResponseFlags(), flags);
-}
-
-TEST_F(DynamicModuleAccessLogAbiTest, GetResponseFlagsNullContext) {
-  EXPECT_EQ(0, envoy_dynamic_module_callback_access_logger_get_response_flags(nullptr));
-}
-
-TEST_F(DynamicModuleAccessLogAbiTest, HasResponseFlagNullContext) {
-  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_has_response_flag(
-      nullptr, envoy_dynamic_module_type_response_flag_NoRouteFound));
 }
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetRouteName) {
@@ -940,87 +924,6 @@ TEST_F(DynamicModuleAccessLogAbiTest, IsTraceSampled) {
 
   ON_CALL(stream_info_, traceReason()).WillByDefault(testing::Return(Tracing::Reason::Sampling));
   EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_is_trace_sampled(env_ptr));
-}
-
-// =============================================================================
-// Null Context Tests
-// =============================================================================
-
-TEST_F(DynamicModuleAccessLogAbiTest, NullContextResponseCode) {
-  uint32_t code = 0;
-  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_response_code(nullptr, &code));
-}
-
-TEST_F(DynamicModuleAccessLogAbiTest, NullContextHeadersSize) {
-  size_t size = 99;
-  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_headers_size(
-      nullptr, envoy_dynamic_module_type_http_header_type_RequestHeader, &size));
-  EXPECT_EQ(0, size);
-}
-
-TEST_F(DynamicModuleAccessLogAbiTest, NullContextIsHealthCheck) {
-  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_is_health_check(nullptr));
-}
-
-TEST_F(DynamicModuleAccessLogAbiTest, NullContextOtherGuards) {
-  envoy_dynamic_module_type_envoy_buffer buf;
-  envoy_dynamic_module_type_envoy_http_header headers_out[1];
-  envoy_dynamic_module_type_module_buffer key = {"k", 1};
-  uint32_t port = 0;
-  envoy_dynamic_module_type_bytes_info bytes{};
-  envoy_dynamic_module_type_timing_info timing{};
-
-  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_headers(
-      nullptr, //
-      envoy_dynamic_module_type_http_header_type_RequestHeader, headers_out));
-  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_header_value(
-      nullptr, envoy_dynamic_module_type_http_header_type_RequestHeader, key, &buf, 0, nullptr));
-  EXPECT_FALSE(
-      envoy_dynamic_module_callback_access_logger_get_response_code_details(nullptr, &buf));
-  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_protocol(nullptr, &buf));
-
-  // These should populate structs with default values for null context.
-  envoy_dynamic_module_callback_access_logger_get_timing_info(nullptr, &timing);
-  EXPECT_EQ(-1, timing.start_time_unix_ns);
-  envoy_dynamic_module_callback_access_logger_get_bytes_info(nullptr, &bytes);
-  EXPECT_EQ(0, bytes.bytes_received);
-
-  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_route_name(nullptr, &buf));
-  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attempt_count(nullptr, nullptr));
-
-  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_upstream_cluster(nullptr, &buf));
-  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_upstream_host(nullptr, &buf));
-  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_upstream_transport_failure_reason(
-      nullptr, &buf));
-
-  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_downstream_local_address(
-      nullptr, &buf, &port));
-  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_downstream_remote_address(
-      nullptr, &buf, &port));
-  EXPECT_FALSE(
-      envoy_dynamic_module_callback_access_logger_get_upstream_local_address(nullptr, &buf, &port));
-  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_upstream_remote_address(
-      nullptr, &buf, &port));
-
-  EXPECT_EQ(0, envoy_dynamic_module_callback_access_logger_get_connection_id(nullptr));
-  EXPECT_FALSE(
-      envoy_dynamic_module_callback_access_logger_get_requested_server_name(nullptr, &buf));
-  EXPECT_FALSE(
-      envoy_dynamic_module_callback_access_logger_get_downstream_tls_version(nullptr, &buf));
-  EXPECT_FALSE(
-      envoy_dynamic_module_callback_access_logger_get_downstream_peer_subject(nullptr, &buf));
-  EXPECT_FALSE(
-      envoy_dynamic_module_callback_access_logger_get_downstream_peer_cert_digest(nullptr, &buf));
-  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_is_mtls(nullptr));
-
-  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_request_id(nullptr, &buf));
-  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_local_reply_body(nullptr, &buf));
-  EXPECT_FALSE(
-      envoy_dynamic_module_callback_access_logger_get_dynamic_metadata(nullptr, key, key, &buf));
-  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_filter_state(nullptr, key, &buf));
-  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_trace_id(nullptr, &buf));
-  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_span_id(nullptr, &buf));
-  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_is_trace_sampled(nullptr));
 }
 
 } // namespace

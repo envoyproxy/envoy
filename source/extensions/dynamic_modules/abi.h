@@ -3727,12 +3727,11 @@ void envoy_dynamic_module_on_access_logger_flush(
  * @param logger_envoy_ptr is the pointer to the log context.
  * @param header_type is the type of header map to access. Supported types are RequestHeader,
  *        ResponseHeader, and ResponseTrailer.
- * @param size_out is the output parameter for the number of headers.
- * @return true if the header map is available, false otherwise.
+ * @return the number of headers, or 0 if the header map is not available.
  */
-bool envoy_dynamic_module_callback_access_logger_get_headers_size(
+size_t envoy_dynamic_module_callback_access_logger_get_headers_size(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
-    envoy_dynamic_module_type_http_header_type header_type, size_t* size_out);
+    envoy_dynamic_module_type_http_header_type header_type);
 
 /**
  * Get all headers from the specified header map.
