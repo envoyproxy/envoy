@@ -14,7 +14,6 @@ envoy_cc_test(
     srcs = ["sse_parser_test.cc"],
     deps = [
         "//source/common/http/sse:sse_parser_lib",
-        "//test/test_common:utility_lib",
     ],
 )
 
