@@ -76,25 +76,6 @@ logger_name: test_logger
   EXPECT_NE(nullptr, access_log);
 }
 
-TEST_F(DynamicModuleAccessLogFactoryTest, DisableBuiltinFilter) {
-  NiceMock<Server::Configuration::MockGenericFactoryContext> context;
-  const std::string yaml = R"EOF(
-dynamic_module_config:
-  name: access_log_no_op
-  do_not_close: true
-logger_name: test_logger
-disable_builtin_filter: true
-)EOF";
-
-  envoy::extensions::access_loggers::dynamic_modules::v3::DynamicModuleAccessLog proto_config;
-  TestUtility::loadFromYaml(yaml, proto_config);
-
-  // Even with a filter provided, disable_builtin_filter should ignore it.
-  auto filter = std::make_unique<NiceMock<AccessLog::MockFilter>>();
-  auto access_log = factory_.createAccessLogInstance(proto_config, std::move(filter), context, {});
-  EXPECT_NE(nullptr, access_log);
-}
-
 TEST_F(DynamicModuleAccessLogFactoryTest, InvalidModule) {
   NiceMock<Server::Configuration::MockGenericFactoryContext> context;
   const std::string yaml = R"EOF(

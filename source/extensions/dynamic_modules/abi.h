@@ -3807,10 +3807,11 @@ bool envoy_dynamic_module_callback_access_logger_has_response_flag(
  * Get all response flags as a bitmask.
  *
  * @param logger_envoy_ptr is the pointer to the log context.
- * @return bitmask of response flags.
+ * @param flags_out is the output parameter for the bitmask of response flags.
+ * @return true if the context is valid, false otherwise.
  */
-uint64_t envoy_dynamic_module_callback_access_logger_get_response_flags(
-    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+bool envoy_dynamic_module_callback_access_logger_get_response_flags(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr, uint64_t* flags_out);
 
 /**
  * Get the protocol (HTTP/1.0, HTTP/1.1, HTTP/2, HTTP/3).
@@ -3828,8 +3829,9 @@ bool envoy_dynamic_module_callback_access_logger_get_protocol(
  *
  * @param logger_envoy_ptr is the pointer to the log context.
  * @param timing_out is the output parameter for timing info.
+ * @return true if the context is valid, false otherwise.
  */
-void envoy_dynamic_module_callback_access_logger_get_timing_info(
+bool envoy_dynamic_module_callback_access_logger_get_timing_info(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_timing_info* timing_out);
 
@@ -3838,8 +3840,9 @@ void envoy_dynamic_module_callback_access_logger_get_timing_info(
  *
  * @param logger_envoy_ptr is the pointer to the log context.
  * @param bytes_out is the output parameter for byte counts.
+ * @return true if the context is valid, false otherwise.
  */
-void envoy_dynamic_module_callback_access_logger_get_bytes_info(
+bool envoy_dynamic_module_callback_access_logger_get_bytes_info(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_bytes_info* bytes_out);
 

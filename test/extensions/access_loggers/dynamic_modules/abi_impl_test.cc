@@ -250,12 +250,15 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetResponseFlags) {
   EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_has_response_flag(
       env_ptr, envoy_dynamic_module_type_response_flag_RateLimited));
 
-  uint64_t flags = envoy_dynamic_module_callback_access_logger_get_response_flags(env_ptr);
+  uint64_t flags = 0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_response_flags(env_ptr, &flags));
   EXPECT_EQ(stream_info_.legacyResponseFlags(), flags);
 }
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetResponseFlagsNullContext) {
-  EXPECT_EQ(0, envoy_dynamic_module_callback_access_logger_get_response_flags(nullptr));
+  uint64_t flags = 99;
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_response_flags(nullptr, &flags));
+  EXPECT_EQ(0, flags);
 }
 
 TEST_F(DynamicModuleAccessLogAbiTest, HasResponseFlagNullContext) {
@@ -327,7 +330,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetTimingInfo) {
   void* env_ptr = createContext(log_context);
 
   envoy_dynamic_module_type_timing_info timing;
-  envoy_dynamic_module_callback_access_logger_get_timing_info(env_ptr, &timing);
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_timing_info(env_ptr, &timing));
 
   // At minimum, start time should be set.
   EXPECT_GE(timing.start_time_unix_ns, 0);
@@ -347,7 +350,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetTimingInfoNoDownstreamOrUpstream) {
   void* env_ptr = createContext(log_context);
 
   envoy_dynamic_module_type_timing_info timing;
-  envoy_dynamic_module_callback_access_logger_get_timing_info(env_ptr, &timing);
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_timing_info(env_ptr, &timing));
 
   EXPECT_EQ(-1, timing.first_downstream_tx_byte_sent_ns);
   EXPECT_EQ(-1, timing.last_downstream_tx_byte_sent_ns);
@@ -386,7 +389,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetTimingInfoWithValues) {
   void* env_ptr = createContext(log_context);
 
   envoy_dynamic_module_type_timing_info timing;
-  envoy_dynamic_module_callback_access_logger_get_timing_info(env_ptr, &timing);
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_timing_info(env_ptr, &timing));
 
   EXPECT_EQ(5'000'000, timing.request_complete_duration_ns); // 5 ms
   EXPECT_EQ(2'000'000, timing.first_downstream_tx_byte_sent_ns);
@@ -402,7 +405,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetBytesInfo) {
   void* env_ptr = createContext(log_context);
 
   envoy_dynamic_module_type_bytes_info bytes;
-  envoy_dynamic_module_callback_access_logger_get_bytes_info(env_ptr, &bytes);
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_bytes_info(env_ptr, &bytes));
 
   // These should be zeroes for our mock.
   EXPECT_EQ(0, bytes.bytes_received);
@@ -419,7 +422,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetBytesInfoWithUpstreamBytesMeter) {
   void* env_ptr = createContext(log_context);
 
   envoy_dynamic_module_type_bytes_info bytes;
-  envoy_dynamic_module_callback_access_logger_get_bytes_info(env_ptr, &bytes);
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_bytes_info(env_ptr, &bytes));
 
   EXPECT_EQ(123, bytes.wire_bytes_received);
   EXPECT_EQ(456, bytes.wire_bytes_sent);
@@ -985,9 +988,9 @@ TEST_F(DynamicModuleAccessLogAbiTest, NullContextOtherGuards) {
       envoy_dynamic_module_callback_access_logger_get_response_code_details(nullptr, &buf));
   EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_protocol(nullptr, &buf));
 
-  // Void-returning guards should not crash.
-  envoy_dynamic_module_callback_access_logger_get_timing_info(nullptr, &timing);
-  envoy_dynamic_module_callback_access_logger_get_bytes_info(nullptr, &bytes);
+  // These should return false for null context.
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_timing_info(nullptr, &timing));
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_bytes_info(nullptr, &bytes));
 
   EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_route_name(nullptr, &buf));
   EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attempt_count(nullptr, nullptr));

@@ -168,13 +168,15 @@ bool envoy_dynamic_module_callback_access_logger_has_response_flag(
       StreamInfo::ResponseFlag(static_cast<StreamInfo::CoreResponseFlag>(flag)));
 }
 
-uint64_t envoy_dynamic_module_callback_access_logger_get_response_flags(
-    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr) {
+bool envoy_dynamic_module_callback_access_logger_get_response_flags(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr, uint64_t* flags_out) {
   auto* context = static_cast<DynamicModuleAccessLogContext*>(logger_envoy_ptr);
   if (!context) {
-    return 0;
+    *flags_out = 0;
+    return false;
   }
-  return context->stream_info_.legacyResponseFlags();
+  *flags_out = context->stream_info_.legacyResponseFlags();
+  return true;
 }
 
 bool envoy_dynamic_module_callback_access_logger_get_protocol(
@@ -190,12 +192,12 @@ bool envoy_dynamic_module_callback_access_logger_get_protocol(
   return true;
 }
 
-void envoy_dynamic_module_callback_access_logger_get_timing_info(
+bool envoy_dynamic_module_callback_access_logger_get_timing_info(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_timing_info* timing_out) {
   auto* context = static_cast<DynamicModuleAccessLogContext*>(logger_envoy_ptr);
   if (!context) {
-    return;
+    return false;
   }
   const auto& info = context->stream_info_;
   const MonotonicTime start_time = info.startTimeMonotonic();
@@ -237,14 +239,15 @@ void envoy_dynamic_module_callback_access_logger_get_timing_info(
     timing_out->first_upstream_rx_byte_received_ns = -1;
     timing_out->last_upstream_rx_byte_received_ns = -1;
   }
+  return true;
 }
 
-void envoy_dynamic_module_callback_access_logger_get_bytes_info(
+bool envoy_dynamic_module_callback_access_logger_get_bytes_info(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_bytes_info* bytes_out) {
   auto* context = static_cast<DynamicModuleAccessLogContext*>(logger_envoy_ptr);
   if (!context) {
-    return;
+    return false;
   }
   const auto& info = context->stream_info_;
   bytes_out->bytes_received = info.bytesReceived();
@@ -258,6 +261,7 @@ void envoy_dynamic_module_callback_access_logger_get_bytes_info(
     bytes_out->wire_bytes_received = 0;
     bytes_out->wire_bytes_sent = 0;
   }
+  return true;
 }
 
 bool envoy_dynamic_module_callback_access_logger_get_route_name(

@@ -73,9 +73,4 @@ message DynamicModuleAccessLog {
   //    value: "/var/log/envoy/access.log"
   //
   google.protobuf.Any logger_config = 3;
-
-  // If set to true, any builtin access log filter configured alongside this logger
-  // will be ignored. This allows the dynamic module to implement its own filtering logic.
-  // If not specified, defaults to false.
-  bool disable_builtin_filter = 4;
 }

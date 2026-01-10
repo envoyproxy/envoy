@@ -19,13 +19,6 @@ AccessLog::InstanceSharedPtr DynamicModuleAccessLogFactory::createAccessLogInsta
       const envoy::extensions::access_loggers::dynamic_modules::v3::DynamicModuleAccessLog&>(
       config, context.messageValidationVisitor());
 
-  // If disable_builtin_filter is true, we ignore the passed filter and pass nullptr
-  // to the access log instance.
-  AccessLog::FilterPtr effective_filter = std::move(filter);
-  if (proto_config.disable_builtin_filter()) {
-    effective_filter = nullptr;
-  }
-
   const auto& module_config = proto_config.dynamic_module_config();
   auto dynamic_module_or_error = Extensions::DynamicModules::newDynamicModuleByName(
       module_config.name(), module_config.do_not_close(), module_config.load_globally());
@@ -54,7 +47,7 @@ AccessLog::InstanceSharedPtr DynamicModuleAccessLogFactory::createAccessLogInsta
                          std::string(access_log_config.status().message()));
   }
 
-  return std::make_shared<DynamicModuleAccessLog>(std::move(effective_filter),
+  return std::make_shared<DynamicModuleAccessLog>(std::move(filter),
                                                   std::move(access_log_config.value()),
                                                   context.serverFactoryContext().threadLocal());
 }
