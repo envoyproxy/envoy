@@ -296,8 +296,8 @@ TEST_P(OnDemandIntegrationTest, BasicSuccessWithPrefetch) {
   EXPECT_EQ(1, test_server_->counter("sds.server.update_success")->value());
   EXPECT_EQ(0, test_server_->counter("sds.server.update_rejected")->value());
   EXPECT_EQ(1, test_server_->counter(onDemandStat("cert_requested"))->value());
-  EXPECT_EQ(1, test_server_->counter(onDemandStat("cert_updated"))->value());
   EXPECT_EQ(1, test_server_->gauge(onDemandStat("cert_active"))->value());
+  test_server_->waitForCounterEq(onDemandStat("cert_updated"), 1);
 }
 
 TEST_P(OnDemandIntegrationTest, BasicSuccessWithoutPrefetch) {
@@ -385,8 +385,8 @@ TEST_P(OnDemandIntegrationTest, BasicSuccessMixed) {
   }
   conn->sendAndReceiveTlsData("hello", "world");
   conn.reset();
-  EXPECT_EQ(1, test_server_->counter("sds.server.update_success")->value());
-  EXPECT_EQ(1, test_server_->counter("sds.server2.update_success")->value());
+  test_server_->waitForCounterEq("sds.server.update_success", 1);
+  test_server_->waitForCounterEq("sds.server2.update_success", 1);
   EXPECT_EQ(2, test_server_->gauge(onDemandStat("cert_active"))->value());
 }
 
@@ -585,7 +585,7 @@ TEST_P(OnDemandIntegrationTest, ValidationContextUpdate) {
     conn->sendAndReceiveTlsData("hello", "world");
     conn.reset();
   }
-  EXPECT_EQ(1, test_server_->counter(onDemandStat("cert_updated"))->value());
+  test_server_->waitForCounterEq(onDemandStat("cert_updated"), 1);
 
   // Send a wrong CA via validation SDS and open a new connection that fails.
   {
