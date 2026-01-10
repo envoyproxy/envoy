@@ -114,6 +114,29 @@ void verifyOpenTelemetryOutput(KeyValueList output, OpenTelemetryFormatMap expec
   }
 }
 
+// Verifies that unsupported top-level value types (e.g., bool_value) throw an exception.
+TEST(SubstitutionFormatterTest, UnsupportedValueTypeThrows) {
+  KeyValueList key_mapping;
+  auto* kv = key_mapping.add_values();
+  kv->set_key("test");
+  kv->mutable_value()->set_bool_value(true);
+
+  std::vector<Formatter::CommandParserPtr> commands;
+  EXPECT_THROW(OpenTelemetryFormatter(key_mapping, commands), EnvoyException);
+}
+
+// Verifies that unsupported array element types (e.g., int_value) throw an exception.
+TEST(SubstitutionFormatterTest, UnsupportedArrayValueTypeThrows) {
+  KeyValueList key_mapping;
+  auto* kv = key_mapping.add_values();
+  kv->set_key("test");
+  auto* array = kv->mutable_value()->mutable_array_value();
+  array->add_values()->set_int_value(42);
+
+  std::vector<Formatter::CommandParserPtr> commands;
+  EXPECT_THROW(OpenTelemetryFormatter(key_mapping, commands), EnvoyException);
+}
+
 TEST(SubstitutionFormatterTest, OpenTelemetryFormatterPlainStringTest) {
   StreamInfo::MockStreamInfo stream_info;
 

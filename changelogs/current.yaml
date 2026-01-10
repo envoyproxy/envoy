@@ -734,5 +734,19 @@ new_features:
     Adds ``%DOWNSTREAM_LOCAL_ADDRESS_ENDPOINT_ID%``, ``%DOWNSTREAM_DIRECT_LOCAL_ADDRESS_ENDPOINT_ID%``,
     and ``%UPSTREAM_REMOTE_ADDRESS_ENDPOINT_ID%`` access_log command operators to access the endpoint ID
     used to establish a connection to an internal listener.
+- area: access_log
+  change: |
+    Added support for exporting OpenTelemetry access logs via HTTP. New top-level fields
+    ``http_service``, ``grpc_service``, ``log_name``, ``buffer_flush_interval``, ``buffer_size_bytes``,
+    ``filter_state_objects_to_log``, and ``custom_tags`` provide a cleaner configuration.
+    The ``common_config`` field is deprecated but remains functional for backward compatibility.
+    See :ref:`http_service <envoy_v3_api_field_extensions.access_loggers.open_telemetry.v3.OpenTelemetryAccessLogConfig.http_service>`
+    and :ref:`grpc_service <envoy_v3_api_field_extensions.access_loggers.open_telemetry.v3.OpenTelemetryAccessLogConfig.grpc_service>`.
 
 deprecated:
+- area: access_log
+  change: |
+    The ``common_config`` field in
+    :ref:`OpenTelemetryAccessLogConfig <envoy_v3_api_msg_extensions.access_loggers.open_telemetry.v3.OpenTelemetryAccessLogConfig>`
+    is deprecated. Use ``http_service`` for HTTP transport, ``grpc_service`` for gRPC transport,
+    and ``log_name`` for the log identifier instead.
