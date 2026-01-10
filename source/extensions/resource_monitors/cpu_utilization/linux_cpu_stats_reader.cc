@@ -2,9 +2,17 @@
 
 #include <algorithm>
 #include <chrono>
+#include <sstream>
 #include <vector>
 
+#include "envoy/common/exception.h"
 #include "envoy/common/time.h"
+
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/thread.h"
+
+#include "absl/strings/numbers.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -13,8 +21,8 @@ namespace CpuUtilizationMonitor {
 
 constexpr uint64_t NUMBER_OF_CPU_TIMES_TO_PARSE =
     4; // we are interested in user, nice, system and idle times.
-constexpr uint64_t CONTAINER_MILLICORES_PER_CORE = 1000;
 
+// LinuxCpuStatsReader (Host-level CPU monitoring)
 LinuxCpuStatsReader::LinuxCpuStatsReader(const std::string& cpu_stats_filename)
     : cpu_stats_filename_(cpu_stats_filename) {}
 
@@ -23,7 +31,7 @@ CpuTimes LinuxCpuStatsReader::getCpuTimes() {
   cpu_stats_file.open(cpu_stats_filename_);
   if (!cpu_stats_file.is_open()) {
     ENVOY_LOG_MISC(error, "Can't open linux cpu stats file {}", cpu_stats_filename_);
-    return {false, 0, 0};
+    return {false, false, 0, 0, 0};
   }
 
   // The first 5 bytes should be 'cpu ' without a cpu index.
@@ -32,7 +40,7 @@ CpuTimes LinuxCpuStatsReader::getCpuTimes() {
   const std::string target = "cpu  ";
   if (!cpu_stats_file || buffer != target) {
     ENVOY_LOG_MISC(error, "Unexpected format in linux cpu stats file {}", cpu_stats_filename_);
-    return {false, 0, 0};
+    return {false, false, 0, 0, 0};
   }
 
   std::array<uint64_t, NUMBER_OF_CPU_TIMES_TO_PARSE> times;
@@ -40,7 +48,7 @@ CpuTimes LinuxCpuStatsReader::getCpuTimes() {
     cpu_stats_file >> time;
     if (!cpu_stats_file) {
       ENVOY_LOG_MISC(error, "Unexpected format in linux cpu stats file {}", cpu_stats_filename_);
-      return {false, 0, 0};
+      return {false, false, 0, 0, 0};
     }
     times[i] = time;
   }
@@ -48,52 +56,325 @@ CpuTimes LinuxCpuStatsReader::getCpuTimes() {
   uint64_t work_time, total_time;
   work_time = times[0] + times[1] + times[2]; // user + nice + system
   total_time = work_time + times[3];          // idle
-  return {true, static_cast<double>(work_time), total_time};
+  return {true, false, static_cast<double>(work_time), total_time, 0};
 }
 
-LinuxContainerCpuStatsReader::LinuxContainerCpuStatsReader(
-    TimeSource& time_source, const std::string& linux_cgroup_cpu_allocated_file,
-    const std::string& linux_cgroup_cpu_times_file)
-    : time_source_(time_source), linux_cgroup_cpu_allocated_file_(linux_cgroup_cpu_allocated_file),
-      linux_cgroup_cpu_times_file_(linux_cgroup_cpu_times_file) {}
+absl::StatusOr<double> LinuxCpuStatsReader::getUtilization() {
+  CpuTimes current_cpu_times = getCpuTimes();
 
-CpuTimes LinuxContainerCpuStatsReader::getCpuTimes() {
-  std::ifstream cpu_allocated_file, cpu_times_file;
-  double cpu_allocated_value, cpu_times_value;
-
-  cpu_allocated_file.open(linux_cgroup_cpu_allocated_file_);
-  if (!cpu_allocated_file.is_open()) {
-    ENVOY_LOG_MISC(error, "Can't open linux cpu allocated file {}",
-                   linux_cgroup_cpu_allocated_file_);
-    return {false, 0, 0};
+  if (!current_cpu_times.is_valid) {
+    return absl::InvalidArgumentError("Failed to read CPU times");
   }
 
-  cpu_times_file.open(linux_cgroup_cpu_times_file_);
-  if (!cpu_times_file.is_open()) {
-    ENVOY_LOG_MISC(error, "Can't open linux cpu usage seconds file {}",
-                   linux_cgroup_cpu_times_file_);
-    return {false, 0, 0};
+  // For the first call, initialize previous times and return 0
+  if (!previous_cpu_times_.is_valid) {
+    previous_cpu_times_ = current_cpu_times;
+    return 0.0;
   }
 
-  cpu_allocated_file >> cpu_allocated_value;
-  if (!cpu_allocated_file) {
-    ENVOY_LOG_MISC(error, "Unexpected format in linux cpu allocated file {}",
-                   linux_cgroup_cpu_allocated_file_);
-    return {false, 0, 0};
+  // Simple calculation: work_delta / total_delta
+  const double work_over_period = current_cpu_times.work_time - previous_cpu_times_.work_time;
+  const int64_t total_over_period = current_cpu_times.total_time - previous_cpu_times_.total_time;
+
+  if (work_over_period < 0 || total_over_period <= 0) {
+    return absl::InvalidArgumentError(
+        fmt::format("Erroneous CPU stats calculation. Work_over_period='{}' cannot "
+                    "be a negative number and total_over_period='{}' must be a positive number.",
+                    work_over_period, total_over_period));
   }
 
-  cpu_times_file >> cpu_times_value;
-  if (!cpu_times_file) {
-    ENVOY_LOG_MISC(error, "Unexpected format in linux cpu usage seconds file {}",
-                   linux_cgroup_cpu_times_file_);
-    return {false, 0, 0};
+  const double utilization = work_over_period / total_over_period;
+
+  // Update previous times for next call
+  previous_cpu_times_ = current_cpu_times;
+
+  return utilization;
+}
+
+// Container CPU Stats Reader
+LinuxContainerCpuStatsReader::ContainerStatsReaderPtr
+LinuxContainerCpuStatsReader::create(Filesystem::Instance& fs, TimeSource& time_source) {
+  // Check if host supports cgroup v2
+  if (CpuPaths::isV2(fs)) {
+    return std::make_unique<CgroupV2CpuStatsReader>(fs, time_source);
+  }
+
+  // Check if host supports cgroup v1
+  if (CpuPaths::isV1(fs)) {
+    return std::make_unique<CgroupV1CpuStatsReader>(fs, time_source);
+  }
+
+  throw EnvoyException("No supported cgroup CPU implementation found");
+}
+
+CgroupV1CpuStatsReader::CgroupV1CpuStatsReader(Filesystem::Instance& fs, TimeSource& time_source)
+    : LinuxContainerCpuStatsReader(fs, time_source), shares_path_(CpuPaths::V1::getSharesPath()),
+      usage_path_(CpuPaths::V1::getUsagePath()) {}
+
+CgroupV1CpuStatsReader::CgroupV1CpuStatsReader(Filesystem::Instance& fs, TimeSource& time_source,
+                                               const std::string& shares_path,
+                                               const std::string& usage_path)
+    : LinuxContainerCpuStatsReader(fs, time_source), shares_path_(shares_path),
+      usage_path_(usage_path) {}
+
+CpuTimes CgroupV1CpuStatsReader::getCpuTimes() {
+  // Read cpu.shares (cpu allocated)
+  auto shares_result = fs_.fileReadToEnd(shares_path_);
+  if (!shares_result.ok()) {
+    ENVOY_LOG(error, "Unable to read CPU shares file at {}", shares_path_);
+    return {false, false, 0, 0, 0};
+  }
+
+  // Read cpuacct.usage (cpu times)
+  auto usage_result = fs_.fileReadToEnd(usage_path_);
+  if (!usage_result.ok()) {
+    ENVOY_LOG(error, "Unable to read CPU usage file at {}", usage_path_);
+    return {false, false, 0, 0, 0};
+  }
+
+  double cpu_allocated_value;
+  if (!absl::SimpleAtod(shares_result.value(), &cpu_allocated_value)) {
+    ENVOY_LOG(error, "Failed to parse CPU shares value: {}", shares_result.value());
+    return {false, false, 0, 0, 0};
+  }
+
+  double cpu_times_value;
+  if (!absl::SimpleAtod(usage_result.value(), &cpu_times_value)) {
+    ENVOY_LOG(error, "Failed to parse CPU usage value: {}", usage_result.value());
+    return {false, false, 0, 0, 0};
+  }
+
+  if (cpu_allocated_value <= 0) {
+    ENVOY_LOG(error, "Invalid CPU shares value: {}", cpu_allocated_value);
+    return {false, false, 0, 0, 0};
   }
 
   const uint64_t current_time = std::chrono::duration_cast<std::chrono::nanoseconds>(
                                     time_source_.monotonicTime().time_since_epoch())
                                     .count();
-  return {true, (cpu_times_value * CONTAINER_MILLICORES_PER_CORE) / cpu_allocated_value,
-          current_time}; // cpu_times is in nanoseconds and cpu_allocated shares is in Millicores
+
+  // cpu_times is in nanoseconds, cpu_allocated shares is in millicores
+  const double work_time = (cpu_times_value * CONTAINER_MILLICORES_PER_CORE) / cpu_allocated_value;
+
+  ENVOY_LOG(trace, "cgroupv1 cpu_times_value: {}", cpu_times_value);
+  ENVOY_LOG(trace, "cgroupv1 cpu_allocated_value: {}", cpu_allocated_value);
+  ENVOY_LOG(trace, "cgroupv1 current_time: {}", current_time);
+
+  return {true, false, work_time, current_time, 0};
+}
+
+absl::StatusOr<double> CgroupV1CpuStatsReader::getUtilization() {
+  CpuTimes current_cpu_times = getCpuTimes();
+
+  if (!current_cpu_times.is_valid) {
+    return absl::InvalidArgumentError("Failed to read CPU times");
+  }
+
+  // For the first call, initialize previous times and return 0
+  if (!previous_cpu_times_.is_valid) {
+    previous_cpu_times_ = current_cpu_times;
+    return 0.0;
+  }
+
+  // Simple calculation: work_delta / total_delta
+  const double work_over_period = current_cpu_times.work_time - previous_cpu_times_.work_time;
+  const int64_t total_over_period = current_cpu_times.total_time - previous_cpu_times_.total_time;
+
+  if (work_over_period < 0 || total_over_period <= 0) {
+    return absl::InvalidArgumentError(
+        fmt::format("Erroneous CPU stats calculation. Work_over_period='{}' cannot "
+                    "be a negative number and total_over_period='{}' must be a positive number.",
+                    work_over_period, total_over_period));
+  }
+
+  const double utilization = work_over_period / total_over_period;
+
+  // Update previous times for next call
+  previous_cpu_times_ = current_cpu_times;
+
+  return utilization;
+}
+
+CgroupV2CpuStatsReader::CgroupV2CpuStatsReader(Filesystem::Instance& fs, TimeSource& time_source)
+    : LinuxContainerCpuStatsReader(fs, time_source), stat_path_(CpuPaths::V2::getStatPath()),
+      max_path_(CpuPaths::V2::getMaxPath()), effective_path_(CpuPaths::V2::getEffectiveCpusPath()) {
+}
+
+CgroupV2CpuStatsReader::CgroupV2CpuStatsReader(Filesystem::Instance& fs, TimeSource& time_source,
+                                               const std::string& stat_path,
+                                               const std::string& max_path,
+                                               const std::string& effective_path)
+    : LinuxContainerCpuStatsReader(fs, time_source), stat_path_(stat_path), max_path_(max_path),
+      effective_path_(effective_path) {}
+
+CpuTimes CgroupV2CpuStatsReader::getCpuTimes() {
+  // Read cpu.stat for usage_usec
+  auto stat_result = fs_.fileReadToEnd(stat_path_);
+  if (!stat_result.ok()) {
+    ENVOY_LOG(error, "Unable to read CPU stat file at {}", stat_path_);
+    return {false, true, 0, 0, 0};
+  }
+
+  // Parse usage_usec from cpu.stat
+  uint64_t usage_usec = 0;
+  bool found_usage = false;
+  std::istringstream stat_stream(stat_result.value());
+  std::string line;
+
+  while (std::getline(stat_stream, line)) {
+    if (line.rfind("usage_usec ", 0) == 0) {
+      // Line starts with "usage_usec "
+      const size_t pos = line.find_last_of(' ');
+      if (pos != std::string::npos) {
+        if (!absl::SimpleAtoi(line.substr(pos + 1), &usage_usec)) {
+          ENVOY_LOG(error, "Failed to parse usage_usec in cpu.stat file {}", stat_path_);
+          return {false, true, 0, 0, 0};
+        }
+        found_usage = true;
+      }
+      break;
+    }
+  }
+
+  if (!found_usage) {
+    ENVOY_LOG(trace, "Missing usage_usec in cpu.stat file {}", stat_path_);
+    return {false, true, 0, 0, 0};
+  }
+
+  // Read cpuset.cpus.effective
+  auto effective_result = fs_.fileReadToEnd(effective_path_);
+  if (!effective_result.ok()) {
+    ENVOY_LOG(error, "Unable to read effective CPUs file at {}", effective_path_);
+    return {false, true, 0, 0, 0};
+  }
+
+  // Parse effective CPUs (format: "0" or "0-3")
+  int N = 0;
+  std::string range_token = effective_result.value();
+  // Trim whitespace
+  range_token.erase(range_token.find_last_not_of(" \n\r\t") + 1);
+
+  const size_t dash_pos = range_token.find('-');
+  if (dash_pos == std::string::npos) {
+    // Single CPU (e.g., "0" means 1 core)
+    int single_cpu;
+    if (!absl::SimpleAtoi(range_token, &single_cpu)) {
+      ENVOY_LOG(error, "Failed to parse CPU value in {}: {}", effective_path_, range_token);
+      return {false, true, 0, 0, 0};
+    }
+    if (single_cpu < 0) {
+      ENVOY_LOG(error, "Invalid CPU value in {}: {}", effective_path_, range_token);
+      return {false, true, 0, 0, 0};
+    }
+    N = 1;
+  } else {
+    // CPU range (e.g., "0-3" means 4 cores)
+    int range_start, range_end;
+    if (!absl::SimpleAtoi(range_token.substr(0, dash_pos), &range_start) ||
+        !absl::SimpleAtoi(range_token.substr(dash_pos + 1), &range_end)) {
+      ENVOY_LOG(error, "Failed to parse CPU range in {}: {}", effective_path_, range_token);
+      return {false, true, 0, 0, 0};
+    }
+    if (range_start < 0 || range_end < range_start) {
+      ENVOY_LOG(error, "Invalid CPU range in {}: {}", effective_path_, range_token);
+      return {false, true, 0, 0, 0};
+    }
+    N = (range_end - range_start + 1);
+  }
+
+  if (N <= 0) {
+    ENVOY_LOG(error, "No CPUs found in {}", effective_path_);
+    return {false, true, 0, 0, 0};
+  }
+
+  // Read cpu.max
+  auto max_result = fs_.fileReadToEnd(max_path_);
+  if (!max_result.ok()) {
+    ENVOY_LOG(error, "Unable to read CPU max file at {}", max_path_);
+    return {false, true, 0, 0, 0};
+  }
+
+  // Parse cpu.max (format: "quota period" or "max period")
+  double effective_cores = 0;
+  std::istringstream max_stream(max_result.value());
+  std::string quota_str, period_str;
+  max_stream >> quota_str >> period_str;
+
+  if (!max_stream) {
+    ENVOY_LOG(error, "Unexpected format in cpu.max file {}", max_path_);
+    return {false, true, 0, 0, 0};
+  }
+
+  if (quota_str == "max") {
+    ENVOY_LOG(trace, "cgroupv2 max quota found, using N: {}", N);
+    effective_cores = static_cast<double>(N);
+  } else {
+    int quota, period;
+    if (!absl::SimpleAtoi(quota_str, &quota) || !absl::SimpleAtoi(period_str, &period)) {
+      ENVOY_LOG(error, "Failed to parse cpu.max values in {}: {} {}", max_path_, quota_str,
+                period_str);
+      return {false, true, 0, 0, 0};
+    }
+    if (period <= 0) {
+      ENVOY_LOG(error, "Invalid period value in {}: {}", max_path_, period_str);
+      return {false, true, 0, 0, 0};
+    }
+    const double q_cores = static_cast<double>(quota) / static_cast<double>(period);
+    effective_cores = std::min(static_cast<double>(N), q_cores);
+  }
+
+  // Convert usage from usec to match our time units
+  const double cpu_times_value_us = static_cast<double>(usage_usec);
+  const uint64_t current_time = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                    time_source_.monotonicTime().time_since_epoch())
+                                    .count();
+
+  ENVOY_LOG(trace, "cgroupv2 usage_usec: {}", usage_usec);
+  ENVOY_LOG(trace, "cgroupv2 effective_cores: {}", effective_cores);
+  ENVOY_LOG(trace, "cgroupv2 current_time: {}", current_time);
+
+  return {true, true, cpu_times_value_us, current_time, effective_cores};
+}
+
+absl::StatusOr<double> CgroupV2CpuStatsReader::getUtilization() {
+  CpuTimes current_cpu_times = getCpuTimes();
+
+  if (!current_cpu_times.is_valid) {
+    return absl::InvalidArgumentError("Failed to read CPU times");
+  }
+
+  // For the first call, initialize previous times and return 0
+  if (!previous_cpu_times_.is_valid) {
+    previous_cpu_times_ = current_cpu_times;
+    return 0.0;
+  }
+
+  // CgroupV2-specific calculation with unit conversions and effective cores
+  const double work_over_period = current_cpu_times.work_time - previous_cpu_times_.work_time;
+  const int64_t total_over_period = current_cpu_times.total_time - previous_cpu_times_.total_time;
+
+  if (work_over_period < 0 || total_over_period <= 0) {
+    return absl::InvalidArgumentError(
+        fmt::format("Erroneous CPU stats calculation. Work_over_period='{}' cannot "
+                    "be a negative number and total_over_period='{}' must be a positive number.",
+                    work_over_period, total_over_period));
+  }
+
+  // Convert nanoseconds to seconds and microseconds to seconds
+  const double total_over_period_seconds = total_over_period / 1000000000.0;
+  const double work_over_period_seconds = work_over_period / 1000000.0;
+
+  // Calculate utilization considering effective cores
+  const double utilization =
+      work_over_period_seconds / (total_over_period_seconds * current_cpu_times.effective_cores);
+
+  // Clamp to [0.0, 1.0]
+  const double clamped_utilization = std::clamp(utilization, 0.0, 1.0);
+
+  // Update previous times for next call
+  previous_cpu_times_ = current_cpu_times;
+
+  return clamped_utilization;
 }
 
 } // namespace CpuUtilizationMonitor

@@ -7,8 +7,13 @@
 #include <filesystem>
 #include <fstream>
 
+#include "envoy/common/exception.h"
+
+#include "source/common/common/fmt.h"
 #include "source/common/common/logger.h"
 
+#include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/str_split.h"
 
 namespace Envoy {
@@ -18,9 +23,11 @@ namespace CpuUtilizationMonitor {
 
 struct CpuTimes {
   bool is_valid;
+  bool is_cgroup_v2;
   double work_time; // For container cpu mode, to support normalisation of cgroup cpu usage stat per
                     // cpu core by dividing with available cpu limit
   uint64_t total_time;
+  double effective_cores; // number of effective cores available to the container
 };
 
 class CpuStatsReader {
@@ -28,6 +35,13 @@ public:
   CpuStatsReader() = default;
   virtual ~CpuStatsReader() = default;
   virtual CpuTimes getCpuTimes() PURE;
+
+  /**
+   * Performs implementation-specific calculation logic.
+   * @return StatusOr containing utilization value (0.0 to 1.0) on success,
+   *         or InvalidArgumentError if calculation fails.
+   */
+  virtual absl::StatusOr<double> getUtilization() PURE;
 };
 
 } // namespace CpuUtilizationMonitor

@@ -6,6 +6,7 @@
 #include "source/server/resource_monitor_config_impl.h"
 
 #include "test/mocks/event/mocks.h"
+#include "test/mocks/filesystem/mocks.h"
 #include "test/mocks/server/options.h"
 #include "test/test_common/environment.h"
 
@@ -18,6 +19,8 @@ namespace Extensions {
 namespace ResourceMonitors {
 namespace CpuUtilizationMonitor {
 namespace {
+
+using testing::Return;
 
 TEST(LinuxCpuStatsReader, ReadsCpuStats) {
   const std::string temp_path = TestEnvironment::temporaryPath("cpu_stats");
@@ -128,11 +131,13 @@ private:
 
 TEST_F(LinuxContainerCpuStatsReaderTest, ReadsCgroupContainerStats) {
   TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
   setCpuAllocated("2000\n");
   setCpuTimes("1000\n");
 
-  LinuxContainerCpuStatsReader container_stats_reader(test_time_source, cpuAllocatedPath(),
-                                                      cpuTimesPath());
+  // Use V1 reader directly with test-friendly constructor
+  CgroupV1CpuStatsReader container_stats_reader(api->fileSystem(), test_time_source,
+                                                cpuAllocatedPath(), cpuTimesPath());
   CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
 
   const uint64_t current_monotonic_time = std::chrono::duration_cast<std::chrono::nanoseconds>(
@@ -146,11 +151,14 @@ TEST_F(LinuxContainerCpuStatsReaderTest, ReadsCgroupContainerStats) {
 
 TEST_F(LinuxContainerCpuStatsReaderTest, CannotReadFileCpuAllocated) {
   TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
   const std::string temp_path_cpu_allocated =
       TestEnvironment::temporaryPath("container_cpu_times_not_exists");
 
-  LinuxContainerCpuStatsReader container_stats_reader(test_time_source, temp_path_cpu_allocated,
-                                                      cpuTimesPath());
+  // Pass non-existent paths for cgroup v2 files to test cgroup v1 behavior
+  const std::string nonexistent_path = TestEnvironment::temporaryPath("nonexistent");
+  CgroupV1CpuStatsReader container_stats_reader(api->fileSystem(), test_time_source,
+                                                temp_path_cpu_allocated, cpuTimesPath());
   CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
   EXPECT_FALSE(envoy_container_stats.is_valid);
   EXPECT_EQ(envoy_container_stats.work_time, 0);
@@ -159,11 +167,14 @@ TEST_F(LinuxContainerCpuStatsReaderTest, CannotReadFileCpuAllocated) {
 
 TEST_F(LinuxContainerCpuStatsReaderTest, CannotReadFileCpuTimes) {
   TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
   const std::string temp_path_cpu_times =
       TestEnvironment::temporaryPath("container_cpu_times_not_exists");
 
-  LinuxContainerCpuStatsReader container_stats_reader(test_time_source, cpuAllocatedPath(),
-                                                      temp_path_cpu_times);
+  // Pass non-existent paths for cgroup v2 files to test cgroup v1 behavior
+  const std::string nonexistent_path = TestEnvironment::temporaryPath("nonexistent");
+  CgroupV1CpuStatsReader container_stats_reader(api->fileSystem(), test_time_source,
+                                                cpuAllocatedPath(), temp_path_cpu_times);
   CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
   EXPECT_FALSE(envoy_container_stats.is_valid);
   EXPECT_EQ(envoy_container_stats.work_time, 0);
@@ -172,10 +183,13 @@ TEST_F(LinuxContainerCpuStatsReaderTest, CannotReadFileCpuTimes) {
 
 TEST_F(LinuxContainerCpuStatsReaderTest, UnexpectedFormatCpuAllocatedLine) {
   TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
   setCpuAllocated("notanumb3r\n");
 
-  LinuxContainerCpuStatsReader container_stats_reader(test_time_source, cpuAllocatedPath(),
-                                                      cpuTimesPath());
+  // Pass non-existent paths for cgroup v2 files to test cgroup v1 behavior
+  const std::string nonexistent_path = TestEnvironment::temporaryPath("nonexistent");
+  CgroupV1CpuStatsReader container_stats_reader(api->fileSystem(), test_time_source,
+                                                cpuAllocatedPath(), cpuTimesPath());
   CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
   EXPECT_FALSE(envoy_container_stats.is_valid);
   EXPECT_EQ(envoy_container_stats.work_time, 0);
@@ -184,14 +198,1247 @@ TEST_F(LinuxContainerCpuStatsReaderTest, UnexpectedFormatCpuAllocatedLine) {
 
 TEST_F(LinuxContainerCpuStatsReaderTest, UnexpectedFormatCpuTimesLine) {
   TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
   setCpuTimes("notanumb3r\n");
 
-  LinuxContainerCpuStatsReader container_stats_reader(test_time_source, cpuAllocatedPath(),
-                                                      cpuTimesPath());
+  // Pass non-existent paths for cgroup v2 files to test cgroup v1 behavior
+  const std::string nonexistent_path = TestEnvironment::temporaryPath("nonexistent");
+  CgroupV1CpuStatsReader container_stats_reader(api->fileSystem(), test_time_source,
+                                                cpuAllocatedPath(), cpuTimesPath());
   CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
   EXPECT_FALSE(envoy_container_stats.is_valid);
   EXPECT_EQ(envoy_container_stats.work_time, 0);
   EXPECT_EQ(envoy_container_stats.total_time, 0);
+}
+
+// Test: Cgroup v1 with different cpu_allocated values
+TEST_F(LinuxContainerCpuStatsReaderTest, DifferentCpuAllocatedValues) {
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  setCpuAllocated("1024\n"); // Standard value
+  setCpuTimes("5000\n");
+
+  const std::string nonexistent_path = TestEnvironment::temporaryPath("nonexistent");
+  CgroupV1CpuStatsReader container_stats_reader(api->fileSystem(), test_time_source,
+                                                cpuAllocatedPath(), cpuTimesPath());
+  CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  EXPECT_TRUE(envoy_container_stats.is_valid);
+  EXPECT_FALSE(envoy_container_stats.is_cgroup_v2);
+  // work_time = (5000 * 1000) / 1024 = 4882.8125
+  EXPECT_NEAR(envoy_container_stats.work_time, 4882.8125, 0.01);
+  EXPECT_GT(envoy_container_stats.total_time, 0);
+}
+
+// Test: Cgroup v1 with large cpu_times value
+TEST_F(LinuxContainerCpuStatsReaderTest, LargeCpuTimesValue) {
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  setCpuAllocated("2048\n");
+  setCpuTimes("999999999\n");
+
+  const std::string nonexistent_path = TestEnvironment::temporaryPath("nonexistent");
+  CgroupV1CpuStatsReader container_stats_reader(api->fileSystem(), test_time_source,
+                                                cpuAllocatedPath(), cpuTimesPath());
+  CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  EXPECT_TRUE(envoy_container_stats.is_valid);
+  EXPECT_FALSE(envoy_container_stats.is_cgroup_v2);
+  EXPECT_GT(envoy_container_stats.work_time, 0);
+}
+
+// Test: Cgroup v1 with zero cpu_times
+TEST_F(LinuxContainerCpuStatsReaderTest, ZeroCpuTimes) {
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  setCpuAllocated("2000\n");
+  setCpuTimes("0\n");
+
+  const std::string nonexistent_path = TestEnvironment::temporaryPath("nonexistent");
+  CgroupV1CpuStatsReader container_stats_reader(api->fileSystem(), test_time_source,
+                                                cpuAllocatedPath(), cpuTimesPath());
+  CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  EXPECT_TRUE(envoy_container_stats.is_valid);
+  EXPECT_FALSE(envoy_container_stats.is_cgroup_v2);
+  EXPECT_EQ(envoy_container_stats.work_time, 0);
+}
+
+// Test: Cgroup v1 with small cpu_allocated value
+TEST_F(LinuxContainerCpuStatsReaderTest, SmallCpuAllocatedValue) {
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  setCpuAllocated("512\n");
+  setCpuTimes("2000\n");
+
+  const std::string nonexistent_path = TestEnvironment::temporaryPath("nonexistent");
+  CgroupV1CpuStatsReader container_stats_reader(api->fileSystem(), test_time_source,
+                                                cpuAllocatedPath(), cpuTimesPath());
+  CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  EXPECT_TRUE(envoy_container_stats.is_valid);
+  EXPECT_FALSE(envoy_container_stats.is_cgroup_v2);
+  // work_time = (2000 * 1000) / 512 = 3906.25
+  EXPECT_NEAR(envoy_container_stats.work_time, 3906.25, 0.01);
+}
+
+// Test: Cgroup v1 with very large cpu_allocated value
+TEST_F(LinuxContainerCpuStatsReaderTest, VeryLargeCpuAllocatedValue) {
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  setCpuAllocated("102400\n"); // 100x the default
+  setCpuTimes("10000\n");
+
+  const std::string nonexistent_path = TestEnvironment::temporaryPath("nonexistent");
+  CgroupV1CpuStatsReader container_stats_reader(api->fileSystem(), test_time_source,
+                                                cpuAllocatedPath(), cpuTimesPath());
+  CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  EXPECT_TRUE(envoy_container_stats.is_valid);
+  EXPECT_FALSE(envoy_container_stats.is_cgroup_v2);
+  EXPECT_GT(envoy_container_stats.work_time, 0);
+}
+
+// Test fixture for cgroup v2 tests
+class LinuxContainerCpuStatsReaderV2Test : public testing::Test {
+public:
+  LinuxContainerCpuStatsReaderV2Test()
+      : api_(Api::createApiForTest()),
+        context_(dispatcher_, options_, *api_, ProtobufMessage::getStrictValidationVisitor()),
+        v2_cpu_stat_path_(TestEnvironment::temporaryPath("cgroupv2_cpu_stat")),
+        v2_cpu_max_path_(TestEnvironment::temporaryPath("cgroupv2_cpu_max")),
+        v2_cpu_effective_path_(TestEnvironment::temporaryPath("cgroupv2_cpu_effective")),
+        v1_cpu_allocated_path_(TestEnvironment::temporaryPath("cgroupv1_cpu_allocated")),
+        v1_cpu_times_path_(TestEnvironment::temporaryPath("cgroupv1_cpu_times")) {}
+
+  TimeSource& timeSource() { return context_.api().timeSource(); }
+
+  const std::string& v2CpuStatPath() const { return v2_cpu_stat_path_; }
+  void setV2CpuStat(const std::string& contents) {
+    AtomicFileUpdater file(v2CpuStatPath());
+    file.update(contents);
+  }
+
+  const std::string& v2CpuMaxPath() const { return v2_cpu_max_path_; }
+  void setV2CpuMax(const std::string& contents) {
+    AtomicFileUpdater file(v2CpuMaxPath());
+    file.update(contents);
+  }
+
+  const std::string& v2CpuEffectivePath() const { return v2_cpu_effective_path_; }
+  void setV2CpuEffective(const std::string& contents) {
+    AtomicFileUpdater file(v2CpuEffectivePath());
+    file.update(contents);
+  }
+
+  const std::string& v1CpuAllocatedPath() const { return v1_cpu_allocated_path_; }
+  const std::string& v1CpuTimesPath() const { return v1_cpu_times_path_; }
+
+private:
+  Event::MockDispatcher dispatcher_;
+  Api::ApiPtr api_;
+  Server::MockOptions options_;
+  Server::Configuration::ResourceMonitorFactoryContextImpl context_;
+  std::string v2_cpu_stat_path_;
+  std::string v2_cpu_max_path_;
+  std::string v2_cpu_effective_path_;
+  std::string v1_cpu_allocated_path_;
+  std::string v1_cpu_times_path_;
+};
+
+// Test: Happy path - all v2 files properly formatted with CPU range
+TEST_F(LinuxContainerCpuStatsReaderV2Test, ReadsCgroupV2StatsWithCpuRange) {
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  // Set up cgroup v2 files
+  setV2CpuStat("usage_usec 500000\nuser_usec 300000\nsystem_usec 200000\n");
+  setV2CpuMax("200000 100000\n"); // quota=200000, period=100000 => 2.0 cores
+  setV2CpuEffective("0-3\n");     // 4 cores available
+
+  CgroupV2CpuStatsReader container_stats_reader(
+      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
+  CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  EXPECT_TRUE(envoy_container_stats.is_valid);
+  EXPECT_TRUE(envoy_container_stats.is_cgroup_v2);
+  EXPECT_EQ(envoy_container_stats.work_time, 500000); // usage_usec
+  EXPECT_GT(envoy_container_stats.total_time, 0);
+  EXPECT_DOUBLE_EQ(envoy_container_stats.effective_cores, 2.0); // min(4, 200000/100000)
+}
+
+// Test: Happy path - all v2 files with single CPU
+TEST_F(LinuxContainerCpuStatsReaderV2Test, ReadsCgroupV2StatsWithSingleCpu) {
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  setV2CpuStat("usage_usec 750000\n");
+  setV2CpuMax("50000 100000\n"); // quota=50000, period=100000 => 0.5 cores
+  setV2CpuEffective("0\n");      // 1 core available
+
+  CgroupV2CpuStatsReader container_stats_reader(
+      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
+  CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  EXPECT_TRUE(envoy_container_stats.is_valid);
+  EXPECT_TRUE(envoy_container_stats.is_cgroup_v2);
+  EXPECT_EQ(envoy_container_stats.work_time, 750000);
+  EXPECT_DOUBLE_EQ(envoy_container_stats.effective_cores, 0.5); // min(1, 0.5)
+}
+
+// Test: "max" quota means no CPU limit
+TEST_F(LinuxContainerCpuStatsReaderV2Test, ReadsCgroupV2StatsWithMaxQuota) {
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  setV2CpuStat("usage_usec 1000000\n");
+  setV2CpuMax("max 100000\n"); // No CPU limit
+  setV2CpuEffective("0-7\n");  // 8 cores available
+
+  CgroupV2CpuStatsReader container_stats_reader(
+      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
+  CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  EXPECT_TRUE(envoy_container_stats.is_valid);
+  EXPECT_TRUE(envoy_container_stats.is_cgroup_v2);
+  EXPECT_EQ(envoy_container_stats.work_time, 1000000);
+  EXPECT_DOUBLE_EQ(envoy_container_stats.effective_cores, 8.0); // No quota limit, use N
+}
+
+// Test: Large CPU range
+TEST_F(LinuxContainerCpuStatsReaderV2Test, ReadsCgroupV2StatsWithLargeCpuRange) {
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  setV2CpuStat("usage_usec 2000000\n");
+  setV2CpuMax("1600000 100000\n"); // quota=1600000, period=100000 => 16.0 cores
+  setV2CpuEffective("0-31\n");     // 32 cores available
+
+  CgroupV2CpuStatsReader container_stats_reader(
+      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
+  CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  EXPECT_TRUE(envoy_container_stats.is_valid);
+  EXPECT_TRUE(envoy_container_stats.is_cgroup_v2);
+  EXPECT_DOUBLE_EQ(envoy_container_stats.effective_cores, 16.0); // min(32, 16)
+}
+
+// Test: Missing usage_usec in cpu.stat
+TEST_F(LinuxContainerCpuStatsReaderV2Test, MissingUsageUsecInCpuStat) {
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  setV2CpuStat("user_usec 300000\nsystem_usec 200000\n"); // No usage_usec
+  setV2CpuMax("200000 100000\n");
+  setV2CpuEffective("0-3\n");
+
+  CgroupV2CpuStatsReader container_stats_reader(
+      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
+  CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  EXPECT_FALSE(envoy_container_stats.is_valid);
+  EXPECT_TRUE(envoy_container_stats.is_cgroup_v2);
+}
+
+// Test: Invalid numeric format in usage_usec
+TEST_F(LinuxContainerCpuStatsReaderV2Test, InvalidUsageUsecFormat) {
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  setV2CpuStat("usage_usec notanumber\n");
+  setV2CpuMax("200000 100000\n");
+  setV2CpuEffective("0-3\n");
+
+  CgroupV2CpuStatsReader container_stats_reader(
+      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
+  CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  EXPECT_FALSE(envoy_container_stats.is_valid);
+  EXPECT_TRUE(envoy_container_stats.is_cgroup_v2);
+}
+
+// Test: Invalid CPU value (negative) in cpuset.cpus.effective
+TEST_F(LinuxContainerCpuStatsReaderV2Test, InvalidNegativeCpuValue) {
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  setV2CpuStat("usage_usec 500000\n");
+  setV2CpuMax("200000 100000\n");
+  setV2CpuEffective("-1\n"); // Invalid negative CPU
+
+  CgroupV2CpuStatsReader container_stats_reader(
+      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
+  CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  EXPECT_FALSE(envoy_container_stats.is_valid);
+  EXPECT_TRUE(envoy_container_stats.is_cgroup_v2);
+}
+
+// Test: Invalid CPU range (start > end) in cpuset.cpus.effective
+TEST_F(LinuxContainerCpuStatsReaderV2Test, InvalidCpuRangeStartGreaterThanEnd) {
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  setV2CpuStat("usage_usec 500000\n");
+  setV2CpuMax("200000 100000\n");
+  setV2CpuEffective("5-2\n"); // Invalid range: start > end
+
+  CgroupV2CpuStatsReader container_stats_reader(
+      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
+  CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  EXPECT_FALSE(envoy_container_stats.is_valid);
+  EXPECT_TRUE(envoy_container_stats.is_cgroup_v2);
+}
+
+// Test: Invalid CPU range (negative start) in cpuset.cpus.effective
+TEST_F(LinuxContainerCpuStatsReaderV2Test, InvalidCpuRangeNegativeStart) {
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  setV2CpuStat("usage_usec 500000\n");
+  setV2CpuMax("200000 100000\n");
+  setV2CpuEffective("-1-3\n"); // Invalid range: negative start
+
+  CgroupV2CpuStatsReader container_stats_reader(
+      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
+  CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  EXPECT_FALSE(envoy_container_stats.is_valid);
+  EXPECT_TRUE(envoy_container_stats.is_cgroup_v2);
+}
+
+// Test: Invalid numeric format in cpuset.cpus.effective
+TEST_F(LinuxContainerCpuStatsReaderV2Test, InvalidCpuEffectiveFormat) {
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  setV2CpuStat("usage_usec 500000\n");
+  setV2CpuMax("200000 100000\n");
+  setV2CpuEffective("notanumber\n");
+
+  CgroupV2CpuStatsReader container_stats_reader(
+      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
+  CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  EXPECT_FALSE(envoy_container_stats.is_valid);
+  EXPECT_TRUE(envoy_container_stats.is_cgroup_v2);
+}
+
+// Test: Empty cpuset.cpus.effective file
+TEST_F(LinuxContainerCpuStatsReaderV2Test, EmptyCpuEffectiveFile) {
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  setV2CpuStat("usage_usec 500000\n");
+  setV2CpuMax("200000 100000\n");
+  setV2CpuEffective(""); // Empty file
+
+  CgroupV2CpuStatsReader container_stats_reader(
+      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
+  CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  EXPECT_FALSE(envoy_container_stats.is_valid);
+  EXPECT_TRUE(envoy_container_stats.is_cgroup_v2);
+}
+
+// Test: Invalid period value (zero) in cpu.max
+TEST_F(LinuxContainerCpuStatsReaderV2Test, InvalidZeroPeriodInCpuMax) {
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  setV2CpuStat("usage_usec 500000\n");
+  setV2CpuMax("200000 0\n"); // Invalid period: 0
+  setV2CpuEffective("0-3\n");
+
+  CgroupV2CpuStatsReader container_stats_reader(
+      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
+  CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  EXPECT_FALSE(envoy_container_stats.is_valid);
+  EXPECT_TRUE(envoy_container_stats.is_cgroup_v2);
+}
+
+// Test: Invalid period value (negative) in cpu.max
+TEST_F(LinuxContainerCpuStatsReaderV2Test, InvalidNegativePeriodInCpuMax) {
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  setV2CpuStat("usage_usec 500000\n");
+  setV2CpuMax("200000 -100\n"); // Invalid period: negative
+  setV2CpuEffective("0-3\n");
+
+  CgroupV2CpuStatsReader container_stats_reader(
+      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
+  CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  EXPECT_FALSE(envoy_container_stats.is_valid);
+  EXPECT_TRUE(envoy_container_stats.is_cgroup_v2);
+}
+
+// Test: Invalid numeric format in cpu.max quota
+TEST_F(LinuxContainerCpuStatsReaderV2Test, InvalidQuotaFormatInCpuMax) {
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  setV2CpuStat("usage_usec 500000\n");
+  setV2CpuMax("notanumber 100000\n");
+  setV2CpuEffective("0-3\n");
+
+  CgroupV2CpuStatsReader container_stats_reader(
+      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
+  CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  EXPECT_FALSE(envoy_container_stats.is_valid);
+  EXPECT_TRUE(envoy_container_stats.is_cgroup_v2);
+}
+
+// Test: Invalid numeric format in cpu.max period
+TEST_F(LinuxContainerCpuStatsReaderV2Test, InvalidPeriodFormatInCpuMax) {
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  setV2CpuStat("usage_usec 500000\n");
+  setV2CpuMax("200000 notanumber\n");
+  setV2CpuEffective("0-3\n");
+
+  CgroupV2CpuStatsReader container_stats_reader(
+      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
+  CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  EXPECT_FALSE(envoy_container_stats.is_valid);
+  EXPECT_TRUE(envoy_container_stats.is_cgroup_v2);
+}
+
+// Test: Missing period in cpu.max (only quota provided)
+TEST_F(LinuxContainerCpuStatsReaderV2Test, MissingPeriodInCpuMax) {
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  setV2CpuStat("usage_usec 500000\n");
+  setV2CpuMax("200000\n"); // Missing period
+  setV2CpuEffective("0-3\n");
+
+  CgroupV2CpuStatsReader container_stats_reader(
+      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
+  CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  EXPECT_FALSE(envoy_container_stats.is_valid);
+  EXPECT_TRUE(envoy_container_stats.is_cgroup_v2);
+}
+
+// Test: Empty cpu.max file
+TEST_F(LinuxContainerCpuStatsReaderV2Test, EmptyCpuMaxFile) {
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  setV2CpuStat("usage_usec 500000\n");
+  setV2CpuMax(""); // Empty file
+  setV2CpuEffective("0-3\n");
+
+  CgroupV2CpuStatsReader container_stats_reader(
+      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
+  CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  EXPECT_FALSE(envoy_container_stats.is_valid);
+  EXPECT_TRUE(envoy_container_stats.is_cgroup_v2);
+}
+
+// Test: Empty cpu.stat file
+TEST_F(LinuxContainerCpuStatsReaderV2Test, EmptyCpuStatFile) {
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  setV2CpuStat(""); // Empty file
+  setV2CpuMax("200000 100000\n");
+  setV2CpuEffective("0-3\n");
+
+  CgroupV2CpuStatsReader container_stats_reader(
+      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
+  CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  EXPECT_FALSE(envoy_container_stats.is_valid);
+  EXPECT_TRUE(envoy_container_stats.is_cgroup_v2);
+}
+
+// Test: Quota exceeds available cores
+TEST_F(LinuxContainerCpuStatsReaderV2Test, QuotaExceedsAvailableCores) {
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  setV2CpuStat("usage_usec 500000\n");
+  setV2CpuMax("800000 100000\n"); // quota=800000, period=100000 => 8.0 cores
+  setV2CpuEffective("0-3\n");     // Only 4 cores available
+
+  CgroupV2CpuStatsReader container_stats_reader(
+      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
+  CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  EXPECT_TRUE(envoy_container_stats.is_valid);
+  EXPECT_TRUE(envoy_container_stats.is_cgroup_v2);
+  EXPECT_DOUBLE_EQ(envoy_container_stats.effective_cores,
+                   4.0); // min(4, 8) = 4, limited by available cores
+}
+
+// Test: Very large usage value
+TEST_F(LinuxContainerCpuStatsReaderV2Test, VeryLargeUsageValue) {
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  setV2CpuStat("usage_usec 999999999999\n"); // Very large usage
+  setV2CpuMax("400000 100000\n");
+  setV2CpuEffective("0-7\n");
+
+  CgroupV2CpuStatsReader container_stats_reader(
+      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
+  CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  EXPECT_TRUE(envoy_container_stats.is_valid);
+  EXPECT_TRUE(envoy_container_stats.is_cgroup_v2);
+  EXPECT_EQ(envoy_container_stats.work_time, 999999999999ULL);
+  EXPECT_DOUBLE_EQ(envoy_container_stats.effective_cores, 4.0);
+}
+
+// Test: Zero usage value
+TEST_F(LinuxContainerCpuStatsReaderV2Test, ZeroUsageValue) {
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  setV2CpuStat("usage_usec 0\n");
+  setV2CpuMax("200000 100000\n");
+  setV2CpuEffective("0-3\n");
+
+  CgroupV2CpuStatsReader container_stats_reader(
+      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
+  CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  EXPECT_TRUE(envoy_container_stats.is_valid);
+  EXPECT_TRUE(envoy_container_stats.is_cgroup_v2);
+  EXPECT_EQ(envoy_container_stats.work_time, 0);
+}
+
+// Test: Fractional CPU quota (less than 1 core)
+TEST_F(LinuxContainerCpuStatsReaderV2Test, FractionalCpuQuota) {
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  setV2CpuStat("usage_usec 100000\n");
+  setV2CpuMax("25000 100000\n"); // quota=25000, period=100000 => 0.25 cores
+  setV2CpuEffective("0-3\n");
+
+  CgroupV2CpuStatsReader container_stats_reader(
+      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
+  CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  EXPECT_TRUE(envoy_container_stats.is_valid);
+  EXPECT_TRUE(envoy_container_stats.is_cgroup_v2);
+  EXPECT_DOUBLE_EQ(envoy_container_stats.effective_cores, 0.25);
+}
+
+// Test: Different period value
+TEST_F(LinuxContainerCpuStatsReaderV2Test, DifferentPeriodValue) {
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  setV2CpuStat("usage_usec 300000\n");
+  setV2CpuMax("50000 50000\n"); // quota=50000, period=50000 => 1.0 core
+  setV2CpuEffective("0-7\n");
+
+  CgroupV2CpuStatsReader container_stats_reader(
+      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
+  CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  EXPECT_TRUE(envoy_container_stats.is_valid);
+  EXPECT_TRUE(envoy_container_stats.is_cgroup_v2);
+  EXPECT_DOUBLE_EQ(envoy_container_stats.effective_cores, 1.0);
+}
+
+// Test: cpu.stat with additional fields
+TEST_F(LinuxContainerCpuStatsReaderV2Test, CpuStatWithAdditionalFields) {
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  setV2CpuStat("usage_usec 450000\nuser_usec 250000\nsystem_usec 200000\nother_field 12345\n");
+  setV2CpuMax("300000 100000\n");
+  setV2CpuEffective("0-3\n");
+
+  CgroupV2CpuStatsReader container_stats_reader(
+      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
+  CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  EXPECT_TRUE(envoy_container_stats.is_valid);
+  EXPECT_TRUE(envoy_container_stats.is_cgroup_v2);
+  EXPECT_EQ(envoy_container_stats.work_time, 450000);
+}
+
+// =============================================================================
+// File Read Error Tests - Test !stat_result.ok(), !effective_result.ok(), !max_result.ok()
+// =============================================================================
+
+TEST_F(LinuxContainerCpuStatsReaderV2Test, CannotReadCpuStatFile) {
+  // Test: if (!stat_result.ok()) - cpu.stat file doesn't exist or can't be read
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+
+  // Create reader with non-existent cpu.stat file path
+  const std::string nonexistent_stat = TestEnvironment::temporaryPath("nonexistent_cpu_stat");
+  setV2CpuMax("200000 100000\n");
+  setV2CpuEffective("0-3\n");
+
+  CgroupV2CpuStatsReader container_stats_reader(
+      api->fileSystem(), test_time_source, nonexistent_stat, v2CpuMaxPath(), v2CpuEffectivePath());
+  CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  // Should return invalid CpuTimes
+  EXPECT_FALSE(envoy_container_stats.is_valid);
+  EXPECT_TRUE(envoy_container_stats.is_cgroup_v2);
+  EXPECT_EQ(envoy_container_stats.work_time, 0);
+  EXPECT_EQ(envoy_container_stats.total_time, 0);
+  EXPECT_EQ(envoy_container_stats.effective_cores, 0);
+}
+
+TEST_F(LinuxContainerCpuStatsReaderV2Test, CannotReadEffectiveCpusFile) {
+  // Test: if (!effective_result.ok()) - cpuset.cpus.effective file doesn't exist
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+
+  // Create reader with non-existent cpuset.cpus.effective file path
+  setV2CpuStat("usage_usec 500000\n");
+  setV2CpuMax("200000 100000\n");
+  const std::string nonexistent_effective = TestEnvironment::temporaryPath("nonexistent_effective");
+
+  CgroupV2CpuStatsReader container_stats_reader(
+      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), nonexistent_effective);
+  CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  // Should return invalid CpuTimes
+  EXPECT_FALSE(envoy_container_stats.is_valid);
+  EXPECT_TRUE(envoy_container_stats.is_cgroup_v2);
+  EXPECT_EQ(envoy_container_stats.work_time, 0);
+  EXPECT_EQ(envoy_container_stats.total_time, 0);
+  EXPECT_EQ(envoy_container_stats.effective_cores, 0);
+}
+
+TEST_F(LinuxContainerCpuStatsReaderV2Test, CannotReadCpuMaxFile) {
+  // Test: if (!max_result.ok()) - cpu.max file doesn't exist
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+
+  // Create reader with non-existent cpu.max file path
+  setV2CpuStat("usage_usec 500000\n");
+  setV2CpuEffective("0-3\n");
+  const std::string nonexistent_max = TestEnvironment::temporaryPath("nonexistent_max");
+
+  CgroupV2CpuStatsReader container_stats_reader(
+      api->fileSystem(), test_time_source, v2CpuStatPath(), nonexistent_max, v2CpuEffectivePath());
+  CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  // Should return invalid CpuTimes
+  EXPECT_FALSE(envoy_container_stats.is_valid);
+  EXPECT_TRUE(envoy_container_stats.is_cgroup_v2);
+  EXPECT_EQ(envoy_container_stats.work_time, 0);
+  EXPECT_EQ(envoy_container_stats.total_time, 0);
+  EXPECT_EQ(envoy_container_stats.effective_cores, 0);
+}
+
+TEST_F(LinuxContainerCpuStatsReaderV2Test, NegativeSingleCpuValue) {
+  // Test: if (single_cpu < 0) - Single CPU with negative value
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+
+  setV2CpuStat("usage_usec 500000\n");
+  setV2CpuMax("200000 100000\n");
+  setV2CpuEffective("-1\n"); // Negative single CPU value
+
+  CgroupV2CpuStatsReader container_stats_reader(
+      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
+  CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  // Should return invalid CpuTimes
+  EXPECT_FALSE(envoy_container_stats.is_valid);
+  EXPECT_TRUE(envoy_container_stats.is_cgroup_v2);
+}
+
+TEST_F(LinuxContainerCpuStatsReaderV2Test, EmptyRangeResultsInZeroN) {
+  // Test: if (N <= 0) - After parsing, N ends up being 0 or negative
+  // This is a tricky case - we need to force N to remain 0 after parsing
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+
+  setV2CpuStat("usage_usec 500000\n");
+  setV2CpuMax("200000 100000\n");
+  // Empty string after trimming - this will cause parsing to fail and N to remain 0
+  setV2CpuEffective("\n");
+
+  CgroupV2CpuStatsReader container_stats_reader(
+      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
+  CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  // Should return invalid CpuTimes
+  EXPECT_FALSE(envoy_container_stats.is_valid);
+  EXPECT_TRUE(envoy_container_stats.is_cgroup_v2);
+}
+
+// Test for negative period value edge case
+TEST_F(LinuxContainerCpuStatsReaderV2Test, VeryLargeNegativePeriod) {
+  // Additional coverage for period validation
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+
+  setV2CpuStat("usage_usec 500000\n");
+  setV2CpuEffective("0-3\n");
+  setV2CpuMax("200000 -999999\n"); // Very large negative period
+
+  CgroupV2CpuStatsReader container_stats_reader(
+      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
+  CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  EXPECT_FALSE(envoy_container_stats.is_valid);
+  EXPECT_TRUE(envoy_container_stats.is_cgroup_v2);
+}
+
+// =============================================================================
+// Factory Method Tests - LinuxContainerCpuStatsReader::create()
+// =============================================================================
+
+TEST(LinuxContainerCpuStatsReaderFactoryTest, CreatesV2ReaderWhenV2FilesExist) {
+  Api::ApiPtr api = Api::createApiForTest();
+  Event::MockDispatcher dispatcher;
+  Server::MockOptions options;
+  Server::Configuration::ResourceMonitorFactoryContextImpl context(
+      dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor());
+
+  // Create mock filesystem with V2 files
+  Filesystem::MockInstance mock_fs;
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu.stat")).WillOnce(Return(true));
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu.max")).WillOnce(Return(true));
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpuset.cpus.effective")).WillOnce(Return(true));
+
+  // Factory should create V2 reader
+  auto reader = LinuxContainerCpuStatsReader::create(mock_fs, context.api().timeSource());
+  EXPECT_NE(reader, nullptr);
+
+  // Verify it's V2 by checking the returned CpuTimes
+  // (V2 readers set is_cgroup_v2 = true)
+  // We can't easily verify the type without RTTI, but we can test behavior
+}
+
+TEST(LinuxContainerCpuStatsReaderFactoryTest, CreatesV1ReaderWhenOnlyV1FilesExist) {
+  Api::ApiPtr api = Api::createApiForTest();
+  Event::MockDispatcher dispatcher;
+  Server::MockOptions options;
+  Server::Configuration::ResourceMonitorFactoryContextImpl context(
+      dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor());
+
+  // Create mock filesystem with only V1 files
+  Filesystem::MockInstance mock_fs;
+
+  // V2 files don't exist
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu.stat")).WillOnce(Return(false));
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu.max"))
+      .Times(testing::AtMost(1))
+      .WillRepeatedly(Return(false));
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpuset.cpus.effective"))
+      .Times(testing::AtMost(1))
+      .WillRepeatedly(Return(false));
+
+  // V1 files exist
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu/cpu.shares")).WillOnce(Return(true));
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpuacct/cpuacct.usage")).WillOnce(Return(true));
+
+  // Factory should create V1 reader
+  auto reader = LinuxContainerCpuStatsReader::create(mock_fs, context.api().timeSource());
+  EXPECT_NE(reader, nullptr);
+}
+
+TEST(LinuxContainerCpuStatsReaderFactoryTest, PrefersV2OverV1WhenBothExist) {
+  // In mixed environments, V2 should be preferred
+  Api::ApiPtr api = Api::createApiForTest();
+  Event::MockDispatcher dispatcher;
+  Server::MockOptions options;
+  Server::Configuration::ResourceMonitorFactoryContextImpl context(
+      dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor());
+
+  Filesystem::MockInstance mock_fs;
+
+  // Both V2 and V1 files exist
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu.stat")).WillOnce(Return(true));
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu.max")).WillOnce(Return(true));
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpuset.cpus.effective")).WillOnce(Return(true));
+
+  // V1 checks should not be called due to short-circuit
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu/cpu.shares")).Times(0);
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpuacct/cpuacct.usage")).Times(0);
+
+  // Factory should create V2 reader (preferred over V1)
+  auto reader = LinuxContainerCpuStatsReader::create(mock_fs, context.api().timeSource());
+  EXPECT_NE(reader, nullptr);
+}
+
+TEST(LinuxContainerCpuStatsReaderFactoryTest, ThrowsWhenNoCgroupFilesExist) {
+  Api::ApiPtr api = Api::createApiForTest();
+  Event::MockDispatcher dispatcher;
+  Server::MockOptions options;
+  Server::Configuration::ResourceMonitorFactoryContextImpl context(
+      dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor());
+
+  Filesystem::MockInstance mock_fs;
+
+  // No V2 files
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu.stat")).WillOnce(Return(false));
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu.max"))
+      .Times(testing::AtMost(1))
+      .WillRepeatedly(Return(false));
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpuset.cpus.effective"))
+      .Times(testing::AtMost(1))
+      .WillRepeatedly(Return(false));
+
+  // No V1 files
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu/cpu.shares")).WillOnce(Return(false));
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpuacct/cpuacct.usage"))
+      .Times(testing::AtMost(1))
+      .WillRepeatedly(Return(false));
+
+  // Factory should throw exception
+  EXPECT_THROW(
+      {
+        try {
+          LinuxContainerCpuStatsReader::create(mock_fs, context.api().timeSource());
+        } catch (const EnvoyException& e) {
+          EXPECT_NE(std::string(e.what()).find("No supported cgroup CPU implementation"),
+                    std::string::npos);
+          throw;
+        }
+      },
+      EnvoyException);
+}
+
+TEST(LinuxContainerCpuStatsReaderFactoryTest, ThrowsWhenOnlyPartialV2FilesExist) {
+  // Only some V2 files exist - should not be detected as V2
+  Api::ApiPtr api = Api::createApiForTest();
+  Event::MockDispatcher dispatcher;
+  Server::MockOptions options;
+  Server::Configuration::ResourceMonitorFactoryContextImpl context(
+      dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor());
+
+  Filesystem::MockInstance mock_fs;
+
+  // Only 2 out of 3 V2 files exist
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu.stat")).WillOnce(Return(true));
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu.max")).WillOnce(Return(true));
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpuset.cpus.effective")).WillOnce(Return(false));
+
+  // No V1 files
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu/cpu.shares")).WillOnce(Return(false));
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpuacct/cpuacct.usage"))
+      .Times(testing::AtMost(1))
+      .WillRepeatedly(Return(false));
+
+  // Factory should throw exception
+  EXPECT_THROW(LinuxContainerCpuStatsReader::create(mock_fs, context.api().timeSource()),
+               EnvoyException);
+}
+
+TEST(LinuxContainerCpuStatsReaderFactoryTest, ThrowsWhenOnlyPartialV1FilesExist) {
+  // Only some V1 files exist - should not be detected as V1
+  Api::ApiPtr api = Api::createApiForTest();
+  Event::MockDispatcher dispatcher;
+  Server::MockOptions options;
+  Server::Configuration::ResourceMonitorFactoryContextImpl context(
+      dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor());
+
+  Filesystem::MockInstance mock_fs;
+
+  // No V2 files
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu.stat")).WillOnce(Return(false));
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu.max"))
+      .Times(testing::AtMost(1))
+      .WillRepeatedly(Return(false));
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpuset.cpus.effective"))
+      .Times(testing::AtMost(1))
+      .WillRepeatedly(Return(false));
+
+  // Only shares file exists for V1
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu/cpu.shares")).WillOnce(Return(true));
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpuacct/cpuacct.usage")).WillOnce(Return(false));
+
+  // Factory should throw exception
+  EXPECT_THROW(LinuxContainerCpuStatsReader::create(mock_fs, context.api().timeSource()),
+               EnvoyException);
+}
+
+// =============================================================================
+// Additional Edge Case Tests for CgroupV1
+// =============================================================================
+
+TEST_F(LinuxContainerCpuStatsReaderTest, ZeroCpuAllocatedValue) {
+  // Test handling of zero cpu.shares value (invalid)
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  setCpuAllocated("0\n"); // Invalid: zero shares
+  setCpuTimes("1000\n");
+
+  const std::string nonexistent_path = TestEnvironment::temporaryPath("nonexistent");
+  CgroupV1CpuStatsReader container_stats_reader(api->fileSystem(), test_time_source,
+                                                cpuAllocatedPath(), cpuTimesPath());
+  CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  EXPECT_FALSE(envoy_container_stats.is_valid);
+}
+
+TEST_F(LinuxContainerCpuStatsReaderTest, NegativeCpuAllocatedValue) {
+  // Test handling of negative cpu.shares value (invalid)
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  setCpuAllocated("-1024\n"); // Invalid: negative shares
+  setCpuTimes("1000\n");
+
+  CgroupV1CpuStatsReader container_stats_reader(api->fileSystem(), test_time_source,
+                                                cpuAllocatedPath(), cpuTimesPath());
+  CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  EXPECT_FALSE(envoy_container_stats.is_valid);
+}
+
+TEST_F(LinuxContainerCpuStatsReaderTest, EmptyCpuAllocatedFile) {
+  // Test handling of empty cpu.shares file
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  setCpuAllocated(""); // Empty file
+  setCpuTimes("1000\n");
+
+  CgroupV1CpuStatsReader container_stats_reader(api->fileSystem(), test_time_source,
+                                                cpuAllocatedPath(), cpuTimesPath());
+  CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  EXPECT_FALSE(envoy_container_stats.is_valid);
+}
+
+TEST_F(LinuxContainerCpuStatsReaderTest, EmptyCpuTimesFile) {
+  // Test handling of empty cpuacct.usage file
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  setCpuAllocated("2000\n");
+  setCpuTimes(""); // Empty file
+
+  CgroupV1CpuStatsReader container_stats_reader(api->fileSystem(), test_time_source,
+                                                cpuAllocatedPath(), cpuTimesPath());
+  CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  EXPECT_FALSE(envoy_container_stats.is_valid);
+}
+
+TEST_F(LinuxContainerCpuStatsReaderTest, WhitespaceOnlyCpuAllocatedFile) {
+  // Test handling of whitespace-only cpu.shares file
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  setCpuAllocated("   \n\n  "); // Only whitespace
+  setCpuTimes("1000\n");
+
+  CgroupV1CpuStatsReader container_stats_reader(api->fileSystem(), test_time_source,
+                                                cpuAllocatedPath(), cpuTimesPath());
+  CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  EXPECT_FALSE(envoy_container_stats.is_valid);
+}
+
+TEST_F(LinuxContainerCpuStatsReaderTest, VerySmallCpuAllocatedValue) {
+  // Test with very small cpu.shares value (0.001 millicores)
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  setCpuAllocated("0.001\n");
+  setCpuTimes("1000\n");
+
+  CgroupV1CpuStatsReader container_stats_reader(api->fileSystem(), test_time_source,
+                                                cpuAllocatedPath(), cpuTimesPath());
+  CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  EXPECT_TRUE(envoy_container_stats.is_valid);
+  EXPECT_FALSE(envoy_container_stats.is_cgroup_v2);
+  // work_time = (1000 * 1000.0) / 0.001 = 1000000000
+  EXPECT_NEAR(envoy_container_stats.work_time, 1000000000.0, 1.0);
+}
+
+// =============================================================================
+// getUtilization() Method Tests for LinuxCpuStatsReader
+// =============================================================================
+
+TEST(LinuxCpuStatsReaderUtilizationTest, FirstCallReturnsZero) {
+  // Test that the first call to getUtilization() returns 0 (initialization)
+  const std::string temp_path = TestEnvironment::temporaryPath("cpu_stats_util");
+  AtomicFileUpdater file_updater(temp_path);
+  const std::string contents = R"EOF(cpu  1000 100 200 500 0 0 0 0 0 0
+)EOF";
+  file_updater.update(contents);
+
+  LinuxCpuStatsReader cpu_stats_reader(temp_path);
+  auto result = cpu_stats_reader.getUtilization();
+
+  ASSERT_TRUE(result.ok());
+  EXPECT_DOUBLE_EQ(result.value(), 0.0);
+}
+
+TEST(LinuxCpuStatsReaderUtilizationTest, CalculatesUtilizationCorrectly) {
+  // Test correct utilization calculation between two readings
+  const std::string temp_path = TestEnvironment::temporaryPath("cpu_stats_util2");
+  AtomicFileUpdater file_updater(temp_path);
+
+  // First reading
+  file_updater.update("cpu  1000 100 200 700 0 0 0 0 0 0\n");
+  LinuxCpuStatsReader cpu_stats_reader(temp_path);
+  auto result1 = cpu_stats_reader.getUtilization();
+  ASSERT_TRUE(result1.ok());
+  EXPECT_DOUBLE_EQ(result1.value(), 0.0); // First call returns 0
+
+  // Second reading: work increased by 600, total increased by 1000
+  file_updater.update("cpu  1600 100 200 1100 0 0 0 0 0 0\n");
+  auto result2 = cpu_stats_reader.getUtilization();
+  ASSERT_TRUE(result2.ok());
+  // utilization = 600 / 1000 = 0.6
+  EXPECT_DOUBLE_EQ(result2.value(), 0.6);
+}
+
+TEST(LinuxCpuStatsReaderUtilizationTest, InvalidFileReturnsError) {
+  // Test that invalid file returns an error
+  const std::string temp_path = TestEnvironment::temporaryPath("cpu_stats_not_exist_util");
+  LinuxCpuStatsReader cpu_stats_reader(temp_path);
+  auto result = cpu_stats_reader.getUtilization();
+
+  EXPECT_FALSE(result.ok());
+  EXPECT_NE(result.status().message().find("Failed to read CPU times"), std::string::npos);
+}
+
+TEST(LinuxCpuStatsReaderUtilizationTest, NegativeWorkDeltaReturnsError) {
+  // Test that negative work delta returns an error
+  const std::string temp_path = TestEnvironment::temporaryPath("cpu_stats_util3");
+  AtomicFileUpdater file_updater(temp_path);
+
+  // First reading
+  file_updater.update("cpu  1000 100 200 700 0 0 0 0 0 0\n");
+  LinuxCpuStatsReader cpu_stats_reader(temp_path);
+  (void)cpu_stats_reader.getUtilization(); // Initialize
+
+  // Second reading: work decreased (clock regression)
+  file_updater.update("cpu  500 100 200 1100 0 0 0 0 0 0\n");
+  auto result = cpu_stats_reader.getUtilization();
+
+  EXPECT_FALSE(result.ok());
+  EXPECT_NE(result.status().message().find("Work_over_period"), std::string::npos);
+}
+
+TEST(LinuxCpuStatsReaderUtilizationTest, ZeroTotalDeltaReturnsError) {
+  // Test that zero total delta returns an error
+  // Note: In /proc/stat, total = user + nice + system + idle,
+  // so we need all four values to stay the same
+  const std::string temp_path = TestEnvironment::temporaryPath("cpu_stats_util4");
+  AtomicFileUpdater file_updater(temp_path);
+
+  // First reading: work=1300 (1000+100+200), total=2000 (work+idle)
+  file_updater.update("cpu  1000 100 200 700 0 0 0 0 0 0\n");
+  LinuxCpuStatsReader cpu_stats_reader(temp_path);
+  (void)cpu_stats_reader.getUtilization(); // Initialize
+
+  // Second reading: same total (all values unchanged)
+  file_updater.update("cpu  1000 100 200 700 0 0 0 0 0 0\n");
+  auto result = cpu_stats_reader.getUtilization();
+
+  EXPECT_FALSE(result.ok());
+  EXPECT_NE(result.status().message().find("total_over_period"), std::string::npos);
+}
+
+// getUtilization() Method Tests for CgroupV1CpuStatsReader
+TEST_F(LinuxContainerCpuStatsReaderTest, V1GetUtilizationFirstCallReturnsZero) {
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  setCpuAllocated("2000\n");
+  setCpuTimes("1000\n");
+
+  CgroupV1CpuStatsReader container_stats_reader(api->fileSystem(), test_time_source,
+                                                cpuAllocatedPath(), cpuTimesPath());
+  auto result = container_stats_reader.getUtilization();
+
+  ASSERT_TRUE(result.ok());
+  EXPECT_DOUBLE_EQ(result.value(), 0.0);
+}
+
+TEST_F(LinuxContainerCpuStatsReaderTest, V1GetUtilizationCalculatesCorrectly) {
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  setCpuAllocated("2000\n");
+  setCpuTimes("1000000000\n"); // 1 billion nanoseconds
+
+  CgroupV1CpuStatsReader container_stats_reader(api->fileSystem(), test_time_source,
+                                                cpuAllocatedPath(), cpuTimesPath());
+  auto result1 = container_stats_reader.getUtilization();
+  ASSERT_TRUE(result1.ok());
+  EXPECT_DOUBLE_EQ(result1.value(), 0.0); // First call
+
+  // Update CPU times - the TimeSource will automatically advance
+  setCpuTimes("2000000000\n"); // 2 billion nanoseconds
+  auto result2 = container_stats_reader.getUtilization();
+  ASSERT_TRUE(result2.ok());
+
+  // work_delta = (2000000000 * 1000.0 / 2000) - (1000000000 * 1000.0 / 2000)
+  //           = 1000000 - 500000 = 500000 nanoseconds of normalized CPU time
+  // total_delta = time difference from the mock TimeSource
+  // We just verify it returns a valid utilization value
+  EXPECT_GE(result2.value(), 0.0);
+}
+
+TEST_F(LinuxContainerCpuStatsReaderTest, V1GetUtilizationInvalidFileReturnsError) {
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  const std::string nonexistent = TestEnvironment::temporaryPath("nonexistent_v1_util");
+
+  CgroupV1CpuStatsReader container_stats_reader(api->fileSystem(), test_time_source, nonexistent,
+                                                cpuTimesPath());
+  auto result = container_stats_reader.getUtilization();
+
+  EXPECT_FALSE(result.ok());
+  EXPECT_NE(result.status().message().find("Failed to read CPU times"), std::string::npos);
+}
+
+TEST_F(LinuxContainerCpuStatsReaderTest, V1GetUtilizationNegativeWorkDeltaReturnsError) {
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  setCpuAllocated("2000\n");
+  setCpuTimes("2000000000\n");
+
+  CgroupV1CpuStatsReader container_stats_reader(api->fileSystem(), test_time_source,
+                                                cpuAllocatedPath(), cpuTimesPath());
+  (void)container_stats_reader.getUtilization(); // Initialize
+
+  // Decrease CPU times (regression)
+  setCpuTimes("1000000000\n");
+  auto result = container_stats_reader.getUtilization();
+
+  EXPECT_FALSE(result.ok());
+  EXPECT_NE(result.status().message().find("Work_over_period"), std::string::npos);
+}
+
+// =============================================================================
+// getUtilization() Method Tests for CgroupV2CpuStatsReader
+// =============================================================================
+
+TEST_F(LinuxContainerCpuStatsReaderV2Test, V2GetUtilizationFirstCallReturnsZero) {
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  setV2CpuStat("usage_usec 500000\n");
+  setV2CpuMax("200000 100000\n");
+  setV2CpuEffective("0-3\n");
+
+  CgroupV2CpuStatsReader container_stats_reader(
+      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
+  auto result = container_stats_reader.getUtilization();
+
+  ASSERT_TRUE(result.ok());
+  EXPECT_DOUBLE_EQ(result.value(), 0.0);
+}
+
+TEST_F(LinuxContainerCpuStatsReaderV2Test, V2GetUtilizationCalculatesCorrectly) {
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  setV2CpuStat("usage_usec 0\n");
+  setV2CpuMax("200000 100000\n"); // 2 cores
+  setV2CpuEffective("0-3\n");     // 4 cores available, min(4, 2) = 2
+
+  CgroupV2CpuStatsReader container_stats_reader(
+      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
+  auto result1 = container_stats_reader.getUtilization();
+  ASSERT_TRUE(result1.ok());
+  EXPECT_DOUBLE_EQ(result1.value(), 0.0); // First call
+
+  // Simulate: 1 second passed, 1 million microseconds of CPU used on 2 cores
+  // That's 1 second of CPU time on 2 cores over 1 second = 50% utilization
+  setV2CpuStat("usage_usec 1000000\n");
+  auto result2 = container_stats_reader.getUtilization();
+  ASSERT_TRUE(result2.ok());
+
+  // work_delta = 1000000 usec = 1 second
+  // total_delta = approximately 1 second (in nanoseconds)
+  // utilization = (1 / 1) / 2 cores = 0.5
+  EXPECT_GT(result2.value(), 0.0);
+  EXPECT_LE(result2.value(), 1.0); // Should be clamped to 1.0 max
+}
+
+TEST_F(LinuxContainerCpuStatsReaderV2Test, V2GetUtilizationClampsAtOne) {
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  setV2CpuStat("usage_usec 0\n");
+  setV2CpuMax("100000 100000\n"); // 1 core
+  setV2CpuEffective("0\n");       // 1 core
+
+  CgroupV2CpuStatsReader container_stats_reader(
+      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
+  (void)container_stats_reader.getUtilization(); // Initialize
+
+  // Simulate impossibly high CPU usage (would be > 100%)
+  setV2CpuStat("usage_usec 10000000\n"); // 10 seconds of CPU in short time
+  auto result = container_stats_reader.getUtilization();
+
+  ASSERT_TRUE(result.ok());
+  EXPECT_DOUBLE_EQ(result.value(), 1.0); // Should be clamped to 1.0
+}
+
+TEST_F(LinuxContainerCpuStatsReaderV2Test, V2GetUtilizationInvalidFileReturnsError) {
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  const std::string nonexistent = TestEnvironment::temporaryPath("nonexistent_v2_util");
+  setV2CpuMax("200000 100000\n");
+  setV2CpuEffective("0-3\n");
+
+  CgroupV2CpuStatsReader container_stats_reader(api->fileSystem(), test_time_source, nonexistent,
+                                                v2CpuMaxPath(), v2CpuEffectivePath());
+  auto result = container_stats_reader.getUtilization();
+
+  EXPECT_FALSE(result.ok());
+  EXPECT_NE(result.status().message().find("Failed to read CPU times"), std::string::npos);
+}
+
+TEST_F(LinuxContainerCpuStatsReaderV2Test, V2GetUtilizationNegativeWorkDeltaReturnsError) {
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  setV2CpuStat("usage_usec 1000000\n");
+  setV2CpuMax("200000 100000\n");
+  setV2CpuEffective("0-3\n");
+
+  CgroupV2CpuStatsReader container_stats_reader(
+      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
+  (void)container_stats_reader.getUtilization(); // Initialize
+
+  // Decrease usage (clock regression)
+  setV2CpuStat("usage_usec 500000\n");
+  auto result = container_stats_reader.getUtilization();
+
+  EXPECT_FALSE(result.ok());
+  EXPECT_NE(result.status().message().find("Work_over_period"), std::string::npos);
+}
+
+TEST_F(LinuxContainerCpuStatsReaderV2Test, V2GetUtilizationMultipleCallsSequence) {
+  // Test a sequence of multiple calls to ensure state is maintained correctly
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  setV2CpuStat("usage_usec 100000\n");
+  setV2CpuMax("200000 100000\n"); // 2 cores
+  setV2CpuEffective("0-1\n");     // 2 cores
+
+  CgroupV2CpuStatsReader container_stats_reader(
+      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
+
+  // First call
+  auto result1 = container_stats_reader.getUtilization();
+  ASSERT_TRUE(result1.ok());
+  EXPECT_DOUBLE_EQ(result1.value(), 0.0);
+
+  // Second call
+  setV2CpuStat("usage_usec 200000\n");
+  auto result2 = container_stats_reader.getUtilization();
+  ASSERT_TRUE(result2.ok());
+  EXPECT_GT(result2.value(), 0.0);
+  EXPECT_LE(result2.value(), 1.0);
+
+  // Third call
+  setV2CpuStat("usage_usec 300000\n");
+  auto result3 = container_stats_reader.getUtilization();
+  ASSERT_TRUE(result3.ok());
+  EXPECT_GT(result3.value(), 0.0);
+  EXPECT_LE(result3.value(), 1.0);
+}
+
+TEST_F(LinuxContainerCpuStatsReaderV2Test, V2GetUtilizationZeroWorkDelta) {
+  // Test when no CPU work is done between calls
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  setV2CpuStat("usage_usec 100000\n");
+  setV2CpuMax("200000 100000\n");
+  setV2CpuEffective("0-1\n");
+
+  CgroupV2CpuStatsReader container_stats_reader(
+      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
+  (void)container_stats_reader.getUtilization(); // Initialize
+
+  // No change in usage
+  setV2CpuStat("usage_usec 100000\n");
+  auto result = container_stats_reader.getUtilization();
+
+  ASSERT_TRUE(result.ok());
+  EXPECT_DOUBLE_EQ(result.value(), 0.0); // No work done = 0% utilization
 }
 
 } // namespace
