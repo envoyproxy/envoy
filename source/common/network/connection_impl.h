@@ -248,7 +248,7 @@ private:
   uint64_t last_write_buffer_size_{};
   Buffer::Instance* current_write_buffer_{};
   uint32_t read_disable_count_{0};
-  StreamInfo::DetectedCloseType detected_close_type_{StreamInfo::DetectedCloseType::Normal};
+  StreamInfo::DetectedCloseType detected_close_type_{StreamInfo::DetectedCloseType::Undefined};
   bool write_buffer_above_high_watermark_ : 1;
   bool detect_early_close_ : 1;
   bool enable_half_close_ : 1;
