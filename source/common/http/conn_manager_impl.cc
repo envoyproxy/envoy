@@ -145,7 +145,9 @@ ConnectionManagerImpl::ConnectionManagerImpl(
           runtime_.snapshot().getInteger(ConnectionManagerImpl::MaxRequestsPerIoCycle, UINT32_MAX)),
       direction_(direction),
       allow_upstream_half_close_(Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.allow_multiplexed_upstream_half_close")) {
+          "envoy.reloadable_features.allow_multiplexed_upstream_half_close")),
+      close_connection_on_zombie_stream_complete_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.http1_close_connection_on_zombie_stream_complete")) {
   ENVOY_LOG_ONCE_IF(
       trace, accept_new_http_stream_ == nullptr,
       "LoadShedPoint envoy.load_shed_points.http_connection_manager_decode_headers is not "
@@ -2150,8 +2152,7 @@ void ConnectionManagerImpl::ActiveStream::onCodecEncodeComplete() {
     // closed. doEndStream() call that created the zombie may have set
     // drain_state_ to Closing, but checkForDeferredClose() couldn't close the
     // connection at that time because streams_ wasn't empty yet.
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.http1_close_connection_on_zombie_stream_complete")) {
+    if (connection_manager_.close_connection_on_zombie_stream_complete_) {
       connection_manager_.checkForDeferredClose(skip_delay);
     }
   }
@@ -2172,8 +2173,7 @@ void ConnectionManagerImpl::ActiveStream::onCodecLowLevelReset() {
     // closed. doEndStream() call that created the zombie may have set
     // drain_state_ to Closing, but checkForDeferredClose() couldn't close the
     // connection at that time because streams_ wasn't empty yet.
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.http1_close_connection_on_zombie_stream_complete")) {
+    if (connection_manager_.close_connection_on_zombie_stream_complete_) {
       connection_manager_.checkForDeferredClose(skip_delay);
     }
   }

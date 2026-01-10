@@ -2109,6 +2109,10 @@ TEST_F(HttpConnectionManagerImplTest, DownstreamRemoteResetRefused) {
 // This tests the fix for a potential connection leak where zombie streams
 // were not triggering connection close when drain_state_ was Closing.
 TEST_F(HttpConnectionManagerImplTest, ZombieStreamClosesConnectionOnCodecComplete) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.http1_close_connection_on_zombie_stream_complete", "true"}});
+
   // Use HTTP/1.1 and set max_requests_per_connection to 1 to trigger
   // drain_state_ = DrainState::Closing when the first request is received.
   max_requests_per_connection_ = 1;
@@ -2167,8 +2171,57 @@ TEST_F(HttpConnectionManagerImplTest, ZombieStreamClosesConnectionOnCodecComplet
   response_encoder_.stream_.codec_callbacks_->onCodecEncodeComplete();
 }
 
+// Same as above but with runtime guard disabled - connection should NOT be closed.
+TEST_F(HttpConnectionManagerImplTest, ZombieStreamDoesNotCloseConnectionWhenGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.http1_close_connection_on_zombie_stream_complete", "false"}});
+
+  max_requests_per_connection_ = 1;
+  EXPECT_CALL(*codec_, protocol()).WillRepeatedly(Return(Protocol::Http11));
+  setup();
+
+  setupFilterChain(1, 0);
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
+    decoder_ = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{
+        new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "POST"}}};
+    decoder_->decodeHeaders(std::move(headers), false);
+    Buffer::OwnedImpl body("hello");
+    decoder_->decodeData(body, true);
+    return Http::okStatus();
+  }));
+
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[0], decodeData(_, true))
+      .WillOnce(Return(FilterDataStatus::Continue));
+
+  Buffer::OwnedImpl fake_input;
+  conn_manager_->onData(fake_input, false);
+
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, true));
+
+  ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
+  decoder_filters_[0]->callbacks_->streamInfo().setResponseCodeDetails("");
+  decoder_filters_[0]->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
+
+  // With runtime guard disabled, connection close should NOT be called.
+  // The old behavior leaves the connection open (the bug this fix addresses).
+  EXPECT_CALL(*decoder_filters_[0], onStreamComplete());
+  EXPECT_CALL(*decoder_filters_[0], onDestroy());
+  EXPECT_CALL(filter_callbacks_.connection_, close(_, _)).Times(0);
+
+  response_encoder_.stream_.codec_callbacks_->onCodecEncodeComplete();
+}
+
 // Similar test but for onCodecLowLevelReset() path
 TEST_F(HttpConnectionManagerImplTest, ZombieStreamClosesConnectionOnCodecLowLevelReset) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.http1_close_connection_on_zombie_stream_complete", "true"}});
+
   // Use HTTP/1.1 and set max_requests_per_connection to 1 to trigger
   // drain_state_ = DrainState::Closing when the first request is received.
   max_requests_per_connection_ = 1;
