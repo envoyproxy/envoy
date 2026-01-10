@@ -130,7 +130,7 @@ Http::FilterHeadersStatus McpFilter::decodeHeaders(Http::RequestHeaderMap& heade
       // Set the buffer limit - Envoy will automatically send 413 if exceeded
       const uint32_t max_size = getMaxRequestBodySize();
       if (max_size > 0) {
-        decoder_callbacks_->setDecoderBufferLimit(max_size);
+        decoder_callbacks_->setBufferLimit(max_size);
         ENVOY_LOG(debug, "set decoder buffer limit to {} bytes", max_size);
       }
 

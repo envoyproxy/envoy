@@ -356,6 +356,10 @@ ResponseTrailerMapOptRef ActiveStreamFilterBase::responseTrailers() {
   return parent_.filter_manager_callbacks_.responseTrailers();
 }
 
+void ActiveStreamFilterBase::setBufferLimit(uint64_t limit) { parent_.setBufferLimit(limit); }
+
+uint64_t ActiveStreamFilterBase::bufferLimit() { return parent_.buffer_limit_; }
+
 void ActiveStreamFilterBase::sendLocalReply(
     Code code, absl::string_view body,
     std::function<void(ResponseHeaderMap& headers)> modify_headers,
@@ -1756,12 +1760,6 @@ void ActiveStreamDecoderFilter::removeDownstreamWatermarkCallbacks(
   parent_.watermark_callbacks_.remove(&watermark_callbacks);
 }
 
-void ActiveStreamDecoderFilter::setDecoderBufferLimit(uint64_t limit) {
-  parent_.setBufferLimit(limit);
-}
-
-uint64_t ActiveStreamDecoderFilter::decoderBufferLimit() { return parent_.buffer_limit_; }
-
 bool ActiveStreamDecoderFilter::recreateStream(const ResponseHeaderMap* headers) {
   // Because the filter's and the HCM view of if the stream has a body and if
   // the stream is complete may differ, re-check bytesReceived() to make sure
@@ -1895,12 +1893,6 @@ void ActiveStreamEncoderFilter::onEncoderFilterBelowWriteBufferLowWatermark() {
   ENVOY_STREAM_LOG(debug, "Enabling upstream stream due to filter callbacks.", parent_);
   parent_.callLowWatermarkCallbacks();
 }
-
-void ActiveStreamEncoderFilter::setEncoderBufferLimit(uint64_t limit) {
-  parent_.setBufferLimit(limit);
-}
-
-uint64_t ActiveStreamEncoderFilter::encoderBufferLimit() { return parent_.buffer_limit_; }
 
 void ActiveStreamEncoderFilter::continueEncoding() { commonContinue(); }
 
