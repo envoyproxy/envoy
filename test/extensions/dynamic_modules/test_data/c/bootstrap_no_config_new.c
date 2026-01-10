@@ -14,12 +14,10 @@ envoy_dynamic_module_type_abi_version_module_ptr envoy_dynamic_module_on_program
 envoy_dynamic_module_type_bootstrap_extension_config_module_ptr
 envoy_dynamic_module_on_bootstrap_extension_config_new(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
-    const char* name_ptr, size_t name_size, const char* config_ptr, size_t config_size) {
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config) {
   (void)extension_config_envoy_ptr;
-  (void)name_ptr;
-  (void)name_size;
-  (void)config_ptr;
-  (void)config_size;
+  (void)name;
+  (void)config;
   return NULL;
 }
 

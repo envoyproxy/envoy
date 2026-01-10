@@ -29,10 +29,16 @@ struct MyBootstrapExtension {}
 
 impl BootstrapExtension for MyBootstrapExtension {
   fn on_server_initialized(&mut self, envoy_extension: &mut dyn EnvoyBootstrapExtension) {
-    envoy_extension.log(2, "Bootstrap extension initialized from Rust!");
+    envoy_extension.log(
+      abi::envoy_dynamic_module_type_log_level::Info,
+      "Bootstrap extension initialized from Rust!",
+    );
   }
 
   fn on_worker_thread_initialized(&mut self, envoy_extension: &mut dyn EnvoyBootstrapExtension) {
-    envoy_extension.log(2, "Worker thread initialized from Rust!");
+    envoy_extension.log(
+      abi::envoy_dynamic_module_type_log_level::Info,
+      "Worker thread initialized from Rust!",
+    );
   }
 }

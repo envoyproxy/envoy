@@ -5207,15 +5207,7 @@ pub trait EnvoyBootstrapExtension {
   fn as_ptr(&self) -> abi::envoy_dynamic_module_type_bootstrap_extension_envoy_ptr;
 
   /// Log a message to Envoy's logging system.
-  ///
-  /// The `level` parameter specifies the log level:
-  /// - 0: trace
-  /// - 1: debug
-  /// - 2: info
-  /// - 3: warn
-  /// - 4: error
-  /// - 5: critical
-  fn log(&self, level: u32, message: &str);
+  fn log(&self, level: abi::envoy_dynamic_module_type_log_level, message: &str);
 }
 
 /// BootstrapExtensionConfig is the module-side bootstrap extension configuration.
@@ -5292,13 +5284,15 @@ impl EnvoyBootstrapExtension for EnvoyBootstrapExtensionImpl {
     self.raw
   }
 
-  fn log(&self, level: u32, message: &str) {
+  fn log(&self, level: abi::envoy_dynamic_module_type_log_level, message: &str) {
     unsafe {
       abi::envoy_dynamic_module_callback_bootstrap_extension_log(
         self.raw,
         level,
-        message.as_ptr() as *const ::std::os::raw::c_char,
-        message.len(),
+        abi::envoy_dynamic_module_type_module_buffer {
+          ptr: message.as_ptr() as *const ::std::os::raw::c_char,
+          length: message.len(),
+        },
       );
     }
   }
@@ -5309,21 +5303,22 @@ impl EnvoyBootstrapExtension for EnvoyBootstrapExtensionImpl {
 #[no_mangle]
 pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_config_new(
   envoy_extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
-  name_ptr: *const i8,
-  name_size: usize,
-  config_ptr: *const i8,
-  config_size: usize,
+  name: abi::envoy_dynamic_module_type_envoy_buffer,
+  config: abi::envoy_dynamic_module_type_envoy_buffer,
 ) -> abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr {
   let mut envoy_extension_config =
     EnvoyBootstrapExtensionConfigImpl::new(envoy_extension_config_ptr);
-  let name = unsafe {
-    std::str::from_utf8_unchecked(std::slice::from_raw_parts(name_ptr as *const _, name_size))
+  let name_str = unsafe {
+    std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+      name.ptr as *const _,
+      name.length,
+    ))
   };
-  let config = unsafe { std::slice::from_raw_parts(config_ptr as *const _, config_size) };
+  let config_slice = unsafe { std::slice::from_raw_parts(config.ptr as *const _, config.length) };
   init_bootstrap_extension_config(
     &mut envoy_extension_config,
-    name,
-    config,
+    name_str,
+    config_slice,
     NEW_BOOTSTRAP_EXTENSION_CONFIG_FUNCTION
       .get()
       .expect("NEW_BOOTSTRAP_EXTENSION_CONFIG_FUNCTION must be set"),

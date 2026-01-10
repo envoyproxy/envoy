@@ -30,9 +30,8 @@ newDynamicModuleBootstrapExtensionConfig(
   // Resolve the required symbols from the dynamic module.
   auto constructor =
       dynamic_module
-          ->getFunctionPointer<envoy_dynamic_module_type_bootstrap_extension_config_module_ptr (*)(
-              envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr, const char*, size_t,
-              const char*, size_t)>("envoy_dynamic_module_on_bootstrap_extension_config_new");
+          ->getFunctionPointer<decltype(&envoy_dynamic_module_on_bootstrap_extension_config_new)>(
+              "envoy_dynamic_module_on_bootstrap_extension_config_new");
   if (!constructor.ok()) {
     return constructor.status();
   }
@@ -74,8 +73,8 @@ newDynamicModuleBootstrapExtensionConfig(
       extension_name, extension_config, std::move(dynamic_module));
 
   const void* extension_config_module_ptr = (*constructor.value())(
-      static_cast<void*>(config.get()), extension_name.data(), extension_name.size(),
-      extension_config.data(), extension_config.size());
+      static_cast<void*>(config.get()), {extension_name.data(), extension_name.size()},
+      {extension_config.data(), extension_config.size()});
   if (extension_config_module_ptr == nullptr) {
     return absl::InvalidArgumentError("Failed to initialize dynamic module");
   }

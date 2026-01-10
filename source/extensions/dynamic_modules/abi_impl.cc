@@ -10,38 +10,31 @@
 extern "C" {
 
 void envoy_dynamic_module_callback_bootstrap_extension_log(
-    envoy_dynamic_module_type_bootstrap_extension_envoy_ptr /*extension_envoy_ptr*/, uint32_t level,
-    const char* message_ptr, size_t message_size) {
-  absl::string_view message(message_ptr, message_size);
+    envoy_dynamic_module_type_bootstrap_extension_envoy_ptr /*extension_envoy_ptr*/,
+    envoy_dynamic_module_type_log_level level, envoy_dynamic_module_type_module_buffer message) {
+  absl::string_view message_view(message.ptr, message.length);
+  spdlog::logger& logger = Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules);
 
   switch (level) {
-  case 0:
-    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), trace,
-                        "{}", message);
+  case envoy_dynamic_module_type_log_level_Trace:
+    ENVOY_LOG_TO_LOGGER(logger, trace, "{}", message_view);
     break;
-  case 1:
-    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
-                        "{}", message);
+  case envoy_dynamic_module_type_log_level_Debug:
+    ENVOY_LOG_TO_LOGGER(logger, debug, "{}", message_view);
     break;
-  case 2:
-    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), info,
-                        "{}", message);
+  case envoy_dynamic_module_type_log_level_Info:
+    ENVOY_LOG_TO_LOGGER(logger, info, "{}", message_view);
     break;
-  case 3:
-    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), warn,
-                        "{}", message);
+  case envoy_dynamic_module_type_log_level_Warn:
+    ENVOY_LOG_TO_LOGGER(logger, warn, "{}", message_view);
     break;
-  case 4:
-    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), error,
-                        "{}", message);
+  case envoy_dynamic_module_type_log_level_Error:
+    ENVOY_LOG_TO_LOGGER(logger, error, "{}", message_view);
     break;
-  case 5:
-    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules),
-                        critical, "{}", message);
+  case envoy_dynamic_module_type_log_level_Critical:
+    ENVOY_LOG_TO_LOGGER(logger, critical, "{}", message_view);
     break;
   default:
-    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), info,
-                        "{}", message);
     break;
   }
 }

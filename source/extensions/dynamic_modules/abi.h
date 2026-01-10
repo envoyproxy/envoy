@@ -3555,10 +3555,8 @@ typedef const void* envoy_dynamic_module_type_bootstrap_extension_module_ptr;
  *
  * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
  * object for the corresponding config.
- * @param name_ptr is the name of the extension.
- * @param name_size is the size of the extension name.
- * @param config_ptr is the configuration for the extension.
- * @param config_size is the size of the configuration.
+ * @param name is the name of the extension.
+ * @param config is the configuration for the extension.
  * @return envoy_dynamic_module_type_bootstrap_extension_config_module_ptr is the pointer to the
  * in-module bootstrap extension configuration. Returning nullptr indicates a failure to initialize
  * the module. When it fails, the extension configuration will be rejected.
@@ -3566,7 +3564,7 @@ typedef const void* envoy_dynamic_module_type_bootstrap_extension_module_ptr;
 envoy_dynamic_module_type_bootstrap_extension_config_module_ptr
 envoy_dynamic_module_on_bootstrap_extension_config_new(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
-    const char* name_ptr, size_t name_size, const char* config_ptr, size_t config_size);
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config);
 
 /**
  * envoy_dynamic_module_on_bootstrap_extension_config_destroy is called when the bootstrap extension
@@ -3633,13 +3631,12 @@ void envoy_dynamic_module_on_bootstrap_extension_destroy(
  * envoy_dynamic_module_callback_bootstrap_extension_log is called by the module to log a message.
  *
  * @param extension_envoy_ptr is the pointer to the DynamicModuleBootstrapExtension object.
- * @param level is the log level (0=trace, 1=debug, 2=info, 3=warn, 4=error, 5=critical).
- * @param message_ptr is the message to log.
- * @param message_size is the size of the message.
+ * @param level is the log level.
+ * @param message is the log message to be logged.
  */
 void envoy_dynamic_module_callback_bootstrap_extension_log(
-    envoy_dynamic_module_type_bootstrap_extension_envoy_ptr extension_envoy_ptr, uint32_t level,
-    const char* message_ptr, size_t message_size);
+    envoy_dynamic_module_type_bootstrap_extension_envoy_ptr extension_envoy_ptr,
+    envoy_dynamic_module_type_log_level level, envoy_dynamic_module_type_module_buffer message);
 
 #ifdef __cplusplus
 }
