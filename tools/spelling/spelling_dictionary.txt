@@ -465,6 +465,7 @@ SIGSEGV
 SIGTERM
 SIMD
 SIO
+SSE
 SMTP
 SNI
 SOTW
@@ -1061,6 +1062,7 @@ msgpack
 multi
 multicast
 multikill
+multiline
 multimap
 multiple
 multivalue
