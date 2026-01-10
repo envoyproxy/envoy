@@ -6,6 +6,7 @@ package(default_visibility = [
     "//test/extensions/dynamic_modules:__pkg__",
     "//test/extensions/dynamic_modules/http:__pkg__",
     "//test/extensions/dynamic_modules/network:__pkg__",
+    "//test/extensions/transport_sockets/dynamic_modules:__pkg__",
 ])
 
 test_program(name = "no_op")
@@ -23,3 +24,7 @@ test_program(name = "http")
 test_program(name = "http_integration_test")
 
 test_program(name = "http_stream_callouts_test")
+
+test_program(name = "transport_socket_passthrough")
+
+test_program(name = "transport_socket_noop")

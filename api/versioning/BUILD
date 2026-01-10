@@ -328,6 +328,7 @@ proto_library(
         "//envoy/extensions/tracers/opentelemetry/resource_detectors/v3:pkg",
         "//envoy/extensions/tracers/opentelemetry/samplers/v3:pkg",
         "//envoy/extensions/transport_sockets/alts/v3:pkg",
+        "//envoy/extensions/transport_sockets/dynamic_modules/v3:pkg",
         "//envoy/extensions/transport_sockets/http_11_proxy/v3:pkg",
         "//envoy/extensions/transport_sockets/internal_upstream/v3:pkg",
         "//envoy/extensions/transport_sockets/proxy_protocol/v3:pkg",

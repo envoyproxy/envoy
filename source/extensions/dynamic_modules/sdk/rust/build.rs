@@ -12,6 +12,7 @@ fn main() {
   // In any case, clang must be found to build the bindings.
 
   println!("cargo:rerun-if-changed=../../abi.h");
+  println!("cargo:rerun-if-changed=../../transport_socket_abi.h");
 
   let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
   let abi_version_path = out_path.join("generated_abi_version.h");
@@ -65,6 +66,7 @@ const char* kAbiVersion = "{}";
 
   let bindings = bindgen::Builder::default()
     .header("../../abi.h")
+    .header("../../transport_socket_abi.h")
     .header(abi_version_path.to_str().unwrap())
     .clang_arg("-v")
     .default_enum_style(bindgen::EnumVariation::Rust {

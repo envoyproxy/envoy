@@ -5,6 +5,7 @@
 #![allow(clippy::unnecessary_cast)]
 
 pub mod buffer;
+pub mod transport_socket;
 pub use buffer::{EnvoyBuffer, EnvoyMutBuffer};
 use mockall::predicate::*;
 use mockall::*;

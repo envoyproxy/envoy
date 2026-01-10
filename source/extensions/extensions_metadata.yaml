@@ -1488,6 +1488,15 @@ envoy.transport_sockets.alts:
   status: stable
   type_urls:
   - envoy.extensions.transport_sockets.alts.v3.Alts
+envoy.transport_sockets.dynamic_modules:
+  categories:
+  - envoy.transport_sockets.downstream
+  - envoy.transport_sockets.upstream
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.transport_sockets.dynamic_modules.v3.DynamicModuleUpstreamTransportSocket
+  - envoy.extensions.transport_sockets.dynamic_modules.v3.DynamicModuleDownstreamTransportSocket
 envoy.transport_sockets.internal_upstream:
   categories:
   - envoy.transport_sockets.upstream
