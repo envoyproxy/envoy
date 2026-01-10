@@ -68,7 +68,7 @@ Http::FilterHeadersStatus FileSystemBufferFilter::decodeHeaders(Http::RequestHea
   // means we still have the thread potentially using twice the memory that the user configured as
   // the memory limit, once in our own buffer and once in the outgoing buffer. (Plus overflow
   // because the limit isn't hard.)
-  request_callbacks_->setDecoderBufferLimit(request_state_.config_->memoryBufferBytesLimit());
+  request_callbacks_->setBufferLimit(request_state_.config_->memoryBufferBytesLimit());
   request_headers_ = &headers;
   return Http::FilterHeadersStatus::StopIteration;
 }
@@ -96,7 +96,7 @@ Http::FilterHeadersStatus FileSystemBufferFilter::encodeHeaders(Http::ResponseHe
   // means we still have the thread potentially using twice the memory that the user configured as
   // the memory limit, once in our own buffer and once in the outgoing buffer. (Plus overflow
   // because the limit isn't hard.)
-  response_callbacks_->setEncoderBufferLimit(response_state_.config_->memoryBufferBytesLimit());
+  response_callbacks_->setBufferLimit(response_state_.config_->memoryBufferBytesLimit());
   response_headers_ = &headers;
   return Http::FilterHeadersStatus::StopIteration;
 }
