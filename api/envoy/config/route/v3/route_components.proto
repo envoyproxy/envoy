@@ -2836,7 +2836,6 @@ message QueryParameterMatcher {
 }
 
 // Cookie matching inspects individual name/value pairs parsed from the ``Cookie`` header.
-// [#next-free-field: 4]
 message CookieMatcher {
   // Specifies the cookie name to evaluate.
   string name = 1 [(validate.rules).string = {min_len: 1 max_bytes: 1024}];
