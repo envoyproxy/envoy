@@ -154,7 +154,6 @@ jobs:
         fetch-depth: 0
     - run: |
         shas=(
-            sha
             sha-ci
             sha-devtools
             sha-docker
@@ -188,7 +187,6 @@ jobs:
       uses: envoyproxy/toolshed/actions/docker/shas@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
       with:
         images: |
-           sha: docker.io/envoyproxy/envoy-build:devtools-${{ steps.build-tools.outputs.tag }}
            sha-ci: docker.io/envoyproxy/envoy-build:ci-${{ steps.build-tools.outputs.tag }}
            sha-devtools: docker.io/envoyproxy/envoy-build:devtools-${{ steps.build-tools.outputs.tag }}
            sha-docker: docker.io/envoyproxy/envoy-build:docker-${{ steps.build-tools.outputs.tag }}
@@ -199,7 +197,6 @@ jobs:
     - run: |
         SHA_REPLACE=(
             "$CURRENT_ENVOY_TAG:$ENVOY_TAG"
-            "$CURRENT_ENVOY_SHA:${{ fromJSON(steps.build-images.outputs.shas).sha }}"
             "$CURRENT_ENVOY_SHA_CI:${{ fromJSON(steps.build-images.outputs.shas).sha-ci }}"
             "$CURRENT_ENVOY_SHA_DEVTOOLS:${{ fromJSON(steps.build-images.outputs.shas).sha-devtools }}"
             "$CURRENT_ENVOY_SHA_DOCKER:${{ fromJSON(steps.build-images.outputs.shas).sha-docker }}"
@@ -212,7 +209,6 @@ jobs:
       env:
         ENVOY_TAG: ${{ steps.build-tools.outputs.tag }}
         CURRENT_ENVOY_TAG: ${{ steps.current.outputs.tag }}
-        CURRENT_ENVOY_SHA: ${{ steps.current.outputs.sha }}
         CURRENT_ENVOY_SHA_CI: ${{ steps.current.outputs.sha-ci }}
         CURRENT_ENVOY_SHA_DEVTOOLS: ${{ steps.current.outputs.sha-devtools }}
         CURRENT_ENVOY_SHA_DOCKER: ${{ steps.current.outputs.sha-docker }}
