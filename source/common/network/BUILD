@@ -431,6 +431,7 @@ envoy_cc_library(
     deps = [
         ":address_lib",
         "//envoy/api:os_sys_calls_interface",
+        "//envoy/network:address_interface",
         "//envoy/network:listen_socket_interface",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:assert_lib",
@@ -486,6 +487,7 @@ envoy_cc_library(
         ":address_lib",
         ":socket_option_lib",
         ":win32_redirect_records_option_lib",
+        "//envoy/network:address_interface",
         "//envoy/network:listen_socket_interface",
         "//source/common/common:logger_lib",
         "@com_google_absl//absl/types:optional",
