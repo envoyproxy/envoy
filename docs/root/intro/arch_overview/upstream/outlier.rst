@@ -205,6 +205,20 @@ required request volume in an interval is less than the
 :ref:`outlier_detection.failure_percentage_minimum_hosts<envoy_v3_api_field_config.cluster.v3.OutlierDetection.failure_percentage_minimum_hosts>`
 value.
 
+Degraded Host Detection
+^^^^^^^^^^^^^^^^^^^^^^^
+
+Degraded host detection is enabled by setting
+:ref:`outlier_detection.detect_degraded_hosts<envoy_v3_api_field_config.cluster.v3.OutlierDetection.detect_degraded_hosts>`
+to ``true``. When enabled, hosts that return
+the ``x-envoy-degraded`` header are marked as degraded. Unlike ejected hosts, degraded hosts
+remain in the load balancing rotation but are deprioritized, only receiving traffic when there
+are insufficient healthy hosts available. For more information about how degraded endpoints are
+handled during load balancing, see :ref:`degraded endpoints <arch_overview_load_balancing_degraded>`.
+
+When a host is marked as degraded, it remains in that state for a period calculated
+using the same backoff algorithm as ejection, and automatically cleared after this period expires.
+
 .. _arch_overview_outlier_detection_error_mapping:
 
 Error Mapping
