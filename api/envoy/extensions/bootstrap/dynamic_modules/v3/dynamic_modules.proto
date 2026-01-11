@@ -1,0 +1,74 @@
+syntax = "proto3";
+
+package envoy.extensions.bootstrap.dynamic_modules.v3;
+
+import "envoy/extensions/dynamic_modules/v3/dynamic_modules.proto";
+
+import "google/protobuf/any.proto";
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.bootstrap.dynamic_modules.v3";
+option java_outer_classname = "DynamicModulesProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/bootstrap/dynamic_modules/v3;dynamic_modulesv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Dynamic Modules Bootstrap Extension]
+// [#extension: envoy.bootstrap.dynamic_modules]
+
+// Configuration for the Dynamic Modules bootstrap extension. This extension allows loading shared
+// object files that can be loaded via ``dlopen`` to extend Envoy's bootstrap behavior.
+//
+// A module can be loaded by multiple bootstrap extensions; the module is loaded only once and shared
+// across multiple extensions.
+//
+// Bootstrap extensions run on the main thread and are initialized when Envoy starts. They can:
+//
+// * Perform initialization tasks when the server is initialized.
+// * Perform per-worker thread initialization when worker threads start.
+// * Access server-level resources like the cluster manager and dispatcher.
+//
+message DynamicModuleBootstrapExtension {
+  // Specifies the shared-object level configuration.
+  envoy.extensions.dynamic_modules.v3.DynamicModuleConfig dynamic_module_config = 1;
+
+  // The name for this extension configuration.
+  //
+  // This can be used to distinguish between different extension implementations inside a dynamic
+  // module. For example, a module can have completely different extension implementations. When Envoy
+  // receives this configuration, it passes the ``extension_name`` to the dynamic module's bootstrap
+  // extension config init function together with the ``extension_config``. That way a module can
+  // decide which in-module extension implementation to use based on the name at load time.
+  //
+  // If not specified, defaults to an empty string.
+  string extension_name = 2;
+
+  // The configuration for the extension chosen by ``extension_name``.
+  //
+  // This is passed to the module's bootstrap extension initialization function. Together with the
+  // ``extension_name``, the module can decide which in-module extension implementation to use and
+  // fine-tune the behavior of the extension.
+  //
+  // For example, if a module has two extension implementations, one for configuration loading and
+  // one for metric initialization, ``extension_name`` is used to choose the implementation. The
+  // ``extension_config`` can be used to configure the specific behavior of each implementation.
+  //
+  // ``google.protobuf.Struct`` is serialized as JSON before passing it to the module.
+  // ``google.protobuf.BytesValue`` and ``google.protobuf.StringValue`` are passed directly
+  // without the wrapper.
+  //
+  // .. code-block:: yaml
+  //
+  //  # Passing a string value
+  //  extension_config:
+  //    "@type": "type.googleapis.com/google.protobuf.StringValue"
+  //    value: hello
+  //
+  //  # Passing raw bytes
+  //  extension_config:
+  //    "@type": "type.googleapis.com/google.protobuf.BytesValue"
+  //    value: aGVsbG8=  # echo -n "hello" | base64
+  //
+  google.protobuf.Any extension_config = 3;
+}

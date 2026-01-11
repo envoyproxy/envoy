@@ -148,6 +148,8 @@ paths:
     # Extensions can exempt entire directories but new extensions
     # points should ideally use StatusOr
     - source/extensions/access_loggers
+    # Bootstrap extension factories must throw per interface documentation.
+    - source/extensions/bootstrap/dynamic_modules/factory.cc
     - source/extensions/clusters/eds/
     - source/extensions/clusters/logical_dns
     - source/extensions/clusters/original_dst

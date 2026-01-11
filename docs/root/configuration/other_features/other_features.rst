@@ -4,6 +4,7 @@ Other features
 .. toctree::
   :maxdepth: 2
 
+  bootstrap_extensions/dynamic_modules
   dlb
   hyperscan
   internal_listener

@@ -15,3 +15,4 @@ Bootstrap
   ../config/metrics/v3/stats.proto
   ../extensions/vcl/v3alpha/vcl_socket_interface.proto
   ../extensions/wasm/v3/wasm.proto
+  ../extensions/bootstrap/dynamic_modules/v3/dynamic_modules.proto
