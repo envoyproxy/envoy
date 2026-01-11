@@ -34,6 +34,20 @@ SslStats generateSslStats(Stats::Scope& store);
 
 Stats::Gauge& createCertificateExpirationGauge(Stats::Scope& scope, const std::string& cert_name);
 
+/**
+ * Certificate compression stats per algorithm. @see stats_macros.h
+ */
+#define CERT_COMPRESSION_STATS(COUNTER)                                                            \
+  COUNTER(compressed)                                                                              \
+  COUNTER(total_uncompressed_bytes)                                                                \
+  COUNTER(total_compressed_bytes)
+
+struct CertCompressionStats {
+  CERT_COMPRESSION_STATS(GENERATE_COUNTER_STRUCT)
+};
+
+CertCompressionStats generateCertCompressionStats(Stats::Scope& scope, const std::string& prefix);
+
 } // namespace Tls
 } // namespace TransportSockets
 } // namespace Extensions

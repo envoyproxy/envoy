@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/stats/scope.h"
+
 #include "source/common/quic/envoy_quic_proof_source_base.h"
 #include "source/common/quic/quic_server_transport_socket_factory.h"
 #include "source/server/listener_stats.h"
@@ -12,9 +14,10 @@ class EnvoyQuicProofSource : public EnvoyQuicProofSourceBase {
 public:
   EnvoyQuicProofSource(Network::Socket& listen_socket,
                        Network::FilterChainManager& filter_chain_manager,
-                       Server::ListenerStats& listener_stats, TimeSource& time_source)
+                       Server::ListenerStats& listener_stats, TimeSource& time_source,
+                       Stats::Scope& stats_scope)
       : listen_socket_(listen_socket), filter_chain_manager_(&filter_chain_manager),
-        listener_stats_(listener_stats), time_source_(time_source) {}
+        listener_stats_(listener_stats), time_source_(time_source), stats_scope_(stats_scope) {}
 
   ~EnvoyQuicProofSource() override = default;
 
@@ -58,6 +61,7 @@ private:
   Network::FilterChainManager* filter_chain_manager_{nullptr};
   Server::ListenerStats& listener_stats_;
   TimeSource& time_source_;
+  Stats::Scope& stats_scope_;
 };
 
 } // namespace Quic
