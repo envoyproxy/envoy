@@ -14,7 +14,9 @@ envoy_cc_library(
     srcs = ["filter_config.cc"],
     hdrs = ["filter_config.h"],
     deps = [
+        "//envoy/stats:stats_interface",
         "//source/common/config:utility_lib",
+        "//source/common/stats:utility_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
         "@envoy_api//envoy/extensions/filters/udp/dynamic_modules/v3:pkg_cc_proto",
     ],
@@ -38,6 +40,7 @@ envoy_cc_library(
         "//source/common/common:logger_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf",
+        "//source/common/stats:utility_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
     ],
 )

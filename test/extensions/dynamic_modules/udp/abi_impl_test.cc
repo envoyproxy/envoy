@@ -2,6 +2,7 @@
 
 #include "source/common/network/address_impl.h"
 #include "source/common/network/utility.h"
+#include "source/common/stats/isolated_store_impl.h"
 #include "source/extensions/dynamic_modules/abi.h"
 #include "source/extensions/filters/udp/dynamic_modules/filter.h"
 
@@ -26,7 +27,7 @@ public:
     proto_config.mutable_filter_config()->set_value("some_config");
 
     filter_config_ = std::make_shared<DynamicModuleUdpListenerFilterConfig>(
-        proto_config, std::move(dynamic_module.value()));
+        proto_config, std::move(dynamic_module.value()), *stats_.rootScope());
 
     filter_ = std::make_shared<DynamicModuleUdpListenerFilter>(callbacks_, filter_config_);
   }
@@ -35,6 +36,7 @@ public:
 
   void* filterPtr() { return static_cast<void*>(filter_.get()); }
 
+  Stats::IsolatedStoreImpl stats_;
   DynamicModuleUdpListenerFilterConfigSharedPtr filter_config_;
   std::shared_ptr<DynamicModuleUdpListenerFilter> filter_;
   NiceMock<Network::MockUdpReadFilterCallbacks> callbacks_;

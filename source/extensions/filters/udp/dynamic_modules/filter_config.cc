@@ -11,10 +11,13 @@ namespace DynamicModules {
 DynamicModuleUdpListenerFilterConfig::DynamicModuleUdpListenerFilterConfig(
     const envoy::extensions::filters::udp::dynamic_modules::v3::DynamicModuleUdpListenerFilter&
         config,
-    Extensions::DynamicModules::DynamicModulePtr dynamic_module)
+    Extensions::DynamicModules::DynamicModulePtr dynamic_module, Stats::Scope& stats_scope)
     : filter_name_(config.filter_name()),
       filter_config_(MessageUtil::getJsonStringFromMessageOrError(config.filter_config())),
-      dynamic_module_(std::move(dynamic_module)) {
+      dynamic_module_(std::move(dynamic_module)),
+      stats_scope_(stats_scope.createScope(
+          absl::StrCat(UdpListenerFilterStatsNamespace, ".", config.filter_name(), "."))),
+      stat_name_pool_(stats_scope_->symbolTable()) {
 
   auto config_new_or_error = dynamic_module_->getFunctionPointer<decltype(on_filter_config_new_)>(
       "envoy_dynamic_module_on_udp_listener_filter_config_new");

@@ -38,6 +38,7 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:access_log_no_op",
     ],
     deps = [
+        "//source/common/stats:isolated_store_lib",
         "//source/extensions/access_loggers/dynamic_modules:access_log_lib",
         "//test/extensions/dynamic_modules:util",
         "//test/mocks/access_log:access_log_mocks",
