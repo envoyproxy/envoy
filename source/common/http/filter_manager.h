@@ -955,6 +955,14 @@ protected:
     // True when the filter chain iteration was aborted with local reply.
     bool decoder_filter_chain_aborted_{};
     bool encoder_filter_chain_aborted_{};
+
+    // Each Nth bit in the array denotes if Nth filter has received `end_stream=true`
+    // via decodeHeaders() or decodeData().
+    std::bitset<32> filters_observed_decode_end_stream_;
+    // Each Nth bit in the array denotes if Nth filter has received `end_stream=true`
+    // via encodeHeaders() or encodeData().
+    std::bitset<32> filters_observed_encode_end_stream_;
+
     bool saw_downstream_reset_{};
     // True when the stream was recreated.
     bool recreated_stream_{};

@@ -38,3 +38,15 @@ envoy_extension_cc_test(
         "//test/mocks/server:server_mocks",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "bandwidth_limit_integration_test",
+    srcs = ["bandwidth_limit_integration_test.cc"],
+    extension_names = ["envoy.filters.http.bandwidth_limit"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/extensions/filters/http/bandwidth_limit:config",
+        "//test/integration:http_integration_lib",
+        "//test/integration:http_protocol_integration_lib",
+    ],
+)
