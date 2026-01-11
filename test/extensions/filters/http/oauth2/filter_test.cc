@@ -4121,7 +4121,8 @@ TEST_F(OAuth2Test, MixedCookieSameSiteWithoutDisabled) {
                                    std::chrono::seconds(600));
 }
 
-// Test all cookies with Partitioned attribute enabled (requires SameSite=None for third-party context)
+// Test all cookies with Partitioned attribute enabled (requires SameSite=None for third-party
+// context)
 TEST_F(OAuth2Test, AllCookiesPartitioned) {
   using SameSite = envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite;
   init(getConfig(true, true,
@@ -4131,11 +4132,10 @@ TEST_F(OAuth2Test, AllCookiesPartitioned) {
                  SameSite::CookieConfig_SameSite_NONE, SameSite::CookieConfig_SameSite_NONE,
                  SameSite::CookieConfig_SameSite_NONE, SameSite::CookieConfig_SameSite_NONE,
                  SameSite::CookieConfig_SameSite_NONE, SameSite::CookieConfig_SameSite_NONE, 0, 0,
-                 false, "", "", "", "", "", "", "",
-                 true /* bearer_partitioned */, true /* hmac_partitioned */,
-                 true /* expires_partitioned */, true /* id_token_partitioned */,
-                 true /* refresh_token_partitioned */, true /* nonce_partitioned */,
-                 true /* code_verifier_partitioned */));
+                 false, "", "", "", "", "", "", "", true /* bearer_partitioned */,
+                 true /* hmac_partitioned */, true /* expires_partitioned */,
+                 true /* id_token_partitioned */, true /* refresh_token_partitioned */,
+                 true /* nonce_partitioned */, true /* code_verifier_partitioned */));
   oauthHMAC = "4TKyxPV/F7yyvr0XgJ2bkWFOc8t4IOFen1k29b84MAQ=;";
   TestScopedRuntime scoped_runtime;
   test_time_.setSystemTime(SystemTime(std::chrono::seconds(1000)));
@@ -4188,11 +4188,10 @@ TEST_F(OAuth2Test, MixedCookiesPartitioned) {
                  SameSite::CookieConfig_SameSite_NONE, SameSite::CookieConfig_SameSite_LAX,
                  SameSite::CookieConfig_SameSite_NONE, SameSite::CookieConfig_SameSite_NONE,
                  SameSite::CookieConfig_SameSite_NONE, SameSite::CookieConfig_SameSite_NONE, 0, 0,
-                 false, "", "", "", "", "", "", "",
-                 true /* bearer_partitioned */, true /* hmac_partitioned */,
-                 false /* expires_partitioned */, true /* id_token_partitioned */,
-                 true /* refresh_token_partitioned */, false /* nonce_partitioned */,
-                 false /* code_verifier_partitioned */));
+                 false, "", "", "", "", "", "", "", true /* bearer_partitioned */,
+                 true /* hmac_partitioned */, false /* expires_partitioned */,
+                 true /* id_token_partitioned */, true /* refresh_token_partitioned */,
+                 false /* nonce_partitioned */, false /* code_verifier_partitioned */));
   oauthHMAC = "4TKyxPV/F7yyvr0XgJ2bkWFOc8t4IOFen1k29b84MAQ=;";
   TestScopedRuntime scoped_runtime;
   test_time_.setSystemTime(SystemTime(std::chrono::seconds(1000)));
