@@ -1,3 +1,5 @@
+#include "envoy/extensions/transport_sockets/tls/cert_mappers/filter_state_override/v3/config.pb.h"
+#include "envoy/extensions/transport_sockets/tls/cert_mappers/sni/v3/config.pb.h"
 #include "envoy/extensions/transport_sockets/tls/cert_mappers/static_name/v3/config.pb.h"
 #include "envoy/extensions/transport_sockets/tls/cert_selectors/on_demand_secret/v3/config.pb.h"
 
@@ -11,6 +13,7 @@
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
+#include "openssl/ssl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -90,6 +93,38 @@ TEST_F(OnDemandTest, QuicCall) {
   bool sni;
   absl::InlinedVector<int, 3> curve;
   EXPECT_DEATH(selector->findTlsContext("", curve, false, &sni), "Not supported with QUIC");
+}
+
+TEST(SNIMapper, Derivation) {
+  NiceMock<Server::Configuration::MockGenericFactoryContext> factory_context;
+  Ssl::TlsCertificateMapperConfigFactory& mapper_factory =
+      Config::Utility::getAndCheckFactoryByName<Ssl::TlsCertificateMapperConfigFactory>(
+          "envoy.tls.certificate_mappers.sni");
+  envoy::extensions::transport_sockets::tls::cert_mappers::sni::v3::SNI config;
+  TestUtility::loadFromYaml("default_value: test", config);
+  auto mapper_status = mapper_factory.createTlsCertificateMapperFactory(config, factory_context);
+  ASSERT_OK(mapper_status);
+  auto mapper = mapper_status.value()();
+  bssl::UniquePtr<SSL_CTX> ctx(SSL_CTX_new(TLS_method()));
+  bssl::UniquePtr<SSL> ssl(SSL_new(ctx.get()));
+  EXPECT_EQ("test", mapper->deriveFromServerHello(*ssl, nullptr));
+}
+
+TEST(FilterStateMapper, Derivation) {
+  NiceMock<Server::Configuration::MockGenericFactoryContext> factory_context;
+  Ssl::TlsCertificateMapperConfigFactory& mapper_factory =
+      Config::Utility::getAndCheckFactoryByName<Ssl::TlsCertificateMapperConfigFactory>(
+          "envoy.tls.certificate_mappers.filter_state_override");
+  envoy::extensions::transport_sockets::tls::cert_mappers::filter_state_override::v3::Config config;
+  TestUtility::loadFromYaml("default_value: test", config);
+  auto mapper_status = mapper_factory.createTlsCertificateMapperFactory(config, factory_context);
+  ASSERT_OK(mapper_status);
+  auto mapper = mapper_status.value()();
+  bssl::UniquePtr<SSL_CTX> ctx(SSL_CTX_new(TLS_method()));
+  bssl::UniquePtr<SSL> ssl(SSL_new(ctx.get()));
+  EXPECT_EQ("test", mapper->deriveFromServerHello(*ssl, nullptr));
+  SSL_CLIENT_HELLO hello;
+  EXPECT_EQ("test", mapper->deriveFromClientHello(hello));
 }
 
 } // namespace

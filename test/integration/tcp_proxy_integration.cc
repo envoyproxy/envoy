@@ -3,29 +3,29 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-void TcpProxyIntegrationTest::initialize() {
+void BaseTcpProxyIntegrationTest::initialize() {
   config_helper_.renameListener("tcp_proxy");
   BaseIntegrationTest::initialize();
 }
 
-void TcpProxyIntegrationTest::setupByteMeterAccessLog() {
+void BaseTcpProxyIntegrationTest::setupByteMeterAccessLog() {
   useListenerAccessLog("DOWNSTREAM_WIRE_BYTES_SENT=%DOWNSTREAM_WIRE_BYTES_SENT% "
                        "DOWNSTREAM_WIRE_BYTES_RECEIVED=%DOWNSTREAM_WIRE_BYTES_RECEIVED% "
                        "UPSTREAM_WIRE_BYTES_SENT=%UPSTREAM_WIRE_BYTES_SENT% "
                        "UPSTREAM_WIRE_BYTES_RECEIVED=%UPSTREAM_WIRE_BYTES_RECEIVED%");
 }
 
-void TcpProxySslIntegrationTest::initialize() {
+void BaseTcpProxySslIntegrationTest::initialize() {
   config_helper_.addSslConfig();
-  TcpProxyIntegrationTest::initialize();
+  BaseTcpProxyIntegrationTest::initialize();
 
   context_manager_ = std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(
       server_factory_context_);
   context_ = Ssl::createClientSslTransportSocketFactory(ssl_options_, *context_manager_, *api_);
 }
 
-TcpProxySslIntegrationTest::ClientSslConnection::ClientSslConnection(
-    TcpProxySslIntegrationTest& parent)
+BaseTcpProxySslIntegrationTest::ClientSslConnection::ClientSslConnection(
+    BaseTcpProxySslIntegrationTest& parent)
     : parent_(parent),
       payload_reader_(std::make_shared<WaitForPayloadReader>(*parent.dispatcher_)) {
   // Set up the mock buffer factory so the newly created SSL client will have a mock write
@@ -57,7 +57,7 @@ TcpProxySslIntegrationTest::ClientSslConnection::ClientSslConnection(
   ssl_client_->connect();
 }
 
-void TcpProxySslIntegrationTest::ClientSslConnection::waitForUpstreamConnection() {
+void BaseTcpProxySslIntegrationTest::ClientSslConnection::waitForUpstreamConnection() {
   while (!connect_callbacks_.connected()) {
     parent_.dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
@@ -65,9 +65,15 @@ void TcpProxySslIntegrationTest::ClientSslConnection::waitForUpstreamConnection(
   RELEASE_ASSERT(result, result.message());
 }
 
+void BaseTcpProxySslIntegrationTest::ClientRawConnection::waitForUpstreamConnection() {
+  AssertionResult result = parent_.dataStream()->waitForRawConnection(
+      fake_upstream_connection_, TestUtility::DefaultTimeout, *parent_.dispatcher_);
+  RELEASE_ASSERT(result, result.message());
+}
+
 // Test proxying data in both directions with envoy doing TCP and TLS
 // termination.
-void TcpProxySslIntegrationTest::ClientSslConnection::sendAndReceiveTlsData(
+void BaseTcpProxySslIntegrationTest::ClientSslConnection::sendAndReceiveTlsData(
     const std::string& data_to_send_upstream, const std::string& data_to_send_downstream) {
   // Ship some data upstream.
   Buffer::OwnedImpl buffer(data_to_send_upstream);
@@ -96,14 +102,43 @@ void TcpProxySslIntegrationTest::ClientSslConnection::sendAndReceiveTlsData(
   EXPECT_TRUE(connect_callbacks_.closed());
 }
 
-void TcpProxySslIntegrationTest::setupConnections() {
+void BaseTcpProxySslIntegrationTest::ClientRawConnection::sendAndReceiveTlsData(
+    const std::string& data_to_send_upstream, const std::string& data_to_send_downstream) {
+  ASSERT_TRUE(tcp_client_.write(data_to_send_upstream));
+  ASSERT_TRUE(fake_upstream_connection_->waitForData(data_to_send_upstream.size()));
+  ASSERT_TRUE(fake_upstream_connection_->write(data_to_send_downstream));
+  tcp_client_.waitForData(data_to_send_downstream);
+  tcp_client_.close();
+  ASSERT_TRUE(fake_upstream_connection_->waitForHalfClose());
+  ASSERT_TRUE(fake_upstream_connection_->close());
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+}
+
+void BaseTcpProxySslIntegrationTest::ClientSslConnection::close() {
+  ssl_client_->close(Network::ConnectionCloseType::NoFlush);
+}
+
+void BaseTcpProxySslIntegrationTest::ClientRawConnection::close() { tcp_client_.close(); }
+
+void BaseTcpProxySslIntegrationTest::ClientSslConnection::waitForDisconnect() {
+  while (!connect_callbacks_.closed()) {
+    parent_.dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+}
+
+void BaseTcpProxySslIntegrationTest::ClientRawConnection::waitForDisconnect() {
+  tcp_client_.waitForHalfClose();
+  tcp_client_.close();
+}
+
+void BaseTcpProxySslIntegrationTest::setupConnections() {
   initialize();
   client_ = std::make_unique<ClientSslConnection>(*this);
   client_->waitForUpstreamConnection();
 }
 
-void TcpProxySslIntegrationTest::sendAndReceiveTlsData(const std::string& data_to_send_upstream,
-                                                       const std::string& data_to_send_downstream) {
+void BaseTcpProxySslIntegrationTest::sendAndReceiveTlsData(
+    const std::string& data_to_send_upstream, const std::string& data_to_send_downstream) {
   client_->sendAndReceiveTlsData(data_to_send_upstream, data_to_send_downstream);
 }
 } // namespace Envoy

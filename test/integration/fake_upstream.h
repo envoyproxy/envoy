@@ -773,7 +773,8 @@ public:
   ABSL_MUST_USE_RESULT
   testing::AssertionResult
   waitForRawConnection(FakeRawConnectionPtr& connection,
-                       std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+                       std::chrono::milliseconds timeout = TestUtility::DefaultTimeout,
+                       OptRef<Event::Dispatcher> dispatcher = absl::nullopt);
   Network::Address::InstanceConstSharedPtr localAddress() const {
     return socket_->connectionInfoProvider().localAddress();
   }
