@@ -73,6 +73,7 @@ constexpr absl::string_view OAUTH2_SCOPE_OPENID = "openid";
 constexpr absl::string_view SameSiteLax = ";SameSite=Lax";
 constexpr absl::string_view SameSiteStrict = ";SameSite=Strict";
 constexpr absl::string_view SameSiteNone = ";SameSite=None";
+constexpr absl::string_view PartitionedCookie = ";Partitioned";
 constexpr absl::string_view HmacPayloadSeparator = "\n";
 constexpr absl::string_view CookieSuffixDelimiter = ".";
 
@@ -1181,6 +1182,9 @@ std::string OAuth2Filter::buildCookieTail(const FilterConfig::CookieSettings& se
   if (!config_->cookieDomain().empty()) {
     cookie_tail =
         absl::StrCat(fmt::format(CookieDomainFormatString, config_->cookieDomain()), cookie_tail);
+  }
+  if (settings.partitioned_) {
+    absl::StrAppend(&cookie_tail, PartitionedCookie);
   }
   return cookie_tail;
 }
