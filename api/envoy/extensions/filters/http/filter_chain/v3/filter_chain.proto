@@ -1,0 +1,58 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.filter_chain.v3;
+
+import "envoy/config/core/v3/extension.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.filter_chain.v3";
+option java_outer_classname = "FilterChainProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/filter_chain/v3;filter_chainv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Filter Chain]
+// Filter Chain :ref:`configuration overview <config_http_filters_filter_chain>`.
+// [#extension: envoy.filters.http.filter_chain]
+
+// A filter chain is a list of HTTP filters that are applied in order.
+// This message is used to define a reusable chain of filters that can be
+// referenced by name or used as the default filter chain.
+message FilterChain {
+  // A list of HTTP filter configurations to be applied in order.
+  // Each filter in the chain will process the request/response in sequence.
+  // At least one filter must be specified.
+  // [#extension-category: envoy.filters.http]
+  repeated config.core.v3.TypedExtensionConfig filters = 1
+      [(validate.rules).repeated = {min_items: 1}];
+}
+
+// Filter-level configuration for the filter chain filter. This filter acts as a wrapper
+// that applies a configurable chain of HTTP filters to incoming requests.
+message FilterChainConfig {
+  // Default filter chain applied when no route-level filter chain is specified
+  // or when the route-level filter chain name does not match any defined filter chains.
+  // This field is optional. If not specified and no route-level configuration matches,
+  // the filter will pass through without applying any additional filters.
+  FilterChain filter_chain = 1;
+
+  // Map of named filter chains. The key is an arbitrary name assigned to the filter chain.
+  // These named filter chains can be referenced by the per-route configuration using
+  // the filter_chain_name field in FilterChainConfigPerRoute.
+  map<string, FilterChain> filter_chains = 2;
+}
+
+// Per-route configuration for the filter chain filter. This allows different filter chains
+// to be applied on different routes.
+message FilterChainConfigPerRoute {
+  // Filter chain to be applied on this route.
+  // If specified, this filter chain takes precedence over filter_chain_name.
+  FilterChain filter_chain = 1;
+
+  // Name of the filter chain to be applied on this route. This name should match
+  // one of the names defined in the FilterChainConfig.filter_chains map.
+  // If filter_chain is also specified, this field is ignored.
+  string filter_chain_name = 2;
+}

@@ -297,6 +297,12 @@ new_features:
     actions using the ``filter_chain_name`` field in :ref:`ExecuteFilterAction
     <envoy_v3_api_msg_extensions.filters.http.composite.v3.ExecuteFilterAction>`. This improves
     scalability by allowing filter chains to be defined once and referenced across many match actions.
+- area: http
+  change: |
+    Added new :ref:`filter chain filter <config_http_filters_filter_chain>` to allow users to configure
+    multiple sub filter chain in single position of the main HTTP filter chain.
+    And allow per route configuration of the filter chain filter to select different sub filter chains
+    based on route match criteria.
 - area: server
   change: |
     Added command-line option ``--file-flush-min-size-kb <integer>`` to configure the minimum size in kilobytes for log file flushing.
