@@ -5194,18 +5194,12 @@ pub type NewBootstrapExtensionConfigFunction = fn(
 /// EnvoyBootstrapExtensionConfig is the Envoy-side bootstrap extension configuration.
 /// This is a handle to the Envoy configuration object.
 #[automock]
-pub trait EnvoyBootstrapExtensionConfig {
-  /// Get the raw pointer to the Envoy bootstrap extension config object.
-  fn as_ptr(&self) -> abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr;
-}
+pub trait EnvoyBootstrapExtensionConfig {}
 
 /// EnvoyBootstrapExtension is the Envoy-side bootstrap extension.
 /// This is a handle to the Envoy extension object.
 #[automock]
 pub trait EnvoyBootstrapExtension {
-  /// Get the raw pointer to the Envoy bootstrap extension object.
-  fn as_ptr(&self) -> abi::envoy_dynamic_module_type_bootstrap_extension_envoy_ptr;
-
   /// Log a message to Envoy's logging system.
   fn log(&self, level: abi::envoy_dynamic_module_type_log_level, message: &str);
 }
@@ -5252,6 +5246,7 @@ pub trait BootstrapExtension: Send + Sync {
 // Implementation of EnvoyBootstrapExtensionConfig
 
 struct EnvoyBootstrapExtensionConfigImpl {
+  #[allow(dead_code)]
   raw: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
 }
 
@@ -5261,11 +5256,7 @@ impl EnvoyBootstrapExtensionConfigImpl {
   }
 }
 
-impl EnvoyBootstrapExtensionConfig for EnvoyBootstrapExtensionConfigImpl {
-  fn as_ptr(&self) -> abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr {
-    self.raw
-  }
-}
+impl EnvoyBootstrapExtensionConfig for EnvoyBootstrapExtensionConfigImpl {}
 
 // Implementation of EnvoyBootstrapExtension
 
@@ -5280,10 +5271,6 @@ impl EnvoyBootstrapExtensionImpl {
 }
 
 impl EnvoyBootstrapExtension for EnvoyBootstrapExtensionImpl {
-  fn as_ptr(&self) -> abi::envoy_dynamic_module_type_bootstrap_extension_envoy_ptr {
-    self.raw
-  }
-
   fn log(&self, level: abi::envoy_dynamic_module_type_log_level, message: &str) {
     unsafe {
       abi::envoy_dynamic_module_callback_bootstrap_extension_log(
