@@ -335,7 +335,8 @@ absl::StatusOr<Network::SocketSharedPtr> ProdListenerComponentFactory::createLis
     if (!io_handle) {
       return absl::InvalidArgumentError("failed to create socket using custom interface");
     }
-    return std::make_shared<Network::TcpListenSocket>(std::move(io_handle), address, options);
+    return std::make_shared<Network::TcpListenSocket>(std::move(io_handle), address, options,
+                                                      absl::nullopt, bind_type != BindType::NoBind);
   }
 
   // Continue with standard socket creation for addresses using the default interface.
