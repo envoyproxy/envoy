@@ -368,6 +368,10 @@ new_features:
     Added scheduler API for HTTP filter configuration in dynamic modules. The configuration scheduler allows modules
     to dispatch asynchronous operations to the main thread, enabling singleton/bootstrap patterns similar to WASM
     filters for initialization and background tasks.
+- area: dynamic modules
+  change: |
+    Added :ref:`access logger <envoy_v3_api_msg_extensions.access_loggers.dynamic_modules.v3.DynamicModuleAccessLog>`
+    support for dynamic modules, enabling custom access logging with dynamic modules.
 - area: udp_sink
   change: |
     Enhanced the UDP sink to support tapped messages larger than 64KB.

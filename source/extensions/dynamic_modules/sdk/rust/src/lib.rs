@@ -4,6 +4,7 @@
 #![allow(dead_code)]
 #![allow(clippy::unnecessary_cast)]
 
+pub mod access_log;
 pub mod buffer;
 pub use buffer::{EnvoyBuffer, EnvoyMutBuffer};
 use mockall::predicate::*;
