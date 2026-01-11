@@ -3,6 +3,7 @@
 #include "source/common/http/message_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/router/string_accessor_impl.h"
+#include "source/common/stats/isolated_store_impl.h"
 #include "source/extensions/dynamic_modules/abi.h"
 #include "source/extensions/filters/network/dynamic_modules/filter.h"
 
@@ -24,8 +25,9 @@ public:
     auto dynamic_module = newDynamicModule(testSharedObjectPath("network_no_op", "c"), false);
     EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
-    auto filter_config_or_status = newDynamicModuleNetworkFilterConfig(
-        "test_filter", "", std::move(dynamic_module.value()), cluster_manager_);
+    auto filter_config_or_status =
+        newDynamicModuleNetworkFilterConfig("test_filter", "", std::move(dynamic_module.value()),
+                                            cluster_manager_, *stats_.rootScope());
     EXPECT_TRUE(filter_config_or_status.ok()) << filter_config_or_status.status().message();
     filter_config_ = filter_config_or_status.value();
 
@@ -47,6 +49,7 @@ public:
 
   void* filterPtr() { return static_cast<void*>(filter_.get()); }
 
+  Stats::IsolatedStoreImpl stats_;
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
   DynamicModuleNetworkFilterConfigSharedPtr filter_config_;
   std::shared_ptr<DynamicModuleNetworkFilter> filter_;
@@ -1258,8 +1261,9 @@ public:
     auto dynamic_module = newDynamicModule(testSharedObjectPath("network_no_op", "c"), false);
     EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
-    auto filter_config_or_status = newDynamicModuleNetworkFilterConfig(
-        "test_filter", "", std::move(dynamic_module.value()), cluster_manager_);
+    auto filter_config_or_status =
+        newDynamicModuleNetworkFilterConfig("test_filter", "", std::move(dynamic_module.value()),
+                                            cluster_manager_, *stats_.rootScope());
     EXPECT_TRUE(filter_config_or_status.ok()) << filter_config_or_status.status().message();
     filter_config_ = filter_config_or_status.value();
 
@@ -1280,6 +1284,7 @@ public:
 
   void* filterPtr() { return static_cast<void*>(filter_.get()); }
 
+  Stats::IsolatedStoreImpl stats_;
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
   DynamicModuleNetworkFilterConfigSharedPtr filter_config_;
   std::shared_ptr<DynamicModuleNetworkFilter> filter_;
