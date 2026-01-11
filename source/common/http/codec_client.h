@@ -18,7 +18,6 @@
 #include "source/common/common/logger.h"
 #include "source/common/http/codec_wrappers.h"
 #include "source/common/network/filter_impl.h"
-#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Http {
@@ -194,6 +193,12 @@ protected:
   }
 
   void enableIdleTimer() {
+    // Bug fix (default): only enable idle timer when connection is established.
+    // Old behavior (when flag is disabled): enable idle timer even when connection is not yet
+    // established.
+    if (!connected_ && enable_idle_timer_only_when_connected_) {
+      return;
+    }
     if (idle_timer_ != nullptr) {
       idle_timer_->enableTimer(idle_timeout_.value());
     }
@@ -207,6 +212,7 @@ protected:
   ClientConnectionPtr codec_;
   Event::TimerPtr idle_timer_;
   const absl::optional<std::chrono::milliseconds> idle_timeout_;
+  const bool enable_idle_timer_only_when_connected_;
 
 private:
   /**
