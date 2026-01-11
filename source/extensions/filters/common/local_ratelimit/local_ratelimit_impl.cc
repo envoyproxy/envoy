@@ -76,12 +76,11 @@ ShareProviderManagerSharedPtr ShareProviderManager::singleton(Event::Dispatcher&
 
 RateLimitTokenBucket::RateLimitTokenBucket(uint64_t max_tokens, uint64_t tokens_per_fill,
                                            std::chrono::milliseconds fill_interval,
-                                           TimeSource& time_source)
+                                           TimeSource& time_source, bool shadow_mode)
     : token_bucket_(max_tokens, time_source,
                     // Calculate the fill rate in tokens per second.
                     tokens_per_fill / std::chrono::duration<double>(fill_interval).count()),
-      fill_interval_(fill_interval) {}
-
+      fill_interval_(fill_interval), shadow_mode_(shadow_mode) {}
 bool RateLimitTokenBucket::consume(double factor, uint64_t to_consume) {
   ASSERT(!(factor <= 0.0 || factor > 1.0));
   auto cb = [tokens = to_consume / factor](double total) { return total < tokens ? 0.0 : tokens; };
@@ -103,8 +102,8 @@ LocalRateLimiterImpl::LocalRateLimiterImpl(
     if (fill_interval < std::chrono::milliseconds(50)) {
       throw EnvoyException("local rate limit token bucket fill timer must be >= 50ms");
     }
-    default_token_bucket_ = std::make_shared<RateLimitTokenBucket>(max_tokens, tokens_per_fill,
-                                                                   fill_interval, time_source_);
+    default_token_bucket_ = std::make_shared<RateLimitTokenBucket>(
+        max_tokens, tokens_per_fill, fill_interval, time_source_, false);
   }
 
   for (const auto& descriptor : descriptors) {
@@ -123,6 +122,7 @@ LocalRateLimiterImpl::LocalRateLimiterImpl(
         PROTOBUF_GET_WRAPPED_OR_DEFAULT(descriptor.token_bucket(), tokens_per_fill, 1);
     const auto per_descriptor_fill_interval = std::chrono::milliseconds(
         PROTOBUF_GET_MS_OR_DEFAULT(descriptor.token_bucket(), fill_interval, 0));
+    const auto shadow_mode = descriptor.shadow_mode();
 
     // Validate that the descriptor's fill interval is logically correct (same
     // constraint of >=50msec as for fill_interval).
@@ -133,14 +133,14 @@ LocalRateLimiterImpl::LocalRateLimiterImpl(
     if (wildcard_found) {
       DynamicDescriptorSharedPtr dynamic_descriptor = std::make_shared<DynamicDescriptor>(
           per_descriptor_max_tokens, per_descriptor_tokens_per_fill, per_descriptor_fill_interval,
-          lru_size, dispatcher.timeSource());
+          lru_size, dispatcher.timeSource(), shadow_mode);
       dynamic_descriptors_.addDescriptor(std::move(new_descriptor), std::move(dynamic_descriptor));
       continue;
     }
     RateLimitTokenBucketSharedPtr per_descriptor_token_bucket =
-        std::make_shared<RateLimitTokenBucket>(per_descriptor_max_tokens,
-                                               per_descriptor_tokens_per_fill,
-                                               per_descriptor_fill_interval, time_source_);
+        std::make_shared<RateLimitTokenBucket>(
+            per_descriptor_max_tokens, per_descriptor_tokens_per_fill, per_descriptor_fill_interval,
+            time_source_, shadow_mode);
     auto result =
         descriptors_.emplace(std::move(new_descriptor), std::move(per_descriptor_token_bucket));
     if (!result.second) {
@@ -194,7 +194,8 @@ LocalRateLimiterImpl::requestAllowed(absl::Span<const RateLimit::Descriptor> req
             share_factor, match_result.request_descriptor.get().hits_addend_.value_or(1))) {
       // If the request is forbidden by a descriptor, return the result and the descriptor
       // token bucket.
-      return {false, std::shared_ptr<TokenBucketContext>(match_result.token_bucket)};
+      return {match_result.token_bucket->shadowMode(),
+              std::shared_ptr<TokenBucketContext>(match_result.token_bucket)};
     }
     ENVOY_LOG(trace,
               "request allowed by descriptor with fill rate: {}, maxToken: {}, remainingToken {}",
@@ -214,7 +215,8 @@ LocalRateLimiterImpl::requestAllowed(absl::Span<const RateLimit::Descriptor> req
     if (const bool result = default_token_bucket_->consume(share_factor); !result) {
       // If the request is forbidden by the default token bucket, return the result and the
       // default token bucket.
-      return {false, std::shared_ptr<TokenBucketContext>(default_token_bucket_)};
+      return {default_token_bucket_->shadowMode(),
+              std::shared_ptr<TokenBucketContext>(default_token_bucket_)};
     }
 
     // If the request is allowed then return the result the token bucket. The descriptor
@@ -282,10 +284,10 @@ DynamicDescriptorMap::getBucket(const RateLimit::Descriptor request_descriptor) 
 DynamicDescriptor::DynamicDescriptor(uint64_t per_descriptor_max_tokens,
                                      uint64_t per_descriptor_tokens_per_fill,
                                      std::chrono::milliseconds per_descriptor_fill_interval,
-                                     uint32_t lru_size, TimeSource& time_source)
+                                     uint32_t lru_size, TimeSource& time_source, bool shadow_mode)
     : max_tokens_(per_descriptor_max_tokens), tokens_per_fill_(per_descriptor_tokens_per_fill),
-      fill_interval_(per_descriptor_fill_interval), lru_size_(lru_size), time_source_(time_source) {
-}
+      fill_interval_(per_descriptor_fill_interval), lru_size_(lru_size), time_source_(time_source),
+      shadow_mode_(shadow_mode) {}
 
 RateLimitTokenBucketSharedPtr
 DynamicDescriptor::addOrGetDescriptor(const RateLimit::Descriptor& request_descriptor) {
@@ -303,7 +305,7 @@ DynamicDescriptor::addOrGetDescriptor(const RateLimit::Descriptor& request_descr
   ENVOY_LOG(trace, "max_tokens: {}, tokens_per_fill: {}, fill_interval: {}", max_tokens_,
             tokens_per_fill_, std::chrono::duration<double>(fill_interval_).count());
   per_descriptor_token_bucket = std::make_shared<RateLimitTokenBucket>(
-      max_tokens_, tokens_per_fill_, fill_interval_, time_source_);
+      max_tokens_, tokens_per_fill_, fill_interval_, time_source_, shadow_mode_);
 
   ENVOY_LOG(trace, "DynamicDescriptor::addorGetDescriptor: adding dynamic descriptor: {}",
             request_descriptor.toString());
