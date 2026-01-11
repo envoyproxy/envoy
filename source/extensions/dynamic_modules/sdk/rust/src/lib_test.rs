@@ -772,12 +772,12 @@ fn test_socket_option_int_round_trip() {
   let mut filter = EnvoyNetworkFilterImpl {
     raw: std::ptr::null_mut(),
   };
-  assert!(filter.set_socket_option_int(
+  filter.set_socket_option_int(
     1,
     2,
     abi::envoy_dynamic_module_type_socket_option_state::Prebind,
-    42
-  ));
+    42,
+  );
   let value = filter.get_socket_option_int(
     1,
     2,
@@ -792,12 +792,12 @@ fn test_socket_option_bytes_round_trip() {
   let mut filter = EnvoyNetworkFilterImpl {
     raw: std::ptr::null_mut(),
   };
-  assert!(filter.set_socket_option_bytes(
+  filter.set_socket_option_bytes(
     3,
     4,
     abi::envoy_dynamic_module_type_socket_option_state::Bound,
     b"bytes-val",
-  ));
+  );
   let value = filter.get_socket_option_bytes(
     3,
     4,
@@ -812,18 +812,18 @@ fn test_socket_option_list() {
   let mut filter = EnvoyNetworkFilterImpl {
     raw: std::ptr::null_mut(),
   };
-  assert!(filter.set_socket_option_int(
+  filter.set_socket_option_int(
     5,
     6,
     abi::envoy_dynamic_module_type_socket_option_state::Prebind,
-    11
-  ));
-  assert!(filter.set_socket_option_bytes(
+    11,
+  );
+  filter.set_socket_option_bytes(
     7,
     8,
     abi::envoy_dynamic_module_type_socket_option_state::Listening,
     b"data",
-  ));
+  );
 
   let options = filter.get_socket_options();
   assert_eq!(2, options.len());

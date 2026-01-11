@@ -125,15 +125,10 @@ bool envoy_dynamic_module_callback_access_logger_get_header_value(
 // Access Logger Callbacks - Stream Info Basic
 // -----------------------------------------------------------------------------
 
-bool envoy_dynamic_module_callback_access_logger_get_response_code(
-    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
-    uint32_t* response_code_out) {
+uint32_t envoy_dynamic_module_callback_access_logger_get_response_code(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr) {
   auto* context = static_cast<DynamicModuleAccessLogContext*>(logger_envoy_ptr);
-  if (!context->stream_info_.responseCode().has_value()) {
-    return false;
-  }
-  *response_code_out = context->stream_info_.responseCode().value();
-  return true;
+  return context->stream_info_.responseCode().value_or(0);
 }
 
 bool envoy_dynamic_module_callback_access_logger_get_response_code_details(
@@ -258,14 +253,10 @@ bool envoy_dynamic_module_callback_access_logger_is_health_check(
   return context->stream_info_.healthCheck();
 }
 
-bool envoy_dynamic_module_callback_access_logger_get_attempt_count(
-    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr, uint32_t* count_out) {
+uint32_t envoy_dynamic_module_callback_access_logger_get_attempt_count(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr) {
   auto* context = static_cast<DynamicModuleAccessLogContext*>(logger_envoy_ptr);
-  if (!context->stream_info_.attemptCount().has_value()) {
-    return false;
-  }
-  *count_out = context->stream_info_.attemptCount().value();
-  return true;
+  return context->stream_info_.attemptCount().value_or(0);
 }
 
 // -----------------------------------------------------------------------------

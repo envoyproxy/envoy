@@ -58,8 +58,8 @@ DynamicModuleUdpListenerFilterConfig::DynamicModuleUdpListenerFilterConfig(
   on_filter_destroy_ = filter_destroy_or_error.value();
 
   in_module_config_ =
-      on_filter_config_new_(static_cast<void*>(this), filter_name_.c_str(), filter_name_.size(),
-                            filter_config_.data(), filter_config_.size());
+      on_filter_config_new_(static_cast<void*>(this), {filter_name_.c_str(), filter_name_.size()},
+                            {filter_config_.data(), filter_config_.size()});
 }
 
 DynamicModuleUdpListenerFilterConfig::~DynamicModuleUdpListenerFilterConfig() {
