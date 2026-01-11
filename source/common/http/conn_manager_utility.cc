@@ -292,7 +292,7 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
     value.setCopy("1");
     request_headers.addViaMove(HeaderString(Headers::get().EarlyData), std::move(value));
   }
-  mutateXfccRequestHeader(request_headers, connection, config, stream_info);
+  mutateXfccRequestHeader(request_headers, stream_info, connection, config);
 
   return {final_remote_address, absl::nullopt};
 }
@@ -518,33 +518,14 @@ void applyForwardClientCertConfig(
   }
 }
 
-// Overload that takes the config and only calls setCurrentClientCertDetails() when needed.
-// This avoids calling setCurrentClientCertDetails() for types that don't need it (Sanitize,
-// ForwardOnly, AlwaysForwardOnly).
-void applyForwardClientCertConfig(RequestHeaderMap& request_headers,
-                                  Network::Connection& connection,
-                                  ConnectionManagerConfig& config) {
-  const auto forward_client_cert = config.forwardClientCert();
-  // Only call setCurrentClientCertDetails() if it's actually needed (AppendForward or SanitizeSet).
-  if (forward_client_cert == ForwardClientCertType::AppendForward ||
-      forward_client_cert == ForwardClientCertType::SanitizeSet) {
-    applyForwardClientCertConfig(request_headers, connection, forward_client_cert,
-                                 config.setCurrentClientCertDetails());
-  } else {
-    applyForwardClientCertConfig(request_headers, connection, forward_client_cert,
-                                 std::vector<ClientCertDetailsType>{});
-  }
-}
-
 } // namespace
 
 void ConnectionManagerUtility::mutateXfccRequestHeader(RequestHeaderMap& request_headers,
+                                                       const StreamInfo::StreamInfo& stream_info,
                                                        Network::Connection& connection,
-                                                       ConnectionManagerConfig& config,
-                                                       const StreamInfo::StreamInfo& stream_info) {
+                                                       ConnectionManagerConfig& config) {
   // If a matcher is configured, evaluate it to get per-request forward client cert config.
-  const auto& matcher = config.forwardClientCertMatcher();
-  if (matcher != nullptr) {
+  if (const auto& matcher = config.forwardClientCertMatcher(); matcher != nullptr) {
     Matching::HttpMatchingDataImpl data(stream_info);
     data.onRequestHeaders(request_headers);
     auto match_result = Matcher::evaluateMatch<HttpMatchingData>(*matcher, data);
@@ -560,7 +541,8 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(RequestHeaderMap& request
   }
 
   // Fall back to static config if no matcher or no match.
-  applyForwardClientCertConfig(request_headers, connection, config);
+  applyForwardClientCertConfig(request_headers, connection, config.forwardClientCert(),
+                               config.setCurrentClientCertDetails());
 }
 
 void ConnectionManagerUtility::mutateResponseHeaders(ResponseHeaderMap& response_headers,

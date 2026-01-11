@@ -592,46 +592,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     PANIC_DUE_TO_CORRUPT_ENUM;
   }
 
-  switch (config.forward_client_cert_details()) {
-    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
-  case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
-      SANITIZE:
-    forward_client_cert_ = Http::ForwardClientCertType::Sanitize;
-    break;
-  case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
-      FORWARD_ONLY:
-    forward_client_cert_ = Http::ForwardClientCertType::ForwardOnly;
-    break;
-  case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
-      APPEND_FORWARD:
-    forward_client_cert_ = Http::ForwardClientCertType::AppendForward;
-    break;
-  case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
-      SANITIZE_SET:
-    forward_client_cert_ = Http::ForwardClientCertType::SanitizeSet;
-    break;
-  case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
-      ALWAYS_FORWARD_ONLY:
-    forward_client_cert_ = Http::ForwardClientCertType::AlwaysForwardOnly;
-    break;
-  }
-
-  const auto& set_current_client_cert_details = config.set_current_client_cert_details();
-  if (set_current_client_cert_details.cert()) {
-    set_current_client_cert_details_.push_back(Http::ClientCertDetailsType::Cert);
-  }
-  if (set_current_client_cert_details.chain()) {
-    set_current_client_cert_details_.push_back(Http::ClientCertDetailsType::Chain);
-  }
-  if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(set_current_client_cert_details, subject, false)) {
-    set_current_client_cert_details_.push_back(Http::ClientCertDetailsType::Subject);
-  }
-  if (set_current_client_cert_details.uri()) {
-    set_current_client_cert_details_.push_back(Http::ClientCertDetailsType::URI);
-  }
-  if (set_current_client_cert_details.dns()) {
-    set_current_client_cert_details_.push_back(Http::ClientCertDetailsType::DNS);
-  }
+  forward_client_cert_ = convertForwardClientCertDetailsType(config.forward_client_cert_details());
+  set_current_client_cert_details_ =
+      convertSetCurrentClientCertDetails(config.set_current_client_cert_details());
 
   // Initialize the forward client cert matcher if configured.
   if (config.has_forward_client_cert_matcher()) {

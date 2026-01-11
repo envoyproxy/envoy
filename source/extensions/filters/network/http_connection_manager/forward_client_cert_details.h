@@ -7,6 +7,7 @@
 
 #include "source/common/http/conn_manager_config.h"
 #include "source/common/http/forward_client_cert.h"
+#include "source/common/matcher/matcher.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -17,9 +18,10 @@ namespace HttpConnectionManager {
  * Action that returns ForwardClientCertConfig when matched.
  * Implements Http::ForwardClientCertActionConfig so the conn_manager_utility can access it.
  */
-class ForwardClientCertAction : public Http::ForwardClientCertActionBase<
-                                    envoy::extensions::filters::network::http_connection_manager::
-                                        v3::HttpConnectionManager::ForwardClientCertConfig> {
+class ForwardClientCertAction
+    : public Matcher::ActionBase<envoy::extensions::filters::network::http_connection_manager::v3::
+                                     HttpConnectionManager::ForwardClientCertConfig,
+                                 Http::ForwardClientCertActionConfig> {
 public:
   ForwardClientCertAction(Http::ForwardClientCertType forward_type,
                           std::vector<Http::ClientCertDetailsType> details)
@@ -86,6 +88,20 @@ public:
 Matcher::MatchTreePtr<Http::HttpMatchingData>
 createForwardClientCertMatcher(const xds::type::matcher::v3::Matcher& matcher_config,
                                Server::Configuration::ServerFactoryContext& factory_context);
+
+/**
+ * Convert proto ForwardClientCertDetails enum to Http::ForwardClientCertType.
+ */
+Http::ForwardClientCertType
+convertForwardClientCertDetailsType(envoy::extensions::filters::network::http_connection_manager::
+                                        v3::HttpConnectionManager::ForwardClientCertDetails type);
+
+/**
+ * Convert proto SetCurrentClientCertDetails to vector of Http::ClientCertDetailsType.
+ */
+std::vector<Http::ClientCertDetailsType> convertSetCurrentClientCertDetails(
+    const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+        SetCurrentClientCertDetails& details);
 
 } // namespace HttpConnectionManager
 } // namespace NetworkFilters

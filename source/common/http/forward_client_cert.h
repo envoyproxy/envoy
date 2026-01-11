@@ -31,12 +31,5 @@ public:
   virtual const std::vector<ClientCertDetailsType>& setCurrentClientCertDetails() const PURE;
 };
 
-/**
- * Base class for forward client cert matcher actions that implements the interface.
- */
-template <class ProtoType>
-class ForwardClientCertActionBase
-    : public Matcher::ActionBase<ProtoType, ForwardClientCertActionConfig> {};
-
 } // namespace Http
 } // namespace Envoy

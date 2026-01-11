@@ -5,8 +5,6 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace HttpConnectionManager {
 
-namespace {
-
 Http::ForwardClientCertType
 convertForwardClientCertDetailsType(envoy::extensions::filters::network::http_connection_manager::
                                         v3::HttpConnectionManager::ForwardClientCertDetails type) {
@@ -52,8 +50,6 @@ std::vector<Http::ClientCertDetailsType> convertSetCurrentClientCertDetails(
   }
   return result;
 }
-
-} // namespace
 
 Matcher::ActionConstSharedPtr
 ForwardClientCertActionFactory::createAction(const Protobuf::Message& config,
