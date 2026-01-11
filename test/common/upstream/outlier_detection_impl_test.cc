@@ -2784,6 +2784,8 @@ detect_degraded_hosts: true
 
   // Report a degraded response
   EXPECT_CALL(checker_, check(hosts_[0]));
+  EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
+                                       _, envoy::data::cluster::v3::DEGRADED, true));
   hosts_[0]->outlierDetector().putResult(Result::ExtOriginRequestDegraded, 200);
 
   // Host should now be marked as degraded
@@ -2800,6 +2802,8 @@ detect_degraded_hosts: true
   // Timer-based recovery: advance time past base_ejection_time (30s)
   time_system_.setMonotonicTime(std::chrono::milliseconds(30001));
   EXPECT_CALL(checker_, check(hosts_[0]));
+  EXPECT_CALL(*event_logger_,
+              logUneject(std::static_pointer_cast<const HostDescription>(hosts_[0])));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
   interval_timer_->invokeCallback();
 
@@ -2861,6 +2865,8 @@ detect_degraded_hosts: true
 
   // Send a degraded response - should reset consecutive counters
   EXPECT_CALL(checker_, check(hosts_[0]));
+  EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
+                                       _, envoy::data::cluster::v3::DEGRADED, true));
   hosts_[0]->outlierDetector().putResult(Result::ExtOriginRequestDegraded, 200);
   EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::DEGRADED_OUTLIER_DETECTION));
 

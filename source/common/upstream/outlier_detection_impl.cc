@@ -415,12 +415,17 @@ void DetectorImpl::checkHostForUndegrade(HostSharedPtr host, DetectorHostMonitor
       runtime_.snapshot().getInteger(BaseEjectionTimeMsRuntime, config_.baseEjectionTimeMs()));
   const std::chrono::milliseconds max_eject_time = std::chrono::milliseconds(
       runtime_.snapshot().getInteger(MaxEjectionTimeMsRuntime, config_.maxEjectionTimeMs()));
+  const std::chrono::milliseconds jitter = monitor->getJitter();
   ASSERT(monitor->numDegradations() > 0);
-  if ((std::min(base_eject_time * monitor->degradeTimeBackoff(), max_eject_time)) <=
+  if ((std::min(base_eject_time * monitor->degradeTimeBackoff(), max_eject_time) + jitter) <=
       (now - monitor->lastDegradedTime().value())) {
     host->healthFlagClear(Host::HealthFlag::DEGRADED_OUTLIER_DETECTION);
     monitor->undegrade(time_source_.monotonicTime());
     runCallbacks(host);
+
+    if (event_logger_) {
+      event_logger_->logUneject(host);
+    }
   }
 }
 
@@ -464,6 +469,9 @@ bool DetectorImpl::enforceEjection(envoy::data::cluster::v3::OutlierEjectionType
   case envoy::data::cluster::v3::FAILURE_PERCENTAGE_LOCAL_ORIGIN:
     return runtime_.snapshot().featureEnabled(EnforcingFailurePercentageLocalOriginRuntime,
                                               config_.enforcingFailurePercentageLocalOrigin());
+  case envoy::data::cluster::v3::DEGRADED:
+    // Degradation uses its own code path, not the ejection helpers
+    IS_ENVOY_BUG("enforceEjection() should not be called for DEGRADED type");
   }
 
   PANIC_DUE_TO_CORRUPT_ENUM;
@@ -494,6 +502,10 @@ void DetectorImpl::updateEnforcedEjectionStats(envoy::data::cluster::v3::Outlier
   case envoy::data::cluster::v3::FAILURE_PERCENTAGE_LOCAL_ORIGIN:
     stats_.ejections_enforced_local_origin_failure_percentage_.inc();
     break;
+  case envoy::data::cluster::v3::DEGRADED:
+    // Degradation uses its own code path, not the ejection helpers
+    IS_ENVOY_BUG("updateEnforcedEjectionStats() should not be called for DEGRADED type");
+    return;
   }
 }
 
@@ -520,6 +532,9 @@ void DetectorImpl::updateDetectedEjectionStats(envoy::data::cluster::v3::Outlier
     break;
   case envoy::data::cluster::v3::FAILURE_PERCENTAGE_LOCAL_ORIGIN:
     stats_.ejections_detected_local_origin_failure_percentage_.inc();
+    break;
+  case envoy::data::cluster::v3::DEGRADED:
+    stats_.ejections_detected_degradation_.inc();
     break;
   }
 }
@@ -664,7 +679,7 @@ void DetectorImpl::clearHostDegraded(HostSharedPtr host) {
 
 void DetectorImpl::setHostDegradedMainThread(HostSharedPtr host) {
   if (!host->healthFlagGet(Host::HealthFlag::DEGRADED_OUTLIER_DETECTION)) {
-    stats_.ejections_detected_degradation_.inc();
+    updateDetectedEjectionStats(envoy::data::cluster::v3::DEGRADED);
 
     // Use the degrade() method which tracks timing
     host_monitors_[host]->degrade(time_source_.monotonicTime());
@@ -679,6 +694,13 @@ void DetectorImpl::setHostDegradedMainThread(HostSharedPtr host) {
       host_monitors_[host]->degradeTimeBackoff()++;
     }
 
+    // Log degradation event
+    // Use DEGRADED type to distinguish from actual ejections
+    // The enforced=true since degradation is always enforced (host is deprioritized)
+    if (event_logger_) {
+      event_logger_->logEject(host, *this, envoy::data::cluster::v3::DEGRADED, true);
+    }
+
     runCallbacks(host);
   }
 }
@@ -689,7 +711,6 @@ void DetectorImpl::clearHostDegradedMainThread(HostSharedPtr host) {
     // Use undegrade() to track recovery time
     host_monitors_[host]->undegrade(time_source_.monotonicTime());
     runCallbacks(host);
-    // Note: Degraded state doesn't use event logging as it's not an ejection.
     // Backoff decrement happens in the interval timer (same as ejection).
   }
 }
@@ -720,6 +741,8 @@ void DetectorImpl::onConsecutiveErrorWorker(HostSharedPtr host,
   case envoy::data::cluster::v3::FAILURE_PERCENTAGE:
     FALLTHRU;
   case envoy::data::cluster::v3::FAILURE_PERCENTAGE_LOCAL_ORIGIN:
+    FALLTHRU;
+  case envoy::data::cluster::v3::DEGRADED:
     IS_ENVOY_BUG("unexpected non-consecutive error");
     return;
   case envoy::data::cluster::v3::CONSECUTIVE_5XX:
