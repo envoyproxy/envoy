@@ -1351,6 +1351,42 @@ pub trait EnvoyHttpFilter {
     labels: &[&'a str],
     value: u64,
   ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Set an integer socket option with the given level, name, and state.
+  /// This is used to set socket options on the upstream connection.
+  fn set_socket_option_int(
+    &mut self,
+    level: i64,
+    name: i64,
+    state: abi::envoy_dynamic_module_type_socket_option_state,
+    value: i64,
+  ) -> bool;
+
+  /// Set a bytes socket option with the given level, name, and state.
+  /// This is used to set socket options on the upstream connection.
+  fn set_socket_option_bytes(
+    &mut self,
+    level: i64,
+    name: i64,
+    state: abi::envoy_dynamic_module_type_socket_option_state,
+    value: &[u8],
+  ) -> bool;
+
+  /// Get an integer socket option value.
+  fn get_socket_option_int(
+    &self,
+    level: i64,
+    name: i64,
+    state: abi::envoy_dynamic_module_type_socket_option_state,
+  ) -> Option<i64>;
+
+  /// Get a bytes socket option value.
+  fn get_socket_option_bytes(
+    &self,
+    level: i64,
+    name: i64,
+    state: abi::envoy_dynamic_module_type_socket_option_state,
+  ) -> Option<Vec<u8>>;
 }
 
 /// This implements the [`EnvoyHttpFilter`] trait with the given raw pointer to the Envoy HTTP
@@ -2474,12 +2510,6 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     } else {
       None
     }
-  }
-
-  fn get_socket_options(&self) -> Vec<SocketOption> {
-    // HTTP filter does not have an ABI for listing all socket options.
-    // This is primarily used for network filters.
-    Vec::new()
   }
 }
 
