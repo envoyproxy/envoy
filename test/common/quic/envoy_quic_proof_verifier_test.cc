@@ -457,5 +457,97 @@ TEST_F(EnvoyQuicProofVerifierTest, CreateDefaultContext) {
   EXPECT_EQ(nullptr, verifier_->CreateDefaultContext());
 }
 
+TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainWithAcceptUntrusted) {
+  configCertVerificationDetails(true);
+  // Create a verifier that accepts untrusted certificates
+  auto context_or_error = Extensions::TransportSockets::Tls::ClientContextImpl::create(
+      *store_.rootScope(), client_context_config_, factory_context_);
+  THROW_IF_NOT_OK(context_or_error.status());
+  auto untrusted_verifier =
+      std::make_unique<EnvoyQuicProofVerifier>(std::move(*context_or_error), true);
+
+  std::unique_ptr<quic::CertificateView> cert_view =
+      quic::CertificateView::ParseSingleCertificate(leaf_cert_);
+  const std::string ocsp_response;
+  const std::string cert_sct;
+  std::string error_details;
+  std::unique_ptr<quic::ProofVerifyDetails> verify_details;
+
+  // Test with valid hostname - should succeed even with accept_untrusted=true
+  EXPECT_EQ(quic::QUIC_SUCCESS, untrusted_verifier->VerifyCertChain(
+                                    std::string(cert_view->subject_alt_name_domains()[0]), 54321,
+                                    {leaf_cert_}, ocsp_response, cert_sct, &verify_context_,
+                                    &error_details, &verify_details, nullptr, nullptr));
+  EXPECT_NE(verify_details, nullptr);
+  EXPECT_TRUE(static_cast<CertVerifyResult&>(*verify_details).isValid());
+}
+
+TEST_F(EnvoyQuicProofVerifierTest, AsyncVerifyCertChainWithAcceptUntrusted) {
+  custom_validator_config_ = envoy::config::core::v3::TypedExtensionConfig();
+  TestUtility::loadFromYaml(TestEnvironment::substitute(R"EOF(
+name: "envoy.tls.cert_validator.timed_cert_validator"
+typed_config:
+  "@type": type.googleapis.com/test.common.config.DummyConfig
+  )EOF"),
+                            custom_validator_config_.value());
+
+  configCertVerificationDetails(true);
+  // Create a verifier that accepts untrusted certificates
+  auto context_or_error = Extensions::TransportSockets::Tls::ClientContextImpl::create(
+      *store_.rootScope(), client_context_config_, factory_context_);
+  THROW_IF_NOT_OK(context_or_error.status());
+  auto untrusted_verifier =
+      std::make_unique<EnvoyQuicProofVerifier>(std::move(*context_or_error), true);
+
+  const std::string ocsp_response;
+  const std::string cert_sct;
+  std::string error_details;
+  std::unique_ptr<quic::ProofVerifyDetails> verify_details;
+  auto* quic_verify_callback = new MockProofVerifierCallback();
+  Event::MockTimer* verify_timer = new NiceMock<Event::MockTimer>(&dispatcher_);
+
+  std::unique_ptr<quic::CertificateView> cert_view =
+      quic::CertificateView::ParseSingleCertificate(leaf_cert_);
+
+  // Test with valid hostname and accept_untrusted=true in async mode
+  EXPECT_EQ(quic::QUIC_PENDING,
+            untrusted_verifier->VerifyCertChain(
+                std::string(cert_view->subject_alt_name_domains()[0]), 54321, {leaf_cert_},
+                ocsp_response, cert_sct, &verify_context_, &error_details, &verify_details, nullptr,
+                std::unique_ptr<MockProofVerifierCallback>(quic_verify_callback)));
+  EXPECT_EQ(verify_details, nullptr);
+  EXPECT_TRUE(verify_timer->enabled());
+
+  // With accept_untrusted=true and valid hostname, verification should succeed
+  EXPECT_CALL(*quic_verify_callback, Run(true, "", _))
+      .WillOnce(Invoke(
+          [](bool, const std::string&, std::unique_ptr<quic::ProofVerifyDetails>* verify_details) {
+            EXPECT_NE(verify_details, nullptr);
+            auto details = std::unique_ptr<quic::ProofVerifyDetails>((*verify_details)->Clone());
+            EXPECT_TRUE(static_cast<CertVerifyResult&>(*details).isValid());
+          }));
+  verify_timer->invokeCallback();
+}
+
+TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainWithInvalidCertificateParsing) {
+  configCertVerificationDetails(true);
+
+  const std::string ocsp_response;
+  const std::string cert_sct;
+  std::string error_details;
+  std::unique_ptr<quic::ProofVerifyDetails> verify_details;
+
+  // Create a certificate that will fail CertificateView::ParseSingleCertificate.
+  std::string invalid_cert =
+      "-----BEGIN CERTIFICATE-----\nINVALID_CERT_DATA\n-----END CERTIFICATE-----";
+
+  EXPECT_EQ(quic::QUIC_FAILURE,
+            verifier_->VerifyCertChain("test.example.com", 54321, {invalid_cert}, ocsp_response,
+                                       cert_sct, &verify_context_, &error_details, &verify_details,
+                                       nullptr, nullptr));
+  EXPECT_EQ("d2i_X509: fail to parse DER", error_details);
+  EXPECT_EQ(verify_details, nullptr);
+}
+
 } // namespace Quic
 } // namespace Envoy

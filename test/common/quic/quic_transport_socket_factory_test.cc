@@ -95,7 +95,7 @@ enable_early_data:
   verifyQuicServerTransportSocketFactory(yaml, true);
 }
 
-TEST_F(QuicServerTransportSocketFactoryConfigTest, ClientAuthUnsupported) {
+TEST_F(QuicServerTransportSocketFactoryConfigTest, ClientAuthSupported) {
   const std::string yaml = TestEnvironment::substitute(R"EOF(
 downstream_tls_context:
   require_client_certificate: true
@@ -109,8 +109,81 @@ downstream_tls_context:
       trusted_ca:
         filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
 )EOF");
-  EXPECT_THROW_WITH_MESSAGE(verifyQuicServerTransportSocketFactory(yaml, true), EnvoyException,
-                            "TLS Client Authentication is not supported over QUIC");
+  // Client authentication should be supported. Verify successful creation.
+  verifyQuicServerTransportSocketFactory(yaml, true);
+}
+
+TEST_F(QuicServerTransportSocketFactoryConfigTest, TestRequiresClientCertificate) {
+  // Test with require_client_certificate = true
+  {
+    const std::string yaml = TestEnvironment::substitute(R"EOF(
+downstream_tls_context:
+  require_client_certificate: true
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+)EOF");
+
+    envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport proto_config;
+    TestUtility::loadFromYaml(yaml, proto_config);
+    Network::DownstreamTransportSocketFactoryPtr transport_socket_factory = THROW_OR_RETURN_VALUE(
+        config_factory_.createTransportSocketFactory(proto_config, context_, {}),
+        Network::DownstreamTransportSocketFactoryPtr);
+
+    auto& quic_factory = static_cast<QuicServerTransportSocketFactory&>(*transport_socket_factory);
+    EXPECT_TRUE(quic_factory.requiresClientCertificate());
+  }
+
+  // Test with require_client_certificate = false
+  {
+    const std::string yaml = TestEnvironment::substitute(R"EOF(
+downstream_tls_context:
+  require_client_certificate: false
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
+)EOF");
+
+    envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport proto_config;
+    TestUtility::loadFromYaml(yaml, proto_config);
+    Network::DownstreamTransportSocketFactoryPtr transport_socket_factory = THROW_OR_RETURN_VALUE(
+        config_factory_.createTransportSocketFactory(proto_config, context_, {}),
+        Network::DownstreamTransportSocketFactoryPtr);
+
+    auto& quic_factory = static_cast<QuicServerTransportSocketFactory&>(*transport_socket_factory);
+    EXPECT_FALSE(quic_factory.requiresClientCertificate());
+  }
+
+  // Test with require_client_certificate not specified (default should be false)
+  {
+    const std::string yaml = TestEnvironment::substitute(R"EOF(
+downstream_tls_context:
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
+)EOF");
+
+    envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport proto_config;
+    TestUtility::loadFromYaml(yaml, proto_config);
+    Network::DownstreamTransportSocketFactoryPtr transport_socket_factory = THROW_OR_RETURN_VALUE(
+        config_factory_.createTransportSocketFactory(proto_config, context_, {}),
+        Network::DownstreamTransportSocketFactoryPtr);
+
+    auto& quic_factory = static_cast<QuicServerTransportSocketFactory&>(*transport_socket_factory);
+    EXPECT_FALSE(quic_factory.requiresClientCertificate());
+  }
 }
 
 class QuicClientTransportSocketFactoryTest : public testing::Test {
@@ -158,6 +231,66 @@ TEST_F(QuicClientTransportSocketFactoryTest, GetCryptoConfig) {
   update_callback_();
   std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config2 = factory_->getCryptoConfig();
   EXPECT_NE(crypto_config2, crypto_config1);
+}
+
+// Test for QuicClientCertInitializer functionality
+TEST_F(QuicClientTransportSocketFactoryTest, QuicClientCertInitializerTests) {
+  // Test initialization with null SSL context
+  factory_->initialize();
+  EXPECT_EQ(nullptr, factory_->getCryptoConfig());
+
+  // Test with valid SSL context
+  Ssl::ClientContextSharedPtr ssl_context{new Ssl::MockClientContext()};
+  EXPECT_CALL(context_.server_context_.ssl_context_manager_, createSslClientContext(_, _))
+      .WillOnce(Return(ssl_context));
+
+  // Test the update callback (QuicClientCertInitializer logic)
+  update_callback_();
+
+  // Should have created a crypto config
+  std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config = factory_->getCryptoConfig();
+  EXPECT_NE(nullptr, crypto_config);
+
+  // Test multiple updates (should create new config each time)
+  Ssl::ClientContextSharedPtr ssl_context2{new Ssl::MockClientContext()};
+  EXPECT_CALL(context_.server_context_.ssl_context_manager_, createSslClientContext(_, _))
+      .WillOnce(Return(ssl_context2));
+  update_callback_();
+
+  std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config2 = factory_->getCryptoConfig();
+  EXPECT_NE(crypto_config2, crypto_config);
+}
+
+// Test for QuicClientCertInitializer error handling.
+TEST_F(QuicClientTransportSocketFactoryTest, QuicClientCertInitializerErrorHandling) {
+  factory_->initialize();
+
+  // Test with SSL context creation failure.
+  EXPECT_CALL(context_.server_context_.ssl_context_manager_, createSslClientContext(_, _))
+      .WillOnce(Return(nullptr));
+
+  // Update callback should handle null SSL context gracefully.
+  update_callback_();
+
+  // Should not have created a crypto config.
+  EXPECT_EQ(nullptr, factory_->getCryptoConfig());
+}
+
+// Targeted test to hit the upstream_context_secrets_not_ready statistic.
+TEST_F(QuicClientTransportSocketFactoryTest, UpstreamContextSecretsNotReadyStatistic) {
+  factory_->initialize();
+
+  // When SSL context is not ready (nullptr in constructor mock), getCryptoConfig should return
+  // nullptr This internally triggers the upstream_context_secrets_not_ready statistic increment
+  auto crypto_config = factory_->getCryptoConfig();
+  EXPECT_EQ(crypto_config, nullptr);
+
+  // Call it again to verify consistent behavior
+  auto crypto_config2 = factory_->getCryptoConfig();
+  EXPECT_EQ(crypto_config2, nullptr);
+
+  // The statistic is being incremented internally in the implementation
+  // This test ensures the code path that increments it is exercised
 }
 
 } // namespace Quic

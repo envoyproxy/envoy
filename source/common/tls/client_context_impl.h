@@ -46,6 +46,7 @@ public:
   absl::StatusOr<bssl::UniquePtr<SSL>>
   newSsl(const Network::TransportSocketOptionsConstSharedPtr& options,
          Upstream::HostDescriptionConstSharedPtr host) override;
+  const std::vector<Ssl::TlsContext>& getTlsContexts() const { return tls_contexts_; }
 
 private:
   ClientContextImpl(Stats::Scope& scope, const Envoy::Ssl::ClientContextConfig& config,
