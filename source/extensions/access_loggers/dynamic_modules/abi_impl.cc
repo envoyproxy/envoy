@@ -2,7 +2,9 @@
 #include "source/common/http/header_utility.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/stats/utility.h"
 #include "source/extensions/access_loggers/dynamic_modules/access_log.h"
+#include "source/extensions/access_loggers/dynamic_modules/access_log_config.h"
 #include "source/extensions/dynamic_modules/abi.h"
 
 #include "absl/strings/str_split.h"
@@ -575,6 +577,112 @@ bool envoy_dynamic_module_callback_access_logger_is_trace_sampled(
   auto* context = static_cast<DynamicModuleAccessLogContext*>(logger_envoy_ptr);
   // Note: The Span interface doesn't expose a sampled() method. We check trace reason instead.
   return context->stream_info_.traceReason() != Tracing::Reason::NotTraceable;
+}
+
+// -----------------------------------------------------------------------------
+// Metrics Callbacks
+// -----------------------------------------------------------------------------
+
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_access_logger_config_define_counter(
+    envoy_dynamic_module_type_access_logger_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name, size_t* counter_id_ptr) {
+  auto* config = static_cast<DynamicModuleAccessLogConfig*>(config_envoy_ptr);
+  Stats::StatName main_stat_name =
+      config->stat_name_pool_.add(absl::string_view(name.ptr, name.length));
+  Stats::Counter& c = Stats::Utility::counterFromStatNames(*config->stats_scope_, {main_stat_name});
+  *counter_id_ptr = config->addCounter({c});
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_access_logger_increment_counter(
+    envoy_dynamic_module_type_access_logger_config_envoy_ptr config_envoy_ptr, size_t id,
+    uint64_t value) {
+  auto* config = static_cast<DynamicModuleAccessLogConfig*>(config_envoy_ptr);
+  auto counter = config->getCounterById(id);
+  if (!counter.has_value()) {
+    return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+  }
+  counter->add(value);
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_access_logger_config_define_gauge(
+    envoy_dynamic_module_type_access_logger_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name, size_t* gauge_id_ptr) {
+  auto* config = static_cast<DynamicModuleAccessLogConfig*>(config_envoy_ptr);
+  Stats::StatName main_stat_name =
+      config->stat_name_pool_.add(absl::string_view(name.ptr, name.length));
+  Stats::Gauge& g = Stats::Utility::gaugeFromStatNames(*config->stats_scope_, {main_stat_name},
+                                                       Stats::Gauge::ImportMode::Accumulate);
+  *gauge_id_ptr = config->addGauge({g});
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+envoy_dynamic_module_type_metrics_result envoy_dynamic_module_callback_access_logger_set_gauge(
+    envoy_dynamic_module_type_access_logger_config_envoy_ptr config_envoy_ptr, size_t id,
+    uint64_t value) {
+  auto* config = static_cast<DynamicModuleAccessLogConfig*>(config_envoy_ptr);
+  auto gauge = config->getGaugeById(id);
+  if (!gauge.has_value()) {
+    return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+  }
+  gauge->set(value);
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_access_logger_increment_gauge(
+    envoy_dynamic_module_type_access_logger_config_envoy_ptr config_envoy_ptr, size_t id,
+    uint64_t value) {
+  auto* config = static_cast<DynamicModuleAccessLogConfig*>(config_envoy_ptr);
+  auto gauge = config->getGaugeById(id);
+  if (!gauge.has_value()) {
+    return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+  }
+  gauge->add(value);
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_access_logger_decrement_gauge(
+    envoy_dynamic_module_type_access_logger_config_envoy_ptr config_envoy_ptr, size_t id,
+    uint64_t value) {
+  auto* config = static_cast<DynamicModuleAccessLogConfig*>(config_envoy_ptr);
+  auto gauge = config->getGaugeById(id);
+  if (!gauge.has_value()) {
+    return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+  }
+  gauge->sub(value);
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_access_logger_config_define_histogram(
+    envoy_dynamic_module_type_access_logger_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name, size_t* histogram_id_ptr) {
+  auto* config = static_cast<DynamicModuleAccessLogConfig*>(config_envoy_ptr);
+  Stats::StatName main_stat_name =
+      config->stat_name_pool_.add(absl::string_view(name.ptr, name.length));
+  Stats::Histogram& h = Stats::Utility::histogramFromStatNames(
+      *config->stats_scope_, {main_stat_name}, Stats::Histogram::Unit::Unspecified);
+  *histogram_id_ptr = config->addHistogram({h});
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_access_logger_record_histogram_value(
+    envoy_dynamic_module_type_access_logger_config_envoy_ptr config_envoy_ptr, size_t id,
+    uint64_t value) {
+  auto* config = static_cast<DynamicModuleAccessLogConfig*>(config_envoy_ptr);
+  auto histogram = config->getHistogramById(id);
+  if (!histogram.has_value()) {
+    return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+  }
+  histogram->recordValue(value);
+  return envoy_dynamic_module_type_metrics_result_Success;
 }
 
 } // extern "C"

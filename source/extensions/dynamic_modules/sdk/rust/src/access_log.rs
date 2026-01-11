@@ -6,13 +6,208 @@ use crate::abi;
 use std::ffi::c_void;
 use std::{ptr, slice, str};
 
+// -----------------------------------------------------------------------------
+// Metrics Support
+// -----------------------------------------------------------------------------
+
+/// Handle for a counter metric. Counters can only be incremented.
+#[derive(Debug, Clone, Copy)]
+pub struct CounterHandle {
+  id: usize,
+}
+
+/// Handle for a gauge metric. Gauges can be set, incremented, or decremented.
+#[derive(Debug, Clone, Copy)]
+pub struct GaugeHandle {
+  id: usize,
+}
+
+/// Handle for a histogram metric. Histograms record value distributions.
+#[derive(Debug, Clone, Copy)]
+pub struct HistogramHandle {
+  id: usize,
+}
+
+/// Provides access to metrics operations during configuration.
+///
+/// This is passed to `AccessLoggerConfig::new` to allow defining metrics.
+pub struct ConfigContext {
+  envoy_ptr: *mut c_void,
+}
+
+impl ConfigContext {
+  /// Create a new ConfigContext. Used internally by the macro.
+  #[doc(hidden)]
+  pub fn new(envoy_ptr: *mut c_void) -> Self {
+    Self { envoy_ptr }
+  }
+
+  /// Define a counter metric.
+  ///
+  /// Counters are cumulative metrics that can only increase. They are reset on restart.
+  /// Returns a handle that can be used to increment the counter.
+  pub fn define_counter(&self, name: &str) -> Option<CounterHandle> {
+    let name_buf = abi::envoy_dynamic_module_type_module_buffer {
+      ptr: name.as_ptr() as *const _,
+      length: name.len(),
+    };
+    let mut id: usize = 0;
+    let result = unsafe {
+      abi::envoy_dynamic_module_callback_access_logger_config_define_counter(
+        self.envoy_ptr,
+        name_buf,
+        &mut id,
+      )
+    };
+    if result == abi::envoy_dynamic_module_type_metrics_result::Success {
+      Some(CounterHandle { id })
+    } else {
+      None
+    }
+  }
+
+  /// Define a gauge metric.
+  ///
+  /// Gauges are metrics that can go up and down. They represent a current value.
+  /// Returns a handle that can be used to set/increment/decrement the gauge.
+  pub fn define_gauge(&self, name: &str) -> Option<GaugeHandle> {
+    let name_buf = abi::envoy_dynamic_module_type_module_buffer {
+      ptr: name.as_ptr() as *const _,
+      length: name.len(),
+    };
+    let mut id: usize = 0;
+    let result = unsafe {
+      abi::envoy_dynamic_module_callback_access_logger_config_define_gauge(
+        self.envoy_ptr,
+        name_buf,
+        &mut id,
+      )
+    };
+    if result == abi::envoy_dynamic_module_type_metrics_result::Success {
+      Some(GaugeHandle { id })
+    } else {
+      None
+    }
+  }
+
+  /// Define a histogram metric.
+  ///
+  /// Histograms track the distribution of values. They are useful for measuring latencies.
+  /// Returns a handle that can be used to record values in the histogram.
+  pub fn define_histogram(&self, name: &str) -> Option<HistogramHandle> {
+    let name_buf = abi::envoy_dynamic_module_type_module_buffer {
+      ptr: name.as_ptr() as *const _,
+      length: name.len(),
+    };
+    let mut id: usize = 0;
+    let result = unsafe {
+      abi::envoy_dynamic_module_callback_access_logger_config_define_histogram(
+        self.envoy_ptr,
+        name_buf,
+        &mut id,
+      )
+    };
+    if result == abi::envoy_dynamic_module_type_metrics_result::Success {
+      Some(HistogramHandle { id })
+    } else {
+      None
+    }
+  }
+
+  /// Get the raw Envoy pointer. Used internally.
+  #[doc(hidden)]
+  pub fn envoy_ptr(&self) -> *mut c_void {
+    self.envoy_ptr
+  }
+}
+
+/// Provides access to metrics operations at runtime.
+///
+/// This is stored in the logger and used to update metric values during log events.
+pub struct MetricsContext {
+  envoy_ptr: *mut c_void,
+}
+
+// SAFETY: The envoy_ptr points to Envoy's DynamicModuleAccessLogConfig which is thread-safe.
+// The metrics callbacks are designed to be called from any thread.
+unsafe impl Send for MetricsContext {}
+
+impl MetricsContext {
+  /// Create a new MetricsContext. Used internally by the macro.
+  #[doc(hidden)]
+  pub fn new(envoy_ptr: *mut c_void) -> Self {
+    Self { envoy_ptr }
+  }
+
+  /// Increment a counter by the given value.
+  pub fn increment_counter(&self, handle: CounterHandle, value: u64) -> bool {
+    let result = unsafe {
+      abi::envoy_dynamic_module_callback_access_logger_increment_counter(
+        self.envoy_ptr,
+        handle.id,
+        value,
+      )
+    };
+    result == abi::envoy_dynamic_module_type_metrics_result::Success
+  }
+
+  /// Set a gauge to the given value.
+  pub fn set_gauge(&self, handle: GaugeHandle, value: u64) -> bool {
+    let result = unsafe {
+      abi::envoy_dynamic_module_callback_access_logger_set_gauge(self.envoy_ptr, handle.id, value)
+    };
+    result == abi::envoy_dynamic_module_type_metrics_result::Success
+  }
+
+  /// Increment a gauge by the given value.
+  pub fn increment_gauge(&self, handle: GaugeHandle, value: u64) -> bool {
+    let result = unsafe {
+      abi::envoy_dynamic_module_callback_access_logger_increment_gauge(
+        self.envoy_ptr,
+        handle.id,
+        value,
+      )
+    };
+    result == abi::envoy_dynamic_module_type_metrics_result::Success
+  }
+
+  /// Decrement a gauge by the given value.
+  pub fn decrement_gauge(&self, handle: GaugeHandle, value: u64) -> bool {
+    let result = unsafe {
+      abi::envoy_dynamic_module_callback_access_logger_decrement_gauge(
+        self.envoy_ptr,
+        handle.id,
+        value,
+      )
+    };
+    result == abi::envoy_dynamic_module_type_metrics_result::Success
+  }
+
+  /// Record a value in a histogram.
+  pub fn record_histogram(&self, handle: HistogramHandle, value: u64) -> bool {
+    let result = unsafe {
+      abi::envoy_dynamic_module_callback_access_logger_record_histogram_value(
+        self.envoy_ptr,
+        handle.id,
+        value,
+      )
+    };
+    result == abi::envoy_dynamic_module_type_metrics_result::Success
+  }
+}
+
 /// Trait that the dynamic module must implement to provide the access logger configuration.
 pub trait AccessLoggerConfig: Sized + Send + Sync + 'static {
   /// Create a new configuration from the provided name and config bytes.
-  fn new(name: &str, config: &[u8]) -> Result<Self, String>;
+  ///
+  /// The `ctx` provides access to metrics definition APIs. Metrics should be defined
+  /// during configuration creation and the handles stored in the config for later use.
+  fn new(ctx: &ConfigContext, name: &str, config: &[u8]) -> Result<Self, String>;
 
   /// Create a logger instance. Called per-thread for thread-local loggers.
-  fn create_logger(&self) -> Box<dyn AccessLogger>;
+  ///
+  /// The `metrics` context is stored and can be used to update metrics during log events.
+  fn create_logger(&self, metrics: MetricsContext) -> Box<dyn AccessLogger>;
 }
 
 /// Logger trait that handles individual log events.
@@ -274,6 +469,102 @@ impl LogContext {
     unsafe { abi::envoy_dynamic_module_callback_access_logger_is_trace_sampled(self.envoy_ptr) }
   }
 
+  /// Get a request header value by key.
+  ///
+  /// For headers with multiple values, use `index` to access subsequent values.
+  /// Returns the total count of values in `total_count` if provided.
+  pub fn get_request_header(&self, key: &str) -> Option<&[u8]> {
+    self.get_header_value(
+      abi::envoy_dynamic_module_type_http_header_type::RequestHeader,
+      key,
+      0,
+    )
+  }
+
+  /// Get a response header value by key.
+  pub fn get_response_header(&self, key: &str) -> Option<&[u8]> {
+    self.get_header_value(
+      abi::envoy_dynamic_module_type_http_header_type::ResponseHeader,
+      key,
+      0,
+    )
+  }
+
+  /// Get a header value by type and key.
+  fn get_header_value(
+    &self,
+    header_type: abi::envoy_dynamic_module_type_http_header_type,
+    key: &str,
+    index: usize,
+  ) -> Option<&[u8]> {
+    let key_buf = abi::envoy_dynamic_module_type_module_buffer {
+      ptr: key.as_ptr() as *const _,
+      length: key.len(),
+    };
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: ptr::null_mut(),
+      length: 0,
+    };
+    if unsafe {
+      abi::envoy_dynamic_module_callback_access_logger_get_header_value(
+        self.envoy_ptr,
+        header_type,
+        key_buf,
+        &mut result,
+        index,
+        ptr::null_mut(),
+      )
+    } {
+      unsafe {
+        Some(slice::from_raw_parts(
+          result.ptr as *const u8,
+          result.length,
+        ))
+      }
+    } else {
+      None
+    }
+  }
+
+  /// Get a value from dynamic metadata.
+  ///
+  /// # Arguments
+  /// * `filter_name` - The filter namespace (e.g., "envoy.filters.http.dynamic_module")
+  /// * `key` - The key within the filter namespace (e.g., "rbac_policy")
+  ///
+  /// # Returns
+  /// The string value if it exists, None otherwise.
+  /// Note: Only string values are currently supported.
+  pub fn get_dynamic_metadata(&self, filter_name: &str, key: &str) -> Option<&str> {
+    let filter_buf = abi::envoy_dynamic_module_type_module_buffer {
+      ptr: filter_name.as_ptr() as *const _,
+      length: filter_name.len(),
+    };
+    let key_buf = abi::envoy_dynamic_module_type_module_buffer {
+      ptr: key.as_ptr() as *const _,
+      length: key.len(),
+    };
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: ptr::null_mut(),
+      length: 0,
+    };
+    if unsafe {
+      abi::envoy_dynamic_module_callback_access_logger_get_dynamic_metadata(
+        self.envoy_ptr,
+        filter_buf,
+        key_buf,
+        &mut result,
+      )
+    } {
+      unsafe {
+        let slice = slice::from_raw_parts(result.ptr as *const u8, result.length);
+        str::from_utf8(slice).ok()
+      }
+    } else {
+      None
+    }
+  }
+
   /// Get the local reply body (if this was a local response).
   pub fn local_reply_body(&self) -> Option<&[u8]> {
     let mut buffer = abi::envoy_dynamic_module_type_envoy_buffer {
@@ -310,26 +601,42 @@ impl LogContext {
 ///
 /// struct MyLoggerConfig {
 ///     format: String,
+///     logs_counter: CounterHandle,
+///     config_envoy_ptr: *mut std::ffi::c_void,
 /// }
 ///
+/// unsafe impl Send for MyLoggerConfig {}
+/// unsafe impl Sync for MyLoggerConfig {}
+///
 /// impl AccessLoggerConfig for MyLoggerConfig {
-///     fn new(name: &str, config: &[u8]) -> Result<Self, String> {
+///     fn new(ctx: &ConfigContext, name: &str, config: &[u8]) -> Result<Self, String> {
+///         let logs_counter = ctx.define_counter("logs_total")
+///             .ok_or("Failed to define counter")?;
 ///         Ok(Self {
 ///             format: String::from_utf8_lossy(config).to_string(),
+///             logs_counter,
+///             config_envoy_ptr: ctx.envoy_ptr(),
 ///         })
 ///     }
 ///
-///     fn create_logger(&self) -> Box<dyn AccessLogger> {
-///         Box::new(MyLogger { format: self.format.clone() })
+///     fn create_logger(&self, metrics: MetricsContext) -> Box<dyn AccessLogger> {
+///         Box::new(MyLogger {
+///             format: self.format.clone(),
+///             logs_counter: self.logs_counter,
+///             metrics,
+///         })
 ///     }
 /// }
 ///
 /// struct MyLogger {
 ///     format: String,
+///     logs_counter: CounterHandle,
+///     metrics: MetricsContext,
 /// }
 ///
 /// impl AccessLogger for MyLogger {
 ///     fn log(&mut self, ctx: &LogContext) {
+///         self.metrics.increment_counter(self.logs_counter, 1);
 ///         if let Some(code) = ctx.response_code() {
 ///             println!("Response: {}", code);
 ///         }
@@ -341,9 +648,18 @@ impl LogContext {
 #[macro_export]
 macro_rules! declare_access_logger {
   ($config_type:ty) => {
+    /// Wrapper that stores both the config and the envoy pointer for metrics access.
+    struct AccessLoggerConfigWrapper {
+      config: $config_type,
+      config_envoy_ptr: *mut ::std::ffi::c_void,
+    }
+
+    unsafe impl Send for AccessLoggerConfigWrapper {}
+    unsafe impl Sync for AccessLoggerConfigWrapper {}
+
     #[no_mangle]
     pub extern "C" fn envoy_dynamic_module_on_access_logger_config_new(
-      _config_envoy_ptr: *mut ::std::ffi::c_void,
+      config_envoy_ptr: *mut ::std::ffi::c_void,
       name: $crate::abi::envoy_dynamic_module_type_envoy_buffer,
       config: $crate::abi::envoy_dynamic_module_type_envoy_buffer,
     ) -> *const ::std::ffi::c_void {
@@ -354,8 +670,19 @@ macro_rules! declare_access_logger {
       let config_bytes =
         unsafe { ::std::slice::from_raw_parts(config.ptr as *const u8, config.length) };
 
-      match <$config_type as $crate::access_log::AccessLoggerConfig>::new(name_str, config_bytes) {
-        Ok(c) => Box::into_raw(Box::new(c)) as *const ::std::ffi::c_void,
+      let ctx = $crate::access_log::ConfigContext::new(config_envoy_ptr);
+      match <$config_type as $crate::access_log::AccessLoggerConfig>::new(
+        &ctx,
+        name_str,
+        config_bytes,
+      ) {
+        Ok(c) => {
+          let wrapper = AccessLoggerConfigWrapper {
+            config: c,
+            config_envoy_ptr,
+          };
+          Box::into_raw(Box::new(wrapper)) as *const ::std::ffi::c_void
+        },
         Err(_) => ::std::ptr::null(),
       }
     }
@@ -365,7 +692,7 @@ macro_rules! declare_access_logger {
       config_ptr: *const ::std::ffi::c_void,
     ) {
       unsafe {
-        drop(Box::from_raw(config_ptr as *mut $config_type));
+        drop(Box::from_raw(config_ptr as *mut AccessLoggerConfigWrapper));
       }
     }
 
@@ -374,8 +701,9 @@ macro_rules! declare_access_logger {
       config_ptr: *const ::std::ffi::c_void,
       _logger_envoy_ptr: *mut ::std::ffi::c_void,
     ) -> *const ::std::ffi::c_void {
-      let config = unsafe { &*(config_ptr as *const $config_type) };
-      let logger = config.create_logger();
+      let wrapper = unsafe { &*(config_ptr as *const AccessLoggerConfigWrapper) };
+      let metrics = $crate::access_log::MetricsContext::new(wrapper.config_envoy_ptr);
+      let logger = wrapper.config.create_logger(metrics);
       Box::into_raw(Box::new(logger)) as *const ::std::ffi::c_void
     }
 

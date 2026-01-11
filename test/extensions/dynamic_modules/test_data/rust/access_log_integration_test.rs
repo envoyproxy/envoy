@@ -31,23 +31,35 @@ fn new_nop_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter
 /// Access logger configuration.
 struct TestAccessLoggerConfig {
   _name: String,
+  log_counter: CounterHandle,
 }
 
 impl AccessLoggerConfig for TestAccessLoggerConfig {
-  fn new(name: &str, _config: &[u8]) -> Result<Self, String> {
+  fn new(ctx: &ConfigContext, name: &str, _config: &[u8]) -> Result<Self, String> {
+    // Define a counter metric during configuration.
+    let log_counter = ctx
+      .define_counter("test_log_count")
+      .ok_or("Failed to define counter")?;
     Ok(Self {
       _name: name.to_string(),
+      log_counter,
     })
   }
 
-  fn create_logger(&self) -> Box<dyn AccessLogger> {
-    Box::new(TestAccessLogger { pending_logs: 0 })
+  fn create_logger(&self, metrics: MetricsContext) -> Box<dyn AccessLogger> {
+    Box::new(TestAccessLogger {
+      pending_logs: 0,
+      log_counter: self.log_counter,
+      metrics,
+    })
   }
 }
 
 /// Access logger instance that tracks pending (unflushed) logs.
 struct TestAccessLogger {
   pending_logs: u32,
+  log_counter: CounterHandle,
+  metrics: MetricsContext,
 }
 
 impl AccessLogger for TestAccessLogger {
@@ -55,6 +67,9 @@ impl AccessLogger for TestAccessLogger {
     // Increment the global log count.
     LOG_COUNT.fetch_add(1, Ordering::SeqCst);
     self.pending_logs += 1;
+
+    // Increment the metrics counter.
+    self.metrics.increment_counter(self.log_counter, 1);
 
     // Access some log context data to verify callbacks work.
     let _response_code = ctx.response_code();

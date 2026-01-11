@@ -40,7 +40,8 @@ AccessLog::InstanceSharedPtr DynamicModuleAccessLogFactory::createAccessLogInsta
   }
 
   auto access_log_config = newDynamicModuleAccessLogConfig(
-      proto_config.logger_name(), logger_config_str, std::move(dynamic_module_or_error.value()));
+      proto_config.logger_name(), logger_config_str, std::move(dynamic_module_or_error.value()),
+      context.serverFactoryContext().scope());
 
   if (!access_log_config.ok()) {
     throw EnvoyException("Failed to create access logger config: " +
