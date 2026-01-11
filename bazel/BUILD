@@ -27,6 +27,20 @@ sh_library(
     srcs = ["volatile_env.sh"],
 )
 
+# Flag to enable bzlmod mode (set via --//bazel:enable_bzlmod)
+bool_flag(
+    name = "enable_bzlmod",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "bzlmod_mode",
+    flag_values = {
+        ":enable_bzlmod": "True",
+    },
+    visibility = ["//visibility:public"],
+)
+
 # Stamp derived from tree hash + dirty status if `BAZEL_VOLATILE_DIRTY`
 # is set, otherwise the git commit
 genrule(
