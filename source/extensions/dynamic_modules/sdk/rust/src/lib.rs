@@ -2394,6 +2394,93 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     })?;
     Ok(())
   }
+
+  fn set_socket_option_int(
+    &mut self,
+    level: i64,
+    name: i64,
+    state: abi::envoy_dynamic_module_type_socket_option_state,
+    value: i64,
+  ) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_set_socket_option_int(
+        self.raw_ptr, level, name, state, value,
+      )
+    }
+  }
+
+  fn set_socket_option_bytes(
+    &mut self,
+    level: i64,
+    name: i64,
+    state: abi::envoy_dynamic_module_type_socket_option_state,
+    value: &[u8],
+  ) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_set_socket_option_bytes(
+        self.raw_ptr,
+        level,
+        name,
+        state,
+        abi::envoy_dynamic_module_type_module_buffer {
+          ptr: value.as_ptr() as *const _,
+          length: value.len(),
+        },
+      )
+    }
+  }
+
+  fn get_socket_option_int(
+    &self,
+    level: i64,
+    name: i64,
+    state: abi::envoy_dynamic_module_type_socket_option_state,
+  ) -> Option<i64> {
+    let mut value: i64 = 0;
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_socket_option_int(
+        self.raw_ptr, level, name, state, &mut value,
+      )
+    };
+    if success {
+      Some(value)
+    } else {
+      None
+    }
+  }
+
+  fn get_socket_option_bytes(
+    &self,
+    level: i64,
+    name: i64,
+    state: abi::envoy_dynamic_module_type_socket_option_state,
+  ) -> Option<Vec<u8>> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_socket_option_bytes(
+        self.raw_ptr,
+        level,
+        name,
+        state,
+        &mut result as *mut _ as *mut _,
+      )
+    };
+    if success && !result.ptr.is_null() && result.length > 0 {
+      let slice = unsafe { std::slice::from_raw_parts(result.ptr as *const u8, result.length) };
+      Some(slice.to_vec())
+    } else {
+      None
+    }
+  }
+
+  fn get_socket_options(&self) -> Vec<SocketOption> {
+    // HTTP filter does not have an ABI for listing all socket options.
+    // This is primarily used for network filters.
+    Vec::new()
+  }
 }
 
 impl EnvoyHttpFilterImpl {
