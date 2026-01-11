@@ -26,7 +26,8 @@ WebIdentityCredentialsProvider::WebIdentityCredentialsProvider(
   auto provider_or_error_ = Config::DataSource::DataSourceProvider<std::string>::create(
       web_identity_config.web_identity_token_data_source(), context.mainThreadDispatcher(),
       context.threadLocal(), context.api(), false,
-      [](absl::string_view data) { return std::make_shared<std::string>(data); }, 4096);
+      [](absl::string_view data) { return std::make_shared<std::string>(data); }, 4096,
+      absl::nullopt);
   if (provider_or_error_.ok()) {
     web_identity_data_source_provider_ = std::move(provider_or_error_.value());
   } else {
