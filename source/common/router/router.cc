@@ -689,7 +689,10 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     }
   }
 
-  if (upstream_options_ && callbacks_->getUpstreamSocketOptions()) {
+  if (callbacks_->getUpstreamSocketOptions()) {
+    if (!upstream_options_) {
+      upstream_options_ = std::make_shared<Network::Socket::Options>();
+    }
     Network::Socket::appendOptions(upstream_options_, callbacks_->getUpstreamSocketOptions());
   }
 
