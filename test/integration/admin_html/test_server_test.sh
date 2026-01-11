@@ -1,16 +1,27 @@
 #!/usr/bin/env bash
 
 tmp="${TEST_TMPDIR}/test/integration/admin_html/tempfiles"
-export ENVOY_BIN="${TEST_SRCDIR}/envoy/test/integration/admin_html/test_server"
+
 # shellcheck source=test/integration/test_utility.sh
-source "${TEST_SRCDIR}/envoy/test/integration/test_utility.sh"
+# Determine workspace directory first
+if [[ -d "${TEST_SRCDIR}/_main" ]]; then
+  ENVOY_SRCDIR="${TEST_SRCDIR}/_main"
+elif [[ -d "${TEST_SRCDIR}/envoy" ]]; then
+  ENVOY_SRCDIR="${TEST_SRCDIR}/envoy"
+else
+  echo "Error: Could not find workspace directory" >&2
+  exit 1
+fi
+
+export ENVOY_BIN="${ENVOY_SRCDIR}/test/integration/admin_html/test_server"
+source "${ENVOY_SRCDIR}/test/integration/test_utility.sh"
 
 # Verifies that a file can be fetched from the admin address, and it matches
 # the source file from the repo.
 check_file() {
   file="$1"
   check curl "$admin_address/test?file=$file" --output "$tmp/$file.out"
-  check check diff "$tmp/$file.out" "${TEST_SRCDIR}/envoy/test/integration/admin_html/$file"
+  check check diff "$tmp/$file.out" "${ENVOY_SRCDIR}/test/integration/admin_html/$file"
 }
 
 # We also want to verify nothing terrible can happen with this server if we

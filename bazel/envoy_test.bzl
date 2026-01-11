@@ -316,6 +316,8 @@ def envoy_benchmark_test(
         **kargs
     )
 
+# Path: /bazel-out/k8-fastbuild/bin/test/common/network/address_impl_speed_test_benchmark_test.runfiles/_main/test/common/network/address_impl_speed_test
+
 # Envoy Python test binaries should be specified with this function.
 def envoy_py_test_binary(
         name,

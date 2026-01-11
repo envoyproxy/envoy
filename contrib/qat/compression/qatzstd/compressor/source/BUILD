@@ -15,16 +15,19 @@ licenses(["notice"])  # Apache 2
 envoy_contrib_package()
 
 COMMON_ENV = {
-    "ZSTDLIB": "$$EXT_BUILD_ROOT/external/zstd/lib",
+    "ZSTDLIB": "$$EXT_BUILD_ROOT/external/zstd~/lib",
     "QAT_INCLUDE_PATH": "$$EXT_BUILD_DEPS/qatlib/include/qat",
     "LDFLAGS": "-L$$EXT_BUILD_ROOT/$(BINDIR)/bazel/external/lib",
 }
 
-COMMON_CFLAGS = "-I$$EXT_BUILD_ROOT/external/numactl"
+COMMON_CFLAGS = "-I$$EXT_BUILD_ROOT/external/numactl~"
 
 make(
     name = "qat-zstd",
-    build_data = ["@com_github_qat_zstd//:all"],
+    build_data = [
+        "@com_github_qat_zstd//:all",
+        "@zstd",
+    ],
     # Include the numa_archive genrule output so that libnuma.a is available
     # for the linker to find with -lnuma.
     data = ["//bazel/external:numa_archive"],

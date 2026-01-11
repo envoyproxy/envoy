@@ -201,25 +201,65 @@ def envoy_proto_descriptor(name, out, srcs = [], external_deps = []):
     input_files = ["$(location " + src + ")" for src in srcs]
     include_paths = [".", native.package_name()]
 
+    # Track whether we need to compute protobuf include path dynamically
+    has_protobuf_deps = False
+    protobuf_include_marker = None
+
     if "api_httpbody_protos" in external_deps:
         srcs.append("@com_google_googleapis//google/api:httpbody.proto")
-        include_paths.append("external/com_google_googleapis")
+        include_paths.append("external/googleapis~")
 
     if "http_api_protos" in external_deps:
         srcs.append("@com_google_googleapis//google/api:annotations.proto")
         srcs.append("@com_google_googleapis//google/api:http.proto")
-        include_paths.append("external/com_google_googleapis")
+        include_paths.append("external/googleapis~")
 
     if "well_known_protos" in external_deps:
-        srcs.append("@com_google_protobuf//:well_known_type_protos")
-        srcs.append("@com_google_protobuf//:descriptor_proto_srcs")
-        include_paths.append("external/com_google_protobuf/src")
+        # Explicitly reference Well Known Types from their correct packages
+        # to support Protobuf v29+ (bzlmod) structure.
+        # Reference the proto files directly from the subpackages where they are declared.
+        srcs.append("@com_google_protobuf//src/google/protobuf:any.proto")
+        srcs.append("@com_google_protobuf//src/google/protobuf:api.proto")
+        srcs.append("@com_google_protobuf//src/google/protobuf:descriptor.proto")
+        srcs.append("@com_google_protobuf//src/google/protobuf:duration.proto")
+        srcs.append("@com_google_protobuf//src/google/protobuf:empty.proto")
+        srcs.append("@com_google_protobuf//src/google/protobuf:field_mask.proto")
+        srcs.append("@com_google_protobuf//src/google/protobuf:source_context.proto")
+        srcs.append("@com_google_protobuf//src/google/protobuf:struct.proto")
+        srcs.append("@com_google_protobuf//src/google/protobuf:timestamp.proto")
+        srcs.append("@com_google_protobuf//src/google/protobuf:type.proto")
+        srcs.append("@com_google_protobuf//src/google/protobuf:wrappers.proto")
+        srcs.append("@com_google_protobuf//src/google/protobuf/compiler:plugin.proto")
+        has_protobuf_deps = True
+
+        # Use any.proto as a marker to compute the include path dynamically
+        protobuf_include_marker = "@com_google_protobuf//src/google/protobuf:any.proto"
 
     options = ["--include_imports"]
-    options.extend(["-I" + include_path for include_path in include_paths])
-    options.append("--descriptor_set_out=$@")
 
-    cmd = "$(location @com_google_protobuf//:protoc) " + " ".join(options + input_files)
+    # Build the command that computes include paths dynamically at execution time
+    if has_protobuf_deps and protobuf_include_marker:
+        # Extract the directory containing the protobuf proto files at build time
+        # The proto files are in external/com_google_protobuf~/src/google/protobuf/
+        # We need to extract up to the /src part
+        cmd_parts = []
+
+        # Get the full path to any.proto, then extract everything before /google/protobuf/
+        cmd_parts.append("ANY_PROTO_PATH=$(location " + protobuf_include_marker + ")")
+        cmd_parts.append("PROTOBUF_INCLUDE_PATH=$${ANY_PROTO_PATH%/google/protobuf/*}")
+        cmd_parts.append("INCLUDE_OPTS=\"--include_imports\"")
+
+        # Add all include paths
+        for include_path in include_paths:
+            cmd_parts.append("INCLUDE_OPTS=\"$$INCLUDE_OPTS -I" + include_path + "\"")
+        cmd_parts.append("INCLUDE_OPTS=\"$$INCLUDE_OPTS -I$$PROTOBUF_INCLUDE_PATH\"")
+
+        cmd_parts.append("$(location @com_google_protobuf//:protoc) $$INCLUDE_OPTS --descriptor_set_out=$@ " + " ".join(input_files))
+        cmd = " && ".join(cmd_parts)
+    else:
+        options.extend(["-I" + include_path for include_path in include_paths])
+        options.append("--descriptor_set_out=$@")
+        cmd = "$(location @com_google_protobuf//:protoc) " + " ".join(options + input_files)
     native.genrule(
         name = name,
         srcs = srcs,

@@ -113,76 +113,67 @@ def _rust_deps():
         patches = ["@envoy//bazel:rules_rust.patch"],
     )
 
-def envoy_dependencies(skip_targets = []):
-    external_http_archive("platforms")
+def envoy_dependencies(skip_targets = [], bzlmod = False):
+    """Load Envoy dependencies.
+
+    This function loads all Envoy dependencies for both WORKSPACE and bzlmod modes.
+    When bzlmod=True, dependencies already available in Bazel Central Registry (BCR)
+    are skipped since they're loaded via bazel_dep() in MODULE.bazel.
+
+    Args:
+        skip_targets: List of targets to skip (legacy WORKSPACE parameter)
+        bzlmod: If True, skip dependencies already in BCR (loaded via bazel_dep)
+    """
+
+    # Dependencies already in BCR when bzlmod=True (loaded via bazel_dep in MODULE.bazel):
+    # - platforms, rules_shell, rules_cc, rules_foreign_cc
+    # - boringssl (non-FIPS), emsdk
+    # - fmt, spdlog, yaml-cpp, nlohmann_json, xxhash
+    # - gperftools, numactl
+    # - fast_float, highway
+    # - zlib, zstd, org_brotli, re2
+    # - protobuf, flatbuffers, google_benchmark, googletest
+    # - rules_fuzzing, rules_license, rules_pkg, rules_shellcheck, aspect_bazel_lib
+    # - bazel_features, bazel_gazelle, io_bazel_rules_go
 
     # Treat Envoy's overall build config as an external repo, so projects that
     # build Envoy as a subcomponent can easily override the config.
     if "envoy_build_config" not in native.existing_rules().keys():
         default_envoy_build_config(name = "envoy_build_config")
 
-    # Setup Bazel shell rules
-    external_http_archive(name = "rules_shell")
-
-    # Setup Bazel C++ rules
-    external_http_archive("rules_cc")
-
-    # Setup external Bazel rules
-    _foreign_cc_dependencies()
-
-    # BoringSSL:
-    # - BoringSSL FIPS from @boringssl_fips//:ssl,
-    # - non-FIPS BoringSSL from @boringssl//:ssl.
-    # SSL/crypto dependencies are resolved via EXTERNAL_DEPS_MAP in envoy_internal.bzl
-    _boringssl()
-    _boringssl_fips()
-    _aws_lc()
+    _boringssl_fips()  # FIPS variant not in BCR, needed for both modes
+    _aws_lc()  # Not in BCR, needed for both modes
 
     # The long repo names (`com_github_fmtlib_fmt` instead of `fmtlib`) are
     # semi-standard in the Bazel community, intended to avoid both duplicate
     # dependencies and name conflicts.
     _com_github_awslabs_aws_c_auth()
     _com_github_axboe_liburing()
-    _com_github_bazel_buildtools()
-    _com_github_c_ares_c_ares()
+
     _com_github_openhistogram_libcircllhist()
-    _com_github_cyan4973_xxhash()
     _com_github_datadog_dd_trace_cpp()
     _com_github_mirror_tclap()
     _com_github_envoyproxy_sqlparser()
-    _com_github_fmtlib_fmt()
-    _com_github_gabime_spdlog()
-    _com_github_google_benchmark()
     _com_github_google_jwt_verify()
     _com_github_google_libprotobuf_mutator()
     _com_github_google_libsxg()
     _com_github_google_tcmalloc()
-    _gperftools()
-    _com_github_grpc_grpc()
-    _rules_proto_grpc()
+    _com_github_grpc_grpc(bzlmod = bzlmod)
     _com_github_unicode_org_icu()
     _com_github_intel_ipp_crypto_crypto_mb()
-    _numactl()
     _uadk()
     _com_github_intel_qatlib()
     _com_github_intel_qatzip()
     _com_github_qat_zstd()
     _com_github_lz4_lz4()
-    _com_github_jbeder_yaml_cpp()
     _com_github_libevent_libevent()
     _com_github_luajit_luajit()
     _com_github_nghttp2_nghttp2()
     _com_github_msgpack_cpp()
     _com_github_skyapm_cpp2sky()
     _com_github_alibaba_hessian2_codec()
-    _com_github_nlohmann_json()
     _com_github_ncopa_suexec()
-    _com_google_absl()
-    _com_google_googletest()
-    _com_google_protobuf()
-    _v8()
-    _fast_float()
-    _highway()
+    _v8(bzlmod = bzlmod)
     _dragonbox()
     _fp16()
     _simdutf()
@@ -194,66 +185,33 @@ def envoy_dependencies(skip_targets = []):
     _io_opentelemetry_api_cpp()
     _net_colm_open_source_colm()
     _net_colm_open_source_ragel()
-    _zlib()
     _intel_dlb()
     _com_github_zlib_ng_zlib_ng()
     _org_boost()
-    _org_brotli()
-    _zstd()
-    _re2()
-    _proxy_wasm_cpp_sdk()
-    _proxy_wasm_cpp_host()
-    _emsdk()
-    _rules_fuzzing()
-    external_http_archive("proxy_wasm_rust_sdk")
-    _com_google_cel_cpp()
     _com_github_google_perfetto()
-    _rules_ruby()
-    external_http_archive("com_github_google_flatbuffers")
-    external_http_archive("bazel_features")
+
     external_http_archive("bazel_toolchains")
     external_http_archive("bazel_compdb")
-    external_http_archive(
-        name = "envoy_examples",
-    )
-    external_http_archive("envoy_toolshed")
 
     _com_github_maxmind_libmaxminddb()
     _thrift()
-
-    external_http_archive("rules_license")
-    external_http_archive("rules_pkg")
-    external_http_archive("com_github_aignas_rules_shellcheck")
-    external_http_archive(
-        "aspect_bazel_lib",
-        patch_args = ["-p1"],
-        patches = ["@envoy//bazel:aspect.patch"],
-    )
 
     _com_github_fdio_vpp_vcl()
 
     # Unconditional, since we use this only for compiler-agnostic fuzzing utils.
     _org_llvm_releases_compiler_rt()
 
-    _toolchains_llvm()
+    # Protoc binaries for different platforms - needed for both modes
+    for platform in PROTOC_VERSIONS:
+        external_http_archive(
+            "com_google_protobuf_protoc_%s" % platform,
+            build_file = "@envoy//bazel/protoc:BUILD.protoc",
+        )
 
     _cc_deps()
-    _go_deps(skip_targets)
-    _rust_deps()
     _kafka_deps()
     _com_github_wamr()
     _com_github_wasmtime()
-
-    switched_rules_by_language(
-        name = "com_google_googleapis_imports",
-        cc = True,
-        go = True,
-        python = True,
-        grpc = True,
-    )
-
-def _boringssl():
-    external_http_archive(name = "boringssl")
 
 def _boringssl_fips():
     external_http_archive(
@@ -669,27 +627,27 @@ def _com_google_protobuf():
         },
     )
 
-def _v8():
-    external_http_archive(
-        name = "v8",
-        patches = [
+def _v8(bzlmod = False):
+    # Build kwargs for external_http_archive
+    v8_kwargs = {
+        "name": "v8",
+        "patches": [
             "@envoy//bazel:v8.patch",
             "@envoy//bazel:v8_ppc64le.patch",
             # https://issues.chromium.org/issues/423403090
             "@envoy//bazel:v8_python.patch",
         ],
-        patch_args = ["-p1"],
-        patch_cmds = [
+        "patch_args": ["-p1"],
+        "patch_cmds": [
+            "find . -name 'BUILD*' -o -name '*.bzl' | xargs sed -i.bak 's|@abseil-cpp//|@com_google_absl//|g'",
             "find ./src ./include -type f -exec sed -i.bak -e 's!#include \"third_party/simdutf/simdutf.h\"!#include \"simdutf.h\"!' {} \\;",
             "find ./src ./include -type f -exec sed -i.bak -e 's!#include \"third_party/fp16/src/include/fp16.h\"!#include \"fp16.h\"!' {} \\;",
             "find ./src ./include -type f -exec sed -i.bak -e 's!#include \"third_party/dragonbox/src/include/dragonbox/dragonbox.h\"!#include \"dragonbox/dragonbox.h\"!' {} \\;",
             "find ./src ./include -type f -exec sed -i.bak -e 's!#include \"third_party/fast_float/src/include/fast_float/!#include \"fast_float/!' {} \\;",
         ],
-        repo_mapping = {
-            "@abseil-cpp": "@com_google_absl",
-            "@icu": "@com_github_unicode_org_icu",
-        },
-    )
+    }
+
+    external_http_archive(**v8_kwargs)
 
 def _fast_float():
     external_http_archive(
@@ -749,13 +707,14 @@ def _org_llvm_releases_compiler_rt():
         build_file = "@envoy//bazel/external:compiler_rt.BUILD",
     )
 
-def _com_github_grpc_grpc():
-    external_http_archive(
-        name = "com_github_grpc_grpc",
-        patch_args = ["-p1"],
-        patches = ["@envoy//bazel:grpc.patch"],
-        repo_mapping = {"@openssl": "@boringssl"},
-    )
+def _com_github_grpc_grpc(bzlmod = False):
+    grpc_kwargs = {
+        "name": "com_github_grpc_grpc",
+        "patch_args": ["-p1"],
+        "patches": ["@envoy//bazel:grpc.patch"],
+    }
+
+    external_http_archive(**grpc_kwargs)
     external_http_archive(
         "build_bazel_rules_apple",
         patch_args = ["-p1"],

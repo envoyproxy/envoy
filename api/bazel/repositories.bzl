@@ -21,9 +21,6 @@ def api_dependencies(bzlmod = False):
     external_http_archive(
         name = "com_github_chrusty_protoc_gen_jsonschema",
     )
-    external_http_archive(
-        name = "envoy_toolshed",
-    )
 
     # WORKSPACE-only dependencies (available in BCR for bzlmod or not needed)
     if bzlmod:
@@ -43,6 +40,9 @@ def api_dependencies(bzlmod = False):
     )
     external_http_archive(
         name = "com_github_cncf_xds",
+    )
+    external_http_archive(
+        name = "envoy_toolshed",
     )
     external_http_archive(
         name = "rules_buf",
