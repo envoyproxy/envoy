@@ -7,7 +7,6 @@
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
 #include "source/common/network/socket_option_impl.h"
-#include "source/common/network/upstream_socket_options_filter_state.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/extensions/dynamic_modules/abi.h"
 #include "source/extensions/filters/http/dynamic_modules/filter.h"
@@ -1290,26 +1289,6 @@ bool envoy_dynamic_module_callback_http_add_custom_flag(
 
 namespace {
 
-Network::UpstreamSocketOptionsFilterState*
-ensureHttpUpstreamSocketOptionsFilterState(DynamicModuleHttpFilter& filter) {
-  auto stream_info = filter.streamInfo();
-  if (stream_info == nullptr) {
-    return nullptr;
-  }
-  auto filter_state_shared = stream_info->filterState();
-  StreamInfo::FilterState& filter_state = *filter_state_shared;
-  const bool has_options = filter_state.hasData<Network::UpstreamSocketOptionsFilterState>(
-      Network::UpstreamSocketOptionsFilterState::key());
-  if (!has_options) {
-    filter_state.setData(Network::UpstreamSocketOptionsFilterState::key(),
-                         std::make_unique<Network::UpstreamSocketOptionsFilterState>(),
-                         StreamInfo::FilterState::StateType::Mutable,
-                         StreamInfo::FilterState::LifeSpan::Request);
-  }
-  return filter_state.getDataMutable<Network::UpstreamSocketOptionsFilterState>(
-      Network::UpstreamSocketOptionsFilterState::key());
-}
-
 envoy::config::core::v3::SocketOption::SocketState
 mapHttpSocketState(envoy_dynamic_module_type_socket_option_state state) {
   switch (state) {
@@ -1338,8 +1317,7 @@ bool envoy_dynamic_module_callback_http_set_socket_option_int(
     return false;
   }
   auto* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
-  auto* upstream_options = ensureHttpUpstreamSocketOptionsFilterState(*filter);
-  if (upstream_options == nullptr) {
+  if (filter->decoder_callbacks_ == nullptr) {
     return false;
   }
 
@@ -1349,7 +1327,7 @@ bool envoy_dynamic_module_callback_http_set_socket_option_int(
       static_cast<int>(value));
   Network::Socket::OptionsSharedPtr option_list = std::make_shared<Network::Socket::Options>();
   option_list->push_back(option);
-  upstream_options->addOption(option_list);
+  filter->decoder_callbacks_->addUpstreamSocketOptions(option_list);
 
   filter->storeSocketOptionInt(level, name, state, value);
   return true;
@@ -1363,8 +1341,7 @@ bool envoy_dynamic_module_callback_http_set_socket_option_bytes(
     return false;
   }
   auto* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
-  auto* upstream_options = ensureHttpUpstreamSocketOptionsFilterState(*filter);
-  if (upstream_options == nullptr) {
+  if (filter->decoder_callbacks_ == nullptr) {
     return false;
   }
 
@@ -1374,7 +1351,7 @@ bool envoy_dynamic_module_callback_http_set_socket_option_bytes(
       Network::SocketOptionName(static_cast<int>(level), static_cast<int>(name), ""), value_view);
   Network::Socket::OptionsSharedPtr option_list = std::make_shared<Network::Socket::Options>();
   option_list->push_back(option);
-  upstream_options->addOption(option_list);
+  filter->decoder_callbacks_->addUpstreamSocketOptions(option_list);
 
   filter->storeSocketOptionBytes(level, name, state, value_view);
   return true;
