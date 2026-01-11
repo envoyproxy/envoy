@@ -2232,6 +2232,71 @@ bool envoy_dynamic_module_callback_http_add_custom_flag(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer flag);
 
+// ---------------------- HTTP filter socket option callbacks --------------------
+
+/**
+ * envoy_dynamic_module_callback_http_set_socket_option_int sets an integer socket option with
+ * the given level, name, and state.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
+ * @param level is the socket option level (e.g., SOL_SOCKET).
+ * @param name is the socket option name (e.g., SO_KEEPALIVE).
+ * @param state is the socket state at which this option should be applied.
+ * @param value is the integer value for the socket option.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_set_socket_option_int(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, int64_t level, int64_t name,
+    envoy_dynamic_module_type_socket_option_state state, int64_t value);
+
+/**
+ * envoy_dynamic_module_callback_http_set_socket_option_bytes sets a bytes socket option with
+ * the given level, name, and state.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
+ * @param level is the socket option level.
+ * @param name is the socket option name.
+ * @param state is the socket state at which this option should be applied.
+ * @param value is the byte buffer value for the socket option.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_set_socket_option_bytes(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, int64_t level, int64_t name,
+    envoy_dynamic_module_type_socket_option_state state,
+    envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_http_get_socket_option_int retrieves an integer socket option
+ * value.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
+ * @param level is the socket option level.
+ * @param name is the socket option name.
+ * @param state is the socket state.
+ * @param value_out is the pointer to store the retrieved integer value.
+ * @return true if the option is found, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_get_socket_option_int(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, int64_t level, int64_t name,
+    envoy_dynamic_module_type_socket_option_state state, int64_t* value_out);
+
+/**
+ * envoy_dynamic_module_callback_http_get_socket_option_bytes retrieves a bytes socket option
+ * value.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
+ * @param level is the socket option level.
+ * @param name is the socket option name.
+ * @param state is the socket state.
+ * @param value_out is the pointer to store the retrieved buffer. The buffer is owned by Envoy and
+ * valid until the filter is destroyed.
+ * @return true if the option is found, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_get_socket_option_bytes(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, int64_t level, int64_t name,
+    envoy_dynamic_module_type_socket_option_state state,
+    envoy_dynamic_module_type_envoy_buffer* value_out);
+
 // ---------------------- HTTP filter scheduler callbacks ------------------------
 
 /**

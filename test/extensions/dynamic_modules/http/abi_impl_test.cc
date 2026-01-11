@@ -451,6 +451,101 @@ TEST_F(DynamicModuleHttpFilterTest, AddCustomFlag) {
   envoy_dynamic_module_callback_http_add_custom_flag(filter_.get(), {flag.data(), flag.size()});
 }
 
+// =============================================================================
+// Tests for HTTP filter socket options.
+// =============================================================================
+
+TEST_F(DynamicModuleHttpFilterTest, SetAndGetSocketOptionInt) {
+  const int64_t level = 1;
+  const int64_t name = 2;
+  const int64_t value = 12345;
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_set_socket_option_int(
+      filter_.get(), level, name, envoy_dynamic_module_type_socket_option_state_Prebind, value));
+
+  int64_t result = 0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_socket_option_int(
+      filter_.get(), level, name, envoy_dynamic_module_type_socket_option_state_Prebind, &result));
+  EXPECT_EQ(value, result);
+}
+
+TEST_F(DynamicModuleHttpFilterTest, SetAndGetSocketOptionBytes) {
+  const int64_t level = 3;
+  const int64_t name = 4;
+  const std::string value = "socket-bytes";
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_set_socket_option_bytes(
+      filter_.get(), level, name, envoy_dynamic_module_type_socket_option_state_Bound,
+      {value.data(), value.size()}));
+
+  envoy_dynamic_module_type_envoy_buffer result;
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_socket_option_bytes(
+      filter_.get(), level, name, envoy_dynamic_module_type_socket_option_state_Bound, &result));
+  EXPECT_EQ(value, std::string(result.ptr, result.length));
+}
+
+TEST_F(DynamicModuleHttpFilterTest, GetSocketOptionIntMissing) {
+  int64_t value = 0;
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_socket_option_int(
+      filter_.get(), 99, 100, envoy_dynamic_module_type_socket_option_state_Prebind, &value));
+}
+
+TEST_F(DynamicModuleHttpFilterTest, GetSocketOptionBytesMissing) {
+  envoy_dynamic_module_type_envoy_buffer value_out;
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_socket_option_bytes(
+      filter_.get(), 99, 100, envoy_dynamic_module_type_socket_option_state_Bound, &value_out));
+}
+
+TEST_F(DynamicModuleHttpFilterTest, SocketOptionInvalidState) {
+  // Test with invalid state value (cast an invalid value).
+  const auto invalid_state = static_cast<envoy_dynamic_module_type_socket_option_state>(999);
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_set_socket_option_int(filter_.get(), 1, 2,
+                                                                        invalid_state, 100));
+
+  int64_t result = 0;
+  EXPECT_FALSE(
+      envoy_dynamic_module_callback_http_get_socket_option_int(filter_.get(), 1, 2, invalid_state, &result));
+}
+
+TEST_F(DynamicModuleHttpFilterTest, SocketOptionNullValueOut) {
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_socket_option_int(
+      filter_.get(), 1, 2, envoy_dynamic_module_type_socket_option_state_Prebind, nullptr));
+
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_socket_option_bytes(
+      filter_.get(), 1, 2, envoy_dynamic_module_type_socket_option_state_Prebind, nullptr));
+}
+
+TEST_F(DynamicModuleHttpFilterTest, SetSocketOptionBytesNullPtr) {
+  // Test with null pointer for bytes value.
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_set_socket_option_bytes(
+      filter_.get(), 1, 2, envoy_dynamic_module_type_socket_option_state_Prebind, {nullptr, 0}));
+}
+
+TEST_F(DynamicModuleHttpFilterTest, SocketOptionMultipleOptions) {
+  // Add multiple options with different states.
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_set_socket_option_int(
+      filter_.get(), 1, 1, envoy_dynamic_module_type_socket_option_state_Prebind, 100));
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_set_socket_option_int(
+      filter_.get(), 1, 1, envoy_dynamic_module_type_socket_option_state_Bound, 200));
+  const std::string bytes_val = "test-bytes";
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_set_socket_option_bytes(
+      filter_.get(), 2, 2, envoy_dynamic_module_type_socket_option_state_Listening,
+      {bytes_val.data(), bytes_val.size()}));
+
+  // Verify each option can be retrieved.
+  int64_t int_result = 0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_socket_option_int(
+      filter_.get(), 1, 1, envoy_dynamic_module_type_socket_option_state_Prebind, &int_result));
+  EXPECT_EQ(100, int_result);
+
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_socket_option_int(
+      filter_.get(), 1, 1, envoy_dynamic_module_type_socket_option_state_Bound, &int_result));
+  EXPECT_EQ(200, int_result);
+
+  envoy_dynamic_module_type_envoy_buffer bytes_result;
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_socket_option_bytes(
+      filter_.get(), 2, 2, envoy_dynamic_module_type_socket_option_state_Listening, &bytes_result));
+  EXPECT_EQ(bytes_val, std::string(bytes_result.ptr, bytes_result.length));
+}
+
 TEST(ABIImpl, metadata) {
   Stats::SymbolTableImpl symbol_table;
   DynamicModuleHttpFilter filter{nullptr, symbol_table};
