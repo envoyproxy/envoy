@@ -36,6 +36,7 @@
 #include "source/common/network/cidr_range.h"
 #include "source/common/tracing/http_tracer_impl.h"
 #include "source/extensions/filters/network/common/factory_base.h"
+#include "source/extensions/filters/network/http_connection_manager/forward_client_cert_details.h"
 #include "source/extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
@@ -220,6 +221,9 @@ public:
   const std::vector<Http::ClientCertDetailsType>& setCurrentClientCertDetails() const override {
     return set_current_client_cert_details_;
   }
+  const Matcher::MatchTreePtr<Http::HttpMatchingData>& forwardClientCertMatcher() const override {
+    return forward_client_cert_matcher_;
+  }
   Tracing::TracerSharedPtr tracer() override { return tracer_; }
   const Http::TracingConnectionManagerConfig* tracingConfig() override {
     return tracing_config_.get();
@@ -309,6 +313,7 @@ private:
   const std::string via_;
   Http::ForwardClientCertType forward_client_cert_;
   std::vector<Http::ClientCertDetailsType> set_current_client_cert_details_;
+  Matcher::MatchTreePtr<Http::HttpMatchingData> forward_client_cert_matcher_;
   Config::ConfigProviderManager* scoped_routes_config_provider_manager_;
   FilterConfigProviderManager& filter_config_provider_manager_;
   CodecType codec_type_;

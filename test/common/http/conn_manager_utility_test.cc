@@ -8,9 +8,11 @@
 #include "source/common/http/conn_manager_utility.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
+#include "source/common/http/matching/data_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/runtime/runtime_impl.h"
+#include "source/extensions/filters/network/http_connection_manager/forward_client_cert_details.h"
 #include "source/extensions/http/original_ip_detection/xff/xff.h"
 #include "source/extensions/request_id/uuid/config.h"
 
@@ -20,6 +22,7 @@
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/printers.h"
@@ -31,6 +34,7 @@
 
 using testing::_;
 using testing::An;
+using testing::Const;
 using testing::Matcher;
 using testing::NiceMock;
 using testing::Return;
@@ -129,6 +133,12 @@ public:
     detection_extensions_.push_back(getXFFExtension(0, true));
     ON_CALL(config_, originalIpDetectionExtensions())
         .WillByDefault(ReturnRef(detection_extensions_));
+    ON_CALL(Const(config_), forwardClientCertMatcher())
+        .WillByDefault(ReturnRef(forward_client_cert_matcher_));
+    ON_CALL(Const(config_), forwardClientCert())
+        .WillByDefault(Return(Http::ForwardClientCertType::Sanitize));
+    ON_CALL(Const(config_), setCurrentClientCertDetails())
+        .WillByDefault(ReturnRef(set_current_client_cert_details_));
   }
 
   struct MutateRequestRet {
@@ -181,6 +191,8 @@ public:
   std::string empty_node_;
   std::string via_;
   std::string node_id_;
+  Matcher::MatchTreePtr<Http::HttpMatchingData> forward_client_cert_matcher_;
+  std::vector<Http::ClientCertDetailsType> set_current_client_cert_details_;
 };
 
 // Tests for ConnectionManagerUtility::determineNextProtocol.
@@ -1777,6 +1789,127 @@ TEST_F(ConnectionManagerUtilityTest, NonTlsAlwaysForwardClientCert) {
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_TRUE(headers.has("x-forwarded-client-cert"));
   EXPECT_EQ("By=test://foo.com/fe;URI=test://bar.com/be", headers.get_("x-forwarded-client-cert"));
+}
+
+// Test that forward_client_cert_matcher takes priority over static forward_client_cert_details.
+// When the matcher matches, it should use the matched action's config instead of the static config.
+TEST_F(ConnectionManagerUtilityTest, ForwardClientCertMatcherTakesPriority) {
+  // Set up mTLS connection.
+  auto ssl = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  ON_CALL(*ssl, peerCertificatePresented()).WillByDefault(Return(true));
+  const std::vector<std::string> local_uri_sans{"test://foo.com/be"};
+  EXPECT_CALL(*ssl, uriSanLocalCertificate()).WillOnce(Return(local_uri_sans));
+  std::string expected_sha("abcdefg");
+  EXPECT_CALL(*ssl, sha256PeerCertificateDigest()).WillOnce(ReturnRef(expected_sha));
+  const std::vector<std::string> peer_uri_sans{"test://foo.com/fe"};
+  EXPECT_CALL(*ssl, uriSanPeerCertificate()).WillRepeatedly(Return(peer_uri_sans));
+  ON_CALL(connection_, ssl()).WillByDefault(Return(ssl));
+
+  // Set static config to SANITIZE - this should be overridden by the matcher.
+  ON_CALL(config_, forwardClientCert())
+      .WillByDefault(Return(Http::ForwardClientCertType::Sanitize));
+  std::vector<Http::ClientCertDetailsType> static_details;
+  ON_CALL(config_, setCurrentClientCertDetails()).WillByDefault(ReturnRef(static_details));
+
+  // Create a matcher that always returns APPEND_FORWARD with URI details.
+  // Use on_no_match so it always matches.
+  const std::string matcher_yaml = R"EOF(
+on_no_match:
+  action:
+    name: forward_client_cert
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.ForwardClientCertConfig
+      forward_client_cert_details: APPEND_FORWARD
+      set_current_client_cert_details:
+        uri: true
+  )EOF";
+
+  xds::type::matcher::v3::Matcher matcher_config;
+  TestUtility::loadFromYaml(matcher_yaml, matcher_config);
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
+  forward_client_cert_matcher_ =
+      Extensions::NetworkFilters::HttpConnectionManager::createForwardClientCertMatcher(
+          matcher_config, server_factory_context);
+  ON_CALL(Const(config_), forwardClientCertMatcher())
+      .WillByDefault(ReturnRef(forward_client_cert_matcher_));
+
+  // The client sends an existing XFCC header - with APPEND_FORWARD it should be appended to.
+  TestRequestHeaderMapImpl headers{{"x-forwarded-client-cert", "By=test://bar.com/fe"}};
+
+  EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false, Tracing::Reason::NotTraceable}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
+  EXPECT_TRUE(headers.has("x-forwarded-client-cert"));
+  // If the static SANITIZE config was used, the header would be removed.
+  // Instead, we expect APPEND_FORWARD behavior from the matcher - the original header
+  // should be preserved and the new cert info appended.
+  EXPECT_EQ("By=test://bar.com/fe,"
+            "By=test://foo.com/be;Hash=abcdefg;URI=test://foo.com/fe",
+            headers.get_("x-forwarded-client-cert"));
+}
+
+// Test that when forward_client_cert_matcher is configured but doesn't match,
+// the static forward_client_cert_details config is used as fallback.
+TEST_F(ConnectionManagerUtilityTest, ForwardClientCertMatcherFallbackToStatic) {
+  // Set up mTLS connection.
+  auto ssl = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  ON_CALL(*ssl, peerCertificatePresented()).WillByDefault(Return(true));
+  const std::vector<std::string> local_uri_sans{"test://foo.com/be"};
+  EXPECT_CALL(*ssl, uriSanLocalCertificate()).WillOnce(Return(local_uri_sans));
+  std::string expected_sha("abcdefg");
+  EXPECT_CALL(*ssl, sha256PeerCertificateDigest()).WillOnce(ReturnRef(expected_sha));
+  const std::vector<std::string> peer_uri_sans{"test://foo.com/fe"};
+  EXPECT_CALL(*ssl, uriSanPeerCertificate()).WillRepeatedly(Return(peer_uri_sans));
+  ON_CALL(connection_, ssl()).WillByDefault(Return(ssl));
+
+  // Set static config to SANITIZE_SET.
+  ON_CALL(config_, forwardClientCert())
+      .WillByDefault(Return(Http::ForwardClientCertType::SanitizeSet));
+  std::vector<Http::ClientCertDetailsType> static_details = {Http::ClientCertDetailsType::URI};
+  ON_CALL(config_, setCurrentClientCertDetails()).WillByDefault(ReturnRef(static_details));
+
+  // Create a matcher that only matches path prefix /mtls - our request won't match.
+  const std::string matcher_yaml = R"EOF(
+matcher_list:
+  matchers:
+  - predicate:
+      single_predicate:
+        input:
+          name: envoy.matching.inputs.request_headers
+          typed_config:
+            "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+            header_name: ":path"
+        value_match:
+          prefix: "/mtls"
+    on_match:
+      action:
+        name: forward_client_cert
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.ForwardClientCertConfig
+          forward_client_cert_details: FORWARD_ONLY
+  )EOF";
+
+  xds::type::matcher::v3::Matcher matcher_config;
+  TestUtility::loadFromYaml(matcher_yaml, matcher_config);
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
+  forward_client_cert_matcher_ =
+      Extensions::NetworkFilters::HttpConnectionManager::createForwardClientCertMatcher(
+          matcher_config, server_factory_context);
+  ON_CALL(Const(config_), forwardClientCertMatcher())
+      .WillByDefault(ReturnRef(forward_client_cert_matcher_));
+
+  // Request with path /api - won't match the /mtls prefix.
+  TestRequestHeaderMapImpl headers{{":path", "/api"},
+                                   {"x-forwarded-client-cert", "By=test://bar.com/fe"}};
+
+  EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false, Tracing::Reason::NotTraceable}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
+  EXPECT_TRUE(headers.has("x-forwarded-client-cert"));
+  // Since the matcher didn't match, fallback to static SANITIZE_SET - the header should be
+  // replaced with the new cert info (not appended).
+  EXPECT_EQ("By=test://foo.com/be;Hash=abcdefg;URI=test://foo.com/fe",
+            headers.get_("x-forwarded-client-cert"));
 }
 
 // Sampling, global on.

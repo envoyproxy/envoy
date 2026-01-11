@@ -80,6 +80,8 @@ public:
 
   Configuration::FactoryContext& factoryContext() { return factory_context_; }
 
+  const Matcher::MatchTreePtr<Http::HttpMatchingData>& forwardClientCertMatcher() const override;
+
   // Server::Admin
   // TODO(jsedgwick) These can be managed with a generic version of ConfigTracker.
   // Wins would be no manual removeHandler() and code reuse.
@@ -467,6 +469,7 @@ private:
   Http::RequestIDExtensionSharedPtr request_id_extension_;
   AccessLog::InstanceSharedPtrVector access_logs_;
   std::vector<Matchers::StringMatcherPtr> allowlisted_paths_;
+  Matcher::MatchTreePtr<Http::HttpMatchingData> forward_client_cert_matcher_;
   const bool flush_access_log_on_new_request_ = false;
   const absl::optional<std::chrono::milliseconds> null_access_log_flush_interval_;
   const std::string profile_path_;
