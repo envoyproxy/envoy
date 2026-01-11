@@ -66,8 +66,8 @@ public:
     IS_ENVOY_BUG("unexpected call to closeConnection for QUIC");
   }
 
-  Network::DetectedCloseType detectedCloseType() const override {
-    return Network::DetectedCloseType::Normal;
+  StreamInfo::DetectedCloseType detectedCloseType() const override {
+    return StreamInfo::DetectedCloseType::Normal;
   }
   Event::Dispatcher& dispatcher() const override { return dispatcher_; }
   std::string nextProtocol() const override { return EMPTY_STRING; }

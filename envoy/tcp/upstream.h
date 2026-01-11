@@ -169,10 +169,15 @@ public:
    * @return the const SSL connection data of upstream.
    */
   virtual Ssl::ConnectionInfoConstSharedPtr getUpstreamConnectionSslInfo() PURE;
+
+  /**
+   * Called when upstream connection is closed.
+   * @return the detected close type from socket.
+   */
+  virtual StreamInfo::DetectedCloseType detectedCloseType() const PURE;
 };
 
 using GenericConnPoolPtr = std::unique_ptr<GenericConnPool>;
-
 /*
  * A factory for creating generic connection pools.
  */
