@@ -55,19 +55,16 @@ TEST_F(DynamicModuleUdpListenerFilterAbiCallbackTest, GetDatagramDataWithSingleC
   // Set current data to simulate being inside onData callback.
   filter_->setCurrentDataForTest(&data);
 
-  size_t chunks_size = 0;
-  bool ok = envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks_size(
-      filterPtr(), &chunks_size);
+  size_t chunks_size =
+      envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks_size(filterPtr());
 
-  EXPECT_TRUE(ok);
   EXPECT_GE(chunks_size, 1);
 
   std::vector<envoy_dynamic_module_type_envoy_buffer> chunks(chunks_size);
   ASSERT_TRUE(envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks(
       filterPtr(), chunks.data()));
-  size_t returned_length = 0;
-  ASSERT_TRUE(envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_size(
-      filterPtr(), &returned_length));
+  size_t returned_length =
+      envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_size(filterPtr());
 
   // Verify the data.
   size_t total_length = 0;
@@ -85,19 +82,14 @@ TEST_F(DynamicModuleUdpListenerFilterAbiCallbackTest, GetDatagramDataWithSingleC
 
 TEST_F(DynamicModuleUdpListenerFilterAbiCallbackTest, GetDatagramDataNoCurrentData) {
   // No current data set outside of onData callback.
-  size_t chunks_size = 0;
-
-  bool ok = envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks_size(
-      filterPtr(), &chunks_size);
-
-  EXPECT_FALSE(ok);
+  size_t chunks_size =
+      envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks_size(filterPtr());
   EXPECT_EQ(0, chunks_size);
 
   EXPECT_FALSE(envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks(
       filterPtr(), nullptr));
-  size_t returned_length = 0;
-  EXPECT_FALSE(envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_size(
-      filterPtr(), &returned_length));
+  size_t returned_length =
+      envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_size(filterPtr());
   EXPECT_EQ(0, returned_length);
 }
 
@@ -111,18 +103,15 @@ TEST_F(DynamicModuleUdpListenerFilterAbiCallbackTest, GetDatagramDataMultipleChu
 
   filter_->setCurrentDataForTest(&data);
 
-  size_t chunks_size = 0;
-  bool ok = envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks_size(
-      filterPtr(), &chunks_size);
-  EXPECT_TRUE(ok);
+  size_t chunks_size =
+      envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks_size(filterPtr());
   EXPECT_GE(chunks_size, 1);
 
   std::vector<envoy_dynamic_module_type_envoy_buffer> chunks(chunks_size);
   ASSERT_TRUE(envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks(
       filterPtr(), chunks.data()));
-  size_t returned_length = 0;
-  ASSERT_TRUE(envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_size(
-      filterPtr(), &returned_length));
+  size_t returned_length =
+      envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_size(filterPtr());
 
   size_t total_length = 0;
   std::string combined;
@@ -144,14 +133,8 @@ TEST_F(DynamicModuleUdpListenerFilterAbiCallbackTest, GetDatagramDataNullChunksS
 
   filter_->setCurrentDataForTest(&data);
 
-  bool ok = envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks_size(
-      filterPtr(), nullptr);
-
-  EXPECT_TRUE(ok);
-
-  size_t chunks_size = 0;
-  envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks_size(filterPtr(),
-                                                                                  &chunks_size);
+  size_t chunks_size =
+      envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks_size(filterPtr());
   std::vector<envoy_dynamic_module_type_envoy_buffer> chunks(chunks_size);
   ASSERT_TRUE(envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks(
       filterPtr(), chunks.data()));
@@ -166,18 +149,15 @@ TEST_F(DynamicModuleUdpListenerFilterAbiCallbackTest, GetDatagramDataEmptyBuffer
 
   filter_->setCurrentDataForTest(&data);
 
-  size_t chunks_size = 0;
-  bool ok = envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks_size(
-      filterPtr(), &chunks_size);
+  size_t chunks_size =
+      envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks_size(filterPtr());
 
-  EXPECT_TRUE(ok);
   EXPECT_EQ(0, chunks_size);
 
   EXPECT_FALSE(envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks(
       filterPtr(), nullptr));
-  size_t returned_length = 0;
-  EXPECT_TRUE(envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_size(
-      filterPtr(), &returned_length));
+  size_t returned_length =
+      envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_size(filterPtr());
   EXPECT_EQ(0, returned_length);
 
   filter_->setCurrentDataForTest(nullptr);

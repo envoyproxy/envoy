@@ -27,22 +27,15 @@ void fillBufferChunks(const Envoy::Buffer::Instance& buffer,
 
 extern "C" {
 
-bool envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks_size(
-    envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr,
-    size_t* chunks_size_out) {
+size_t envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks_size(
+    envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr) {
   auto* filter = static_cast<DynamicModuleUdpListenerFilter*>(filter_envoy_ptr);
   auto* data = filter->currentData();
   if (!data || !data->buffer_) {
-    if (chunks_size_out != nullptr) {
-      *chunks_size_out = 0;
-    }
-    return false;
+    return 0;
   }
 
-  if (chunks_size_out != nullptr) {
-    *chunks_size_out = data->buffer_->getRawSlices().size();
-  }
-  return true;
+  return data->buffer_->getRawSlices().size();
 }
 
 bool envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks(
@@ -62,17 +55,14 @@ bool envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks(
   return true;
 }
 
-bool envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_size(
-    envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr, size_t* size_out) {
+size_t envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_size(
+    envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr) {
   auto* filter = static_cast<DynamicModuleUdpListenerFilter*>(filter_envoy_ptr);
   auto* data = filter->currentData();
   if (!data || !data->buffer_) {
-    return false;
+    return 0;
   }
-  if (size_out != nullptr) {
-    *size_out = data->buffer_->length();
-  }
-  return true;
+  return data->buffer_->length();
 }
 
 bool envoy_dynamic_module_callback_udp_listener_filter_set_datagram_data(

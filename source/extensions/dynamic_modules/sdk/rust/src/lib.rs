@@ -868,9 +868,7 @@ pub trait EnvoyHttpFilter {
 
   /// Set the number-typed dynamic metadata value with the given key.
   /// If the namespace is not found, this will create a new namespace.
-  ///
-  /// Returns true if the operation is successful.
-  fn set_dynamic_metadata_number(&mut self, namespace: &str, key: &str, value: f64) -> bool;
+  fn set_dynamic_metadata_number(&mut self, namespace: &str, key: &str, value: f64);
 
   /// Get the string-typed metadata value with the given key.
   /// Use the `source` parameter to specify which metadata to use.
@@ -886,7 +884,7 @@ pub trait EnvoyHttpFilter {
   /// If the namespace is not found, this will create a new namespace.
   ///
   /// Returns true if the operation is successful.
-  fn set_dynamic_metadata_string(&mut self, namespace: &str, key: &str, value: &str) -> bool;
+  fn set_dynamic_metadata_string(&mut self, namespace: &str, key: &str, value: &str);
 
   /// Get the bytes-typed filter state value with the given key.
   /// If the filter state is not found or is the wrong type, this returns `None`.
@@ -952,11 +950,11 @@ pub trait EnvoyHttpFilter {
   /// This should only be used in the [`HttpFilter::on_request_body`] callback.
   ///
   /// Returns None if the request body is not available.
-  fn get_received_request_body_size(&mut self) -> Option<usize>;
+  fn get_received_request_body_size(&mut self) -> usize;
 
   /// Similar to [`EnvoyHttpFilter::get_received_request_body_size`], but returns the size of the
   /// buffered request body in bytes.
-  fn get_buffered_request_body_size(&mut self) -> Option<usize>;
+  fn get_buffered_request_body_size(&mut self) -> usize;
 
   /// Drain the given number of bytes from the front of the received request body.
   /// This should only be used in the [`HttpFilter::on_request_body`] callback.
@@ -1053,14 +1051,14 @@ pub trait EnvoyHttpFilter {
   /// Get the size of the received response body in bytes.
   /// This should only be used in the [`HttpFilter::on_response_body`] callback.
   ///
-  /// Returns None if the response body is not available.
-  fn get_received_response_body_size(&mut self) -> Option<usize>;
+  /// Returns zero if the response body is not available or empty.
+  fn get_received_response_body_size(&mut self) -> usize;
 
   /// Similar to [`EnvoyHttpFilter::get_received_response_body_size`], but returns the size of the
   /// buffered response body in bytes.
   ///
-  /// Returns None if the response body is not available.
-  fn get_buffered_response_body_size(&mut self) -> Option<usize>;
+  /// Returns zero if the response body is not available or empty.
+  fn get_buffered_response_body_size(&mut self) -> usize;
 
   /// Drain the given number of bytes from the front of the received response body.
   /// This should only be used in the [`HttpFilter::on_response_body`] callback.
@@ -1643,7 +1641,7 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     }
   }
 
-  fn set_dynamic_metadata_number(&mut self, namespace: &str, key: &str, value: f64) -> bool {
+  fn set_dynamic_metadata_number(&mut self, namespace: &str, key: &str, value: f64) {
     unsafe {
       abi::envoy_dynamic_module_callback_http_set_dynamic_metadata_number(
         self.raw_ptr,
@@ -1680,7 +1678,7 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     }
   }
 
-  fn set_dynamic_metadata_string(&mut self, namespace: &str, key: &str, value: &str) -> bool {
+  fn set_dynamic_metadata_string(&mut self, namespace: &str, key: &str, value: &str) {
     unsafe {
       abi::envoy_dynamic_module_callback_http_set_dynamic_metadata_string(
         self.raw_ptr,
@@ -1721,15 +1719,13 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
   }
 
   fn get_received_request_body(&mut self) -> Option<Vec<EnvoyMutBuffer>> {
-    let mut size: usize = 0;
-    let ok = unsafe {
+    let size = unsafe {
       abi::envoy_dynamic_module_callback_http_get_body_chunks_size(
         self.raw_ptr,
         abi::envoy_dynamic_module_type_http_body_type::ReceivedRequestBody,
-        &mut size,
       )
     };
-    if !ok || size == 0 {
+    if size == 0 {
       return None;
     }
 
@@ -1749,15 +1745,13 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
   }
 
   fn get_buffered_request_body(&mut self) -> Option<Vec<EnvoyMutBuffer<'_>>> {
-    let mut size: usize = 0;
-    let ok = unsafe {
+    let size = unsafe {
       abi::envoy_dynamic_module_callback_http_get_body_chunks_size(
         self.raw_ptr,
         abi::envoy_dynamic_module_type_http_body_type::BufferedRequestBody,
-        &mut size,
       )
     };
-    if !ok || size == 0 {
+    if size == 0 {
       return None;
     }
 
@@ -1776,35 +1770,21 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     }
   }
 
-  fn get_received_request_body_size(&mut self) -> Option<usize> {
-    let mut size: usize = 0;
-    let ok = unsafe {
+  fn get_received_request_body_size(&mut self) -> usize {
+    unsafe {
       abi::envoy_dynamic_module_callback_http_get_body_size(
         self.raw_ptr,
         abi::envoy_dynamic_module_type_http_body_type::ReceivedRequestBody,
-        &mut size as *mut _ as *mut _,
       )
-    };
-    if ok {
-      Some(size)
-    } else {
-      None
     }
   }
 
-  fn get_buffered_request_body_size(&mut self) -> Option<usize> {
-    let mut size: usize = 0;
-    let ok = unsafe {
+  fn get_buffered_request_body_size(&mut self) -> usize {
+    unsafe {
       abi::envoy_dynamic_module_callback_http_get_body_size(
         self.raw_ptr,
         abi::envoy_dynamic_module_type_http_body_type::BufferedRequestBody,
-        &mut size as *mut _ as *mut _,
       )
-    };
-    if ok {
-      Some(size)
-    } else {
-      None
     }
   }
 
@@ -1849,15 +1829,13 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
   }
 
   fn get_received_response_body(&mut self) -> Option<Vec<EnvoyMutBuffer>> {
-    let mut size: usize = 0;
-    let ok = unsafe {
+    let size = unsafe {
       abi::envoy_dynamic_module_callback_http_get_body_chunks_size(
         self.raw_ptr,
         abi::envoy_dynamic_module_type_http_body_type::ReceivedResponseBody,
-        &mut size,
       )
     };
-    if !ok || size == 0 {
+    if size == 0 {
       return None;
     }
 
@@ -1877,15 +1855,13 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
   }
 
   fn get_buffered_response_body(&mut self) -> Option<Vec<EnvoyMutBuffer<'_>>> {
-    let mut size: usize = 0;
-    let ok = unsafe {
+    let size = unsafe {
       abi::envoy_dynamic_module_callback_http_get_body_chunks_size(
         self.raw_ptr,
         abi::envoy_dynamic_module_type_http_body_type::BufferedResponseBody,
-        &mut size,
       )
     };
-    if !ok || size == 0 {
+    if size == 0 {
       return None;
     }
 
@@ -1904,35 +1880,21 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     }
   }
 
-  fn get_received_response_body_size(&mut self) -> Option<usize> {
-    let mut size: usize = 0;
-    let ok = unsafe {
+  fn get_received_response_body_size(&mut self) -> usize {
+    unsafe {
       abi::envoy_dynamic_module_callback_http_get_body_size(
         self.raw_ptr,
         abi::envoy_dynamic_module_type_http_body_type::ReceivedResponseBody,
-        &mut size as *mut _ as *mut _,
       )
-    };
-    if ok {
-      Some(size)
-    } else {
-      None
     }
   }
 
-  fn get_buffered_response_body_size(&mut self) -> Option<usize> {
-    let mut size: usize = 0;
-    let ok = unsafe {
+  fn get_buffered_response_body_size(&mut self) -> usize {
+    unsafe {
       abi::envoy_dynamic_module_callback_http_get_body_size(
         self.raw_ptr,
         abi::envoy_dynamic_module_type_http_body_type::BufferedResponseBody,
-        &mut size as *mut _ as *mut _,
       )
-    };
-    if ok {
-      Some(size)
-    } else {
-      None
     }
   }
 
@@ -2407,15 +2369,10 @@ impl EnvoyHttpFilterImpl {
     &self,
     header_type: abi::envoy_dynamic_module_type_http_header_type,
   ) -> Vec<(EnvoyBuffer, EnvoyBuffer)> {
-    let mut count: usize = 0;
-    let ok = unsafe {
-      abi::envoy_dynamic_module_callback_http_get_headers_size(
-        self.raw_ptr,
-        header_type,
-        &mut count as *mut _ as *mut _,
-      )
+    let count = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_headers_size(self.raw_ptr, header_type)
     };
-    if !ok || count == 0 {
+    if count == 0 {
       return Vec::default();
     }
 
@@ -3373,8 +3330,7 @@ pub trait EnvoyNetworkFilter {
   fn get_filter_state_bytes<'a>(&'a self, key: &[u8]) -> Option<EnvoyBuffer<'a>>;
 
   /// Set the string-typed dynamic metadata value with the given namespace and key value.
-  /// Returns true if the operation is successful.
-  fn set_dynamic_metadata_string(&mut self, namespace: &str, key: &str, value: &str) -> bool;
+  fn set_dynamic_metadata_string(&mut self, namespace: &str, key: &str, value: &str);
 
   /// Get the string-typed dynamic metadata value with the given namespace and key value.
   /// Returns None if the metadata is not found or is the wrong type.
@@ -3382,7 +3338,7 @@ pub trait EnvoyNetworkFilter {
 
   /// Set the number-typed dynamic metadata value with the given namespace and key value.
   /// Returns true if the operation is successful.
-  fn set_dynamic_metadata_number(&mut self, namespace: &str, key: &str, value: f64) -> bool;
+  fn set_dynamic_metadata_number(&mut self, namespace: &str, key: &str, value: f64);
 
   /// Get the number-typed dynamic metadata value with the given namespace and key value.
   /// Returns None if the metadata is not found or is the wrong type.
@@ -3395,7 +3351,7 @@ pub trait EnvoyNetworkFilter {
     name: i64,
     state: abi::envoy_dynamic_module_type_socket_option_state,
     value: i64,
-  ) -> bool;
+  );
 
   /// Set a bytes socket option with the given level, name, and state.
   fn set_socket_option_bytes(
@@ -3404,7 +3360,7 @@ pub trait EnvoyNetworkFilter {
     name: i64,
     state: abi::envoy_dynamic_module_type_socket_option_state,
     value: &[u8],
-  ) -> bool;
+  );
 
   /// Get an integer socket option value.
   fn get_socket_option_int(
@@ -3574,13 +3530,16 @@ impl EnvoyNetworkFilterImpl {
 
 impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
   fn get_read_buffer_chunks(&mut self) -> (Vec<EnvoyBuffer>, usize) {
-    let mut size: usize = 0;
-    let ok = unsafe {
-      abi::envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks_size(
-        self.raw, &mut size,
-      )
+    let size = unsafe {
+      abi::envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks_size(self.raw)
     };
-    if !ok || size == 0 {
+    if size == 0 {
+      return (Vec::new(), 0);
+    }
+
+    let total_length =
+      unsafe { abi::envoy_dynamic_module_callback_network_filter_get_read_buffer_size(self.raw) };
+    if total_length == 0 {
       return (Vec::new(), 0);
     }
 
@@ -3591,7 +3550,7 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
       };
       size
     ];
-    let total_length = unsafe {
+    unsafe {
       abi::envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks(
         self.raw,
         buffers.as_mut_ptr(),
@@ -3605,13 +3564,16 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
   }
 
   fn get_write_buffer_chunks(&mut self) -> (Vec<EnvoyBuffer>, usize) {
-    let mut size: usize = 0;
-    let ok = unsafe {
-      abi::envoy_dynamic_module_callback_network_filter_get_write_buffer_chunks_size(
-        self.raw, &mut size,
-      )
+    let size = unsafe {
+      abi::envoy_dynamic_module_callback_network_filter_get_write_buffer_chunks_size(self.raw)
     };
-    if !ok || size == 0 {
+    if size == 0 {
+      return (Vec::new(), 0);
+    }
+
+    let total_length =
+      unsafe { abi::envoy_dynamic_module_callback_network_filter_get_write_buffer_size(self.raw) };
+    if total_length == 0 {
       return (Vec::new(), 0);
     }
 
@@ -3622,7 +3584,7 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
       };
       size
     ];
-    let total_length = unsafe {
+    unsafe {
       abi::envoy_dynamic_module_callback_network_filter_get_write_buffer_chunks(
         self.raw,
         buffers.as_mut_ptr(),
@@ -3852,11 +3814,9 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
   }
 
   fn get_ssl_uri_sans(&self) -> Vec<EnvoyBuffer> {
-    let mut size: usize = 0;
-    let success = unsafe {
-      abi::envoy_dynamic_module_callback_network_filter_get_ssl_uri_sans_size(self.raw, &mut size)
-    };
-    if !success || size == 0 {
+    let size =
+      unsafe { abi::envoy_dynamic_module_callback_network_filter_get_ssl_uri_sans_size(self.raw) };
+    if size == 0 {
       return Vec::new();
     }
 
@@ -3867,19 +3827,19 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
       };
       size
     ];
-    let count = unsafe {
+    let ok = unsafe {
       abi::envoy_dynamic_module_callback_network_filter_get_ssl_uri_sans(
         self.raw,
         sans_buffers.as_mut_ptr(),
       )
     };
-    if count == 0 {
+    if !ok {
       return Vec::new();
     }
 
     sans_buffers
       .iter()
-      .take(count)
+      .take(size)
       .map(|buf| {
         if !buf.ptr.is_null() && buf.length > 0 {
           unsafe { EnvoyBuffer::new_from_raw(buf.ptr as *const _, buf.length) }
@@ -3891,11 +3851,9 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
   }
 
   fn get_ssl_dns_sans(&self) -> Vec<EnvoyBuffer> {
-    let mut size: usize = 0;
-    let success = unsafe {
-      abi::envoy_dynamic_module_callback_network_filter_get_ssl_dns_sans_size(self.raw, &mut size)
-    };
-    if !success || size == 0 {
+    let size =
+      unsafe { abi::envoy_dynamic_module_callback_network_filter_get_ssl_dns_sans_size(self.raw) };
+    if size == 0 {
       return Vec::new();
     }
 
@@ -3906,19 +3864,19 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
       };
       size
     ];
-    let count = unsafe {
+    let ok = unsafe {
       abi::envoy_dynamic_module_callback_network_filter_get_ssl_dns_sans(
         self.raw,
         sans_buffers.as_mut_ptr(),
       )
     };
-    if count == 0 {
+    if !ok {
       return Vec::new();
     }
 
     sans_buffers
       .iter()
-      .take(count)
+      .take(size)
       .map(|buf| {
         if !buf.ptr.is_null() && buf.length > 0 {
           unsafe { EnvoyBuffer::new_from_raw(buf.ptr as *const _, buf.length) }
@@ -3979,7 +3937,7 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
     }
   }
 
-  fn set_dynamic_metadata_string(&mut self, namespace: &str, key: &str, value: &str) -> bool {
+  fn set_dynamic_metadata_string(&mut self, namespace: &str, key: &str, value: &str) {
     unsafe {
       abi::envoy_dynamic_module_callback_network_set_dynamic_metadata_string(
         self.raw,
@@ -4016,7 +3974,7 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
     }
   }
 
-  fn set_dynamic_metadata_number(&mut self, namespace: &str, key: &str, value: f64) -> bool {
+  fn set_dynamic_metadata_number(&mut self, namespace: &str, key: &str, value: f64) {
     unsafe {
       abi::envoy_dynamic_module_callback_network_set_dynamic_metadata_number(
         self.raw,
@@ -4050,7 +4008,7 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
     name: i64,
     state: abi::envoy_dynamic_module_type_socket_option_state,
     value: i64,
-  ) -> bool {
+  ) {
     unsafe {
       abi::envoy_dynamic_module_callback_network_set_socket_option_int(
         self.raw, level, name, state, value,
@@ -4064,7 +4022,7 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
     name: i64,
     state: abi::envoy_dynamic_module_type_socket_option_state,
     value: &[u8],
-  ) -> bool {
+  ) {
     unsafe {
       abi::envoy_dynamic_module_callback_network_set_socket_option_bytes(
         self.raw,
@@ -4660,8 +4618,7 @@ pub trait EnvoyListenerFilter {
   fn get_dynamic_metadata_string(&self, namespace: &str, key: &str) -> Option<String>;
 
   /// Set the string-typed dynamic metadata value with the given namespace and key value.
-  /// Returns true if the operation is successful.
-  fn set_dynamic_metadata_string(&mut self, namespace: &str, key: &str, value: &str) -> bool;
+  fn set_dynamic_metadata_string(&mut self, namespace: &str, key: &str, value: &str);
 
   /// Get the maximum number of bytes to read from the socket.
   /// This is used to determine the buffer size for reading data.
@@ -4980,7 +4937,7 @@ impl EnvoyListenerFilter for EnvoyListenerFilterImpl {
     }
   }
 
-  fn set_dynamic_metadata_string(&mut self, namespace: &str, key: &str, value: &str) -> bool {
+  fn set_dynamic_metadata_string(&mut self, namespace: &str, key: &str, value: &str) {
     unsafe {
       abi::envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string(
         self.raw,
@@ -5420,13 +5377,10 @@ impl EnvoyUdpListenerFilterImpl {
 
 impl EnvoyUdpListenerFilter for EnvoyUdpListenerFilterImpl {
   fn get_datagram_data(&self) -> (Vec<EnvoyBuffer<'_>>, usize) {
-    let mut size: usize = 0;
-    let ok = unsafe {
-      abi::envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks_size(
-        self.raw, &mut size,
-      )
+    let size = unsafe {
+      abi::envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks_size(self.raw)
     };
-    if !ok || size == 0 {
+    if size == 0 {
       return (Vec::new(), 0);
     }
     let mut buffers = vec![
@@ -5446,14 +5400,10 @@ impl EnvoyUdpListenerFilter for EnvoyUdpListenerFilterImpl {
       return (Vec::new(), 0);
     }
 
-    let mut total_length: usize = 0;
-    let ok_size = unsafe {
-      abi::envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_size(
-        self.raw,
-        &mut total_length,
-      )
+    let total_length = unsafe {
+      abi::envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_size(self.raw)
     };
-    if !ok_size {
+    if total_length == 0 {
       // This shouldn't happen if chunks were retrieved, but for safety:
       return (Vec::new(), 0);
     }

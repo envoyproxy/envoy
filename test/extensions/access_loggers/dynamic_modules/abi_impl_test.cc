@@ -91,6 +91,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetHeaders) {
   // Order isn't guaranteed by map iteration, but for small maps typically consistent.
   // We just verify the contents exist.
   std::vector<std::pair<std::string, std::string>> result;
+  result.reserve(headers.size());
   for (const auto& h : headers) {
     result.push_back(
         {std::string(h.key_ptr, h.key_length), std::string(h.value_ptr, h.value_length)});
@@ -176,9 +177,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetResponseCode) {
   Formatter::Context log_context(nullptr, nullptr, nullptr);
   void* env_ptr = createContext(log_context);
 
-  uint32_t code = 0;
-  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_response_code(env_ptr, &code));
-  EXPECT_EQ(200, code);
+  EXPECT_EQ(envoy_dynamic_module_callback_access_logger_get_response_code(env_ptr), 200);
 }
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetResponseCodeNotSet) {
@@ -186,8 +185,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetResponseCodeNotSet) {
   Formatter::Context log_context(nullptr, nullptr, nullptr);
   void* env_ptr = createContext(log_context);
 
-  uint32_t code = 99;
-  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_response_code(env_ptr, &code));
+  EXPECT_EQ(envoy_dynamic_module_callback_access_logger_get_response_code(env_ptr), 0);
 }
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetResponseCodeDetails) {
@@ -288,9 +286,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetAttemptCount) {
   Formatter::Context log_context(nullptr, nullptr, nullptr);
   void* env_ptr = createContext(log_context);
 
-  uint32_t count = 0;
-  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attempt_count(env_ptr, &count));
-  EXPECT_EQ(3, count);
+  EXPECT_EQ(envoy_dynamic_module_callback_access_logger_get_attempt_count(env_ptr), 3);
 }
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetAttemptCountNotSet) {
@@ -298,8 +294,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetAttemptCountNotSet) {
   Formatter::Context log_context(nullptr, nullptr, nullptr);
   void* env_ptr = createContext(log_context);
 
-  uint32_t count = 0;
-  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attempt_count(env_ptr, &count));
+  EXPECT_EQ(envoy_dynamic_module_callback_access_logger_get_attempt_count(env_ptr), 0);
 }
 
 // =============================================================================

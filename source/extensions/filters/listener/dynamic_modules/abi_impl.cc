@@ -410,22 +410,24 @@ void envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata(
   callbacks->setDynamicMetadata(ns, metadata);
 }
 
-void envoy_dynamic_module_callback_listener_filter_set_filter_state(
+bool envoy_dynamic_module_callback_listener_filter_set_filter_state(
     envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value) {
   auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
   auto* callbacks = filter->callbacks();
 
   if (callbacks == nullptr || key.ptr == nullptr || value.ptr == nullptr) {
-    return;
+    return false;
   }
 
   std::string key_str(key.ptr, key.length);
   std::string value_str(value.ptr, value.length);
 
+  // TODO(wbpcode): check whether the key already exists and whether overwriting is allowed.
   callbacks->filterState().setData(key_str, std::make_shared<Router::StringAccessorImpl>(value_str),
                                    StreamInfo::FilterState::StateType::ReadOnly,
                                    StreamInfo::FilterState::LifeSpan::Connection);
+  return true;
 }
 
 bool envoy_dynamic_module_callback_listener_filter_get_filter_state(
@@ -527,7 +529,7 @@ bool envoy_dynamic_module_callback_listener_filter_get_dynamic_metadata_string(
   return true;
 }
 
-bool envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string(
+void envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string(
     envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer filter_namespace,
     envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value) {
@@ -536,7 +538,8 @@ bool envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string(
 
   if (callbacks == nullptr || filter_namespace.ptr == nullptr || key.ptr == nullptr ||
       value.ptr == nullptr) {
-    return false;
+    // TODO(wbpcode): These should never happen and may be converted to asserts.
+    return;
   }
 
   std::string ns(filter_namespace.ptr, filter_namespace.length);
@@ -548,7 +551,6 @@ bool envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string(
   fields[key_str].set_string_value(value_str);
 
   callbacks->setDynamicMetadata(ns, metadata);
-  return true;
 }
 
 size_t envoy_dynamic_module_callback_listener_filter_max_read_bytes(

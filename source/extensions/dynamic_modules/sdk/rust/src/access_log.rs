@@ -273,10 +273,10 @@ impl LogContext {
 
   /// Get the HTTP response code.
   pub fn response_code(&self) -> Option<u32> {
-    let mut code = 0;
-    if unsafe {
-      abi::envoy_dynamic_module_callback_access_logger_get_response_code(self.envoy_ptr, &mut code)
-    } {
+    let code =
+      unsafe { abi::envoy_dynamic_module_callback_access_logger_get_response_code(self.envoy_ptr) };
+
+    if code != 0 {
       Some(code)
     } else {
       None
