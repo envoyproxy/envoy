@@ -890,6 +890,239 @@ TEST_F(FilterTest, FilterChainStopsIterationOnDecode) {
   filter_.onDestroy();
 }
 
+// Test that filter chain resumes from the next filter after StopIteration.
+TEST_F(FilterTest, FilterChainResumesAfterStopIteration) {
+  auto filter1 = std::make_shared<Http::MockStreamFilter>();
+  auto filter2 = std::make_shared<Http::MockStreamFilter>();
+  auto filter3 = std::make_shared<Http::MockStreamFilter>();
+
+  StreamInfo::FilterStateSharedPtr filter_state =
+      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
+  ON_CALL(decoder_callbacks_, filterConfigName()).WillByDefault(testing::Return("rootFilterName"));
+  ON_CALL(decoder_callbacks_.stream_info_, filterState())
+      .WillByDefault(testing::ReturnRef(filter_state));
+
+  FilterFactoryCbList filter_factories;
+  filter_factories.push_back(
+      [&](Http::FilterChainFactoryCallbacks& cb) { cb.addStreamFilter(filter1); });
+  filter_factories.push_back(
+      [&](Http::FilterChainFactoryCallbacks& cb) { cb.addStreamFilter(filter2); });
+  filter_factories.push_back(
+      [&](Http::FilterChainFactoryCallbacks& cb) { cb.addStreamFilter(filter3); });
+
+  EXPECT_CALL(*filter1, setDecoderFilterCallbacks(_));
+  EXPECT_CALL(*filter1, setEncoderFilterCallbacks(_));
+  EXPECT_CALL(*filter2, setDecoderFilterCallbacks(_));
+  EXPECT_CALL(*filter2, setEncoderFilterCallbacks(_));
+  EXPECT_CALL(*filter3, setDecoderFilterCallbacks(_));
+  EXPECT_CALL(*filter3, setEncoderFilterCallbacks(_));
+  EXPECT_CALL(success_counter_, inc());
+
+  ExecuteFilterAction action(std::move(filter_factories), "filter_chain", absl::nullopt,
+                             context_.runtime_loader_);
+  filter_.onMatchCallback(action);
+
+  // On the first call, filter1 returns StopIteration, so filter2 and filter3 won't be called.
+  EXPECT_CALL(*filter1, decodeHeaders(_, false))
+      .WillOnce(testing::Return(Http::FilterHeadersStatus::StopIteration));
+  EXPECT_CALL(*filter2, decodeHeaders(_, _)).Times(0);
+  EXPECT_CALL(*filter3, decodeHeaders(_, _)).Times(0);
+
+  auto status = filter_.decodeHeaders(default_request_headers_, false);
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, status);
+
+  // Simulate continueDecoding() by calling decodeHeaders again. Here, filter1 should not be
+  // called again, filter2 should be called and return Continue, then filter3 should be called.
+  EXPECT_CALL(*filter1, decodeHeaders(_, _)).Times(0);
+  EXPECT_CALL(*filter2, decodeHeaders(_, false))
+      .WillOnce(testing::Return(Http::FilterHeadersStatus::Continue));
+  EXPECT_CALL(*filter3, decodeHeaders(_, false))
+      .WillOnce(testing::Return(Http::FilterHeadersStatus::Continue));
+
+  status = filter_.decodeHeaders(default_request_headers_, false);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, status);
+
+  EXPECT_CALL(*filter1, onDestroy());
+  EXPECT_CALL(*filter2, onDestroy());
+  EXPECT_CALL(*filter3, onDestroy());
+  filter_.onDestroy();
+}
+
+// Test that filter chain resumes correctly on encode path after StopIteration.
+TEST_F(FilterTest, FilterChainResumesAfterStopIterationOnEncode) {
+  auto filter1 = std::make_shared<Http::MockStreamFilter>();
+  auto filter2 = std::make_shared<Http::MockStreamFilter>();
+  auto filter3 = std::make_shared<Http::MockStreamFilter>();
+
+  StreamInfo::FilterStateSharedPtr filter_state =
+      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
+  ON_CALL(decoder_callbacks_, filterConfigName()).WillByDefault(testing::Return("rootFilterName"));
+  ON_CALL(decoder_callbacks_.stream_info_, filterState())
+      .WillByDefault(testing::ReturnRef(filter_state));
+
+  FilterFactoryCbList filter_factories;
+  filter_factories.push_back(
+      [&](Http::FilterChainFactoryCallbacks& cb) { cb.addStreamFilter(filter1); });
+  filter_factories.push_back(
+      [&](Http::FilterChainFactoryCallbacks& cb) { cb.addStreamFilter(filter2); });
+  filter_factories.push_back(
+      [&](Http::FilterChainFactoryCallbacks& cb) { cb.addStreamFilter(filter3); });
+
+  EXPECT_CALL(*filter1, setDecoderFilterCallbacks(_));
+  EXPECT_CALL(*filter1, setEncoderFilterCallbacks(_));
+  EXPECT_CALL(*filter2, setDecoderFilterCallbacks(_));
+  EXPECT_CALL(*filter2, setEncoderFilterCallbacks(_));
+  EXPECT_CALL(*filter3, setDecoderFilterCallbacks(_));
+  EXPECT_CALL(*filter3, setEncoderFilterCallbacks(_));
+  EXPECT_CALL(success_counter_, inc());
+
+  ExecuteFilterAction action(std::move(filter_factories), "filter_chain", absl::nullopt,
+                             context_.runtime_loader_);
+  filter_.onMatchCallback(action);
+
+  // Encode path iterates in reverse: filter3 -> filter2 -> filter1.
+  // On the first call, filter3 returns StopIteration, so filter2 and filter1 won't be called.
+  EXPECT_CALL(*filter3, encodeHeaders(_, false))
+      .WillOnce(testing::Return(Http::FilterHeadersStatus::StopIteration));
+  EXPECT_CALL(*filter2, encodeHeaders(_, _)).Times(0);
+  EXPECT_CALL(*filter1, encodeHeaders(_, _)).Times(0);
+
+  auto status = filter_.encodeHeaders(default_response_headers_, false);
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, status);
+
+  // Simulate continueEncoding() by calling encodeHeaders again. Here, filter3 should not be
+  // called again, filter2 and filter1 should be called and return Continue.
+  EXPECT_CALL(*filter3, encodeHeaders(_, _)).Times(0);
+  EXPECT_CALL(*filter2, encodeHeaders(_, false))
+      .WillOnce(testing::Return(Http::FilterHeadersStatus::Continue));
+  EXPECT_CALL(*filter1, encodeHeaders(_, false))
+      .WillOnce(testing::Return(Http::FilterHeadersStatus::Continue));
+
+  status = filter_.encodeHeaders(default_response_headers_, false);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, status);
+
+  EXPECT_CALL(*filter1, onDestroy());
+  EXPECT_CALL(*filter2, onDestroy());
+  EXPECT_CALL(*filter3, onDestroy());
+  filter_.onDestroy();
+}
+
+// Test that filter chain handles multiple stops and resumes correctly.
+TEST_F(FilterTest, FilterChainMultipleStopsAndResumes) {
+  auto filter1 = std::make_shared<Http::MockStreamFilter>();
+  auto filter2 = std::make_shared<Http::MockStreamFilter>();
+  auto filter3 = std::make_shared<Http::MockStreamFilter>();
+
+  StreamInfo::FilterStateSharedPtr filter_state =
+      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
+  ON_CALL(decoder_callbacks_, filterConfigName()).WillByDefault(testing::Return("rootFilterName"));
+  ON_CALL(decoder_callbacks_.stream_info_, filterState())
+      .WillByDefault(testing::ReturnRef(filter_state));
+
+  FilterFactoryCbList filter_factories;
+  filter_factories.push_back(
+      [&](Http::FilterChainFactoryCallbacks& cb) { cb.addStreamFilter(filter1); });
+  filter_factories.push_back(
+      [&](Http::FilterChainFactoryCallbacks& cb) { cb.addStreamFilter(filter2); });
+  filter_factories.push_back(
+      [&](Http::FilterChainFactoryCallbacks& cb) { cb.addStreamFilter(filter3); });
+
+  EXPECT_CALL(*filter1, setDecoderFilterCallbacks(_));
+  EXPECT_CALL(*filter1, setEncoderFilterCallbacks(_));
+  EXPECT_CALL(*filter2, setDecoderFilterCallbacks(_));
+  EXPECT_CALL(*filter2, setEncoderFilterCallbacks(_));
+  EXPECT_CALL(*filter3, setDecoderFilterCallbacks(_));
+  EXPECT_CALL(*filter3, setEncoderFilterCallbacks(_));
+  EXPECT_CALL(success_counter_, inc());
+
+  ExecuteFilterAction action(std::move(filter_factories), "filter_chain", absl::nullopt,
+                             context_.runtime_loader_);
+  filter_.onMatchCallback(action);
+
+  // On the first call, filter1 returns StopIteration.
+  EXPECT_CALL(*filter1, decodeHeaders(_, false))
+      .WillOnce(testing::Return(Http::FilterHeadersStatus::StopIteration));
+  EXPECT_CALL(*filter2, decodeHeaders(_, _)).Times(0);
+  EXPECT_CALL(*filter3, decodeHeaders(_, _)).Times(0);
+
+  auto status = filter_.decodeHeaders(default_request_headers_, false);
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, status);
+
+  // On the second call, filter2 returns StopIteration.
+  EXPECT_CALL(*filter1, decodeHeaders(_, _)).Times(0);
+  EXPECT_CALL(*filter2, decodeHeaders(_, false))
+      .WillOnce(testing::Return(Http::FilterHeadersStatus::StopIteration));
+  EXPECT_CALL(*filter3, decodeHeaders(_, _)).Times(0);
+
+  status = filter_.decodeHeaders(default_request_headers_, false);
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, status);
+
+  // On the third call, filter3 returns Continue.
+  EXPECT_CALL(*filter1, decodeHeaders(_, _)).Times(0);
+  EXPECT_CALL(*filter2, decodeHeaders(_, _)).Times(0);
+  EXPECT_CALL(*filter3, decodeHeaders(_, false))
+      .WillOnce(testing::Return(Http::FilterHeadersStatus::Continue));
+
+  status = filter_.decodeHeaders(default_request_headers_, false);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, status);
+
+  EXPECT_CALL(*filter1, onDestroy());
+  EXPECT_CALL(*filter2, onDestroy());
+  EXPECT_CALL(*filter3, onDestroy());
+  filter_.onDestroy();
+}
+
+// Test that filter chain resumes correctly on decodeData after StopIteration.
+TEST_F(FilterTest, FilterChainResumesAfterStopIterationOnDecodeData) {
+  auto filter1 = std::make_shared<Http::MockStreamFilter>();
+  auto filter2 = std::make_shared<Http::MockStreamFilter>();
+
+  StreamInfo::FilterStateSharedPtr filter_state =
+      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
+  ON_CALL(decoder_callbacks_, filterConfigName()).WillByDefault(testing::Return("rootFilterName"));
+  ON_CALL(decoder_callbacks_.stream_info_, filterState())
+      .WillByDefault(testing::ReturnRef(filter_state));
+
+  FilterFactoryCbList filter_factories;
+  filter_factories.push_back(
+      [&](Http::FilterChainFactoryCallbacks& cb) { cb.addStreamFilter(filter1); });
+  filter_factories.push_back(
+      [&](Http::FilterChainFactoryCallbacks& cb) { cb.addStreamFilter(filter2); });
+
+  EXPECT_CALL(*filter1, setDecoderFilterCallbacks(_));
+  EXPECT_CALL(*filter1, setEncoderFilterCallbacks(_));
+  EXPECT_CALL(*filter2, setDecoderFilterCallbacks(_));
+  EXPECT_CALL(*filter2, setEncoderFilterCallbacks(_));
+  EXPECT_CALL(success_counter_, inc());
+
+  ExecuteFilterAction action(std::move(filter_factories), "filter_chain", absl::nullopt,
+                             context_.runtime_loader_);
+  filter_.onMatchCallback(action);
+
+  // On the first call, filter1 returns StopIterationAndBuffer, so filter2 won't be called.
+  EXPECT_CALL(*filter1, decodeData(_, false))
+      .WillOnce(testing::Return(Http::FilterDataStatus::StopIterationAndBuffer));
+  EXPECT_CALL(*filter2, decodeData(_, _)).Times(0);
+
+  Buffer::OwnedImpl data("test_data");
+  auto status = filter_.decodeData(data, false);
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, status);
+
+  // On the second call after continueDecoding, filter1 should not be called again, filter2
+  // should be called and return Continue.
+  EXPECT_CALL(*filter1, decodeData(_, _)).Times(0);
+  EXPECT_CALL(*filter2, decodeData(_, false))
+      .WillOnce(testing::Return(Http::FilterDataStatus::Continue));
+
+  Buffer::OwnedImpl data2("more_data");
+  status = filter_.decodeData(data2, false);
+  EXPECT_EQ(Http::FilterDataStatus::Continue, status);
+
+  EXPECT_CALL(*filter1, onDestroy());
+  EXPECT_CALL(*filter2, onDestroy());
+  filter_.onDestroy();
+}
+
 // Test that filter chain properly handles mixed filter types i.e. decoder and encoder filters.
 TEST_F(FilterTest, FilterChainWithMixedFilterTypes) {
   auto decoder_filter = std::make_shared<Http::MockStreamDecoderFilter>();
