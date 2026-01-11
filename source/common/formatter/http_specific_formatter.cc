@@ -304,6 +304,55 @@ QueryParameterFormatter::formatValue(const Context& context,
   return ValueUtil::optionalStringValue(format(context, stream_info));
 }
 
+QueryParametersFormatter::QueryParametersFormatter(absl::string_view decoding,
+                                                   absl::optional<size_t> max_length)
+    : decoding_(decoding), max_length_(max_length) {}
+
+// FormatterProvider
+absl::optional<std::string> QueryParametersFormatter::format(const Context& context,
+                                                             const StreamInfo::StreamInfo&) const {
+  const auto request_headers = context.requestHeaders();
+  if (!request_headers.has_value()) {
+    return absl::nullopt;
+  }
+
+  bool decode_bool = false;
+  if (decoding.empty()) {
+    decode_bool = false;
+  } else if (decoding == "ORIG") {
+    decode_bool = false;
+  } if (decoding == "DECODED") {
+    decode_bool = true;
+  } else {
+    return absl::InvalidArgumentError(
+        fmt::format("Invalid QUERY_PARAMS option: '{}', only 'ORIG'/'DECODED' are allowed", decoding));
+  }
+
+  // Gather query parameters substring from path
+  absl::string_view path_view = request_headers->getPathValue();
+  auto query_offset = path_view.find('?');
+  absl::optional<std::string> query_params;
+  if (query_offset != absl::string_view::npos) {
+    query_params = path_view.substr(query_offset+1);
+  }
+
+  // Apply query param percent decoding on the query params if requested
+  if (query_params.has_value() && decode_bool) {
+    query_params = Http::Utility::PercentEncoding::urlDecodeQueryParameter(query_params);
+  }
+
+  if (query_params.has_value() && max_length_.has_value()) {
+    SubstitutionFormatUtils::truncate(query_params.value(), max_length_.value());
+  }
+  return value;
+}
+
+Protobuf::Value
+QueryParametersFormatter::formatValue(const Context& context,
+                                      const StreamInfo::StreamInfo& stream_info) const {
+  return ValueUtil::optionalStringValue(format(context, stream_info));
+}
+
 absl::optional<std::string> PathFormatter::format(const Context& context,
                                                   const StreamInfo::StreamInfo&) const {
 
@@ -494,6 +543,11 @@ BuiltInHttpCommandParser::getKnownFormatters() {
         {CommandSyntaxChecker::PARAMS_REQUIRED | CommandSyntaxChecker::LENGTH_ALLOWED,
          [](absl::string_view format, absl::optional<size_t> max_length) {
            return std::make_unique<QueryParameterFormatter>(std::string(format), max_length);
+         }}},
+       {"QUERY_PARAMS",
+        {CommandSyntaxChecker::PARAMS_OPTIONAL | CommandSyntaxChecker::LENGTH_ALLOWED,
+         [](absl::string_view decoding, absl::optional<size_t> max_length) {
+           return std::make_unique<QueryParametersFormatter>(max_length);
          }}},
        {"PATH",
         {CommandSyntaxChecker::PARAMS_OPTIONAL | CommandSyntaxChecker::LENGTH_ALLOWED,

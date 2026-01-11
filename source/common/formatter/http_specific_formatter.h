@@ -180,6 +180,21 @@ private:
   absl::optional<size_t> max_length_;
 };
 
+class QueryParametersFormatter : public FormatterProvider {
+public:
+  QueryParametersFormatter(absl::string_view decoding, absl::optional<size_t> max_length);
+
+  // FormatterProvider
+  absl::optional<std::string> format(const Context& context,
+                                     const StreamInfo::StreamInfo& stream_info) const override;
+  Protobuf::Value formatValue(const Context& context,
+                              const StreamInfo::StreamInfo& stream_info) const override;
+
+private:
+  const std::string decoding_;
+  absl::optional<size_t> max_length_;
+};
+
 class PathFormatter : public FormatterProvider {
 public:
   enum PathFormatterOption {

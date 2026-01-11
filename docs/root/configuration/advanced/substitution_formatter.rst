@@ -1425,6 +1425,21 @@ Current supported substitution commands include:
   TCP/UDP
     Not implemented. It will appear as ``"-"`` in the access logs.
 
+``%QUERY_PARAMS(X):Z%``
+  HTTP
+    All of the query parameters. The parameter ``X`` is used to specify how the query parameters are presented.
+
+    The ``X`` parameter can be:
+
+    * ``ORIG``: The output will be original query params string part of the path with no treatment. If the ``X`` is
+      not present, ``WQ`` will be used.
+    * ``DECODED``: The query params will be URL decoded.
+
+    ``Z`` is an optional parameter denoting string truncation up to ``Z`` characters long.
+
+  TCP/UDP
+    Not implemented. It will appear as ``"-"`` in the access logs.
+
 ``%PATH(X:Y):Z%``
   HTTP
     The value of the request path. The parameter ``X`` is used to specify whether the output contains
