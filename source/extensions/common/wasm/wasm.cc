@@ -498,6 +498,10 @@ Wasm* PluginConfig::maybeReloadHandleIfNeeded(SinglePluginHandle& handle_wrapper
     return wasm;
   }
 
+  // Publish RuntimeError event when detected. On failure, only the state is updated by sdk, no
+  // event was published.
+  stats_handler_->onEvent(WasmEvent::RuntimeError);
+
   // If the handle is not allowed to reload, return it directly.
   if (failure_policy_ != FailurePolicy::FAIL_RELOAD) {
     return wasm;
