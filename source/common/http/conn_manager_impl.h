@@ -391,6 +391,12 @@ private:
              state_.is_internally_destroyed_;
     }
 
+    // Computes whether to skip the delay when closing a draining connection.
+    // Returns true if we should use FlushWrite (immediate close after flush),
+    // false if we should use FlushWriteAndDelay (close with delay).
+    // See https://github.com/envoyproxy/envoy/issues/30010 for background.
+    bool shouldSkipDeferredCloseDelay() const;
+
     // Per-stream idle timeout callback.
     void onIdleTimeout();
     // Per-stream request timeout callback.
@@ -687,6 +693,10 @@ private:
   // request was incomplete at response completion, the stream is reset.
 
   const bool allow_upstream_half_close_{};
+  // Whether to call checkForDeferredClose() when zombie streams complete.
+  // This fixes a potential FD leak where connections with zombie streams in draining state
+  // would not be properly closed.
+  const bool close_connection_on_zombie_stream_complete_{};
 
   // Whether the connection manager is drained due to premature resets.
   bool drained_due_to_premature_resets_{false};

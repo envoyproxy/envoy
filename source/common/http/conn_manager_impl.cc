@@ -145,7 +145,9 @@ ConnectionManagerImpl::ConnectionManagerImpl(
           runtime_.snapshot().getInteger(ConnectionManagerImpl::MaxRequestsPerIoCycle, UINT32_MAX)),
       direction_(direction),
       allow_upstream_half_close_(Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.allow_multiplexed_upstream_half_close")) {
+          "envoy.reloadable_features.allow_multiplexed_upstream_half_close")),
+      close_connection_on_zombie_stream_complete_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.http1_close_connection_on_zombie_stream_complete")) {
   ENVOY_LOG_ONCE_IF(
       trace, accept_new_http_stream_ == nullptr,
       "LoadShedPoint envoy.load_shed_points.http_connection_manager_decode_headers is not "
@@ -312,19 +314,7 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream, bool check_for_def
   }
 
   if (check_for_deferred_close) {
-    // If HTTP/1.0 has no content length, it is framed by close and won't consider
-    // the request complete until the FIN is read. Don't delay close in this case.
-    const bool http_10_sans_cl =
-        (codec_->protocol() == Protocol::Http10) &&
-        (!stream.response_headers_ || !stream.response_headers_->ContentLength());
-    // We also don't delay-close in the case of HTTP/1.1 where the request is
-    // fully read, as there's no race condition to avoid.
-    const bool connection_close =
-        stream.filter_manager_.streamInfo().shouldDrainConnectionUponCompletion();
-    const bool request_complete = stream.filter_manager_.hasLastDownstreamByteReceived();
-
-    // Don't do delay close for HTTP/1.0 or if the request is complete.
-    checkForDeferredClose(connection_close && (request_complete || http_10_sans_cl));
+    checkForDeferredClose(stream.shouldSkipDeferredCloseDelay());
   }
 }
 
@@ -2130,6 +2120,20 @@ void ConnectionManagerImpl::ActiveStream::onBelowWriteBufferLowWatermark() {
   filter_manager_.callLowWatermarkCallbacks();
 }
 
+bool ConnectionManagerImpl::ActiveStream::shouldSkipDeferredCloseDelay() const {
+  // If HTTP/1.0 has no content length, it is framed by close and won't consider
+  // the request complete until the FIN is read. Don't delay close in this case.
+  const bool http_10_sans_cl = (connection_manager_.codec_->protocol() == Protocol::Http10) &&
+                               (!response_headers_ || !response_headers_->ContentLength());
+  // We also don't delay-close in the case of HTTP/1.1 where the request is
+  // fully read, as there's no race condition to avoid.
+  const bool connection_close = filter_manager_.streamInfo().shouldDrainConnectionUponCompletion();
+  const bool request_complete = filter_manager_.hasLastDownstreamByteReceived();
+
+  // Don't do delay close for HTTP/1.0 or if the request is complete.
+  return connection_close && (request_complete || http_10_sans_cl);
+}
+
 void ConnectionManagerImpl::ActiveStream::onCodecEncodeComplete() {
   ASSERT(!state_.codec_encode_complete_);
   ENVOY_STREAM_LOG(debug, "Codec completed encoding stream.", *this);
@@ -2142,7 +2146,15 @@ void ConnectionManagerImpl::ActiveStream::onCodecEncodeComplete() {
 
   // Only reap stream once.
   if (state_.is_zombie_stream_) {
+    const bool skip_delay = shouldSkipDeferredCloseDelay();
     connection_manager_.doDeferredStreamDestroy(*this);
+    // After destroying a zombie stream, check if the connection should be
+    // closed. doEndStream() call that created the zombie may have set
+    // drain_state_ to Closing, but checkForDeferredClose() couldn't close the
+    // connection at that time because streams_ wasn't empty yet.
+    if (connection_manager_.close_connection_on_zombie_stream_complete_) {
+      connection_manager_.checkForDeferredClose(skip_delay);
+    }
   }
 }
 
@@ -2155,7 +2167,15 @@ void ConnectionManagerImpl::ActiveStream::onCodecLowLevelReset() {
 
   // Only reap stream once.
   if (state_.is_zombie_stream_) {
+    const bool skip_delay = shouldSkipDeferredCloseDelay();
     connection_manager_.doDeferredStreamDestroy(*this);
+    // After destroying a zombie stream, check if the connection should be
+    // closed. doEndStream() call that created the zombie may have set
+    // drain_state_ to Closing, but checkForDeferredClose() couldn't close the
+    // connection at that time because streams_ wasn't empty yet.
+    if (connection_manager_.close_connection_on_zombie_stream_complete_) {
+      connection_manager_.checkForDeferredClose(skip_delay);
+    }
   }
 }
 

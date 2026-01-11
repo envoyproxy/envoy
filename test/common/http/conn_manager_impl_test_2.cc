@@ -576,6 +576,11 @@ TEST_F(HttpConnectionManagerImplTest, DrainConnectionUponCompletionVsOnDrainTime
   filter->callbacks_->streamInfo().setResponseCodeDetails("");
   filter->callbacks_->encodeHeaders(
       ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true, "details");
+
+  // After the response is complete, connection should be closed since drain_state is Closing.
+  EXPECT_CALL(*connection_duration_timer, disableTimer());
+  EXPECT_CALL(*drain_timer, disableTimer());
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite, _));
   response_encoder_.stream_.codec_callbacks_->onCodecEncodeComplete();
 }
 
@@ -2097,6 +2102,169 @@ TEST_F(HttpConnectionManagerImplTest, DownstreamRemoteResetRefused) {
   conn_manager_->onData(fake_input, false);
   response_encoder_.stream_.setDetails("http2.remote_refuse");
   response_encoder_.stream_.resetStream(StreamResetReason::RemoteRefusedStreamReset);
+}
+
+// Verify that when a zombie stream is destroyed via onCodecEncodeComplete(),
+// checkForDeferredClose() is called and the connection is properly closed.
+// This tests the fix for a potential connection leak where zombie streams
+// were not triggering connection close when drain_state_ was Closing.
+TEST_F(HttpConnectionManagerImplTest, ZombieStreamClosesConnectionOnCodecComplete) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.http1_close_connection_on_zombie_stream_complete", "true"}});
+
+  // Use HTTP/1.1 and set max_requests_per_connection to 1 to trigger
+  // drain_state_ = DrainState::Closing when the first request is received.
+  max_requests_per_connection_ = 1;
+  EXPECT_CALL(*codec_, protocol()).WillRepeatedly(Return(Protocol::Http11));
+  setup();
+
+  // Use setupFilterChain helper which properly handles the FilterChainManager callback.
+  setupFilterChain(1, 0);
+
+  // Send a complete request (with body, so hasLastDownstreamByteReceived() is true).
+  // This means no reset will happen when response is sent, making the stream
+  // potentially become a zombie if codec_encode_complete_ is false.
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
+    decoder_ = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{
+        new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "POST"}}};
+    decoder_->decodeHeaders(std::move(headers), false);
+    Buffer::OwnedImpl body("hello");
+    decoder_->decodeData(body, true); // Request complete
+    return Http::okStatus();
+  }));
+
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[0], decodeData(_, true))
+      .WillOnce(Return(FilterDataStatus::Continue));
+
+  Buffer::OwnedImpl fake_input;
+  conn_manager_->onData(fake_input, false);
+
+  // Now send response. Do NOT call onCodecEncodeComplete() yet.
+  // The stream should become a zombie waiting for the codec to complete.
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, true));
+
+  // Note: We do NOT expect connection close yet - the stream should be a zombie
+  // waiting for onCodecEncodeComplete().
+
+  ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
+  decoder_filters_[0]->callbacks_->streamInfo().setResponseCodeDetails("");
+  decoder_filters_[0]->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
+
+  // At this point, the stream should be in zombie state because:
+  // - Request was complete (no reset needed)
+  // - But codec_encode_complete_ is false (we haven't called onCodecEncodeComplete)
+  // - drain_state_ should be Closing due to max_requests_per_connection
+
+  // Now simulate the codec completing encoding. This should trigger
+  // checkForDeferredClose() and close the connection.
+  // Since request is complete (hasLastDownstreamByteReceived() is true) and
+  // connection should drain (max_requests_per_connection=1), we skip delay close
+  // and use FlushWrite instead of FlushWriteAndDelay.
+  EXPECT_CALL(*decoder_filters_[0], onStreamComplete());
+  EXPECT_CALL(*decoder_filters_[0], onDestroy());
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite, _));
+
+  response_encoder_.stream_.codec_callbacks_->onCodecEncodeComplete();
+}
+
+// Same as above but with runtime guard disabled - connection should NOT be closed.
+TEST_F(HttpConnectionManagerImplTest, ZombieStreamDoesNotCloseConnectionWhenGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.http1_close_connection_on_zombie_stream_complete", "false"}});
+
+  max_requests_per_connection_ = 1;
+  EXPECT_CALL(*codec_, protocol()).WillRepeatedly(Return(Protocol::Http11));
+  setup();
+
+  setupFilterChain(1, 0);
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
+    decoder_ = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{
+        new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "POST"}}};
+    decoder_->decodeHeaders(std::move(headers), false);
+    Buffer::OwnedImpl body("hello");
+    decoder_->decodeData(body, true);
+    return Http::okStatus();
+  }));
+
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[0], decodeData(_, true))
+      .WillOnce(Return(FilterDataStatus::Continue));
+
+  Buffer::OwnedImpl fake_input;
+  conn_manager_->onData(fake_input, false);
+
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, true));
+
+  ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
+  decoder_filters_[0]->callbacks_->streamInfo().setResponseCodeDetails("");
+  decoder_filters_[0]->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
+
+  // With runtime guard disabled, connection close should NOT be called.
+  // The old behavior leaves the connection open (the bug this fix addresses).
+  EXPECT_CALL(*decoder_filters_[0], onStreamComplete());
+  EXPECT_CALL(*decoder_filters_[0], onDestroy());
+  EXPECT_CALL(filter_callbacks_.connection_, close(_, _)).Times(0);
+
+  response_encoder_.stream_.codec_callbacks_->onCodecEncodeComplete();
+}
+
+// Similar test but for onCodecLowLevelReset() path
+TEST_F(HttpConnectionManagerImplTest, ZombieStreamClosesConnectionOnCodecLowLevelReset) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.http1_close_connection_on_zombie_stream_complete", "true"}});
+
+  // Use HTTP/1.1 and set max_requests_per_connection to 1 to trigger
+  // drain_state_ = DrainState::Closing when the first request is received.
+  max_requests_per_connection_ = 1;
+  EXPECT_CALL(*codec_, protocol()).WillRepeatedly(Return(Protocol::Http11));
+  setup();
+
+  // Use setupFilterChain helper which properly handles the FilterChainManager callback.
+  setupFilterChain(1, 0);
+
+  // Send a complete request
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
+    decoder_ = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{
+        new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "POST"}}};
+    decoder_->decodeHeaders(std::move(headers), false);
+    Buffer::OwnedImpl body("hello");
+    decoder_->decodeData(body, true); // Request complete
+    return Http::okStatus();
+  }));
+
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[0], decodeData(_, true))
+      .WillOnce(Return(FilterDataStatus::Continue));
+
+  Buffer::OwnedImpl fake_input;
+  conn_manager_->onData(fake_input, false);
+
+  // Send response without calling codec callbacks
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, true));
+
+  ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
+  decoder_filters_[0]->callbacks_->streamInfo().setResponseCodeDetails("");
+  decoder_filters_[0]->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
+
+  // Simulate codec low-level reset (e.g., from underlying connection issue).
+  // This should trigger checkForDeferredClose() and close the connection.
+  // Since request is complete and connection should drain, we skip delay close.
+  EXPECT_CALL(*decoder_filters_[0], onStreamComplete());
+  EXPECT_CALL(*decoder_filters_[0], onDestroy());
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite, _));
+
+  response_encoder_.stream_.codec_callbacks_->onCodecLowLevelReset();
 }
 
 } // namespace Http

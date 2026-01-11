@@ -159,6 +159,12 @@ bug_fixes:
     Fixed ``shouldDrainConnectionUponCompletion()`` to send ``GOAWAY`` frames for HTTP/2 and HTTP/3 instead of
     aggressively closing connections, preventing interrupted response bodies and ``ERR_DRAINING`` client errors.
     HTTP/1.1 behavior is unchanged.
+- area: http
+  change: |
+    Fixed a potential file descriptor leak where HTTP/1.1 connections with zombie streams (waiting for codec completion)
+    would not be properly closed when in draining state. This could occur when a response was sent before the request
+    was fully received, causing connections to remain open indefinitely. This fix is guarded by the runtime flag
+    ``envoy.reloadable_features.http1_close_connection_on_zombie_stream_complete``.
 - area: udp_proxy
   change: |
     Fixed cases where addresses could be moved from the data packet being processed.
