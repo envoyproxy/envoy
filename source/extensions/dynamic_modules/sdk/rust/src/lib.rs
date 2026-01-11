@@ -869,7 +869,6 @@ pub trait EnvoyHttpFilter {
   /// Set the number-typed dynamic metadata value with the given key.
   /// If the namespace is not found, this will create a new namespace.
   ///
-  /// Returns true if the operation is successful.
   fn set_dynamic_metadata_number(&mut self, namespace: &str, key: &str, value: f64);
 
   /// Get the string-typed metadata value with the given key.
