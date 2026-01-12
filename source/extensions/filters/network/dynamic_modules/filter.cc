@@ -122,6 +122,22 @@ void DynamicModuleNetworkFilter::onScheduled(uint64_t event_id) {
   }
 }
 
+void DynamicModuleNetworkFilter::onTimerExpired(uint64_t timer_id) {
+  if (in_module_filter_ != nullptr && config_->on_network_filter_timer_expired_ != nullptr) {
+    config_->on_network_filter_timer_expired_(thisAsVoidPtr(), in_module_filter_, timer_id);
+  }
+}
+
+DynamicModuleNetworkFilterTimer::DynamicModuleNetworkFilterTimer(
+    DynamicModuleNetworkFilterWeakPtr filter, Event::Dispatcher& dispatcher, uint64_t timer_id)
+    : filter_(std::move(filter)), timer_id_(timer_id) {
+  timer_ = dispatcher.createTimer([this]() {
+    if (DynamicModuleNetworkFilterSharedPtr filter_shared = filter_.lock()) {
+      filter_shared->onTimerExpired(timer_id_);
+    }
+  });
+}
+
 void DynamicModuleNetworkFilter::onAboveWriteBufferHighWatermark() {
   // Not currently exposed to dynamic modules.
 }

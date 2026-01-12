@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/event/timer.h"
 #include "envoy/http/async_client.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
@@ -141,6 +142,11 @@ public:
   void onScheduled(uint64_t event_id);
 
   /**
+   * This is called when a timer expires via DynamicModuleNetworkFilterTimer.
+   */
+  void onTimerExpired(uint64_t timer_id);
+
+  /**
    * Get the dispatcher for the worker thread this filter is running on.
    * Returns nullptr if callbacks are not set.
    */
@@ -214,6 +220,30 @@ private:
   };
 
   std::vector<StoredSocketOption> socket_options_;
+};
+
+/**
+ * This class represents a timer associated with a network filter. It is created via
+ * envoy_dynamic_module_callback_network_filter_timer_new and deleted via
+ * envoy_dynamic_module_callback_network_filter_timer_delete.
+ */
+class DynamicModuleNetworkFilterTimer {
+public:
+  DynamicModuleNetworkFilterTimer(DynamicModuleNetworkFilterWeakPtr filter,
+                                  Event::Dispatcher& dispatcher, uint64_t timer_id);
+
+  void enable(std::chrono::milliseconds duration) { timer_->enableTimer(duration); }
+  void disable() { timer_->disableTimer(); }
+  bool enabled() const { return timer_->enabled(); }
+
+private:
+  // The filter that this timer is associated with. Using a weak pointer to avoid unnecessarily
+  // extending the lifetime of the filter.
+  DynamicModuleNetworkFilterWeakPtr filter_;
+  // The timer object managed by Envoy's event dispatcher.
+  Event::TimerPtr timer_;
+  // The timer ID for identifying this timer in callbacks.
+  uint64_t timer_id_;
 };
 
 /**

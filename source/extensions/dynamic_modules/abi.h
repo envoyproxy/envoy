@@ -1996,6 +1996,18 @@ typedef void* envoy_dynamic_module_type_network_filter_scheduler_module_ptr;
 typedef void* envoy_dynamic_module_type_network_filter_config_scheduler_module_ptr;
 
 /**
+ * envoy_dynamic_module_type_network_filter_timer_module_ptr is a raw pointer to the
+ * DynamicModuleNetworkFilterTimer class in Envoy.
+ *
+ * OWNERSHIP: The allocation is done by Envoy but the module is responsible for managing the
+ * lifetime of the pointer. The creation of this pointer is done by
+ * envoy_dynamic_module_callback_network_filter_timer_new and the destruction is done by
+ * envoy_dynamic_module_callback_network_filter_timer_delete. Since its lifecycle is
+ * owned/managed by the module, this has _module_ptr suffix.
+ */
+typedef void* envoy_dynamic_module_type_network_filter_timer_module_ptr;
+
+/**
  * envoy_dynamic_module_type_on_network_filter_data_status represents the status of the filter
  * after processing data. This corresponds to `Network::FilterStatus` in envoy/network/filter.h.
  */
@@ -2214,6 +2226,19 @@ void envoy_dynamic_module_on_network_filter_scheduled(
 void envoy_dynamic_module_on_network_filter_config_scheduled(
     envoy_dynamic_module_type_network_filter_config_module_ptr filter_config_ptr,
     uint64_t event_id);
+
+/**
+ * envoy_dynamic_module_on_network_filter_timer_expired is called when a timer created via
+ * envoy_dynamic_module_callback_network_filter_timer_new expires.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param filter_module_ptr is the pointer to the in-module network filter.
+ * @param timer_id is the ID of the timer that was passed to
+ * envoy_dynamic_module_callback_network_filter_timer_new when the timer was created.
+ */
+void envoy_dynamic_module_on_network_filter_timer_expired(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_network_filter_module_ptr filter_module_ptr, uint64_t timer_id);
 
 // =============================================================================
 // Network Filter Callbacks
@@ -3068,6 +3093,72 @@ void envoy_dynamic_module_callback_network_filter_config_scheduler_delete(
 void envoy_dynamic_module_callback_network_filter_config_scheduler_commit(
     envoy_dynamic_module_type_network_filter_config_scheduler_module_ptr scheduler_module_ptr,
     uint64_t event_id);
+
+// ---------------------- Network filter timer callbacks -----------------------
+
+/**
+ * envoy_dynamic_module_callback_network_filter_timer_new is called by the module to create a new
+ * timer for the network filter. The timer is associated with the filter's worker thread dispatcher
+ * and will invoke envoy_dynamic_module_on_network_filter_timer_expired when it expires.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object of the
+ * corresponding network filter.
+ * @param timer_id is an identifier for the timer that will be passed back to the module when
+ * the timer expires. This allows the module to distinguish between multiple timers.
+ * @return envoy_dynamic_module_type_network_filter_timer_module_ptr is the pointer to the
+ * created network filter timer. Returns nullptr if the timer could not be created (e.g., if
+ * the filter's dispatcher is not available).
+ *
+ * NOTE: It is the caller's responsibility to delete the timer using
+ * envoy_dynamic_module_callback_network_filter_timer_delete when it is no longer needed.
+ */
+envoy_dynamic_module_type_network_filter_timer_module_ptr
+envoy_dynamic_module_callback_network_filter_timer_new(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, uint64_t timer_id);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_timer_enable is called by the module to enable
+ * or re-enable a timer with a specified duration. If the timer is already pending, it will be
+ * reset to the new duration.
+ *
+ * @param timer_module_ptr is the pointer to the timer created by
+ * envoy_dynamic_module_callback_network_filter_timer_new.
+ * @param duration_milliseconds is the duration in milliseconds after which the timer will expire.
+ */
+void envoy_dynamic_module_callback_network_filter_timer_enable(
+    envoy_dynamic_module_type_network_filter_timer_module_ptr timer_module_ptr,
+    uint64_t duration_milliseconds);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_timer_disable is called by the module to disable
+ * a pending timer without destroying it. The timer can be re-enabled later using
+ * envoy_dynamic_module_callback_network_filter_timer_enable.
+ *
+ * @param timer_module_ptr is the pointer to the timer created by
+ * envoy_dynamic_module_callback_network_filter_timer_new.
+ */
+void envoy_dynamic_module_callback_network_filter_timer_disable(
+    envoy_dynamic_module_type_network_filter_timer_module_ptr timer_module_ptr);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_timer_enabled is called by the module to check
+ * whether the timer is currently enabled (pending).
+ *
+ * @param timer_module_ptr is the pointer to the timer created by
+ * envoy_dynamic_module_callback_network_filter_timer_new.
+ * @return true if the timer is currently enabled, false otherwise.
+ */
+bool envoy_dynamic_module_callback_network_filter_timer_enabled(
+    envoy_dynamic_module_type_network_filter_timer_module_ptr timer_module_ptr);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_timer_delete is called by the module to delete
+ * a timer created by envoy_dynamic_module_callback_network_filter_timer_new.
+ *
+ * @param timer_module_ptr is the pointer to the timer to delete.
+ */
+void envoy_dynamic_module_callback_network_filter_timer_delete(
+    envoy_dynamic_module_type_network_filter_timer_module_ptr timer_module_ptr);
 
 // =============================================================================
 // ============================= Listener Filter ===============================

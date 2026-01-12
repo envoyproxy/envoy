@@ -1942,6 +1942,241 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest,
   envoy_dynamic_module_callback_network_filter_config_scheduler_delete(scheduler);
 }
 
+// =============================================================================
+// Timer tests.
+// =============================================================================
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, NetworkFilterTimerNewReturnsTimerPtr) {
+  // Set up the dispatcher for the filter via connection.
+  NiceMock<Event::MockDispatcher> worker_dispatcher;
+  EXPECT_CALL(connection_, dispatcher()).WillRepeatedly(testing::ReturnRef(worker_dispatcher));
+
+  auto* mock_timer = new NiceMock<Event::MockTimer>();
+  EXPECT_CALL(worker_dispatcher, createTimer_(_)).WillOnce(testing::Return(mock_timer));
+
+  auto timer = envoy_dynamic_module_callback_network_filter_timer_new(filterPtr(), 42);
+  EXPECT_NE(nullptr, timer);
+
+  // Clean up.
+  envoy_dynamic_module_callback_network_filter_timer_delete(timer);
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest,
+       NetworkFilterTimerNewReturnsNullWithNoDispatcher) {
+  // Don't set up the dispatcher, so dispatcher() returns nullptr.
+  filter_->initializeReadFilterCallbacks(read_callbacks_);
+
+  // Remove the read callbacks to simulate no dispatcher.
+  NiceMock<Network::MockReadFilterCallbacks> null_callbacks;
+  ON_CALL(null_callbacks, connection()).WillByDefault(testing::ReturnRef(connection_));
+
+  // Create a new filter without read callbacks to test null dispatcher case.
+  auto filter_no_callbacks = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
+  filter_no_callbacks->initializeInModuleFilter();
+  // Don't initialize read filter callbacks so dispatcher() returns nullptr.
+
+  auto timer = envoy_dynamic_module_callback_network_filter_timer_new(
+      static_cast<void*>(filter_no_callbacks.get()), 42);
+  EXPECT_EQ(nullptr, timer);
+
+  // Clean up.
+  filter_no_callbacks->onEvent(Network::ConnectionEvent::LocalClose);
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, NetworkFilterTimerEnableCallsEnableTimer) {
+  // Set up the dispatcher for the filter via connection.
+  NiceMock<Event::MockDispatcher> worker_dispatcher;
+  EXPECT_CALL(connection_, dispatcher()).WillRepeatedly(testing::ReturnRef(worker_dispatcher));
+
+  auto* mock_timer = new NiceMock<Event::MockTimer>();
+  EXPECT_CALL(worker_dispatcher, createTimer_(_)).WillOnce(testing::Return(mock_timer));
+
+  auto timer = envoy_dynamic_module_callback_network_filter_timer_new(filterPtr(), 42);
+  ASSERT_NE(nullptr, timer);
+
+  // Expect enableTimer to be called with the specified duration.
+  EXPECT_CALL(*mock_timer, enableTimer(std::chrono::milliseconds(100), _));
+  envoy_dynamic_module_callback_network_filter_timer_enable(timer, 100);
+
+  // Clean up.
+  envoy_dynamic_module_callback_network_filter_timer_delete(timer);
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, NetworkFilterTimerDisableCallsDisableTimer) {
+  // Set up the dispatcher for the filter via connection.
+  NiceMock<Event::MockDispatcher> worker_dispatcher;
+  EXPECT_CALL(connection_, dispatcher()).WillRepeatedly(testing::ReturnRef(worker_dispatcher));
+
+  auto* mock_timer = new NiceMock<Event::MockTimer>();
+  EXPECT_CALL(worker_dispatcher, createTimer_(_)).WillOnce(testing::Return(mock_timer));
+
+  auto timer = envoy_dynamic_module_callback_network_filter_timer_new(filterPtr(), 42);
+  ASSERT_NE(nullptr, timer);
+
+  // Enable the timer first.
+  EXPECT_CALL(*mock_timer, enableTimer(std::chrono::milliseconds(100), _));
+  envoy_dynamic_module_callback_network_filter_timer_enable(timer, 100);
+
+  // Expect disableTimer to be called.
+  EXPECT_CALL(*mock_timer, disableTimer());
+  envoy_dynamic_module_callback_network_filter_timer_disable(timer);
+
+  // Clean up.
+  envoy_dynamic_module_callback_network_filter_timer_delete(timer);
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, NetworkFilterTimerEnabledReturnsCorrectState) {
+  // Set up the dispatcher for the filter via connection.
+  NiceMock<Event::MockDispatcher> worker_dispatcher;
+  EXPECT_CALL(connection_, dispatcher()).WillRepeatedly(testing::ReturnRef(worker_dispatcher));
+
+  auto* mock_timer = new NiceMock<Event::MockTimer>();
+  EXPECT_CALL(worker_dispatcher, createTimer_(_)).WillOnce(testing::Return(mock_timer));
+
+  auto timer = envoy_dynamic_module_callback_network_filter_timer_new(filterPtr(), 42);
+  ASSERT_NE(nullptr, timer);
+
+  // Initially timer is not enabled.
+  EXPECT_CALL(*mock_timer, enabled()).WillOnce(testing::Return(false));
+  EXPECT_FALSE(envoy_dynamic_module_callback_network_filter_timer_enabled(timer));
+
+  // After enabling, it should return true.
+  EXPECT_CALL(*mock_timer, enableTimer(std::chrono::milliseconds(100), _));
+  envoy_dynamic_module_callback_network_filter_timer_enable(timer, 100);
+  EXPECT_CALL(*mock_timer, enabled()).WillOnce(testing::Return(true));
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_filter_timer_enabled(timer));
+
+  // Clean up.
+  envoy_dynamic_module_callback_network_filter_timer_delete(timer);
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, NetworkFilterTimerExpiredCallbackInvokesHook) {
+  // Set up the dispatcher for the filter via connection.
+  NiceMock<Event::MockDispatcher> worker_dispatcher;
+  EXPECT_CALL(connection_, dispatcher()).WillRepeatedly(testing::ReturnRef(worker_dispatcher));
+
+  // Capture the timer callback.
+  Event::TimerCb captured_timer_cb;
+  auto* mock_timer = new NiceMock<Event::MockTimer>();
+  EXPECT_CALL(worker_dispatcher, createTimer_(_)).WillOnce(testing::Invoke([&](Event::TimerCb cb) {
+    captured_timer_cb = std::move(cb);
+    return mock_timer;
+  }));
+
+  auto timer = envoy_dynamic_module_callback_network_filter_timer_new(filterPtr(), 42);
+  ASSERT_NE(nullptr, timer);
+
+  // Enable the timer.
+  EXPECT_CALL(*mock_timer, enableTimer(std::chrono::milliseconds(100), _));
+  envoy_dynamic_module_callback_network_filter_timer_enable(timer, 100);
+
+  // Invoke the captured timer callback to simulate timer expiration.
+  // Since the no_op module's hook is a no-op, we just verify it doesn't crash.
+  captured_timer_cb();
+
+  // Clean up.
+  envoy_dynamic_module_callback_network_filter_timer_delete(timer);
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest,
+       NetworkFilterTimerExpiredAfterFilterDestroyedDoesNotCrash) {
+  // Set up the dispatcher for the filter via connection.
+  NiceMock<Event::MockDispatcher> worker_dispatcher;
+  EXPECT_CALL(connection_, dispatcher()).WillRepeatedly(testing::ReturnRef(worker_dispatcher));
+
+  // Capture the timer callback.
+  Event::TimerCb captured_timer_cb;
+  auto* mock_timer = new NiceMock<Event::MockTimer>();
+  EXPECT_CALL(worker_dispatcher, createTimer_(_)).WillOnce(testing::Invoke([&](Event::TimerCb cb) {
+    captured_timer_cb = std::move(cb);
+    return mock_timer;
+  }));
+
+  auto timer = envoy_dynamic_module_callback_network_filter_timer_new(filterPtr(), 42);
+  ASSERT_NE(nullptr, timer);
+
+  // Enable the timer.
+  EXPECT_CALL(*mock_timer, enableTimer(std::chrono::milliseconds(100), _));
+  envoy_dynamic_module_callback_network_filter_timer_enable(timer, 100);
+
+  // Destroy the filter before invoking the timer callback.
+  filter_.reset();
+
+  // The timer callback should not crash even though the filter is destroyed.
+  captured_timer_cb();
+
+  // Clean up - timer still needs to be deleted.
+  envoy_dynamic_module_callback_network_filter_timer_delete(timer);
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, NetworkFilterTimerMultipleTimersWork) {
+  // Set up the dispatcher for the filter via connection.
+  NiceMock<Event::MockDispatcher> worker_dispatcher;
+  EXPECT_CALL(connection_, dispatcher()).WillRepeatedly(testing::ReturnRef(worker_dispatcher));
+
+  // Create two timers with different IDs.
+  Event::TimerCb captured_timer_cb1;
+  Event::TimerCb captured_timer_cb2;
+  auto* mock_timer1 = new NiceMock<Event::MockTimer>();
+  auto* mock_timer2 = new NiceMock<Event::MockTimer>();
+
+  EXPECT_CALL(worker_dispatcher, createTimer_(_))
+      .WillOnce(testing::Invoke([&](Event::TimerCb cb) {
+        captured_timer_cb1 = std::move(cb);
+        return mock_timer1;
+      }))
+      .WillOnce(testing::Invoke([&](Event::TimerCb cb) {
+        captured_timer_cb2 = std::move(cb);
+        return mock_timer2;
+      }));
+
+  auto timer1 = envoy_dynamic_module_callback_network_filter_timer_new(filterPtr(), 1);
+  auto timer2 = envoy_dynamic_module_callback_network_filter_timer_new(filterPtr(), 2);
+  ASSERT_NE(nullptr, timer1);
+  ASSERT_NE(nullptr, timer2);
+
+  // Enable both timers with different durations.
+  EXPECT_CALL(*mock_timer1, enableTimer(std::chrono::milliseconds(100), _));
+  EXPECT_CALL(*mock_timer2, enableTimer(std::chrono::milliseconds(200), _));
+  envoy_dynamic_module_callback_network_filter_timer_enable(timer1, 100);
+  envoy_dynamic_module_callback_network_filter_timer_enable(timer2, 200);
+
+  // Invoke the timer callbacks - both should work independently.
+  captured_timer_cb1();
+  captured_timer_cb2();
+
+  // Clean up.
+  envoy_dynamic_module_callback_network_filter_timer_delete(timer1);
+  envoy_dynamic_module_callback_network_filter_timer_delete(timer2);
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, NetworkFilterTimerReenableAfterDisable) {
+  // Set up the dispatcher for the filter via connection.
+  NiceMock<Event::MockDispatcher> worker_dispatcher;
+  EXPECT_CALL(connection_, dispatcher()).WillRepeatedly(testing::ReturnRef(worker_dispatcher));
+
+  auto* mock_timer = new NiceMock<Event::MockTimer>();
+  EXPECT_CALL(worker_dispatcher, createTimer_(_)).WillOnce(testing::Return(mock_timer));
+
+  auto timer = envoy_dynamic_module_callback_network_filter_timer_new(filterPtr(), 42);
+  ASSERT_NE(nullptr, timer);
+
+  // Enable the timer.
+  EXPECT_CALL(*mock_timer, enableTimer(std::chrono::milliseconds(100), _));
+  envoy_dynamic_module_callback_network_filter_timer_enable(timer, 100);
+
+  // Disable the timer.
+  EXPECT_CALL(*mock_timer, disableTimer());
+  envoy_dynamic_module_callback_network_filter_timer_disable(timer);
+
+  // Re-enable with a different duration.
+  EXPECT_CALL(*mock_timer, enableTimer(std::chrono::milliseconds(200), _));
+  envoy_dynamic_module_callback_network_filter_timer_enable(timer, 200);
+
+  // Clean up.
+  envoy_dynamic_module_callback_network_filter_timer_delete(timer);
+}
+
 } // namespace NetworkFilters
 } // namespace DynamicModules
 } // namespace Extensions

@@ -3295,6 +3295,15 @@ pub trait NetworkFilter<ENF: EnvoyNetworkFilter> {
   ///
   /// See [`EnvoyNetworkFilter::new_scheduler`] for more details on how to use this.
   fn on_scheduled(&mut self, _envoy_filter: &mut ENF, _event_id: u64) {}
+
+  /// This is called when a timer created via [`EnvoyNetworkFilter::new_timer`] expires.
+  ///
+  /// * `envoy_filter` can be used to interact with the underlying Envoy filter object.
+  /// * `timer_id` is the ID of the timer that was passed to [`EnvoyNetworkFilter::new_timer`] when
+  ///   the timer was created.
+  ///
+  /// See [`EnvoyNetworkFilter::new_timer`] for more details on how to use timers.
+  fn on_timer_expired(&mut self, _envoy_filter: &mut ENF, _timer_id: u64) {}
 }
 
 /// The trait that represents the Envoy network filter.
@@ -3557,6 +3566,46 @@ pub trait EnvoyNetworkFilter {
   /// }
   /// ```
   fn new_scheduler(&self) -> impl EnvoyNetworkFilterScheduler + 'static;
+
+  /// Create a new timer associated with this network filter.
+  ///
+  /// The timer can be used to schedule delayed or periodic operations. When the timer expires,
+  /// [`NetworkFilter::on_timer_expired`] will be called with the same `timer_id`.
+  ///
+  /// The `timer_id` can be any value and is used to distinguish between multiple timers
+  /// created by the same filter.
+  ///
+  /// Returns `None` if the timer could not be created (e.g., if the dispatcher is not available).
+  ///
+  /// ## Example Usage
+  ///
+  /// ```
+  /// use envoy_proxy_dynamic_modules_rust_sdk::*;
+  /// use std::time::Duration;
+  ///
+  /// struct TestFilter {
+  ///   timer: Option<Box<dyn EnvoyNetworkFilterTimer>>,
+  /// }
+  /// impl<ENF: EnvoyNetworkFilter> NetworkFilter<ENF> for TestFilter {
+  ///   fn on_new_connection(
+  ///     &mut self,
+  ///     envoy_filter: &mut ENF,
+  ///   ) -> abi::envoy_dynamic_module_type_on_network_filter_data_status {
+  ///     // Create a timer with id 42 and enable it to fire after 100ms.
+  ///     if let Some(timer) = envoy_filter.new_timer(42) {
+  ///       timer.enable(Duration::from_millis(100));
+  ///       self.timer = Some(timer);
+  ///     }
+  ///     abi::envoy_dynamic_module_type_on_network_filter_data_status::Continue
+  ///   }
+  ///
+  ///   fn on_timer_expired(&mut self, _envoy_filter: &mut ENF, timer_id: u64) {
+  ///     // Handle the timer expiration.
+  ///     assert_eq!(timer_id, 42);
+  ///   }
+  /// }
+  /// ```
+  fn new_timer(&self, timer_id: u64) -> Option<Box<dyn EnvoyNetworkFilterTimer>>;
 }
 
 /// This represents a thread-safe object that can be used to schedule a generic event to the
@@ -3658,6 +3707,81 @@ impl EnvoyNetworkFilterConfigScheduler for EnvoyNetworkFilterConfigSchedulerImpl
 impl EnvoyNetworkFilterConfigScheduler for Box<dyn EnvoyNetworkFilterConfigScheduler> {
   fn commit(&self, event_id: u64) {
     (**self).commit(event_id);
+  }
+}
+
+/// This represents a timer that can be used to schedule delayed operations for a network filter.
+///
+/// The timer is created by the [`EnvoyNetworkFilter::new_timer`] method. When the timer expires,
+/// [`NetworkFilter::on_timer_expired`] will be called with the timer ID that was passed when
+/// creating the timer.
+///
+/// Unlike the scheduler, the timer is not intended to be sent across threads. It should be
+/// used on the same worker thread where the network filter is running.
+#[automock]
+pub trait EnvoyNetworkFilterTimer {
+  /// Enable the timer with the specified duration. If the timer is already pending,
+  /// it will be reset to the new duration.
+  ///
+  /// When the timer expires, [`NetworkFilter::on_timer_expired`] will be called.
+  fn enable(&self, duration: std::time::Duration);
+
+  /// Disable the timer without destroying it. The timer can be re-enabled later
+  /// using [`EnvoyNetworkFilterTimer::enable`].
+  fn disable(&self);
+
+  /// Check whether the timer is currently enabled (pending).
+  fn enabled(&self) -> bool;
+}
+
+/// This implements the [`EnvoyNetworkFilterTimer`] trait with the given raw pointer to the
+/// Envoy network filter timer object.
+struct EnvoyNetworkFilterTimerImpl {
+  raw_ptr: abi::envoy_dynamic_module_type_network_filter_timer_module_ptr,
+}
+
+impl Drop for EnvoyNetworkFilterTimerImpl {
+  fn drop(&mut self) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_network_filter_timer_delete(self.raw_ptr);
+    }
+  }
+}
+
+impl EnvoyNetworkFilterTimer for EnvoyNetworkFilterTimerImpl {
+  fn enable(&self, duration: std::time::Duration) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_network_filter_timer_enable(
+        self.raw_ptr,
+        duration.as_millis() as u64,
+      );
+    }
+  }
+
+  fn disable(&self) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_network_filter_timer_disable(self.raw_ptr);
+    }
+  }
+
+  fn enabled(&self) -> bool {
+    unsafe { abi::envoy_dynamic_module_callback_network_filter_timer_enabled(self.raw_ptr) }
+  }
+}
+
+// Box<dyn EnvoyNetworkFilterTimer> is returned by the new_timer method, so we need to implement
+// EnvoyNetworkFilterTimer for it as well.
+impl EnvoyNetworkFilterTimer for Box<dyn EnvoyNetworkFilterTimer> {
+  fn enable(&self, duration: std::time::Duration) {
+    (**self).enable(duration);
+  }
+
+  fn disable(&self) {
+    (**self).disable();
+  }
+
+  fn enabled(&self) -> bool {
+    (**self).enabled()
   }
 }
 
@@ -4574,6 +4698,17 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
       }
     }
   }
+
+  fn new_timer(&self, timer_id: u64) -> Option<Box<dyn EnvoyNetworkFilterTimer>> {
+    unsafe {
+      let timer_ptr =
+        abi::envoy_dynamic_module_callback_network_filter_timer_new(self.raw, timer_id);
+      if timer_ptr.is_null() {
+        return None;
+      }
+      Some(Box::new(EnvoyNetworkFilterTimerImpl { raw_ptr: timer_ptr }))
+    }
+  }
 }
 
 // Network Filter Event Hook Implementations
@@ -4780,6 +4915,17 @@ pub extern "C" fn envoy_dynamic_module_on_network_filter_config_scheduled(
     unsafe { &**raw }
   };
   filter_config.on_config_scheduled(event_id);
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_on_network_filter_timer_expired(
+  envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+  filter_ptr: abi::envoy_dynamic_module_type_network_filter_module_ptr,
+  timer_id: u64,
+) {
+  let filter = filter_ptr as *mut Box<dyn NetworkFilter<EnvoyNetworkFilterImpl>>;
+  let filter = unsafe { &mut *filter };
+  filter.on_timer_expired(&mut EnvoyNetworkFilterImpl::new(envoy_ptr), timer_id);
 }
 
 // =============================================================================

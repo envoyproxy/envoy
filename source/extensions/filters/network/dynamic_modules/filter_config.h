@@ -29,6 +29,8 @@ using OnNetworkFilterHttpCalloutDoneType =
 using OnNetworkFilterScheduledType = decltype(&envoy_dynamic_module_on_network_filter_scheduled);
 using OnNetworkFilterConfigScheduledType =
     decltype(&envoy_dynamic_module_on_network_filter_config_scheduled);
+using OnNetworkFilterTimerExpiredType =
+    decltype(&envoy_dynamic_module_on_network_filter_timer_expired);
 
 // Custom namespace prefix for network filter stats.
 constexpr char NetworkFilterStatsNamespace[] = "dynamic_module_network_filter";
@@ -88,6 +90,8 @@ public:
   // Optional: modules that don't need scheduling don't need to implement this.
   OnNetworkFilterScheduledType on_network_filter_scheduled_ = nullptr;
   OnNetworkFilterConfigScheduledType on_network_filter_config_scheduled_ = nullptr;
+  // Optional: modules that don't need timers don't need to implement this.
+  OnNetworkFilterTimerExpiredType on_network_filter_timer_expired_ = nullptr;
 
   Envoy::Upstream::ClusterManager& cluster_manager_;
 

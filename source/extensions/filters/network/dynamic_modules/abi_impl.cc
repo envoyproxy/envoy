@@ -987,6 +987,45 @@ void envoy_dynamic_module_callback_network_filter_config_scheduler_commit(
   scheduler->commit(event_id);
 }
 
+// -----------------------------------------------------------------------------
+// Network filter timer callbacks.
+// -----------------------------------------------------------------------------
+
+envoy_dynamic_module_type_network_filter_timer_module_ptr
+envoy_dynamic_module_callback_network_filter_timer_new(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, uint64_t timer_id) {
+  auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
+  Event::Dispatcher* dispatcher = filter->dispatcher();
+  if (dispatcher == nullptr) {
+    return nullptr;
+  }
+  return new DynamicModuleNetworkFilterTimer(filter->weak_from_this(), *dispatcher, timer_id);
+}
+
+void envoy_dynamic_module_callback_network_filter_timer_enable(
+    envoy_dynamic_module_type_network_filter_timer_module_ptr timer_module_ptr,
+    uint64_t duration_milliseconds) {
+  auto* timer = static_cast<DynamicModuleNetworkFilterTimer*>(timer_module_ptr);
+  timer->enable(std::chrono::milliseconds(duration_milliseconds));
+}
+
+void envoy_dynamic_module_callback_network_filter_timer_disable(
+    envoy_dynamic_module_type_network_filter_timer_module_ptr timer_module_ptr) {
+  auto* timer = static_cast<DynamicModuleNetworkFilterTimer*>(timer_module_ptr);
+  timer->disable();
+}
+
+bool envoy_dynamic_module_callback_network_filter_timer_enabled(
+    envoy_dynamic_module_type_network_filter_timer_module_ptr timer_module_ptr) {
+  auto* timer = static_cast<DynamicModuleNetworkFilterTimer*>(timer_module_ptr);
+  return timer->enabled();
+}
+
+void envoy_dynamic_module_callback_network_filter_timer_delete(
+    envoy_dynamic_module_type_network_filter_timer_module_ptr timer_module_ptr) {
+  delete static_cast<DynamicModuleNetworkFilterTimer*>(timer_module_ptr);
+}
+
 } // extern "C"
 
 } // namespace NetworkFilters

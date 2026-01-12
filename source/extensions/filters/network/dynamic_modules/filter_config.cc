@@ -81,6 +81,10 @@ absl::StatusOr<DynamicModuleNetworkFilterConfigSharedPtr> newDynamicModuleNetwor
   auto on_config_scheduled = dynamic_module->getFunctionPointer<OnNetworkFilterConfigScheduledType>(
       "envoy_dynamic_module_on_network_filter_config_scheduled");
 
+  // Optional: modules that don't need timers don't need to implement this.
+  auto on_timer_expired = dynamic_module->getFunctionPointer<OnNetworkFilterTimerExpiredType>(
+      "envoy_dynamic_module_on_network_filter_timer_expired");
+
   auto config = std::make_shared<DynamicModuleNetworkFilterConfig>(
       filter_name, filter_config, std::move(dynamic_module), cluster_manager, stats_scope,
       main_thread_dispatcher);
@@ -99,6 +103,8 @@ absl::StatusOr<DynamicModuleNetworkFilterConfigSharedPtr> newDynamicModuleNetwor
       on_filter_scheduled.ok() ? on_filter_scheduled.value() : nullptr;
   config->on_network_filter_config_scheduled_ =
       on_config_scheduled.ok() ? on_config_scheduled.value() : nullptr;
+  config->on_network_filter_timer_expired_ =
+      on_timer_expired.ok() ? on_timer_expired.value() : nullptr;
 
   // Create the in-module configuration.
   envoy_dynamic_module_type_envoy_buffer name_buffer = {const_cast<char*>(filter_name.data()),
