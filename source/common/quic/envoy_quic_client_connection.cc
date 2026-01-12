@@ -6,6 +6,7 @@
 
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/network/udp_packet_writer_handler_impl.h"
+#include "source/common/quic/envoy_quic_network_observer_registry_factory.h"
 #include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
@@ -96,17 +97,25 @@ void EnvoyQuicClientConnection::EnvoyQuicClinetPathContextFactory::CreatePathVal
 }
 
 quic::QuicNetworkHandle EnvoyQuicClientConnection::EnvoyQuicMigrationHelper::FindAlternateNetwork(
-    quic::QuicNetworkHandle /*network*/) {
-  return quic::kInvalidNetworkHandle;
+    quic::QuicNetworkHandle network) {
+  return registry_.has_value() ? registry_.value().get().getAlternativeNetwork(network)
+                               : quic::kInvalidNetworkHandle;
 }
 
 quic::QuicNetworkHandle EnvoyQuicClientConnection::EnvoyQuicMigrationHelper::GetDefaultNetwork() {
-  return quic::kInvalidNetworkHandle;
+  return registry_.has_value() ? registry_.value().get().getDefaultNetwork()
+                               : quic::kInvalidNetworkHandle;
+}
+
+quic::QuicNetworkHandle EnvoyQuicClientConnection::EnvoyQuicMigrationHelper::GetCurrentNetwork() {
+  return initial_network_;
 }
 
 void EnvoyQuicClientConnection::EnvoyQuicMigrationHelper::OnMigrationToPathDone(
     std::unique_ptr<quic::QuicClientPathValidationContext> context, bool success) {
   if (success) {
+    ENVOY_CONN_LOG(trace, "Successfully migrate to use path {} to {}", connection_,
+                   context->self_address().ToString(), context->peer_address().ToString());
     auto* envoy_context = static_cast<EnvoyQuicClientPathValidationContext*>(context.get());
     // Connection already owns the writer.
     envoy_context->releaseWriter();
@@ -117,6 +126,9 @@ void EnvoyQuicClientConnection::EnvoyQuicMigrationHelper::OnMigrationToPathDone(
     connection_.connectionSocket()->ioHandle().activateFileEvents(Event::FileReadyType::Write);
     // Send something to notify the peer of the address change immediately.
     connection_.SendPing();
+  } else {
+    ENVOY_CONN_LOG(trace, "Failed to migrate to use path {} to {}", connection_,
+                   context->self_address().ToString(), context->peer_address().ToString());
   }
 }
 
@@ -422,10 +434,11 @@ void EnvoyQuicClientConnection::OnCanWrite() {
 
 EnvoyQuicClientConnection::EnvoyQuicMigrationHelper&
 EnvoyQuicClientConnection::getOrCreateMigrationHelper(
-    QuicClientPacketWriterFactory& writer_factory,
+    QuicClientPacketWriterFactory& writer_factory, quic::QuicNetworkHandle initial_network,
     OptRef<EnvoyQuicNetworkObserverRegistry> registry) {
   if (migration_helper_ == nullptr) {
-    migration_helper_ = std::make_unique<EnvoyQuicMigrationHelper>(*this, registry, writer_factory);
+    migration_helper_ = std::make_unique<EnvoyQuicMigrationHelper>(*this, registry, writer_factory,
+                                                                   initial_network);
   }
   return *migration_helper_;
 }

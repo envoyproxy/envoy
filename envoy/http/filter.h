@@ -543,6 +543,28 @@ public:
    * to assume that any set of headers will be valid for the duration of the stream.
    */
   virtual ResponseTrailerMapOptRef responseTrailers() PURE;
+
+  /**
+   * This routine may be called to change the buffer limit for filters.
+   *
+   * It is recommended (but not required) that filters calling this function should
+   * generally only perform increases to the buffer limit, to avoid potentially
+   * conflicting with the buffer requirements of other filters in the chain, i.e.
+   *
+   * if (desired_limit > bufferLimit()) {setBufferLimit(desired_limit);}
+   *
+   * @param limit supplies the desired buffer limit.
+   */
+  virtual void setBufferLimit(uint64_t limit) PURE;
+
+  /**
+   * This routine returns the current buffer limit for filters. Filters should abide by
+   * this limit or change it via setBufferLimit.
+   * A buffer limit of 0 bytes indicates no limits are applied.
+   *
+   * @return the buffer limit the filter should apply.
+   */
+  virtual uint64_t bufferLimit() PURE;
 };
 
 /**
@@ -764,28 +786,6 @@ public:
   virtual void removeDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks& callbacks) PURE;
 
   /**
-   * This routine may be called to change the buffer limit for decoder filters.
-   *
-   * It is recommended (but not required) that filters calling this function should
-   * generally only perform increases to the buffer limit, to avoid potentially
-   * conflicting with the buffer requirements of other filters in the chain, i.e.
-   *
-   * if (desired_limit > decoderBufferLimit()) {setDecoderBufferLimit(desired_limit);}
-   *
-   * @param limit supplies the desired buffer limit.
-   */
-  virtual void setDecoderBufferLimit(uint64_t limit) PURE;
-
-  /**
-   * This routine returns the current buffer limit for decoder filters. Filters should abide by
-   * this limit or change it via setDecoderBufferLimit.
-   * A buffer limit of 0 bytes indicates no limits are applied.
-   *
-   * @return the buffer limit the filter should apply.
-   */
-  virtual uint64_t decoderBufferLimit() PURE;
-
-  /**
    * @return the account, if any, used by this stream.
    */
   virtual Buffer::BufferMemoryAccountSharedPtr account() const PURE;
@@ -841,6 +841,13 @@ public:
    * @return true if the filter should shed load based on the system pressure, typically memory.
    */
   virtual bool shouldLoadShed() const PURE;
+
+  /**
+   * Deprecated methods for decoder buffer limit accessors. Use setBufferLimit and bufferLimit
+   * instead. This is kept for backward compatibility and will be removed in next few releases.
+   */
+  void setDecoderBufferLimit(uint64_t limit) { setBufferLimit(limit); }
+  uint64_t decoderBufferLimit() { return bufferLimit(); }
 };
 
 /**
@@ -1111,26 +1118,11 @@ public:
   virtual void onEncoderFilterBelowWriteBufferLowWatermark() PURE;
 
   /**
-   * This routine may be called to change the buffer limit for encoder filters.
-   *
-   * It is recommended (but not required) that filters calling this function should
-   * generally only perform increases to the buffer limit, to avoid potentially
-   * conflicting with the buffer requirements of other filters in the chain, i.e.
-   *
-   * if (desired_limit > encoderBufferLimit()) {setEncoderBufferLimit(desired_limit);}
-   *
-   * @param limit supplies the desired buffer limit.
+   * Deprecated methods for encoder buffer limit accessors. Use setBufferLimit and bufferLimit
+   * instead. This is kept for backward compatibility and will be removed in next few releases.
    */
-  virtual void setEncoderBufferLimit(uint64_t limit) PURE;
-
-  /**
-   * This routine returns the current buffer limit for encoder filters. Filters should abide by
-   * this limit or change it via setEncoderBufferLimit.
-   * A buffer limit of 0 bytes indicates no limits are applied.
-   *
-   * @return the buffer limit the filter should apply.
-   */
-  virtual uint64_t encoderBufferLimit() PURE;
+  void setEncoderBufferLimit(uint64_t limit) { setBufferLimit(limit); }
+  uint64_t encoderBufferLimit() { return bufferLimit(); }
 };
 
 /**
