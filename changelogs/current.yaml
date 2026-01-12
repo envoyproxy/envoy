@@ -1,7 +1,6 @@
-date: Pending
+date: January 13, 2026
 
 behavior_changes:
-# *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
 - area: server
   change: |
     Added container-aware CPU detection on Linux that respects cgroup CPU limits alongside hardware thread count
@@ -36,7 +35,6 @@ behavior_changes:
     ``404 Not Found`` (gRPC ``NOT_FOUND``) to prevent method enumeration.
 
 minor_behavior_changes:
-# *Changes that may cause incompatibilities for some users, but should not for most*
 - area: router
   change: |
     Added :ref:`host_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.host_rewrite>` and
@@ -245,7 +243,6 @@ bug_fixes:
     ``proto_api_scrubber_FAILED_PRECONDITION`` instead of terminating the process.
 
 removed_config_or_runtime:
-# *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 - area: http
   change: |
     Removed runtime guard ``envoy.reloadable_features.http1_balsa_disallow_lone_cr_in_chunk_extension``
