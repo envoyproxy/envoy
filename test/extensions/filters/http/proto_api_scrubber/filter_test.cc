@@ -186,11 +186,9 @@ protected:
   }
 
   void setupMocks() {
-    ON_CALL(mock_decoder_callbacks_, decoderBufferLimit())
-        .WillByDefault(testing::Return(UINT32_MAX));
+    ON_CALL(mock_decoder_callbacks_, bufferLimit()).WillByDefault(testing::Return(UINT32_MAX));
 
-    ON_CALL(mock_encoder_callbacks_, encoderBufferLimit())
-        .WillByDefault(testing::Return(UINT32_MAX));
+    ON_CALL(mock_encoder_callbacks_, bufferLimit()).WillByDefault(testing::Return(UINT32_MAX));
     ON_CALL(mock_factory_context_, serverFactoryContext())
         .WillByDefault(ReturnRef(server_factory_context_));
 
@@ -550,7 +548,7 @@ TEST_F(ProtoApiScrubberInvalidRequestHeaderTests, PathNotExist) {
 using ProtoApiScrubberRequestRejectedTests = ProtoApiScrubberFilterTest;
 
 TEST_F(ProtoApiScrubberRequestRejectedTests, RequestBufferLimitedExceeded) {
-  ON_CALL(mock_decoder_callbacks_, decoderBufferLimit()).WillByDefault(testing::Return(0));
+  ON_CALL(mock_decoder_callbacks_, bufferLimit()).WillByDefault(testing::Return(0));
 
   TestRequestHeaderMapImpl req_headers =
       TestRequestHeaderMapImpl{{":method", "POST"},
@@ -573,7 +571,7 @@ TEST_F(ProtoApiScrubberRequestRejectedTests, RequestBufferLimitedExceeded) {
 }
 
 TEST_F(ProtoApiScrubberRequestRejectedTests, ResponseBufferLimitedExceeded) {
-  ON_CALL(mock_encoder_callbacks_, encoderBufferLimit()).WillByDefault(testing::Return(0));
+  ON_CALL(mock_encoder_callbacks_, bufferLimit()).WillByDefault(testing::Return(0));
 
   TestRequestHeaderMapImpl req_headers =
       TestRequestHeaderMapImpl{{":method", "POST"},

@@ -24,7 +24,7 @@ envoy_extension_cc_test_library(
         "//source/common/network:utility_lib",
         "//source/extensions/filters/udp/dns_filter:dns_filter_lib",
         "//test/test_common:environment_lib",
-        "@com_github_c_ares_c_ares//:ares",
+        "@com_github_cares_cares//:ares",
     ],
 )
 

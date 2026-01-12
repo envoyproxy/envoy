@@ -46,7 +46,7 @@ public:
     } else {
       watermark_enabled_ = true;
       buffer_limit_ = std::stoul(std::string(entry_buffer[0]->value().getStringView()));
-      decoder_callbacks_->setDecoderBufferLimit(buffer_limit_);
+      decoder_callbacks_->setBufferLimit(buffer_limit_);
       header_map.remove(Http::LowerCaseString("buffer_limit"));
       return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
     }
