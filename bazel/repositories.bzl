@@ -33,6 +33,9 @@ WINDOWS_SKIP_TARGETS = [
     "envoy.filters.http.rbac",
     "envoy.filters.network.rbac",
     "envoy.rbac.matchers.upstream_ip_port",
+    # Very new and likely not useful on Windows
+    "envoy.bootstrap.reverse_tunnel.downstream_socket_interface",
+    "envoy.bootstrap.reverse_tunnel.upstream_socket_interface",
 ]
 
 NO_HTTP3_SKIP_TARGETS = [
