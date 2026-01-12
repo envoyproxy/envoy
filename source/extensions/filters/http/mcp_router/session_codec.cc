@@ -43,7 +43,6 @@ SessionCodec::parseCompositeSessionId(const std::string& composite) {
 
   ParsedSession result;
   result.route = parts[0];
-  // Decode Base64-encoded subject.
   result.subject = Base64::decode(parts[1]);
 
   if (parts[2].empty()) {
