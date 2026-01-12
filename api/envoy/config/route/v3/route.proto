@@ -169,4 +169,9 @@ message Vhds {
 
   // Configuration source specifier for VHDS.
   core.v3.ConfigSource config_source = 1 [(validate.rules).message = {required: true}];
+
+  // When true (default), the host header will be converted to lowercase for
+  // case-insensitive matching during on-demand VHDS updates. When false, the
+  // host header will be used as-is for case-sensitive matching.
+  google.protobuf.BoolValue case_insensitive_match = 2;
 }

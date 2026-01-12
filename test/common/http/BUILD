@@ -503,6 +503,19 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "route_config_update_requster_test",
+    srcs = ["route_config_update_requster_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/http:route_config_update_requster_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/router:router_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "status_test",
     srcs = ["status_test.cc"],
     rbe_pool = "6gig",

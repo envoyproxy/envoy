@@ -10,7 +10,10 @@ void RdsRouteConfigUpdateRequester::requestRouteConfigUpdate(
     RequestHeaderMap& request_headers) {
   if (route_config.has_value() && route_config.value()->usesVhds()) {
     ASSERT(!request_headers.Host()->value().empty());
-    const auto& host_header = absl::AsciiStrToLower(request_headers.getHostValue());
+    const auto host_value = request_headers.getHostValue();
+    const auto& host_header = route_config.value()->vhdsCaseInsensitiveMatch()
+                                  ? absl::AsciiStrToLower(host_value)
+                                  : std::string(host_value);
     requestVhdsUpdate(host_header, dispatcher, std::move(route_config_updated_cb));
     return;
   } else if (scope_key_builder_.has_value()) {

@@ -12130,6 +12130,296 @@ virtual_hosts:
   EXPECT_EQ(334U, route->requestBodyBufferLimit());
 }
 
+// Test case-insensitive host matching (default behavior with VHDS)
+TEST_F(RouteMatcherTest, VhdsCaseInsensitiveMatchingDefault) {
+  const std::string yaml = R"EOF(
+vhds:
+  config_source:
+    ads: {}
+virtual_hosts:
+- name: exact_match_host
+  domains:
+  - "Example.Com"
+  routes:
+  - match:
+      prefix: "/"
+    route:
+      cluster: exact_cluster
+- name: wildcard_suffix_host
+  domains:
+  - "*.Example.Org"
+  routes:
+  - match:
+      prefix: "/"
+    route:
+      cluster: wildcard_suffix_cluster
+- name: wildcard_prefix_host
+  domains:
+  - "Foo.*"
+  routes:
+  - match:
+      prefix: "/"
+    route:
+      cluster: wildcard_prefix_cluster
+- name: default
+  domains:
+  - "*"
+  routes:
+  - match:
+      prefix: "/"
+    route:
+      cluster: default_cluster
+)EOF";
+
+  factory_context_.cluster_manager_.initializeClusters(
+      {"exact_cluster", "wildcard_suffix_cluster", "wildcard_prefix_cluster", "default_cluster"},
+      {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+  EXPECT_TRUE(creation_status_.ok());
+
+  // Test exact match with various cases - should match case-insensitively
+  {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("example.com", "/test", "GET");
+    EXPECT_EQ("exact_cluster", config.route(headers, 0)->routeEntry()->clusterName());
+  }
+  {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("EXAMPLE.COM", "/test", "GET");
+    EXPECT_EQ("exact_cluster", config.route(headers, 0)->routeEntry()->clusterName());
+  }
+  {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("Example.Com", "/test", "GET");
+    EXPECT_EQ("exact_cluster", config.route(headers, 0)->routeEntry()->clusterName());
+  }
+  {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("eXaMpLe.CoM", "/test", "GET");
+    EXPECT_EQ("exact_cluster", config.route(headers, 0)->routeEntry()->clusterName());
+  }
+
+  // Test wildcard suffix match with various cases - should match case-insensitively
+  {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("www.example.org", "/test", "GET");
+    EXPECT_EQ("wildcard_suffix_cluster", config.route(headers, 0)->routeEntry()->clusterName());
+  }
+  {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("WWW.EXAMPLE.ORG", "/test", "GET");
+    EXPECT_EQ("wildcard_suffix_cluster", config.route(headers, 0)->routeEntry()->clusterName());
+  }
+  {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("Api.Example.Org", "/test", "GET");
+    EXPECT_EQ("wildcard_suffix_cluster", config.route(headers, 0)->routeEntry()->clusterName());
+  }
+
+  // Test wildcard prefix match with various cases - should match case-insensitively
+  {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("foo.com", "/test", "GET");
+    EXPECT_EQ("wildcard_prefix_cluster", config.route(headers, 0)->routeEntry()->clusterName());
+  }
+  {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("FOO.COM", "/test", "GET");
+    EXPECT_EQ("wildcard_prefix_cluster", config.route(headers, 0)->routeEntry()->clusterName());
+  }
+  {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("Foo.Net", "/test", "GET");
+    EXPECT_EQ("wildcard_prefix_cluster", config.route(headers, 0)->routeEntry()->clusterName());
+  }
+}
+
+// Test case-sensitive host matching when VHDS case_insensitive_match is false
+TEST_F(RouteMatcherTest, VhdsCaseSensitiveMatching) {
+  const std::string yaml = R"EOF(
+vhds:
+  config_source:
+    ads: {}
+  case_insensitive_match: false
+virtual_hosts:
+- name: exact_match_host
+  domains:
+  - "Example.Com"
+  routes:
+  - match:
+      prefix: "/"
+    route:
+      cluster: exact_cluster
+- name: wildcard_suffix_host
+  domains:
+  - "*.Example.Org"
+  routes:
+  - match:
+      prefix: "/"
+    route:
+      cluster: wildcard_suffix_cluster
+- name: wildcard_prefix_host
+  domains:
+  - "Foo.*"
+  routes:
+  - match:
+      prefix: "/"
+    route:
+      cluster: wildcard_prefix_cluster
+- name: default
+  domains:
+  - "*"
+  routes:
+  - match:
+      prefix: "/"
+    route:
+      cluster: default_cluster
+)EOF";
+
+  factory_context_.cluster_manager_.initializeClusters(
+      {"exact_cluster", "wildcard_suffix_cluster", "wildcard_prefix_cluster", "default_cluster"},
+      {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+  EXPECT_TRUE(creation_status_.ok());
+
+  // Test exact match - only exact case should match
+  {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("Example.Com", "/test", "GET");
+    EXPECT_EQ("exact_cluster", config.route(headers, 0)->routeEntry()->clusterName());
+  }
+  {
+    // Different case should NOT match - falls back to default
+    Http::TestRequestHeaderMapImpl headers = genHeaders("example.com", "/test", "GET");
+    EXPECT_EQ("default_cluster", config.route(headers, 0)->routeEntry()->clusterName());
+  }
+  {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("EXAMPLE.COM", "/test", "GET");
+    EXPECT_EQ("default_cluster", config.route(headers, 0)->routeEntry()->clusterName());
+  }
+  {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("eXaMpLe.CoM", "/test", "GET");
+    EXPECT_EQ("default_cluster", config.route(headers, 0)->routeEntry()->clusterName());
+  }
+
+  // Test wildcard suffix match - only exact case should match
+  {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("www.Example.Org", "/test", "GET");
+    EXPECT_EQ("wildcard_suffix_cluster", config.route(headers, 0)->routeEntry()->clusterName());
+  }
+  {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("Api.Example.Org", "/test", "GET");
+    EXPECT_EQ("wildcard_suffix_cluster", config.route(headers, 0)->routeEntry()->clusterName());
+  }
+  {
+    // Different case should NOT match - falls back to default
+    Http::TestRequestHeaderMapImpl headers = genHeaders("www.example.org", "/test", "GET");
+    EXPECT_EQ("default_cluster", config.route(headers, 0)->routeEntry()->clusterName());
+  }
+  {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("WWW.EXAMPLE.ORG", "/test", "GET");
+    EXPECT_EQ("default_cluster", config.route(headers, 0)->routeEntry()->clusterName());
+  }
+
+  // Test wildcard prefix match - only exact case should match
+  {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("Foo.com", "/test", "GET");
+    EXPECT_EQ("wildcard_prefix_cluster", config.route(headers, 0)->routeEntry()->clusterName());
+  }
+  {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("Foo.Net", "/test", "GET");
+    EXPECT_EQ("wildcard_prefix_cluster", config.route(headers, 0)->routeEntry()->clusterName());
+  }
+  {
+    // Different case should NOT match - falls back to default
+    Http::TestRequestHeaderMapImpl headers = genHeaders("foo.com", "/test", "GET");
+    EXPECT_EQ("default_cluster", config.route(headers, 0)->routeEntry()->clusterName());
+  }
+  {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("FOO.COM", "/test", "GET");
+    EXPECT_EQ("default_cluster", config.route(headers, 0)->routeEntry()->clusterName());
+  }
+}
+
+// Test that case_insensitive_match explicitly set to true behaves the same as default
+TEST_F(RouteMatcherTest, VhdsCaseInsensitiveMatchingExplicitTrue) {
+  const std::string yaml = R"EOF(
+vhds:
+  config_source:
+    ads: {}
+  case_insensitive_match: true
+virtual_hosts:
+- name: test_host
+  domains:
+  - "Test.Example.Com"
+  routes:
+  - match:
+      prefix: "/"
+    route:
+      cluster: test_cluster
+- name: default
+  domains:
+  - "*"
+  routes:
+  - match:
+      prefix: "/"
+    route:
+      cluster: default_cluster
+)EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"test_cluster", "default_cluster"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+  EXPECT_TRUE(creation_status_.ok());
+
+  // Should match case-insensitively
+  {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("test.example.com", "/test", "GET");
+    EXPECT_EQ("test_cluster", config.route(headers, 0)->routeEntry()->clusterName());
+  }
+  {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("TEST.EXAMPLE.COM", "/test", "GET");
+    EXPECT_EQ("test_cluster", config.route(headers, 0)->routeEntry()->clusterName());
+  }
+  {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("Test.Example.Com", "/test", "GET");
+    EXPECT_EQ("test_cluster", config.route(headers, 0)->routeEntry()->clusterName());
+  }
+}
+
+// Test that without VHDS config, matching still defaults to case-insensitive
+TEST_F(RouteMatcherTest, CaseInsensitiveMatchingWithoutVhds) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: test_host
+  domains:
+  - "Test.Example.Com"
+  routes:
+  - match:
+      prefix: "/"
+    route:
+      cluster: test_cluster
+- name: default
+  domains:
+  - "*"
+  routes:
+  - match:
+      prefix: "/"
+    route:
+      cluster: default_cluster
+)EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"test_cluster", "default_cluster"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+  EXPECT_TRUE(creation_status_.ok());
+
+  // Should match case-insensitively (default behavior)
+  {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("test.example.com", "/test", "GET");
+    EXPECT_EQ("test_cluster", config.route(headers, 0)->routeEntry()->clusterName());
+  }
+  {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("TEST.EXAMPLE.COM", "/test", "GET");
+    EXPECT_EQ("test_cluster", config.route(headers, 0)->routeEntry()->clusterName());
+  }
+  {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("Test.Example.Com", "/test", "GET");
+    EXPECT_EQ("test_cluster", config.route(headers, 0)->routeEntry()->clusterName());
+  }
+}
+
 } // namespace
 } // namespace Router
 } // namespace Envoy
