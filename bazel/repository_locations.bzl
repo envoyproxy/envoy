@@ -1697,6 +1697,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.filters.http.dynamic_modules",
             "envoy.filters.listener.dynamic_modules",
             "envoy.filters.network.dynamic_modules",
+            "envoy.filters.udp_listener.dynamic_modules",
         ],
         release_date = "2025-03-04",
         cpe = "N/A",
