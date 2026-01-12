@@ -64,3 +64,20 @@ void envoy_dynamic_module_on_listener_filter_destroy(
     envoy_dynamic_module_type_listener_filter_module_ptr filter_module_ptr) {
   assert(filter_module_ptr == &some_variable + 1);
 }
+
+void envoy_dynamic_module_on_listener_filter_scheduled(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_listener_filter_module_ptr filter_module_ptr, uint64_t event_id) {
+  (void)filter_envoy_ptr;
+  (void)filter_module_ptr;
+  (void)event_id;
+}
+
+void envoy_dynamic_module_on_listener_filter_config_scheduled(
+    envoy_dynamic_module_type_listener_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_listener_filter_config_module_ptr filter_config_module_ptr,
+    uint64_t event_id) {
+  (void)filter_config_envoy_ptr;
+  (void)filter_config_module_ptr;
+  (void)event_id;
+}

@@ -481,7 +481,7 @@ TEST_F(CacheFilterTest, WatermarkEventsAreSentIfCacheBlocksStreamAndLimitExceede
   const std::string body1 = "abcde";
   const std::string body2 = "fghij";
   // Set the buffer limit to 2 bytes to ensure we send watermark events.
-  EXPECT_CALL(encoder_callbacks_, encoderBufferLimit()).WillRepeatedly(::testing::Return(2));
+  EXPECT_CALL(encoder_callbacks_, bufferLimit()).WillRepeatedly(::testing::Return(2));
   auto mock_http_cache = std::make_shared<MockHttpCache>();
   MockLookupContext* mock_lookup_context = mock_http_cache->mockLookupContext();
   MockInsertContext* mock_insert_context = mock_http_cache->mockInsertContext();
@@ -547,7 +547,7 @@ TEST_F(CacheFilterTest, FilterDestroyedWhileWatermarkedSendsLowWatermarkEvent) {
   const std::string body1 = "abcde";
   const std::string body2 = "fghij";
   // Set the buffer limit to 2 bytes to ensure we send watermark events.
-  EXPECT_CALL(encoder_callbacks_, encoderBufferLimit()).WillRepeatedly(::testing::Return(2));
+  EXPECT_CALL(encoder_callbacks_, bufferLimit()).WillRepeatedly(::testing::Return(2));
   auto mock_http_cache = std::make_shared<MockHttpCache>();
   MockLookupContext* mock_lookup_context = mock_http_cache->mockLookupContext();
   MockInsertContext* mock_insert_context = mock_http_cache->mockInsertContext();
@@ -751,7 +751,7 @@ TEST_F(CacheFilterTest, BodyReadFromCacheLimitedToBufferSizeChunks) {
   request_headers_.setHost("CacheHitWithBody");
   // Set the buffer limit to 5 bytes, and we will have the file be of size
   // 8 bytes.
-  EXPECT_CALL(encoder_callbacks_, encoderBufferLimit()).WillRepeatedly(::testing::Return(5));
+  EXPECT_CALL(encoder_callbacks_, bufferLimit()).WillRepeatedly(::testing::Return(5));
   auto mock_http_cache = std::make_shared<MockHttpCache>();
   MockLookupContext* mock_lookup_context = mock_http_cache->mockLookupContext();
   EXPECT_CALL(*mock_lookup_context, getHeaders(_)).WillOnce([&](LookupHeadersCallback&& cb) {

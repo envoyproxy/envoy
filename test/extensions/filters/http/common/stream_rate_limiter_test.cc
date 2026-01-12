@@ -33,7 +33,7 @@ public:
     EXPECT_CALL(decoder_callbacks_.dispatcher_, popTrackedObject(_)).Times(AnyNumber());
 
     limiter_ = std::make_unique<StreamRateLimiter>(
-        limit_kbps, decoder_callbacks_.decoderBufferLimit(),
+        limit_kbps, decoder_callbacks_.bufferLimit(),
         [this] { decoder_callbacks_.onDecoderFilterAboveWriteBufferHighWatermark(); },
         [this] { decoder_callbacks_.onDecoderFilterBelowWriteBufferLowWatermark(); },
         [this](Buffer::Instance& data, bool end_stream) {
@@ -52,7 +52,7 @@ public:
     EXPECT_CALL(decoder_callbacks_.dispatcher_, popTrackedObject(_)).Times(AnyNumber());
 
     limiter_ = std::make_unique<StreamRateLimiter>(
-        limit_kbps, decoder_callbacks_.decoderBufferLimit(),
+        limit_kbps, decoder_callbacks_.bufferLimit(),
         [this] { decoder_callbacks_.onDecoderFilterAboveWriteBufferHighWatermark(); },
         [this] { decoder_callbacks_.onDecoderFilterBelowWriteBufferLowWatermark(); },
         [this](Buffer::Instance& data, bool end_stream) {
@@ -76,7 +76,7 @@ public:
 };
 
 TEST_F(StreamRateLimiterTest, RateLimitOnSingleStream) {
-  ON_CALL(decoder_callbacks_, decoderBufferLimit()).WillByDefault(Return(1100));
+  ON_CALL(decoder_callbacks_, bufferLimit()).WillByDefault(Return(1100));
   Event::MockTimer* token_timer = new NiceMock<Event::MockTimer>(&decoder_callbacks_.dispatcher_);
   setUpTest(1);
 

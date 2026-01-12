@@ -3,10 +3,12 @@
 
 #include "source/common/network/address_impl.h"
 #include "source/common/router/string_accessor_impl.h"
+#include "source/common/stats/isolated_store_impl.h"
 #include "source/extensions/dynamic_modules/abi.h"
 #include "source/extensions/filters/listener/dynamic_modules/filter.h"
 
 #include "test/extensions/dynamic_modules/util.h"
+#include "test/mocks/event/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 
@@ -59,7 +61,8 @@ public:
     EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
     auto filter_config_or_status =
-        newDynamicModuleListenerFilterConfig("test_filter", "", std::move(dynamic_module.value()));
+        newDynamicModuleListenerFilterConfig("test_filter", "", std::move(dynamic_module.value()),
+                                             *stats_.rootScope(), main_thread_dispatcher_);
     EXPECT_TRUE(filter_config_or_status.ok()) << filter_config_or_status.status().message();
     filter_config_ = filter_config_or_status.value();
 
@@ -73,9 +76,11 @@ public:
 
   void* filterPtr() { return static_cast<void*>(filter_.get()); }
 
+  Stats::IsolatedStoreImpl stats_;
   DynamicModuleListenerFilterConfigSharedPtr filter_config_;
   std::shared_ptr<DynamicModuleListenerFilter> filter_;
   NiceMock<Network::MockListenerFilterCallbacks> callbacks_;
+  NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
 };
 
 // =============================================================================
@@ -834,8 +839,8 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicMetadata) {
   envoy_dynamic_module_type_module_buffer ns_buf = {ns, 7};
   envoy_dynamic_module_type_module_buffer key_buf = {key, 6};
   envoy_dynamic_module_type_module_buffer value_buf = {value, 8};
-  envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata(filterPtr(), ns_buf, key_buf,
-                                                                     value_buf);
+  envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string(filterPtr(), ns_buf,
+                                                                            key_buf, value_buf);
 }
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicMetadataNullCallbacks) {
@@ -849,7 +854,7 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicMetadataNullCallbac
   envoy_dynamic_module_type_module_buffer key_buf = {key, 6};
   envoy_dynamic_module_type_module_buffer value_buf = {value, 8};
   // Should not crash.
-  envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata(
+  envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string(
       static_cast<void*>(filter.get()), ns_buf, key_buf, value_buf);
 }
 
@@ -860,8 +865,8 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicMetadataNullNamespa
   envoy_dynamic_module_type_module_buffer key_buf = {key, 6};
   envoy_dynamic_module_type_module_buffer value_buf = {value, 8};
   // Should not crash with null namespace.
-  envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata(filterPtr(), ns_buf, key_buf,
-                                                                     value_buf);
+  envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string(filterPtr(), ns_buf,
+                                                                            key_buf, value_buf);
 }
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicMetadataNullKey) {
@@ -871,8 +876,8 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicMetadataNullKey) {
   envoy_dynamic_module_type_module_buffer key_buf = {nullptr, 6};
   envoy_dynamic_module_type_module_buffer value_buf = {value, 8};
   // Should not crash with null key.
-  envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata(filterPtr(), ns_buf, key_buf,
-                                                                     value_buf);
+  envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string(filterPtr(), ns_buf,
+                                                                            key_buf, value_buf);
 }
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicMetadataNullValue) {
@@ -882,8 +887,8 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicMetadataNullValue) 
   envoy_dynamic_module_type_module_buffer key_buf = {key, 6};
   envoy_dynamic_module_type_module_buffer value_buf = {nullptr, 8};
   // Should not crash with null value.
-  envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata(filterPtr(), ns_buf, key_buf,
-                                                                     value_buf);
+  envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string(filterPtr(), ns_buf,
+                                                                            key_buf, value_buf);
 }
 
 // =============================================================================
@@ -1140,10 +1145,8 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicTypedMetadataSucces
 
   EXPECT_CALL(callbacks_, setDynamicMetadata(testing::_, testing::_));
 
-  bool success = envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string(
-      filterPtr(), ns_buf, key_buf, value_buf);
-
-  EXPECT_TRUE(success);
+  envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string(filterPtr(), ns_buf,
+                                                                            key_buf, value_buf);
 }
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicTypedMetadataNullCallbacks) {
@@ -1157,10 +1160,9 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicTypedMetadataNullCa
   envoy_dynamic_module_type_module_buffer key_buf = {key, 4};
   envoy_dynamic_module_type_module_buffer value_buf = {value, 6};
 
-  bool success = envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string(
+  // TODO(wbpcode): this should never happen in practice, but ensure it doesn't crash.
+  envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string(
       static_cast<void*>(filter.get()), ns_buf, key_buf, value_buf);
-
-  EXPECT_FALSE(success);
 }
 
 // =============================================================================
@@ -1172,6 +1174,162 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, MaxReadBytes) {
       envoy_dynamic_module_callback_listener_filter_max_read_bytes(filterPtr());
   // The default maxReadBytes() implementation returns 0, but filters can override it.
   EXPECT_EQ(0, max_bytes);
+}
+
+// =============================================================================
+// Tests for scheduler callbacks.
+// =============================================================================
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, ListenerFilterSchedulerNewDelete) {
+  // Set up the dispatcher for the filter.
+  NiceMock<Event::MockDispatcher> worker_dispatcher;
+  EXPECT_CALL(callbacks_, dispatcher()).WillRepeatedly(testing::ReturnRef(worker_dispatcher));
+
+  auto* scheduler = envoy_dynamic_module_callback_listener_filter_scheduler_new(filterPtr());
+  EXPECT_NE(nullptr, scheduler);
+
+  envoy_dynamic_module_callback_listener_filter_scheduler_delete(scheduler);
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, ListenerFilterSchedulerCommit) {
+  // Set up the dispatcher for the filter.
+  NiceMock<Event::MockDispatcher> worker_dispatcher;
+  EXPECT_CALL(callbacks_, dispatcher()).WillRepeatedly(testing::ReturnRef(worker_dispatcher));
+
+  auto* scheduler = envoy_dynamic_module_callback_listener_filter_scheduler_new(filterPtr());
+  EXPECT_NE(nullptr, scheduler);
+
+  // Expect the callback to be posted.
+  EXPECT_CALL(worker_dispatcher, post(_));
+
+  envoy_dynamic_module_callback_listener_filter_scheduler_commit(scheduler, 123);
+
+  // Clean up.
+  envoy_dynamic_module_callback_listener_filter_scheduler_delete(scheduler);
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, ListenerFilterConfigSchedulerNewDelete) {
+  auto* scheduler = envoy_dynamic_module_callback_listener_filter_config_scheduler_new(
+      static_cast<void*>(filter_config_.get()));
+  EXPECT_NE(nullptr, scheduler);
+
+  envoy_dynamic_module_callback_listener_filter_config_scheduler_delete(scheduler);
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, ListenerFilterConfigSchedulerCommit) {
+  auto* scheduler = envoy_dynamic_module_callback_listener_filter_config_scheduler_new(
+      static_cast<void*>(filter_config_.get()));
+  EXPECT_NE(nullptr, scheduler);
+
+  // Expect the callback to be posted.
+  EXPECT_CALL(main_thread_dispatcher_, post(_));
+
+  envoy_dynamic_module_callback_listener_filter_config_scheduler_commit(scheduler, 456);
+
+  // Clean up.
+  envoy_dynamic_module_callback_listener_filter_config_scheduler_delete(scheduler);
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest,
+       ListenerFilterSchedulerCommitInvokesOnScheduled) {
+  // Set up the dispatcher for the filter.
+  NiceMock<Event::MockDispatcher> worker_dispatcher;
+  EXPECT_CALL(callbacks_, dispatcher()).WillRepeatedly(testing::ReturnRef(worker_dispatcher));
+
+  auto* scheduler = envoy_dynamic_module_callback_listener_filter_scheduler_new(filterPtr());
+  EXPECT_NE(nullptr, scheduler);
+
+  // Capture the posted callback and invoke it to verify onScheduled is called.
+  Event::PostCb captured_cb;
+  EXPECT_CALL(worker_dispatcher, post(_)).WillOnce(testing::Invoke([&](Event::PostCb cb) {
+    captured_cb = std::move(cb);
+  }));
+
+  envoy_dynamic_module_callback_listener_filter_scheduler_commit(scheduler, 789);
+
+  // Invoke the captured callback to simulate the dispatcher running the event.
+  // This should call filter_->onScheduled(789), which invokes the module's on_scheduled hook.
+  // Since the no_op module's on_scheduled is a no-op, we just verify it doesn't crash.
+  captured_cb();
+
+  // Clean up.
+  envoy_dynamic_module_callback_listener_filter_scheduler_delete(scheduler);
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest,
+       ListenerFilterConfigSchedulerCommitInvokesOnScheduled) {
+  auto* scheduler = envoy_dynamic_module_callback_listener_filter_config_scheduler_new(
+      static_cast<void*>(filter_config_.get()));
+  EXPECT_NE(nullptr, scheduler);
+
+  // Capture the posted callback and invoke it to verify onScheduled is called.
+  Event::PostCb captured_cb;
+  EXPECT_CALL(main_thread_dispatcher_, post(_)).WillOnce(testing::Invoke([&](Event::PostCb cb) {
+    captured_cb = std::move(cb);
+  }));
+
+  envoy_dynamic_module_callback_listener_filter_config_scheduler_commit(scheduler, 999);
+
+  // Invoke the captured callback to simulate the dispatcher running the event.
+  // This should call filter_config_->onScheduled(999), which invokes the module's
+  // on_config_scheduled hook. Since the no_op module's hook is a no-op, we just verify it doesn't
+  // crash.
+  captured_cb();
+
+  // Clean up.
+  envoy_dynamic_module_callback_listener_filter_config_scheduler_delete(scheduler);
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest,
+       ListenerFilterSchedulerCommitAfterFilterDestroyedDoesNotCrash) {
+  // Set up the dispatcher for the filter.
+  NiceMock<Event::MockDispatcher> worker_dispatcher;
+  EXPECT_CALL(callbacks_, dispatcher()).WillRepeatedly(testing::ReturnRef(worker_dispatcher));
+
+  auto* scheduler = envoy_dynamic_module_callback_listener_filter_scheduler_new(filterPtr());
+  EXPECT_NE(nullptr, scheduler);
+
+  // Capture the posted callback.
+  Event::PostCb captured_cb;
+  EXPECT_CALL(worker_dispatcher, post(_)).WillOnce(testing::Invoke([&](Event::PostCb cb) {
+    captured_cb = std::move(cb);
+  }));
+
+  envoy_dynamic_module_callback_listener_filter_scheduler_commit(scheduler, 123);
+
+  // Destroy the filter before invoking the callback.
+  filter_.reset();
+
+  // Invoke the captured callback - should not crash because the scheduler holds a weak_ptr.
+  captured_cb();
+
+  // Clean up.
+  envoy_dynamic_module_callback_listener_filter_scheduler_delete(scheduler);
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest,
+       ListenerFilterConfigSchedulerCommitAfterConfigDestroyedDoesNotCrash) {
+  auto* scheduler = envoy_dynamic_module_callback_listener_filter_config_scheduler_new(
+      static_cast<void*>(filter_config_.get()));
+  EXPECT_NE(nullptr, scheduler);
+
+  // Capture the posted callback.
+  Event::PostCb captured_cb;
+  EXPECT_CALL(main_thread_dispatcher_, post(_)).WillOnce(testing::Invoke([&](Event::PostCb cb) {
+    captured_cb = std::move(cb);
+  }));
+
+  envoy_dynamic_module_callback_listener_filter_config_scheduler_commit(scheduler, 456);
+
+  // Destroy the filter and config before invoking the callback.
+  filter_.reset();
+  filter_config_.reset();
+
+  // Invoke the captured callback - should not crash because the scheduler holds a weak_ptr.
+  captured_cb();
+
+  // Clean up.
+  envoy_dynamic_module_callback_listener_filter_config_scheduler_delete(scheduler);
 }
 
 } // namespace ListenerFilters

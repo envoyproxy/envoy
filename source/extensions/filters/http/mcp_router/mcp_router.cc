@@ -1,11 +1,13 @@
 #include "source/extensions/filters/http/mcp_router/mcp_router.h"
 
 #include "source/common/common/fmt.h"
+#include "source/common/config/metadata.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
 #include "source/common/json/json_loader.h"
 #include "source/common/json/json_streamer.h"
+#include "source/common/protobuf/utility.h"
 
 #include "absl/container/flat_hash_set.h"
 #include "absl/strings/str_cat.h"
@@ -142,12 +144,6 @@ Http::FilterHeadersStatus McpRouterFilter::decodeHeaders(Http::RequestHeaderMap&
     encoded_session_id_ = std::string(session_header[0]->value().getStringView());
   }
 
-  // TODO(botengyao): Extract subject from JWT filter metadata or authorization header.
-  // For Initialize requests, there is no session yet, so we need to get the subject
-  // from the authentication layer (e.g., JWT claims or auth header) and store it.
-  // This subject will be used when building the composite session ID after backends respond.
-  // Example: subject_ = extractSubjectFromJwtOrAuth(headers);
-
   if (end_stream) {
     // No body - invalid MCP POST request
     sendHttpError(400, "Missing request body");
@@ -169,7 +165,7 @@ Http::FilterDataStatus McpRouterFilter::decodeData(Buffer::Instance& data, bool 
               request_id_);
 
     if (!encoded_session_id_.empty() && !decodeAndParseSession()) {
-      sendHttpError(400, "Invalid session ID");
+      // decodeAndParseSession already sent the appropriate error response
       return Http::FilterDataStatus::StopIterationNoBuffer;
     }
 
@@ -285,6 +281,67 @@ bool McpRouterFilter::decodeAndParseSession() {
   session_subject_ = parsed->subject;
   backend_sessions_ = std::move(parsed->backend_sessions);
 
+  if (!validateSubjectIfRequired()) {
+    return false;
+  }
+
+  return true;
+}
+
+absl::StatusOr<std::string> McpRouterFilter::getAuthenticatedSubject() {
+  const auto& source = config_->subjectSource();
+
+  if (absl::holds_alternative<HeaderSubjectSource>(source)) {
+    const auto& header_source = absl::get<HeaderSubjectSource>(source);
+    auto header = request_headers_->get(Http::LowerCaseString(header_source.header_name));
+    if (header.empty()) {
+      return absl::NotFoundError(
+          absl::StrCat("Header '", header_source.header_name, "' not found"));
+    }
+    return std::string(header[0]->value().getStringView());
+  }
+
+  if (absl::holds_alternative<MetadataSubjectSource>(source)) {
+    const auto& metadata_source = absl::get<MetadataSubjectSource>(source);
+    const auto& metadata = decoder_callbacks_->streamInfo().dynamicMetadata();
+
+    const auto& value = Config::Metadata::metadataValue(&metadata, metadata_source.filter,
+                                                        metadata_source.path_keys);
+
+    if (value.kind_case() == Protobuf::Value::KIND_NOT_SET) {
+      return absl::NotFoundError("Subject not found in metadata path");
+    }
+
+    if (!value.has_string_value()) {
+      return absl::InvalidArgumentError("Subject metadata value is not a string");
+    }
+
+    return value.string_value();
+  }
+
+  return absl::InvalidArgumentError("No subject source configured");
+}
+
+bool McpRouterFilter::validateSubjectIfRequired() {
+  // Only validate if enforcement is enabled.
+  if (!config_->shouldEnforceValidation()) {
+    return true;
+  }
+
+  auto auth_subject = getAuthenticatedSubject();
+  if (!auth_subject.ok()) {
+    ENVOY_LOG(warn, "Failed to get authenticated subject: {}", auth_subject.status().message());
+    sendHttpError(403, "Unable to verify session identity");
+    return false;
+  }
+
+  if (session_subject_ != *auth_subject) {
+    ENVOY_LOG(warn, "Session subject mismatch: session='{}'", session_subject_);
+    sendHttpError(403, "Session identity mismatch");
+    return false;
+  }
+
+  ENVOY_LOG(debug, "Subject validation passed for '{}'", session_subject_);
   return true;
 }
 
@@ -490,7 +547,24 @@ void McpRouterFilter::streamData(Buffer::Instance& data, bool end_stream) {
 void McpRouterFilter::handleInitialize() {
   ENVOY_LOG(debug, "Initialize: setting up fanout to {} backends", config_->backends().size());
 
-  initializeFanout([this](std::vector<BackendResponse> responses) {
+  // Extract subject for the new session if session identity is configured.
+  std::string subject = "default";
+  if (config_->hasSessionIdentity()) {
+    auto auth_subject = getAuthenticatedSubject();
+    if (!auth_subject.ok()) {
+      ENVOY_LOG(warn, "Failed to get subject for session: {}", auth_subject.status().message());
+      if (config_->shouldEnforceValidation()) {
+        sendHttpError(403, "Unable to determine session identity");
+        return;
+      }
+      // In DISABLED mode, proceed with anonymous session.
+      ENVOY_LOG(debug, "Subject extraction failed, proceeding with anonymous session");
+    } else {
+      subject = *auth_subject;
+    }
+  }
+
+  initializeFanout([this, subject = std::move(subject)](std::vector<BackendResponse> responses) {
     // TODO(botengyao): handle text/event-stream from backends.
     std::string response_body = aggregateInitialize(responses);
 
@@ -506,9 +580,7 @@ void McpRouterFilter::handleInitialize() {
       return;
     }
 
-    // Build composite session ID
-    // TODO(botengyao): extract subject from JWT filter metadata or authorization header.
-    std::string composite = SessionCodec::buildCompositeSessionId(route_name_, "default", sessions);
+    std::string composite = SessionCodec::buildCompositeSessionId(route_name_, subject, sessions);
     std::string encoded_session = SessionCodec::encode(composite);
 
     sendJsonResponse(response_body, encoded_session);

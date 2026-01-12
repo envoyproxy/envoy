@@ -33,8 +33,6 @@ std::string SessionCodec::buildCompositeSessionId(
   return absl::StrCat(route, "@", subject, "@", absl::StrJoin(backend_parts, ","));
 }
 
-// TODO(botengyao): we could add a config option to the previous mcp_filter to get
-// the subject from the session id, to apply identity check with the subject.
 absl::StatusOr<SessionCodec::ParsedSession>
 SessionCodec::parseCompositeSessionId(const std::string& composite) {
   std::vector<std::string> parts = absl::StrSplit(composite, '@');
