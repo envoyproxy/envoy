@@ -3408,7 +3408,7 @@ void envoy_dynamic_module_callback_listener_filter_close_socket(
 
 /**
  * envoy_dynamic_module_callback_listener_filter_get_socket_fd is called by the module to get the
- * raw socket file descriptor. This allows advanced socket manipulations.
+ * raw socket file descriptor for advanced socket manipulations.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
  * @return the socket file descriptor, or -1 if the socket is not available.
@@ -3418,7 +3418,7 @@ int64_t envoy_dynamic_module_callback_listener_filter_get_socket_fd(
 
 /**
  * envoy_dynamic_module_callback_listener_filter_set_socket_option_int sets an integer socket option
- * directly on the accepted socket via setsockopt().
+ * on the accepted socket (@see man 2 setsockopt).
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
  * @param level is the socket option level (e.g., SOL_SOCKET, IPPROTO_TCP).
@@ -3432,11 +3432,11 @@ bool envoy_dynamic_module_callback_listener_filter_set_socket_option_int(
 
 /**
  * envoy_dynamic_module_callback_listener_filter_set_socket_option_bytes sets a bytes socket option
- * directly on the accepted socket via setsockopt().
+ * on the accepted socket (@see man 2 setsockopt).
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
- * @param level is the socket option level.
- * @param name is the socket option name.
+ * @param level is the socket option level (e.g., SOL_SOCKET, IPPROTO_TCP).
+ * @param name is the socket option name (e.g., SO_KEEPALIVE, TCP_NODELAY).
  * @param value is the byte buffer value for the socket option.
  * @return true if the socket option was set successfully, false otherwise.
  */
@@ -3446,12 +3446,12 @@ bool envoy_dynamic_module_callback_listener_filter_set_socket_option_bytes(
 
 /**
  * envoy_dynamic_module_callback_listener_filter_get_socket_option_int retrieves an integer socket
- * option value directly from the accepted socket via getsockopt(). This reads the actual value from
+ * option value from the accepted socket (@see man 2 getsockopt). This reads the actual value from
  * the socket, including options set by other filters or the system.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
  * @param level is the socket option level (e.g., SOL_SOCKET, IPPROTO_TCP).
- * @param name is the socket option name.
+ * @param name is the socket option name (e.g., SO_KEEPALIVE, TCP_NODELAY).
  * @param value_out is the pointer to store the retrieved integer value.
  * @return true if the option was retrieved successfully, false otherwise.
  */
@@ -3461,12 +3461,12 @@ bool envoy_dynamic_module_callback_listener_filter_get_socket_option_int(
 
 /**
  * envoy_dynamic_module_callback_listener_filter_get_socket_option_bytes retrieves a bytes socket
- * option value directly from the accepted socket via getsockopt(). This reads the actual value from
+ * option value from the accepted socket (@see man 2 getsockopt). This reads the actual value from
  * the socket, including options set by other filters or the system.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
- * @param level is the socket option level.
- * @param name is the socket option name.
+ * @param level is the socket option level (e.g., SOL_SOCKET, IPPROTO_TCP).
+ * @param name is the socket option name (e.g., SO_KEEPALIVE, TCP_NODELAY).
  * @param value_out is the pointer to store the retrieved buffer. The module should pre-allocate the
  * buffer with sufficient size before calling this function.
  * @param value_size is the size of the pre-allocated buffer.
