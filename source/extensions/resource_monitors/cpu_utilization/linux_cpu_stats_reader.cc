@@ -72,7 +72,6 @@ absl::StatusOr<double> LinuxCpuStatsReader::getUtilization() {
     return 0.0;
   }
 
-  // Simple calculation: work_delta / total_delta
   const double work_over_period = current_cpu_times.work_time - previous_cpu_times_.work_time;
   const int64_t total_over_period = current_cpu_times.total_time - previous_cpu_times_.total_time;
 
@@ -85,13 +84,12 @@ absl::StatusOr<double> LinuxCpuStatsReader::getUtilization() {
 
   const double utilization = work_over_period / total_over_period;
 
-  // Update previous times for next call
+  // Update previous times for the next call
   previous_cpu_times_ = current_cpu_times;
 
   return utilization;
 }
 
-// Container CPU Stats Reader
 LinuxContainerCpuStatsReader::ContainerStatsReaderPtr
 LinuxContainerCpuStatsReader::create(Filesystem::Instance& fs, TimeSource& time_source) {
   // Check if host supports cgroup v2
@@ -170,13 +168,11 @@ absl::StatusOr<double> CgroupV1CpuStatsReader::getUtilization() {
     return absl::InvalidArgumentError("Failed to read CPU times");
   }
 
-  // For the first call, initialize previous times and return 0
   if (!previous_cpu_times_.is_valid) {
     previous_cpu_times_ = current_cpu_times;
     return 0.0;
   }
 
-  // Simple calculation: work_delta / total_delta
   const double work_over_period = current_cpu_times.work_time - previous_cpu_times_.work_time;
   const int64_t total_over_period = current_cpu_times.total_time - previous_cpu_times_.total_time;
 
@@ -189,7 +185,6 @@ absl::StatusOr<double> CgroupV1CpuStatsReader::getUtilization() {
 
   const double utilization = work_over_period / total_over_period;
 
-  // Update previous times for next call
   previous_cpu_times_ = current_cpu_times;
 
   return utilization;
