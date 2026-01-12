@@ -4784,6 +4784,28 @@ pub trait EnvoyListenerFilter {
   /// This is used to determine the buffer size for reading data.
   fn max_read_bytes(&self) -> usize;
 
+  /// Get the raw socket file descriptor.
+  /// Returns -1 if the socket is not available.
+  fn get_socket_fd(&self) -> i64;
+
+  /// Set an integer socket option directly on the accepted socket via setsockopt().
+  /// Returns true if the option was set successfully.
+  fn set_socket_option_int(&mut self, level: i64, name: i64, value: i64) -> bool;
+
+  /// Set a bytes socket option directly on the accepted socket via setsockopt().
+  /// Returns true if the option was set successfully.
+  fn set_socket_option_bytes(&mut self, level: i64, name: i64, value: &[u8]) -> bool;
+
+  /// Get an integer socket option directly from the accepted socket via getsockopt().
+  /// This reads the actual value from the socket, including options set by other filters.
+  /// Returns None if the option could not be retrieved.
+  fn get_socket_option_int(&self, level: i64, name: i64) -> Option<i64>;
+
+  /// Get a bytes socket option directly from the accepted socket via getsockopt().
+  /// This reads the actual value from the socket, including options set by other filters.
+  /// Returns None if the option could not be retrieved.
+  fn get_socket_option_bytes(&self, level: i64, name: i64, max_size: usize) -> Option<Vec<u8>>;
+
   /// Increment the counter with the given id.
   fn increment_counter(
     &self,
@@ -5254,6 +5276,67 @@ impl EnvoyListenerFilter for EnvoyListenerFilterImpl {
 
   fn max_read_bytes(&self) -> usize {
     unsafe { abi::envoy_dynamic_module_callback_listener_filter_max_read_bytes(self.raw) }
+  }
+
+  fn get_socket_fd(&self) -> i64 {
+    unsafe { abi::envoy_dynamic_module_callback_listener_filter_get_socket_fd(self.raw) }
+  }
+
+  fn set_socket_option_int(&mut self, level: i64, name: i64, value: i64) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_set_socket_option_int(
+        self.raw, level, name, value,
+      )
+    }
+  }
+
+  fn set_socket_option_bytes(&mut self, level: i64, name: i64, value: &[u8]) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_set_socket_option_bytes(
+        self.raw,
+        level,
+        name,
+        abi::envoy_dynamic_module_type_module_buffer {
+          ptr: value.as_ptr() as *const _,
+          length: value.len(),
+        },
+      )
+    }
+  }
+
+  fn get_socket_option_int(&self, level: i64, name: i64) -> Option<i64> {
+    let mut value: i64 = 0;
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_get_socket_option_int(
+        self.raw, level, name, &mut value,
+      )
+    };
+    if success {
+      Some(value)
+    } else {
+      None
+    }
+  }
+
+  fn get_socket_option_bytes(&self, level: i64, name: i64, max_size: usize) -> Option<Vec<u8>> {
+    let mut buffer: Vec<u8> = vec![0; max_size];
+    let mut actual_size: usize = 0;
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_get_socket_option_bytes(
+        self.raw,
+        level,
+        name,
+        buffer.as_mut_ptr() as *mut _,
+        max_size,
+        &mut actual_size,
+      )
+    };
+    if success {
+      buffer.truncate(actual_size);
+      Some(buffer)
+    } else {
+      None
+    }
   }
 
   fn increment_counter(
