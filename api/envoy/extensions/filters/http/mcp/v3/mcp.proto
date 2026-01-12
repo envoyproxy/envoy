@@ -73,14 +73,25 @@ message ParserConfig {
     // This matches the "method" field in the JSON-RPC request.
     string method = 1 [(validate.rules).string = {min_len: 1}];
 
+    // The group/category name to assign to this method (e.g., "tool", "lifecycle").
+    // This will be emitted to dynamic metadata under the key specified by group_metadata_key.
+    // If empty, the built-in group classification is used.
+    string group = 2;
+
     // Attributes to extract for this method.
-    // If empty, no attributes will be extracted for this method beyond the default ones (jsonrpc, method).
-    repeated AttributeExtractionRule extraction_rules = 2;
+    // If empty, only default attributes (jsonrpc, method) are extracted.
+    repeated AttributeExtractionRule extraction_rules = 3;
   }
 
-  // Method-specific configurations.
-  // These rules override or supplement the default extraction logic for the specified methods.
+  // List of rules for classification and extraction.
+  // Rules are evaluated in order; the first match wins.
+  // If no rule matches, extraction defaults are used and group falls back to built-in classification.
+  // Built-in groups: lifecycle, tool, resource, prompt, notification, logging, sampling, completion, unknown.
   repeated MethodConfig methods = 1;
+
+  // The dynamic metadata key where the group name will be stored.
+  // If empty, group classification is disabled.
+  string group_metadata_key = 2;
 }
 
 // Per-route override configuration for MCP filter

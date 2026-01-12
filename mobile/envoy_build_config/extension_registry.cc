@@ -25,6 +25,7 @@
 #include "source/extensions/network/dns_resolver/getaddrinfo/getaddrinfo.h"
 #include "source/extensions/path/match/uri_template/config.h"
 #include "source/extensions/path/rewrite/uri_template/config.h"
+#include "source/extensions/quic/client_packet_writer/default_quic_client_packet_writer_factory_config.h"
 #include "source/extensions/request_id/uuid/config.h"
 #include "source/extensions/transport_sockets/http_11_proxy/config.h"
 #include "source/extensions/transport_sockets/raw_buffer/config.h"
@@ -62,6 +63,7 @@
 #include "library/common/extensions/key_value/platform/config.h"
 #include "library/common/extensions/listener_managers/api_listener_manager/api_listener_manager.h"
 #include "library/common/extensions/retry/options/network_configuration/config.h"
+#include "library/common/extensions/quic_packet_writer/platform/config.h"
 
 namespace Envoy {
 
@@ -169,6 +171,9 @@ void ExtensionRegistry::registerFactories() {
 
   // This is required for load balancers of upstream clusters `base` and `base_clear`.
   Envoy::Extensions::LoadBalancingPolicies::ClusterProvided::forceRegisterFactory();
+
+  Quic::forceRegisterDefaultQuicClientPacketWriterFactoryConfig();
+  Quic::forceRegisterQuicPlatformPacketWriterConfigFactory();
 
 #ifdef ENVOY_MOBILE_ENABLE_LISTENER
   // These are downstream factories required if Envoy Mobile is compiled with
