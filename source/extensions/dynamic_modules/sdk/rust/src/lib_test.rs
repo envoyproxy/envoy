@@ -991,3 +991,465 @@ fn test_envoy_dynamic_module_on_udp_listener_filter_callbacks() {
 
   assert!(ON_DATA_CALLED.load(std::sync::atomic::Ordering::SeqCst));
 }
+
+// =============================================================================
+// Upstream Host Access and StartTLS FFI stubs for testing.
+// =============================================================================
+
+#[derive(Clone, Default)]
+struct MockUpstreamHost {
+  address: Option<String>,
+  port: u32,
+  hostname: Option<String>,
+  cluster_name: Option<String>,
+}
+
+static MOCK_UPSTREAM_HOST: std::sync::Mutex<Option<MockUpstreamHost>> = std::sync::Mutex::new(None);
+static MOCK_START_TLS_RESULT: std::sync::atomic::AtomicBool =
+  std::sync::atomic::AtomicBool::new(false);
+
+fn reset_upstream_host_mock() {
+  *MOCK_UPSTREAM_HOST.lock().unwrap() = None;
+  MOCK_START_TLS_RESULT.store(false, std::sync::atomic::Ordering::SeqCst);
+}
+
+fn set_upstream_host_mock(host: MockUpstreamHost) {
+  *MOCK_UPSTREAM_HOST.lock().unwrap() = Some(host);
+}
+
+fn set_start_tls_result(result: bool) {
+  MOCK_START_TLS_RESULT.store(result, std::sync::atomic::Ordering::SeqCst);
+}
+
+// Keep a static buffer for the address string to ensure it remains valid.
+static MOCK_ADDRESS_BUFFER: std::sync::Mutex<String> = std::sync::Mutex::new(String::new());
+static MOCK_HOSTNAME_BUFFER: std::sync::Mutex<String> = std::sync::Mutex::new(String::new());
+static MOCK_CLUSTER_BUFFER: std::sync::Mutex<String> = std::sync::Mutex::new(String::new());
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_network_filter_get_upstream_host_address(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+  address_out: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+  port_out: *mut u32,
+) -> bool {
+  let guard = MOCK_UPSTREAM_HOST.lock().unwrap();
+  match &*guard {
+    Some(host) => match &host.address {
+      Some(addr) => {
+        // Store address in static buffer to maintain lifetime.
+        let mut buf = MOCK_ADDRESS_BUFFER.lock().unwrap();
+        *buf = addr.clone();
+        unsafe {
+          (*address_out).ptr = buf.as_ptr() as *const _;
+          (*address_out).length = buf.len();
+          *port_out = host.port;
+        }
+        true
+      },
+      None => {
+        unsafe {
+          (*address_out).ptr = std::ptr::null();
+          (*address_out).length = 0;
+          *port_out = 0;
+        }
+        false
+      },
+    },
+    None => {
+      unsafe {
+        (*address_out).ptr = std::ptr::null();
+        (*address_out).length = 0;
+        *port_out = 0;
+      }
+      false
+    },
+  }
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_network_filter_get_upstream_host_hostname(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+  hostname_out: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+) -> bool {
+  let guard = MOCK_UPSTREAM_HOST.lock().unwrap();
+  match &*guard {
+    Some(host) => match &host.hostname {
+      Some(hostname) if !hostname.is_empty() => {
+        // Store hostname in static buffer to maintain lifetime.
+        let mut buf = MOCK_HOSTNAME_BUFFER.lock().unwrap();
+        *buf = hostname.clone();
+        unsafe {
+          (*hostname_out).ptr = buf.as_ptr() as *const _;
+          (*hostname_out).length = buf.len();
+        }
+        true
+      },
+      _ => {
+        unsafe {
+          (*hostname_out).ptr = std::ptr::null();
+          (*hostname_out).length = 0;
+        }
+        false
+      },
+    },
+    None => {
+      unsafe {
+        (*hostname_out).ptr = std::ptr::null();
+        (*hostname_out).length = 0;
+      }
+      false
+    },
+  }
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_network_filter_get_upstream_host_cluster(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+  cluster_name_out: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+) -> bool {
+  let guard = MOCK_UPSTREAM_HOST.lock().unwrap();
+  match &*guard {
+    Some(host) => match &host.cluster_name {
+      Some(cluster) => {
+        // Store cluster name in static buffer to maintain lifetime.
+        let mut buf = MOCK_CLUSTER_BUFFER.lock().unwrap();
+        *buf = cluster.clone();
+        unsafe {
+          (*cluster_name_out).ptr = buf.as_ptr() as *const _;
+          (*cluster_name_out).length = buf.len();
+        }
+        true
+      },
+      None => {
+        unsafe {
+          (*cluster_name_out).ptr = std::ptr::null();
+          (*cluster_name_out).length = 0;
+        }
+        false
+      },
+    },
+    None => {
+      unsafe {
+        (*cluster_name_out).ptr = std::ptr::null();
+        (*cluster_name_out).length = 0;
+      }
+      false
+    },
+  }
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_network_filter_has_upstream_host(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+) -> bool {
+  MOCK_UPSTREAM_HOST.lock().unwrap().is_some()
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_network_filter_start_upstream_secure_transport(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+) -> bool {
+  MOCK_START_TLS_RESULT.load(std::sync::atomic::Ordering::SeqCst)
+}
+
+// =============================================================================
+// Upstream Host Access Tests
+// =============================================================================
+
+#[test]
+fn test_get_upstream_host_address_with_host() {
+  reset_upstream_host_mock();
+  set_upstream_host_mock(MockUpstreamHost {
+    address: Some("192.168.1.100".to_string()),
+    port: 8080,
+    hostname: Some("backend.local".to_string()),
+    cluster_name: Some("my_cluster".to_string()),
+  });
+
+  let filter = EnvoyNetworkFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  let result = filter.get_upstream_host_address();
+  assert!(result.is_some());
+  let (addr, port) = result.unwrap();
+  assert_eq!(addr, "192.168.1.100");
+  assert_eq!(port, 8080);
+}
+
+#[test]
+fn test_get_upstream_host_address_no_host() {
+  reset_upstream_host_mock();
+
+  let filter = EnvoyNetworkFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  let result = filter.get_upstream_host_address();
+  assert!(result.is_none());
+}
+
+#[test]
+fn test_get_upstream_host_address_no_ip() {
+  reset_upstream_host_mock();
+  set_upstream_host_mock(MockUpstreamHost {
+    address: None, // No IP address (e.g., pipe address).
+    port: 0,
+    hostname: Some("backend.local".to_string()),
+    cluster_name: Some("my_cluster".to_string()),
+  });
+
+  let filter = EnvoyNetworkFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  let result = filter.get_upstream_host_address();
+  assert!(result.is_none());
+}
+
+#[test]
+fn test_get_upstream_host_hostname_with_host() {
+  reset_upstream_host_mock();
+  set_upstream_host_mock(MockUpstreamHost {
+    address: Some("10.0.0.1".to_string()),
+    port: 443,
+    hostname: Some("api.example.com".to_string()),
+    cluster_name: Some("api_cluster".to_string()),
+  });
+
+  let filter = EnvoyNetworkFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  let result = filter.get_upstream_host_hostname();
+  assert!(result.is_some());
+  assert_eq!(result.unwrap(), "api.example.com");
+}
+
+#[test]
+fn test_get_upstream_host_hostname_no_host() {
+  reset_upstream_host_mock();
+
+  let filter = EnvoyNetworkFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  let result = filter.get_upstream_host_hostname();
+  assert!(result.is_none());
+}
+
+#[test]
+fn test_get_upstream_host_hostname_empty() {
+  reset_upstream_host_mock();
+  set_upstream_host_mock(MockUpstreamHost {
+    address: Some("10.0.0.1".to_string()),
+    port: 443,
+    hostname: Some("".to_string()), // Empty hostname.
+    cluster_name: Some("api_cluster".to_string()),
+  });
+
+  let filter = EnvoyNetworkFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  let result = filter.get_upstream_host_hostname();
+  assert!(result.is_none());
+}
+
+#[test]
+fn test_get_upstream_host_cluster_with_host() {
+  reset_upstream_host_mock();
+  set_upstream_host_mock(MockUpstreamHost {
+    address: Some("172.16.0.50".to_string()),
+    port: 9000,
+    hostname: Some("service.internal".to_string()),
+    cluster_name: Some("backend_cluster".to_string()),
+  });
+
+  let filter = EnvoyNetworkFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  let result = filter.get_upstream_host_cluster();
+  assert!(result.is_some());
+  assert_eq!(result.unwrap(), "backend_cluster");
+}
+
+#[test]
+fn test_get_upstream_host_cluster_no_host() {
+  reset_upstream_host_mock();
+
+  let filter = EnvoyNetworkFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  let result = filter.get_upstream_host_cluster();
+  assert!(result.is_none());
+}
+
+#[test]
+fn test_has_upstream_host_true() {
+  reset_upstream_host_mock();
+  set_upstream_host_mock(MockUpstreamHost {
+    address: Some("10.0.0.1".to_string()),
+    port: 80,
+    hostname: None,
+    cluster_name: Some("test_cluster".to_string()),
+  });
+
+  let filter = EnvoyNetworkFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  assert!(filter.has_upstream_host());
+}
+
+#[test]
+fn test_has_upstream_host_false() {
+  reset_upstream_host_mock();
+
+  let filter = EnvoyNetworkFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  assert!(!filter.has_upstream_host());
+}
+
+// =============================================================================
+// StartTLS Tests
+// =============================================================================
+
+#[test]
+fn test_start_upstream_secure_transport_success() {
+  reset_upstream_host_mock();
+  set_start_tls_result(true);
+
+  let mut filter = EnvoyNetworkFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  assert!(filter.start_upstream_secure_transport());
+}
+
+#[test]
+fn test_start_upstream_secure_transport_failure() {
+  reset_upstream_host_mock();
+  set_start_tls_result(false);
+
+  let mut filter = EnvoyNetworkFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  assert!(!filter.start_upstream_secure_transport());
+}
+
+// =============================================================================
+// Combined Upstream Host Access Tests
+// =============================================================================
+
+#[test]
+fn test_upstream_host_full_info() {
+  reset_upstream_host_mock();
+  set_upstream_host_mock(MockUpstreamHost {
+    address: Some("10.20.30.40".to_string()),
+    port: 8443,
+    hostname: Some("secure-backend.example.com".to_string()),
+    cluster_name: Some("secure_cluster".to_string()),
+  });
+
+  let filter = EnvoyNetworkFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  // Verify all fields are accessible.
+  assert!(filter.has_upstream_host());
+
+  let addr_result = filter.get_upstream_host_address();
+  assert!(addr_result.is_some());
+  let (addr, port) = addr_result.unwrap();
+  assert_eq!(addr, "10.20.30.40");
+  assert_eq!(port, 8443);
+
+  let hostname_result = filter.get_upstream_host_hostname();
+  assert!(hostname_result.is_some());
+  assert_eq!(hostname_result.unwrap(), "secure-backend.example.com");
+
+  let cluster_result = filter.get_upstream_host_cluster();
+  assert!(cluster_result.is_some());
+  assert_eq!(cluster_result.unwrap(), "secure_cluster");
+}
+
+#[test]
+fn test_upstream_host_partial_info() {
+  reset_upstream_host_mock();
+  // Host with address but no hostname.
+  set_upstream_host_mock(MockUpstreamHost {
+    address: Some("192.168.0.1".to_string()),
+    port: 3000,
+    hostname: None,
+    cluster_name: Some("partial_cluster".to_string()),
+  });
+
+  let filter = EnvoyNetworkFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  assert!(filter.has_upstream_host());
+
+  // Address should be available.
+  let addr_result = filter.get_upstream_host_address();
+  assert!(addr_result.is_some());
+  let (addr, port) = addr_result.unwrap();
+  assert_eq!(addr, "192.168.0.1");
+  assert_eq!(port, 3000);
+
+  // Hostname should be None.
+  assert!(filter.get_upstream_host_hostname().is_none());
+
+  // Cluster should be available.
+  let cluster_result = filter.get_upstream_host_cluster();
+  assert!(cluster_result.is_some());
+  assert_eq!(cluster_result.unwrap(), "partial_cluster");
+}
+
+#[test]
+fn test_upstream_host_ipv6_address() {
+  reset_upstream_host_mock();
+  set_upstream_host_mock(MockUpstreamHost {
+    address: Some("::1".to_string()),
+    port: 8080,
+    hostname: Some("localhost".to_string()),
+    cluster_name: Some("ipv6_cluster".to_string()),
+  });
+
+  let filter = EnvoyNetworkFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  let addr_result = filter.get_upstream_host_address();
+  assert!(addr_result.is_some());
+  let (addr, port) = addr_result.unwrap();
+  assert_eq!(addr, "::1");
+  assert_eq!(port, 8080);
+}
+
+#[test]
+fn test_upstream_host_full_ipv6_address() {
+  reset_upstream_host_mock();
+  set_upstream_host_mock(MockUpstreamHost {
+    address: Some("2001:0db8:85a3:0000:0000:8a2e:0370:7334".to_string()),
+    port: 443,
+    hostname: Some("ipv6-host.example.com".to_string()),
+    cluster_name: Some("ipv6_full_cluster".to_string()),
+  });
+
+  let filter = EnvoyNetworkFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  let addr_result = filter.get_upstream_host_address();
+  assert!(addr_result.is_some());
+  let (addr, port) = addr_result.unwrap();
+  assert_eq!(addr, "2001:0db8:85a3:0000:0000:8a2e:0370:7334");
+  assert_eq!(port, 443);
+}
