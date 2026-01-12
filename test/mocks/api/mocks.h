@@ -31,17 +31,17 @@ public:
   ~MockApi() override;
 
   // Api::Api
-  Event::DispatcherPtr allocateDispatcher(const std::string& name) override;
+  Event::DispatcherPtr allocateDispatcher(const std::string& name, absl::optional<uint32_t> worker_thread_index) override;
   Event::DispatcherPtr
-  allocateDispatcher(const std::string& name,
+  allocateDispatcher(const std::string& name, absl::optional<uint32_t> worker_thread_index,
                      const Event::ScaledRangeTimerManagerFactory& scaled_timer_factory) override;
-  Event::DispatcherPtr allocateDispatcher(const std::string& name,
+  Event::DispatcherPtr allocateDispatcher(const std::string& name, absl::optional<uint32_t> worker_thread_index,
                                           Buffer::WatermarkFactoryPtr&& watermark_factory) override;
   TimeSource& timeSource() override { return time_system_; }
 
-  MOCK_METHOD(Event::Dispatcher*, allocateDispatcher_, (const std::string&, Event::TimeSystem&));
+  MOCK_METHOD(Event::Dispatcher*, allocateDispatcher_, (const std::string&, absl::optional<uint32_t>, Event::TimeSystem&));
   MOCK_METHOD(Event::Dispatcher*, allocateDispatcher_,
-              (const std::string&,
+              (const std::string&, absl::optional<uint32_t>,
                const Event::ScaledRangeTimerManagerFactory& scaled_timer_factory,
                Buffer::WatermarkFactoryPtr&& watermark_factory, Event::TimeSystem&));
   MOCK_METHOD(Filesystem::Instance&, fileSystem, ());

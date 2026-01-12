@@ -62,9 +62,3 @@ test_program(name = "listener_no_op")
 test_program(name = "listener_config_new_fail")
 
 test_program(name = "listener_stop_iteration")
-
-test_program(name = "server_init_fail")
-
-test_program(name = "init_callback")
-
-test_program(name = "init_callback_fail")

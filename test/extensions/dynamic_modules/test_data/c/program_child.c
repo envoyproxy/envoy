@@ -6,7 +6,8 @@
 // Other functions that will be accessed by other tests.
 int dynamicModulesTestLoadGlobally();
 
-envoy_dynamic_module_type_abi_version_module_ptr envoy_dynamic_module_on_program_init(void) {
+envoy_dynamic_module_type_abi_version_module_ptr envoy_dynamic_module_on_program_init(
+  envoy_dynamic_module_type_server_factory_context_envoy_ptr server_factory_context_ptr) {
   return kAbiVersion;
 }
 

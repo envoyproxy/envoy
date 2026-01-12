@@ -22,10 +22,10 @@ public:
                  const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
                  const ProcessContextOptRef& process_context = absl::nullopt);
 
-  Event::DispatcherPtr allocateDispatcher(const std::string& name) override;
-  Event::DispatcherPtr allocateDispatcher(const std::string& name,
+  Event::DispatcherPtr allocateDispatcher(const std::string& name, absl::optional<uint32_t> worker_thread_index) override;
+  Event::DispatcherPtr allocateDispatcher(const std::string& name, absl::optional<uint32_t> worker_thread_index,
                                           const Event::ScaledRangeTimerManagerFactory&) override;
-  Event::DispatcherPtr allocateDispatcher(const std::string& name,
+  Event::DispatcherPtr allocateDispatcher(const std::string& name, absl::optional<uint32_t> worker_thread_index,
                                           Buffer::WatermarkFactoryPtr&& watermark_factory) override;
 
 private:

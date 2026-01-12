@@ -8,6 +8,7 @@
 
 #include "test/extensions/dynamic_modules/util.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -52,7 +53,8 @@ private:
 class DynamicModuleListenerFilterAbiCallbackTest : public testing::Test {
 public:
   void SetUp() override {
-    auto dynamic_module = newDynamicModule(testSharedObjectPath("listener_no_op", "c"), false);
+    NiceMock<Server::Configuration::MockServerFactoryContext> context;
+    auto dynamic_module = newDynamicModule(testSharedObjectPath("listener_no_op", "c"), false, context);
     EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
     auto filter_config_or_status =

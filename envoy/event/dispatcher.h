@@ -118,6 +118,13 @@ public:
   virtual const std::string& name() PURE;
 
   /**
+   * Returns the index of the worker thread if this dispatcher is for a worker thread.
+   * @return absl::optional<uint32_t> the index of the worker thread, or absl::nullopt if this is not a
+   * worker thread dispatcher.
+   */
+  virtual absl::optional<uint32_t> workerThreadIndex() PURE;
+
+  /**
    * Creates a file event that will signal when a file is readable or writable. On UNIX systems this
    * can be used for any file like interface (files, sockets, etc.).
    * @param fd supplies the fd to watch.

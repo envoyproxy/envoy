@@ -7,7 +7,9 @@ mod http_test;
 declare_init_functions!(init, new_http_filter_config_fn);
 
 /// This implements the [`envoy_proxy_dynamic_modules_rust_sdk::ProgramInitFunction`] signature.
-fn init() -> bool {
+fn init(
+  _server_factory_context: abi::envoy_dynamic_module_type_server_factory_context_envoy_ptr,
+) -> bool {
   true
 }
 

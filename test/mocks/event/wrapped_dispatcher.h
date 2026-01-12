@@ -19,6 +19,9 @@ public:
 
   // Event::Dispatcher
   const std::string& name() override { return impl_.name(); }
+  absl::optional<uint32_t> workerThreadIndex() override {
+    return impl_.workerThreadIndex();
+  }
 
   void registerWatchdog(const Server::WatchDogSharedPtr& watchdog,
                         std::chrono::milliseconds min_touch_interval) override {

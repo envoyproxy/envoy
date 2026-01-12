@@ -27,11 +27,11 @@ public:
        Buffer::WatermarkFactorySharedPtr watermark_factory = nullptr);
 
   // Api::Api
-  Event::DispatcherPtr allocateDispatcher(const std::string& name) override;
+  Event::DispatcherPtr allocateDispatcher(const std::string& name, absl::optional<uint32_t> worker_thread_index = absl::nullopt) override;
   Event::DispatcherPtr
-  allocateDispatcher(const std::string& name,
+  allocateDispatcher(const std::string& name, absl::optional<uint32_t> worker_thread_index,
                      const Event::ScaledRangeTimerManagerFactory& scaled_timer_factory) override;
-  Event::DispatcherPtr allocateDispatcher(const std::string& name,
+  Event::DispatcherPtr allocateDispatcher(const std::string& name, absl::optional<uint32_t> worker_thread_index,
                                           Buffer::WatermarkFactoryPtr&& watermark_factory) override;
   Thread::ThreadFactory& threadFactory() override { return thread_factory_; }
   Filesystem::Instance& fileSystem() override { return file_system_; }

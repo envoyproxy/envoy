@@ -23,6 +23,7 @@ envoy_cc_test(
         "//source/extensions/filters/listener/dynamic_modules:filter_lib",
         "//test/extensions/dynamic_modules:util",
         "//test/mocks/network:network_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
     ],
 )
 
@@ -58,5 +59,6 @@ envoy_cc_test(
         "//source/extensions/filters/listener/dynamic_modules:filter_lib",
         "//test/extensions/dynamic_modules:util",
         "//test/mocks/network:network_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
     ],
 )

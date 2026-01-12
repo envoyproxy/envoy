@@ -38,37 +38,37 @@
 namespace Envoy {
 namespace Event {
 
-DispatcherImpl::DispatcherImpl(const std::string& name, Api::Api& api,
+DispatcherImpl::DispatcherImpl(const std::string& name, absl::optional<uint32_t> worker_thread_index, Api::Api& api,
                                Event::TimeSystem& time_system)
-    : DispatcherImpl(name, api, time_system, {}) {}
+    : DispatcherImpl(name, worker_thread_index, api, time_system, {}) {}
 
-DispatcherImpl::DispatcherImpl(const std::string& name, Api::Api& api,
+DispatcherImpl::DispatcherImpl(const std::string& name, absl::optional<uint32_t> worker_thread_index, Api::Api& api,
                                Event::TimeSystem& time_system,
                                const Buffer::WatermarkFactorySharedPtr& watermark_factory)
     : DispatcherImpl(
-          name, api, time_system,
+          name, worker_thread_index, api, time_system,
           [](Dispatcher& dispatcher) {
             return std::make_unique<ScaledRangeTimerManagerImpl>(dispatcher);
           },
           watermark_factory) {}
 
-DispatcherImpl::DispatcherImpl(const std::string& name, Api::Api& api,
+DispatcherImpl::DispatcherImpl(const std::string& name, absl::optional<uint32_t> worker_thread_index, Api::Api& api,
                                Event::TimeSystem& time_system,
                                const ScaledRangeTimerManagerFactory& scaled_timer_factory,
                                const Buffer::WatermarkFactorySharedPtr& watermark_factory)
-    : DispatcherImpl(name, api.threadFactory(), api.timeSource(), api.fileSystem(), time_system,
+    : DispatcherImpl(name, worker_thread_index, api.threadFactory(), api.timeSource(), api.fileSystem(), time_system,
                      scaled_timer_factory,
                      watermark_factory != nullptr
                          ? watermark_factory
                          : std::make_shared<Buffer::WatermarkBufferFactory>(
                                api.bootstrap().overload_manager().buffer_factory_config())) {}
 
-DispatcherImpl::DispatcherImpl(const std::string& name, Thread::ThreadFactory& thread_factory,
+DispatcherImpl::DispatcherImpl(const std::string& name, absl::optional<uint32_t> worker_thread_index, Thread::ThreadFactory& thread_factory,
                                TimeSource& time_source, Filesystem::Instance& file_system,
                                Event::TimeSystem& time_system,
                                const ScaledRangeTimerManagerFactory& scaled_timer_factory,
                                const Buffer::WatermarkFactorySharedPtr& watermark_factory)
-    : name_(name), thread_factory_(thread_factory), time_source_(time_source),
+    : name_(name), worker_thread_index_(worker_thread_index), thread_factory_(thread_factory), time_source_(time_source),
       file_system_(file_system), buffer_factory_(watermark_factory),
       scheduler_(time_system.createScheduler(base_scheduler_, base_scheduler_)),
       thread_local_delete_cb_(

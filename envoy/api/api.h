@@ -29,20 +29,24 @@ public:
    * @param name the identity name for a dispatcher, e.g. "worker_2" or "main_thread".
    *             This name will appear in per-handler/worker statistics, such as
    *             "server.worker_2.watchdog_miss".
+   * @param worker_thread_index the index of the worker thread if this dispatcher is for a worker
+   *                            thread, or absl::nullopt if this is not a worker thread dispatcher.
    * @return Event::DispatcherPtr which is owned by the caller.
    */
-  virtual Event::DispatcherPtr allocateDispatcher(const std::string& name) PURE;
+  virtual Event::DispatcherPtr allocateDispatcher(const std::string& name, absl::optional<uint32_t> worker_thread_index = absl::nullopt) PURE;
 
   /**
    * Allocate a dispatcher.
    * @param name the identity name for a dispatcher, e.g. "worker_2" or "main_thread".
    *             This name will appear in per-handler/worker statistics, such as
    *             "server.worker_2.watchdog_miss".
+   * @param worker_thread_index the index of the worker thread if this dispatcher is for a worker
+   *                            thread, or absl::nullopt if this is not a worker thread dispatcher.
    * @param scaled_timer_factory the factory to use when creating the scaled timer manager.
    * @return Event::DispatcherPtr which is owned by the caller.
    */
   virtual Event::DispatcherPtr
-  allocateDispatcher(const std::string& name,
+  allocateDispatcher(const std::string& name, absl::optional<uint32_t> worker_thread_index,
                      const Event::ScaledRangeTimerManagerFactory& scaled_timer_factory) PURE;
 
   /**
@@ -50,11 +54,14 @@ public:
    * @param name the identity name for a dispatcher, e.g. "worker_2" or "main_thread".
    *             This name will appear in per-handler/worker statistics, such as
    *             "server.worker_2.watchdog_miss".
+   * @param worker_thread_index the index of the worker thread if this dispatcher is for a worker
+   *                            thread, or absl::nullopt if this is not a worker thread dispatcher.
    * @param watermark_factory the watermark factory, ownership is transferred to the dispatcher.
    * @return Event::DispatcherPtr which is owned by the caller.
    */
   virtual Event::DispatcherPtr
-  allocateDispatcher(const std::string& name, Buffer::WatermarkFactoryPtr&& watermark_factory) PURE;
+  allocateDispatcher(const std::string& name, absl::optional<uint32_t> worker_thread_index,
+                     Buffer::WatermarkFactoryPtr&& watermark_factory) PURE;
 
   /**
    * @return a reference to the ThreadFactory

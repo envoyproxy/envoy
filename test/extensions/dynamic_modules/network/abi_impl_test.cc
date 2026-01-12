@@ -12,6 +12,7 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
+#include "test/mocks/server/server_factory_context.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -21,7 +22,8 @@ namespace NetworkFilters {
 class DynamicModuleNetworkFilterAbiCallbackTest : public testing::Test {
 public:
   void SetUp() override {
-    auto dynamic_module = newDynamicModule(testSharedObjectPath("network_no_op", "c"), false);
+    NiceMock<Server::Configuration::MockServerFactoryContext> context;
+    auto dynamic_module = newDynamicModule(testSharedObjectPath("network_no_op", "c"), false, context);
     EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
     auto filter_config_or_status = newDynamicModuleNetworkFilterConfig(
@@ -1255,7 +1257,8 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, ListSocketOptions) {
 class DynamicModuleNetworkFilterHttpCalloutTest : public testing::Test {
 public:
   void SetUp() override {
-    auto dynamic_module = newDynamicModule(testSharedObjectPath("network_no_op", "c"), false);
+    NiceMock<Server::Configuration::MockServerFactoryContext> context;
+    auto dynamic_module = newDynamicModule(testSharedObjectPath("network_no_op", "c"), false, context);
     EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
     auto filter_config_or_status = newDynamicModuleNetworkFilterConfig(

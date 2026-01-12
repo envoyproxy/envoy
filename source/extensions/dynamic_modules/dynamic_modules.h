@@ -4,6 +4,8 @@
 #include <memory>
 #include <string>
 
+#include "envoy/server/factory_context.h"
+
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 
@@ -56,13 +58,6 @@ private:
 using DynamicModulePtr = std::unique_ptr<DynamicModule>;
 
 /**
- * This function is called after a dynamic module is successfully loaded.
- * @param module_ptr the dynamic module pointer that has been loaded.
- * @return ok status if the initialization is successful, otherwise an error status.
- */
-using DynamicModuleInitCb = std::function<absl::Status(DynamicModulePtr& module_ptr)>;
-
-/**
  * Creates a new DynamicModule. This is mainly exposed for testing purposes. Use
  * newDynamicModuleByName in wiring up dynamic modules.
  * @param object_file_absolute_path the absolute path to the object file to load.
@@ -70,14 +65,15 @@ using DynamicModuleInitCb = std::function<absl::Status(DynamicModulePtr& module_
  * will not be destroyed. This is useful when an object has some global state that should not be
  * terminated. For example, c-shared objects compiled by Go doesn't support dlclose
  * https://github.com/golang/go/issues/11100.
+ * @param context the server factory context to pass to the module init function. 
+ * It can be used to load server wide properties during module initialization.
  * @param load_globally if true, the dlopen will be called with RTLD_GLOBAL, so the loaded object
  * can share symbols with other dynamically loaded modules. This is useful for modules that need to
  * share symbols with other modules.
- * @param init_module_cb an optional callback that is called after the module is loaded.
  */
 absl::StatusOr<DynamicModulePtr>
-newDynamicModule(const std::filesystem::path& object_file_absolute_path, const bool do_not_close,
-                 const bool load_globally = false, DynamicModuleInitCb init_module_cb = nullptr);
+newDynamicModule(const std::filesystem::path& object_file_absolute_path, const bool do_not_close, Server::Configuration::ServerFactoryContext& context,
+                 const bool load_globally = false);
 
 /**
  * Creates a new DynamicModule by name under the search path specified by the environment variable
@@ -87,15 +83,15 @@ newDynamicModule(const std::filesystem::path& object_file_absolute_path, const b
  * @param do_not_close if true, the dlopen will be called with RTLD_NODELETE, so the loaded object
  * will not be destroyed. This is useful when an object has some global state that should not be
  * terminated.
+ * @param context the server factory context to pass to the module init function. 
+ * It can be used to load server wide properties during module initialization.
  * @param load_globally if true, the dlopen will be called with RTLD_GLOBAL, so the loaded object
  * can share symbols with other dynamically loaded modules. This is useful for modules that need to
  * share symbols with other modules.
- *  @param init_module_cb an optional callback that is called after the module is loaded.
  */
 absl::StatusOr<DynamicModulePtr>
-newDynamicModuleByName(const absl::string_view module_name, const bool do_not_close,
-                       const bool load_globally = false,
-                       DynamicModuleInitCb init_module_cb = nullptr);
+newDynamicModuleByName(const absl::string_view module_name, const bool do_not_close, Server::Configuration::ServerFactoryContext& context,
+                       const bool load_globally = false);
 } // namespace DynamicModules
 } // namespace Extensions
 } // namespace Envoy

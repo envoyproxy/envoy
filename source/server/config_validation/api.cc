@@ -15,17 +15,17 @@ ValidationImpl::ValidationImpl(Thread::ThreadFactory& thread_factory, Stats::Sto
            process_context),
       time_system_(time_system) {}
 
-Event::DispatcherPtr ValidationImpl::allocateDispatcher(const std::string& name) {
-  return Event::DispatcherPtr{new Event::ValidationDispatcher(name, *this, time_system_)};
+Event::DispatcherPtr ValidationImpl::allocateDispatcher(const std::string& name, absl::optional<uint32_t> worker_thread_index) {
+  return Event::DispatcherPtr{new Event::ValidationDispatcher(name, worker_thread_index, *this, time_system_)};
 }
 
 Event::DispatcherPtr
-ValidationImpl::allocateDispatcher(const std::string&,
+ValidationImpl::allocateDispatcher(const std::string&, absl::optional<uint32_t>,
                                    const Event::ScaledRangeTimerManagerFactory&) {
   PANIC("not implemented");
 }
 
-Event::DispatcherPtr ValidationImpl::allocateDispatcher(const std::string&,
+Event::DispatcherPtr ValidationImpl::allocateDispatcher(const std::string&, absl::optional<uint32_t>,
                                                         Buffer::WatermarkFactoryPtr&&) {
   PANIC("not implemented");
 }

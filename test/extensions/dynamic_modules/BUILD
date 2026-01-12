@@ -21,27 +21,22 @@ envoy_cc_test(
     srcs = ["dynamic_modules_test.cc"],
     data = [
         "//test/extensions/dynamic_modules/test_data/c:abi_version_mismatch",
-        "//test/extensions/dynamic_modules/test_data/c:init_callback",
-        "//test/extensions/dynamic_modules/test_data/c:init_callback_fail",
         "//test/extensions/dynamic_modules/test_data/c:no_op",
         "//test/extensions/dynamic_modules/test_data/c:no_program_init",
         "//test/extensions/dynamic_modules/test_data/c:program_child",
         "//test/extensions/dynamic_modules/test_data/c:program_global",
         "//test/extensions/dynamic_modules/test_data/c:program_init_assert",
         "//test/extensions/dynamic_modules/test_data/c:program_init_fail",
-        "//test/extensions/dynamic_modules/test_data/c:server_init_fail",
         "//test/extensions/dynamic_modules/test_data/rust:abi_version_mismatch",
-        "//test/extensions/dynamic_modules/test_data/rust:init_callback",
-        "//test/extensions/dynamic_modules/test_data/rust:init_callback_fail",
         "//test/extensions/dynamic_modules/test_data/rust:no_op",
         "//test/extensions/dynamic_modules/test_data/rust:no_program_init",
         "//test/extensions/dynamic_modules/test_data/rust:program_init_fail",
-        "//test/extensions/dynamic_modules/test_data/rust:server_init_fail",
     ],
     rbe_pool = "6gig",
     deps = [
         ":util",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
+        "//test/mocks/server:server_factory_context_mocks",
     ],
 )
 

@@ -10,13 +10,9 @@ int getSomeVariable(void) {
   return some_variable;
 }
 
-envoy_dynamic_module_type_abi_version_module_ptr envoy_dynamic_module_on_program_init(void) {
+envoy_dynamic_module_type_abi_version_module_ptr envoy_dynamic_module_on_program_init(
+  envoy_dynamic_module_type_server_factory_context_envoy_ptr server_factory_context_ptr) {
   return kAbiVersion;
-}
-
-bool envoy_dynamic_module_on_server_init(
-    envoy_dynamic_module_type_server_factory_context_envoy_ptr server_factory_context_ptr) {
-  return true;
 }
 
 envoy_dynamic_module_type_http_filter_config_module_ptr

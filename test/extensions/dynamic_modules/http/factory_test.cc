@@ -231,8 +231,6 @@ filter_config:
       {"no_http_filter_per_route_config_destroy",
        symbol_err("envoy_dynamic_module_on_http_filter_per_route_config_destroy")},
       {"http_filter_per_route_config_new_fail", "Failed to initialize per-route dynamic module"},
-      {"server_init_fail",
-       "Failed to load dynamic module: Dynamic module envoy_dynamic_module_on_server_init failed"},
   };
 
   for (const auto& test_case : per_route_test_cases) {
@@ -259,42 +257,6 @@ filter_config:
     EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
     EXPECT_THAT(result.status().message(), testing::HasSubstr(expected_error));
   }
-}
-
-TEST(DynamicModuleConfigFactory, LoadInitServerFailed) {
-  TestEnvironment::setEnvVar(
-      "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
-      TestEnvironment::substitute("{{ test_rundir }}/test/extensions/dynamic_modules/test_data/c"),
-      1);
-
-  envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilter config;
-  const std::string yaml = R"EOF(
-dynamic_module_config:
-    name: server_init_fail
-    do_not_close: false
-    load_globally: false
-filter_name: foo
-filter_config:
-    "@type": "type.googleapis.com/google.protobuf.StringValue"
-    value: "bar"
-)EOF";
-
-  envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilter proto_config;
-  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
-
-  NiceMock<Server::Configuration::MockFactoryContext> context;
-  Api::ApiPtr api = Api::createApiForTest();
-  EXPECT_CALL(context.server_factory_context_, api()).WillRepeatedly(testing::ReturnRef(*api));
-  ON_CALL(context.server_factory_context_.options_, concurrency())
-      .WillByDefault(testing::Return(1));
-
-  Envoy::Server::Configuration::DynamicModuleConfigFactory factory;
-  auto result = factory.createFilterFactoryFromProto(proto_config, "", context);
-  EXPECT_FALSE(result.ok());
-  EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
-  EXPECT_THAT(result.status().message(),
-              testing::HasSubstr("Failed to load dynamic module: Dynamic module "
-                                 "envoy_dynamic_module_on_server_init failed"));
 }
 
 } // namespace HttpFilters

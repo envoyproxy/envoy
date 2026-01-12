@@ -721,25 +721,12 @@ typedef enum envoy_dynamic_module_type_address_type {
  * to check compatibility and gracefully fail the initialization because there is no way to
  * report an error to Envoy.
  *
+ * @param server_factory_context_ptr is the pointer to the ServerFactoryContext object in Envoy.
+ *
  * @return envoy_dynamic_module_type_abi_version_module_ptr is the ABI version of the dynamic
  * module. Null means the error and the module will be unloaded immediately.
  */
-envoy_dynamic_module_type_abi_version_module_ptr envoy_dynamic_module_on_program_init(void);
-
-/**
- * envoy_dynamic_module_on_server_init is called by the main thread exactly after the module is
- * loaded and server context is available.
- *
- * For dynamic modules, this is useful when they need to perform initialization dependent
- * on server-wide configuration such as concurrency.
- *
- * @param server_factory_context_ptr is the pointer to the ServerFactoryContext object in Envoy.
- *
- * @return true if the initialization is successful. Returning false indicates a failure to
- * initialize server-related settings. This doesn't unload the module, but server startup will
- * fail.
- */
-bool envoy_dynamic_module_on_server_init(
+envoy_dynamic_module_type_abi_version_module_ptr envoy_dynamic_module_on_program_init(
     envoy_dynamic_module_type_server_factory_context_envoy_ptr server_factory_context_ptr);
 
 /**

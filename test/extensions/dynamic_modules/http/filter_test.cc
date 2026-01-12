@@ -12,6 +12,7 @@
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/thread_local_cluster.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {
@@ -27,10 +28,10 @@ TEST_P(DynamicModuleTestLanguages, Nop) {
   const std::string filter_config = "bar";
 
   const auto language = GetParam();
-  auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", language), false);
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", language), false, context);
   EXPECT_TRUE(dynamic_module.ok());
 
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   Stats::IsolatedStoreImpl stats_store;
   auto filter_config_or_status =
       Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
@@ -69,9 +70,9 @@ TEST_P(DynamicModuleTestLanguages, Nop) {
 }
 
 TEST(DynamicModulesTest, ConfigInitializationFailure) {
-  auto dynamic_module = newDynamicModule(testSharedObjectPath("http", "rust"), false);
-  EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  auto dynamic_module = newDynamicModule(testSharedObjectPath("http", "rust"), false, context);
+  EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
   Stats::IsolatedStoreImpl stats_store;
   auto filter_config_or_status = newDynamicModuleHttpFilterConfig(
       "config_init_failure", "", false, std::move(dynamic_module.value()),
@@ -85,13 +86,13 @@ TEST(DynamicModulesTest, StatsCallbacks) {
   const std::string filter_name = "stats_callbacks";
   const std::string filter_config = "";
   // TODO: Add non-Rust test program once we have non-Rust SDK.
-  auto dynamic_module = newDynamicModule(testSharedObjectPath("http", "rust"), false);
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  auto dynamic_module = newDynamicModule(testSharedObjectPath("http", "rust"), false, context);
   if (!dynamic_module.ok()) {
     ENVOY_LOG_MISC(debug, "Failed to load dynamic module: {}", dynamic_module.status().message());
   }
   EXPECT_TRUE(dynamic_module.ok());
 
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   Stats::TestUtil::TestStore stats_store;
   Stats::TestUtil::TestScope stats_scope{"", stats_store};
   auto filter_config_or_status =
@@ -206,13 +207,13 @@ TEST(DynamicModulesTest, HeaderCallbacks) {
   const std::string filter_name = "header_callbacks";
   const std::string filter_config = "";
   // TODO: Add non-Rust test program once we have non-Rust SDK.
-  auto dynamic_module = newDynamicModule(testSharedObjectPath("http", "rust"), false);
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  auto dynamic_module = newDynamicModule(testSharedObjectPath("http", "rust"), false, context);
   if (!dynamic_module.ok()) {
     ENVOY_LOG_MISC(debug, "Failed to load dynamic module: {}", dynamic_module.status().message());
   }
   EXPECT_TRUE(dynamic_module.ok());
 
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   Stats::IsolatedStoreImpl stats_store;
   auto filter_config_or_status =
       Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
@@ -268,13 +269,13 @@ TEST(DynamicModulesTest, DynamicMetadataCallbacks) {
   const std::string filter_name = "dynamic_metadata_callbacks";
   const std::string filter_config = "";
   // TODO: Add non-Rust test program once we have non-Rust SDK.
-  auto dynamic_module = newDynamicModule(testSharedObjectPath("http", "rust"), false);
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  auto dynamic_module = newDynamicModule(testSharedObjectPath("http", "rust"), false, context);
   if (!dynamic_module.ok()) {
     ENVOY_LOG_MISC(debug, "Failed to load dynamic module: {}", dynamic_module.status().message());
   }
   EXPECT_TRUE(dynamic_module.ok());
 
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   Stats::IsolatedStoreImpl stats_store;
   auto stats_scope = stats_store.createScope("");
   auto filter_config_or_status =
@@ -352,13 +353,13 @@ TEST(DynamicModulesTest, FilterStateCallbacks) {
   const std::string filter_name = "filter_state_callbacks";
   const std::string filter_config = "";
   // TODO: Add non-Rust test program once we have non-Rust SDK.
-  auto dynamic_module = newDynamicModule(testSharedObjectPath("http", "rust"), false);
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  auto dynamic_module = newDynamicModule(testSharedObjectPath("http", "rust"), false, context);
   if (!dynamic_module.ok()) {
     ENVOY_LOG_MISC(debug, "Failed to load dynamic module: {}", dynamic_module.status().message());
   }
   EXPECT_TRUE(dynamic_module.ok());
 
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   Stats::IsolatedStoreImpl stats_store;
   auto stats_scope = stats_store.createScope("");
   auto filter_config_or_status =
@@ -430,13 +431,13 @@ TEST(DynamicModulesTest, BodyCallbacks) {
   const std::string filter_name = "body_callbacks";
   const std::string filter_config = "";
   // TODO: Add non-Rust test program once we have non-Rust SDK.
-  auto dynamic_module = newDynamicModule(testSharedObjectPath("http", "rust"), false);
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  auto dynamic_module = newDynamicModule(testSharedObjectPath("http", "rust"), false, context);
   if (!dynamic_module.ok()) {
     ENVOY_LOG_MISC(debug, "Failed to load dynamic module: {}", dynamic_module.status().message());
   }
   EXPECT_TRUE(dynamic_module.ok());
 
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   Stats::IsolatedStoreImpl stats_store;
   auto stats_scope = stats_store.createScope("");
   auto filter_config_or_status =
@@ -498,14 +499,14 @@ TEST(DynamicModulesTest, BodyCallbacks) {
 TEST(DynamicModulesTest, HttpFilterHttpCallout_non_existing_cluster) {
   const std::string filter_name = "http_callouts";
   // TODO: Add non-Rust test program once we have non-Rust SDK.
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   auto dynamic_module =
-      newDynamicModule(testSharedObjectPath("http_integration_test", "rust"), false);
+      newDynamicModule(testSharedObjectPath("http_integration_test", "rust"), false, context);
   if (!dynamic_module.ok()) {
     ENVOY_LOG_MISC(debug, "Failed to load dynamic module: {}", dynamic_module.status().message());
   }
   EXPECT_TRUE(dynamic_module.ok());
 
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   Stats::IsolatedStoreImpl stats_store;
   auto stats_scope = stats_store.createScope("");
   Upstream::MockClusterManager cluster_manager;
@@ -538,14 +539,14 @@ TEST(DynamicModulesTest, HttpFilterHttpCallout_non_existing_cluster) {
 TEST(DynamicModulesTest, HttpFilterHttpCallout_immediate_failing_cluster) {
   const std::string filter_name = "http_callouts";
   // TODO: Add non-Rust test program once we have non-Rust SDK.
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   auto dynamic_module =
-      newDynamicModule(testSharedObjectPath("http_integration_test", "rust"), false);
+      newDynamicModule(testSharedObjectPath("http_integration_test", "rust"), false, context);
   if (!dynamic_module.ok()) {
     ENVOY_LOG_MISC(debug, "Failed to load dynamic module: {}", dynamic_module.status().message());
   }
   EXPECT_TRUE(dynamic_module.ok());
 
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   Stats::IsolatedStoreImpl stats_store;
   auto stats_scope = stats_store.createScope("");
   Upstream::MockClusterManager cluster_manager;
@@ -592,14 +593,14 @@ TEST(DynamicModulesTest, HttpFilterHttpCallout_immediate_failing_cluster) {
 TEST(DynamicModulesTest, HttpFilterHttpCallout_success) {
   const std::string filter_name = "http_callouts";
   // TODO: Add non-Rust test program once we have non-Rust SDK.
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   auto dynamic_module =
-      newDynamicModule(testSharedObjectPath("http_integration_test", "rust"), false);
+      newDynamicModule(testSharedObjectPath("http_integration_test", "rust"), false, context);
   if (!dynamic_module.ok()) {
     ENVOY_LOG_MISC(debug, "Failed to load dynamic module: {}", dynamic_module.status().message());
   }
   EXPECT_TRUE(dynamic_module.ok());
 
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   Stats::IsolatedStoreImpl stats_store;
   auto stats_scope = stats_store.createScope("");
   Upstream::MockClusterManager cluster_manager;
@@ -662,14 +663,14 @@ TEST(DynamicModulesTest, HttpFilterHttpCallout_success) {
 TEST(DynamicModulesTest, HttpFilterHttpCallout_resetting) {
   const std::string filter_name = "http_callouts";
   // TODO: Add non-Rust test program once we have non-Rust SDK.
+ NiceMock<Server::Configuration::MockServerFactoryContext> context;
   auto dynamic_module =
-      newDynamicModule(testSharedObjectPath("http_integration_test", "rust"), false);
+      newDynamicModule(testSharedObjectPath("http_integration_test", "rust"), false, context);
   if (!dynamic_module.ok()) {
     ENVOY_LOG_MISC(debug, "Failed to load dynamic module: {}", dynamic_module.status().message());
   }
   EXPECT_TRUE(dynamic_module.ok());
 
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   Stats::IsolatedStoreImpl stats_store;
   auto stats_scope = stats_store.createScope("");
   Upstream::MockClusterManager cluster_manager;
@@ -716,14 +717,14 @@ TEST(DynamicModulesTest, HttpFilterHttpCallout_resetting) {
 // This test verifies that handling of per-route config is correct in terms of lifetimes.
 TEST(DynamicModulesTest, HttpFilterPerFilterConfigLifetimes) {
   const std::string filter_name = "per_route_config";
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   auto dynamic_module =
-      newDynamicModule(testSharedObjectPath("http_integration_test", "rust"), false);
+      newDynamicModule(testSharedObjectPath("http_integration_test", "rust"), false, context);
   if (!dynamic_module.ok()) {
     ENVOY_LOG_MISC(debug, "Failed to load dynamic module: {}", dynamic_module.status().message());
   }
   EXPECT_TRUE(dynamic_module.ok());
 
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   Stats::IsolatedStoreImpl stats_store;
   auto stats_scope = stats_store.createScope("");
   Upstream::MockClusterManager cluster_manager;
@@ -740,7 +741,7 @@ TEST(DynamicModulesTest, HttpFilterPerFilterConfigLifetimes) {
   EXPECT_TRUE(filter_config_or_status.ok());
 
   auto dynamic_module_for_route =
-      newDynamicModule(testSharedObjectPath("http_integration_test", "rust"), false);
+      newDynamicModule(testSharedObjectPath("http_integration_test", "rust"), false, context);
   if (!dynamic_module.ok()) {
     ENVOY_LOG_MISC(debug, "Failed to load dynamic module: {}", dynamic_module.status().message());
   }
@@ -872,9 +873,9 @@ TEST(HttpFilter, SendStreamTrailersOnInvalidStream) {
 }
 
 TEST(DynamicModulesTest, HttpFilterHttpStreamCalloutOnComplete) {
-  auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", "c"), false);
-  EXPECT_TRUE(dynamic_module.ok());
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", "c"), false, context);
+  EXPECT_TRUE(dynamic_module.ok());
   Stats::IsolatedStoreImpl stats_store;
   auto stats_scope = stats_store.createScope("");
 
@@ -924,9 +925,9 @@ TEST(DynamicModulesTest, HttpFilterHttpStreamCalloutOnComplete) {
 }
 
 TEST(DynamicModulesTest, StartHttpStreamDoesNotSetContentLength) {
-  auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", "c"), false);
-  EXPECT_TRUE(dynamic_module.ok());
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", "c"), false, context);
+  EXPECT_TRUE(dynamic_module.ok());
   Stats::IsolatedStoreImpl stats_store;
   auto stats_scope = stats_store.createScope("");
 
@@ -991,9 +992,9 @@ TEST(DynamicModulesTest, StartHttpStreamDoesNotSetContentLength) {
 }
 
 TEST(DynamicModulesTest, StartHttpStreamAndNoCluster) {
-  auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", "c"), false);
-  EXPECT_TRUE(dynamic_module.ok());
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", "c"), false, context);
+  EXPECT_TRUE(dynamic_module.ok());
   Stats::IsolatedStoreImpl stats_store;
   auto stats_scope = stats_store.createScope("");
 
@@ -1026,9 +1027,9 @@ TEST(DynamicModulesTest, StartHttpStreamAndNoCluster) {
 }
 
 TEST(DynamicModulesTest, StartHttpStreamMissingRequiredHeaders) {
-  auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", "c"), false);
-  EXPECT_TRUE(dynamic_module.ok());
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", "c"), false, context);
+  EXPECT_TRUE(dynamic_module.ok());
   Stats::IsolatedStoreImpl stats_store;
   auto stats_scope = stats_store.createScope("");
 
@@ -1064,9 +1065,9 @@ TEST(DynamicModulesTest, StartHttpStreamMissingRequiredHeaders) {
 }
 
 TEST(DynamicModulesTest, StartHttpStreamHandlesInlineResetDuringHeaders) {
-  auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", "c"), false);
-  EXPECT_TRUE(dynamic_module.ok());
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", "c"), false, context);
+  EXPECT_TRUE(dynamic_module.ok());
   Stats::IsolatedStoreImpl stats_store;
   auto stats_scope = stats_store.createScope("");
 
@@ -1119,9 +1120,9 @@ TEST(DynamicModulesTest, StartHttpStreamHandlesInlineResetDuringHeaders) {
 }
 
 TEST(DynamicModulesTest, HttpStreamCalloutDeferredDeleteOnDestroy) {
-  auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", "c"), false);
-  EXPECT_TRUE(dynamic_module.ok());
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", "c"), false, context);
+  EXPECT_TRUE(dynamic_module.ok());
   Stats::IsolatedStoreImpl stats_store;
   auto stats_scope = stats_store.createScope("");
 
@@ -1176,9 +1177,9 @@ TEST(DynamicModulesTest, HttpStreamCalloutDeferredDeleteOnDestroy) {
 }
 
 TEST(DynamicModulesTest, HttpFilterHttpStreamCalloutOnReset) {
-  auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", "c"), false);
-  EXPECT_TRUE(dynamic_module.ok());
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", "c"), false, context);
+  EXPECT_TRUE(dynamic_module.ok());
   Stats::IsolatedStoreImpl stats_store;
   auto stats_scope = stats_store.createScope("");
 

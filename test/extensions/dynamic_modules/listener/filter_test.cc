@@ -4,6 +4,7 @@
 #include "test/extensions/dynamic_modules/util.h"
 #include "test/mocks/network/io_handle.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {
@@ -39,7 +40,8 @@ private:
 class DynamicModuleListenerFilterTest : public testing::Test {
 public:
   void SetUp() override {
-    auto dynamic_module = newDynamicModule(testSharedObjectPath("listener_no_op", "c"), false);
+    NiceMock<Server::Configuration::MockServerFactoryContext> context;
+    auto dynamic_module = newDynamicModule(testSharedObjectPath("listener_no_op", "c"), false, context);
     EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
     auto filter_config_or_status =
@@ -191,7 +193,8 @@ TEST_F(DynamicModuleListenerFilterTest, GetFilterConfig) {
 }
 
 TEST(DynamicModuleListenerFilterConfigTest, ConfigInitialization) {
-  auto dynamic_module = newDynamicModule(testSharedObjectPath("listener_no_op", "c"), false);
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  auto dynamic_module = newDynamicModule(testSharedObjectPath("listener_no_op", "c"), false, context);
   EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
   auto filter_config_or_status = newDynamicModuleListenerFilterConfig(
@@ -211,7 +214,8 @@ TEST(DynamicModuleListenerFilterConfigTest, ConfigInitialization) {
 
 TEST(DynamicModuleListenerFilterConfigTest, MissingSymbols) {
   // Use the HTTP filter no_op module which lacks listener filter symbols.
-  auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", "c"), false);
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", "c"), false, context);
   EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
   auto filter_config_or_status =
@@ -221,8 +225,9 @@ TEST(DynamicModuleListenerFilterConfigTest, MissingSymbols) {
 
 TEST(DynamicModuleListenerFilterConfigTest, ConfigInitializationFailure) {
   // Use a module that returns nullptr from config_new.
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   auto dynamic_module =
-      newDynamicModule(testSharedObjectPath("listener_config_new_fail", "c"), false);
+      newDynamicModule(testSharedObjectPath("listener_config_new_fail", "c"), false, context);
   EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
   auto filter_config_or_status =
@@ -233,8 +238,9 @@ TEST(DynamicModuleListenerFilterConfigTest, ConfigInitializationFailure) {
 }
 
 TEST(DynamicModuleListenerFilterConfigTest, StopIterationStatus) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   auto dynamic_module =
-      newDynamicModule(testSharedObjectPath("listener_stop_iteration", "c"), false);
+      newDynamicModule(testSharedObjectPath("listener_stop_iteration", "c"), false, context);
   EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
   auto filter_config_or_status =
@@ -255,8 +261,9 @@ TEST(DynamicModuleListenerFilterConfigTest, StopIterationStatus) {
 }
 
 TEST(DynamicModuleListenerFilterConfigTest, OnDataStopIterationStatus) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   auto dynamic_module =
-      newDynamicModule(testSharedObjectPath("listener_stop_iteration", "c"), false);
+      newDynamicModule(testSharedObjectPath("listener_stop_iteration", "c"), false, context);
   EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
   auto filter_config_or_status =

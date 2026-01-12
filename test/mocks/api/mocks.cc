@@ -24,19 +24,19 @@ MockApi::MockApi() {
 
 MockApi::~MockApi() = default;
 
-Event::DispatcherPtr MockApi::allocateDispatcher(const std::string& name) {
-  return Event::DispatcherPtr{allocateDispatcher_(name, time_system_)};
+Event::DispatcherPtr MockApi::allocateDispatcher(const std::string& name, absl::optional<uint32_t> worker_thread_index) {
+  return Event::DispatcherPtr{allocateDispatcher_(name, worker_thread_index, time_system_)};
 }
 
 Event::DispatcherPtr
-MockApi::allocateDispatcher(const std::string& name,
+MockApi::allocateDispatcher(const std::string& name, absl::optional<uint32_t> worker_thread_index,
                             const Event::ScaledRangeTimerManagerFactory& scaled_timer_factory) {
-  return Event::DispatcherPtr{allocateDispatcher_(name, scaled_timer_factory, {}, time_system_)};
+  return Event::DispatcherPtr{allocateDispatcher_(name, worker_thread_index, scaled_timer_factory, {}, time_system_)};
 }
-Event::DispatcherPtr MockApi::allocateDispatcher(const std::string& name,
+Event::DispatcherPtr MockApi::allocateDispatcher(const std::string& name, absl::optional<uint32_t> worker_thread_index,
                                                  Buffer::WatermarkFactoryPtr&& watermark_factory) {
   return Event::DispatcherPtr{
-      allocateDispatcher_(name, {}, std::move(watermark_factory), time_system_)};
+      allocateDispatcher_(name, worker_thread_index, {}, std::move(watermark_factory), time_system_)};
 }
 
 MockOsSysCalls::MockOsSysCalls() {
