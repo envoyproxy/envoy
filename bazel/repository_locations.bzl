@@ -261,7 +261,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         license = "Apache-2.0",
         license_url = "https://github.com/google/perfetto/blob/v{version}/LICENSE",
     ),
-    com_github_c_ares_c_ares = dict(
+    com_github_cares_cares = dict(
         project_name = "c-ares",
         project_desc = "C library for asynchronous DNS requests",
         project_url = "https://c-ares.haxx.se/",
