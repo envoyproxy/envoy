@@ -181,6 +181,9 @@ std::vector<Envoy::Network::ProxyProtocolTLV> UpstreamProxyProtocolSocket::build
   std::vector<Envoy::Network::ProxyProtocolTLV> custom_tlvs;
   absl::flat_hash_set<uint8_t> host_level_tlv_types;
 
+  const bool runtime_allow_duplicate_tlvs = Runtime::runtimeFeatureEnabled(
+      "envoy.reloadable_features.proxy_protocol_allow_duplicate_tlvs");
+
   // Attempt to parse host-level TLVs first.
   const auto& upstream_info = callbacks_->connection().streamInfo().upstreamInfo();
   if (upstream_info && upstream_info->upstreamHost()) {
@@ -198,8 +201,7 @@ std::vector<Envoy::Network::ProxyProtocolTLV> UpstreamProxyProtocolSocket::build
                     upstream_info->upstreamHost()->address()->asString(), status.message());
         } else {
           // Insert host-level TLVs.
-          if (Runtime::runtimeFeatureEnabled(
-                  "envoy.reloadable_features.proxy_protocol_allow_duplicate_tlvs")) {
+          if (runtime_allow_duplicate_tlvs) {
             for (const auto& entry : host_tlv_metadata.added_tlvs()) {
               custom_tlvs.push_back(Network::ProxyProtocolTLV{
                   static_cast<uint8_t>(entry.type()),
@@ -225,8 +227,7 @@ std::vector<Envoy::Network::ProxyProtocolTLV> UpstreamProxyProtocolSocket::build
   }
 
   // If host-level parse failed or was not present, we still read config-level TLVs.
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.proxy_protocol_allow_duplicate_tlvs")) {
+  if (runtime_allow_duplicate_tlvs) {
     for (const auto& tlv : added_tlvs_) {
       if (!host_level_tlv_types.contains(tlv.type)) {
         custom_tlvs.push_back(tlv);
