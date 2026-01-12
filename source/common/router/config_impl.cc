@@ -54,6 +54,7 @@
 #include "source/extensions/path/match/uri_template/uri_template_match.h"
 #include "source/extensions/path/rewrite/uri_template/uri_template_rewrite.h"
 
+#include "absl/container/flat_hash_set.h"
 #include "absl/container/inlined_vector.h"
 #include "absl/strings/match.h"
 #include "absl/types/optional.h"
@@ -866,7 +867,15 @@ bool RouteEntryImplBase::matchRoute(const Http::RequestHeaderMap& headers,
   }
 
   if (!config_cookies_.empty()) {
-    const auto cookies = Http::Utility::parseCookies(headers);
+    absl::flat_hash_set<absl::string_view> cookie_names;
+    cookie_names.reserve(config_cookies_.size());
+    for (const auto& matcher : config_cookies_) {
+      cookie_names.insert(matcher->name());
+    }
+    const auto cookies =
+        Http::Utility::parseCookies(headers, [&cookie_names](absl::string_view key) -> bool {
+          return cookie_names.find(key) != cookie_names.end();
+        });
     if (!ConfigUtility::matchCookies(cookies, config_cookies_)) {
       return false;
     }

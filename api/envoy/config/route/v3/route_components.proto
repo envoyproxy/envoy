@@ -2844,7 +2844,8 @@ message CookieMatcher {
   // <envoy_v3_api_msg_type.matcher.v3.StringMatcher>` semantics.
   type.matcher.v3.StringMatcher string_match = 2 [(validate.rules).message = {required: true}];
 
-  // Invert the match result.
+  // Invert the match result. If the cookie is not present, the match result is false, so
+  // ``invert_match`` will cause the matcher to succeed when the cookie is absent.
   bool invert_match = 3;
 }
 
