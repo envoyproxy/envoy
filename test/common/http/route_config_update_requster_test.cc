@@ -47,7 +47,7 @@ TEST_F(RouteConfigUpdateRequesterTest, VhdsCaseInsensitiveMatchingDefault) {
   EXPECT_CALL(route_config_provider_,
               requestVirtualHostsUpdate("example.com", _, _));
 
-  NiceMock<Router::MockRouteCache> route_cache;
+  NiceMock<Http::MockRouteCache> route_cache;
   requester.requestRouteConfigUpdate(route_cache, route_config_updated_cb, route_config,
                                     dispatcher_, headers);
 }
@@ -75,7 +75,7 @@ TEST_F(RouteConfigUpdateRequesterTest, VhdsCaseSensitiveMatching) {
   EXPECT_CALL(route_config_provider_,
               requestVirtualHostsUpdate("Example.Com", _, _));
 
-  NiceMock<Router::MockRouteCache> route_cache;
+  NiceMock<Http::MockRouteCache> route_cache;
   requester.requestRouteConfigUpdate(route_cache, route_config_updated_cb, route_config,
                                     dispatcher_, headers);
 }
@@ -100,7 +100,7 @@ TEST_F(RouteConfigUpdateRequesterTest, VhdsCaseInsensitiveMatchingUppercase) {
   EXPECT_CALL(route_config_provider_,
               requestVirtualHostsUpdate("example.com", _, _));
 
-  NiceMock<Router::MockRouteCache> route_cache;
+  NiceMock<Http::MockRouteCache> route_cache;
   requester.requestRouteConfigUpdate(route_cache, route_config_updated_cb, route_config,
                                     dispatcher_, headers);
 }
@@ -125,7 +125,7 @@ TEST_F(RouteConfigUpdateRequesterTest, VhdsCaseSensitiveMatchingUppercase) {
   EXPECT_CALL(route_config_provider_,
               requestVirtualHostsUpdate("EXAMPLE.COM", _, _));
 
-  NiceMock<Router::MockRouteCache> route_cache;
+  NiceMock<Http::MockRouteCache> route_cache;
   requester.requestRouteConfigUpdate(route_cache, route_config_updated_cb, route_config,
                                     dispatcher_, headers);
 }
@@ -150,7 +150,7 @@ TEST_F(RouteConfigUpdateRequesterTest, VhdsCaseInsensitiveMatchingLowercase) {
   EXPECT_CALL(route_config_provider_,
               requestVirtualHostsUpdate("example.com", _, _));
 
-  NiceMock<Router::MockRouteCache> route_cache;
+  NiceMock<Http::MockRouteCache> route_cache;
   requester.requestRouteConfigUpdate(route_cache, route_config_updated_cb, route_config,
                                     dispatcher_, headers);
 }

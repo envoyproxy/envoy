@@ -507,7 +507,7 @@ envoy_cc_test(
     srcs = ["route_config_update_requster_test.cc"],
     rbe_pool = "6gig",
     deps = [
-        "//source/common/http:route_config_update_requster_lib",
+        "//source/common/http:rds_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/router:router_mocks",
