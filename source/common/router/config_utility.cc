@@ -111,10 +111,6 @@ bool ConfigUtility::matchQueryParams(
 
 bool ConfigUtility::matchCookies(const absl::flat_hash_map<std::string, std::string>& cookies,
                                  const std::vector<CookieMatcherPtr>& matchers) {
-  if (matchers.empty()) {
-    return true;
-  }
-
   for (const auto& matcher : matchers) {
     absl::optional<absl::string_view> cookie_value;
     const auto it = cookies.find(matcher->name());
