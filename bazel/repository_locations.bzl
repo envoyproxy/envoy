@@ -1693,6 +1693,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/dlfcn-win32/dlfcn-win32/archive/refs/tags/v{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = [
+            "envoy.access_loggers.dynamic_modules",
             "envoy.filters.http.dynamic_modules",
             "envoy.filters.listener.dynamic_modules",
             "envoy.filters.network.dynamic_modules",
