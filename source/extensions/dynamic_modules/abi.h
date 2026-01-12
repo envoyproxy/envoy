@@ -1267,6 +1267,15 @@ typedef enum envoy_dynamic_module_type_socket_option_state {
 } envoy_dynamic_module_type_socket_option_state;
 
 /**
+ * envoy_dynamic_module_type_socket_direction represents whether the socket option should be
+ * applied to the upstream (outgoing to backend) or downstream (incoming from client) connection.
+ */
+typedef enum envoy_dynamic_module_type_socket_direction {
+  envoy_dynamic_module_type_socket_direction_Upstream = 0,
+  envoy_dynamic_module_type_socket_direction_Downstream = 1,
+} envoy_dynamic_module_type_socket_direction;
+
+/**
  * envoy_dynamic_module_type_socket_option_value_type represents the type of value stored in a
  * socket option.
  */
@@ -2241,13 +2250,16 @@ bool envoy_dynamic_module_callback_http_add_custom_flag(
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
  * @param level is the socket option level (e.g., SOL_SOCKET).
  * @param name is the socket option name (e.g., SO_KEEPALIVE).
- * @param state is the socket state at which this option should be applied.
+ * @param state is the socket state at which this option should be applied. For downstream
+ *        sockets, this is ignored since the socket is already connected.
+ * @param direction specifies whether to apply to upstream or downstream socket.
  * @param value is the integer value for the socket option.
  * @return true if the operation is successful, false otherwise.
  */
 bool envoy_dynamic_module_callback_http_set_socket_option_int(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, int64_t level, int64_t name,
-    envoy_dynamic_module_type_socket_option_state state, int64_t value);
+    envoy_dynamic_module_type_socket_option_state state,
+    envoy_dynamic_module_type_socket_direction direction, int64_t value);
 
 /**
  * envoy_dynamic_module_callback_http_set_socket_option_bytes sets a bytes socket option with
@@ -2256,13 +2268,16 @@ bool envoy_dynamic_module_callback_http_set_socket_option_int(
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
  * @param level is the socket option level.
  * @param name is the socket option name.
- * @param state is the socket state at which this option should be applied.
+ * @param state is the socket state at which this option should be applied. For downstream
+ *        sockets, this is ignored since the socket is already connected.
+ * @param direction specifies whether to apply to upstream or downstream socket.
  * @param value is the byte buffer value for the socket option.
  * @return true if the operation is successful, false otherwise.
  */
 bool envoy_dynamic_module_callback_http_set_socket_option_bytes(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, int64_t level, int64_t name,
     envoy_dynamic_module_type_socket_option_state state,
+    envoy_dynamic_module_type_socket_direction direction,
     envoy_dynamic_module_type_module_buffer value);
 
 /**
@@ -2273,12 +2288,14 @@ bool envoy_dynamic_module_callback_http_set_socket_option_bytes(
  * @param level is the socket option level.
  * @param name is the socket option name.
  * @param state is the socket state.
+ * @param direction specifies whether to get from upstream or downstream socket.
  * @param value_out is the pointer to store the retrieved integer value.
  * @return true if the option is found, false otherwise.
  */
 bool envoy_dynamic_module_callback_http_get_socket_option_int(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, int64_t level, int64_t name,
-    envoy_dynamic_module_type_socket_option_state state, int64_t* value_out);
+    envoy_dynamic_module_type_socket_option_state state,
+    envoy_dynamic_module_type_socket_direction direction, int64_t* value_out);
 
 /**
  * envoy_dynamic_module_callback_http_get_socket_option_bytes retrieves a bytes socket option
@@ -2288,6 +2305,7 @@ bool envoy_dynamic_module_callback_http_get_socket_option_int(
  * @param level is the socket option level.
  * @param name is the socket option name.
  * @param state is the socket state.
+ * @param direction specifies whether to get from upstream or downstream socket.
  * @param value_out is the pointer to store the retrieved buffer. The buffer is owned by Envoy and
  * valid until the filter is destroyed.
  * @return true if the option is found, false otherwise.
@@ -2295,6 +2313,7 @@ bool envoy_dynamic_module_callback_http_get_socket_option_int(
 bool envoy_dynamic_module_callback_http_get_socket_option_bytes(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, int64_t level, int64_t name,
     envoy_dynamic_module_type_socket_option_state state,
+    envoy_dynamic_module_type_socket_direction direction,
     envoy_dynamic_module_type_envoy_buffer* value_out);
 
 // ---------------------- HTTP filter scheduler callbacks ------------------------

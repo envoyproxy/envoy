@@ -1352,23 +1352,27 @@ pub trait EnvoyHttpFilter {
     value: u64,
   ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
 
-  /// Set an integer socket option with the given level, name, and state.
-  /// This is used to set socket options on the upstream connection.
+  /// Set an integer socket option with the given level, name, state, and direction.
+  /// Direction specifies whether to apply to upstream (outgoing to backend) or
+  /// downstream (incoming from client) socket.
   fn set_socket_option_int(
     &mut self,
     level: i64,
     name: i64,
     state: abi::envoy_dynamic_module_type_socket_option_state,
+    direction: abi::envoy_dynamic_module_type_socket_direction,
     value: i64,
   ) -> bool;
 
-  /// Set a bytes socket option with the given level, name, and state.
-  /// This is used to set socket options on the upstream connection.
+  /// Set a bytes socket option with the given level, name, state, and direction.
+  /// Direction specifies whether to apply to upstream (outgoing to backend) or
+  /// downstream (incoming from client) socket.
   fn set_socket_option_bytes(
     &mut self,
     level: i64,
     name: i64,
     state: abi::envoy_dynamic_module_type_socket_option_state,
+    direction: abi::envoy_dynamic_module_type_socket_direction,
     value: &[u8],
   ) -> bool;
 
@@ -1378,6 +1382,7 @@ pub trait EnvoyHttpFilter {
     level: i64,
     name: i64,
     state: abi::envoy_dynamic_module_type_socket_option_state,
+    direction: abi::envoy_dynamic_module_type_socket_direction,
   ) -> Option<i64>;
 
   /// Get a bytes socket option value.
@@ -1386,6 +1391,7 @@ pub trait EnvoyHttpFilter {
     level: i64,
     name: i64,
     state: abi::envoy_dynamic_module_type_socket_option_state,
+    direction: abi::envoy_dynamic_module_type_socket_direction,
   ) -> Option<Vec<u8>>;
 }
 
@@ -2436,11 +2442,12 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     level: i64,
     name: i64,
     state: abi::envoy_dynamic_module_type_socket_option_state,
+    direction: abi::envoy_dynamic_module_type_socket_direction,
     value: i64,
   ) -> bool {
     unsafe {
       abi::envoy_dynamic_module_callback_http_set_socket_option_int(
-        self.raw_ptr, level, name, state, value,
+        self.raw_ptr, level, name, state, direction, value,
       )
     }
   }
@@ -2450,6 +2457,7 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     level: i64,
     name: i64,
     state: abi::envoy_dynamic_module_type_socket_option_state,
+    direction: abi::envoy_dynamic_module_type_socket_direction,
     value: &[u8],
   ) -> bool {
     unsafe {
@@ -2458,6 +2466,7 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
         level,
         name,
         state,
+        direction,
         abi::envoy_dynamic_module_type_module_buffer {
           ptr: value.as_ptr() as *const _,
           length: value.len(),
@@ -2471,11 +2480,12 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     level: i64,
     name: i64,
     state: abi::envoy_dynamic_module_type_socket_option_state,
+    direction: abi::envoy_dynamic_module_type_socket_direction,
   ) -> Option<i64> {
     let mut value: i64 = 0;
     let success = unsafe {
       abi::envoy_dynamic_module_callback_http_get_socket_option_int(
-        self.raw_ptr, level, name, state, &mut value,
+        self.raw_ptr, level, name, state, direction, &mut value,
       )
     };
     if success {
@@ -2490,6 +2500,7 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     level: i64,
     name: i64,
     state: abi::envoy_dynamic_module_type_socket_option_state,
+    direction: abi::envoy_dynamic_module_type_socket_direction,
   ) -> Option<Vec<u8>> {
     let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
       ptr: std::ptr::null(),
@@ -2501,6 +2512,7 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
         level,
         name,
         state,
+        direction,
         &mut result as *mut _ as *mut _,
       )
     };
