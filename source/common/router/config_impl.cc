@@ -635,6 +635,12 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
     config_cookies_.push_back(
         std::make_unique<ConfigUtility::CookieMatcher>(cookie_matcher, factory_context));
   }
+  if (!config_cookies_.empty()) {
+    config_cookie_names_.reserve(config_cookies_.size());
+    for (const auto& matcher : config_cookies_) {
+      config_cookie_names_.insert(matcher->name());
+    }
+  }
 
   if (!route.route().hash_policy().empty()) {
     hash_policy_ = THROW_OR_RETURN_VALUE(
@@ -867,14 +873,9 @@ bool RouteEntryImplBase::matchRoute(const Http::RequestHeaderMap& headers,
   }
 
   if (!config_cookies_.empty()) {
-    absl::flat_hash_set<absl::string_view> cookie_names;
-    cookie_names.reserve(config_cookies_.size());
-    for (const auto& matcher : config_cookies_) {
-      cookie_names.insert(matcher->name());
-    }
     const auto cookies =
-        Http::Utility::parseCookies(headers, [&cookie_names](absl::string_view key) -> bool {
-          return cookie_names.find(key) != cookie_names.end();
+        Http::Utility::parseCookies(headers, [this](absl::string_view key) -> bool {
+          return config_cookie_names_.find(key) != config_cookie_names_.end();
         });
     if (!ConfigUtility::matchCookies(cookies, config_cookies_)) {
       return false;
