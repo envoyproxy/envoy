@@ -940,6 +940,53 @@ bool envoy_dynamic_module_callback_network_filter_start_upstream_secure_transpor
   return filter->readCallbacks()->startUpstreamSecureTransport();
 }
 
+// -----------------------------------------------------------------------------
+// Network filter scheduler callbacks.
+// -----------------------------------------------------------------------------
+
+envoy_dynamic_module_type_network_filter_scheduler_module_ptr
+envoy_dynamic_module_callback_network_filter_scheduler_new(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr) {
+  auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
+  Event::Dispatcher* dispatcher = filter->dispatcher();
+  if (dispatcher == nullptr) {
+    return nullptr;
+  }
+  return new DynamicModuleNetworkFilterScheduler(filter->weak_from_this(), *dispatcher);
+}
+
+void envoy_dynamic_module_callback_network_filter_scheduler_delete(
+    envoy_dynamic_module_type_network_filter_scheduler_module_ptr scheduler_module_ptr) {
+  delete static_cast<DynamicModuleNetworkFilterScheduler*>(scheduler_module_ptr);
+}
+
+void envoy_dynamic_module_callback_network_filter_scheduler_commit(
+    envoy_dynamic_module_type_network_filter_scheduler_module_ptr scheduler_module_ptr,
+    uint64_t event_id) {
+  auto* scheduler = static_cast<DynamicModuleNetworkFilterScheduler*>(scheduler_module_ptr);
+  scheduler->commit(event_id);
+}
+
+envoy_dynamic_module_type_network_filter_config_scheduler_module_ptr
+envoy_dynamic_module_callback_network_filter_config_scheduler_new(
+    envoy_dynamic_module_type_network_filter_config_envoy_ptr filter_config_envoy_ptr) {
+  auto* filter_config = static_cast<DynamicModuleNetworkFilterConfig*>(filter_config_envoy_ptr);
+  return new DynamicModuleNetworkFilterConfigScheduler(filter_config->weak_from_this(),
+                                                       filter_config->main_thread_dispatcher_);
+}
+
+void envoy_dynamic_module_callback_network_filter_config_scheduler_delete(
+    envoy_dynamic_module_type_network_filter_config_scheduler_module_ptr scheduler_module_ptr) {
+  delete static_cast<DynamicModuleNetworkFilterConfigScheduler*>(scheduler_module_ptr);
+}
+
+void envoy_dynamic_module_callback_network_filter_config_scheduler_commit(
+    envoy_dynamic_module_type_network_filter_config_scheduler_module_ptr scheduler_module_ptr,
+    uint64_t event_id) {
+  auto* scheduler = static_cast<DynamicModuleNetworkFilterConfigScheduler*>(scheduler_module_ptr);
+  scheduler->commit(event_id);
+}
+
 } // extern "C"
 
 } // namespace NetworkFilters

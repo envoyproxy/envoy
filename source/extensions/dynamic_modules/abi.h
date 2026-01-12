@@ -1970,6 +1970,32 @@ typedef void* envoy_dynamic_module_type_network_filter_envoy_ptr;
 typedef const void* envoy_dynamic_module_type_network_filter_module_ptr;
 
 /**
+ * envoy_dynamic_module_type_network_filter_scheduler_module_ptr is a raw pointer to the
+ * DynamicModuleNetworkFilterScheduler class in Envoy.
+ *
+ * OWNERSHIP: The allocation is done by Envoy but the module is responsible for managing the
+ * lifetime of the pointer. Notably, it must be explicitly destroyed by the module
+ * when scheduling the network filter event is done. The creation of this pointer is done by
+ * envoy_dynamic_module_callback_network_filter_scheduler_new and the scheduling and destruction is
+ * done by envoy_dynamic_module_callback_network_filter_scheduler_delete. Since its lifecycle is
+ * owned/managed by the module, this has _module_ptr suffix.
+ */
+typedef void* envoy_dynamic_module_type_network_filter_scheduler_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_network_filter_config_scheduler_module_ptr is a raw pointer to the
+ * DynamicModuleNetworkFilterConfigScheduler class in Envoy.
+ *
+ * OWNERSHIP: The allocation is done by Envoy but the module is responsible for managing the
+ * lifetime of the pointer. Notably, it must be explicitly destroyed by the module
+ * when scheduling the network filter config event is done. The creation of this pointer is done by
+ * envoy_dynamic_module_callback_network_filter_config_scheduler_new and the scheduling and
+ * destruction is done by envoy_dynamic_module_callback_network_filter_config_scheduler_delete.
+ * Since its lifecycle is owned/managed by the module, this has _module_ptr suffix.
+ */
+typedef void* envoy_dynamic_module_type_network_filter_config_scheduler_module_ptr;
+
+/**
  * envoy_dynamic_module_type_on_network_filter_data_status represents the status of the filter
  * after processing data. This corresponds to `Network::FilterStatus` in envoy/network/filter.h.
  */
@@ -2163,6 +2189,31 @@ void envoy_dynamic_module_on_network_filter_http_callout_done(
     envoy_dynamic_module_type_http_callout_result result,
     envoy_dynamic_module_type_envoy_http_header* headers, size_t headers_size,
     envoy_dynamic_module_type_envoy_buffer* body_chunks, size_t body_chunks_size);
+
+/**
+ * envoy_dynamic_module_on_network_filter_scheduled is called when the event is scheduled via
+ * envoy_dynamic_module_callback_network_filter_scheduler_commit callback.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param filter_module_ptr is the pointer to the in-module network filter.
+ * @param event_id is the ID of the event. This is the same value as the one passed to
+ * envoy_dynamic_module_callback_network_filter_scheduler_commit.
+ */
+void envoy_dynamic_module_on_network_filter_scheduled(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_network_filter_module_ptr filter_module_ptr, uint64_t event_id);
+
+/**
+ * envoy_dynamic_module_on_network_filter_config_scheduled is called when the event is scheduled via
+ * envoy_dynamic_module_callback_network_filter_config_scheduler_commit callback.
+ *
+ * @param filter_config_ptr is the pointer to the in-module network filter configuration.
+ * @param event_id is the ID of the event. This is the same value as the one passed to
+ * envoy_dynamic_module_callback_network_filter_config_scheduler_commit.
+ */
+void envoy_dynamic_module_on_network_filter_config_scheduled(
+    envoy_dynamic_module_type_network_filter_config_module_ptr filter_config_ptr,
+    uint64_t event_id);
 
 // =============================================================================
 // Network Filter Callbacks
@@ -2921,6 +2972,102 @@ bool envoy_dynamic_module_callback_network_filter_has_upstream_host(
  */
 bool envoy_dynamic_module_callback_network_filter_start_upstream_secure_transport(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr);
+
+// ---------------------- Network filter scheduler callbacks -------------------
+
+/**
+ * envoy_dynamic_module_callback_network_filter_scheduler_new is called by the module to create a
+ * new network filter scheduler. The scheduler is used to dispatch network filter operations from
+ * any thread including the ones managed by the module.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object of the
+ * corresponding network filter.
+ * @return envoy_dynamic_module_type_network_filter_scheduler_module_ptr is the pointer to the
+ * created network filter scheduler.
+ *
+ * NOTE: it is caller's responsibility to delete the scheduler using
+ * envoy_dynamic_module_callback_network_filter_scheduler_delete when it is no longer needed.
+ * See the comment on envoy_dynamic_module_type_network_filter_scheduler_module_ptr.
+ */
+envoy_dynamic_module_type_network_filter_scheduler_module_ptr
+envoy_dynamic_module_callback_network_filter_scheduler_new(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_scheduler_commit is called by the module to
+ * schedule a generic event to the network filter on the worker thread it is running on.
+ *
+ * This will eventually end up invoking envoy_dynamic_module_on_network_filter_scheduled
+ * event hook on the worker thread.
+ *
+ * This can be called multiple times to schedule multiple events to the same filter.
+ *
+ * @param scheduler_module_ptr is the pointer to the network filter scheduler created by
+ * envoy_dynamic_module_callback_network_filter_scheduler_new.
+ * @param event_id is the ID of the event. This can be used to differentiate between multiple
+ * events scheduled to the same filter. It can be any module-defined value.
+ */
+void envoy_dynamic_module_callback_network_filter_scheduler_commit(
+    envoy_dynamic_module_type_network_filter_scheduler_module_ptr scheduler_module_ptr,
+    uint64_t event_id);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_scheduler_delete is called by the module to delete
+ * the network filter scheduler created by
+ * envoy_dynamic_module_callback_network_filter_scheduler_new.
+ *
+ * @param scheduler_module_ptr is the pointer to the network filter scheduler created by
+ * envoy_dynamic_module_callback_network_filter_scheduler_new.
+ */
+void envoy_dynamic_module_callback_network_filter_scheduler_delete(
+    envoy_dynamic_module_type_network_filter_scheduler_module_ptr scheduler_module_ptr);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_config_scheduler_new is called by the module to
+ * create a new network filter configuration scheduler. The scheduler is used to dispatch network
+ * filter configuration operations to the main thread from any thread including the ones managed by
+ * the module.
+ *
+ * @param filter_config_envoy_ptr is the pointer to the DynamicModuleNetworkFilterConfig object.
+ * @return envoy_dynamic_module_type_network_filter_config_scheduler_module_ptr is the pointer to
+ * the created network filter configuration scheduler.
+ *
+ * NOTE: it is caller's responsibility to delete the scheduler using
+ * envoy_dynamic_module_callback_network_filter_config_scheduler_delete when it is no longer needed.
+ * See the comment on envoy_dynamic_module_type_network_filter_config_scheduler_module_ptr.
+ */
+envoy_dynamic_module_type_network_filter_config_scheduler_module_ptr
+envoy_dynamic_module_callback_network_filter_config_scheduler_new(
+    envoy_dynamic_module_type_network_filter_config_envoy_ptr filter_config_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_config_scheduler_delete is called by the module to
+ * delete the network filter configuration scheduler created by
+ * envoy_dynamic_module_callback_network_filter_config_scheduler_new.
+ *
+ * @param scheduler_module_ptr is the pointer to the network filter configuration scheduler created
+ * by envoy_dynamic_module_callback_network_filter_config_scheduler_new.
+ */
+void envoy_dynamic_module_callback_network_filter_config_scheduler_delete(
+    envoy_dynamic_module_type_network_filter_config_scheduler_module_ptr scheduler_module_ptr);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_config_scheduler_commit is called by the module to
+ * schedule a generic event to the network filter configuration on the main thread.
+ *
+ * This will eventually end up invoking envoy_dynamic_module_on_network_filter_config_scheduled
+ * event hook on the main thread.
+ *
+ * This can be called multiple times to schedule multiple events to the same filter configuration.
+ *
+ * @param scheduler_module_ptr is the pointer to the network filter configuration scheduler created
+ * by envoy_dynamic_module_callback_network_filter_config_scheduler_new.
+ * @param event_id is the ID of the event. This can be used to differentiate between multiple
+ * events scheduled to the same filter configuration. It can be any module-defined value.
+ */
+void envoy_dynamic_module_callback_network_filter_config_scheduler_commit(
+    envoy_dynamic_module_type_network_filter_config_scheduler_module_ptr scheduler_module_ptr,
+    uint64_t event_id);
 
 // =============================================================================
 // ============================= Listener Filter ===============================
