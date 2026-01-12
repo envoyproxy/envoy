@@ -624,22 +624,18 @@ void BaseIntegrationTest::cleanUpXdsConnection() {
 }
 
 AssertionResult BaseIntegrationTest::compareDiscoveryRequest(
-    const std::string& expected_type_url, const std::string& expected_version,
-    const std::vector<std::string>& expected_resource_names,
-    const std::vector<std::string>& expected_resource_names_added,
-    const std::vector<std::string>& expected_resource_names_removed, bool expect_node,
-    const Protobuf::int32 expected_error_code, const std::string& expected_error_substring,
-    FakeStream* stream,
-    OptRef<const absl::flat_hash_map<std::string, std::string>> initial_resource_versions) {
+    const DiscoveryRequestTestParams& params) {
   if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw ||
       sotw_or_delta_ == Grpc::SotwOrDelta::UnifiedSotw) {
-    return compareSotwDiscoveryRequest(expected_type_url, expected_version, expected_resource_names,
-                                       expect_node, expected_error_code, expected_error_substring,
-                                       stream);
+    return compareSotwDiscoveryRequest(params.expected_type_url, params.expected_version,
+                                       params.expected_resource_names, params.expect_node,
+                                       params.expected_error_code,
+                                       params.expected_error_substring, params.stream);
   } else {
     return compareDeltaDiscoveryRequest(
-        expected_type_url, expected_resource_names_added, expected_resource_names_removed, stream,
-        expected_error_code, expected_error_substring, expect_node, initial_resource_versions);
+        params.expected_type_url, params.expected_resource_names_added,
+        params.expected_resource_names_removed, params.stream, params.expected_error_code,
+        params.expected_error_substring, params.expect_node, params.initial_resource_versions);
   }
 }
 

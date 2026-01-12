@@ -181,35 +181,46 @@ void AdsIntegrationTestBase::initializeAds(const bool rate_limiting) {
 
 void AdsIntegrationTestBase::testBasicFlow() {
   // Send initial configuration, validate we can process a request.
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "", {}, {}, {}, true));
+  EXPECT_TRUE(compareDiscoveryRequest(
+      {.expected_type_url = Config::TestTypeUrl::get().Cluster, .expect_node = true}));
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TestTypeUrl::get().Cluster,
                                                              {buildCluster("cluster_0")},
                                                              {buildCluster("cluster_0")}, {}, "1");
 
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().ClusterLoadAssignment, "",
-                                      {"cluster_0"}, {"cluster_0"}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(
+      {.expected_type_url = Config::TestTypeUrl::get().ClusterLoadAssignment,
+       .expected_resource_names = {"cluster_0"},
+       .expected_resource_names_added = {"cluster_0"}}));
   sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
       Config::TestTypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment("cluster_0")},
       {buildClusterLoadAssignment("cluster_0")}, {}, "1");
 
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "1", {}, {}, {}));
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Listener, "", {}, {}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(
+      {.expected_type_url = Config::TestTypeUrl::get().Cluster, .expected_version = "1"}));
+  EXPECT_TRUE(compareDiscoveryRequest({.expected_type_url = Config::TestTypeUrl::get().Listener}));
   sendDiscoveryResponse<envoy::config::listener::v3::Listener>(
       Config::TestTypeUrl::get().Listener, {buildListener("listener_0", "route_config_0")},
       {buildListener("listener_0", "route_config_0")}, {}, "1");
 
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().ClusterLoadAssignment, "1",
-                                      {"cluster_0"}, {}, {}));
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "",
-                                      {"route_config_0"}, {"route_config_0"}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(
+      {.expected_type_url = Config::TestTypeUrl::get().ClusterLoadAssignment,
+       .expected_version = "1",
+       .expected_resource_names = {"cluster_0"}}));
+  EXPECT_TRUE(compareDiscoveryRequest(
+      {.expected_type_url = Config::TestTypeUrl::get().RouteConfiguration,
+       .expected_resource_names = {"route_config_0"},
+       .expected_resource_names_added = {"route_config_0"}}));
   sendDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
       Config::TestTypeUrl::get().RouteConfiguration,
       {buildRouteConfig("route_config_0", "cluster_0")},
       {buildRouteConfig("route_config_0", "cluster_0")}, {}, "1");
 
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Listener, "1", {}, {}, {}));
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "1",
-                                      {"route_config_0"}, {}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(
+      {.expected_type_url = Config::TestTypeUrl::get().Listener, .expected_version = "1"}));
+  EXPECT_TRUE(compareDiscoveryRequest(
+      {.expected_type_url = Config::TestTypeUrl::get().RouteConfiguration,
+       .expected_version = "1",
+       .expected_resource_names = {"route_config_0"}}));
 
   test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
   makeSingleRequest();
@@ -231,18 +242,26 @@ void AdsIntegrationTestBase::testBasicFlow() {
       {buildClusterLoadAssignment("cluster_1"), buildClusterLoadAssignment("cluster_2")},
       {"cluster_0"}, "2");
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().ClusterLoadAssignment, "1",
-                                      {"cluster_2", "cluster_1"}, {"cluster_2", "cluster_1"},
-                                      {"cluster_0"}));
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "2", {}, {}, {}));
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().ClusterLoadAssignment, "2",
-                                      {"cluster_2", "cluster_1"}, {}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(
+      {.expected_type_url = Config::TestTypeUrl::get().ClusterLoadAssignment,
+       .expected_version = "1",
+       .expected_resource_names = {"cluster_2", "cluster_1"},
+       .expected_resource_names_added = {"cluster_2", "cluster_1"},
+       .expected_resource_names_removed = {"cluster_0"}}));
+  EXPECT_TRUE(compareDiscoveryRequest(
+      {.expected_type_url = Config::TestTypeUrl::get().Cluster, .expected_version = "2"}));
+  EXPECT_TRUE(compareDiscoveryRequest(
+      {.expected_type_url = Config::TestTypeUrl::get().ClusterLoadAssignment,
+       .expected_version = "2",
+       .expected_resource_names = {"cluster_2", "cluster_1"}}));
   sendDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
       Config::TestTypeUrl::get().RouteConfiguration,
       {buildRouteConfig("route_config_0", "cluster_1")},
       {buildRouteConfig("route_config_0", "cluster_1")}, {}, "2");
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "2",
-                                      {"route_config_0"}, {}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(
+      {.expected_type_url = Config::TestTypeUrl::get().RouteConfiguration,
+       .expected_version = "2",
+       .expected_resource_names = {"route_config_0"}}));
 
   makeSingleRequest();
   const Protobuf::Timestamp first_active_listener_ts_2 =
@@ -260,13 +279,18 @@ void AdsIntegrationTestBase::testBasicFlow() {
       {buildListener("listener_1", "route_config_1"),
        buildListener("listener_2", "route_config_2")},
       {"listener_0"}, "2");
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "2",
-                                      {"route_config_2", "route_config_1", "route_config_0"},
-                                      {"route_config_2", "route_config_1"}, {}));
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Listener, "2", {}, {}, {}));
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "2",
-                                      {"route_config_2", "route_config_1"}, {},
-                                      {"route_config_0"}));
+  EXPECT_TRUE(compareDiscoveryRequest(
+      {.expected_type_url = Config::TestTypeUrl::get().RouteConfiguration,
+       .expected_version = "2",
+       .expected_resource_names = {"route_config_2", "route_config_1", "route_config_0"},
+       .expected_resource_names_added = {"route_config_2", "route_config_1"}}));
+  EXPECT_TRUE(compareDiscoveryRequest(
+      {.expected_type_url = Config::TestTypeUrl::get().Listener, .expected_version = "2"}));
+  EXPECT_TRUE(compareDiscoveryRequest(
+      {.expected_type_url = Config::TestTypeUrl::get().RouteConfiguration,
+       .expected_version = "2",
+       .expected_resource_names = {"route_config_2", "route_config_1"},
+       .expected_resource_names_removed = {"route_config_0"}}));
   sendDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
       Config::TestTypeUrl::get().RouteConfiguration,
       {buildRouteConfig("route_config_1", "cluster_1"),
@@ -274,8 +298,10 @@ void AdsIntegrationTestBase::testBasicFlow() {
       {buildRouteConfig("route_config_1", "cluster_1"),
        buildRouteConfig("route_config_2", "cluster_1")},
       {"route_config_0"}, "3");
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "3",
-                                      {"route_config_2", "route_config_1"}, {}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(
+      {.expected_type_url = Config::TestTypeUrl::get().RouteConfiguration,
+       .expected_version = "3",
+       .expected_resource_names = {"route_config_2", "route_config_1"}}));
 
   test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
   makeSingleRequest();

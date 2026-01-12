@@ -191,15 +191,20 @@ public:
   // sending/receiving to/from the (imaginary) xDS server. You should almost always use
   // compareDiscoveryRequest() and sendDiscoveryResponse(), but the SotW/delta-specific versions are
   // available if you're writing a SotW/delta-specific test.
-  AssertionResult compareDiscoveryRequest(
-      const std::string& expected_type_url, const std::string& expected_version,
-      const std::vector<std::string>& expected_resource_names,
-      const std::vector<std::string>& expected_resource_names_added,
-      const std::vector<std::string>& expected_resource_names_removed, bool expect_node = false,
-      const Protobuf::int32 expected_error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
-      const std::string& expected_error_message = "", FakeStream* stream = nullptr,
-      OptRef<const absl::flat_hash_map<std::string, std::string>> initial_resource_versions =
-          absl::nullopt);
+  struct DiscoveryRequestTestParams {
+    std::string expected_type_url;
+    std::string expected_version = "";
+    std::vector<std::string> expected_resource_names = {};
+    std::vector<std::string> expected_resource_names_added = {};
+    std::vector<std::string> expected_resource_names_removed = {};
+    bool expect_node = false;
+    Protobuf::int32 expected_error_code = Grpc::Status::WellKnownGrpcStatus::Ok;
+    std::string expected_error_substring = "";
+    FakeStream* stream = nullptr;
+    OptRef<const absl::flat_hash_map<std::string, std::string>> initial_resource_versions =
+        absl::nullopt;
+  };
+  AssertionResult compareDiscoveryRequest(const DiscoveryRequestTestParams& params);
 
   template <class T>
   void sendDiscoveryResponse(const std::string& type_url, const std::vector<T>& state_of_the_world,
