@@ -43,7 +43,7 @@ public:
       return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
     } else {
       watermark_enabled_ = true;
-      encoder_callbacks_->setEncoderBufferLimit(
+      encoder_callbacks_->setBufferLimit(
           std::stoul(std::string(entry_buffer[0]->value().getStringView())));
       return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
     }

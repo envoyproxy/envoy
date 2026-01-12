@@ -656,6 +656,152 @@ TEST_F(MutationUtilsTest, TestHeaderMutationExceedsMaxCountAndSize) {
   EXPECT_THAT(effect, ProcessingEffect::Effect::MutationRejectedSizeLimitExceeded);
 }
 
+TEST_F(MutationUtilsTest, ProtoToHeaders) {
+  constexpr absl::string_view header_map = R"pb(
+    headers {
+      key: ":status"
+      raw_value: "200"
+    }
+    headers {
+      key: "some-header"
+      raw_value: "value"
+    }
+  )pb";
+  envoy::config::core::v3::HeaderMap headers_proto;
+  ASSERT_TRUE(Protobuf::TextFormat::ParseFromString(header_map, &headers_proto));
+  Http::TestResponseHeaderMapImpl headers;
+  Checker checker(HeaderMutationRules::default_instance(), regex_engine_);
+  Envoy::Stats::MockCounter rejections;
+  EXPECT_OK(MutationUtils::protoToHeaders(headers_proto, headers, checker, rejections));
+  Http::TestResponseHeaderMapImpl expected{{":status", "200"}, {"some-header", "value"}};
+  EXPECT_THAT(&headers, HeaderMapEqualIgnoreOrder(&expected));
+}
+
+TEST_F(MutationUtilsTest, ProtoToHeadersTooManyHeaders) {
+  constexpr absl::string_view header_map = R"pb(
+    headers {
+      key: ":status"
+      raw_value: "200"
+    }
+    headers {
+      key: "some-header"
+      raw_value: "value"
+    }
+    headers {
+      key: "some-header-2"
+      raw_value: "value2"
+    }
+  )pb";
+  envoy::config::core::v3::HeaderMap headers_proto;
+  ASSERT_TRUE(Protobuf::TextFormat::ParseFromString(header_map, &headers_proto));
+  TestHeaderMapImplWithOverrides headers;
+  headers.setMaxHeadersCount(2);
+  headers.setMaxHeadersKb(1);
+  Checker checker(HeaderMutationRules::default_instance(), regex_engine_);
+  Envoy::Stats::MockCounter rejections;
+  EXPECT_CALL(rejections, inc());
+  EXPECT_THAT(MutationUtils::protoToHeaders(headers_proto, headers, checker, rejections),
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        "header_mutation_operation_count_exceeds_limit"));
+}
+
+TEST_F(MutationUtilsTest, ProtoToHeadersTooLargeHeader) {
+  constexpr absl::string_view header_map = R"pb(
+    headers {
+      key: ":status"
+      raw_value: "200"
+    }
+    headers {
+      key: "some-header"
+      raw_value: "value"
+    }
+  )pb";
+  envoy::config::core::v3::HeaderMap headers_proto;
+  ASSERT_TRUE(Protobuf::TextFormat::ParseFromString(header_map, &headers_proto));
+  headers_proto.mutable_headers(1)->set_raw_value(std::string(2048, 'v'));
+  TestHeaderMapImplWithOverrides headers;
+  headers.setMaxHeadersCount(3);
+  // limit is lower than 2Kb header in the proto
+  headers.setMaxHeadersKb(1);
+  Checker checker(HeaderMutationRules::default_instance(), regex_engine_);
+  Envoy::Stats::MockCounter rejections;
+  EXPECT_CALL(rejections, inc());
+  EXPECT_THAT(
+      MutationUtils::protoToHeaders(headers_proto, headers, checker, rejections),
+      HasStatus(absl::StatusCode::kInvalidArgument, "header_mutation_result_exceeds_limit"));
+}
+
+TEST_F(MutationUtilsTest, ProtoToHeadersXEnvoyDisallowed) {
+  constexpr absl::string_view header_map = R"pb(
+    headers {
+      key: ":status"
+      raw_value: "200"
+    }
+    headers {
+      key: "x-envoy-some-header"
+      raw_value: "value"
+    }
+  )pb";
+  envoy::config::core::v3::HeaderMap headers_proto;
+  ASSERT_TRUE(Protobuf::TextFormat::ParseFromString(header_map, &headers_proto));
+  Http::TestResponseHeaderMapImpl headers;
+  // By default x-envoy headers are disallowed.
+  Checker checker(HeaderMutationRules::default_instance(), regex_engine_);
+  Envoy::Stats::MockCounter rejections;
+  EXPECT_CALL(rejections, inc());
+  EXPECT_OK(MutationUtils::protoToHeaders(headers_proto, headers, checker, rejections));
+  // x-envoy header is dropped and the rejections counter is incremented.
+  Http::TestResponseHeaderMapImpl expected{{":status", "200"}};
+  EXPECT_THAT(&headers, HeaderMapEqualIgnoreOrder(&expected));
+}
+
+TEST_F(MutationUtilsTest, StatusIsPreservedEvenWhenDisallowed) {
+  constexpr absl::string_view header_map = R"pb(
+    headers {
+      key: ":status"
+      raw_value: "200"
+    }
+    headers {
+      key: "x-some-header"
+      raw_value: "value"
+    }
+  )pb";
+  envoy::config::core::v3::HeaderMap headers_proto;
+  ASSERT_TRUE(Protobuf::TextFormat::ParseFromString(header_map, &headers_proto));
+  Http::TestResponseHeaderMapImpl headers;
+  HeaderMutationRules rules;
+  rules.mutable_disallow_system()->set_value(true);
+  Checker checker(rules, regex_engine_);
+  Envoy::Stats::MockCounter rejections;
+  EXPECT_CALL(rejections, inc()).Times(0);
+  EXPECT_OK(MutationUtils::protoToHeaders(headers_proto, headers, checker, rejections));
+  Http::TestResponseHeaderMapImpl expected{{":status", "200"}, {"x-some-header", "value"}};
+  EXPECT_THAT(&headers, HeaderMapEqualIgnoreOrder(&expected));
+}
+
+TEST_F(MutationUtilsTest, InvalidStatusRejected) {
+  constexpr absl::string_view header_map = R"pb(
+    headers {
+      key: ":status"
+      raw_value: "foobar"
+    }
+    headers {
+      key: "x-some-header"
+      raw_value: "value"
+    }
+  )pb";
+  envoy::config::core::v3::HeaderMap headers_proto;
+  ASSERT_TRUE(Protobuf::TextFormat::ParseFromString(header_map, &headers_proto));
+  Http::TestResponseHeaderMapImpl headers;
+  HeaderMutationRules rules;
+  rules.mutable_disallow_system()->set_value(true);
+  Checker checker(rules, regex_engine_);
+  Envoy::Stats::MockCounter rejections;
+  EXPECT_CALL(rejections, inc());
+  EXPECT_THAT(MutationUtils::protoToHeaders(headers_proto, headers, checker, rejections),
+              HasStatus(absl::StatusCode::kInvalidArgument, "header_mutation_set_headers_failed"));
+}
+
 } // namespace
 } // namespace ExternalProcessing
 } // namespace HttpFilters

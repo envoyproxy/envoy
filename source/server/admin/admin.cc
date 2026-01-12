@@ -309,12 +309,9 @@ bool AdminImpl::createNetworkFilterChain(Network::Connection& connection,
   return true;
 }
 
-bool AdminImpl::createFilterChain(Http::FilterChainManager& manager,
-                                  const Http::FilterChainOptions&) const {
-  Http::FilterFactoryCb factory = [this](Http::FilterChainFactoryCallbacks& callbacks) {
-    callbacks.addStreamFilter(std::make_shared<AdminFilter>(*this));
-  };
-  manager.applyFilterFactoryCb({}, factory);
+bool AdminImpl::createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) const {
+  callbacks.setFilterConfigName("");
+  callbacks.addStreamFilter(std::make_shared<AdminFilter>(*this));
   return true;
 }
 

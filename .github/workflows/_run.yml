@@ -114,9 +114,6 @@ on:
       rbe-google:
         type: boolean
         default: false
-      repo-fetch-depth:
-        type: number
-        default: 1
       report-pre:
         type: string
         default: |
@@ -146,7 +143,7 @@ on:
       summary-post:
         type: string
         default: |
-          - uses: envoyproxy/toolshed/gh-actions/envoy/run/summary@cb93f5b06def5199bf739b007615f7a257bb0165  # v0.3.37
+          - uses: envoyproxy/toolshed/actions/envoy/run/summary@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
             with:
               context: %{{ inputs.context }}
       steps-pre:
@@ -209,7 +206,7 @@ jobs:
     name: ${{ inputs.target-suffix && format('[{0}] ', inputs.target-suffix) || '' }}${{ inputs.command }} ${{ inputs.target }}
     timeout-minutes: ${{ inputs.timeout-minutes }}
     steps:
-    - uses: envoyproxy/toolshed/gh-actions/jq@cb93f5b06def5199bf739b007615f7a257bb0165  # v0.3.37
+    - uses: envoyproxy/toolshed/actions/jq@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
       id: started
       name: Create timestamp
       with:
@@ -217,7 +214,7 @@ jobs:
         filter: |
           now
     # This controls which input vars are exposed to the run action (and related steps)
-    - uses: envoyproxy/toolshed/gh-actions/jq@cb93f5b06def5199bf739b007615f7a257bb0165  # v0.3.37
+    - uses: envoyproxy/toolshed/actions/jq@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
       name: Context
       id: context
       with:
@@ -247,14 +244,14 @@ jobs:
             fi
         fi
       id: disk
-    - uses: envoyproxy/toolshed/gh-actions/github/remnt@cb93f5b06def5199bf739b007615f7a257bb0165  # v0.3.37
+    - uses: envoyproxy/toolshed/actions/github/remnt@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
       if: steps.disk.outputs.should-remnt == 'true'
-    - uses: envoyproxy/toolshed/gh-actions/bind-mounts@cb93f5b06def5199bf739b007615f7a257bb0165  # v0.3.37
+    - uses: envoyproxy/toolshed/actions/bind-mounts@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
       if: inputs.bind-mount && ! github.event.repository.private
       with:
         mounts: ${{ inputs.bind-mounts }}
     - name: Free diskspace
-      uses: envoyproxy/toolshed/gh-actions/diskspace@cb93f5b06def5199bf739b007615f7a257bb0165  # v0.3.37
+      uses: envoyproxy/toolshed/actions/diskspace@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
       if: inputs.diskspace-hack || github.event.repository.private
       with:
         to_remove: ${{ inputs.diskspace-hack-paths }}
@@ -278,7 +275,7 @@ jobs:
         sudo systemctl restart docker
 
     # Caches
-    - uses: envoyproxy/toolshed/gh-actions/cache/restore@cb93f5b06def5199bf739b007615f7a257bb0165  # v0.3.37
+    - uses: envoyproxy/toolshed/actions/cache/restore@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
       if: >-
         inputs.bazel-cache
       name: >-
@@ -298,19 +295,19 @@ jobs:
     # HACK/WORKAROUND for cache scope issue (https://github.com/envoyproxy/envoy/issues/37603)
     - if: ${{ inputs.cache-build-image }}
       id: cache-lookup
-      uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830  # v4.3.0
+      uses: actions/cache/restore@9255dc7a253b0ccc959486e2bca901246202afeb  # v5.0.1
       with:
         lookup-only: true
         path: /tmp/cache
         key: ${{ inputs.cache-build-image }}${{ inputs.cache-build-image-key-suffix }}
     - if: ${{ inputs.cache-build-image && steps.cache-lookup.outputs.cache-hit == 'true' }}
       name: Restore Docker cache ${{ inputs.cache-build-image && format('({0})', inputs.cache-build-image) || '' }}
-      uses: envoyproxy/toolshed/gh-actions/docker/cache/restore@cb93f5b06def5199bf739b007615f7a257bb0165  # v0.3.37
+      uses: envoyproxy/toolshed/actions/docker/cache/restore@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
       with:
         image-tag: ${{ inputs.cache-build-image }}
         key-suffix: ${{ inputs.cache-build-image-key-suffix }}
 
-    - uses: envoyproxy/toolshed/gh-actions/appauth@cb93f5b06def5199bf739b007615f7a257bb0165  # v0.3.37
+    - uses: envoyproxy/toolshed/actions/appauth@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
       id: appauth
       name: Appauth
       if: ${{ inputs.trusted }}
@@ -321,13 +318,12 @@ jobs:
         # - the workaround is to allow the token to be passed through.
         token: ${{ github.token }}
         token-ok: true
-    - uses: envoyproxy/toolshed/gh-actions/github/checkout@cb93f5b06def5199bf739b007615f7a257bb0165  # v0.3.37
+    - uses: envoyproxy/toolshed/actions/github/checkout@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
       id: checkout
       name: Checkout Envoy repository
       with:
         branch: ${{ fromJSON(inputs.request).request.target-branch }}
         config: |
-          fetch-depth: ${{ inputs.repo-fetch-depth }}
           # WARNING: This allows untrusted code to run!!!
           #  If this is set to run untrusted code, then anything before or after in the job should be regarded as
           #  compromisable.
@@ -338,7 +334,7 @@ jobs:
         token: ${{ inputs.trusted && steps.appauth.outputs.token || github.token }}
 
     # This is currently only use by mobile-docs and can be removed once they are updated to the newer website
-    - uses: envoyproxy/toolshed/gh-actions/github/checkout@cb93f5b06def5199bf739b007615f7a257bb0165  # v0.3.37
+    - uses: envoyproxy/toolshed/actions/github/checkout@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
       id: checkout-extra
       name: Checkout extra repository (for publishing)
       if: ${{ inputs.checkout-extra }}
@@ -347,7 +343,7 @@ jobs:
         ssh-key: ${{ inputs.trusted && inputs.ssh-key-extra || '' }}
 
     - name: Import GPG key
-      uses: envoyproxy/toolshed/gh-actions/gpg/import@cb93f5b06def5199bf739b007615f7a257bb0165  # v0.3.37
+      uses: envoyproxy/toolshed/actions/gpg/import@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
       if: ${{ inputs.import-gpg }}
       with:
         key: ${{ secrets.gpg-key }}
@@ -360,7 +356,7 @@ jobs:
       name: Configure PR Bazel settings
       if: >-
         ${{ fromJSON(inputs.request).request.pr != '' }}
-    - uses: envoyproxy/toolshed/gh-actions/gcp/setup@cb93f5b06def5199bf739b007615f7a257bb0165  # v0.3.37
+    - uses: envoyproxy/toolshed/actions/gcp/setup@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
       name: Setup GCP (artefacts)
       id: gcp
       with:
@@ -373,7 +369,7 @@ jobs:
 
     # NOTE: This is where untrusted code can be run!!!
     #  It MUST be the last step in the workflow
-    - uses: envoyproxy/toolshed/gh-actions/github/run@cb93f5b06def5199bf739b007615f7a257bb0165  # v0.3.37
+    - uses: envoyproxy/toolshed/actions/github/run@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
       name: Run CI ${{ inputs.command }} ${{ inputs.target }}
       with:
         args: ${{ inputs.args != '--' && inputs.args || inputs.target }}

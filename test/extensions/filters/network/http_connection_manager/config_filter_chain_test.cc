@@ -50,10 +50,10 @@ TEST_F(FilterChainTest, CreateFilterChain) {
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_TRUE(creation_status_.ok());
 
-  NiceMock<Http::MockFilterChainManager> manager;
-  EXPECT_CALL(manager.callbacks_, addStreamFilter(_));        // Buffer
-  EXPECT_CALL(manager.callbacks_, addStreamDecoderFilter(_)); // Router
-  config.createFilterChain(manager);
+  NiceMock<Http::MockFilterChainFactoryCallbacks> callbacks;
+  EXPECT_CALL(callbacks, addStreamFilter(_));        // Buffer
+  EXPECT_CALL(callbacks, addStreamDecoderFilter(_)); // Router
+  config.createFilterChain(callbacks);
 }
 
 TEST_F(FilterChainTest, CreateFilterChainWithDisabledFilter) {
@@ -85,9 +85,9 @@ http_filters:
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_TRUE(creation_status_.ok());
 
-  NiceMock<Http::MockFilterChainManager> manager;
-  EXPECT_CALL(manager.callbacks_, addStreamDecoderFilter(_)); // Router
-  config.createFilterChain(manager);
+  NiceMock<Http::MockFilterChainFactoryCallbacks> callbacks;
+  EXPECT_CALL(callbacks, addStreamDecoderFilter(_)); // Router
+  config.createFilterChain(callbacks);
 }
 
 TEST_F(FilterChainTest, CreateFilterChainWithDisabledTerminalFilter) {
@@ -156,14 +156,13 @@ http_filters:
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_TRUE(creation_status_.ok());
 
-  NiceMock<Http::MockFilterChainManager> manager;
+  NiceMock<Http::MockFilterChainFactoryCallbacks> callbacks;
   Http::StreamDecoderFilterSharedPtr missing_config_filter;
-  EXPECT_CALL(manager.callbacks_, addStreamDecoderFilter(_))
+  EXPECT_CALL(callbacks, addStreamDecoderFilter(_))
       .Times(2)
       .WillOnce(testing::SaveArg<0>(&missing_config_filter))
       .WillOnce(Return()); // MissingConfigFilter (only once) and router
-  config.createFilterChain(manager);
-
+  config.createFilterChain(callbacks);
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   EXPECT_CALL(decoder_callbacks, streamInfo()).WillRepeatedly(ReturnRef(stream_info));
   EXPECT_CALL(decoder_callbacks, sendLocalReply(Http::Code::InternalServerError, _, _, _, _))
@@ -185,24 +184,23 @@ TEST_F(FilterChainTest, CreateUpgradeFilterChain) {
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_TRUE(creation_status_.ok());
 
-  NiceMock<Http::MockFilterChainManager> manager;
-  const Http::EmptyFilterChainOptions options;
+  NiceMock<Http::MockFilterChainFactoryCallbacks> callbacks;
 
   // Check the case where WebSockets are configured in the HCM, and no router
   // config is present. We should create an upgrade filter chain for
   // WebSockets.
   {
-    EXPECT_CALL(manager.callbacks_, addStreamFilter(_));        // Buffer
-    EXPECT_CALL(manager.callbacks_, addStreamDecoderFilter(_)); // Router
-    EXPECT_TRUE(config.createUpgradeFilterChain("WEBSOCKET", nullptr, manager, options));
+    EXPECT_CALL(callbacks, addStreamFilter(_));        // Buffer
+    EXPECT_CALL(callbacks, addStreamDecoderFilter(_)); // Router
+    EXPECT_TRUE(config.createUpgradeFilterChain("WEBSOCKET", nullptr, callbacks));
   }
 
   // Check the case where WebSockets are configured in the HCM, and no router
   // config is present. We should not create an upgrade filter chain for Foo
   {
-    EXPECT_CALL(manager.callbacks_, addStreamFilter(_)).Times(0);
-    EXPECT_CALL(manager.callbacks_, addStreamDecoderFilter(_)).Times(0);
-    EXPECT_FALSE(config.createUpgradeFilterChain("foo", nullptr, manager, options));
+    EXPECT_CALL(callbacks, addStreamFilter(_)).Times(0);
+    EXPECT_CALL(callbacks, addStreamDecoderFilter(_)).Times(0);
+    EXPECT_FALSE(config.createUpgradeFilterChain("foo", nullptr, callbacks));
   }
 
   // Now override the HCM with a route-specific disabling of WebSocket to
@@ -210,17 +208,17 @@ TEST_F(FilterChainTest, CreateUpgradeFilterChain) {
   {
     std::map<std::string, bool> upgrade_map;
     upgrade_map.emplace(std::make_pair("WebSocket", false));
-    EXPECT_FALSE(config.createUpgradeFilterChain("WEBSOCKET", &upgrade_map, manager, options));
+    EXPECT_FALSE(config.createUpgradeFilterChain("WEBSOCKET", &upgrade_map, callbacks));
   }
 
   // For paranoia's sake make sure route-specific enabling doesn't break
   // anything.
   {
-    EXPECT_CALL(manager.callbacks_, addStreamFilter(_));        // Buffer
-    EXPECT_CALL(manager.callbacks_, addStreamDecoderFilter(_)); // Router
+    EXPECT_CALL(callbacks, addStreamFilter(_));        // Buffer
+    EXPECT_CALL(callbacks, addStreamDecoderFilter(_)); // Router
     std::map<std::string, bool> upgrade_map;
     upgrade_map.emplace(std::make_pair("WebSocket", true));
-    EXPECT_TRUE(config.createUpgradeFilterChain("WEBSOCKET", &upgrade_map, manager, options));
+    EXPECT_TRUE(config.createUpgradeFilterChain("WEBSOCKET", &upgrade_map, callbacks));
   }
 }
 
@@ -236,24 +234,23 @@ TEST_F(FilterChainTest, CreateUpgradeFilterChainHCMDisabled) {
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_TRUE(creation_status_.ok());
 
-  NiceMock<Http::MockFilterChainManager> manager;
-  const Http::EmptyFilterChainOptions options;
+  NiceMock<Http::MockFilterChainFactoryCallbacks> callbacks;
 
   // Check the case where WebSockets are off in the HCM, and no router config is present.
-  { EXPECT_FALSE(config.createUpgradeFilterChain("WEBSOCKET", nullptr, manager, options)); }
+  { EXPECT_FALSE(config.createUpgradeFilterChain("WEBSOCKET", nullptr, callbacks)); }
 
   // Check the case where WebSockets are off in the HCM and in router config.
   {
     std::map<std::string, bool> upgrade_map;
     upgrade_map.emplace(std::make_pair("WebSocket", false));
-    EXPECT_FALSE(config.createUpgradeFilterChain("WEBSOCKET", &upgrade_map, manager, options));
+    EXPECT_FALSE(config.createUpgradeFilterChain("WEBSOCKET", &upgrade_map, callbacks));
   }
 
   // With a route-specific enabling for WebSocket, WebSocket should work.
   {
     std::map<std::string, bool> upgrade_map;
     upgrade_map.emplace(std::make_pair("WebSocket", true));
-    EXPECT_TRUE(config.createUpgradeFilterChain("WEBSOCKET", &upgrade_map, manager, options));
+    EXPECT_TRUE(config.createUpgradeFilterChain("WEBSOCKET", &upgrade_map, callbacks));
   }
 
   // With only a route-config we should do what the route config says.
@@ -261,9 +258,9 @@ TEST_F(FilterChainTest, CreateUpgradeFilterChainHCMDisabled) {
     std::map<std::string, bool> upgrade_map;
     upgrade_map.emplace(std::make_pair("foo", true));
     upgrade_map.emplace(std::make_pair("bar", false));
-    EXPECT_TRUE(config.createUpgradeFilterChain("foo", &upgrade_map, manager, options));
-    EXPECT_FALSE(config.createUpgradeFilterChain("bar", &upgrade_map, manager, options));
-    EXPECT_FALSE(config.createUpgradeFilterChain("eep", &upgrade_map, manager, options));
+    EXPECT_TRUE(config.createUpgradeFilterChain("foo", &upgrade_map, callbacks));
+    EXPECT_FALSE(config.createUpgradeFilterChain("bar", &upgrade_map, callbacks));
+    EXPECT_FALSE(config.createUpgradeFilterChain("eep", &upgrade_map, callbacks));
   }
 }
 
@@ -294,26 +291,24 @@ TEST_F(FilterChainTest, CreateCustomUpgradeFilterChain) {
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_TRUE(creation_status_.ok());
 
-  const Http::EmptyFilterChainOptions options;
-
   {
-    NiceMock<Http::MockFilterChainManager> manager;
-    EXPECT_CALL(manager.callbacks_, addStreamFilter(_));        // Buffer
-    EXPECT_CALL(manager.callbacks_, addStreamDecoderFilter(_)); // Router
-    config.createFilterChain(manager);
+    NiceMock<Http::MockFilterChainFactoryCallbacks> callbacks;
+    EXPECT_CALL(callbacks, addStreamFilter(_));        // Buffer
+    EXPECT_CALL(callbacks, addStreamDecoderFilter(_)); // Router
+    config.createFilterChain(callbacks);
   }
 
   {
-    NiceMock<Http::MockFilterChainManager> manager;
-    EXPECT_CALL(manager.callbacks_, addStreamDecoderFilter(_));
-    EXPECT_TRUE(config.createUpgradeFilterChain("websocket", nullptr, manager, options));
+    NiceMock<Http::MockFilterChainFactoryCallbacks> callbacks;
+    EXPECT_CALL(callbacks, addStreamDecoderFilter(_));
+    EXPECT_TRUE(config.createUpgradeFilterChain("websocket", nullptr, callbacks));
   }
 
   {
-    NiceMock<Http::MockFilterChainManager> manager;
-    EXPECT_CALL(manager.callbacks_, addStreamDecoderFilter(_));
-    EXPECT_CALL(manager.callbacks_, addStreamFilter(_)).Times(2); // Buffer
-    EXPECT_TRUE(config.createUpgradeFilterChain("Foo", nullptr, manager, options));
+    NiceMock<Http::MockFilterChainFactoryCallbacks> callbacks;
+    EXPECT_CALL(callbacks, addStreamDecoderFilter(_));
+    EXPECT_CALL(callbacks, addStreamFilter(_)).Times(2); // Buffer
+    EXPECT_TRUE(config.createUpgradeFilterChain("Foo", nullptr, callbacks));
   }
 }
 

@@ -16,6 +16,7 @@
 #include "library/common/extensions/filters/http/socket_tag/filter_descriptor.pb.h"
 #include "library/common/extensions/key_value/platform/platform_descriptor.pb.h"
 #include "library/common/extensions/retry/options/network_configuration/predicate_descriptor.pb.h"
+#include "library/common/extensions/quic_packet_writer/platform/platform_packet_writer_descriptor.pb.h"
 
 namespace Envoy {
 
@@ -36,6 +37,9 @@ bool initialize() {
           kFileDescriptorInfo,
       protobuf::reflection::
           library_common_extensions_retry_options_network_configuration_predicate::
+              kFileDescriptorInfo,
+      protobuf::reflection::
+          library_common_extensions_quic_packet_writer_platform_platform_packet_writer::
               kFileDescriptorInfo,
   };
   for (const FileDescriptorInfo& descriptor : file_descriptors) {

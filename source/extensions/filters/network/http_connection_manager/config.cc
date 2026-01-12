@@ -705,6 +705,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
                           Server::Configuration::NamedHttpFilterConfigFactory>
       helper(filter_config_provider_manager_, context_.serverFactoryContext(),
              context_.serverFactoryContext().clusterManager(), context_, stats_prefix_);
+
   SET_AND_RETURN_IF_NOT_OK(
       helper.processFilters(config.http_filters(), "http", "http", filter_factories_),
       creation_status);
@@ -725,8 +726,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
           helper.processFilters(upgrade_config.filters(), name, "http upgrade", *factories),
           creation_status);
       // TODO(auni53): Validate encode dependencies too.
-      auto status = upgrade_dependency_manager.validDecodeDependencies();
-      SET_AND_RETURN_IF_NOT_OK(status, creation_status);
+      SET_AND_RETURN_IF_NOT_OK(upgrade_dependency_manager.validDecodeDependencies(),
+                               creation_status);
 
       upgrade_filter_factories_.emplace(
           std::make_pair(name, FilterConfig{std::move(factories), enabled}));
@@ -778,16 +779,16 @@ Http::ServerConnectionPtr HttpConnectionManagerConfig::createCodec(
   PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
-bool HttpConnectionManagerConfig::createFilterChain(Http::FilterChainManager& manager,
-                                                    const Http::FilterChainOptions& options) const {
-  Http::FilterChainUtility::createFilterChainForFactories(manager, options, filter_factories_);
+bool HttpConnectionManagerConfig::createFilterChain(
+    Http::FilterChainFactoryCallbacks& callbacks) const {
+  Http::FilterChainUtility::createFilterChainForFactories(callbacks, filter_factories_);
   return true;
 }
 
 bool HttpConnectionManagerConfig::createUpgradeFilterChain(
     absl::string_view upgrade_type,
     const Http::FilterChainFactory::UpgradeMap* per_route_upgrade_map,
-    Http::FilterChainManager& callbacks, const Http::FilterChainOptions& options) const {
+    Http::FilterChainFactoryCallbacks& callbacks) const {
   bool route_enabled = false;
   if (per_route_upgrade_map) {
     auto route_it = findUpgradeBoolCaseInsensitive(*per_route_upgrade_map, upgrade_type);
@@ -812,7 +813,7 @@ bool HttpConnectionManagerConfig::createUpgradeFilterChain(
     filters_to_use = it->second.filter_factories.get();
   }
 
-  Http::FilterChainUtility::createFilterChainForFactories(callbacks, options, *filters_to_use);
+  Http::FilterChainUtility::createFilterChainForFactories(callbacks, *filters_to_use);
   return true;
 }
 

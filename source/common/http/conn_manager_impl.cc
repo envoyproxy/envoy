@@ -288,11 +288,10 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream, bool check_for_def
     } else {
       const bool reset_with_error =
           Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reset_with_error");
-      // TODO(wbpcode): We may should not propagate UpstreamProtocolError to downstream as that
-      // indicates an error on the upstream connection and may have nothing to do with the
-      // downstream.
       if (stream.filter_manager_.streamInfo().hasResponseFlag(
-              StreamInfo::CoreResponseFlag::UpstreamProtocolError)) {
+              StreamInfo::CoreResponseFlag::UpstreamProtocolError) &&
+          !Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.reset_ignore_upstream_reason")) {
         stream.response_encoder_->getStream().resetStream(StreamResetReason::ProtocolError);
       } else if (reset_with_error && stream.filter_manager_.streamInfo().hasResponseFlag(
                                          StreamInfo::CoreResponseFlag::DownstreamProtocolError)) {
@@ -462,6 +461,7 @@ RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encod
     new_stream->response_encoder_->getStream().setFlushTimeout(config_->streamIdleTimeout());
   }
   new_stream->streamInfo().setDownstreamBytesMeter(response_encoder.getStream().bytesMeter());
+  new_stream->streamInfo().setCodecStreamId(response_encoder.getStream().codecStreamId());
   // If the network connection is backed up, the stream should be made aware of it on creation.
   // Both HTTP/1.x and HTTP/2 codecs handle this in StreamCallbackHelper::addCallbacksHelper.
   ASSERT(read_callbacks_->connection().aboveHighWatermark() == false ||
