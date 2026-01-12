@@ -1,3 +1,10 @@
+envoy.access_loggers.dynamic_modules:
+  categories:
+  - envoy.access_loggers
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.access_loggers.dynamic_modules.v3.DynamicModuleAccessLog
 envoy.access_loggers.file:
   categories:
   - envoy.access_loggers

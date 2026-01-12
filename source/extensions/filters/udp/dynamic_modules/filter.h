@@ -28,6 +28,9 @@ public:
   Network::UdpRecvData* currentData() { return current_data_; }
   Network::UdpReadFilterCallbacks* callbacks() { return read_callbacks_; }
 
+  // Get the filter config for metrics access.
+  DynamicModuleUdpListenerFilterConfig& getFilterConfig() const { return *config_; }
+
 #ifdef ENVOY_ENABLE_FULL_PROTOS
   // Test-only method to set current_data_ for ABI callback testing.
   void setCurrentDataForTest(Network::UdpRecvData* data) { current_data_ = data; }

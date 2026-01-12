@@ -1,3 +1,4 @@
+#include "source/common/stats/isolated_store_impl.h"
 #include "source/extensions/dynamic_modules/abi.h"
 #include "source/extensions/filters/udp/dynamic_modules/filter.h"
 
@@ -23,9 +24,10 @@ public:
     proto_config.mutable_filter_config()->set_value("some_config");
 
     filter_config_ = std::make_shared<DynamicModuleUdpListenerFilterConfig>(
-        proto_config, std::move(dynamic_module.value()));
+        proto_config, std::move(dynamic_module.value()), *stats_.rootScope());
   }
 
+  Stats::IsolatedStoreImpl stats_;
   DynamicModuleUdpListenerFilterConfigSharedPtr filter_config_;
 };
 
@@ -64,8 +66,8 @@ TEST_F(DynamicModuleUdpListenerFilterTest, ConfigMissingSymbols) {
   proto_config.set_filter_name("test_filter");
 
   EXPECT_THROW_WITH_MESSAGE(
-      std::make_shared<DynamicModuleUdpListenerFilterConfig>(proto_config,
-                                                             std::move(dynamic_module.value())),
+      std::make_shared<DynamicModuleUdpListenerFilterConfig>(
+          proto_config, std::move(dynamic_module.value()), *stats_.rootScope()),
       EnvoyException,
       "Dynamic module does not support UDP listener filters: Failed to resolve symbol "
       "envoy_dynamic_module_on_udp_listener_filter_config_new");
@@ -84,7 +86,7 @@ TEST_F(DynamicModuleUdpListenerFilterTest, NullInModuleFilter) {
   proto_config.mutable_filter_config()->set_value("config");
 
   auto bad_filter_config = std::make_shared<DynamicModuleUdpListenerFilterConfig>(
-      proto_config, std::move(dynamic_module.value()));
+      proto_config, std::move(dynamic_module.value()), *stats_.rootScope());
 
   // Replace the on_filter_new function to return null.
   auto null_returner = +[](envoy_dynamic_module_type_udp_listener_filter_config_module_ptr,
@@ -149,7 +151,7 @@ TEST_F(DynamicModuleUdpListenerFilterTest, FilterConfigWithEmptyName) {
   proto_config.mutable_filter_config()->set_value("config");
 
   auto config = std::make_shared<DynamicModuleUdpListenerFilterConfig>(
-      proto_config, std::move(dynamic_module.value()));
+      proto_config, std::move(dynamic_module.value()), *stats_.rootScope());
   EXPECT_EQ("", config->filter_name_);
 }
 
@@ -163,7 +165,7 @@ TEST_F(DynamicModuleUdpListenerFilterTest, FilterConfigWithNoConfig) {
   // No filter_config set.
 
   auto config = std::make_shared<DynamicModuleUdpListenerFilterConfig>(
-      proto_config, std::move(dynamic_module.value()));
+      proto_config, std::move(dynamic_module.value()), *stats_.rootScope());
   EXPECT_FALSE(config->filter_config_.empty());
 }
 
@@ -220,9 +222,10 @@ public:
     proto_config.mutable_filter_config()->set_value("config");
 
     filter_config_ = std::make_shared<DynamicModuleUdpListenerFilterConfig>(
-        proto_config, std::move(dynamic_module.value()));
+        proto_config, std::move(dynamic_module.value()), *stats_.rootScope());
   }
 
+  Stats::IsolatedStoreImpl stats_;
   DynamicModuleUdpListenerFilterConfigSharedPtr filter_config_;
 };
 
@@ -239,6 +242,7 @@ TEST_F(DynamicModuleUdpListenerFilterStopIterationTest, ReturnsStopIteration) {
 
 // Test for missing config_destroy symbol.
 TEST(DynamicModuleUdpListenerFilterConfigErrorTest, MissingConfigDestroy) {
+  Stats::IsolatedStoreImpl stats;
   auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
       Extensions::DynamicModules::testSharedObjectPath("udp_no_config_destroy", "c"), false);
   EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
@@ -248,8 +252,8 @@ TEST(DynamicModuleUdpListenerFilterConfigErrorTest, MissingConfigDestroy) {
   proto_config.mutable_filter_config()->set_value("config");
 
   EXPECT_THROW_WITH_MESSAGE(
-      std::make_shared<DynamicModuleUdpListenerFilterConfig>(proto_config,
-                                                             std::move(dynamic_module.value())),
+      std::make_shared<DynamicModuleUdpListenerFilterConfig>(
+          proto_config, std::move(dynamic_module.value()), *stats.rootScope()),
       EnvoyException,
       "Dynamic module does not support UDP listener filters: Failed to resolve symbol "
       "envoy_dynamic_module_on_udp_listener_filter_config_destroy");
@@ -257,6 +261,7 @@ TEST(DynamicModuleUdpListenerFilterConfigErrorTest, MissingConfigDestroy) {
 
 // Test for missing filter_new symbol.
 TEST(DynamicModuleUdpListenerFilterConfigErrorTest, MissingFilterNew) {
+  Stats::IsolatedStoreImpl stats;
   auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
       Extensions::DynamicModules::testSharedObjectPath("udp_no_filter_new", "c"), false);
   EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
@@ -265,8 +270,8 @@ TEST(DynamicModuleUdpListenerFilterConfigErrorTest, MissingFilterNew) {
   proto_config.set_filter_name("test");
 
   EXPECT_THROW_WITH_MESSAGE(
-      std::make_shared<DynamicModuleUdpListenerFilterConfig>(proto_config,
-                                                             std::move(dynamic_module.value())),
+      std::make_shared<DynamicModuleUdpListenerFilterConfig>(
+          proto_config, std::move(dynamic_module.value()), *stats.rootScope()),
       EnvoyException,
       "Dynamic module does not support UDP listener filters: Failed to resolve symbol "
       "envoy_dynamic_module_on_udp_listener_filter_new");
@@ -274,6 +279,7 @@ TEST(DynamicModuleUdpListenerFilterConfigErrorTest, MissingFilterNew) {
 
 // Test for missing on_data symbol.
 TEST(DynamicModuleUdpListenerFilterConfigErrorTest, MissingOnData) {
+  Stats::IsolatedStoreImpl stats;
   auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
       Extensions::DynamicModules::testSharedObjectPath("udp_no_on_data", "c"), false);
   EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
@@ -282,8 +288,8 @@ TEST(DynamicModuleUdpListenerFilterConfigErrorTest, MissingOnData) {
   proto_config.set_filter_name("test");
 
   EXPECT_THROW_WITH_MESSAGE(
-      std::make_shared<DynamicModuleUdpListenerFilterConfig>(proto_config,
-                                                             std::move(dynamic_module.value())),
+      std::make_shared<DynamicModuleUdpListenerFilterConfig>(
+          proto_config, std::move(dynamic_module.value()), *stats.rootScope()),
       EnvoyException,
       "Dynamic module does not support UDP listener filters: Failed to resolve symbol "
       "envoy_dynamic_module_on_udp_listener_filter_on_data");
@@ -291,6 +297,7 @@ TEST(DynamicModuleUdpListenerFilterConfigErrorTest, MissingOnData) {
 
 // Test for missing filter_destroy symbol.
 TEST(DynamicModuleUdpListenerFilterConfigErrorTest, MissingFilterDestroy) {
+  Stats::IsolatedStoreImpl stats;
   auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
       Extensions::DynamicModules::testSharedObjectPath("udp_no_filter_destroy", "c"), false);
   EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
@@ -299,11 +306,109 @@ TEST(DynamicModuleUdpListenerFilterConfigErrorTest, MissingFilterDestroy) {
   proto_config.set_filter_name("test");
 
   EXPECT_THROW_WITH_MESSAGE(
-      std::make_shared<DynamicModuleUdpListenerFilterConfig>(proto_config,
-                                                             std::move(dynamic_module.value())),
+      std::make_shared<DynamicModuleUdpListenerFilterConfig>(
+          proto_config, std::move(dynamic_module.value()), *stats.rootScope()),
       EnvoyException,
       "Dynamic module does not support UDP listener filters: Failed to resolve symbol "
       "envoy_dynamic_module_on_udp_listener_filter_destroy");
+}
+
+// =================================================================================================
+// Metrics ABI Tests
+// =================================================================================================
+
+TEST_F(DynamicModuleUdpListenerFilterTest, MetricsCounterDefineAndIncrement) {
+  NiceMock<Network::MockUdpReadFilterCallbacks> callbacks;
+  auto filter = std::make_shared<DynamicModuleUdpListenerFilter>(callbacks, filter_config_);
+
+  // Define a counter via the config.
+  size_t counter_id = 0;
+  auto result = envoy_dynamic_module_callback_udp_listener_filter_config_define_counter(
+      static_cast<void*>(filter_config_.get()),
+      {const_cast<char*>("test_counter"), strlen("test_counter")}, &counter_id);
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success, result);
+  EXPECT_EQ(0, counter_id);
+
+  // Increment the counter via the filter.
+  result = envoy_dynamic_module_callback_udp_listener_filter_increment_counter(
+      static_cast<void*>(filter.get()), counter_id, 5);
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success, result);
+
+  // Verify the counter value.
+  auto counter = TestUtility::findCounter(
+      stats_, "dynamic_module_udp_listener_filter.test_filter.test_counter");
+  ASSERT_NE(nullptr, counter);
+  EXPECT_EQ(5, counter->value());
+}
+
+TEST_F(DynamicModuleUdpListenerFilterTest, MetricsGaugeDefineAndOperations) {
+  NiceMock<Network::MockUdpReadFilterCallbacks> callbacks;
+  auto filter = std::make_shared<DynamicModuleUdpListenerFilter>(callbacks, filter_config_);
+
+  // Define a gauge.
+  size_t gauge_id = 0;
+  auto result = envoy_dynamic_module_callback_udp_listener_filter_config_define_gauge(
+      static_cast<void*>(filter_config_.get()),
+      {const_cast<char*>("test_gauge"), strlen("test_gauge")}, &gauge_id);
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success, result);
+
+  // Set gauge value.
+  result = envoy_dynamic_module_callback_udp_listener_filter_set_gauge(
+      static_cast<void*>(filter.get()), gauge_id, 100);
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success, result);
+
+  // Increment gauge.
+  result = envoy_dynamic_module_callback_udp_listener_filter_increment_gauge(
+      static_cast<void*>(filter.get()), gauge_id, 10);
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success, result);
+
+  // Decrement gauge.
+  result = envoy_dynamic_module_callback_udp_listener_filter_decrement_gauge(
+      static_cast<void*>(filter.get()), gauge_id, 5);
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success, result);
+
+  // Verify gauge value.
+  auto gauge =
+      TestUtility::findGauge(stats_, "dynamic_module_udp_listener_filter.test_filter.test_gauge");
+  ASSERT_NE(nullptr, gauge);
+  EXPECT_EQ(105, gauge->value());
+}
+
+TEST_F(DynamicModuleUdpListenerFilterTest, MetricsHistogramDefineAndRecord) {
+  NiceMock<Network::MockUdpReadFilterCallbacks> callbacks;
+  auto filter = std::make_shared<DynamicModuleUdpListenerFilter>(callbacks, filter_config_);
+
+  // Define a histogram.
+  size_t histogram_id = 0;
+  auto result = envoy_dynamic_module_callback_udp_listener_filter_config_define_histogram(
+      static_cast<void*>(filter_config_.get()),
+      {const_cast<char*>("test_histogram"), strlen("test_histogram")}, &histogram_id);
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success, result);
+
+  // Record a value. This doesn't crash.
+  result = envoy_dynamic_module_callback_udp_listener_filter_record_histogram_value(
+      static_cast<void*>(filter.get()), histogram_id, 42);
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success, result);
+}
+
+TEST_F(DynamicModuleUdpListenerFilterTest, MetricsNotFound) {
+  NiceMock<Network::MockUdpReadFilterCallbacks> callbacks;
+  auto filter = std::make_shared<DynamicModuleUdpListenerFilter>(callbacks, filter_config_);
+
+  // Try to increment a counter that doesn't exist.
+  auto result = envoy_dynamic_module_callback_udp_listener_filter_increment_counter(
+      static_cast<void*>(filter.get()), 999, 1);
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound, result);
+
+  // Try to set a gauge that doesn't exist.
+  result = envoy_dynamic_module_callback_udp_listener_filter_set_gauge(
+      static_cast<void*>(filter.get()), 999, 1);
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound, result);
+
+  // Try to record a histogram that doesn't exist.
+  result = envoy_dynamic_module_callback_udp_listener_filter_record_histogram_value(
+      static_cast<void*>(filter.get()), 999, 1);
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound, result);
 }
 
 } // namespace DynamicModules

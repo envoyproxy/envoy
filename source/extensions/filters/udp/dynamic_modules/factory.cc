@@ -9,7 +9,7 @@ namespace DynamicModules {
 
 Network::UdpListenerFilterFactoryCb
 DynamicModuleUdpListenerFilterConfigFactory::createFilterFactoryFromProto(
-    const Protobuf::Message& config, Server::Configuration::ListenerFactoryContext&) {
+    const Protobuf::Message& config, Server::Configuration::ListenerFactoryContext& context) {
   const auto& proto_config = dynamic_cast<
       const envoy::extensions::filters::udp::dynamic_modules::v3::DynamicModuleUdpListenerFilter&>(
       config);
@@ -26,7 +26,7 @@ DynamicModuleUdpListenerFilterConfigFactory::createFilterFactoryFromProto(
   auto dynamic_module = std::move(dynamic_module_or_error.value());
 
   auto filter_config = std::make_shared<DynamicModuleUdpListenerFilterConfig>(
-      proto_config, std::move(dynamic_module));
+      proto_config, std::move(dynamic_module), context.scope());
 
   return [filter_config](Network::UdpListenerFilterManager& filter_manager,
                          Network::UdpReadFilterCallbacks& callbacks) -> void {

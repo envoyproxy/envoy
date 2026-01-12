@@ -1,0 +1,141 @@
+# Example configuration for exporting OpenTelemetry logs and traces via HTTP.
+# This demonstrates OTLP/HTTP transport for both access logs and tracing.
+#
+# Usage:
+#   1. Start an OTLP HTTP collector on localhost:4318 (e.g., otel-tui)
+#   2. Run: bazel-bin/source/exe/envoy-static -c configs/envoy-otel-http.yaml
+#   3. Test: curl localhost:10080/get
+
+admin:
+  address:
+    socket_address:
+      protocol: TCP
+      address: 127.0.0.1
+      port_value: 9901
+
+static_resources:
+  listeners:
+  - name: listener_0
+    address:
+      socket_address:
+        protocol: TCP
+        address: 0.0.0.0
+        port_value: 10080
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: ingress_http
+          generate_request_id: true
+          tracing:
+            spawn_upstream_span: true
+            random_sampling:
+              value: 100.0
+            provider:
+              name: envoy.tracers.opentelemetry
+              typed_config:
+                "@type": type.googleapis.com/envoy.config.trace.v3.OpenTelemetryConfig
+                http_service:
+                  http_uri:
+                    uri: "http://localhost:4318/v1/traces"
+                    cluster: otel_collector
+                    timeout: 1s
+                  request_headers_to_add:
+                  - header:
+                      key: "Authorization"
+                      value: "Bearer fake"
+                service_name: "envoy-demo"
+                sampler:
+                  name: envoy.tracers.opentelemetry.samplers.always_on
+                  typed_config:
+                    "@type": type.googleapis.com/envoy.extensions.tracers.opentelemetry.samplers.v3.AlwaysOnSamplerConfig
+          access_log:
+          - name: envoy.access_loggers.open_telemetry
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.access_loggers.open_telemetry.v3.OpenTelemetryAccessLogConfig
+              log_name: envoy_access_log
+              # Flush immediately for testing (default is 16384 bytes).
+              buffer_size_bytes: 1
+              http_service:
+                http_uri:
+                  uri: "http://localhost:4318/v1/logs"
+                  cluster: otel_collector
+                  timeout: 1s
+                request_headers_to_add:
+                - header:
+                    key: "Authorization"
+                    value: "Bearer fake"
+              resource_attributes:
+                values:
+                - key: "service.name"
+                  value:
+                    string_value: "envoy-demo"
+              body:
+                string_value: "%REQ(:METHOD)% %REQ(:PATH)% %PROTOCOL% %RESPONSE_CODE%"
+              attributes:
+                values:
+                - key: "response_code_details"
+                  value:
+                    string_value: "%RESPONSE_CODE_DETAILS%"
+                - key: "upstream_host"
+                  value:
+                    string_value: "%UPSTREAM_HOST%"
+                - key: "upstream_cluster"
+                  value:
+                    string_value: "%UPSTREAM_CLUSTER%"
+                - key: "upstream_transport_failure_reason"
+                  value:
+                    string_value: "%UPSTREAM_TRANSPORT_FAILURE_REASON%"
+                - key: "response_flags"
+                  value:
+                    string_value: "%RESPONSE_FLAGS%"
+                - key: "connection_termination_details"
+                  value:
+                    string_value: "%CONNECTION_TERMINATION_DETAILS%"
+          route_config:
+            name: local_route
+            virtual_hosts:
+            - name: backend
+              domains: ["*"]
+              routes:
+              - match:
+                  prefix: "/"
+                route:
+                  host_rewrite_literal: httpbingo.org
+                  cluster: httpbingo
+          http_filters:
+          - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  clusters:
+  - name: otel_collector
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: otel_collector
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: localhost
+                port_value: 4318
+  - name: httpbingo
+    type: LOGICAL_DNS
+    dns_lookup_family: V4_ONLY
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: httpbingo
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: httpbingo.org
+                port_value: 443
+    transport_socket:
+      name: envoy.transport_sockets.tls
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+        sni: httpbingo.org

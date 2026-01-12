@@ -16,6 +16,7 @@
 
 # access loggers
 /*/extensions/access_loggers/common @auni53 @zuercher
+/*/extensions/access_loggers/dynamic_modules @agrawroh @wbpcode @mathetake
 /*/extensions/access_loggers/open_telemetry @itamarkam @yanavlasov
 /*/extensions/access_loggers/stats @ggreenway @wbpcode @kyessenov
 /*/extensions/access_loggers/stream @mattklein123 @davinci26
