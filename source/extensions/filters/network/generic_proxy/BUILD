@@ -224,6 +224,7 @@ envoy_cc_library(
     deps = [
         ":route_interface",
         "//envoy/access_log:access_log_config_interface",
+        "//source/common/tracing:tracer_config_lib",
         "//envoy/tracing:trace_config_interface",
         "//envoy/tracing:tracer_interface",
         "//source/extensions/filters/network/generic_proxy:access_log_lib",

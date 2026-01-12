@@ -10,6 +10,7 @@
 #include "source/extensions/filters/network/generic_proxy/match_input.h"
 #include "source/extensions/filters/network/generic_proxy/route.h"
 #include "source/extensions/filters/network/generic_proxy/stats.h"
+#include "source/common/tracing/tracer_config_impl.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -1270,7 +1270,8 @@ public:
   virtual Event::Dispatcher& dispatcher() PURE;
 
   /**
-   * @return absl::string_view the latest configured name of the filter in the filter chain.
+   * @return absl::string_view the filter config name that used to create the filter. This
+   * will return the latest set name by the setFilterConfigName() method.
    */
   virtual absl::string_view filterConfigName() const PURE;
 
@@ -1281,6 +1282,9 @@ public:
    *
    * NOTE: This method should be called for each filter before adding the filter to the filter
    * chain via addStreamDecoderFilter(), addStreamEncoderFilter(), or addStreamFilter().
+   * NOTE: By default, the FilterChainFactory will call this method to set the config name
+   * from configuration and the per filter factory does not need to care this method except
+   * it wants to override the config name.
    *
    * @param name the name to be used for looking up filter-specific configuration.
    */
