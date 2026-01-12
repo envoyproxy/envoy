@@ -3445,6 +3445,26 @@ pub trait EnvoyNetworkFilter {
     id: EnvoyHistogramId,
     value: u64,
   ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Get the upstream host address and port if an upstream host is selected.
+  /// Returns None if no upstream host is set or the address is not an IP.
+  fn get_upstream_host_address(&self) -> Option<(String, u32)>;
+
+  /// Get the upstream host hostname if an upstream host is selected.
+  /// Returns None if no upstream host is set or hostname is empty.
+  fn get_upstream_host_hostname(&self) -> Option<String>;
+
+  /// Get the upstream host cluster name if an upstream host is selected.
+  /// Returns None if no upstream host is set.
+  fn get_upstream_host_cluster(&self) -> Option<String>;
+
+  /// Check if an upstream host has been selected for this connection.
+  fn has_upstream_host(&self) -> bool;
+
+  /// Signal to the filter manager to enable secure transport mode in upstream connection.
+  /// This is done when upstream connection's transport socket is of startTLS type.
+  /// Returns true if the upstream transport was successfully converted to secure mode.
+  fn start_upstream_secure_transport(&mut self) -> bool;
 }
 
 pub enum SocketOptionValue {
@@ -4258,6 +4278,87 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
       Ok(())
     } else {
       Err(res)
+    }
+  }
+
+  fn get_upstream_host_address(&self) -> Option<(String, u32)> {
+    let mut address = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null_mut(),
+      length: 0,
+    };
+    let mut port: u32 = 0;
+    let result = unsafe {
+      abi::envoy_dynamic_module_callback_network_filter_get_upstream_host_address(
+        self.raw,
+        &mut address as *mut _ as *mut _,
+        &mut port,
+      )
+    };
+    if !result || address.length == 0 || address.ptr.is_null() {
+      return None;
+    }
+    let address_str = unsafe {
+      std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+        address.ptr as *const _,
+        address.length,
+      ))
+    };
+    Some((address_str.to_string(), port))
+  }
+
+  fn get_upstream_host_hostname(&self) -> Option<String> {
+    let mut hostname = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null_mut(),
+      length: 0,
+    };
+    let result = unsafe {
+      abi::envoy_dynamic_module_callback_network_filter_get_upstream_host_hostname(
+        self.raw,
+        &mut hostname as *mut _ as *mut _,
+      )
+    };
+    if !result || hostname.length == 0 || hostname.ptr.is_null() {
+      return None;
+    }
+    let hostname_str = unsafe {
+      std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+        hostname.ptr as *const _,
+        hostname.length,
+      ))
+    };
+    Some(hostname_str.to_string())
+  }
+
+  fn get_upstream_host_cluster(&self) -> Option<String> {
+    let mut cluster_name = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null_mut(),
+      length: 0,
+    };
+    let result = unsafe {
+      abi::envoy_dynamic_module_callback_network_filter_get_upstream_host_cluster(
+        self.raw,
+        &mut cluster_name as *mut _ as *mut _,
+      )
+    };
+    if !result || cluster_name.length == 0 || cluster_name.ptr.is_null() {
+      return None;
+    }
+    let cluster_str = unsafe {
+      std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+        cluster_name.ptr as *const _,
+        cluster_name.length,
+      ))
+    };
+    Some(cluster_str.to_string())
+  }
+
+  fn has_upstream_host(&self) -> bool {
+    unsafe { abi::envoy_dynamic_module_callback_network_filter_has_upstream_host(self.raw) }
+  }
+
+  fn start_upstream_secure_transport(&mut self) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_network_filter_start_upstream_secure_transport(self.raw)
     }
   }
 }

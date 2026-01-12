@@ -826,6 +826,120 @@ envoy_dynamic_module_callback_network_filter_record_histogram_value(
   return envoy_dynamic_module_type_metrics_result_Success;
 }
 
+// -----------------------------------------------------------------------------
+// Upstream Host Access Callbacks
+// -----------------------------------------------------------------------------
+
+bool envoy_dynamic_module_callback_network_filter_get_upstream_host_address(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* address_out, uint32_t* port_out) {
+  auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
+  if (filter->readCallbacks() == nullptr) {
+    address_out->ptr = nullptr;
+    address_out->length = 0;
+    *port_out = 0;
+    return false;
+  }
+
+  const auto host = filter->readCallbacks()->upstreamHost();
+  if (host == nullptr) {
+    address_out->ptr = nullptr;
+    address_out->length = 0;
+    *port_out = 0;
+    return false;
+  }
+
+  const auto& address = host->address();
+  if (address == nullptr || address->ip() == nullptr) {
+    address_out->ptr = nullptr;
+    address_out->length = 0;
+    *port_out = 0;
+    return false;
+  }
+
+  const std::string& addr_str = address->ip()->addressAsString();
+  address_out->ptr = const_cast<char*>(addr_str.data());
+  address_out->length = addr_str.size();
+  *port_out = address->ip()->port();
+  return true;
+}
+
+bool envoy_dynamic_module_callback_network_filter_get_upstream_host_hostname(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* hostname_out) {
+  auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
+  if (filter->readCallbacks() == nullptr) {
+    hostname_out->ptr = nullptr;
+    hostname_out->length = 0;
+    return false;
+  }
+
+  const auto host = filter->readCallbacks()->upstreamHost();
+  if (host == nullptr) {
+    hostname_out->ptr = nullptr;
+    hostname_out->length = 0;
+    return false;
+  }
+
+  const std::string& hostname = host->hostname();
+  if (hostname.empty()) {
+    hostname_out->ptr = nullptr;
+    hostname_out->length = 0;
+    return false;
+  }
+
+  hostname_out->ptr = const_cast<char*>(hostname.data());
+  hostname_out->length = hostname.size();
+  return true;
+}
+
+bool envoy_dynamic_module_callback_network_filter_get_upstream_host_cluster(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* cluster_name_out) {
+  auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
+  if (filter->readCallbacks() == nullptr) {
+    cluster_name_out->ptr = nullptr;
+    cluster_name_out->length = 0;
+    return false;
+  }
+
+  const auto host = filter->readCallbacks()->upstreamHost();
+  if (host == nullptr) {
+    cluster_name_out->ptr = nullptr;
+    cluster_name_out->length = 0;
+    return false;
+  }
+
+  const std::string& cluster_name = host->cluster().name();
+  cluster_name_out->ptr = const_cast<char*>(cluster_name.data());
+  cluster_name_out->length = cluster_name.size();
+  return true;
+}
+
+bool envoy_dynamic_module_callback_network_filter_has_upstream_host(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr) {
+  auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
+  if (filter->readCallbacks() == nullptr) {
+    return false;
+  }
+
+  return filter->readCallbacks()->upstreamHost() != nullptr;
+}
+
+// -----------------------------------------------------------------------------
+// StartTLS Support Callbacks
+// -----------------------------------------------------------------------------
+
+bool envoy_dynamic_module_callback_network_filter_start_upstream_secure_transport(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr) {
+  auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
+  if (filter->readCallbacks() == nullptr) {
+    return false;
+  }
+
+  return filter->readCallbacks()->startUpstreamSecureTransport();
+}
+
 } // extern "C"
 
 } // namespace NetworkFilters
