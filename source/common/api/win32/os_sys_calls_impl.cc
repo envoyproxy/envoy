@@ -10,14 +10,6 @@
 
 #define DWORD_MAX UINT32_MAX
 
-#ifndef SIO_SET_RECV_IP_ECN
-#define SIO_SET_RECV_IP_ECN _WSAIOW(IOC_VENDOR, 12)
-#endif
-
-#ifndef SIO_GET_RECV_IP_ECN
-#define SIO_GET_RECV_IP_ECN _WSAIOR(IOC_VENDOR, 13)
-#endif
-
 namespace Envoy {
 namespace Api {
 namespace {
@@ -252,25 +244,12 @@ SysCallIntResult OsSysCallsImpl::fstat(os_fd_t fd, struct stat* buf) {
 
 SysCallIntResult OsSysCallsImpl::setsockopt(os_fd_t sockfd, int level, int optname,
                                             const void* optval, socklen_t optlen) {
-  if (optname == IP_RECVTOS || optname == IPV6_RECVTCLASS) {
-    DWORD enabled = (*(int*)optval == 1) ? 1 : 0;
-    DWORD bytes_returned;
-    const int rc = ::WSAIoctl(sockfd, SIO_SET_RECV_IP_ECN, &enabled, sizeof(enabled), nullptr, 0,
-                              &bytes_returned, nullptr, nullptr);
-    return {rc, rc != -1 ? 0 : ::WSAGetLastError()};
-  }
   const int rc = ::setsockopt(sockfd, level, optname, static_cast<const char*>(optval), optlen);
   return {rc, rc != -1 ? 0 : ::WSAGetLastError()};
 }
 
 SysCallIntResult OsSysCallsImpl::getsockopt(os_fd_t sockfd, int level, int optname, void* optval,
                                             socklen_t* optlen) {
-  if (optname == IP_RECVTOS || optname == IPV6_RECVTCLASS) {
-    DWORD bytes_returned;
-    const int rc = ::WSAIoctl(sockfd, SIO_GET_RECV_IP_ECN, nullptr, 0, optval, sizeof(DWORD),
-                              &bytes_returned, nullptr, nullptr);
-    return {rc, rc != -1 ? 0 : ::WSAGetLastError()};
-  }
   const int rc = ::getsockopt(sockfd, level, optname, static_cast<char*>(optval), optlen);
   return {rc, rc != -1 ? 0 : ::WSAGetLastError()};
 }
