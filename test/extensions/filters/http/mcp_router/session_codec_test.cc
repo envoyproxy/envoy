@@ -22,14 +22,12 @@ TEST(SessionCodecTest, BuildCompositeSessionId) {
   const std::string id = SessionCodec::buildCompositeSessionId(
       "route1", "user1", {{"backend1", "s1"}, {"backend2", "s2"}});
 
-  // Only subject is Base64 encoded.
   EXPECT_THAT(id, testing::StartsWith("route1@" + SessionCodec::encode("user1") + "@"));
   EXPECT_THAT(id, testing::HasSubstr("backend1:" + SessionCodec::encode("s1")));
   EXPECT_THAT(id, testing::HasSubstr("backend2:" + SessionCodec::encode("s2")));
 }
 
 TEST(SessionCodecTest, ParseCompositeSessionId) {
-  // Only subject is Base64-encoded.
   std::string composite =
       absl::StrCat("route1@", SessionCodec::encode("user1"),
                    "@backend1:", SessionCodec::encode("s1"), ",backend2:", SessionCodec::encode("s2"));
@@ -43,7 +41,7 @@ TEST(SessionCodecTest, ParseCompositeSessionId) {
               UnorderedElementsAre(Pair("backend1", "s1"), Pair("backend2", "s2")));
 }
 
-// Test that subjects containing @ are correctly handled (e.g., email addresses).
+// Test that subjects containing spliter are correctly handled.
 TEST(SessionCodecTest, SubjectWithAtSymbol) {
   const std::string subject_with_at = "user@example.com";
   const std::string id = SessionCodec::buildCompositeSessionId(
