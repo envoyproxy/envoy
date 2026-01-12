@@ -63,13 +63,28 @@ McpParserConfig::fromProto(const envoy::extensions::filters::http::mcp::v3::Pars
   config.always_extract_.insert("method");
   config.initializeDefaults();
 
-  // Process method-specific overrides
+  config.group_metadata_key_ = proto.group_metadata_key();
+
+  // Process method-specific configs (for both extraction rules and group overrides)
   for (const auto& method_proto : proto.methods()) {
-    std::vector<AttributeExtractionRule> extraction_rules;
+    MethodConfigEntry entry;
+    entry.method_pattern = method_proto.method();
+    entry.group = method_proto.group();
+
     for (const auto& extraction_rule_proto : method_proto.extraction_rules()) {
-      extraction_rules.emplace_back(extraction_rule_proto.path());
+      entry.extraction_rules.emplace_back(extraction_rule_proto.path());
     }
-    config.addMethodConfig(method_proto.method(), std::move(extraction_rules));
+
+    config.method_configs_.push_back(std::move(entry));
+
+    // Also update method_fields_ for extraction rules (for backward compatibility)
+    if (!method_proto.extraction_rules().empty()) {
+      std::vector<AttributeExtractionRule> extraction_rules;
+      for (const auto& rule_proto : method_proto.extraction_rules()) {
+        extraction_rules.emplace_back(rule_proto.path());
+      }
+      config.addMethodConfig(method_proto.method(), std::move(extraction_rules));
+    }
   }
 
   return config;
@@ -86,6 +101,66 @@ McpParserConfig::getFieldsForMethod(const std::string& method) const {
   static const std::vector<AttributeExtractionRule> empty;
   auto it = method_fields_.find(method);
   return (it != method_fields_.end()) ? it->second : empty;
+}
+
+std::string McpParserConfig::getMethodGroup(const std::string& method) const {
+  // Check user-configured rules first (exact match only)
+  for (const auto& entry : method_configs_) {
+    if (method == entry.method_pattern && !entry.group.empty()) {
+      return entry.group;
+    }
+  }
+
+  // Fall back to built-in groups
+  return getBuiltInMethodGroup(method);
+}
+
+std::string McpParserConfig::getBuiltInMethodGroup(const std::string& method) const {
+  using namespace McpConstants::Methods;
+  using namespace McpConstants::MethodGroups;
+
+  // Lifecycle methods
+  if (method == INITIALIZE || method == NOTIFICATION_INITIALIZED || method == PING) {
+    return std::string(LIFECYCLE);
+  }
+
+  // Tool methods
+  if (method == TOOLS_CALL || method == TOOLS_LIST) {
+    return std::string(TOOL);
+  }
+
+  // Resource methods
+  if (method == RESOURCES_READ || method == RESOURCES_LIST || method == RESOURCES_SUBSCRIBE ||
+      method == RESOURCES_UNSUBSCRIBE || method == RESOURCES_TEMPLATES_LIST) {
+    return std::string(RESOURCE);
+  }
+
+  // Prompt methods
+  if (method == PROMPTS_GET || method == PROMPTS_LIST) {
+    return std::string(PROMPT);
+  }
+
+  // Logging
+  if (method == LOGGING_SET_LEVEL) {
+    return std::string(LOGGING);
+  }
+
+  // Sampling
+  if (method == SAMPLING_CREATE_MESSAGE) {
+    return std::string(SAMPLING);
+  }
+
+  // Completion
+  if (method == COMPLETION_COMPLETE) {
+    return std::string(COMPLETION);
+  }
+
+  // General notifications (prefix match, excluding those already categorized)
+  if (absl::StartsWith(method, NOTIFICATION_PREFIX)) {
+    return std::string(NOTIFICATION);
+  }
+
+  return std::string(UNKNOWN);
 }
 
 // McpFieldExtractor implementation

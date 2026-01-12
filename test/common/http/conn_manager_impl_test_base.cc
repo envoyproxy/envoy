@@ -258,18 +258,20 @@ void HttpConnectionManagerImplMixin::setupFilterChain(int num_decoder_filters,
   for (int req = 0; req < num_requests; req++) {
     EXPECT_CALL(filter_factory_, createFilterChain(_))
         .WillOnce(Invoke([num_decoder_filters, num_encoder_filters, req,
-                          this](FilterChainManager& manager) -> bool {
+                          this](FilterChainFactoryCallbacks& callbacks) -> bool {
           bool applied_filters = false;
           if (log_handler_) {
             auto factory = createLogHandlerFactoryCb(log_handler_);
-            manager.applyFilterFactoryCb({}, factory);
+            callbacks.setFilterConfigName("");
+            factory(callbacks);
             applied_filters = true;
           }
           for (int i = 0; i < num_decoder_filters; i++) {
             auto factory = createDecoderFilterFactoryCb(
                 StreamDecoderFilterSharedPtr{decoder_filters_[req * num_decoder_filters + i]});
             std::string name = absl::StrCat(req * num_decoder_filters + i);
-            manager.applyFilterFactoryCb({name}, factory);
+            callbacks.setFilterConfigName(name);
+            factory(callbacks);
             applied_filters = true;
           }
 
@@ -277,7 +279,8 @@ void HttpConnectionManagerImplMixin::setupFilterChain(int num_decoder_filters,
             auto factory = createEncoderFilterFactoryCb(
                 StreamEncoderFilterSharedPtr{encoder_filters_[req * num_encoder_filters + i]});
             std::string name = absl::StrCat(req * num_decoder_filters + i);
-            manager.applyFilterFactoryCb({name}, factory);
+            callbacks.setFilterConfigName(name);
+            factory(callbacks);
             applied_filters = true;
           }
           return applied_filters;

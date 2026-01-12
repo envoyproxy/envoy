@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cstddef>
 
 #include "envoy/config/core/v3/socket_option.pb.h"
 #include "envoy/http/message.h"
@@ -9,8 +10,10 @@
 #include "source/common/network/upstream_socket_options_filter_state.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/router/string_accessor_impl.h"
+#include "source/common/stats/utility.h"
 #include "source/extensions/dynamic_modules/abi.h"
 #include "source/extensions/filters/network/dynamic_modules/filter.h"
+#include "source/extensions/filters/network/dynamic_modules/filter_config.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -52,114 +55,143 @@ void fillBufferChunks(const Buffer::Instance& buffer,
 
 extern "C" {
 
-bool envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks_size(
-    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, size_t* size) {
-  auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
-  Buffer::Instance* buffer = filter->currentReadBuffer();
-
-  if (buffer == nullptr) {
-    return false;
-  }
-  *size = buffer->getRawSlices(std::nullopt).size();
-  return true;
-}
-
-size_t envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks(
-    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_envoy_buffer* result_buffer_vector) {
+size_t envoy_dynamic_module_callback_network_filter_get_read_buffer_size(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
   Buffer::Instance* buffer = filter->currentReadBuffer();
 
   if (buffer == nullptr) {
     return 0;
   }
-
-  fillBufferChunks(*buffer, result_buffer_vector);
   return buffer->length();
 }
 
-bool envoy_dynamic_module_callback_network_filter_get_write_buffer_chunks_size(
-    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, size_t* size) {
+size_t envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks_size(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
-  Buffer::Instance* buffer = filter->currentWriteBuffer();
+  Buffer::Instance* buffer = filter->currentReadBuffer();
+  if (buffer == nullptr) {
+    return 0;
+  }
+  return buffer->getRawSlices(std::nullopt).size();
+}
 
+bool envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result_buffer_vector) {
+  auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
+  Buffer::Instance* buffer = filter->currentReadBuffer();
   if (buffer == nullptr) {
     return false;
   }
-  *size = buffer->getRawSlices(std::nullopt).size();
+
+  fillBufferChunks(*buffer, result_buffer_vector);
   return true;
 }
 
-size_t envoy_dynamic_module_callback_network_filter_get_write_buffer_chunks(
-    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_envoy_buffer* result_buffer_vector) {
+size_t envoy_dynamic_module_callback_network_filter_get_write_buffer_size(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr) {
+  auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
+  Buffer::Instance* buffer = filter->currentWriteBuffer();
+  if (buffer == nullptr) {
+    return 0;
+  }
+  return buffer->length();
+}
+
+size_t envoy_dynamic_module_callback_network_filter_get_write_buffer_chunks_size(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
   Buffer::Instance* buffer = filter->currentWriteBuffer();
 
   if (buffer == nullptr) {
     return 0;
   }
+  return buffer->getRawSlices(std::nullopt).size();
+}
+
+bool envoy_dynamic_module_callback_network_filter_get_write_buffer_chunks(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result_buffer_vector) {
+  auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
+  Buffer::Instance* buffer = filter->currentWriteBuffer();
+
+  if (buffer == nullptr) {
+    return false;
+  }
 
   fillBufferChunks(*buffer, result_buffer_vector);
-  return buffer->length();
+  return true;
 }
 
-void envoy_dynamic_module_callback_network_filter_drain_read_buffer(
+bool envoy_dynamic_module_callback_network_filter_drain_read_buffer(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, size_t length) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
   Buffer::Instance* buffer = filter->currentReadBuffer();
   if (buffer != nullptr && length > 0) {
     buffer->drain(std::min(static_cast<uint64_t>(length), buffer->length()));
+    return true;
   }
+  return false;
 }
 
-void envoy_dynamic_module_callback_network_filter_drain_write_buffer(
+bool envoy_dynamic_module_callback_network_filter_drain_write_buffer(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, size_t length) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
   Buffer::Instance* buffer = filter->currentWriteBuffer();
   if (buffer != nullptr && length > 0) {
     buffer->drain(std::min(static_cast<uint64_t>(length), buffer->length()));
+    return true;
   }
+  return false;
 }
 
-void envoy_dynamic_module_callback_network_filter_prepend_read_buffer(
+bool envoy_dynamic_module_callback_network_filter_prepend_read_buffer(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer data) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
   Buffer::Instance* buffer = filter->currentReadBuffer();
   if (buffer != nullptr && data.ptr != nullptr && data.length > 0) {
     buffer->prepend(absl::string_view(data.ptr, data.length));
+    return true;
   }
+  return false;
 }
 
-void envoy_dynamic_module_callback_network_filter_append_read_buffer(
+bool envoy_dynamic_module_callback_network_filter_append_read_buffer(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer data) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
   Buffer::Instance* buffer = filter->currentReadBuffer();
   if (buffer != nullptr && data.ptr != nullptr && data.length > 0) {
     buffer->add(data.ptr, data.length);
+    return true;
   }
+  return false;
 }
 
-void envoy_dynamic_module_callback_network_filter_prepend_write_buffer(
+bool envoy_dynamic_module_callback_network_filter_prepend_write_buffer(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer data) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
   Buffer::Instance* buffer = filter->currentWriteBuffer();
   if (buffer != nullptr && data.ptr != nullptr && data.length > 0) {
     buffer->prepend(absl::string_view(data.ptr, data.length));
+    return true;
   }
+  return false;
 }
 
-void envoy_dynamic_module_callback_network_filter_append_write_buffer(
+bool envoy_dynamic_module_callback_network_filter_append_write_buffer(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer data) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
   Buffer::Instance* buffer = filter->currentWriteBuffer();
   if (buffer != nullptr && data.ptr != nullptr && data.length > 0) {
     buffer->add(data.ptr, data.length);
+    return true;
   }
+  return false;
 }
 
 void envoy_dynamic_module_callback_network_filter_write(
@@ -325,76 +357,62 @@ bool envoy_dynamic_module_callback_network_filter_get_direct_remote_address(
   return true;
 }
 
-bool envoy_dynamic_module_callback_network_filter_get_ssl_uri_sans_size(
-    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, size_t* size) {
+size_t envoy_dynamic_module_callback_network_filter_get_ssl_uri_sans_size(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
   const auto ssl = filter->connection().ssl();
   if (!ssl) {
-    *size = 0;
-    return false;
+    return 0;
   }
 
-  const auto& uri_sans = ssl->uriSanPeerCertificate();
-  *size = uri_sans.size();
-  return true;
+  return ssl->uriSanPeerCertificate().size();
 }
 
-size_t envoy_dynamic_module_callback_network_filter_get_ssl_uri_sans(
+bool envoy_dynamic_module_callback_network_filter_get_ssl_uri_sans(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer* sans_out) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
   const auto ssl = filter->connection().ssl();
   if (!ssl) {
-    return 0;
+    return false;
   }
 
   const auto& uri_sans = ssl->uriSanPeerCertificate();
-  if (uri_sans.empty()) {
-    return 0;
-  }
-
   // Populate the pre-allocated array. Module is responsible for allocating the correct size.
   for (size_t i = 0; i < uri_sans.size(); ++i) {
     sans_out[i].ptr = const_cast<char*>(uri_sans[i].data());
     sans_out[i].length = uri_sans[i].size();
   }
-  return uri_sans.size();
-}
-
-bool envoy_dynamic_module_callback_network_filter_get_ssl_dns_sans_size(
-    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, size_t* size) {
-  auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
-  const auto ssl = filter->connection().ssl();
-  if (!ssl) {
-    *size = 0;
-    return false;
-  }
-
-  const auto& dns_sans = ssl->dnsSansPeerCertificate();
-  *size = dns_sans.size();
   return true;
 }
 
-size_t envoy_dynamic_module_callback_network_filter_get_ssl_dns_sans(
+size_t envoy_dynamic_module_callback_network_filter_get_ssl_dns_sans_size(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr) {
+  auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
+  const auto ssl = filter->connection().ssl();
+  if (!ssl) {
+    return 0;
+  }
+
+  return ssl->dnsSansPeerCertificate().size();
+}
+
+bool envoy_dynamic_module_callback_network_filter_get_ssl_dns_sans(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer* sans_out) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
   const auto ssl = filter->connection().ssl();
   if (!ssl) {
-    return 0;
+    return false;
   }
 
   const auto& dns_sans = ssl->dnsSansPeerCertificate();
-  if (dns_sans.empty()) {
-    return 0;
-  }
-
   // Populate the pre-allocated array. Module is responsible for allocating the correct size.
   for (size_t i = 0; i < dns_sans.size(); ++i) {
     sans_out[i].ptr = const_cast<char*>(dns_sans[i].data());
     sans_out[i].length = dns_sans[i].size();
   }
-  return dns_sans.size();
+  return true;
 }
 
 bool envoy_dynamic_module_callback_network_filter_get_ssl_subject(
@@ -448,7 +466,7 @@ bool envoy_dynamic_module_callback_network_get_filter_state_bytes(
   return true;
 }
 
-bool envoy_dynamic_module_callback_network_set_dynamic_metadata_string(
+void envoy_dynamic_module_callback_network_set_dynamic_metadata_string(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer filter_namespace,
     envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value) {
@@ -465,7 +483,6 @@ bool envoy_dynamic_module_callback_network_set_dynamic_metadata_string(
   auto& fields = *metadata.mutable_fields();
   fields[std::string(key_view)].set_string_value(std::string(value_view));
   stream_info.setDynamicMetadata(namespace_str, metadata);
-  return true;
 }
 
 bool envoy_dynamic_module_callback_network_get_dynamic_metadata_string(
@@ -501,7 +518,7 @@ bool envoy_dynamic_module_callback_network_get_dynamic_metadata_string(
   return true;
 }
 
-bool envoy_dynamic_module_callback_network_set_dynamic_metadata_number(
+void envoy_dynamic_module_callback_network_set_dynamic_metadata_number(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer filter_namespace,
     envoy_dynamic_module_type_module_buffer key, double value) {
@@ -517,7 +534,6 @@ bool envoy_dynamic_module_callback_network_set_dynamic_metadata_number(
   auto& fields = *metadata.mutable_fields();
   fields[std::string(key_view)].set_number_value(value);
   stream_info.setDynamicMetadata(namespace_str, metadata);
-  return true;
 }
 
 bool envoy_dynamic_module_callback_network_get_dynamic_metadata_number(
@@ -624,12 +640,11 @@ bool validateSocketState(envoy_dynamic_module_type_socket_option_state state) {
 
 } // namespace
 
-bool envoy_dynamic_module_callback_network_set_socket_option_int(
+void envoy_dynamic_module_callback_network_set_socket_option_int(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, int64_t level,
     int64_t name, envoy_dynamic_module_type_socket_option_state state, int64_t value) {
-  if (!validateSocketState(state)) {
-    return false;
-  }
+  ASSERT(validateSocketState(state));
+
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
   auto* upstream_options = ensureUpstreamSocketOptionsFilterState(*filter);
 
@@ -642,16 +657,14 @@ bool envoy_dynamic_module_callback_network_set_socket_option_int(
   upstream_options->addOption(option_list);
 
   filter->storeSocketOptionInt(level, name, state, value);
-  return true;
 }
 
-bool envoy_dynamic_module_callback_network_set_socket_option_bytes(
+void envoy_dynamic_module_callback_network_set_socket_option_bytes(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, int64_t level,
     int64_t name, envoy_dynamic_module_type_socket_option_state state,
     envoy_dynamic_module_type_module_buffer value) {
-  if (!validateSocketState(state) || value.ptr == nullptr) {
-    return false;
-  }
+  ASSERT(validateSocketState(state));
+
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
   auto* upstream_options = ensureUpstreamSocketOptionsFilterState(*filter);
 
@@ -664,7 +677,6 @@ bool envoy_dynamic_module_callback_network_set_socket_option_bytes(
   upstream_options->addOption(option_list);
 
   filter->storeSocketOptionBytes(level, name, state, value_view);
-  return true;
 }
 
 bool envoy_dynamic_module_callback_network_get_socket_option_int(
@@ -706,6 +718,112 @@ void envoy_dynamic_module_callback_network_get_socket_options(
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
   size_t options_written = 0;
   filter->copySocketOptions(options_out, filter->socketOptionCount(), options_written);
+}
+
+// -----------------------------------------------------------------------------
+// Metrics Callbacks
+// -----------------------------------------------------------------------------
+
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_network_filter_config_define_counter(
+    envoy_dynamic_module_type_network_filter_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name, size_t* counter_id_ptr) {
+  auto* config = static_cast<DynamicModuleNetworkFilterConfig*>(config_envoy_ptr);
+  Stats::StatName main_stat_name =
+      config->stat_name_pool_.add(absl::string_view(name.ptr, name.length));
+  Stats::Counter& c = Stats::Utility::counterFromStatNames(*config->stats_scope_, {main_stat_name});
+  *counter_id_ptr = config->addCounter({c});
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_network_filter_increment_counter(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, size_t id,
+    uint64_t value) {
+  auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
+  auto counter = filter->getFilterConfig().getCounterById(id);
+  if (!counter.has_value()) {
+    return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+  }
+  counter->add(value);
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_network_filter_config_define_gauge(
+    envoy_dynamic_module_type_network_filter_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name, size_t* gauge_id_ptr) {
+  auto* config = static_cast<DynamicModuleNetworkFilterConfig*>(config_envoy_ptr);
+  Stats::StatName main_stat_name =
+      config->stat_name_pool_.add(absl::string_view(name.ptr, name.length));
+  Stats::Gauge& g = Stats::Utility::gaugeFromStatNames(*config->stats_scope_, {main_stat_name},
+                                                       Stats::Gauge::ImportMode::Accumulate);
+  *gauge_id_ptr = config->addGauge({g});
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+envoy_dynamic_module_type_metrics_result envoy_dynamic_module_callback_network_filter_set_gauge(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, size_t id,
+    uint64_t value) {
+  auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
+  auto gauge = filter->getFilterConfig().getGaugeById(id);
+  if (!gauge.has_value()) {
+    return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+  }
+  gauge->set(value);
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_network_filter_increment_gauge(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, size_t id,
+    uint64_t value) {
+  auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
+  auto gauge = filter->getFilterConfig().getGaugeById(id);
+  if (!gauge.has_value()) {
+    return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+  }
+  gauge->add(value);
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_network_filter_decrement_gauge(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, size_t id,
+    uint64_t value) {
+  auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
+  auto gauge = filter->getFilterConfig().getGaugeById(id);
+  if (!gauge.has_value()) {
+    return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+  }
+  gauge->sub(value);
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_network_filter_config_define_histogram(
+    envoy_dynamic_module_type_network_filter_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name, size_t* histogram_id_ptr) {
+  auto* config = static_cast<DynamicModuleNetworkFilterConfig*>(config_envoy_ptr);
+  Stats::StatName main_stat_name =
+      config->stat_name_pool_.add(absl::string_view(name.ptr, name.length));
+  Stats::Histogram& h = Stats::Utility::histogramFromStatNames(
+      *config->stats_scope_, {main_stat_name}, Stats::Histogram::Unit::Unspecified);
+  *histogram_id_ptr = config->addHistogram({h});
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_network_filter_record_histogram_value(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, size_t id,
+    uint64_t value) {
+  auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
+  auto histogram = filter->getFilterConfig().getHistogramById(id);
+  if (!histogram.has_value()) {
+    return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+  }
+  histogram->recordValue(value);
+  return envoy_dynamic_module_type_metrics_result_Success;
 }
 
 } // extern "C"

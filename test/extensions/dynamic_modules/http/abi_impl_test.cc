@@ -291,11 +291,8 @@ TEST_P(DynamicModuleHttpFilterHeaderTest, SetHeaderValue) {
 TEST_P(DynamicModuleHttpFilterHeaderTest, GetHeadersCount) {
   envoy_dynamic_module_type_http_header_type header_type = GetParam();
 
-  size_t size = 0;
-
   // Test with nullptr accessors.
-  EXPECT_EQ(envoy_dynamic_module_callback_http_get_headers_size(filter_.get(), header_type, &size),
-            false);
+  EXPECT_EQ(envoy_dynamic_module_callback_http_get_headers_size(filter_.get(), header_type), 0);
 
   std::initializer_list<std::pair<std::string, std::string>> headers = {
       {"single", "value"}, {"multi", "value1"}, {"multi", "value2"}};
@@ -312,9 +309,7 @@ TEST_P(DynamicModuleHttpFilterHeaderTest, GetHeadersCount) {
   EXPECT_CALL(encoder_callbacks_, responseTrailers())
       .WillRepeatedly(testing::Return(makeOptRef<ResponseTrailerMap>(response_trailers)));
 
-  EXPECT_TRUE(
-      envoy_dynamic_module_callback_http_get_headers_size(filter_.get(), header_type, &size));
-  EXPECT_EQ(size, 3);
+  EXPECT_EQ(envoy_dynamic_module_callback_http_get_headers_size(filter_.get(), header_type), 3);
 }
 
 TEST_P(DynamicModuleHttpFilterHeaderTest, GetHeaders) {
@@ -463,12 +458,13 @@ TEST(ABIImpl, metadata) {
   envoy_dynamic_module_type_envoy_buffer result_buffer = {nullptr, 0};
 
   // No stream info.
-  EXPECT_FALSE(envoy_dynamic_module_callback_http_set_dynamic_metadata_number(
+  // TODO(wbpcode): this should never happen in practice.
+  envoy_dynamic_module_callback_http_set_dynamic_metadata_number(
       &filter, {namespace_str.data(), namespace_str.size()}, {key_str.data(), key_str.size()},
-      value));
-  EXPECT_FALSE(envoy_dynamic_module_callback_http_set_dynamic_metadata_string(
+      value);
+  envoy_dynamic_module_callback_http_set_dynamic_metadata_string(
       &filter, {namespace_str.data(), namespace_str.size()}, {key_str.data(), key_str.size()},
-      {value_str.data(), value_str.size()}));
+      {value_str.data(), value_str.size()});
   EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_number(
       &filter, envoy_dynamic_module_type_metadata_source_Dynamic,
       {namespace_str.data(), namespace_str.size()}, {key_str.data(), key_str.size()},
@@ -516,9 +512,9 @@ TEST(ABIImpl, metadata) {
   // With namespace but non existing key.
   const std::string non_existing_key = "non_existing";
   // This will create the namespace.
-  EXPECT_TRUE(envoy_dynamic_module_callback_http_set_dynamic_metadata_number(
+  envoy_dynamic_module_callback_http_set_dynamic_metadata_number(
       &filter, {namespace_str.data(), namespace_str.size()}, {key_str.data(), key_str.size()},
-      value));
+      value);
   EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_number(
       &filter, envoy_dynamic_module_type_metadata_source_Dynamic,
       {namespace_str.data(), namespace_str.size()},
@@ -529,9 +525,9 @@ TEST(ABIImpl, metadata) {
       {non_existing_key.data(), non_existing_key.size()}, &result_buffer));
 
   // With namespace and key.
-  EXPECT_TRUE(envoy_dynamic_module_callback_http_set_dynamic_metadata_number(
+  envoy_dynamic_module_callback_http_set_dynamic_metadata_number(
       &filter, {namespace_str.data(), namespace_str.size()}, {key_str.data(), key_str.size()},
-      value));
+      value);
   EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_number(
       &filter, envoy_dynamic_module_type_metadata_source_Dynamic,
       {namespace_str.data(), namespace_str.size()}, {key_str.data(), key_str.size()},
@@ -543,9 +539,9 @@ TEST(ABIImpl, metadata) {
       {namespace_str.data(), namespace_str.size()}, {key_str.data(), key_str.size()},
       &result_buffer));
 
-  EXPECT_TRUE(envoy_dynamic_module_callback_http_set_dynamic_metadata_string(
+  envoy_dynamic_module_callback_http_set_dynamic_metadata_string(
       &filter, {namespace_str.data(), namespace_str.size()}, {key_str.data(), key_str.size()},
-      {value_str.data(), value_str.size()}));
+      {value_str.data(), value_str.size()});
   EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_string(
       &filter, envoy_dynamic_module_type_metadata_source_Dynamic,
       {namespace_str.data(), namespace_str.size()}, {key_str.data(), key_str.size()},
@@ -632,16 +628,15 @@ TEST(ABIImpl, RequestBody) {
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
   filter.setDecoderFilterCallbacks(callbacks);
 
-  size_t chunks_size = 0;
-  size_t body_size = 0;
-
   // Non existing buffer should return false.
   EXPECT_FALSE(envoy_dynamic_module_callback_http_get_body_chunks(
       &filter, envoy_dynamic_module_type_http_body_type_ReceivedRequestBody, nullptr));
-  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_body_chunks_size(
-      &filter, envoy_dynamic_module_type_http_body_type_ReceivedRequestBody, &chunks_size));
-  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_body_size(
-      &filter, envoy_dynamic_module_type_http_body_type_ReceivedRequestBody, &body_size));
+  EXPECT_EQ(envoy_dynamic_module_callback_http_get_body_chunks_size(
+                &filter, envoy_dynamic_module_type_http_body_type_ReceivedRequestBody),
+            0);
+  EXPECT_EQ(envoy_dynamic_module_callback_http_get_body_size(
+                &filter, envoy_dynamic_module_type_http_body_type_ReceivedRequestBody),
+            0);
   EXPECT_FALSE(envoy_dynamic_module_callback_http_drain_body(
       &filter, envoy_dynamic_module_type_http_body_type_ReceivedRequestBody, 0));
   EXPECT_FALSE(envoy_dynamic_module_callback_http_append_body(
@@ -651,12 +646,12 @@ TEST(ABIImpl, RequestBody) {
   filter.current_request_body_ = &buffer;
 
   // Empty buffer should return size 0 and drain should return work without problems.
-  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_body_chunks_size(
-      &filter, envoy_dynamic_module_type_http_body_type_ReceivedRequestBody, &chunks_size));
-  EXPECT_EQ(chunks_size, 0);
-  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_body_size(
-      &filter, envoy_dynamic_module_type_http_body_type_ReceivedRequestBody, &body_size));
-  EXPECT_EQ(body_size, 0);
+  EXPECT_EQ(envoy_dynamic_module_callback_http_get_body_chunks_size(
+                &filter, envoy_dynamic_module_type_http_body_type_ReceivedRequestBody),
+            0);
+  EXPECT_EQ(envoy_dynamic_module_callback_http_get_body_size(
+                &filter, envoy_dynamic_module_type_http_body_type_ReceivedRequestBody),
+            0);
   EXPECT_TRUE(envoy_dynamic_module_callback_http_drain_body(
       &filter, envoy_dynamic_module_type_http_body_type_ReceivedRequestBody, 0));
 
@@ -668,16 +663,17 @@ TEST(ABIImpl, RequestBody) {
   EXPECT_EQ(buffer.toString(), data);
 
   // Get the data from the buffer.
-  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_body_chunks_size(
-      &filter, envoy_dynamic_module_type_http_body_type_ReceivedRequestBody, &chunks_size));
-  auto result_buffer_vector = std::vector<envoy_dynamic_module_type_envoy_buffer>(chunks_size);
+  EXPECT_EQ(envoy_dynamic_module_callback_http_get_body_chunks_size(
+                &filter, envoy_dynamic_module_type_http_body_type_ReceivedRequestBody),
+            1);
+  auto result_buffer_vector = std::vector<envoy_dynamic_module_type_envoy_buffer>(1);
   EXPECT_TRUE(envoy_dynamic_module_callback_http_get_body_chunks(
       &filter, envoy_dynamic_module_type_http_body_type_ReceivedRequestBody,
       result_buffer_vector.data()));
   EXPECT_EQ(bufferVectorToString(result_buffer_vector), data);
-  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_body_size(
-      &filter, envoy_dynamic_module_type_http_body_type_ReceivedRequestBody, &body_size));
-  EXPECT_EQ(body_size, 3);
+  EXPECT_EQ(envoy_dynamic_module_callback_http_get_body_size(
+                &filter, envoy_dynamic_module_type_http_body_type_ReceivedRequestBody),
+            3);
 
   // Add more data to the buffer.
   const std::string data2 = "bar";
@@ -691,32 +687,34 @@ TEST(ABIImpl, RequestBody) {
   EXPECT_EQ(buffer.toString(), data + data2 + data3);
 
   // Check the data.
-  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_body_chunks_size(
-      &filter, envoy_dynamic_module_type_http_body_type_ReceivedRequestBody, &chunks_size));
-  auto result_buffer_vector2 = std::vector<envoy_dynamic_module_type_envoy_buffer>(chunks_size);
+  EXPECT_EQ(envoy_dynamic_module_callback_http_get_body_chunks_size(
+                &filter, envoy_dynamic_module_type_http_body_type_ReceivedRequestBody),
+            1);
+  auto result_buffer_vector2 = std::vector<envoy_dynamic_module_type_envoy_buffer>(1);
   EXPECT_TRUE(envoy_dynamic_module_callback_http_get_body_chunks(
       &filter, envoy_dynamic_module_type_http_body_type_ReceivedRequestBody,
       result_buffer_vector2.data()));
   EXPECT_EQ(bufferVectorToString(result_buffer_vector2), data + data2 + data3);
-  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_body_size(
-      &filter, envoy_dynamic_module_type_http_body_type_ReceivedRequestBody, &body_size));
-  EXPECT_EQ(body_size, 9);
+  EXPECT_EQ(envoy_dynamic_module_callback_http_get_body_size(
+                &filter, envoy_dynamic_module_type_http_body_type_ReceivedRequestBody),
+            9);
 
   // Drain the first 5 bytes.
   EXPECT_TRUE(envoy_dynamic_module_callback_http_drain_body(
       &filter, envoy_dynamic_module_type_http_body_type_ReceivedRequestBody, 5));
 
   // Check the data.
-  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_body_chunks_size(
-      &filter, envoy_dynamic_module_type_http_body_type_ReceivedRequestBody, &chunks_size));
-  auto result_buffer_vector3 = std::vector<envoy_dynamic_module_type_envoy_buffer>(chunks_size);
+  EXPECT_EQ(envoy_dynamic_module_callback_http_get_body_chunks_size(
+                &filter, envoy_dynamic_module_type_http_body_type_ReceivedRequestBody),
+            1);
+  auto result_buffer_vector3 = std::vector<envoy_dynamic_module_type_envoy_buffer>(1);
   EXPECT_TRUE(envoy_dynamic_module_callback_http_get_body_chunks(
       &filter, envoy_dynamic_module_type_http_body_type_ReceivedRequestBody,
       result_buffer_vector3.data()));
   EXPECT_EQ(bufferVectorToString(result_buffer_vector3), "rbaz");
-  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_body_size(
-      &filter, envoy_dynamic_module_type_http_body_type_ReceivedRequestBody, &body_size));
-  EXPECT_EQ(body_size, 4);
+  EXPECT_EQ(envoy_dynamic_module_callback_http_get_body_size(
+                &filter, envoy_dynamic_module_type_http_body_type_ReceivedRequestBody),
+            4);
 
   // Clear up the current_request_body_ pointer.
   filter.current_request_body_ = nullptr;
@@ -724,10 +722,12 @@ TEST(ABIImpl, RequestBody) {
   // Everything should return false again.
   EXPECT_FALSE(envoy_dynamic_module_callback_http_get_body_chunks(
       &filter, envoy_dynamic_module_type_http_body_type_ReceivedRequestBody, nullptr));
-  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_body_chunks_size(
-      &filter, envoy_dynamic_module_type_http_body_type_ReceivedRequestBody, &chunks_size));
-  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_body_size(
-      &filter, envoy_dynamic_module_type_http_body_type_ReceivedRequestBody, &body_size));
+  EXPECT_EQ(envoy_dynamic_module_callback_http_get_body_chunks_size(
+                &filter, envoy_dynamic_module_type_http_body_type_ReceivedRequestBody),
+            0);
+  EXPECT_EQ(envoy_dynamic_module_callback_http_get_body_size(
+                &filter, envoy_dynamic_module_type_http_body_type_ReceivedRequestBody),
+            0);
   EXPECT_FALSE(envoy_dynamic_module_callback_http_drain_body(
       &filter, envoy_dynamic_module_type_http_body_type_ReceivedRequestBody, 0));
   EXPECT_FALSE(envoy_dynamic_module_callback_http_append_body(
@@ -746,17 +746,16 @@ TEST(ABIImpl, BufferedRequestBody) {
   EXPECT_CALL(callbacks, modifyDecodingBuffer(_)).Times(testing::AnyNumber());
   EXPECT_CALL(callbacks, addDecodedData(_, _)).Times(testing::AnyNumber());
 
-  size_t chunks_size = 0;
-  size_t body_size = 0;
-
   // Non buffered buffer should return false.
   EXPECT_CALL(callbacks, decodingBuffer()).WillRepeatedly(testing::ReturnNull());
   EXPECT_FALSE(envoy_dynamic_module_callback_http_get_body_chunks(
       &filter, envoy_dynamic_module_type_http_body_type_BufferedRequestBody, nullptr));
-  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_body_chunks_size(
-      &filter, envoy_dynamic_module_type_http_body_type_BufferedRequestBody, &chunks_size));
-  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_body_size(
-      &filter, envoy_dynamic_module_type_http_body_type_BufferedRequestBody, &body_size));
+  EXPECT_EQ(envoy_dynamic_module_callback_http_get_body_chunks_size(
+                &filter, envoy_dynamic_module_type_http_body_type_BufferedRequestBody),
+            0);
+  EXPECT_EQ(envoy_dynamic_module_callback_http_get_body_size(
+                &filter, envoy_dynamic_module_type_http_body_type_BufferedRequestBody),
+            0);
   EXPECT_FALSE(envoy_dynamic_module_callback_http_drain_body(
       &filter, envoy_dynamic_module_type_http_body_type_BufferedRequestBody, 0));
 
@@ -773,12 +772,12 @@ TEST(ABIImpl, BufferedRequestBody) {
       .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) -> void { buffer.add(data); }));
 
   // Empty buffer should return size 0 and drain should return work without problems.
-  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_body_chunks_size(
-      &filter, envoy_dynamic_module_type_http_body_type_BufferedRequestBody, &chunks_size));
-  EXPECT_EQ(chunks_size, 0);
-  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_body_size(
-      &filter, envoy_dynamic_module_type_http_body_type_BufferedRequestBody, &body_size));
-  EXPECT_EQ(body_size, 0);
+  EXPECT_EQ(envoy_dynamic_module_callback_http_get_body_chunks_size(
+                &filter, envoy_dynamic_module_type_http_body_type_BufferedRequestBody),
+            0);
+  EXPECT_EQ(envoy_dynamic_module_callback_http_get_body_size(
+                &filter, envoy_dynamic_module_type_http_body_type_BufferedRequestBody),
+            0);
   EXPECT_TRUE(envoy_dynamic_module_callback_http_drain_body(
       &filter, envoy_dynamic_module_type_http_body_type_BufferedRequestBody, 0));
 
@@ -790,16 +789,17 @@ TEST(ABIImpl, BufferedRequestBody) {
   EXPECT_EQ(buffer.toString(), data);
 
   // Check the data.
-  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_body_chunks_size(
-      &filter, envoy_dynamic_module_type_http_body_type_BufferedRequestBody, &chunks_size));
-  auto result_buffer_vector = std::vector<envoy_dynamic_module_type_envoy_buffer>(chunks_size);
+  EXPECT_EQ(envoy_dynamic_module_callback_http_get_body_chunks_size(
+                &filter, envoy_dynamic_module_type_http_body_type_BufferedRequestBody),
+            1);
+  auto result_buffer_vector = std::vector<envoy_dynamic_module_type_envoy_buffer>(1);
   EXPECT_TRUE(envoy_dynamic_module_callback_http_get_body_chunks(
       &filter, envoy_dynamic_module_type_http_body_type_BufferedRequestBody,
       result_buffer_vector.data()));
   EXPECT_EQ(bufferVectorToString(result_buffer_vector), data);
-  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_body_size(
-      &filter, envoy_dynamic_module_type_http_body_type_BufferedRequestBody, &body_size));
-  EXPECT_EQ(body_size, 3);
+  EXPECT_EQ(envoy_dynamic_module_callback_http_get_body_size(
+                &filter, envoy_dynamic_module_type_http_body_type_BufferedRequestBody),
+            3);
 
   // Add more data to the buffer.
   const std::string data2 = "bar";
@@ -813,32 +813,34 @@ TEST(ABIImpl, BufferedRequestBody) {
   EXPECT_EQ(buffer.toString(), data + data2 + data3);
 
   // Check the data.
-  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_body_chunks_size(
-      &filter, envoy_dynamic_module_type_http_body_type_BufferedRequestBody, &chunks_size));
-  auto result_buffer_vector2 = std::vector<envoy_dynamic_module_type_envoy_buffer>(chunks_size);
+  EXPECT_EQ(envoy_dynamic_module_callback_http_get_body_chunks_size(
+                &filter, envoy_dynamic_module_type_http_body_type_BufferedRequestBody),
+            1);
+  auto result_buffer_vector2 = std::vector<envoy_dynamic_module_type_envoy_buffer>(1);
   EXPECT_TRUE(envoy_dynamic_module_callback_http_get_body_chunks(
       &filter, envoy_dynamic_module_type_http_body_type_BufferedRequestBody,
       result_buffer_vector2.data()));
   EXPECT_EQ(bufferVectorToString(result_buffer_vector2), data + data2 + data3);
-  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_body_size(
-      &filter, envoy_dynamic_module_type_http_body_type_BufferedRequestBody, &body_size));
-  EXPECT_EQ(body_size, 9);
+  EXPECT_EQ(envoy_dynamic_module_callback_http_get_body_size(
+                &filter, envoy_dynamic_module_type_http_body_type_BufferedRequestBody),
+            9);
 
   // Drain the first 5 bytes.
   EXPECT_TRUE(envoy_dynamic_module_callback_http_drain_body(
       &filter, envoy_dynamic_module_type_http_body_type_BufferedRequestBody, 5));
 
   // Check the data.
-  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_body_chunks_size(
-      &filter, envoy_dynamic_module_type_http_body_type_BufferedRequestBody, &chunks_size));
-  auto result_buffer_vector3 = std::vector<envoy_dynamic_module_type_envoy_buffer>(chunks_size);
+  EXPECT_EQ(envoy_dynamic_module_callback_http_get_body_chunks_size(
+                &filter, envoy_dynamic_module_type_http_body_type_BufferedRequestBody),
+            1);
+  auto result_buffer_vector3 = std::vector<envoy_dynamic_module_type_envoy_buffer>(1);
   EXPECT_TRUE(envoy_dynamic_module_callback_http_get_body_chunks(
       &filter, envoy_dynamic_module_type_http_body_type_BufferedRequestBody,
       result_buffer_vector3.data()));
   EXPECT_EQ(bufferVectorToString(result_buffer_vector3), "rbaz");
-  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_body_size(
-      &filter, envoy_dynamic_module_type_http_body_type_BufferedRequestBody, &body_size));
-  EXPECT_EQ(body_size, 4);
+  EXPECT_EQ(envoy_dynamic_module_callback_http_get_body_size(
+                &filter, envoy_dynamic_module_type_http_body_type_BufferedRequestBody),
+            4);
 }
 
 TEST(ABIImpl, ResponseBody) {
@@ -849,16 +851,15 @@ TEST(ABIImpl, ResponseBody) {
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
   filter.setEncoderFilterCallbacks(callbacks);
 
-  size_t chunks_size = 0;
-  size_t body_size = 0;
-
   // Non existing buffer should return false.
   EXPECT_FALSE(envoy_dynamic_module_callback_http_get_body_chunks(
       &filter, envoy_dynamic_module_type_http_body_type_ReceivedResponseBody, nullptr));
-  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_body_chunks_size(
-      &filter, envoy_dynamic_module_type_http_body_type_ReceivedResponseBody, &chunks_size));
-  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_body_size(
-      &filter, envoy_dynamic_module_type_http_body_type_ReceivedResponseBody, &body_size));
+  EXPECT_EQ(envoy_dynamic_module_callback_http_get_body_chunks_size(
+                &filter, envoy_dynamic_module_type_http_body_type_ReceivedResponseBody),
+            0);
+  EXPECT_EQ(envoy_dynamic_module_callback_http_get_body_size(
+                &filter, envoy_dynamic_module_type_http_body_type_ReceivedResponseBody),
+            0);
   EXPECT_FALSE(envoy_dynamic_module_callback_http_drain_body(
       &filter, envoy_dynamic_module_type_http_body_type_ReceivedResponseBody, 0));
   EXPECT_FALSE(envoy_dynamic_module_callback_http_append_body(
@@ -868,12 +869,12 @@ TEST(ABIImpl, ResponseBody) {
   filter.current_response_body_ = &buffer;
 
   // Empty buffer should return size 0 and drain should return work without problems.
-  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_body_chunks_size(
-      &filter, envoy_dynamic_module_type_http_body_type_ReceivedResponseBody, &chunks_size));
-  EXPECT_EQ(chunks_size, 0);
-  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_body_size(
-      &filter, envoy_dynamic_module_type_http_body_type_ReceivedResponseBody, &body_size));
-  EXPECT_EQ(body_size, 0);
+  EXPECT_EQ(envoy_dynamic_module_callback_http_get_body_chunks_size(
+                &filter, envoy_dynamic_module_type_http_body_type_ReceivedResponseBody),
+            0);
+  EXPECT_EQ(envoy_dynamic_module_callback_http_get_body_size(
+                &filter, envoy_dynamic_module_type_http_body_type_ReceivedResponseBody),
+            0);
   EXPECT_TRUE(envoy_dynamic_module_callback_http_drain_body(
       &filter, envoy_dynamic_module_type_http_body_type_ReceivedResponseBody, 0));
 
@@ -885,16 +886,17 @@ TEST(ABIImpl, ResponseBody) {
   EXPECT_EQ(buffer.toString(), data);
 
   // Check the data.
-  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_body_chunks_size(
-      &filter, envoy_dynamic_module_type_http_body_type_ReceivedResponseBody, &chunks_size));
-  auto result_buffer_vector = std::vector<envoy_dynamic_module_type_envoy_buffer>(chunks_size);
+  EXPECT_EQ(envoy_dynamic_module_callback_http_get_body_chunks_size(
+                &filter, envoy_dynamic_module_type_http_body_type_ReceivedResponseBody),
+            1);
+  auto result_buffer_vector = std::vector<envoy_dynamic_module_type_envoy_buffer>(1);
   EXPECT_TRUE(envoy_dynamic_module_callback_http_get_body_chunks(
       &filter, envoy_dynamic_module_type_http_body_type_ReceivedResponseBody,
       result_buffer_vector.data()));
   EXPECT_EQ(bufferVectorToString(result_buffer_vector), data);
-  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_body_size(
-      &filter, envoy_dynamic_module_type_http_body_type_ReceivedResponseBody, &body_size));
-  EXPECT_EQ(body_size, 3);
+  EXPECT_EQ(envoy_dynamic_module_callback_http_get_body_size(
+                &filter, envoy_dynamic_module_type_http_body_type_ReceivedResponseBody),
+            3);
 
   // Add more data to the buffer.
   const std::string data2 = "bar";
@@ -908,32 +910,34 @@ TEST(ABIImpl, ResponseBody) {
   EXPECT_EQ(buffer.toString(), data + data2 + data3);
 
   // Check the data.
-  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_body_chunks_size(
-      &filter, envoy_dynamic_module_type_http_body_type_ReceivedResponseBody, &chunks_size));
-  auto result_buffer_vector2 = std::vector<envoy_dynamic_module_type_envoy_buffer>(chunks_size);
+  EXPECT_EQ(envoy_dynamic_module_callback_http_get_body_chunks_size(
+                &filter, envoy_dynamic_module_type_http_body_type_ReceivedResponseBody),
+            1);
+  auto result_buffer_vector2 = std::vector<envoy_dynamic_module_type_envoy_buffer>(1);
   EXPECT_TRUE(envoy_dynamic_module_callback_http_get_body_chunks(
       &filter, envoy_dynamic_module_type_http_body_type_ReceivedResponseBody,
       result_buffer_vector2.data()));
   EXPECT_EQ(bufferVectorToString(result_buffer_vector2), data + data2 + data3);
-  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_body_size(
-      &filter, envoy_dynamic_module_type_http_body_type_ReceivedResponseBody, &body_size));
-  EXPECT_EQ(body_size, 9);
+  EXPECT_EQ(envoy_dynamic_module_callback_http_get_body_size(
+                &filter, envoy_dynamic_module_type_http_body_type_ReceivedResponseBody),
+            9);
 
   // Drain the first 5 bytes.
   EXPECT_TRUE(envoy_dynamic_module_callback_http_drain_body(
       &filter, envoy_dynamic_module_type_http_body_type_ReceivedResponseBody, 5));
 
   // Check the data.
-  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_body_chunks_size(
-      &filter, envoy_dynamic_module_type_http_body_type_ReceivedResponseBody, &chunks_size));
-  auto result_buffer_vector3 = std::vector<envoy_dynamic_module_type_envoy_buffer>(chunks_size);
+  EXPECT_EQ(envoy_dynamic_module_callback_http_get_body_chunks_size(
+                &filter, envoy_dynamic_module_type_http_body_type_ReceivedResponseBody),
+            1);
+  auto result_buffer_vector3 = std::vector<envoy_dynamic_module_type_envoy_buffer>(1);
   EXPECT_TRUE(envoy_dynamic_module_callback_http_get_body_chunks(
       &filter, envoy_dynamic_module_type_http_body_type_ReceivedResponseBody,
       result_buffer_vector3.data()));
   EXPECT_EQ(bufferVectorToString(result_buffer_vector3), "rbaz");
-  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_body_size(
-      &filter, envoy_dynamic_module_type_http_body_type_ReceivedResponseBody, &body_size));
-  EXPECT_EQ(body_size, 4);
+  EXPECT_EQ(envoy_dynamic_module_callback_http_get_body_size(
+                &filter, envoy_dynamic_module_type_http_body_type_ReceivedResponseBody),
+            4);
 
   // Clear up the current_response_body_ pointer.
   filter.current_response_body_ = nullptr;
@@ -941,10 +945,12 @@ TEST(ABIImpl, ResponseBody) {
   // Everything should return false again.
   EXPECT_FALSE(envoy_dynamic_module_callback_http_get_body_chunks(
       &filter, envoy_dynamic_module_type_http_body_type_ReceivedResponseBody, nullptr));
-  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_body_chunks_size(
-      &filter, envoy_dynamic_module_type_http_body_type_ReceivedResponseBody, &chunks_size));
-  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_body_size(
-      &filter, envoy_dynamic_module_type_http_body_type_ReceivedResponseBody, &body_size));
+  EXPECT_EQ(envoy_dynamic_module_callback_http_get_body_chunks_size(
+                &filter, envoy_dynamic_module_type_http_body_type_ReceivedResponseBody),
+            0);
+  EXPECT_EQ(envoy_dynamic_module_callback_http_get_body_size(
+                &filter, envoy_dynamic_module_type_http_body_type_ReceivedResponseBody),
+            0);
   EXPECT_FALSE(envoy_dynamic_module_callback_http_drain_body(
       &filter, envoy_dynamic_module_type_http_body_type_ReceivedResponseBody, 0));
   EXPECT_FALSE(envoy_dynamic_module_callback_http_append_body(
@@ -963,17 +969,16 @@ TEST(ABIImpl, BufferedResponseBody) {
   EXPECT_CALL(callbacks, modifyEncodingBuffer(_)).Times(testing::AnyNumber());
   EXPECT_CALL(callbacks, addEncodedData(_, _)).Times(testing::AnyNumber());
 
-  size_t chunks_size = 0;
-  size_t body_size = 0;
-
   // Non existing buffer should return false.
   EXPECT_CALL(callbacks, encodingBuffer()).WillRepeatedly(testing::ReturnNull());
   EXPECT_FALSE(envoy_dynamic_module_callback_http_get_body_chunks(
       &filter, envoy_dynamic_module_type_http_body_type_BufferedResponseBody, nullptr));
-  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_body_chunks_size(
-      &filter, envoy_dynamic_module_type_http_body_type_BufferedResponseBody, &chunks_size));
-  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_body_size(
-      &filter, envoy_dynamic_module_type_http_body_type_BufferedResponseBody, &body_size));
+  EXPECT_EQ(envoy_dynamic_module_callback_http_get_body_chunks_size(
+                &filter, envoy_dynamic_module_type_http_body_type_BufferedResponseBody),
+            0);
+  EXPECT_EQ(envoy_dynamic_module_callback_http_get_body_size(
+                &filter, envoy_dynamic_module_type_http_body_type_BufferedResponseBody),
+            0);
   EXPECT_FALSE(envoy_dynamic_module_callback_http_drain_body(
       &filter, envoy_dynamic_module_type_http_body_type_BufferedResponseBody, 0));
 
@@ -990,12 +995,12 @@ TEST(ABIImpl, BufferedResponseBody) {
       .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) -> void { buffer.add(data); }));
 
   // Empty buffer should return size 0 and drain should return work without problems.
-  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_body_chunks_size(
-      &filter, envoy_dynamic_module_type_http_body_type_BufferedResponseBody, &chunks_size));
-  EXPECT_EQ(chunks_size, 0);
-  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_body_size(
-      &filter, envoy_dynamic_module_type_http_body_type_BufferedResponseBody, &body_size));
-  EXPECT_EQ(body_size, 0);
+  EXPECT_EQ(envoy_dynamic_module_callback_http_get_body_chunks_size(
+                &filter, envoy_dynamic_module_type_http_body_type_BufferedResponseBody),
+            0);
+  EXPECT_EQ(envoy_dynamic_module_callback_http_get_body_size(
+                &filter, envoy_dynamic_module_type_http_body_type_BufferedResponseBody),
+            0);
   EXPECT_TRUE(envoy_dynamic_module_callback_http_drain_body(
       &filter, envoy_dynamic_module_type_http_body_type_BufferedResponseBody, 0));
 
@@ -1007,16 +1012,17 @@ TEST(ABIImpl, BufferedResponseBody) {
   EXPECT_EQ(buffer.toString(), data);
 
   // Get the data from the buffer.
-  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_body_chunks_size(
-      &filter, envoy_dynamic_module_type_http_body_type_BufferedResponseBody, &chunks_size));
-  auto result_buffer_vector = std::vector<envoy_dynamic_module_type_envoy_buffer>(chunks_size);
+  EXPECT_EQ(envoy_dynamic_module_callback_http_get_body_chunks_size(
+                &filter, envoy_dynamic_module_type_http_body_type_BufferedResponseBody),
+            1);
+  auto result_buffer_vector = std::vector<envoy_dynamic_module_type_envoy_buffer>(1);
   EXPECT_TRUE(envoy_dynamic_module_callback_http_get_body_chunks(
       &filter, envoy_dynamic_module_type_http_body_type_BufferedResponseBody,
       result_buffer_vector.data()));
   EXPECT_EQ(bufferVectorToString(result_buffer_vector), data);
-  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_body_size(
-      &filter, envoy_dynamic_module_type_http_body_type_BufferedResponseBody, &body_size));
-  EXPECT_EQ(body_size, 3);
+  EXPECT_EQ(envoy_dynamic_module_callback_http_get_body_size(
+                &filter, envoy_dynamic_module_type_http_body_type_BufferedResponseBody),
+            3);
 
   // Add more data to the buffer.
   const std::string data2 = "bar";
@@ -1030,32 +1036,36 @@ TEST(ABIImpl, BufferedResponseBody) {
   EXPECT_EQ(buffer.toString(), data + data2 + data3);
 
   // Check the data.
-  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_body_chunks_size(
-      &filter, envoy_dynamic_module_type_http_body_type_BufferedResponseBody, &chunks_size));
-  auto result_buffer_vector2 = std::vector<envoy_dynamic_module_type_envoy_buffer>(chunks_size);
-  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_body_chunks(
-      &filter, envoy_dynamic_module_type_http_body_type_BufferedResponseBody,
-      result_buffer_vector2.data()));
+  EXPECT_EQ(envoy_dynamic_module_callback_http_get_body_chunks_size(
+                &filter, envoy_dynamic_module_type_http_body_type_BufferedResponseBody),
+            1);
+  auto result_buffer_vector2 = std::vector<envoy_dynamic_module_type_envoy_buffer>(1);
+  EXPECT_EQ(envoy_dynamic_module_callback_http_get_body_chunks(
+                &filter, envoy_dynamic_module_type_http_body_type_BufferedResponseBody,
+                result_buffer_vector2.data()),
+            true);
   EXPECT_EQ(bufferVectorToString(result_buffer_vector2), data + data2 + data3);
-  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_body_size(
-      &filter, envoy_dynamic_module_type_http_body_type_BufferedResponseBody, &body_size));
-  EXPECT_EQ(body_size, 9);
+  EXPECT_EQ(envoy_dynamic_module_callback_http_get_body_size(
+                &filter, envoy_dynamic_module_type_http_body_type_BufferedResponseBody),
+            9);
 
   // Drain the first 5 bytes.
   EXPECT_TRUE(envoy_dynamic_module_callback_http_drain_body(
       &filter, envoy_dynamic_module_type_http_body_type_BufferedResponseBody, 5));
 
   // Check the data.
-  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_body_chunks_size(
-      &filter, envoy_dynamic_module_type_http_body_type_BufferedResponseBody, &chunks_size));
-  auto result_buffer_vector3 = std::vector<envoy_dynamic_module_type_envoy_buffer>(chunks_size);
-  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_body_chunks(
-      &filter, envoy_dynamic_module_type_http_body_type_BufferedResponseBody,
-      result_buffer_vector3.data()));
+  EXPECT_EQ(envoy_dynamic_module_callback_http_get_body_chunks_size(
+                &filter, envoy_dynamic_module_type_http_body_type_BufferedResponseBody),
+            1);
+  auto result_buffer_vector3 = std::vector<envoy_dynamic_module_type_envoy_buffer>(1);
+  EXPECT_EQ(envoy_dynamic_module_callback_http_get_body_chunks(
+                &filter, envoy_dynamic_module_type_http_body_type_BufferedResponseBody,
+                result_buffer_vector3.data()),
+            true);
   EXPECT_EQ(bufferVectorToString(result_buffer_vector3), "rbaz");
-  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_body_size(
-      &filter, envoy_dynamic_module_type_http_body_type_BufferedResponseBody, &body_size));
-  EXPECT_EQ(body_size, 4);
+  EXPECT_EQ(envoy_dynamic_module_callback_http_get_body_size(
+                &filter, envoy_dynamic_module_type_http_body_type_BufferedResponseBody),
+            4);
 }
 
 TEST(ABIImpl, ClearRouteCache) {

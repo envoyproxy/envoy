@@ -3,6 +3,7 @@
 #include "source/common/http/message_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/router/string_accessor_impl.h"
+#include "source/common/stats/isolated_store_impl.h"
 #include "source/extensions/dynamic_modules/abi.h"
 #include "source/extensions/filters/network/dynamic_modules/filter.h"
 
@@ -24,8 +25,9 @@ public:
     auto dynamic_module = newDynamicModule(testSharedObjectPath("network_no_op", "c"), false);
     EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
-    auto filter_config_or_status = newDynamicModuleNetworkFilterConfig(
-        "test_filter", "", std::move(dynamic_module.value()), cluster_manager_);
+    auto filter_config_or_status =
+        newDynamicModuleNetworkFilterConfig("test_filter", "", std::move(dynamic_module.value()),
+                                            cluster_manager_, *stats_.rootScope());
     EXPECT_TRUE(filter_config_or_status.ok()) << filter_config_or_status.status().message();
     filter_config_ = filter_config_or_status.value();
 
@@ -47,6 +49,7 @@ public:
 
   void* filterPtr() { return static_cast<void*>(filter_.get()); }
 
+  Stats::IsolatedStoreImpl stats_;
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
   DynamicModuleNetworkFilterConfigSharedPtr filter_config_;
   std::shared_ptr<DynamicModuleNetworkFilter> filter_;
@@ -63,16 +66,16 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetReadBufferChunksWithData) {
   Buffer::OwnedImpl buffer("hello world");
   filter_->setCurrentReadBufferForTest(&buffer);
 
-  size_t size = 0;
-  bool ok =
-      envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks_size(filterPtr(), &size);
-  EXPECT_TRUE(ok);
+  size_t size =
+      envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks_size(filterPtr());
   EXPECT_GT(size, 0);
 
   std::vector<envoy_dynamic_module_type_envoy_buffer> result_buffer(size);
-  size_t total_length = envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks(
+  bool success = envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks(
       filterPtr(), result_buffer.data());
-
+  EXPECT_TRUE(success);
+  size_t total_length =
+      envoy_dynamic_module_callback_network_filter_get_read_buffer_size(filterPtr());
   EXPECT_EQ(11, total_length);
   EXPECT_GT(size, 0);
 
@@ -80,10 +83,8 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetReadBufferChunksWithData) {
 }
 
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetReadBufferChunksNullBuffer) {
-  size_t size = 0;
-  bool ok =
-      envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks_size(filterPtr(), &size);
-  EXPECT_FALSE(ok);
+  size_t size =
+      envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks_size(filterPtr());
   EXPECT_EQ(0, size);
 
   std::vector<envoy_dynamic_module_type_envoy_buffer> result_buffer(1);
@@ -97,16 +98,16 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetReadBufferChunksEmptyBuffer
   Buffer::OwnedImpl empty_buffer;
   filter_->setCurrentReadBufferForTest(&empty_buffer);
 
-  size_t size = 0;
-  bool ok =
-      envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks_size(filterPtr(), &size);
-  EXPECT_TRUE(ok);
+  size_t size =
+      envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks_size(filterPtr());
   EXPECT_EQ(0, size);
 
   std::vector<envoy_dynamic_module_type_envoy_buffer> result_buffer(1);
-  size_t total_length = envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks(
+  bool success = envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks(
       filterPtr(), result_buffer.data());
-
+  EXPECT_TRUE(success);
+  size_t total_length =
+      envoy_dynamic_module_callback_network_filter_get_read_buffer_size(filterPtr());
   EXPECT_EQ(0, total_length);
 
   filter_->setCurrentReadBufferForTest(nullptr);
@@ -120,16 +121,17 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetWriteBufferChunksWithData) 
   Buffer::OwnedImpl buffer("test data");
   filter_->setCurrentWriteBufferForTest(&buffer);
 
-  size_t size = 0;
-  bool ok =
-      envoy_dynamic_module_callback_network_filter_get_write_buffer_chunks_size(filterPtr(), &size);
-  EXPECT_TRUE(ok);
+  size_t size =
+      envoy_dynamic_module_callback_network_filter_get_write_buffer_chunks_size(filterPtr());
   EXPECT_GT(size, 0);
 
   std::vector<envoy_dynamic_module_type_envoy_buffer> result_buffer(size);
-  size_t total_length = envoy_dynamic_module_callback_network_filter_get_write_buffer_chunks(
+  bool success = envoy_dynamic_module_callback_network_filter_get_write_buffer_chunks(
       filterPtr(), result_buffer.data());
 
+  EXPECT_TRUE(success);
+  size_t total_length =
+      envoy_dynamic_module_callback_network_filter_get_write_buffer_size(filterPtr());
   EXPECT_EQ(9, total_length);
   EXPECT_GT(size, 0);
 
@@ -137,10 +139,8 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetWriteBufferChunksWithData) 
 }
 
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetWriteBufferChunksNullBuffer) {
-  size_t size = 0;
-  bool ok =
-      envoy_dynamic_module_callback_network_filter_get_write_buffer_chunks_size(filterPtr(), &size);
-  EXPECT_FALSE(ok);
+  size_t size =
+      envoy_dynamic_module_callback_network_filter_get_write_buffer_chunks_size(filterPtr());
   EXPECT_EQ(0, size);
 
   std::vector<envoy_dynamic_module_type_envoy_buffer> result_buffer(1);
@@ -154,16 +154,17 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetWriteBufferChunksEmptyBuffe
   Buffer::OwnedImpl empty_buffer;
   filter_->setCurrentWriteBufferForTest(&empty_buffer);
 
-  size_t size = 0;
-  bool ok =
-      envoy_dynamic_module_callback_network_filter_get_write_buffer_chunks_size(filterPtr(), &size);
-  EXPECT_TRUE(ok);
+  size_t size =
+      envoy_dynamic_module_callback_network_filter_get_write_buffer_chunks_size(filterPtr());
   EXPECT_EQ(0, size);
 
   std::vector<envoy_dynamic_module_type_envoy_buffer> result_buffer(1);
-  size_t total_length = envoy_dynamic_module_callback_network_filter_get_write_buffer_chunks(
+  bool success = envoy_dynamic_module_callback_network_filter_get_write_buffer_chunks(
       filterPtr(), result_buffer.data());
 
+  EXPECT_TRUE(success);
+  size_t total_length =
+      envoy_dynamic_module_callback_network_filter_get_write_buffer_size(filterPtr());
   EXPECT_EQ(0, total_length);
 
   filter_->setCurrentWriteBufferForTest(nullptr);
@@ -727,17 +728,15 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetSslUriSans) {
       .WillRepeatedly(testing::Return(absl::Span<const std::string>(sans)));
 
   // First get the size.
-  size_t count = 0;
-  bool ok = envoy_dynamic_module_callback_network_filter_get_ssl_uri_sans_size(filterPtr(), &count);
-  EXPECT_TRUE(ok);
+  size_t count = envoy_dynamic_module_callback_network_filter_get_ssl_uri_sans_size(filterPtr());
   EXPECT_EQ(2, count);
 
   // Allocate array and populate.
   std::vector<envoy_dynamic_module_type_envoy_buffer> buffers(count);
-  size_t populated =
+  bool ok =
       envoy_dynamic_module_callback_network_filter_get_ssl_uri_sans(filterPtr(), buffers.data());
 
-  EXPECT_EQ(2, populated);
+  EXPECT_TRUE(ok);
   EXPECT_EQ("spiffe://example.com/sa", std::string(buffers[0].ptr, buffers[0].length));
   EXPECT_EQ("spiffe://example.com/sb", std::string(buffers[1].ptr, buffers[1].length));
 }
@@ -745,9 +744,7 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetSslUriSans) {
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetSslUriSansNoSsl) {
   EXPECT_CALL(connection_, ssl()).WillOnce(testing::Return(nullptr));
 
-  size_t count = 0;
-  bool ok = envoy_dynamic_module_callback_network_filter_get_ssl_uri_sans_size(filterPtr(), &count);
-  EXPECT_FALSE(ok);
+  size_t count = envoy_dynamic_module_callback_network_filter_get_ssl_uri_sans_size(filterPtr());
   EXPECT_EQ(0, count);
 }
 
@@ -758,15 +755,12 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetSslUriSansEmpty) {
   EXPECT_CALL(*ssl, uriSanPeerCertificate())
       .WillRepeatedly(testing::Return(absl::Span<const std::string>(sans)));
 
-  size_t count = 0;
-  bool ok = envoy_dynamic_module_callback_network_filter_get_ssl_uri_sans_size(filterPtr(), &count);
-  EXPECT_TRUE(ok);
+  size_t count = envoy_dynamic_module_callback_network_filter_get_ssl_uri_sans_size(filterPtr());
   EXPECT_EQ(0, count);
 
-  // Can still call get with empty array. This returns 0.
-  size_t populated =
-      envoy_dynamic_module_callback_network_filter_get_ssl_uri_sans(filterPtr(), nullptr);
-  EXPECT_EQ(0, populated);
+  // Can still return OK with empty array. This returns 0.
+  bool ok = envoy_dynamic_module_callback_network_filter_get_ssl_uri_sans(filterPtr(), nullptr);
+  EXPECT_TRUE(ok);
 }
 
 // =============================================================================
@@ -781,17 +775,15 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetSslDnsSans) {
       .WillRepeatedly(testing::Return(absl::Span<const std::string>(sans)));
 
   // First get the size.
-  size_t count = 0;
-  bool ok = envoy_dynamic_module_callback_network_filter_get_ssl_dns_sans_size(filterPtr(), &count);
-  EXPECT_TRUE(ok);
+  size_t count = envoy_dynamic_module_callback_network_filter_get_ssl_dns_sans_size(filterPtr());
   EXPECT_EQ(2, count);
 
   // Allocate array and populate.
   std::vector<envoy_dynamic_module_type_envoy_buffer> buffers(count);
-  size_t populated =
+  bool ok =
       envoy_dynamic_module_callback_network_filter_get_ssl_dns_sans(filterPtr(), buffers.data());
 
-  EXPECT_EQ(2, populated);
+  EXPECT_TRUE(ok);
   EXPECT_EQ("example.com", std::string(buffers[0].ptr, buffers[0].length));
   EXPECT_EQ("www.example.com", std::string(buffers[1].ptr, buffers[1].length));
 }
@@ -803,15 +795,12 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetSslDnsSansEmpty) {
   EXPECT_CALL(*ssl, dnsSansPeerCertificate())
       .WillRepeatedly(testing::Return(absl::Span<const std::string>(sans)));
 
-  size_t count = 0;
-  bool ok = envoy_dynamic_module_callback_network_filter_get_ssl_dns_sans_size(filterPtr(), &count);
-  EXPECT_TRUE(ok);
+  size_t count = envoy_dynamic_module_callback_network_filter_get_ssl_dns_sans_size(filterPtr());
   EXPECT_EQ(0, count);
 
   // Can still call get with empty array. This returns 0.
-  size_t populated =
-      envoy_dynamic_module_callback_network_filter_get_ssl_dns_sans(filterPtr(), nullptr);
-  EXPECT_EQ(0, populated);
+  bool ok = envoy_dynamic_module_callback_network_filter_get_ssl_dns_sans(filterPtr(), nullptr);
+  EXPECT_TRUE(ok);
 }
 
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetSslDnsSansNoSsl) {
@@ -819,16 +808,13 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetSslDnsSansNoSsl) {
   EXPECT_CALL(connection_, ssl()).WillOnce(testing::Return(nullptr));
 
   // Size function should return false and set size to 0.
-  size_t count = 99; // Initialize to non-zero to verify it gets set to 0
-  bool ok = envoy_dynamic_module_callback_network_filter_get_ssl_dns_sans_size(filterPtr(), &count);
-  EXPECT_FALSE(ok);
+  size_t count = envoy_dynamic_module_callback_network_filter_get_ssl_dns_sans_size(filterPtr());
   EXPECT_EQ(0, count);
 
   // Get function should return 0.
   EXPECT_CALL(connection_, ssl()).WillOnce(testing::Return(nullptr));
-  size_t populated =
-      envoy_dynamic_module_callback_network_filter_get_ssl_dns_sans(filterPtr(), nullptr);
-  EXPECT_EQ(0, populated);
+  bool ok = envoy_dynamic_module_callback_network_filter_get_ssl_dns_sans(filterPtr(), nullptr);
+  EXPECT_FALSE(ok);
 }
 
 // =============================================================================
@@ -944,14 +930,13 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, SetAndGetDynamicMetadataString
       .WillRepeatedly(testing::SaveArg<1>(&(*metadata.mutable_filter_metadata())[ns]));
 
   // Set the metadata.
-  bool ok = envoy_dynamic_module_callback_network_set_dynamic_metadata_string(
+  envoy_dynamic_module_callback_network_set_dynamic_metadata_string(
       filterPtr(), {const_cast<char*>(ns.data()), ns.size()},
       {const_cast<char*>(key.data()), key.size()}, {const_cast<char*>(value.data()), value.size()});
-  EXPECT_TRUE(ok);
 
   // Verify by reading it back.
   envoy_dynamic_module_type_envoy_buffer result;
-  ok = envoy_dynamic_module_callback_network_get_dynamic_metadata_string(
+  bool ok = envoy_dynamic_module_callback_network_get_dynamic_metadata_string(
       filterPtr(), {const_cast<char*>(ns.data()), ns.size()},
       {const_cast<char*>(key.data()), key.size()}, &result);
   EXPECT_TRUE(ok);
@@ -972,14 +957,13 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, SetAndGetDynamicMetadataNumber
       .WillRepeatedly(testing::SaveArg<1>(&(*metadata.mutable_filter_metadata())[ns]));
 
   // Set the metadata.
-  bool ok = envoy_dynamic_module_callback_network_set_dynamic_metadata_number(
+  envoy_dynamic_module_callback_network_set_dynamic_metadata_number(
       filterPtr(), {const_cast<char*>(ns.data()), ns.size()},
       {const_cast<char*>(key.data()), key.size()}, value);
-  EXPECT_TRUE(ok);
 
   // Verify by reading it back.
   double result = 0.0;
-  ok = envoy_dynamic_module_callback_network_get_dynamic_metadata_number(
+  bool ok = envoy_dynamic_module_callback_network_get_dynamic_metadata_number(
       filterPtr(), {const_cast<char*>(ns.data()), ns.size()},
       {const_cast<char*>(key.data()), key.size()}, &result);
   EXPECT_TRUE(ok);
@@ -1014,14 +998,13 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetDynamicMetadataStringWrongT
       .WillRepeatedly(testing::SaveArg<1>(&(*metadata.mutable_filter_metadata())[ns]));
 
   // Set as number first.
-  bool ok = envoy_dynamic_module_callback_network_set_dynamic_metadata_number(
+  envoy_dynamic_module_callback_network_set_dynamic_metadata_number(
       filterPtr(), {const_cast<char*>(ns.data()), ns.size()},
       {const_cast<char*>(key.data()), key.size()}, 123.45);
-  EXPECT_TRUE(ok);
 
   // Try to get as string. It should fail because it's a number.
   envoy_dynamic_module_type_envoy_buffer result;
-  ok = envoy_dynamic_module_callback_network_get_dynamic_metadata_string(
+  bool ok = envoy_dynamic_module_callback_network_get_dynamic_metadata_string(
       filterPtr(), {const_cast<char*>(ns.data()), ns.size()},
       {const_cast<char*>(key.data()), key.size()}, &result);
 
@@ -1057,14 +1040,13 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetDynamicMetadataNumberNonExi
 
   // Set a different key.
   const std::string other_key = "other.key";
-  bool ok = envoy_dynamic_module_callback_network_set_dynamic_metadata_number(
+  envoy_dynamic_module_callback_network_set_dynamic_metadata_number(
       filterPtr(), {const_cast<char*>(ns.data()), ns.size()},
       {const_cast<char*>(other_key.data()), other_key.size()}, 456.78);
-  EXPECT_TRUE(ok);
 
   // Try to get non-existent key.
   double result = 0.0;
-  ok = envoy_dynamic_module_callback_network_get_dynamic_metadata_number(
+  bool ok = envoy_dynamic_module_callback_network_get_dynamic_metadata_number(
       filterPtr(), {const_cast<char*>(ns.data()), ns.size()},
       {const_cast<char*>(key.data()), key.size()}, &result);
 
@@ -1084,14 +1066,13 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetDynamicMetadataNumberWrongT
 
   // Set as string first.
   const std::string value = "test.value";
-  bool ok = envoy_dynamic_module_callback_network_set_dynamic_metadata_string(
+  envoy_dynamic_module_callback_network_set_dynamic_metadata_string(
       filterPtr(), {const_cast<char*>(ns.data()), ns.size()},
       {const_cast<char*>(key.data()), key.size()}, {const_cast<char*>(value.data()), value.size()});
-  EXPECT_TRUE(ok);
 
   // Try to get as number. It should fail because it's a string.
   double result = 0.0;
-  ok = envoy_dynamic_module_callback_network_get_dynamic_metadata_number(
+  bool ok = envoy_dynamic_module_callback_network_get_dynamic_metadata_number(
       filterPtr(), {const_cast<char*>(ns.data()), ns.size()},
       {const_cast<char*>(key.data()), key.size()}, &result);
 
@@ -1110,15 +1091,14 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, SetDynamicMetadataStringEmptyV
   EXPECT_CALL(connection_.stream_info_, setDynamicMetadata(ns, testing::_))
       .WillRepeatedly(testing::SaveArg<1>(&(*metadata.mutable_filter_metadata())[ns]));
 
-  bool ok = envoy_dynamic_module_callback_network_set_dynamic_metadata_string(
+  envoy_dynamic_module_callback_network_set_dynamic_metadata_string(
       filterPtr(), {const_cast<char*>(ns.data()), ns.size()},
       {const_cast<char*>(key.data()), key.size()},
       {const_cast<char*>(empty_value.data()), empty_value.size()});
-  EXPECT_TRUE(ok);
 
   // Verify by reading it back.
   envoy_dynamic_module_type_envoy_buffer result;
-  ok = envoy_dynamic_module_callback_network_get_dynamic_metadata_string(
+  bool ok = envoy_dynamic_module_callback_network_get_dynamic_metadata_string(
       filterPtr(), {const_cast<char*>(ns.data()), ns.size()},
       {const_cast<char*>(key.data()), key.size()}, &result);
   EXPECT_TRUE(ok);
@@ -1137,14 +1117,13 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, SetDynamicMetadataNumberZero) 
   EXPECT_CALL(connection_.stream_info_, setDynamicMetadata(ns, testing::_))
       .WillRepeatedly(testing::SaveArg<1>(&(*metadata.mutable_filter_metadata())[ns]));
 
-  bool ok = envoy_dynamic_module_callback_network_set_dynamic_metadata_number(
+  envoy_dynamic_module_callback_network_set_dynamic_metadata_number(
       filterPtr(), {const_cast<char*>(ns.data()), ns.size()},
       {const_cast<char*>(key.data()), key.size()}, zero_value);
-  EXPECT_TRUE(ok);
 
   // Verify by reading it back.
   double result = 999.0;
-  ok = envoy_dynamic_module_callback_network_get_dynamic_metadata_number(
+  bool ok = envoy_dynamic_module_callback_network_get_dynamic_metadata_number(
       filterPtr(), {const_cast<char*>(ns.data()), ns.size()},
       {const_cast<char*>(key.data()), key.size()}, &result);
   EXPECT_TRUE(ok);
@@ -1163,14 +1142,13 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, SetDynamicMetadataNumberNegati
   EXPECT_CALL(connection_.stream_info_, setDynamicMetadata(ns, testing::_))
       .WillRepeatedly(testing::SaveArg<1>(&(*metadata.mutable_filter_metadata())[ns]));
 
-  bool ok = envoy_dynamic_module_callback_network_set_dynamic_metadata_number(
+  envoy_dynamic_module_callback_network_set_dynamic_metadata_number(
       filterPtr(), {const_cast<char*>(ns.data()), ns.size()},
       {const_cast<char*>(key.data()), key.size()}, negative_value);
-  EXPECT_TRUE(ok);
 
   // Verify by reading it back.
   double result = 0.0;
-  ok = envoy_dynamic_module_callback_network_get_dynamic_metadata_number(
+  bool ok = envoy_dynamic_module_callback_network_get_dynamic_metadata_number(
       filterPtr(), {const_cast<char*>(ns.data()), ns.size()},
       {const_cast<char*>(key.data()), key.size()}, &result);
   EXPECT_TRUE(ok);
@@ -1185,8 +1163,8 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, SetAndGetSocketOptionInt) {
   const int64_t level = 1;
   const int64_t name = 2;
   const int64_t value = 12345;
-  EXPECT_TRUE(envoy_dynamic_module_callback_network_set_socket_option_int(
-      filterPtr(), level, name, envoy_dynamic_module_type_socket_option_state_Prebind, value));
+  envoy_dynamic_module_callback_network_set_socket_option_int(
+      filterPtr(), level, name, envoy_dynamic_module_type_socket_option_state_Prebind, value);
 
   int64_t result = 0;
   EXPECT_TRUE(envoy_dynamic_module_callback_network_get_socket_option_int(
@@ -1198,9 +1176,9 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, SetAndGetSocketOptionBytes) {
   const int64_t level = 3;
   const int64_t name = 4;
   const std::string value = "socket-bytes";
-  EXPECT_TRUE(envoy_dynamic_module_callback_network_set_socket_option_bytes(
+  envoy_dynamic_module_callback_network_set_socket_option_bytes(
       filterPtr(), level, name, envoy_dynamic_module_type_socket_option_state_Bound,
-      {value.data(), value.size()}));
+      {value.data(), value.size()});
 
   envoy_dynamic_module_type_envoy_buffer result;
   EXPECT_TRUE(envoy_dynamic_module_callback_network_get_socket_option_bytes(
@@ -1222,12 +1200,12 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetSocketOptionBytesMissing) {
 
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, ListSocketOptions) {
   // Add two options.
-  EXPECT_TRUE(envoy_dynamic_module_callback_network_set_socket_option_int(
-      filterPtr(), 10, 11, envoy_dynamic_module_type_socket_option_state_Prebind, 7));
+  envoy_dynamic_module_callback_network_set_socket_option_int(
+      filterPtr(), 10, 11, envoy_dynamic_module_type_socket_option_state_Prebind, 7);
   const std::string bytes_val = "opt-bytes";
-  EXPECT_TRUE(envoy_dynamic_module_callback_network_set_socket_option_bytes(
+  envoy_dynamic_module_callback_network_set_socket_option_bytes(
       filterPtr(), 12, 13, envoy_dynamic_module_type_socket_option_state_Listening,
-      {bytes_val.data(), bytes_val.size()}));
+      {bytes_val.data(), bytes_val.size()});
 
   const size_t size = envoy_dynamic_module_callback_network_get_socket_options_size(filterPtr());
   EXPECT_EQ(2, size);
@@ -1258,8 +1236,9 @@ public:
     auto dynamic_module = newDynamicModule(testSharedObjectPath("network_no_op", "c"), false);
     EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
-    auto filter_config_or_status = newDynamicModuleNetworkFilterConfig(
-        "test_filter", "", std::move(dynamic_module.value()), cluster_manager_);
+    auto filter_config_or_status =
+        newDynamicModuleNetworkFilterConfig("test_filter", "", std::move(dynamic_module.value()),
+                                            cluster_manager_, *stats_.rootScope());
     EXPECT_TRUE(filter_config_or_status.ok()) << filter_config_or_status.status().message();
     filter_config_ = filter_config_or_status.value();
 
@@ -1280,6 +1259,7 @@ public:
 
   void* filterPtr() { return static_cast<void*>(filter_.get()); }
 
+  Stats::IsolatedStoreImpl stats_;
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
   DynamicModuleNetworkFilterConfigSharedPtr filter_config_;
   std::shared_ptr<DynamicModuleNetworkFilter> filter_;
@@ -1549,14 +1529,6 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetRemoteAddressNullProvider) 
   EXPECT_EQ(nullptr, address_out.ptr);
   EXPECT_EQ(0, address_out.length);
   EXPECT_EQ(0, port_out);
-}
-
-TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, SetSocketOptionBytesNullPtr) {
-  auto state = envoy_dynamic_module_type_socket_option_state_Prebind;
-  envoy_dynamic_module_type_module_buffer value = {nullptr, 3};
-  bool ok = envoy_dynamic_module_callback_network_set_socket_option_bytes(filterPtr(), 1, 2, state,
-                                                                          value);
-  EXPECT_FALSE(ok);
 }
 
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetSocketOptionIntNullOut) {

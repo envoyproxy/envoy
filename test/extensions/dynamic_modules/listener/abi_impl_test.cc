@@ -3,6 +3,7 @@
 
 #include "source/common/network/address_impl.h"
 #include "source/common/router/string_accessor_impl.h"
+#include "source/common/stats/isolated_store_impl.h"
 #include "source/extensions/dynamic_modules/abi.h"
 #include "source/extensions/filters/listener/dynamic_modules/filter.h"
 
@@ -55,8 +56,8 @@ public:
     auto dynamic_module = newDynamicModule(testSharedObjectPath("listener_no_op", "c"), false);
     EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
-    auto filter_config_or_status =
-        newDynamicModuleListenerFilterConfig("test_filter", "", std::move(dynamic_module.value()));
+    auto filter_config_or_status = newDynamicModuleListenerFilterConfig(
+        "test_filter", "", std::move(dynamic_module.value()), *stats_.rootScope());
     EXPECT_TRUE(filter_config_or_status.ok()) << filter_config_or_status.status().message();
     filter_config_ = filter_config_or_status.value();
 
@@ -70,6 +71,7 @@ public:
 
   void* filterPtr() { return static_cast<void*>(filter_.get()); }
 
+  Stats::IsolatedStoreImpl stats_;
   DynamicModuleListenerFilterConfigSharedPtr filter_config_;
   std::shared_ptr<DynamicModuleListenerFilter> filter_;
   NiceMock<Network::MockListenerFilterCallbacks> callbacks_;
@@ -831,8 +833,8 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicMetadata) {
   envoy_dynamic_module_type_module_buffer ns_buf = {ns, 7};
   envoy_dynamic_module_type_module_buffer key_buf = {key, 6};
   envoy_dynamic_module_type_module_buffer value_buf = {value, 8};
-  envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata(filterPtr(), ns_buf, key_buf,
-                                                                     value_buf);
+  envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string(filterPtr(), ns_buf,
+                                                                            key_buf, value_buf);
 }
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicMetadataNullCallbacks) {
@@ -846,7 +848,7 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicMetadataNullCallbac
   envoy_dynamic_module_type_module_buffer key_buf = {key, 6};
   envoy_dynamic_module_type_module_buffer value_buf = {value, 8};
   // Should not crash.
-  envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata(
+  envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string(
       static_cast<void*>(filter.get()), ns_buf, key_buf, value_buf);
 }
 
@@ -857,8 +859,8 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicMetadataNullNamespa
   envoy_dynamic_module_type_module_buffer key_buf = {key, 6};
   envoy_dynamic_module_type_module_buffer value_buf = {value, 8};
   // Should not crash with null namespace.
-  envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata(filterPtr(), ns_buf, key_buf,
-                                                                     value_buf);
+  envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string(filterPtr(), ns_buf,
+                                                                            key_buf, value_buf);
 }
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicMetadataNullKey) {
@@ -868,8 +870,8 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicMetadataNullKey) {
   envoy_dynamic_module_type_module_buffer key_buf = {nullptr, 6};
   envoy_dynamic_module_type_module_buffer value_buf = {value, 8};
   // Should not crash with null key.
-  envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata(filterPtr(), ns_buf, key_buf,
-                                                                     value_buf);
+  envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string(filterPtr(), ns_buf,
+                                                                            key_buf, value_buf);
 }
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicMetadataNullValue) {
@@ -879,8 +881,8 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicMetadataNullValue) 
   envoy_dynamic_module_type_module_buffer key_buf = {key, 6};
   envoy_dynamic_module_type_module_buffer value_buf = {nullptr, 8};
   // Should not crash with null value.
-  envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata(filterPtr(), ns_buf, key_buf,
-                                                                     value_buf);
+  envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string(filterPtr(), ns_buf,
+                                                                            key_buf, value_buf);
 }
 
 // =============================================================================
@@ -1137,10 +1139,8 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicTypedMetadataSucces
 
   EXPECT_CALL(callbacks_, setDynamicMetadata(testing::_, testing::_));
 
-  bool success = envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string(
-      filterPtr(), ns_buf, key_buf, value_buf);
-
-  EXPECT_TRUE(success);
+  envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string(filterPtr(), ns_buf,
+                                                                            key_buf, value_buf);
 }
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicTypedMetadataNullCallbacks) {
@@ -1154,10 +1154,9 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicTypedMetadataNullCa
   envoy_dynamic_module_type_module_buffer key_buf = {key, 4};
   envoy_dynamic_module_type_module_buffer value_buf = {value, 6};
 
-  bool success = envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string(
+  // TODO(wbpcode): this should never happen in practice, but ensure it doesn't crash.
+  envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string(
       static_cast<void*>(filter.get()), ns_buf, key_buf, value_buf);
-
-  EXPECT_FALSE(success);
 }
 
 // =============================================================================

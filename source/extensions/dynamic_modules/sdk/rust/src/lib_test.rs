@@ -772,12 +772,12 @@ fn test_socket_option_int_round_trip() {
   let mut filter = EnvoyNetworkFilterImpl {
     raw: std::ptr::null_mut(),
   };
-  assert!(filter.set_socket_option_int(
+  filter.set_socket_option_int(
     1,
     2,
     abi::envoy_dynamic_module_type_socket_option_state::Prebind,
-    42
-  ));
+    42,
+  );
   let value = filter.get_socket_option_int(
     1,
     2,
@@ -792,12 +792,12 @@ fn test_socket_option_bytes_round_trip() {
   let mut filter = EnvoyNetworkFilterImpl {
     raw: std::ptr::null_mut(),
   };
-  assert!(filter.set_socket_option_bytes(
+  filter.set_socket_option_bytes(
     3,
     4,
     abi::envoy_dynamic_module_type_socket_option_state::Bound,
     b"bytes-val",
-  ));
+  );
   let value = filter.get_socket_option_bytes(
     3,
     4,
@@ -812,18 +812,18 @@ fn test_socket_option_list() {
   let mut filter = EnvoyNetworkFilterImpl {
     raw: std::ptr::null_mut(),
   };
-  assert!(filter.set_socket_option_int(
+  filter.set_socket_option_int(
     5,
     6,
     abi::envoy_dynamic_module_type_socket_option_state::Prebind,
-    11
-  ));
-  assert!(filter.set_socket_option_bytes(
+    11,
+  );
+  filter.set_socket_option_bytes(
     7,
     8,
     abi::envoy_dynamic_module_type_socket_option_state::Listening,
     b"data",
-  ));
+  );
 
   let options = filter.get_socket_options();
   assert_eq!(2, options.len());
@@ -835,4 +835,159 @@ fn test_socket_option_list() {
     SocketOptionValue::Bytes(bytes) => assert_eq!(b"data".to_vec(), *bytes),
     _ => panic!("expected bytes"),
   }
+}
+
+// =============================================================================
+// UDP Listener Filter Tests
+// =============================================================================
+
+#[test]
+fn test_envoy_dynamic_module_on_udp_listener_filter_config_new_impl() {
+  struct TestUdpListenerFilterConfig;
+  impl<ELF: EnvoyUdpListenerFilter> UdpListenerFilterConfig<ELF> for TestUdpListenerFilterConfig {
+    fn new_udp_listener_filter(&self, _envoy: &mut ELF) -> Box<dyn UdpListenerFilter<ELF>> {
+      Box::new(TestUdpListenerFilter)
+    }
+  }
+
+  struct TestUdpListenerFilter;
+  impl<ELF: EnvoyUdpListenerFilter> UdpListenerFilter<ELF> for TestUdpListenerFilter {}
+
+  let mut envoy_filter_config = EnvoyUdpListenerFilterConfigImpl {
+    raw: std::ptr::null_mut(),
+  };
+  let mut new_fn: NewUdpListenerFilterConfigFunction<
+    EnvoyUdpListenerFilterConfigImpl,
+    EnvoyUdpListenerFilterImpl,
+  > = |_, _, _| Some(Box::new(TestUdpListenerFilterConfig));
+  let result = init_udp_listener_filter_config(
+    &mut envoy_filter_config,
+    "test_name",
+    b"test_config",
+    &new_fn,
+  );
+  assert!(!result.is_null());
+
+  unsafe {
+    envoy_dynamic_module_on_udp_listener_filter_config_destroy(result);
+  }
+
+  // None should result in null pointer.
+  new_fn = |_, _, _| None;
+  let result = init_udp_listener_filter_config(
+    &mut envoy_filter_config,
+    "test_name",
+    b"test_config",
+    &new_fn,
+  );
+  assert!(result.is_null());
+}
+
+#[test]
+fn test_envoy_dynamic_module_on_udp_listener_filter_config_destroy() {
+  static DROPPED: AtomicBool = AtomicBool::new(false);
+  struct TestUdpListenerFilterConfig;
+  impl<ELF: EnvoyUdpListenerFilter> UdpListenerFilterConfig<ELF> for TestUdpListenerFilterConfig {
+    fn new_udp_listener_filter(&self, _envoy: &mut ELF) -> Box<dyn UdpListenerFilter<ELF>> {
+      Box::new(TestUdpListenerFilter)
+    }
+  }
+  impl Drop for TestUdpListenerFilterConfig {
+    fn drop(&mut self) {
+      DROPPED.store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+  }
+
+  struct TestUdpListenerFilter;
+  impl<ELF: EnvoyUdpListenerFilter> UdpListenerFilter<ELF> for TestUdpListenerFilter {}
+
+  let new_fn: NewUdpListenerFilterConfigFunction<
+    EnvoyUdpListenerFilterConfigImpl,
+    EnvoyUdpListenerFilterImpl,
+  > = |_, _, _| Some(Box::new(TestUdpListenerFilterConfig));
+  let config_ptr = init_udp_listener_filter_config(
+    &mut EnvoyUdpListenerFilterConfigImpl {
+      raw: std::ptr::null_mut(),
+    },
+    "test_name",
+    b"test_config",
+    &new_fn,
+  );
+
+  unsafe {
+    envoy_dynamic_module_on_udp_listener_filter_config_destroy(config_ptr);
+  }
+  // Now that the drop is called, DROPPED must be set to true.
+  assert!(DROPPED.load(std::sync::atomic::Ordering::SeqCst));
+}
+
+#[test]
+fn test_envoy_dynamic_module_on_udp_listener_filter_new_destroy() {
+  static DROPPED: AtomicBool = AtomicBool::new(false);
+  struct TestUdpListenerFilterConfig;
+  impl<ELF: EnvoyUdpListenerFilter> UdpListenerFilterConfig<ELF> for TestUdpListenerFilterConfig {
+    fn new_udp_listener_filter(&self, _envoy: &mut ELF) -> Box<dyn UdpListenerFilter<ELF>> {
+      Box::new(TestUdpListenerFilter)
+    }
+  }
+
+  struct TestUdpListenerFilter;
+  impl<ELF: EnvoyUdpListenerFilter> UdpListenerFilter<ELF> for TestUdpListenerFilter {}
+  impl Drop for TestUdpListenerFilter {
+    fn drop(&mut self) {
+      DROPPED.store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+  }
+
+  let mut filter_config = TestUdpListenerFilterConfig;
+  let result = envoy_dynamic_module_on_udp_listener_filter_new_impl(
+    &mut EnvoyUdpListenerFilterImpl {
+      raw: std::ptr::null_mut(),
+    },
+    &mut filter_config,
+  );
+  assert!(!result.is_null());
+
+  envoy_dynamic_module_on_udp_listener_filter_destroy(result);
+
+  assert!(DROPPED.load(std::sync::atomic::Ordering::SeqCst));
+}
+
+#[test]
+fn test_envoy_dynamic_module_on_udp_listener_filter_callbacks() {
+  struct TestUdpListenerFilterConfig;
+  impl<ELF: EnvoyUdpListenerFilter> UdpListenerFilterConfig<ELF> for TestUdpListenerFilterConfig {
+    fn new_udp_listener_filter(&self, _envoy: &mut ELF) -> Box<dyn UdpListenerFilter<ELF>> {
+      Box::new(TestUdpListenerFilter)
+    }
+  }
+
+  static ON_DATA_CALLED: AtomicBool = AtomicBool::new(false);
+
+  struct TestUdpListenerFilter;
+  impl<ELF: EnvoyUdpListenerFilter> UdpListenerFilter<ELF> for TestUdpListenerFilter {
+    fn on_data(
+      &mut self,
+      _envoy_filter: &mut ELF,
+    ) -> abi::envoy_dynamic_module_type_on_udp_listener_filter_status {
+      ON_DATA_CALLED.store(true, std::sync::atomic::Ordering::SeqCst);
+      abi::envoy_dynamic_module_type_on_udp_listener_filter_status::Continue
+    }
+  }
+
+  let mut filter_config = TestUdpListenerFilterConfig;
+  let filter = envoy_dynamic_module_on_udp_listener_filter_new_impl(
+    &mut EnvoyUdpListenerFilterImpl {
+      raw: std::ptr::null_mut(),
+    },
+    &mut filter_config,
+  );
+
+  assert_eq!(
+    envoy_dynamic_module_on_udp_listener_filter_on_data(std::ptr::null_mut(), filter),
+    abi::envoy_dynamic_module_type_on_udp_listener_filter_status::Continue
+  );
+  envoy_dynamic_module_on_udp_listener_filter_destroy(filter);
+
+  assert!(ON_DATA_CALLED.load(std::sync::atomic::Ordering::SeqCst));
 }

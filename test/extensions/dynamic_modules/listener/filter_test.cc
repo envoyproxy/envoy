@@ -1,5 +1,7 @@
+#include "source/common/stats/isolated_store_impl.h"
 #include "source/extensions/dynamic_modules/abi.h"
 #include "source/extensions/filters/listener/dynamic_modules/filter.h"
+#include "source/extensions/filters/listener/dynamic_modules/filter_config.h"
 
 #include "test/extensions/dynamic_modules/util.h"
 #include "test/mocks/network/io_handle.h"
@@ -42,12 +44,13 @@ public:
     auto dynamic_module = newDynamicModule(testSharedObjectPath("listener_no_op", "c"), false);
     EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
-    auto filter_config_or_status =
-        newDynamicModuleListenerFilterConfig("test_filter", "", std::move(dynamic_module.value()));
+    auto filter_config_or_status = newDynamicModuleListenerFilterConfig(
+        "test_filter", "", std::move(dynamic_module.value()), *stats_.rootScope());
     EXPECT_TRUE(filter_config_or_status.ok()) << filter_config_or_status.status().message();
     filter_config_ = filter_config_or_status.value();
   }
 
+  Stats::IsolatedStoreImpl stats_;
   DynamicModuleListenerFilterConfigSharedPtr filter_config_;
 };
 
@@ -191,11 +194,12 @@ TEST_F(DynamicModuleListenerFilterTest, GetFilterConfig) {
 }
 
 TEST(DynamicModuleListenerFilterConfigTest, ConfigInitialization) {
+  Stats::IsolatedStoreImpl stats;
   auto dynamic_module = newDynamicModule(testSharedObjectPath("listener_no_op", "c"), false);
   EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
   auto filter_config_or_status = newDynamicModuleListenerFilterConfig(
-      "test_filter", "some_config", std::move(dynamic_module.value()));
+      "test_filter", "some_config", std::move(dynamic_module.value()), *stats.rootScope());
   EXPECT_TRUE(filter_config_or_status.ok());
 
   auto config = filter_config_or_status.value();
@@ -210,35 +214,38 @@ TEST(DynamicModuleListenerFilterConfigTest, ConfigInitialization) {
 }
 
 TEST(DynamicModuleListenerFilterConfigTest, MissingSymbols) {
+  Stats::IsolatedStoreImpl stats;
   // Use the HTTP filter no_op module which lacks listener filter symbols.
   auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", "c"), false);
   EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
-  auto filter_config_or_status =
-      newDynamicModuleListenerFilterConfig("test_filter", "", std::move(dynamic_module.value()));
+  auto filter_config_or_status = newDynamicModuleListenerFilterConfig(
+      "test_filter", "", std::move(dynamic_module.value()), *stats.rootScope());
   EXPECT_FALSE(filter_config_or_status.ok());
 }
 
 TEST(DynamicModuleListenerFilterConfigTest, ConfigInitializationFailure) {
+  Stats::IsolatedStoreImpl stats;
   // Use a module that returns nullptr from config_new.
   auto dynamic_module =
       newDynamicModule(testSharedObjectPath("listener_config_new_fail", "c"), false);
   EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
-  auto filter_config_or_status =
-      newDynamicModuleListenerFilterConfig("test_filter", "", std::move(dynamic_module.value()));
+  auto filter_config_or_status = newDynamicModuleListenerFilterConfig(
+      "test_filter", "", std::move(dynamic_module.value()), *stats.rootScope());
   EXPECT_FALSE(filter_config_or_status.ok());
   EXPECT_THAT(filter_config_or_status.status().message(),
               testing::HasSubstr("Failed to initialize"));
 }
 
 TEST(DynamicModuleListenerFilterConfigTest, StopIterationStatus) {
+  Stats::IsolatedStoreImpl stats;
   auto dynamic_module =
       newDynamicModule(testSharedObjectPath("listener_stop_iteration", "c"), false);
   EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
-  auto filter_config_or_status =
-      newDynamicModuleListenerFilterConfig("test_filter", "", std::move(dynamic_module.value()));
+  auto filter_config_or_status = newDynamicModuleListenerFilterConfig(
+      "test_filter", "", std::move(dynamic_module.value()), *stats.rootScope());
   EXPECT_TRUE(filter_config_or_status.ok());
   auto config = filter_config_or_status.value();
 
@@ -255,12 +262,13 @@ TEST(DynamicModuleListenerFilterConfigTest, StopIterationStatus) {
 }
 
 TEST(DynamicModuleListenerFilterConfigTest, OnDataStopIterationStatus) {
+  Stats::IsolatedStoreImpl stats;
   auto dynamic_module =
       newDynamicModule(testSharedObjectPath("listener_stop_iteration", "c"), false);
   EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
-  auto filter_config_or_status =
-      newDynamicModuleListenerFilterConfig("test_filter", "", std::move(dynamic_module.value()));
+  auto filter_config_or_status = newDynamicModuleListenerFilterConfig(
+      "test_filter", "", std::move(dynamic_module.value()), *stats.rootScope());
   EXPECT_TRUE(filter_config_or_status.ok());
   auto config = filter_config_or_status.value();
 
@@ -275,6 +283,96 @@ TEST(DynamicModuleListenerFilterConfigTest, OnDataStopIterationStatus) {
 
   // onData should return StopIteration for the stop_iteration module.
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter->onData(test_buffer));
+}
+
+TEST_F(DynamicModuleListenerFilterTest, MetricsCounterDefineAndIncrement) {
+  // Test that we can define and increment a counter via the config.
+  envoy_dynamic_module_type_module_buffer name = {.ptr = "test_counter", .length = 12};
+  size_t counter_id = 0;
+
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_listener_filter_config_define_counter(
+                static_cast<void*>(filter_config_.get()), name, &counter_id));
+  EXPECT_EQ(0, counter_id);
+
+  auto filter = std::make_unique<DynamicModuleListenerFilter>(filter_config_);
+  filter->initializeInModuleFilter();
+
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_listener_filter_increment_counter(
+                static_cast<void*>(filter.get()), counter_id, 5));
+
+  // Verify the counter value.
+  auto counter = TestUtility::findCounter(stats_, "dynamic_module_listener_filter.test_counter");
+  ASSERT_NE(nullptr, counter);
+  EXPECT_EQ(5, counter->value());
+}
+
+TEST_F(DynamicModuleListenerFilterTest, MetricsGaugeDefineAndManipulate) {
+  // Test that we can define and manipulate a gauge via the config.
+  envoy_dynamic_module_type_module_buffer name = {.ptr = "test_gauge", .length = 10};
+  size_t gauge_id = 0;
+
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_listener_filter_config_define_gauge(
+                static_cast<void*>(filter_config_.get()), name, &gauge_id));
+  EXPECT_EQ(0, gauge_id);
+
+  auto filter = std::make_unique<DynamicModuleListenerFilter>(filter_config_);
+  filter->initializeInModuleFilter();
+
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_listener_filter_set_gauge(
+                static_cast<void*>(filter.get()), gauge_id, 100));
+
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_listener_filter_increment_gauge(
+                static_cast<void*>(filter.get()), gauge_id, 10));
+
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_listener_filter_decrement_gauge(
+                static_cast<void*>(filter.get()), gauge_id, 5));
+
+  // Verify the gauge value: 100 + 10 - 5 = 105.
+  auto gauge = TestUtility::findGauge(stats_, "dynamic_module_listener_filter.test_gauge");
+  ASSERT_NE(nullptr, gauge);
+  EXPECT_EQ(105, gauge->value());
+}
+
+TEST_F(DynamicModuleListenerFilterTest, MetricsHistogramDefineAndRecord) {
+  // Test that we can define and record values in a histogram via the config.
+  envoy_dynamic_module_type_module_buffer name = {.ptr = "test_histogram", .length = 14};
+  size_t histogram_id = 0;
+
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_listener_filter_config_define_histogram(
+                static_cast<void*>(filter_config_.get()), name, &histogram_id));
+  EXPECT_EQ(0, histogram_id);
+
+  auto filter = std::make_unique<DynamicModuleListenerFilter>(filter_config_);
+  filter->initializeInModuleFilter();
+
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_listener_filter_record_histogram_value(
+                static_cast<void*>(filter.get()), histogram_id, 42));
+
+  // Histograms don't expose a simple value to check, but we verify no error.
+}
+
+TEST_F(DynamicModuleListenerFilterTest, MetricsInvalidId) {
+  auto filter = std::make_unique<DynamicModuleListenerFilter>(filter_config_);
+  filter->initializeInModuleFilter();
+
+  // Test that using an invalid ID returns an error.
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
+            envoy_dynamic_module_callback_listener_filter_increment_counter(
+                static_cast<void*>(filter.get()), 999, 1));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
+            envoy_dynamic_module_callback_listener_filter_set_gauge(
+                static_cast<void*>(filter.get()), 999, 1));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
+            envoy_dynamic_module_callback_listener_filter_record_histogram_value(
+                static_cast<void*>(filter.get()), 999, 1));
 }
 
 } // namespace ListenerFilters

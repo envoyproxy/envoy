@@ -37,6 +37,7 @@ paths:
   # TODO(alyssawilk) unexclude mobile
   excluded:
   - .
+  - bazel/external/c-ares/
   - bazel/external/http_parser/
   - bazel/rbe/toolchains/configs/
   - bazel-

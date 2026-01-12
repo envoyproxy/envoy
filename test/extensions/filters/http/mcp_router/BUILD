@@ -29,8 +29,10 @@ envoy_extension_cc_test(
         "//source/common/buffer:buffer_lib",
         "//source/common/http:message_lib",
         "//source/extensions/filters/http/mcp_router:mcp_router_lib",
+        "//test/mocks/event:event_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:utility_lib",
     ],
 )

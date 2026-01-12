@@ -11,9 +11,10 @@ namespace ListenerFilters {
 
 DynamicModuleListenerFilterConfig::DynamicModuleListenerFilterConfig(
     const absl::string_view filter_name, const absl::string_view filter_config,
-    DynamicModulePtr dynamic_module)
-    : filter_name_(filter_name), filter_config_(filter_config),
-      dynamic_module_(std::move(dynamic_module)) {}
+    DynamicModulePtr dynamic_module, Stats::Scope& stats_scope)
+    : stats_scope_(stats_scope.createScope(std::string(ListenerFilterStatsNamespace) + ".")),
+      stat_name_pool_(stats_scope_->symbolTable()), filter_name_(filter_name),
+      filter_config_(filter_config), dynamic_module_(std::move(dynamic_module)) {}
 
 DynamicModuleListenerFilterConfig::~DynamicModuleListenerFilterConfig() {
   if (in_module_config_ != nullptr) {
@@ -24,7 +25,7 @@ DynamicModuleListenerFilterConfig::~DynamicModuleListenerFilterConfig() {
 absl::StatusOr<DynamicModuleListenerFilterConfigSharedPtr>
 newDynamicModuleListenerFilterConfig(const absl::string_view filter_name,
                                      const absl::string_view filter_config,
-                                     DynamicModulePtr dynamic_module) {
+                                     DynamicModulePtr dynamic_module, Stats::Scope& stats_scope) {
 
   // Resolve the symbols for the listener filter using graceful error handling.
   auto on_config_new =
@@ -62,8 +63,8 @@ newDynamicModuleListenerFilterConfig(const absl::string_view filter_name,
       "envoy_dynamic_module_on_listener_filter_destroy");
   RETURN_IF_NOT_OK_REF(on_destroy.status());
 
-  auto config = std::make_shared<DynamicModuleListenerFilterConfig>(filter_name, filter_config,
-                                                                    std::move(dynamic_module));
+  auto config = std::make_shared<DynamicModuleListenerFilterConfig>(
+      filter_name, filter_config, std::move(dynamic_module), stats_scope);
 
   // Store the resolved function pointers.
   config->on_listener_filter_config_destroy_ = on_config_destroy.value();
