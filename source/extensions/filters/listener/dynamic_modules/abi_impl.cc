@@ -665,6 +665,53 @@ envoy_dynamic_module_callback_listener_filter_record_histogram_value(
   return envoy_dynamic_module_type_metrics_result_Success;
 }
 
+// -----------------------------------------------------------------------------
+// Scheduler Callbacks
+// -----------------------------------------------------------------------------
+
+envoy_dynamic_module_type_listener_filter_scheduler_module_ptr
+envoy_dynamic_module_callback_listener_filter_scheduler_new(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  Event::Dispatcher* dispatcher = filter->dispatcher();
+  if (dispatcher == nullptr) {
+    return nullptr;
+  }
+  return new DynamicModuleListenerFilterScheduler(filter->weak_from_this(), *dispatcher);
+}
+
+void envoy_dynamic_module_callback_listener_filter_scheduler_delete(
+    envoy_dynamic_module_type_listener_filter_scheduler_module_ptr scheduler_module_ptr) {
+  delete static_cast<DynamicModuleListenerFilterScheduler*>(scheduler_module_ptr);
+}
+
+void envoy_dynamic_module_callback_listener_filter_scheduler_commit(
+    envoy_dynamic_module_type_listener_filter_scheduler_module_ptr scheduler_module_ptr,
+    uint64_t event_id) {
+  auto* scheduler = static_cast<DynamicModuleListenerFilterScheduler*>(scheduler_module_ptr);
+  scheduler->commit(event_id);
+}
+
+envoy_dynamic_module_type_listener_filter_config_scheduler_module_ptr
+envoy_dynamic_module_callback_listener_filter_config_scheduler_new(
+    envoy_dynamic_module_type_listener_filter_config_envoy_ptr filter_config_envoy_ptr) {
+  auto* filter_config = static_cast<DynamicModuleListenerFilterConfig*>(filter_config_envoy_ptr);
+  return new DynamicModuleListenerFilterConfigScheduler(filter_config->weak_from_this(),
+                                                        filter_config->main_thread_dispatcher_);
+}
+
+void envoy_dynamic_module_callback_listener_filter_config_scheduler_delete(
+    envoy_dynamic_module_type_listener_filter_config_scheduler_module_ptr scheduler_module_ptr) {
+  delete static_cast<DynamicModuleListenerFilterConfigScheduler*>(scheduler_module_ptr);
+}
+
+void envoy_dynamic_module_callback_listener_filter_config_scheduler_commit(
+    envoy_dynamic_module_type_listener_filter_config_scheduler_module_ptr scheduler_module_ptr,
+    uint64_t event_id) {
+  auto* scheduler = static_cast<DynamicModuleListenerFilterConfigScheduler*>(scheduler_module_ptr);
+  scheduler->commit(event_id);
+}
+
 } // extern "C"
 
 } // namespace ListenerFilters

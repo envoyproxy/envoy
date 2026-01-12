@@ -4519,6 +4519,9 @@ pub trait EnvoyListenerFilterConfig {
     &mut self,
     name: &str,
   ) -> Result<EnvoyHistogramId, abi::envoy_dynamic_module_type_metrics_result>;
+
+  /// Create a new implementation of the [`EnvoyListenerFilterConfigScheduler`] trait.
+  fn new_config_scheduler(&self) -> impl EnvoyListenerFilterConfigScheduler + 'static;
 }
 
 /// The trait that represents the configuration for an Envoy listener filter configuration.
@@ -4532,6 +4535,15 @@ pub trait EnvoyListenerFilterConfig {
 pub trait ListenerFilterConfig<ELF: EnvoyListenerFilter>: Sync {
   /// This is called from a worker thread when a new connection is accepted.
   fn new_listener_filter(&self, _envoy: &mut ELF) -> Box<dyn ListenerFilter<ELF>>;
+
+  /// This is called when the new event is scheduled via the
+  /// [`EnvoyListenerFilterConfigScheduler::commit`] for this [`ListenerFilterConfig`].
+  ///
+  /// * `event_id` is the ID of the event that was scheduled with
+  ///   [`EnvoyListenerFilterConfigScheduler::commit`] to distinguish multiple scheduled events.
+  ///
+  /// See [`EnvoyListenerFilterConfig::new_config_scheduler`] for more details on how to use this.
+  fn on_config_scheduled(&self, _event_id: u64) {}
 }
 
 /// The trait that corresponds to an Envoy listener filter for each accepted connection
@@ -4564,6 +4576,16 @@ pub trait ListenerFilter<ELF: EnvoyListenerFilter> {
 
   /// This is called when the listener filter is destroyed for each accepted connection.
   fn on_close(&mut self, _envoy_filter: &mut ELF) {}
+
+  /// This is called when the new event is scheduled via the
+  /// [`EnvoyListenerFilterScheduler::commit`] for this [`ListenerFilter`].
+  ///
+  /// * `envoy_filter` can be used to interact with the underlying Envoy filter object.
+  /// * `event_id` is the ID of the event that was scheduled with
+  ///   [`EnvoyListenerFilterScheduler::commit`] to distinguish multiple scheduled events.
+  ///
+  /// See [`EnvoyListenerFilter::new_scheduler`] for more details on how to use this.
+  fn on_scheduled(&mut self, _envoy_filter: &mut ELF, _event_id: u64) {}
 }
 
 /// The trait that represents the Envoy listener filter.
@@ -4658,6 +4680,140 @@ pub trait EnvoyListenerFilter {
     id: EnvoyHistogramId,
     value: u64,
   ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result>;
+
+  /// Create a new implementation of the [`EnvoyListenerFilterScheduler`] trait.
+  ///
+  /// ## Example Usage
+  ///
+  /// ```
+  /// use envoy_proxy_dynamic_modules_rust_sdk::*;
+  /// use std::thread;
+  ///
+  /// struct TestFilter;
+  /// impl<ELF: EnvoyListenerFilter> ListenerFilter<ELF> for TestFilter {
+  ///   fn on_accept(
+  ///     &mut self,
+  ///     envoy_filter: &mut ELF,
+  ///   ) -> abi::envoy_dynamic_module_type_on_listener_filter_status {
+  ///     let scheduler = envoy_filter.new_scheduler();
+  ///     let _ = std::thread::spawn(move || {
+  ///       // Do some work in a separate thread.
+  ///       // ...
+  ///       // Then schedule the event to continue processing.
+  ///       scheduler.commit(123);
+  ///     });
+  ///     abi::envoy_dynamic_module_type_on_listener_filter_status::StopIteration
+  ///   }
+  ///
+  ///   fn on_scheduled(&mut self, _envoy_filter: &mut ELF, event_id: u64) {
+  ///     // Handle the scheduled event.
+  ///     assert_eq!(event_id, 123);
+  ///   }
+  /// }
+  /// ```
+  fn new_scheduler(&self) -> impl EnvoyListenerFilterScheduler + 'static;
+}
+
+/// This represents a thread-safe object that can be used to schedule a generic event to the
+/// Envoy listener filter on the worker thread where the listener filter is running.
+///
+/// The scheduler is created by the [`EnvoyListenerFilter::new_scheduler`] method. When calling
+/// [`EnvoyListenerFilterScheduler::commit`] with an event id, eventually
+/// [`ListenerFilter::on_scheduled`] is called with the same event id on the worker thread where the
+/// listener filter is running, IF the filter is still alive by the time the event is committed.
+///
+/// Since this is primarily designed to be used from a different thread than the one
+/// where the [`ListenerFilter`] instance was created, it is marked as `Send` so that
+/// the [`Box<dyn EnvoyListenerFilterScheduler>`] can be sent across threads.
+///
+/// It is also safe to be called concurrently, so it is marked as `Sync` as well.
+#[automock]
+pub trait EnvoyListenerFilterScheduler: Send + Sync {
+  /// Commit the scheduled event to the worker thread where [`ListenerFilter`] is running.
+  ///
+  /// It accepts an `event_id` which can be used to distinguish different events
+  /// scheduled by the same filter. The `event_id` can be any value.
+  ///
+  /// Once this is called, [`ListenerFilter::on_scheduled`] will be called with
+  /// the same `event_id` on the worker thread where the filter is running IF
+  /// by the time the event is committed, the filter is still alive.
+  fn commit(&self, event_id: u64);
+}
+
+/// This implements the [`EnvoyListenerFilterScheduler`] trait with the given raw pointer to the
+/// Envoy listener filter scheduler object.
+struct EnvoyListenerFilterSchedulerImpl {
+  raw_ptr: abi::envoy_dynamic_module_type_listener_filter_scheduler_module_ptr,
+}
+
+unsafe impl Send for EnvoyListenerFilterSchedulerImpl {}
+unsafe impl Sync for EnvoyListenerFilterSchedulerImpl {}
+
+impl Drop for EnvoyListenerFilterSchedulerImpl {
+  fn drop(&mut self) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_scheduler_delete(self.raw_ptr);
+    }
+  }
+}
+
+impl EnvoyListenerFilterScheduler for EnvoyListenerFilterSchedulerImpl {
+  fn commit(&self, event_id: u64) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_scheduler_commit(self.raw_ptr, event_id);
+    }
+  }
+}
+
+// Box<dyn EnvoyListenerFilterScheduler> is returned by mockall, so we need to implement
+// EnvoyListenerFilterScheduler for it as well.
+impl EnvoyListenerFilterScheduler for Box<dyn EnvoyListenerFilterScheduler> {
+  fn commit(&self, event_id: u64) {
+    (**self).commit(event_id);
+  }
+}
+
+/// This represents a thread-safe object that can be used to schedule a generic event to the
+/// Envoy listener filter config on the main thread.
+#[automock]
+pub trait EnvoyListenerFilterConfigScheduler: Send + Sync {
+  /// Commit the scheduled event to the main thread.
+  fn commit(&self, event_id: u64);
+}
+
+/// This implements the [`EnvoyListenerFilterConfigScheduler`] trait.
+struct EnvoyListenerFilterConfigSchedulerImpl {
+  raw_ptr: abi::envoy_dynamic_module_type_listener_filter_config_scheduler_module_ptr,
+}
+
+unsafe impl Send for EnvoyListenerFilterConfigSchedulerImpl {}
+unsafe impl Sync for EnvoyListenerFilterConfigSchedulerImpl {}
+
+impl Drop for EnvoyListenerFilterConfigSchedulerImpl {
+  fn drop(&mut self) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_config_scheduler_delete(self.raw_ptr);
+    }
+  }
+}
+
+impl EnvoyListenerFilterConfigScheduler for EnvoyListenerFilterConfigSchedulerImpl {
+  fn commit(&self, event_id: u64) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_config_scheduler_commit(
+        self.raw_ptr,
+        event_id,
+      );
+    }
+  }
+}
+
+// Box<dyn EnvoyListenerFilterConfigScheduler> is returned by mockall, so we need to implement
+// EnvoyListenerFilterConfigScheduler for it as well.
+impl EnvoyListenerFilterConfigScheduler for Box<dyn EnvoyListenerFilterConfigScheduler> {
+  fn commit(&self, event_id: u64) {
+    (**self).commit(event_id);
+  }
 }
 
 /// The implementation of [`EnvoyListenerFilterConfig`] for the Envoy listener filter
@@ -4716,6 +4872,16 @@ impl EnvoyListenerFilterConfig for EnvoyListenerFilterConfigImpl {
       )
     })?;
     Ok(EnvoyHistogramId(id))
+  }
+
+  fn new_config_scheduler(&self) -> impl EnvoyListenerFilterConfigScheduler + 'static {
+    unsafe {
+      let scheduler_ptr =
+        abi::envoy_dynamic_module_callback_listener_filter_config_scheduler_new(self.raw);
+      EnvoyListenerFilterConfigSchedulerImpl {
+        raw_ptr: scheduler_ptr,
+      }
+    }
   }
 }
 
@@ -5030,6 +5196,16 @@ impl EnvoyListenerFilter for EnvoyListenerFilterImpl {
       Err(res)
     }
   }
+
+  fn new_scheduler(&self) -> impl EnvoyListenerFilterScheduler + 'static {
+    unsafe {
+      let scheduler_ptr =
+        abi::envoy_dynamic_module_callback_listener_filter_scheduler_new(self.raw);
+      EnvoyListenerFilterSchedulerImpl {
+        raw_ptr: scheduler_ptr,
+      }
+    }
+  }
 }
 
 // Listener Filter Event Hook Implementations
@@ -5137,6 +5313,29 @@ pub extern "C" fn envoy_dynamic_module_on_listener_filter_destroy(
 ) {
   let _ =
     unsafe { Box::from_raw(filter_ptr as *mut Box<dyn ListenerFilter<EnvoyListenerFilterImpl>>) };
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_on_listener_filter_scheduled(
+  envoy_ptr: abi::envoy_dynamic_module_type_listener_filter_envoy_ptr,
+  filter_ptr: abi::envoy_dynamic_module_type_listener_filter_module_ptr,
+  event_id: u64,
+) {
+  let filter = filter_ptr as *mut Box<dyn ListenerFilter<EnvoyListenerFilterImpl>>;
+  let filter = unsafe { &mut *filter };
+  filter.on_scheduled(&mut EnvoyListenerFilterImpl::new(envoy_ptr), event_id);
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_on_listener_filter_config_scheduled(
+  _filter_config_envoy_ptr: abi::envoy_dynamic_module_type_listener_filter_config_envoy_ptr,
+  filter_config_module_ptr: abi::envoy_dynamic_module_type_listener_filter_config_module_ptr,
+  event_id: u64,
+) {
+  let filter_config =
+    filter_config_module_ptr as *const *const dyn ListenerFilterConfig<EnvoyListenerFilterImpl>;
+  let filter_config = unsafe { &**filter_config };
+  filter_config.on_config_scheduled(event_id);
 }
 
 // =============================================================================
