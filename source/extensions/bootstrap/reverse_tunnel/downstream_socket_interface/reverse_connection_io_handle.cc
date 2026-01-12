@@ -10,7 +10,6 @@
 #include "envoy/network/connection.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
 #include "source/common/event/real_time_system.h"
@@ -57,14 +56,13 @@ void ReverseConnectionIOHandle::cleanup() {
                  "reverse_tunnel: cleaning up trigger pipe; "
                  "trigger_pipe_write_fd_={}, trigger_pipe_read_fd_={}",
                  trigger_pipe_write_fd_, trigger_pipe_read_fd_);
-  auto& os_sys_calls = Api::OsSysCallsSingleton::get();
-  if (trigger_pipe_write_fd_ != INVALID_SOCKET) {
-    os_sys_calls.close(trigger_pipe_write_fd_);
-    trigger_pipe_write_fd_ = INVALID_SOCKET;
+  if (trigger_pipe_write_fd_ >= 0) {
+    ::close(trigger_pipe_write_fd_);
+    trigger_pipe_write_fd_ = -1;
   }
-  if (trigger_pipe_read_fd_ != INVALID_SOCKET) {
-    os_sys_calls.close(trigger_pipe_read_fd_);
-    trigger_pipe_read_fd_ = INVALID_SOCKET;
+  if (trigger_pipe_read_fd_ >= 0) {
+    ::close(trigger_pipe_read_fd_);
+    trigger_pipe_read_fd_ = -1;
   }
 
   // Cancel the retry timer safely.
@@ -165,8 +163,8 @@ void ReverseConnectionIOHandle::initializeFileEvent(Event::Dispatcher& dispatche
 
   // Replace the monitored FD with pipe read FD
   // This must happen before any event registration.
-  os_fd_t trigger_fd = getPipeMonitorFd();
-  if (trigger_fd != INVALID_SOCKET) {
+  int trigger_fd = getPipeMonitorFd();
+  if (trigger_fd != -1) {
     ENVOY_LOG(info, "Replacing monitored FD from {} to pipe read FD {}", fd_, trigger_fd);
     fd_ = trigger_fd;
   }
@@ -192,9 +190,7 @@ Envoy::Network::IoHandlePtr ReverseConnectionIOHandle::accept(struct sockaddr* a
   ENVOY_LOG(debug, "reverse_tunnel: accept() called");
   if (isTriggerPipeReady()) {
     char trigger_byte;
-    auto& os_sys_calls = Api::OsSysCallsSingleton::get();
-    ssize_t bytes_read =
-        os_sys_calls.recv(trigger_pipe_read_fd_, &trigger_byte, 1, 0).return_value_;
+    ssize_t bytes_read = ::read(trigger_pipe_read_fd_, &trigger_byte, 1);
     if (bytes_read == 1) {
       ENVOY_LOG(debug, "reverse_tunnel: received trigger, processing connection.");
       // When a connection is established, a byte is written to the trigger_pipe_write_fd_ and the
@@ -365,7 +361,7 @@ void ReverseConnectionIOHandle::onEvent(Network::ConnectionEvent event) {
   ENVOY_LOG(trace, "reverse_tunnel: event: {}", static_cast<int>(event));
 }
 
-os_fd_t ReverseConnectionIOHandle::getPipeMonitorFd() const { return trigger_pipe_read_fd_; }
+int ReverseConnectionIOHandle::getPipeMonitorFd() const { return trigger_pipe_read_fd_; }
 
 // Get time source for consistent time operations.
 TimeSource& ReverseConnectionIOHandle::getTimeSource() const {
@@ -1019,32 +1015,30 @@ bool ReverseConnectionIOHandle::initiateOneReverseConnection(const std::string& 
 // Trigger pipe used to wake up accept() when a connection is established.
 void ReverseConnectionIOHandle::createTriggerPipe() {
   ENVOY_LOG(debug, "reverse_tunnel: Creating trigger pipe for single-byte mechanism");
-  os_fd_t pipe_fds[2];
-  auto& os_sys_calls = Api::OsSysCallsSingleton::get();
-#ifdef _WIN32
-  // On Windows, we use AF_INET to emulate a pipe with a TCP socket pair.
-  const int domain = AF_INET;
-#else
-  const int domain = AF_UNIX;
-#endif // _WIN32
-  auto result = os_sys_calls.socketpair(domain, SOCK_STREAM, 0, pipe_fds);
-  if (result.return_value_ != 0) {
-    ENVOY_LOG(error, "Failed to create trigger pipe: {}", errorDetails(result.errno_));
-    trigger_pipe_read_fd_ = INVALID_SOCKET;
-    trigger_pipe_write_fd_ = INVALID_SOCKET;
+  int pipe_fds[2];
+  if (pipe(pipe_fds) == -1) {
+    ENVOY_LOG(error, "Failed to create trigger pipe: {}", errorDetails(errno));
+    trigger_pipe_read_fd_ = -1;
+    trigger_pipe_write_fd_ = -1;
     return;
   }
   trigger_pipe_read_fd_ = pipe_fds[0];
   trigger_pipe_write_fd_ = pipe_fds[1];
   // Make both ends non-blocking.
-  os_sys_calls.setsocketblocking(trigger_pipe_write_fd_, false);
-  os_sys_calls.setsocketblocking(trigger_pipe_read_fd_, false);
+  int flags = fcntl(trigger_pipe_write_fd_, F_GETFL, 0);
+  if (flags != -1) {
+    fcntl(trigger_pipe_write_fd_, F_SETFL, flags | O_NONBLOCK);
+  }
+  flags = fcntl(trigger_pipe_read_fd_, F_GETFL, 0);
+  if (flags != -1) {
+    fcntl(trigger_pipe_read_fd_, F_SETFL, flags | O_NONBLOCK);
+  }
   ENVOY_LOG(debug, "reverse_tunnel: Created trigger pipe: read_fd={}, write_fd={}",
             trigger_pipe_read_fd_, trigger_pipe_write_fd_);
 }
 
 bool ReverseConnectionIOHandle::isTriggerPipeReady() const {
-  return trigger_pipe_read_fd_ != INVALID_SOCKET && trigger_pipe_write_fd_ != INVALID_SOCKET;
+  return trigger_pipe_read_fd_ != -1 && trigger_pipe_write_fd_ != -1;
 }
 
 void ReverseConnectionIOHandle::onConnectionDone(const std::string& error,
@@ -1191,16 +1185,14 @@ void ReverseConnectionIOHandle::onConnectionDone(const std::string& error,
       // Trigger accept mechanism safely.
       if (isTriggerPipeReady()) {
         char trigger_byte = 1;
-        auto& os_sys_calls = Api::OsSysCallsSingleton::get();
-        auto result = os_sys_calls.send(trigger_pipe_write_fd_, &trigger_byte, 1, 0);
-        if (result.return_value_ == 1) {
+        ssize_t bytes_written = ::write(trigger_pipe_write_fd_, &trigger_byte, 1);
+        if (bytes_written == 1) {
           ENVOY_LOG(info,
                     "reverse_tunnel: Successfully triggered reverse_conn_listener "
                     "accept() for host {}",
                     host_address);
         } else {
-          ENVOY_LOG(error, "reverse_tunnel: Failed to write trigger byte: {}",
-                    errorDetails(result.errno_));
+          ENVOY_LOG(error, "reverse_tunnel: Failed to write trigger byte: {}", errorDetails(errno));
         }
       }
     }

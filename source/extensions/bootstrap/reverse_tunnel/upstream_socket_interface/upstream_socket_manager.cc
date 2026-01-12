@@ -291,11 +291,7 @@ void UpstreamSocketManager::markSocketDead(const int fd) {
       // Found the FD in idle pool, this is an idle socket.
       ENVOY_LOG(debug, "reverse_tunnel: marking idle socket dead. node: {} cluster: {} fd: {}.",
                 node_id, cluster_id, fd);
-#ifndef _WIN32
       ::shutdown(fd, SHUT_RDWR);
-#else
-      ::shutdown(fd, SD_BOTH);
-#endif // _WIN32
       itr = sockets.erase(itr);
       is_idle_socket = true;
 
