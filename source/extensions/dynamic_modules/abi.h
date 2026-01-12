@@ -2953,6 +2953,74 @@ envoy_dynamic_module_type_metrics_result
 envoy_dynamic_module_callback_network_filter_record_histogram_value(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, size_t id, uint64_t value);
 
+// ---------------------- Upstream Host Access Callbacks -----------------------
+
+/**
+ * envoy_dynamic_module_callback_network_filter_get_upstream_host_address is called by the module
+ * to get the address and port of the currently selected upstream host.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param address_out is the output buffer where the address string owned by Envoy will be stored.
+ * @param port_out is the output pointer to the port number.
+ * @return true if the upstream host is set and has an IP address, false otherwise.
+ */
+bool envoy_dynamic_module_callback_network_filter_get_upstream_host_address(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* address_out, uint32_t* port_out);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_get_upstream_host_hostname is called by the module
+ * to get the hostname of the currently selected upstream host.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param hostname_out is the output buffer where the hostname string owned by Envoy will be stored.
+ * @return true if the upstream host is set and has a hostname, false otherwise.
+ */
+bool envoy_dynamic_module_callback_network_filter_get_upstream_host_hostname(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* hostname_out);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_get_upstream_host_cluster is called by the module
+ * to get the cluster name of the currently selected upstream host.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param cluster_name_out is the output buffer where the cluster name string owned by Envoy will
+ * be stored.
+ * @return true if the upstream host is set, false otherwise.
+ */
+bool envoy_dynamic_module_callback_network_filter_get_upstream_host_cluster(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* cluster_name_out);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_has_upstream_host is called by the module to check
+ * if an upstream host has been selected for this connection.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @return true if an upstream host is set, false otherwise.
+ */
+bool envoy_dynamic_module_callback_network_filter_has_upstream_host(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr);
+
+// ---------------------- StartTLS Support Callbacks ---------------------------
+
+/**
+ * envoy_dynamic_module_callback_network_filter_start_upstream_secure_transport is called by the
+ * module to convert the upstream connection from non-secure to secure mode (StartTLS).
+ *
+ * This signals the filter manager to enable secure transport mode in the upstream connection.
+ * This is done when the upstream connection's transport socket is of startTLS type. At the moment
+ * it is the only transport socket type which can be programmatically converted from non-secure
+ * mode to secure mode.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @return true if the upstream transport was successfully converted to secure mode, false
+ * otherwise.
+ */
+bool envoy_dynamic_module_callback_network_filter_start_upstream_secure_transport(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr);
+
 // =============================================================================
 // ============================= Listener Filter ===============================
 // =============================================================================
