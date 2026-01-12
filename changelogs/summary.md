@@ -8,7 +8,7 @@ Envoy 1.37.0 is a major feature release with significant enhancements to dynamic
 
 ### Dynamic Modules Expansion
 - Added support for network, listener, UDP listener, and access logger filters
-- Introduced streaming HTTP callouts and scheduler API for asynchronous operations
+- Introduced streaming HTTP callouts to HTTP filters
 - Enhanced ABI for streaming body manipulation and header operations
 - Added global module loading and improved module search path handling
 
