@@ -344,6 +344,12 @@ protected:
     absl::string_view responseDetails() override { return details_; }
     Buffer::BufferMemoryAccountSharedPtr account() const override { return buffer_memory_account_; }
     void setAccount(Buffer::BufferMemoryAccountSharedPtr account) override;
+    absl::optional<uint32_t> codecStreamId() const override {
+      if (stream_id_ == -1) {
+        return absl::nullopt;
+      }
+      return stream_id_;
+    }
 
     // ScopeTrackedObject
     void dumpState(std::ostream& os, int indent_level) const override;

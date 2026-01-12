@@ -147,6 +147,28 @@ TEST_P(TlsInspectorTest, SniRegistered) {
   EXPECT_EQ(1, cfg_->stats().alpn_not_found_.value());
 }
 
+// Test that SNI stats are only incremented once even though both early extraction and
+// the server name callback processing extract the same SNI. This verifies the sni_found_
+// flag prevents duplicate stat incrementing.
+TEST_P(TlsInspectorTest, SniStatsNotDoubleCounted) {
+  init();
+  const std::string servername("example.com");
+  std::vector<uint8_t> client_hello = Tls::Test::generateClientHello(
+      std::get<0>(GetParam()), std::get<1>(GetParam()), servername, "");
+  mockSysCallForPeek(client_hello);
+  // setRequestedServerName should only be called once despite both callbacks processing SNI.
+  EXPECT_CALL(socket_, setRequestedServerName(Eq(servername)));
+  EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
+  EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("tls")));
+  EXPECT_CALL(socket_, detectedTransportProtocol()).Times(::testing::AnyNumber());
+  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
+  auto state = filter_->onData(*buffer_);
+  EXPECT_EQ(Network::FilterStatus::Continue, state);
+  // Verify stats are incremented exactly once.
+  EXPECT_EQ(1, cfg_->stats().sni_found_.value());
+  EXPECT_EQ(0, cfg_->stats().sni_not_found_.value());
+}
+
 // Test that a ClientHello with an ALPN value causes the correct name notification.
 TEST_P(TlsInspectorTest, AlpnRegistered) {
   init();

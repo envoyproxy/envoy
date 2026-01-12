@@ -259,48 +259,6 @@ envoy_cmake(
 )
 
 envoy_cmake(
-    name = "ares",
-    build_args = select({
-        "//bazel/foreign_cc:parallel_builds_enabled": ["-j"],
-        "//conditions:default": ["-j1"],
-    }),
-    cache_entries = {
-        "CARES_BUILD_TOOLS": "no",
-        "CARES_SHARED": "no",
-        "CARES_STATIC": "on",
-        "CMAKE_CXX_COMPILER_FORCED": "on",
-        "CMAKE_INSTALL_LIBDIR": "lib",
-    },
-    defines = ["CARES_STATICLIB"],
-    exec_properties = select({
-        "//bazel:engflow_rbe_x86_64": {
-            "Pool": "linux_x64_large",
-        },
-        "//bazel:engflow_rbe_aarch64": {
-            "Pool": "linux_arm64_small",
-        },
-        "//conditions:default": {},
-    }),
-    generate_args = [
-        "-G",
-        "Ninja",
-    ],
-    lib_source = "@com_github_c_ares_c_ares//:all",
-    linkopts = select({
-        "//bazel:apple": ["-lresolv"],
-        "//conditions:default": [],
-    }),
-    out_static_libs = select({
-        "//bazel:windows_x86_64": ["cares.lib"],
-        "//conditions:default": ["libcares.a"],
-    }),
-    postfix_script = select({
-        "//bazel:windows_x86_64": "cp -L $$EXT_BUILD_ROOT/external/com_github_c_ares_c_ares/src/lib/ares_nameser.h $$INSTALLDIR/include/ares_nameser.h && cp -L $$EXT_BUILD_ROOT/external/com_github_c_ares_c_ares/include/ares_dns.h $$INSTALLDIR/include/ares_dns.h",
-        "//conditions:default": "rm -f $$INSTALLDIR/include/ares_dns.h && cp -L $$EXT_BUILD_ROOT/external/com_github_c_ares_c_ares/include/ares_dns.h $$INSTALLDIR/include/ares_dns.h",
-    }),
-)
-
-envoy_cmake(
     name = "event",
     build_args = select({
         "//bazel/foreign_cc:parallel_builds_enabled": ["-j"],

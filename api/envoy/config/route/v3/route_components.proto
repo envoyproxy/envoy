@@ -579,7 +579,7 @@ message ClusterSpecifierPlugin {
   bool is_optional = 2;
 }
 
-// [#next-free-field: 17]
+// [#next-free-field: 18]
 message RouteMatch {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RouteMatch";
 
@@ -713,6 +713,11 @@ message RouteMatch {
   //    URL-encoded, but the message fields are not. For example, if a query
   //    parameter is "foo%20bar", the message field will be "foo bar".
   repeated QueryParameterMatcher query_parameters = 7;
+
+  // Specifies a set of cookies on which the route should match. The router parses the ``Cookie``
+  // header and evaluates the named cookie against each matcher. If the number of specified cookie
+  // matchers is nonzero, they all must match for the route to be selected.
+  repeated CookieMatcher cookies = 17;
 
   // If specified, only gRPC requests will be matched. The router will check
   // that the ``Content-Type`` header has ``application/grpc`` or one of the various
@@ -2828,6 +2833,20 @@ message QueryParameterMatcher {
     // Specifies whether a query parameter should be present.
     bool present_match = 6;
   }
+}
+
+// Cookie matching inspects individual name/value pairs parsed from the ``Cookie`` header.
+message CookieMatcher {
+  // Specifies the cookie name to evaluate.
+  string name = 1 [(validate.rules).string = {min_len: 1 max_bytes: 1024}];
+
+  // Match the cookie value using :ref:`StringMatcher
+  // <envoy_v3_api_msg_type.matcher.v3.StringMatcher>` semantics.
+  type.matcher.v3.StringMatcher string_match = 2 [(validate.rules).message = {required: true}];
+
+  // Invert the match result. If the cookie is not present, the match result is false, so
+  // ``invert_match`` will cause the matcher to succeed when the cookie is absent.
+  bool invert_match = 3;
 }
 
 // HTTP Internal Redirect :ref:`architecture overview <arch_overview_internal_redirects>`.

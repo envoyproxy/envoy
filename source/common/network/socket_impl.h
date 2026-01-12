@@ -17,6 +17,9 @@ public:
       : local_address_(local_address), direct_local_address_(local_address),
         remote_address_(remote_address), direct_remote_address_(remote_address) {}
 
+  void setDirectLocalAddressForTest(const Address::InstanceConstSharedPtr& direct_local_address) {
+    direct_local_address_ = direct_local_address;
+  }
   void setDirectRemoteAddressForTest(const Address::InstanceConstSharedPtr& direct_remote_address) {
     direct_remote_address_ = direct_remote_address;
   }
