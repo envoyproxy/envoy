@@ -87,7 +87,7 @@ public:
 
   /**
    * See if the cookies specified in the config are present/matching in a request.
-   * @param headers supplies the headers from the request.
+   * @param cookies supplies the parsed cookies from the request.
    * @param matchers supplies the list of configured cookie matchers on which to match.
    * @return bool true if all cookie matchers succeed.
    */
