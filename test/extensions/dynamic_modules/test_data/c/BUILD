@@ -3,6 +3,7 @@ load("//test/extensions/dynamic_modules/test_data/c:test_data.bzl", "test_progra
 licenses(["notice"])  # Apache 2
 
 package(default_visibility = [
+    "//test/extensions/access_loggers/dynamic_modules:__pkg__",
     "//test/extensions/dynamic_modules:__pkg__",
     "//test/extensions/dynamic_modules/http:__pkg__",
     "//test/extensions/dynamic_modules/listener:__pkg__",
@@ -75,3 +76,17 @@ test_program(name = "udp_no_filter_new")
 test_program(name = "udp_no_on_data")
 
 test_program(name = "udp_no_filter_destroy")
+
+test_program(name = "access_log_no_op")
+
+test_program(name = "access_log_missing_config_new")
+
+test_program(name = "access_log_missing_config_destroy")
+
+test_program(name = "access_log_missing_logger_new")
+
+test_program(name = "access_log_missing_logger_log")
+
+test_program(name = "access_log_missing_logger_destroy")
+
+test_program(name = "access_log_config_new_fail")

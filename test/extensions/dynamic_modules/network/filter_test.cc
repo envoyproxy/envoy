@@ -1,3 +1,4 @@
+#include "source/common/stats/isolated_store_impl.h"
 #include "source/extensions/dynamic_modules/abi.h"
 #include "source/extensions/filters/network/dynamic_modules/filter.h"
 
@@ -17,12 +18,14 @@ public:
     auto dynamic_module = newDynamicModule(testSharedObjectPath("network_no_op", "c"), false);
     EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
-    auto filter_config_or_status = newDynamicModuleNetworkFilterConfig(
-        "test_filter", "", std::move(dynamic_module.value()), cluster_manager_);
+    auto filter_config_or_status =
+        newDynamicModuleNetworkFilterConfig("test_filter", "", std::move(dynamic_module.value()),
+                                            cluster_manager_, *stats_.rootScope());
     EXPECT_TRUE(filter_config_or_status.ok()) << filter_config_or_status.status().message();
     filter_config_ = filter_config_or_status.value();
   }
 
+  Stats::IsolatedStoreImpl stats_;
   DynamicModuleNetworkFilterConfigSharedPtr filter_config_;
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
 };
@@ -240,9 +243,11 @@ TEST(DynamicModuleNetworkFilterConfigTest, ConfigInitialization) {
   auto dynamic_module = newDynamicModule(testSharedObjectPath("network_no_op", "c"), false);
   EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
+  Stats::IsolatedStoreImpl stats;
   NiceMock<Upstream::MockClusterManager> cluster_manager;
   auto filter_config_or_status = newDynamicModuleNetworkFilterConfig(
-      "test_filter", "some_config", std::move(dynamic_module.value()), cluster_manager);
+      "test_filter", "some_config", std::move(dynamic_module.value()), cluster_manager,
+      *stats.rootScope());
   EXPECT_TRUE(filter_config_or_status.ok());
 
   auto config = filter_config_or_status.value();
@@ -261,9 +266,10 @@ TEST(DynamicModuleNetworkFilterConfigTest, MissingSymbols) {
   auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", "c"), false);
   EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
+  Stats::IsolatedStoreImpl stats;
   NiceMock<Upstream::MockClusterManager> cluster_manager;
   auto filter_config_or_status = newDynamicModuleNetworkFilterConfig(
-      "test_filter", "", std::move(dynamic_module.value()), cluster_manager);
+      "test_filter", "", std::move(dynamic_module.value()), cluster_manager, *stats.rootScope());
   EXPECT_FALSE(filter_config_or_status.ok());
 }
 
@@ -273,9 +279,10 @@ TEST(DynamicModuleNetworkFilterConfigTest, ConfigInitializationFailure) {
       newDynamicModule(testSharedObjectPath("network_config_new_fail", "c"), false);
   EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
+  Stats::IsolatedStoreImpl stats;
   NiceMock<Upstream::MockClusterManager> cluster_manager;
   auto filter_config_or_status = newDynamicModuleNetworkFilterConfig(
-      "test_filter", "", std::move(dynamic_module.value()), cluster_manager);
+      "test_filter", "", std::move(dynamic_module.value()), cluster_manager, *stats.rootScope());
   EXPECT_FALSE(filter_config_or_status.ok());
   EXPECT_THAT(filter_config_or_status.status().message(),
               testing::HasSubstr("Failed to initialize"));
@@ -286,9 +293,10 @@ TEST(DynamicModuleNetworkFilterConfigTest, StopIterationStatus) {
       newDynamicModule(testSharedObjectPath("network_stop_iteration", "c"), false);
   EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
+  Stats::IsolatedStoreImpl stats;
   NiceMock<Upstream::MockClusterManager> cluster_manager;
   auto filter_config_or_status = newDynamicModuleNetworkFilterConfig(
-      "test_filter", "", std::move(dynamic_module.value()), cluster_manager);
+      "test_filter", "", std::move(dynamic_module.value()), cluster_manager, *stats.rootScope());
   EXPECT_TRUE(filter_config_or_status.ok());
   auto config = filter_config_or_status.value();
 
@@ -306,6 +314,105 @@ TEST(DynamicModuleNetworkFilterConfigTest, StopIterationStatus) {
   Buffer::OwnedImpl data("test");
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter->onData(data, false));
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter->onWrite(data, false));
+}
+
+// -----------------------------------------------------------------------------
+// Metrics Tests
+// -----------------------------------------------------------------------------
+
+TEST_F(DynamicModuleNetworkFilterTest, DefineAndIncrementCounter) {
+  // Define a counter on the config.
+  size_t counter_id = 0;
+  envoy_dynamic_module_type_module_buffer name = {"test_counter", 12};
+  auto result = envoy_dynamic_module_callback_network_filter_config_define_counter(
+      filter_config_.get(), name, &counter_id);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
+  EXPECT_EQ(counter_id, 0);
+
+  // Create filter and increment counter.
+  auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
+  filter->initializeInModuleFilter();
+
+  result =
+      envoy_dynamic_module_callback_network_filter_increment_counter(filter.get(), counter_id, 5);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
+
+  // Verify counter value.
+  auto counter = filter_config_->getCounterById(counter_id);
+  EXPECT_TRUE(counter.has_value());
+}
+
+TEST_F(DynamicModuleNetworkFilterTest, DefineAndManipulateGauge) {
+  // Define a gauge on the config.
+  size_t gauge_id = 0;
+  envoy_dynamic_module_type_module_buffer name = {"test_gauge", 10};
+  auto result = envoy_dynamic_module_callback_network_filter_config_define_gauge(
+      filter_config_.get(), name, &gauge_id);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
+  EXPECT_EQ(gauge_id, 0);
+
+  // Create filter and manipulate gauge.
+  auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
+  filter->initializeInModuleFilter();
+
+  result = envoy_dynamic_module_callback_network_filter_set_gauge(filter.get(), gauge_id, 100);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
+
+  result = envoy_dynamic_module_callback_network_filter_increment_gauge(filter.get(), gauge_id, 50);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
+
+  result = envoy_dynamic_module_callback_network_filter_decrement_gauge(filter.get(), gauge_id, 25);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
+
+  // Verify gauge exists.
+  auto gauge = filter_config_->getGaugeById(gauge_id);
+  EXPECT_TRUE(gauge.has_value());
+}
+
+TEST_F(DynamicModuleNetworkFilterTest, DefineAndRecordHistogram) {
+  // Define a histogram on the config.
+  size_t histogram_id = 0;
+  envoy_dynamic_module_type_module_buffer name = {"test_histogram", 14};
+  auto result = envoy_dynamic_module_callback_network_filter_config_define_histogram(
+      filter_config_.get(), name, &histogram_id);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
+  EXPECT_EQ(histogram_id, 0);
+
+  // Create filter and record histogram value.
+  auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
+  filter->initializeInModuleFilter();
+
+  result = envoy_dynamic_module_callback_network_filter_record_histogram_value(filter.get(),
+                                                                               histogram_id, 42);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
+
+  // Verify histogram exists.
+  auto histogram = filter_config_->getHistogramById(histogram_id);
+  EXPECT_TRUE(histogram.has_value());
+}
+
+TEST_F(DynamicModuleNetworkFilterTest, MetricNotFound) {
+  // Create filter without defining metrics.
+  auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
+  filter->initializeInModuleFilter();
+
+  // Try to use invalid metric IDs.
+  auto result =
+      envoy_dynamic_module_callback_network_filter_increment_counter(filter.get(), 999, 1);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_MetricNotFound);
+
+  result = envoy_dynamic_module_callback_network_filter_set_gauge(filter.get(), 999, 1);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_MetricNotFound);
+
+  result = envoy_dynamic_module_callback_network_filter_increment_gauge(filter.get(), 999, 1);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_MetricNotFound);
+
+  result = envoy_dynamic_module_callback_network_filter_decrement_gauge(filter.get(), 999, 1);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_MetricNotFound);
+
+  result =
+      envoy_dynamic_module_callback_network_filter_record_histogram_value(filter.get(), 999, 1);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_MetricNotFound);
 }
 
 } // namespace NetworkFilters

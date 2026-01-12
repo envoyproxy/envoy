@@ -354,6 +354,12 @@ new_features:
     details.
 - area: dynamic modules
   change: |
+    Added fallback module search path support in dynamic modules. When loading a module by name, Envoy first searches
+    in the directory specified by the ``ENVOY_DYNAMIC_MODULES_SEARCH_PATH`` environment variable. If the variable is
+    not set, Envoy falls back to searching in the current working directory before searching standard library paths
+    such as ``LD_LIBRARY_PATH`` and ``/usr/lib``.
+- area: dynamic modules
+  change: |
     Added support for streamable HTTP callouts in dynamic modules. Modules can create streaming HTTP connections to
     upstream clusters using ``start_http_stream``, send request data and trailers incrementally, and receive streaming
     response headers, data, and trailers through dedicated callbacks.
@@ -362,6 +368,10 @@ new_features:
     Added scheduler API for HTTP filter configuration in dynamic modules. The configuration scheduler allows modules
     to dispatch asynchronous operations to the main thread, enabling singleton/bootstrap patterns similar to WASM
     filters for initialization and background tasks.
+- area: dynamic modules
+  change: |
+    Added :ref:`access logger <envoy_v3_api_msg_extensions.access_loggers.dynamic_modules.v3.DynamicModuleAccessLog>`
+    support for dynamic modules, enabling custom access logging with dynamic modules.
 - area: udp_sink
   change: |
     Enhanced the UDP sink to support tapped messages larger than 64KB.
@@ -408,6 +418,25 @@ new_features:
     Added :ref:`vhost_header <envoy_v3_api_field_config.route.v3.RouteConfiguration.vhost_header>` to
     :ref:`RouteConfiguration <envoy_v3_api_msg_config.route.v3.RouteConfiguration>` to allow using a different header
     for vhost matching.
+- area: http
+  change: |
+    Added :ref:`forward_client_cert_matcher
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.forward_client_cert_matcher>`
+    to :ref:`HttpConnectionManager
+    <envoy_v3_api_msg_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager>`
+    to enable per-request configuration of forward client cert behavior using the xDS matcher framework. This allows
+    different XFCC header handling based on request properties (e.g., headers, path). If the matcher matches, the
+    matched action's config is used; otherwise, the static
+    :ref:`forward_client_cert_details
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.forward_client_cert_details>`
+    and
+    :ref:`set_current_client_cert_details
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.set_current_client_cert_details>`
+    config is used as fallback.
+- area: http
+  change: |
+    Added :ref:`cookies <envoy_v3_api_field_config.route.v3.RouteMatch.cookies>` to route matches,
+    enabling structured matching against specific cookies without parsing the full ``Cookie`` header.
 - area: http2
   change: |
     Added a parameter to ``sendGoAwayAndClose`` to support graceful closure of HTTP/2 connections.
@@ -696,6 +725,11 @@ new_features:
     :ref:`endpoint_params <envoy_v3_api_field_extensions.http.injected_credentials.oauth2.v3.OAuth2.endpoint_params>`.
     This allows passing custom parameters required by authorization servers (such as Logto or EntraID) that expect
     additional body parameters during the token exchange.
+- area: reverse_tunnel
+  change: |
+    Added ``required_cluster_name`` field to validate reverse tunnel initiations against the
+    ``x-envoy-reverse-tunnel-upstream-cluster-name`` header. If initiator envoy's upstream cluster name does not match
+    ``required_cluster_name``, connection is rejected with a ``400 Bad Request``.
 - area: proto_api_scrubber
   change: |
     Enabled the :ref:`Proto API Scrubber <config_http_filters_proto_api_scrubber>` HTTP filter. This filter allows
@@ -723,11 +757,25 @@ new_features:
     Adds ``%DOWNSTREAM_LOCAL_ADDRESS_ENDPOINT_ID%``, ``%DOWNSTREAM_DIRECT_LOCAL_ADDRESS_ENDPOINT_ID%``,
     and ``%UPSTREAM_REMOTE_ADDRESS_ENDPOINT_ID%`` access_log command operators to access the endpoint ID
     used to establish a connection to an internal listener.
+- area: access_log
+  change: |
+    Added support for exporting OpenTelemetry access logs via HTTP. New top-level fields
+    ``http_service``, ``grpc_service``, ``log_name``, ``buffer_flush_interval``, ``buffer_size_bytes``,
+    ``filter_state_objects_to_log``, and ``custom_tags`` provide a cleaner configuration.
+    The ``common_config`` field is deprecated but remains functional for backward compatibility.
+    See :ref:`http_service <envoy_v3_api_field_extensions.access_loggers.open_telemetry.v3.OpenTelemetryAccessLogConfig.http_service>`
+    and :ref:`grpc_service <envoy_v3_api_field_extensions.access_loggers.open_telemetry.v3.OpenTelemetryAccessLogConfig.grpc_service>`.
 - area: resource_monitors
   change: |
     Added cgroup v2 support to the CPU utilization resource monitor. The monitor now automatically
     detects and selects between cgroup v1 and v2 at runtime by checking available cgroup files on
     the system. This enables the resource monitor to work correctly in both cgroup v1 and v2
-    environments without configuration changes.
+    environments without configuration changes.    
 
 deprecated:
+- area: access_log
+  change: |
+    The ``common_config`` field in
+    :ref:`OpenTelemetryAccessLogConfig <envoy_v3_api_msg_extensions.access_loggers.open_telemetry.v3.OpenTelemetryAccessLogConfig>`
+    is deprecated. Use ``http_service`` for HTTP transport, ``grpc_service`` for gRPC transport,
+    and ``log_name`` for the log identifier instead.

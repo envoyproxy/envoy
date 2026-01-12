@@ -34,7 +34,8 @@ DynamicModuleNetworkFilterConfigFactory::createFilterFactoryFromProtoTyped(
       filter_config =
           Envoy::Extensions::DynamicModules::NetworkFilters::newDynamicModuleNetworkFilterConfig(
               proto_config.filter_name(), config, std::move(dynamic_module.value()),
-              context.serverFactoryContext().clusterManager());
+              context.serverFactoryContext().clusterManager(),
+              context.serverFactoryContext().scope());
 
   if (!filter_config.ok()) {
     return absl::InvalidArgumentError("Failed to create filter config: " +

@@ -272,6 +272,19 @@ TEST_P(EnvoyQuicClientSessionTest, NewStream) {
   stream.OnStreamHeaderList(/*fin=*/true, headers.uncompressed_header_bytes(), headers);
 }
 
+TEST_P(EnvoyQuicClientSessionTest, ProtocolStreamId) {
+  NiceMock<Http::MockResponseDecoder> response_decoder;
+  EXPECT_CALL(*quic_connection_, SendControlFrame(_));
+  int stream_id = 0;
+  for (int i = 0; i < 10; ++i) {
+    NiceMock<Http::MockStreamCallbacks> stream_callbacks;
+    EnvoyQuicClientStream& stream = sendGetRequest(response_decoder, stream_callbacks);
+    EXPECT_EQ(stream_id, stream.codecStreamId());
+    stream_id += 4;
+    stream.resetStream(Http::StreamResetReason::LocalReset);
+  }
+}
+
 TEST_P(EnvoyQuicClientSessionTest, PacketLimits) {
   // We always allow for reading packets, even if there's no stream.
   EXPECT_EQ(0, envoy_quic_session_->GetNumActiveStreams());
