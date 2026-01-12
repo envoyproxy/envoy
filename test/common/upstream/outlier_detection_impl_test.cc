@@ -2784,6 +2784,7 @@ detect_degraded_hosts: true
 
   // Report a degraded response
   EXPECT_CALL(checker_, check(hosts_[0]));
+  EXPECT_CALL(random_, random()).WillRepeatedly(Return(0)); // Jitter = 0
   EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
                                        _, envoy::data::cluster::v3::DEGRADED, true));
   hosts_[0]->outlierDetector().putResult(Result::ExtOriginRequestDegraded, 200);
@@ -2865,6 +2866,7 @@ detect_degraded_hosts: true
 
   // Send a degraded response - should reset consecutive counters
   EXPECT_CALL(checker_, check(hosts_[0]));
+  EXPECT_CALL(random_, random()).WillRepeatedly(Return(0)); // Jitter = 0
   EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
                                        _, envoy::data::cluster::v3::DEGRADED, true));
   hosts_[0]->outlierDetector().putResult(Result::ExtOriginRequestDegraded, 200);

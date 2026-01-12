@@ -689,6 +689,13 @@ void DetectorImpl::setHostDegradedMainThread(HostSharedPtr host) {
     const std::chrono::milliseconds max_eject_time = std::chrono::milliseconds(
         runtime_.snapshot().getInteger(MaxEjectionTimeMsRuntime, config_.maxEjectionTimeMs()));
 
+    // Generate random jitter to prevent connection storms when hosts undegrade
+    const uint64_t max_eject_time_jitter = runtime_.snapshot().getInteger(
+        MaxEjectionTimeJitterMsRuntime, config_.maxEjectionTimeJitterMs());
+    const std::chrono::milliseconds jitter =
+        std::chrono::milliseconds(random_generator_() % (max_eject_time_jitter + 1));
+    host_monitors_[host]->setJitter(jitter);
+
     if ((host_monitors_[host]->degradeTimeBackoff() * base_eject_time) <
         (max_eject_time + base_eject_time)) {
       host_monitors_[host]->degradeTimeBackoff()++;
