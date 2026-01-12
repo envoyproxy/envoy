@@ -3404,6 +3404,79 @@ void envoy_dynamic_module_callback_listener_filter_use_original_dst(
 void envoy_dynamic_module_callback_listener_filter_close_socket(
     envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr);
 
+// ---------------------- Socket Option Callbacks ------------------------------
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_socket_fd is called by the module to get the
+ * raw socket file descriptor for advanced socket manipulations.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @return the socket file descriptor, or -1 if the socket is not available.
+ */
+int64_t envoy_dynamic_module_callback_listener_filter_get_socket_fd(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_set_socket_option_int sets an integer socket option
+ * on the accepted socket (@see man 2 setsockopt).
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param level is the socket option level (e.g., SOL_SOCKET, IPPROTO_TCP).
+ * @param name is the socket option name (e.g., SO_KEEPALIVE, TCP_NODELAY).
+ * @param value is the integer value for the socket option.
+ * @return true if the socket option was set successfully, false otherwise.
+ */
+bool envoy_dynamic_module_callback_listener_filter_set_socket_option_int(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr, int64_t level,
+    int64_t name, int64_t value);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_set_socket_option_bytes sets a bytes socket option
+ * on the accepted socket (@see man 2 setsockopt).
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param level is the socket option level (e.g., SOL_SOCKET, IPPROTO_TCP).
+ * @param name is the socket option name (e.g., SO_KEEPALIVE, TCP_NODELAY).
+ * @param value is the byte buffer value for the socket option.
+ * @return true if the socket option was set successfully, false otherwise.
+ */
+bool envoy_dynamic_module_callback_listener_filter_set_socket_option_bytes(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr, int64_t level,
+    int64_t name, envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_socket_option_int retrieves an integer socket
+ * option value from the accepted socket (@see man 2 getsockopt). This reads the actual value from
+ * the socket, including options set by other filters or the system.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param level is the socket option level (e.g., SOL_SOCKET, IPPROTO_TCP).
+ * @param name is the socket option name (e.g., SO_KEEPALIVE, TCP_NODELAY).
+ * @param value_out is the pointer to store the retrieved integer value.
+ * @return true if the option was retrieved successfully, false otherwise.
+ */
+bool envoy_dynamic_module_callback_listener_filter_get_socket_option_int(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr, int64_t level,
+    int64_t name, int64_t* value_out);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_socket_option_bytes retrieves a bytes socket
+ * option value from the accepted socket (@see man 2 getsockopt). This reads the actual value from
+ * the socket, including options set by other filters or the system.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param level is the socket option level (e.g., SOL_SOCKET, IPPROTO_TCP).
+ * @param name is the socket option name (e.g., SO_KEEPALIVE, TCP_NODELAY).
+ * @param value_out is the pointer to store the retrieved buffer. The module should pre-allocate the
+ * buffer with sufficient size before calling this function.
+ * @param value_size is the size of the pre-allocated buffer.
+ * @param actual_size_out is the pointer to store the actual size of the option value.
+ * @return true if the option was retrieved successfully, false otherwise.
+ */
+bool envoy_dynamic_module_callback_listener_filter_get_socket_option_bytes(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr, int64_t level,
+    int64_t name, char* value_out, size_t value_size, size_t* actual_size_out);
+
 // ------------------------- Filter State Operations ---------------------------
 
 /**
