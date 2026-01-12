@@ -1919,6 +1919,10 @@ RouteMatcher::RouteMatcher(const envoy::config::route::v3::RouteConfiguration& r
     : vhost_scope_(factory_context.scope().scopeFromStatName(
           factory_context.routerContext().virtualClusterStatNames().vhost_)),
       ignore_port_in_host_matching_(route_config.ignore_port_in_host_matching()),
+      vhds_case_insensitive_match_(
+          route_config.has_vhds()
+              ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(route_config.vhds(), case_insensitive_match, true)
+              : true),
       vhost_header_(route_config.vhost_header()) {
   for (const auto& virtual_host_config : route_config.virtual_hosts()) {
     VirtualHostImplSharedPtr virtual_host = std::make_shared<VirtualHostImpl>(
@@ -1926,8 +1930,10 @@ RouteMatcher::RouteMatcher(const envoy::config::route::v3::RouteConfiguration& r
         validate_clusters, creation_status);
     SET_AND_RETURN_IF_NOT_OK(creation_status, creation_status);
     for (const std::string& domain_name : virtual_host_config.domains()) {
-      const Http::LowerCaseString lower_case_domain_name(domain_name);
-      absl::string_view domain = lower_case_domain_name;
+      // Conditionally convert domain name to lowercase based on vhds_case_insensitive_match flag
+      const std::string processed_domain_name =
+          vhds_case_insensitive_match_ ? absl::AsciiStrToLower(domain_name) : domain_name;
+      absl::string_view domain = processed_domain_name;
       bool duplicate_found = false;
       if ("*" == domain) {
         if (default_virtual_host_) {
@@ -1991,8 +1997,9 @@ const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::RequestHeaderMa
   }
   // TODO (@rshriram) Match Origin header in WebSocket
   // request with VHost, using wildcard match
-  // Lower-case the value of the host header, as hostnames are case insensitive.
-  const std::string host = absl::AsciiStrToLower(host_header_value);
+  // Conditionally lower-case the host header based on vhds_case_insensitive_match flag.
+  const std::string host =
+      vhds_case_insensitive_match_ ? absl::AsciiStrToLower(host_header_value) : std::string(host_header_value);
   const auto iter = virtual_hosts_.find(host);
   if (iter != virtual_hosts_.end()) {
     return iter->second.get();
@@ -2072,6 +2079,10 @@ CommonConfigImpl::CommonConfigImpl(const envoy::config::route::v3::RouteConfigur
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_direct_response_body_size_bytes,
                                           DEFAULT_MAX_DIRECT_RESPONSE_BODY_SIZE_BYTES)),
       uses_vhds_(config.has_vhds()),
+      vhds_case_insensitive_match_(
+          config.has_vhds()
+              ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.vhds(), case_insensitive_match, true)
+              : true),
       most_specific_header_mutations_wins_(config.most_specific_header_mutations_wins()),
       ignore_path_parameters_in_path_matching_(config.ignore_path_parameters_in_path_matching()) {
   if (!config.request_mirror_policies().empty()) {
