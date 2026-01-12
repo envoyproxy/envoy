@@ -37,15 +37,18 @@ class DispatcherImpl : Logger::Loggable<Logger::Id::main>,
                        public Dispatcher,
                        public FatalErrorHandlerInterface {
 public:
-  DispatcherImpl(const std::string& name, absl::optional<uint32_t> worker_thread_index, Api::Api& api, Event::TimeSystem& time_system);
-  DispatcherImpl(const std::string& name, absl::optional<uint32_t> worker_thread_index, Api::Api& api, Event::TimeSystem& time_system,
+  DispatcherImpl(const std::string& name, absl::optional<uint32_t> worker_thread_index,
+                 Api::Api& api, Event::TimeSystem& time_system);
+  DispatcherImpl(const std::string& name, absl::optional<uint32_t> worker_thread_index,
+                 Api::Api& api, Event::TimeSystem& time_system,
                  const Buffer::WatermarkFactorySharedPtr& watermark_factory);
-  DispatcherImpl(const std::string& name, absl::optional<uint32_t> worker_thread_index, Api::Api& api, Event::TimeSystem& time_system,
+  DispatcherImpl(const std::string& name, absl::optional<uint32_t> worker_thread_index,
+                 Api::Api& api, Event::TimeSystem& time_system,
                  const ScaledRangeTimerManagerFactory& scaled_timer_factory,
                  const Buffer::WatermarkFactorySharedPtr& watermark_factory);
-  DispatcherImpl(const std::string& name, absl::optional<uint32_t> worker_thread_index, Thread::ThreadFactory& thread_factory,
-                 TimeSource& time_source, Filesystem::Instance& file_system,
-                 Event::TimeSystem& time_system,
+  DispatcherImpl(const std::string& name, absl::optional<uint32_t> worker_thread_index,
+                 Thread::ThreadFactory& thread_factory, TimeSource& time_source,
+                 Filesystem::Instance& file_system, Event::TimeSystem& time_system,
                  const ScaledRangeTimerManagerFactory& scaled_timer_factory,
                  const Buffer::WatermarkFactorySharedPtr& watermark_factory);
   ~DispatcherImpl() override;

@@ -1,8 +1,8 @@
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 
 #include "test/extensions/dynamic_modules/util.h"
-#include "test/test_common/utility.h"
 #include "test/mocks/server/server_factory_context.h"
+#include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
@@ -36,8 +36,8 @@ TEST_P(DynamicModuleTestLanguages, DoNotClose) {
 
   // Release the module, and reload it.
   module->reset();
-  module = newDynamicModule(testSharedObjectPath("no_op", language),
-                            true, context); // This time, do not close the module.
+  module = newDynamicModule(testSharedObjectPath("no_op", language), true,
+                            context); // This time, do not close the module.
   EXPECT_TRUE(module.ok());
 
   // This module must be reloaded and the variable must be reset.
@@ -90,7 +90,8 @@ TEST(DynamicModuleTestLanguages, LoadLibGlobally) {
 
   // The child module should be able to access the symbol from the global module.
   const auto child_path = testSharedObjectPath("program_child", "c");
-  absl::StatusOr<DynamicModulePtr> child_module = newDynamicModule(child_path, false, context, false);
+  absl::StatusOr<DynamicModulePtr> child_module =
+      newDynamicModule(child_path, false, context, false);
   EXPECT_TRUE(child_module.ok());
 
   using GetSomeVariableFuncType = int (*)(void);

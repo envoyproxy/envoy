@@ -16,7 +16,8 @@ DynamicModuleNetworkFilterConfigFactory::createFilterFactoryFromProtoTyped(
 
   const auto& module_config = proto_config.dynamic_module_config();
   auto dynamic_module = Extensions::DynamicModules::newDynamicModuleByName(
-      module_config.name(), module_config.do_not_close(), context.serverFactoryContext(), module_config.load_globally());
+      module_config.name(), module_config.do_not_close(), context.serverFactoryContext(),
+      module_config.load_globally());
   if (!dynamic_module.ok()) {
     return absl::InvalidArgumentError("Failed to load dynamic module: " +
                                       std::string(dynamic_module.status().message()));

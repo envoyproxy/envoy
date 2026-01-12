@@ -33,7 +33,9 @@ public:
    *                            thread, or absl::nullopt if this is not a worker thread dispatcher.
    * @return Event::DispatcherPtr which is owned by the caller.
    */
-  virtual Event::DispatcherPtr allocateDispatcher(const std::string& name, absl::optional<uint32_t> worker_thread_index = absl::nullopt) PURE;
+  virtual Event::DispatcherPtr
+  allocateDispatcher(const std::string& name,
+                     absl::optional<uint32_t> worker_thread_index = absl::nullopt) PURE;
 
   /**
    * Allocate a dispatcher.

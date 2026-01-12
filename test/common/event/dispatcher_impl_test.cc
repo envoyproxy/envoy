@@ -1354,8 +1354,8 @@ TEST(DispatcherWithScaledTimerFactoryTest, CreatesScaledTimerManager) {
   EXPECT_CALL(scaled_timer_manager_factory, Call)
       .WillOnce(Return(ByMove(ScaledRangeTimerManagerPtr(manager))));
 
-  DispatcherPtr dispatcher =
-      api->allocateDispatcher("test_thread", absl::nullopt, scaled_timer_manager_factory.AsStdFunction());
+  DispatcherPtr dispatcher = api->allocateDispatcher("test_thread", absl::nullopt,
+                                                     scaled_timer_manager_factory.AsStdFunction());
 }
 
 TEST(DispatcherWithScaledTimerFactoryTest, CreateScaledTimerWithMinimum) {
@@ -1366,8 +1366,8 @@ TEST(DispatcherWithScaledTimerFactoryTest, CreateScaledTimerWithMinimum) {
   EXPECT_CALL(scaled_timer_manager_factory, Call)
       .WillOnce(Return(ByMove(ScaledRangeTimerManagerPtr(manager))));
 
-  DispatcherPtr dispatcher =
-      api->allocateDispatcher("test_thread", absl::nullopt, scaled_timer_manager_factory.AsStdFunction());
+  DispatcherPtr dispatcher = api->allocateDispatcher("test_thread", absl::nullopt,
+                                                     scaled_timer_manager_factory.AsStdFunction());
 
   EXPECT_CALL(*manager, createTimer_(ScaledTimerMinimum(ScaledMinimum(UnitFloat(0.8f))), _));
   dispatcher->createScaledTimer(ScaledTimerMinimum(ScaledMinimum(UnitFloat(0.8f))), []() {});

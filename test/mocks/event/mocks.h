@@ -32,7 +32,8 @@ namespace Event {
 class MockDispatcher : public Dispatcher {
 public:
   MockDispatcher();
-  MockDispatcher(const std::string& name, absl::optional<uint32_t> worker_thread_index = absl::nullopt);
+  MockDispatcher(const std::string& name,
+                 absl::optional<uint32_t> worker_thread_index = absl::nullopt);
   ~MockDispatcher() override;
 
   // Dispatcher

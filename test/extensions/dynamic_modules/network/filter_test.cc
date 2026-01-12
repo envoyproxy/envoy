@@ -3,8 +3,8 @@
 
 #include "test/extensions/dynamic_modules/util.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/server/server_factory_context.h"
+#include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {
@@ -16,7 +16,8 @@ class DynamicModuleNetworkFilterTest : public testing::Test {
 public:
   void SetUp() override {
     NiceMock<Server::Configuration::MockServerFactoryContext> context;
-    auto dynamic_module = newDynamicModule(testSharedObjectPath("network_no_op", "c"), false, context);
+    auto dynamic_module =
+        newDynamicModule(testSharedObjectPath("network_no_op", "c"), false, context);
     EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
     auto filter_config_or_status = newDynamicModuleNetworkFilterConfig(
@@ -240,7 +241,8 @@ TEST_F(DynamicModuleNetworkFilterTest, CallbackAccessors) {
 
 TEST(DynamicModuleNetworkFilterConfigTest, ConfigInitialization) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  auto dynamic_module = newDynamicModule(testSharedObjectPath("network_no_op", "c"), false, context);
+  auto dynamic_module =
+      newDynamicModule(testSharedObjectPath("network_no_op", "c"), false, context);
   EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
   NiceMock<Upstream::MockClusterManager> cluster_manager;

@@ -12,7 +12,6 @@
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/thread_local_cluster.h"
-#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {
@@ -663,7 +662,7 @@ TEST(DynamicModulesTest, HttpFilterHttpCallout_success) {
 TEST(DynamicModulesTest, HttpFilterHttpCallout_resetting) {
   const std::string filter_name = "http_callouts";
   // TODO: Add non-Rust test program once we have non-Rust SDK.
- NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   auto dynamic_module =
       newDynamicModule(testSharedObjectPath("http_integration_test", "rust"), false, context);
   if (!dynamic_module.ok()) {

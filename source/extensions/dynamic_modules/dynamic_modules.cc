@@ -16,9 +16,8 @@ namespace DynamicModules {
 constexpr char DYNAMIC_MODULES_SEARCH_PATH[] = "ENVOY_DYNAMIC_MODULES_SEARCH_PATH";
 
 absl::StatusOr<DynamicModulePtr>
-newDynamicModule(const std::filesystem::path& object_file_absolute_path, const bool do_not_close, 
-                Server::Configuration::ServerFactoryContext& context,
-                 const bool load_globally) {
+newDynamicModule(const std::filesystem::path& object_file_absolute_path, const bool do_not_close,
+                 Server::Configuration::ServerFactoryContext& context, const bool load_globally) {
   // From the man page of dlopen(3):
   //
   // > This can be used to test if the object is already resident (dlopen() returns NULL if it
@@ -73,10 +72,10 @@ newDynamicModule(const std::filesystem::path& object_file_absolute_path, const b
   return dynamic_module;
 }
 
-absl::StatusOr<DynamicModulePtr> newDynamicModuleByName(const absl::string_view module_name,
-                                                        const bool do_not_close,
-                                                        Server::Configuration::ServerFactoryContext& context,
-                                                        const bool load_globally) {
+absl::StatusOr<DynamicModulePtr>
+newDynamicModuleByName(const absl::string_view module_name, const bool do_not_close,
+                       Server::Configuration::ServerFactoryContext& context,
+                       const bool load_globally) {
   const char* module_search_path = getenv(DYNAMIC_MODULES_SEARCH_PATH);
   if (module_search_path == nullptr) {
     return absl::InvalidArgumentError(absl::StrCat("Failed to load dynamic module: ", module_name,

@@ -54,7 +54,8 @@ class DynamicModuleListenerFilterAbiCallbackTest : public testing::Test {
 public:
   void SetUp() override {
     NiceMock<Server::Configuration::MockServerFactoryContext> context;
-    auto dynamic_module = newDynamicModule(testSharedObjectPath("listener_no_op", "c"), false, context);
+    auto dynamic_module =
+        newDynamicModule(testSharedObjectPath("listener_no_op", "c"), false, context);
     EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
     auto filter_config_or_status =

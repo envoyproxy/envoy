@@ -119,8 +119,8 @@ public:
 
   /**
    * Returns the index of the worker thread if this dispatcher is for a worker thread.
-   * @return absl::optional<uint32_t> the index of the worker thread, or absl::nullopt if this is not a
-   * worker thread dispatcher.
+   * @return absl::optional<uint32_t> the index of the worker thread, or absl::nullopt if this is
+   * not a worker thread dispatcher.
    */
   virtual absl::optional<uint32_t> workerThreadIndex() PURE;
 

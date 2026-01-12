@@ -14,7 +14,8 @@ namespace Event {
  */
 class ValidationDispatcher : public DispatcherImpl {
 public:
-  ValidationDispatcher(const std::string& name, absl::optional<uint32_t> worker_thread_index, Api::Api& api, Event::TimeSystem& time_system)
+  ValidationDispatcher(const std::string& name, absl::optional<uint32_t> worker_thread_index,
+                       Api::Api& api, Event::TimeSystem& time_system)
       : DispatcherImpl(name, worker_thread_index, api, time_system) {}
 
   Network::ClientConnectionPtr createClientConnection(
