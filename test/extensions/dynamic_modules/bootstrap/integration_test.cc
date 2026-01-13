@@ -51,8 +51,15 @@ TEST_P(DynamicModulesBootstrapIntegrationTest, BasicC) {
   initializeWithBootstrapExtension(testDataDir("c"), "bootstrap_no_op");
 }
 
+// This test verifies that the Rust bootstrap extension can use the common logging callbacks.
+// The integration test module logs messages during on_server_initialized and
+// on_worker_thread_initialized hooks.
 TEST_P(DynamicModulesBootstrapIntegrationTest, BasicRust) {
-  initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_integration_test");
+  EXPECT_LOG_CONTAINS_ALL_OF(
+      Envoy::ExpectedLogMessages(
+          {{"info", "Bootstrap extension server initialized from Rust!"},
+           {"info", "Bootstrap extension worker thread initialized from Rust!"}}),
+      initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_integration_test"));
 }
 
 } // namespace DynamicModules

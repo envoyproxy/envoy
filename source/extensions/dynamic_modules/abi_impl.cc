@@ -1,17 +1,21 @@
 // NOLINT(namespace-envoy)
+
+// This file provides host-side implementations for ABI callbacks that are shared across
+// all dynamic modules. These are the "Common Callbacks" declared in abi.h and are available
+// regardless of which extension point is being used (HTTP/Network/Listener/UDP/Bootstrap/etc).
+
 #include "source/common/common/logger.h"
 #include "source/extensions/dynamic_modules/abi.h"
 
-// Provide host-side implementations for ABI callbacks that are shared across
-// all dynamic modules. This file is linked into dynamic_modules_lib so that
-// core callbacks are always available, regardless of which extension point
-// is being used (HTTP/Network/Listener/UDP/Bootstrap/etc).
-
 extern "C" {
 
-void envoy_dynamic_module_callback_bootstrap_extension_log(
-    envoy_dynamic_module_type_bootstrap_extension_envoy_ptr /*extension_envoy_ptr*/,
-    envoy_dynamic_module_type_log_level level, envoy_dynamic_module_type_module_buffer message) {
+bool envoy_dynamic_module_callback_log_enabled(envoy_dynamic_module_type_log_level level) {
+  return Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules).level() <=
+         static_cast<spdlog::level::level_enum>(level);
+}
+
+void envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level level,
+                                       envoy_dynamic_module_type_module_buffer message) {
   absl::string_view message_view(message.ptr, message.length);
   spdlog::logger& logger = Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules);
 

@@ -41,6 +41,7 @@ envoy_cc_extension(
         "//envoy/registry",
         "//envoy/server:bootstrap_extension_config_interface",
         "//source/common/protobuf:utility_lib",
+        "//source/extensions/dynamic_modules:abi_impl",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
         "@envoy_api//envoy/extensions/bootstrap/dynamic_modules/v3:pkg_cc_proto",
     ],

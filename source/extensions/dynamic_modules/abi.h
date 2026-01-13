@@ -4939,9 +4939,13 @@ envoy_dynamic_module_callback_access_logger_record_histogram_value(
     envoy_dynamic_module_type_access_logger_config_envoy_ptr config_envoy_ptr, size_t id,
     uint64_t value);
 
-// -----------------------------------------------------------------------------
-// Bootstrap Extension
-// -----------------------------------------------------------------------------
+// =============================================================================
+// =========================== Bootstrap Extension =============================
+// =============================================================================
+
+// =============================================================================
+// Bootstrap Extension Types
+// =============================================================================
 
 /**
  * envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr is a raw pointer to the
@@ -4975,10 +4979,14 @@ typedef void* envoy_dynamic_module_type_bootstrap_extension_envoy_ptr;
  */
 typedef const void* envoy_dynamic_module_type_bootstrap_extension_module_ptr;
 
+// =============================================================================
+// Bootstrap Extension Event Hooks
+// =============================================================================
+
 /**
  * envoy_dynamic_module_on_bootstrap_extension_config_new is called by the main thread when the
  * bootstrap extension config is loaded. The function returns a
- * envoy_dynamic_module_type_bootstrap_extension_config_module_ptr for given name and config.
+ * envoy_dynamic_module_type_bootstrap_extension_config_module_ptr for the given name and config.
  *
  * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
  * object for the corresponding config.
@@ -4998,8 +5006,8 @@ envoy_dynamic_module_on_bootstrap_extension_config_new(
  * configuration is destroyed in Envoy. The module should release any resources associated with the
  * corresponding in-module bootstrap extension configuration.
  *
- * @param extension_config_ptr is a pointer to the in-module bootstrap extension configuration whose
- * corresponding Envoy bootstrap extension configuration is being destroyed.
+ * @param extension_config_ptr is the pointer to the in-module bootstrap extension configuration
+ * whose corresponding Envoy bootstrap extension configuration is being destroyed.
  */
 void envoy_dynamic_module_on_bootstrap_extension_config_destroy(
     envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_ptr);
@@ -5051,19 +5059,6 @@ void envoy_dynamic_module_on_bootstrap_extension_worker_thread_initialized(
  */
 void envoy_dynamic_module_on_bootstrap_extension_destroy(
     envoy_dynamic_module_type_bootstrap_extension_module_ptr extension_module_ptr);
-
-// Callbacks
-
-/**
- * envoy_dynamic_module_callback_bootstrap_extension_log is called by the module to log a message.
- *
- * @param extension_envoy_ptr is the pointer to the DynamicModuleBootstrapExtension object.
- * @param level is the log level.
- * @param message is the log message to be logged.
- */
-void envoy_dynamic_module_callback_bootstrap_extension_log(
-    envoy_dynamic_module_type_bootstrap_extension_envoy_ptr extension_envoy_ptr,
-    envoy_dynamic_module_type_log_level level, envoy_dynamic_module_type_module_buffer message);
 
 #ifdef __cplusplus
 }

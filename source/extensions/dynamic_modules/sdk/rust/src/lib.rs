@@ -6303,10 +6303,7 @@ pub trait EnvoyBootstrapExtensionConfig {}
 /// EnvoyBootstrapExtension is the Envoy-side bootstrap extension.
 /// This is a handle to the Envoy extension object.
 #[automock]
-pub trait EnvoyBootstrapExtension {
-  /// Log a message to Envoy's logging system.
-  fn log(&self, level: abi::envoy_dynamic_module_type_log_level, message: &str);
-}
+pub trait EnvoyBootstrapExtension {}
 
 /// BootstrapExtensionConfig is the module-side bootstrap extension configuration.
 ///
@@ -6350,6 +6347,9 @@ pub trait BootstrapExtension: Send + Sync {
 // Implementation of EnvoyBootstrapExtensionConfig
 
 struct EnvoyBootstrapExtensionConfigImpl {
+  // The raw pointer is stored for future callback implementations.
+  // Currently, the EnvoyBootstrapExtensionConfig trait has no methods, but
+  // callbacks may be added in the future (e.g., for metrics or other APIs).
   #[allow(dead_code)]
   raw: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
 }
@@ -6365,6 +6365,10 @@ impl EnvoyBootstrapExtensionConfig for EnvoyBootstrapExtensionConfigImpl {}
 // Implementation of EnvoyBootstrapExtension
 
 struct EnvoyBootstrapExtensionImpl {
+  // The raw pointer is stored for future callback implementations.
+  // Currently, the EnvoyBootstrapExtension trait has no methods, but
+  // callbacks may be added in the future.
+  #[allow(dead_code)]
   raw: abi::envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
 }
 
@@ -6374,20 +6378,7 @@ impl EnvoyBootstrapExtensionImpl {
   }
 }
 
-impl EnvoyBootstrapExtension for EnvoyBootstrapExtensionImpl {
-  fn log(&self, level: abi::envoy_dynamic_module_type_log_level, message: &str) {
-    unsafe {
-      abi::envoy_dynamic_module_callback_bootstrap_extension_log(
-        self.raw,
-        level,
-        abi::envoy_dynamic_module_type_module_buffer {
-          ptr: message.as_ptr() as *const ::std::os::raw::c_char,
-          length: message.len(),
-        },
-      );
-    }
-  }
-}
+impl EnvoyBootstrapExtension for EnvoyBootstrapExtensionImpl {}
 
 // Bootstrap Extension Event Hook Implementations
 
@@ -6522,11 +6513,9 @@ pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_destroy(
 /// struct MyBootstrapExtension {}
 ///
 /// impl BootstrapExtension for MyBootstrapExtension {
-///   fn on_server_initialized(&mut self, envoy_extension: &mut dyn EnvoyBootstrapExtension) {
-///     envoy_extension.log(
-///       abi::envoy_dynamic_module_type_log_level::Info,
-///       "Bootstrap extension initialized!",
-///     );
+///   fn on_server_initialized(&mut self, _envoy_extension: &mut dyn EnvoyBootstrapExtension) {
+///     // Use envoy_log_info! macro for logging.
+///     // envoy_log_info!("Bootstrap extension initialized!");
 ///   }
 /// }
 /// ```
