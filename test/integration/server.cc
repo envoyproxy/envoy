@@ -48,6 +48,7 @@ createTestOptionsImpl(const std::string& config_path, const std::string& config_
   test_options.setConfigYaml(config_yaml);
   test_options.setLocalAddressIpVersion(ip_version);
   test_options.setFileFlushIntervalMsec(std::chrono::milliseconds(50));
+  test_options.setFileFlushMinSizeKB(128);
   test_options.setDrainTime(drain_time);
   test_options.setParentShutdownTime(std::chrono::seconds(2));
   test_options.setDrainStrategy(drain_strategy);

@@ -152,17 +152,17 @@ void GrpcJsonReverseTranscoderFilter::InitPerRouteConfig() {
 void GrpcJsonReverseTranscoderFilter::MaybeExpandBufferLimits() const {
   const uint32_t max_request_body_size = per_route_config_->max_request_body_size_.value_or(0);
   const uint32_t max_response_body_size = per_route_config_->max_response_body_size_.value_or(0);
-  if (max_request_body_size > decoder_callbacks_->decoderBufferLimit()) {
-    decoder_callbacks_->setDecoderBufferLimit(max_request_body_size);
+  if (max_request_body_size > decoder_callbacks_->bufferLimit()) {
+    decoder_callbacks_->setBufferLimit(max_request_body_size);
   }
-  if (max_response_body_size > encoder_callbacks_->encoderBufferLimit()) {
-    encoder_callbacks_->setEncoderBufferLimit(max_response_body_size);
+  if (max_response_body_size > encoder_callbacks_->bufferLimit()) {
+    encoder_callbacks_->setBufferLimit(max_response_body_size);
   }
 }
 
 bool GrpcJsonReverseTranscoderFilter::DecoderBufferLimitReached(uint64_t buffer_length) const {
   const uint32_t max_size =
-      per_route_config_->max_request_body_size_.value_or(decoder_callbacks_->decoderBufferLimit());
+      per_route_config_->max_request_body_size_.value_or(decoder_callbacks_->bufferLimit());
   if (buffer_length > max_size) {
     ENVOY_STREAM_LOG(error, "Request size has exceeded the maximum allowed request size limit",
                      *decoder_callbacks_);
@@ -177,7 +177,7 @@ bool GrpcJsonReverseTranscoderFilter::DecoderBufferLimitReached(uint64_t buffer_
 
 bool GrpcJsonReverseTranscoderFilter::EncoderBufferLimitReached(uint64_t buffer_length) const {
   const uint32_t max_size =
-      per_route_config_->max_response_body_size_.value_or(encoder_callbacks_->encoderBufferLimit());
+      per_route_config_->max_response_body_size_.value_or(encoder_callbacks_->bufferLimit());
   if (buffer_length > max_size) {
     ENVOY_STREAM_LOG(error, "Response size has exceeded the maximum allowed response size limit",
                      *encoder_callbacks_);

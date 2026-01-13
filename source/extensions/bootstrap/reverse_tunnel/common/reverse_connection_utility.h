@@ -22,6 +22,8 @@ class ReverseConnectionUtility : public Logger::Loggable<Logger::Id::connection>
 public:
   static constexpr absl::string_view PING_MESSAGE = "RPING";
   static constexpr absl::string_view PROXY_MESSAGE = "PROXY";
+  static constexpr absl::string_view DEFAULT_REVERSE_TUNNEL_REQUEST_PATH =
+      "/reverse_connections/request";
 
   static bool isPingMessage(absl::string_view data);
 
@@ -55,6 +57,12 @@ inline const Http::LowerCaseString& reverseTunnelClusterIdHeader() {
 inline const Http::LowerCaseString& reverseTunnelTenantIdHeader() {
   static const Http::LowerCaseString kHeader{
       absl::StrCat(Http::Headers::get().prefix(), "-reverse-tunnel-tenant-id")};
+  return kHeader;
+}
+
+inline const Http::LowerCaseString& reverseTunnelUpstreamClusterNameHeader() {
+  static const Http::LowerCaseString kHeader{
+      absl::StrCat(Http::Headers::get().prefix(), "-reverse-tunnel-upstream-cluster-name")};
   return kHeader;
 }
 

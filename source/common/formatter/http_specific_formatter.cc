@@ -6,6 +6,7 @@
 #include "source/common/common/thread.h"
 #include "source/common/common/utility.h"
 #include "source/common/config/metadata.h"
+#include "source/common/formatter/coalesce_formatter.h"
 #include "source/common/grpc/common.h"
 #include "source/common/grpc/status.h"
 #include "source/common/http/header_map_impl.h"
@@ -501,6 +502,12 @@ BuiltInHttpCommandParser::getKnownFormatters() {
            absl::string_view option;
            SubstitutionFormatUtils::parseSubcommand(format, ':', query, option);
            return THROW_OR_RETURN_VALUE(PathFormatter::create(query, option, max_length),
+                                        FormatterProviderPtr);
+         }}},
+       {"COALESCE",
+        {CommandSyntaxChecker::PARAMS_REQUIRED | CommandSyntaxChecker::LENGTH_ALLOWED,
+         [](absl::string_view format, absl::optional<size_t> max_length) {
+           return THROW_OR_RETURN_VALUE(CoalesceFormatter::create(format, max_length),
                                         FormatterProviderPtr);
          }}}});
 }

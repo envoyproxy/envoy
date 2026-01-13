@@ -380,7 +380,7 @@ void Filter::processBody(const Buffer::Instance* body, const Rules& rules,
     for (unsigned long i = 0; i < keys.size() - 1; i++) {
       absl::StatusOr<Json::ObjectSharedPtr> next_node_result = node->getObject(keys[i]);
       if (!next_node_result.ok()) {
-        ENVOY_LOG(warn, result.status().message());
+        ENVOY_LOG(debug, next_node_result.status().message());
         handleOnMissing(rule, struct_map, filter_callback);
         on_missing = true;
         break;
@@ -393,7 +393,7 @@ void Filter::processBody(const Buffer::Instance* body, const Rules& rules,
     absl::Status result =
         handleOnPresent(std::move(node), keys.back(), rule, struct_map, filter_callback);
     if (!result.ok()) {
-      ENVOY_LOG(warn, fmt::format("{} key: {}", result.message(), keys.back()));
+      ENVOY_LOG(debug, fmt::format("{} key: {}", result.message(), keys.back()));
       handleOnMissing(rule, struct_map, filter_callback);
     }
   }
