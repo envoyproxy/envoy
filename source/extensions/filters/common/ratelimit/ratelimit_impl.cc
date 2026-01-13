@@ -132,7 +132,7 @@ void GrpcClientImpl::onSuccess(
   callbacks_ = nullptr;
   call_backs->complete(status, std::move(descriptor_statuses), std::move(response_headers_to_add),
                        std::move(request_headers_to_add), response->raw_body(),
-                       std::move(dynamic_metadata));
+                       std::move(dynamic_metadata), response->shadow_mode());
 }
 
 void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::string& msg,
@@ -144,7 +144,7 @@ void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::strin
   // callback, so we release the callback here to make the destructor happy.
   auto call_backs = callbacks_;
   callbacks_ = nullptr;
-  call_backs->complete(LimitStatus::Error, nullptr, nullptr, nullptr, EMPTY_STRING, nullptr);
+  call_backs->complete(LimitStatus::Error, nullptr, nullptr, nullptr, EMPTY_STRING, nullptr, false);
 }
 
 ClientPtr rateLimitClient(Server::Configuration::FactoryContext& context,

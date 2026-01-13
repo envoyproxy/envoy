@@ -537,5 +537,50 @@ TEST_P(RatelimitIntegrationTest, OverLimitResponseHeadersToAdd) {
   EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.error"));
 }
 
+TEST_P(RatelimitIntegrationTest, ShadowModeOK) {
+  initiateClientConnection();
+  waitForRatelimitRequest();
+
+  envoy::service::ratelimit::v3::RateLimitResponse response_msg;
+  response_msg.set_overall_code(envoy::service::ratelimit::v3::RateLimitResponse::OK);
+  response_msg.set_shadow_mode(true);
+
+  ratelimit_requests_[0]->startGrpcStream();
+  ratelimit_requests_[0]->sendGrpcMessage(response_msg);
+  ratelimit_requests_[0]->finishGrpcStream(Grpc::Status::Ok);
+
+  waitForSuccessfulUpstreamResponse(0);
+  cleanup();
+
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.ratelimit.shadow_ok")->value());
+  EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.ok"));
+}
+
+TEST_P(RatelimitIntegrationTest, ShadowModeOverLimit) {
+  initiateClientConnection();
+  waitForRatelimitRequest();
+
+  envoy::service::ratelimit::v3::RateLimitResponse response_msg;
+  response_msg.set_overall_code(envoy::service::ratelimit::v3::RateLimitResponse::OVER_LIMIT);
+  response_msg.set_shadow_mode(true);
+
+  ratelimit_requests_[0]->startGrpcStream();
+  ratelimit_requests_[0]->sendGrpcMessage(response_msg);
+  ratelimit_requests_[0]->finishGrpcStream(Grpc::Status::Ok);
+
+  // In shadow mode, the request should succeed (200) not fail (429)
+  waitForSuccessfulUpstreamResponse(0);
+
+  // Shadow mode should NOT add the x-envoy-ratelimited header
+  EXPECT_THAT(responses_[0].get()->headers(),
+              ::testing::Not(ContainsHeader(Http::Headers::get().EnvoyRateLimited, _)));
+
+  cleanup();
+
+  // Shadow mode should increment shadow_over_limit, not over_limit
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.ratelimit.shadow_over_limit")->value());
+  EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.over_limit"));
+}
+
 } // namespace
 } // namespace Envoy

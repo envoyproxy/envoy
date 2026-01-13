@@ -253,7 +253,8 @@ public:
                 Http::ResponseHeaderMapPtr&& response_headers_to_add,
                 Http::RequestHeaderMapPtr&& request_headers_to_add,
                 const std::string& response_body,
-                Filters::Common::RateLimit::DynamicMetadataPtr&& dynamic_metadata) override;
+                Filters::Common::RateLimit::DynamicMetadataPtr&& dynamic_metadata,
+                bool shadow_mode) override;
 
 private:
   void initiateCall(const Http::RequestHeaderMap& headers);
