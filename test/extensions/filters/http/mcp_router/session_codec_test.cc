@@ -41,7 +41,7 @@ TEST(SessionCodecTest, ParseCompositeSessionId) {
               UnorderedElementsAre(Pair("backend1", "s1"), Pair("backend2", "s2")));
 }
 
-// Test that subjects containing spliter are correctly handled.
+// Test that subjects containing splitter are correctly handled.
 TEST(SessionCodecTest, SubjectWithAtSymbol) {
   const std::string subject_with_at = "user@example.com";
   const std::string id = SessionCodec::buildCompositeSessionId("my_route", subject_with_at,
