@@ -1,5 +1,6 @@
 #include "source/extensions/filters/http/local_ratelimit/local_ratelimit.h"
 
+#include <cstddef>
 #include <memory>
 #include <string>
 #include <vector>
@@ -170,7 +171,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   // The global limiter, route limiter, or connection level limiter are all have longer life
   // than the request, so we can safely store the token bucket context reference.
   token_bucket_context_ = result.token_bucket_context;
-
+  if (token_bucket_context_ != nullptr && token_bucket_context_->shadowMode()) {
+    used_config_->stats().shadow_mode_.inc();
+  }
   if (result.allowed) {
     used_config_->stats().ok_.inc();
     return Http::FilterHeadersStatus::Continue;

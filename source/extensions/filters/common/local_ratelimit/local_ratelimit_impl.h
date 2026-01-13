@@ -111,10 +111,10 @@ public:
 
   // RateLimitTokenBucket
   bool consume(double factor = 1.0, uint64_t tokens = 1);
-  bool shadowMode() const { return shadow_mode_; }
   double fillRate() const { return token_bucket_.fillRate(); }
   std::chrono::milliseconds fillInterval() const { return fill_interval_; }
 
+  bool shadowMode() const override { return shadow_mode_; }
   uint64_t maxTokens() const override { return static_cast<uint64_t>(token_bucket_.maxTokens()); }
   uint64_t remainingTokens() const override {
     return static_cast<uint64_t>(token_bucket_.remainingTokens());
