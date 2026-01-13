@@ -27,9 +27,10 @@ public:
 
     auto* filter = new MockStreamFilter();
     EXPECT_CALL(filter_factory_, createFilterChain(_))
-        .WillOnce(Invoke([&](FilterChainManager& manager) -> bool {
+        .WillOnce(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> bool {
           auto factory = createStreamFilterFactoryCb(StreamFilterSharedPtr{filter});
-          manager.applyFilterFactoryCb({}, factory);
+          callbacks.setFilterConfigName("");
+          factory(callbacks);
           return true;
         }));
     EXPECT_CALL(*filter, setDecoderFilterCallbacks(_));

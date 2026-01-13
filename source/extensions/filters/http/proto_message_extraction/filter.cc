@@ -154,8 +154,8 @@ Envoy::Http::FilterHeadersStatus Filter::decodeHeaders(Envoy::Http::RequestHeade
   auto cord_message_data_factory = std::make_unique<CreateMessageDataFunc>(
       []() { return std::make_unique<Protobuf::field_extraction::CordMessageData>(); });
 
-  request_msg_converter_ = std::make_unique<MessageConverter>(
-      std::move(cord_message_data_factory), decoder_callbacks_->decoderBufferLimit());
+  request_msg_converter_ = std::make_unique<MessageConverter>(std::move(cord_message_data_factory),
+                                                              decoder_callbacks_->bufferLimit());
 
   return Envoy::Http::FilterHeadersStatus::Continue;
 }
@@ -271,8 +271,8 @@ Envoy::Http::FilterHeadersStatus Filter::encodeHeaders(Envoy::Http::ResponseHead
   auto cord_message_data_factory = std::make_unique<CreateMessageDataFunc>(
       []() { return std::make_unique<Protobuf::field_extraction::CordMessageData>(); });
 
-  response_msg_converter_ = std::make_unique<MessageConverter>(
-      std::move(cord_message_data_factory), encoder_callbacks_->encoderBufferLimit());
+  response_msg_converter_ = std::make_unique<MessageConverter>(std::move(cord_message_data_factory),
+                                                               encoder_callbacks_->bufferLimit());
 
   return Http::FilterHeadersStatus::Continue;
 }

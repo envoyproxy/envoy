@@ -36,6 +36,7 @@
 #include "library/common/extensions/filters/http/network_configuration/filter.pb.h"
 #include "library/common/extensions/filters/http/socket_tag/filter.pb.h"
 #include "library/common/extensions/key_value/platform/platform.pb.h"
+#include "library/common/extensions/quic_packet_writer/platform/platform_packet_writer.pb.h"
 
 #if defined(__APPLE__)
 #include "library/common/network/apple_proxy_resolution.h"
@@ -229,6 +230,16 @@ EngineBuilder& EngineBuilder::enableHttp3(bool http3_on) {
   return *this;
 }
 
+EngineBuilder& EngineBuilder::addQuicConnectionOption(std::string option) {
+  quic_connection_options_.push_back(std::move(option));
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::addQuicClientConnectionOption(std::string option) {
+  quic_client_connection_options_.push_back(std::move(option));
+  return *this;
+}
+
 EngineBuilder& EngineBuilder::setHttp3ConnectionOptions(std::string options) {
   http3_connection_options_ = std::move(options);
   return *this;
@@ -383,6 +394,33 @@ EngineBuilder& EngineBuilder::setNodeLocality(std::string region, std::string zo
 
 EngineBuilder& EngineBuilder::setNodeMetadata(Protobuf::Struct node_metadata) {
   node_metadata_ = std::move(node_metadata);
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::setUseQuicPlatformPacketWriter(bool use_quic_platform_packet_writer) {
+  use_quic_platform_packet_writer_ = use_quic_platform_packet_writer;
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::enableQuicConnectionMigration(bool quic_connection_migration_on) {
+  enable_quic_connection_migration_ = quic_connection_migration_on;
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::setMigrateIdleQuicConnection(bool migrate_idle_quic_connection) {
+  migrate_idle_quic_connection_ = migrate_idle_quic_connection;
+  return *this;
+}
+
+EngineBuilder&
+EngineBuilder::setMaxIdleTimeBeforeQuicMigrationSeconds(int max_idle_time_before_quic_migration) {
+  max_idle_time_before_quic_migration_seconds_ = max_idle_time_before_quic_migration;
+  return *this;
+}
+
+EngineBuilder&
+EngineBuilder::setMaxTimeOnNonDefaultNetworkSeconds(int max_time_on_non_default_network) {
+  max_time_on_non_default_network_seconds_ = max_time_on_non_default_network;
   return *this;
 }
 
@@ -864,8 +902,17 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     auto* quic_protocol_options = alpn_options.mutable_auto_config()
                                       ->mutable_http3_protocol_options()
                                       ->mutable_quic_protocol_options();
-    quic_protocol_options->set_connection_options(http3_connection_options_);
-    quic_protocol_options->set_client_connection_options(http3_client_connection_options_);
+    if (!quic_connection_options_.empty()) {
+      quic_protocol_options->set_connection_options(absl::StrJoin(quic_connection_options_, ","));
+    } else {
+      quic_protocol_options->set_connection_options(http3_connection_options_);
+    }
+    if (!quic_client_connection_options_.empty()) {
+      quic_protocol_options->set_client_connection_options(
+          absl::StrJoin(quic_client_connection_options_, ","));
+    } else {
+      quic_protocol_options->set_client_connection_options(http3_client_connection_options_);
+    }
     quic_protocol_options->mutable_initial_stream_window_size()->set_value(
         initial_stream_window_size_);
     quic_protocol_options->mutable_initial_connection_window_size()->set_value(
@@ -882,6 +929,29 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     }
     if (max_concurrent_streams_ > 0) {
       quic_protocol_options->mutable_max_concurrent_streams()->set_value(max_concurrent_streams_);
+    }
+    if (enable_quic_connection_migration_) {
+      auto* migration_setting = quic_protocol_options->mutable_connection_migration();
+      if (migrate_idle_quic_connection_) {
+        auto* migrate_idle_connections = migration_setting->mutable_migrate_idle_connections();
+        if (max_idle_time_before_quic_migration_seconds_ > 0) {
+          migrate_idle_connections->mutable_max_idle_time_before_migration()->set_seconds(
+              max_idle_time_before_quic_migration_seconds_);
+        }
+      }
+      if (max_time_on_non_default_network_seconds_ > 0) {
+        migration_setting->mutable_max_time_on_non_default_network()->set_seconds(
+            max_time_on_non_default_network_seconds_);
+      }
+    }
+
+    if (use_quic_platform_packet_writer_ || enable_quic_connection_migration_) {
+      envoy_mobile::extensions::quic_packet_writer::platform::QuicPlatformPacketWriterConfig
+          writer_config;
+      quic_protocol_options->mutable_client_packet_writer()->mutable_typed_config()->PackFrom(
+          writer_config);
+      quic_protocol_options->mutable_client_packet_writer()->set_name(
+          "envoy.quic.packet_writer.platform");
     }
 
     alpn_options.mutable_auto_config()->mutable_alternate_protocols_cache_options()->set_name(

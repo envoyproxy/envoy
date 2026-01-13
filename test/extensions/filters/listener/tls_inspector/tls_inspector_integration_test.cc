@@ -604,6 +604,48 @@ TEST_P(TlsInspectorIntegrationTest, JA4FingerprintWithMinimalExtensions) {
   EXPECT_THAT(log_content, testing::HasSubstr("i"));
 }
 
+// Test that SNI is captured and available in access logs even when the TLS connection
+// fails.
+TEST_P(TlsInspectorIntegrationTest, SniCapturedOnFilterChainNotFound) {
+  const std::string test_sni = "test.example.com";
+  initializeWithTlsInspector(/*ssl_client=*/true,
+                             /*log_format=*/"%REQUESTED_SERVER_NAME%|%RESPONSE_CODE_DETAILS%",
+                             /*listener_filter_disabled=*/absl::nullopt);
+
+  // Set up the SSL client with an SNI that won't match any filter chain.
+  Network::Address::InstanceConstSharedPtr address =
+      Ssl::getSslAddress(version_, lookupPort("echo"));
+
+  Ssl::ClientSslTransportOptions ssl_options;
+  ssl_options.setSni(test_sni);
+  context_ = Ssl::createClientSslTransportSocketFactory(ssl_options, *context_manager_, *api_);
+
+  // Use ALPN that doesn't match the filter chain.
+  Network::TransportSocketPtr transport_socket = context_->createTransportSocket(
+      std::make_shared<Network::TransportSocketOptionsImpl>(
+          absl::string_view(""), std::vector<std::string>(), std::vector<std::string>{"nomatch"}),
+      nullptr);
+
+  client_ = dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
+                                                std::move(transport_socket), nullptr, nullptr);
+  client_->addConnectionCallbacks(connect_callbacks_);
+  client_->connect();
+
+  while (!connect_callbacks_.connected() && !connect_callbacks_.closed()) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+
+  // Connection should fail due to filter chain not found.
+  ASSERT_FALSE(connect_callbacks_.connected());
+  ASSERT(connect_callbacks_.closed());
+
+  // Verify that even though the connection failed, the SNI was captured and is in the access log.
+  std::string log_content = waitForAccessLog(listener_access_log_name_);
+  EXPECT_THAT(log_content, testing::HasSubstr(test_sni));
+  EXPECT_THAT(log_content,
+              testing::HasSubstr(StreamInfo::ResponseCodeDetails::get().FilterChainNotFound));
+}
+
 INSTANTIATE_TEST_SUITE_P(IpVersions, TlsInspectorIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);

@@ -142,7 +142,7 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
   filter_manager_ = std::make_unique<UpstreamFilterManager>(
       *filter_manager_callbacks_, parent_.callbacks()->dispatcher(), UpstreamRequest::connection(),
       parent_.callbacks()->streamId(), parent_.callbacks()->account(), true,
-      parent_.callbacks()->decoderBufferLimit(), *this);
+      parent_.callbacks()->bufferLimit(), *this);
   // Attempt to create custom cluster-specified filter chain
   bool created = filter_manager_->createFilterChain(*parent_.cluster()).created();
 

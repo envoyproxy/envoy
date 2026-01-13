@@ -1001,8 +1001,8 @@ TEST_P(TcpProxyTest, StreamDecoderFilterCallbacks) {
   EXPECT_NO_THROW(stream_decoder_callbacks.encodeMetadata(nullptr));
   EXPECT_NO_THROW(stream_decoder_callbacks.onDecoderFilterAboveWriteBufferHighWatermark());
   EXPECT_NO_THROW(stream_decoder_callbacks.onDecoderFilterBelowWriteBufferLowWatermark());
-  EXPECT_NO_THROW(stream_decoder_callbacks.setDecoderBufferLimit(uint32_t{0}));
-  EXPECT_NO_THROW(stream_decoder_callbacks.decoderBufferLimit());
+  EXPECT_NO_THROW(stream_decoder_callbacks.setBufferLimit(uint32_t{0}));
+  EXPECT_NO_THROW(stream_decoder_callbacks.bufferLimit());
   EXPECT_NO_THROW(stream_decoder_callbacks.recreateStream(nullptr));
   EXPECT_NO_THROW(stream_decoder_callbacks.getUpstreamSocketOptions());
   Network::Socket::OptionsSharedPtr sock_options =
@@ -1034,7 +1034,7 @@ TEST_P(TcpProxyTest, StreamDecoderFilterCallbacks) {
   EXPECT_NO_THROW(stream_decoder_callbacks.encodeHeaders(nullptr, false, ""));
   EXPECT_NO_THROW(stream_decoder_callbacks.encodeData(inject_data, false));
   EXPECT_NO_THROW(stream_decoder_callbacks.encodeTrailers(nullptr));
-  EXPECT_NO_THROW(stream_decoder_callbacks.setDecoderBufferLimit(0));
+  EXPECT_NO_THROW(stream_decoder_callbacks.setBufferLimit(0));
   std::array<char, 256> buffer;
   OutputBufferStream ostream{buffer.data(), buffer.size()};
   EXPECT_NO_THROW(stream_decoder_callbacks.dumpState(ostream, 0));
@@ -1598,6 +1598,18 @@ TEST_P(TcpProxyTest, AccessLogDownstreamAddress) {
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
   filter_.reset();
   EXPECT_EQ(access_log_data_, "1.1.1.1 1.1.1.2:20000");
+}
+
+// Test that access log fields %DOWNSTREAM_LOCAL_ADDRESS_ENDPOINT_ID% is correctly logged.
+TEST_P(TcpProxyTest, AccessLogDownstreamEndpointId) {
+  auto downstream_local_address = Network::Address::InstanceConstSharedPtr{
+      new Network::Address::EnvoyInternalInstance("downstream", "1234567890")};
+  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
+      downstream_local_address);
+  setup(1, accessLogConfig("%DOWNSTREAM_LOCAL_ADDRESS_ENDPOINT_ID%"));
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+  filter_.reset();
+  EXPECT_EQ(access_log_data_, "1234567890");
 }
 
 // Test that intermediate log entry by field %ACCESS_LOG_TYPE%.

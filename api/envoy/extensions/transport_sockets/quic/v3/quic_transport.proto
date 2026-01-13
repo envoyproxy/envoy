@@ -16,7 +16,8 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/tra
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: quic transport]
-// [#comment:#extension: envoy.transport_sockets.quic]
+// [#extension: envoy.transport_sockets.quic]
+// The QUIC configurations below provide the transport socket configuration for downstream/upstream QUIC.
 
 // Configuration for Downstream QUIC transport socket. This provides Google's implementation of Google QUIC and IETF QUIC to Envoy.
 message QuicDownstreamTransport {

@@ -15,6 +15,7 @@
 #include "source/extensions/filters/http/mcp_router/session_codec.h"
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/status/statusor.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -100,6 +101,8 @@ public:
 private:
   bool readMetadataFromMcpFilter();
   bool decodeAndParseSession();
+  absl::StatusOr<std::string> getAuthenticatedSubject();
+  bool validateSubjectIfRequired();
 
   std::pair<std::string, std::string> parseToolName(const std::string& prefixed_name);
   // Rewrites the tool name in the buffer. Returns the size delta (new_size - old_size).
@@ -153,14 +156,10 @@ private:
   std::string encoded_session_id_;
   absl::flat_hash_map<std::string, std::string> backend_sessions_;
 
-  // MuxDemux for fanout operations (per-filter instance)
+  // MuxDemux for all backend operations (fanout and single-backend)
   std::shared_ptr<Http::MuxDemux> muxdemux_;
   std::unique_ptr<Http::MultiStream> multistream_;
   std::vector<std::shared_ptr<BackendStreamCallbacks>> stream_callbacks_;
-
-  // Single backend stream (for tools/call)
-  // TODO(botengyao): better to use MuxDemux, but this is simpler now.
-  Http::AsyncClient::Stream* single_stream_{};
 
   // Store headers to keep them alive for the duration of the stream
   // AsyncStreamImpl stores only a pointer to headers, so we must keep them alive

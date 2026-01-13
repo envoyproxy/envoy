@@ -258,6 +258,14 @@ public:
    */
   static absl::optional<uint32_t>
   extractDownstreamAddressJustPort(const Network::Address::Instance& address);
+
+  /**
+   * @param address supplies the downstream address.
+   * @return the endpoint id of an EnvoyInternalAddress, extracted from the provided downstream
+   * address for logs, header expansion, etc.
+   */
+  static const std::string
+  formatDownstreamAddressJustEndpointId(const Network::Address::Instance& address);
 };
 
 // Static utils for creating, consuming, and producing strings from the

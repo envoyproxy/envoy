@@ -178,6 +178,8 @@ public:
   MOCK_METHOD(OptRef<const StreamInfo>, parentStreamInfo, (), (const));
   MOCK_METHOD(void, addCustomFlag, (absl::string_view));
   MOCK_METHOD(absl::string_view, customFlags, (), (const));
+  MOCK_METHOD(absl::optional<uint32_t>, codecStreamId, (), (const, override));
+  MOCK_METHOD(void, setCodecStreamId, (absl::optional<uint32_t> id), (override));
 
   Envoy::Event::SimulatedTimeSystem ts_;
   SystemTime start_time_;

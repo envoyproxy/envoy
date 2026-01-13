@@ -90,6 +90,17 @@ void SaveProcessingResponse::afterReceivingImmediateResponse(
   addToFilterState(processing_response, status, stream_info);
 }
 
+void SaveProcessingResponse::afterProcessingStreamingImmediateResponse(
+    const envoy::service::ext_proc::v3::StreamedImmediateResponse& response, absl::Status status,
+    Envoy::StreamInfo::StreamInfo& stream_info) {
+  if (!shouldSaveResponse(save_immediate_response_, status)) {
+    return;
+  }
+  envoy::service::ext_proc::v3::ProcessingResponse processing_response;
+  *processing_response.mutable_streamed_immediate_response() = response;
+  addToFilterState(processing_response, status, stream_info);
+}
+
 } // namespace ExternalProcessing
 } // namespace Http
 } // namespace Envoy

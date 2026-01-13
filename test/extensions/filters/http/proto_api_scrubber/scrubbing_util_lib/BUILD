@@ -11,9 +11,14 @@ envoy_package()
 envoy_cc_test(
     name = "field_checker_test",
     srcs = ["field_checker_test.cc"],
-    data = ["//test/proto:apikeys_proto_descriptor"],
+    data = [
+        "//test/extensions/filters/http/proto_api_scrubber:scrubber_test_proto_descriptor",
+        "//test/proto:apikeys_proto_descriptor",
+    ],
     deps = [
+        "//envoy/common:optref_lib",
         "//source/common/protobuf",
+        "//source/common/stats:isolated_store_lib",
         "//source/extensions/filters/http/proto_api_scrubber/scrubbing_util_lib",
         "//source/extensions/matching/http/cel_input:cel_input_lib",
         "//source/extensions/matching/input_matchers/cel_matcher:config",
@@ -22,6 +27,7 @@ envoy_cc_test(
         "//test/mocks/server:factory_context_mocks",
         "//test/proto:apikeys_proto_cc_proto",
         "//test/test_common:environment_lib",
+        "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
         "@com_github_cncf_xds//xds/type/matcher/v3:pkg_cc_proto",
         "@com_google_protoprocessinglib//proto_processing_lib/proto_scrubber",
