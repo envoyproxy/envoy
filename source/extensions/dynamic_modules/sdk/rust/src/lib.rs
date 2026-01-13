@@ -2410,7 +2410,12 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
   ) -> bool {
     unsafe {
       abi::envoy_dynamic_module_callback_http_set_socket_option_int(
-        self.raw_ptr, level, name, state, direction, value,
+        self.raw_ptr,
+        level,
+        name,
+        state,
+        direction,
+        value,
       )
     }
   }
@@ -2448,7 +2453,12 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     let mut value: i64 = 0;
     let success = unsafe {
       abi::envoy_dynamic_module_callback_http_get_socket_option_int(
-        self.raw_ptr, level, name, state, direction, &mut value,
+        self.raw_ptr,
+        level,
+        name,
+        state,
+        direction,
+        &mut value,
       )
     };
     if success {
