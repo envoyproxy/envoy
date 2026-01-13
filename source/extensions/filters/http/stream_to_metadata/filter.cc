@@ -107,7 +107,7 @@ Http::FilterDataStatus Filter::encodeData(Buffer::Instance& data, bool end_strea
   }
 
   if (data_length > 0) {
-    buffer_.append(static_cast<const char*>(data.linearize(data_length)), data_length);
+    buffer_.append(data.toString());
     processBuffer(end_stream);
   }
 
@@ -151,6 +151,7 @@ void Filter::processBuffer(bool end_stream) {
     buffer_view = buffer_view.substr(next_event);
   }
 
+  // Keep only the unprocessed tail substring (remove processed bytes from front).
   buffer_.erase(0, buffer_.size() - buffer_view.size());
 }
 
@@ -179,16 +180,14 @@ bool Filter::processSseEvent(absl::string_view event) {
   }
 
   const auto& json_obj = result.value();
-  bool should_stop = false;
 
   for (size_t i = 0; i < config_->rules().size(); ++i) {
     if (applyRule(json_obj, i)) {
-      should_stop = true;
-      break;
+      return true;
     }
   }
 
-  return should_stop;
+  return false;
 }
 
 bool Filter::applyRule(const Json::ObjectSharedPtr& json_obj, size_t rule_index) {

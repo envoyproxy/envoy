@@ -108,18 +108,38 @@ INSTANTIATE_TEST_SUITE_P(
 TEST_P(StreamToMetadataIntegrationTest, BasicSseTokenExtraction) {
   initializeFilter();
   runTest(request_headers_, "", response_headers_, sse_response_body_);
+
+  // Verify stats
+  // - Events 1,2: only model_name matches (2 successes)
+  // - Event 3: both tokens and model_name match (2 successes)
+  // - Event 4: [DONE] is invalid JSON (1 invalid_json)
+  // Total: 4 successes, 1 invalid_json
+  EXPECT_EQ(4UL, test_server_->counter("stream_to_metadata.resp.success")->value());
+  EXPECT_EQ(0UL, test_server_->counter("stream_to_metadata.resp.mismatched_content_type")->value());
+  EXPECT_EQ(0UL, test_server_->counter("stream_to_metadata.resp.no_data_field")->value());
+  EXPECT_EQ(1UL, test_server_->counter("stream_to_metadata.resp.invalid_json")->value());
 }
 
 TEST_P(StreamToMetadataIntegrationTest, SseWithSmallChunks) {
   initializeFilter();
   // Test with very small chunks to ensure buffering works correctly
   runTest(request_headers_, "", response_headers_, sse_response_body_, 5);
+
+  EXPECT_EQ(4UL, test_server_->counter("stream_to_metadata.resp.success")->value());
+  EXPECT_EQ(0UL, test_server_->counter("stream_to_metadata.resp.mismatched_content_type")->value());
+  EXPECT_EQ(0UL, test_server_->counter("stream_to_metadata.resp.no_data_field")->value());
+  EXPECT_EQ(1UL, test_server_->counter("stream_to_metadata.resp.invalid_json")->value());
 }
 
 TEST_P(StreamToMetadataIntegrationTest, SseWithLargeChunks) {
   initializeFilter();
   // Test with large chunks
   runTest(request_headers_, "", response_headers_, sse_response_body_, 100);
+
+  EXPECT_EQ(4UL, test_server_->counter("stream_to_metadata.resp.success")->value());
+  EXPECT_EQ(0UL, test_server_->counter("stream_to_metadata.resp.mismatched_content_type")->value());
+  EXPECT_EQ(0UL, test_server_->counter("stream_to_metadata.resp.no_data_field")->value());
+  EXPECT_EQ(1UL, test_server_->counter("stream_to_metadata.resp.invalid_json")->value());
 }
 
 TEST_P(StreamToMetadataIntegrationTest, MismatchedContentType) {
@@ -128,6 +148,50 @@ TEST_P(StreamToMetadataIntegrationTest, MismatchedContentType) {
   initializeFilter();
   const std::string json_body = R"({"result": "not an SSE stream"})";
   runTest(request_headers_, "", json_headers, json_body);
+
+  // Content-type mismatch should not process the response
+  EXPECT_EQ(0UL, test_server_->counter("stream_to_metadata.resp.success")->value());
+  EXPECT_EQ(1UL, test_server_->counter("stream_to_metadata.resp.mismatched_content_type")->value());
+  EXPECT_EQ(0UL, test_server_->counter("stream_to_metadata.resp.no_data_field")->value());
+  EXPECT_EQ(0UL, test_server_->counter("stream_to_metadata.resp.invalid_json")->value());
+}
+
+TEST_P(StreamToMetadataIntegrationTest, VerifyMetadataValues) {
+  // Configure access log to capture and verify actual metadata values
+  config_helper_.prependFilter(filter_config_);
+  useAccessLog("%DYNAMIC_METADATA(envoy.lb)%");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers_);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+
+  // Send SSE response
+  upstream_request_->encodeHeaders(response_headers_, false);
+  Buffer::OwnedImpl buffer(sse_response_body_);
+  upstream_request_->encodeData(buffer, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+
+  // Cleanup
+  codec_client_->close();
+  ASSERT_TRUE(fake_upstream_connection_->close());
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+
+  // Verify metadata was extracted correctly
+  // The last matching event (event 3) has total_tokens: 30 and model: "gpt-4"
+  // These are the final values written to metadata (last wins)
+  std::string log = waitForAccessLog(access_log_name_);
+  EXPECT_THAT(log, testing::HasSubstr(R"("tokens":30)"));
+  EXPECT_THAT(log, testing::HasSubstr(R"("model_name":"gpt-4")"));
+
+  // Also verify stats
+  EXPECT_EQ(4UL, test_server_->counter("stream_to_metadata.resp.success")->value());
+  EXPECT_EQ(1UL, test_server_->counter("stream_to_metadata.resp.invalid_json")->value());
 }
 
 } // namespace
