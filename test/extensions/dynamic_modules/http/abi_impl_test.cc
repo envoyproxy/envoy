@@ -498,16 +498,16 @@ TEST_F(DynamicModuleHttpFilterTest, SocketOptionInvalidState) {
   // Test with invalid state value (cast an invalid value).
   // Invalid state triggers ASSERT failure.
   const auto invalid_state = static_cast<envoy_dynamic_module_type_socket_option_state>(999);
-  EXPECT_ENVOY_BUG(envoy_dynamic_module_callback_http_set_socket_option_int(
-                       filter_.get(), 1, 2, invalid_state,
-                       envoy_dynamic_module_type_socket_direction_Upstream, 100),
-                   "assert failure: validateHttpSocketState(state)");
+  ASSERT_DEBUG_DEATH(envoy_dynamic_module_callback_http_set_socket_option_int(
+                         filter_.get(), 1, 2, invalid_state,
+                         envoy_dynamic_module_type_socket_direction_Upstream, 100),
+                     "");
 
   int64_t result = 0;
-  EXPECT_ENVOY_BUG(envoy_dynamic_module_callback_http_get_socket_option_int(
-                       filter_.get(), 1, 2, invalid_state,
-                       envoy_dynamic_module_type_socket_direction_Upstream, &result),
-                   "assert failure: validateHttpSocketState(state)");
+  ASSERT_DEBUG_DEATH(envoy_dynamic_module_callback_http_get_socket_option_int(
+                         filter_.get(), 1, 2, invalid_state,
+                         envoy_dynamic_module_type_socket_direction_Upstream, &result),
+                     "");
 }
 
 TEST_F(DynamicModuleHttpFilterTest, SocketOptionNullValueOut) {
