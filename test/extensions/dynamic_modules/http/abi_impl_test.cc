@@ -496,14 +496,18 @@ TEST_F(DynamicModuleHttpFilterTest, GetSocketOptionBytesMissing) {
 
 TEST_F(DynamicModuleHttpFilterTest, SocketOptionInvalidState) {
   // Test with invalid state value (cast an invalid value).
+  // Invalid state triggers ASSERT failure.
   const auto invalid_state = static_cast<envoy_dynamic_module_type_socket_option_state>(999);
-  EXPECT_FALSE(envoy_dynamic_module_callback_http_set_socket_option_int(
-      filter_.get(), 1, 2, invalid_state, envoy_dynamic_module_type_socket_direction_Upstream, 100));
+  EXPECT_ENVOY_BUG(envoy_dynamic_module_callback_http_set_socket_option_int(
+                       filter_.get(), 1, 2, invalid_state,
+                       envoy_dynamic_module_type_socket_direction_Upstream, 100),
+                   "assert failure: validateHttpSocketState(state)");
 
   int64_t result = 0;
-  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_socket_option_int(
-      filter_.get(), 1, 2, invalid_state, envoy_dynamic_module_type_socket_direction_Upstream,
-      &result));
+  EXPECT_ENVOY_BUG(envoy_dynamic_module_callback_http_get_socket_option_int(
+                       filter_.get(), 1, 2, invalid_state,
+                       envoy_dynamic_module_type_socket_direction_Upstream, &result),
+                   "assert failure: validateHttpSocketState(state)");
 }
 
 TEST_F(DynamicModuleHttpFilterTest, SocketOptionNullValueOut) {
@@ -596,8 +600,7 @@ TEST_F(DynamicModuleHttpFilterTest, SocketOptionDirectionDifferentiation) {
 TEST_F(DynamicModuleHttpFilterTest, DownstreamSocketOptionNoConnection) {
   // Test that setting downstream socket option fails when there is no connection.
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_no_conn;
-  EXPECT_CALL(callbacks_no_conn, connection())
-      .WillRepeatedly(testing::Return(absl::nullopt));
+  EXPECT_CALL(callbacks_no_conn, connection()).WillRepeatedly(testing::Return(absl::nullopt));
   filter_->setDecoderFilterCallbacks(callbacks_no_conn);
 
   EXPECT_FALSE(envoy_dynamic_module_callback_http_set_socket_option_int(

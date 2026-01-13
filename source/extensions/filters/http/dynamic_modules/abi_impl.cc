@@ -1381,9 +1381,7 @@ bool envoy_dynamic_module_callback_http_set_socket_option_int(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, int64_t level, int64_t name,
     envoy_dynamic_module_type_socket_option_state state,
     envoy_dynamic_module_type_socket_direction direction, int64_t value) {
-  if (!validateHttpSocketState(state)) {
-    return false;
-  }
+  ASSERT(validateHttpSocketState(state));
   auto* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
   if (filter->decoder_callbacks_ == nullptr) {
     return false;
@@ -1423,7 +1421,8 @@ bool envoy_dynamic_module_callback_http_set_socket_option_bytes(
     envoy_dynamic_module_type_socket_option_state state,
     envoy_dynamic_module_type_socket_direction direction,
     envoy_dynamic_module_type_module_buffer value) {
-  if (!validateHttpSocketState(state) || value.ptr == nullptr) {
+  ASSERT(validateHttpSocketState(state));
+  if (value.ptr == nullptr) {
     return false;
   }
   auto* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
@@ -1466,7 +1465,8 @@ bool envoy_dynamic_module_callback_http_get_socket_option_int(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, int64_t level, int64_t name,
     envoy_dynamic_module_type_socket_option_state state,
     envoy_dynamic_module_type_socket_direction direction, int64_t* value_out) {
-  if (value_out == nullptr || !validateHttpSocketState(state)) {
+  ASSERT(validateHttpSocketState(state));
+  if (value_out == nullptr) {
     return false;
   }
   auto* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
@@ -1478,7 +1478,8 @@ bool envoy_dynamic_module_callback_http_get_socket_option_bytes(
     envoy_dynamic_module_type_socket_option_state state,
     envoy_dynamic_module_type_socket_direction direction,
     envoy_dynamic_module_type_envoy_buffer* value_out) {
-  if (value_out == nullptr || !validateHttpSocketState(state)) {
+  ASSERT(validateHttpSocketState(state));
+  if (value_out == nullptr) {
     return false;
   }
   auto* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
