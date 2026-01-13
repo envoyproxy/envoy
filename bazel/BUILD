@@ -27,6 +27,20 @@ sh_library(
     srcs = ["volatile_env.sh"],
 )
 
+# TODO(phlax): Cleanup once bzlmod migration is complete
+bool_flag(
+    name = "enable_bzlmod",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "bzlmod_mode",
+    flag_values = {
+        ":enable_bzlmod": "True",
+    },
+    visibility = ["//visibility:public"],
+)
+
 # Stamp derived from tree hash + dirty status if `BAZEL_VOLATILE_DIRTY`
 # is set, otherwise the git commit
 genrule(

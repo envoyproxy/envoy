@@ -1,5 +1,7 @@
 #include "test/test_common/environment.h"
 
+#include <sys/stat.h>
+
 #include <fstream>
 #include <iostream>
 #include <regex>
@@ -300,6 +302,33 @@ const std::string& TestEnvironment::temporaryDirectory() {
 
 std::string TestEnvironment::runfilesDirectory(const std::string& workspace) {
   RELEASE_ASSERT(runfiles_ != nullptr, "");
+  // TODO(phlax): Cleanup once bzlmod migration is complete
+  // In bzlmod mode, the workspace name is _main instead of envoy
+  // Try _main first for bzlmod, then envoy for WORKSPACE mode
+  std::vector<std::string> workspaces_to_try;
+  if (workspace == "envoy") {
+    // When looking for envoy workspace, try both _main (bzlmod) and envoy (WORKSPACE)
+    workspaces_to_try = {"_main", "envoy"};
+  } else {
+    // For other workspaces, just try the requested one
+    workspaces_to_try = {workspace};
+  }
+
+  for (const auto& ws : workspaces_to_try) {
+    auto path = runfiles_->Rlocation(ws);
+    if (!path.empty()) {
+      // Check if the directory exists
+      struct stat info;
+      if (stat(path.c_str(), &info) == 0 && S_ISDIR(info.st_mode)) {
+#ifdef WIN32
+        path = std::regex_replace(path, std::regex("\\\\"), "/");
+#endif
+        return path;
+      }
+    }
+  }
+
+  // Fallback: return the result for the requested workspace even if it doesn't exist
   auto path = runfiles_->Rlocation(workspace);
 #ifdef WIN32
   path = std::regex_replace(path, std::regex("\\\\"), "/");
@@ -309,6 +338,30 @@ std::string TestEnvironment::runfilesDirectory(const std::string& workspace) {
 
 std::string TestEnvironment::runfilesPath(const std::string& path, const std::string& workspace) {
   RELEASE_ASSERT(runfiles_ != nullptr, "");
+  // TODO(phlax): Cleanup once bzlmod migration is complete
+  // In bzlmod mode, the workspace name is _main instead of envoy
+  // Try _main first for bzlmod, then envoy for WORKSPACE mode
+  std::vector<std::string> workspaces_to_try;
+  if (workspace == "envoy") {
+    // When looking for envoy workspace, try both _main (bzlmod) and envoy (WORKSPACE)
+    workspaces_to_try = {"_main", "envoy"};
+  } else {
+    // For other workspaces, just try the requested one
+    workspaces_to_try = {workspace};
+  }
+
+  for (const auto& ws : workspaces_to_try) {
+    std::string result = runfiles_->Rlocation(absl::StrCat(ws, "/", path));
+    if (!result.empty()) {
+      // Check if the file exists
+      struct stat info;
+      if (stat(result.c_str(), &info) == 0) {
+        return result;
+      }
+    }
+  }
+
+  // Fallback: return the result for the requested workspace even if it doesn't exist
   return runfiles_->Rlocation(absl::StrCat(workspace, "/", path));
 }
 

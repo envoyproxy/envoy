@@ -2,11 +2,22 @@
 
 set -e
 
+# TODO(phlax): Cleanup once bzlmod migration is complete
+# Detect workspace directory (bzlmod vs WORKSPACE mode)
+if [[ -d "${TEST_SRCDIR}/_main" ]]; then
+    ENVOY_SRCDIR="${TEST_SRCDIR}/_main"
+elif [[ -d "${TEST_SRCDIR}/envoy" ]]; then
+    ENVOY_SRCDIR="${TEST_SRCDIR}/envoy"
+else
+    echo "ERROR: Could not find workspace directory in ${TEST_SRCDIR}"
+    exit 1
+fi
+
 # Router_check_tool binary path
-PATH_BIN="${TEST_SRCDIR}/envoy"/test/tools/router_check/router_check_tool
+PATH_BIN="${ENVOY_SRCDIR}"/test/tools/router_check/router_check_tool
 
 # Config json path
-PATH_CONFIG="${TEST_SRCDIR}/envoy"/test/tools/router_check/test/config
+PATH_CONFIG="${ENVOY_SRCDIR}"/test/tools/router_check/test/config
 
 TESTS=("ContentType" "ClusterHeader" "DirectResponse" "HeaderMatchedRouting" "Redirect" "Redirect2" "Redirect3" "Redirect4" "Runtime" "TestRoutes" "Weighted")
 
