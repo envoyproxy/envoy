@@ -4,6 +4,8 @@
 #include "envoy/extensions/transport_sockets/tls/cert_selectors/on_demand_secret/v3/config.pb.h"
 
 #include "source/common/config/utility.h"
+#include "source/common/network/transport_socket_options_impl.h"
+#include "source/common/router/string_accessor_impl.h"
 #include "source/common/tls/context_impl.h"
 #include "source/extensions/transport_sockets/tls/cert_selectors/on_demand/config.h"
 
@@ -123,6 +125,15 @@ TEST(FilterStateMapper, Derivation) {
   bssl::UniquePtr<SSL_CTX> ctx(SSL_CTX_new(TLS_method()));
   bssl::UniquePtr<SSL> ssl(SSL_new(ctx.get()));
   EXPECT_EQ("test", mapper->deriveFromServerHello(*ssl, nullptr));
+  auto filter_state_object = std::make_shared<Router::StringAccessorImpl>("new_value");
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
+  filter_state.setData("envoy.tls.certificate_mappers.on_demand_secret", filter_state_object,
+                       StreamInfo::FilterState::StateType::ReadOnly,
+                       StreamInfo::FilterState::LifeSpan::Connection,
+                       StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
+  auto transport_socket_options =
+      Network::TransportSocketOptionsUtility::fromFilterState(filter_state);
+  EXPECT_EQ("new_value", mapper->deriveFromServerHello(*ssl, transport_socket_options));
   SSL_CLIENT_HELLO hello;
   EXPECT_EQ("test", mapper->deriveFromClientHello(hello));
 }

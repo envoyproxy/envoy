@@ -15,6 +15,7 @@ envoy_cc_extension(
     external_deps = ["ssl"],
     deps = [
         "//envoy/registry",
+        "//envoy/router:string_accessor_interface",
         "//envoy/server:factory_context_interface",
         "//envoy/ssl:handshaker_interface",
         "@envoy_api//envoy/extensions/transport_sockets/tls/cert_mappers/filter_state_override/v3:pkg_cc_proto",

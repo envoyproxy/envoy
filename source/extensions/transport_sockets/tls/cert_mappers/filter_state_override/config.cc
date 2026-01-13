@@ -1,5 +1,7 @@
 #include "source/extensions/transport_sockets/tls/cert_mappers/filter_state_override/config.h"
 
+#include "envoy/router/string_accessor.h"
+
 #include "openssl/ssl.h"
 
 namespace Envoy {
@@ -18,11 +20,12 @@ public:
                                     const Network::TransportSocketOptionsConstSharedPtr& options) {
     if (options) {
       for (const auto& obj : options->downstreamSharedFilterStateObjects()) {
-        if (obj.name_ == "envoy.network.on_demand_secret") {
-          auto value = obj.data_->serializeAsString();
+        if (obj.name_ == "envoy.tls.certificate_mappers.on_demand_secret") {
+          auto value = dynamic_cast<const Router::StringAccessor*>(obj.data_.get());
           if (value) {
-            return *value;
+            return std::string(value->asString());
           }
+          break;
         }
       }
     }

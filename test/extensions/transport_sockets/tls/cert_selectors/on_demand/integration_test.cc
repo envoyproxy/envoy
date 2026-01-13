@@ -88,7 +88,7 @@ public:
           typed_config:
             "@type": type.googleapis.com/envoy.extensions.filters.network.set_filter_state.v3.Config
             on_new_connection:
-            - object_key: envoy.network.on_demand_secret
+            - object_key: envoy.tls.certificate_mappers.on_demand_secret
               factory_key: envoy.string
               format_string:
                 text_format_source:

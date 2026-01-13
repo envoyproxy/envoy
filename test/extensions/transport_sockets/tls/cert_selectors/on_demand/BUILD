@@ -20,6 +20,8 @@ envoy_extension_cc_test(
     extension_names = ["envoy.tls.certificate_selectors.on_demand_secret"],
     deps = [
         "//source/common/config:utility_lib",
+        "//source/common/network:transport_socket_options_lib",
+        "//source/common/router:string_accessor_lib",
         "//source/common/tls:context_lib",
         "//source/extensions/transport_sockets/tls/cert_mappers/filter_state_override:config",
         "//source/extensions/transport_sockets/tls/cert_mappers/sni:config",

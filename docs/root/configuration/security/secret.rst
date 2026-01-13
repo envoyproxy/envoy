@@ -296,7 +296,8 @@ when resuming the handshake.
 
 On-demand SDS should be used with DELTA_GRPC to manage the deletion of the secrets from the data
 plane. A resource removal sent via the xDS response will cancel the data plane subscription for the
-specific secret name.
+specific secret name. When using the regular GRPC xDS protocol, the subscription for each mapped
+secret remains active until the removal of the parent resource (listener or cluster).
 
 In addition to the standard SDS `subscription statistics <subscription_statistics>`, the following
 statistics are produced by the on-demand certificate extension. For downstream listeners, they are
@@ -408,7 +409,7 @@ the downstream filter chain, e.g. using the following filter configuration:
   typed_config:
     "@type": type.googleapis.com/envoy.extensions.filters.network.set_filter_state.v3.Config
     on_new_connection:
-    - object_key: envoy.network.on_demand_secret
+    - object_key: envoy.tls.certificate_mappers.on_demand_secret
       factory_key: envoy.string
       format_string:
         text_format_source:
