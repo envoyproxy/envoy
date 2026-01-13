@@ -2170,6 +2170,29 @@ TEST_F(ConnectionManagerUtilityTest, SanitizePathRelativePAth) {
   EXPECT_EQ(header_map.getPathValue(), "/abc");
 }
 
+// Verify that %2E is decoded as the . character before normalization
+TEST_F(ConnectionManagerUtilityTest, SanitizePathDotsDecoded) {
+  ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(true));
+  TestRequestHeaderMapImpl original_headers;
+  original_headers.setPath("/xyz/%2e./abc");
+
+  TestRequestHeaderMapImpl header_map(original_headers);
+  ConnectionManagerUtility::maybeNormalizePath(header_map, config_);
+  EXPECT_EQ(header_map.getPathValue(), "/abc");
+}
+
+// Verify that %25 is NOT decoded as the % character per
+// https://datatracker.ietf.org/doc/html/rfc3986#section-2.4
+TEST_F(ConnectionManagerUtilityTest, EncodedPercentIsNotDecoded) {
+  ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(true));
+  TestRequestHeaderMapImpl original_headers;
+  original_headers.setPath("/xyz/%252e./abc");
+
+  TestRequestHeaderMapImpl header_map(original_headers);
+  ConnectionManagerUtility::maybeNormalizePath(header_map, config_);
+  EXPECT_EQ(header_map.getPathValue(), "/xyz/%252e./abc");
+}
+
 // maybeNormalizePath() does not touch adjacent slashes by default.
 TEST_F(ConnectionManagerUtilityTest, MergeSlashesDefaultOff) {
   ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(true));

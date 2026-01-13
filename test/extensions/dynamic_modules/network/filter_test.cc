@@ -3,6 +3,7 @@
 #include "source/extensions/filters/network/dynamic_modules/filter.h"
 
 #include "test/extensions/dynamic_modules/util.h"
+#include "test/mocks/event/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/upstream/cluster_manager.h"
@@ -21,14 +22,15 @@ public:
         newDynamicModule(testSharedObjectPath("network_no_op", "c"), false, context);
     EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
-    auto filter_config_or_status =
-        newDynamicModuleNetworkFilterConfig("test_filter", "", std::move(dynamic_module.value()),
-                                            cluster_manager_, *stats_.rootScope());
+    auto filter_config_or_status = newDynamicModuleNetworkFilterConfig(
+        "test_filter", "", std::move(dynamic_module.value()), cluster_manager_, *stats_.rootScope(),
+        main_thread_dispatcher_);
     EXPECT_TRUE(filter_config_or_status.ok()) << filter_config_or_status.status().message();
     filter_config_ = filter_config_or_status.value();
   }
 
   Stats::IsolatedStoreImpl stats_;
+  NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   DynamicModuleNetworkFilterConfigSharedPtr filter_config_;
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
 };
@@ -250,9 +252,10 @@ TEST(DynamicModuleNetworkFilterConfigTest, ConfigInitialization) {
 
   Stats::IsolatedStoreImpl stats;
   NiceMock<Upstream::MockClusterManager> cluster_manager;
+  NiceMock<Event::MockDispatcher> main_thread_dispatcher;
   auto filter_config_or_status = newDynamicModuleNetworkFilterConfig(
       "test_filter", "some_config", std::move(dynamic_module.value()), cluster_manager,
-      *stats.rootScope());
+      *stats.rootScope(), main_thread_dispatcher);
   EXPECT_TRUE(filter_config_or_status.ok());
 
   auto config = filter_config_or_status.value();
@@ -274,8 +277,10 @@ TEST(DynamicModuleNetworkFilterConfigTest, MissingSymbols) {
 
   Stats::IsolatedStoreImpl stats;
   NiceMock<Upstream::MockClusterManager> cluster_manager;
+  NiceMock<Event::MockDispatcher> main_thread_dispatcher;
   auto filter_config_or_status = newDynamicModuleNetworkFilterConfig(
-      "test_filter", "", std::move(dynamic_module.value()), cluster_manager, *stats.rootScope());
+      "test_filter", "", std::move(dynamic_module.value()), cluster_manager, *stats.rootScope(),
+      main_thread_dispatcher);
   EXPECT_FALSE(filter_config_or_status.ok());
 }
 
@@ -288,8 +293,10 @@ TEST(DynamicModuleNetworkFilterConfigTest, ConfigInitializationFailure) {
 
   Stats::IsolatedStoreImpl stats;
   NiceMock<Upstream::MockClusterManager> cluster_manager;
+  NiceMock<Event::MockDispatcher> main_thread_dispatcher;
   auto filter_config_or_status = newDynamicModuleNetworkFilterConfig(
-      "test_filter", "", std::move(dynamic_module.value()), cluster_manager, *stats.rootScope());
+      "test_filter", "", std::move(dynamic_module.value()), cluster_manager, *stats.rootScope(),
+      main_thread_dispatcher);
   EXPECT_FALSE(filter_config_or_status.ok());
   EXPECT_THAT(filter_config_or_status.status().message(),
               testing::HasSubstr("Failed to initialize"));
@@ -303,8 +310,10 @@ TEST(DynamicModuleNetworkFilterConfigTest, StopIterationStatus) {
 
   Stats::IsolatedStoreImpl stats;
   NiceMock<Upstream::MockClusterManager> cluster_manager;
+  NiceMock<Event::MockDispatcher> main_thread_dispatcher;
   auto filter_config_or_status = newDynamicModuleNetworkFilterConfig(
-      "test_filter", "", std::move(dynamic_module.value()), cluster_manager, *stats.rootScope());
+      "test_filter", "", std::move(dynamic_module.value()), cluster_manager, *stats.rootScope(),
+      main_thread_dispatcher);
   EXPECT_TRUE(filter_config_or_status.ok());
   auto config = filter_config_or_status.value();
 

@@ -1441,6 +1441,7 @@ uint32_t envoy_dynamic_module_callback_server_factory_context_get_concurrency(
   return context->options().concurrency();
 }
 }
+} // extern "C"
 } // namespace HttpFilters
 } // namespace DynamicModules
 } // namespace Extensions
