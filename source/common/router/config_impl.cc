@@ -1998,8 +1998,8 @@ const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::RequestHeaderMa
   // TODO (@rshriram) Match Origin header in WebSocket
   // request with VHost, using wildcard match
   // Conditionally lower-case the host header based on vhds_case_insensitive_match flag.
-  const std::string host =
-      vhds_case_insensitive_match_ ? absl::AsciiStrToLower(host_header_value) : std::string(host_header_value);
+  const std::string host = vhds_case_insensitive_match_ ? absl::AsciiStrToLower(host_header_value)
+                                                        : std::string(host_header_value);
   const auto iter = virtual_hosts_.find(host);
   if (iter != virtual_hosts_.end()) {
     return iter->second.get();
