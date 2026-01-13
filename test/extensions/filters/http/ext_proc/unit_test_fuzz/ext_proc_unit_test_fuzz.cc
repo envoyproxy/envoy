@@ -29,8 +29,8 @@ public:
     ON_CALL(encoder_callbacks_, addEncodedTrailers()).WillByDefault(ReturnRef(response_trailers_));
     ON_CALL(decoder_callbacks_, decodingBuffer()).WillByDefault(Return(&buffer_));
     ON_CALL(encoder_callbacks_, encodingBuffer()).WillByDefault(Return(&buffer_));
-    ON_CALL(decoder_callbacks_, decoderBufferLimit()).WillByDefault(Return(1024));
-    ON_CALL(encoder_callbacks_, encoderBufferLimit()).WillByDefault(Return(1024));
+    ON_CALL(decoder_callbacks_, bufferLimit()).WillByDefault(Return(1024));
+    ON_CALL(encoder_callbacks_, bufferLimit()).WillByDefault(Return(1024));
     ON_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, _))
         .WillByDefault(
             Invoke([&](Buffer::Instance& data, bool) -> void { data.drain(data.length()); }));

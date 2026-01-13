@@ -33,6 +33,7 @@ envoy_cc_library(
         "//envoy/http:header_map_interface",
         "//envoy/stats:stats_macros",
         "//source/common/buffer:buffer_lib",
+        "//source/common/http:header_map_lib",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
         "//source/common/runtime:runtime_features_lib",

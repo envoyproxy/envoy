@@ -199,7 +199,7 @@ public:
                ShadowWriterPtr&& shadow_writer, bool emit_dynamic_stats, bool start_child_span,
                bool suppress_envoy_headers, bool respect_expected_rq_timeout,
                bool suppress_grpc_request_failure_code_stats,
-               bool flush_upstream_log_on_upstream_stream,
+               bool flush_upstream_log_on_upstream_stream, bool reject_connect_request_early_data,
                const Protobuf::RepeatedPtrField<std::string>& strict_check_headers,
                TimeSource& time_source, Http::Context& http_context,
                Router::Context& router_context)
@@ -211,6 +211,7 @@ public:
         respect_expected_rq_timeout_(respect_expected_rq_timeout),
         suppress_grpc_request_failure_code_stats_(suppress_grpc_request_failure_code_stats),
         flush_upstream_log_on_upstream_stream_(flush_upstream_log_on_upstream_stream),
+        reject_connect_request_early_data_(reject_connect_request_early_data),
         http_context_(http_context), zone_name_(factory_context.localInfo().zoneStatName()),
         shadow_writer_(std::move(shadow_writer)), time_source_(time_source) {
     if (!strict_check_headers.empty()) {
@@ -233,21 +234,19 @@ protected:
                absl::Status& creation_status);
 
 public:
-  bool createFilterChain(
-      Http::FilterChainManager& manager,
-      const Http::FilterChainOptions& options = Http::EmptyFilterChainOptions{}) const override {
+  bool createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) const override {
     // Currently there is no default filter chain, so only_create_if_configured true doesn't make
     // sense.
     if (upstream_http_filter_factories_.empty()) {
       return false;
     }
-    Http::FilterChainUtility::createFilterChainForFactories(manager, options,
+    Http::FilterChainUtility::createFilterChainForFactories(callbacks,
                                                             upstream_http_filter_factories_);
     return true;
   }
 
-  bool createUpgradeFilterChain(absl::string_view, const UpgradeMap*, Http::FilterChainManager&,
-                                const Http::FilterChainOptions&) const override {
+  bool createUpgradeFilterChain(absl::string_view, const UpgradeMap*,
+                                Http::FilterChainFactoryCallbacks&) const override {
     // Upgrade filter chains not yet supported for upstream HTTP filters.
     return false;
   }
@@ -274,6 +273,7 @@ public:
   // TODO(xyu-stripe): Make this a bitset to keep cluster memory footprint down.
   HeaderVectorPtr strict_check_headers_;
   const bool flush_upstream_log_on_upstream_stream_;
+  const bool reject_connect_request_early_data_;
   absl::optional<std::chrono::milliseconds> upstream_log_flush_interval_;
   std::list<AccessLog::InstanceSharedPtr> upstream_logs_;
   Http::Context& http_context_;
@@ -304,9 +304,7 @@ public:
       : config_(config), stats_(stats),
         allow_multiplexed_upstream_half_close_(Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.allow_multiplexed_upstream_half_close")),
-        reject_early_connect_data_enabled_(
-            Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reject_early_connect_data")) {
-  }
+        reject_early_connect_data_enabled_(config->reject_connect_request_early_data_) {}
 
   ~Filter() override;
 
