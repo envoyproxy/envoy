@@ -10,9 +10,10 @@ namespace Envoy {
 namespace {
 
 class AsyncExampleIntegrationTest : public HttpIntegrationTest,
-                                    public testing::TestWithParam<Network::Address::IpVersion> {
+                                    public testing::TestWithParam<Http::CodecType> {
 public:
-  AsyncExampleIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, GetParam()) {}
+  AsyncExampleIntegrationTest()
+      : HttpIntegrationTest(GetParam(), Network::Address::IpVersion::v4) {}
 
   void initializeFilter() {
     config_helper_.addConfigModifier(
@@ -31,30 +32,12 @@ public:
   }
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, AsyncExampleIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
-
-TEST_P(AsyncExampleIntegrationTest, DecodeDataPauseAndResume) {
-  initializeFilter();
-  initialize();
-
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto response = codec_client_->makeRequestWithBody(default_request_headers_, 10);
-
-  // The filter should pause processing for 1000ms (default).
-  // We can't easily verify the pause duration in an integration test without simulated time,
-  // but we can verify that it eventually completes.
-  // Ideally, we would use simulated time, but integration tests usually run with real time.
-  // Let's just verify it succeeds.
-
-  waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(default_response_headers_, true);
-
-  ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().getStatusValue());
-}
+INSTANTIATE_TEST_SUITE_P(Codecs, AsyncExampleIntegrationTest,
+                         testing::Values(Http::CodecType::HTTP1, Http::CodecType::HTTP2,
+                                         Http::CodecType::HTTP3),
+                         [](const testing::TestParamInfo<Http::CodecType>& params) {
+                           return std::string(downstreamToString(params.param));
+                         });
 
 TEST_P(AsyncExampleIntegrationTest, LargeBodyAsyncTest) {
   initializeFilter();

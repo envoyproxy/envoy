@@ -45,7 +45,10 @@ Http::FilterDataStatus AsyncExampleFilter::decodeData(Buffer::Instance& data, bo
   ENVOY_LOG(error, "decodeData {}", dataDebugString(data));
 
   if (delay_timer_ && !delay_timer_->enabled()) {
-    ENVOY_LOG(error, "Starting async delay for {} ms", config_->delay().count());
+    ENVOY_LOG(
+        error,
+        "Starting async delay for {} ms and calling onDecoderFilterAboveWriteBufferHighWatermark",
+        config_->delay().count());
     async_complete_ = false;
     decoder_callbacks_->onDecoderFilterAboveWriteBufferHighWatermark();
     delay_timer_->enableTimer(config_->delay());
@@ -69,7 +72,8 @@ void AsyncExampleFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCall
 }
 
 void AsyncExampleFilter::onTimer() {
-  ENVOY_LOG(error, "Async delay finished, resuming decoding ...");
+  ENVOY_LOG(error, "Async delay finished, calling onDecoderFilterBelowWriteBufferLowWatermark to "
+                   "continue decoding ...");
   async_complete_ = true;
   decoder_callbacks_->onDecoderFilterBelowWriteBufferLowWatermark();
   decoder_callbacks_->continueDecoding();
