@@ -220,7 +220,8 @@ public:
   void SetUp() override {
     NiceMock<Server::Configuration::MockServerFactoryContext> context;
     auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
-        Extensions::DynamicModules::testSharedObjectPath("udp_stop_iteration", "c"), false, context);
+        Extensions::DynamicModules::testSharedObjectPath("udp_stop_iteration", "c"), false,
+        context);
     EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
     envoy::extensions::filters::udp::dynamic_modules::v3::DynamicModuleUdpListenerFilter
@@ -252,7 +253,8 @@ TEST(DynamicModuleUdpListenerFilterConfigErrorTest, MissingConfigDestroy) {
   Stats::IsolatedStoreImpl stats;
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
-      Extensions::DynamicModules::testSharedObjectPath("udp_no_config_destroy", "c"), false, context);
+      Extensions::DynamicModules::testSharedObjectPath("udp_no_config_destroy", "c"), false,
+      context);
   EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
   envoy::extensions::filters::udp::dynamic_modules::v3::DynamicModuleUdpListenerFilter proto_config;
@@ -310,7 +312,8 @@ TEST(DynamicModuleUdpListenerFilterConfigErrorTest, MissingFilterDestroy) {
   Stats::IsolatedStoreImpl stats;
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
-      Extensions::DynamicModules::testSharedObjectPath("udp_no_filter_destroy", "c"), false, context);
+      Extensions::DynamicModules::testSharedObjectPath("udp_no_filter_destroy", "c"), false,
+      context);
   EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
   envoy::extensions::filters::udp::dynamic_modules::v3::DynamicModuleUdpListenerFilter proto_config;

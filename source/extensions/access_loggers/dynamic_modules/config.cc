@@ -21,7 +21,8 @@ AccessLog::InstanceSharedPtr DynamicModuleAccessLogFactory::createAccessLogInsta
 
   const auto& module_config = proto_config.dynamic_module_config();
   auto dynamic_module_or_error = Extensions::DynamicModules::newDynamicModuleByName(
-      module_config.name(), module_config.do_not_close(), context.serverFactoryContext(), module_config.load_globally());
+      module_config.name(), module_config.do_not_close(), context.serverFactoryContext(),
+      module_config.load_globally());
 
   if (!dynamic_module_or_error.ok()) {
     throw EnvoyException("Failed to load dynamic module: " +
