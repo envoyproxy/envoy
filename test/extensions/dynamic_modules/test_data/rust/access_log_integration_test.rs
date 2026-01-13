@@ -15,7 +15,11 @@ static LOG_COUNT: AtomicU32 = AtomicU32::new(0);
 /// Global counter for flush calls.
 static FLUSH_COUNT: AtomicU32 = AtomicU32::new(0);
 
-fn init() -> bool {
+fn init(
+  server_factory_context: abi::envoy_dynamic_module_type_server_factory_context_envoy_ptr,
+) -> bool {
+  let concurrency = unsafe { get_server_concurrency(server_factory_context) };
+  assert_eq!(concurrency, 1);
   true
 }
 

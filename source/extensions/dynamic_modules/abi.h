@@ -562,7 +562,6 @@ typedef void* envoy_dynamic_module_type_http_filter_scheduler_module_ptr;
  */
 typedef void* envoy_dynamic_module_type_http_filter_config_scheduler_module_ptr;
 
-
 typedef enum envoy_dynamic_module_type_http_body_type {
   envoy_dynamic_module_type_http_body_type_ReceivedRequestBody,
   envoy_dynamic_module_type_http_body_type_BufferedRequestBody,
@@ -1941,7 +1940,6 @@ uint32_t envoy_dynamic_module_callback_http_filter_get_worker_index(
  */
 uint32_t envoy_dynamic_module_callback_server_factory_context_get_concurrency(
     envoy_dynamic_module_type_server_factory_context_envoy_ptr server_factory_context_envoy_ptr);
-
 
 // =============================================================================
 // ============================= Network Filter ================================

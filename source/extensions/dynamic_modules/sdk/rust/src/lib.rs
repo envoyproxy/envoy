@@ -3091,10 +3091,12 @@ impl From<envoy_dynamic_module_type_metrics_result>
 macro_rules! declare_network_filter_init_functions {
   ($f:ident, $new_network_filter_config_fn:expr) => {
     #[no_mangle]
-    pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
+    pub extern "C" fn envoy_dynamic_module_on_program_init(
+      server_factory_context_ptr: abi::envoy_dynamic_module_type_server_factory_context_envoy_ptr,
+    ) -> *const ::std::os::raw::c_char {
       envoy_proxy_dynamic_modules_rust_sdk::NEW_NETWORK_FILTER_CONFIG_FUNCTION
         .get_or_init(|| $new_network_filter_config_fn);
-      if ($f()) {
+      if ($f(server_factory_context_ptr)) {
         envoy_proxy_dynamic_modules_rust_sdk::abi::kAbiVersion.as_ptr()
           as *const ::std::os::raw::c_char
       } else {
@@ -3124,7 +3126,9 @@ macro_rules! declare_network_filter_init_functions {
 ///
 /// declare_all_init_functions!(my_program_init, my_new_http_filter_config_fn, my_new_network_filter_config_fn);
 ///
-/// fn my_program_init() -> bool {
+/// fn my_program_init(
+///   server_factory_context_ptr: abi::envoy_dynamic_module_type_server_factory_context_envoy_ptr,
+/// ) -> bool {
 ///   true
 /// }
 ///
@@ -4625,10 +4629,12 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_network_filter_http_callout_don
 macro_rules! declare_listener_filter_init_functions {
   ($f:ident, $new_listener_filter_config_fn:expr) => {
     #[no_mangle]
-    pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
+    pub extern "C" fn envoy_dynamic_module_on_program_init(
+      server_factory_context_ptr: abi::envoy_dynamic_module_type_server_factory_context_envoy_ptr,
+    ) -> *const ::std::os::raw::c_char {
       envoy_proxy_dynamic_modules_rust_sdk::NEW_LISTENER_FILTER_CONFIG_FUNCTION
         .get_or_init(|| $new_listener_filter_config_fn);
-      if ($f()) {
+      if ($f(server_factory_context_ptr)) {
         envoy_proxy_dynamic_modules_rust_sdk::abi::kAbiVersion.as_ptr()
           as *const ::std::os::raw::c_char
       } else {
@@ -5518,10 +5524,12 @@ pub extern "C" fn envoy_dynamic_module_on_listener_filter_config_scheduled(
 macro_rules! declare_udp_listener_filter_init_functions {
   ($f:ident, $new_udp_listener_filter_config_fn:expr) => {
     #[no_mangle]
-    pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
+    pub extern "C" fn envoy_dynamic_module_on_program_init(
+      server_factory_context_ptr: abi::envoy_dynamic_module_type_server_factory_context_envoy_ptr,
+    ) -> *const ::std::os::raw::c_char {
       envoy_proxy_dynamic_modules_rust_sdk::NEW_UDP_LISTENER_FILTER_CONFIG_FUNCTION
         .get_or_init(|| $new_udp_listener_filter_config_fn);
-      if ($f()) {
+      if ($f(server_factory_context_ptr)) {
         envoy_proxy_dynamic_modules_rust_sdk::abi::kAbiVersion.as_ptr()
           as *const ::std::os::raw::c_char
       } else {
