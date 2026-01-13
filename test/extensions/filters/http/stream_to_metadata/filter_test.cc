@@ -1361,6 +1361,79 @@ TEST_F(StreamToMetadataFilterTest, OnErrorPriorityOverOnMissing) {
   EXPECT_EQ(findCounter("stream_to_metadata.resp.selector_not_found"), 1);
 }
 
+TEST_F(StreamToMetadataFilterTest, TrailersFinalizesRules) {
+  // Create config programmatically to ensure on_missing value is set correctly
+  envoy::extensions::filters::http::stream_to_metadata::v3::StreamToMetadata proto_config;
+  auto* rules = proto_config.mutable_response_rules();
+  rules->set_format(envoy::extensions::filters::http::stream_to_metadata::v3::StreamToMetadata::
+                        SERVER_SENT_EVENTS);
+
+  auto* rule = rules->add_rules();
+  rule->mutable_selector()->mutable_json_path()->add_path("usage");
+  rule->mutable_selector()->mutable_json_path()->add_path("total_tokens");
+
+  auto* on_missing = rule->add_on_missing();
+  on_missing->set_metadata_namespace("envoy.lb");
+  on_missing->set_key("tokens");
+  on_missing->mutable_value()->set_number_value(-1);
+
+  config_ = std::make_shared<FilterConfig>(proto_config, *stats_store_.rootScope());
+  filter_ = std::make_unique<Filter>(config_);
+  filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+  ON_CALL(encoder_callbacks_, streamInfo()).WillByDefault(ReturnRef(stream_info_));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
+
+  // Send data with end_stream=false (trailers will follow)
+  addEncodeDataChunks(std::string("data: {\"model\": \"gpt-4\"}") + std::string(delimiter_), false);
+
+  // At this point, on_missing should NOT be executed yet
+  auto metadata_before = getMetadata("envoy.lb", "tokens");
+  EXPECT_EQ(metadata_before.kind_case(), 0);
+
+  // Send trailers
+  Http::TestResponseTrailerMapImpl trailers{{"x-test-trailer", "value"}};
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(trailers));
+
+  // After trailers, on_missing should have been executed
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.selector_not_found"), 1);
+  auto metadata_after = getMetadata("envoy.lb", "tokens");
+  EXPECT_NE(metadata_after.kind_case(), 0);
+  EXPECT_EQ(metadata_after.number_value(), -1);
+}
+
+TEST_F(StreamToMetadataFilterTest, TrailersWithContentTypeMismatch) {
+  const std::string config = R"EOF(
+  response_rules:
+    format: SERVER_SENT_EVENTS
+    rules:
+      - selector:
+          json_path:
+            path: ["usage", "total_tokens"]
+        on_error:
+          - metadata_namespace: "envoy.lb"
+            key: "tokens"
+            value:
+              number_value: 0
+  )EOF";
+
+  setupFilter(config);
+  Http::TestResponseHeaderMapImpl wrong_headers{{":status", "200"},
+                                                {"content-type", "application/json"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(wrong_headers, false));
+
+  // Send some data
+  addEncodeDataChunks("{\"some\": \"json\"}", false);
+
+  // Send trailers
+  Http::TestResponseTrailerMapImpl trailers{{"x-test-trailer", "value"}};
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(trailers));
+
+  // Should execute on_error due to content-type mismatch
+  auto metadata = getMetadata("envoy.lb", "tokens");
+  EXPECT_EQ(metadata.number_value(), 0);
+  EXPECT_EQ(findCounter("stream_to_metadata.resp.mismatched_content_type"), 1);
+}
+
 } // namespace
 } // namespace StreamToMetadata
 } // namespace HttpFilters

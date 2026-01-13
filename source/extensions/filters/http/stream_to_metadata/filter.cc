@@ -119,6 +119,20 @@ Http::FilterDataStatus Filter::encodeData(Buffer::Instance& data, bool end_strea
   return Http::FilterDataStatus::Continue;
 }
 
+Http::FilterTrailersStatus Filter::encodeTrailers(Http::ResponseTrailerMap&) {
+  // Finalize rules if not already done.
+  if (!processing_complete_) {
+    if (!content_type_matched_) {
+      // Mark all rules as having an error (content-type mismatch)
+      for (auto& state : rule_states_) {
+        state.has_error_occurred = true;
+      }
+    }
+    finalizeRules();
+  }
+  return Http::FilterTrailersStatus::Continue;
+}
+
 void Filter::processBuffer(bool end_stream) {
   absl::string_view buffer_view(buffer_);
 
