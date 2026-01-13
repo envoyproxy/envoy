@@ -51,6 +51,9 @@ enum UpstreamConnectMode {
   // and negotiated parameters, which can be used for routing decisions or passed as metadata
   // to the upstream.
   //
+  // This mode requires ``max_early_data_bytes`` to be set. Setting it to zero disables
+  // early data buffering and provides zero-memory-overhead behavior.
+  //
   // .. note::
   //   This mode is only effective when the downstream connection uses TLS. For non-TLS
   //   connections, it behaves the same as ``IMMEDIATE``.

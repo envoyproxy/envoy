@@ -2741,6 +2741,7 @@ TEST(TcpProxyConfigTest, UpstreamConnectModeOnDownstreamTlsHandshakeConfig) {
     stat_prefix: name
     cluster: fake_cluster
     upstream_connect_mode: ON_DOWNSTREAM_TLS_HANDSHAKE
+    max_early_data_bytes: 0
   )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
@@ -2751,6 +2752,8 @@ TEST(TcpProxyConfigTest, UpstreamConnectModeOnDownstreamTlsHandshakeConfig) {
 
   EXPECT_EQ(config.upstreamConnectMode(),
             envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_TLS_HANDSHAKE);
+  EXPECT_TRUE(config.maxEarlyDataBytes().has_value());
+  EXPECT_EQ(config.maxEarlyDataBytes().value(), 0);
 }
 
 TEST(TcpProxyConfigTest, UpstreamConnectModeDefaultConfig) {
@@ -2807,7 +2810,44 @@ TEST(TcpProxyConfigTest, UpstreamConnectModeOnDownstreamDataRequiresEarlyDataByt
   // Should throw exception because max_early_data_bytes is not set.
   EXPECT_THROW_WITH_MESSAGE(
       Config config(tcp_proxy, factory_context), EnvoyException,
-      "max_early_data_bytes must be set when upstream_connect_mode is ON_DOWNSTREAM_DATA");
+      "max_early_data_bytes must be set when upstream_connect_mode is not IMMEDIATE");
+}
+
+// Test that ON_DOWNSTREAM_TLS_HANDSHAKE mode requires max_early_data_bytes.
+TEST(TcpProxyConfigTest, UpstreamConnectModeOnDownstreamTlsHandshakeRequiresEarlyDataBytes) {
+  const std::string yaml = R"EOF(
+    stat_prefix: name
+    cluster: fake_cluster
+    upstream_connect_mode: ON_DOWNSTREAM_TLS_HANDSHAKE
+  )EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
+  TestUtility::loadFromYamlAndValidate(yaml, tcp_proxy);
+
+  // Should throw exception because max_early_data_bytes is not set.
+  EXPECT_THROW_WITH_MESSAGE(
+      Config config(tcp_proxy, factory_context), EnvoyException,
+      "max_early_data_bytes must be set when upstream_connect_mode is not IMMEDIATE");
+}
+
+// Test that max_early_data_bytes can be set to zero for ON_DOWNSTREAM_TLS_HANDSHAKE.
+TEST(TcpProxyConfigTest, UpstreamConnectModeOnDownstreamTlsHandshakeAllowsZeroEarlyDataBytes) {
+  const std::string yaml = R"EOF(
+    stat_prefix: name
+    cluster: fake_cluster
+    upstream_connect_mode: ON_DOWNSTREAM_TLS_HANDSHAKE
+    max_early_data_bytes: 0
+  )EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
+  TestUtility::loadFromYamlAndValidate(yaml, tcp_proxy);
+
+  // Should not throw exception - zero is allowed.
+  Config config(tcp_proxy, factory_context);
+  EXPECT_TRUE(config.maxEarlyDataBytes().has_value());
+  EXPECT_EQ(config.maxEarlyDataBytes().value(), 0);
 }
 
 // Test TLS handshake completion detection for ON_DOWNSTREAM_TLS_HANDSHAKE mode.
