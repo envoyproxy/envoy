@@ -4,9 +4,11 @@
 #include "envoy/network/address.h"
 
 #include "source/common/network/utility.h"
+#include "source/common/stats/utility.h"
 #include "source/extensions/filters/udp/dynamic_modules/filter.h"
 
 using Envoy::Extensions::UdpFilters::DynamicModules::DynamicModuleUdpListenerFilter;
+using Envoy::Extensions::UdpFilters::DynamicModules::DynamicModuleUdpListenerFilterConfig;
 
 namespace {
 
@@ -25,22 +27,15 @@ void fillBufferChunks(const Envoy::Buffer::Instance& buffer,
 
 extern "C" {
 
-bool envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks_size(
-    envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr,
-    size_t* chunks_size_out) {
+size_t envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks_size(
+    envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr) {
   auto* filter = static_cast<DynamicModuleUdpListenerFilter*>(filter_envoy_ptr);
   auto* data = filter->currentData();
   if (!data || !data->buffer_) {
-    if (chunks_size_out != nullptr) {
-      *chunks_size_out = 0;
-    }
-    return false;
+    return 0;
   }
 
-  if (chunks_size_out != nullptr) {
-    *chunks_size_out = data->buffer_->getRawSlices().size();
-  }
-  return true;
+  return data->buffer_->getRawSlices().size();
 }
 
 bool envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks(
@@ -60,17 +55,14 @@ bool envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks(
   return true;
 }
 
-bool envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_size(
-    envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr, size_t* size_out) {
+size_t envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_size(
+    envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr) {
   auto* filter = static_cast<DynamicModuleUdpListenerFilter*>(filter_envoy_ptr);
   auto* data = filter->currentData();
   if (!data || !data->buffer_) {
-    return false;
+    return 0;
   }
-  if (size_out != nullptr) {
-    *size_out = data->buffer_->length();
-  }
-  return true;
+  return data->buffer_->length();
 }
 
 bool envoy_dynamic_module_callback_udp_listener_filter_set_datagram_data(
@@ -176,6 +168,114 @@ bool envoy_dynamic_module_callback_udp_listener_filter_send_datagram(
     return true;
   }
   return false;
+}
+
+// -----------------------------------------------------------------------------
+// Metrics ABI Callbacks
+// -----------------------------------------------------------------------------
+
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_udp_listener_filter_config_define_counter(
+    envoy_dynamic_module_type_udp_listener_filter_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name, size_t* counter_id_ptr) {
+  auto* config = static_cast<DynamicModuleUdpListenerFilterConfig*>(config_envoy_ptr);
+  Envoy::Stats::StatName main_stat_name =
+      config->stat_name_pool_.add(absl::string_view(name.ptr, name.length));
+  Envoy::Stats::Counter& c =
+      Envoy::Stats::Utility::counterFromStatNames(*config->stats_scope_, {main_stat_name});
+  *counter_id_ptr = config->addCounter({c});
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_udp_listener_filter_increment_counter(
+    envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr, size_t id,
+    uint64_t value) {
+  auto* filter = static_cast<DynamicModuleUdpListenerFilter*>(filter_envoy_ptr);
+  auto counter = filter->getFilterConfig().getCounterById(id);
+  if (!counter.has_value()) {
+    return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+  }
+  counter->add(value);
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_udp_listener_filter_config_define_gauge(
+    envoy_dynamic_module_type_udp_listener_filter_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name, size_t* gauge_id_ptr) {
+  auto* config = static_cast<DynamicModuleUdpListenerFilterConfig*>(config_envoy_ptr);
+  Envoy::Stats::StatName main_stat_name =
+      config->stat_name_pool_.add(absl::string_view(name.ptr, name.length));
+  Envoy::Stats::Gauge& g = Envoy::Stats::Utility::gaugeFromStatNames(
+      *config->stats_scope_, {main_stat_name}, Envoy::Stats::Gauge::ImportMode::Accumulate);
+  *gauge_id_ptr = config->addGauge({g});
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_udp_listener_filter_set_gauge(
+    envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr, size_t id,
+    uint64_t value) {
+  auto* filter = static_cast<DynamicModuleUdpListenerFilter*>(filter_envoy_ptr);
+  auto gauge = filter->getFilterConfig().getGaugeById(id);
+  if (!gauge.has_value()) {
+    return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+  }
+  gauge->set(value);
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_udp_listener_filter_increment_gauge(
+    envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr, size_t id,
+    uint64_t value) {
+  auto* filter = static_cast<DynamicModuleUdpListenerFilter*>(filter_envoy_ptr);
+  auto gauge = filter->getFilterConfig().getGaugeById(id);
+  if (!gauge.has_value()) {
+    return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+  }
+  gauge->add(value);
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_udp_listener_filter_decrement_gauge(
+    envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr, size_t id,
+    uint64_t value) {
+  auto* filter = static_cast<DynamicModuleUdpListenerFilter*>(filter_envoy_ptr);
+  auto gauge = filter->getFilterConfig().getGaugeById(id);
+  if (!gauge.has_value()) {
+    return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+  }
+  gauge->sub(value);
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_udp_listener_filter_config_define_histogram(
+    envoy_dynamic_module_type_udp_listener_filter_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name, size_t* histogram_id_ptr) {
+  auto* config = static_cast<DynamicModuleUdpListenerFilterConfig*>(config_envoy_ptr);
+  Envoy::Stats::StatName main_stat_name =
+      config->stat_name_pool_.add(absl::string_view(name.ptr, name.length));
+  Envoy::Stats::Histogram& h = Envoy::Stats::Utility::histogramFromStatNames(
+      *config->stats_scope_, {main_stat_name}, Envoy::Stats::Histogram::Unit::Unspecified);
+  *histogram_id_ptr = config->addHistogram({h});
+  return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_udp_listener_filter_record_histogram_value(
+    envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr, size_t id,
+    uint64_t value) {
+  auto* filter = static_cast<DynamicModuleUdpListenerFilter*>(filter_envoy_ptr);
+  auto histogram = filter->getFilterConfig().getHistogramById(id);
+  if (!histogram.has_value()) {
+    return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+  }
+  histogram->recordValue(value);
+  return envoy_dynamic_module_type_metrics_result_Success;
 }
 
 } // extern "C"

@@ -7,6 +7,7 @@
 #include "envoy/http/header_validator.h"
 #include "envoy/http/original_ip_detection.h"
 #include "envoy/http/request_id_extension.h"
+#include "envoy/matcher/matcher.h"
 #include "envoy/router/rds.h"
 #include "envoy/router/scopes.h"
 #include "envoy/stats/scope.h"
@@ -431,6 +432,13 @@ public:
    * to be forwarded.
    */
   virtual const std::vector<ClientCertDetailsType>& setCurrentClientCertDetails() const PURE;
+
+  /**
+   * @return the matcher for selecting forward client cert config per-request. Returns nullptr
+   * if no matcher is configured, in which case the static forwardClientCert() and
+   * setCurrentClientCertDetails() should be used.
+   */
+  virtual const Matcher::MatchTreePtr<HttpMatchingData>& forwardClientCertMatcher() const PURE;
 
   /**
    * @return local address.

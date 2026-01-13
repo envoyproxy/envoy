@@ -3764,7 +3764,7 @@ TEST_F(HttpConnectionManagerImplTest, BufferLimitAndRefresh) {
 
   // The initial route buffer limit is not valid value and the limit from underlying stream
   // will be used.
-  { EXPECT_EQ(122U, decoder_filters_[0]->callbacks_->decoderBufferLimit()); }
+  { EXPECT_EQ(122U, decoder_filters_[0]->callbacks_->bufferLimit()); }
 
   // Less buffer limit from route entry will not be applied.
   {
@@ -3786,7 +3786,7 @@ TEST_F(HttpConnectionManagerImplTest, BufferLimitAndRefresh) {
     decoder_filters_[0]->callbacks_->downstreamCallbacks()->clearRouteCache();
     decoder_filters_[0]->callbacks_->clusterInfo();
 
-    EXPECT_EQ(150U, decoder_filters_[0]->callbacks_->decoderBufferLimit());
+    EXPECT_EQ(150U, decoder_filters_[0]->callbacks_->bufferLimit());
   }
 
   // Cleanup.

@@ -168,7 +168,11 @@ public:
       bool disable_token_encryption = false, const std::string& bearer_token_path = "",
       const std::string& hmac_path = "", const std::string& expires_path = "",
       const std::string& id_token_path = "", const std::string& refresh_token_path = "",
-      const std::string& nonce_path = "", const std::string& code_verifier_path = "") {
+      const std::string& nonce_path = "", const std::string& code_verifier_path = "",
+      bool bearer_partitioned = false, bool hmac_partitioned = false,
+      bool expires_partitioned = false, bool id_token_partitioned = false,
+      bool refresh_token_partitioned = false, bool nonce_partitioned = false,
+      bool code_verifier_partitioned = false) {
 
     envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
     auto* endpoint = p.mutable_token_endpoint();
@@ -233,6 +237,7 @@ public:
     // Bearer Token Cookie Config
     auto* bearer_config = cookie_configs->mutable_bearer_token_cookie_config();
     bearer_config->set_same_site(bearer_samesite);
+    bearer_config->set_partitioned(bearer_partitioned);
     if (!bearer_token_path.empty()) {
       bearer_config->set_path(bearer_token_path);
     }
@@ -240,6 +245,7 @@ public:
     // HMAC Cookie Config, Set value to disabled by default.
     auto* hmac_config = cookie_configs->mutable_oauth_hmac_cookie_config();
     hmac_config->set_same_site(hmac_samesite);
+    hmac_config->set_partitioned(hmac_partitioned);
     if (!hmac_path.empty()) {
       hmac_config->set_path(hmac_path);
     }
@@ -247,6 +253,7 @@ public:
     // Set value to disabled by default.
     auto* expires_config = cookie_configs->mutable_oauth_expires_cookie_config();
     expires_config->set_same_site(expires_samesite);
+    expires_config->set_partitioned(expires_partitioned);
     if (!expires_path.empty()) {
       expires_config->set_path(expires_path);
     }
@@ -254,6 +261,7 @@ public:
     // Set value to disabled by default.
     auto* id_token_config = cookie_configs->mutable_id_token_cookie_config();
     id_token_config->set_same_site(id_token_samesite);
+    id_token_config->set_partitioned(id_token_partitioned);
     if (!id_token_path.empty()) {
       id_token_config->set_path(id_token_path);
     }
@@ -261,6 +269,7 @@ public:
     // Set value to disabled by default.
     auto* refresh_token_config = cookie_configs->mutable_refresh_token_cookie_config();
     refresh_token_config->set_same_site(refresh_token_samesite);
+    refresh_token_config->set_partitioned(refresh_token_partitioned);
     if (!refresh_token_path.empty()) {
       refresh_token_config->set_path(refresh_token_path);
     }
@@ -268,6 +277,7 @@ public:
     // Set value to disabled by default.
     auto* oauth_nonce_config = cookie_configs->mutable_oauth_nonce_cookie_config();
     oauth_nonce_config->set_same_site(nonce_samesite);
+    oauth_nonce_config->set_partitioned(nonce_partitioned);
     if (!nonce_path.empty()) {
       oauth_nonce_config->set_path(nonce_path);
     }
@@ -275,6 +285,7 @@ public:
     // Set value to disabled by default.
     auto* code_verifier_config = cookie_configs->mutable_code_verifier_cookie_config();
     code_verifier_config->set_same_site(code_verifier_samesite);
+    code_verifier_config->set_partitioned(code_verifier_partitioned);
     if (!code_verifier_path.empty()) {
       code_verifier_config->set_path(code_verifier_path);
     }
@@ -4092,6 +4103,119 @@ TEST_F(OAuth2Test, MixedCookieSameSiteWithoutDisabled) {
       {Http::Headers::get().SetCookie.get(),
        "RefreshToken=" + TEST_ENCRYPTED_REFRESH_TOKEN +
            ";path=/;Max-Age=604800;secure;HttpOnly;SameSite=Lax"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthNonce.00000000075bcd15=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthNonce=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
+      {Http::Headers::get().SetCookie.get(),
+       "CodeVerifier.00000000075bcd15=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
+      {Http::Headers::get().SetCookie.get(),
+       "CodeVerifier=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
+      {Http::Headers::get().Location.get(), ""},
+  };
+
+  filter_->decodeHeaders(request_headers, false);
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
+
+  filter_->onGetAccessTokenSuccess("access_code", "some-id-token", "some-refresh-token",
+                                   std::chrono::seconds(600));
+}
+
+// Test all cookies with Partitioned attribute enabled (requires SameSite=None for third-party
+// context)
+TEST_F(OAuth2Test, AllCookiesPartitioned) {
+  using SameSite = envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite;
+  init(getConfig(true, true,
+                 envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
+                     OAuth2Config_AuthType_URL_ENCODED_BODY,
+                 0, false, false, false, false, false, SameSite::CookieConfig_SameSite_NONE,
+                 SameSite::CookieConfig_SameSite_NONE, SameSite::CookieConfig_SameSite_NONE,
+                 SameSite::CookieConfig_SameSite_NONE, SameSite::CookieConfig_SameSite_NONE,
+                 SameSite::CookieConfig_SameSite_NONE, SameSite::CookieConfig_SameSite_NONE, 0, 0,
+                 false, "", "", "", "", "", "", "", true /* bearer_partitioned */,
+                 true /* hmac_partitioned */, true /* expires_partitioned */,
+                 true /* id_token_partitioned */, true /* refresh_token_partitioned */,
+                 true /* nonce_partitioned */, true /* code_verifier_partitioned */));
+  oauthHMAC = "4TKyxPV/F7yyvr0XgJ2bkWFOc8t4IOFen1k29b84MAQ=;";
+  TestScopedRuntime scoped_runtime;
+  test_time_.setSystemTime(SystemTime(std::chrono::seconds(1000)));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Path.get(), "/_signout"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+  };
+
+  Http::TestResponseHeaderMapImpl response_headers{
+      {Http::Headers::get().Status.get(), "302"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthHMAC=" + oauthHMAC + "path=/;Max-Age=600;secure;HttpOnly;SameSite=None;Partitioned"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthExpires=1600;path=/;Max-Age=600;secure;HttpOnly;SameSite=None;Partitioned"},
+      {Http::Headers::get().SetCookie.get(),
+       "BearerToken=" + TEST_ENCRYPTED_ACCESS_TOKEN +
+           ";path=/;Max-Age=600;secure;HttpOnly;SameSite=None;Partitioned"},
+      {Http::Headers::get().SetCookie.get(),
+       "IdToken=" + TEST_ENCRYPTED_ID_TOKEN +
+           ";path=/;Max-Age=600;secure;HttpOnly;SameSite=None;Partitioned"},
+      {Http::Headers::get().SetCookie.get(),
+       "RefreshToken=" + TEST_ENCRYPTED_REFRESH_TOKEN +
+           ";path=/;Max-Age=604800;secure;HttpOnly;SameSite=None;Partitioned"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthNonce.00000000075bcd15=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthNonce=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
+      {Http::Headers::get().SetCookie.get(),
+       "CodeVerifier.00000000075bcd15=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
+      {Http::Headers::get().SetCookie.get(),
+       "CodeVerifier=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
+      {Http::Headers::get().Location.get(), ""},
+  };
+
+  filter_->decodeHeaders(request_headers, false);
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
+
+  filter_->onGetAccessTokenSuccess("access_code", "some-id-token", "some-refresh-token",
+                                   std::chrono::seconds(600));
+}
+
+// Test mixed Partitioned configurations - only some cookies have Partitioned
+TEST_F(OAuth2Test, MixedCookiesPartitioned) {
+  using SameSite = envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite;
+  init(getConfig(true, true,
+                 envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
+                     OAuth2Config_AuthType_URL_ENCODED_BODY,
+                 0, false, false, false, false, false, SameSite::CookieConfig_SameSite_NONE,
+                 SameSite::CookieConfig_SameSite_NONE, SameSite::CookieConfig_SameSite_LAX,
+                 SameSite::CookieConfig_SameSite_NONE, SameSite::CookieConfig_SameSite_NONE,
+                 SameSite::CookieConfig_SameSite_NONE, SameSite::CookieConfig_SameSite_NONE, 0, 0,
+                 false, "", "", "", "", "", "", "", true /* bearer_partitioned */,
+                 true /* hmac_partitioned */, false /* expires_partitioned */,
+                 true /* id_token_partitioned */, true /* refresh_token_partitioned */,
+                 false /* nonce_partitioned */, false /* code_verifier_partitioned */));
+  oauthHMAC = "4TKyxPV/F7yyvr0XgJ2bkWFOc8t4IOFen1k29b84MAQ=;";
+  TestScopedRuntime scoped_runtime;
+  test_time_.setSystemTime(SystemTime(std::chrono::seconds(1000)));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Path.get(), "/_signout"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+  };
+
+  Http::TestResponseHeaderMapImpl response_headers{
+      {Http::Headers::get().Status.get(), "302"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthHMAC=" + oauthHMAC + "path=/;Max-Age=600;secure;HttpOnly;SameSite=None;Partitioned"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthExpires=1600;path=/;Max-Age=600;secure;HttpOnly;SameSite=Lax"},
+      {Http::Headers::get().SetCookie.get(),
+       "BearerToken=" + TEST_ENCRYPTED_ACCESS_TOKEN +
+           ";path=/;Max-Age=600;secure;HttpOnly;SameSite=None;Partitioned"},
+      {Http::Headers::get().SetCookie.get(),
+       "IdToken=" + TEST_ENCRYPTED_ID_TOKEN +
+           ";path=/;Max-Age=600;secure;HttpOnly;SameSite=None;Partitioned"},
+      {Http::Headers::get().SetCookie.get(),
+       "RefreshToken=" + TEST_ENCRYPTED_REFRESH_TOKEN +
+           ";path=/;Max-Age=604800;secure;HttpOnly;SameSite=None;Partitioned"},
       {Http::Headers::get().SetCookie.get(),
        "OauthNonce.00000000075bcd15=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
       {Http::Headers::get().SetCookie.get(),

@@ -12,7 +12,7 @@ envoy_dynamic_module_type_abi_version_module_ptr envoy_dynamic_module_on_program
 envoy_dynamic_module_type_udp_listener_filter_config_module_ptr
 envoy_dynamic_module_on_udp_listener_filter_config_new(
     envoy_dynamic_module_type_udp_listener_filter_config_envoy_ptr filter_config_envoy_ptr,
-    const char* name_ptr, size_t name_size, const char* config_ptr, size_t config_size) {
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config) {
   return &some_variable;
 }
 
