@@ -156,7 +156,8 @@ public:
         listener_stats_({ALL_LISTENER_STATS(POOL_COUNTER(listener_config_.listenerScope()),
                                             POOL_GAUGE(listener_config_.listenerScope()),
                                             POOL_HISTOGRAM(listener_config_.listenerScope()))}),
-        proof_source_(listen_socket_, filter_chain_manager_, listener_stats_, time_system_) {
+        proof_source_(listen_socket_, filter_chain_manager_, listener_stats_, time_system_,
+                      listener_config_.listenerScope()) {
     EXPECT_CALL(*mock_context_config_, setSecretUpdateCallback(_))
         .Times(testing::AtLeast(1u))
         .WillRepeatedly(SaveArg<0>(&secret_update_callback_));
