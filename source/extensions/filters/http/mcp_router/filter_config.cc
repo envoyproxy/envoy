@@ -45,10 +45,17 @@ parseSessionIdentity(const envoy::extensions::filters::http::mcp_router::v3::Mcp
 }
 } // namespace
 
+namespace {
+constexpr absl::string_view kDefaultMetadataNamespace = "mcp_proxy";
+} // namespace
+
 McpRouterConfig::McpRouterConfig(
     const envoy::extensions::filters::http::mcp_router::v3::McpRouter& proto_config,
     Server::Configuration::FactoryContext& context)
-    : factory_context_(context), session_identity_(parseSessionIdentity(proto_config)) {
+    : factory_context_(context), session_identity_(parseSessionIdentity(proto_config)),
+      metadata_namespace_(proto_config.metadata_namespace().empty()
+                              ? std::string(kDefaultMetadataNamespace)
+                              : proto_config.metadata_namespace()) {
   for (const auto& server : proto_config.servers()) {
     McpBackendConfig backend;
     const auto& mcp_cluster = server.mcp_cluster();
