@@ -1,10 +1,5 @@
-# Envoy 1.37.0 Release Summary
 
-## Overview
-
-Envoy 1.37.0 is a major feature release with significant enhancements to dynamic modules, HTTP processing, security features, and observability capabilities.
-
-## Major Themes
+## Summary of changes
 
 ### Dynamic Modules Expansion
 - Added support for network, listener, UDP listener, and access logger filters
@@ -61,5 +56,3 @@ Envoy 1.37.0 is a major feature release with significant enhancements to dynamic
 ## Deprecations
 
 - OpenTelemetry access log `common_config` field deprecated in favor of explicit `http_service`/`grpc_service` configuration
-
-For complete details, see the full changelog in `changelogs/current.yaml`.
