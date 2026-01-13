@@ -375,6 +375,12 @@ new_features:
     filters for initialization and background tasks.
 - area: dynamic modules
   change: |
+    Added :ref:`bootstrap extension <envoy_v3_api_msg_extensions.bootstrap.dynamic_modules.v3.DynamicModuleBootstrapExtension>`
+    support for dynamic modules, enabling server initialization hooks and per-worker-thread initialization. Bootstrap
+    extensions can perform setup tasks when Envoy starts, access server-level resources, and implement singleton patterns
+    for configuration loading and global state management.
+- area: dynamic modules
+  change: |
     Added :ref:`access logger <envoy_v3_api_msg_extensions.access_loggers.dynamic_modules.v3.DynamicModuleAccessLog>`
     support for dynamic modules, enabling custom access logging with dynamic modules.
 - area: udp_sink
