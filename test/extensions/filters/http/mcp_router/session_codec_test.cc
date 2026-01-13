@@ -28,9 +28,9 @@ TEST(SessionCodecTest, BuildCompositeSessionId) {
 }
 
 TEST(SessionCodecTest, ParseCompositeSessionId) {
-  std::string composite =
-      absl::StrCat("route1@", SessionCodec::encode("user1"),
-                   "@backend1:", SessionCodec::encode("s1"), ",backend2:", SessionCodec::encode("s2"));
+  std::string composite = absl::StrCat("route1@", SessionCodec::encode("user1"),
+                                       "@backend1:", SessionCodec::encode("s1"),
+                                       ",backend2:", SessionCodec::encode("s2"));
 
   auto result = SessionCodec::parseCompositeSessionId(composite);
 
@@ -44,8 +44,8 @@ TEST(SessionCodecTest, ParseCompositeSessionId) {
 // Test that subjects containing spliter are correctly handled.
 TEST(SessionCodecTest, SubjectWithAtSymbol) {
   const std::string subject_with_at = "user@example.com";
-  const std::string id = SessionCodec::buildCompositeSessionId(
-      "my_route", subject_with_at, {{"backend1", "session1"}});
+  const std::string id = SessionCodec::buildCompositeSessionId("my_route", subject_with_at,
+                                                               {{"backend1", "session1"}});
 
   auto result = SessionCodec::parseCompositeSessionId(id);
 
