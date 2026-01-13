@@ -770,6 +770,12 @@ new_features:
     The ``common_config`` field is deprecated but remains functional for backward compatibility.
     See :ref:`http_service <envoy_v3_api_field_extensions.access_loggers.open_telemetry.v3.OpenTelemetryAccessLogConfig.http_service>`
     and :ref:`grpc_service <envoy_v3_api_field_extensions.access_loggers.open_telemetry.v3.OpenTelemetryAccessLogConfig.grpc_service>`.
+- area: jwt_authn
+  change: |
+    Added :ref:`extract_only_without_validation
+    <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtRequirement.extract_only_without_validation>`
+    requirement type that extracts JWT claims and forwards them as headers without performing
+    signature verification.
 
 deprecated:
 - area: access_log
