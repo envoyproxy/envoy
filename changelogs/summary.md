@@ -15,7 +15,7 @@
 
 ### Filter Ecosystem Growth
 - New transform filter for request/response body modification
-- New MCP (Model Context Protocol) filter and router for AI/ML workloads
+- New MCP (Model Context Protocol) filter and router for agentic network
 - Network-layer geoip filter for non-HTTP geolocation
 - Postgres Inspector listener filter for PostgreSQL traffic routing
 
