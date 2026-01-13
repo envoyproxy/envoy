@@ -8,6 +8,12 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: http
+  change: |
+    Fixed a potential file descriptor leak where HTTP/1.1 connections with zombie streams (waiting for codec completion)
+    would not be properly closed when in draining state. This could occur when a response was sent before the request
+    was fully received, causing connections to remain open indefinitely. This behavior change can be temporarily reverted
+    by setting the runtime guard ``envoy.reloadable_features.http1_close_connection_on_zombie_stream_complete`` to ``false``.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
