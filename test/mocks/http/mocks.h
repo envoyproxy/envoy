@@ -670,6 +670,8 @@ public:
   MOCK_METHOD(Http::ForwardClientCertType, forwardClientCert, (), (const));
   MOCK_METHOD(const std::vector<Http::ClientCertDetailsType>&, setCurrentClientCertDetails, (),
               (const));
+  MOCK_METHOD(const Matcher::MatchTreePtr<HttpMatchingData>&, forwardClientCertMatcher, (),
+              (const));
   MOCK_METHOD(const Network::Address::Instance&, localAddress, ());
   MOCK_METHOD(const absl::optional<std::string>&, userAgent, ());
   MOCK_METHOD(const Http::TracingConnectionManagerConfig*, tracingConfig, ());

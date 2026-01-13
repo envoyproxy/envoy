@@ -16,6 +16,7 @@
 
 # access loggers
 /*/extensions/access_loggers/common @auni53 @zuercher
+/*/extensions/access_loggers/dynamic_modules @agrawroh @wbpcode @mathetake
 /*/extensions/access_loggers/open_telemetry @itamarkam @yanavlasov
 /*/extensions/access_loggers/stats @ggreenway @wbpcode @kyessenov
 /*/extensions/access_loggers/stream @mattklein123 @davinci26
@@ -399,6 +400,7 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/filters/network/generic_proxy/ @wbpcode @UNOWNED
 # Dynamic Modules
 /*/extensions/dynamic_modules @mattklein123 @mathetake @wbpcode @agrawroh
+/*/extensions/bootstrap/dynamic_modules @agrawroh @mathetake @wbpcode
 /*/extensions/filters/http/dynamic_modules @mattklein123 @mathetake @wbpcode @agrawroh
 /*/extensions/filters/network/dynamic_modules @agrawroh @mathetake @wbpcode
 /*/extensions/filters/listener/dynamic_modules @agrawroh @mathetake @wbpcode

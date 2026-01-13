@@ -144,7 +144,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_awslabs_aws_c_auth()
     _com_github_axboe_liburing()
     _com_github_bazel_buildtools()
-    _com_github_c_ares_c_ares()
+    _com_github_cares_cares()
     _com_github_openhistogram_libcircllhist()
     _com_github_cyan4973_xxhash()
     _com_github_datadog_dd_trace_cpp()
@@ -321,9 +321,9 @@ def _com_github_bazel_buildtools():
         name = "com_github_bazelbuild_buildtools",
     )
 
-def _com_github_c_ares_c_ares():
+def _com_github_cares_cares():
     external_http_archive(
-        name = "com_github_c_ares_c_ares",
+        name = "com_github_cares_cares",
         build_file = "@envoy//bazel/external:c-ares.BUILD",
         patch_args = ["-p1"],
         patches = ["@envoy//bazel:c-ares.patch"],
