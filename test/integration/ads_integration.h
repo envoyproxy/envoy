@@ -103,14 +103,33 @@ public:
   static std::string protocolTestParamsToString(
       const ::testing::TestParamInfo<
           std::tuple<Network::Address::IpVersion, Grpc::ClientType, Grpc::SotwOrDelta>>& p) {
+    absl::string_view sotw_or_delta_str;
+    switch (std::get<2>(p.param)) {
+      case Grpc::SotwOrDelta::Sotw:
+        sotw_or_delta_str = "Sotw";
+        break;
+      case Grpc::SotwOrDelta::Delta:
+        sotw_or_delta_str = "Delta";
+        break;
+      case Grpc::SotwOrDelta::UnifiedSotw:
+        sotw_or_delta_str = "UnifiedSotw";
+        break;
+      case Grpc::SotwOrDelta::UnifiedDelta:
+        sotw_or_delta_str = "UnifiedDelta";
+        break;
+    }
     return fmt::format(
         "{}_{}_{}", TestUtility::ipVersionToString(std::get<0>(p.param)),
         std::get<1>(p.param) == Grpc::ClientType::GoogleGrpc ? "GoogleGrpc" : "EnvoyGrpc",
-        std::get<2>(p.param) == Grpc::SotwOrDelta::Delta ? "Delta" : "StateOfTheWorld");
+        sotw_or_delta_str);
   }
   Network::Address::IpVersion ipVersion() const override { return std::get<0>(GetParam()); }
   Grpc::ClientType clientType() const override { return std::get<1>(GetParam()); }
   Grpc::SotwOrDelta sotwOrDelta() const { return std::get<2>(GetParam()); }
+  bool isSotw() const {
+    return sotwOrDelta() == Grpc::SotwOrDelta::Sotw ||
+           sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw;
+  }
 };
 
 // When old delta subscription state goes away, we could replace this macro back with
@@ -119,30 +138,5 @@ public:
   testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),                     \
                    testing::ValuesIn(TestEnvironment::getsGrpcVersionsForTest()),                  \
                    testing::Values(Grpc::SotwOrDelta::Sotw, Grpc::SotwOrDelta::Delta))
-
-inline std::string adsIntegrationTestName(
-    const testing::TestParamInfo<
-        std::tuple<Network::Address::IpVersion, Grpc::ClientType, Grpc::SotwOrDelta>>& info) {
-  const auto& [ip_version, client_type, sotw_or_delta] = info.param;
-  std::string ip_version_str = (ip_version == Network::Address::IpVersion::v4) ? "IpV4" : "IpV6";
-  std::string client_type_str =
-      (client_type == Grpc::ClientType::EnvoyGrpc) ? "EnvoyGrpc" : "GoogleGrpc";
-  std::string sotw_or_delta_str;
-  switch (sotw_or_delta) {
-  case Grpc::SotwOrDelta::Sotw:
-    sotw_or_delta_str = "Sotw";
-    break;
-  case Grpc::SotwOrDelta::Delta:
-    sotw_or_delta_str = "Delta";
-    break;
-  case Grpc::SotwOrDelta::UnifiedSotw:
-    sotw_or_delta_str = "UnifiedSotw";
-    break;
-  case Grpc::SotwOrDelta::UnifiedDelta:
-    sotw_or_delta_str = "UnifiedDelta";
-    break;
-  }
-  return ip_version_str + "_" + client_type_str + "_" + sotw_or_delta_str;
-}
 
 } // namespace Envoy

@@ -135,7 +135,7 @@ bool DeltaSubscriptionState::subscriptionUpdatePending() const {
   // because even if it's empty, it won't be interpreted as legacy wildcard subscription, which can
   // only for the first request in the stream. So sending an empty request at this point should be
   // harmless.
-  return must_send_discovery_request_;
+  return dynamic_context_changed_;
 }
 
 void DeltaSubscriptionState::markStreamFresh(bool should_send_initial_resource_versions) {
@@ -291,7 +291,6 @@ void DeltaSubscriptionState::handleEstablishmentFailure() {
 envoy::service::discovery::v3::DeltaDiscoveryRequest
 DeltaSubscriptionState::getNextRequestAckless() {
   envoy::service::discovery::v3::DeltaDiscoveryRequest request;
-  must_send_discovery_request_ = false;
   if (!any_request_sent_yet_in_current_stream_) {
     any_request_sent_yet_in_current_stream_ = true;
     const bool is_legacy_wildcard = isInitialRequestForLegacyWildcard();

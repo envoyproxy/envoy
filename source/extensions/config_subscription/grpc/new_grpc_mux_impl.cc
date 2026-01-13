@@ -51,7 +51,9 @@ NewGrpcMuxImpl::NewGrpcMuxImpl(GrpcMuxContext& grpc_mux_context)
                 return absl::OkStatus();
               })),
       xds_config_tracker_(grpc_mux_context.xds_config_tracker_),
-      skip_subsequent_node_(grpc_mux_context.skip_subsequent_node_),
+      skip_subsequent_node_(
+          grpc_mux_context.skip_subsequent_node_ && Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.xds_legacy_delta_skip_subsequent_node")),
       eds_resources_cache_(std::move(grpc_mux_context.eds_resources_cache_)) {
   AllMuxes::get().insert(this);
 }
@@ -189,11 +191,11 @@ void NewGrpcMuxImpl::onDiscoveryResponse(
 }
 
 void NewGrpcMuxImpl::onStreamEstablished() {
-  node_sent_in_current_stream_ = false;
   for (auto& [type_url, subscription] : subscriptions_) {
     UNREFERENCED_PARAMETER(type_url);
     subscription->sub_state_.markStreamFresh(should_send_initial_resource_versions_);
   }
+  first_request_on_stream_ = true;
   pausable_ack_queue_.clear();
   trySendDiscoveryRequests();
 }
@@ -402,14 +404,13 @@ void NewGrpcMuxImpl::trySendDiscoveryRequests() {
     } else {
       request = sub->second->sub_state_.getNextRequestAckless();
     }
-    if (sub->second->sub_state_.dynamicContextChanged() ||
-        !Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.legacy_delta_xds_skip_subsequent_node") ||
-        !skip_subsequent_node_ || !node_sent_in_current_stream_) {
-      request.mutable_node()->MergeFrom(local_info_.node());
-      node_sent_in_current_stream_ = true;
-      sub->second->sub_state_.clearDynamicContextChanged();
+    const bool set_node = sub->second->sub_state_.dynamicContextChanged() ||
+        !skip_subsequent_node_ || first_request_on_stream_;
+    if (set_node) {
+      first_request_on_stream_ = false;
+      *request.mutable_node() = local_info_.node();
     }
+    sub->second->sub_state_.clearDynamicContextChanged();
     grpc_stream_->sendMessage(request);
   }
   grpc_stream_->maybeUpdateQueueSizeStat(pausable_ack_queue_.size());

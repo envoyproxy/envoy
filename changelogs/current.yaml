@@ -544,6 +544,7 @@ new_features:
 - area: config
   change: |
     Added support for `:ref:`set_node_on_first_message_only
-    <envoy_api_field_core.ApiConfigSource.set_node_on_first_message_only>` to Delta-xDS
+    <envoy_api_field_core.ApiConfigSource.set_node_on_first_message_only>` to Delta-xDS. Guarded by
+    flag ``envoy.reloadable_features.xds_legacy_delta_skip_subsequent_node``.
 
 deprecated:

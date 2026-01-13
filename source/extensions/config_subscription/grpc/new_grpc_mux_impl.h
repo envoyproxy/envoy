@@ -220,7 +220,7 @@ private:
   XdsConfigTrackerOptRef xds_config_tracker_;
   const bool skip_subsequent_node_;
   EdsResourcesCachePtr eds_resources_cache_;
-  bool node_sent_in_current_stream_{false};
+  bool first_request_on_stream_{true};
 
   // Used to track whether initial_resource_versions should be populated on the
   // next reconnection.
