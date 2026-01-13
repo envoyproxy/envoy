@@ -643,6 +643,33 @@ TEST_F(DynamicModuleHttpFilterTest, DownstreamSocketOptionSetFailure) {
       envoy_dynamic_module_type_socket_direction_Downstream, 100));
 }
 
+TEST_F(DynamicModuleHttpFilterTest, DownstreamSocketOptionBytesNoConnection) {
+  // Test that setting downstream bytes socket option fails when there is no connection.
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_no_conn;
+  EXPECT_CALL(callbacks_no_conn, connection()).WillRepeatedly(testing::Return(absl::nullopt));
+  filter_->setDecoderFilterCallbacks(callbacks_no_conn);
+
+  const std::string value = "test-bytes";
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_set_socket_option_bytes(
+      filter_.get(), 1, 2, envoy_dynamic_module_type_socket_option_state_Prebind,
+      envoy_dynamic_module_type_socket_direction_Downstream, {value.data(), value.size()}));
+}
+
+TEST_F(DynamicModuleHttpFilterTest, DownstreamSocketOptionBytesSetFailure) {
+  // Test that setting downstream bytes socket option fails when the underlying socket call fails.
+  NiceMock<Network::MockConnection> connection;
+  EXPECT_CALL(decoder_callbacks_, connection())
+      .WillRepeatedly(
+          testing::Return(makeOptRef(dynamic_cast<const Network::Connection&>(connection))));
+  EXPECT_CALL(connection, setSocketOption(testing::_, testing::_))
+      .WillRepeatedly(testing::Return(false));
+
+  const std::string value = "test-bytes";
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_set_socket_option_bytes(
+      filter_.get(), 1, 2, envoy_dynamic_module_type_socket_option_state_Prebind,
+      envoy_dynamic_module_type_socket_direction_Downstream, {value.data(), value.size()}));
+}
+
 TEST(ABIImpl, metadata) {
   Stats::SymbolTableImpl symbol_table;
   DynamicModuleHttpFilter filter{nullptr, symbol_table};
