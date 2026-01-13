@@ -54,8 +54,10 @@
 #include "source/extensions/path/match/uri_template/uri_template_match.h"
 #include "source/extensions/path/rewrite/uri_template/uri_template_rewrite.h"
 
+#include "absl/container/flat_hash_set.h"
 #include "absl/container/inlined_vector.h"
 #include "absl/strings/match.h"
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Router {
@@ -629,6 +631,17 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
         std::make_unique<ConfigUtility::QueryParameterMatcher>(query_parameter, factory_context));
   }
 
+  for (const auto& cookie_matcher : route.match().cookies()) {
+    config_cookies_.push_back(
+        std::make_unique<ConfigUtility::CookieMatcher>(cookie_matcher, factory_context));
+  }
+  if (!config_cookies_.empty()) {
+    config_cookie_names_.reserve(config_cookies_.size());
+    for (const auto& matcher : config_cookies_) {
+      config_cookie_names_.insert(matcher->name());
+    }
+  }
+
   if (!route.route().hash_policy().empty()) {
     hash_policy_ = THROW_OR_RETURN_VALUE(
         Http::HashPolicyImpl::create(route.route().hash_policy(), factory_context.regexEngine()),
@@ -855,6 +868,16 @@ bool RouteEntryImplBase::matchRoute(const Http::RequestHeaderMap& headers,
         Http::Utility::QueryParamsMulti::parseQueryString(headers.getPathValue());
     matches &= ConfigUtility::matchQueryParams(query_parameters, config_query_parameters_);
     if (!matches) {
+      return false;
+    }
+  }
+
+  if (!config_cookies_.empty()) {
+    const auto cookies =
+        Http::Utility::parseCookies(headers, [this](absl::string_view key) -> bool {
+          return config_cookie_names_.find(key) != config_cookie_names_.end();
+        });
+    if (!ConfigUtility::matchCookies(cookies, config_cookies_)) {
       return false;
     }
   }

@@ -75,6 +75,7 @@ proto_library(
         "//envoy/data/core/v3:pkg",
         "//envoy/data/dns/v3:pkg",
         "//envoy/data/tap/v3:pkg",
+        "//envoy/extensions/access_loggers/dynamic_modules/v3:pkg",
         "//envoy/extensions/access_loggers/file/v3:pkg",
         "//envoy/extensions/access_loggers/filters/cel/v3:pkg",
         "//envoy/extensions/access_loggers/filters/process_ratelimit/v3:pkg",

@@ -127,6 +127,11 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: proxy_protocol
+  change: |
+    Fixed a bug where Envoy incorrectly removed PROXY protocol v2 TLVs if there were multiple TLVs with the same key. See
+    https://github.com/envoyproxy/envoy/issues/42075 for details. This behavior can be reverted by setting the runtime
+    guard ``envoy.reloadable_features.proxy_protocol_allow_duplicate_tlvs`` to ``false``.
 - area: adaptive concurrency
   change: |
     Fixed a race condition in the gradient controller that allowed more outstanding requests than the concurrency limit,
@@ -374,6 +379,10 @@ new_features:
     support for dynamic modules, enabling server initialization hooks and per-worker-thread initialization. Bootstrap
     extensions can perform setup tasks when Envoy starts, access server-level resources, and implement singleton patterns
     for configuration loading and global state management.
+- area: dynamic modules
+  change: |
+    Added :ref:`access logger <envoy_v3_api_msg_extensions.access_loggers.dynamic_modules.v3.DynamicModuleAccessLog>`
+    support for dynamic modules, enabling custom access logging with dynamic modules.
 - area: udp_sink
   change: |
     Enhanced the UDP sink to support tapped messages larger than 64KB.
@@ -420,6 +429,25 @@ new_features:
     Added :ref:`vhost_header <envoy_v3_api_field_config.route.v3.RouteConfiguration.vhost_header>` to
     :ref:`RouteConfiguration <envoy_v3_api_msg_config.route.v3.RouteConfiguration>` to allow using a different header
     for vhost matching.
+- area: http
+  change: |
+    Added :ref:`forward_client_cert_matcher
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.forward_client_cert_matcher>`
+    to :ref:`HttpConnectionManager
+    <envoy_v3_api_msg_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager>`
+    to enable per-request configuration of forward client cert behavior using the xDS matcher framework. This allows
+    different XFCC header handling based on request properties (e.g., headers, path). If the matcher matches, the
+    matched action's config is used; otherwise, the static
+    :ref:`forward_client_cert_details
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.forward_client_cert_details>`
+    and
+    :ref:`set_current_client_cert_details
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.set_current_client_cert_details>`
+    config is used as fallback.
+- area: http
+  change: |
+    Added :ref:`cookies <envoy_v3_api_field_config.route.v3.RouteMatch.cookies>` to route matches,
+    enabling structured matching against specific cookies without parsing the full ``Cookie`` header.
 - area: http2
   change: |
     Added a parameter to ``sendGoAwayAndClose`` to support graceful closure of HTTP/2 connections.
@@ -748,6 +776,12 @@ new_features:
     The ``common_config`` field is deprecated but remains functional for backward compatibility.
     See :ref:`http_service <envoy_v3_api_field_extensions.access_loggers.open_telemetry.v3.OpenTelemetryAccessLogConfig.http_service>`
     and :ref:`grpc_service <envoy_v3_api_field_extensions.access_loggers.open_telemetry.v3.OpenTelemetryAccessLogConfig.grpc_service>`.
+- area: jwt_authn
+  change: |
+    Added :ref:`extract_only_without_validation
+    <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtRequirement.extract_only_without_validation>`
+    requirement type that extracts JWT claims and forwards them as headers without performing
+    signature verification.
 
 deprecated:
 - area: access_log
