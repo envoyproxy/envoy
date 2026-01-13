@@ -4939,6 +4939,127 @@ envoy_dynamic_module_callback_access_logger_record_histogram_value(
     envoy_dynamic_module_type_access_logger_config_envoy_ptr config_envoy_ptr, size_t id,
     uint64_t value);
 
+// =============================================================================
+// =========================== Bootstrap Extension =============================
+// =============================================================================
+
+// =============================================================================
+// Bootstrap Extension Types
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr is a raw pointer to the
+ * DynamicModuleBootstrapExtensionConfig class in Envoy.
+ *
+ * OWNERSHIP: Envoy owns the pointer.
+ */
+typedef void* envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_bootstrap_extension_config_module_ptr is a pointer to an in-module
+ * bootstrap extension configuration.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer.
+ */
+typedef const void* envoy_dynamic_module_type_bootstrap_extension_config_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_bootstrap_extension_envoy_ptr is a raw pointer to the
+ * DynamicModuleBootstrapExtension class in Envoy.
+ *
+ * OWNERSHIP: Envoy owns the pointer.
+ */
+typedef void* envoy_dynamic_module_type_bootstrap_extension_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_bootstrap_extension_module_ptr is a pointer to an in-module bootstrap
+ * extension.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer.
+ */
+typedef const void* envoy_dynamic_module_type_bootstrap_extension_module_ptr;
+
+// =============================================================================
+// Bootstrap Extension Event Hooks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_on_bootstrap_extension_config_new is called by the main thread when the
+ * bootstrap extension config is loaded. The function returns a
+ * envoy_dynamic_module_type_bootstrap_extension_config_module_ptr for the given name and config.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object for the corresponding config.
+ * @param name is the name of the extension.
+ * @param config is the configuration for the extension.
+ * @return envoy_dynamic_module_type_bootstrap_extension_config_module_ptr is the pointer to the
+ * in-module bootstrap extension configuration. Returning nullptr indicates a failure to initialize
+ * the module. When it fails, the extension configuration will be rejected.
+ */
+envoy_dynamic_module_type_bootstrap_extension_config_module_ptr
+envoy_dynamic_module_on_bootstrap_extension_config_new(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config);
+
+/**
+ * envoy_dynamic_module_on_bootstrap_extension_config_destroy is called when the bootstrap extension
+ * configuration is destroyed in Envoy. The module should release any resources associated with the
+ * corresponding in-module bootstrap extension configuration.
+ *
+ * @param extension_config_ptr is the pointer to the in-module bootstrap extension configuration
+ * whose corresponding Envoy bootstrap extension configuration is being destroyed.
+ */
+void envoy_dynamic_module_on_bootstrap_extension_config_destroy(
+    envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_ptr);
+
+/**
+ * envoy_dynamic_module_on_bootstrap_extension_new is called when a new bootstrap extension is
+ * created.
+ *
+ * @param extension_config_ptr is the pointer to the in-module bootstrap extension configuration.
+ * @param extension_envoy_ptr is the pointer to the DynamicModuleBootstrapExtension object of the
+ * corresponding bootstrap extension.
+ * @return envoy_dynamic_module_type_bootstrap_extension_module_ptr is the pointer to the in-module
+ * bootstrap extension. Returning nullptr indicates a failure to initialize the module. When it
+ * fails, the extension will be rejected.
+ */
+envoy_dynamic_module_type_bootstrap_extension_module_ptr
+envoy_dynamic_module_on_bootstrap_extension_new(
+    envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_envoy_ptr extension_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_on_bootstrap_extension_server_initialized is called when the server is
+ * initialized. This is called on the main thread after the ServerFactoryContext is fully
+ * initialized.
+ *
+ * @param extension_envoy_ptr is the pointer to the DynamicModuleBootstrapExtension object.
+ * @param extension_module_ptr is the pointer to the in-module bootstrap extension.
+ */
+void envoy_dynamic_module_on_bootstrap_extension_server_initialized(
+    envoy_dynamic_module_type_bootstrap_extension_envoy_ptr extension_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_module_ptr extension_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_bootstrap_extension_worker_thread_initialized is called when a worker
+ * thread is initialized. This is called once per worker thread.
+ *
+ * @param extension_envoy_ptr is the pointer to the DynamicModuleBootstrapExtension object.
+ * @param extension_module_ptr is the pointer to the in-module bootstrap extension.
+ */
+void envoy_dynamic_module_on_bootstrap_extension_worker_thread_initialized(
+    envoy_dynamic_module_type_bootstrap_extension_envoy_ptr extension_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_module_ptr extension_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_bootstrap_extension_destroy is called when the bootstrap extension is
+ * destroyed.
+ *
+ * @param extension_module_ptr is the pointer to the in-module bootstrap extension.
+ */
+void envoy_dynamic_module_on_bootstrap_extension_destroy(
+    envoy_dynamic_module_type_bootstrap_extension_module_ptr extension_module_ptr);
+
 #ifdef __cplusplus
 }
 #endif

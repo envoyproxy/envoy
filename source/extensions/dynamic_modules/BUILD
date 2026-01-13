@@ -22,6 +22,15 @@ envoy_cc_library(
     ],
 )
 
+envoy_cc_library(
+    name = "abi_impl",
+    srcs = ["abi_impl.cc"],
+    deps = [
+        ":dynamic_modules_lib",
+        "//source/common/common:logger_lib",
+    ],
+)
+
 py_binary(
     name = "compute_abi_hash",
     srcs = ["compute_abi_hash.py"],
