@@ -40,16 +40,14 @@ TEST_F(RouteConfigUpdateRequesterTest, VhdsCaseInsensitiveMatchingDefault) {
       {":authority", "Example.Com"},
   };
 
-  auto route_config_updated_cb =
-      std::make_shared<RouteConfigUpdatedCallback>([](bool) {});
+  auto route_config_updated_cb = std::make_shared<RouteConfigUpdatedCallback>([](bool) {});
 
   // Expect that the host header is converted to lowercase
-  EXPECT_CALL(route_config_provider_,
-              requestVirtualHostsUpdate("example.com", _, _));
+  EXPECT_CALL(route_config_provider_, requestVirtualHostsUpdate("example.com", _, _));
 
   NiceMock<Http::MockRouteCache> route_cache;
   requester.requestRouteConfigUpdate(route_cache, route_config_updated_cb, route_config,
-                                    dispatcher_, headers);
+                                     dispatcher_, headers);
 }
 
 // Test that host header is NOT lowercased when case_insensitive_match is false
@@ -68,16 +66,14 @@ TEST_F(RouteConfigUpdateRequesterTest, VhdsCaseSensitiveMatching) {
       {":authority", "Example.Com"},
   };
 
-  auto route_config_updated_cb =
-      std::make_shared<RouteConfigUpdatedCallback>([](bool) {});
+  auto route_config_updated_cb = std::make_shared<RouteConfigUpdatedCallback>([](bool) {});
 
   // Expect that the host header is kept as-is (NOT lowercased)
-  EXPECT_CALL(route_config_provider_,
-              requestVirtualHostsUpdate("Example.Com", _, _));
+  EXPECT_CALL(route_config_provider_, requestVirtualHostsUpdate("Example.Com", _, _));
 
   NiceMock<Http::MockRouteCache> route_cache;
   requester.requestRouteConfigUpdate(route_cache, route_config_updated_cb, route_config,
-                                    dispatcher_, headers);
+                                     dispatcher_, headers);
 }
 
 // Test that uppercase host header is lowercased by default
@@ -94,15 +90,13 @@ TEST_F(RouteConfigUpdateRequesterTest, VhdsCaseInsensitiveMatchingUppercase) {
       {":authority", "EXAMPLE.COM"},
   };
 
-  auto route_config_updated_cb =
-      std::make_shared<RouteConfigUpdatedCallback>([](bool) {});
+  auto route_config_updated_cb = std::make_shared<RouteConfigUpdatedCallback>([](bool) {});
 
-  EXPECT_CALL(route_config_provider_,
-              requestVirtualHostsUpdate("example.com", _, _));
+  EXPECT_CALL(route_config_provider_, requestVirtualHostsUpdate("example.com", _, _));
 
   NiceMock<Http::MockRouteCache> route_cache;
   requester.requestRouteConfigUpdate(route_cache, route_config_updated_cb, route_config,
-                                    dispatcher_, headers);
+                                     dispatcher_, headers);
 }
 
 // Test that uppercase host header is preserved when case-sensitive
@@ -119,15 +113,13 @@ TEST_F(RouteConfigUpdateRequesterTest, VhdsCaseSensitiveMatchingUppercase) {
       {":authority", "EXAMPLE.COM"},
   };
 
-  auto route_config_updated_cb =
-      std::make_shared<RouteConfigUpdatedCallback>([](bool) {});
+  auto route_config_updated_cb = std::make_shared<RouteConfigUpdatedCallback>([](bool) {});
 
-  EXPECT_CALL(route_config_provider_,
-              requestVirtualHostsUpdate("EXAMPLE.COM", _, _));
+  EXPECT_CALL(route_config_provider_, requestVirtualHostsUpdate("EXAMPLE.COM", _, _));
 
   NiceMock<Http::MockRouteCache> route_cache;
   requester.requestRouteConfigUpdate(route_cache, route_config_updated_cb, route_config,
-                                    dispatcher_, headers);
+                                     dispatcher_, headers);
 }
 
 // Test that lowercase host header stays lowercase by default
@@ -144,15 +136,13 @@ TEST_F(RouteConfigUpdateRequesterTest, VhdsCaseInsensitiveMatchingLowercase) {
       {":authority", "example.com"},
   };
 
-  auto route_config_updated_cb =
-      std::make_shared<RouteConfigUpdatedCallback>([](bool) {});
+  auto route_config_updated_cb = std::make_shared<RouteConfigUpdatedCallback>([](bool) {});
 
-  EXPECT_CALL(route_config_provider_,
-              requestVirtualHostsUpdate("example.com", _, _));
+  EXPECT_CALL(route_config_provider_, requestVirtualHostsUpdate("example.com", _, _));
 
   NiceMock<Http::MockRouteCache> route_cache;
   requester.requestRouteConfigUpdate(route_cache, route_config_updated_cb, route_config,
-                                    dispatcher_, headers);
+                                     dispatcher_, headers);
 }
 
 } // namespace

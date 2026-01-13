@@ -1344,7 +1344,9 @@ public:
   }
   const std::string& name() const override { return shared_config_->name(); }
   bool usesVhds() const override { return shared_config_->usesVhds(); }
-  bool vhdsCaseInsensitiveMatch() const override { return shared_config_->vhdsCaseInsensitiveMatch(); }
+  bool vhdsCaseInsensitiveMatch() const override {
+    return shared_config_->vhdsCaseInsensitiveMatch();
+  }
   bool mostSpecificHeaderMutationsWins() const override {
     return shared_config_->mostSpecificHeaderMutationsWins();
   }
