@@ -2204,76 +2204,81 @@ TEST_P(TcpProxySslIntegrationTest, OnDownstreamTlsHandshakeModeWithEarlyData) {
 
   initialize();
 
+  // Local variables for SSL connection setup (similar to ClientSslConnection but with custom logic).
+  MockWatermarkBuffer* client_write_buffer = nullptr;
+  ConnectionStatusCallbacks connect_callbacks;
+  std::shared_ptr<WaitForPayloadReader> payload_reader =
+      std::make_shared<WaitForPayloadReader>(*dispatcher_);
+  Network::ClientConnectionPtr ssl_client;
+  FakeRawConnectionPtr fake_upstream_connection;
+
   // Set up the mock buffer factory so the newly created SSL client will have a mock write
   // buffer. This allows us to track the bytes actually written to the socket.
   EXPECT_CALL(*mock_buffer_factory_, createBuffer_(_, _, _))
       .Times(AtLeast(1))
       .WillOnce(Invoke([&](std::function<void()> below_low, std::function<void()> above_high,
                            std::function<void()> above_overflow) -> Buffer::Instance* {
-        client_write_buffer_ =
+        client_write_buffer =
             new NiceMock<MockWatermarkBuffer>(below_low, above_high, above_overflow);
-        ON_CALL(*client_write_buffer_, move(_))
-            .WillByDefault(Invoke(client_write_buffer_, &MockWatermarkBuffer::baseMove));
-        ON_CALL(*client_write_buffer_, drain(_))
-            .WillByDefault(Invoke(client_write_buffer_, &MockWatermarkBuffer::trackDrains));
-        return client_write_buffer_;
+        ON_CALL(*client_write_buffer, move(_))
+            .WillByDefault(Invoke(client_write_buffer, &MockWatermarkBuffer::baseMove));
+        ON_CALL(*client_write_buffer, drain(_))
+            .WillByDefault(Invoke(client_write_buffer, &MockWatermarkBuffer::trackDrains));
+        return client_write_buffer;
       }));
 
   // Set up the SSL client.
   Network::Address::InstanceConstSharedPtr address =
       Ssl::getSslAddress(version_, lookupPort("tcp_proxy"));
-  context_ = Ssl::createClientSslTransportSocketFactory({}, *context_manager_, *api_);
-  ssl_client_ = dispatcher_->createClientConnection(
+  ssl_client = dispatcher_->createClientConnection(
       address, Network::Address::InstanceConstSharedPtr(),
       context_->createTransportSocket(nullptr, nullptr), nullptr, nullptr);
 
   // Perform the SSL handshake. Loopback is allowlisted in tcp_proxy.json for the ssl_auth
   // filter so there will be no pause waiting on auth data.
-  ssl_client_->addConnectionCallbacks(connect_callbacks_);
-  ssl_client_->enableHalfClose(true);
-  ssl_client_->addReadFilter(payload_reader_);
-  ssl_client_->connect();
+  ssl_client->addConnectionCallbacks(connect_callbacks);
+  ssl_client->enableHalfClose(true);
+  ssl_client->addReadFilter(payload_reader);
+  ssl_client->connect();
 
   // No upstream connection should be established yet (before TLS handshake completes).
-  FakeRawConnectionPtr fake_upstream_connection;
   ASSERT_FALSE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection,
-                                                        std::chrono::milliseconds(500)));
+                                                         std::chrono::milliseconds(500)));
 
   // Wait for TLS handshake to complete. The Connected event fires after TLS handshake.
-  while (!connect_callbacks_.connected()) {
+  while (!connect_callbacks.connected()) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
 
   // Now upstream connection should be established after TLS handshake completes.
   AssertionResult result = fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection);
   RELEASE_ASSERT(result, result.message());
-  fake_upstream_connection_ = std::move(fake_upstream_connection);
 
   // Send data after TLS handshake - this should be buffered if upstream isn't ready yet.
   Buffer::OwnedImpl buffer("hello");
-  ssl_client_->write(buffer, false);
-  while (client_write_buffer_->bytesDrained() != 5) {
+  ssl_client->write(buffer, false);
+  while (client_write_buffer->bytesDrained() != 5) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
 
   // Verify data is forwarded (buffered and then sent once upstream is ready).
-  ASSERT_TRUE(fake_upstream_connection_->waitForData(5));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(5));
 
   // Send response back.
-  ASSERT_TRUE(fake_upstream_connection_->write("world", true));
-  payload_reader_->setDataToWaitFor("world");
-  ssl_client_->dispatcher().run(Event::Dispatcher::RunType::Block);
+  ASSERT_TRUE(fake_upstream_connection->write("world", true));
+  payload_reader->setDataToWaitFor("world");
+  ssl_client->dispatcher().run(Event::Dispatcher::RunType::Block);
 
   // Clean up.
   Buffer::OwnedImpl empty_buffer;
-  ssl_client_->write(empty_buffer, true);
+  ssl_client->write(empty_buffer, true);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  ASSERT_TRUE(fake_upstream_connection_->waitForHalfClose());
-  ASSERT_TRUE(fake_upstream_connection_->write("", true));
-  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
-  ssl_client_->dispatcher().run(Event::Dispatcher::RunType::Block);
-  EXPECT_TRUE(payload_reader_->readLastByte());
-  EXPECT_TRUE(connect_callbacks_.closed());
+  ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
+  ASSERT_TRUE(fake_upstream_connection->write("", true));
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+  ssl_client->dispatcher().run(Event::Dispatcher::RunType::Block);
+  EXPECT_TRUE(payload_reader->readLastByte());
+  EXPECT_TRUE(connect_callbacks.closed());
 }
 
 // Test connection close during wait for data trigger.
