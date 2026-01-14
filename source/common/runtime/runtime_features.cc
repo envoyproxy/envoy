@@ -195,6 +195,10 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_fixed_heap_use_allocated);
 // Flip back to true once performance aligns with nghttp2 and
 // https://github.com/envoyproxy/envoy/issues/40070 is resolved.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_http2_use_oghttp2);
+// Enable case-insensitive host header matching for VHDS (Virtual Host Discovery Service).
+// When enabled (default), host headers are converted to lowercase before matching virtual hosts.
+// When disabled, host headers are matched case-sensitively.
+RUNTIME_GUARD(envoy_reloadable_features_vhds_case_insensitive_match);
 
 // Block of non-boolean flags. Use of int flags is deprecated. Do not add more.
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT

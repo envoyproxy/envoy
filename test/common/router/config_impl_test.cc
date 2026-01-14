@@ -20,6 +20,7 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/router/config_impl.h"
 #include "source/common/router/string_accessor_impl.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/stream_info/filter_state_impl.h"
 #include "source/common/stream_info/upstream_address.h"
 
@@ -12327,11 +12328,13 @@ virtual_hosts:
 
 // Test case-sensitive host matching when VHDS case_insensitive_match is false
 TEST_F(RouteMatcherTest, VhdsCaseSensitiveMatching) {
+  // Disable case-insensitive matching via runtime flag
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.vhds_case_insensitive_match", false);
+
   const std::string yaml = R"EOF(
 vhds:
   config_source:
     ads: {}
-  case_insensitive_match: false
 virtual_hosts:
 - name: exact_match_host
   domains:
@@ -12434,11 +12437,13 @@ virtual_hosts:
 
 // Test that case_insensitive_match explicitly set to true behaves the same as default
 TEST_F(RouteMatcherTest, VhdsCaseInsensitiveMatchingExplicitTrue) {
+  // Enable case-insensitive matching via runtime flag (explicit true for clarity)
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.vhds_case_insensitive_match", true);
+
   const std::string yaml = R"EOF(
 vhds:
   config_source:
     ads: {}
-  case_insensitive_match: true
 virtual_hosts:
 - name: test_host
   domains:

@@ -22,6 +22,7 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/matchers.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/common/packed_struct.h"
 #include "source/common/config/datasource.h"
 #include "source/common/config/metadata.h"
@@ -45,6 +46,11 @@
 
 namespace Envoy {
 namespace Router {
+
+// Helper function to check the runtime flag for VHDS case-insensitive matching
+inline bool vhdsCaseInsensitiveMatchEnabled() {
+  return Runtime::runtimeFeatureEnabled("envoy.reloadable_features.vhds_case_insensitive_match");
+}
 
 using RouteMetadataPack = Envoy::Config::MetadataPack<HttpRouteTypedMetadataFactory>;
 using RouteMetadataPackPtr = Envoy::Config::MetadataPackPtr<HttpRouteTypedMetadataFactory>;
@@ -1238,7 +1244,6 @@ private:
 
   VirtualHostImplSharedPtr default_virtual_host_;
   const bool ignore_port_in_host_matching_{false};
-  const bool vhds_case_insensitive_match_{true};
   const Http::LowerCaseString vhost_header_;
 };
 
@@ -1278,7 +1283,7 @@ public:
   }
   const std::string& name() const override { return name_; }
   bool usesVhds() const override { return uses_vhds_; }
-  bool vhdsCaseInsensitiveMatch() const override { return vhds_case_insensitive_match_; }
+  bool vhdsCaseInsensitiveMatch() const override;
   bool mostSpecificHeaderMutationsWins() const override {
     return most_specific_header_mutations_wins_;
   }
@@ -1311,7 +1316,6 @@ private:
   // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
   const uint32_t max_direct_response_body_size_bytes_;
   const bool uses_vhds_ : 1;
-  const bool vhds_case_insensitive_match_ : 1;
   const bool most_specific_header_mutations_wins_ : 1;
   const bool ignore_path_parameters_in_path_matching_ : 1;
 };
@@ -1344,9 +1348,7 @@ public:
   }
   const std::string& name() const override { return shared_config_->name(); }
   bool usesVhds() const override { return shared_config_->usesVhds(); }
-  bool vhdsCaseInsensitiveMatch() const override {
-    return shared_config_->vhdsCaseInsensitiveMatch();
-  }
+  bool vhdsCaseInsensitiveMatch() const override;
   bool mostSpecificHeaderMutationsWins() const override {
     return shared_config_->mostSpecificHeaderMutationsWins();
   }
@@ -1399,7 +1401,7 @@ public:
 
   const std::string& name() const override { return name_; }
   bool usesVhds() const override { return false; }
-  bool vhdsCaseInsensitiveMatch() const override { return true; }
+  bool vhdsCaseInsensitiveMatch() const override;
   bool mostSpecificHeaderMutationsWins() const override { return false; }
   uint32_t maxDirectResponseBodySizeBytes() const override { return 0; }
   const envoy::config::core::v3::Metadata& metadata() const override;

@@ -41,7 +41,7 @@ struct NullCommonConfig : public Router::CommonConfig {
 
   const std::string& name() const override { return EMPTY_STRING; }
   bool usesVhds() const override { return false; }
-  bool vhdsCaseInsensitiveMatch() const override { return true; }
+  bool vhdsCaseInsensitiveMatch() const override;
   bool mostSpecificHeaderMutationsWins() const override { return false; }
   uint32_t maxDirectResponseBodySizeBytes() const override { return 0; }
   const envoy::config::core::v3::Metadata& metadata() const override {
