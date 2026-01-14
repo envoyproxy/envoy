@@ -605,6 +605,12 @@ new_features:
     Added substitution formatting for direct response bodies via
     :ref:`body_format <envoy_v3_api_field_config.route.v3.DirectResponseAction.body_format>` in
     :ref:`DirectResponseAction <envoy_v3_api_msg_config.route.v3.DirectResponseAction>`.
+- area: router
+  change: |
+    Added runtime flag ``envoy.reloadable_features.vhds_case_insensitive_match`` to control case sensitivity
+    for host header matching in :ref:`VHDS (Virtual Host Discovery Service) <arch_overview_dynamic_config_vhds>`.
+    When enabled (default is ``true``), host headers are converted to lowercase for matching, maintaining backward
+    compatibility with previous behavior. Set to ``false`` to enable case-sensitive host header matching.
 - area: tls_inspector
   change: |
     Propagated transport errors from tls_inspector to ``DownstreamTransportFailureReason`` in ``StreamInfo`` for access logging
