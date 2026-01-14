@@ -527,6 +527,25 @@ TEST_F(DynamicModuleHttpFilterTest, SetSocketOptionBytesNullPtr) {
       envoy_dynamic_module_type_socket_direction_Upstream, {nullptr, 0}));
 }
 
+TEST_F(DynamicModuleHttpFilterTest, SetSocketOptionIntNoCallbacks) {
+  // Test with no decoder callbacks set.
+  Stats::SymbolTableImpl symbol_table;
+  auto filter_no_callbacks = std::make_unique<DynamicModuleHttpFilter>(nullptr, symbol_table);
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_set_socket_option_int(
+      filter_no_callbacks.get(), 1, 2, envoy_dynamic_module_type_socket_option_state_Prebind,
+      envoy_dynamic_module_type_socket_direction_Upstream, 100));
+}
+
+TEST_F(DynamicModuleHttpFilterTest, SetSocketOptionBytesNoCallbacks) {
+  // Test with no decoder callbacks set.
+  Stats::SymbolTableImpl symbol_table;
+  auto filter_no_callbacks = std::make_unique<DynamicModuleHttpFilter>(nullptr, symbol_table);
+  const std::string value = "test-bytes";
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_set_socket_option_bytes(
+      filter_no_callbacks.get(), 1, 2, envoy_dynamic_module_type_socket_option_state_Prebind,
+      envoy_dynamic_module_type_socket_direction_Upstream, {value.data(), value.size()}));
+}
+
 TEST_F(DynamicModuleHttpFilterTest, SocketOptionMultipleOptions) {
   // Add multiple options with different states.
   EXPECT_TRUE(envoy_dynamic_module_callback_http_set_socket_option_int(
