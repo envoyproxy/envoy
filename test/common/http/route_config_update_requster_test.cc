@@ -20,7 +20,7 @@ namespace {
 
 class RouteConfigUpdateRequesterTest : public testing::Test {
 public:
-  RouteConfigUpdateRequesterTest() {}
+  RouteConfigUpdateRequesterTest() = default;
 
   NiceMock<Router::MockRouteConfigProvider> route_config_provider_;
   NiceMock<Event::MockDispatcher> dispatcher_;
