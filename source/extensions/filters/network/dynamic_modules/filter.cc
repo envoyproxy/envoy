@@ -64,6 +64,12 @@ void DynamicModuleNetworkFilter::destroy() {
 void DynamicModuleNetworkFilter::initializeReadFilterCallbacks(
     Network::ReadFilterCallbacks& callbacks) {
   read_callbacks_ = &callbacks;
+  worker_index_ = callbacks.connection().dispatcher().workerThreadIndex().value_or(0);
+
+  // Delay the in-module filter initialization until read callbacks are set
+  // to allow accessing worker index during filter creation.
+  initializeInModuleFilter();
+
   // Register for connection events.
   read_callbacks_->connection().addConnectionCallbacks(*this);
 }

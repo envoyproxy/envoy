@@ -40,6 +40,11 @@ void DynamicModuleListenerFilter::destroy() {
 
 Network::FilterStatus DynamicModuleListenerFilter::onAccept(Network::ListenerFilterCallbacks& cb) {
   callbacks_ = &cb;
+  worker_index_ = cb.dispatcher().workerThreadIndex().value_or(0);
+
+  // Delay the in-module filter initialization until callbacks are set
+  // to allow accessing worker thread index during filter creation.
+  initializeInModuleFilter();
 
   if (in_module_filter_ == nullptr) {
     // Module failed to create filter, close the connection.

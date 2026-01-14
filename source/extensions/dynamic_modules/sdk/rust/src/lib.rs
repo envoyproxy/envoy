@@ -3590,6 +3590,9 @@ pub trait EnvoyNetworkFilter {
   /// }
   /// ```
   fn new_scheduler(&self) -> impl EnvoyNetworkFilterScheduler + 'static;
+
+  /// Get the index of the current worker thread.
+  fn get_worker_index(&self) -> u32;
 }
 
 /// This represents a thread-safe object that can be used to schedule a generic event to the
@@ -4607,6 +4610,10 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
       }
     }
   }
+
+  fn get_worker_index(&self) -> u32 {
+    unsafe { abi::envoy_dynamic_module_callback_network_filter_get_worker_index(self.raw) }
+  }
 }
 
 // Network Filter Event Hook Implementations
@@ -5106,6 +5113,9 @@ pub trait EnvoyListenerFilter {
   /// }
   /// ```
   fn new_scheduler(&self) -> impl EnvoyListenerFilterScheduler + 'static;
+
+  /// Get the index of the current worker thread.
+  fn get_worker_index(&self) -> u32;
 }
 
 /// This represents a thread-safe object that can be used to schedule a generic event to the
@@ -5661,6 +5671,10 @@ impl EnvoyListenerFilter for EnvoyListenerFilterImpl {
       }
     }
   }
+
+  fn get_worker_index(&self) -> u32 {
+    unsafe { abi::envoy_dynamic_module_callback_listener_filter_get_worker_index(self.raw) }
+  }
 }
 
 // Listener Filter Event Hook Implementations
@@ -5959,6 +5973,9 @@ pub trait EnvoyUdpListenerFilter {
     id: EnvoyHistogramId,
     value: u64,
   ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result>;
+
+  /// Get the index of the current worker thread.
+  fn get_worker_index(&self) -> u32;
 }
 
 /// The implementation of [`EnvoyUdpListenerFilterConfig`] for the Envoy UDP listener filter
@@ -6221,6 +6238,10 @@ impl EnvoyUdpListenerFilter for EnvoyUdpListenerFilterImpl {
     } else {
       Err(res)
     }
+  }
+
+  fn get_worker_index(&self) -> u32 {
+    unsafe { abi::envoy_dynamic_module_callback_udp_listener_filter_get_worker_index(self.raw) }
   }
 }
 

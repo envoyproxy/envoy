@@ -1,11 +1,10 @@
 #include "source/extensions/bootstrap/dynamic_modules/extension_config.h"
 
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
-
-#include "test/mocks/server/server_factory_context.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -20,8 +19,9 @@ protected:
 };
 
 TEST_F(ExtensionConfigTest, LoadOK) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   auto dynamic_module =
-      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false, context);
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
   auto config =

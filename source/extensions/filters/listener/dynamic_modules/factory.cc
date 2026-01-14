@@ -53,7 +53,6 @@ DynamicModuleListenerFilterConfigFactory::createListenerFilterFactoryFromProto(
     auto filter =
         std::make_unique<Extensions::DynamicModules::ListenerFilters::DynamicModuleListenerFilter>(
             filter_cfg);
-    filter->initializeInModuleFilter();
     filter_manager.addAcceptFilter(listener_filter_matcher, std::move(filter));
   };
 }

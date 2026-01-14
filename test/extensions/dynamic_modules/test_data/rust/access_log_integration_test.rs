@@ -82,6 +82,10 @@ impl AccessLogger for TestAccessLogger {
     let _is_health_check = ctx.is_health_check();
     let _timing = ctx.timing_info();
     let _bytes = ctx.bytes_info();
+
+    // Test worker id.
+    let worker_id = ctx.get_worker_index();
+    assert_eq!(worker_id, 0);
   }
 
   fn flush(&mut self) {

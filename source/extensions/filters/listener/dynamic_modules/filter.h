@@ -70,6 +70,11 @@ public:
     return callbacks_ != nullptr ? &callbacks_->dispatcher() : nullptr;
   }
 
+  /**
+   * Returns the worker index assigned to this filter.
+   */
+  uint32_t workerIndex() const { return worker_index_; }
+
 private:
   /**
    * Helper to get the `this` pointer as a void pointer.
@@ -95,6 +100,8 @@ private:
   Network::Address::InstanceConstSharedPtr cached_original_dst_;
 
   bool destroyed_ = false;
+
+  uint32_t worker_index_;
 };
 
 /**

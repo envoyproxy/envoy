@@ -587,6 +587,13 @@ impl LogContext {
       None
     }
   }
+
+  /// Get the index of the current worker thread.
+  pub fn get_worker_index(&self) -> u32 {
+    unsafe {
+      abi::envoy_dynamic_module_callback_access_logger_get_worker_index(self.envoy_ptr)
+    }
+  }
 }
 
 /// Macro to declare access logger entry points.

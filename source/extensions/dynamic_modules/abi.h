@@ -1921,15 +1921,21 @@ envoy_dynamic_module_type_http_filter_per_route_config_module_ptr
 envoy_dynamic_module_callback_get_most_specific_route_config(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
 
+// ------------------- Http Filter Callbacks - Misc ---------------
+
 /**
  * envoy_dynamic_module_callback_http_filter_get_worker_index is called by the module to get the
  * worker index assigned to the current HTTP filter. This can be used by the module to manage
  * worker-specific resources or perform worker-specific logic.
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @return the worker index assigned to the current HTTP filter.
  */
 uint32_t envoy_dynamic_module_callback_http_filter_get_worker_index(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
 
 // ------------------- Misc Callbacks for Server Context -------------------------
+
 /**
  * envoy_dynamic_module_callback_server_factory_context_get_concurrency may be called by the dynamic
  * module during server initialization to get the configured concurrency level of the server.
@@ -3101,6 +3107,19 @@ void envoy_dynamic_module_callback_network_filter_config_scheduler_commit(
     envoy_dynamic_module_type_network_filter_config_scheduler_module_ptr scheduler_module_ptr,
     uint64_t event_id);
 
+// --------------------- Network Filter Callbacks - Misc ---------------
+
+/**
+ * envoy_dynamic_module_callback_network_filter_get_worker_index is called by the module to get the
+ * worker index assigned to the current network filter. This can be used by the module to manage
+ * worker-specific resources or perform worker-specific logic.
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object of the
+ * corresponding network filter.
+ * @return the worker index assigned to the current network filter.
+ */
+uint32_t envoy_dynamic_module_callback_network_filter_get_worker_index(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr);
+
 // =============================================================================
 // ============================= Listener Filter ===============================
 // =============================================================================
@@ -3962,6 +3981,19 @@ void envoy_dynamic_module_callback_listener_filter_config_scheduler_commit(
     envoy_dynamic_module_type_listener_filter_config_scheduler_module_ptr scheduler_module_ptr,
     uint64_t event_id);
 
+// --------------------- Listener Filter Callbacks - Misc ---------------
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_worker_index is called by the module to get the
+ * worker index assigned to the current listener filter. This can be used by the module to manage
+ * worker-specific resources or perform worker-specific logic.
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object of the
+ * corresponding listener filter.
+ * @return the worker index assigned to the current listener filter.
+ */
+uint32_t envoy_dynamic_module_callback_listener_filter_get_worker_index(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr);
+
 // =============================================================================
 // ========================== UDP Listener Filter ==============================
 // =============================================================================
@@ -4252,6 +4284,19 @@ envoy_dynamic_module_callback_udp_listener_filter_record_histogram_value(
     envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr, size_t id,
     uint64_t value);
 
+// --------------------- UDP Listener Filter Callbacks - Metrics ---------------
+
+/**
+ * envoy_dynamic_module_callback_udp_listener_filter_get_worker_index is called by the module to get the
+ * worker index assigned to the current UDP listener filter. This can be used by the module to manage
+ * worker-specific resources or perform worker-specific logic.
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleUdpListenerFilter object of the
+ * corresponding UDP listener filter.
+ * @return the worker index assigned to the current UDP listener filter.
+ */
+uint32_t envoy_dynamic_module_callback_udp_listener_filter_get_worker_index(
+    envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr);
+
 // =============================================================================
 // ============================== Access Logger ================================
 // =============================================================================
@@ -4445,6 +4490,7 @@ void envoy_dynamic_module_on_access_logger_log(
  * @param logger_module_ptr is the pointer to the in-module logger instance.
  */
 void envoy_dynamic_module_on_access_logger_destroy(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_access_logger_module_ptr logger_module_ptr);
 
 /**
@@ -4459,6 +4505,7 @@ void envoy_dynamic_module_on_access_logger_destroy(
  * @param logger_module_ptr is the pointer to the in-module logger instance.
  */
 void envoy_dynamic_module_on_access_logger_flush(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_access_logger_module_ptr logger_module_ptr);
 
 // =============================================================================
@@ -4970,6 +5017,19 @@ envoy_dynamic_module_type_metrics_result
 envoy_dynamic_module_callback_access_logger_record_histogram_value(
     envoy_dynamic_module_type_access_logger_config_envoy_ptr config_envoy_ptr, size_t id,
     uint64_t value);
+
+// --------------------- Access Logger Callbacks - Misc ---------------
+
+/**
+ * envoy_dynamic_module_callback_access_logger_get_worker_index is called by the module to get the
+ * worker index assigned to the current access logger. This can be used by the module to manage
+ * worker-specific resources or perform worker-specific logic.
+ * @param access_logger_envoy_ptr is the pointer to the DynamicModuleAccessLogger object of the
+ * corresponding access logger.
+ * @return the worker index assigned to the current access logger.
+ */
+uint32_t envoy_dynamic_module_callback_access_logger_get_worker_index(
+    envoy_dynamic_module_type_access_logger_envoy_ptr access_logger_envoy_ptr);
 
 // =============================================================================
 // =========================== Bootstrap Extension =============================

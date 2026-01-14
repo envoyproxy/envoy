@@ -2,7 +2,7 @@ use envoy_proxy_dynamic_modules_rust_sdk::*;
 
 declare_bootstrap_init_functions!(my_program_init, my_new_bootstrap_extension_config_fn);
 
-fn init(
+fn my_program_init(
   server_factory_context: abi::envoy_dynamic_module_type_server_factory_context_envoy_ptr,
 ) -> bool {
   let concurrency = unsafe { get_server_concurrency(server_factory_context) };

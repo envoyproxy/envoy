@@ -148,6 +148,11 @@ public:
     return read_callbacks_ != nullptr ? &read_callbacks_->connection().dispatcher() : nullptr;
   }
 
+  /**
+   * Returns the worker index assigned to this filter.
+   */
+  uint32_t workerIndex() const { return worker_index_; }
+
 private:
   /**
    * Helper to get the `this` pointer as a void pointer.
@@ -171,6 +176,8 @@ private:
   Buffer::Instance* current_write_buffer_ = nullptr;
 
   bool destroyed_ = false;
+
+  uint32_t worker_index_;
 
   /**
    * This implementation of the AsyncClient::Callbacks is used to handle the response from the HTTP

@@ -30,8 +30,9 @@ DynamicModuleUdpListenerFilterConfigFactory::createFilterFactoryFromProto(
 
   return [filter_config](Network::UdpListenerFilterManager& filter_manager,
                          Network::UdpReadFilterCallbacks& callbacks) -> void {
-    filter_manager.addReadFilter(
-        std::make_unique<DynamicModuleUdpListenerFilter>(callbacks, filter_config));
+    auto worker_thread_index = callbacks.udpListener().dispatcher().workerThreadIndex().value_or(0);
+    filter_manager.addReadFilter(std::make_unique<DynamicModuleUdpListenerFilter>(
+        callbacks, filter_config, worker_thread_index));
   };
 }
 
