@@ -6278,3 +6278,260 @@ pub extern "C" fn envoy_dynamic_module_on_udp_listener_filter_destroy(
     Box::from_raw(filter_ptr as *mut Box<dyn UdpListenerFilter<EnvoyUdpListenerFilterImpl>>)
   };
 }
+
+// ============================================================================
+// Bootstrap Extension
+// ============================================================================
+
+/// A global variable that holds the factory function to create a new bootstrap extension config.
+/// This is set by the [`declare_bootstrap_init_functions`] macro.
+pub static NEW_BOOTSTRAP_EXTENSION_CONFIG_FUNCTION: OnceLock<NewBootstrapExtensionConfigFunction> =
+  OnceLock::new();
+
+/// The type of the factory function that creates a new bootstrap extension configuration.
+pub type NewBootstrapExtensionConfigFunction = fn(
+  &mut dyn EnvoyBootstrapExtensionConfig,
+  &str,
+  &[u8],
+) -> Option<Box<dyn BootstrapExtensionConfig>>;
+
+/// EnvoyBootstrapExtensionConfig is the Envoy-side bootstrap extension configuration.
+/// This is a handle to the Envoy configuration object.
+#[automock]
+pub trait EnvoyBootstrapExtensionConfig {}
+
+/// EnvoyBootstrapExtension is the Envoy-side bootstrap extension.
+/// This is a handle to the Envoy extension object.
+#[automock]
+pub trait EnvoyBootstrapExtension {}
+
+/// BootstrapExtensionConfig is the module-side bootstrap extension configuration.
+///
+/// This trait must be implemented by the module to handle bootstrap extension configuration.
+/// The object is created when the corresponding Envoy bootstrap extension config is created, and
+/// it is dropped when the corresponding Envoy bootstrap extension config is destroyed. Therefore,
+/// the implementation is recommended to implement the [`Drop`] trait to handle the necessary
+/// cleanup.
+///
+/// Implementations must also be `Send + Sync` since they may be accessed from multiple threads.
+pub trait BootstrapExtensionConfig: Send + Sync {
+  /// Create a new bootstrap extension instance.
+  ///
+  /// This is called when a new bootstrap extension is created.
+  fn new_bootstrap_extension(
+    &self,
+    envoy_extension: &mut dyn EnvoyBootstrapExtension,
+  ) -> Box<dyn BootstrapExtension>;
+}
+
+/// BootstrapExtension is the module-side bootstrap extension.
+///
+/// This trait must be implemented by the module to handle bootstrap extension lifecycle events.
+///
+/// All the event hooks are called on the main thread unless otherwise noted.
+pub trait BootstrapExtension: Send + Sync {
+  /// Called when the server is initialized.
+  ///
+  /// This is called on the main thread after the ServerFactoryContext is fully initialized.
+  /// This is where you can perform initialization tasks like fetching configuration from
+  /// external services, initializing global state, or registering singleton resources.
+  fn on_server_initialized(&mut self, _envoy_extension: &mut dyn EnvoyBootstrapExtension) {}
+
+  /// Called when a worker thread is initialized.
+  ///
+  /// This is called once per worker thread when it starts. You can use this to perform
+  /// per-worker-thread initialization like setting up thread-local storage.
+  fn on_worker_thread_initialized(&mut self, _envoy_extension: &mut dyn EnvoyBootstrapExtension) {}
+}
+
+// Implementation of EnvoyBootstrapExtensionConfig
+
+struct EnvoyBootstrapExtensionConfigImpl {
+  // The raw pointer is stored for future callback implementations.
+  // Currently, the EnvoyBootstrapExtensionConfig trait has no methods, but
+  // callbacks may be added in the future (e.g., for metrics or other APIs).
+  #[allow(dead_code)]
+  raw: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+}
+
+impl EnvoyBootstrapExtensionConfigImpl {
+  fn new(raw: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr) -> Self {
+    Self { raw }
+  }
+}
+
+impl EnvoyBootstrapExtensionConfig for EnvoyBootstrapExtensionConfigImpl {}
+
+// Implementation of EnvoyBootstrapExtension
+
+struct EnvoyBootstrapExtensionImpl {
+  // The raw pointer is stored for future callback implementations.
+  // Currently, the EnvoyBootstrapExtension trait has no methods, but
+  // callbacks may be added in the future.
+  #[allow(dead_code)]
+  raw: abi::envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
+}
+
+impl EnvoyBootstrapExtensionImpl {
+  fn new(raw: abi::envoy_dynamic_module_type_bootstrap_extension_envoy_ptr) -> Self {
+    Self { raw }
+  }
+}
+
+impl EnvoyBootstrapExtension for EnvoyBootstrapExtensionImpl {}
+
+// Bootstrap Extension Event Hook Implementations
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_config_new(
+  envoy_extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  name: abi::envoy_dynamic_module_type_envoy_buffer,
+  config: abi::envoy_dynamic_module_type_envoy_buffer,
+) -> abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr {
+  let mut envoy_extension_config =
+    EnvoyBootstrapExtensionConfigImpl::new(envoy_extension_config_ptr);
+  let name_str = unsafe {
+    std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+      name.ptr as *const _,
+      name.length,
+    ))
+  };
+  let config_slice = unsafe { std::slice::from_raw_parts(config.ptr as *const _, config.length) };
+  init_bootstrap_extension_config(
+    &mut envoy_extension_config,
+    name_str,
+    config_slice,
+    NEW_BOOTSTRAP_EXTENSION_CONFIG_FUNCTION
+      .get()
+      .expect("NEW_BOOTSTRAP_EXTENSION_CONFIG_FUNCTION must be set"),
+  )
+}
+
+fn init_bootstrap_extension_config(
+  envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+  name: &str,
+  config: &[u8],
+  new_extension_config_fn: &NewBootstrapExtensionConfigFunction,
+) -> abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr {
+  let extension_config = new_extension_config_fn(envoy_extension_config, name, config);
+  match extension_config {
+    Some(config) => wrap_into_c_void_ptr!(config),
+    None => std::ptr::null(),
+  }
+}
+
+#[no_mangle]
+unsafe extern "C" fn envoy_dynamic_module_on_bootstrap_extension_config_destroy(
+  extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
+) {
+  drop_wrapped_c_void_ptr!(extension_config_ptr, BootstrapExtensionConfig);
+}
+
+#[no_mangle]
+unsafe extern "C" fn envoy_dynamic_module_on_bootstrap_extension_new(
+  extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
+  envoy_extension_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
+) -> abi::envoy_dynamic_module_type_bootstrap_extension_module_ptr {
+  let mut envoy_extension = EnvoyBootstrapExtensionImpl::new(envoy_extension_ptr);
+  let extension_config = {
+    let raw = extension_config_ptr as *const *const dyn BootstrapExtensionConfig;
+    &**raw
+  };
+  envoy_dynamic_module_on_bootstrap_extension_new_impl(&mut envoy_extension, extension_config)
+}
+
+fn envoy_dynamic_module_on_bootstrap_extension_new_impl(
+  envoy_extension: &mut EnvoyBootstrapExtensionImpl,
+  extension_config: &dyn BootstrapExtensionConfig,
+) -> abi::envoy_dynamic_module_type_bootstrap_extension_module_ptr {
+  let extension = extension_config.new_bootstrap_extension(envoy_extension);
+  wrap_into_c_void_ptr!(extension)
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_server_initialized(
+  envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
+  extension_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_module_ptr,
+) {
+  let extension = extension_ptr as *mut Box<dyn BootstrapExtension>;
+  let extension = unsafe { &mut *extension };
+  extension.on_server_initialized(&mut EnvoyBootstrapExtensionImpl::new(envoy_ptr));
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_worker_thread_initialized(
+  envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
+  extension_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_module_ptr,
+) {
+  let extension = extension_ptr as *mut Box<dyn BootstrapExtension>;
+  let extension = unsafe { &mut *extension };
+  extension.on_worker_thread_initialized(&mut EnvoyBootstrapExtensionImpl::new(envoy_ptr));
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_destroy(
+  extension_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_module_ptr,
+) {
+  let _ = unsafe { Box::from_raw(extension_ptr as *mut Box<dyn BootstrapExtension>) };
+}
+
+/// Declare the init functions for the bootstrap extension dynamic module.
+///
+/// The first argument is the program init function with [`ProgramInitFunction`] type.
+/// The second argument is the factory function with [`NewBootstrapExtensionConfigFunction`] type.
+///
+/// # Example
+///
+/// ```
+/// use envoy_proxy_dynamic_modules_rust_sdk::*;
+///
+/// declare_bootstrap_init_functions!(my_program_init, my_new_bootstrap_extension_config_fn);
+///
+/// fn my_program_init() -> bool {
+///   true
+/// }
+///
+/// fn my_new_bootstrap_extension_config_fn(
+///   _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+///   _name: &str,
+///   _config: &[u8],
+/// ) -> Option<Box<dyn BootstrapExtensionConfig>> {
+///   Some(Box::new(MyBootstrapExtensionConfig {}))
+/// }
+///
+/// struct MyBootstrapExtensionConfig {}
+///
+/// impl BootstrapExtensionConfig for MyBootstrapExtensionConfig {
+///   fn new_bootstrap_extension(
+///     &self,
+///     _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+///   ) -> Box<dyn BootstrapExtension> {
+///     Box::new(MyBootstrapExtension {})
+///   }
+/// }
+///
+/// struct MyBootstrapExtension {}
+///
+/// impl BootstrapExtension for MyBootstrapExtension {
+///   fn on_server_initialized(&mut self, _envoy_extension: &mut dyn EnvoyBootstrapExtension) {
+///     // Use envoy_log_info! macro for logging.
+///     // envoy_log_info!("Bootstrap extension initialized!");
+///   }
+/// }
+/// ```
+#[macro_export]
+macro_rules! declare_bootstrap_init_functions {
+  ($f:ident, $new_bootstrap_extension_config_fn:expr) => {
+    #[no_mangle]
+    pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_BOOTSTRAP_EXTENSION_CONFIG_FUNCTION
+        .get_or_init(|| $new_bootstrap_extension_config_fn);
+      if ($f()) {
+        envoy_proxy_dynamic_modules_rust_sdk::abi::kAbiVersion.as_ptr()
+          as *const ::std::os::raw::c_char
+      } else {
+        ::std::ptr::null()
+      }
+    }
+  };
+}

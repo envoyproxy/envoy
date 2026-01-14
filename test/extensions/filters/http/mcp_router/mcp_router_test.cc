@@ -196,7 +196,9 @@ TEST_F(SessionCodecTest, BuildCompositeSessionId) {
   std::string composite = SessionCodec::buildCompositeSessionId("route1", "user1", sessions);
 
   EXPECT_TRUE(absl::StrContains(composite, "route1@"));
-  EXPECT_TRUE(absl::StrContains(composite, "@user1@"));
+  auto parsed = SessionCodec::parseCompositeSessionId(composite);
+  ASSERT_TRUE(parsed.ok());
+  EXPECT_EQ(parsed->subject, "user1");
   EXPECT_TRUE(absl::StrContains(composite, "backend1:"));
   EXPECT_TRUE(absl::StrContains(composite, "backend2:"));
 }
