@@ -535,6 +535,9 @@ TEST_F(DynamicModuleHttpFilterTest, SocketOptionMultipleOptions) {
   EXPECT_TRUE(envoy_dynamic_module_callback_http_set_socket_option_int(
       filter_.get(), 1, 1, envoy_dynamic_module_type_socket_option_state_Bound,
       envoy_dynamic_module_type_socket_direction_Upstream, 200));
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_set_socket_option_int(
+      filter_.get(), 1, 1, envoy_dynamic_module_type_socket_option_state_Listening,
+      envoy_dynamic_module_type_socket_direction_Upstream, 300));
   const std::string bytes_val = "test-bytes";
   EXPECT_TRUE(envoy_dynamic_module_callback_http_set_socket_option_bytes(
       filter_.get(), 2, 2, envoy_dynamic_module_type_socket_option_state_Listening,
@@ -551,6 +554,11 @@ TEST_F(DynamicModuleHttpFilterTest, SocketOptionMultipleOptions) {
       filter_.get(), 1, 1, envoy_dynamic_module_type_socket_option_state_Bound,
       envoy_dynamic_module_type_socket_direction_Upstream, &int_result));
   EXPECT_EQ(200, int_result);
+
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_socket_option_int(
+      filter_.get(), 1, 1, envoy_dynamic_module_type_socket_option_state_Listening,
+      envoy_dynamic_module_type_socket_direction_Upstream, &int_result));
+  EXPECT_EQ(300, int_result);
 
   envoy_dynamic_module_type_envoy_buffer bytes_result;
   EXPECT_TRUE(envoy_dynamic_module_callback_http_get_socket_option_bytes(
