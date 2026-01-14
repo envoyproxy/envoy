@@ -146,6 +146,7 @@ proto_library(
         "//envoy/extensions/access_loggers/stats/v3:pkg",
         "//envoy/extensions/access_loggers/stream/v3:pkg",
         "//envoy/extensions/access_loggers/wasm/v3:pkg",
+        "//envoy/extensions/bootstrap/dynamic_modules/v3:pkg",
         "//envoy/extensions/bootstrap/internal_listener/v3:pkg",
         "//envoy/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/v3:pkg",
         "//envoy/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/v3:pkg",

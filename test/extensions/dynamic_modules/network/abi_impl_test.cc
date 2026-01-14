@@ -8,6 +8,7 @@
 #include "source/extensions/filters/network/dynamic_modules/filter.h"
 
 #include "test/extensions/dynamic_modules/util.h"
+#include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/ssl/mocks.h"
@@ -27,9 +28,9 @@ public:
     auto dynamic_module = newDynamicModule(testSharedObjectPath("network_no_op", "c"), false);
     EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
-    auto filter_config_or_status =
-        newDynamicModuleNetworkFilterConfig("test_filter", "", std::move(dynamic_module.value()),
-                                            cluster_manager_, *stats_.rootScope());
+    auto filter_config_or_status = newDynamicModuleNetworkFilterConfig(
+        "test_filter", "", std::move(dynamic_module.value()), cluster_manager_, *stats_.rootScope(),
+        main_thread_dispatcher_);
     EXPECT_TRUE(filter_config_or_status.ok()) << filter_config_or_status.status().message();
     filter_config_ = filter_config_or_status.value();
 
@@ -53,6 +54,7 @@ public:
 
   Stats::IsolatedStoreImpl stats_;
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
+  NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   DynamicModuleNetworkFilterConfigSharedPtr filter_config_;
   std::shared_ptr<DynamicModuleNetworkFilter> filter_;
   NiceMock<Network::MockReadFilterCallbacks> read_callbacks_;
@@ -1238,9 +1240,9 @@ public:
     auto dynamic_module = newDynamicModule(testSharedObjectPath("network_no_op", "c"), false);
     EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
-    auto filter_config_or_status =
-        newDynamicModuleNetworkFilterConfig("test_filter", "", std::move(dynamic_module.value()),
-                                            cluster_manager_, *stats_.rootScope());
+    auto filter_config_or_status = newDynamicModuleNetworkFilterConfig(
+        "test_filter", "", std::move(dynamic_module.value()), cluster_manager_, *stats_.rootScope(),
+        main_thread_dispatcher_);
     EXPECT_TRUE(filter_config_or_status.ok()) << filter_config_or_status.status().message();
     filter_config_ = filter_config_or_status.value();
 
@@ -1263,6 +1265,7 @@ public:
 
   Stats::IsolatedStoreImpl stats_;
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
+  NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   DynamicModuleNetworkFilterConfigSharedPtr filter_config_;
   std::shared_ptr<DynamicModuleNetworkFilter> filter_;
   NiceMock<Network::MockReadFilterCallbacks> read_callbacks_;
@@ -1782,6 +1785,161 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, StartUpstreamSecureTransportNu
   bool result = envoy_dynamic_module_callback_network_filter_start_upstream_secure_transport(
       static_cast<void*>(filter.get()));
   EXPECT_FALSE(result);
+}
+
+// =============================================================================
+// Tests for network filter scheduler callbacks.
+// =============================================================================
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, NetworkFilterSchedulerNewDelete) {
+  // Set up the dispatcher for the filter via connection.
+  NiceMock<Event::MockDispatcher> worker_dispatcher;
+  EXPECT_CALL(connection_, dispatcher()).WillRepeatedly(testing::ReturnRef(worker_dispatcher));
+
+  auto scheduler = envoy_dynamic_module_callback_network_filter_scheduler_new(filterPtr());
+  EXPECT_NE(nullptr, scheduler);
+
+  envoy_dynamic_module_callback_network_filter_scheduler_delete(scheduler);
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, NetworkFilterSchedulerCommit) {
+  // Set up the dispatcher for the filter via connection.
+  NiceMock<Event::MockDispatcher> worker_dispatcher;
+  EXPECT_CALL(connection_, dispatcher()).WillRepeatedly(testing::ReturnRef(worker_dispatcher));
+
+  auto scheduler = envoy_dynamic_module_callback_network_filter_scheduler_new(filterPtr());
+  EXPECT_NE(nullptr, scheduler);
+
+  // Expect the callback to be posted.
+  EXPECT_CALL(worker_dispatcher, post(_));
+
+  envoy_dynamic_module_callback_network_filter_scheduler_commit(scheduler, 12345);
+
+  // Clean up.
+  envoy_dynamic_module_callback_network_filter_scheduler_delete(scheduler);
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, NetworkFilterConfigSchedulerNewDelete) {
+  auto scheduler = envoy_dynamic_module_callback_network_filter_config_scheduler_new(
+      static_cast<void*>(filter_config_.get()));
+  EXPECT_NE(nullptr, scheduler);
+
+  envoy_dynamic_module_callback_network_filter_config_scheduler_delete(scheduler);
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, NetworkFilterConfigSchedulerCommit) {
+  auto scheduler = envoy_dynamic_module_callback_network_filter_config_scheduler_new(
+      static_cast<void*>(filter_config_.get()));
+  EXPECT_NE(nullptr, scheduler);
+
+  // Expect the callback to be posted.
+  EXPECT_CALL(main_thread_dispatcher_, post(_));
+
+  envoy_dynamic_module_callback_network_filter_config_scheduler_commit(scheduler, 54321);
+
+  // Clean up.
+  envoy_dynamic_module_callback_network_filter_config_scheduler_delete(scheduler);
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, NetworkFilterSchedulerCommitInvokesOnScheduled) {
+  // Set up the dispatcher for the filter via connection.
+  NiceMock<Event::MockDispatcher> worker_dispatcher;
+  EXPECT_CALL(connection_, dispatcher()).WillRepeatedly(testing::ReturnRef(worker_dispatcher));
+
+  auto scheduler = envoy_dynamic_module_callback_network_filter_scheduler_new(filterPtr());
+  EXPECT_NE(nullptr, scheduler);
+
+  // Capture the posted callback and invoke it to verify onScheduled is called.
+  Event::PostCb captured_cb;
+  EXPECT_CALL(worker_dispatcher, post(_)).WillOnce(testing::Invoke([&](Event::PostCb cb) {
+    captured_cb = std::move(cb);
+  }));
+
+  envoy_dynamic_module_callback_network_filter_scheduler_commit(scheduler, 789);
+
+  // Invoke the captured callback to simulate the dispatcher running the event.
+  // This should call filter_->onScheduled(789), which invokes the module's on_scheduled hook.
+  // Since the no_op module's on_scheduled is a no-op, we just verify it doesn't crash.
+  captured_cb();
+
+  // Clean up.
+  envoy_dynamic_module_callback_network_filter_scheduler_delete(scheduler);
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest,
+       NetworkFilterConfigSchedulerCommitInvokesOnScheduled) {
+  auto scheduler = envoy_dynamic_module_callback_network_filter_config_scheduler_new(
+      static_cast<void*>(filter_config_.get()));
+  EXPECT_NE(nullptr, scheduler);
+
+  // Capture the posted callback and invoke it to verify onScheduled is called.
+  Event::PostCb captured_cb;
+  EXPECT_CALL(main_thread_dispatcher_, post(_)).WillOnce(testing::Invoke([&](Event::PostCb cb) {
+    captured_cb = std::move(cb);
+  }));
+
+  envoy_dynamic_module_callback_network_filter_config_scheduler_commit(scheduler, 999);
+
+  // Invoke the captured callback to simulate the dispatcher running the event.
+  // This should call filter_config_->onScheduled(999), which invokes the module's
+  // on_config_scheduled hook. Since the no_op module's hook is a no-op, we just verify it doesn't
+  // crash.
+  captured_cb();
+
+  // Clean up.
+  envoy_dynamic_module_callback_network_filter_config_scheduler_delete(scheduler);
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest,
+       NetworkFilterSchedulerCommitAfterFilterDestroyedDoesNotCrash) {
+  // Set up the dispatcher for the filter via connection.
+  NiceMock<Event::MockDispatcher> worker_dispatcher;
+  EXPECT_CALL(connection_, dispatcher()).WillRepeatedly(testing::ReturnRef(worker_dispatcher));
+
+  auto scheduler = envoy_dynamic_module_callback_network_filter_scheduler_new(filterPtr());
+  EXPECT_NE(nullptr, scheduler);
+
+  // Capture the posted callback.
+  Event::PostCb captured_cb;
+  EXPECT_CALL(worker_dispatcher, post(_)).WillOnce(testing::Invoke([&](Event::PostCb cb) {
+    captured_cb = std::move(cb);
+  }));
+
+  envoy_dynamic_module_callback_network_filter_scheduler_commit(scheduler, 123);
+
+  // Destroy the filter before invoking the callback.
+  filter_.reset();
+
+  // The callback should not crash even though the filter is destroyed.
+  captured_cb();
+
+  // Clean up.
+  envoy_dynamic_module_callback_network_filter_scheduler_delete(scheduler);
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest,
+       NetworkFilterConfigSchedulerCommitAfterConfigDestroyedDoesNotCrash) {
+  auto scheduler = envoy_dynamic_module_callback_network_filter_config_scheduler_new(
+      static_cast<void*>(filter_config_.get()));
+  EXPECT_NE(nullptr, scheduler);
+
+  // Capture the posted callback.
+  Event::PostCb captured_cb;
+  EXPECT_CALL(main_thread_dispatcher_, post(_)).WillOnce(testing::Invoke([&](Event::PostCb cb) {
+    captured_cb = std::move(cb);
+  }));
+
+  envoy_dynamic_module_callback_network_filter_config_scheduler_commit(scheduler, 456);
+
+  // Destroy the filter and config before invoking the callback.
+  filter_.reset();
+  filter_config_.reset();
+
+  // The callback should not crash even though the config is destroyed.
+  captured_cb();
+
+  // Clean up.
+  envoy_dynamic_module_callback_network_filter_config_scheduler_delete(scheduler);
 }
 
 } // namespace NetworkFilters

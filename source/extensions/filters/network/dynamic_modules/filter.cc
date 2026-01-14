@@ -116,6 +116,12 @@ void DynamicModuleNetworkFilter::onEvent(Network::ConnectionEvent event) {
                                     toAbiConnectionEvent(event));
 }
 
+void DynamicModuleNetworkFilter::onScheduled(uint64_t event_id) {
+  if (in_module_filter_ != nullptr && config_->on_network_filter_scheduled_ != nullptr) {
+    config_->on_network_filter_scheduled_(thisAsVoidPtr(), in_module_filter_, event_id);
+  }
+}
+
 void DynamicModuleNetworkFilter::onAboveWriteBufferHighWatermark() {
   // Not currently exposed to dynamic modules.
 }
