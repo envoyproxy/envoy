@@ -351,10 +351,9 @@ envoy_cc_test(
 
 envoy_cc_test_library(
     name = "test_utils_lib",
-    hdrs = envoy_select_enable_http3(["test_utils.h"]),
+    hdrs = ["test_utils.h"],
     external_deps = ["bazel_runfiles"],
     deps = envoy_select_enable_http3([
-        "//envoy/stream_info:stream_info_interface",
         "//source/common/quic:envoy_quic_client_connection_lib",
         "//source/common/quic:envoy_quic_client_session_lib",
         "//source/common/quic:envoy_quic_connection_debug_visitor_factory_interface",
@@ -362,12 +361,15 @@ envoy_cc_test_library(
         "//source/common/quic:envoy_quic_server_connection_lib",
         "//source/common/quic:quic_filter_manager_connection_lib",
         "//test/common/config:dummy_config_proto_cc_proto",
-        "//test/test_common:environment_lib",
-        "//test/test_common:utility_lib",
         "@com_github_google_quiche//:quic_core_http_spdy_session_lib",
         "@com_github_google_quiche//:quic_test_tools_first_flight_lib",
         "@com_github_google_quiche//:quic_test_tools_qpack_qpack_test_utils_lib",
-    ]),
+    ]) + [
+        "//envoy/stream_info:stream_info_interface",
+        "//source/common/quic:envoy_quic_network_observer_registry_factory_lib",
+        "//test/test_common:environment_lib",
+        "//test/test_common:utility_lib",
+    ],
 )
 
 envoy_cc_test(

@@ -8,7 +8,7 @@ namespace Redis {
 
 bool SupportedCommands::isSupportedCommand(const std::string& command) {
   return (simpleCommands().contains(command) || evalCommands().contains(command) ||
-          hashMultipleSumResultCommands().contains(command) ||
+          objectCommands().contains(command) || hashMultipleSumResultCommands().contains(command) ||
           ClusterScopeCommands().contains(command) || randomShardCommands().contains(command) ||
           transactionCommands().contains(command) || auth() == command || echo() == command ||
           mget() == command || mset() == command || ping() == command || time() == command ||

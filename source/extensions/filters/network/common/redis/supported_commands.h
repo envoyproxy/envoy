@@ -62,6 +62,14 @@ struct SupportedCommands {
   }
 
   /**
+   * @return commands which hash on the third argument (subcommand key pattern)
+   * OBJECT subcommand key [arguments] -> key is at index 2
+   */
+  static const absl::flat_hash_set<std::string>& objectCommands() {
+    CONSTRUCT_ON_FIRST_USE(absl::flat_hash_set<std::string>, "object");
+  }
+
+  /**
    * @return commands which are sent to multiple servers and coalesced by summing the responses
    */
   static const absl::flat_hash_set<std::string>& hashMultipleSumResultCommands() {
@@ -74,7 +82,7 @@ struct SupportedCommands {
    */
   static const absl::flat_hash_set<std::string>& ClusterScopeCommands() {
     CONSTRUCT_ON_FIRST_USE(absl::flat_hash_set<std::string>, "script", "flushall", "flushdb",
-                           "slowlog", "config", "info", "keys", "select", "role");
+                           "slowlog", "config", "info", "keys", "select", "role", "hello");
   }
 
   /**
@@ -103,6 +111,11 @@ struct SupportedCommands {
     CONSTRUCT_ON_FIRST_USE(absl::flat_hash_set<std::string>, "multi", "exec", "discard", "watch",
                            "unwatch");
   }
+
+  /**
+   * @return hello command
+   */
+  static const std::string& hello() { CONSTRUCT_ON_FIRST_USE(std::string, "hello"); }
 
   /**
    * @return auth command
@@ -182,7 +195,8 @@ struct SupportedCommands {
                            "randomkey", // RANDOMKEY
                            "quit",      // QUIT
                            "role",      // ROLE
-                           "info"       // INFO [section]
+                           "info",      // INFO [section]
+                           "hello"      // HELLO [version]
     );
   }
 

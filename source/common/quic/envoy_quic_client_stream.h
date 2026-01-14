@@ -41,6 +41,7 @@ public:
   // Http::Stream
   void resetStream(Http::StreamResetReason reason) override;
   void setFlushTimeout(std::chrono::milliseconds) override {}
+  absl::optional<uint32_t> codecStreamId() const override { return id(); }
 
   // quic::QuicStream
   void OnStreamFrame(const quic::QuicStreamFrame& frame) override;

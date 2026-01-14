@@ -249,7 +249,7 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
   auto& quic_transport_socket_factory =
       dynamic_cast<Quic::QuicClientTransportSocketFactory&>(*transport_socket_factory);
   std::unique_ptr<Quic::PersistentQuicInfoImpl> persistent_info =
-      Quic::createPersistentQuicInfoForCluster(*dispatcher, *cluster);
+      Quic::createPersistentQuicInfoForCluster(*dispatcher, *cluster, server_factory_context);
 
   Network::Address::InstanceConstSharedPtr local_address;
   if (addr->ip()->version() == Network::Address::IpVersion::v4) {

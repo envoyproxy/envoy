@@ -54,7 +54,7 @@ using StreamInfoFormatterProviderCreateFunc =
 
 enum class DurationPrecision { Milliseconds, Microseconds, Nanoseconds };
 
-enum class StreamInfoAddressFieldExtractionType { WithPort, WithoutPort, JustPort };
+enum class StreamInfoAddressFieldExtractionType { WithPort, WithoutPort, JustPort, JustEndpointId };
 
 /**
  * Base formatter for formatting Metadata objects
@@ -293,6 +293,39 @@ public:
 
 private:
   Protobuf::Value str_;
+};
+
+/**
+ * FormatterProvider for requested server name from StreamInfo.
+ */
+class RequestedServerNameFormatter : public StreamInfoFormatterProvider {
+public:
+  enum HostFormatterSource {
+    SNI,
+    SNIFirst,
+    HostFirst,
+  };
+  enum HostFormatterOption {
+    OriginalHostOrHost,
+    HostOnly,
+    OriginalHostOnly,
+  };
+
+  RequestedServerNameFormatter(absl::string_view fallback, absl::string_view option);
+
+  // StreamInfoFormatterProvider
+  // Don't hide the other structure of format and formatValue.
+  using StreamInfoFormatterProvider::format;
+  using StreamInfoFormatterProvider::formatValue;
+  absl::optional<std::string> format(const StreamInfo::StreamInfo&) const override;
+  Protobuf::Value formatValue(const StreamInfo::StreamInfo&) const override;
+
+  absl::optional<std::string> getHostFromHeaders(const StreamInfo::StreamInfo& stream_info) const;
+  absl::optional<std::string> getSNIFromStreamInfo(const StreamInfo::StreamInfo& stream_info) const;
+
+private:
+  HostFormatterSource source_;
+  HostFormatterOption option_;
 };
 
 class DefaultBuiltInStreamInfoCommandParserFactory : public BuiltInCommandParserFactory {

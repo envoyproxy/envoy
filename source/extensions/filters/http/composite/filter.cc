@@ -95,6 +95,50 @@ void Filter::encodeComplete() {
 void Filter::onMatchCallback(const Matcher::Action& action) {
   const auto& composite_action = action.getTyped<ExecuteFilterAction>();
 
+  // Handle named filter chain lookup.
+  if (composite_action.isNamedFilterChainLookup()) {
+    // Check sampling first.
+    if (composite_action.actionSkip()) {
+      return;
+    }
+
+    const std::string& chain_name = composite_action.filterChainName();
+
+    // Soft fail: if no named filter chains are configured, do nothing.
+    if (!named_filter_chains_) {
+      ENVOY_LOG(debug, "filter_chain_name '{}' specified but no named filter chains configured",
+                chain_name);
+      return;
+    }
+
+    // Look up the filter chain by name.
+    auto it = named_filter_chains_->find(chain_name);
+    if (it == named_filter_chains_->end()) {
+      // Soft fail: if the named filter chain is not found, do nothing.
+      ENVOY_LOG(debug, "filter_chain_name '{}' not found in named filter chains", chain_name);
+      return;
+    }
+
+    // Create filters from the pre-compiled factories.
+    FactoryCallbacksWrapper wrapper(*this, dispatcher_, true /* is_filter_chain */);
+    for (const auto& factory_cb : it->second) {
+      factory_cb(wrapper);
+    }
+
+    if (!wrapper.filters_to_inject_.empty()) {
+      stats_.filter_delegation_success_.inc();
+      delegated_filter_ =
+          std::make_shared<DelegatedFilterChain>(std::move(wrapper.filters_to_inject_));
+      updateFilterState(decoder_callbacks_, std::string(decoder_callbacks_->filterConfigName()),
+                        chain_name);
+      delegated_filter_->setDecoderFilterCallbacks(*decoder_callbacks_);
+      delegated_filter_->setEncoderFilterCallbacks(*encoder_callbacks_);
+      access_loggers_.insert(access_loggers_.end(), wrapper.access_loggers_.begin(),
+                             wrapper.access_loggers_.end());
+    }
+    return;
+  }
+
   // Use filter chain mode if the action is a filter chain.
   const bool is_filter_chain = composite_action.isFilterChain();
   FactoryCallbacksWrapper wrapper(*this, dispatcher_, is_filter_chain);
