@@ -8,6 +8,11 @@ try-import ../.bazelrc
 # global
 #############################################################################
 
+# Disable autoloading for android rules - they're loaded explicitly via WORKSPACE
+# This prevents Bazel 8 autoload from interfering with rules_android resolution
+# See: https://github.com/bazelbuild/bazel/issues/24235
+common --incompatible_autoload_externally=
+
 # Common flags for all builds
 build --define=hot_restart=disabled
 build --define=tcmalloc=disabled

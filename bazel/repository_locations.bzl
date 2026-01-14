@@ -1119,7 +1119,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "6ef26d4f978e8b4cf5ce1d47532d70cb62cd18431227a1c8007c8f7843243c06",
         release_date = "2025-12-09",
         urls = ["https://github.com/bazelbuild/rules_java/releases/download/{version}/rules_java-{version}.tar.gz"],
-        use_category = ["build"],
+        use_category = ["build", "dataplane_core", "controlplane"],
         license = "Apache-2.0",
         license_url = "https://github.com/bazelbuild/rules_java/blob/{version}/LICENSE",
     ),
