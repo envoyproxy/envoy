@@ -17,13 +17,10 @@ namespace CpuUtilizationMonitor {
 
 static const std::string LINUX_CPU_STATS_FILE = "/proc/stat";
 
-/**
- * Reads CPU stats from /proc/stat for host-level CPU monitoring.
- */
 class LinuxCpuStatsReader : public CpuStatsReader {
 public:
   explicit LinuxCpuStatsReader(const std::string& cpu_stats_filename = LINUX_CPU_STATS_FILE);
-  CpuTimes getCpuTimes() override;
+  CpuTimes getCpuTimes();
   absl::StatusOr<double> getUtilization() override;
 
 private:
@@ -31,10 +28,7 @@ private:
   CpuTimes previous_cpu_times_{false, false, 0, 0, 0};
 };
 
-/**
- * Base class for container CPU stats readers which supports
- * both cgroup v1 and v2 implementations.
- */
+ // Container CPU modes with both cgroup v1 and v2 implementations.
 class LinuxContainerCpuStatsReader : public CpuStatsReader {
 public:
   using ContainerStatsReaderPtr = std::unique_ptr<LinuxContainerCpuStatsReader>;
@@ -67,7 +61,7 @@ public:
   CgroupV1CpuStatsReader(Filesystem::Instance& fs, TimeSource& time_source,
                          const std::string& shares_path, const std::string& usage_path);
 
-  CpuTimes getCpuTimes() override;
+  CpuTimes getCpuTimes();
   absl::StatusOr<double> getUtilization() override;
 
 private:
@@ -87,7 +81,7 @@ public:
                          const std::string& stat_path, const std::string& max_path,
                          const std::string& effective_path);
 
-  CpuTimes getCpuTimes() override;
+  CpuTimes getCpuTimes();
   absl::StatusOr<double> getUtilization() override;
 
 private:

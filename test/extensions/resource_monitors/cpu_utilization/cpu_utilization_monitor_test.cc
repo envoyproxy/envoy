@@ -21,53 +21,7 @@ class MockCpuStatsReader : public CpuStatsReader {
 public:
   MockCpuStatsReader() = default;
 
-  MOCK_METHOD(CpuTimes, getCpuTimes, ());
-
-  // Implement getUtilization() to use getCpuTimes() and calculate utilization
-  absl::StatusOr<double> getUtilization() override {
-    CpuTimes current_cpu_times = getCpuTimes();
-
-    if (!current_cpu_times.is_valid) {
-      return absl::InvalidArgumentError("Failed to read CPU times");
-    }
-
-    // For the first call, initialize previous times and return 0
-    if (!previous_cpu_times_.is_valid) {
-      previous_cpu_times_ = current_cpu_times;
-      return 0.0;
-    }
-
-    // Calculate utilization based on deltas
-    const double work_over_period = current_cpu_times.work_time - previous_cpu_times_.work_time;
-    const int64_t total_over_period = current_cpu_times.total_time - previous_cpu_times_.total_time;
-
-    if (work_over_period < 0 || total_over_period <= 0) {
-      return absl::InvalidArgumentError(
-          fmt::format("Erroneous CPU stats calculation. Work_over_period='{}' cannot "
-                      "be a negative number and total_over_period='{}' must be a positive number.",
-                      work_over_period, total_over_period));
-    }
-
-    double utilization;
-    if (current_cpu_times.is_cgroup_v2) {
-      // CgroupV2-specific calculation with unit conversions
-      const double total_over_period_seconds = total_over_period / 1000000000.0;
-      utilization = ((work_over_period / 1000000.0) /
-                     (total_over_period_seconds * current_cpu_times.effective_cores));
-      utilization = std::clamp(utilization, 0.0, 1.0);
-    } else {
-      // Simple calculation for Linux host and CgroupV1
-      utilization = work_over_period / total_over_period;
-    }
-
-    // Update previous times for next call
-    previous_cpu_times_ = current_cpu_times;
-
-    return utilization;
-  }
-
-private:
-  CpuTimes previous_cpu_times_{false, false, 0, 0, 0};
+  MOCK_METHOD(absl::StatusOr<double>, getUtilization, ());
 };
 
 class ResourcePressure : public Server::ResourceUpdateCallbacks {
@@ -91,51 +45,48 @@ private:
 TEST(HostCpuUtilizationMonitorTest, ComputesCorrectUsageCgroupV1) {
   envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig config;
   auto stats_reader = std::make_unique<MockCpuStatsReader>();
-  EXPECT_CALL(*stats_reader, getCpuTimes())
-      .WillOnce(Return(CpuTimes{true, false, 50, 100, 0}))   // cgroup v1
-      .WillOnce(Return(CpuTimes{true, false, 100, 200, 0}))  // cgroup v1
-      .WillOnce(Return(CpuTimes{true, false, 200, 300, 0})); // cgroup v1
+  // Mock returns utilization directly
+  // Note: Constructor calls getUtilization() once to establish baseline
+  // Original test: CpuTimes{50,100}, {100,200}, {200,300}
+  // Delta1: (100-50)/(200-100) = 50/100 = 0.5
+  // Delta2: (200-100)/(300-200) = 100/100 = 1.0
+  EXPECT_CALL(*stats_reader, getUtilization())
+      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(0.5))  // First update: 50% utilization
+      .WillOnce(Return(1.0)); // Second update: 100% utilization
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
 
   ResourcePressure resource;
   monitor->updateResourceUsage(resource);
   ASSERT_TRUE(resource.hasPressure());
   ASSERT_FALSE(resource.hasError());
-  EXPECT_DOUBLE_EQ(resource.pressure(), 0.025); // dampening
+  EXPECT_DOUBLE_EQ(resource.pressure(), 0.025); // 0.5 * 0.05
 
   monitor->updateResourceUsage(resource);
   ASSERT_TRUE(resource.hasPressure());
   ASSERT_FALSE(resource.hasError());
-  EXPECT_DOUBLE_EQ(resource.pressure(), 0.07375); // dampening
+  EXPECT_DOUBLE_EQ(resource.pressure(), 0.07375); // 1.0 * 0.05 + 0.025 * 0.95
 }
 
 TEST(HostCpuUtilizationMonitorTest, ComputesCorrectUsageCgroupV2) {
   envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig config;
   auto stats_reader = std::make_unique<MockCpuStatsReader>();
-  // For cgroup v2: work_time is in microseconds, total_time is in nanoseconds, effective_cores must
-  // be > 0 Formula: current_utilization = ((work_over_period / 1000000.0) /
-  // (total_over_period_seconds * effective_cores)) where total_over_period_seconds =
-  // total_over_period / 1000000000.0
-  EXPECT_CALL(*stats_reader, getCpuTimes())
-      .WillOnce(Return(CpuTimes{true, true, 50000.0, 100000000,
-                                2.0})) // cgroup v2: 50ms work, 100ms total, 2 cores
-      .WillOnce(Return(CpuTimes{true, true, 100000.0, 200000000,
-                                2.0})) // cgroup v2: 100ms work, 200ms total, 2 cores
-      .WillOnce(Return(CpuTimes{true, true, 200000.0, 400000000,
-                                2.0})); // cgroup v2: 200ms work, 400ms total, 2 cores
+  // Mock cgroup v2 returns utilization directly
+  // Note: Constructor calls getUtilization() once to establish baseline
+  EXPECT_CALL(*stats_reader, getUtilization())
+      .WillOnce(Return(0.0))   // Constructor call
+      .WillOnce(Return(0.25))  // First update: 25% utilization
+      .WillOnce(Return(0.25)); // Second update: 25% utilization
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
 
   ResourcePressure resource;
-  // First update: work_over_period=50000, total_over_period=100000000
-  // total_over_period_seconds = 0.1, current_utilization = (0.05 / (0.1 * 2)) = 0.25
-  // utilization = 0.25 * 0.05 = 0.0125
+  // First update: utilization = 0.25 * 0.05 = 0.0125
   monitor->updateResourceUsage(resource);
   ASSERT_TRUE(resource.hasPressure());
   ASSERT_FALSE(resource.hasError());
   EXPECT_DOUBLE_EQ(resource.pressure(), 0.0125);
 
-  // Second update: work_over_period=50000, total_over_period=100000000
-  // current_utilization = 0.25, utilization = 0.25 * 0.05 + 0.0125 * 0.95 = 0.024375
+  // Second update: utilization = 0.25 * 0.05 + 0.0125 * 0.95 = 0.024375
   monitor->updateResourceUsage(resource);
   ASSERT_TRUE(resource.hasPressure());
   ASSERT_FALSE(resource.hasError());
@@ -145,9 +96,11 @@ TEST(HostCpuUtilizationMonitorTest, ComputesCorrectUsageCgroupV2) {
 TEST(HostCpuUtilizationMonitorTest, GetsErroneousStatsDenominator) {
   envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig config;
   auto stats_reader = std::make_unique<MockCpuStatsReader>();
-  EXPECT_CALL(*stats_reader, getCpuTimes())
-      .WillOnce(Return(CpuTimes{true, false, 100, 100, 0})) // cgroup v1
-      .WillOnce(Return(CpuTimes{true, false, 100, 99, 0})); // cgroup v1
+  // Mock returns error for invalid denominator
+  // Constructor call succeeds with 0.0, then update fails
+  EXPECT_CALL(*stats_reader, getUtilization())
+      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(absl::InvalidArgumentError("total_over_period must be positive")));
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
   ResourcePressure resource;
   monitor->updateResourceUsage(resource);
@@ -157,9 +110,11 @@ TEST(HostCpuUtilizationMonitorTest, GetsErroneousStatsDenominator) {
 TEST(HostCpuUtilizationMonitorTest, GetsErroneousStatsNumerator) {
   envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig config;
   auto stats_reader = std::make_unique<MockCpuStatsReader>();
-  EXPECT_CALL(*stats_reader, getCpuTimes())
-      .WillOnce(Return(CpuTimes{true, false, 100, 100, 0})) // cgroup v1
-      .WillOnce(Return(CpuTimes{true, false, 99, 150, 0})); // cgroup v1
+  // Mock returns error for invalid numerator (negative work delta)
+  // Constructor call succeeds with 0.0, then update fails
+  EXPECT_CALL(*stats_reader, getUtilization())
+      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(absl::InvalidArgumentError("Work_over_period cannot be negative")));
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
 
   ResourcePressure resource;
@@ -170,10 +125,12 @@ TEST(HostCpuUtilizationMonitorTest, GetsErroneousStatsNumerator) {
 TEST(HostCpuUtilizationMonitorTest, ReportsError) {
   envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig config;
   auto stats_reader = std::make_unique<MockCpuStatsReader>();
-  EXPECT_CALL(*stats_reader, getCpuTimes())
-      .WillOnce(Return(CpuTimes{false, false, 0, 0, 0}))    // cgroup v1
-      .WillOnce(Return(CpuTimes{false, false, 0, 200, 0}))  // cgroup v1
-      .WillOnce(Return(CpuTimes{false, false, 0, 300, 0})); // cgroup v1
+  // Mock returns error (e.g., file read failure)
+  // Constructor call succeeds with 0.0, then updates fail
+  EXPECT_CALL(*stats_reader, getUtilization())
+      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(absl::InvalidArgumentError("Failed to read CPU times")))
+      .WillOnce(Return(absl::InvalidArgumentError("Failed to read CPU times")));
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
 
   ResourcePressure resource;
@@ -189,22 +146,23 @@ TEST(ContainerCpuUsageMonitorTest, ComputesCorrectUsage) {
   config.set_mode(
       envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig::CONTAINER);
   auto stats_reader = std::make_unique<MockCpuStatsReader>();
-  EXPECT_CALL(*stats_reader, getCpuTimes())
-      .WillOnce(Return(CpuTimes{true, false, 1101, 1001, 0}))  // cgroup v1
-      .WillOnce(Return(CpuTimes{true, false, 1102, 1002, 0}))  // cgroup v1
-      .WillOnce(Return(CpuTimes{true, false, 1103, 1003, 0})); // cgroup v1
+  // Mock returns 100% utilization (work delta 1, total delta 1)
+  EXPECT_CALL(*stats_reader, getUtilization())
+      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(1.0)) // First call: 100% utilization
+      .WillOnce(Return(1.0)); // Second call: 100% utilization
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
 
   ResourcePressure resource;
   monitor->updateResourceUsage(resource);
   ASSERT_TRUE(resource.hasPressure());
   ASSERT_FALSE(resource.hasError());
-  EXPECT_DOUBLE_EQ(resource.pressure(), 0.05);
+  EXPECT_DOUBLE_EQ(resource.pressure(), 0.05); // 1.0 * 0.05
 
   monitor->updateResourceUsage(resource);
   ASSERT_TRUE(resource.hasPressure());
   ASSERT_FALSE(resource.hasError());
-  EXPECT_DOUBLE_EQ(resource.pressure(), 0.0975);
+  EXPECT_DOUBLE_EQ(resource.pressure(), 0.0975); // 1.0 * 0.05 + 0.05 * 0.95
 }
 
 TEST(ContainerCpuUsageMonitorTest, GetsErroneousStatsDenominator) {
@@ -212,9 +170,10 @@ TEST(ContainerCpuUsageMonitorTest, GetsErroneousStatsDenominator) {
   config.set_mode(
       envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig::CONTAINER);
   auto stats_reader = std::make_unique<MockCpuStatsReader>();
-  EXPECT_CALL(*stats_reader, getCpuTimes())
-      .WillOnce(Return(CpuTimes{true, false, 1000, 100, 0})) // cgroup v1
-      .WillOnce(Return(CpuTimes{true, false, 1001, 99, 0})); // cgroup v1
+  // Mock returns error for invalid denominator
+  EXPECT_CALL(*stats_reader, getUtilization())
+      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(absl::InvalidArgumentError("total_over_period must be positive")));
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
   ResourcePressure resource;
   monitor->updateResourceUsage(resource);
@@ -226,9 +185,10 @@ TEST(ContainerCpuUsageMonitorTest, GetsErroneousStatsNumerator) {
   config.set_mode(
       envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig::CONTAINER);
   auto stats_reader = std::make_unique<MockCpuStatsReader>();
-  EXPECT_CALL(*stats_reader, getCpuTimes())
-      .WillOnce(Return(CpuTimes{true, false, 1000, 101, 0})) // cgroup v1
-      .WillOnce(Return(CpuTimes{true, false, 999, 102, 0})); // cgroup v1
+  // Mock returns error for invalid numerator (negative work delta)
+  EXPECT_CALL(*stats_reader, getUtilization())
+      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(absl::InvalidArgumentError("Work_over_period cannot be negative")));
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
   ResourcePressure resource;
   monitor->updateResourceUsage(resource);
@@ -240,10 +200,11 @@ TEST(ContainerCpuUtilizationMonitorTest, ReportsError) {
   config.set_mode(
       envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig::CONTAINER);
   auto stats_reader = std::make_unique<MockCpuStatsReader>();
-  EXPECT_CALL(*stats_reader, getCpuTimes())
-      .WillOnce(Return(CpuTimes{false, false, 0, 0, 0}))    // cgroup v1
-      .WillOnce(Return(CpuTimes{false, false, 0, 0, 0}))    // cgroup v1
-      .WillOnce(Return(CpuTimes{false, false, 0, 200, 0})); // cgroup v1
+  // Mock returns error (e.g., file read failure)
+  EXPECT_CALL(*stats_reader, getUtilization())
+      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(absl::InvalidArgumentError("Failed to read CPU times")))
+      .WillOnce(Return(absl::InvalidArgumentError("Failed to read CPU times")));
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
 
   ResourcePressure resource;
@@ -259,11 +220,11 @@ TEST(ContainerCpuUsageMonitorTest, ComputesCorrectUsageCgroupV2) {
   config.set_mode(
       envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig::CONTAINER);
   auto stats_reader = std::make_unique<MockCpuStatsReader>();
-  // Initial sample
-  EXPECT_CALL(*stats_reader, getCpuTimes())
-      .WillOnce(Return(CpuTimes{true, true, 0, 1000000000ULL, 2}))
-      // Second sample after 1 second: 1,000,000 usec consumed across 2 cores -> 0.5
-      .WillOnce(Return(CpuTimes{true, true, 1000000, 2000000000ULL, 2}));
+  // Mock cgroup v2: 1,000,000 usec work over 1s (1B nsec) with 2 cores = 50% utilization
+  // Formula: (1000000 / 1000000.0) / ((1000000000 / 1000000000.0) * 2) = 1.0 / 2.0 = 0.5
+  EXPECT_CALL(*stats_reader, getUtilization())
+      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(0.5)); // 50% utilization
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
 
   ResourcePressure resource;
@@ -280,14 +241,11 @@ TEST(HostCpuUtilizationMonitorTest, CgroupV2SingleCore) {
   auto stats_reader = std::make_unique<MockCpuStatsReader>();
 
   // Scenario: Container with 1 core, using 50% of that core
-  // work_time: 50ms = 50000 usec, total_time: 100ms = 100000000 nsec
-  // Formula: ((50000 / 1000000.0) / (0.1 * 1.0)) = 0.05 / 0.1 = 0.5 (50% utilization)
-  EXPECT_CALL(*stats_reader, getCpuTimes())
-      .WillOnce(Return(CpuTimes{true, true, 0.0, 0, 1.0})) // Initial: 0ms work, 0ms total, 1 core
-      .WillOnce(Return(
-          CpuTimes{true, true, 50000.0, 100000000, 1.0})) // After: 50ms work, 100ms total, 1 core
-      .WillOnce(Return(CpuTimes{true, true, 100000.0, 200000000,
-                                1.0})); // After: 100ms work, 200ms total, 1 core
+  // work_time: 50ms, total_time: 100ms, 1 core = 50% utilization
+  EXPECT_CALL(*stats_reader, getUtilization())
+      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(0.5)) // First call: 50% utilization
+      .WillOnce(Return(0.5)); // Second call: 50% utilization
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
 
   ResourcePressure resource;
@@ -310,11 +268,10 @@ TEST(HostCpuUtilizationMonitorTest, CgroupV2FractionalCores) {
   auto stats_reader = std::make_unique<MockCpuStatsReader>();
 
   // Scenario: Container with 1.5 cores (cpu.max = "150000 100000")
-  // Using 75ms of CPU work over 100ms period on 1.5 cores
-  // Formula: ((75000 / 1000000.0) / (0.1 * 1.5)) = 0.075 / 0.15 = 0.5 (50% utilization)
-  EXPECT_CALL(*stats_reader, getCpuTimes())
-      .WillOnce(Return(CpuTimes{true, true, 0.0, 0, 1.5}))
-      .WillOnce(Return(CpuTimes{true, true, 75000.0, 100000000, 1.5}));
+  // Using 75ms of CPU work over 100ms period on 1.5 cores = 50% utilization
+  EXPECT_CALL(*stats_reader, getUtilization())
+      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(0.5)); // 50% utilization
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
 
   ResourcePressure resource;
@@ -331,10 +288,10 @@ TEST(HostCpuUtilizationMonitorTest, CgroupV2HighCoreCount) {
   auto stats_reader = std::make_unique<MockCpuStatsReader>();
 
   // Scenario: Large server with 32 cores, using 800ms over 100ms = 8 cores fully utilized
-  // Formula: ((800000 / 1000000.0) / (0.1 * 32)) = 0.8 / 3.2 = 0.25 (25% utilization)
-  EXPECT_CALL(*stats_reader, getCpuTimes())
-      .WillOnce(Return(CpuTimes{true, true, 0.0, 0, 32.0}))
-      .WillOnce(Return(CpuTimes{true, true, 800000.0, 100000000, 32.0}));
+  // Result: 25% utilization
+  EXPECT_CALL(*stats_reader, getUtilization())
+      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(0.25)); // 25% utilization
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
 
   ResourcePressure resource;
@@ -344,26 +301,24 @@ TEST(HostCpuUtilizationMonitorTest, CgroupV2HighCoreCount) {
   EXPECT_DOUBLE_EQ(resource.pressure(), 0.0125); // 0.25 * 0.05
 }
 
-// Verify clamp(0.0, 100.0) works when calculated value > 100
+// Verify clamp(0.0, 1.0) works when calculated value > 1.0
 // This can happen due to timing anomalies or system clock adjustments
 TEST(HostCpuUtilizationMonitorTest, CgroupV2ClampingAtMaximum) {
   envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig config;
   auto stats_reader = std::make_unique<MockCpuStatsReader>();
 
-  // Scenario: Anomalous reading where work_time exceeds what's theoretically possible
-  // work_time: 50,000ms (50 seconds!) on 2 cores over 100ms period = 25,000% utilization
-  // Formula: ((50000000 / 1000000.0) / (0.1 * 2)) = 50.0 / 0.2 = 250.0 → clamped to 1.0
-  // Then: 1.0 * 0.05 (DAMPENING_ALPHA) = 0.05
-  EXPECT_CALL(*stats_reader, getCpuTimes())
-      .WillOnce(Return(CpuTimes{true, true, 0.0, 0, 2.0}))
-      .WillOnce(Return(CpuTimes{true, true, 50000000.0, 100000000, 2.0})); // 50 seconds of work!
+  // Scenario: Anomalous reading clamped to 1.0 (100% utilization)
+  // The implementation clamps the result to [0.0, 1.0]
+  EXPECT_CALL(*stats_reader, getUtilization())
+      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(1.0)); // Clamped to 100%
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
 
   ResourcePressure resource;
   monitor->updateResourceUsage(resource);
   ASSERT_TRUE(resource.hasPressure());
   ASSERT_FALSE(resource.hasError());
-  // Calculation gives 250.0 (2.5 as fraction), clamped to 1.0, then EWMA: 1.0 * 0.05 = 0.05
+  // EWMA: 1.0 * 0.05 = 0.05
   EXPECT_DOUBLE_EQ(resource.pressure(), 0.05);
 }
 
@@ -373,11 +328,10 @@ TEST(HostCpuUtilizationMonitorTest, CgroupV2NearZeroUsage) {
   envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig config;
   auto stats_reader = std::make_unique<MockCpuStatsReader>();
 
-  // Scenario: Nearly idle container, using 0.1ms over 1000ms on 2 cores
-  // Formula: ((100 / 1000000.0) / (1.0 * 2)) = 0.0001 / 2 = 0.00005 (0.005% utilization)
-  EXPECT_CALL(*stats_reader, getCpuTimes())
-      .WillOnce(Return(CpuTimes{true, true, 0.0, 0, 2.0}))
-      .WillOnce(Return(CpuTimes{true, true, 100.0, 1000000000, 2.0}));
+  // Scenario: Nearly idle container, using 0.1ms over 1000ms on 2 cores = 0.005% utilization
+  EXPECT_CALL(*stats_reader, getUtilization())
+      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(0.00005)); // 0.005% utilization
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
 
   ResourcePressure resource;
@@ -393,11 +347,10 @@ TEST(HostCpuUtilizationMonitorTest, CgroupV2ZeroWorkTime) {
   envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig config;
   auto stats_reader = std::make_unique<MockCpuStatsReader>();
 
-  // Scenario: No CPU work done (container sleeping)
-  // work_over_period = 0, so utilization should be 0%
-  EXPECT_CALL(*stats_reader, getCpuTimes())
-      .WillOnce(Return(CpuTimes{true, true, 1000.0, 1000000000, 2.0}))
-      .WillOnce(Return(CpuTimes{true, true, 1000.0, 2000000000, 2.0})); // Same work_time
+  // Scenario: No CPU work done (container sleeping) = 0% utilization
+  EXPECT_CALL(*stats_reader, getUtilization())
+      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(0.0)); // 0% utilization
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
 
   ResourcePressure resource;
@@ -413,12 +366,10 @@ TEST(HostCpuUtilizationMonitorTest, CgroupV2LargeTimeDelta) {
   envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig config;
   auto stats_reader = std::make_unique<MockCpuStatsReader>();
 
-  // Scenario: 1 hour period (3600 seconds = 3,600,000,000,000 nanoseconds)
-  // Using 1.8 billion usec (1,800,000 ms) on 4 cores = 50% utilization
-  // Formula: ((1800000000 / 1000000.0) / (3600 * 4)) = 1800 / 14400 = 0.125
-  EXPECT_CALL(*stats_reader, getCpuTimes())
-      .WillOnce(Return(CpuTimes{true, true, 0.0, 0, 4.0}))
-      .WillOnce(Return(CpuTimes{true, true, 1800000000.0, 3600000000000ULL, 4.0}));
+  // Scenario: 1 hour period with 12.5% utilization
+  EXPECT_CALL(*stats_reader, getUtilization())
+      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(0.125)); // 12.5% utilization
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
 
   ResourcePressure resource;
@@ -434,12 +385,10 @@ TEST(HostCpuUtilizationMonitorTest, CgroupV2SmallTimeDelta) {
   envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig config;
   auto stats_reader = std::make_unique<MockCpuStatsReader>();
 
-  // Scenario: 1ms sampling period (1,000,000 nanoseconds)
-  // Using 1ms on 2 cores = 50% utilization
-  // Formula: ((1000 / 1000000.0) / (0.001 * 2)) = 0.001 / 0.002 = 0.5
-  EXPECT_CALL(*stats_reader, getCpuTimes())
-      .WillOnce(Return(CpuTimes{true, true, 0.0, 0, 2.0}))
-      .WillOnce(Return(CpuTimes{true, true, 1000.0, 1000000, 2.0}));
+  // Scenario: 1ms sampling period with 50% utilization
+  EXPECT_CALL(*stats_reader, getUtilization())
+      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(0.5)); // 50% utilization
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
 
   ResourcePressure resource;
@@ -455,12 +404,10 @@ TEST(HostCpuUtilizationMonitorTest, CgroupV2TimeUnitConversion) {
   envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig config;
   auto stats_reader = std::make_unique<MockCpuStatsReader>();
 
-  // Scenario: Precise values to test conversion
-  // work_time: 123456 usec = 123.456ms, total_time: 500000000 nsec = 500ms, 1 core
-  // Formula: ((123456 / 1000000.0) / (0.5 * 1)) = 0.123456 / 0.5 = 0.246912
-  EXPECT_CALL(*stats_reader, getCpuTimes())
-      .WillOnce(Return(CpuTimes{true, true, 0.0, 0, 1.0}))
-      .WillOnce(Return(CpuTimes{true, true, 123456.0, 500000000, 1.0}));
+  // Scenario: Precise utilization value (123.456ms work / 500ms on 1 core = 24.6912% utilization)
+  EXPECT_CALL(*stats_reader, getUtilization())
+      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(0.246912)); // 24.6912% utilization
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
 
   ResourcePressure resource;
@@ -476,15 +423,12 @@ TEST(HostCpuUtilizationMonitorTest, CgroupV2BurstyCpuUsage) {
   envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig config;
   auto stats_reader = std::make_unique<MockCpuStatsReader>();
 
-  // Scenario: Alternating between 10% and 90% utilization on 2 cores
-  // Period 1: 10ms work over 100ms = 5% per core = 10% total
-  // Period 2: 90ms work over 100ms = 45% per core = 90% total
-  // Period 3: 10ms work over 100ms = 5% per core = 10% total
-  EXPECT_CALL(*stats_reader, getCpuTimes())
-      .WillOnce(Return(CpuTimes{true, true, 0.0, 0, 2.0}))
-      .WillOnce(Return(CpuTimes{true, true, 20000.0, 100000000, 2.0}))   // 10% utilization
-      .WillOnce(Return(CpuTimes{true, true, 200000.0, 200000000, 2.0}))  // 90% utilization spike
-      .WillOnce(Return(CpuTimes{true, true, 220000.0, 300000000, 2.0})); // Back to 10%
+  // Scenario: Alternating between 10% and 90% utilization
+  EXPECT_CALL(*stats_reader, getUtilization())
+      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(0.1))  // 10% utilization
+      .WillOnce(Return(0.9))  // 90% utilization spike
+      .WillOnce(Return(0.1)); // Back to 10%
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
 
   ResourcePressure resource;
@@ -509,12 +453,11 @@ TEST(HostCpuUtilizationMonitorTest, CgroupV2SustainedHighLoad) {
   auto stats_reader = std::make_unique<MockCpuStatsReader>();
 
   // Scenario: Sustained 95% CPU utilization on 2 cores
-  // 190ms work over 100ms on 2 cores = 95% utilization
-  EXPECT_CALL(*stats_reader, getCpuTimes())
-      .WillOnce(Return(CpuTimes{true, true, 0.0, 0, 2.0}))
-      .WillOnce(Return(CpuTimes{true, true, 190000.0, 100000000, 2.0}))
-      .WillOnce(Return(CpuTimes{true, true, 380000.0, 200000000, 2.0}))
-      .WillOnce(Return(CpuTimes{true, true, 570000.0, 300000000, 2.0}));
+  EXPECT_CALL(*stats_reader, getUtilization())
+      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(0.95)) // 95% utilization
+      .WillOnce(Return(0.95)) // 95% utilization
+      .WillOnce(Return(0.95)); // 95% utilization
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
 
   ResourcePressure resource;
@@ -537,11 +480,10 @@ TEST(HostCpuUtilizationMonitorTest, CgroupV2MultiCoreSaturation) {
   envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig config;
   auto stats_reader = std::make_unique<MockCpuStatsReader>();
 
-  // Scenario: 4 cores, 100% usage = 400ms work over 100ms
-  // Formula: ((400000 / 1000000.0) / (0.1 * 4)) = 0.4 / 0.4 = 1.0 (100%)
-  EXPECT_CALL(*stats_reader, getCpuTimes())
-      .WillOnce(Return(CpuTimes{true, true, 0.0, 0, 4.0}))
-      .WillOnce(Return(CpuTimes{true, true, 400000.0, 100000000, 4.0}));
+  // Scenario: 4 cores, 100% usage
+  EXPECT_CALL(*stats_reader, getUtilization())
+      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(1.0)); // 100% utilization
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
 
   ResourcePressure resource;
@@ -556,11 +498,10 @@ TEST(HostCpuUtilizationMonitorTest, CgroupV2PartialCoreUtilization) {
   envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig config;
   auto stats_reader = std::make_unique<MockCpuStatsReader>();
 
-  // Scenario: 4 cores, but only 2 fully utilized = 200ms work over 100ms
-  // Formula: ((200000 / 1000000.0) / (0.1 * 4)) = 0.2 / 0.4 = 0.5 (50%)
-  EXPECT_CALL(*stats_reader, getCpuTimes())
-      .WillOnce(Return(CpuTimes{true, true, 0.0, 0, 4.0}))
-      .WillOnce(Return(CpuTimes{true, true, 200000.0, 100000000, 4.0}));
+  // Scenario: 4 cores, but only 2 fully utilized = 50% utilization
+  EXPECT_CALL(*stats_reader, getUtilization())
+      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(0.5)); // 50% utilization
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
 
   ResourcePressure resource;
@@ -576,15 +517,14 @@ TEST(HostCpuUtilizationMonitorTest, CgroupV2TimeRegression) {
   auto stats_reader = std::make_unique<MockCpuStatsReader>();
 
   // Scenario: work_time decreases (goes backwards)
-  // This should trigger an error in the monitor
-  EXPECT_CALL(*stats_reader, getCpuTimes())
-      .WillOnce(Return(CpuTimes{true, true, 100000.0, 100000000, 2.0}))
-      .WillOnce(Return(CpuTimes{true, true, 50000.0, 200000000, 2.0})); // work_time decreased!
+  // This should trigger an error in the implementation
+  EXPECT_CALL(*stats_reader, getUtilization())
+      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(absl::InvalidArgumentError("Work_over_period cannot be negative")));
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
 
   ResourcePressure resource;
   monitor->updateResourceUsage(resource);
-  // work_over_period = 50000 - 100000 = -50000 (negative!)
   // This should trigger an error: "Work_over_period cannot be a negative number"
   ASSERT_TRUE(resource.hasError());
 }
@@ -596,12 +536,10 @@ TEST(ContainerCpuUsageMonitorTest, CgroupV2HalfCore) {
       envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig::CONTAINER);
   auto stats_reader = std::make_unique<MockCpuStatsReader>();
 
-  // Scenario: Container limited to 0.5 cores (cpu.max = "50000 100000")
-  // Using 25ms over 100ms = 50% of the 0.5 core allocation
-  // Formula: ((25000 / 1000000.0) / (0.1 * 0.5)) = 0.025 / 0.05 = 0.5
-  EXPECT_CALL(*stats_reader, getCpuTimes())
-      .WillOnce(Return(CpuTimes{true, true, 0.0, 0, 0.5}))
-      .WillOnce(Return(CpuTimes{true, true, 25000.0, 100000000, 0.5}));
+  // Scenario: Container limited to 0.5 cores, using 50% of that allocation
+  EXPECT_CALL(*stats_reader, getUtilization())
+      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(0.5)); // 50% utilization
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
 
   ResourcePressure resource;
@@ -618,12 +556,10 @@ TEST(ContainerCpuUsageMonitorTest, CgroupV2QuarterCore) {
       envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig::CONTAINER);
   auto stats_reader = std::make_unique<MockCpuStatsReader>();
 
-  // Scenario: Container limited to 0.25 cores (cpu.max = "25000 100000")
-  // Using 25ms over 100ms = 100% of the 0.25 core allocation
-  // Formula: ((25000 / 1000000.0) / (0.1 * 0.25)) = 0.025 / 0.025 = 1.0
-  EXPECT_CALL(*stats_reader, getCpuTimes())
-      .WillOnce(Return(CpuTimes{true, true, 0.0, 0, 0.25}))
-      .WillOnce(Return(CpuTimes{true, true, 25000.0, 100000000, 0.25}));
+  // Scenario: Container limited to 0.25 cores, using 100% of that allocation
+  EXPECT_CALL(*stats_reader, getUtilization())
+      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(1.0)); // 100% utilization
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
 
   ResourcePressure resource;
@@ -640,11 +576,10 @@ TEST(ContainerCpuUsageMonitorTest, CgroupV2ThreeAndHalfCores) {
       envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig::CONTAINER);
   auto stats_reader = std::make_unique<MockCpuStatsReader>();
 
-  // Scenario: Container with 3.5 cores, using 175ms over 100ms = 50% utilization
-  // Formula: ((175000 / 1000000.0) / (0.1 * 3.5)) = 0.175 / 0.35 = 0.5
-  EXPECT_CALL(*stats_reader, getCpuTimes())
-      .WillOnce(Return(CpuTimes{true, true, 0.0, 0, 3.5}))
-      .WillOnce(Return(CpuTimes{true, true, 175000.0, 100000000, 3.5}));
+  // Scenario: Container with 3.5 cores, using 50% utilization
+  EXPECT_CALL(*stats_reader, getUtilization())
+      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(0.5)); // 50% utilization
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
 
   ResourcePressure resource;
@@ -663,11 +598,10 @@ TEST(ContainerCpuUsageMonitorTest, CgroupV2NoCpuLimit) {
   auto stats_reader = std::make_unique<MockCpuStatsReader>();
 
   // Scenario: No CPU limit set, so container can use all 8 cores from cpuset
-  // Using 400ms over 100ms = 50% of 8 cores = 4 cores fully utilized
-  // Formula: ((400000 / 1000000.0) / (0.1 * 8)) = 0.4 / 0.8 = 0.5
-  EXPECT_CALL(*stats_reader, getCpuTimes())
-      .WillOnce(Return(CpuTimes{true, true, 0.0, 0, 8.0})) // effective_cores = N from cpuset
-      .WillOnce(Return(CpuTimes{true, true, 400000.0, 100000000, 8.0}));
+  // Result: 50% utilization
+  EXPECT_CALL(*stats_reader, getUtilization())
+      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(0.5)); // 50% utilization
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
 
   ResourcePressure resource;
@@ -687,13 +621,12 @@ TEST(ContainerCpuUsageMonitorTest, CgroupV2ThrottledContainer) {
   auto stats_reader = std::make_unique<MockCpuStatsReader>();
 
   // Scenario: Container limited to 2 cores but trying to use more
-  // CPU work approaches the limit: 195ms, 198ms, 199ms over 100ms periods
   // This simulates throttling kicking in as utilization approaches 100%
-  EXPECT_CALL(*stats_reader, getCpuTimes())
-      .WillOnce(Return(CpuTimes{true, true, 0.0, 0, 2.0}))
-      .WillOnce(Return(CpuTimes{true, true, 195000.0, 100000000, 2.0}))  // 97.5% utilization
-      .WillOnce(Return(CpuTimes{true, true, 393000.0, 200000000, 2.0}))  // 99% utilization
-      .WillOnce(Return(CpuTimes{true, true, 592000.0, 300000000, 2.0})); // 99.5% utilization
+  EXPECT_CALL(*stats_reader, getUtilization())
+      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(0.975)) // 97.5% utilization
+      .WillOnce(Return(0.99))  // 99% utilization
+      .WillOnce(Return(0.995)); // 99.5% utilization
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
 
   ResourcePressure resource;
@@ -717,12 +650,10 @@ TEST(ContainerCpuUsageMonitorTest, CgroupV2LargeCoreRange) {
       envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig::CONTAINER);
   auto stats_reader = std::make_unique<MockCpuStatsReader>();
 
-  // Scenario: Container on 16-core system, limited to 12 cores
-  // Using 600ms over 100ms = 50% of 12 cores = 6 cores fully utilized
-  // Formula: ((600000 / 1000000.0) / (0.1 * 12)) = 0.6 / 1.2 = 0.5
-  EXPECT_CALL(*stats_reader, getCpuTimes())
-      .WillOnce(Return(CpuTimes{true, true, 0.0, 0, 12.0}))
-      .WillOnce(Return(CpuTimes{true, true, 600000.0, 100000000, 12.0}));
+  // Scenario: Container on 16-core system, limited to 12 cores, using 50%
+  EXPECT_CALL(*stats_reader, getUtilization())
+      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(0.5)); // 50% utilization
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
 
   ResourcePressure resource;
@@ -743,11 +674,10 @@ TEST(ContainerCpuUsageMonitorTest, CgroupV2DynamicCoreChange) {
 
   // Scenario: Core count changes from 4 to 2 (limit reduced)
   // This tests if monitor handles changing effective_cores gracefully
-  EXPECT_CALL(*stats_reader, getCpuTimes())
-      .WillOnce(Return(CpuTimes{true, true, 0.0, 0, 4.0}))
-      .WillOnce(Return(CpuTimes{true, true, 200000.0, 100000000, 4.0})) // 50% on 4 cores
-      .WillOnce(
-          Return(CpuTimes{true, true, 300000.0, 200000000, 2.0})); // Now only 2 cores available!
+  EXPECT_CALL(*stats_reader, getUtilization())
+      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(0.5)) // 50% utilization on 4 cores
+      .WillOnce(Return(0.5)); // 50% utilization on 2 cores (different base)
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
 
   ResourcePressure resource;
@@ -765,10 +695,11 @@ TEST(ContainerCpuUsageMonitorTest, CgroupV2DynamicCoreChange) {
 TEST(HostCpuUtilizationMonitorTest, CgroupV2ReportsError) {
   envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig config;
   auto stats_reader = std::make_unique<MockCpuStatsReader>();
-  EXPECT_CALL(*stats_reader, getCpuTimes())
-      .WillOnce(Return(CpuTimes{false, true, 0, 0, 0}))      // Constructor call
-      .WillOnce(Return(CpuTimes{false, true, 0, 0, 0}))      // Invalid cgroup v2
-      .WillOnce(Return(CpuTimes{false, true, 0, 200, 2.0})); // Invalid cgroup v2
+  // Mock returns errors for invalid cgroup v2 data
+  EXPECT_CALL(*stats_reader, getUtilization())
+      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(absl::InvalidArgumentError("Failed to read CPU times")))
+      .WillOnce(Return(absl::InvalidArgumentError("Failed to read CPU times")));
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
 
   ResourcePressure resource;
@@ -784,9 +715,10 @@ TEST(HostCpuUtilizationMonitorTest, CgroupV2ReportsError) {
 TEST(HostCpuUtilizationMonitorTest, CgroupV2ErroneousStatsDenominator) {
   envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig config;
   auto stats_reader = std::make_unique<MockCpuStatsReader>();
-  EXPECT_CALL(*stats_reader, getCpuTimes())
-      .WillOnce(Return(CpuTimes{true, true, 100000.0, 100000000, 2.0})) // Initial valid
-      .WillOnce(Return(CpuTimes{true, true, 100000.0, 99999999, 2.0})); // total_time goes backward
+  // Mock returns error for negative or zero total_time delta
+  EXPECT_CALL(*stats_reader, getUtilization())
+      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(absl::InvalidArgumentError("total_over_period must be positive")));
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
 
   ResourcePressure resource;
@@ -798,9 +730,10 @@ TEST(HostCpuUtilizationMonitorTest, CgroupV2ErroneousStatsDenominator) {
 TEST(HostCpuUtilizationMonitorTest, CgroupV2ErroneousStatsNumerator) {
   envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig config;
   auto stats_reader = std::make_unique<MockCpuStatsReader>();
-  EXPECT_CALL(*stats_reader, getCpuTimes())
-      .WillOnce(Return(CpuTimes{true, true, 100000.0, 100000000, 2.0})) // Initial valid
-      .WillOnce(Return(CpuTimes{true, true, 99999.0, 200000000, 2.0})); // work_time goes backward
+  // Mock returns error for negative work_time delta
+  EXPECT_CALL(*stats_reader, getUtilization())
+      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(absl::InvalidArgumentError("Work_over_period cannot be negative")));
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
 
   ResourcePressure resource;
@@ -812,9 +745,10 @@ TEST(HostCpuUtilizationMonitorTest, CgroupV2ErroneousStatsNumerator) {
 TEST(HostCpuUtilizationMonitorTest, CgroupV2ZeroTotalTimeDelta) {
   envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig config;
   auto stats_reader = std::make_unique<MockCpuStatsReader>();
-  EXPECT_CALL(*stats_reader, getCpuTimes())
-      .WillOnce(Return(CpuTimes{true, true, 100000.0, 100000000, 2.0}))  // Initial valid
-      .WillOnce(Return(CpuTimes{true, true, 100000.0, 100000000, 2.0})); // No time delta (zero)
+  // Mock returns error for zero total_time delta
+  EXPECT_CALL(*stats_reader, getUtilization())
+      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(absl::InvalidArgumentError("total_over_period must be positive")));
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
 
   ResourcePressure resource;
@@ -828,10 +762,11 @@ TEST(ContainerCpuUsageMonitorTest, CgroupV2ReportsError) {
   config.set_mode(
       envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig::CONTAINER);
   auto stats_reader = std::make_unique<MockCpuStatsReader>();
-  EXPECT_CALL(*stats_reader, getCpuTimes())
-      .WillOnce(Return(CpuTimes{false, true, 0, 0, 2.0}))    // Constructor call
-      .WillOnce(Return(CpuTimes{false, true, 0, 0, 2.0}))    // Invalid cgroup v2
-      .WillOnce(Return(CpuTimes{false, true, 0, 200, 2.0})); // Invalid cgroup v2
+  // Mock returns errors for invalid cgroup v2 data
+  EXPECT_CALL(*stats_reader, getUtilization())
+      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(absl::InvalidArgumentError("Failed to read CPU times")))
+      .WillOnce(Return(absl::InvalidArgumentError("Failed to read CPU times")));
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
 
   ResourcePressure resource;
@@ -847,9 +782,10 @@ TEST(ContainerCpuUsageMonitorTest, CgroupV2ErroneousStatsDenominator) {
   config.set_mode(
       envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig::CONTAINER);
   auto stats_reader = std::make_unique<MockCpuStatsReader>();
-  EXPECT_CALL(*stats_reader, getCpuTimes())
-      .WillOnce(Return(CpuTimes{true, true, 100000.0, 100000000, 2.0})) // Initial valid
-      .WillOnce(Return(CpuTimes{true, true, 100000.0, 99999999, 2.0})); // total_time goes backward
+  // Mock returns error for negative or zero total_time delta
+  EXPECT_CALL(*stats_reader, getUtilization())
+      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(absl::InvalidArgumentError("total_over_period must be positive")));
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
 
   ResourcePressure resource;
@@ -862,9 +798,10 @@ TEST(ContainerCpuUsageMonitorTest, CgroupV2ErroneousStatsNumerator) {
   config.set_mode(
       envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig::CONTAINER);
   auto stats_reader = std::make_unique<MockCpuStatsReader>();
-  EXPECT_CALL(*stats_reader, getCpuTimes())
-      .WillOnce(Return(CpuTimes{true, true, 100000.0, 100000000, 2.0})) // Initial valid
-      .WillOnce(Return(CpuTimes{true, true, 99999.0, 200000000, 2.0})); // work_time goes backward
+  // Mock returns error for negative work_time delta
+  EXPECT_CALL(*stats_reader, getUtilization())
+      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(absl::InvalidArgumentError("Work_over_period cannot be negative")));
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
 
   ResourcePressure resource;
