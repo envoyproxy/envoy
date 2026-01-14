@@ -1,0 +1,256 @@
+admin:
+  address:
+    socket_address:
+      address: 0.0.0.0
+      port_value: 9901
+static_resources:
+  clusters:
+  - connect_timeout: 5s
+    load_assignment:
+      cluster_name: default-local-mcp-backend
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: mcp-everything-svc.default.svc.cluster.local
+                port_value: 3001
+    name: default-local-mcp-backend
+    type: STRICT_DNS
+  - connect_timeout: 5s
+    load_assignment:
+      cluster_name: default-remote-mcp-backend
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: mcp.deepwiki.com
+                port_value: 443
+    name: default-remote-mcp-backend
+    transport_socket:
+      name: envoy.transport_sockets.tls
+      typed_config:
+        '@type': type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+        sni: mcp.deepwiki.com
+    type: LOGICAL_DNS
+  listeners:
+  - address:
+      socket_address:
+        address: 0.0.0.0
+        port_value: 10001
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          '@type': type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: mcp_proxy
+          http_filters:
+          - name: envoy.filters.http.jwt_authn
+            typed_config:
+              '@type': type.googleapis.com/envoy.extensions.filters.http.jwt_authn.v3.JwtAuthentication
+              providers:
+                kubernetes_provider:
+                  claim_to_headers:
+                  - claim_name: sub
+                    header_name: x-user-role
+                  from_headers:
+                  - name: x-k8s-sa-token
+                  issuer: https://kubernetes.default.svc.cluster.local
+                  local_jwks:
+                    inline_string: >-
+                      {"keys": [
+                        {"kty":"RSA",
+                         "n": "0vx7agoebGcQSuuPiLJXZptN9nndrQmbXEps2aiAFbWhM78LhWx4cbbfAAtVT86z
+                              wu1RK7aPFFxuhDR1L6tSoc_BJECPebWKRXjBZCiFV4n3oknjhMstn64tZ_2W-5JsGY4Hc
+                              5n9yBXArwl93lqt7_RN5w6Cf0h4QyQ5v-65YGjQR0_FDW2QvzqY368QQMicAtaSqzs8K
+                              JZgnYb9c7d0zgdAZHzu6qMQvRL5hajrn1n91CbOpbISD08qNLyrdkt-bFTWhAI4vMQFh
+                              6WeZu0fM4lFd2NcRwr3XPksINHaQ-G_xBniIqbw0Ls1jF44-csFCur-kEgU8awapJzKn
+                              qDKgw",
+                         "e":"AQAB",
+                         "alg":"RS256",
+                         "kid":"2011-04-29"}]}
+              rules:
+              - match:
+                  prefix: /
+                requires:
+                  provider_name: kubernetes_provider
+          - name: envoy.filters.http.mcp
+            typed_config:
+              '@type': type.googleapis.com/envoy.extensions.filters.http.mcp.v3.Mcp
+              traffic_mode: PASS_THROUGH
+          - name: envoy.filters.http.rbac
+            typed_config:
+              '@type': type.googleapis.com/envoy.extensions.filters.http.rbac.v3.RBAC
+          # Example: ext_authz filter can consume MCP metadata
+          # - name: envoy.filters.http.ext_authz
+          #   typed_config:
+          #     '@type': type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthz
+          #     grpc_service:
+          #       envoy_grpc:
+          #         cluster_name: ext-authz
+          #     metadata_context_namespaces:
+          #     - mcp_proxy
+          - name: envoy.filters.http.router
+            typed_config:
+              '@type': type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+          route_config:
+            name: route-10001
+            virtual_hosts:
+            - domains:
+              - '*'
+              name: agentic-net-gateway-vh-10001-*
+              routes:
+              - match:
+                  path_separated_prefix: /remote/mcp
+                name: default-httproute-remote-mcp-rule0-match0
+                route:
+                  prefix_rewrite: /mcp
+                  weighted_clusters:
+                    total_weight: 100
+                    clusters:
+                    - host_rewrite_literal: mcp.deepwiki.com
+                      name: default-remote-mcp-backend
+                      weight: 100
+                      typed_per_filter_config:
+                        envoy.filters.http.rbac:
+                          '@type': type.googleapis.com/envoy.extensions.filters.http.rbac.v3.RBACPerRoute
+                          rbac:
+                            rules:
+                              policies:
+                                allow-anyone-to-initialize-and-list-tools:
+                                  permissions:
+                                  - and_rules:
+                                      rules:
+                                      - sourced_metadata:
+                                          metadata_matcher:
+                                            filter: mcp_proxy
+                                            path:
+                                            - key: method
+                                            value:
+                                              or_match:
+                                                value_matchers:
+                                                - string_match:
+                                                    exact: initialize
+                                                - string_match:
+                                                    exact: notifications/initialized
+                                                - string_match:
+                                                    exact: tools/list
+                                  principals:
+                                  - any: true
+                                allow-admins-to-call-tools:
+                                  permissions:
+                                  - and_rules:
+                                      rules:
+                                      - sourced_metadata:
+                                          metadata_matcher:
+                                            filter: mcp_proxy
+                                            path:
+                                            - key: method
+                                            value:
+                                              string_match:
+                                                exact: tools/call
+                                  principals:
+                                  - header:
+                                      name: x-user-role
+                                      string_match:
+                                        exact: system:serviceaccount:default:admin
+                                allow-users-to-call-safe-tools:
+                                  permissions:
+                                  - and_rules:
+                                      rules:
+                                      - sourced_metadata:
+                                          metadata_matcher:
+                                            filter: mcp_proxy
+                                            path:
+                                            - key: method
+                                            value:
+                                              string_match:
+                                                exact: tools/call
+                                      - sourced_metadata:
+                                          metadata_matcher:
+                                            filter: mcp_proxy
+                                            path:
+                                            - key: params
+                                            - key: name
+                                            value:
+                                              string_match:
+                                                exact: get_weather
+                                  principals:
+                                  - any: true
+              - match:
+                  path_separated_prefix: /local/mcp
+                name: default-httproute-local-mcp-rule0-match0
+                route:
+                  prefix_rewrite: /mcp
+                  weighted_clusters:
+                    total_weight: 100
+                    clusters:
+                    - name: default-local-mcp-backend
+                      weight: 100
+                      typed_per_filter_config:
+                        envoy.filters.http.rbac:
+                          '@type': type.googleapis.com/envoy.extensions.filters.http.rbac.v3.RBACPerRoute
+                          rbac:
+                            rules:
+                              policies:
+                                allow-anyone-to-initialize-and-list-tools:
+                                  permissions:
+                                  - and_rules:
+                                      rules:
+                                      - sourced_metadata:
+                                          metadata_matcher:
+                                            filter: mcp_proxy
+                                            path:
+                                            - key: method
+                                            value:
+                                              or_match:
+                                                value_matchers:
+                                                - string_match:
+                                                    exact: initialize
+                                                - string_match:
+                                                    exact: notifications/initialized
+                                                - string_match:
+                                                    exact: tools/list
+                                  principals:
+                                  - any: true
+                                allow-admins-to-call-tools:
+                                  permissions:
+                                  - and_rules:
+                                      rules:
+                                      - sourced_metadata:
+                                          metadata_matcher:
+                                            filter: mcp_proxy
+                                            path:
+                                            - key: method
+                                            value:
+                                              string_match:
+                                                exact: tools/call
+                                  principals:
+                                  - header:
+                                      name: x-user-role
+                                      string_match:
+                                        exact: system:serviceaccount:default:admin
+                                allow-users-to-call-safe-tools:
+                                  permissions:
+                                  - and_rules:
+                                      rules:
+                                      - sourced_metadata:
+                                          metadata_matcher:
+                                            filter: mcp_proxy
+                                            path:
+                                            - key: method
+                                            value:
+                                              string_match:
+                                                exact: tools/call
+                                      - sourced_metadata:
+                                          metadata_matcher:
+                                            filter: mcp_proxy
+                                            path:
+                                            - key: params
+                                            - key: name
+                                            value:
+                                              string_match:
+                                                exact: get_weather
+                                  principals:
+                                  - any: true
