@@ -51,8 +51,8 @@ TEST(HostCpuUtilizationMonitorTest, ComputesCorrectUsageCgroupV1) {
   // Delta1: (100-50)/(200-100) = 50/100 = 0.5
   // Delta2: (200-100)/(300-200) = 100/100 = 1.0
   EXPECT_CALL(*stats_reader, getUtilization())
-      .WillOnce(Return(0.0))  // Constructor call
-      .WillOnce(Return(0.5))  // First update: 50% utilization
+      .WillOnce(Return(0.0)) // Constructor call
+      .WillOnce(Return(0.5)) // First update: 50% utilization
       .WillOnce(Return(1.0)); // Second update: 100% utilization
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
 
@@ -74,8 +74,8 @@ TEST(HostCpuUtilizationMonitorTest, ComputesCorrectUsageCgroupV2) {
   // Mock cgroup v2 returns utilization directly
   // Note: Constructor calls getUtilization() once to establish baseline
   EXPECT_CALL(*stats_reader, getUtilization())
-      .WillOnce(Return(0.0))   // Constructor call
-      .WillOnce(Return(0.25))  // First update: 25% utilization
+      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(0.25)) // First update: 25% utilization
       .WillOnce(Return(0.25)); // Second update: 25% utilization
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
 
@@ -99,7 +99,7 @@ TEST(HostCpuUtilizationMonitorTest, GetsErroneousStatsDenominator) {
   // Mock returns error for invalid denominator
   // Constructor call succeeds with 0.0, then update fails
   EXPECT_CALL(*stats_reader, getUtilization())
-      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(0.0)) // Constructor call
       .WillOnce(Return(absl::InvalidArgumentError("total_over_period must be positive")));
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
   ResourcePressure resource;
@@ -113,7 +113,7 @@ TEST(HostCpuUtilizationMonitorTest, GetsErroneousStatsNumerator) {
   // Mock returns error for invalid numerator (negative work delta)
   // Constructor call succeeds with 0.0, then update fails
   EXPECT_CALL(*stats_reader, getUtilization())
-      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(0.0)) // Constructor call
       .WillOnce(Return(absl::InvalidArgumentError("Work_over_period cannot be negative")));
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
 
@@ -128,7 +128,7 @@ TEST(HostCpuUtilizationMonitorTest, ReportsError) {
   // Mock returns error (e.g., file read failure)
   // Constructor call succeeds with 0.0, then updates fail
   EXPECT_CALL(*stats_reader, getUtilization())
-      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(0.0)) // Constructor call
       .WillOnce(Return(absl::InvalidArgumentError("Failed to read CPU times")))
       .WillOnce(Return(absl::InvalidArgumentError("Failed to read CPU times")));
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
@@ -148,7 +148,7 @@ TEST(ContainerCpuUsageMonitorTest, ComputesCorrectUsage) {
   auto stats_reader = std::make_unique<MockCpuStatsReader>();
   // Mock returns 100% utilization (work delta 1, total delta 1)
   EXPECT_CALL(*stats_reader, getUtilization())
-      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(0.0)) // Constructor call
       .WillOnce(Return(1.0)) // First call: 100% utilization
       .WillOnce(Return(1.0)); // Second call: 100% utilization
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
@@ -172,7 +172,7 @@ TEST(ContainerCpuUsageMonitorTest, GetsErroneousStatsDenominator) {
   auto stats_reader = std::make_unique<MockCpuStatsReader>();
   // Mock returns error for invalid denominator
   EXPECT_CALL(*stats_reader, getUtilization())
-      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(0.0)) // Constructor call
       .WillOnce(Return(absl::InvalidArgumentError("total_over_period must be positive")));
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
   ResourcePressure resource;
@@ -187,7 +187,7 @@ TEST(ContainerCpuUsageMonitorTest, GetsErroneousStatsNumerator) {
   auto stats_reader = std::make_unique<MockCpuStatsReader>();
   // Mock returns error for invalid numerator (negative work delta)
   EXPECT_CALL(*stats_reader, getUtilization())
-      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(0.0)) // Constructor call
       .WillOnce(Return(absl::InvalidArgumentError("Work_over_period cannot be negative")));
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
   ResourcePressure resource;
@@ -202,7 +202,7 @@ TEST(ContainerCpuUtilizationMonitorTest, ReportsError) {
   auto stats_reader = std::make_unique<MockCpuStatsReader>();
   // Mock returns error (e.g., file read failure)
   EXPECT_CALL(*stats_reader, getUtilization())
-      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(0.0)) // Constructor call
       .WillOnce(Return(absl::InvalidArgumentError("Failed to read CPU times")))
       .WillOnce(Return(absl::InvalidArgumentError("Failed to read CPU times")));
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
@@ -223,7 +223,7 @@ TEST(ContainerCpuUsageMonitorTest, ComputesCorrectUsageCgroupV2) {
   // Mock cgroup v2: 1,000,000 usec work over 1s (1B nsec) with 2 cores = 50% utilization
   // Formula: (1000000 / 1000000.0) / ((1000000000 / 1000000000.0) * 2) = 1.0 / 2.0 = 0.5
   EXPECT_CALL(*stats_reader, getUtilization())
-      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(0.0)) // Constructor call
       .WillOnce(Return(0.5)); // 50% utilization
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
 
@@ -243,7 +243,7 @@ TEST(HostCpuUtilizationMonitorTest, CgroupV2SingleCore) {
   // Scenario: Container with 1 core, using 50% of that core
   // work_time: 50ms, total_time: 100ms, 1 core = 50% utilization
   EXPECT_CALL(*stats_reader, getUtilization())
-      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(0.0)) // Constructor call
       .WillOnce(Return(0.5)) // First call: 50% utilization
       .WillOnce(Return(0.5)); // Second call: 50% utilization
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
@@ -270,7 +270,7 @@ TEST(HostCpuUtilizationMonitorTest, CgroupV2FractionalCores) {
   // Scenario: Container with 1.5 cores (cpu.max = "150000 100000")
   // Using 75ms of CPU work over 100ms period on 1.5 cores = 50% utilization
   EXPECT_CALL(*stats_reader, getUtilization())
-      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(0.0)) // Constructor call
       .WillOnce(Return(0.5)); // 50% utilization
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
 
@@ -290,7 +290,7 @@ TEST(HostCpuUtilizationMonitorTest, CgroupV2HighCoreCount) {
   // Scenario: Large server with 32 cores, using 800ms over 100ms = 8 cores fully utilized
   // Result: 25% utilization
   EXPECT_CALL(*stats_reader, getUtilization())
-      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(0.0)) // Constructor call
       .WillOnce(Return(0.25)); // 25% utilization
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
 
@@ -310,7 +310,7 @@ TEST(HostCpuUtilizationMonitorTest, CgroupV2ClampingAtMaximum) {
   // Scenario: Anomalous reading clamped to 1.0 (100% utilization)
   // The implementation clamps the result to [0.0, 1.0]
   EXPECT_CALL(*stats_reader, getUtilization())
-      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(0.0)) // Constructor call
       .WillOnce(Return(1.0)); // Clamped to 100%
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
 
@@ -330,7 +330,7 @@ TEST(HostCpuUtilizationMonitorTest, CgroupV2NearZeroUsage) {
 
   // Scenario: Nearly idle container, using 0.1ms over 1000ms on 2 cores = 0.005% utilization
   EXPECT_CALL(*stats_reader, getUtilization())
-      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(0.0)) // Constructor call
       .WillOnce(Return(0.00005)); // 0.005% utilization
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
 
@@ -349,7 +349,7 @@ TEST(HostCpuUtilizationMonitorTest, CgroupV2ZeroWorkTime) {
 
   // Scenario: No CPU work done (container sleeping) = 0% utilization
   EXPECT_CALL(*stats_reader, getUtilization())
-      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(0.0)) // Constructor call
       .WillOnce(Return(0.0)); // 0% utilization
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
 
@@ -368,7 +368,7 @@ TEST(HostCpuUtilizationMonitorTest, CgroupV2LargeTimeDelta) {
 
   // Scenario: 1 hour period with 12.5% utilization
   EXPECT_CALL(*stats_reader, getUtilization())
-      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(0.0)) // Constructor call
       .WillOnce(Return(0.125)); // 12.5% utilization
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
 
@@ -387,7 +387,7 @@ TEST(HostCpuUtilizationMonitorTest, CgroupV2SmallTimeDelta) {
 
   // Scenario: 1ms sampling period with 50% utilization
   EXPECT_CALL(*stats_reader, getUtilization())
-      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(0.0)) // Constructor call
       .WillOnce(Return(0.5)); // 50% utilization
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
 
@@ -406,7 +406,7 @@ TEST(HostCpuUtilizationMonitorTest, CgroupV2TimeUnitConversion) {
 
   // Scenario: Precise utilization value (123.456ms work / 500ms on 1 core = 24.6912% utilization)
   EXPECT_CALL(*stats_reader, getUtilization())
-      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(0.0)) // Constructor call
       .WillOnce(Return(0.246912)); // 24.6912% utilization
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
 
@@ -425,9 +425,9 @@ TEST(HostCpuUtilizationMonitorTest, CgroupV2BurstyCpuUsage) {
 
   // Scenario: Alternating between 10% and 90% utilization
   EXPECT_CALL(*stats_reader, getUtilization())
-      .WillOnce(Return(0.0))  // Constructor call
-      .WillOnce(Return(0.1))  // 10% utilization
-      .WillOnce(Return(0.9))  // 90% utilization spike
+      .WillOnce(Return(0.0)) // Constructor call
+      .WillOnce(Return(0.1)) // 10% utilization
+      .WillOnce(Return(0.9)) // 90% utilization spike
       .WillOnce(Return(0.1)); // Back to 10%
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
 
@@ -454,7 +454,7 @@ TEST(HostCpuUtilizationMonitorTest, CgroupV2SustainedHighLoad) {
 
   // Scenario: Sustained 95% CPU utilization on 2 cores
   EXPECT_CALL(*stats_reader, getUtilization())
-      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(0.0)) // Constructor call
       .WillOnce(Return(0.95)) // 95% utilization
       .WillOnce(Return(0.95)) // 95% utilization
       .WillOnce(Return(0.95)); // 95% utilization
@@ -482,7 +482,7 @@ TEST(HostCpuUtilizationMonitorTest, CgroupV2MultiCoreSaturation) {
 
   // Scenario: 4 cores, 100% usage
   EXPECT_CALL(*stats_reader, getUtilization())
-      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(0.0)) // Constructor call
       .WillOnce(Return(1.0)); // 100% utilization
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
 
@@ -500,7 +500,7 @@ TEST(HostCpuUtilizationMonitorTest, CgroupV2PartialCoreUtilization) {
 
   // Scenario: 4 cores, but only 2 fully utilized = 50% utilization
   EXPECT_CALL(*stats_reader, getUtilization())
-      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(0.0)) // Constructor call
       .WillOnce(Return(0.5)); // 50% utilization
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
 
@@ -519,7 +519,7 @@ TEST(HostCpuUtilizationMonitorTest, CgroupV2TimeRegression) {
   // Scenario: work_time decreases (goes backwards)
   // This should trigger an error in the implementation
   EXPECT_CALL(*stats_reader, getUtilization())
-      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(0.0)) // Constructor call
       .WillOnce(Return(absl::InvalidArgumentError("Work_over_period cannot be negative")));
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
 
@@ -538,7 +538,7 @@ TEST(ContainerCpuUsageMonitorTest, CgroupV2HalfCore) {
 
   // Scenario: Container limited to 0.5 cores, using 50% of that allocation
   EXPECT_CALL(*stats_reader, getUtilization())
-      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(0.0)) // Constructor call
       .WillOnce(Return(0.5)); // 50% utilization
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
 
@@ -558,7 +558,7 @@ TEST(ContainerCpuUsageMonitorTest, CgroupV2QuarterCore) {
 
   // Scenario: Container limited to 0.25 cores, using 100% of that allocation
   EXPECT_CALL(*stats_reader, getUtilization())
-      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(0.0)) // Constructor call
       .WillOnce(Return(1.0)); // 100% utilization
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
 
@@ -578,7 +578,7 @@ TEST(ContainerCpuUsageMonitorTest, CgroupV2ThreeAndHalfCores) {
 
   // Scenario: Container with 3.5 cores, using 50% utilization
   EXPECT_CALL(*stats_reader, getUtilization())
-      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(0.0)) // Constructor call
       .WillOnce(Return(0.5)); // 50% utilization
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
 
@@ -600,7 +600,7 @@ TEST(ContainerCpuUsageMonitorTest, CgroupV2NoCpuLimit) {
   // Scenario: No CPU limit set, so container can use all 8 cores from cpuset
   // Result: 50% utilization
   EXPECT_CALL(*stats_reader, getUtilization())
-      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(0.0)) // Constructor call
       .WillOnce(Return(0.5)); // 50% utilization
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
 
@@ -623,9 +623,9 @@ TEST(ContainerCpuUsageMonitorTest, CgroupV2ThrottledContainer) {
   // Scenario: Container limited to 2 cores but trying to use more
   // This simulates throttling kicking in as utilization approaches 100%
   EXPECT_CALL(*stats_reader, getUtilization())
-      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(0.0)) // Constructor call
       .WillOnce(Return(0.975)) // 97.5% utilization
-      .WillOnce(Return(0.99))  // 99% utilization
+      .WillOnce(Return(0.99)) // 99% utilization
       .WillOnce(Return(0.995)); // 99.5% utilization
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
 
@@ -652,7 +652,7 @@ TEST(ContainerCpuUsageMonitorTest, CgroupV2LargeCoreRange) {
 
   // Scenario: Container on 16-core system, limited to 12 cores, using 50%
   EXPECT_CALL(*stats_reader, getUtilization())
-      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(0.0)) // Constructor call
       .WillOnce(Return(0.5)); // 50% utilization
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
 
@@ -675,7 +675,7 @@ TEST(ContainerCpuUsageMonitorTest, CgroupV2DynamicCoreChange) {
   // Scenario: Core count changes from 4 to 2 (limit reduced)
   // This tests if monitor handles changing effective_cores gracefully
   EXPECT_CALL(*stats_reader, getUtilization())
-      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(0.0)) // Constructor call
       .WillOnce(Return(0.5)) // 50% utilization on 4 cores
       .WillOnce(Return(0.5)); // 50% utilization on 2 cores (different base)
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
@@ -697,7 +697,7 @@ TEST(HostCpuUtilizationMonitorTest, CgroupV2ReportsError) {
   auto stats_reader = std::make_unique<MockCpuStatsReader>();
   // Mock returns errors for invalid cgroup v2 data
   EXPECT_CALL(*stats_reader, getUtilization())
-      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(0.0)) // Constructor call
       .WillOnce(Return(absl::InvalidArgumentError("Failed to read CPU times")))
       .WillOnce(Return(absl::InvalidArgumentError("Failed to read CPU times")));
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
@@ -717,7 +717,7 @@ TEST(HostCpuUtilizationMonitorTest, CgroupV2ErroneousStatsDenominator) {
   auto stats_reader = std::make_unique<MockCpuStatsReader>();
   // Mock returns error for negative or zero total_time delta
   EXPECT_CALL(*stats_reader, getUtilization())
-      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(0.0)) // Constructor call
       .WillOnce(Return(absl::InvalidArgumentError("total_over_period must be positive")));
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
 
@@ -732,7 +732,7 @@ TEST(HostCpuUtilizationMonitorTest, CgroupV2ErroneousStatsNumerator) {
   auto stats_reader = std::make_unique<MockCpuStatsReader>();
   // Mock returns error for negative work_time delta
   EXPECT_CALL(*stats_reader, getUtilization())
-      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(0.0)) // Constructor call
       .WillOnce(Return(absl::InvalidArgumentError("Work_over_period cannot be negative")));
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
 
@@ -747,7 +747,7 @@ TEST(HostCpuUtilizationMonitorTest, CgroupV2ZeroTotalTimeDelta) {
   auto stats_reader = std::make_unique<MockCpuStatsReader>();
   // Mock returns error for zero total_time delta
   EXPECT_CALL(*stats_reader, getUtilization())
-      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(0.0)) // Constructor call
       .WillOnce(Return(absl::InvalidArgumentError("total_over_period must be positive")));
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
 
@@ -764,7 +764,7 @@ TEST(ContainerCpuUsageMonitorTest, CgroupV2ReportsError) {
   auto stats_reader = std::make_unique<MockCpuStatsReader>();
   // Mock returns errors for invalid cgroup v2 data
   EXPECT_CALL(*stats_reader, getUtilization())
-      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(0.0)) // Constructor call
       .WillOnce(Return(absl::InvalidArgumentError("Failed to read CPU times")))
       .WillOnce(Return(absl::InvalidArgumentError("Failed to read CPU times")));
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
@@ -784,7 +784,7 @@ TEST(ContainerCpuUsageMonitorTest, CgroupV2ErroneousStatsDenominator) {
   auto stats_reader = std::make_unique<MockCpuStatsReader>();
   // Mock returns error for negative or zero total_time delta
   EXPECT_CALL(*stats_reader, getUtilization())
-      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(0.0)) // Constructor call
       .WillOnce(Return(absl::InvalidArgumentError("total_over_period must be positive")));
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
 
@@ -800,7 +800,7 @@ TEST(ContainerCpuUsageMonitorTest, CgroupV2ErroneousStatsNumerator) {
   auto stats_reader = std::make_unique<MockCpuStatsReader>();
   // Mock returns error for negative work_time delta
   EXPECT_CALL(*stats_reader, getUtilization())
-      .WillOnce(Return(0.0))  // Constructor call
+      .WillOnce(Return(0.0)) // Constructor call
       .WillOnce(Return(absl::InvalidArgumentError("Work_over_period cannot be negative")));
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
 
