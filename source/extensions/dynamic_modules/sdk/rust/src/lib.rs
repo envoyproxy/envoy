@@ -6535,3 +6535,777 @@ macro_rules! declare_bootstrap_init_functions {
     }
   };
 }
+
+// =============================================================================
+// Cluster Dynamic Modules Support
+// =============================================================================
+
+/// Represents the health status of a host.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HostHealth {
+  Unknown,
+  Healthy,
+  Unhealthy,
+  Degraded,
+  Timeout,
+}
+
+impl From<abi::envoy_dynamic_module_type_host_health> for HostHealth {
+  fn from(health: abi::envoy_dynamic_module_type_host_health) -> Self {
+    match health {
+      abi::envoy_dynamic_module_type_host_health::Healthy => HostHealth::Healthy,
+      abi::envoy_dynamic_module_type_host_health::Unhealthy => HostHealth::Unhealthy,
+      abi::envoy_dynamic_module_type_host_health::Degraded => HostHealth::Degraded,
+      abi::envoy_dynamic_module_type_host_health::Timeout => HostHealth::Timeout,
+      _ => HostHealth::Unknown,
+    }
+  }
+}
+
+/// Represents a health state transition.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HealthTransition {
+  Unchanged,
+  Changed,
+  ChangePending,
+}
+
+impl From<abi::envoy_dynamic_module_type_health_transition> for HealthTransition {
+  fn from(transition: abi::envoy_dynamic_module_type_health_transition) -> Self {
+    match transition {
+      abi::envoy_dynamic_module_type_health_transition::Changed => HealthTransition::Changed,
+      abi::envoy_dynamic_module_type_health_transition::ChangePending => {
+        HealthTransition::ChangePending
+      },
+      _ => HealthTransition::Unchanged,
+    }
+  }
+}
+
+/// Represents errors that can occur during cluster operations.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ClusterError {
+  Ok,
+  InvalidAddress,
+  InvalidWeight,
+  MaxHostsReached,
+  HostNotFound,
+}
+
+impl From<abi::envoy_dynamic_module_type_cluster_error> for ClusterError {
+  fn from(error: abi::envoy_dynamic_module_type_cluster_error) -> Self {
+    match error {
+      abi::envoy_dynamic_module_type_cluster_error::Ok => ClusterError::Ok,
+      abi::envoy_dynamic_module_type_cluster_error::InvalidAddress => ClusterError::InvalidAddress,
+      abi::envoy_dynamic_module_type_cluster_error::InvalidWeight => ClusterError::InvalidWeight,
+      abi::envoy_dynamic_module_type_cluster_error::MaxHostsReached => {
+        ClusterError::MaxHostsReached
+      },
+      abi::envoy_dynamic_module_type_cluster_error::HostNotFound => ClusterError::HostNotFound,
+    }
+  }
+}
+
+/// Information about a host in the cluster.
+#[derive(Debug, Clone)]
+pub struct HostInfo {
+  /// The raw host pointer.
+  pub host: abi::envoy_dynamic_module_type_host_envoy_ptr,
+  /// The address of the host.
+  pub address: String,
+  /// The weight of the host.
+  pub weight: u32,
+  /// The health status of the host.
+  pub health: HostHealth,
+}
+
+/// A handle to a host in the cluster.
+#[derive(Debug, Clone, Copy)]
+pub struct HostHandle(pub abi::envoy_dynamic_module_type_host_envoy_ptr);
+
+// SAFETY: HostHandle contains a raw pointer to an Envoy Host object which is thread-safe.
+// Envoy's host objects are designed to be shared across worker threads.
+unsafe impl Send for HostHandle {}
+unsafe impl Sync for HostHandle {}
+
+impl HostHandle {
+  /// Gets the address of the host.
+  pub fn address(&self) -> String {
+    let mut buffer = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    unsafe {
+      abi::envoy_dynamic_module_callback_cluster_host_get_address(self.0, &mut buffer);
+    }
+    if buffer.ptr.is_null() || buffer.length == 0 {
+      return String::new();
+    }
+    unsafe {
+      std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+        buffer.ptr as *const u8,
+        buffer.length,
+      ))
+    }
+    .to_string()
+  }
+
+  /// Gets the health status of the host.
+  pub fn health(&self) -> HostHealth {
+    unsafe { abi::envoy_dynamic_module_callback_cluster_host_get_health(self.0) }.into()
+  }
+
+  /// Gets the weight of the host.
+  pub fn weight(&self) -> u32 {
+    unsafe { abi::envoy_dynamic_module_callback_cluster_host_get_weight(self.0) }
+  }
+}
+
+/// Trait for the Envoy cluster configuration object.
+pub trait EnvoyCluster: Sized {
+  /// Gets the name of the cluster.
+  fn name(&self) -> String;
+
+  /// Adds a host to the cluster.
+  fn add_host(&mut self, address: &str, weight: u32) -> Result<HostHandle, ClusterError>;
+
+  /// Removes a host from the cluster.
+  fn remove_host(&mut self, host: HostHandle) -> Result<(), ClusterError>;
+
+  /// Gets all hosts in the cluster.
+  fn get_hosts(&self) -> Vec<HostInfo>;
+
+  /// Gets a host by address.
+  fn get_host_by_address(&self, address: &str) -> Option<HostHandle>;
+
+  /// Sets the weight of a host.
+  fn set_host_weight(&mut self, host: HostHandle, weight: u32) -> Result<(), ClusterError>;
+
+  /// Signals that pre-initialization is complete.
+  fn pre_init_complete(&mut self);
+
+  /// Gets the cluster manager for accessing other clusters.
+  fn cluster_manager(&self) -> ClusterManagerHandle;
+}
+
+/// Implementation of EnvoyCluster.
+pub struct EnvoyClusterImpl {
+  raw: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
+}
+
+impl EnvoyClusterImpl {
+  pub fn new(raw: abi::envoy_dynamic_module_type_cluster_envoy_ptr) -> Self {
+    Self { raw }
+  }
+
+  pub fn raw(&self) -> abi::envoy_dynamic_module_type_cluster_envoy_ptr {
+    self.raw
+  }
+}
+
+impl EnvoyCluster for EnvoyClusterImpl {
+  fn name(&self) -> String {
+    let mut buffer = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    unsafe {
+      abi::envoy_dynamic_module_callback_cluster_get_name(self.raw, &mut buffer);
+    }
+    if buffer.ptr.is_null() || buffer.length == 0 {
+      return String::new();
+    }
+    unsafe {
+      std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+        buffer.ptr as *const u8,
+        buffer.length,
+      ))
+    }
+    .to_string()
+  }
+
+  fn add_host(&mut self, address: &str, weight: u32) -> Result<HostHandle, ClusterError> {
+    let addr_buffer = str_to_envoy_buffer(address);
+    let mut host_ptr: abi::envoy_dynamic_module_type_host_envoy_ptr = std::ptr::null_mut();
+    let result = unsafe {
+      abi::envoy_dynamic_module_callback_cluster_add_host(
+        self.raw,
+        addr_buffer,
+        weight,
+        &mut host_ptr,
+      )
+    };
+    let error: ClusterError = result.into();
+    match error {
+      ClusterError::Ok => Ok(HostHandle(host_ptr)),
+      e => Err(e),
+    }
+  }
+
+  fn remove_host(&mut self, host: HostHandle) -> Result<(), ClusterError> {
+    let result =
+      unsafe { abi::envoy_dynamic_module_callback_cluster_remove_host(self.raw, host.0) };
+    let error: ClusterError = result.into();
+    match error {
+      ClusterError::Ok => Ok(()),
+      e => Err(e),
+    }
+  }
+
+  fn get_hosts(&self) -> Vec<HostInfo> {
+    // First, get the count.
+    let count = unsafe {
+      abi::envoy_dynamic_module_callback_cluster_get_hosts(self.raw, std::ptr::null_mut(), 0)
+    };
+    if count == 0 {
+      return Vec::new();
+    }
+
+    let mut hosts: Vec<abi::envoy_dynamic_module_type_host_info> = vec![
+        abi::envoy_dynamic_module_type_host_info {
+          host: std::ptr::null_mut(),
+          address: abi::envoy_dynamic_module_type_envoy_buffer {
+            ptr: std::ptr::null(),
+            length: 0,
+          },
+          weight: 0,
+          health: abi::envoy_dynamic_module_type_host_health::Unknown,
+        };
+        count
+      ];
+    let actual = unsafe {
+      abi::envoy_dynamic_module_callback_cluster_get_hosts(self.raw, hosts.as_mut_ptr(), count)
+    };
+
+    hosts
+      .iter()
+      .take(actual)
+      .map(|h| HostInfo {
+        host: h.host,
+        address: if h.address.ptr.is_null() || h.address.length == 0 {
+          String::new()
+        } else {
+          unsafe {
+            std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+              h.address.ptr as *const u8,
+              h.address.length,
+            ))
+          }
+          .to_string()
+        },
+        weight: h.weight,
+        health: h.health.into(),
+      })
+      .collect()
+  }
+
+  fn get_host_by_address(&self, address: &str) -> Option<HostHandle> {
+    let addr_buffer = str_to_envoy_buffer(address);
+    let host = unsafe {
+      abi::envoy_dynamic_module_callback_cluster_get_host_by_address(self.raw, addr_buffer)
+    };
+    if host.is_null() {
+      None
+    } else {
+      Some(HostHandle(host))
+    }
+  }
+
+  fn set_host_weight(&mut self, host: HostHandle, weight: u32) -> Result<(), ClusterError> {
+    let result = unsafe {
+      abi::envoy_dynamic_module_callback_cluster_host_set_weight(self.raw, host.0, weight)
+    };
+    let error: ClusterError = result.into();
+    match error {
+      ClusterError::Ok => Ok(()),
+      e => Err(e),
+    }
+  }
+
+  fn pre_init_complete(&mut self) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_cluster_pre_init_complete(self.raw);
+    }
+  }
+
+  fn cluster_manager(&self) -> ClusterManagerHandle {
+    // Note: The cluster manager is obtained from the cluster's context.
+    // For now, we return a placeholder. The actual implementation would need
+    // to be provided by the cluster when it's created.
+    ClusterManagerHandle(std::ptr::null_mut())
+  }
+}
+
+/// Handle to the cluster manager.
+#[derive(Debug, Clone, Copy)]
+pub struct ClusterManagerHandle(pub abi::envoy_dynamic_module_type_cluster_manager_envoy_ptr);
+
+impl ClusterManagerHandle {
+  /// Gets a thread-local cluster by name.
+  pub fn get_thread_local_cluster(&self, name: &str) -> Option<ThreadLocalClusterHandle> {
+    let name_buffer = str_to_envoy_buffer(name);
+    let tlc = unsafe {
+      abi::envoy_dynamic_module_callback_cluster_manager_get_thread_local_cluster(
+        self.0,
+        name_buffer,
+      )
+    };
+    if tlc.is_null() {
+      None
+    } else {
+      Some(ThreadLocalClusterHandle(tlc))
+    }
+  }
+}
+
+/// Handle to a thread-local cluster.
+#[derive(Debug, Clone, Copy)]
+pub struct ThreadLocalClusterHandle(
+  pub abi::envoy_dynamic_module_type_thread_local_cluster_envoy_ptr,
+);
+
+impl ThreadLocalClusterHandle {
+  /// Chooses a host from the cluster.
+  pub fn choose_host(&self, context: &LoadBalancerContextHandle) -> Option<HostHandle> {
+    let host = unsafe {
+      abi::envoy_dynamic_module_callback_thread_local_cluster_choose_host(self.0, context.0)
+    };
+    if host.is_null() {
+      None
+    } else {
+      Some(HostHandle(host))
+    }
+  }
+
+  /// Gets the name of the cluster.
+  pub fn name(&self) -> String {
+    let mut buffer = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    unsafe {
+      abi::envoy_dynamic_module_callback_thread_local_cluster_get_name(self.0, &mut buffer);
+    }
+    if buffer.ptr.is_null() || buffer.length == 0 {
+      return String::new();
+    }
+    unsafe {
+      std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+        buffer.ptr as *const u8,
+        buffer.length,
+      ))
+    }
+    .to_string()
+  }
+
+  /// Gets the number of hosts in the cluster.
+  pub fn host_count(&self) -> usize {
+    unsafe { abi::envoy_dynamic_module_callback_thread_local_cluster_host_count(self.0) }
+  }
+}
+
+/// Handle to a load balancer context.
+#[derive(Debug, Clone, Copy)]
+pub struct LoadBalancerContextHandle(pub abi::envoy_dynamic_module_type_lb_context_envoy_ptr);
+
+impl LoadBalancerContextHandle {
+  /// Gets the hash key for consistent hashing.
+  pub fn hash_key(&self) -> Option<u64> {
+    let mut result: u64 = 0;
+    let ok =
+      unsafe { abi::envoy_dynamic_module_callback_lb_context_get_hash_key(self.0, &mut result) };
+    if ok {
+      Some(result)
+    } else {
+      None
+    }
+  }
+
+  /// Gets a header value from the request.
+  pub fn get_header(&self, key: &str) -> Option<String> {
+    let key_buffer = str_to_envoy_buffer(key);
+    let mut result_buffer = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let len = unsafe {
+      abi::envoy_dynamic_module_callback_lb_context_get_header(
+        self.0,
+        key_buffer,
+        &mut result_buffer,
+      )
+    };
+    if len == 0 || result_buffer.ptr.is_null() {
+      return None;
+    }
+    Some(
+      unsafe {
+        std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+          result_buffer.ptr as *const u8,
+          result_buffer.length,
+        ))
+      }
+      .to_string(),
+    )
+  }
+
+  /// Gets the override host if set.
+  pub fn override_host(&self) -> Option<String> {
+    let mut buffer = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let len = unsafe {
+      abi::envoy_dynamic_module_callback_lb_context_get_override_host(self.0, &mut buffer)
+    };
+    if len == 0 || buffer.ptr.is_null() {
+      return None;
+    }
+    Some(
+      unsafe {
+        std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+          buffer.ptr as *const u8,
+          buffer.length,
+        ))
+      }
+      .to_string(),
+    )
+  }
+
+  /// Gets the current attempt count.
+  pub fn attempt_count(&self) -> u32 {
+    unsafe { abi::envoy_dynamic_module_callback_lb_context_get_attempt_count(self.0) }
+  }
+
+  /// Gets the downstream connection ID.
+  pub fn downstream_connection_id(&self) -> Option<u64> {
+    let id =
+      unsafe { abi::envoy_dynamic_module_callback_lb_context_get_downstream_connection_id(self.0) };
+    if id == 0 {
+      None
+    } else {
+      Some(id)
+    }
+  }
+}
+
+/// Trait for the cluster configuration.
+pub trait ClusterConfig<EC: EnvoyCluster>: Send + Sync {
+  /// Creates a new cluster instance.
+  fn new_cluster(&self, envoy: &mut EC) -> Box<dyn Cluster<EC>>;
+}
+
+/// Trait for a cluster instance.
+pub trait Cluster<EC: EnvoyCluster>: Send + Sync {
+  /// Called when the cluster initialization begins.
+  fn on_init(&mut self, _envoy: &mut EC) {}
+
+  /// Called periodically for cleanup.
+  fn on_cleanup(&mut self, _envoy: &mut EC) {}
+
+  /// Called when the host set changes.
+  fn on_host_set_change(
+    &mut self,
+    _envoy: &mut EC,
+    _hosts_added: &[HostInfo],
+    _hosts_removed: &[HostInfo],
+  ) {
+  }
+
+  /// Called when a host's health changes.
+  fn on_host_health_change(
+    &mut self,
+    _envoy: &mut EC,
+    _host: HostHandle,
+    _health: HostHealth,
+    _transition: HealthTransition,
+  ) {
+  }
+
+  /// Creates a new load balancer instance for a worker thread.
+  fn new_load_balancer(&self) -> Box<dyn LoadBalancer>;
+}
+
+/// Trait for a load balancer instance.
+pub trait LoadBalancer: Send + Sync {
+  /// Chooses a host for the request.
+  fn choose_host(&mut self, context: LoadBalancerContextHandle) -> Option<HostHandle>;
+}
+
+/// The function signature for creating a new cluster configuration.
+pub type NewClusterConfigFunction<EC> =
+  fn(envoy: &mut EC, name: &str, config: &[u8]) -> Option<Box<dyn ClusterConfig<EC>>>;
+
+/// Global function for creating cluster configurations.
+pub static NEW_CLUSTER_CONFIG_FUNCTION: OnceLock<NewClusterConfigFunction<EnvoyClusterImpl>> =
+  OnceLock::new();
+
+/// Declare the init functions for a cluster dynamic module.
+#[macro_export]
+macro_rules! declare_cluster_init_functions {
+  ($program_init:ident, $new_cluster_config_fn:expr) => {
+    #[no_mangle]
+    pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_CLUSTER_CONFIG_FUNCTION
+        .get_or_init(|| $new_cluster_config_fn);
+      if ($program_init()) {
+        envoy_proxy_dynamic_modules_rust_sdk::abi::kAbiVersion.as_ptr()
+          as *const ::std::os::raw::c_char
+      } else {
+        ::std::ptr::null()
+      }
+    }
+  };
+}
+
+// Helper function to convert a string to an envoy buffer.
+fn str_to_envoy_buffer(s: &str) -> abi::envoy_dynamic_module_type_envoy_buffer {
+  abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: s.as_ptr() as *const _,
+    length: s.len(),
+  }
+}
+
+// Cluster ABI Event Hook Implementations
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_on_cluster_config_new(
+  _config_envoy_ptr: abi::envoy_dynamic_module_type_cluster_config_envoy_ptr,
+  name: abi::envoy_dynamic_module_type_envoy_buffer,
+  config: abi::envoy_dynamic_module_type_envoy_buffer,
+) -> abi::envoy_dynamic_module_type_cluster_config_module_ptr {
+  // Handle null/empty name.
+  let name_str = if name.ptr.is_null() || name.length == 0 {
+    ""
+  } else {
+    unsafe {
+      std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+        name.ptr as *const u8,
+        name.length,
+      ))
+    }
+  };
+
+  // Handle null/empty config.
+  let config_bytes: &[u8] = if config.ptr.is_null() || config.length == 0 {
+    &[]
+  } else {
+    unsafe { std::slice::from_raw_parts(config.ptr as *const u8, config.length) }
+  };
+
+  let new_fn = match NEW_CLUSTER_CONFIG_FUNCTION.get() {
+    Some(f) => f,
+    None => return std::ptr::null(),
+  };
+
+  // Create a dummy EnvoyClusterImpl for config creation.
+  // The actual cluster will be created in on_cluster_new.
+  let mut dummy_envoy = EnvoyClusterImpl::new(std::ptr::null_mut());
+  match new_fn(&mut dummy_envoy, name_str, config_bytes) {
+    Some(config) => wrap_into_c_void_ptr!(config),
+    None => std::ptr::null(),
+  }
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_on_cluster_config_destroy(
+  config_ptr: abi::envoy_dynamic_module_type_cluster_config_module_ptr,
+) {
+  if config_ptr.is_null() {
+    return;
+  }
+  drop_wrapped_c_void_ptr!(config_ptr, ClusterConfig<EnvoyClusterImpl>);
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_on_cluster_new(
+  config_ptr: abi::envoy_dynamic_module_type_cluster_config_module_ptr,
+  cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
+) -> abi::envoy_dynamic_module_type_cluster_module_ptr {
+  if config_ptr.is_null() {
+    return std::ptr::null();
+  }
+  let config = unsafe {
+    let raw = config_ptr as *const *const dyn ClusterConfig<EnvoyClusterImpl>;
+    &**raw
+  };
+  let mut envoy = EnvoyClusterImpl::new(cluster_envoy_ptr);
+  let cluster = config.new_cluster(&mut envoy);
+  wrap_into_c_void_ptr!(cluster)
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_on_cluster_destroy(
+  cluster_ptr: abi::envoy_dynamic_module_type_cluster_module_ptr,
+) {
+  if cluster_ptr.is_null() {
+    return;
+  }
+  drop_wrapped_c_void_ptr!(cluster_ptr, Cluster<EnvoyClusterImpl>);
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_on_cluster_init(
+  cluster_ptr: abi::envoy_dynamic_module_type_cluster_module_ptr,
+  cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
+) {
+  if cluster_ptr.is_null() {
+    return;
+  }
+  let cluster = unsafe {
+    let raw = cluster_ptr as *mut Box<dyn Cluster<EnvoyClusterImpl>>;
+    &mut **raw
+  };
+  let mut envoy = EnvoyClusterImpl::new(cluster_envoy_ptr);
+  cluster.on_init(&mut envoy);
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_on_cluster_cleanup(
+  cluster_ptr: abi::envoy_dynamic_module_type_cluster_module_ptr,
+  cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
+) {
+  if cluster_ptr.is_null() {
+    return;
+  }
+  let cluster = unsafe {
+    let raw = cluster_ptr as *mut Box<dyn Cluster<EnvoyClusterImpl>>;
+    &mut **raw
+  };
+  let mut envoy = EnvoyClusterImpl::new(cluster_envoy_ptr);
+  cluster.on_cleanup(&mut envoy);
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_on_load_balancer_new(
+  cluster_ptr: abi::envoy_dynamic_module_type_cluster_module_ptr,
+) -> abi::envoy_dynamic_module_type_load_balancer_module_ptr {
+  if cluster_ptr.is_null() {
+    return std::ptr::null();
+  }
+  let cluster = unsafe {
+    let raw = cluster_ptr as *const Box<dyn Cluster<EnvoyClusterImpl>>;
+    &**raw
+  };
+  let lb = cluster.new_load_balancer();
+  wrap_into_c_void_ptr!(lb)
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_on_load_balancer_destroy(
+  lb_ptr: abi::envoy_dynamic_module_type_load_balancer_module_ptr,
+) {
+  if lb_ptr.is_null() {
+    return;
+  }
+  drop_wrapped_c_void_ptr!(lb_ptr, LoadBalancer);
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_on_load_balancer_choose_host(
+  lb_ptr: abi::envoy_dynamic_module_type_load_balancer_module_ptr,
+  context: abi::envoy_dynamic_module_type_lb_context_envoy_ptr,
+) -> abi::envoy_dynamic_module_type_host_envoy_ptr {
+  if lb_ptr.is_null() {
+    return std::ptr::null_mut();
+  }
+  let lb = unsafe {
+    let raw = lb_ptr as *mut Box<dyn LoadBalancer>;
+    &mut **raw
+  };
+  match lb.choose_host(LoadBalancerContextHandle(context)) {
+    Some(host) => host.0,
+    None => std::ptr::null_mut(),
+  }
+}
+
+/// # Safety
+/// This function is called from C code. The caller must ensure that:
+/// - `hosts_added` is valid for reads of `hosts_added_size` elements if not null.
+/// - `hosts_removed` is valid for reads of `hosts_removed_size` elements if not null.
+#[no_mangle]
+pub unsafe extern "C" fn envoy_dynamic_module_on_host_set_change(
+  cluster_ptr: abi::envoy_dynamic_module_type_cluster_module_ptr,
+  hosts_added: *mut abi::envoy_dynamic_module_type_host_info,
+  hosts_added_size: usize,
+  hosts_removed: *mut abi::envoy_dynamic_module_type_host_info,
+  hosts_removed_size: usize,
+) {
+  if cluster_ptr.is_null() {
+    return;
+  }
+  let cluster = {
+    let raw = cluster_ptr as *mut Box<dyn Cluster<EnvoyClusterImpl>>;
+    &mut **raw
+  };
+
+  let added: Vec<HostInfo> = if hosts_added.is_null() || hosts_added_size == 0 {
+    Vec::new()
+  } else {
+    std::slice::from_raw_parts(hosts_added, hosts_added_size)
+      .iter()
+      .map(|h| HostInfo {
+        host: h.host,
+        address: if h.address.ptr.is_null() || h.address.length == 0 {
+          String::new()
+        } else {
+          std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+            h.address.ptr as *const u8,
+            h.address.length,
+          ))
+          .to_string()
+        },
+        weight: h.weight,
+        health: h.health.into(),
+      })
+      .collect()
+  };
+
+  let removed: Vec<HostInfo> = if hosts_removed.is_null() || hosts_removed_size == 0 {
+    Vec::new()
+  } else {
+    std::slice::from_raw_parts(hosts_removed, hosts_removed_size)
+      .iter()
+      .map(|h| HostInfo {
+        host: h.host,
+        address: if h.address.ptr.is_null() || h.address.length == 0 {
+          String::new()
+        } else {
+          std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+            h.address.ptr as *const u8,
+            h.address.length,
+          ))
+          .to_string()
+        },
+        weight: h.weight,
+        health: h.health.into(),
+      })
+      .collect()
+  };
+
+  let mut dummy_envoy = EnvoyClusterImpl::new(std::ptr::null_mut());
+  cluster.on_host_set_change(&mut dummy_envoy, &added, &removed);
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_on_host_health_change(
+  cluster_ptr: abi::envoy_dynamic_module_type_cluster_module_ptr,
+  host: abi::envoy_dynamic_module_type_host_envoy_ptr,
+  health: abi::envoy_dynamic_module_type_host_health,
+  transition: abi::envoy_dynamic_module_type_health_transition,
+) {
+  if cluster_ptr.is_null() {
+    return;
+  }
+  let cluster = unsafe {
+    let raw = cluster_ptr as *mut Box<dyn Cluster<EnvoyClusterImpl>>;
+    &mut **raw
+  };
+  let mut dummy_envoy = EnvoyClusterImpl::new(std::ptr::null_mut());
+  cluster.on_host_health_change(
+    &mut dummy_envoy,
+    HostHandle(host),
+    health.into(),
+    transition.into(),
+  );
+}

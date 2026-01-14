@@ -57,3 +57,11 @@ envoy_cc_library(
         "abi_version.h",
     ],
 )
+
+envoy_cc_library(
+    name = "abi",
+    hdrs = ["abi.h"],
+)
+
+# Export the abi.h header for use by other extensions.
+exports_files(["abi.h"])
