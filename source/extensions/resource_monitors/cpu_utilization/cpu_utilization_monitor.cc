@@ -47,7 +47,7 @@ void CpuUtilizationMonitor::updateResourceUsage(Server::ResourceUpdateCallbacks&
     return;
   }
 
-  double current_utilization = utilization_result.value();
+  const double current_utilization = utilization_result.value();
 
   // Debug logging
   ENVOY_LOG_MISC(trace, "CPU utilization: {}", current_utilization);
