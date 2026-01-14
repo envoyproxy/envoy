@@ -3152,12 +3152,14 @@ macro_rules! declare_network_filter_init_functions {
 macro_rules! declare_all_init_functions {
   ($f:ident, $new_http_filter_config_fn:expr, $new_network_filter_config_fn:expr) => {
     #[no_mangle]
-    pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
+    pub extern "C" fn envoy_dynamic_module_on_program_init(
+      server_factory_context_ptr: abi::envoy_dynamic_module_type_server_factory_context_envoy_ptr,
+    ) -> *const ::std::os::raw::c_char {
       envoy_proxy_dynamic_modules_rust_sdk::NEW_HTTP_FILTER_CONFIG_FUNCTION
         .get_or_init(|| $new_http_filter_config_fn);
       envoy_proxy_dynamic_modules_rust_sdk::NEW_NETWORK_FILTER_CONFIG_FUNCTION
         .get_or_init(|| $new_network_filter_config_fn);
-      if ($f()) {
+      if ($f(server_factory_context_ptr)) {
         envoy_proxy_dynamic_modules_rust_sdk::abi::kAbiVersion.as_ptr()
           as *const ::std::os::raw::c_char
       } else {
@@ -6522,7 +6524,9 @@ pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_destroy(
 ///
 /// declare_bootstrap_init_functions!(my_program_init, my_new_bootstrap_extension_config_fn);
 ///
-/// fn my_program_init() -> bool {
+/// fn my_program_init(
+///   server_factory_context_ptr: abi::envoy_dynamic_module_type_server_factory_context_envoy_ptr,
+/// ) -> bool {
 ///   true
 /// }
 ///
@@ -6558,10 +6562,12 @@ pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_destroy(
 macro_rules! declare_bootstrap_init_functions {
   ($f:ident, $new_bootstrap_extension_config_fn:expr) => {
     #[no_mangle]
-    pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
+    pub extern "C" fn envoy_dynamic_module_on_program_init(
+      server_factory_context_ptr: abi::envoy_dynamic_module_type_server_factory_context_envoy_ptr,
+    ) -> *const ::std::os::raw::c_char {
       envoy_proxy_dynamic_modules_rust_sdk::NEW_BOOTSTRAP_EXTENSION_CONFIG_FUNCTION
         .get_or_init(|| $new_bootstrap_extension_config_fn);
-      if ($f()) {
+      if ($f(server_factory_context_ptr)) {
         envoy_proxy_dynamic_modules_rust_sdk::abi::kAbiVersion.as_ptr()
           as *const ::std::os::raw::c_char
       } else {

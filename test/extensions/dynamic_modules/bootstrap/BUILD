@@ -27,6 +27,7 @@ envoy_cc_test(
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
+        "//test/mocks/server:server_factory_context_mocks",
     ],
 )
 
@@ -41,6 +42,7 @@ envoy_cc_test(
         "//source/extensions/bootstrap/dynamic_modules:extension_lib",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
+        "//test/mocks/server:server_factory_context_mocks",
     ],
 )
 
