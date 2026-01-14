@@ -38,8 +38,9 @@ uint32_t ActiveClient::calculateInitialStreamsLimit(
       
       if (filter_metadata.has_string_value() &&
           filter_metadata.string_value() == match_value) {
-        if (ep_option.has_http2_max_concurrent_streams()) {
-          initial_streams = ep_option.http2_max_concurrent_streams().value();
+        if (ep_option.has_http2_protocol_options() &&
+            ep_option.http2_protocol_options().has_max_concurrent_streams()) {
+          initial_streams = ep_option.http2_protocol_options().max_concurrent_streams().value();
         }
         break;
       }

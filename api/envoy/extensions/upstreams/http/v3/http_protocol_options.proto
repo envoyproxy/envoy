@@ -2,8 +2,6 @@ syntax = "proto3";
 
 package envoy.extensions.upstreams.http.v3;
 
-import "google/protobuf/wrappers.proto";
-
 import "envoy/config/common/matcher/v3/matcher.proto";
 import "envoy/config/core/v3/extension.proto";
 import "envoy/config/core/v3/protocol.proto";
@@ -189,23 +187,20 @@ message HttpProtocolOptions {
   OutlierDetection outlier_detection = 8;
 }
 
-// [#next-free-field: 2]
 // Aggregates endpoint-specific protocol options. Each item has
-// a "metadata match" field that allows for specific endpoints to 
+// a "metadata match" field that allows for specific endpoints to
 // pick up a particular configuration.
+// [#next-free-field: 2]
 message EpSpecificHttpProtocolOptions {
   // Defines endpoint-specific HTTP protocol options. These options
   // are only applied to endpoints for each their metadata match the 
   // `ep_metadata_match` string field. Otherwise the endpoint will
   // pick the cluster's protocol options.
   message EpSpecificOptions {
-    // Same semantics as `Http2ProtocolOptions.max_concurrent_streams`
-    // but only scoped to the matching endpoint.
-    google.protobuf.UInt32Value http2_max_concurrent_streams = 1;
-
-    // Same semantics as `HttpProtocolOptions.max_requests_per_connection`
-    // but only scoped to the matching endpoint.
-    google.protobuf.UInt32Value http_max_requests_per_connection = 2;
+    // Endpoint-specific HTTP/2 protocol options.
+    config.core.v3.Http2ProtocolOptions http2_protocol_options = 1;
+    // Endpoint-specific HTTP protocol options.
+    config.core.v3.HttpProtocolOptions http_protocol_options = 2;
 
     // Defines a string that will be used to match against the endpoints
     // these configurations should be applied to. The endpoint must have 

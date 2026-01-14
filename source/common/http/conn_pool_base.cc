@@ -216,8 +216,9 @@ uint32_t MultiplexedActiveClientBase::maxStreamsPerConnection(uint32_t max_strea
       
       if (filter_metadata.has_string_value() &&
           filter_metadata.string_value() == match_value) {
-        if (ep_option.has_http_max_requests_per_connection()) {
-          max_requests = ep_option.http_max_requests_per_connection().value();
+        if (ep_option.has_http_protocol_options() &&
+            ep_option.http_protocol_options().has_max_requests_per_connection()) {
+          max_requests = ep_option.http_protocol_options().max_requests_per_connection().value();
         }
         break;
       }
