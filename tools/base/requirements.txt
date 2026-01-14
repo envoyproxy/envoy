@@ -1407,9 +1407,9 @@ requests==2.32.4 \
     # via
     #   pygithub
     #   sphinx
-roman-numerals-py==3.1.0 \
-    --hash=sha256:9da2ad2fb670bcf24e81070ceb3be72f6c11c440d73bd579fbeca1e9f330954c \
-    --hash=sha256:be4bf804f083a4ce001b5eb7e3c0862479d10f94c936f6c4e5f250aa5ff5bd2d
+roman-numerals==4.1.0 \
+    --hash=sha256:1af8b147eb1405d5839e78aeb93131690495fe9da5c91856cb33ad55a7f1e5b2 \
+    --hash=sha256:647ba99caddc2cc1e55a51e4360689115551bf4476d90e8162cf8c345fe233c7
     # via sphinx
 service-identity==24.1.0 \
     --hash=sha256:6829c9d62fb832c2e1c435629b0a8c476e1929881f28bee4d20bc24161009221 \
@@ -1433,9 +1433,9 @@ snowballstemmer==2.2.0 \
     --hash=sha256:09b16deb8547d3412ad7b590689584cd0fe25ec8db3be37788be3810cbf19cb1 \
     --hash=sha256:c8e1716e83cc398ae16824e5572ae04e0d9fc2c6b985fb0f900f5f0c96ecba1a
     # via sphinx
-sphinx==8.2.3 \
-    --hash=sha256:398ad29dee7f63a75888314e9424d40f52ce5a6a87ae88e7071e80af296ec348 \
-    --hash=sha256:4405915165f13521d875a8c29c8970800a0141c14cc5416a38feca4ea5d9b9c3
+sphinx==9.1.0 \
+    --hash=sha256:7741722357dd75f8190766926071fed3bdc211c74dd2d7d4df5404da95930ddb \
+    --hash=sha256:c84fdd4e782504495fe4f2c0b3413d6c2bf388589bb352d439b2a3bb99991978
     # via
     #   -r requirements.in
     #   envoy-docs-sphinx-runner
