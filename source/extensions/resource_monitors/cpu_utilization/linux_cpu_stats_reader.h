@@ -28,7 +28,7 @@ private:
   CpuTimes previous_cpu_times_{false, false, 0, 0, 0};
 };
 
- // Container CPU modes with both cgroup v1 and v2 implementations.
+// Container CPU modes with both cgroup v1 and v2 implementations.
 class LinuxContainerCpuStatsReader : public CpuStatsReader {
 public:
   using ContainerStatsReaderPtr = std::unique_ptr<LinuxContainerCpuStatsReader>;
