@@ -78,7 +78,7 @@ AccessLog::AccessLog(
   attributes_formatter_ = std::make_unique<OpenTelemetryFormatter>(config.attributes(), commands);
 }
 
-void AccessLog::emitLog(const Formatter::HttpFormatterContext& log_context,
+void AccessLog::emitLog(const Formatter::Context& log_context,
                         const StreamInfo::StreamInfo& stream_info) {
   opentelemetry::proto::logs::v1::LogRecord log_entry;
   log_entry.set_time_unix_nano(std::chrono::duration_cast<std::chrono::nanoseconds>(

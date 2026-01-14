@@ -44,6 +44,17 @@ def swift_repos():
         url = "https://github.com/buildbuddy-io/rules_xcodeproj/releases/download/1.2.0/release.tar.gz",
     )
 
+    http_archive(
+        name = "xctestrunner",
+        urls = [
+            "https://github.com/google/xctestrunner/archive/b7698df3d435b6491b4b4c0f9fc7a63fbed5e3a6.tar.gz",
+        ],
+        strip_prefix = "xctestrunner-b7698df3d435b6491b4b4c0f9fc7a63fbed5e3a6",
+        sha256 = "ae3a063c985a8633cb7eb566db21656f8db8eb9a0edb8c182312c7f0db53730d",
+        patch_args = ["-p1"],
+        patches = ["@envoy_mobile//bazel:xctestrunner.patch"],
+    )
+
 def kotlin_repos():
     http_archive(
         name = "rules_java",
@@ -89,9 +100,9 @@ def kotlin_repos():
 
     http_archive(
         name = "robolectric",
-        sha256 = "5bcde5db598f6938c9887a140a0a1249f95d3c16274d40869503d0c322a20d5d",
-        urls = ["https://github.com/robolectric/robolectric-bazel/archive/4.8.2.tar.gz"],
-        strip_prefix = "robolectric-bazel-4.8.2",
+        sha256 = "cf04b4206b9d21b385e8dbee478fac619fc1344e8e46935dcec2d64939dd0525",
+        urls = ["https://github.com/robolectric/robolectric-bazel/releases/download/4.16/robolectric-bazel-4.16.tar.gz"],
+        strip_prefix = "robolectric-bazel-4.16",
     )
 
 def android_repos():

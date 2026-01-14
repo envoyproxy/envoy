@@ -24,7 +24,7 @@ void AdminResponse::getHeaders(HeadersFn fn) {
 
   // First check for cancelling or termination.
   {
-    absl::MutexLock lock(&mutex_);
+    absl::MutexLock lock(mutex_);
     ASSERT(headers_fn_ == nullptr);
     if (cancelled_) {
       return;
@@ -44,7 +44,7 @@ void AdminResponse::nextChunk(BodyFn fn) {
   // Note the caller may race a call to nextChunk with the server being
   // terminated.
   {
-    absl::MutexLock lock(&mutex_);
+    absl::MutexLock lock(mutex_);
     ASSERT(body_fn_ == nullptr);
     if (cancelled_) {
       return;
@@ -71,14 +71,14 @@ void AdminResponse::nextChunk(BodyFn fn) {
 // admin request. After calling cancel() the caller must not call nextChunk or
 // getHeaders.
 void AdminResponse::cancel() {
-  absl::MutexLock lock(&mutex_);
+  absl::MutexLock lock(mutex_);
   cancelled_ = true;
   headers_fn_ = nullptr;
   body_fn_ = nullptr;
 }
 
 bool AdminResponse::cancelled() const {
-  absl::MutexLock lock(&mutex_);
+  absl::MutexLock lock(mutex_);
   return cancelled_;
 }
 
@@ -88,7 +88,7 @@ bool AdminResponse::cancelled() const {
 // resulting in 503 and an empty body.
 void AdminResponse::terminate() {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
-  absl::MutexLock lock(&mutex_);
+  absl::MutexLock lock(mutex_);
   if (!terminated_) {
     terminated_ = true;
     sendErrorLockHeld();
@@ -99,7 +99,7 @@ void AdminResponse::terminate() {
 void AdminResponse::requestHeaders() {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
   {
-    absl::MutexLock lock(&mutex_);
+    absl::MutexLock lock(mutex_);
     if (cancelled_ || terminated_) {
       return;
     }
@@ -109,7 +109,7 @@ void AdminResponse::requestHeaders() {
   request_ = opt_admin_->makeRequest(filter);
   code_ = request_->start(*response_headers_);
   {
-    absl::MutexLock lock(&mutex_);
+    absl::MutexLock lock(mutex_);
     if (headers_fn_ == nullptr || cancelled_) {
       return;
     }
@@ -122,7 +122,7 @@ void AdminResponse::requestHeaders() {
 void AdminResponse::requestNextChunk() {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
   {
-    absl::MutexLock lock(&mutex_);
+    absl::MutexLock lock(mutex_);
     if (cancelled_ || terminated_ || !more_data_) {
       return;
     }
@@ -130,7 +130,7 @@ void AdminResponse::requestNextChunk() {
   ASSERT(response_.length() == 0);
   more_data_ = request_->nextChunk(response_);
   {
-    absl::MutexLock lock(&mutex_);
+    absl::MutexLock lock(mutex_);
     if (sent_end_stream_ || cancelled_) {
       return;
     }
@@ -162,7 +162,7 @@ void AdminResponse::sendErrorLockHeld() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_) {
 void AdminResponse::PtrSet::terminateAdminRequests() {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
 
-  absl::MutexLock lock(&mutex_);
+  absl::MutexLock lock(mutex_);
   accepting_admin_requests_ = false;
   for (AdminResponse* response : response_set_) {
     // Consider the possibility of response being deleted due to its creator
@@ -175,7 +175,7 @@ void AdminResponse::PtrSet::terminateAdminRequests() {
 }
 
 void AdminResponse::PtrSet::attachResponse(AdminResponse* response) {
-  absl::MutexLock lock(&mutex_);
+  absl::MutexLock lock(mutex_);
   if (accepting_admin_requests_) {
     response_set_.insert(response);
   } else {
@@ -184,7 +184,7 @@ void AdminResponse::PtrSet::attachResponse(AdminResponse* response) {
 }
 
 void AdminResponse::PtrSet::detachResponse(AdminResponse* response) {
-  absl::MutexLock lock(&mutex_);
+  absl::MutexLock lock(mutex_);
   response_set_.erase(response);
 }
 

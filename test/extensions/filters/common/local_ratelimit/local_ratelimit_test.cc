@@ -425,7 +425,7 @@ TEST_F(LocalRateLimiterImplTest, AtomicTokenBucketMultipleTokensPerFillWithShare
 
 // Verify token bucket functionality with max tokens > tokens per fill.
 TEST_F(LocalRateLimiterImplTest, AtomicTokenBucketMaxTokensGreaterThanTokensPerFill) {
-  initializeWithAtomicTokenBucket(std::chrono::milliseconds(200), 2, 1);
+  initializeWithAtomicTokenBucket(std::chrono::milliseconds(200), 2, 1, nullptr);
 
   // 2 -> 0 tokens
   EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_).allowed);

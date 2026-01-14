@@ -37,6 +37,10 @@ message SinkConfig {
     repeated opentelemetry.proto.common.v1.KeyValue static_metric_labels = 3;
   }
 
+  // DropAction is an action that, when matched, will prevent the stat from being converted to an OTLP metric and flushed.
+  message DropAction {
+  }
+
   oneof protocol_specifier {
     option (validate.required) = true;
 
@@ -72,7 +76,10 @@ message SinkConfig {
   string prefix = 6;
 
   // The custom conversion from a stat to a metric. Currently, the only supported input is
-  // ``envoy.extensions.matching.common_inputs.stats.v3.StatFullNameMatchInput`` and the only support action is
-  // ``envoy.extensions.stat_sinks.open_telemetry.v3.SinkConfig.ConversionAction``.
+  // ``envoy.extensions.matching.common_inputs.stats.v3.StatFullNameMatchInput``.
+  // The supported actions are
+  // - ``envoy.extensions.stat_sinks.open_telemetry.v3.SinkConfig.DropAction``.
+  // - ``envoy.extensions.stat_sinks.open_telemetry.v3.SinkConfig.ConversionAction``.
+  // If stats are not matched, they will be directly converted to OTLP metrics as usual.
   xds.type.matcher.v3.Matcher custom_metric_conversions = 8;
 }

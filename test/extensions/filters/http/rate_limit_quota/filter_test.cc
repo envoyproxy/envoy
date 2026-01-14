@@ -51,6 +51,7 @@ using ::testing::NiceMock;
 
 enum class MatcherConfigType {
   Valid,
+  ValidPreview,
   Invalid,
   Empty,
   NoMatcher,
@@ -61,6 +62,8 @@ enum class MatcherConfigType {
 class FilterTest : public testing::Test {
 public:
   FilterTest() {
+    // Enable keep_matching support for preview matcher testing.
+    visitor_.setSupportKeepMatching(true);
     // Add the grpc service config.
     TestUtility::loadFromYaml(std::string(GoogleGrpcConfig), config_);
   }
@@ -68,7 +71,7 @@ public:
   void addMatcherConfig(xds::type::matcher::v3::Matcher& matcher) {
     config_.mutable_bucket_matchers()->MergeFrom(matcher);
     match_tree_ = matcher_factory_.create(matcher)();
-    EXPECT_TRUE(visitor_.errors().empty());
+    ASSERT_TRUE(visitor_.errors().empty()) << "First error: " << visitor_.errors().at(0);
   }
 
   void addMatcherConfig(MatcherConfigType config_type) {
@@ -77,6 +80,10 @@ public:
     switch (config_type) {
     case MatcherConfigType::Valid: {
       TestUtility::loadFromYaml(std::string(ValidMatcherConfig), matcher);
+      break;
+    }
+    case MatcherConfigType::ValidPreview: {
+      TestUtility::loadFromYaml(std::string(ValidPreviewMatcherConfig), matcher);
       break;
     }
     case MatcherConfigType::ValidOnNoMatchConfig: {
@@ -666,6 +673,142 @@ TEST_F(FilterTest, DecodeHeaderWithTokenBucketDeny) {
   EXPECT_EQ(bucket->quota_usage->num_requests_denied.load(std::memory_order_relaxed), 1);
 }
 
+TEST_F(FilterTest, DecodeHeaderWithPreviewBucket) {
+  addMatcherConfig(MatcherConfigType::ValidPreview);
+  createFilter();
+  // Define the key value pairs that is used to build the bucket_id dynamically
+  // via `custom_value` in the config.
+  absl::flat_hash_map<std::string, std::string> custom_value_pairs = {{"environment", "staging"},
+                                                                      {"group", "envoy"}};
+  buildCustomHeader(custom_value_pairs);
+
+  absl::flat_hash_map<std::string, std::string> expected_bucket_ids = custom_value_pairs;
+  expected_bucket_ids.insert({{"name", "prod"}});
+  absl::flat_hash_map<std::string, std::string> expected_preview_bucket_ids(expected_bucket_ids);
+  // The low priority config has a different bucket id intentionally.
+  expected_preview_bucket_ids.insert({{"preview_name", "preview_test"}});
+
+  // Expect request processing to check for an existing bucket, find none, and
+  // go through bucket creation for the preview bucket.
+  BucketId bucket_id = bucketIdFromMap(expected_bucket_ids);
+  size_t bucket_id_hash = MessageUtil::hash(bucket_id);
+  BucketId preview_bucket_id = bucketIdFromMap(expected_preview_bucket_ids);
+  size_t preview_bucket_id_hash = MessageUtil::hash(preview_bucket_id);
+
+  // Expect the new actionable bucket to fallback to DENY_ALL without a
+  // configured no_assignment_behavior & the preview bucket to fallback to
+  // ALLOW_ALL.
+  BucketAction expected_action;
+  expected_action.mutable_quota_assignment_action()
+      ->mutable_rate_limit_strategy()
+      ->set_blanket_rule(RateLimitStrategy::DENY_ALL);
+  *expected_action.mutable_bucket_id() = bucket_id;
+  BucketAction preview_expected_action;
+  preview_expected_action.mutable_quota_assignment_action()
+      ->mutable_rate_limit_strategy()
+      ->set_blanket_rule(RateLimitStrategy::ALLOW_ALL);
+  *preview_expected_action.mutable_bucket_id() = preview_bucket_id;
+
+  // The bucket creation shouldn't try to include a fallback or
+  // no-assignment-default action as neither is set in the BucketMatcher.
+  EXPECT_CALL(*mock_local_client_, getBucket(preview_bucket_id_hash)).WillOnce(Return(nullptr));
+  EXPECT_CALL(*mock_local_client_, getBucket(bucket_id_hash)).WillOnce(Return(nullptr));
+  EXPECT_CALL(*mock_local_client_,
+              createBucket(ProtoEqIgnoreRepeatedFieldOrdering(preview_bucket_id),
+                           preview_bucket_id_hash, ProtoEq(preview_expected_action),
+                           testing::IsNull(), std::chrono::milliseconds::zero(), true))
+      .WillOnce(Return());
+  EXPECT_CALL(*mock_local_client_,
+              createBucket(ProtoEqIgnoreRepeatedFieldOrdering(bucket_id), bucket_id_hash,
+                           ProtoEq(expected_action), testing::IsNull(),
+                           std::chrono::milliseconds::zero(), false))
+      .WillOnce(Return());
+
+  Http::FilterHeadersStatus status = filter_->decodeHeaders(default_headers_, false);
+  EXPECT_EQ(status, Envoy::Http::FilterHeadersStatus::StopIteration);
+}
+
+TEST_F(FilterTest, DecodeHeaderWithPreviewTokenBucket) {
+  addMatcherConfig(MatcherConfigType::ValidPreview);
+  createFilter();
+  // Define the key value pairs that is used to build the bucket_id dynamically
+  // via `custom_value` in the config.
+  absl::flat_hash_map<std::string, std::string> custom_value_pairs = {{"environment", "staging"},
+                                                                      {"group", "envoy"}};
+  buildCustomHeader(custom_value_pairs);
+
+  absl::flat_hash_map<std::string, std::string> expected_bucket_ids = custom_value_pairs;
+  expected_bucket_ids.insert({{"name", "prod"}});
+  absl::flat_hash_map<std::string, std::string> expected_preview_bucket_ids(expected_bucket_ids);
+
+  // The low priority config has a different bucket id intentionally.
+  expected_preview_bucket_ids.insert({{"preview_name", "preview_test"}});
+  // Expect request processing to check for both buckets, and create the missing actionable bucket.
+  BucketId bucket_id = bucketIdFromMap(expected_bucket_ids);
+  size_t bucket_id_hash = MessageUtil::hash(bucket_id);
+  // The preview bucket will have a pre-cached TokenBucket for testing.
+  BucketId preview_bucket_id = bucketIdFromMap(expected_preview_bucket_ids);
+  size_t preview_bucket_id_hash = MessageUtil::hash(preview_bucket_id);
+
+  // Expect the new actionable bucket to fallback to ALLOW_ALL.
+  // The preview bucket's TokenBucket should log a DENY action, but the actionable bucket should
+  // allow the traffic anyway.
+  BucketAction expected_action;
+  expected_action.mutable_quota_assignment_action()
+      ->mutable_rate_limit_strategy()
+      ->set_blanket_rule(RateLimitStrategy::ALLOW_ALL);
+  *expected_action.mutable_bucket_id() = bucket_id;
+  BucketAction preview_expected_action;
+  preview_expected_action.mutable_quota_assignment_action()
+      ->mutable_rate_limit_strategy()
+      ->set_blanket_rule(RateLimitStrategy::ALLOW_ALL);
+  *preview_expected_action.mutable_bucket_id() = preview_bucket_id;
+
+  auto cached_preview_action = std::make_unique<RateLimitQuotaResponse::BucketAction>();
+  TokenBucket* preview_token_bucket = cached_preview_action->mutable_quota_assignment_action()
+                                          ->mutable_rate_limit_strategy()
+                                          ->mutable_token_bucket();
+  preview_token_bucket->set_max_tokens(1);
+  preview_token_bucket->mutable_tokens_per_fill()->set_value(1);
+  preview_token_bucket->mutable_fill_interval()->set_seconds(60);
+  std::shared_ptr<AtomicTokenBucketImpl> token_bucket_limiter =
+      std::make_shared<AtomicTokenBucketImpl>(1, dispatcher_.timeSource(), 1 / 60);
+  // All subsequent requests should deny for 60 (mock) seconds.
+  EXPECT_TRUE(token_bucket_limiter->consume());
+
+  RateLimitQuotaResponse::BucketAction no_assignment_action;
+  no_assignment_action.mutable_quota_assignment_action()
+      ->mutable_rate_limit_strategy()
+      ->set_blanket_rule(RateLimitStrategy::ALLOW_ALL);
+
+  std::shared_ptr<CachedBucket> cached_preview_bucket = std::make_shared<CachedBucket>(
+      preview_bucket_id, std::make_shared<QuotaUsage>(1, 0, std::chrono::nanoseconds(0)),
+      std::move(cached_preview_action), nullptr, std::chrono::milliseconds::zero(),
+      no_assignment_action, token_bucket_limiter);
+  // The actionable bucket has an allow-all no_assignment_action and no cached
+  // assignment, so the traffic should be allowed regardless of the previewed TokenBucket.
+  std::shared_ptr<CachedBucket> cached_allow_all_bucket = std::make_shared<CachedBucket>(
+      bucket_id, std::make_shared<QuotaUsage>(1, 0, std::chrono::nanoseconds(0)), nullptr, nullptr,
+      std::chrono::milliseconds::zero(), no_assignment_action, nullptr);
+
+  EXPECT_CALL(*mock_local_client_, getBucket(bucket_id_hash))
+      .WillOnce(Return(cached_allow_all_bucket));
+  EXPECT_CALL(*mock_local_client_, getBucket(preview_bucket_id_hash))
+      .WillOnce(Return(cached_preview_bucket));
+
+  Http::FilterHeadersStatus status = filter_->decodeHeaders(default_headers_, false);
+  EXPECT_EQ(status, Envoy::Http::FilterHeadersStatus::Continue);
+  EXPECT_EQ(
+      cached_preview_bucket->quota_usage->num_requests_allowed.load(std::memory_order_relaxed), 1);
+  EXPECT_EQ(cached_preview_bucket->quota_usage->num_requests_denied.load(std::memory_order_relaxed),
+            1);
+  EXPECT_EQ(
+      cached_allow_all_bucket->quota_usage->num_requests_allowed.load(std::memory_order_relaxed),
+      2);
+  EXPECT_EQ(
+      cached_allow_all_bucket->quota_usage->num_requests_denied.load(std::memory_order_relaxed), 0);
+}
+
 TEST_F(FilterTest, UnsupportedRequestsPerTimeUnit) {
   addMatcherConfig(MatcherConfigType::Valid);
   createFilter();
@@ -755,6 +898,319 @@ TEST_F(FilterTest, CachedBucketMissingStrategy) {
   EXPECT_EQ(status, Envoy::Http::FilterHeadersStatus::Continue);
   EXPECT_EQ(bucket->quota_usage->num_requests_allowed.load(std::memory_order_relaxed), 2);
   EXPECT_EQ(bucket->quota_usage->num_requests_denied.load(std::memory_order_relaxed), 0);
+}
+
+// Tests for gRPC status functionality
+
+TEST_F(FilterTest, DenyResponseWithExplicitGrpcStatus) {
+  // Create a custom config with explicit grpc_status set to UNAVAILABLE
+  const std::string config_yaml = R"EOF(
+rlqs_server:
+  google_grpc:
+    target_uri: rate_limit_quota_server
+    stat_prefix: rlqs
+bucket_matchers:
+  matcher_list:
+    matchers:
+    - predicate:
+        single_predicate:
+          input:
+            typed_config:
+              "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+              header_name: environment
+          value_match:
+            exact: staging
+      on_match:
+        action:
+          name: rate_limit_quota
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings
+            bucket_id_builder:
+              bucket_id_builder:
+                "environment":
+                  string_value: "staging"
+            deny_response_settings:
+              http_status:
+                code: 429
+              grpc_status:
+                code: 14  # UNAVAILABLE
+                message: "Service temporarily unavailable"
+            expired_assignment_behavior:
+              fallback_rate_limit:
+                blanket_rule: ALLOW_ALL
+            reporting_interval: 5s
+)EOF";
+
+  // Extract just the matcher portion for loading into xds::type::matcher::v3::Matcher
+  const std::string matcher_yaml_explicit = R"EOF(
+  matcher_list:
+    matchers:
+    - predicate:
+        single_predicate:
+          input:
+            typed_config:
+              "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+              header_name: environment
+          value_match:
+            exact: staging
+      on_match:
+        action:
+          name: rate_limit_quota
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings
+            bucket_id_builder:
+              bucket_id_builder:
+                "environment":
+                  string_value: "staging"
+            deny_response_settings:
+              http_status:
+                code: 429
+              grpc_status:
+                code: 14
+                message: "Service temporarily unavailable"
+            expired_assignment_behavior:
+              fallback_rate_limit:
+                blanket_rule: ALLOW_ALL
+            reporting_interval: 5s
+  )EOF";
+
+  FilterConfig config;
+  TestUtility::loadFromYaml(config_yaml, config);
+
+  xds::type::matcher::v3::Matcher matcher;
+  TestUtility::loadFromYaml(matcher_yaml_explicit, matcher);
+  addMatcherConfig(matcher);
+
+  filter_config_ = std::make_shared<FilterConfig>(config);
+  Grpc::GrpcServiceConfigWithHashKey config_with_hash_key =
+      Grpc::GrpcServiceConfigWithHashKey(filter_config_->rlqs_server());
+
+  mock_local_client_ = new MockRateLimitClient();
+  filter_ = std::make_unique<RateLimitQuotaFilter>(filter_config_, context_,
+                                                   absl::WrapUnique(mock_local_client_),
+                                                   config_with_hash_key, match_tree_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  // Build headers that match the config
+  Http::TestRequestHeaderMapImpl headers{{":method", "GET"},
+                                         {":path", "/"},
+                                         {":scheme", "http"},
+                                         {":authority", "host"},
+                                         {"environment", "staging"}};
+
+  // Set up bucket with DENY_ALL action
+  absl::flat_hash_map<std::string, std::string> expected_bucket_ids({{"environment", "staging"}});
+  BucketId bucket_id = bucketIdFromMap(expected_bucket_ids);
+  size_t bucket_id_hash = MessageUtil::hash(bucket_id);
+  auto cached_action = std::make_unique<RateLimitQuotaResponse::BucketAction>();
+  cached_action->mutable_quota_assignment_action()->mutable_rate_limit_strategy()->set_blanket_rule(
+      RateLimitStrategy::DENY_ALL);
+
+  RateLimitQuotaResponse::BucketAction no_assignment_action;
+  no_assignment_action.mutable_quota_assignment_action()
+      ->mutable_rate_limit_strategy()
+      ->set_blanket_rule(RateLimitStrategy::ALLOW_ALL);
+
+  std::shared_ptr<CachedBucket> bucket = std::make_shared<CachedBucket>(
+      bucket_id, std::make_shared<QuotaUsage>(1, 0, std::chrono::nanoseconds(0)),
+      std::move(cached_action), nullptr, std::chrono::milliseconds::zero(), no_assignment_action,
+      nullptr);
+
+  EXPECT_CALL(*mock_local_client_, getBucket(bucket_id_hash)).WillOnce(Return(bucket));
+
+  // Expect sendLocalReply to be called with UNAVAILABLE gRPC status and custom message
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::TooManyRequests, _, _, _, _))
+      .WillOnce(Invoke(
+          [](Http::Code, absl::string_view body_text, std::function<void(Http::ResponseHeaderMap&)>,
+             const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view) {
+            EXPECT_EQ(grpc_status, Grpc::Status::WellKnownGrpcStatus::Unavailable);
+            EXPECT_EQ(body_text, "Service temporarily unavailable");
+          }));
+
+  Http::FilterHeadersStatus status = filter_->decodeHeaders(headers, false);
+  EXPECT_EQ(status, Envoy::Http::FilterHeadersStatus::StopIteration);
+  EXPECT_EQ(bucket->quota_usage->num_requests_allowed.load(std::memory_order_relaxed), 1);
+  EXPECT_EQ(bucket->quota_usage->num_requests_denied.load(std::memory_order_relaxed), 1);
+}
+
+TEST_F(FilterTest, DenyResponseDefaultBehavior) {
+  // Test default behavior when grpc_status is not set
+  addMatcherConfig(MatcherConfigType::Valid);
+  createFilter();
+
+  // Build headers that match the config
+  absl::flat_hash_map<std::string, std::string> custom_value_pairs = {{"environment", "staging"},
+                                                                      {"group", "envoy"}};
+  buildCustomHeader(custom_value_pairs);
+
+  // Set up bucket with DENY_ALL action
+  absl::flat_hash_map<std::string, std::string> expected_bucket_ids = custom_value_pairs;
+  expected_bucket_ids.insert({"name", "prod"});
+  BucketId bucket_id = bucketIdFromMap(expected_bucket_ids);
+  size_t bucket_id_hash = MessageUtil::hash(bucket_id);
+  auto cached_action = std::make_unique<RateLimitQuotaResponse::BucketAction>();
+  cached_action->mutable_quota_assignment_action()->mutable_rate_limit_strategy()->set_blanket_rule(
+      RateLimitStrategy::DENY_ALL);
+
+  RateLimitQuotaResponse::BucketAction no_assignment_action;
+  no_assignment_action.mutable_quota_assignment_action()
+      ->mutable_rate_limit_strategy()
+      ->set_blanket_rule(RateLimitStrategy::ALLOW_ALL);
+
+  std::shared_ptr<CachedBucket> bucket = std::make_shared<CachedBucket>(
+      bucket_id, std::make_shared<QuotaUsage>(1, 0, std::chrono::nanoseconds(0)),
+      std::move(cached_action), nullptr, std::chrono::milliseconds::zero(), no_assignment_action,
+      nullptr);
+
+  EXPECT_CALL(*mock_local_client_, getBucket(bucket_id_hash)).WillOnce(Return(bucket));
+
+  // Should use default behavior (absl::nullopt for gRPC status)
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::TooManyRequests, _, _, _, _))
+      .WillOnce(
+          Invoke([](Http::Code, absl::string_view, std::function<void(Http::ResponseHeaderMap&)>,
+                    const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                    absl::string_view) { EXPECT_EQ(grpc_status, absl::nullopt); }));
+
+  Http::FilterHeadersStatus status = filter_->decodeHeaders(default_headers_, false);
+  EXPECT_EQ(status, Envoy::Http::FilterHeadersStatus::StopIteration);
+  EXPECT_EQ(bucket->quota_usage->num_requests_allowed.load(std::memory_order_relaxed), 1);
+  EXPECT_EQ(bucket->quota_usage->num_requests_denied.load(std::memory_order_relaxed), 1);
+}
+
+TEST_F(FilterTest, CustomGrpcMessageTest) {
+  // Test that custom gRPC message is passed correctly in sendLocalReply body_text parameter
+  const std::string config_yaml = R"EOF(
+rlqs_server:
+  google_grpc:
+    target_uri: rate_limit_quota_server
+    stat_prefix: rlqs
+bucket_matchers:
+  matcher_list:
+    matchers:
+    - predicate:
+        single_predicate:
+          input:
+            typed_config:
+              "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+              header_name: environment
+          value_match:
+            exact: staging
+      on_match:
+        action:
+          name: rate_limit_quota
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings
+            bucket_id_builder:
+              bucket_id_builder:
+                "environment":
+                  string_value: "staging"
+            deny_response_settings:
+              http_status:
+                code: 429
+              grpc_status:
+                code: 8
+                message: "Custom rate limit message from test"
+            expired_assignment_behavior:
+              fallback_rate_limit:
+                blanket_rule: ALLOW_ALL
+            reporting_interval: 5s
+)EOF";
+
+  // Extract just the matcher portion for loading into xds::type::matcher::v3::Matcher
+  const std::string matcher_yaml = R"EOF(
+matcher_list:
+  matchers:
+  - predicate:
+      single_predicate:
+        input:
+          typed_config:
+            "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+            header_name: environment
+        value_match:
+          exact: staging
+    on_match:
+      action:
+        name: rate_limit_quota
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings
+          bucket_id_builder:
+            bucket_id_builder:
+              "environment":
+                string_value: "staging"
+          deny_response_settings:
+            http_status:
+              code: 429
+            grpc_status:
+              code: 8
+              message: "Custom rate limit message from test"
+          expired_assignment_behavior:
+            fallback_rate_limit:
+              blanket_rule: ALLOW_ALL
+          reporting_interval: 5s
+)EOF";
+
+  FilterConfig config;
+  TestUtility::loadFromYaml(config_yaml, config);
+
+  xds::type::matcher::v3::Matcher matcher;
+  TestUtility::loadFromYaml(matcher_yaml, matcher);
+  addMatcherConfig(matcher);
+
+  filter_config_ = std::make_shared<FilterConfig>(config);
+  Grpc::GrpcServiceConfigWithHashKey config_with_hash_key =
+      Grpc::GrpcServiceConfigWithHashKey(filter_config_->rlqs_server());
+
+  mock_local_client_ = new MockRateLimitClient();
+  filter_ = std::make_unique<RateLimitQuotaFilter>(filter_config_, context_,
+                                                   absl::WrapUnique(mock_local_client_),
+                                                   config_with_hash_key, match_tree_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  // Build headers that match the config
+  Http::TestRequestHeaderMapImpl headers{{":method", "GET"},
+                                         {":path", "/"},
+                                         {":scheme", "http"},
+                                         {":authority", "host"},
+                                         {"environment", "staging"}};
+
+  // Set up bucket with DENY_ALL action
+  absl::flat_hash_map<std::string, std::string> expected_bucket_ids({{"environment", "staging"}});
+  BucketId bucket_id = bucketIdFromMap(expected_bucket_ids);
+  size_t bucket_id_hash = MessageUtil::hash(bucket_id);
+  auto cached_action = std::make_unique<RateLimitQuotaResponse::BucketAction>();
+  cached_action->mutable_quota_assignment_action()->mutable_rate_limit_strategy()->set_blanket_rule(
+      RateLimitStrategy::DENY_ALL);
+
+  RateLimitQuotaResponse::BucketAction no_assignment_action;
+  no_assignment_action.mutable_quota_assignment_action()
+      ->mutable_rate_limit_strategy()
+      ->set_blanket_rule(RateLimitStrategy::ALLOW_ALL);
+
+  std::shared_ptr<CachedBucket> bucket = std::make_shared<CachedBucket>(
+      bucket_id, std::make_shared<QuotaUsage>(1, 0, std::chrono::nanoseconds(0)),
+      std::move(cached_action), nullptr, std::chrono::milliseconds::zero(), no_assignment_action,
+      nullptr);
+
+  EXPECT_CALL(*mock_local_client_, getBucket(bucket_id_hash)).WillOnce(Return(bucket));
+
+  // Expect sendLocalReply to be called with custom gRPC message in body_text parameter
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::TooManyRequests, _, _, _, _))
+      .WillOnce(Invoke([](Http::Code, absl::string_view body,
+                          std::function<void(Http::ResponseHeaderMap&)>,
+                          const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                          absl::string_view details) {
+        // Check that the custom message is in the body_text parameter (for gRPC message)
+        EXPECT_EQ(body, "Custom rate limit message from test");
+        // Check that the gRPC status is RESOURCE_EXHAUSTED
+        EXPECT_EQ(grpc_status, Grpc::Status::WellKnownGrpcStatus::ResourceExhausted);
+        // Check that details contains our debug info
+        EXPECT_EQ(details, "rate_limited_by_quota");
+      }));
+
+  Http::FilterHeadersStatus status = filter_->decodeHeaders(headers, false);
+  EXPECT_EQ(status, Envoy::Http::FilterHeadersStatus::StopIteration);
+  EXPECT_EQ(bucket->quota_usage->num_requests_allowed.load(std::memory_order_relaxed), 1);
+  EXPECT_EQ(bucket->quota_usage->num_requests_denied.load(std::memory_order_relaxed), 1);
 }
 
 } // namespace

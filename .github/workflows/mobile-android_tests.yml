@@ -40,6 +40,7 @@ jobs:
 
   linux:
     permissions:
+      actions: read
       contents: read
       packages: read
     name: Android linux tests
@@ -49,7 +50,6 @@ jobs:
     with:
       args: ${{ matrix.args }}
       container: ${{ needs.load.outputs.build-image && fromJSON(needs.load.outputs.build-image).mobile || '' }}
-      diskspace-hack: true
       request: ${{ needs.load.outputs.request }}
       target: ${{ matrix.target }}
       timeout-minutes: 90
@@ -61,13 +61,17 @@ jobs:
           target: java_tests_linux
           args: >-
             test
-            --config=mobile-remote-ci-android
+            --config=ci
+            --config=mobile-rbe
+            --config=mobile-android
             //test/java/...
         - name: kotlin
           target: kotlin_tests_linux
           args: >-
             test
-            --config=mobile-remote-ci-android
+            --config=ci
+            --config=mobile-rbe
+            --config=mobile-android
             //test/kotlin/...
 
   request:

@@ -312,7 +312,10 @@ public:
   // Override the lowest level of stat creation based on StatName to redirect
   // back to the old string-based mechanisms still on the MockStore object
   // to allow tests to inject EXPECT_CALL hooks for those.
-  Counter& counterFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef) override;
+  MOCK_METHOD(Counter&, counterFromStatNameWithTags,
+              (const StatName&, StatNameTagVectorOptConstRef));
+  Counter& counterFromStatNameWithTags_(const StatName& name, StatNameTagVectorOptConstRef);
+
   Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef,
                                    Gauge::ImportMode import_mode) override;
   Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef,

@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.config.rbac.v3;
 
 import "envoy/config/core/v3/address.proto";
+import "envoy/config/core/v3/cel.proto";
 import "envoy/config/core/v3/extension.proto";
 import "envoy/config/route/v3/route_components.proto";
 import "envoy/type/matcher/v3/filter_state.proto";
@@ -173,6 +174,7 @@ message RBAC {
 // A policy matches if and only if at least one of its permissions match the
 // action taking place AND at least one of its principals match the downstream
 // AND the condition is true if specified.
+// [#next-free-field: 6]
 message Policy {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.rbac.v2.Policy";
 
@@ -199,6 +201,12 @@ message Policy {
   // Only be used when condition is not used.
   google.api.expr.v1alpha1.CheckedExpr checked_condition = 4
       [(udpa.annotations.field_migrate).oneof_promotion = "expression_specifier"];
+
+  // CEL expression configuration that modifies the evaluation behavior of the ``condition`` field.
+  // If specified, string conversion, concatenation, and manipulation functions may be enabled
+  // for the CEL expression. See :ref:`CelExpressionConfig <envoy_v3_api_msg_config.core.v3.CelExpressionConfig>`
+  // for more details.
+  core.v3.CelExpressionConfig cel_config = 5;
 }
 
 // SourcedMetadata enables matching against metadata from different sources in the request processing

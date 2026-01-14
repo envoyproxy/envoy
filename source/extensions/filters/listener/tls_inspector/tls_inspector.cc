@@ -50,8 +50,7 @@ const unsigned Config::TLS_MAX_SUPPORTED_VERSION = TLS1_3_VERSION;
 
 Config::Config(
     Stats::Scope& scope,
-    const envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector& proto_config,
-    uint32_t max_client_hello_size)
+    const envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector& proto_config)
     : stats_{ALL_TLS_INSPECTOR_STATS(POOL_COUNTER_PREFIX(scope, "tls_inspector."),
                                      POOL_HISTOGRAM_PREFIX(scope, "tls_inspector."))},
       ssl_ctx_(SSL_CTX_new(TLS_with_buffers_method())),
@@ -61,11 +60,12 @@ Config::Config(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, enable_ja4_fingerprinting, false)),
       close_connection_on_client_hello_parsing_errors_(
           proto_config.close_connection_on_client_hello_parsing_errors()),
-      max_client_hello_size_(max_client_hello_size),
+      max_client_hello_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, max_client_hello_size,
+                                                             TLS_MAX_CLIENT_HELLO)),
       initial_read_buffer_size_(
           std::min(PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, initial_read_buffer_size,
-                                                   max_client_hello_size),
-                   max_client_hello_size)) {
+                                                   max_client_hello_size_),
+                   max_client_hello_size_)) {
   if (max_client_hello_size_ > TLS_MAX_CLIENT_HELLO) {
     throw EnvoyException(fmt::format("max_client_hello_size of {} is greater than maximum of {}.",
                                      max_client_hello_size_, size_t(TLS_MAX_CLIENT_HELLO)));
@@ -184,6 +184,16 @@ void Filter::setDynamicMetadata(absl::string_view failure_reason) {
   cb_->setDynamicMetadata(dynamicMetadataKey(), metadata);
 }
 
+void Filter::setDownstreamTransportFailureReason() {
+  const std::string transport_failure = absl::StrCat(
+      "TLS_error|",
+      Extensions::TransportSockets::Tls::Utility::getLastCryptoError().value_or("unknown"),
+      ":TLS_error_end");
+  ENVOY_LOG(debug, "tls inspector: parseClientHello failed: {}, {}: {}", ERR_peek_error(),
+            ERR_peek_last_error(), transport_failure);
+  cb_->streamInfo().setDownstreamTransportFailureReason(transport_failure);
+}
+
 ParseState Filter::getParserState(int handshake_status) {
   switch (SSL_get_error(ssl_.get(), handshake_status)) {
   case SSL_ERROR_WANT_READ:
@@ -231,10 +241,7 @@ ParseState Filter::getParserState(int handshake_status) {
       }
       config_->stats().tls_not_found_.inc();
       setDynamicMetadata(failureReasonClientHelloNotDetected());
-      ENVOY_LOG(
-          debug, "tls inspector: parseClientHello failed: {}, {}: {}", ERR_peek_error(),
-          ERR_peek_last_error(),
-          Extensions::TransportSockets::Tls::Utility::getLastCryptoError().value_or("unknown"));
+      setDownstreamTransportFailureReason();
     }
     return ParseState::Done;
   default:

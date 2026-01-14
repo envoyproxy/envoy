@@ -58,7 +58,7 @@ public:
    * @param stream_info holds additional information about the request.
    */
   virtual void finalizeResponseHeaders(Http::ResponseHeaderMap& headers,
-                                       const Formatter::HttpFormatterContext& context,
+                                       const Formatter::Context& context,
                                        const StreamInfo::StreamInfo& stream_info) const PURE;
 
   /**
@@ -96,11 +96,21 @@ public:
   virtual std::string newUri(const Http::RequestHeaderMap& headers) const PURE;
 
   /**
-   * Returns the response body to send with direct responses.
-   * @return std::string& the response body specified in the route configuration,
-   *         or an empty string if no response body is specified.
+   * Format the response body for direct responses. Users should pass
+   * a string reference to populate, `body`, and the return value may
+   * or may not be the same reference based on if a formatter is applied.
+   * If a formatter is applied, the return value will be the same reference.
+   * If no formatter is applied, the return value will be the configured body.
+   * @param request_headers supplies the request headers.
+   * @param response_headers supplies the response headers.
+   * @param stream_info holds additional information about the request.
+   * @param body_out a string in which a formatted body may be stored.
+   * @return std::string& the response body.
    */
-  virtual const std::string& responseBody() const PURE;
+  virtual absl::string_view formatBody(const Http::RequestHeaderMap& request_headers,
+                                       const Http::ResponseHeaderMap& response_headers,
+                                       const StreamInfo::StreamInfo& stream_info,
+                                       std::string& body_out) const PURE;
 
   /**
    * Do potentially destructive header transforms on Path header prior to redirection. For
@@ -960,7 +970,7 @@ public:
    *        or x-envoy-original-host header if host rewritten.
    */
   virtual void finalizeRequestHeaders(Http::RequestHeaderMap& headers,
-                                      const Formatter::HttpFormatterContext& context,
+                                      const Formatter::Context& context,
                                       const StreamInfo::StreamInfo& stream_info,
                                       bool keep_original_host_or_path) const PURE;
 

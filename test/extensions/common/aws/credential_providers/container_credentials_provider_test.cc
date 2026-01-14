@@ -273,8 +273,9 @@ TEST_F(ContainerCredentialsProviderTest, RefreshOnNormalCredentialExpiration) {
   setupProvider();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
-  // System time is set to Tue Jan  2 03:04:05 UTC 2018, so this credential expiry is in 2hrs
-  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(std::chrono::hours(2)), nullptr));
+  // System time is set to Tue Jan  2 03:04:05 UTC 2018, so this credential expiry is in
+  // 2hrs minus 60s grace period = 7140s
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(7140000), nullptr));
 
   // Kick off a refresh
   auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
@@ -472,7 +473,10 @@ TEST_F(ContainerEKSPodIdentityCredentialsProviderTest, AuthTokenFromFile) {
 
   setupProvider();
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
-  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(std::chrono::hours(1)), nullptr));
+  // 1 hour - 60s grace period = 3540 seconds
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(std::chrono::hours(1)) -
+                                       std::chrono::milliseconds(std::chrono::seconds(60)),
+                                   nullptr));
 
   // Kick off a refresh
   auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);

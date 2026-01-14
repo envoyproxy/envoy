@@ -891,6 +891,10 @@ Filter::doHeaders(StreamHandleRef& handle, Filters::Common::Lua::CoroutinePtr& c
 
   Http::FilterHeadersStatus status = Http::FilterHeadersStatus::Continue;
   TRY_NEEDS_AUDIT {
+    // The counter will increment twice if the supplied script has both request and response
+    // handles. This is intentionally kept so as to provide consistency with the way the 'errors'
+    // counter is incremented.
+    stats_.executions_.inc();
     status = handle.get()->start(function_ref);
     handle.markDead();
   }

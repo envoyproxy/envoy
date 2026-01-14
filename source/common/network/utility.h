@@ -331,7 +331,7 @@ public:
    */
   static Api::IoCallUint64Result
   readFromSocket(IoHandle& handle, const Address::Instance& local_address,
-                 UdpPacketProcessor& udp_packet_processor, MonotonicTime receive_time,
+                 UdpPacketProcessor& udp_packet_processor, TimeSource& time_source,
                  UdpRecvMsgMethod recv_msg_method, uint32_t* packets_dropped,
                  uint32_t* num_packets_read);
 

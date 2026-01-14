@@ -154,7 +154,7 @@ DEFINE_PROTO_FUZZER(const test::common::router::RouteTestCase& input) {
                                                  ProtobufMessage::getNullValidationVisitor(), true),
                               std::shared_ptr<ConfigImpl>);
     auto headers = Fuzz::fromHeaders<Http::TestRequestHeaderMapImpl>(input.headers());
-    const Formatter::HttpFormatterContext formatter_context{&headers};
+    const Formatter::Context formatter_context{&headers};
     auto route = config->route(headers, stream_info, input.random_value()).route;
     if (route != nullptr && route->routeEntry() != nullptr) {
       route->routeEntry()->finalizeRequestHeaders(headers, formatter_context, stream_info, true);

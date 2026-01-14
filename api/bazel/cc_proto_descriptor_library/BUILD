@@ -1,3 +1,6 @@
+load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+
 licenses(["notice"])  # Apache 2
 
 cc_library(
@@ -37,7 +40,6 @@ cc_library(
         "@com_google_absl//absl/strings:str_format",
         "@com_google_protobuf//:protobuf",
         "@com_google_protobuf//src/google/protobuf/compiler:code_generator",
-        "@com_google_protobuf//src/google/protobuf/compiler:retention",
     ],
 )
 

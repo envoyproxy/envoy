@@ -9,12 +9,15 @@
 
 #include "envoy/config/core/v3/extension.pb.h"
 #include "envoy/config/core/v3/protocol.pb.h"
+#include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/extensions/upstreams/http/v3/http_protocol_options.pb.h"
 #include "envoy/extensions/upstreams/http/v3/http_protocol_options.pb.validate.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_validator.h"
+#include "envoy/router/router.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/server/transport_socket_config.h"
+#include "envoy/upstream/upstream.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/protobuf/message_validator_impl.h"
@@ -25,7 +28,7 @@ namespace Extensions {
 namespace Upstreams {
 namespace Http {
 
-class ProtocolOptionsConfigImpl : public Upstream::ProtocolOptionsConfig {
+class ProtocolOptionsConfigImpl : public Upstream::HttpProtocolOptionsConfig {
 public:
   static absl::StatusOr<std::shared_ptr<ProtocolOptionsConfigImpl>> createProtocolOptionsConfig(
       const envoy::extensions::upstreams::http::v3::HttpProtocolOptions& options,
@@ -43,6 +46,30 @@ public:
   // returns a unit64_t representing the enabled Upstream::ClusterInfo::Features.
   static uint64_t parseFeatures(const envoy::config::cluster::v3::Cluster& config,
                                 const ProtocolOptionsConfigImpl& options);
+
+  const Envoy::Http::Http1Settings& http1Settings() const override { return http1_settings_; }
+  const envoy::config::core::v3::Http2ProtocolOptions& http2Options() const override {
+    return http2_options_;
+  }
+  const envoy::config::core::v3::Http3ProtocolOptions& http3Options() const override {
+    return http3_options_;
+  }
+  const envoy::config::core::v3::HttpProtocolOptions& commonHttpProtocolOptions() const override {
+    return common_http_protocol_options_;
+  }
+  const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>&
+  upstreamHttpProtocolOptions() const override {
+    return upstream_http_protocol_options_;
+  }
+  const absl::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions>&
+  alternateProtocolsCacheOptions() const override {
+    return alternate_protocol_cache_options_;
+  }
+  const std::vector<Envoy::Router::ShadowPolicyPtr>& shadowPolicies() const override {
+    return shadow_policies_;
+  }
+  const Envoy::Router::RetryPolicy* retryPolicy() const override { return retry_policy_.get(); }
+  const Envoy::Http::HashPolicy* hashPolicy() const override { return hash_policy_.get(); }
 
   const Envoy::Http::Http1Settings http1_settings_;
   const envoy::config::core::v3::Http2ProtocolOptions http2_options_;
@@ -63,13 +90,32 @@ public:
   const bool use_alpn_{};
 
   std::vector<Extensions::Common::Matcher::MatcherPtr> outlier_detection_http_error_matcher_;
+  const std::vector<Envoy::Router::ShadowPolicyPtr> shadow_policies_;
+  const std::shared_ptr<const Envoy::Router::RetryPolicy> retry_policy_;
+  const std::unique_ptr<Envoy::Http::HashPolicy> hash_policy_;
 
 private:
+  static absl::StatusOr<std::vector<Envoy::Router::ShadowPolicyPtr>>
+  buildShadowPolicies(const envoy::extensions::upstreams::http::v3::HttpProtocolOptions& options,
+                      Server::Configuration::ServerFactoryContext& server_context);
+
+  static absl::StatusOr<std::shared_ptr<const Envoy::Router::RetryPolicy>>
+  buildRetryPolicy(const envoy::extensions::upstreams::http::v3::HttpProtocolOptions& options,
+                   ProtobufMessage::ValidationVisitor& validation_visitor,
+                   Server::Configuration::ServerFactoryContext& server_context);
+
+  static absl::StatusOr<std::unique_ptr<Envoy::Http::HashPolicy>>
+  buildHashPolicy(const envoy::extensions::upstreams::http::v3::HttpProtocolOptions& options,
+                  Server::Configuration::ServerFactoryContext& server_context);
+
   ProtocolOptionsConfigImpl(
       const envoy::extensions::upstreams::http::v3::HttpProtocolOptions& options,
       envoy::config::core::v3::Http2ProtocolOptions validated_h2_options,
       Envoy::Http::HeaderValidatorFactoryPtr&& header_validator_factory,
       absl::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions> cache_options,
+      std::vector<Envoy::Router::ShadowPolicyPtr>&& shadow_policies,
+      std::shared_ptr<const Envoy::Router::RetryPolicy>&& retry_policy,
+      std::unique_ptr<Envoy::Http::HashPolicy>&& hash_policy,
       Server::Configuration::ServerFactoryContext& server_context);
   // Constructor for legacy (deprecated) config.
   ProtocolOptionsConfigImpl(
@@ -90,8 +136,12 @@ public:
     const auto& typed_config = MessageUtil::downcastAndValidate<
         const envoy::extensions::upstreams::http::v3::HttpProtocolOptions&>(
         config, context.messageValidationVisitor());
-    return ProtocolOptionsConfigImpl::createProtocolOptionsConfig(typed_config,
-                                                                  context.serverFactoryContext());
+    auto result = ProtocolOptionsConfigImpl::createProtocolOptionsConfig(
+        typed_config, context.serverFactoryContext());
+    if (!result.ok()) {
+      return result.status();
+    }
+    return std::static_pointer_cast<const Upstream::ProtocolOptionsConfig>(result.value());
   }
 
   std::string category() const override { return "envoy.upstream_options"; }

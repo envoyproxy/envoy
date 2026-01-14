@@ -18,27 +18,23 @@
 namespace Envoy {
 namespace Formatter {
 
-absl::optional<std::string>
-LocalReplyBodyFormatter::formatWithContext(const HttpFormatterContext& context,
-                                           const StreamInfo::StreamInfo&) const {
+absl::optional<std::string> LocalReplyBodyFormatter::format(const Context& context,
+                                                            const StreamInfo::StreamInfo&) const {
   return std::string(context.localReplyBody());
 }
 
-Protobuf::Value
-LocalReplyBodyFormatter::formatValueWithContext(const HttpFormatterContext& context,
-                                                const StreamInfo::StreamInfo&) const {
+Protobuf::Value LocalReplyBodyFormatter::formatValue(const Context& context,
+                                                     const StreamInfo::StreamInfo&) const {
   return ValueUtil::stringValue(std::string(context.localReplyBody()));
 }
 
-absl::optional<std::string>
-AccessLogTypeFormatter::formatWithContext(const HttpFormatterContext& context,
-                                          const StreamInfo::StreamInfo&) const {
+absl::optional<std::string> AccessLogTypeFormatter::format(const Context& context,
+                                                           const StreamInfo::StreamInfo&) const {
   return AccessLogType_Name(context.accessLogType());
 }
 
-Protobuf::Value
-AccessLogTypeFormatter::formatValueWithContext(const HttpFormatterContext& context,
-                                               const StreamInfo::StreamInfo&) const {
+Protobuf::Value AccessLogTypeFormatter::formatValue(const Context& context,
+                                                    const StreamInfo::StreamInfo&) const {
   return ValueUtil::stringValue(AccessLogType_Name(context.accessLogType()));
 }
 
@@ -90,15 +86,13 @@ ResponseHeaderFormatter::ResponseHeaderFormatter(absl::string_view main_header,
                                                  absl::optional<size_t> max_length)
     : HeaderFormatter(main_header, alternative_header, max_length) {}
 
-absl::optional<std::string>
-ResponseHeaderFormatter::formatWithContext(const HttpFormatterContext& context,
-                                           const StreamInfo::StreamInfo&) const {
+absl::optional<std::string> ResponseHeaderFormatter::format(const Context& context,
+                                                            const StreamInfo::StreamInfo&) const {
   return HeaderFormatter::format(context.responseHeaders());
 }
 
-Protobuf::Value
-ResponseHeaderFormatter::formatValueWithContext(const HttpFormatterContext& context,
-                                                const StreamInfo::StreamInfo&) const {
+Protobuf::Value ResponseHeaderFormatter::formatValue(const Context& context,
+                                                     const StreamInfo::StreamInfo&) const {
   return HeaderFormatter::formatValue(context.responseHeaders());
 }
 
@@ -107,15 +101,13 @@ RequestHeaderFormatter::RequestHeaderFormatter(absl::string_view main_header,
                                                absl::optional<size_t> max_length)
     : HeaderFormatter(main_header, alternative_header, max_length) {}
 
-absl::optional<std::string>
-RequestHeaderFormatter::formatWithContext(const HttpFormatterContext& context,
-                                          const StreamInfo::StreamInfo&) const {
+absl::optional<std::string> RequestHeaderFormatter::format(const Context& context,
+                                                           const StreamInfo::StreamInfo&) const {
   return HeaderFormatter::format(context.requestHeaders());
 }
 
-Protobuf::Value
-RequestHeaderFormatter::formatValueWithContext(const HttpFormatterContext& context,
-                                               const StreamInfo::StreamInfo&) const {
+Protobuf::Value RequestHeaderFormatter::formatValue(const Context& context,
+                                                    const StreamInfo::StreamInfo&) const {
   return HeaderFormatter::formatValue(context.requestHeaders());
 }
 
@@ -124,15 +116,13 @@ ResponseTrailerFormatter::ResponseTrailerFormatter(absl::string_view main_header
                                                    absl::optional<size_t> max_length)
     : HeaderFormatter(main_header, alternative_header, max_length) {}
 
-absl::optional<std::string>
-ResponseTrailerFormatter::formatWithContext(const HttpFormatterContext& context,
-                                            const StreamInfo::StreamInfo&) const {
+absl::optional<std::string> ResponseTrailerFormatter::format(const Context& context,
+                                                             const StreamInfo::StreamInfo&) const {
   return HeaderFormatter::format(context.responseTrailers());
 }
 
-Protobuf::Value
-ResponseTrailerFormatter::formatValueWithContext(const HttpFormatterContext& context,
-                                                 const StreamInfo::StreamInfo&) const {
+Protobuf::Value ResponseTrailerFormatter::formatValue(const Context& context,
+                                                      const StreamInfo::StreamInfo&) const {
   return HeaderFormatter::formatValue(context.responseTrailers());
 }
 
@@ -154,22 +144,20 @@ uint64_t HeadersByteSizeFormatter::extractHeadersByteSize(
   PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
-absl::optional<std::string>
-HeadersByteSizeFormatter::formatWithContext(const HttpFormatterContext& context,
-                                            const StreamInfo::StreamInfo&) const {
+absl::optional<std::string> HeadersByteSizeFormatter::format(const Context& context,
+                                                             const StreamInfo::StreamInfo&) const {
   return absl::StrCat(extractHeadersByteSize(context.requestHeaders(), context.responseHeaders(),
                                              context.responseTrailers()));
 }
 
-Protobuf::Value
-HeadersByteSizeFormatter::formatValueWithContext(const HttpFormatterContext& context,
-                                                 const StreamInfo::StreamInfo&) const {
+Protobuf::Value HeadersByteSizeFormatter::formatValue(const Context& context,
+                                                      const StreamInfo::StreamInfo&) const {
   return ValueUtil::numberValue(extractHeadersByteSize(
       context.requestHeaders(), context.responseHeaders(), context.responseTrailers()));
 }
 
-Protobuf::Value TraceIDFormatter::formatValueWithContext(const HttpFormatterContext& context,
-                                                         const StreamInfo::StreamInfo&) const {
+Protobuf::Value TraceIDFormatter::formatValue(const Context& context,
+                                              const StreamInfo::StreamInfo&) const {
   const auto active_span = context.activeSpan();
   if (!active_span.has_value()) {
     return SubstitutionFormatUtils::unspecifiedValue();
@@ -181,9 +169,8 @@ Protobuf::Value TraceIDFormatter::formatValueWithContext(const HttpFormatterCont
   return ValueUtil::stringValue(trace_id);
 }
 
-absl::optional<std::string>
-TraceIDFormatter::formatWithContext(const HttpFormatterContext& context,
-                                    const StreamInfo::StreamInfo&) const {
+absl::optional<std::string> TraceIDFormatter::format(const Context& context,
+                                                     const StreamInfo::StreamInfo&) const {
   const auto active_span = context.activeSpan();
   if (!active_span.has_value()) {
     return absl::nullopt;
@@ -216,9 +203,8 @@ GrpcStatusFormatter::GrpcStatusFormatter(const std::string& main_header,
                                          absl::optional<size_t> max_length, Format format)
     : HeaderFormatter(main_header, alternative_header, max_length), format_(format) {}
 
-absl::optional<std::string>
-GrpcStatusFormatter::formatWithContext(const HttpFormatterContext& context,
-                                       const StreamInfo::StreamInfo& info) const {
+absl::optional<std::string> GrpcStatusFormatter::format(const Context& context,
+                                                        const StreamInfo::StreamInfo& info) const {
   if (!Grpc::Common::isGrpcRequestHeaders(
           context.requestHeaders().value_or(*Http::StaticEmptyHeaders::get().request_headers))) {
     return absl::nullopt;
@@ -253,9 +239,8 @@ GrpcStatusFormatter::formatWithContext(const HttpFormatterContext& context,
   PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
-Protobuf::Value
-GrpcStatusFormatter::formatValueWithContext(const HttpFormatterContext& context,
-                                            const StreamInfo::StreamInfo& info) const {
+Protobuf::Value GrpcStatusFormatter::formatValue(const Context& context,
+                                                 const StreamInfo::StreamInfo& info) const {
   if (!Grpc::Common::isGrpcRequestHeaders(
           context.requestHeaders().value_or(*Http::StaticEmptyHeaders::get().request_headers))) {
     return SubstitutionFormatUtils::unspecifiedValue();
@@ -296,9 +281,8 @@ QueryParameterFormatter::QueryParameterFormatter(absl::string_view parameter_key
     : parameter_key_(parameter_key), max_length_(max_length) {}
 
 // FormatterProvider
-absl::optional<std::string>
-QueryParameterFormatter::formatWithContext(const HttpFormatterContext& context,
-                                           const StreamInfo::StreamInfo&) const {
+absl::optional<std::string> QueryParameterFormatter::format(const Context& context,
+                                                            const StreamInfo::StreamInfo&) const {
   const auto request_headers = context.requestHeaders();
   if (!request_headers.has_value()) {
     return absl::nullopt;
@@ -314,13 +298,13 @@ QueryParameterFormatter::formatWithContext(const HttpFormatterContext& context,
 }
 
 Protobuf::Value
-QueryParameterFormatter::formatValueWithContext(const HttpFormatterContext& context,
-                                                const StreamInfo::StreamInfo& stream_info) const {
-  return ValueUtil::optionalStringValue(formatWithContext(context, stream_info));
+QueryParameterFormatter::formatValue(const Context& context,
+                                     const StreamInfo::StreamInfo& stream_info) const {
+  return ValueUtil::optionalStringValue(format(context, stream_info));
 }
 
-absl::optional<std::string> PathFormatter::formatWithContext(const HttpFormatterContext& context,
-                                                             const StreamInfo::StreamInfo&) const {
+absl::optional<std::string> PathFormatter::format(const Context& context,
+                                                  const StreamInfo::StreamInfo&) const {
 
   absl::string_view path_view;
   const auto headers = context.requestHeaders();
@@ -362,10 +346,9 @@ absl::optional<std::string> PathFormatter::formatWithContext(const HttpFormatter
   return std::string(path_view);
 }
 
-Protobuf::Value
-PathFormatter::formatValueWithContext(const HttpFormatterContext& context,
-                                      const StreamInfo::StreamInfo& stream_info) const {
-  return ValueUtil::optionalStringValue(formatWithContext(context, stream_info));
+Protobuf::Value PathFormatter::formatValue(const Context& context,
+                                           const StreamInfo::StreamInfo& stream_info) const {
+  return ValueUtil::optionalStringValue(format(context, stream_info));
 }
 
 absl::StatusOr<FormatterProviderPtr> PathFormatter::create(absl::string_view with_query,
@@ -405,7 +388,7 @@ const BuiltInHttpCommandParser::FormatterProviderLookupTbl&
 BuiltInHttpCommandParser::getKnownFormatters() {
   CONSTRUCT_ON_FIRST_USE(
       FormatterProviderLookupTbl,
-      {{"REQ",
+      {{"REQ", // Same as REQUEST_HEADER and used for backward compatibility.
         {CommandSyntaxChecker::PARAMS_REQUIRED | CommandSyntaxChecker::LENGTH_ALLOWED,
          [](absl::string_view format, absl::optional<size_t> max_length) {
            auto result = SubstitutionFormatUtils::parseSubcommandHeaders(format);
@@ -413,7 +396,15 @@ BuiltInHttpCommandParser::getKnownFormatters() {
            return std::make_unique<RequestHeaderFormatter>(result.value().first,
                                                            result.value().second, max_length);
          }}},
-       {"RESP",
+       {"REQUEST_HEADER",
+        {CommandSyntaxChecker::PARAMS_REQUIRED | CommandSyntaxChecker::LENGTH_ALLOWED,
+         [](absl::string_view format, absl::optional<size_t> max_length) {
+           auto result = SubstitutionFormatUtils::parseSubcommandHeaders(format);
+           THROW_IF_NOT_OK_REF(result.status());
+           return std::make_unique<RequestHeaderFormatter>(result.value().first,
+                                                           result.value().second, max_length);
+         }}},
+       {"RESP", // Same as RESPONSE_HEADER and used for backward compatibility.
         {CommandSyntaxChecker::PARAMS_REQUIRED | CommandSyntaxChecker::LENGTH_ALLOWED,
          [](absl::string_view format, absl::optional<size_t> max_length) {
            auto result = SubstitutionFormatUtils::parseSubcommandHeaders(format);
@@ -421,7 +412,23 @@ BuiltInHttpCommandParser::getKnownFormatters() {
            return std::make_unique<ResponseHeaderFormatter>(result.value().first,
                                                             result.value().second, max_length);
          }}},
-       {"TRAILER",
+       {"RESPONSE_HEADER",
+        {CommandSyntaxChecker::PARAMS_REQUIRED | CommandSyntaxChecker::LENGTH_ALLOWED,
+         [](absl::string_view format, absl::optional<size_t> max_length) {
+           auto result = SubstitutionFormatUtils::parseSubcommandHeaders(format);
+           THROW_IF_NOT_OK_REF(result.status());
+           return std::make_unique<ResponseHeaderFormatter>(result.value().first,
+                                                            result.value().second, max_length);
+         }}},
+       {"TRAILER", // Same as RESPONSE_TRAILER and used for backward compatibility.
+        {CommandSyntaxChecker::PARAMS_REQUIRED | CommandSyntaxChecker::LENGTH_ALLOWED,
+         [](absl::string_view format, absl::optional<size_t> max_length) {
+           auto result = SubstitutionFormatUtils::parseSubcommandHeaders(format);
+           THROW_IF_NOT_OK_REF(result.status());
+           return std::make_unique<ResponseTrailerFormatter>(result.value().first,
+                                                             result.value().second, max_length);
+         }}},
+       {"RESPONSE_TRAILER",
         {CommandSyntaxChecker::PARAMS_REQUIRED | CommandSyntaxChecker::LENGTH_ALLOWED,
          [](absl::string_view format, absl::optional<size_t> max_length) {
            auto result = SubstitutionFormatUtils::parseSubcommandHeaders(format);

@@ -73,6 +73,7 @@ constexpr absl::string_view ResponseTrailerLatencyUsField = "response_trailer_la
 constexpr absl::string_view ResponseTrailerCallStatusField = "response_trailer_call_status";
 constexpr absl::string_view BytesSentField = "bytes_sent";
 constexpr absl::string_view BytesReceivedField = "bytes_received";
+constexpr absl::string_view GrpcStatusBeforeFirstCallField = "grpc_status_before_first_call";
 
 absl::optional<ProcessingMode> initProcessingMode(const ExtProcPerRoute& config) {
   if (!config.disabled() && config.has_overrides() && config.overrides().has_processing_mode()) {
@@ -133,6 +134,25 @@ initUntypedReceivingNamespaces(const ExtProcPerRoute& config) {
   }
 
   return {initNamespaces(config.overrides().metadata_options().receiving_namespaces().untyped())};
+}
+absl::optional<std::vector<std::string>>
+initUntypedClusterMetadataForwardingNamespaces(const ExtProcPerRoute& config) {
+  if (!config.has_overrides() || !config.overrides().has_metadata_options() ||
+      !config.overrides().metadata_options().has_cluster_metadata_forwarding_namespaces()) {
+    return absl::nullopt;
+  }
+  return {initNamespaces(
+      config.overrides().metadata_options().cluster_metadata_forwarding_namespaces().untyped())};
+}
+
+absl::optional<std::vector<std::string>>
+initTypedClusterMetadataForwardingNamespaces(const ExtProcPerRoute& config) {
+  if (!config.has_overrides() || !config.overrides().has_metadata_options() ||
+      !config.overrides().metadata_options().has_cluster_metadata_forwarding_namespaces()) {
+    return absl::nullopt;
+  }
+  return {initNamespaces(
+      config.overrides().metadata_options().cluster_metadata_forwarding_namespaces().typed())};
 }
 
 absl::optional<ProcessingMode> mergeProcessingMode(const FilterConfigPerRoute& less_specific,
@@ -257,8 +277,13 @@ FilterConfig::FilterConfig(const ExternalProcessor& config,
       untyped_receiving_namespaces_(
           config.metadata_options().receiving_namespaces().untyped().begin(),
           config.metadata_options().receiving_namespaces().untyped().end()),
-      allowed_override_modes_(config.allowed_override_modes().begin(),
-                              config.allowed_override_modes().end()),
+      untyped_cluster_metadata_forwarding_namespaces_(
+          config.metadata_options().cluster_metadata_forwarding_namespaces().untyped().begin(),
+          config.metadata_options().cluster_metadata_forwarding_namespaces().untyped().end()),
+      typed_cluster_metadata_forwarding_namespaces_(
+          config.metadata_options().cluster_metadata_forwarding_namespaces().typed().begin(),
+          config.metadata_options().cluster_metadata_forwarding_namespaces().typed().end()),
+      allowed_override_modes_(config.allowed_override_modes()),
       expression_manager_(builder, context.localInfo(), config.request_attributes(),
                           config.response_attributes()),
       processing_request_modifier_factory_cb_(
@@ -391,6 +416,8 @@ ProtobufTypes::MessagePtr ExtProcLoggingInfo::serializeAsProto() const {
       static_cast<double>(bytes_sent_));
   (*struct_msg->mutable_fields())[BytesReceivedField].set_number_value(
       static_cast<double>(bytes_received_));
+  (*struct_msg->mutable_fields())[GrpcStatusBeforeFirstCallField].set_number_value(
+      static_cast<double>(static_cast<int>(grpc_status_before_first_call_)));
   return struct_msg;
 }
 
@@ -432,6 +459,7 @@ absl::optional<std::string> ExtProcLoggingInfo::serializeAsString() const {
   }
   parts.push_back(absl::StrCat("bs:", bytes_sent_));
   parts.push_back(absl::StrCat("br:", bytes_received_));
+  parts.push_back(absl::StrCat("os:", static_cast<int>(grpc_status_before_first_call_)));
 
   return absl::StrJoin(parts, ",");
 }
@@ -495,6 +523,9 @@ ExtProcLoggingInfo::getField(absl::string_view field_name) const {
   if (field_name == BytesReceivedField) {
     return static_cast<int64_t>(bytes_received_);
   }
+  if (field_name == GrpcStatusBeforeFirstCallField) {
+    return static_cast<int64_t>(grpc_status_before_first_call_);
+  }
   return {};
 }
 
@@ -509,6 +540,10 @@ FilterConfigPerRoute::FilterConfigPerRoute(
       untyped_forwarding_namespaces_(initUntypedForwardingNamespaces(config)),
       typed_forwarding_namespaces_(initTypedForwardingNamespaces(config)),
       untyped_receiving_namespaces_(initUntypedReceivingNamespaces(config)),
+      untyped_cluster_metadata_forwarding_namespaces_(
+          initUntypedClusterMetadataForwardingNamespaces(config)),
+      typed_cluster_metadata_forwarding_namespaces_(
+          initTypedClusterMetadataForwardingNamespaces(config)),
       failure_mode_allow_(
           config.overrides().has_failure_mode_allow()
               ? absl::optional<bool>(config.overrides().failure_mode_allow().value())
@@ -532,6 +567,14 @@ FilterConfigPerRoute::FilterConfigPerRoute(const FilterConfigPerRoute& less_spec
       untyped_receiving_namespaces_(more_specific.untypedReceivingMetadataNamespaces().has_value()
                                         ? more_specific.untypedReceivingMetadataNamespaces()
                                         : less_specific.untypedReceivingMetadataNamespaces()),
+      untyped_cluster_metadata_forwarding_namespaces_(
+          more_specific.untypedClusterMetadataForwardingNamespaces().has_value()
+              ? more_specific.untypedClusterMetadataForwardingNamespaces()
+              : less_specific.untypedClusterMetadataForwardingNamespaces()),
+      typed_cluster_metadata_forwarding_namespaces_(
+          more_specific.typedClusterMetadataForwardingNamespaces().has_value()
+              ? more_specific.typedClusterMetadataForwardingNamespaces()
+              : less_specific.typedClusterMetadataForwardingNamespaces()),
       failure_mode_allow_(more_specific.failureModeAllow().has_value()
                               ? more_specific.failureModeAllow()
                               : less_specific.failureModeAllow()),
@@ -602,8 +645,7 @@ void Filter::onError() {
   } else {
     // Return an error and stop processing the current stream.
     processing_complete_ = true;
-    decoding_state_.onFinishProcessorCall(Grpc::Status::Aborted);
-    encoding_state_.onFinishProcessorCall(Grpc::Status::Aborted);
+    onFinishProcessorCalls(Grpc::Status::Aborted);
     ImmediateResponse errorResponse;
     errorResponse.mutable_status()->set_code(
         static_cast<StatusCode>(static_cast<uint32_t>(config_->statusOnError())));
@@ -693,6 +735,16 @@ void Filter::deferredCloseStream() {
   config_->threadLocalStreamManager().deferredErase(stream_, filter_callbacks_->dispatcher());
 }
 
+void Filter::closeStreamMaybeGraceful() {
+  processing_complete_ = true;
+  if (config_->gracefulGrpcClose()) {
+    halfCloseAndWaitForRemoteClose();
+  } else {
+    // Perform immediate close on the stream otherwise.
+    closeStream();
+  }
+}
+
 void Filter::onDestroy() {
   ENVOY_STREAM_LOG(debug, "onDestroy", *decoder_callbacks_);
   // Make doubly-sure we no longer use the stream, as
@@ -720,12 +772,7 @@ void Filter::onDestroy() {
     // Second, perform stream deferred closure.
     deferredCloseStream();
   } else {
-    if (config_->gracefulGrpcClose()) {
-      halfCloseAndWaitForRemoteClose();
-    } else {
-      // Perform immediate close on the stream otherwise.
-      closeStream();
-    }
+    closeStreamMaybeGraceful();
   }
 }
 
@@ -1239,6 +1286,13 @@ FilterHeadersStatus Filter::encodeHeaders(ResponseHeaderMap& headers, bool end_s
   if (!processing_complete_ && encoding_state_.shouldRemoveContentLength()) {
     headers.removeContentLength();
   }
+
+  // If there is no external processing configured in the encoding path,
+  // closing the gRPC stream if it is still open.
+  if (encoding_state_.noExternalProcess()) {
+    closeStreamMaybeGraceful();
+  }
+
   return status;
 }
 
@@ -1389,6 +1443,28 @@ void Filter::addDynamicMetadata(const ProcessorState& state, ProcessingRequest& 
   auto* cb = state.callbacks();
   envoy::config::core::v3::Metadata forwarding_metadata;
 
+  // Forward cluster metadata if so configured.
+  absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info =
+      cb->streamInfo().upstreamClusterInfo();
+  if (cluster_info.has_value() && cluster_info.value() != nullptr) {
+    const auto& cluster_metadata = cluster_info.value()->metadata().filter_metadata();
+    for (const auto& context_key : state.untypedClusterMetadataForwardingNamespaces()) {
+      if (const auto metadata_it = cluster_metadata.find(context_key);
+          metadata_it != cluster_metadata.end()) {
+        (*forwarding_metadata.mutable_filter_metadata())[metadata_it->first] = metadata_it->second;
+      }
+    }
+
+    const auto& cluster_typed_metadata = cluster_info.value()->metadata().typed_filter_metadata();
+    for (const auto& context_key : state.typedClusterMetadataForwardingNamespaces()) {
+      if (const auto metadata_it = cluster_typed_metadata.find(context_key);
+          metadata_it != cluster_typed_metadata.end()) {
+        (*forwarding_metadata.mutable_typed_filter_metadata())[metadata_it->first] =
+            metadata_it->second;
+      }
+    }
+  }
+
   // If metadata_context_namespaces is specified, pass matching filter metadata to the ext_proc
   // service. If metadata key is set in both the connection and request metadata then the value
   // will be the request metadata value. The metadata will only be searched for the callbacks
@@ -1440,7 +1516,8 @@ void Filter::addAttributes(ProcessorState& state, ProcessingRequest& req) {
 
   auto activation_ptr = Filters::Common::Expr::createActivation(
       &config_->expressionManager().localInfo(), state.callbacks()->streamInfo(),
-      state.requestHeaders(), dynamic_cast<const Http::ResponseHeaderMap*>(state.responseHeaders()),
+      state.callbacks()->streamInfo().getRequestHeaders(),
+      dynamic_cast<const Http::ResponseHeaderMap*>(state.responseHeaders()),
       dynamic_cast<const Http::ResponseTrailerMap*>(state.responseTrailers()));
   auto attributes = state.evaluateAttributes(config_->expressionManager(), *activation_ptr);
 
@@ -1525,7 +1602,96 @@ ProcessingMode effectiveModeOverride(const ProcessingMode& target_override,
   return mode_override;
 }
 
+// Returns true if this body response is the last message in the current direction (request or
+// response path). This means no further body chunks or trailers are expected in this direction.
+// For now, such check is only done for STREAMED or FULL_DUPLEX_STREAMED body mode. For any
+// other body mode, it always return false.
+bool isLastBodyResponse(ProcessorState& state,
+                        const envoy::service::ext_proc::v3::BodyResponse& body_response) {
+  switch (state.bodyMode()) {
+  case ProcessingMode::BUFFERED:
+  case ProcessingMode::BUFFERED_PARTIAL:
+    // TODO: - skip stream closing optimization for BUFFERED and BUFFERED_PARTIAL for now.
+    return false;
+  case ProcessingMode::STREAMED:
+    if (!state.chunkQueue().empty()) {
+      return state.chunkQueue().queue().front()->end_stream;
+    }
+    return false;
+  case ProcessingMode::FULL_DUPLEX_STREAMED: {
+    if (body_response.has_response() && body_response.response().has_body_mutation()) {
+      const auto& body_mutation = body_response.response().body_mutation();
+      if (body_mutation.has_streamed_response()) {
+        return body_mutation.streamed_response().end_of_stream();
+      }
+    }
+    return false;
+  }
+  default:
+    break;
+  }
+  return false;
+}
+
 } // namespace
+
+void Filter::closeGrpcStreamIfLastRespReceived(const ProcessingResponse& response,
+                                               const bool is_last_body_resp) {
+  // Bail out if the gRPC stream has already been closed. This can happen in scenarios
+  // like immediate responses or rejected header mutations.
+  if (stream_ == nullptr || !Runtime::runtimeFeatureEnabled(
+                                "envoy.reloadable_features.ext_proc_stream_close_optimization")) {
+    return;
+  }
+
+  bool last_response = false;
+
+  switch (response.response_case()) {
+  case ProcessingResponse::ResponseCase::kRequestHeaders:
+    if ((decoding_state_.hasNoBody() ||
+         (decoding_state_.bodyMode() == ProcessingMode::NONE && !decoding_state_.sendTrailers())) &&
+        encoding_state_.noExternalProcess()) {
+      last_response = true;
+    }
+    break;
+  case ProcessingResponse::ResponseCase::kRequestBody:
+    if (is_last_body_resp && encoding_state_.noExternalProcess()) {
+      last_response = true;
+    }
+    break;
+  case ProcessingResponse::ResponseCase::kRequestTrailers:
+    if (encoding_state_.noExternalProcess()) {
+      last_response = true;
+    }
+    break;
+  case ProcessingResponse::ResponseCase::kResponseHeaders:
+    if (encoding_state_.hasNoBody() ||
+        (encoding_state_.bodyMode() == ProcessingMode::NONE && !encoding_state_.sendTrailers())) {
+      last_response = true;
+    }
+    break;
+  case ProcessingResponse::ResponseCase::kResponseBody:
+    if (is_last_body_resp) {
+      last_response = true;
+    }
+    break;
+  case ProcessingResponse::ResponseCase::kResponseTrailers:
+    last_response = true;
+    break;
+  case ProcessingResponse::ResponseCase::kImmediateResponse:
+    // Immediate response currently may close the stream immediately.
+    // Leave it as it is for now.
+    break;
+  default:
+    break;
+  }
+
+  if (last_response) {
+    ENVOY_STREAM_LOG(debug, "Closing gRPC stream after receiving last response",
+                     *decoder_callbacks_);
+    closeStreamMaybeGraceful();
+  }
+}
 
 void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
 
@@ -1561,27 +1727,11 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
       (config_->processingMode().request_body_mode() != ProcessingMode::FULL_DUPLEX_STREAMED) &&
       (config_->processingMode().response_body_mode() != ProcessingMode::FULL_DUPLEX_STREAMED) &&
       inHeaderProcessState() && response->has_mode_override()) {
-    bool mode_override_allowed = true;
     const auto mode_override =
         effectiveModeOverride(response->mode_override(), config_->processingMode());
 
-    // First, check if mode override allow-list is configured
-    if (!config_->allowedOverrideModes().empty()) {
-      // Second, check if mode override from response is allowed.
-      mode_override_allowed = absl::c_any_of(
-          config_->allowedOverrideModes(),
-          [&mode_override](
-              const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode& other) {
-            // Ignore matching on request_header_mode as it's not applicable.
-            return mode_override.request_body_mode() == other.request_body_mode() &&
-                   mode_override.request_trailer_mode() == other.request_trailer_mode() &&
-                   mode_override.response_header_mode() == other.response_header_mode() &&
-                   mode_override.response_body_mode() == other.response_body_mode() &&
-                   mode_override.response_trailer_mode() == other.response_trailer_mode();
-          });
-    }
-
-    if (mode_override_allowed) {
+    // Check if mode override allow-list is configured.
+    if (config_->isAllowedOverrideMode(mode_override)) {
       ENVOY_STREAM_LOG(debug, "Processing mode overridden by server for this request",
                        *decoder_callbacks_);
       decoding_state_.setProcessingMode(mode_override);
@@ -1594,6 +1744,8 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
 
   ENVOY_STREAM_LOG(debug, "Received {} response", *decoder_callbacks_,
                    responseCaseToString(response->response_case()));
+
+  bool is_last_body_resp = false;
   absl::Status processing_status;
   switch (response->response_case()) {
   case ProcessingResponse::ResponseCase::kRequestHeaders:
@@ -1605,10 +1757,12 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
     processing_status = encoding_state_.handleHeadersResponse(response->response_headers());
     break;
   case ProcessingResponse::ResponseCase::kRequestBody:
+    is_last_body_resp = isLastBodyResponse(decoding_state_, response->request_body());
     setDecoderDynamicMetadata(*response);
     processing_status = decoding_state_.handleBodyResponse(response->request_body());
     break;
   case ProcessingResponse::ResponseCase::kResponseBody:
+    is_last_body_resp = isLastBodyResponse(encoding_state_, response->response_body());
     setEncoderDynamicMetadata(*response);
     processing_status = encoding_state_.handleBodyResponse(response->response_body());
     break;
@@ -1634,11 +1788,7 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
       ENVOY_STREAM_LOG(debug, "Sending immediate response", *decoder_callbacks_);
       processing_complete_ = true;
       onFinishProcessorCalls(Grpc::Status::Ok);
-      if (config_->gracefulGrpcClose()) {
-        halfCloseAndWaitForRemoteClose();
-      } else {
-        closeStream();
-      }
+      closeStreamMaybeGraceful();
       if (on_processing_response_) {
         on_processing_response_->afterReceivingImmediateResponse(
             response->immediate_response(), absl::OkStatus(), decoder_callbacks_->streamInfo());
@@ -1682,6 +1832,9 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
     stats_.stream_msgs_received_.inc();
     handleErrorResponse(processing_status);
   }
+
+  // Close the gRPC stream if no more external processing needed.
+  closeGrpcStreamIfLastRespReceived(*response, is_last_body_resp);
 }
 
 void Filter::onGrpcError(Grpc::Status::GrpcStatus status, const std::string& message) {
@@ -1717,6 +1870,10 @@ void Filter::onGrpcClose() { onGrpcCloseWithStatus(Grpc::Status::Aborted); }
 void Filter::onGrpcCloseWithStatus(Grpc::Status::GrpcStatus status) {
   ENVOY_STREAM_LOG(debug, "Received gRPC stream close", *decoder_callbacks_);
 
+  if (processing_complete_) {
+    return;
+  }
+
   processing_complete_ = true;
   stats_.streams_closed_.inc();
   // Successful close. We can ignore the stream for the rest of our request
@@ -1743,8 +1900,7 @@ void Filter::onMessageTimeout() {
     // Return an error and stop processing the current stream.
     processing_complete_ = true;
     closeStream();
-    decoding_state_.onFinishProcessorCall(Grpc::Status::DeadlineExceeded);
-    encoding_state_.onFinishProcessorCall(Grpc::Status::DeadlineExceeded);
+    onFinishProcessorCalls(Grpc::Status::DeadlineExceeded);
     ImmediateResponse errorResponse;
     errorResponse.mutable_status()->set_code(StatusCode::GatewayTimeout);
     errorResponse.set_details(absl::StrFormat("%s_per-message_timeout_exceeded", ErrorPrefix));
@@ -1752,9 +1908,19 @@ void Filter::onMessageTimeout() {
   }
 }
 
+void Filter::recordGrpcStatusBeforeFirstCall(Grpc::Status::GrpcStatus call_status) {
+  if (!decoding_state_.getCallStartTime().has_value() &&
+      !encoding_state_.getCallStartTime().has_value()) {
+    if (loggingInfo() != nullptr) {
+      loggingInfo()->recordGrpcStatusBeforeFirstCall(call_status);
+    }
+  }
+}
+
 // Regardless of the current filter state, reset it to "IDLE", continue
 // the current callback, and reset timers. This is used in a few error-handling situations.
 void Filter::clearAsyncState(Grpc::Status::GrpcStatus call_status) {
+  recordGrpcStatusBeforeFirstCall(call_status);
   decoding_state_.clearAsyncState(call_status);
   encoding_state_.clearAsyncState(call_status);
 }
@@ -1762,6 +1928,7 @@ void Filter::clearAsyncState(Grpc::Status::GrpcStatus call_status) {
 // Regardless of the current state, ensure that the timers won't fire
 // again.
 void Filter::onFinishProcessorCalls(Grpc::Status::GrpcStatus call_status) {
+  recordGrpcStatusBeforeFirstCall(call_status);
   decoding_state_.onFinishProcessorCall(call_status);
   encoding_state_.onFinishProcessorCall(call_status);
 }
@@ -1881,6 +2048,34 @@ void Filter::mergePerRouteConfig() {
         *decoder_callbacks_);
     decoding_state_.setUntypedReceivingMetadataNamespaces(untyped_receiving_namespaces_);
     encoding_state_.setUntypedReceivingMetadataNamespaces(untyped_receiving_namespaces_);
+  }
+
+  if (merged_config->untypedClusterMetadataForwardingNamespaces().has_value()) {
+    untyped_cluster_metadata_forwarding_namespaces_ =
+        merged_config->untypedClusterMetadataForwardingNamespaces().value();
+    ENVOY_STREAM_LOG(trace,
+                     "Setting new untyped cluster metadata forwarding "
+                     "namespaces from per-route "
+                     "configuration",
+                     *decoder_callbacks_);
+    decoding_state_.setUntypedClusterMetadataForwardingNamespaces(
+        untyped_cluster_metadata_forwarding_namespaces_);
+    encoding_state_.setUntypedClusterMetadataForwardingNamespaces(
+        untyped_cluster_metadata_forwarding_namespaces_);
+  }
+
+  if (merged_config->typedClusterMetadataForwardingNamespaces().has_value()) {
+    typed_cluster_metadata_forwarding_namespaces_ =
+        merged_config->typedClusterMetadataForwardingNamespaces().value();
+    ENVOY_STREAM_LOG(trace,
+                     "Setting new typed cluster metadata forwarding namespaces "
+                     "from per-route "
+                     "configuration",
+                     *decoder_callbacks_);
+    decoding_state_.setTypedClusterMetadataForwardingNamespaces(
+        typed_cluster_metadata_forwarding_namespaces_);
+    encoding_state_.setTypedClusterMetadataForwardingNamespaces(
+        typed_cluster_metadata_forwarding_namespaces_);
   }
 
   if (merged_config->failureModeAllow().has_value()) {

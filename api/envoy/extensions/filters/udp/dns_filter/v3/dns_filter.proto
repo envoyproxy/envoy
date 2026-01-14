@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.filters.udp.dns_filter.v3;
 
+import "envoy/config/accesslog/v3/accesslog.proto";
 import "envoy/config/core/v3/address.proto";
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/extension.proto";
@@ -111,4 +112,15 @@ message DnsFilterConfig {
   // 2. Otherwise, uses the default c-ares DNS resolver.
   //
   ClientContextConfig client_config = 3;
+
+  // Configuration for :ref:`access logs <arch_overview_access_logs>`
+  // emitted by the DNS filter for each DNS query received.
+  // Supports custom format commands for DNS-specific attributes:
+  // - ``QUERY_NAME``: The DNS query name being resolved
+  // - ``QUERY_TYPE``: The DNS query type (A, AAAA, SRV, etc.)
+  // - ``QUERY_CLASS``: The DNS query class
+  // - ``ANSWER_COUNT``: Number of answers in the response
+  // - ``RESPONSE_CODE``: DNS response code
+  // - ``PARSE_STATUS``: Whether the query was successfully parsed
+  repeated config.accesslog.v3.AccessLog access_log = 4;
 }

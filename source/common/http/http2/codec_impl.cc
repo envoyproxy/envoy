@@ -25,6 +25,7 @@
 #include "source/common/runtime/runtime_features.h"
 
 #include "absl/cleanup/cleanup.h"
+#include "absl/container/flat_hash_map.h"
 #include "quiche/common/quiche_endian.h"
 #include "quiche/http2/adapter/nghttp2_adapter.h"
 #include "quiche/http2/adapter/oghttp2_adapter.h"
@@ -32,6 +33,83 @@
 namespace Envoy {
 namespace Http {
 namespace Http2 {
+
+namespace {
+
+// Optimization: Map of well-known header names to Envoy's static LowerCaseString objects.
+// This allows us to avoid copying header names for common HTTP/2 headers.
+// The string_views point to compile-time string literals which live forever.
+class StaticHeaderNameLookup {
+public:
+  StaticHeaderNameLookup() {
+    const auto& headers = Headers::get();
+    const auto& custom_headers = CustomHeaders::get();
+
+    // HTTP/2 pseudo-headers (most common).
+    addMapping(":authority", headers.Host);
+    addMapping(":method", headers.Method);
+    addMapping(":path", headers.Path);
+    addMapping(":scheme", headers.Scheme);
+    addMapping(":status", headers.Status);
+    addMapping(":protocol", headers.Protocol);
+
+    // Common request headers.
+    addMapping("accept", custom_headers.Accept);
+    addMapping("accept-encoding", custom_headers.AcceptEncoding);
+    addMapping("authorization", custom_headers.Authorization);
+    addMapping("cache-control", custom_headers.CacheControl);
+    addMapping("content-encoding", custom_headers.ContentEncoding);
+    addMapping("content-length", headers.ContentLength);
+    addMapping("content-type", headers.ContentType);
+    addMapping("cookie", headers.Cookie);
+    addMapping("date", headers.Date);
+    addMapping("expect", headers.Expect);
+    addMapping("grpc-timeout", headers.GrpcTimeout);
+    addMapping("host", headers.HostLegacy);
+    addMapping("user-agent", headers.UserAgent);
+
+    // Common response headers.
+    addMapping("location", headers.Location);
+    addMapping("server", headers.Server);
+    addMapping("set-cookie", headers.SetCookie);
+    addMapping("grpc-status", headers.GrpcStatus);
+    addMapping("grpc-message", headers.GrpcMessage);
+
+    // Common request/response headers.
+    addMapping("connection", headers.Connection);
+    addMapping("keep-alive", headers.KeepAlive);
+    addMapping("proxy-connection", headers.ProxyConnection);
+    addMapping("te", headers.TE);
+    addMapping("transfer-encoding", headers.TransferEncoding);
+    addMapping("upgrade", headers.Upgrade);
+    addMapping("via", headers.Via);
+    addMapping("x-request-id", headers.RequestId);
+
+    // X-Forwarded headers.
+    addMapping("x-forwarded-for", headers.ForwardedFor);
+    addMapping("x-forwarded-host", headers.ForwardedHost);
+    addMapping("x-forwarded-proto", headers.ForwardedProto);
+    addMapping("x-forwarded-port", headers.ForwardedPort);
+  }
+
+  const LowerCaseString* lookup(absl::string_view name) const {
+    auto it = map_.find(name);
+    return it != map_.end() ? it->second : nullptr;
+  }
+
+private:
+  void addMapping(absl::string_view name, const LowerCaseString& header) {
+    map_.emplace(name, &header);
+  }
+
+  absl::flat_hash_map<absl::string_view, const LowerCaseString*> map_;
+};
+
+const StaticHeaderNameLookup& getStaticHeaderNameLookup() {
+  CONSTRUCT_ON_FIRST_USE(StaticHeaderNameLookup);
+}
+
+} // namespace
 
 // for nghttp2 compatibility.
 const int ERR_CALLBACK_FAILURE = -902;
@@ -89,14 +167,43 @@ const char* codecStrError(int error_code) { return nghttp2_strerror(error_code);
 const char* codecStrError(int) { return "unknown_error"; }
 #endif
 
-int reasonToReset(StreamResetReason reason) {
+/**
+ * Convert StreamResetReason to HTTP/2 error code.
+ * @param reason the StreamResetReason to convert
+ * @param response_end_stream_sent whether END_STREAM has been sent for a server stream.
+ * True means the response has been fully sent.
+ */
+int reasonToReset(StreamResetReason reason, bool response_end_stream_sent) {
   switch (reason) {
   case StreamResetReason::LocalRefusedStreamReset:
     return OGHTTP2_REFUSED_STREAM;
   case StreamResetReason::ConnectError:
     return OGHTTP2_CONNECT_ERROR;
+  case StreamResetReason::ProtocolError:
+    if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reset_with_error")) {
+      return OGHTTP2_NO_ERROR;
+    }
+    return OGHTTP2_PROTOCOL_ERROR;
   default:
-    return OGHTTP2_NO_ERROR;
+    if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reset_with_error")) {
+      return OGHTTP2_NO_ERROR;
+    }
+    // If the response has been fully sent then we reset with OGHTTP2_NO_ERROR to tell
+    // there is no transport level error.
+    return response_end_stream_sent ? OGHTTP2_NO_ERROR : OGHTTP2_INTERNAL_ERROR;
+  }
+}
+
+StreamResetReason errorCodeToResetReason(int error_code) {
+  switch (error_code) {
+  case OGHTTP2_REFUSED_STREAM:
+    return StreamResetReason::RemoteRefusedStreamReset;
+  case OGHTTP2_CONNECT_ERROR:
+    return StreamResetReason::ConnectError;
+  case OGHTTP2_PROTOCOL_ERROR:
+    return StreamResetReason::ProtocolError;
+  default:
+    return StreamResetReason::RemoteReset;
   }
 }
 
@@ -816,10 +923,19 @@ void ConnectionImpl::StreamImpl::resetStreamWorker(StreamResetReason reason) {
     return;
   }
   if (codec_callbacks_) {
-    codec_callbacks_->onCodecLowLevelReset();
+    // TODO(wbpcode): this ensure that onCodecLowLevelReset is only called once. But
+    // we should replace this with a better design later.
+    // See https://github.com/envoyproxy/envoy/issues/42264 for why we need this.
+    if (!codec_low_level_reset_is_called_) {
+      codec_low_level_reset_is_called_ = true;
+      codec_callbacks_->onCodecLowLevelReset();
+    }
   }
-  parent_.adapter_->SubmitRst(stream_id_,
-                              static_cast<http2::adapter::Http2ErrorCode>(reasonToReset(reason)));
+
+  const bool response_end_stream_sent =
+      parent_.adapter_->IsServerSession() ? local_end_stream_sent_ : false;
+  parent_.adapter_->SubmitRst(stream_id_, static_cast<http2::adapter::Http2ErrorCode>(
+                                              reasonToReset(reason, response_end_stream_sent)));
 }
 
 NewMetadataEncoder& ConnectionImpl::StreamImpl::getMetadataEncoder() {
@@ -1432,19 +1548,27 @@ Status ConnectionImpl::onStreamClose(StreamImpl* stream, uint32_t error_code) {
         // depending whether the connection is upstream or downstream.
         reason = getMessagingErrorResetReason();
       } else {
-        if (error_code == OGHTTP2_REFUSED_STREAM) {
-          reason = StreamResetReason::RemoteRefusedStreamReset;
-          stream->setDetails(Http2ResponseCodeDetails::get().remote_refused);
-        } else {
-          if (error_code == OGHTTP2_CONNECT_ERROR) {
-            reason = StreamResetReason::ConnectError;
+        if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reset_with_error")) {
+          reason = errorCodeToResetReason(error_code);
+          if (error_code == OGHTTP2_REFUSED_STREAM) {
+            stream->setDetails(Http2ResponseCodeDetails::get().remote_refused);
           } else {
-            reason = StreamResetReason::RemoteReset;
+            stream->setDetails(Http2ResponseCodeDetails::get().remote_reset);
           }
-          stream->setDetails(Http2ResponseCodeDetails::get().remote_reset);
+        } else {
+          if (error_code == OGHTTP2_REFUSED_STREAM) {
+            reason = StreamResetReason::RemoteRefusedStreamReset;
+            stream->setDetails(Http2ResponseCodeDetails::get().remote_refused);
+          } else {
+            if (error_code == OGHTTP2_CONNECT_ERROR) {
+              reason = StreamResetReason::ConnectError;
+            } else {
+              reason = StreamResetReason::RemoteReset;
+            }
+            stream->setDetails(Http2ResponseCodeDetails::get().remote_reset);
+          }
         }
       }
-
       stream->runResetCallbacks(reason, absl::string_view());
 
     } else if (!stream->reset_reason_.has_value() &&
@@ -1787,11 +1911,25 @@ bool ConnectionImpl::Http2Visitor::OnBeginHeadersForStream(Http2StreamId stream_
 OnHeaderResult ConnectionImpl::Http2Visitor::OnHeaderForStream(Http2StreamId stream_id,
                                                                absl::string_view name_view,
                                                                absl::string_view value_view) {
-  // TODO PERF: Can reference count here to avoid copies.
+  // We use reference counting to avoid copying well-known header names.
+  // For common HTTP/2 headers (e.g., :method, :path, :status), we reference Envoy's
+  // static LowerCaseString objects instead of allocating and copying the name string.
+  // This significantly reduces memory allocations and copy operations for typical requests.
   HeaderString name;
-  name.setCopy(name_view.data(), name_view.size());
+  const LowerCaseString* static_name = getStaticHeaderNameLookup().lookup(name_view);
+  if (static_name != nullptr) {
+    // Header name matches a well-known header. Use setReference to avoid copying.
+    name.setReference(static_name->get());
+  } else {
+    // Unknown header name. Copy the data.
+    name.setCopy(name_view.data(), name_view.size());
+  }
+
+  // Always copy the value, as header values are highly variable and the data from
+  // the HTTP/2 adapter is only valid during this callback.
   HeaderString value;
   value.setCopy(value_view.data(), value_view.size());
+
   const int result = connection_->onHeader(stream_id, std::move(name), std::move(value));
   switch (result) {
   case 0:

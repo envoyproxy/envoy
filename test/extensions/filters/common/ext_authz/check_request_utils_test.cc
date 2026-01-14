@@ -197,7 +197,8 @@ TEST_F(CheckRequestUtilsTest, BasicTcp) {
   Protobuf::Map<std::string, std::string> labels;
   labels["label_1"] = "value_1";
   labels["label_2"] = "value_2";
-  CheckRequestUtils::createTcpCheck(&net_callbacks_, request, false, false, labels);
+  CheckRequestUtils::createTcpCheck(&net_callbacks_, request, false, false, labels,
+                                    envoy::config::core::v3::Metadata());
 
   EXPECT_EQ(request.attributes().source().certificate().size(), 0);
   EXPECT_EQ("value_1", request.attributes().destination().labels().at("label_1"));
@@ -219,7 +220,8 @@ TEST_F(CheckRequestUtilsTest, TcpPeerCertificate) {
   EXPECT_CALL(*ssl_, urlEncodedPemEncodedPeerCertificate()).WillOnce(ReturnRef(cert_data_));
 
   CheckRequestUtils::createTcpCheck(&net_callbacks_, request, true, false,
-                                    Protobuf::Map<std::string, std::string>());
+                                    Protobuf::Map<std::string, std::string>(),
+                                    envoy::config::core::v3::Metadata());
 
   EXPECT_EQ(cert_data_, request.attributes().source().certificate());
 }
@@ -239,7 +241,8 @@ TEST_F(CheckRequestUtilsTest, TcpTlsSession) {
   EXPECT_CALL(*ssl_, sni()).Times(2).WillRepeatedly(ReturnRef(want_tls_session.sni()));
 
   CheckRequestUtils::createTcpCheck(&net_callbacks_, request, false, true,
-                                    Protobuf::Map<std::string, std::string>());
+                                    Protobuf::Map<std::string, std::string>(),
+                                    envoy::config::core::v3::Metadata());
   EXPECT_TRUE(request.attributes().has_tls_session());
   EXPECT_EQ(want_tls_session.sni(), request.attributes().tls_session().sni());
 }
@@ -262,7 +265,8 @@ TEST_F(CheckRequestUtilsTest, TcpTlsSessionNoSessionSni) {
   EXPECT_CALL(*ssl_, sni()).WillOnce(ReturnRef(want_tls_session.sni()));
 
   CheckRequestUtils::createTcpCheck(&net_callbacks_, request, false, true,
-                                    Protobuf::Map<std::string, std::string>());
+                                    Protobuf::Map<std::string, std::string>(),
+                                    envoy::config::core::v3::Metadata());
   EXPECT_TRUE(request.attributes().has_tls_session());
   EXPECT_EQ(requested_server_name_, request.attributes().tls_session().sni());
 }

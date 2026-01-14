@@ -21,7 +21,7 @@ public:
   static constexpr absl::string_view SigV4Algorithm{"AWS4-HMAC-SHA256"};
 };
 
-using AwsSigningHeaderExclusionVector = std::vector<envoy::type::matcher::v3::StringMatcher>;
+using AwsSigningHeaderMatcherVector = std::vector<envoy::type::matcher::v3::StringMatcher>;
 
 /**
  * Implementation of the Signature V4 signing process.
@@ -39,11 +39,12 @@ public:
   SigV4SignerImpl(absl::string_view service_name, absl::string_view region,
                   const CredentialsProviderChainSharedPtr& credentials_provider,
                   Server::Configuration::CommonFactoryContext& context,
-                  const AwsSigningHeaderExclusionVector& matcher_config,
+                  const AwsSigningHeaderMatcherVector& exclude_matcher_config,
+                  const AwsSigningHeaderMatcherVector& include_matcher_config,
                   const bool query_string = false,
                   const uint16_t expiration_time = SignatureQueryParameterValues::DefaultExpiration)
-      : SignerBaseImpl(service_name, region, credentials_provider, context, matcher_config,
-                       query_string, expiration_time) {}
+      : SignerBaseImpl(service_name, region, credentials_provider, context, exclude_matcher_config,
+                       include_matcher_config, query_string, expiration_time) {}
 
 private:
   std::string createCredentialScope(const absl::string_view short_date,

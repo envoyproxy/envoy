@@ -1,5 +1,7 @@
 #include "source/extensions/filters/network/ext_proc/ext_proc.h"
 
+#include "source/extensions/filters/network/well_known_names.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -50,12 +52,74 @@ void MessageTimeoutManager::onTimeout(bool is_read) {
   filter_.handleMessageTimeout(is_read);
 }
 
+void NetworkExtProcLoggingInfo::recordGrpcCall(std::chrono::microseconds latency,
+                                               Grpc::Status::GrpcStatus call_status,
+                                               bool is_read_direction) {
+  DirectionalStats& stats = is_read_direction ? read_stats_ : write_stats_;
+
+  // Update counters.
+  stats.grpc_calls_++;
+  if (call_status != Grpc::Status::WellKnownGrpcStatus::Ok) {
+    stats.grpc_errors_++;
+  }
+
+  stats.total_latency_ += latency;
+  stats.max_latency_ = std::max(stats.max_latency_, latency);
+  stats.min_latency_ = std::min(stats.min_latency_, latency);
+  last_call_status_ = call_status;
+}
+
+void NetworkExtProcLoggingInfo::addBytesProcessed(uint64_t bytes, bool is_read_direction) {
+  DirectionalStats& stats = is_read_direction ? read_stats_ : write_stats_;
+  stats.bytes_processed_ += bytes;
+  stats.message_count_++;
+}
+
+void NetworkExtProcLoggingInfo::setConnectionInfo(const Network::Connection* connection) {
+  if (connection == nullptr) {
+    return;
+  }
+
+  const auto& remote_address = connection->connectionInfoProvider().remoteAddress();
+  if (remote_address != nullptr) {
+    peer_address_ = remote_address->asString();
+  }
+
+  const auto& local_address = connection->connectionInfoProvider().localAddress();
+  if (local_address != nullptr) {
+    local_address_ = local_address->asString();
+  }
+}
+
 NetworkExtProcFilter::NetworkExtProcFilter(ConfigConstSharedPtr config,
                                            ExternalProcessorClientPtr&& client)
     : config_(config), stats_(config->stats()), client_(std::move(client)),
       config_with_hash_key_(config_->grpcService()), downstream_callbacks_(*this) {}
 
 NetworkExtProcFilter::~NetworkExtProcFilter() { closeStream(); }
+
+void NetworkExtProcFilter::initializeLoggingInfo() {
+  if (read_callbacks_ == nullptr) {
+    return;
+  }
+
+  const Envoy::StreamInfo::FilterStateSharedPtr& filter_state =
+      read_callbacks_->connection().streamInfo().filterState();
+
+  if (!filter_state->hasData<NetworkExtProcLoggingInfo>(
+          NetworkFilterNames::get().NetworkExternalProcessor)) {
+    filter_state->setData(NetworkFilterNames::get().NetworkExternalProcessor,
+                          std::make_shared<NetworkExtProcLoggingInfo>(),
+                          Envoy::StreamInfo::FilterState::StateType::Mutable,
+                          Envoy::StreamInfo::FilterState::LifeSpan::Connection);
+  }
+
+  logging_info_ = filter_state->getDataMutable<NetworkExtProcLoggingInfo>(
+      NetworkFilterNames::get().NetworkExternalProcessor);
+  if (logging_info_ != nullptr) {
+    logging_info_->setConnectionInfo(&read_callbacks_->connection());
+  }
+}
 
 void NetworkExtProcFilter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
   read_callbacks_ = &callbacks;
@@ -65,6 +129,8 @@ void NetworkExtProcFilter::initializeReadFilterCallbacks(Network::ReadFilterCall
     timeout_manager_ =
         std::make_unique<MessageTimeoutManager>(*this, read_callbacks_->connection().dispatcher());
   }
+
+  initializeLoggingInfo();
 }
 
 void NetworkExtProcFilter::initializeWriteFilterCallbacks(
@@ -91,7 +157,6 @@ Network::FilterStatus NetworkExtProcFilter::onData(Buffer::Instance& data, bool 
     return (state == StreamOpenState::Error) ? handleStreamError()
                                              : Network::FilterStatus::Continue;
   }
-
   sendRequest(data, end_stream, /*is_read=*/true);
   return Network::FilterStatus::StopIteration;
 }
@@ -248,6 +313,10 @@ void NetworkExtProcFilter::sendRequest(Buffer::Instance& data, bool end_stream, 
   // Prevent connection close while waiting for processor response
   updateCloseCallbackStatus(true, is_read);
 
+  if (logging_info_ != nullptr) {
+    logging_info_->addBytesProcessed(data.length(), is_read);
+  }
+
   // Prepare the request message
   ProcessingRequest request;
   addDynamicMetadata(request);
@@ -258,12 +327,15 @@ void NetworkExtProcFilter::sendRequest(Buffer::Instance& data, bool end_stream, 
     read_data->set_end_of_stream(end_stream);
     stats_.read_data_sent_.inc();
     read_pending_ = true;
+    read_call_start_time_ = read_callbacks_->connection().dispatcher().timeSource().monotonicTime();
   } else {
     auto* write_data = request.mutable_write_data();
     write_data->set_data(data.toString());
     write_data->set_end_of_stream(end_stream);
     stats_.write_data_sent_.inc();
     write_pending_ = true;
+    write_call_start_time_ =
+        read_callbacks_->connection().dispatcher().timeSource().monotonicTime();
   }
 
   // Start timeout for this specific direction
@@ -290,6 +362,8 @@ void NetworkExtProcFilter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&
   auto response = std::move(res);
   ENVOY_CONN_LOG(debug, "Received response from external processor", read_callbacks_->connection());
   stats_.stream_msgs_received_.inc();
+  bool is_read = response->has_read_data();
+  recordCallCompletion(Grpc::Status::WellKnownGrpcStatus::Ok, is_read);
 
   // Handle connection status before processing data
   handleConnectionStatus(*response);
@@ -336,6 +410,12 @@ void NetworkExtProcFilter::onGrpcError(Grpc::Status::GrpcStatus status,
                  status, message);
   // Mark processing as complete to avoid further gRPC calls
   processing_complete_ = true;
+  if (read_pending_) {
+    recordCallCompletion(status, true);
+  } else if (write_pending_) {
+    recordCallCompletion(status, false);
+  }
+
   closeStream();
   stats_.streams_grpc_error_.inc();
 
@@ -357,6 +437,24 @@ void NetworkExtProcFilter::onGrpcClose() {
   closeStream();
 }
 
+void NetworkExtProcFilter::recordCallCompletion(Grpc::Status::GrpcStatus status,
+                                                bool is_read_direction) {
+  if (logging_info_ == nullptr) {
+    return;
+  }
+
+  auto& call_start_time = is_read_direction ? read_call_start_time_ : write_call_start_time_;
+
+  if (call_start_time.has_value()) {
+    const auto duration = std::chrono::duration_cast<std::chrono::microseconds>(
+        read_callbacks_->connection().dispatcher().timeSource().monotonicTime() -
+        call_start_time.value());
+
+    logging_info_->recordGrpcCall(duration, status, is_read_direction);
+    call_start_time = absl::nullopt;
+  }
+}
+
 // Update closeStream to stop all timers
 void NetworkExtProcFilter::closeStream() {
   if (timeout_manager_) {
@@ -367,6 +465,8 @@ void NetworkExtProcFilter::closeStream() {
   // Clear pending flags
   read_pending_ = false;
   write_pending_ = false;
+  write_call_start_time_ = absl::nullopt;
+  read_call_start_time_ = absl::nullopt;
 
   if (stream_ == nullptr) {
     return;

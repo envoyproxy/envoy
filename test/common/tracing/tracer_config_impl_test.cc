@@ -44,13 +44,16 @@ TEST(ConnectionManagerTracingConfigImplTest, SimpleTest) {
     auto* custom_tag = tracing_config.add_custom_tags();
     custom_tag->set_tag("foo");
     custom_tag->mutable_literal()->set_value("bar");
+    auto* custom_tag2 = tracing_config.add_custom_tags();
+    custom_tag2->set_tag("dynamic_foo");
+    custom_tag2->set_value("%REQ(X-FOO)%");
 
     ConnectionManagerTracingConfig config(traffic_direction, tracing_config);
 
     EXPECT_EQ(Tracing::OperationName::Egress, config.operationName());
     EXPECT_EQ(true, config.verbose());
     EXPECT_EQ(256, config.maxPathTagLength());
-    EXPECT_EQ(1, config.getCustomTags().size());
+    EXPECT_EQ(2, config.getCustomTags().size());
 
     EXPECT_EQ(100, config.getClientSampling().numerator());
     EXPECT_EQ(10000, config.getRandomSampling().numerator());

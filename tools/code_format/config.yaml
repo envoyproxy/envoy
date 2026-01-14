@@ -228,6 +228,7 @@ paths:
     - source/extensions/transport_sockets/internal_upstream
     - source/extensions/transport_sockets/tls/cert_validator
     - source/extensions/transport_sockets/tcp_stats/config.cc
+    - source/common/tracing/custom_tag_impl.cc
 
   # Only one C++ file should instantiate grpc_init
   grpc_init:
