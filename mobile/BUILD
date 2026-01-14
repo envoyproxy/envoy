@@ -6,7 +6,7 @@ load(
     "xcode_schemes",
     "xcodeproj",
 )
-load("@rules_android//android:rules.bzl", "aar_import")
+load("@rules_android//rules:rules.bzl", "aar_import")
 load("@rules_kotlin//kotlin/internal:toolchains.bzl", "define_kt_toolchain")
 load("//bazel:framework_imports_extractor.bzl", "framework_imports_extractor")
 
