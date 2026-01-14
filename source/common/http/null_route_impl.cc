@@ -20,6 +20,5 @@ const std::multimap<std::string, std::string> RouteEntryImpl::opaque_config_;
 const NullPathMatchCriterion RouteEntryImpl::path_match_criterion_;
 const RouteEntryImpl::ConnectConfigOptRef RouteEntryImpl::connect_config_nullopt_;
 const std::vector<LowerCaseString> NullCommonConfig::internal_only_headers_;
-
 } // namespace Http
 } // namespace Envoy
