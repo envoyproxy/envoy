@@ -3004,7 +3004,7 @@ detect_degraded_hosts: true
   EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::DEGRADED_OUTLIER_DETECTION));
 }
 
-// Test multiple degradations with backoff increment and max backoff
+// Test multiple degrades with backoff increment and max backoff
 TEST_F(OutlierDetectorImplTest, DegradedBackoffIncrementAndMax) {
   const std::string yaml = R"EOF(
 interval: 10s
