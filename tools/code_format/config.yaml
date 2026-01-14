@@ -37,6 +37,7 @@ paths:
   # TODO(alyssawilk) unexclude mobile
   excluded:
   - .
+  - bazel/external/c-ares/
   - bazel/external/http_parser/
   - bazel/rbe/toolchains/configs/
   - bazel-
@@ -93,6 +94,8 @@ paths:
     - source/extensions/common/matcher/ip_range_matcher.h
     - envoy/common/exception.h
     - source/common/protobuf/utility.h
+    - source/common/rds/common/route_config_provider_manager_impl.h
+    - source/common/rds/route_config_provider_manager.h
     # legacy core files which throw exceptions. We can add to this list but strongly prefer
     # StausOr where possible.
     - source/common/watchdog/abort_action_config.cc
@@ -104,7 +107,6 @@ paths:
     - source/common/network/address_impl.cc
     - source/common/formatter/http_specific_formatter.cc
     - source/common/formatter/stream_info_formatter.cc
-    - source/common/formatter/substitution_formatter.h
     - source/common/formatter/substitution_formatter.cc
     - source/common/stats/tag_extractor_impl.cc
     - source/common/protobuf/yaml_utility.cc
@@ -112,17 +114,17 @@ paths:
     - source/common/grpc/google_grpc_utils.cc
     - source/common/tcp_proxy/tcp_proxy.cc
     - source/common/listener_manager/lds_api.cc
-    - source/common/rds/common/route_config_provider_manager_impl.h
-    - source/common/rds/route_config_provider_manager.h
     - source/common/json/json_internal.cc
     - source/common/router/scoped_rds.cc
     - source/common/router/config_impl.cc
     - source/common/router/weighted_cluster_specifier.cc
     - source/common/router/scoped_config_impl.cc
     - source/common/common/utility.cc
+    - source/common/secret/sds_api.h
+    - source/common/secret/sds_api.cc
     - source/exe/stripped_main_base.cc
     - source/common/http/header_utility.cc
-    - source/common/common/matchers.h
+    - source/common/common/matchers.cc
     - source/server/options_impl.cc
     - source/server/config_validation/server.cc
     - source/server/admin/html/active_stats.js
@@ -133,7 +135,7 @@ paths:
     - source/common/upstream/health_discovery_service.cc
     - source/common/upstream/prod_cluster_info_factory.cc
     - source/common/secret/sds_api.cc
-    - source/common/config/config_provider_impl.h
+    - source/common/config/config_provider_impl.cc
     - source/common/grpc/google_grpc_creds_impl.cc
     - source/server/drain_manager_impl.cc
     - source/common/router/rds_impl.cc
@@ -142,9 +144,12 @@ paths:
     - source/common/event/file_event_impl.cc
     - source/common/http/async_client_impl.cc
     - source/common/grpc/google_async_client_impl.cc
+    - source/common/tracing/tracer_config_impl.cc
     # Extensions can exempt entire directories but new extensions
     # points should ideally use StatusOr
     - source/extensions/access_loggers
+    # Bootstrap extension factories must throw per interface documentation.
+    - source/extensions/bootstrap/dynamic_modules/factory.cc
     - source/extensions/clusters/eds/
     - source/extensions/clusters/logical_dns
     - source/extensions/clusters/original_dst
@@ -312,6 +317,9 @@ paths:
     include:
     - api/bazel/cc_proto_descriptor_library/file_descriptor_generator.cc
     - contrib/config/source/kv_store_xds_delegate.cc
+    - contrib/istio/filters/network/metadata_exchange/source/metadata_exchange.cc
+    - contrib/istio/filters/network/metadata_exchange/test/metadata_exchange_test.cc
+    - contrib/istio/filters/http/peer_metadata/source/peer_metadata.cc
     - source/common/protobuf/utility.h
     - source/common/protobuf/utility.cc
     - source/extensions/filters/http/grpc_json_transcoder/json_transcoder_filter.cc

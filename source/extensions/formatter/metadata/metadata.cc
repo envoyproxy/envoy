@@ -48,6 +48,25 @@ public:
             }) {}
 };
 
+// Metadata formatter for listener filter chain metadata.
+class ListenerFilterChainMetadataFormatter : public ::Envoy::Formatter::MetadataFormatter {
+public:
+  ListenerFilterChainMetadataFormatter(absl::string_view filter_namespace,
+                                       const std::vector<absl::string_view>& path,
+                                       absl::optional<size_t> max_length)
+      : ::Envoy::Formatter::MetadataFormatter(
+            filter_namespace, path, max_length,
+            [](const StreamInfo::StreamInfo& stream_info)
+                -> const envoy::config::core::v3::Metadata* {
+              const auto filter_chain_info =
+                  stream_info.downstreamAddressProvider().filterChainInfo();
+              if (filter_chain_info) {
+                return &filter_chain_info->metadata();
+              }
+              return nullptr;
+            }) {}
+};
+
 // Metadata formatter for virtual host metadata.
 class VirtualHostMetadataFormatter : public ::Envoy::Formatter::MetadataFormatter {
 public:
@@ -102,6 +121,12 @@ const auto& formatterProviderFuncTable() {
            [](absl::string_view filter_namespace, const std::vector<absl::string_view>& path,
               absl::optional<size_t> max_length) {
              return std::make_unique<ListenerMetadataFormatter>(filter_namespace, path, max_length);
+           }},
+          {"LISTENER_FILTER_CHAIN",
+           [](absl::string_view filter_namespace, const std::vector<absl::string_view>& path,
+              absl::optional<size_t> max_length) {
+             return std::make_unique<ListenerFilterChainMetadataFormatter>(filter_namespace, path,
+                                                                           max_length);
            }},
           {"VIRTUAL_HOST",
            [](absl::string_view filter_namespace, const std::vector<absl::string_view>& path,

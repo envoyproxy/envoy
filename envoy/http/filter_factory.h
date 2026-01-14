@@ -28,53 +28,11 @@ using FilterFactoryCb = std::function<void(FilterChainFactoryCallbacks& callback
  * from configuration, etc.
  */
 struct FilterContext {
+  FilterContext() = default;
+  FilterContext(absl::string_view name) : config_name(std::string(name)) {}
   // The name of the filter configuration that used to create related filter factory function.
   // This could be any legitimate non-empty string.
   std::string config_name;
-};
-
-/**
- * Additional options for creating HTTP filter chain.
- * TODO(wbpcode): it is possible to add more options to customize HTTP filter chain creation.
- * For example, we can add related options here to tell FilterChainFactory to create
- * upgrade filter chain or not.
- */
-class FilterChainOptions {
-public:
-  virtual ~FilterChainOptions() = default;
-
-  /**
-   * Skip filter creation if the filter is explicitly disabled after the filter chain is
-   * selected.
-   *
-   * @param config_name the config name of the filter.
-   * @return whether the filter should be disabled or enabled based on the config name.
-   *         nullopt if no decision can be made explicitly for the filter.
-   */
-  virtual absl::optional<bool> filterDisabled(absl::string_view config_name) const PURE;
-};
-
-class EmptyFilterChainOptions : public FilterChainOptions {
-public:
-  absl::optional<bool> filterDisabled(absl::string_view) const override { return {}; }
-};
-
-/**
- * The filter chain manager is provided by the connection manager to the filter chain factory.
- * The filter chain factory will post the filter factory context and filter factory to the
- * filter chain manager to create filter and construct HTTP stream filter chain.
- */
-class FilterChainManager {
-public:
-  virtual ~FilterChainManager() = default;
-
-  /**
-   * Post filter factory context and filter factory to the filter chain manager. The filter
-   * chain manager will create filter instance based on the context and factory internally.
-   * @param context supplies additional contextual information of filter factory.
-   * @param factory factory function used to create filter instances.
-   */
-  virtual void applyFilterFactoryCb(FilterContext context, FilterFactoryCb& factory) PURE;
 };
 
 /**
@@ -89,29 +47,23 @@ public:
 
   /**
    * Called when a new HTTP stream is created on the connection.
-   * @param manager supplies the "sink" that is used for actually creating the filter chain. @see
-   *                FilterChainManager.
-   * @param options additional options for creating a filter chain.
+   * @param callbacks supplies the callbacks that is used to create the filter chain.
    * @return whather a filter chain has been created.
    */
-  virtual bool
-  createFilterChain(FilterChainManager& manager,
-                    const FilterChainOptions& options = EmptyFilterChainOptions{}) const PURE;
+  virtual bool createFilterChain(FilterChainFactoryCallbacks& callbacks) const PURE;
 
   /**
    * Called when a new upgrade stream is created on the connection.
    * @param upgrade supplies the upgrade header from downstream
    * @param per_route_upgrade_map supplies the upgrade map, if any, for this route.
-   * @param manager supplies the "sink" that is used for actually creating the filter chain. @see
-   *                FilterChainManager.
+   * @param callbacks supplies the callbacks that is used to create the filter chain.
    * @return true if upgrades of this type are allowed and the filter chain has been created.
    *    returns false if this upgrade type is not configured, and no filter chain is created.
    */
   using UpgradeMap = std::map<std::string, bool>;
-  virtual bool createUpgradeFilterChain(
-      absl::string_view upgrade, const UpgradeMap* per_route_upgrade_map,
-      FilterChainManager& manager,
-      const FilterChainOptions& options = EmptyFilterChainOptions{}) const PURE;
+  virtual bool createUpgradeFilterChain(absl::string_view upgrade,
+                                        const UpgradeMap* per_route_upgrade_map,
+                                        FilterChainFactoryCallbacks& callbacks) const PURE;
 };
 
 } // namespace Http

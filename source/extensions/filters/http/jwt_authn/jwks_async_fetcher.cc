@@ -34,11 +34,12 @@ std::chrono::milliseconds getFailedRefetchDuration(const JwksAsyncFetch& async_f
 } // namespace
 
 JwksAsyncFetcher::JwksAsyncFetcher(const RemoteJwks& remote_jwks,
+                                   Router::RetryPolicyConstSharedPtr retry_policy,
                                    Server::Configuration::FactoryContext& context,
                                    CreateJwksFetcherCb create_fetcher_fn,
                                    JwtAuthnFilterStats& stats, JwksDoneFetched done_fn)
-    : remote_jwks_(remote_jwks), context_(context), create_fetcher_fn_(create_fetcher_fn),
-      stats_(stats), done_fn_(done_fn),
+    : remote_jwks_(remote_jwks), retry_policy_(std::move(retry_policy)), context_(context),
+      create_fetcher_fn_(create_fetcher_fn), stats_(stats), done_fn_(done_fn),
       debug_name_(absl::StrCat("Jwks async fetching url=", remote_jwks_.http_uri().uri())) {
   // if async_fetch is not enabled, do nothing.
   if (!remote_jwks_.has_async_fetch()) {
@@ -84,7 +85,8 @@ void JwksAsyncFetcher::fetch() {
   }
 
   ENVOY_LOG(debug, "{}: started", debug_name_);
-  fetcher_ = create_fetcher_fn_(context_.serverFactoryContext().clusterManager(), remote_jwks_);
+  fetcher_ = create_fetcher_fn_(context_.serverFactoryContext().clusterManager(), retry_policy_,
+                                remote_jwks_);
   fetcher_->fetch(Tracing::NullSpan::instance(), *this);
 }
 

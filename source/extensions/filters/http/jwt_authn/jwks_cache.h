@@ -66,6 +66,9 @@ public:
     virtual const envoy::extensions::filters::http::jwt_authn::v3::JwtProvider&
     getJwtProvider() const PURE;
 
+    // Get the retry policy for remote Jwks fetcher.
+    virtual const Router::RetryPolicyConstSharedPtr& retryPolicy() const PURE;
+
     // Get the Jwks object.
     virtual const ::google::jwt_verify::Jwks* getJwksObj() const PURE;
 

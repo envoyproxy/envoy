@@ -8,14 +8,18 @@
 #include "source/common/grpc/common.h"
 #include "source/common/grpc/status.h"
 #include "source/common/http/codes.h"
+#include "source/common/stats/isolated_store_impl.h"
 #include "source/extensions/filters/http/proto_api_scrubber/filter.h"
 #include "source/extensions/filters/http/proto_api_scrubber/filter_config.h"
 
 #include "test/extensions/filters/http/grpc_field_extraction/message_converter/message_converter_test_lib.h"
+#include "test/extensions/filters/http/proto_api_scrubber/scrubber_test.pb.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/matcher/mocks.h"
 #include "test/mocks/server/factory_context.h"
+#include "test/mocks/stats/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
+#include "test/mocks/tracing/mocks.h"
 #include "test/proto/apikeys.pb.h"
 #include "test/proto/bookstore.pb.h"
 #include "test/test_common/environment.h"
@@ -40,12 +44,16 @@ using ::apikeys::CreateApiKeyRequest;
 using ::bookstore::CreateShelfRequest;
 using ::envoy::extensions::filters::http::proto_api_scrubber::v3::ProtoApiScrubberConfig;
 using ::Envoy::Extensions::HttpFilters::GrpcFieldExtraction::checkSerializedData;
+using ::Envoy::Extensions::HttpFilters::GrpcFieldExtraction::MessageConverter;
+using ::Envoy::Extensions::HttpFilters::GrpcFieldExtraction::StreamMessage;
 using ::Envoy::Grpc::Status;
 using ::Envoy::Http::MockStreamDecoderFilterCallbacks;
 using ::Envoy::Http::MockStreamEncoderFilterCallbacks;
 using ::Envoy::Http::TestRequestHeaderMapImpl;
 using ::Envoy::Http::TestResponseHeaderMapImpl;
 using ::Envoy::Protobuf::Struct;
+using ::test::extensions::filters::http::proto_api_scrubber::ScrubRequest;
+using ::test::extensions::filters::http::proto_api_scrubber::SensitiveMessage;
 using ::testing::_;
 using ::testing::Eq;
 using ::testing::HasSubstr;
@@ -68,14 +76,23 @@ public:
               (const std::string& method_name, const std::string& field_mask), (const, override));
   MOCK_METHOD(MatchTreeHttpMatchingDataSharedPtr, getResponseFieldMatcher,
               (const std::string& method_name, const std::string& field_mask), (const, override));
+  MOCK_METHOD(MatchTreeHttpMatchingDataSharedPtr, getMessageFieldMatcher,
+              (const std::string& message_name, const std::string& field_name), (const, override));
   MOCK_METHOD(absl::StatusOr<const Protobuf::Type*>, getRequestType,
               (const std::string& method_name), (const, override));
   MOCK_METHOD(absl::StatusOr<const Protobuf::Type*>, getResponseType,
               (const std::string& method_name), (const, override));
   MOCK_METHOD(const TypeFinder&, getTypeFinder, (), (const, override));
 
+  MOCK_METHOD(absl::StatusOr<const Protobuf::MethodDescriptor*>, getMethodDescriptor,
+              (const std::string& method_name), (const, override));
+
+  MOCK_METHOD(const Protobuf::Type*, getParentType, (const Protobuf::Field* field),
+              (const, override));
+
   // Delegate non-mocked calls to the real object
-  MockProtoApiScrubberFilterConfig() : ProtoApiScrubberFilterConfig() {
+  MockProtoApiScrubberFilterConfig(ProtoApiScrubberStats stats, TimeSource& time_source)
+      : ProtoApiScrubberFilterConfig(stats, time_source) {
     ON_CALL(*this, getRequestType(_)).WillByDefault([this](const std::string& method_name) {
       return real_config_->getRequestType(method_name);
     });
@@ -95,6 +112,16 @@ public:
         });
     ON_CALL(*this, getMethodMatcher(_)).WillByDefault([this](const std::string& method_name) {
       return real_config_->getMethodMatcher(method_name);
+    });
+    ON_CALL(*this, getMessageFieldMatcher(_, _))
+        .WillByDefault([this](const std::string& message_name, const std::string& field_name) {
+          return real_config_->getMessageFieldMatcher(message_name, field_name);
+        });
+    ON_CALL(*this, getMethodDescriptor(_)).WillByDefault([this](const std::string& method_name) {
+      return real_config_->getMethodDescriptor(method_name);
+    });
+    ON_CALL(*this, getParentType(_)).WillByDefault([this](const Protobuf::Field* field) {
+      return real_config_->getParentType(field);
     });
   }
 
@@ -117,10 +144,32 @@ public:
               (override));
 };
 
+// Test Filter subclass to allow overriding of message conversion logic.
+class TestProtoApiScrubberFilter : public ProtoApiScrubberFilter {
+public:
+  using ProtoApiScrubberFilter::ProtoApiScrubberFilter;
+
+  // Flag to simulate conversion failures in tests.
+  bool fail_conversion_ = false;
+
+protected:
+  // Override the conversion wrapper to trigger failures on demand.
+  absl::StatusOr<Envoy::Buffer::InstancePtr>
+  convertMessageToBuffer(MessageConverter& converter,
+                         std::unique_ptr<StreamMessage> message) override {
+    if (fail_conversion_) {
+      return absl::ResourceExhaustedError("Fake Buffer Limit Exceeded");
+    }
+    return ProtoApiScrubberFilter::convertMessageToBuffer(converter, std::move(message));
+  }
+};
+
 inline constexpr const char kApiKeysDescriptorRelativePath[] = "test/proto/apikeys.descriptor";
 inline constexpr char kRemoveFieldActionType[] =
     "type.googleapis.com/envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction";
 inline constexpr const char kBookstoreDescriptorRelativePath[] = "test/proto/bookstore.descriptor";
+inline constexpr const char kScrubberTestDescriptorRelativePath[] =
+    "test/extensions/filters/http/proto_api_scrubber/scrubber_test.descriptor";
 
 class ProtoApiScrubberFilterTest : public ::testing::Test {
 protected:
@@ -137,18 +186,19 @@ protected:
   }
 
   void setupMocks() {
-    ON_CALL(mock_decoder_callbacks_, decoderBufferLimit())
-        .WillByDefault(testing::Return(UINT32_MAX));
+    ON_CALL(mock_decoder_callbacks_, bufferLimit()).WillByDefault(testing::Return(UINT32_MAX));
 
-    ON_CALL(mock_encoder_callbacks_, encoderBufferLimit())
-        .WillByDefault(testing::Return(UINT32_MAX));
+    ON_CALL(mock_encoder_callbacks_, bufferLimit()).WillByDefault(testing::Return(UINT32_MAX));
     ON_CALL(mock_factory_context_, serverFactoryContext())
         .WillByDefault(ReturnRef(server_factory_context_));
+
+    ON_CALL(mock_factory_context_, scope()).WillByDefault(ReturnRef(*stats_store_.rootScope()));
+    ON_CALL(server_factory_context_, timeSource()).WillByDefault(ReturnRef(time_system_));
     ON_CALL(server_factory_context_, api()).WillByDefault(ReturnRef(*api_));
   }
 
   void setupFilter() {
-    filter_ = std::make_unique<ProtoApiScrubberFilter>(*mock_filter_config_);
+    filter_ = std::make_unique<TestProtoApiScrubberFilter>(*mock_filter_config_);
     filter_->setDecoderFilterCallbacks(mock_decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(mock_encoder_callbacks_);
   }
@@ -162,7 +212,9 @@ protected:
               .fileReadToEnd(Envoy::TestEnvironment::runfilesPath(descriptor_path))
               .value();
     }
-    mock_filter_config_ = std::make_shared<NiceMock<MockProtoApiScrubberFilterConfig>>();
+    ProtoApiScrubberStats stats(*stats_store_.rootScope(), "proto_api_scrubber.");
+    mock_filter_config_ =
+        std::make_shared<NiceMock<MockProtoApiScrubberFilterConfig>>(stats, time_system_);
     mock_filter_config_->initializeRealConfig(proto_config_, mock_factory_context_);
   }
 
@@ -245,6 +297,72 @@ protected:
     *(*field_map)[field_path].mutable_matcher() = matcher;
   }
 
+  void addMessageFieldRestriction(ProtoApiScrubberConfig& config, const std::string& message_type,
+                                  const std::string& field_name, bool match_result,
+                                  const std::string& action_type_url) {
+    constexpr absl::string_view matcher_template = R"pb(
+      matcher_list: {
+        matchers: {
+          predicate: {
+            single_predicate: {
+              input: {
+                name: "request"
+                typed_config: {
+                  [type.googleapis.com/xds.type.matcher.v3.HttpAttributesCelMatchInput] { }
+                }
+              }
+              custom_match: {
+                 name: "cel"
+                typed_config: {
+                  [type.googleapis.com/xds.type.matcher.v3.CelMatcher] {
+                    expr_match: {
+                      cel_expr_parsed: {
+                        expr: {
+                          id: 1
+                          const_expr: {
+                            bool_value: $0
+                          }
+                        }
+                        source_info: {
+                          syntax_version: "cel1"
+                          location: "inline_expression"
+                          positions: {
+                            key: 1
+                            value: 0
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+          on_match: {
+            action: {
+              name: "remove"
+              typed_config: {
+                [$1] { }
+              }
+            }
+          }
+        }
+      }
+    )pb";
+
+    std::string matcher_str =
+        absl::Substitute(matcher_template, match_result ? "true" : "false", action_type_url);
+
+    xds::type::matcher::v3::Matcher matcher;
+    if (!Envoy::Protobuf::TextFormat::ParseFromString(matcher_str, &matcher)) {
+      FAIL() << "Failed to parse generated matcher config.";
+    }
+
+    auto& message_config =
+        (*config.mutable_restrictions()->mutable_message_restrictions())[message_type];
+    *(*message_config.mutable_field_restrictions())[field_name].mutable_matcher() = matcher;
+  }
+
   /**
    * Replaces the existing 'filter_' and 'filter_config_' with a new one based on
    * the provided proto. This overrides the default setup done in the constructor.
@@ -261,7 +379,9 @@ protected:
           std::move(content_or.value());
     }
 
-    mock_filter_config_ = std::make_shared<NiceMock<MockProtoApiScrubberFilterConfig>>();
+    ProtoApiScrubberStats stats(*stats_store_.rootScope(), "proto_api_scrubber.");
+    mock_filter_config_ =
+        std::make_shared<NiceMock<MockProtoApiScrubberFilterConfig>>(stats, time_system_);
     mock_filter_config_->initializeRealConfig(config, mock_factory_context_);
 
     setupFilter();
@@ -318,6 +438,16 @@ protected:
     return response;
   }
 
+  ScrubRequest makeScrubRequestWithAny(absl::string_view sensitive_secret) {
+    ScrubRequest request;
+    SensitiveMessage sensitive_msg;
+    sensitive_msg.set_secret(std::string(sensitive_secret));
+    sensitive_msg.set_public_field("public_data");
+
+    request.mutable_any_field()->PackFrom(sensitive_msg);
+    return request;
+  }
+
   // Helper to construct a gRPC frame containing a nested message that claims to be
   // 100 bytes long but terminates immediately with Tag 0.
   // outer_tag: The field tag of the nested message (e.g., 0x12 for Field 2).
@@ -357,6 +487,8 @@ protected:
     EXPECT_EQ(data->length(), 0);
   }
 
+  Stats::IsolatedStoreImpl stats_store_;
+  Event::SimulatedTimeSystem time_system_;
   Api::ApiPtr api_;
   ProtoApiScrubberConfig proto_config_;
   std::shared_ptr<NiceMock<MockProtoApiScrubberFilterConfig>> mock_filter_config_;
@@ -364,7 +496,7 @@ protected:
   testing::NiceMock<MockStreamEncoderFilterCallbacks> mock_encoder_callbacks_;
   NiceMock<Server::Configuration::MockFactoryContext> mock_factory_context_;
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
-  std::unique_ptr<ProtoApiScrubberFilter> filter_;
+  std::unique_ptr<TestProtoApiScrubberFilter> filter_;
 };
 
 // Following tests validate that the filter is not executed for requests with invalid headers.
@@ -378,6 +510,9 @@ TEST_F(ProtoApiScrubberInvalidRequestHeaderTests, RequestNotGrpc) {
 
   // Pass through headers directly.
   EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(req_headers, true));
+
+  // Verify that it did NOT increment "total_requests_checked" because it wasn't valid gRPC
+  EXPECT_EQ(0, mock_filter_config_->stats().total_requests_checked_.value());
 
   // Pass through request data directly.
   EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue,
@@ -413,7 +548,7 @@ TEST_F(ProtoApiScrubberInvalidRequestHeaderTests, PathNotExist) {
 using ProtoApiScrubberRequestRejectedTests = ProtoApiScrubberFilterTest;
 
 TEST_F(ProtoApiScrubberRequestRejectedTests, RequestBufferLimitedExceeded) {
-  ON_CALL(mock_decoder_callbacks_, decoderBufferLimit()).WillByDefault(testing::Return(0));
+  ON_CALL(mock_decoder_callbacks_, bufferLimit()).WillByDefault(testing::Return(0));
 
   TestRequestHeaderMapImpl req_headers =
       TestRequestHeaderMapImpl{{":method", "POST"},
@@ -431,10 +566,12 @@ TEST_F(ProtoApiScrubberRequestRejectedTests, RequestBufferLimitedExceeded) {
                   "proto_api_scrubber_FAILED_PRECONDITION{REQUEST_BUFFER_CONVERSION_FAIL}"));
   EXPECT_EQ(Envoy::Http::FilterDataStatus::StopIterationNoBuffer,
             filter_->decodeData(*request_data, true));
+
+  EXPECT_EQ(1, mock_filter_config_->stats().request_buffer_conversion_error_.value());
 }
 
 TEST_F(ProtoApiScrubberRequestRejectedTests, ResponseBufferLimitedExceeded) {
-  ON_CALL(mock_encoder_callbacks_, encoderBufferLimit()).WillByDefault(testing::Return(0));
+  ON_CALL(mock_encoder_callbacks_, bufferLimit()).WillByDefault(testing::Return(0));
 
   TestRequestHeaderMapImpl req_headers =
       TestRequestHeaderMapImpl{{":method", "POST"},
@@ -457,6 +594,8 @@ TEST_F(ProtoApiScrubberRequestRejectedTests, ResponseBufferLimitedExceeded) {
                   "proto_api_scrubber_FAILED_PRECONDITION{RESPONSE_BUFFER_CONVERSION_FAIL}"));
   EXPECT_EQ(Envoy::Http::FilterDataStatus::StopIterationNoBuffer,
             filter_->encodeData(*response_data, true));
+
+  EXPECT_EQ(1, mock_filter_config_->stats().response_buffer_conversion_error_.value());
 }
 
 // Following tests validate filter's graceful handling of empty messages in request and response.
@@ -510,6 +649,10 @@ TEST_F(ProtoApiScrubberPassThroughTest, UnarySingleBuffer) {
 
   // No data modification.
   checkSerializedData<CreateApiKeyRequest>(*request_data, {request});
+
+  // Verify stats
+  EXPECT_EQ(1, mock_filter_config_->stats().total_requests_checked_.value());
+  EXPECT_TRUE(mock_filter_config_->stats().request_scrubbing_latency_.used());
 }
 
 TEST_F(ProtoApiScrubberPassThroughTest, UnaryMultipeBuffers) {
@@ -607,6 +750,7 @@ TEST_F(ProtoApiScrubberPathValidationTest, ValidateMethodNameScenarios) {
 
     EXPECT_EQ(Envoy::Http::FilterHeadersStatus::StopIteration,
               filter_->decodeHeaders(req_headers, true));
+    EXPECT_EQ(1, mock_filter_config_->stats().invalid_method_name_.value());
   }
 
   // Case 2: Wildcard in Path
@@ -623,6 +767,8 @@ TEST_F(ProtoApiScrubberPathValidationTest, ValidateMethodNameScenarios) {
 
     EXPECT_EQ(Envoy::Http::FilterHeadersStatus::StopIteration,
               filter_->decodeHeaders(req_headers, true));
+    // Accumulated stats (previous 1 + this 1 = 2).
+    EXPECT_EQ(2, mock_filter_config_->stats().invalid_method_name_.value());
   }
 
   // Case 3: Missing Leading Slash
@@ -750,9 +896,8 @@ TEST_F(ProtoApiScrubberFilterTest, UnknownGrpcMethod_RequestFlow) {
   // The headers check passes because content-type is application/grpc.
   EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(req_headers, true));
 
-  std::string expected_error_msg =
-      "Unable to find method `some.nonexistent.Service.UnknownMethod` in the "
-      "descriptor pool configured for this filter.";
+  std::string expected_error_msg = "Method '/some.nonexistent.Service/UnknownMethod' not found in "
+                                   "descriptor pool (type lookup failed).";
 
   EXPECT_CALL(mock_decoder_callbacks_,
               sendLocalReply(Envoy::Http::Code::BadRequest, Eq(expected_error_msg), _,
@@ -761,6 +906,9 @@ TEST_F(ProtoApiScrubberFilterTest, UnknownGrpcMethod_RequestFlow) {
 
   EXPECT_EQ(Envoy::Http::FilterDataStatus::StopIterationNoBuffer,
             filter_->decodeData(*request_data, true));
+
+  // Verify failure stat.
+  EXPECT_EQ(1, mock_filter_config_->stats().request_scrubbing_failed_.value());
 }
 
 // Tests the case where an unknown method name is passed in the request headers due to which
@@ -798,13 +946,16 @@ TEST_F(ProtoApiScrubberFilterTest, UnknownGrpcMethod_ResponseFlow) {
   // Expect the error log and Local Reply
   EXPECT_CALL(mock_encoder_callbacks_,
               sendLocalReply(Http::Code::BadRequest,
-                             "Unable to find method `apikeys.ApiKeys.NonExistentMethod` in the "
-                             "descriptor pool configured for this filter.",
+                             "Method '/apikeys.ApiKeys/NonExistentMethod' not found in descriptor "
+                             "pool (type lookup failed).",
                              Eq(nullptr), Eq(Envoy::Grpc::Status::InvalidArgument),
                              "proto_api_scrubber_INVALID_ARGUMENT{BAD_REQUEST}"));
 
   EXPECT_EQ(Envoy::Http::FilterDataStatus::StopIterationNoBuffer,
             filter_->encodeData(*response_data, true));
+
+  // Verify failure stat.
+  EXPECT_EQ(1, mock_filter_config_->stats().response_scrubbing_failed_.value());
 }
 
 using ProtoApiScrubberScrubbingTest = ProtoApiScrubberFilterTest;
@@ -899,7 +1050,9 @@ TEST_F(ProtoApiScrubberScrubbingTest, RequestScrubbingFailsOnTruncatedNestedMess
   Envoy::Buffer::OwnedImpl bad_data = createTruncatedNestedMessageFrame(0x12);
 
   // Execute the action
-  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(bad_data, true));
+  EXPECT_LOG_CONTAINS(
+      "warn", "Scrubbing failed with error: ",
+      EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(bad_data, true)));
 
   // Verify Fail-Open (data matches expected payload unmodified)
   Envoy::Grpc::Decoder decoder;
@@ -907,6 +1060,60 @@ TEST_F(ProtoApiScrubberScrubbingTest, RequestScrubbingFailsOnTruncatedNestedMess
   ASSERT_TRUE(decoder.decode(bad_data, frames).ok());
 
   EXPECT_EQ(createTruncatedPayload(0x12), frames[0].data_->toString());
+
+  // Verify failure stat.
+  EXPECT_EQ(1, mock_filter_config_->stats().request_scrubbing_failed_.value());
+}
+
+// Tests that a field inside `Any` message gets scrubbed based on message-type restrictions.
+TEST_F(ProtoApiScrubberScrubbingTest, ScrubRequestAnyField) {
+  ProtoApiScrubberConfig proto_config;
+  proto_config.set_filtering_mode(ProtoApiScrubberConfig::OVERRIDE);
+
+  std::string method_name =
+      "/test.extensions.filters.http.proto_api_scrubber.ScrubberTestService/Scrub";
+  std::string sensitive_message_type =
+      "test.extensions.filters.http.proto_api_scrubber.SensitiveMessage";
+  std::string sensitive_field = "secret";
+
+  // Add restriction for SensitiveMessage.secret field
+  addMessageFieldRestriction(proto_config, sensitive_message_type, sensitive_field, true,
+                             kRemoveFieldActionType);
+
+  // Reload the filter with the config and descriptor set containing ScrubberTestMessage and
+  // SensitiveMessage
+  ASSERT_TRUE(reloadFilter(proto_config, kScrubberTestDescriptorRelativePath).ok());
+
+  // Prepare request
+  TestRequestHeaderMapImpl req_headers = TestRequestHeaderMapImpl{
+      {":method", "POST"}, {":path", method_name}, {"content-type", "application/grpc"}};
+
+  std::string secret_value = "this_is_secret";
+  ScrubRequest request = makeScrubRequestWithAny(secret_value);
+  Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
+
+  // Pre-check
+  SensitiveMessage inner_message;
+  request.any_field().UnpackTo(&inner_message);
+  EXPECT_EQ(inner_message.secret(), secret_value);
+
+  // Run filter
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(req_headers, true));
+  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(*request_data, true));
+
+  // Verify scrubbing
+  ScrubRequest scrubbed_request;
+  std::vector<Envoy::Grpc::Frame> frames;
+  Envoy::Grpc::Decoder decoder;
+  EXPECT_TRUE(decoder.decode(*request_data, frames).ok());
+  EXPECT_EQ(frames.size(), 1);
+  EXPECT_TRUE(scrubbed_request.ParseFromString(frames[0].data_->toString()));
+
+  SensitiveMessage scrubbed_inner;
+  scrubbed_request.any_field().UnpackTo(&scrubbed_inner);
+
+  EXPECT_EQ(scrubbed_inner.secret(), "");                  // Field should be cleared
+  EXPECT_EQ(scrubbed_inner.public_field(), "public_data"); // Other field preserved
 }
 
 using ProtoApiScrubberResponsePassThroughTest = ProtoApiScrubberFilterTest;
@@ -929,6 +1136,9 @@ TEST_F(ProtoApiScrubberResponsePassThroughTest, UnaryResponseSingleBuffer) {
   EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->encodeData(*response_data, true));
 
   checkSerializedData<ApiKey>(*response_data, {response});
+
+  // Verify response latency stat.
+  EXPECT_TRUE(mock_filter_config_->stats().response_scrubbing_latency_.used());
 }
 
 // Tests that a multi-buffer gRPC response passes through correctly, buffering internally until
@@ -1061,7 +1271,9 @@ TEST_F(ProtoApiScrubberResponseScrubbingTest, ResponseScrubbingFailsOnTruncatedN
   Envoy::Buffer::OwnedImpl bad_data = createTruncatedNestedMessageFrame(0x22);
 
   // Execute the action
-  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->encodeData(bad_data, true));
+  EXPECT_LOG_CONTAINS(
+      "warn", "Response scrubbing failed with error: ",
+      EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->encodeData(bad_data, true)));
 
   // Verify that data matches expected payload (unmodified)
   Envoy::Grpc::Decoder decoder;
@@ -1069,6 +1281,9 @@ TEST_F(ProtoApiScrubberResponseScrubbingTest, ResponseScrubbingFailsOnTruncatedN
   ASSERT_TRUE(decoder.decode(bad_data, frames).ok());
 
   EXPECT_EQ(createTruncatedPayload(0x22), frames[0].data_->toString());
+
+  // Verify failure stat.
+  EXPECT_EQ(1, mock_filter_config_->stats().response_scrubbing_failed_.value());
 }
 
 // Tests for Method Level Restrictions
@@ -1077,7 +1292,9 @@ protected:
   void SetUp() override {
     ProtoApiScrubberFilterTest::SetUp();
     // Re-initialize for each test.
-    mock_filter_config_ = std::make_shared<NiceMock<MockProtoApiScrubberFilterConfig>>();
+    ProtoApiScrubberStats stats(*stats_store_.rootScope(), "proto_api_scrubber.");
+    mock_filter_config_ =
+        std::make_shared<NiceMock<MockProtoApiScrubberFilterConfig>>(stats, time_system_);
     ProtoApiScrubberConfig real_proto_config;
     *real_proto_config.mutable_descriptor_set()->mutable_data_source()->mutable_inline_bytes() =
         api_->fileSystem()
@@ -1106,12 +1323,18 @@ TEST_F(MethodLevelRestrictionTest, MethodBlockedByMatcher) {
       {":method", "POST"}, {":path", method_name}, {"content-type", "application/grpc"}};
 
   EXPECT_CALL(mock_decoder_callbacks_,
-              sendLocalReply(Http::Code::Forbidden, "Method not allowed", Eq(nullptr),
-                             Eq(Status::PermissionDenied),
-                             "proto_api_scrubber_Forbidden{METHOD_BLOCKED}"));
+              sendLocalReply(Http::Code::NotFound, "Method not allowed", Eq(nullptr),
+                             Eq(Status::NotFound), "proto_api_scrubber_Not Found{METHOD_BLOCKED}"));
+
+  // Verify Trace Tag.
+  EXPECT_CALL(mock_decoder_callbacks_.active_span_,
+              setTag("proto_api_scrubber.outcome", "blocked"));
 
   EXPECT_EQ(Envoy::Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(req_headers, false));
+
+  // Verify stats.
+  EXPECT_EQ(1, mock_filter_config_->stats().method_blocked_.value());
 }
 
 // Tests that a request is allowed if the method-level matcher evaluates to false.
@@ -1201,6 +1424,10 @@ TEST_F(MethodLevelRestrictionTest, MethodAllowedWithFieldRestrictions) {
       .WillByDefault([this](const std::string& method_name, const std::string& field_mask) {
         return mock_filter_config_->real_config_->getRequestFieldMatcher(method_name, field_mask);
       });
+  ON_CALL(*mock_filter_config_, getMethodDescriptor(_))
+      .WillByDefault([this](const std::string& method_name) {
+        return mock_filter_config_->real_config_->getMethodDescriptor(method_name);
+      });
 
   auto req_headers = TestRequestHeaderMapImpl{
       {":method", "POST"}, {":path", method_name}, {"content-type", "application/grpc"}};
@@ -1218,6 +1445,166 @@ TEST_F(MethodLevelRestrictionTest, MethodAllowedWithFieldRestrictions) {
   expected_request.mutable_shelf()->clear_theme(); // Theme should be scrubbed.
 
   checkSerializedData<CreateShelfRequest>(*request_data, {expected_request});
+}
+
+using ProtoApiScrubberBufferConversionTest = ProtoApiScrubberFilterTest;
+
+// This test verifies that the filter handles request buffer conversion failures gracefully.
+TEST_F(ProtoApiScrubberBufferConversionTest, RequestBufferConversionFailure) {
+  ProtoApiScrubberConfig proto_config;
+  proto_config.set_filtering_mode(ProtoApiScrubberConfig::OVERRIDE);
+  std::string method_name = "/apikeys.ApiKeys/CreateApiKey";
+
+  // Configure a simple scrubbing rule
+  addRestriction(proto_config, method_name, "key.display_name", FieldType::Request, true,
+                 kRemoveFieldActionType);
+  ASSERT_TRUE(reloadFilter(proto_config).ok());
+
+  // Trigger conversion failure in test.
+  filter_->fail_conversion_ = true;
+
+  // 1. Setup Request
+  TestRequestHeaderMapImpl req_headers = TestRequestHeaderMapImpl{
+      {":method", "POST"}, {":path", method_name}, {"content-type", "application/grpc"}};
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(req_headers, true));
+
+  CreateApiKeyRequest request = makeCreateApiKeyRequest();
+  Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
+
+  // Expect the filter to handle the error by sending a Local Reply.
+  EXPECT_CALL(mock_decoder_callbacks_,
+              sendLocalReply(Envoy::Http::Code::TooManyRequests, // Mapped from ResourceExhausted
+                             Eq("Fake Buffer Limit Exceeded"), _,
+                             Eq(Envoy::Grpc::Status::ResourceExhausted),
+                             testing::HasSubstr("REQUEST_BUFFER_CONVERSION_FAIL")));
+
+  EXPECT_EQ(Envoy::Http::FilterDataStatus::StopIterationNoBuffer,
+            filter_->decodeData(*request_data, true));
+}
+
+// This test verifies that the filter handles response buffer conversion failures gracefully.
+TEST_F(ProtoApiScrubberBufferConversionTest, ResponseBufferConversionFailure) {
+  ProtoApiScrubberConfig proto_config;
+  proto_config.set_filtering_mode(ProtoApiScrubberConfig::OVERRIDE);
+  std::string method_name = "/apikeys.ApiKeys/CreateApiKey";
+
+  addRestriction(proto_config, method_name, "create_time.seconds", FieldType::Response, true,
+                 kRemoveFieldActionType);
+  ASSERT_TRUE(reloadFilter(proto_config).ok());
+
+  // Trigger conversion failure in test.
+  filter_->fail_conversion_ = true;
+
+  TestRequestHeaderMapImpl req_headers = TestRequestHeaderMapImpl{
+      {":method", "POST"}, {":path", method_name}, {"content-type", "application/grpc"}};
+  filter_->decodeHeaders(req_headers, true);
+
+  TestResponseHeaderMapImpl resp_headers =
+      TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/grpc"}};
+  filter_->encodeHeaders(resp_headers, false);
+
+  ApiKey response = makeCreateApiKeyResponse();
+  Envoy::Buffer::InstancePtr response_data = Envoy::Grpc::Common::serializeToGrpcFrame(response);
+
+  // Expect the filter to handle the error by sending a Local Reply.
+  EXPECT_CALL(mock_encoder_callbacks_,
+              sendLocalReply(Envoy::Http::Code::TooManyRequests, // Mapped from ResourceExhausted
+                             Eq("Fake Buffer Limit Exceeded"), _,
+                             Eq(Envoy::Grpc::Status::ResourceExhausted),
+                             testing::HasSubstr("RESPONSE_BUFFER_CONVERSION_FAIL")));
+
+  EXPECT_EQ(Envoy::Http::FilterDataStatus::StopIterationNoBuffer,
+            filter_->encodeData(*response_data, true));
+}
+
+// ============================================================================
+// Observability Tests
+// ============================================================================
+
+class ObservabilityTest : public ProtoApiScrubberFilterTest {};
+
+// Tests that the filter increments the 'total_requests_checked' counter upon receiving a valid gRPC
+// request.
+TEST_F(ObservabilityTest, DecodeHeadersIncrementsTotalRequests) {
+  TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                   {":path", "/apikeys.ApiKeys/CreateApiKey"},
+                                   {"content-type", "application/grpc"}};
+
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+  EXPECT_EQ(1, mock_filter_config_->stats().total_requests_checked_.value());
+}
+
+// Tests that blocking a request via method-level rules increments the 'method_blocked' counter and
+// sets the trace tag.
+TEST_F(ObservabilityTest, MethodLevelBlockingUpdatesStatsAndTrace) {
+  std::string method_name = "/bookstore.Bookstore/CreateShelf";
+
+  auto mock_match_tree = std::make_shared<NiceMock<MockMatchTree>>();
+  auto mock_action = std::make_shared<NiceMock<MockAction>>();
+  ON_CALL(*mock_action, typeUrl())
+      .WillByDefault(
+          Return("envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction"));
+
+  EXPECT_CALL(*mock_filter_config_, getMethodMatcher(method_name))
+      .WillOnce(Return(mock_match_tree));
+
+  // Return Match to simulate block.
+  EXPECT_CALL(*mock_match_tree, match(_, _)).WillOnce(Return(Matcher::MatchResult(mock_action)));
+
+  TestRequestHeaderMapImpl headers{
+      {":method", "POST"}, {":path", method_name}, {"content-type", "application/grpc"}};
+
+  // Verify Trace Tag.
+  EXPECT_CALL(mock_decoder_callbacks_.active_span_,
+              setTag("proto_api_scrubber.outcome", "blocked"));
+
+  // Verify 404.
+  EXPECT_CALL(mock_decoder_callbacks_, sendLocalReply(Http::Code::NotFound, _, _, _, _));
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(headers, false));
+
+  // Verify Stat.
+  EXPECT_EQ(1, mock_filter_config_->stats().method_blocked_.value());
+}
+
+// Tests that successful scrubbing of a request records the processing latency in the histogram.
+TEST_F(ObservabilityTest, RequestScrubbingRecordsLatency) {
+  TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                   {":path", "/apikeys.ApiKeys/CreateApiKey"},
+                                   {"content-type", "application/grpc"}};
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+
+  // Valid empty message.
+  Envoy::Buffer::OwnedImpl data;
+  char grpc_frame[] = {0, 0, 0, 0, 0};
+  data.add(grpc_frame, 5);
+
+  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(data, true));
+
+  // Verify Histogram was used (recorded a value)
+  EXPECT_TRUE(mock_filter_config_->stats().request_scrubbing_latency_.used());
+}
+
+// Tests that successful scrubbing of a response records the processing latency in the histogram.
+TEST_F(ObservabilityTest, ResponseScrubbingRecordsLatency) {
+  TestRequestHeaderMapImpl req_headers{{":method", "POST"},
+                                       {":path", "/apikeys.ApiKeys/CreateApiKey"},
+                                       {"content-type", "application/grpc"}};
+  filter_->decodeHeaders(req_headers, true);
+
+  TestResponseHeaderMapImpl resp_headers{{":status", "200"}, {"content-type", "application/grpc"}};
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue,
+            filter_->encodeHeaders(resp_headers, false));
+
+  // Valid empty message.
+  Envoy::Buffer::OwnedImpl data;
+  char grpc_frame[] = {0, 0, 0, 0, 0};
+  data.add(grpc_frame, 5);
+
+  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->encodeData(data, true));
+
+  // Verify Histogram was used (recorded a value).
+  EXPECT_TRUE(mock_filter_config_->stats().response_scrubbing_latency_.used());
 }
 
 } // namespace

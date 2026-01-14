@@ -1,3 +1,4 @@
+#include "source/common/router/retry_policy_impl.h"
 #include "source/extensions/filters/http/jwt_authn/jwks_async_fetcher.h"
 
 #include "test/extensions/filters/http/jwt_authn/test_common.h"
@@ -59,9 +60,23 @@ public:
       timer_ = new NiceMock<Event::MockTimer>(&context_.server_factory_context_.dispatcher_);
     }
 
+    Router::RetryPolicyConstSharedPtr retry_policy = nullptr;
+    if (config_.has_retry_policy()) {
+      envoy::config::route::v3::RetryPolicy route_retry_policy =
+          Http::Utility::convertCoreToRouteRetryPolicy(config_.retry_policy(),
+                                                       "5xx,gateway-error,connect-failure,reset");
+      // Use the null validation visitor because it was used by the async client in the previous
+      // implementation.
+      auto policy_or_error = Router::RetryPolicyImpl::create(
+          route_retry_policy, ProtobufMessage::getNullValidationVisitor(),
+          context_.serverFactoryContext());
+      THROW_IF_NOT_OK_REF(policy_or_error.status());
+      retry_policy = std::move(policy_or_error.value());
+    }
+
     async_fetcher_ = std::make_unique<JwksAsyncFetcher>(
-        config_, context_,
-        [this](Upstream::ClusterManager&, const RemoteJwks&) {
+        config_, std::move(retry_policy), context_,
+        [this](Upstream::ClusterManager&, Router::RetryPolicyConstSharedPtr, const RemoteJwks&) {
           return std::make_unique<MockJwksFetcher>(
               [this](Common::JwksFetcher::JwksReceiver& receiver) {
                 fetch_receiver_array_.push_back(&receiver);

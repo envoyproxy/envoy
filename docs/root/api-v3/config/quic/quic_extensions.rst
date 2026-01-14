@@ -12,3 +12,4 @@ Quic extensions
   ../../extensions/quic/server_preferred_address/v3/*
   ../../extensions/quic/connection_debug_visitor/v3/*
   ../../extensions/quic/connection_debug_visitor/quic_stats/v3/*
+  ../../extensions/quic/client_writer_factory/v3/*

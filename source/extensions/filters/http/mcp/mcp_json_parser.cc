@@ -21,20 +21,18 @@ void McpParserConfig::initializeDefaults() {
   // Always extract core JSON-RPC fields
   always_extract_.insert("jsonrpc");
   always_extract_.insert("method");
+  always_extract_.insert("id");
 
   // Tools
   addMethodConfig(Methods::TOOLS_CALL, {AttributeExtractionRule("params.name")});
 
   // Resources
   addMethodConfig(Methods::RESOURCES_READ, {AttributeExtractionRule("params.uri")});
-  addMethodConfig(Methods::RESOURCES_LIST, {AttributeExtractionRule("params.cursor")});
   addMethodConfig(Methods::RESOURCES_SUBSCRIBE, {AttributeExtractionRule("params.uri")});
   addMethodConfig(Methods::RESOURCES_UNSUBSCRIBE, {AttributeExtractionRule("params.uri")});
-  addMethodConfig(Methods::RESOURCES_TEMPLATES_LIST, {AttributeExtractionRule("params.cursor")});
 
   // Prompts
   addMethodConfig(Methods::PROMPTS_GET, {AttributeExtractionRule("params.name")});
-  addMethodConfig(Methods::PROMPTS_LIST, {AttributeExtractionRule("params.cursor")});
 
   // Completion
   addMethodConfig(Methods::COMPLETION_COMPLETE, {});
@@ -65,13 +63,28 @@ McpParserConfig::fromProto(const envoy::extensions::filters::http::mcp::v3::Pars
   config.always_extract_.insert("method");
   config.initializeDefaults();
 
-  // Process method-specific overrides
+  config.group_metadata_key_ = proto.group_metadata_key();
+
+  // Process method-specific configs (for both extraction rules and group overrides)
   for (const auto& method_proto : proto.methods()) {
-    std::vector<AttributeExtractionRule> extraction_rules;
+    MethodConfigEntry entry;
+    entry.method_pattern = method_proto.method();
+    entry.group = method_proto.group();
+
     for (const auto& extraction_rule_proto : method_proto.extraction_rules()) {
-      extraction_rules.emplace_back(extraction_rule_proto.path());
+      entry.extraction_rules.emplace_back(extraction_rule_proto.path());
     }
-    config.addMethodConfig(method_proto.method(), std::move(extraction_rules));
+
+    config.method_configs_.push_back(std::move(entry));
+
+    // Also update method_fields_ for extraction rules (for backward compatibility)
+    if (!method_proto.extraction_rules().empty()) {
+      std::vector<AttributeExtractionRule> extraction_rules;
+      for (const auto& rule_proto : method_proto.extraction_rules()) {
+        extraction_rules.emplace_back(rule_proto.path());
+      }
+      config.addMethodConfig(method_proto.method(), std::move(extraction_rules));
+    }
   }
 
   return config;
@@ -88,6 +101,66 @@ McpParserConfig::getFieldsForMethod(const std::string& method) const {
   static const std::vector<AttributeExtractionRule> empty;
   auto it = method_fields_.find(method);
   return (it != method_fields_.end()) ? it->second : empty;
+}
+
+std::string McpParserConfig::getMethodGroup(const std::string& method) const {
+  // Check user-configured rules first (exact match only)
+  for (const auto& entry : method_configs_) {
+    if (method == entry.method_pattern && !entry.group.empty()) {
+      return entry.group;
+    }
+  }
+
+  // Fall back to built-in groups
+  return getBuiltInMethodGroup(method);
+}
+
+std::string McpParserConfig::getBuiltInMethodGroup(const std::string& method) const {
+  using namespace McpConstants::Methods;
+  using namespace McpConstants::MethodGroups;
+
+  // Lifecycle methods
+  if (method == INITIALIZE || method == NOTIFICATION_INITIALIZED || method == PING) {
+    return std::string(LIFECYCLE);
+  }
+
+  // Tool methods
+  if (method == TOOLS_CALL || method == TOOLS_LIST) {
+    return std::string(TOOL);
+  }
+
+  // Resource methods
+  if (method == RESOURCES_READ || method == RESOURCES_LIST || method == RESOURCES_SUBSCRIBE ||
+      method == RESOURCES_UNSUBSCRIBE || method == RESOURCES_TEMPLATES_LIST) {
+    return std::string(RESOURCE);
+  }
+
+  // Prompt methods
+  if (method == PROMPTS_GET || method == PROMPTS_LIST) {
+    return std::string(PROMPT);
+  }
+
+  // Logging
+  if (method == LOGGING_SET_LEVEL) {
+    return std::string(LOGGING);
+  }
+
+  // Sampling
+  if (method == SAMPLING_CREATE_MESSAGE) {
+    return std::string(SAMPLING);
+  }
+
+  // Completion
+  if (method == COMPLETION_COMPLETE) {
+    return std::string(COMPLETION);
+  }
+
+  // General notifications (prefix match, excluding those already categorized)
+  if (absl::StartsWith(method, NOTIFICATION_PREFIX)) {
+    return std::string(NOTIFICATION);
+  }
+
+  return std::string(UNKNOWN);
 }
 
 // McpFieldExtractor implementation
@@ -216,6 +289,7 @@ McpFieldExtractor* McpFieldExtractor::RenderString(absl::string_view name,
         is_valid_mcp_ = true;
       }
       method_ = std::string(value);
+      is_notification_ = absl::StartsWith(method_, Methods::NOTIFICATION_PREFIX);
     }
   }
 
@@ -344,11 +418,14 @@ void McpFieldExtractor::checkEarlyStop() {
   }
 
   // Update fields_needed_ now that we know the method
-  static bool fields_needed_updated = false;
-  if (!fields_needed_updated) {
+  if (!fields_needed_updated_) {
     const auto& required_fields = config_.getFieldsForMethod(method_);
     fields_needed_ += required_fields.size();
-    fields_needed_updated = true;
+    // Notifications don't have 'id' field, so reduce the expected count
+    if (is_notification_) {
+      fields_needed_--;
+    }
+    fields_needed_updated_ = true;
   }
 
   // Fast path: check if we have collected enough fields
@@ -357,7 +434,11 @@ void McpFieldExtractor::checkEarlyStop() {
   }
 
   // Verify we actually have all required fields (not just the count)
+  // Notifications don't have an 'id' field per JSON-RPC spec, so skip it for them
   for (const auto& field : config_.getAlwaysExtract()) {
+    if (is_notification_ && field == "id") {
+      continue;
+    }
     if (collected_fields_.count(field) == 0) {
       return;
     }

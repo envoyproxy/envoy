@@ -40,6 +40,7 @@ NO_HTTP3_SKIP_TARGETS = [
     "envoy.quic.server_preferred_address.fixed",
     "envoy.quic.server_preferred_address.datasource",
     "envoy.quic.connection_debug_visitor.basic",
+    "envoy.quic.packet_writer.default",
 ]
 
 # Make all contents of an external repository accessible under a filegroup.  Used for external HTTP
@@ -143,7 +144,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_awslabs_aws_c_auth()
     _com_github_axboe_liburing()
     _com_github_bazel_buildtools()
-    _com_github_c_ares_c_ares()
+    _com_github_cares_cares()
     _com_github_openhistogram_libcircllhist()
     _com_github_cyan4973_xxhash()
     _com_github_datadog_dd_trace_cpp()
@@ -212,10 +213,13 @@ def envoy_dependencies(skip_targets = []):
     external_http_archive("bazel_features")
     external_http_archive("bazel_toolchains")
     external_http_archive("bazel_compdb")
-    external_http_archive("envoy_examples")
+    external_http_archive(
+        name = "envoy_examples",
+    )
     external_http_archive("envoy_toolshed")
 
     _com_github_maxmind_libmaxminddb()
+    _thrift()
 
     external_http_archive("rules_license")
     external_http_archive("rules_pkg")
@@ -317,10 +321,10 @@ def _com_github_bazel_buildtools():
         name = "com_github_bazelbuild_buildtools",
     )
 
-def _com_github_c_ares_c_ares():
+def _com_github_cares_cares():
     external_http_archive(
-        name = "com_github_c_ares_c_ares",
-        build_file_content = BUILD_ALL_CONTENT,
+        name = "com_github_cares_cares",
+        build_file = "@envoy//bazel/external:c-ares.BUILD",
         patch_args = ["-p1"],
         patches = ["@envoy//bazel:c-ares.patch"],
     )
@@ -550,7 +554,10 @@ def _com_github_nghttp2_nghttp2():
         # This patch cannot be picked up due to ABI rules. Discussion at;
         # https://github.com/nghttp2/nghttp2/pull/1395
         # https://github.com/envoyproxy/envoy/pull/8572#discussion_r334067786
-        patches = ["@envoy//bazel/foreign_cc:nghttp2.patch"],
+        patches = [
+            "@envoy//bazel/foreign_cc:nghttp2.patch",
+            "@envoy//bazel/foreign_cc:nghttp2_huffman.patch",
+        ],
     )
 
 def _com_github_msgpack_cpp():
@@ -592,8 +599,6 @@ def _com_github_skyapm_cpp2sky():
     )
     external_http_archive(
         name = "skywalking_data_collect_protocol",
-        patches = ["@envoy//bazel:skywalking_data_collect_protocol.patch"],
-        patch_args = ["-p1"],
     )
 
 def _com_github_nlohmann_json():
@@ -913,6 +918,15 @@ def _foreign_cc_dependencies():
         name = "rules_foreign_cc",
         patches = ["@envoy//bazel:rules_foreign_cc.patch"],
         patch_args = ["-p1"],
+    )
+
+def _thrift():
+    external_http_archive(
+        name = "thrift",
+        build_file = "@envoy//bazel/external:thrift.BUILD",
+        patches = ["@envoy//bazel:thrift.patch"],
+        patch_args = ["-p1"],
+        patch_cmds = ["mv src thrift"],
     )
 
 def _com_github_maxmind_libmaxminddb():

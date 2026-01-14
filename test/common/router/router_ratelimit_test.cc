@@ -17,6 +17,7 @@
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/server/instance.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -284,7 +285,9 @@ public:
     ON_CALL(Const(stream_info_), route()).WillByDefault(testing::Return(route_));
   }
 
+  TestScopedRuntime scoped_runtime_;
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
+  ScopedThreadLocalServerContextSetter server_context_singleton_setter_{factory_context_};
   std::unique_ptr<RateLimitPolicyEntryImpl> rate_limit_entry_;
   Http::TestRequestHeaderMapImpl header_;
   std::shared_ptr<MockRoute> route_{new NiceMock<MockRoute>()};
@@ -307,6 +310,7 @@ public:
   }
 
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
+  ScopedThreadLocalServerContextSetter server_context_singleton_setter_{factory_context_};
   std::unique_ptr<RateLimitPolicyEntryImpl> rate_limit_entry_;
   Http::TestRequestHeaderMapImpl header_;
   std::shared_ptr<MockRoute> route_{new NiceMock<MockRoute>()};
@@ -1322,6 +1326,597 @@ actions:
 
   rate_limit_entry_->populateDescriptors(descriptors_, "", header, stream_info_);
   EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"my_param", "hello world"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyEntryTest, GenericKeyDescriptorFormat) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_formatter_for_ratelimit_action_descriptor_value",
+        "true"}});
+  const std::string yaml = R"EOF(
+actions:
+- generic_key:
+    descriptor_value: "%REQ(x-custom-header)%"
+  )EOF";
+
+  setupTest(yaml);
+  Http::TestRequestHeaderMapImpl header{{"x-custom-header", "custom_value"}};
+
+  rate_limit_entry_->populateDescriptors(descriptors_, "", header, stream_info_);
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"generic_key", "custom_value"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyEntryTest, GenericKeyDescriptorFormatCEL) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_formatter_for_ratelimit_action_descriptor_value",
+        "true"}});
+  const std::string yaml = R"EOF(
+actions:
+- generic_key:
+    descriptor_value: "%CEL(request.headers['user-type'])%"
+  )EOF";
+
+  setupTest(yaml);
+  Http::TestRequestHeaderMapImpl header{{"user-type", "premium"}};
+
+  rate_limit_entry_->populateDescriptors(descriptors_, "", header, stream_info_);
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"generic_key", "premium"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyEntryTest, GenericKeyDescriptorFormatCELHeaderMissing) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_formatter_for_ratelimit_action_descriptor_value",
+        "true"}});
+  const std::string yaml = R"EOF(
+actions:
+- generic_key:
+    descriptor_value: "%CEL(request.headers['user-type'])%"
+  )EOF";
+
+  setupTest(yaml);
+  Http::TestRequestHeaderMapImpl header{{}};
+
+  // When header is missing, CEL returns empty/null, descriptor is skipped
+  rate_limit_entry_->populateDescriptors(descriptors_, "", header, stream_info_);
+  EXPECT_TRUE(descriptors_.empty());
+}
+
+TEST_F(RateLimitPolicyEntryTest, GenericKeyDescriptorFormatCELRegexExtract) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_formatter_for_ratelimit_action_descriptor_value",
+        "true"}});
+  const std::string yaml = R"EOF(
+actions:
+- generic_key:
+    descriptor_key: "user_id_key"
+    descriptor_value: "%CEL(re.extract(request.headers['x-user-context'], '^id:([a-zA-Z0-9]+),', '\\\\1'))%"
+  )EOF";
+
+  setupTest(yaml);
+  Http::TestRequestHeaderMapImpl header{{"x-user-context", "id:abc123,tenant:prod"}};
+
+  rate_limit_entry_->populateDescriptors(descriptors_, "", header, stream_info_);
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"user_id_key", "abc123"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyEntryTest, GenericKeyDescriptorFormatCELRegexExtractHeaderMissing) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_formatter_for_ratelimit_action_descriptor_value",
+        "true"}});
+  const std::string yaml = R"EOF(
+actions:
+- generic_key:
+    descriptor_key: "user_id_key"
+    descriptor_value: "%CEL(re.extract(request.headers['x-user-context'], '^id:([a-zA-Z0-9]+),', '\\\\1'))%"
+    default_value: "unknown"
+  )EOF";
+
+  setupTest(yaml);
+  Http::TestRequestHeaderMapImpl header{{}};
+
+  rate_limit_entry_->populateDescriptors(descriptors_, "", header, stream_info_);
+  // With default_value set to non-empty string, descriptor is created with the default value
+  EXPECT_THAT(descriptors_, testing::ContainerEq(std::vector<Envoy::RateLimit::Descriptor>(
+                                {{{{"user_id_key", "unknown"}}}})));
+}
+
+TEST_F(RateLimitPolicyEntryTest, GenericKeyDescriptorFormatCELWithDefaultValue) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_formatter_for_ratelimit_action_descriptor_value",
+        "true"}});
+  const std::string yaml = R"EOF(
+actions:
+- generic_key:
+    descriptor_key: "user_id_key"
+    descriptor_value: "%CEL(re.extract(request.headers['x-user-context'], '^id:([a-zA-Z0-9]+),', '\\\\1'))%"
+    default_value: "anonymous"
+  )EOF";
+
+  setupTest(yaml);
+  Http::TestRequestHeaderMapImpl header{{}};
+
+  rate_limit_entry_->populateDescriptors(descriptors_, "", header, stream_info_);
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"user_id_key", "anonymous"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyEntryTest, GenericKeyDescriptorFormatCELWithoutDefaultValueSkipsDescriptor) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_formatter_for_ratelimit_action_descriptor_value",
+        "true"}});
+  const std::string yaml = R"EOF(
+actions:
+- generic_key:
+    descriptor_key: "user_id_key"
+    descriptor_value: "%CEL(re.extract(request.headers['x-user-context'], '^id:([a-zA-Z0-9]+),', '\\\\1'))%"
+  )EOF";
+
+  setupTest(yaml);
+  Http::TestRequestHeaderMapImpl header{{}};
+
+  rate_limit_entry_->populateDescriptors(descriptors_, "", header, stream_info_);
+  // Descriptor should be skipped when formatting fails and no default_value is set
+  EXPECT_TRUE(descriptors_.empty());
+}
+
+TEST_F(RateLimitPolicyEntryTest, HeaderValueMatchDescriptorFormatWithDefaultValue) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_formatter_for_ratelimit_action_descriptor_value",
+        "true"}});
+  const std::string yaml = R"EOF(
+actions:
+- header_value_match:
+    descriptor_value: "%CEL(re.extract(request.headers['x-user-id'], '^user-([0-9]+)', '\\\\1'))%"
+    descriptor_key: "user_match"
+    default_value: "unknown"
+    headers:
+    - name: x-header-name
+      string_match:
+        exact: test_value
+  )EOF";
+
+  setupTest(yaml);
+  Http::TestRequestHeaderMapImpl header{{"x-header-name", "test_value"}};
+
+  rate_limit_entry_->populateDescriptors(descriptors_, "", header, stream_info_);
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"user_match", "unknown"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyEntryTest, HeaderValueMatchDescriptorFormatWithDefaultValueSuccess) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_formatter_for_ratelimit_action_descriptor_value",
+        "true"}});
+  const std::string yaml = R"EOF(
+actions:
+- header_value_match:
+    descriptor_value: "%CEL(re.extract(request.headers['x-user-id'], '^user-([0-9]+)', '\\\\1'))%"
+    descriptor_key: "user_match"
+    default_value: "unknown"
+    headers:
+    - name: x-header-name
+      string_match:
+        exact: test_value
+  )EOF";
+
+  setupTest(yaml);
+  Http::TestRequestHeaderMapImpl header{{"x-header-name", "test_value"}, {"x-user-id", "user-123"}};
+
+  rate_limit_entry_->populateDescriptors(descriptors_, "", header, stream_info_);
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"user_match", "123"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyEntryTest, QueryParameterValueMatchDescriptorFormatWithDefaultValue) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_formatter_for_ratelimit_action_descriptor_value",
+        "true"}});
+  const std::string yaml = R"EOF(
+actions:
+- query_parameter_value_match:
+    descriptor_value: "%CEL(re.extract(request.headers['x-api-key'], '^key-([a-z]+)', '\\\\1'))%"
+    descriptor_key: "api_key"
+    default_value: "default_key"
+    query_parameters:
+    - name: action
+      string_match:
+        exact: query_value
+  )EOF";
+
+  setupTest(yaml);
+  Http::TestRequestHeaderMapImpl header{{":path", "/path?action=query_value"}};
+
+  rate_limit_entry_->populateDescriptors(descriptors_, "", header, stream_info_);
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"api_key", "default_key"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyEntryTest, GenericKeyDescriptorFormatPlainString) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_formatter_for_ratelimit_action_descriptor_value",
+        "true"}});
+  const std::string yaml = R"EOF(
+actions:
+- generic_key:
+    descriptor_key: "static_key"
+    descriptor_value: "static_value"
+  )EOF";
+
+  setupTest(yaml);
+  Http::TestRequestHeaderMapImpl header{{"x-test", "test"}};
+
+  rate_limit_entry_->populateDescriptors(descriptors_, "", header, stream_info_);
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"static_key", "static_value"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyEntryTest, HeaderValueMatchDescriptorFormat) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_formatter_for_ratelimit_action_descriptor_value",
+        "true"}});
+  const std::string yaml = R"EOF(
+actions:
+- header_value_match:
+    descriptor_value: "%REQ(x-user-id)%"
+    headers:
+    - name: x-header-name
+      string_match:
+        exact: test_value
+  )EOF";
+
+  setupTest(yaml);
+  Http::TestRequestHeaderMapImpl header{{"x-header-name", "test_value"}, {"x-user-id", "123"}};
+
+  rate_limit_entry_->populateDescriptors(descriptors_, "", header, stream_info_);
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"header_match", "123"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyEntryTest, HeaderValueMatchDescriptorFormatCEL) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_formatter_for_ratelimit_action_descriptor_value",
+        "true"}});
+  const std::string yaml = R"EOF(
+actions:
+- header_value_match:
+    descriptor_value: "%CEL(request.headers['x-tier'])%"
+    headers:
+    - name: x-header-name
+      string_match:
+        exact: test_value
+  )EOF";
+
+  setupTest(yaml);
+  Http::TestRequestHeaderMapImpl header{{"x-header-name", "test_value"}, {"x-tier", "premium"}};
+
+  rate_limit_entry_->populateDescriptors(descriptors_, "", header, stream_info_);
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"header_match", "premium"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyEntryTest, HeaderValueMatchDescriptorFormatCELHeaderMissing) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_formatter_for_ratelimit_action_descriptor_value",
+        "true"}});
+  const std::string yaml = R"EOF(
+actions:
+- header_value_match:
+    descriptor_value: "%CEL(request.headers['x-tier'])%"
+    headers:
+    - name: x-header-name
+      string_match:
+        exact: test_value
+  )EOF";
+
+  setupTest(yaml);
+  Http::TestRequestHeaderMapImpl header{{"x-header-name", "test_value"}};
+
+  // When header is missing, CEL returns empty/null, descriptor is skipped
+  rate_limit_entry_->populateDescriptors(descriptors_, "", header, stream_info_);
+  EXPECT_TRUE(descriptors_.empty());
+}
+
+TEST_F(RateLimitPolicyEntryTest, QueryParameterValueMatchDescriptorFormat) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_formatter_for_ratelimit_action_descriptor_value",
+        "true"}});
+  const std::string yaml = R"EOF(
+actions:
+- query_parameter_value_match:
+    descriptor_value: "%REQ(x-api-key)%"
+    query_parameters:
+    - name: x-parameter-name
+      string_match:
+        exact: test_value
+  )EOF";
+
+  setupTest(yaml);
+  Http::TestRequestHeaderMapImpl header{{":path", "/?x-parameter-name=test_value"},
+                                        {"x-api-key", "secret123"}};
+
+  rate_limit_entry_->populateDescriptors(descriptors_, "", header, stream_info_);
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"query_match", "secret123"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyEntryTest, QueryParameterValueMatchDescriptorFormatCEL) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_formatter_for_ratelimit_action_descriptor_value",
+        "true"}});
+  const std::string yaml = R"EOF(
+actions:
+- query_parameter_value_match:
+    descriptor_value: "%CEL(request.headers['x-region'])%"
+    query_parameters:
+    - name: x-parameter-name
+      string_match:
+        exact: test_value
+  )EOF";
+
+  setupTest(yaml);
+  Http::TestRequestHeaderMapImpl header{{":path", "/?x-parameter-name=test_value"},
+                                        {"x-region", "eu-central"}};
+
+  rate_limit_entry_->populateDescriptors(descriptors_, "", header, stream_info_);
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"query_match", "eu-central"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyEntryTest, QueryParameterValueMatchDescriptorFormatCELHeaderMissing) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_formatter_for_ratelimit_action_descriptor_value",
+        "true"}});
+  const std::string yaml = R"EOF(
+actions:
+- query_parameter_value_match:
+    descriptor_value: "%CEL(request.headers['x-region'])%"
+    query_parameters:
+    - name: x-parameter-name
+      string_match:
+        exact: test_value
+  )EOF";
+
+  setupTest(yaml);
+  Http::TestRequestHeaderMapImpl header{{":path", "/?x-parameter-name=test_value"}};
+
+  // When header is missing, CEL returns empty/null, descriptor is skipped
+  rate_limit_entry_->populateDescriptors(descriptors_, "", header, stream_info_);
+  EXPECT_TRUE(descriptors_.empty());
+}
+
+TEST_F(RateLimitPolicyEntryTest, QueryParameterValueMatchDescriptorFormatWithDefaultValueSuccess) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_formatter_for_ratelimit_action_descriptor_value",
+        "true"}});
+  const std::string yaml = R"EOF(
+actions:
+- query_parameter_value_match:
+    descriptor_value: "%CEL(re.extract(request.headers['x-api-key'], '^key-([a-z]+)', '\\\\1'))%"
+    descriptor_key: "api_key"
+    default_value: "default_key"
+    query_parameters:
+    - name: action
+      string_match:
+        exact: query_value
+  )EOF";
+
+  setupTest(yaml);
+  Http::TestRequestHeaderMapImpl header{{":path", "/path?action=query_value"},
+                                        {"x-api-key", "key-alpha"}};
+
+  rate_limit_entry_->populateDescriptors(descriptors_, "", header, stream_info_);
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"api_key", "alpha"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyEntryTest, GenericKeyDescriptorFormatREQWithDefaultValue) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_formatter_for_ratelimit_action_descriptor_value",
+        "true"}});
+  const std::string yaml = R"EOF(
+actions:
+- generic_key:
+    descriptor_key: "method_key"
+    descriptor_value: "%REQ(x-custom-method)%"
+    default_value: "GET"
+  )EOF";
+
+  setupTest(yaml);
+  Http::TestRequestHeaderMapImpl header{{}};
+
+  rate_limit_entry_->populateDescriptors(descriptors_, "", header, stream_info_);
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"method_key", "GET"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyEntryTest, HeaderValueMatchDescriptorFormatREQWithDefaultValue) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_formatter_for_ratelimit_action_descriptor_value",
+        "true"}});
+  const std::string yaml = R"EOF(
+actions:
+- header_value_match:
+    descriptor_value: "%REQ(x-priority)%"
+    descriptor_key: "priority"
+    default_value: "normal"
+    headers:
+    - name: x-service
+      string_match:
+        exact: api
+  )EOF";
+
+  setupTest(yaml);
+  Http::TestRequestHeaderMapImpl header{{"x-service", "api"}};
+
+  rate_limit_entry_->populateDescriptors(descriptors_, "", header, stream_info_);
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"priority", "normal"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyEntryTest, QueryParameterValueMatchDescriptorFormatREQWithDefaultValue) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_formatter_for_ratelimit_action_descriptor_value",
+        "true"}});
+  const std::string yaml = R"EOF(
+actions:
+- query_parameter_value_match:
+    descriptor_value: "%REQ(x-client-type)%"
+    descriptor_key: "client_type"
+    default_value: "web"
+    query_parameters:
+    - name: version
+      string_match:
+        exact: v2
+  )EOF";
+
+  setupTest(yaml);
+  Http::TestRequestHeaderMapImpl header{{":path", "/?version=v2"}};
+
+  rate_limit_entry_->populateDescriptors(descriptors_, "", header, stream_info_);
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"client_type", "web"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyEntryTest, GenericKeyMixedStaticAndDynamicFormatters) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_formatter_for_ratelimit_action_descriptor_value",
+        "true"}});
+  const std::string yaml = R"EOF(
+actions:
+- generic_key:
+    descriptor_value: "%REQ(x-header1)%_static_value_%CEL(request.headers['x-header2'])%"
+  )EOF";
+
+  setupTest(yaml);
+  Http::TestRequestHeaderMapImpl header{{"x-header1", "dynamic1"}, {"x-header2", "dynamic2"}};
+
+  rate_limit_entry_->populateDescriptors(descriptors_, "", header, stream_info_);
+
+  // Multiple formatters with static text should concatenate properly
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>(
+                  {{{{"generic_key", "dynamic1_static_value_dynamic2"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyEntryTest, GenericKeyFormatterDisabled) {
+  const std::string yaml = R"EOF(
+actions:
+- generic_key:
+    descriptor_value: "%REQ(x-header1)%_static_value_%CEL(request.headers['x-header2'])%"
+  )EOF";
+
+  setupTest(yaml);
+  Http::TestRequestHeaderMapImpl header{{"x-header1", "dynamic1"}, {"x-header2", "dynamic2"}};
+
+  rate_limit_entry_->populateDescriptors(descriptors_, "", header, stream_info_);
+
+  // With formatter disabled (default), descriptor_value should be used as literal string
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>(
+                  {{{{"generic_key",
+                      "%REQ(x-header1)%_static_value_%CEL(request.headers['x-header2'])%"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyEntryTest, HeaderValueMatchMixedStaticAndDynamicFormatters) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_formatter_for_ratelimit_action_descriptor_value",
+        "true"}});
+  const std::string yaml = R"EOF(
+actions:
+- header_value_match:
+    descriptor_value: "%REQ(x-header1)%_static_value_%CEL(request.headers['x-header2'])%"
+    headers:
+    - name: x-service
+      string_match:
+        exact: api
+  )EOF";
+
+  setupTest(yaml);
+  Http::TestRequestHeaderMapImpl header{
+      {"x-service", "api"}, {"x-header1", "dynamic1"}, {"x-header2", "dynamic2"}};
+
+  rate_limit_entry_->populateDescriptors(descriptors_, "", header, stream_info_);
+
+  // Multiple formatters with static text should concatenate properly
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>(
+                  {{{{"header_match", "dynamic1_static_value_dynamic2"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyEntryTest, HeaderValueMatchFormatterDisabled) {
+  const std::string yaml = R"EOF(
+actions:
+- header_value_match:
+    descriptor_value: "%REQ(x-header1)%_static_value_%CEL(request.headers['x-header2'])%"
+    headers:
+    - name: x-service
+      string_match:
+        exact: api
+  )EOF";
+
+  setupTest(yaml);
+  Http::TestRequestHeaderMapImpl header{
+      {"x-service", "api"}, {"x-header1", "dynamic1"}, {"x-header2", "dynamic2"}};
+
+  rate_limit_entry_->populateDescriptors(descriptors_, "", header, stream_info_);
+
+  // With formatter disabled (default), descriptor_value should be used as literal string
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>(
+                  {{{{"header_match",
+                      "%REQ(x-header1)%_static_value_%CEL(request.headers['x-header2'])%"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyEntryTest, QueryParameterValueMatchMixedStaticAndDynamicFormatters) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_formatter_for_ratelimit_action_descriptor_value",
+        "true"}});
+  const std::string yaml = R"EOF(
+actions:
+- query_parameter_value_match:
+    descriptor_value: "%REQ(x-header1)%_static_value_%CEL(request.headers['x-header2'])%"
+    query_parameters:
+    - name: version
+      string_match:
+        exact: v2
+  )EOF";
+
+  setupTest(yaml);
+  Http::TestRequestHeaderMapImpl header{
+      {":path", "/?version=v2"}, {"x-header1", "dynamic1"}, {"x-header2", "dynamic2"}};
+
+  rate_limit_entry_->populateDescriptors(descriptors_, "", header, stream_info_);
+
+  // Multiple formatters with static text should concatenate properly
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>(
+                  {{{{"query_match", "dynamic1_static_value_dynamic2"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyEntryTest, QueryParameterValueMatchFormatterDisabled) {
+  const std::string yaml = R"EOF(
+actions:
+- query_parameter_value_match:
+    descriptor_value: "%REQ(x-header1)%_static_value_%CEL(request.headers['x-header2'])%"
+    query_parameters:
+    - name: version
+      string_match:
+        exact: v2
+  )EOF";
+
+  setupTest(yaml);
+  Http::TestRequestHeaderMapImpl header{
+      {":path", "/?version=v2"}, {"x-header1", "dynamic1"}, {"x-header2", "dynamic2"}};
+
+  rate_limit_entry_->populateDescriptors(descriptors_, "", header, stream_info_);
+
+  // With formatter disabled (default), descriptor_value should be used as literal string
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>(
+                  {{{{"query_match",
+                      "%REQ(x-header1)%_static_value_%CEL(request.headers['x-header2'])%"}}}}),
               testing::ContainerEq(descriptors_));
 }
 

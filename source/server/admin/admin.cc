@@ -309,17 +309,18 @@ bool AdminImpl::createNetworkFilterChain(Network::Connection& connection,
   return true;
 }
 
-bool AdminImpl::createFilterChain(Http::FilterChainManager& manager,
-                                  const Http::FilterChainOptions&) const {
-  Http::FilterFactoryCb factory = [this](Http::FilterChainFactoryCallbacks& callbacks) {
-    callbacks.addStreamFilter(std::make_shared<AdminFilter>(*this));
-  };
-  manager.applyFilterFactoryCb({}, factory);
+bool AdminImpl::createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) const {
+  callbacks.setFilterConfigName("");
+  callbacks.addStreamFilter(std::make_shared<AdminFilter>(*this));
   return true;
 }
 
 void AdminImpl::addAllowlistedPath(Matchers::StringMatcherPtr matcher) {
   allowlisted_paths_.emplace_back(std::move(matcher));
+}
+
+const Matcher::MatchTreePtr<Http::HttpMatchingData>& AdminImpl::forwardClientCertMatcher() const {
+  return forward_client_cert_matcher_;
 }
 
 namespace {

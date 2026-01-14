@@ -44,7 +44,7 @@ public:
    * @param monotonic_time The desired new current time.
    */
   void setMonotonicTime(const MonotonicTime& monotonic_time) {
-    absl::MutexLock lock(&mutex_);
+    absl::MutexLock lock(mutex_);
     setMonotonicTimeLockHeld(monotonic_time);
   }
 
@@ -64,12 +64,12 @@ private:
   class Alarm;
 
   void registerScheduler(SimulatedScheduler* scheduler) {
-    absl::MutexLock lock(&mutex_);
+    absl::MutexLock lock(mutex_);
     schedulers_.insert(scheduler);
   }
 
   void unregisterScheduler(SimulatedScheduler* scheduler) {
-    absl::MutexLock lock(&mutex_);
+    absl::MutexLock lock(mutex_);
     schedulers_.erase(scheduler);
   }
 
@@ -87,11 +87,11 @@ private:
   // Keeps track of the number of simulated schedulers that have pending monotonic time updates.
   // Used by advanceTimeWait() to determine when the time updates have finished propagating.
   void incPending() {
-    absl::MutexLock lock(&mutex_);
+    absl::MutexLock lock(mutex_);
     ++pending_updates_;
   }
   void decPending() {
-    absl::MutexLock lock(&mutex_);
+    absl::MutexLock lock(mutex_);
     --pending_updates_;
   }
   void waitForNoPendingLockHeld() const ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);

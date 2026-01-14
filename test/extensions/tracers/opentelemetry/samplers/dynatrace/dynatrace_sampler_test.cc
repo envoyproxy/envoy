@@ -96,7 +96,7 @@ TEST_F(DynatraceSamplerTest, TestWithoutParentContext) {
   EXPECT_EQ(tcr_values[0], "atm");
 
   EXPECT_STREQ(sampling_result.tracestate.c_str(),
-               "5b3f9fed-980df25c@dt=fw4;0;0;0;0;0;0;95;8h0101");
+               "5b3f9fed-980df25c@dt=fw4;0;0;0;0;0;0;95;3b1a;8h0101");
   EXPECT_TRUE(sampling_result.isRecording());
   EXPECT_TRUE(sampling_result.isSampled());
 }
@@ -115,7 +115,7 @@ TEST_F(DynatraceSamplerTest, TestWithUnknownParentContext) {
             1);
   // Dynatrace tracestate should be prepended
   EXPECT_STREQ(sampling_result.tracestate.c_str(),
-               "5b3f9fed-980df25c@dt=fw4;0;0;0;0;0;0;95;8h0101,some_vendor=some_value");
+               "5b3f9fed-980df25c@dt=fw4;0;0;0;0;0;0;95;3b1a;8h0101,some_vendor=some_value");
   EXPECT_TRUE(sampling_result.isRecording());
   EXPECT_TRUE(sampling_result.isSampled());
 }
@@ -149,7 +149,7 @@ TEST_F(DynatraceSamplerTest, TestWithInvalidDynatraceParentContext) {
                              ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER, {}, {});
   EXPECT_EQ(sampling_result.decision, Decision::RecordAndSample);
   EXPECT_STREQ(sampling_result.tracestate.c_str(),
-               "5b3f9fed-980df25c@dt=fw4;0;0;0;0;0;0;95;8h0101,5b3f9fed-980df25c@dt=fw4;4");
+               "5b3f9fed-980df25c@dt=fw4;0;0;0;0;0;0;95;3b1a;8h0101,5b3f9fed-980df25c@dt=fw4;4");
   EXPECT_TRUE(sampling_result.isRecording());
   EXPECT_TRUE(sampling_result.isSampled());
 }
@@ -164,9 +164,10 @@ TEST_F(DynatraceSamplerTest, TestWithInvalidDynatraceParentContext1) {
       sampler_->shouldSample(stream_info_, parent_context, trace_id, "operation_name",
                              ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER, {}, {});
   EXPECT_EQ(sampling_result.decision, Decision::RecordAndSample);
-  EXPECT_STREQ(sampling_result.tracestate.c_str(),
-               "5b3f9fed-980df25c@dt=fw4;0;0;0;0;0;0;95;8h0101,5b3f9fed-980df25c@dt=fw4;4;4af38366;"
-               "0;0;0;X;123");
+  EXPECT_STREQ(
+      sampling_result.tracestate.c_str(),
+      "5b3f9fed-980df25c@dt=fw4;0;0;0;0;0;0;95;3b1a;8h0101,5b3f9fed-980df25c@dt=fw4;4;4af38366;"
+      "0;0;0;X;123");
   EXPECT_TRUE(sampling_result.isRecording());
   EXPECT_TRUE(sampling_result.isSampled());
 }
@@ -184,7 +185,8 @@ TEST_F(DynatraceSamplerTest, TestWithDynatraceParentContextOtherVersion) {
   EXPECT_EQ(sampling_result.decision, Decision::RecordAndSample);
   EXPECT_STREQ(
       sampling_result.tracestate.c_str(),
-      "5b3f9fed-980df25c@dt=fw4;0;0;0;0;0;0;95;8h0101,5b3f9fed-980df25c@dt=fw3;4;4af38366;0;0;0;0;"
+      "5b3f9fed-980df25c@dt=fw4;0;0;0;0;0;0;95;3b1a;8h0101,5b3f9fed-980df25c@dt=fw3;4;4af38366;0;0;"
+      "0;0;"
       "123;"
       "8eae;2h01;3h4af38366;4h00;5h01;6h67a9a23155e1741b5b35368e08e6ece5;7h9d83def9a4939b7b");
   EXPECT_TRUE(sampling_result.isRecording());
@@ -230,7 +232,8 @@ TEST_F(DynatraceSamplerTest, TestWithDynatraceParentContextFromDifferentTenant) 
             1);
   // new Dynatrace tag should be prepended, already existing tag should be kept
   const char* exptected =
-      "5b3f9fed-980df25c@dt=fw4;0;0;0;0;0;0;95;8h0101,6666ad40-980df25c@dt=fw4;4;4af38366;0;0;1;2;"
+      "5b3f9fed-980df25c@dt=fw4;0;0;0;0;0;0;95;3b1a;8h0101,6666ad40-980df25c@dt=fw4;4;4af38366;0;0;"
+      "1;2;"
       "123;"
       "8eae;2h01;3h4af38366;4h00;5h01;6h67a9a23155e1741b5b35368e08e6ece5;7h9d83def9a4939b7b";
   EXPECT_STREQ(sampling_result.tracestate.c_str(), exptected);
@@ -410,25 +413,32 @@ INSTANTIATE_TEST_SUITE_P(
                 "5b3f9fed-980df25c@dt=fw4;4;4af38366;0;0;1;2;123;8eae;2h01;3h4af38366;4h00;5h01;")),
 
         // Valid trace capture reason present in the tracestate
-        std::make_tuple("5b3f9fed-980df25c@dt=fw4;0;0;0;0;0;0;95;8h0101",
-                        SamplingResultTestData({"atm"},
-                                               "5b3f9fed-980df25c@dt=fw4;0;0;0;0;0;0;95;8h0101")),
+        std::make_tuple(
+            "5b3f9fed-980df25c@dt=fw4;0;0;0;0;0;0;95;3b1a;8h0101",
+            SamplingResultTestData({"atm"}, "5b3f9fed-980df25c@dt=fw4;0;0;0;0;0;0;95;3b1a;8h0101")),
 
         // trace capture reason present in the tracestate with an unsupported version
-        std::make_tuple("5b3f9fed-980df25c@dt=fw3;0;0;0;0;0;0;95;8h0101",
-                        SamplingResultTestData({"atm"},
-                                               "5b3f9fed-980df25c@dt=fw4;0;0;0;0;0;0;95;8h0101,"
-                                               "5b3f9fed-980df25c@dt=fw3;0;0;0;0;0;0;95;8h0101")),
+        std::make_tuple(
+            "5b3f9fed-980df25c@dt=fw3;0;0;0;0;0;0;95;8h0101",
+            SamplingResultTestData({"atm"}, "5b3f9fed-980df25c@dt=fw4;0;0;0;0;0;0;95;3b1a;8h0101,"
+                                            "5b3f9fed-980df25c@dt=fw3;0;0;0;0;0;0;95;8h0101")),
 
         // Multiple, valid trace capture reasons present in the tracestate
         std::make_tuple("5b3f9fed-980df25c@dt=fw4;0;0;0;0;0;0;95;8h0107",
                         SamplingResultTestData({"atm", "fixed", "custom"},
                                                "5b3f9fed-980df25c@dt=fw4;0;0;0;0;0;0;95;8h0107")),
 
+        // trace state with multiple extensions, but no trace capture reason
+        std::make_tuple(
+            "5b3f9fed-980df25c@dt=fw4;4;de84a412;50a92;0;0;0;13d;6edd;2h02;3he2a8e619;4h075f04;"
+            "5h01;6h1f8d0931f1bbe07139169c26faddb564;7hcc46d06657b9b021",
+            SamplingResultTestData(
+                {}, "5b3f9fed-980df25c@dt=fw4;4;de84a412;50a92;0;0;0;13d;6edd;2h02;3he2a8e619;"
+                    "4h075f04;5h01;6h1f8d0931f1bbe07139169c26faddb564;7hcc46d06657b9b021")),
+
         // Root trace started by Envoy - sampler should use the correct reason
-        std::make_tuple("",
-                        SamplingResultTestData({"atm"},
-                                               "5b3f9fed-980df25c@dt=fw4;0;0;0;0;0;0;95;8h0101"))));
+        std::make_tuple("", SamplingResultTestData(
+                                {"atm"}, "5b3f9fed-980df25c@dt=fw4;0;0;0;0;0;0;95;3b1a;8h0101"))));
 } // namespace OpenTelemetry
 } // namespace Tracers
 } // namespace Extensions

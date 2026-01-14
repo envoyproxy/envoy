@@ -5,8 +5,8 @@ load("@envoy_api//bazel:repository_locations_utils.bzl", "load_repository_locati
 load("@envoy_toolshed//:macros.bzl", "json_data")
 load("@envoy_toolshed//dependency:macros.bzl", "updater")
 load("@rules_cc//cc:defs.bzl", "cc_library")
+load("@rules_shell//shell:sh_library.bzl", "sh_library")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
-load("//bazel:envoy_internal.bzl", "envoy_select_force_libcpp")
 load(":repository_locations.bzl", "REPOSITORY_LOCATIONS_SPEC")
 
 licenses(["notice"])  # Apache 2
@@ -157,6 +157,14 @@ config_setting(
 
 config_setting(
     name = "asan_build",
+    values = {"define": "ENVOY_CONFIG_ASAN=1"},
+)
+
+config_setting(
+    name = "local_asan_build",
+    flag_values = {
+        "@envoy_repo//:use_local_llvm_flag": "True",
+    },
     values = {"define": "ENVOY_CONFIG_ASAN=1"},
 )
 

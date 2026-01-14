@@ -186,13 +186,14 @@ TEST_P(TcpProxyOdcdsIntegrationTest, RepeatedRequest) {
   // Verify the on-demand CDS request and respond without providing the cluster.
   EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().Cluster, {"new_cluster"}, {},
                                            odcds_stream_.get()));
+
+  test_server_->waitForCounterEq("tcp.tcpproxy_stats.on_demand_cluster_attempt",
+                                 expected_upstream_connections);
+
   sendDeltaDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
       Config::TestTypeUrl::get().Cluster, {new_cluster_}, {}, "1", odcds_stream_.get());
   EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().Cluster, {}, {},
                                            odcds_stream_.get()));
-
-  test_server_->waitForCounterEq("tcp.tcpproxy_stats.on_demand_cluster_attempt",
-                                 expected_upstream_connections);
 
   // This upstream is listening on the endpoint of `new_cluster`.
   for (auto n = expected_upstream_connections; n != 0; n--) {

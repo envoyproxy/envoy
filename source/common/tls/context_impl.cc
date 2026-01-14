@@ -66,10 +66,11 @@ int ContextImpl::sslExtendedSocketInfoIndex() {
   }());
 }
 
-ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& config,
-                         Server::Configuration::CommonFactoryContext& factory_context,
-                         Ssl::ContextAdditionalInitFunc additional_init,
-                         absl::Status& creation_status)
+ContextImpl::ContextImpl(
+    Stats::Scope& scope, const Envoy::Ssl::ContextConfig& config,
+    const std::vector<std::reference_wrapper<const Ssl::TlsCertificateConfig>>& tls_certificates,
+    Server::Configuration::CommonFactoryContext& factory_context,
+    Ssl::ContextAdditionalInitFunc additional_init, absl::Status& creation_status)
     : scope_(scope), stats_(generateSslStats(scope)), factory_context_(factory_context),
       tls_max_version_(config.maxProtocolVersion()),
       stat_name_set_(scope.symbolTable().makeSet("TransportSockets::Tls")),
@@ -98,7 +99,6 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
   SET_AND_RETURN_IF_NOT_OK(validator_or_error.status(), creation_status);
   cert_validator_ = std::move(*validator_or_error);
 
-  const auto tls_certificates = config.tlsCertificates();
   tls_contexts_.resize(std::max(static_cast<size_t>(1), tls_certificates.size()));
 
   std::vector<SSL_CTX*> ssl_contexts(tls_contexts_.size());
@@ -486,6 +486,10 @@ enum ssl_verify_result_t ContextImpl::customVerifyCallback(SSL* ssl, uint8_t* ou
   case ValidationResults::ValidationStatus::Failed: {
     if (result.tls_alert.has_value() && out_alert) {
       *out_alert = result.tls_alert.value();
+    }
+    // Store detailed error information for access log reporting.
+    if (result.error_details.has_value()) {
+      extended_socket_info->setCertificateValidationError(result.error_details.value());
     }
     return ssl_verify_invalid;
   }
