@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/common/optref.h"
+#include "envoy/event/dispatcher.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -25,9 +26,15 @@ using OnNetworkFilterEventType = decltype(&envoy_dynamic_module_on_network_filte
 using OnNetworkFilterDestroyType = decltype(&envoy_dynamic_module_on_network_filter_destroy);
 using OnNetworkFilterHttpCalloutDoneType =
     decltype(&envoy_dynamic_module_on_network_filter_http_callout_done);
+using OnNetworkFilterScheduledType = decltype(&envoy_dynamic_module_on_network_filter_scheduled);
+using OnNetworkFilterConfigScheduledType =
+    decltype(&envoy_dynamic_module_on_network_filter_config_scheduled);
 
 // Custom namespace prefix for network filter stats.
 constexpr char NetworkFilterStatsNamespace[] = "dynamic_module_network_filter";
+
+class DynamicModuleNetworkFilterConfig;
+using DynamicModuleNetworkFilterConfigSharedPtr = std::shared_ptr<DynamicModuleNetworkFilterConfig>;
 
 /**
  * A config to create network filters based on a dynamic module. This will be owned by multiple
@@ -38,7 +45,8 @@ constexpr char NetworkFilterStatsNamespace[] = "dynamic_module_network_filter";
  * newDynamicModuleNetworkFilterConfig() to provide graceful error handling. The constructor
  * only initializes basic members.
  */
-class DynamicModuleNetworkFilterConfig {
+class DynamicModuleNetworkFilterConfig
+    : public std::enable_shared_from_this<DynamicModuleNetworkFilterConfig> {
 public:
   /**
    * Constructor for the config. Symbol resolution is done in newDynamicModuleNetworkFilterConfig().
@@ -47,14 +55,21 @@ public:
    * @param dynamic_module the dynamic module to use.
    * @param cluster_manager the cluster manager for async HTTP callouts.
    * @param stats_scope the stats scope for metrics.
+   * @param main_thread_dispatcher the main thread dispatcher for scheduling events.
    */
   DynamicModuleNetworkFilterConfig(const absl::string_view filter_name,
                                    const absl::string_view filter_config,
                                    DynamicModulePtr dynamic_module,
                                    Envoy::Upstream::ClusterManager& cluster_manager,
-                                   Stats::Scope& stats_scope);
+                                   Stats::Scope& stats_scope,
+                                   Event::Dispatcher& main_thread_dispatcher);
 
   ~DynamicModuleNetworkFilterConfig();
+
+  /**
+   * This is called when an event is scheduled via DynamicModuleNetworkFilterConfigScheduler.
+   */
+  void onScheduled(uint64_t event_id);
 
   // The corresponding in-module configuration.
   envoy_dynamic_module_type_network_filter_config_module_ptr in_module_config_ = nullptr;
@@ -70,8 +85,14 @@ public:
   OnNetworkFilterEventType on_network_filter_event_ = nullptr;
   OnNetworkFilterDestroyType on_network_filter_destroy_ = nullptr;
   OnNetworkFilterHttpCalloutDoneType on_network_filter_http_callout_done_ = nullptr;
+  // Optional: modules that don't need scheduling don't need to implement this.
+  OnNetworkFilterScheduledType on_network_filter_scheduled_ = nullptr;
+  OnNetworkFilterConfigScheduledType on_network_filter_config_scheduled_ = nullptr;
 
   Envoy::Upstream::ClusterManager& cluster_manager_;
+
+  // The main thread dispatcher for scheduling config-level events.
+  Event::Dispatcher& main_thread_dispatcher_;
 
   // ----------------------------- Metrics Support -----------------------------
   // Handle classes for storing defined metrics.
@@ -157,7 +178,8 @@ private:
                                       const absl::string_view filter_config,
                                       DynamicModulePtr dynamic_module,
                                       Envoy::Upstream::ClusterManager& cluster_manager,
-                                      Stats::Scope& stats_scope);
+                                      Stats::Scope& stats_scope,
+                                      Event::Dispatcher& main_thread_dispatcher);
 
   // The name of the filter passed in the constructor.
   const std::string filter_name_;
@@ -174,7 +196,30 @@ private:
   std::vector<ModuleHistogramHandle> histograms_;
 };
 
-using DynamicModuleNetworkFilterConfigSharedPtr = std::shared_ptr<DynamicModuleNetworkFilterConfig>;
+/**
+ * This class is used to schedule a network filter config event hook from a different thread
+ * than the one it was assigned to. This is created via
+ * envoy_dynamic_module_callback_network_filter_config_scheduler_new and deleted via
+ * envoy_dynamic_module_callback_network_filter_config_scheduler_delete.
+ */
+class DynamicModuleNetworkFilterConfigScheduler {
+public:
+  DynamicModuleNetworkFilterConfigScheduler(std::weak_ptr<DynamicModuleNetworkFilterConfig> config,
+                                            Event::Dispatcher& dispatcher)
+      : config_(std::move(config)), dispatcher_(dispatcher) {}
+
+  void commit(uint64_t event_id) {
+    dispatcher_.post([config = config_, event_id]() {
+      if (std::shared_ptr<DynamicModuleNetworkFilterConfig> config_shared = config.lock()) {
+        config_shared->onScheduled(event_id);
+      }
+    });
+  }
+
+private:
+  std::weak_ptr<DynamicModuleNetworkFilterConfig> config_;
+  Event::Dispatcher& dispatcher_;
+};
 
 /**
  * Creates a new DynamicModuleNetworkFilterConfig for given configuration.
@@ -183,12 +228,14 @@ using DynamicModuleNetworkFilterConfigSharedPtr = std::shared_ptr<DynamicModuleN
  * @param dynamic_module the dynamic module to use.
  * @param cluster_manager the cluster manager for async HTTP callouts.
  * @param stats_scope the stats scope for metrics.
+ * @param main_thread_dispatcher the main thread dispatcher for scheduling events.
  * @return a shared pointer to the new config object or an error if the module could not be loaded.
  */
 absl::StatusOr<DynamicModuleNetworkFilterConfigSharedPtr> newDynamicModuleNetworkFilterConfig(
     const absl::string_view filter_name, const absl::string_view filter_config,
     Extensions::DynamicModules::DynamicModulePtr dynamic_module,
-    Envoy::Upstream::ClusterManager& cluster_manager, Stats::Scope& stats_scope);
+    Envoy::Upstream::ClusterManager& cluster_manager, Stats::Scope& stats_scope,
+    Event::Dispatcher& main_thread_dispatcher);
 
 } // namespace NetworkFilters
 } // namespace DynamicModules

@@ -8,6 +8,8 @@
 #include "source/extensions/filters/listener/dynamic_modules/filter.h"
 
 #include "test/extensions/dynamic_modules/util.h"
+#include "test/mocks/event/mocks.h"
+#include "test/mocks/network/io_handle.h"
 #include "test/mocks/network/mocks.h"
 
 namespace Envoy {
@@ -56,8 +58,9 @@ public:
     auto dynamic_module = newDynamicModule(testSharedObjectPath("listener_no_op", "c"), false);
     EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
-    auto filter_config_or_status = newDynamicModuleListenerFilterConfig(
-        "test_filter", "", std::move(dynamic_module.value()), *stats_.rootScope());
+    auto filter_config_or_status =
+        newDynamicModuleListenerFilterConfig("test_filter", "", std::move(dynamic_module.value()),
+                                             *stats_.rootScope(), main_thread_dispatcher_);
     EXPECT_TRUE(filter_config_or_status.ok()) << filter_config_or_status.status().message();
     filter_config_ = filter_config_or_status.value();
 
@@ -75,6 +78,7 @@ public:
   DynamicModuleListenerFilterConfigSharedPtr filter_config_;
   std::shared_ptr<DynamicModuleListenerFilter> filter_;
   NiceMock<Network::MockListenerFilterCallbacks> callbacks_;
+  NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
 };
 
 // =============================================================================
@@ -1168,6 +1172,357 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, MaxReadBytes) {
       envoy_dynamic_module_callback_listener_filter_max_read_bytes(filterPtr());
   // The default maxReadBytes() implementation returns 0, but filters can override it.
   EXPECT_EQ(0, max_bytes);
+}
+
+// =============================================================================
+// Tests for scheduler callbacks.
+// =============================================================================
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, ListenerFilterSchedulerNewDelete) {
+  // Set up the dispatcher for the filter.
+  NiceMock<Event::MockDispatcher> worker_dispatcher;
+  EXPECT_CALL(callbacks_, dispatcher()).WillRepeatedly(testing::ReturnRef(worker_dispatcher));
+
+  auto* scheduler = envoy_dynamic_module_callback_listener_filter_scheduler_new(filterPtr());
+  EXPECT_NE(nullptr, scheduler);
+
+  envoy_dynamic_module_callback_listener_filter_scheduler_delete(scheduler);
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, ListenerFilterSchedulerCommit) {
+  // Set up the dispatcher for the filter.
+  NiceMock<Event::MockDispatcher> worker_dispatcher;
+  EXPECT_CALL(callbacks_, dispatcher()).WillRepeatedly(testing::ReturnRef(worker_dispatcher));
+
+  auto* scheduler = envoy_dynamic_module_callback_listener_filter_scheduler_new(filterPtr());
+  EXPECT_NE(nullptr, scheduler);
+
+  // Expect the callback to be posted.
+  EXPECT_CALL(worker_dispatcher, post(_));
+
+  envoy_dynamic_module_callback_listener_filter_scheduler_commit(scheduler, 123);
+
+  // Clean up.
+  envoy_dynamic_module_callback_listener_filter_scheduler_delete(scheduler);
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, ListenerFilterConfigSchedulerNewDelete) {
+  auto* scheduler = envoy_dynamic_module_callback_listener_filter_config_scheduler_new(
+      static_cast<void*>(filter_config_.get()));
+  EXPECT_NE(nullptr, scheduler);
+
+  envoy_dynamic_module_callback_listener_filter_config_scheduler_delete(scheduler);
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, ListenerFilterConfigSchedulerCommit) {
+  auto* scheduler = envoy_dynamic_module_callback_listener_filter_config_scheduler_new(
+      static_cast<void*>(filter_config_.get()));
+  EXPECT_NE(nullptr, scheduler);
+
+  // Expect the callback to be posted.
+  EXPECT_CALL(main_thread_dispatcher_, post(_));
+
+  envoy_dynamic_module_callback_listener_filter_config_scheduler_commit(scheduler, 456);
+
+  // Clean up.
+  envoy_dynamic_module_callback_listener_filter_config_scheduler_delete(scheduler);
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest,
+       ListenerFilterSchedulerCommitInvokesOnScheduled) {
+  // Set up the dispatcher for the filter.
+  NiceMock<Event::MockDispatcher> worker_dispatcher;
+  EXPECT_CALL(callbacks_, dispatcher()).WillRepeatedly(testing::ReturnRef(worker_dispatcher));
+
+  auto* scheduler = envoy_dynamic_module_callback_listener_filter_scheduler_new(filterPtr());
+  EXPECT_NE(nullptr, scheduler);
+
+  // Capture the posted callback and invoke it to verify onScheduled is called.
+  Event::PostCb captured_cb;
+  EXPECT_CALL(worker_dispatcher, post(_)).WillOnce(testing::Invoke([&](Event::PostCb cb) {
+    captured_cb = std::move(cb);
+  }));
+
+  envoy_dynamic_module_callback_listener_filter_scheduler_commit(scheduler, 789);
+
+  // Invoke the captured callback to simulate the dispatcher running the event.
+  // This should call filter_->onScheduled(789), which invokes the module's on_scheduled hook.
+  // Since the no_op module's on_scheduled is a no-op, we just verify it doesn't crash.
+  captured_cb();
+
+  // Clean up.
+  envoy_dynamic_module_callback_listener_filter_scheduler_delete(scheduler);
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest,
+       ListenerFilterConfigSchedulerCommitInvokesOnScheduled) {
+  auto* scheduler = envoy_dynamic_module_callback_listener_filter_config_scheduler_new(
+      static_cast<void*>(filter_config_.get()));
+  EXPECT_NE(nullptr, scheduler);
+
+  // Capture the posted callback and invoke it to verify onScheduled is called.
+  Event::PostCb captured_cb;
+  EXPECT_CALL(main_thread_dispatcher_, post(_)).WillOnce(testing::Invoke([&](Event::PostCb cb) {
+    captured_cb = std::move(cb);
+  }));
+
+  envoy_dynamic_module_callback_listener_filter_config_scheduler_commit(scheduler, 999);
+
+  // Invoke the captured callback to simulate the dispatcher running the event.
+  // This should call filter_config_->onScheduled(999), which invokes the module's
+  // on_config_scheduled hook. Since the no_op module's hook is a no-op, we just verify it doesn't
+  // crash.
+  captured_cb();
+
+  // Clean up.
+  envoy_dynamic_module_callback_listener_filter_config_scheduler_delete(scheduler);
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest,
+       ListenerFilterSchedulerCommitAfterFilterDestroyedDoesNotCrash) {
+  // Set up the dispatcher for the filter.
+  NiceMock<Event::MockDispatcher> worker_dispatcher;
+  EXPECT_CALL(callbacks_, dispatcher()).WillRepeatedly(testing::ReturnRef(worker_dispatcher));
+
+  auto* scheduler = envoy_dynamic_module_callback_listener_filter_scheduler_new(filterPtr());
+  EXPECT_NE(nullptr, scheduler);
+
+  // Capture the posted callback.
+  Event::PostCb captured_cb;
+  EXPECT_CALL(worker_dispatcher, post(_)).WillOnce(testing::Invoke([&](Event::PostCb cb) {
+    captured_cb = std::move(cb);
+  }));
+
+  envoy_dynamic_module_callback_listener_filter_scheduler_commit(scheduler, 123);
+
+  // Destroy the filter before invoking the callback.
+  filter_.reset();
+
+  // Invoke the captured callback - should not crash because the scheduler holds a weak_ptr.
+  captured_cb();
+
+  // Clean up.
+  envoy_dynamic_module_callback_listener_filter_scheduler_delete(scheduler);
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest,
+       ListenerFilterConfigSchedulerCommitAfterConfigDestroyedDoesNotCrash) {
+  auto* scheduler = envoy_dynamic_module_callback_listener_filter_config_scheduler_new(
+      static_cast<void*>(filter_config_.get()));
+  EXPECT_NE(nullptr, scheduler);
+
+  // Capture the posted callback.
+  Event::PostCb captured_cb;
+  EXPECT_CALL(main_thread_dispatcher_, post(_)).WillOnce(testing::Invoke([&](Event::PostCb cb) {
+    captured_cb = std::move(cb);
+  }));
+
+  envoy_dynamic_module_callback_listener_filter_config_scheduler_commit(scheduler, 456);
+
+  // Destroy the filter and config before invoking the callback.
+  filter_.reset();
+  filter_config_.reset();
+
+  // Invoke the captured callback - should not crash because the scheduler holds a weak_ptr.
+  captured_cb();
+
+  // Clean up.
+  envoy_dynamic_module_callback_listener_filter_config_scheduler_delete(scheduler);
+}
+
+// =============================================================================
+// Tests for socket option callbacks.
+// =============================================================================
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetSocketFdSuccess) {
+  NiceMock<Network::MockIoHandle> io_handle;
+  EXPECT_CALL(callbacks_.socket_, ioHandle()).WillOnce(testing::ReturnRef(io_handle));
+  EXPECT_CALL(io_handle, fdDoNotUse()).WillOnce(testing::Return(42));
+
+  int64_t fd = envoy_dynamic_module_callback_listener_filter_get_socket_fd(filterPtr());
+  EXPECT_EQ(42, fd);
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetSocketFdNullCallbacks) {
+  auto filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
+  filter->initializeInModuleFilter();
+  // Callbacks not set.
+
+  int64_t fd =
+      envoy_dynamic_module_callback_listener_filter_get_socket_fd(static_cast<void*>(filter.get()));
+  EXPECT_EQ(-1, fd);
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetSocketOptionIntSuccess) {
+  Api::SysCallIntResult success_result{0, 0};
+  EXPECT_CALL(callbacks_.socket_, setSocketOption(1, 2, testing::_, sizeof(int)))
+      .WillOnce(testing::Return(success_result));
+
+  bool result =
+      envoy_dynamic_module_callback_listener_filter_set_socket_option_int(filterPtr(), 1, 2, 123);
+  EXPECT_TRUE(result);
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetSocketOptionIntFailure) {
+  Api::SysCallIntResult fail_result{-1, EINVAL};
+  EXPECT_CALL(callbacks_.socket_, setSocketOption(1, 2, testing::_, sizeof(int)))
+      .WillOnce(testing::Return(fail_result));
+
+  bool result =
+      envoy_dynamic_module_callback_listener_filter_set_socket_option_int(filterPtr(), 1, 2, 123);
+  EXPECT_FALSE(result);
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetSocketOptionIntNullCallbacks) {
+  auto filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
+  filter->initializeInModuleFilter();
+  // Callbacks not set.
+
+  bool result = envoy_dynamic_module_callback_listener_filter_set_socket_option_int(
+      static_cast<void*>(filter.get()), 1, 2, 123);
+  EXPECT_FALSE(result);
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetSocketOptionBytesSuccess) {
+  Api::SysCallIntResult success_result{0, 0};
+  EXPECT_CALL(callbacks_.socket_, setSocketOption(1, 2, testing::_, 5))
+      .WillOnce(testing::Return(success_result));
+
+  char value[] = "hello";
+  envoy_dynamic_module_type_module_buffer value_buf = {value, 5};
+  bool result = envoy_dynamic_module_callback_listener_filter_set_socket_option_bytes(
+      filterPtr(), 1, 2, value_buf);
+  EXPECT_TRUE(result);
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetSocketOptionBytesFailure) {
+  Api::SysCallIntResult fail_result{-1, EINVAL};
+  EXPECT_CALL(callbacks_.socket_, setSocketOption(1, 2, testing::_, 5))
+      .WillOnce(testing::Return(fail_result));
+
+  char value[] = "hello";
+  envoy_dynamic_module_type_module_buffer value_buf = {value, 5};
+  bool result = envoy_dynamic_module_callback_listener_filter_set_socket_option_bytes(
+      filterPtr(), 1, 2, value_buf);
+  EXPECT_FALSE(result);
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetSocketOptionBytesNullValue) {
+  envoy_dynamic_module_type_module_buffer value_buf = {nullptr, 5};
+  bool result = envoy_dynamic_module_callback_listener_filter_set_socket_option_bytes(
+      filterPtr(), 1, 2, value_buf);
+  EXPECT_FALSE(result);
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetSocketOptionBytesNullCallbacks) {
+  auto filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
+  filter->initializeInModuleFilter();
+  // Callbacks not set.
+
+  char value[] = "hello";
+  envoy_dynamic_module_type_module_buffer value_buf = {value, 5};
+  bool result = envoy_dynamic_module_callback_listener_filter_set_socket_option_bytes(
+      static_cast<void*>(filter.get()), 1, 2, value_buf);
+  EXPECT_FALSE(result);
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetSocketOptionIntSuccess) {
+  Api::SysCallIntResult success_result{0, 0};
+  EXPECT_CALL(callbacks_.socket_, getSocketOption(1, 2, testing::_, testing::_))
+      .WillOnce(
+          testing::DoAll(testing::WithArg<2>([](void* optval) { *static_cast<int*>(optval) = 42; }),
+                         testing::Return(success_result)));
+
+  int64_t value_out = 0;
+  bool result = envoy_dynamic_module_callback_listener_filter_get_socket_option_int(filterPtr(), 1,
+                                                                                    2, &value_out);
+  EXPECT_TRUE(result);
+  EXPECT_EQ(42, value_out);
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetSocketOptionIntFailure) {
+  Api::SysCallIntResult fail_result{-1, ENOPROTOOPT};
+  EXPECT_CALL(callbacks_.socket_, getSocketOption(1, 2, testing::_, testing::_))
+      .WillOnce(testing::Return(fail_result));
+
+  int64_t value_out = 0;
+  bool result = envoy_dynamic_module_callback_listener_filter_get_socket_option_int(filterPtr(), 1,
+                                                                                    2, &value_out);
+  EXPECT_FALSE(result);
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetSocketOptionIntNullOut) {
+  bool result = envoy_dynamic_module_callback_listener_filter_get_socket_option_int(filterPtr(), 1,
+                                                                                    2, nullptr);
+  EXPECT_FALSE(result);
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetSocketOptionIntNullCallbacks) {
+  auto filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
+  filter->initializeInModuleFilter();
+  // Callbacks not set.
+
+  int64_t value_out = 0;
+  bool result = envoy_dynamic_module_callback_listener_filter_get_socket_option_int(
+      static_cast<void*>(filter.get()), 1, 2, &value_out);
+  EXPECT_FALSE(result);
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetSocketOptionBytesSuccess) {
+  Api::SysCallIntResult success_result{0, 0};
+  EXPECT_CALL(callbacks_.socket_, getSocketOption(1, 2, testing::_, testing::_))
+      .WillOnce(testing::DoAll(testing::Invoke([](int, int, void* optval, socklen_t* optlen) {
+                                 const char* data = "test";
+                                 memcpy(optval, data, 4);
+                                 *optlen = 4;
+                               }),
+                               testing::Return(success_result)));
+
+  char buffer[16] = {0};
+  size_t actual_size = 0;
+  bool result = envoy_dynamic_module_callback_listener_filter_get_socket_option_bytes(
+      filterPtr(), 1, 2, buffer, sizeof(buffer), &actual_size);
+  EXPECT_TRUE(result);
+  EXPECT_EQ(4, actual_size);
+  EXPECT_EQ("test", std::string(buffer, actual_size));
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetSocketOptionBytesFailure) {
+  Api::SysCallIntResult fail_result{-1, ENOPROTOOPT};
+  EXPECT_CALL(callbacks_.socket_, getSocketOption(1, 2, testing::_, testing::_))
+      .WillOnce(testing::Return(fail_result));
+
+  char buffer[16] = {0};
+  size_t actual_size = 0;
+  bool result = envoy_dynamic_module_callback_listener_filter_get_socket_option_bytes(
+      filterPtr(), 1, 2, buffer, sizeof(buffer), &actual_size);
+  EXPECT_FALSE(result);
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetSocketOptionBytesNullBuffer) {
+  size_t actual_size = 0;
+  bool result = envoy_dynamic_module_callback_listener_filter_get_socket_option_bytes(
+      filterPtr(), 1, 2, nullptr, 16, &actual_size);
+  EXPECT_FALSE(result);
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetSocketOptionBytesNullActualSize) {
+  char buffer[16] = {0};
+  bool result = envoy_dynamic_module_callback_listener_filter_get_socket_option_bytes(
+      filterPtr(), 1, 2, buffer, sizeof(buffer), nullptr);
+  EXPECT_FALSE(result);
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetSocketOptionBytesNullCallbacks) {
+  auto filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
+  filter->initializeInModuleFilter();
+  // Callbacks not set.
+
+  char buffer[16] = {0};
+  size_t actual_size = 0;
+  bool result = envoy_dynamic_module_callback_listener_filter_get_socket_option_bytes(
+      static_cast<void*>(filter.get()), 1, 2, buffer, sizeof(buffer), &actual_size);
+  EXPECT_FALSE(result);
 }
 
 } // namespace ListenerFilters

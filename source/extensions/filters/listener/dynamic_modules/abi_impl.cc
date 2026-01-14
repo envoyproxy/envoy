@@ -387,6 +387,87 @@ void envoy_dynamic_module_callback_listener_filter_close_socket(
   }
 }
 
+int64_t envoy_dynamic_module_callback_listener_filter_get_socket_fd(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  auto* callbacks = filter->callbacks();
+  if (callbacks == nullptr) {
+    return -1;
+  }
+  return callbacks->socket().ioHandle().fdDoNotUse();
+}
+
+bool envoy_dynamic_module_callback_listener_filter_set_socket_option_int(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr, int64_t level,
+    int64_t name, int64_t value) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  auto* callbacks = filter->callbacks();
+  if (callbacks == nullptr) {
+    return false;
+  }
+
+  int int_value = static_cast<int>(value);
+  auto result = callbacks->socket().setSocketOption(static_cast<int>(level), static_cast<int>(name),
+                                                    &int_value, sizeof(int_value));
+  return result.return_value_ == 0;
+}
+
+bool envoy_dynamic_module_callback_listener_filter_set_socket_option_bytes(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr, int64_t level,
+    int64_t name, envoy_dynamic_module_type_module_buffer value) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  auto* callbacks = filter->callbacks();
+  if (callbacks == nullptr || value.ptr == nullptr) {
+    return false;
+  }
+
+  auto result =
+      callbacks->socket().setSocketOption(static_cast<int>(level), static_cast<int>(name),
+                                          value.ptr, static_cast<socklen_t>(value.length));
+  return result.return_value_ == 0;
+}
+
+bool envoy_dynamic_module_callback_listener_filter_get_socket_option_int(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr, int64_t level,
+    int64_t name, int64_t* value_out) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  auto* callbacks = filter->callbacks();
+  if (callbacks == nullptr || value_out == nullptr) {
+    return false;
+  }
+
+  int int_value = 0;
+  socklen_t optlen = sizeof(int_value);
+  auto result = callbacks->socket().getSocketOption(static_cast<int>(level), static_cast<int>(name),
+                                                    &int_value, &optlen);
+  if (result.return_value_ != 0) {
+    return false;
+  }
+
+  *value_out = int_value;
+  return true;
+}
+
+bool envoy_dynamic_module_callback_listener_filter_get_socket_option_bytes(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr, int64_t level,
+    int64_t name, char* value_out, size_t value_size, size_t* actual_size_out) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  auto* callbacks = filter->callbacks();
+  if (callbacks == nullptr || value_out == nullptr || actual_size_out == nullptr) {
+    return false;
+  }
+
+  socklen_t optlen = static_cast<socklen_t>(value_size);
+  auto result = callbacks->socket().getSocketOption(static_cast<int>(level), static_cast<int>(name),
+                                                    value_out, &optlen);
+  if (result.return_value_ != 0) {
+    return false;
+  }
+
+  *actual_size_out = optlen;
+  return true;
+}
+
 void envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata(
     envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer filter_namespace,
@@ -663,6 +744,53 @@ envoy_dynamic_module_callback_listener_filter_record_histogram_value(
   }
   histogram->recordValue(value);
   return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+// -----------------------------------------------------------------------------
+// Scheduler Callbacks
+// -----------------------------------------------------------------------------
+
+envoy_dynamic_module_type_listener_filter_scheduler_module_ptr
+envoy_dynamic_module_callback_listener_filter_scheduler_new(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  Event::Dispatcher* dispatcher = filter->dispatcher();
+  if (dispatcher == nullptr) {
+    return nullptr;
+  }
+  return new DynamicModuleListenerFilterScheduler(filter->weak_from_this(), *dispatcher);
+}
+
+void envoy_dynamic_module_callback_listener_filter_scheduler_delete(
+    envoy_dynamic_module_type_listener_filter_scheduler_module_ptr scheduler_module_ptr) {
+  delete static_cast<DynamicModuleListenerFilterScheduler*>(scheduler_module_ptr);
+}
+
+void envoy_dynamic_module_callback_listener_filter_scheduler_commit(
+    envoy_dynamic_module_type_listener_filter_scheduler_module_ptr scheduler_module_ptr,
+    uint64_t event_id) {
+  auto* scheduler = static_cast<DynamicModuleListenerFilterScheduler*>(scheduler_module_ptr);
+  scheduler->commit(event_id);
+}
+
+envoy_dynamic_module_type_listener_filter_config_scheduler_module_ptr
+envoy_dynamic_module_callback_listener_filter_config_scheduler_new(
+    envoy_dynamic_module_type_listener_filter_config_envoy_ptr filter_config_envoy_ptr) {
+  auto* filter_config = static_cast<DynamicModuleListenerFilterConfig*>(filter_config_envoy_ptr);
+  return new DynamicModuleListenerFilterConfigScheduler(filter_config->weak_from_this(),
+                                                        filter_config->main_thread_dispatcher_);
+}
+
+void envoy_dynamic_module_callback_listener_filter_config_scheduler_delete(
+    envoy_dynamic_module_type_listener_filter_config_scheduler_module_ptr scheduler_module_ptr) {
+  delete static_cast<DynamicModuleListenerFilterConfigScheduler*>(scheduler_module_ptr);
+}
+
+void envoy_dynamic_module_callback_listener_filter_config_scheduler_commit(
+    envoy_dynamic_module_type_listener_filter_config_scheduler_module_ptr scheduler_module_ptr,
+    uint64_t event_id) {
+  auto* scheduler = static_cast<DynamicModuleListenerFilterConfigScheduler*>(scheduler_module_ptr);
+  scheduler->commit(event_id);
 }
 
 } // extern "C"

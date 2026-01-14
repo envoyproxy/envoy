@@ -61,6 +61,7 @@ EXTENSIONS = {
     #
 
     "envoy.bootstrap.wasm":                             "//source/extensions/bootstrap/wasm:config",
+    "envoy.bootstrap.dynamic_modules":                  "//source/extensions/bootstrap/dynamic_modules:config",
 
     #
     # Reverse Connection

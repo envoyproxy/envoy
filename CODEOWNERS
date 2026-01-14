@@ -400,6 +400,7 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/filters/network/generic_proxy/ @wbpcode @UNOWNED
 # Dynamic Modules
 /*/extensions/dynamic_modules @mattklein123 @mathetake @wbpcode @agrawroh
+/*/extensions/bootstrap/dynamic_modules @agrawroh @mathetake @wbpcode
 /*/extensions/filters/http/dynamic_modules @mattklein123 @mathetake @wbpcode @agrawroh
 /*/extensions/filters/network/dynamic_modules @agrawroh @mathetake @wbpcode
 /*/extensions/filters/listener/dynamic_modules @agrawroh @mathetake @wbpcode
