@@ -47,11 +47,6 @@
 namespace Envoy {
 namespace Router {
 
-// Helper function to check the runtime flag for VHDS case-insensitive matching
-inline bool vhdsCaseInsensitiveMatchEnabled() {
-  return Runtime::runtimeFeatureEnabled("envoy.reloadable_features.vhds_case_insensitive_match");
-}
-
 using RouteMetadataPack = Envoy::Config::MetadataPack<HttpRouteTypedMetadataFactory>;
 using RouteMetadataPackPtr = Envoy::Config::MetadataPackPtr<HttpRouteTypedMetadataFactory>;
 using DefaultRouteMetadataPack = ConstSingleton<RouteMetadataPack>;
@@ -1283,7 +1278,6 @@ public:
   }
   const std::string& name() const override { return name_; }
   bool usesVhds() const override { return uses_vhds_; }
-  bool vhdsCaseInsensitiveMatch() const override;
   bool mostSpecificHeaderMutationsWins() const override {
     return most_specific_header_mutations_wins_;
   }
@@ -1348,7 +1342,6 @@ public:
   }
   const std::string& name() const override { return shared_config_->name(); }
   bool usesVhds() const override { return shared_config_->usesVhds(); }
-  bool vhdsCaseInsensitiveMatch() const override;
   bool mostSpecificHeaderMutationsWins() const override {
     return shared_config_->mostSpecificHeaderMutationsWins();
   }
@@ -1401,7 +1394,6 @@ public:
 
   const std::string& name() const override { return name_; }
   bool usesVhds() const override { return false; }
-  bool vhdsCaseInsensitiveMatch() const override;
   bool mostSpecificHeaderMutationsWins() const override { return false; }
   uint32_t maxDirectResponseBodySizeBytes() const override { return 0; }
   const envoy::config::core::v3::Metadata& metadata() const override;

@@ -36,10 +36,6 @@ TEST_F(RouteConfigUpdateRequesterTest, VhdsCaseInsensitiveMatchingDefault) {
   // Create a mock route config that uses VHDS
   auto route_config = std::make_shared<NiceMock<Router::MockConfig>>();
   EXPECT_CALL(*route_config, usesVhds()).WillRepeatedly(Return(true));
-  // Mock should return the runtime flag value
-  EXPECT_CALL(*route_config, vhdsCaseInsensitiveMatch()).WillRepeatedly(testing::Invoke([]() {
-    return Runtime::runtimeFeatureEnabled("envoy.reloadable_features.vhds_case_insensitive_match");
-  }));
 
   // Setup request headers with mixed case host
   TestRequestHeaderMapImpl headers{
@@ -68,10 +64,6 @@ TEST_F(RouteConfigUpdateRequesterTest, VhdsCaseSensitiveMatching) {
   // Create a mock route config that uses VHDS
   auto route_config = std::make_shared<NiceMock<Router::MockConfig>>();
   EXPECT_CALL(*route_config, usesVhds()).WillRepeatedly(Return(true));
-  // Mock should return the runtime flag value
-  EXPECT_CALL(*route_config, vhdsCaseInsensitiveMatch()).WillRepeatedly(testing::Invoke([]() {
-    return Runtime::runtimeFeatureEnabled("envoy.reloadable_features.vhds_case_insensitive_match");
-  }));
 
   // Setup request headers with mixed case host
   TestRequestHeaderMapImpl headers{
@@ -99,10 +91,6 @@ TEST_F(RouteConfigUpdateRequesterTest, VhdsCaseInsensitiveMatchingUppercase) {
 
   auto route_config = std::make_shared<NiceMock<Router::MockConfig>>();
   EXPECT_CALL(*route_config, usesVhds()).WillRepeatedly(Return(true));
-  // Mock should return the runtime flag value
-  EXPECT_CALL(*route_config, vhdsCaseInsensitiveMatch()).WillRepeatedly(testing::Invoke([]() {
-    return Runtime::runtimeFeatureEnabled("envoy.reloadable_features.vhds_case_insensitive_match");
-  }));
 
   TestRequestHeaderMapImpl headers{
       {":method", "GET"},
@@ -128,10 +116,6 @@ TEST_F(RouteConfigUpdateRequesterTest, VhdsCaseSensitiveMatchingUppercase) {
 
   auto route_config = std::make_shared<NiceMock<Router::MockConfig>>();
   EXPECT_CALL(*route_config, usesVhds()).WillRepeatedly(Return(true));
-  // Mock should return the runtime flag value
-  EXPECT_CALL(*route_config, vhdsCaseInsensitiveMatch()).WillRepeatedly(testing::Invoke([]() {
-    return Runtime::runtimeFeatureEnabled("envoy.reloadable_features.vhds_case_insensitive_match");
-  }));
 
   TestRequestHeaderMapImpl headers{
       {":method", "GET"},
@@ -157,10 +141,6 @@ TEST_F(RouteConfigUpdateRequesterTest, VhdsCaseInsensitiveMatchingLowercase) {
 
   auto route_config = std::make_shared<NiceMock<Router::MockConfig>>();
   EXPECT_CALL(*route_config, usesVhds()).WillRepeatedly(Return(true));
-  // Mock should return the runtime flag value
-  EXPECT_CALL(*route_config, vhdsCaseInsensitiveMatch()).WillRepeatedly(testing::Invoke([]() {
-    return Runtime::runtimeFeatureEnabled("envoy.reloadable_features.vhds_case_insensitive_match");
-  }));
 
   TestRequestHeaderMapImpl headers{
       {":method", "GET"},

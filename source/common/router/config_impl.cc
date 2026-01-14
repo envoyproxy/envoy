@@ -1929,7 +1929,9 @@ RouteMatcher::RouteMatcher(const envoy::config::route::v3::RouteConfiguration& r
     for (const std::string& domain_name : virtual_host_config.domains()) {
       // Conditionally convert domain name to lowercase based on runtime flag
       const std::string processed_domain_name =
-          vhdsCaseInsensitiveMatchEnabled() ? absl::AsciiStrToLower(domain_name) : domain_name;
+          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.vhds_case_insensitive_match")
+              ? absl::AsciiStrToLower(domain_name)
+              : domain_name;
       absl::string_view domain = processed_domain_name;
       bool duplicate_found = false;
       if ("*" == domain) {
@@ -1995,9 +1997,10 @@ const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::RequestHeaderMa
   // TODO (@rshriram) Match Origin header in WebSocket
   // request with VHost, using wildcard match
   // Conditionally lower-case the host header based on runtime flag.
-  const std::string host = vhdsCaseInsensitiveMatchEnabled()
-                               ? absl::AsciiStrToLower(host_header_value)
-                               : std::string(host_header_value);
+  const std::string host =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.vhds_case_insensitive_match")
+          ? absl::AsciiStrToLower(host_header_value)
+          : std::string(host_header_value);
   const auto iter = virtual_hosts_.find(host);
   if (iter != virtual_hosts_.end()) {
     return iter->second.get();
@@ -2138,14 +2141,6 @@ const Envoy::Config::TypedMetadata& CommonConfigImpl::typedMetadata() const {
                               : DefaultRouteMetadataPack::get().typed_metadata_;
 }
 
-bool CommonConfigImpl::vhdsCaseInsensitiveMatch() const {
-  return vhdsCaseInsensitiveMatchEnabled();
-}
-
-bool ConfigImpl::vhdsCaseInsensitiveMatch() const {
-  return shared_config_->vhdsCaseInsensitiveMatch();
-}
-
 absl::StatusOr<std::shared_ptr<CommonConfigImpl>>
 create(const envoy::config::route::v3::RouteConfiguration& config,
        Server::Configuration::ServerFactoryContext& factory_context,
@@ -2193,8 +2188,6 @@ const envoy::config::core::v3::Metadata& NullConfigImpl::metadata() const {
 const Envoy::Config::TypedMetadata& NullConfigImpl::typedMetadata() const {
   return DefaultRouteMetadataPack::get().typed_metadata_;
 }
-
-bool NullConfigImpl::vhdsCaseInsensitiveMatch() const { return vhdsCaseInsensitiveMatchEnabled(); }
 
 Matcher::ActionConstSharedPtr
 RouteMatchActionFactory::createAction(const Protobuf::Message& config, RouteActionContext& context,

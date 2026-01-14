@@ -1392,12 +1392,6 @@ public:
   virtual bool usesVhds() const PURE;
 
   /**
-   * @return bool whether VHDS host header matching should be case insensitive. Defaults to true.
-   *         When false, host headers are matched case-sensitively.
-   */
-  virtual bool vhdsCaseInsensitiveMatch() const PURE;
-
-  /**
    * @return bool whether most specific header mutations should take precedence. The default
    * evaluation order is route level, then virtual host level and finally global connection
    * manager level.
