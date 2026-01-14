@@ -1,7 +1,8 @@
 #pragma once
 
-#include "absl/status/statusor.h"
 #include "envoy/common/pure.h"
+
+#include "absl/status/statusor.h"
 
 namespace Envoy {
 namespace Extensions {
