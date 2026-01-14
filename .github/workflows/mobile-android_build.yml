@@ -74,14 +74,14 @@ jobs:
     - load
     - build
     with:
-      command: ./bazelw
+      command: bazel
       container-command:
       diskspace-hack-paths: |
         /opt/hostedtoolcache
         /usr/local/.ghcup
       docker-ipv6: false
       # Return to using:
-      #   ./bazelw mobile-install --fat_apk_cpu=x86_64 --start_app //examples/kotlin/hello_world:hello_envoy_kt
+      #   bazel mobile-install --fat_apk_cpu=x86_64 --start_app //examples/kotlin/hello_world:hello_envoy_kt
       # When https://github.com/envoyproxy/envoy-mobile/issues/853 is fixed.
       args: >-
         build
@@ -126,7 +126,7 @@ jobs:
     - load
     - build
     with:
-      command: ./bazelw
+      command: bazel
       container-command:
       args: ${{ matrix.args }}
       bind-mounts: |
@@ -171,7 +171,7 @@ jobs:
             //examples/java/hello_world:hello_envoy
         - name: kotlin-baseline-app
           # Return to using:
-          #   ./bazelw mobile-install --fat_apk_cpu=x86_64 --start_app //examples/kotlin/hello_world:hello_envoy_kt
+          #   bazel mobile-install --fat_apk_cpu=x86_64 --start_app //examples/kotlin/hello_world:hello_envoy_kt
           # When https://github.com/envoyproxy/envoy-mobile/issues/853 is fixed.
           args: >-
             build
@@ -188,7 +188,7 @@ jobs:
           target: kotlin-baseline-app
         - name: kotlin-experimental-app
           # Return to using:
-          #   ./bazelw mobile-install --fat_apk_cpu=x86_64 --start_app //examples/kotlin/hello_world:hello_envoy_kt
+          #   bazel mobile-install --fat_apk_cpu=x86_64 --start_app //examples/kotlin/hello_world:hello_envoy_kt
           # When https://github.com/envoyproxy/envoy-mobile/issues/853 is fixed.
           args: >-
             build

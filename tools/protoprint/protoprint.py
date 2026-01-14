@@ -542,7 +542,7 @@ def format_options(options):
         option_name = '({})'.format(
             option_descriptor.full_name
         ) if option_descriptor.is_extension else option_descriptor.name
-        if option_descriptor.message_type and option_descriptor.label != option_descriptor.LABEL_REPEATED:
+        if option_descriptor.message_type and not option_descriptor.is_repeated:
             formatted_options.extend([
                 '{}.{} = {}'.format(option_name, subfield.name, text_format_value(subfield, value))
                 for subfield, value in option_value.ListFields()

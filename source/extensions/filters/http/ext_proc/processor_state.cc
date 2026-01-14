@@ -649,6 +649,49 @@ bool ProcessorState::handleDuplexStreamedBodyResponse(const CommonResponse& comm
   return end_of_stream;
 }
 
+bool ProcessorState::isLastResponseAfterHeaderResp() const {
+  if (callbackState() != ProcessorState::CallbackState::Idle) {
+    return false;
+  }
+  if (hasNoBody()) {
+    return true;
+  }
+
+  const bool send_trailers = shouldSendTrailers().send_trailers;
+  if (bodyMode() == ProcessingMode::NONE && !send_trailers) {
+    return true;
+  }
+  if (bodyMode() == ProcessingMode::NONE && send_trailers) {
+    if (completeBodyAvailable() && (responseTrailers() == nullptr)) {
+      return true;
+    }
+  }
+  if (bodyMode() != ProcessingMode::NONE && !send_trailers) {
+    if (responseTrailers() != nullptr) {
+      // If callback state is idle, and trailers are already received,
+      // then there is no more body chunks to send.
+      return true;
+    }
+  }
+  return false;
+}
+
+bool ProcessorState::isLastResponseAfterBodyResp(bool eos_seen_in_body) const {
+  if (callbackState() != ProcessorState::CallbackState::Idle) {
+    return false;
+  }
+  if (eos_seen_in_body) {
+    return true;
+  }
+
+  if (!shouldSendTrailers().send_trailers && responseTrailers() != nullptr) {
+    // If callback state is idle, and trailers are already received,
+    // then there is no more body chunks to send.
+    return true;
+  }
+  return false;
+}
+
 Http::FilterDataStatus ProcessorState::getBodyCallbackResultInStreamedMode(bool end_stream) {
   if (end_stream || callbackState() == ProcessorState::CallbackState::HeadersCallback) {
     setPaused(true);
