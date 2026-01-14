@@ -2182,6 +2182,7 @@ TEST_P(TcpProxyIntegrationTest, UpstreamConnectModeTlsHandshakeNonTls) {
 
     tcp_proxy.set_upstream_connect_mode(
         envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_TLS_HANDSHAKE);
+    tcp_proxy.mutable_max_early_data_bytes()->set_value(0);
 
     filter->mutable_typed_config()->PackFrom(tcp_proxy);
   });
@@ -2222,6 +2223,7 @@ TEST_P(TcpProxyIntegrationTest, UpstreamConnectModeTlsHandshakeWithUpstreamTls) 
 
     tcp_proxy.set_upstream_connect_mode(
         envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_TLS_HANDSHAKE);
+    tcp_proxy.mutable_max_early_data_bytes()->set_value(0);
 
     filter->mutable_typed_config()->PackFrom(tcp_proxy);
   });
@@ -2247,7 +2249,7 @@ TEST_P(TcpProxyIntegrationTest, UpstreamConnectModeTlsHandshakeWithUpstreamTls) 
 
 // Test that ON_DOWNSTREAM_TLS_HANDSHAKE mode works correctly with TLS termination.
 // This test validates that the TLS handshake can complete before establishing
-// the upstream connection, with max_early_data_bytes set to zero for zero-memory-overhead.
+// the upstream connection, with max_early_data_bytes set to zero
 TEST_P(TcpProxySslIntegrationTest, OnDownstreamTlsHandshakeMode) {
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
