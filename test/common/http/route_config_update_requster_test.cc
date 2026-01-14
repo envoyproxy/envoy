@@ -1,5 +1,4 @@
 #include "source/common/http/route_config_update_requster.h"
-
 #include "source/common/runtime/runtime_features.h"
 
 #include "test/mocks/event/mocks.h"

@@ -44,7 +44,6 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/context_impl.h"
 #include "source/common/router/header_cluster_specifier.h"
-#include "source/common/runtime/runtime_features.h"
 #include "source/common/router/matcher_visitor.h"
 #include "source/common/router/weighted_cluster_specifier.h"
 #include "source/common/runtime/runtime_features.h"

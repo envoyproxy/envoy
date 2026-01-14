@@ -22,7 +22,6 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/matchers.h"
-#include "source/common/runtime/runtime_features.h"
 #include "source/common/common/packed_struct.h"
 #include "source/common/config/datasource.h"
 #include "source/common/config/metadata.h"
@@ -37,6 +36,7 @@
 #include "source/common/router/retry_policy_impl.h"
 #include "source/common/router/router_ratelimit.h"
 #include "source/common/router/tls_context_match_criteria_impl.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/stats/symbol_table.h"
 
 #include "absl/container/flat_hash_set.h"
