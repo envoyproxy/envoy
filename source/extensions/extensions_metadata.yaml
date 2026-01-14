@@ -190,6 +190,13 @@ envoy.clusters.dns:
   status: stable
   type_urls:
   - envoy.extensions.clusters.dns.v3.DnsCluster
+envoy.clusters.dynamic_modules:
+  categories:
+  - envoy.clusters
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.clusters.dynamic_modules.v3.ClusterConfig
 envoy.clusters.original_dst:
   categories:
   - envoy.clusters
