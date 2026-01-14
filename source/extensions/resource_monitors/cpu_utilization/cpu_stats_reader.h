@@ -1,34 +1,12 @@
 #pragma once
 
-#include <dirent.h>
-#include <unistd.h>
-
-#include <algorithm>
-#include <filesystem>
-#include <fstream>
-
-#include "envoy/common/exception.h"
-
-#include "source/common/common/fmt.h"
-#include "source/common/common/logger.h"
-
-#include "absl/status/status.h"
 #include "absl/status/statusor.h"
-#include "absl/strings/str_split.h"
+#include "envoy/common/pure.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace ResourceMonitors {
 namespace CpuUtilizationMonitor {
-
-struct CpuTimes {
-  bool is_valid;
-  bool is_cgroup_v2;
-  double work_time; // For container cpu mode, to support normalisation of cgroup cpu usage stat per
-                    // cpu core by dividing with available cpu limit
-  uint64_t total_time;
-  double effective_cores; // number of effective cores available to the container
-};
 
 class CpuStatsReader {
 public:

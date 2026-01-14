@@ -15,17 +15,34 @@ namespace Extensions {
 namespace ResourceMonitors {
 namespace CpuUtilizationMonitor {
 
+// Internal struct for LinuxCpuStatsReader and CgroupV1CpuStatsReader
+// (shared implementation without effective_cores)
+struct CpuTimesBase {
+  bool is_valid;
+  double work_time; // For container cpu mode, to support normalisation of cgroup cpu usage stat per
+                    // cpu core by dividing with available cpu limit
+  uint64_t total_time;
+};
+
+// Internal struct for CgroupV2CpuStatsReader (includes effective_cores)
+struct CpuTimesV2 {
+  bool is_valid;
+  double work_time;
+  uint64_t total_time;
+  double effective_cores; // number of effective cores available to the container
+};
+
 static const std::string LINUX_CPU_STATS_FILE = "/proc/stat";
 
 class LinuxCpuStatsReader : public CpuStatsReader {
 public:
   explicit LinuxCpuStatsReader(const std::string& cpu_stats_filename = LINUX_CPU_STATS_FILE);
-  CpuTimes getCpuTimes();
+  CpuTimesBase getCpuTimes();
   absl::StatusOr<double> getUtilization() override;
 
 private:
   const std::string cpu_stats_filename_;
-  CpuTimes previous_cpu_times_{false, false, 0, 0, 0};
+  CpuTimesBase previous_cpu_times_{false, 0, 0};
 };
 
 // Container CPU modes with both cgroup v1 and v2 implementations.
@@ -61,14 +78,14 @@ public:
   CgroupV1CpuStatsReader(Filesystem::Instance& fs, TimeSource& time_source,
                          const std::string& shares_path, const std::string& usage_path);
 
-  CpuTimes getCpuTimes();
+  CpuTimesBase getCpuTimes();
   absl::StatusOr<double> getUtilization() override;
 
 private:
   static constexpr double CONTAINER_MILLICORES_PER_CORE = 1000.0;
   const std::string shares_path_;
   const std::string usage_path_;
-  CpuTimes previous_cpu_times_{false, false, 0, 0, 0};
+  CpuTimesBase previous_cpu_times_{false, 0, 0};
 };
 
 class CgroupV2CpuStatsReader : public LinuxContainerCpuStatsReader,
@@ -81,14 +98,14 @@ public:
                          const std::string& stat_path, const std::string& max_path,
                          const std::string& effective_path);
 
-  CpuTimes getCpuTimes();
+  CpuTimesV2 getCpuTimes();
   absl::StatusOr<double> getUtilization() override;
 
 private:
   const std::string stat_path_;
   const std::string max_path_;
   const std::string effective_path_;
-  CpuTimes previous_cpu_times_{false, true, 0, 0, 0};
+  CpuTimesV2 previous_cpu_times_{false, 0, 0, 0};
 };
 
 } // namespace CpuUtilizationMonitor
