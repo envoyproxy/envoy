@@ -313,7 +313,10 @@ class ServicesHolder:
         os.mkdir(kafka_store_dir)
 
         # Find the Kafka server 'bin' directory.
+        # Support both Bazel 7 (./external/repo) and Bazel 8 (./repo) runfiles layouts.
         kafka_bin_dir = os.path.join('.', 'external', 'kafka_server_binary', 'bin')
+        if not os.path.isdir(kafka_bin_dir):
+            kafka_bin_dir = os.path.join('.', 'kafka_server_binary', 'bin')
 
         # Main initialization block:
         # - generate random ports,
@@ -428,30 +431,44 @@ class ServicesHolder:
     This method just locates the Java installation in current directory.
     We cannot hardcode the name, as the dirname changes as per:
     https://github.com/bazelbuild/bazel/blob/master/tools/jdk/BUILD#L491
+    Supports both Bazel 7 (./external/repo) and Bazel 8 (./repo) runfiles layouts.
     """
 
+        # Try Bazel 7 style first (./external/repo)
         external_dir = os.path.join('.', 'external')
-        for directory in os.listdir(external_dir):
+        if os.path.isdir(external_dir):
+            for directory in os.listdir(external_dir):
+                if 'remotejdk11' in directory:
+                    result = os.path.join(external_dir, directory, 'bin')
+                    print('Using Java: ' + result)
+                    return result
+
+        # Try Bazel 8 style (./repo at top level)
+        for directory in os.listdir('.'):
             if 'remotejdk11' in directory:
-                result = os.path.join(external_dir, directory, 'bin')
+                result = os.path.join('.', directory, 'bin')
                 print('Using Java: ' + result)
                 return result
-        raise Exception('Could not find Java in: ' + external_dir)
+
+        raise Exception('Could not find Java in runfiles')
 
     @staticmethod
     def find_envoy():
         """
         This method locates envoy binary.
         It's present at ./source/exe/envoy-static (at least for mac/bazel-asan/bazel-tsan),
-        or at ./external/envoy/source/exe/envoy-static (for bazel-compile_time_options).
+        or at ./external/envoy/source/exe/envoy-static (for bazel-compile_time_options with Bazel 7),
+        or at ./envoy/source/exe/envoy-static (for bazel-compile_time_options with Bazel 8).
         """
 
-        candidate = os.path.join('.', 'contrib', 'exe', 'envoy-static')
-        if os.path.isfile(candidate):
-            return candidate
-        candidate = os.path.join('.', 'external', 'envoy', 'contrib', 'exe', 'envoy-static')
-        if os.path.isfile(candidate):
-            return candidate
+        candidates = [
+            os.path.join('.', 'contrib', 'exe', 'envoy-static'),
+            os.path.join('.', 'external', 'envoy', 'contrib', 'exe', 'envoy-static'),  # Bazel 7
+            os.path.join('.', 'envoy', 'contrib', 'exe', 'envoy-static'),  # Bazel 8
+        ]
+        for candidate in candidates:
+            if os.path.isfile(candidate):
+                return candidate
         raise Exception("Could not find Envoy")
 
     def shut_down(self):

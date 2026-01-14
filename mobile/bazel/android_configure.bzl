@@ -45,7 +45,7 @@ def _android_autoconf_impl(repository_ctx):
 
     loads = ""
     if sdk_rule != "" and sdk_rule != "pass":
-        loads += 'load("@rules_android//android:rules.bzl", "android_sdk_repository")\n'
+        loads += 'load("@rules_android//rules:rules.bzl", "android_sdk_repository")\n'
     if ndk_rule != "":
         loads += 'load("@rules_android_ndk//:rules.bzl", "android_ndk_repository")'
 
