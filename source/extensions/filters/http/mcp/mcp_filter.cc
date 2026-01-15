@@ -260,21 +260,24 @@ Http::FilterDataStatus McpFilter::completeParsing() {
   if (!metadata.fields().empty()) {
     McpFilterStateObject::Builder builder;
 
-    // Helper lambda to flatten nested structures with dotted keys
+    // Helper to flatten nested structures
     std::function<void(const Protobuf::Struct&, const std::string&)> flatten =
         [&](const Protobuf::Struct& s, const std::string& prefix) {
           for (const auto& [key, value] : s.fields()) {
             std::string full_key = prefix.empty() ? key : absl::StrCat(prefix, ".", key);
             if (value.has_string_value()) {
-              builder.addField(full_key, value.string_value());
-            } else if (value.has_struct_value()) {
-              flatten(value.struct_value(), full_key);
+              if (full_key == "method") {
+                builder.setMethod(value.string_value());
+              } else {
+                builder.addField(full_key, value.string_value());
+              }
             } else if (value.has_number_value()) {
               builder.addField(full_key, absl::StrCat(static_cast<int64_t>(value.number_value())));
             } else if (value.has_bool_value()) {
               builder.addField(full_key, value.bool_value() ? "true" : "false");
+            } else if (value.has_struct_value()) {
+              flatten(value.struct_value(), full_key);
             }
-            // Skip null_value and list_value
           }
         };
     flatten(metadata, "");
