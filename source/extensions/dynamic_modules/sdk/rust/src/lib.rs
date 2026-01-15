@@ -1379,6 +1379,47 @@ pub trait EnvoyHttpFilter {
 
   /// Get the index of the current worker thread.
   fn get_worker_index(&self) -> u32;
+  /// Set an integer socket option with the given level, name, state, and direction.
+  /// Direction specifies whether to apply to upstream (outgoing to backend) or
+  /// downstream (incoming from client) socket.
+  fn set_socket_option_int(
+    &mut self,
+    level: i64,
+    name: i64,
+    state: abi::envoy_dynamic_module_type_socket_option_state,
+    direction: abi::envoy_dynamic_module_type_socket_direction,
+    value: i64,
+  ) -> bool;
+
+  /// Set a bytes socket option with the given level, name, state, and direction.
+  /// Direction specifies whether to apply to upstream (outgoing to backend) or
+  /// downstream (incoming from client) socket.
+  fn set_socket_option_bytes(
+    &mut self,
+    level: i64,
+    name: i64,
+    state: abi::envoy_dynamic_module_type_socket_option_state,
+    direction: abi::envoy_dynamic_module_type_socket_direction,
+    value: &[u8],
+  ) -> bool;
+
+  /// Get an integer socket option value.
+  fn get_socket_option_int(
+    &self,
+    level: i64,
+    name: i64,
+    state: abi::envoy_dynamic_module_type_socket_option_state,
+    direction: abi::envoy_dynamic_module_type_socket_direction,
+  ) -> Option<i64>;
+
+  /// Get a bytes socket option value.
+  fn get_socket_option_bytes(
+    &self,
+    level: i64,
+    name: i64,
+    state: abi::envoy_dynamic_module_type_socket_option_state,
+    direction: abi::envoy_dynamic_module_type_socket_direction,
+  ) -> Option<Vec<u8>>;
 }
 
 /// This implements the [`EnvoyHttpFilter`] trait with the given raw pointer to the Envoy HTTP
@@ -2420,6 +2461,101 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
 
   fn get_worker_index(&self) -> u32 {
     unsafe { abi::envoy_dynamic_module_callback_http_filter_get_worker_index(self.raw_ptr) }
+  fn set_socket_option_int(
+    &mut self,
+    level: i64,
+    name: i64,
+    state: abi::envoy_dynamic_module_type_socket_option_state,
+    direction: abi::envoy_dynamic_module_type_socket_direction,
+    value: i64,
+  ) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_set_socket_option_int(
+        self.raw_ptr,
+        level,
+        name,
+        state,
+        direction,
+        value,
+      )
+    }
+  }
+
+  fn set_socket_option_bytes(
+    &mut self,
+    level: i64,
+    name: i64,
+    state: abi::envoy_dynamic_module_type_socket_option_state,
+    direction: abi::envoy_dynamic_module_type_socket_direction,
+    value: &[u8],
+  ) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_set_socket_option_bytes(
+        self.raw_ptr,
+        level,
+        name,
+        state,
+        direction,
+        abi::envoy_dynamic_module_type_module_buffer {
+          ptr: value.as_ptr() as *const _,
+          length: value.len(),
+        },
+      )
+    }
+  }
+
+  fn get_socket_option_int(
+    &self,
+    level: i64,
+    name: i64,
+    state: abi::envoy_dynamic_module_type_socket_option_state,
+    direction: abi::envoy_dynamic_module_type_socket_direction,
+  ) -> Option<i64> {
+    let mut value: i64 = 0;
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_socket_option_int(
+        self.raw_ptr,
+        level,
+        name,
+        state,
+        direction,
+        &mut value,
+      )
+    };
+    if success {
+      Some(value)
+    } else {
+      None
+    }
+  }
+
+  fn get_socket_option_bytes(
+    &self,
+    level: i64,
+    name: i64,
+    state: abi::envoy_dynamic_module_type_socket_option_state,
+    direction: abi::envoy_dynamic_module_type_socket_direction,
+  ) -> Option<Vec<u8>> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_socket_option_bytes(
+        self.raw_ptr,
+        level,
+        name,
+        state,
+        direction,
+        &mut result as *mut _ as *mut _,
+      )
+    };
+    if success && !result.ptr.is_null() && result.length > 0 {
+      let slice = unsafe { std::slice::from_raw_parts(result.ptr as *const u8, result.length) };
+      Some(slice.to_vec())
+    } else {
+      None
+    }
   }
 }
 

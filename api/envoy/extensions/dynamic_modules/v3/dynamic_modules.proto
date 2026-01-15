@@ -34,9 +34,12 @@ message DynamicModuleConfig {
   // The name of the dynamic module.
   //
   // The client is expected to have some configuration indicating where to search for the module. In
-  // Envoy, the search path can only be configured via the environment variable
+  // Envoy, the search path can be configured via the environment variable
   // ``ENVOY_DYNAMIC_MODULES_SEARCH_PATH``. The actual search path is
-  // ``${ENVOY_DYNAMIC_MODULES_SEARCH_PATH}/lib${name}.so``.
+  // ``${ENVOY_DYNAMIC_MODULES_SEARCH_PATH}/lib${name}.so``. If not set, the current working directory is
+  // used as the search path. After Envoy fails to find the module in the search path, it will also
+  // try to find the module from a standard system library path (e.g., ``/usr/lib``) following the
+  // platform's default behavior for ``dlopen``.
   //
   // .. note::
   //   There is some remaining work to make the search path configurable via command line options.
