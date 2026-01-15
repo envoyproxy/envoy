@@ -18,10 +18,6 @@ public:
         SSL_get_servername(ssl_client_hello.ssl, TLSEXT_NAMETYPE_host_name));
     return sni.empty() ? default_value_ : std::string(sni);
   }
-  std::string deriveFromServerHello(const SSL&,
-                                    const Network::TransportSocketOptionsConstSharedPtr&) {
-    return default_value_;
-  }
 
 private:
   const std::string default_value_;

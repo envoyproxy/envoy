@@ -15,9 +15,10 @@ namespace FilterStateOverride {
 
 using ConfigProto =
     envoy::extensions::transport_sockets::tls::cert_mappers::filter_state_override::v3::Config;
-class MapperFactory : public Ssl::TlsCertificateMapperConfigFactory {
+
+class MapperFactory : public Ssl::UpstreamTlsCertificateMapperConfigFactory {
 public:
-  absl::StatusOr<Ssl::TlsCertificateMapperFactory> createTlsCertificateMapperFactory(
+  absl::StatusOr<Ssl::UpstreamTlsCertificateMapperFactory> createTlsCertificateMapperFactory(
       const Protobuf::Message& proto_config,
       Server::Configuration::GenericFactoryContext& factory_context) override;
 
@@ -26,7 +27,7 @@ public:
   }
 
   std::string name() const override {
-    return "envoy.tls.certificate_mappers.filter_state_override";
+    return "envoy.tls.upstream_certificate_mappers.filter_state_override";
   }
 };
 

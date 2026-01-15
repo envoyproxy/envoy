@@ -220,16 +220,25 @@ private:
   ThreadLocal::TypedSlot<ThreadLocalCerts> cert_contexts_;
 };
 
+class BaseAsyncSelector : protected Logger::Loggable<Logger::Id::connection> {
+public:
+  BaseAsyncSelector(std::shared_ptr<SecretManager>& secret_manager)
+      : secret_manager_(secret_manager) {}
+
+protected:
+  Ssl::SelectionResult doSelectTlsContext(const std::string& name, const bool client_ocsp_capable,
+                                          Ssl::CertificateSelectionCallbackPtr cb);
+  std::shared_ptr<SecretManager> secret_manager_;
+};
+
 /**
  * An asynchronous certificate selector is created for each TLS socket on each worker.
  */
-class AsyncSelector : public Ssl::TlsCertificateSelector,
-                      public Ssl::UpstreamTlsCertificateSelector,
-                      protected Logger::Loggable<Logger::Id::connection> {
+class AsyncSelector : public BaseAsyncSelector, public Ssl::TlsCertificateSelector {
 public:
   AsyncSelector(Ssl::TlsCertificateMapperPtr&& mapper,
                 std::shared_ptr<SecretManager>& secret_manager)
-      : mapper_(std::move(mapper)), secret_manager_(secret_manager) {}
+      : BaseAsyncSelector(secret_manager), mapper_(std::move(mapper)) {}
 
   // Ssl::TlsCertificateSelector
   bool providesCertificates() const override { return true; }
@@ -241,37 +250,69 @@ public:
     PANIC("Not supported with QUIC");
   };
 
+private:
+  Ssl::TlsCertificateMapperPtr mapper_;
+};
+
+class UpstreamAsyncSelector : public BaseAsyncSelector, public Ssl::UpstreamTlsCertificateSelector {
+public:
+  UpstreamAsyncSelector(Ssl::UpstreamTlsCertificateMapperPtr&& mapper,
+                        std::shared_ptr<SecretManager>& secret_manager)
+      : BaseAsyncSelector(secret_manager), mapper_(std::move(mapper)) {}
   // Ssl::UpstreamTlsCertificateSelector
   Ssl::SelectionResult
   selectTlsContext(const SSL& ssl, const Network::TransportSocketOptionsConstSharedPtr& options,
                    Ssl::CertificateSelectionCallbackPtr cb) override;
 
 private:
-  Ssl::SelectionResult selectTlsContext(const std::string& name, const bool client_ocsp_capable,
-                                        Ssl::CertificateSelectionCallbackPtr cb);
+  Ssl::UpstreamTlsCertificateMapperPtr mapper_;
+};
 
-  Ssl::TlsCertificateMapperPtr mapper_;
+class BaseCertificateSelectorFactory {
+public:
+  BaseCertificateSelectorFactory(std::shared_ptr<SecretManager>&& secret_manager)
+      : secret_manager_(std::move(secret_manager)) {}
+  absl::Status onConfigUpdate();
+
+protected:
   std::shared_ptr<SecretManager> secret_manager_;
 };
 
-class OnDemandTlsCertificateSelectorFactory : public Ssl::TlsCertificateSelectorFactory,
-                                              public Ssl::UpstreamTlsCertificateSelectorFactory {
+class OnDemandTlsCertificateSelectorFactory : public BaseCertificateSelectorFactory,
+                                              public Ssl::TlsCertificateSelectorFactory {
 public:
-  OnDemandTlsCertificateSelectorFactory(Ssl::TlsCertificateMapperFactory&& mapper_factory_,
+  OnDemandTlsCertificateSelectorFactory(Ssl::TlsCertificateMapperFactory&& mapper_factory,
                                         std::shared_ptr<SecretManager>&& secret_manager)
-      : mapper_factory_(std::move(mapper_factory_)), secret_manager_(std::move(secret_manager)) {}
+      : BaseCertificateSelectorFactory(std::move(secret_manager)),
+        mapper_factory_(std::move(mapper_factory)) {}
   // Ssl::TlsCertificateSelectorFactory
   Ssl::TlsCertificateSelectorPtr create(Ssl::TlsCertificateSelectorContext&) override;
-  absl::Status onConfigUpdate() override;
+  absl::Status onConfigUpdate() override {
+    return BaseCertificateSelectorFactory::onConfigUpdate();
+  }
 
+private:
+  Ssl::TlsCertificateMapperFactory mapper_factory_;
+};
+
+class UpstreamOnDemandTlsCertificateSelectorFactory
+    : public BaseCertificateSelectorFactory,
+      public Ssl::UpstreamTlsCertificateSelectorFactory {
+public:
+  UpstreamOnDemandTlsCertificateSelectorFactory(
+      Ssl::UpstreamTlsCertificateMapperFactory&& mapper_factory,
+      std::shared_ptr<SecretManager>&& secret_manager)
+      : BaseCertificateSelectorFactory(std::move(secret_manager)),
+        mapper_factory_(std::move(mapper_factory)) {}
   // Ssl::UpstreamTlsCertificateSelectorFactory
   Ssl::UpstreamTlsCertificateSelectorPtr
   createUpstreamTlsCertificateSelector(Ssl::TlsCertificateSelectorContext&) override;
+  absl::Status onConfigUpdate() override {
+    return BaseCertificateSelectorFactory::onConfigUpdate();
+  }
 
 private:
-  std::unique_ptr<AsyncSelector> create();
-  Ssl::TlsCertificateMapperFactory mapper_factory_;
-  std::shared_ptr<SecretManager> secret_manager_;
+  Ssl::UpstreamTlsCertificateMapperFactory mapper_factory_;
 };
 
 class OnDemandTlsCertificateSelectorConfigFactory

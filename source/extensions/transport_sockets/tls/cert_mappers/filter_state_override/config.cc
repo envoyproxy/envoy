@@ -12,10 +12,9 @@ namespace CertificateMappers {
 namespace FilterStateOverride {
 
 namespace {
-class Mapper : public Ssl::TlsCertificateMapper {
+class Mapper : public Ssl::UpstreamTlsCertificateMapper {
 public:
   explicit Mapper(const std::string& default_value) : default_value_(default_value) {}
-  std::string deriveFromClientHello(const SSL_CLIENT_HELLO&) { return default_value_; }
   std::string deriveFromServerHello(const SSL&,
                                     const Network::TransportSocketOptionsConstSharedPtr& options) {
     if (options) {
@@ -37,7 +36,8 @@ private:
 };
 } // namespace
 
-absl::StatusOr<Ssl::TlsCertificateMapperFactory> MapperFactory::createTlsCertificateMapperFactory(
+absl::StatusOr<Ssl::UpstreamTlsCertificateMapperFactory>
+MapperFactory::createTlsCertificateMapperFactory(
     const Protobuf::Message& proto_config,
     Server::Configuration::GenericFactoryContext& factory_context) {
   const ConfigProto& config = MessageUtil::downcastAndValidate<const ConfigProto&>(
@@ -47,7 +47,7 @@ absl::StatusOr<Ssl::TlsCertificateMapperFactory> MapperFactory::createTlsCertifi
   };
 }
 
-REGISTER_FACTORY(MapperFactory, Ssl::TlsCertificateMapperConfigFactory);
+REGISTER_FACTORY(MapperFactory, Ssl::UpstreamTlsCertificateMapperConfigFactory);
 
 } // namespace FilterStateOverride
 } // namespace CertificateMappers
