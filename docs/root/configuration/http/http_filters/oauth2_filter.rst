@@ -97,8 +97,6 @@ The following is an example configuring the filter.
         name: hmac
         sds_config:
           path: "/etc/envoy/hmac.yaml"
-    # (Optional): client authentication method for token_endpoint
-    auth_type: "MUTUAL_TLS"
     # (Optional): defaults to 'user' scope if not provided
     auth_scopes:
     - user
