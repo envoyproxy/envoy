@@ -163,6 +163,11 @@ TEST_F(LinuxContainerCpuStatsReaderTest, CannotReadFileCpuAllocated) {
                                                 temp_path_cpu_allocated, cpuTimesPath());
   CpuTimesBase envoy_container_stats = container_stats_reader.getCpuTimes();
   EXPECT_FALSE(envoy_container_stats.is_valid);
+
+  // Test that getUtilization also handles the error
+  auto result = container_stats_reader.getUtilization();
+  EXPECT_FALSE(result.ok());
+  EXPECT_NE(result.status().message().find("Failed to read CPU times"), std::string::npos);
 }
 
 TEST_F(LinuxContainerCpuStatsReaderTest, CannotReadFileCpuTimes) {
@@ -175,6 +180,11 @@ TEST_F(LinuxContainerCpuStatsReaderTest, CannotReadFileCpuTimes) {
                                                 cpuAllocatedPath(), temp_path_cpu_times);
   CpuTimesBase envoy_container_stats = container_stats_reader.getCpuTimes();
   EXPECT_FALSE(envoy_container_stats.is_valid);
+
+  // Test that getUtilization also handles the error
+  auto result = container_stats_reader.getUtilization();
+  EXPECT_FALSE(result.ok());
+  EXPECT_NE(result.status().message().find("Failed to read CPU times"), std::string::npos);
 }
 
 TEST_F(LinuxContainerCpuStatsReaderTest, UnexpectedFormatCpuAllocatedLine) {
@@ -224,6 +234,11 @@ TEST_F(LinuxContainerCpuStatsReaderTest, ZeroCpuAllocatedValue) {
   CpuTimesBase envoy_container_stats = container_stats_reader.getCpuTimes();
 
   EXPECT_FALSE(envoy_container_stats.is_valid);
+
+  // Test that getUtilization also handles the error
+  auto result = container_stats_reader.getUtilization();
+  EXPECT_FALSE(result.ok());
+  EXPECT_NE(result.status().message().find("Failed to read CPU times"), std::string::npos);
 }
 
 // =============================================================================
@@ -365,48 +380,82 @@ TEST_F(LinuxContainerCpuStatsReaderV2Test, InvalidUsageUsecFormat) {
   EXPECT_FALSE(envoy_container_stats.is_valid);
 }
 
-// Error: Invalid CPU range (start > end)
-TEST_F(LinuxContainerCpuStatsReaderV2Test, InvalidCpuRangeStartGreaterThanEnd) {
+// Error: Invalid cpuset.cpus.effective formats
+TEST_F(LinuxContainerCpuStatsReaderV2Test, InvalidCpuEffectiveFormats) {
   TimeSource& test_time_source = timeSource();
   Api::ApiPtr api = Api::createApiForTest();
   setV2CpuStat("usage_usec 500000\n");
   setV2CpuMax("200000 100000\n");
+
+  // Test 1: Failed to parse single CPU value (non-numeric)
+  setV2CpuEffective("notanumber\n");
+  CgroupV2CpuStatsReader container_stats_reader1(
+      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
+  CpuTimesV2 envoy_container_stats = container_stats_reader1.getCpuTimes();
+  EXPECT_FALSE(envoy_container_stats.is_valid);
+
+  // Test 2: Invalid single CPU value (negative)
+  setV2CpuEffective("-1\n");
+  CgroupV2CpuStatsReader container_stats_reader2(
+      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
+  envoy_container_stats = container_stats_reader2.getCpuTimes();
+  EXPECT_FALSE(envoy_container_stats.is_valid);
+
+  // Test 3: Failed to parse CPU range (non-numeric range values)
+  setV2CpuEffective("0-abc\n");
+  CgroupV2CpuStatsReader container_stats_reader3(
+      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
+  envoy_container_stats = container_stats_reader3.getCpuTimes();
+  EXPECT_FALSE(envoy_container_stats.is_valid);
+
+  // Test 4: Invalid CPU range (negative start)
+  setV2CpuEffective("-1-3\n");
+  CgroupV2CpuStatsReader container_stats_reader4(
+      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
+  envoy_container_stats = container_stats_reader4.getCpuTimes();
+  EXPECT_FALSE(envoy_container_stats.is_valid);
+
+  // Test 5: Invalid CPU range (start > end)
   setV2CpuEffective("5-2\n");
-
-  CgroupV2CpuStatsReader container_stats_reader(
+  CgroupV2CpuStatsReader container_stats_reader5(
       api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
-  CpuTimesV2 envoy_container_stats = container_stats_reader.getCpuTimes();
-
+  envoy_container_stats = container_stats_reader5.getCpuTimes();
   EXPECT_FALSE(envoy_container_stats.is_valid);
-}
 
-// Error: Empty cpuset.cpus.effective file
-TEST_F(LinuxContainerCpuStatsReaderV2Test, EmptyCpuEffectiveFile) {
-  TimeSource& test_time_source = timeSource();
-  Api::ApiPtr api = Api::createApiForTest();
-  setV2CpuStat("usage_usec 500000\n");
-  setV2CpuMax("200000 100000\n");
+  // Test 6: Empty file (N <= 0)
   setV2CpuEffective("");
-
-  CgroupV2CpuStatsReader container_stats_reader(
+  CgroupV2CpuStatsReader container_stats_reader6(
       api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
-  CpuTimesV2 envoy_container_stats = container_stats_reader.getCpuTimes();
-
+  envoy_container_stats = container_stats_reader6.getCpuTimes();
   EXPECT_FALSE(envoy_container_stats.is_valid);
 }
 
-// Error: Zero period in cpu.max (division by zero protection)
-TEST_F(LinuxContainerCpuStatsReaderV2Test, InvalidZeroPeriodInCpuMax) {
+// Error: Invalid cpu.max file formats
+TEST_F(LinuxContainerCpuStatsReaderV2Test, InvalidCpuMaxFormats) {
   TimeSource& test_time_source = timeSource();
   Api::ApiPtr api = Api::createApiForTest();
   setV2CpuStat("usage_usec 500000\n");
-  setV2CpuMax("200000 0\n");
   setV2CpuEffective("0-3\n");
 
-  CgroupV2CpuStatsReader container_stats_reader(
+  // Test 1: Unexpected format - missing second value
+  setV2CpuMax("200000\n");
+  CgroupV2CpuStatsReader container_stats_reader1(
       api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
-  CpuTimesV2 envoy_container_stats = container_stats_reader.getCpuTimes();
+  CpuTimesV2 envoy_container_stats = container_stats_reader1.getCpuTimes();
+  EXPECT_FALSE(envoy_container_stats.is_valid);
 
+  // Test 2: Failed to parse - non-numeric quota
+  setV2CpuMax("notanumber 100000\n");
+  CgroupV2CpuStatsReader container_stats_reader2(
+      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
+  envoy_container_stats = container_stats_reader2.getCpuTimes();
+  EXPECT_FALSE(envoy_container_stats.is_valid);
+
+  // Test 3: Invalid period value (zero)
+  setV2CpuMax("200000 0\n");
+  CgroupV2CpuStatsReader container_stats_reader3(
+      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
+  envoy_container_stats = container_stats_reader3.getCpuTimes();
   EXPECT_FALSE(envoy_container_stats.is_valid);
 }
 
@@ -456,6 +505,11 @@ TEST_F(LinuxContainerCpuStatsReaderV2Test, CannotReadCpuStatFile) {
   CpuTimesV2 envoy_container_stats = container_stats_reader.getCpuTimes();
 
   EXPECT_FALSE(envoy_container_stats.is_valid);
+
+  // Test that getUtilization also handles the error
+  auto result = container_stats_reader.getUtilization();
+  EXPECT_FALSE(result.ok());
+  EXPECT_NE(result.status().message().find("Failed to read CPU times"), std::string::npos);
 }
 
 TEST_F(LinuxContainerCpuStatsReaderV2Test, CannotReadEffectiveCpusFile) {
@@ -471,6 +525,11 @@ TEST_F(LinuxContainerCpuStatsReaderV2Test, CannotReadEffectiveCpusFile) {
   CpuTimesV2 envoy_container_stats = container_stats_reader.getCpuTimes();
 
   EXPECT_FALSE(envoy_container_stats.is_valid);
+
+  // Test that getUtilization also handles the error
+  auto result = container_stats_reader.getUtilization();
+  EXPECT_FALSE(result.ok());
+  EXPECT_NE(result.status().message().find("Failed to read CPU times"), std::string::npos);
 }
 
 TEST_F(LinuxContainerCpuStatsReaderV2Test, CannotReadCpuMaxFile) {
@@ -486,6 +545,11 @@ TEST_F(LinuxContainerCpuStatsReaderV2Test, CannotReadCpuMaxFile) {
   CpuTimesV2 envoy_container_stats = container_stats_reader.getCpuTimes();
 
   EXPECT_FALSE(envoy_container_stats.is_valid);
+
+  // Test that getUtilization also handles the error
+  auto result = container_stats_reader.getUtilization();
+  EXPECT_FALSE(result.ok());
+  EXPECT_NE(result.status().message().find("Failed to read CPU times"), std::string::npos);
 }
 
 // =============================================================================
@@ -628,6 +692,13 @@ TEST(LinuxCpuStatsReaderUtilizationTest, NegativeWorkDeltaReturnsError) {
 
   EXPECT_FALSE(result.ok());
   EXPECT_NE(result.status().message().find("Work_over_period"), std::string::npos);
+
+  // Also test zero total_over_period by keeping stats unchanged
+  file_updater.update("cpu  500 100 200 1100 0 0 0 0 0 0\n");
+  result = cpu_stats_reader.getUtilization();
+
+  EXPECT_FALSE(result.ok());
+  EXPECT_NE(result.status().message().find("total_over_period"), std::string::npos);
 }
 
 TEST_F(LinuxContainerCpuStatsReaderTest, V1GetUtilizationFirstCallReturnsZero) {
