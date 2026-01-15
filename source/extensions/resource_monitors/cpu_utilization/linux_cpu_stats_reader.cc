@@ -13,6 +13,8 @@
 #include "source/common/common/thread.h"
 
 #include "absl/strings/numbers.h"
+#include "absl/strings/str_split.h"
+#include "absl/strings/strip.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -243,38 +245,41 @@ CpuTimesV2 CgroupV2CpuStatsReader::getCpuTimes() {
     return {false, 0, 0, 0};
   }
 
-  // Parse effective CPUs (format: "0" or "0-3")
+  // Parse effective CPUs
+  // Format can be: "0", "0-3", "0,2,4", "0-2,4", "0-3,5-7", etc.
   int N = 0;
-  std::string range_token = effective_result.value();
-  // Trim whitespace
-  range_token.erase(range_token.find_last_not_of(" \n\r\t") + 1);
+  std::string cpu_list = std::string(absl::StripTrailingAsciiWhitespace(effective_result.value()));
 
-  const size_t dash_pos = range_token.find('-');
-  if (dash_pos == std::string::npos) {
-    // Single CPU (e.g., "0" means 1 core)
-    int single_cpu;
-    if (!absl::SimpleAtoi(range_token, &single_cpu)) {
-      ENVOY_LOG(error, "Failed to parse CPU value in {}: {}", effective_path_, range_token);
-      return {false, 0, 0, 0};
+  // Split by comma to handle multiple ranges/individual CPUs
+  std::vector<std::string> tokens = absl::StrSplit(cpu_list, ',');
+  for (const auto& token : tokens) {
+    const size_t dash_pos = token.find('-');
+    if (dash_pos == std::string::npos) {
+      // Single CPU (e.g., "0" or "4")
+      int single_cpu;
+      if (!absl::SimpleAtoi(token, &single_cpu)) {
+        ENVOY_LOG(error, "Failed to parse CPU value in {}: {}", effective_path_, token);
+        return {false, 0, 0, 0};
+      }
+      if (single_cpu < 0) {
+        ENVOY_LOG(error, "Invalid CPU value in {}: {}", effective_path_, token);
+        return {false, 0, 0, 0};
+      }
+      N += 1;
+    } else {
+      // CPU range (e.g., "0-3" means 4 cores)
+      int range_start, range_end;
+      if (!absl::SimpleAtoi(token.substr(0, dash_pos), &range_start) ||
+          !absl::SimpleAtoi(token.substr(dash_pos + 1), &range_end)) {
+        ENVOY_LOG(error, "Failed to parse CPU range in {}: {}", effective_path_, token);
+        return {false, 0, 0, 0};
+      }
+      if (range_start < 0 || range_end < range_start) {
+        ENVOY_LOG(error, "Invalid CPU range in {}: {}", effective_path_, token);
+        return {false, 0, 0, 0};
+      }
+      N += (range_end - range_start + 1);
     }
-    if (single_cpu < 0) {
-      ENVOY_LOG(error, "Invalid CPU value in {}: {}", effective_path_, range_token);
-      return {false, 0, 0, 0};
-    }
-    N = 1;
-  } else {
-    // CPU range (e.g., "0-3" means 4 cores)
-    int range_start, range_end;
-    if (!absl::SimpleAtoi(range_token.substr(0, dash_pos), &range_start) ||
-        !absl::SimpleAtoi(range_token.substr(dash_pos + 1), &range_end)) {
-      ENVOY_LOG(error, "Failed to parse CPU range in {}: {}", effective_path_, range_token);
-      return {false, 0, 0, 0};
-    }
-    if (range_start < 0 || range_end < range_start) {
-      ENVOY_LOG(error, "Invalid CPU range in {}: {}", effective_path_, range_token);
-      return {false, 0, 0, 0};
-    }
-    N = (range_end - range_start + 1);
   }
 
   if (N <= 0) {

@@ -409,6 +409,134 @@ TEST_F(LinuxContainerCpuStatsReaderV2Test, ReadsCgroupV2StatsWithLargeCpuRange) 
   EXPECT_DOUBLE_EQ(envoy_container_stats.effective_cores, 16.0); // min(32, 16)
 }
 
+// Test: Comma-separated individual CPUs (e.g., "0,2,4")
+TEST_F(LinuxContainerCpuStatsReaderV2Test, ReadsCgroupV2StatsWithCommaSeparatedCpus) {
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  setV2CpuStat("usage_usec 500000\n");
+  setV2CpuMax("300000 100000\n"); // quota=300000, period=100000 => 3.0 cores
+  setV2CpuEffective("0,2,4\n");   // 3 individual cores
+
+  CgroupV2CpuStatsReader container_stats_reader(
+      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
+  CpuTimesV2 envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  EXPECT_TRUE(envoy_container_stats.is_valid);
+  EXPECT_DOUBLE_EQ(envoy_container_stats.effective_cores, 3.0); // min(3, 3)
+}
+
+// Test: Mixed range and individual CPUs (e.g., "0-2,4")
+TEST_F(LinuxContainerCpuStatsReaderV2Test, ReadsCgroupV2StatsWithMixedRangeAndIndividual) {
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  setV2CpuStat("usage_usec 500000\n");
+  setV2CpuMax("400000 100000\n"); // quota=400000, period=100000 => 4.0 cores
+  setV2CpuEffective("0-2,4\n");   // 4 cores: 0, 1, 2, 4
+
+  CgroupV2CpuStatsReader container_stats_reader(
+      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
+  CpuTimesV2 envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  EXPECT_TRUE(envoy_container_stats.is_valid);
+  EXPECT_DOUBLE_EQ(envoy_container_stats.effective_cores, 4.0); // min(4, 4)
+}
+
+// Test: Multiple ranges (e.g., "0-3,5-7")
+TEST_F(LinuxContainerCpuStatsReaderV2Test, ReadsCgroupV2StatsWithMultipleRanges) {
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  setV2CpuStat("usage_usec 500000\n");
+  setV2CpuMax("700000 100000\n"); // quota=700000, period=100000 => 7.0 cores
+  setV2CpuEffective("0-3,5-7\n"); // 7 cores: 0, 1, 2, 3, 5, 6, 7
+
+  CgroupV2CpuStatsReader container_stats_reader(
+      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
+  CpuTimesV2 envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  EXPECT_TRUE(envoy_container_stats.is_valid);
+  EXPECT_DOUBLE_EQ(envoy_container_stats.effective_cores, 7.0); // min(7, 7)
+}
+
+// Test: Individual then range (e.g., "1,3-5")
+TEST_F(LinuxContainerCpuStatsReaderV2Test, ReadsCgroupV2StatsWithIndividualThenRange) {
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  setV2CpuStat("usage_usec 500000\n");
+  setV2CpuMax("400000 100000\n"); // quota=400000, period=100000 => 4.0 cores
+  setV2CpuEffective("1,3-5\n");   // 4 cores: 1, 3, 4, 5
+
+  CgroupV2CpuStatsReader container_stats_reader(
+      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
+  CpuTimesV2 envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  EXPECT_TRUE(envoy_container_stats.is_valid);
+  EXPECT_DOUBLE_EQ(envoy_container_stats.effective_cores, 4.0); // min(4, 4)
+}
+
+// Test: Complex mixed format (e.g., "0,2-4,6")
+TEST_F(LinuxContainerCpuStatsReaderV2Test, ReadsCgroupV2StatsWithComplexMixedFormat) {
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  setV2CpuStat("usage_usec 500000\n");
+  setV2CpuMax("500000 100000\n"); // quota=500000, period=100000 => 5.0 cores
+  setV2CpuEffective("0,2-4,6\n"); // 5 cores: 0, 2, 3, 4, 6
+
+  CgroupV2CpuStatsReader container_stats_reader(
+      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
+  CpuTimesV2 envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  EXPECT_TRUE(envoy_container_stats.is_valid);
+  EXPECT_DOUBLE_EQ(envoy_container_stats.effective_cores, 5.0); // min(5, 5)
+}
+
+// Test: All individual CPUs (e.g., "0,2,4,6")
+TEST_F(LinuxContainerCpuStatsReaderV2Test, ReadsCgroupV2StatsWithAllIndividualCpus) {
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  setV2CpuStat("usage_usec 500000\n");
+  setV2CpuMax("400000 100000\n"); // quota=400000, period=100000 => 4.0 cores
+  setV2CpuEffective("0,2,4,6\n"); // 4 cores: 0, 2, 4, 6
+
+  CgroupV2CpuStatsReader container_stats_reader(
+      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
+  CpuTimesV2 envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  EXPECT_TRUE(envoy_container_stats.is_valid);
+  EXPECT_DOUBLE_EQ(envoy_container_stats.effective_cores, 4.0); // min(4, 4)
+}
+
+// Test: Single element range (e.g., "5-5")
+TEST_F(LinuxContainerCpuStatsReaderV2Test, ReadsCgroupV2StatsWithSingleElementRange) {
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  setV2CpuStat("usage_usec 500000\n");
+  setV2CpuMax("100000 100000\n"); // quota=100000, period=100000 => 1.0 core
+  setV2CpuEffective("5-5\n");     // 1 core: 5
+
+  CgroupV2CpuStatsReader container_stats_reader(
+      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
+  CpuTimesV2 envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  EXPECT_TRUE(envoy_container_stats.is_valid);
+  EXPECT_DOUBLE_EQ(envoy_container_stats.effective_cores, 1.0); // min(1, 1)
+}
+
+// Test: Zero-based range (e.g., "0-0")
+TEST_F(LinuxContainerCpuStatsReaderV2Test, ReadsCgroupV2StatsWithZeroBasedRange) {
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  setV2CpuStat("usage_usec 500000\n");
+  setV2CpuMax("100000 100000\n"); // quota=100000, period=100000 => 1.0 core
+  setV2CpuEffective("0-0\n");     // 1 core: 0
+
+  CgroupV2CpuStatsReader container_stats_reader(
+      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
+  CpuTimesV2 envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  EXPECT_TRUE(envoy_container_stats.is_valid);
+  EXPECT_DOUBLE_EQ(envoy_container_stats.effective_cores, 1.0); // min(1, 1)
+}
+
 // Test: Missing usage_usec in cpu.stat
 TEST_F(LinuxContainerCpuStatsReaderV2Test, MissingUsageUsecInCpuStat) {
   TimeSource& test_time_source = timeSource();
