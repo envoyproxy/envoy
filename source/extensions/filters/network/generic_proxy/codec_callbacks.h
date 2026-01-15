@@ -19,8 +19,8 @@ namespace GenericProxy {
  * the request or response.
  */
 struct StartTime {
-  SystemTime start_time{};
-  MonotonicTime start_time_monotonic{};
+  SystemTime start_time;
+  MonotonicTime start_time_monotonic;
 };
 
 /**

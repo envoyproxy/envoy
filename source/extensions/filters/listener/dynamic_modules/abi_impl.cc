@@ -387,6 +387,87 @@ void envoy_dynamic_module_callback_listener_filter_close_socket(
   }
 }
 
+int64_t envoy_dynamic_module_callback_listener_filter_get_socket_fd(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  auto* callbacks = filter->callbacks();
+  if (callbacks == nullptr) {
+    return -1;
+  }
+  return callbacks->socket().ioHandle().fdDoNotUse();
+}
+
+bool envoy_dynamic_module_callback_listener_filter_set_socket_option_int(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr, int64_t level,
+    int64_t name, int64_t value) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  auto* callbacks = filter->callbacks();
+  if (callbacks == nullptr) {
+    return false;
+  }
+
+  int int_value = static_cast<int>(value);
+  auto result = callbacks->socket().setSocketOption(static_cast<int>(level), static_cast<int>(name),
+                                                    &int_value, sizeof(int_value));
+  return result.return_value_ == 0;
+}
+
+bool envoy_dynamic_module_callback_listener_filter_set_socket_option_bytes(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr, int64_t level,
+    int64_t name, envoy_dynamic_module_type_module_buffer value) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  auto* callbacks = filter->callbacks();
+  if (callbacks == nullptr || value.ptr == nullptr) {
+    return false;
+  }
+
+  auto result =
+      callbacks->socket().setSocketOption(static_cast<int>(level), static_cast<int>(name),
+                                          value.ptr, static_cast<socklen_t>(value.length));
+  return result.return_value_ == 0;
+}
+
+bool envoy_dynamic_module_callback_listener_filter_get_socket_option_int(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr, int64_t level,
+    int64_t name, int64_t* value_out) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  auto* callbacks = filter->callbacks();
+  if (callbacks == nullptr || value_out == nullptr) {
+    return false;
+  }
+
+  int int_value = 0;
+  socklen_t optlen = sizeof(int_value);
+  auto result = callbacks->socket().getSocketOption(static_cast<int>(level), static_cast<int>(name),
+                                                    &int_value, &optlen);
+  if (result.return_value_ != 0) {
+    return false;
+  }
+
+  *value_out = int_value;
+  return true;
+}
+
+bool envoy_dynamic_module_callback_listener_filter_get_socket_option_bytes(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr, int64_t level,
+    int64_t name, char* value_out, size_t value_size, size_t* actual_size_out) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  auto* callbacks = filter->callbacks();
+  if (callbacks == nullptr || value_out == nullptr || actual_size_out == nullptr) {
+    return false;
+  }
+
+  socklen_t optlen = static_cast<socklen_t>(value_size);
+  auto result = callbacks->socket().getSocketOption(static_cast<int>(level), static_cast<int>(name),
+                                                    value_out, &optlen);
+  if (result.return_value_ != 0) {
+    return false;
+  }
+
+  *actual_size_out = optlen;
+  return true;
+}
+
 void envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata(
     envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer filter_namespace,

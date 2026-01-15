@@ -1970,6 +1970,32 @@ typedef void* envoy_dynamic_module_type_network_filter_envoy_ptr;
 typedef const void* envoy_dynamic_module_type_network_filter_module_ptr;
 
 /**
+ * envoy_dynamic_module_type_network_filter_scheduler_module_ptr is a raw pointer to the
+ * DynamicModuleNetworkFilterScheduler class in Envoy.
+ *
+ * OWNERSHIP: The allocation is done by Envoy but the module is responsible for managing the
+ * lifetime of the pointer. Notably, it must be explicitly destroyed by the module
+ * when scheduling the network filter event is done. The creation of this pointer is done by
+ * envoy_dynamic_module_callback_network_filter_scheduler_new and the scheduling and destruction is
+ * done by envoy_dynamic_module_callback_network_filter_scheduler_delete. Since its lifecycle is
+ * owned/managed by the module, this has _module_ptr suffix.
+ */
+typedef void* envoy_dynamic_module_type_network_filter_scheduler_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_network_filter_config_scheduler_module_ptr is a raw pointer to the
+ * DynamicModuleNetworkFilterConfigScheduler class in Envoy.
+ *
+ * OWNERSHIP: The allocation is done by Envoy but the module is responsible for managing the
+ * lifetime of the pointer. Notably, it must be explicitly destroyed by the module
+ * when scheduling the network filter config event is done. The creation of this pointer is done by
+ * envoy_dynamic_module_callback_network_filter_config_scheduler_new and the scheduling and
+ * destruction is done by envoy_dynamic_module_callback_network_filter_config_scheduler_delete.
+ * Since its lifecycle is owned/managed by the module, this has _module_ptr suffix.
+ */
+typedef void* envoy_dynamic_module_type_network_filter_config_scheduler_module_ptr;
+
+/**
  * envoy_dynamic_module_type_on_network_filter_data_status represents the status of the filter
  * after processing data. This corresponds to `Network::FilterStatus` in envoy/network/filter.h.
  */
@@ -2163,6 +2189,31 @@ void envoy_dynamic_module_on_network_filter_http_callout_done(
     envoy_dynamic_module_type_http_callout_result result,
     envoy_dynamic_module_type_envoy_http_header* headers, size_t headers_size,
     envoy_dynamic_module_type_envoy_buffer* body_chunks, size_t body_chunks_size);
+
+/**
+ * envoy_dynamic_module_on_network_filter_scheduled is called when the event is scheduled via
+ * envoy_dynamic_module_callback_network_filter_scheduler_commit callback.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param filter_module_ptr is the pointer to the in-module network filter.
+ * @param event_id is the ID of the event. This is the same value as the one passed to
+ * envoy_dynamic_module_callback_network_filter_scheduler_commit.
+ */
+void envoy_dynamic_module_on_network_filter_scheduled(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_network_filter_module_ptr filter_module_ptr, uint64_t event_id);
+
+/**
+ * envoy_dynamic_module_on_network_filter_config_scheduled is called when the event is scheduled via
+ * envoy_dynamic_module_callback_network_filter_config_scheduler_commit callback.
+ *
+ * @param filter_config_ptr is the pointer to the in-module network filter configuration.
+ * @param event_id is the ID of the event. This is the same value as the one passed to
+ * envoy_dynamic_module_callback_network_filter_config_scheduler_commit.
+ */
+void envoy_dynamic_module_on_network_filter_config_scheduled(
+    envoy_dynamic_module_type_network_filter_config_module_ptr filter_config_ptr,
+    uint64_t event_id);
 
 // =============================================================================
 // Network Filter Callbacks
@@ -2922,6 +2973,102 @@ bool envoy_dynamic_module_callback_network_filter_has_upstream_host(
 bool envoy_dynamic_module_callback_network_filter_start_upstream_secure_transport(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr);
 
+// ---------------------- Network filter scheduler callbacks -------------------
+
+/**
+ * envoy_dynamic_module_callback_network_filter_scheduler_new is called by the module to create a
+ * new network filter scheduler. The scheduler is used to dispatch network filter operations from
+ * any thread including the ones managed by the module.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object of the
+ * corresponding network filter.
+ * @return envoy_dynamic_module_type_network_filter_scheduler_module_ptr is the pointer to the
+ * created network filter scheduler.
+ *
+ * NOTE: it is caller's responsibility to delete the scheduler using
+ * envoy_dynamic_module_callback_network_filter_scheduler_delete when it is no longer needed.
+ * See the comment on envoy_dynamic_module_type_network_filter_scheduler_module_ptr.
+ */
+envoy_dynamic_module_type_network_filter_scheduler_module_ptr
+envoy_dynamic_module_callback_network_filter_scheduler_new(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_scheduler_commit is called by the module to
+ * schedule a generic event to the network filter on the worker thread it is running on.
+ *
+ * This will eventually end up invoking envoy_dynamic_module_on_network_filter_scheduled
+ * event hook on the worker thread.
+ *
+ * This can be called multiple times to schedule multiple events to the same filter.
+ *
+ * @param scheduler_module_ptr is the pointer to the network filter scheduler created by
+ * envoy_dynamic_module_callback_network_filter_scheduler_new.
+ * @param event_id is the ID of the event. This can be used to differentiate between multiple
+ * events scheduled to the same filter. It can be any module-defined value.
+ */
+void envoy_dynamic_module_callback_network_filter_scheduler_commit(
+    envoy_dynamic_module_type_network_filter_scheduler_module_ptr scheduler_module_ptr,
+    uint64_t event_id);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_scheduler_delete is called by the module to delete
+ * the network filter scheduler created by
+ * envoy_dynamic_module_callback_network_filter_scheduler_new.
+ *
+ * @param scheduler_module_ptr is the pointer to the network filter scheduler created by
+ * envoy_dynamic_module_callback_network_filter_scheduler_new.
+ */
+void envoy_dynamic_module_callback_network_filter_scheduler_delete(
+    envoy_dynamic_module_type_network_filter_scheduler_module_ptr scheduler_module_ptr);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_config_scheduler_new is called by the module to
+ * create a new network filter configuration scheduler. The scheduler is used to dispatch network
+ * filter configuration operations to the main thread from any thread including the ones managed by
+ * the module.
+ *
+ * @param filter_config_envoy_ptr is the pointer to the DynamicModuleNetworkFilterConfig object.
+ * @return envoy_dynamic_module_type_network_filter_config_scheduler_module_ptr is the pointer to
+ * the created network filter configuration scheduler.
+ *
+ * NOTE: it is caller's responsibility to delete the scheduler using
+ * envoy_dynamic_module_callback_network_filter_config_scheduler_delete when it is no longer needed.
+ * See the comment on envoy_dynamic_module_type_network_filter_config_scheduler_module_ptr.
+ */
+envoy_dynamic_module_type_network_filter_config_scheduler_module_ptr
+envoy_dynamic_module_callback_network_filter_config_scheduler_new(
+    envoy_dynamic_module_type_network_filter_config_envoy_ptr filter_config_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_config_scheduler_delete is called by the module to
+ * delete the network filter configuration scheduler created by
+ * envoy_dynamic_module_callback_network_filter_config_scheduler_new.
+ *
+ * @param scheduler_module_ptr is the pointer to the network filter configuration scheduler created
+ * by envoy_dynamic_module_callback_network_filter_config_scheduler_new.
+ */
+void envoy_dynamic_module_callback_network_filter_config_scheduler_delete(
+    envoy_dynamic_module_type_network_filter_config_scheduler_module_ptr scheduler_module_ptr);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_config_scheduler_commit is called by the module to
+ * schedule a generic event to the network filter configuration on the main thread.
+ *
+ * This will eventually end up invoking envoy_dynamic_module_on_network_filter_config_scheduled
+ * event hook on the main thread.
+ *
+ * This can be called multiple times to schedule multiple events to the same filter configuration.
+ *
+ * @param scheduler_module_ptr is the pointer to the network filter configuration scheduler created
+ * by envoy_dynamic_module_callback_network_filter_config_scheduler_new.
+ * @param event_id is the ID of the event. This can be used to differentiate between multiple
+ * events scheduled to the same filter configuration. It can be any module-defined value.
+ */
+void envoy_dynamic_module_callback_network_filter_config_scheduler_commit(
+    envoy_dynamic_module_type_network_filter_config_scheduler_module_ptr scheduler_module_ptr,
+    uint64_t event_id);
+
 // =============================================================================
 // ============================= Listener Filter ===============================
 // =============================================================================
@@ -3403,6 +3550,79 @@ void envoy_dynamic_module_callback_listener_filter_use_original_dst(
  */
 void envoy_dynamic_module_callback_listener_filter_close_socket(
     envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr);
+
+// ---------------------- Socket Option Callbacks ------------------------------
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_socket_fd is called by the module to get the
+ * raw socket file descriptor for advanced socket manipulations.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @return the socket file descriptor, or -1 if the socket is not available.
+ */
+int64_t envoy_dynamic_module_callback_listener_filter_get_socket_fd(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_set_socket_option_int sets an integer socket option
+ * on the accepted socket (@see man 2 setsockopt).
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param level is the socket option level (e.g., SOL_SOCKET, IPPROTO_TCP).
+ * @param name is the socket option name (e.g., SO_KEEPALIVE, TCP_NODELAY).
+ * @param value is the integer value for the socket option.
+ * @return true if the socket option was set successfully, false otherwise.
+ */
+bool envoy_dynamic_module_callback_listener_filter_set_socket_option_int(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr, int64_t level,
+    int64_t name, int64_t value);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_set_socket_option_bytes sets a bytes socket option
+ * on the accepted socket (@see man 2 setsockopt).
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param level is the socket option level (e.g., SOL_SOCKET, IPPROTO_TCP).
+ * @param name is the socket option name (e.g., SO_KEEPALIVE, TCP_NODELAY).
+ * @param value is the byte buffer value for the socket option.
+ * @return true if the socket option was set successfully, false otherwise.
+ */
+bool envoy_dynamic_module_callback_listener_filter_set_socket_option_bytes(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr, int64_t level,
+    int64_t name, envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_socket_option_int retrieves an integer socket
+ * option value from the accepted socket (@see man 2 getsockopt). This reads the actual value from
+ * the socket, including options set by other filters or the system.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param level is the socket option level (e.g., SOL_SOCKET, IPPROTO_TCP).
+ * @param name is the socket option name (e.g., SO_KEEPALIVE, TCP_NODELAY).
+ * @param value_out is the pointer to store the retrieved integer value.
+ * @return true if the option was retrieved successfully, false otherwise.
+ */
+bool envoy_dynamic_module_callback_listener_filter_get_socket_option_int(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr, int64_t level,
+    int64_t name, int64_t* value_out);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_socket_option_bytes retrieves a bytes socket
+ * option value from the accepted socket (@see man 2 getsockopt). This reads the actual value from
+ * the socket, including options set by other filters or the system.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param level is the socket option level (e.g., SOL_SOCKET, IPPROTO_TCP).
+ * @param name is the socket option name (e.g., SO_KEEPALIVE, TCP_NODELAY).
+ * @param value_out is the pointer to store the retrieved buffer. The module should pre-allocate the
+ * buffer with sufficient size before calling this function.
+ * @param value_size is the size of the pre-allocated buffer.
+ * @param actual_size_out is the pointer to store the actual size of the option value.
+ * @return true if the option was retrieved successfully, false otherwise.
+ */
+bool envoy_dynamic_module_callback_listener_filter_get_socket_option_bytes(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr, int64_t level,
+    int64_t name, char* value_out, size_t value_size, size_t* actual_size_out);
 
 // ------------------------- Filter State Operations ---------------------------
 
@@ -4718,6 +4938,127 @@ envoy_dynamic_module_type_metrics_result
 envoy_dynamic_module_callback_access_logger_record_histogram_value(
     envoy_dynamic_module_type_access_logger_config_envoy_ptr config_envoy_ptr, size_t id,
     uint64_t value);
+
+// =============================================================================
+// =========================== Bootstrap Extension =============================
+// =============================================================================
+
+// =============================================================================
+// Bootstrap Extension Types
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr is a raw pointer to the
+ * DynamicModuleBootstrapExtensionConfig class in Envoy.
+ *
+ * OWNERSHIP: Envoy owns the pointer.
+ */
+typedef void* envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_bootstrap_extension_config_module_ptr is a pointer to an in-module
+ * bootstrap extension configuration.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer.
+ */
+typedef const void* envoy_dynamic_module_type_bootstrap_extension_config_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_bootstrap_extension_envoy_ptr is a raw pointer to the
+ * DynamicModuleBootstrapExtension class in Envoy.
+ *
+ * OWNERSHIP: Envoy owns the pointer.
+ */
+typedef void* envoy_dynamic_module_type_bootstrap_extension_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_bootstrap_extension_module_ptr is a pointer to an in-module bootstrap
+ * extension.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer.
+ */
+typedef const void* envoy_dynamic_module_type_bootstrap_extension_module_ptr;
+
+// =============================================================================
+// Bootstrap Extension Event Hooks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_on_bootstrap_extension_config_new is called by the main thread when the
+ * bootstrap extension config is loaded. The function returns a
+ * envoy_dynamic_module_type_bootstrap_extension_config_module_ptr for the given name and config.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object for the corresponding config.
+ * @param name is the name of the extension.
+ * @param config is the configuration for the extension.
+ * @return envoy_dynamic_module_type_bootstrap_extension_config_module_ptr is the pointer to the
+ * in-module bootstrap extension configuration. Returning nullptr indicates a failure to initialize
+ * the module. When it fails, the extension configuration will be rejected.
+ */
+envoy_dynamic_module_type_bootstrap_extension_config_module_ptr
+envoy_dynamic_module_on_bootstrap_extension_config_new(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config);
+
+/**
+ * envoy_dynamic_module_on_bootstrap_extension_config_destroy is called when the bootstrap extension
+ * configuration is destroyed in Envoy. The module should release any resources associated with the
+ * corresponding in-module bootstrap extension configuration.
+ *
+ * @param extension_config_ptr is the pointer to the in-module bootstrap extension configuration
+ * whose corresponding Envoy bootstrap extension configuration is being destroyed.
+ */
+void envoy_dynamic_module_on_bootstrap_extension_config_destroy(
+    envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_ptr);
+
+/**
+ * envoy_dynamic_module_on_bootstrap_extension_new is called when a new bootstrap extension is
+ * created.
+ *
+ * @param extension_config_ptr is the pointer to the in-module bootstrap extension configuration.
+ * @param extension_envoy_ptr is the pointer to the DynamicModuleBootstrapExtension object of the
+ * corresponding bootstrap extension.
+ * @return envoy_dynamic_module_type_bootstrap_extension_module_ptr is the pointer to the in-module
+ * bootstrap extension. Returning nullptr indicates a failure to initialize the module. When it
+ * fails, the extension will be rejected.
+ */
+envoy_dynamic_module_type_bootstrap_extension_module_ptr
+envoy_dynamic_module_on_bootstrap_extension_new(
+    envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_envoy_ptr extension_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_on_bootstrap_extension_server_initialized is called when the server is
+ * initialized. This is called on the main thread after the ServerFactoryContext is fully
+ * initialized.
+ *
+ * @param extension_envoy_ptr is the pointer to the DynamicModuleBootstrapExtension object.
+ * @param extension_module_ptr is the pointer to the in-module bootstrap extension.
+ */
+void envoy_dynamic_module_on_bootstrap_extension_server_initialized(
+    envoy_dynamic_module_type_bootstrap_extension_envoy_ptr extension_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_module_ptr extension_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_bootstrap_extension_worker_thread_initialized is called when a worker
+ * thread is initialized. This is called once per worker thread.
+ *
+ * @param extension_envoy_ptr is the pointer to the DynamicModuleBootstrapExtension object.
+ * @param extension_module_ptr is the pointer to the in-module bootstrap extension.
+ */
+void envoy_dynamic_module_on_bootstrap_extension_worker_thread_initialized(
+    envoy_dynamic_module_type_bootstrap_extension_envoy_ptr extension_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_module_ptr extension_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_bootstrap_extension_destroy is called when the bootstrap extension is
+ * destroyed.
+ *
+ * @param extension_module_ptr is the pointer to the in-module bootstrap extension.
+ */
+void envoy_dynamic_module_on_bootstrap_extension_destroy(
+    envoy_dynamic_module_type_bootstrap_extension_module_ptr extension_module_ptr);
 
 #ifdef __cplusplus
 }
