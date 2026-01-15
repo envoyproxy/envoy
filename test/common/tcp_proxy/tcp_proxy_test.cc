@@ -1001,8 +1001,8 @@ TEST_P(TcpProxyTest, StreamDecoderFilterCallbacks) {
   EXPECT_NO_THROW(stream_decoder_callbacks.encodeMetadata(nullptr));
   EXPECT_NO_THROW(stream_decoder_callbacks.onDecoderFilterAboveWriteBufferHighWatermark());
   EXPECT_NO_THROW(stream_decoder_callbacks.onDecoderFilterBelowWriteBufferLowWatermark());
-  EXPECT_NO_THROW(stream_decoder_callbacks.setDecoderBufferLimit(uint32_t{0}));
-  EXPECT_NO_THROW(stream_decoder_callbacks.decoderBufferLimit());
+  EXPECT_NO_THROW(stream_decoder_callbacks.setBufferLimit(uint32_t{0}));
+  EXPECT_NO_THROW(stream_decoder_callbacks.bufferLimit());
   EXPECT_NO_THROW(stream_decoder_callbacks.recreateStream(nullptr));
   EXPECT_NO_THROW(stream_decoder_callbacks.getUpstreamSocketOptions());
   Network::Socket::OptionsSharedPtr sock_options =
@@ -1034,7 +1034,7 @@ TEST_P(TcpProxyTest, StreamDecoderFilterCallbacks) {
   EXPECT_NO_THROW(stream_decoder_callbacks.encodeHeaders(nullptr, false, ""));
   EXPECT_NO_THROW(stream_decoder_callbacks.encodeData(inject_data, false));
   EXPECT_NO_THROW(stream_decoder_callbacks.encodeTrailers(nullptr));
-  EXPECT_NO_THROW(stream_decoder_callbacks.setDecoderBufferLimit(0));
+  EXPECT_NO_THROW(stream_decoder_callbacks.setBufferLimit(0));
   std::array<char, 256> buffer;
   OutputBufferStream ostream{buffer.data(), buffer.size()};
   EXPECT_NO_THROW(stream_decoder_callbacks.dumpState(ostream, 0));

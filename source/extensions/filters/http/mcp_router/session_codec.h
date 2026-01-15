@@ -20,7 +20,7 @@ public:
   static std::string encode(const std::string& data);
   static std::string decode(const std::string& encoded);
 
-  // Format: {route}@{subject}@{backend1}:{base64(sid1)},{backend2}:{base64(sid2)}
+  // Format: {route}@{base64(subject)}@{backend1}:{base64(sid1)},{backend2}:{base64(sid2)}
   static std::string
   buildCompositeSessionId(const std::string& route, const std::string& subject,
                           const absl::flat_hash_map<std::string, std::string>& backend_sessions);

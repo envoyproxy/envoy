@@ -81,6 +81,13 @@ size_t DynamicModuleListenerFilter::maxReadBytes() const {
       const_cast<DynamicModuleListenerFilter*>(this)->thisAsVoidPtr(), in_module_filter_);
 }
 
+void DynamicModuleListenerFilter::onScheduled(uint64_t event_id) {
+  // By the time this event is invoked, the filter might be destroyed.
+  if (in_module_filter_ && config_->on_listener_filter_scheduled_) {
+    config_->on_listener_filter_scheduled_(thisAsVoidPtr(), in_module_filter_, event_id);
+  }
+}
+
 } // namespace ListenerFilters
 } // namespace DynamicModules
 } // namespace Extensions
