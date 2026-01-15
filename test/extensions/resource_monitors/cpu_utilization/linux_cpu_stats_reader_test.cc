@@ -713,6 +713,12 @@ TEST_F(LinuxContainerCpuStatsReaderTest, V1GetUtilizationFirstCallReturnsZero) {
 
   ASSERT_TRUE(result.ok());
   EXPECT_DOUBLE_EQ(result.value(), 0.0);
+
+  // Also test negative work_over_period error scenario (cpu_times decreased)
+  setCpuTimes("500\n");
+  result = container_stats_reader.getUtilization();
+  EXPECT_FALSE(result.ok());
+  EXPECT_NE(result.status().message().find("Work_over_period"), std::string::npos);
 }
 
 TEST_F(LinuxContainerCpuStatsReaderV2Test, V2GetUtilizationFirstCallReturnsZero) {
@@ -728,6 +734,12 @@ TEST_F(LinuxContainerCpuStatsReaderV2Test, V2GetUtilizationFirstCallReturnsZero)
 
   ASSERT_TRUE(result.ok());
   EXPECT_DOUBLE_EQ(result.value(), 0.0);
+
+  // Also test negative work_over_period error scenario (usage decreased)
+  setV2CpuStat("usage_usec 400000\n");
+  result = container_stats_reader.getUtilization();
+  EXPECT_FALSE(result.ok());
+  EXPECT_NE(result.status().message().find("Work_over_period"), std::string::npos);
 }
 
 } // namespace
