@@ -169,11 +169,11 @@ ContextImpl::ContextImpl(
     if (Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.tls_support_certificate_compression")) {
       // Priority: brotli > zstd > zlib (brotli generally provides best compression for certs)
-      CertCompression::registerAlgorithms(
-          ctx.ssl_ctx_.get(),
-          {CertCompression::Algorithm::Brotli, CertCompression::Algorithm::Zstd,
-           CertCompression::Algorithm::Zlib},
-          &scope);
+      CertCompression::registerAlgorithms(ctx.ssl_ctx_.get(),
+                                          {CertCompression::Algorithm::Brotli,
+                                           CertCompression::Algorithm::Zstd,
+                                           CertCompression::Algorithm::Zlib},
+                                          &scope);
     }
   }
 
@@ -581,7 +581,6 @@ void ContextImpl::logHandshake(SSL* ssl) const {
   if (SSL_was_key_usage_invalid(ssl)) {
     stats_.was_key_usage_invalid_.inc();
   }
-
 }
 
 std::vector<Ssl::PrivateKeyMethodProviderSharedPtr> ContextImpl::getPrivateKeyMethodProviders() {

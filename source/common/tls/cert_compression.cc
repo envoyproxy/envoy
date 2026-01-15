@@ -76,8 +76,7 @@ void CertCompression::registerZlib(SSL_CTX* ssl_ctx) {
   ASSERT(ret == 1);
 }
 
-void CertCompression::registerAlgorithms(SSL_CTX* ssl_ctx,
-                                         const std::vector<Algorithm>& algorithms,
+void CertCompression::registerAlgorithms(SSL_CTX* ssl_ctx, const std::vector<Algorithm>& algorithms,
                                          Stats::Scope* scope) {
   if (scope != nullptr) {
     SSL_CTX_set_ex_data(ssl_ctx, getScopeExDataIndex(), scope);
@@ -137,8 +136,7 @@ int CertCompression::decompressBrotli(SSL*, CRYPTO_BUFFER** out, size_t uncompre
   }
 
   size_t decoded_size = uncompressed_len;
-  BrotliDecoderResult result =
-      BrotliDecoderDecompress(in_len, in, &decoded_size, out_buf);
+  BrotliDecoderResult result = BrotliDecoderDecompress(in_len, in, &decoded_size, out_buf);
 
   if (result != BROTLI_DECODER_RESULT_SUCCESS) {
     ENVOY_LOG_PERIODIC(error, std::chrono::seconds(10),
@@ -178,7 +176,8 @@ int CertCompression::compressZstd(SSL* ssl, CBB* out, const uint8_t* in, size_t 
 
   size_t const compressed_size = ZSTD_compress(out_buf, max_size, in, in_len, ZSTD_CLEVEL_DEFAULT);
   if (ZSTD_isError(compressed_size)) {
-    IS_ENVOY_BUG(fmt::format("Cert zstd compression failure: {}", ZSTD_getErrorName(compressed_size)));
+    IS_ENVOY_BUG(
+        fmt::format("Cert zstd compression failure: {}", ZSTD_getErrorName(compressed_size)));
     return FAILURE;
   }
 

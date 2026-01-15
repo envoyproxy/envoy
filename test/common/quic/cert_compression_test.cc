@@ -13,8 +13,7 @@ using TlsCertCompression = Extensions::TransportSockets::Tls::CertCompression;
 TEST(CertCompressionZlibTest, DecompressBadData) {
   EXPECT_LOG_CONTAINS(
       "error",
-      "Cert zlib decompression failure, possibly caused by invalid compressed cert from peer",
-      {
+      "Cert zlib decompression failure, possibly caused by invalid compressed cert from peer", {
         CRYPTO_BUFFER* out = nullptr;
         const uint8_t bad_compressed_data = 1;
         EXPECT_EQ(TlsCertCompression::FAILURE,
@@ -28,8 +27,9 @@ TEST(CertCompressionZlibTest, DecompressBadLength) {
   constexpr size_t uncompressed_len = 6;
   bssl::ScopedCBB compressed;
   ASSERT_EQ(1, CBB_init(compressed.get(), 0));
-  ASSERT_EQ(TlsCertCompression::SUCCESS,
-            TlsCertCompression::compressZlib(nullptr, compressed.get(), the_data, uncompressed_len));
+  ASSERT_EQ(
+      TlsCertCompression::SUCCESS,
+      TlsCertCompression::compressZlib(nullptr, compressed.get(), the_data, uncompressed_len));
   const auto compressed_len = CBB_len(compressed.get());
   EXPECT_NE(0, compressed_len);
 

@@ -7930,10 +7930,10 @@ TEST_P(SslSocketTest, CertificateCompressionEnabled) {
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_tls_context;
   envoy::extensions::transport_sockets::tls::v3::TlsCertificate* server_cert =
       server_tls_context.mutable_common_tls_context()->add_tls_certificates();
-  server_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
-      "{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"));
-  server_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
-      "{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem"));
+  server_cert->mutable_certificate_chain()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"));
+  server_cert->mutable_private_key()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem"));
 
   updateFilterChain(server_tls_context, *filter_chain);
 
@@ -7956,10 +7956,10 @@ TEST_P(SslSocketTest, CertificateCompressionDisabled) {
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_tls_context;
   envoy::extensions::transport_sockets::tls::v3::TlsCertificate* server_cert =
       server_tls_context.mutable_common_tls_context()->add_tls_certificates();
-  server_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
-      "{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"));
-  server_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
-      "{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem"));
+  server_cert->mutable_certificate_chain()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"));
+  server_cert->mutable_private_key()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem"));
 
   updateFilterChain(server_tls_context, *filter_chain);
 

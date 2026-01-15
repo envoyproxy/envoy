@@ -42,8 +42,7 @@ TEST(CertCompressionBrotliTest, RoundTrip) {
 TEST(CertCompressionBrotliTest, DecompressBadData) {
   EXPECT_LOG_CONTAINS(
       "error",
-      "Cert brotli decompression failure, possibly caused by invalid compressed cert from peer",
-      {
+      "Cert brotli decompression failure, possibly caused by invalid compressed cert from peer", {
         CRYPTO_BUFFER* out = nullptr;
         const uint8_t bad_compressed_data = 1;
         EXPECT_EQ(CertCompression::FAILURE,
@@ -60,16 +59,14 @@ TEST(CertCompressionBrotliTest, DecompressBadLength) {
   const auto compressed_len = CBB_len(compressed.get());
   EXPECT_GT(compressed_len, 0u);
 
-  EXPECT_LOG_CONTAINS("error",
-                      "Brotli decompression length did not match peer provided uncompressed length",
-                      {
-                        CRYPTO_BUFFER* out = nullptr;
-                        EXPECT_EQ(CertCompression::FAILURE,
-                                  CertCompression::decompressBrotli(
-                                      nullptr, &out,
-                                      kTestDataLen + 1 /* intentionally incorrect */,
-                                      CBB_data(compressed.get()), compressed_len));
-                      });
+  EXPECT_LOG_CONTAINS(
+      "error", "Brotli decompression length did not match peer provided uncompressed length", {
+        CRYPTO_BUFFER* out = nullptr;
+        EXPECT_EQ(CertCompression::FAILURE,
+                  CertCompression::decompressBrotli(nullptr, &out,
+                                                    kTestDataLen + 1 /* intentionally incorrect */,
+                                                    CBB_data(compressed.get()), compressed_len));
+      });
 }
 
 //
@@ -88,8 +85,8 @@ TEST(CertCompressionZstdTest, RoundTrip) {
   // Decompress
   CRYPTO_BUFFER* out = nullptr;
   EXPECT_EQ(CertCompression::SUCCESS,
-            CertCompression::decompressZstd(nullptr, &out, kTestDataLen,
-                                            CBB_data(compressed.get()), compressed_len));
+            CertCompression::decompressZstd(nullptr, &out, kTestDataLen, CBB_data(compressed.get()),
+                                            compressed_len));
   ASSERT_NE(nullptr, out);
   bssl::UniquePtr<CRYPTO_BUFFER> out_ptr(out);
 
@@ -101,8 +98,7 @@ TEST(CertCompressionZstdTest, RoundTrip) {
 TEST(CertCompressionZstdTest, DecompressBadData) {
   EXPECT_LOG_CONTAINS(
       "error",
-      "Cert zstd decompression failure, possibly caused by invalid compressed cert from peer",
-      {
+      "Cert zstd decompression failure, possibly caused by invalid compressed cert from peer", {
         CRYPTO_BUFFER* out = nullptr;
         const uint8_t bad_compressed_data = 1;
         EXPECT_EQ(CertCompression::FAILURE,
@@ -119,16 +115,14 @@ TEST(CertCompressionZstdTest, DecompressBadLength) {
   const auto compressed_len = CBB_len(compressed.get());
   EXPECT_GT(compressed_len, 0u);
 
-  EXPECT_LOG_CONTAINS("error",
-                      "Zstd decompression length did not match peer provided uncompressed length",
-                      {
-                        CRYPTO_BUFFER* out = nullptr;
-                        EXPECT_EQ(CertCompression::FAILURE,
-                                  CertCompression::decompressZstd(
-                                      nullptr, &out,
-                                      kTestDataLen + 1 /* intentionally incorrect */,
-                                      CBB_data(compressed.get()), compressed_len));
-                      });
+  EXPECT_LOG_CONTAINS(
+      "error", "Zstd decompression length did not match peer provided uncompressed length", {
+        CRYPTO_BUFFER* out = nullptr;
+        EXPECT_EQ(CertCompression::FAILURE,
+                  CertCompression::decompressZstd(nullptr, &out,
+                                                  kTestDataLen + 1 /* intentionally incorrect */,
+                                                  CBB_data(compressed.get()), compressed_len));
+      });
 }
 
 //
@@ -147,8 +141,8 @@ TEST(CertCompressionZlibTest, RoundTrip) {
   // Decompress
   CRYPTO_BUFFER* out = nullptr;
   EXPECT_EQ(CertCompression::SUCCESS,
-            CertCompression::decompressZlib(nullptr, &out, kTestDataLen,
-                                            CBB_data(compressed.get()), compressed_len));
+            CertCompression::decompressZlib(nullptr, &out, kTestDataLen, CBB_data(compressed.get()),
+                                            compressed_len));
   ASSERT_NE(nullptr, out);
   bssl::UniquePtr<CRYPTO_BUFFER> out_ptr(out);
 
@@ -160,8 +154,7 @@ TEST(CertCompressionZlibTest, RoundTrip) {
 TEST(CertCompressionZlibTest, DecompressBadData) {
   EXPECT_LOG_CONTAINS(
       "error",
-      "Cert zlib decompression failure, possibly caused by invalid compressed cert from peer",
-      {
+      "Cert zlib decompression failure, possibly caused by invalid compressed cert from peer", {
         CRYPTO_BUFFER* out = nullptr;
         const uint8_t bad_compressed_data = 1;
         EXPECT_EQ(CertCompression::FAILURE,
@@ -186,8 +179,7 @@ TEST(CertCompressionZlibTest, DecompressBadLength) {
                         CRYPTO_BUFFER* out = nullptr;
                         EXPECT_EQ(CertCompression::FAILURE,
                                   CertCompression::decompressZlib(
-                                      nullptr, &out,
-                                      kTestDataLen + 1 /* intentionally incorrect */,
+                                      nullptr, &out, kTestDataLen + 1 /* intentionally incorrect */,
                                       CBB_data(compressed.get()), compressed_len));
                       });
 }

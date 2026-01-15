@@ -411,6 +411,7 @@ Prereq
 QDCOUNT
 QPACK
 QUIC
+QUICHE
 QoS
 qat
 qatzip
@@ -498,6 +499,7 @@ TE
 TFO
 TID
 TLS
+TLSEXT
 TLSv
 TLV
 TMPDIR
