@@ -31,7 +31,7 @@ private:
   CleanupFunc cleanup_;
 };
 
-// ex_data index for Stats::Scope* - avoids conflict with QUICHE's own SSL_CTX usage.
+// ex_data index for Stats::Scope* - avoids conflict with QUICHE own SSL_CTX usage.
 int getScopeExDataIndex() {
   static int index = SSL_CTX_get_ex_new_index(0, nullptr, nullptr, nullptr, nullptr);
   return index;

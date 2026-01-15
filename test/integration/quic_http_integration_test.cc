@@ -100,11 +100,13 @@ TEST_P(QuicHttpIntegrationTest, RuntimeEnableDraft29) {
 }
 
 TEST_P(QuicHttpIntegrationTest, CertCompressionEnabled) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.tls_support_certificate_compression",
+                                    "true");
   initialize();
 
   EXPECT_LOG_CONTAINS_ALL_OF(
-      Envoy::ExpectedLogMessages(
-          {{"trace", "Cert compression successful"}, {"trace", "Cert decompression successful"}}),
+      Envoy::ExpectedLogMessages({{"trace", "Cert brotli compression successful"},
+                                  {"trace", "Cert brotli decompression successful"}}),
       { testRouterHeaderOnlyRequestAndResponse(); });
 }
 
