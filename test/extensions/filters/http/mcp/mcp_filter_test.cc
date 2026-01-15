@@ -1,4 +1,5 @@
 #include "source/extensions/filters/http/mcp/mcp_filter.h"
+#include "source/extensions/filters/http/mcp/mcp_filter_state.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/factory_context.h"
@@ -766,6 +767,144 @@ TEST_F(McpFilterTest, PerRouteMaxBodySizeFallbackToGlobal) {
   // Should fallback to global limit of 512 bytes
   EXPECT_CALL(decoder_callbacks_, setDecoderBufferLimit(512));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+}
+
+// Test Builder pattern constructs object correctly
+TEST(McpFilterStateObjectTest, BuilderConstruction) {
+  auto obj = McpFilterStateObject::Builder()
+                 .setMethod("tools/call")
+                 .setId("123")
+                 .setJsonRpc("2.0")
+                 .addField("params.name", "my_tool")
+                 .build();
+
+  EXPECT_EQ(obj->method().value(), "tools/call");
+  EXPECT_EQ(obj->id().value(), "123");
+  EXPECT_EQ(obj->jsonrpc().value(), "2.0");
+  EXPECT_TRUE(obj->hasField("params.name"));
+  EXPECT_EQ(std::get<absl::string_view>(obj->getField("params.name")), "my_tool");
+}
+
+// Test Builder with only method
+TEST(McpFilterStateObjectTest, BuilderWithMethodOnly) {
+  auto obj = McpFilterStateObject::Builder().setMethod("initialize").build();
+
+  EXPECT_EQ(obj->method().value(), "initialize");
+  EXPECT_FALSE(obj->id().has_value());
+  EXPECT_FALSE(obj->jsonrpc().has_value());
+}
+
+// Test convenience accessors return nullopt for missing fields
+TEST(McpFilterStateObjectTest, AccessorsMissingFields) {
+  auto obj = McpFilterStateObject::Builder().addField("custom", "value").build();
+
+  EXPECT_FALSE(obj->method().has_value());
+  EXPECT_FALSE(obj->id().has_value());
+  EXPECT_FALSE(obj->jsonrpc().has_value());
+}
+
+// Test hasField returns correct boolean
+TEST(McpFilterStateObjectTest, HasFieldCheck) {
+  auto obj = McpFilterStateObject::Builder()
+                 .setMethod("tools/call")
+                 .addField("params.name", "my_tool")
+                 .build();
+
+  EXPECT_TRUE(obj->hasField("method"));
+  EXPECT_TRUE(obj->hasField("params.name"));
+  EXPECT_FALSE(obj->hasField("nonexistent"));
+  EXPECT_FALSE(obj->hasField("params.uri"));
+}
+
+// Test getField returns monostate for missing field
+TEST(McpFilterStateObjectTest, GetFieldMissing) {
+  auto obj = McpFilterStateObject::Builder().setMethod("test").build();
+
+  auto result = obj->getField("nonexistent");
+  EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result));
+}
+
+// Test getField returns correct string_view
+TEST(McpFilterStateObjectTest, GetFieldExists) {
+  auto obj =
+      McpFilterStateObject::Builder().addField("params.uri", "file:///path/to/resource").build();
+
+  auto result = obj->getField("params.uri");
+  EXPECT_TRUE(absl::holds_alternative<absl::string_view>(result));
+  EXPECT_EQ(std::get<absl::string_view>(result), "file:///path/to/resource");
+}
+
+// Test serialization returns JSON format
+TEST(McpFilterStateObjectTest, SerializationReturnsJson) {
+  auto obj = McpFilterStateObject::Builder().setMethod("prompts/get").build();
+
+  auto serialized = obj->serializeAsString();
+  ASSERT_TRUE(serialized.has_value());
+  EXPECT_THAT(serialized.value(), testing::HasSubstr("\"method\":\"prompts/get\""));
+}
+
+// Test serialization returns nullopt when empty
+TEST(McpFilterStateObjectTest, SerializationEmptyReturnsNullopt) {
+  auto obj = McpFilterStateObject::Builder().build();
+
+  auto serialized = obj->serializeAsString();
+  EXPECT_FALSE(serialized.has_value());
+}
+
+// Test hasFieldSupport returns true
+TEST(McpFilterStateObjectTest, HasFieldSupportEnabled) {
+  auto obj = McpFilterStateObject::Builder().build();
+  EXPECT_TRUE(obj->hasFieldSupport());
+}
+
+// Test fields() accessor
+TEST(McpFilterStateObjectTest, FieldsAccessor) {
+  auto obj = McpFilterStateObject::Builder()
+                 .setMethod("test")
+                 .setId("1")
+                 .addField("custom", "value")
+                 .build();
+
+  const auto& fields = obj->fields();
+  EXPECT_EQ(fields.size(), 3);
+  EXPECT_EQ(fields.at("method"), "test");
+  EXPECT_EQ(fields.at("id"), "1");
+  EXPECT_EQ(fields.at("custom"), "value");
+}
+
+// Test Builder move semantics.
+TEST(McpFilterStateObjectTest, BuilderMoveSemantics) {
+  McpFilterStateObject::Builder builder;
+  builder.setMethod("tools/call").addField("params.name", "large_value_test");
+
+  auto obj = builder.build();
+  EXPECT_EQ(obj->method().value(), "tools/call");
+
+  auto obj2 = builder.build();
+  EXPECT_FALSE(obj2->method().has_value());
+}
+
+// Test FilterState is set correctly after parsing valid MCP request
+TEST_F(McpFilterTest, FilterStateSetAfterParsing) {
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+
+  filter_->decodeHeaders(headers, false);
+
+  std::string json =
+      R"({"jsonrpc": "2.0", "method": "tools/call", "params": {"name": "my_tool"}, "id": 42})";
+  Buffer::OwnedImpl buffer(json);
+
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("mcp_proxy", _))
+      .WillOnce([](const std::string&, const Protobuf::Struct& metadata) {
+        EXPECT_TRUE(metadata.fields().contains("method"));
+        EXPECT_EQ(metadata.fields().at("method").string_value(), "tools/call");
+        EXPECT_TRUE(metadata.fields().contains("params"));
+      });
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
 }
 
 } // namespace

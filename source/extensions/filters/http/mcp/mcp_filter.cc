@@ -1,9 +1,14 @@
 #include "source/extensions/filters/http/mcp/mcp_filter.h"
 
+#include <functional>
+
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/http/mcp/mcp_filter_state.h"
+
+#include "absl/strings/str_cat.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -241,12 +246,37 @@ Http::FilterDataStatus McpFilter::completeParsing() {
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
 
-  // Set dynamic metadata
   const auto& metadata = parser_->metadata();
   if (!metadata.fields().empty()) {
+    McpFilterStateObject::Builder builder;
+
+    // Helper lambda to flatten nested structures with dotted keys
+    std::function<void(const Protobuf::Struct&, const std::string&)> flatten =
+        [&](const Protobuf::Struct& s, const std::string& prefix) {
+          for (const auto& [key, value] : s.fields()) {
+            std::string full_key = prefix.empty() ? key : absl::StrCat(prefix, ".", key);
+            if (value.has_string_value()) {
+              builder.addField(full_key, value.string_value());
+            } else if (value.has_struct_value()) {
+              flatten(value.struct_value(), full_key);
+            } else if (value.has_number_value()) {
+              builder.addField(full_key, absl::StrCat(static_cast<int64_t>(value.number_value())));
+            } else if (value.has_bool_value()) {
+              builder.addField(full_key, value.bool_value() ? "true" : "false");
+            }
+            // Skip null_value and list_value
+          }
+        };
+    flatten(metadata, "");
+
+    decoder_callbacks_->streamInfo().filterState()->setData(
+        std::string(McpFilterStateObject::FilterStateKey), builder.build(),
+        StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Request);
+
+    // Also set dynamic metadata.
     decoder_callbacks_->streamInfo().setDynamicMetadata(std::string(MetadataKeys::FilterName),
                                                         metadata);
-    ENVOY_LOG(debug, "MCP filter set dynamic metadata: {}", metadata.DebugString());
+    ENVOY_LOG(debug, "MCP filter set FilterState and dynamic metadata");
 
     if (config_->clearRouteCache()) {
       if (auto cb = decoder_callbacks_->downstreamCallbacks(); cb.has_value()) {
