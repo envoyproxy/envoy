@@ -23,6 +23,10 @@ The OAuth filter's flow involves:
   the :ref:`token_endpoint <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.token_endpoint>`. The filter knows it has to do this
   instead of reinitiating another login because the incoming request has a path that matches the
   :ref:`redirect_path_matcher <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.redirect_path_matcher>` criteria.
+  When :ref:`auth_type <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.auth_type>` is set to ``MUTUAL_TLS``,
+  client authentication is performed with the TLS client certificate (RFC 8705) and
+  ``token_secret`` is not required. The :ref:`token_endpoint <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.token_endpoint>`
+  must use a cluster configured with an mTLS transport socket (client certificate and key).
 * Upon receiving an access token, the filter sets cookies so that subseqeuent requests can skip the full
   flow. These cookies are calculated using the
   :ref:`hmac_secret <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Credentials.hmac_secret>`
@@ -93,6 +97,8 @@ The following is an example configuring the filter.
         name: hmac
         sds_config:
           path: "/etc/envoy/hmac.yaml"
+    # (Optional): client authentication method for token_endpoint
+    auth_type: "MUTUAL_TLS"
     # (Optional): defaults to 'user' scope if not provided
     auth_scopes:
     - user
