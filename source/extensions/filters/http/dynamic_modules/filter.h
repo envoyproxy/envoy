@@ -308,6 +308,51 @@ private:
   // unique identifier. We store the callback objects here to manage their lifetime.
   absl::flat_hash_map<uint64_t, std::unique_ptr<DynamicModuleHttpFilter::HttpStreamCalloutCallback>>
       http_stream_callouts_;
+
+  // Socket options storage for HTTP filters.
+  struct StoredSocketOption {
+    int64_t level;
+    int64_t name;
+    envoy_dynamic_module_type_socket_option_state state;
+    envoy_dynamic_module_type_socket_direction direction;
+    bool is_int;
+    int64_t int_value;
+    std::string byte_value;
+  };
+
+  std::vector<StoredSocketOption> socket_options_;
+
+public:
+  /**
+   * Store an integer socket option for the current stream and Surface it back to modules.
+   */
+  void storeSocketOptionInt(int64_t level, int64_t name,
+                            envoy_dynamic_module_type_socket_option_state state,
+                            envoy_dynamic_module_type_socket_direction direction, int64_t value);
+
+  /**
+   * Store a bytes socket option for the current stream and Surface it back to modules.
+   */
+  void storeSocketOptionBytes(int64_t level, int64_t name,
+                              envoy_dynamic_module_type_socket_option_state state,
+                              envoy_dynamic_module_type_socket_direction direction,
+                              absl::string_view value);
+
+  /**
+   * Retrieve an integer socket option by level/name/state/direction.
+   */
+  bool tryGetSocketOptionInt(int64_t level, int64_t name,
+                             envoy_dynamic_module_type_socket_option_state state,
+                             envoy_dynamic_module_type_socket_direction direction,
+                             int64_t& value_out) const;
+
+  /**
+   * Retrieve a bytes socket option by level/name/state/direction.
+   */
+  bool tryGetSocketOptionBytes(int64_t level, int64_t name,
+                               envoy_dynamic_module_type_socket_option_state state,
+                               envoy_dynamic_module_type_socket_direction direction,
+                               absl::string_view& value_out) const;
 };
 
 using DynamicModuleHttpFilterSharedPtr = std::shared_ptr<DynamicModuleHttpFilter>;

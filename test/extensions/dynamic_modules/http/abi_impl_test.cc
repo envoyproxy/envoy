@@ -446,6 +446,257 @@ TEST_F(DynamicModuleHttpFilterTest, AddCustomFlag) {
   envoy_dynamic_module_callback_http_add_custom_flag(filter_.get(), {flag.data(), flag.size()});
 }
 
+// =============================================================================
+// Tests for HTTP filter socket options.
+// =============================================================================
+
+TEST_F(DynamicModuleHttpFilterTest, SetAndGetSocketOptionInt) {
+  const int64_t level = 1;
+  const int64_t name = 2;
+  const int64_t value = 12345;
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_set_socket_option_int(
+      filter_.get(), level, name, envoy_dynamic_module_type_socket_option_state_Prebind,
+      envoy_dynamic_module_type_socket_direction_Upstream, value));
+
+  int64_t result = 0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_socket_option_int(
+      filter_.get(), level, name, envoy_dynamic_module_type_socket_option_state_Prebind,
+      envoy_dynamic_module_type_socket_direction_Upstream, &result));
+  EXPECT_EQ(value, result);
+}
+
+TEST_F(DynamicModuleHttpFilterTest, SetAndGetSocketOptionBytes) {
+  const int64_t level = 3;
+  const int64_t name = 4;
+  const std::string value = "socket-bytes";
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_set_socket_option_bytes(
+      filter_.get(), level, name, envoy_dynamic_module_type_socket_option_state_Bound,
+      envoy_dynamic_module_type_socket_direction_Upstream, {value.data(), value.size()}));
+
+  envoy_dynamic_module_type_envoy_buffer result;
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_socket_option_bytes(
+      filter_.get(), level, name, envoy_dynamic_module_type_socket_option_state_Bound,
+      envoy_dynamic_module_type_socket_direction_Upstream, &result));
+  EXPECT_EQ(value, std::string(result.ptr, result.length));
+}
+
+TEST_F(DynamicModuleHttpFilterTest, GetSocketOptionIntMissing) {
+  int64_t value = 0;
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_socket_option_int(
+      filter_.get(), 99, 100, envoy_dynamic_module_type_socket_option_state_Prebind,
+      envoy_dynamic_module_type_socket_direction_Upstream, &value));
+}
+
+TEST_F(DynamicModuleHttpFilterTest, GetSocketOptionBytesMissing) {
+  envoy_dynamic_module_type_envoy_buffer value_out;
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_socket_option_bytes(
+      filter_.get(), 99, 100, envoy_dynamic_module_type_socket_option_state_Bound,
+      envoy_dynamic_module_type_socket_direction_Upstream, &value_out));
+}
+
+TEST_F(DynamicModuleHttpFilterTest, SocketOptionInvalidState) {
+  // Test with invalid state value (cast an invalid value).
+  // Invalid state triggers ASSERT failure.
+  const auto invalid_state = static_cast<envoy_dynamic_module_type_socket_option_state>(999);
+  ASSERT_DEBUG_DEATH(envoy_dynamic_module_callback_http_set_socket_option_int(
+                         filter_.get(), 1, 2, invalid_state,
+                         envoy_dynamic_module_type_socket_direction_Upstream, 100),
+                     "");
+
+  int64_t result = 0;
+  ASSERT_DEBUG_DEATH(envoy_dynamic_module_callback_http_get_socket_option_int(
+                         filter_.get(), 1, 2, invalid_state,
+                         envoy_dynamic_module_type_socket_direction_Upstream, &result),
+                     "");
+}
+
+TEST_F(DynamicModuleHttpFilterTest, SocketOptionNullValueOut) {
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_socket_option_int(
+      filter_.get(), 1, 2, envoy_dynamic_module_type_socket_option_state_Prebind,
+      envoy_dynamic_module_type_socket_direction_Upstream, nullptr));
+
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_socket_option_bytes(
+      filter_.get(), 1, 2, envoy_dynamic_module_type_socket_option_state_Prebind,
+      envoy_dynamic_module_type_socket_direction_Upstream, nullptr));
+}
+
+TEST_F(DynamicModuleHttpFilterTest, SetSocketOptionBytesNullPtr) {
+  // Test with null pointer for bytes value.
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_set_socket_option_bytes(
+      filter_.get(), 1, 2, envoy_dynamic_module_type_socket_option_state_Prebind,
+      envoy_dynamic_module_type_socket_direction_Upstream, {nullptr, 0}));
+}
+
+TEST_F(DynamicModuleHttpFilterTest, SetSocketOptionIntNoCallbacks) {
+  // Test with no decoder callbacks set.
+  Stats::SymbolTableImpl symbol_table;
+  auto filter_no_callbacks = std::make_unique<DynamicModuleHttpFilter>(nullptr, symbol_table);
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_set_socket_option_int(
+      filter_no_callbacks.get(), 1, 2, envoy_dynamic_module_type_socket_option_state_Prebind,
+      envoy_dynamic_module_type_socket_direction_Upstream, 100));
+}
+
+TEST_F(DynamicModuleHttpFilterTest, SetSocketOptionBytesNoCallbacks) {
+  // Test with no decoder callbacks set.
+  Stats::SymbolTableImpl symbol_table;
+  auto filter_no_callbacks = std::make_unique<DynamicModuleHttpFilter>(nullptr, symbol_table);
+  const std::string value = "test-bytes";
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_set_socket_option_bytes(
+      filter_no_callbacks.get(), 1, 2, envoy_dynamic_module_type_socket_option_state_Prebind,
+      envoy_dynamic_module_type_socket_direction_Upstream, {value.data(), value.size()}));
+}
+
+TEST_F(DynamicModuleHttpFilterTest, SocketOptionMultipleOptions) {
+  // Add multiple options with different states.
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_set_socket_option_int(
+      filter_.get(), 1, 1, envoy_dynamic_module_type_socket_option_state_Prebind,
+      envoy_dynamic_module_type_socket_direction_Upstream, 100));
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_set_socket_option_int(
+      filter_.get(), 1, 1, envoy_dynamic_module_type_socket_option_state_Bound,
+      envoy_dynamic_module_type_socket_direction_Upstream, 200));
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_set_socket_option_int(
+      filter_.get(), 1, 1, envoy_dynamic_module_type_socket_option_state_Listening,
+      envoy_dynamic_module_type_socket_direction_Upstream, 300));
+  const std::string bytes_val = "test-bytes";
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_set_socket_option_bytes(
+      filter_.get(), 2, 2, envoy_dynamic_module_type_socket_option_state_Listening,
+      envoy_dynamic_module_type_socket_direction_Upstream, {bytes_val.data(), bytes_val.size()}));
+
+  // Verify each option can be retrieved.
+  int64_t int_result = 0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_socket_option_int(
+      filter_.get(), 1, 1, envoy_dynamic_module_type_socket_option_state_Prebind,
+      envoy_dynamic_module_type_socket_direction_Upstream, &int_result));
+  EXPECT_EQ(100, int_result);
+
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_socket_option_int(
+      filter_.get(), 1, 1, envoy_dynamic_module_type_socket_option_state_Bound,
+      envoy_dynamic_module_type_socket_direction_Upstream, &int_result));
+  EXPECT_EQ(200, int_result);
+
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_socket_option_int(
+      filter_.get(), 1, 1, envoy_dynamic_module_type_socket_option_state_Listening,
+      envoy_dynamic_module_type_socket_direction_Upstream, &int_result));
+  EXPECT_EQ(300, int_result);
+
+  envoy_dynamic_module_type_envoy_buffer bytes_result;
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_socket_option_bytes(
+      filter_.get(), 2, 2, envoy_dynamic_module_type_socket_option_state_Listening,
+      envoy_dynamic_module_type_socket_direction_Upstream, &bytes_result));
+  EXPECT_EQ(bytes_val, std::string(bytes_result.ptr, bytes_result.length));
+}
+
+TEST_F(DynamicModuleHttpFilterTest, SocketOptionDirectionDifferentiation) {
+  // Set the same option with different directions - they should be stored separately.
+  const int64_t level = 1;
+  const int64_t name = 2;
+  const int64_t upstream_value = 100;
+  const int64_t downstream_value = 200;
+
+  // Set up connection mock for downstream socket option
+  NiceMock<Network::MockConnection> connection;
+  EXPECT_CALL(decoder_callbacks_, connection())
+      .WillRepeatedly(
+          testing::Return(makeOptRef(dynamic_cast<const Network::Connection&>(connection))));
+  EXPECT_CALL(connection, setSocketOption(testing::_, testing::_))
+      .WillRepeatedly(testing::Return(true));
+
+  // Set upstream socket option.
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_set_socket_option_int(
+      filter_.get(), level, name, envoy_dynamic_module_type_socket_option_state_Prebind,
+      envoy_dynamic_module_type_socket_direction_Upstream, upstream_value));
+
+  // Set downstream socket option with same level/name/state but different direction.
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_set_socket_option_int(
+      filter_.get(), level, name, envoy_dynamic_module_type_socket_option_state_Prebind,
+      envoy_dynamic_module_type_socket_direction_Downstream, downstream_value));
+
+  // Verify each direction returns its own value.
+  int64_t result = 0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_socket_option_int(
+      filter_.get(), level, name, envoy_dynamic_module_type_socket_option_state_Prebind,
+      envoy_dynamic_module_type_socket_direction_Upstream, &result));
+  EXPECT_EQ(upstream_value, result);
+
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_socket_option_int(
+      filter_.get(), level, name, envoy_dynamic_module_type_socket_option_state_Prebind,
+      envoy_dynamic_module_type_socket_direction_Downstream, &result));
+  EXPECT_EQ(downstream_value, result);
+}
+
+TEST_F(DynamicModuleHttpFilterTest, DownstreamSocketOptionNoConnection) {
+  // Test that setting downstream socket option fails when there is no connection.
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_no_conn;
+  EXPECT_CALL(callbacks_no_conn, connection()).WillRepeatedly(testing::Return(absl::nullopt));
+  filter_->setDecoderFilterCallbacks(callbacks_no_conn);
+
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_set_socket_option_int(
+      filter_.get(), 1, 2, envoy_dynamic_module_type_socket_option_state_Prebind,
+      envoy_dynamic_module_type_socket_direction_Downstream, 100));
+}
+
+TEST_F(DynamicModuleHttpFilterTest, DownstreamSocketOptionBytesWithConnection) {
+  // Test downstream bytes socket option with a mock connection.
+  NiceMock<Network::MockConnection> connection;
+  EXPECT_CALL(decoder_callbacks_, connection())
+      .WillRepeatedly(
+          testing::Return(makeOptRef(dynamic_cast<const Network::Connection&>(connection))));
+  EXPECT_CALL(connection, setSocketOption(testing::_, testing::_))
+      .WillRepeatedly(testing::Return(true));
+
+  const std::string value = "downstream-bytes";
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_set_socket_option_bytes(
+      filter_.get(), 1, 2, envoy_dynamic_module_type_socket_option_state_Prebind,
+      envoy_dynamic_module_type_socket_direction_Downstream, {value.data(), value.size()}));
+
+  envoy_dynamic_module_type_envoy_buffer result;
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_socket_option_bytes(
+      filter_.get(), 1, 2, envoy_dynamic_module_type_socket_option_state_Prebind,
+      envoy_dynamic_module_type_socket_direction_Downstream, &result));
+  EXPECT_EQ(value, std::string(result.ptr, result.length));
+}
+
+TEST_F(DynamicModuleHttpFilterTest, DownstreamSocketOptionSetFailure) {
+  // Test that setting downstream socket option fails when the underlying socket call fails.
+  NiceMock<Network::MockConnection> connection;
+  EXPECT_CALL(decoder_callbacks_, connection())
+      .WillRepeatedly(
+          testing::Return(makeOptRef(dynamic_cast<const Network::Connection&>(connection))));
+  EXPECT_CALL(connection, setSocketOption(testing::_, testing::_))
+      .WillRepeatedly(testing::Return(false));
+
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_set_socket_option_int(
+      filter_.get(), 1, 2, envoy_dynamic_module_type_socket_option_state_Prebind,
+      envoy_dynamic_module_type_socket_direction_Downstream, 100));
+}
+
+TEST_F(DynamicModuleHttpFilterTest, DownstreamSocketOptionBytesNoConnection) {
+  // Test that setting downstream bytes socket option fails when there is no connection.
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_no_conn;
+  EXPECT_CALL(callbacks_no_conn, connection()).WillRepeatedly(testing::Return(absl::nullopt));
+  filter_->setDecoderFilterCallbacks(callbacks_no_conn);
+
+  const std::string value = "test-bytes";
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_set_socket_option_bytes(
+      filter_.get(), 1, 2, envoy_dynamic_module_type_socket_option_state_Prebind,
+      envoy_dynamic_module_type_socket_direction_Downstream, {value.data(), value.size()}));
+}
+
+TEST_F(DynamicModuleHttpFilterTest, DownstreamSocketOptionBytesSetFailure) {
+  // Test that setting downstream bytes socket option fails when the underlying socket call fails.
+  NiceMock<Network::MockConnection> connection;
+  EXPECT_CALL(decoder_callbacks_, connection())
+      .WillRepeatedly(
+          testing::Return(makeOptRef(dynamic_cast<const Network::Connection&>(connection))));
+  EXPECT_CALL(connection, setSocketOption(testing::_, testing::_))
+      .WillRepeatedly(testing::Return(false));
+
+  const std::string value = "test-bytes";
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_set_socket_option_bytes(
+      filter_.get(), 1, 2, envoy_dynamic_module_type_socket_option_state_Prebind,
+      envoy_dynamic_module_type_socket_direction_Downstream, {value.data(), value.size()}));
+}
+
 TEST(ABIImpl, metadata) {
   Stats::SymbolTableImpl symbol_table;
   DynamicModuleHttpFilter filter{nullptr, symbol_table};
