@@ -87,7 +87,8 @@ absl::StatusOr<DynamicModulePtr> newDynamicModuleByName(const absl::string_view 
     absl::StatusOr<DynamicModulePtr> dynamic_module =
         newDynamicModule(file_path_absolute, do_not_close, load_globally);
     // If the file exists but failed to load, return the error without trying other paths.
-    // This allows the user to get the detailed error message such as missing dependencies, ABI mismatch, etc.
+    // This allows the user to get the detailed error message such as missing dependencies, ABI
+    // mismatch, etc.
     return dynamic_module;
   }
 
