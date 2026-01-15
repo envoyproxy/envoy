@@ -1,9 +1,12 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "envoy/config/core/v3/socket_option.pb.h"
+
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
+#include "source/common/network/socket_option_impl.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/extensions/dynamic_modules/abi.h"
 #include "source/extensions/filters/http/dynamic_modules/filter.h"
@@ -1238,6 +1241,144 @@ void envoy_dynamic_module_callback_http_add_custom_flag(
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
   absl::string_view flag_name_view(flag.ptr, flag.length);
   filter->decoder_callbacks_->streamInfo().addCustomFlag(flag_name_view);
+}
+
+namespace {
+
+envoy::config::core::v3::SocketOption::SocketState
+mapHttpSocketState(envoy_dynamic_module_type_socket_option_state state) {
+  switch (state) {
+  case envoy_dynamic_module_type_socket_option_state_Prebind:
+    return envoy::config::core::v3::SocketOption::STATE_PREBIND;
+  case envoy_dynamic_module_type_socket_option_state_Bound:
+    return envoy::config::core::v3::SocketOption::STATE_BOUND;
+  case envoy_dynamic_module_type_socket_option_state_Listening:
+    return envoy::config::core::v3::SocketOption::STATE_LISTENING;
+  }
+  return envoy::config::core::v3::SocketOption::STATE_PREBIND;
+}
+
+bool validateHttpSocketState(envoy_dynamic_module_type_socket_option_state state) {
+  return state == envoy_dynamic_module_type_socket_option_state_Prebind ||
+         state == envoy_dynamic_module_type_socket_option_state_Bound ||
+         state == envoy_dynamic_module_type_socket_option_state_Listening;
+}
+
+} // namespace
+
+bool envoy_dynamic_module_callback_http_set_socket_option_int(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, int64_t level, int64_t name,
+    envoy_dynamic_module_type_socket_option_state state,
+    envoy_dynamic_module_type_socket_direction direction, int64_t value) {
+  ASSERT(validateHttpSocketState(state));
+  auto* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  if (filter->decoder_callbacks_ == nullptr) {
+    return false;
+  }
+
+  if (direction == envoy_dynamic_module_type_socket_direction_Downstream) {
+    // For downstream, apply directly to the existing connection socket
+    auto connection = filter->decoder_callbacks_->connection();
+    if (!connection.has_value()) {
+      return false;
+    }
+    int int_value = static_cast<int>(value);
+    auto value_span = absl::MakeSpan(reinterpret_cast<uint8_t*>(&int_value), sizeof(int_value));
+    Network::SocketOptionName option_name(static_cast<int>(level), static_cast<int>(name), "");
+    // const_cast is safe here because setSocketOption modifies the underlying socket,
+    // not the Connection object's logical state.
+    if (!const_cast<Network::Connection&>(*connection).setSocketOption(option_name, value_span)) {
+      return false;
+    }
+  } else {
+    // For upstream, add to upstream socket options (applied when connection is established)
+    auto option = std::make_shared<Network::SocketOptionImpl>(
+        mapHttpSocketState(state),
+        Network::SocketOptionName(static_cast<int>(level), static_cast<int>(name), ""),
+        static_cast<int>(value));
+    Network::Socket::OptionsSharedPtr option_list = std::make_shared<Network::Socket::Options>();
+    option_list->push_back(option);
+    filter->decoder_callbacks_->addUpstreamSocketOptions(option_list);
+  }
+
+  filter->storeSocketOptionInt(level, name, state, direction, value);
+  return true;
+}
+
+bool envoy_dynamic_module_callback_http_set_socket_option_bytes(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, int64_t level, int64_t name,
+    envoy_dynamic_module_type_socket_option_state state,
+    envoy_dynamic_module_type_socket_direction direction,
+    envoy_dynamic_module_type_module_buffer value) {
+  ASSERT(validateHttpSocketState(state));
+  if (value.ptr == nullptr) {
+    return false;
+  }
+  auto* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  if (filter->decoder_callbacks_ == nullptr) {
+    return false;
+  }
+
+  absl::string_view value_view(value.ptr, value.length);
+
+  if (direction == envoy_dynamic_module_type_socket_direction_Downstream) {
+    // For downstream, apply directly to the existing connection socket
+    auto connection = filter->decoder_callbacks_->connection();
+    if (!connection.has_value()) {
+      return false;
+    }
+    // Need to copy to a mutable buffer since setSocketOption takes non-const span
+    std::vector<uint8_t> mutable_value(value.ptr, value.ptr + value.length);
+    auto value_span = absl::MakeSpan(mutable_value);
+    Network::SocketOptionName option_name(static_cast<int>(level), static_cast<int>(name), "");
+    // const_cast is safe here because setSocketOption modifies the underlying socket,
+    // not the Connection object's logical state.
+    if (!const_cast<Network::Connection&>(*connection).setSocketOption(option_name, value_span)) {
+      return false;
+    }
+  } else {
+    // For upstream, add to upstream socket options (applied when connection is established)
+    auto option = std::make_shared<Network::SocketOptionImpl>(
+        mapHttpSocketState(state),
+        Network::SocketOptionName(static_cast<int>(level), static_cast<int>(name), ""), value_view);
+    Network::Socket::OptionsSharedPtr option_list = std::make_shared<Network::Socket::Options>();
+    option_list->push_back(option);
+    filter->decoder_callbacks_->addUpstreamSocketOptions(option_list);
+  }
+
+  filter->storeSocketOptionBytes(level, name, state, direction, value_view);
+  return true;
+}
+
+bool envoy_dynamic_module_callback_http_get_socket_option_int(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, int64_t level, int64_t name,
+    envoy_dynamic_module_type_socket_option_state state,
+    envoy_dynamic_module_type_socket_direction direction, int64_t* value_out) {
+  ASSERT(validateHttpSocketState(state));
+  if (value_out == nullptr) {
+    return false;
+  }
+  auto* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  return filter->tryGetSocketOptionInt(level, name, state, direction, *value_out);
+}
+
+bool envoy_dynamic_module_callback_http_get_socket_option_bytes(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, int64_t level, int64_t name,
+    envoy_dynamic_module_type_socket_option_state state,
+    envoy_dynamic_module_type_socket_direction direction,
+    envoy_dynamic_module_type_envoy_buffer* value_out) {
+  ASSERT(validateHttpSocketState(state));
+  if (value_out == nullptr) {
+    return false;
+  }
+  auto* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  absl::string_view value_view;
+  if (!filter->tryGetSocketOptionBytes(level, name, state, direction, value_view)) {
+    return false;
+  }
+  value_out->ptr = value_view.data();
+  value_out->length = value_view.size();
+  return true;
 }
 
 envoy_dynamic_module_type_http_callout_init_result
