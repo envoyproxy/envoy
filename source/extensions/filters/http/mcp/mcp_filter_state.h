@@ -2,8 +2,9 @@
 
 #include "envoy/stream_info/filter_state.h"
 
+#include "source/common/json/json_streamer.h"
+
 #include "absl/container/flat_hash_map.h"
-#include "nlohmann/json.hpp"
 
 namespace Envoy {
 namespace Extensions {
@@ -17,14 +18,10 @@ namespace Mcp {
  */
 class McpFilterStateObject : public StreamInfo::FilterState::Object {
 public:
-  // FilterStateKey is used to store the FilterState::Object in the FilterState.
   static constexpr absl::string_view FilterStateKey = "envoy.filters.http.mcp.request";
 
   using FieldMap = absl::flat_hash_map<std::string, std::string>;
 
-  /**
-   * Builder for efficient construction from parser output.
-   */
   class Builder {
   public:
     Builder& setMethod(std::string method) {
@@ -77,11 +74,14 @@ public:
     if (fields_.empty()) {
       return absl::nullopt;
     }
-    nlohmann::json j = nlohmann::json::object();
+    std::string output;
+    Json::StringStreamer streamer(output);
+    auto map = streamer.makeRootMap();
     for (const auto& [key, value] : fields_) {
-      j[key] = value;
+      map->addKey(key);
+      map->addString(value);
     }
-    return j.dump();
+    return output;
   }
 
   absl::optional<absl::string_view> method() const {
@@ -91,7 +91,6 @@ public:
     auto it = fields_.find("id");
     return it != fields_.end() ? absl::optional<absl::string_view>(it->second) : absl::nullopt;
   }
-
   absl::optional<absl::string_view> jsonrpc() const {
     auto it = fields_.find("jsonrpc");
     return it != fields_.end() ? absl::optional<absl::string_view>(it->second) : absl::nullopt;
