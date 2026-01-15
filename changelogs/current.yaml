@@ -14,7 +14,11 @@ bug_fixes:
     would not be properly closed when in draining state. This could occur when a response was sent before the request
     was fully received, causing connections to remain open indefinitely. This behavior change can be temporarily reverted
     by setting the runtime guard ``envoy.reloadable_features.http1_close_connection_on_zombie_stream_complete`` to ``false``.
-
+- area: http
+  change: |
+    Fixed upstream client to not close connection when idle timeout fires before the connection is established.
+    This behavior can be reverted by setting the runtime guard
+    ``envoy.reloadable_features.codec_client_enable_idle_timer_only_when_connected`` to ``false``.
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
