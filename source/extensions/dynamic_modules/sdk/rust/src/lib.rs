@@ -1379,6 +1379,7 @@ pub trait EnvoyHttpFilter {
 
   /// Get the index of the current worker thread.
   fn get_worker_index(&self) -> u32;
+
   /// Set an integer socket option with the given level, name, state, and direction.
   /// Direction specifies whether to apply to upstream (outgoing to backend) or
   /// downstream (incoming from client) socket.
@@ -2461,6 +2462,8 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
 
   fn get_worker_index(&self) -> u32 {
     unsafe { abi::envoy_dynamic_module_callback_http_filter_get_worker_index(self.raw_ptr) }
+  }
+
   fn set_socket_option_int(
     &mut self,
     level: i64,
