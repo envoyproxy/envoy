@@ -12,6 +12,37 @@ class AndroidEngineBuilder(context: Context) : EngineBuilder() {
     return this
   }
 
+  fun setUseQuicPlatformPacketWriter(useQuicPlatformPacketWriter: Boolean): AndroidEngineBuilder {
+    this.useQuicPlatformPacketWriter = useQuicPlatformPacketWriter
+    return this
+  }
+
+  fun setEnableQuicConnectionMigration(
+    enableQuicConnectionMigration: Boolean
+  ): AndroidEngineBuilder {
+    this.enableQuicConnectionMigration = enableQuicConnectionMigration
+    return this
+  }
+
+  fun setMigrateIdleQuicConnection(migrateIdleQuicConnection: Boolean): AndroidEngineBuilder {
+    this.migrateIdleQuicConnection = migrateIdleQuicConnection
+    return this
+  }
+
+  fun setMaxIdleTimeBeforeQuicMigrationSeconds(
+    maxIdleTimeBeforeQuicMigrationSeconds: Long
+  ): AndroidEngineBuilder {
+    this.maxIdleTimeBeforeQuicMigrationSeconds = maxIdleTimeBeforeQuicMigrationSeconds
+    return this
+  }
+
+  fun setMaxTimeOnNonDefaultNetworkSeconds(
+    maxTimeOnNonDefaultNetworkSeconds: Long
+  ): AndroidEngineBuilder {
+    this.maxTimeOnNonDefaultNetworkSeconds = maxTimeOnNonDefaultNetworkSeconds
+    return this
+  }
+
   init {
     addEngineType {
       AndroidEngineImpl(

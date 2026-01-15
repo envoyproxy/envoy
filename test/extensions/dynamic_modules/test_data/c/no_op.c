@@ -4,14 +4,21 @@
 #include "source/extensions/dynamic_modules/abi_version.h"
 
 static int some_variable = 0;
-
-int getSomeVariable(void) {
-  some_variable++;
-  return some_variable;
-}
+static int current_load_id = 0;
+static int seen_load_id = -1;
 
 envoy_dynamic_module_type_abi_version_module_ptr envoy_dynamic_module_on_program_init(void) {
+  current_load_id++;
   return kAbiVersion;
+}
+
+int getSomeVariable(void) {
+  if (seen_load_id != current_load_id) {
+    seen_load_id = current_load_id;
+    some_variable = 0;
+  }
+  some_variable++;
+  return some_variable;
 }
 
 envoy_dynamic_module_type_http_filter_config_module_ptr

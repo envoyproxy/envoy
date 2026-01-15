@@ -812,6 +812,11 @@ public:
         f, StreamInfoAddressFieldExtractionType::JustPort);
   }
 
+  static std::unique_ptr<StreamInfoAddressFormatterProvider> justEndpointId(FieldExtractor f) {
+    return std::make_unique<StreamInfoAddressFormatterProvider>(
+        f, StreamInfoAddressFieldExtractionType::JustEndpointId);
+  }
+
   StreamInfoAddressFormatterProvider(FieldExtractor f,
                                      StreamInfoAddressFieldExtractionType extraction_type)
       : field_extractor_(f), extraction_type_(extraction_type) {}
@@ -852,6 +857,8 @@ private:
       return StreamInfo::Utility::formatDownstreamAddressNoPort(address);
     case StreamInfoAddressFieldExtractionType::JustPort:
       return StreamInfo::Utility::formatDownstreamAddressJustPort(address);
+    case StreamInfoAddressFieldExtractionType::JustEndpointId:
+      return StreamInfo::Utility::formatDownstreamAddressJustEndpointId(address);
     case StreamInfoAddressFieldExtractionType::WithPort:
     default:
       return address.asString();
@@ -1411,6 +1418,15 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                     return getUpstreamRemoteAddress(stream_info);
                   });
             }}},
+          {"UPSTREAM_REMOTE_ADDRESS_ENDPOINT_ID",
+           {CommandSyntaxChecker::COMMAND_ONLY,
+            [](absl::string_view, absl::optional<size_t>) {
+              return StreamInfoAddressFormatterProvider::justEndpointId(
+                  [](const StreamInfo::StreamInfo& stream_info)
+                      -> Network::Address::InstanceConstSharedPtr {
+                    return getUpstreamRemoteAddress(stream_info);
+                  });
+            }}},
           {"UPSTREAM_REQUEST_ATTEMPT_COUNT",
            {CommandSyntaxChecker::COMMAND_ONLY,
             [](absl::string_view, absl::optional<size_t>) {
@@ -1511,6 +1527,22 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
            {CommandSyntaxChecker::COMMAND_ONLY,
             [](absl::string_view, absl::optional<size_t>) {
               return StreamInfoAddressFormatterProvider::justPort(
+                  [](const Envoy::StreamInfo::StreamInfo& stream_info) {
+                    return stream_info.downstreamAddressProvider().directLocalAddress();
+                  });
+            }}},
+          {"DOWNSTREAM_LOCAL_ADDRESS_ENDPOINT_ID",
+           {CommandSyntaxChecker::COMMAND_ONLY,
+            [](absl::string_view, absl::optional<size_t>) {
+              return StreamInfoAddressFormatterProvider::justEndpointId(
+                  [](const Envoy::StreamInfo::StreamInfo& stream_info) {
+                    return stream_info.downstreamAddressProvider().localAddress();
+                  });
+            }}},
+          {"DOWNSTREAM_DIRECT_LOCAL_ADDRESS_ENDPOINT_ID",
+           {CommandSyntaxChecker::COMMAND_ONLY,
+            [](absl::string_view, absl::optional<size_t>) {
+              return StreamInfoAddressFormatterProvider::justEndpointId(
                   [](const Envoy::StreamInfo::StreamInfo& stream_info) {
                     return stream_info.downstreamAddressProvider().directLocalAddress();
                   });

@@ -29,21 +29,13 @@ wasi_rust_transition = transition(
 
 def _wasm_binary_impl(ctx):
     out = ctx.actions.declare_file(ctx.label.name)
-    if ctx.attr.precompile:
-        ctx.actions.run(
-            executable = ctx.executable._compile_tool,
-            arguments = [ctx.files.binary[0].path, out.path],
-            outputs = [out],
-            inputs = ctx.files.binary,
-        )
-    else:
-        ctx.actions.run(
-            executable = "cp",
-            arguments = [ctx.files.binary[0].path, out.path],
-            outputs = [out],
-            inputs = ctx.files.binary,
-        )
-
+    executable = ctx.executable._compile_tool if ctx.attr.precompile else "cp"
+    ctx.actions.run(
+        executable = executable,
+        arguments = [ctx.files.binary[0].path, out.path],
+        outputs = [out],
+        inputs = ctx.files.binary,
+    )
     return [DefaultInfo(files = depset([out]), runfiles = ctx.runfiles([out]))]
 
 def _wasm_attrs(transition):

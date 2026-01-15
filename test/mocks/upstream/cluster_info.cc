@@ -154,9 +154,8 @@ MockClusterInfo::MockClusterInfo()
           }));
   ON_CALL(*this, upstreamHttpProtocol(_))
       .WillByDefault(Return(std::vector<Http::Protocol>{Http::Protocol::Http11}));
-  ON_CALL(*this, createFilterChain(_, _))
-      .WillByDefault(Invoke([&](Http::FilterChainManager&,
-                                const Http::FilterChainOptions&) -> bool { return false; }));
+  ON_CALL(*this, createFilterChain(_))
+      .WillByDefault(Invoke([&](Http::FilterChainFactoryCallbacks&) -> bool { return false; }));
   ON_CALL(*this, makeHeaderValidator(_)).WillByDefault(Invoke([&](Http::Protocol protocol) {
     return header_validator_factory_ ? header_validator_factory_->createClientHeaderValidator(
                                            protocol, codecStats(protocol))
