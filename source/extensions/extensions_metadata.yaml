@@ -2210,12 +2210,6 @@ envoy.tls.upstream_certificate_mappers.filter_state_override:
 envoy.tls.certificate_mappers.static_name:
   categories:
   - envoy.tls.certificate_mappers
-  security_posture: unknown
-  status: alpha
-  type_urls:
-  - envoy.extensions.transport_sockets.tls.cert_mappers.static_name.v3.StaticName
-envoy.tls.upstream_certificate_mappers.static_name:
-  categories:
   - envoy.tls.upstream_certificate_mappers
   security_posture: unknown
   status: alpha
