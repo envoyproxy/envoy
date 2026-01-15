@@ -4287,9 +4287,9 @@ envoy_dynamic_module_callback_udp_listener_filter_record_histogram_value(
 // --------------------- UDP Listener Filter Callbacks - Metrics ---------------
 
 /**
- * envoy_dynamic_module_callback_udp_listener_filter_get_worker_index is called by the module to get the
- * worker index assigned to the current UDP listener filter. This can be used by the module to manage
- * worker-specific resources or perform worker-specific logic.
+ * envoy_dynamic_module_callback_udp_listener_filter_get_worker_index is called by the module to get
+ * the worker index assigned to the current UDP listener filter. This can be used by the module to
+ * manage worker-specific resources or perform worker-specific logic.
  * @param filter_envoy_ptr is the pointer to the DynamicModuleUdpListenerFilter object of the
  * corresponding UDP listener filter.
  * @return the worker index assigned to the current UDP listener filter.

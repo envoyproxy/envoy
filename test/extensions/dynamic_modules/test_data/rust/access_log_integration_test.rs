@@ -50,7 +50,17 @@ impl AccessLoggerConfig for TestAccessLoggerConfig {
     })
   }
 
-  fn create_logger(&self, metrics: MetricsContext) -> Box<dyn AccessLogger> {
+  fn create_logger(
+    &self,
+    metrics: MetricsContext,
+    logger_envoy_ptr: *mut ::std::ffi::c_void,
+  ) -> Box<dyn AccessLogger> {
+    // Test worker id.
+    let worker_id = unsafe {
+      abi::envoy_dynamic_module_callback_access_logger_get_worker_index(logger_envoy_ptr)
+    };
+    assert_eq!(worker_id, 0);
+
     Box::new(TestAccessLogger {
       pending_logs: 0,
       log_counter: self.log_counter,

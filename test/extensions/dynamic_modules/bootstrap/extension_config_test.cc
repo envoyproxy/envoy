@@ -20,8 +20,8 @@ protected:
 
 TEST_F(ExtensionConfigTest, LoadOK) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  auto dynamic_module =
-      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false, context);
+  auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
+      testDataDir() + "/libbootstrap_no_op.so", false, context);
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
   auto config =

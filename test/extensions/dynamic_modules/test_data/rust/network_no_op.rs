@@ -40,7 +40,11 @@ struct NopNetworkFilterConfig {
 }
 
 impl<ENF: EnvoyNetworkFilter> NetworkFilterConfig<ENF> for NopNetworkFilterConfig {
-  fn new_network_filter(&self, _envoy: &mut ENF) -> Box<dyn NetworkFilter<ENF>> {
+  fn new_network_filter(&self, envoy_filter: &mut ENF) -> Box<dyn NetworkFilter<ENF>> {
+    // Test worker id.
+    let worker_id = envoy_filter.get_worker_index();
+    assert_eq!(worker_id, 0);
+
     Box::new(NopNetworkFilter {
       on_new_connection_called: false,
       on_read_called: false,
@@ -83,9 +87,14 @@ impl Drop for NopNetworkFilter {
 impl<ENF: EnvoyNetworkFilter> NetworkFilter<ENF> for NopNetworkFilter {
   fn on_new_connection(
     &mut self,
-    _envoy_filter: &mut ENF,
+    envoy_filter: &mut ENF,
   ) -> abi::envoy_dynamic_module_type_on_network_filter_data_status {
     self.on_new_connection_called = true;
+
+    // Test worker id.
+    let worker_id = envoy_filter.get_worker_index();
+    assert_eq!(worker_id, 0);
+
     abi::envoy_dynamic_module_type_on_network_filter_data_status::Continue
   }
 

@@ -18,6 +18,8 @@ test_program(name = "network_no_op")
 
 test_program(name = "network_config_new_fail")
 
+test_program(name = "network_filter_new_fail")
+
 test_program(name = "network_stop_iteration")
 
 test_program(name = "no_program_init")
@@ -63,6 +65,8 @@ test_program(name = "program_child")
 test_program(name = "listener_no_op")
 
 test_program(name = "listener_config_new_fail")
+
+test_program(name = "listener_filter_new_fail")
 
 test_program(name = "listener_stop_iteration")
 
