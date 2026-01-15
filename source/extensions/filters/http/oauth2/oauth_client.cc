@@ -57,12 +57,19 @@ void OAuth2ClientImpl::asyncGetAccessToken(const std::string& auth_code,
                        Http::Utility::PercentEncoding::encode(secret, ":/=&?"), encoded_cb_url,
                        code_verifier);
     break;
-  case AuthType::BasicAuth:
+  case AuthType::BasicAuth: {
     const auto basic_auth_token = absl::StrCat(client_id, ":", secret);
     const auto encoded_token = Base64::encode(basic_auth_token.data(), basic_auth_token.size());
     const auto basic_auth_header_value = absl::StrCat("Basic ", encoded_token);
     request->headers().appendCopy(Http::CustomHeaders::get().Authorization,
                                   basic_auth_header_value);
+    body = fmt::format(UrlBodyTemplateWithoutCredentialsForAuthCode, auth_code, encoded_cb_url,
+                       code_verifier);
+    break;
+  }
+  case AuthType::MutualTls:
+    // For mTLS, authentication is done via the client certificate in the TLS handshake.
+    // No client_secret is sent in the request body or headers.
     body = fmt::format(UrlBodyTemplateWithoutCredentialsForAuthCode, auth_code, encoded_cb_url,
                        code_verifier);
     break;
@@ -90,12 +97,19 @@ void OAuth2ClientImpl::asyncRefreshAccessToken(const std::string& refresh_token,
                        Http::Utility::PercentEncoding::encode(client_id, ":/=&?"),
                        Http::Utility::PercentEncoding::encode(secret, ":/=&?"));
     break;
-  case AuthType::BasicAuth:
+  case AuthType::BasicAuth: {
     const auto basic_auth_token = absl::StrCat(client_id, ":", secret);
     const auto encoded_token = Base64::encode(basic_auth_token.data(), basic_auth_token.size());
     const auto basic_auth_header_value = absl::StrCat("Basic ", encoded_token);
     request->headers().appendCopy(Http::CustomHeaders::get().Authorization,
                                   basic_auth_header_value);
+    body = fmt::format(UrlBodyTemplateWithoutCredentialsForRefreshToken,
+                       Http::Utility::PercentEncoding::encode(refresh_token));
+    break;
+  }
+  case AuthType::MutualTls:
+    // For mTLS, authentication is done via the client certificate in the TLS handshake.
+    // No client_secret is sent in the request body or headers.
     body = fmt::format(UrlBodyTemplateWithoutCredentialsForRefreshToken,
                        Http::Utility::PercentEncoding::encode(refresh_token));
     break;
