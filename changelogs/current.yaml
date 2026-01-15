@@ -21,6 +21,11 @@ bug_fixes:
     ``envoy.reloadable_features.codec_client_enable_idle_timer_only_when_connected`` to ``false``.
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+- area: oauth2
+  change: |
+    Removed the runtime guard ``envoy.reloadable_features.oauth2_encrypt_tokens``. Token cookies (access,
+    ID, refresh) remain encrypted by default; use the ``disable_token_encryption`` filter configuration
+    to turn encryption off if needed.
 
 new_features:
 
