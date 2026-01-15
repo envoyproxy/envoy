@@ -399,6 +399,15 @@ typedef enum envoy_dynamic_module_type_address_type {
   envoy_dynamic_module_type_address_type_EnvoyInternal = 3,
 } envoy_dynamic_module_type_address_type;
 
+/**
+ * envoy_dynamic_module_type_socket_direction represents whether the socket option should be
+ * applied to the upstream (outgoing to backend) or downstream (incoming from client) connection.
+ */
+typedef enum envoy_dynamic_module_type_socket_direction {
+  envoy_dynamic_module_type_socket_direction_Upstream = 0,
+  envoy_dynamic_module_type_socket_direction_Downstream = 1,
+} envoy_dynamic_module_type_socket_direction;
+
 // =============================================================================
 // Common Event Hooks
 // =============================================================================
@@ -1909,6 +1918,81 @@ envoy_dynamic_module_type_http_filter_per_route_config_module_ptr
 envoy_dynamic_module_callback_get_most_specific_route_config(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
 
+// ---------------------- HTTP filter socket option callbacks --------------------
+
+/**
+ * envoy_dynamic_module_callback_http_set_socket_option_int sets an integer socket option with
+ * the given level, name, and state.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
+ * @param level is the socket option level (e.g., SOL_SOCKET).
+ * @param name is the socket option name (e.g., SO_KEEPALIVE).
+ * @param state is the socket state at which this option should be applied. For downstream
+ *        sockets, this is ignored since the socket is already connected.
+ * @param direction specifies whether to apply to upstream or downstream socket.
+ * @param value is the integer value for the socket option.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_set_socket_option_int(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, int64_t level, int64_t name,
+    envoy_dynamic_module_type_socket_option_state state,
+    envoy_dynamic_module_type_socket_direction direction, int64_t value);
+
+/**
+ * envoy_dynamic_module_callback_http_set_socket_option_bytes sets a bytes socket option with
+ * the given level, name, and state.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
+ * @param level is the socket option level.
+ * @param name is the socket option name.
+ * @param state is the socket state at which this option should be applied. For downstream
+ *        sockets, this is ignored since the socket is already connected.
+ * @param direction specifies whether to apply to upstream or downstream socket.
+ * @param value is the byte buffer value for the socket option.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_set_socket_option_bytes(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, int64_t level, int64_t name,
+    envoy_dynamic_module_type_socket_option_state state,
+    envoy_dynamic_module_type_socket_direction direction,
+    envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_http_get_socket_option_int retrieves an integer socket option
+ * value.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
+ * @param level is the socket option level.
+ * @param name is the socket option name.
+ * @param state is the socket state.
+ * @param direction specifies whether to get from upstream or downstream socket.
+ * @param value_out is the pointer to store the retrieved integer value.
+ * @return true if the option is found, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_get_socket_option_int(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, int64_t level, int64_t name,
+    envoy_dynamic_module_type_socket_option_state state,
+    envoy_dynamic_module_type_socket_direction direction, int64_t* value_out);
+
+/**
+ * envoy_dynamic_module_callback_http_get_socket_option_bytes retrieves a bytes socket option
+ * value.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
+ * @param level is the socket option level.
+ * @param name is the socket option name.
+ * @param state is the socket state.
+ * @param direction specifies whether to get from upstream or downstream socket.
+ * @param value_out is the pointer to store the retrieved buffer. The buffer is owned by Envoy and
+ * valid until the filter is destroyed.
+ * @return true if the option is found, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_get_socket_option_bytes(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, int64_t level, int64_t name,
+    envoy_dynamic_module_type_socket_option_state state,
+    envoy_dynamic_module_type_socket_direction direction,
+    envoy_dynamic_module_type_envoy_buffer* value_out);
+
 // =============================================================================
 // ============================= Network Filter ================================
 // =============================================================================
@@ -2488,6 +2572,8 @@ void envoy_dynamic_module_callback_network_filter_inject_read_data(
     envoy_dynamic_module_type_module_buffer data, bool end_stream);
 
 /**
+ * envoy_dynamic_module_type_socket_option_value_type represents the type of value stored in a
+ * socket option.
  * envoy_dynamic_module_callback_network_filter_inject_write_data is called by the module to inject
  * data into the write filter chain (after this filter).
  *
@@ -3456,6 +3542,7 @@ bool envoy_dynamic_module_callback_listener_filter_get_direct_local_address(
     envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer* address_out, uint32_t* port_out);
 
+// ---------------------- HTTP filter scheduler callbacks ------------------------
 /**
  * envoy_dynamic_module_callback_listener_filter_get_original_dst is called by the module to get the
  * original destination address obtained from the platform (e.g., iptables redirect).
