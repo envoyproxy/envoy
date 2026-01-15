@@ -28,7 +28,7 @@ public:
     return std::make_unique<StaticNameConfigProto>();
   }
 
-  std::string name() const override { return StaticNameExtension; }
+  std::string name() const override { return std::string(StaticNameExtension); }
 };
 
 DECLARE_FACTORY(StaticNameMapperFactory);
@@ -43,7 +43,7 @@ public:
     return std::make_unique<StaticNameConfigProto>();
   }
 
-  std::string name() const override { return StaticNameExtension; }
+  std::string name() const override { return std::string(StaticNameExtension); }
 };
 
 DECLARE_FACTORY(UpstreamStaticNameMapperFactory);
