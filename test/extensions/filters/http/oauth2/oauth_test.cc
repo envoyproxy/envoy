@@ -395,6 +395,7 @@ TEST_F(OAuth2ClientTest, RequestAccessTokenMutualTlsNoClientSecret) {
                                  -> Http::AsyncClient::Request* {
         const std::string body = message->body().toString();
         EXPECT_EQ(std::string::npos, body.find("client_secret="));
+        EXPECT_NE(std::string::npos, body.find("client_id=client_id"));
         EXPECT_TRUE(message->headers().get(Http::CustomHeaders::get().Authorization).empty());
         callbacks_.push_back(&cb);
         return &request_;
@@ -414,6 +415,7 @@ TEST_F(OAuth2ClientTest, RequestRefreshAccessTokenMutualTlsNoClientSecret) {
                                  -> Http::AsyncClient::Request* {
         const std::string body = message->body().toString();
         EXPECT_EQ(std::string::npos, body.find("client_secret="));
+        EXPECT_NE(std::string::npos, body.find("client_id=client_id"));
         EXPECT_TRUE(message->headers().get(Http::CustomHeaders::get().Authorization).empty());
         callbacks_.push_back(&cb);
         return &request_;
