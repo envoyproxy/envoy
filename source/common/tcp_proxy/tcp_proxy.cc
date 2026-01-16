@@ -955,7 +955,7 @@ TunnelingConfigHelperImpl::TunnelingConfigHelperImpl(
                      context.serverFactoryContext().api().randomGenerator(),
                      std::make_unique<Router::ShadowWriterImpl>(
                          context.serverFactoryContext().clusterManager()),
-                     true, false, false, false, false, false, {},
+                     true, false, false, false, false, false, false, {},
                      context.serverFactoryContext().api().timeSource(),
                      context.serverFactoryContext().httpContext(),
                      context.serverFactoryContext().routerContext()),

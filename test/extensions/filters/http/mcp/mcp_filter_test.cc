@@ -324,7 +324,7 @@ TEST_F(McpFilterTest, RequestBodyUnderLimitSucceeds) {
                                          {"accept", "application/json"},
                                          {"accept", "text/event-stream"}};
 
-  EXPECT_CALL(decoder_callbacks_, setDecoderBufferLimit(1024));
+  EXPECT_CALL(decoder_callbacks_, setBufferLimit(1024));
   filter_->decodeHeaders(headers, false);
 
   // Create a JSON-RPC body that's under 1KB
@@ -349,7 +349,7 @@ TEST_F(McpFilterTest, RequestBodyExceedingLimitContinues) {
                                          {"accept", "application/json"},
                                          {"accept", "text/event-stream"}};
 
-  EXPECT_CALL(decoder_callbacks_, setDecoderBufferLimit(100));
+  EXPECT_CALL(decoder_callbacks_, setBufferLimit(100));
   filter_->decodeHeaders(headers, false);
 
   // Create a JSON body that exceeds 100 bytes
@@ -373,7 +373,7 @@ TEST_F(McpFilterTest, RequestBodyExceedingLimitRejectWhenNotEnoughData) {
                                          {"accept", "application/json"},
                                          {"accept", "text/event-stream"}};
 
-  EXPECT_CALL(decoder_callbacks_, setDecoderBufferLimit(20));
+  EXPECT_CALL(decoder_callbacks_, setBufferLimit(20));
   filter_->decodeHeaders(headers, false);
 
   // Create a JSON body that exceeds 20 bytes but is incomplete
@@ -401,8 +401,8 @@ TEST_F(McpFilterTest, RequestBodyWithDisabledLimitAllowsLargeBodies) {
                                          {"accept", "application/json"},
                                          {"accept", "text/event-stream"}};
 
-  // Should NOT call setDecoderBufferLimit when limit is 0
-  EXPECT_CALL(decoder_callbacks_, setDecoderBufferLimit(_)).Times(0);
+  // Should NOT call setBufferLimit when limit is 0
+  EXPECT_CALL(decoder_callbacks_, setBufferLimit(_)).Times(0);
   filter_->decodeHeaders(headers, false);
 
   // Create a large JSON-RPC body
@@ -429,7 +429,7 @@ TEST_F(McpFilterTest, RequestBodyExactlyAtLimitSucceeds) {
                                          {"accept", "application/json"},
                                          {"accept", "text/event-stream"}};
 
-  EXPECT_CALL(decoder_callbacks_, setDecoderBufferLimit(100));
+  EXPECT_CALL(decoder_callbacks_, setBufferLimit(100));
   filter_->decodeHeaders(headers, false);
 
   // Create a JSON body that's exactly 100 bytes
@@ -464,7 +464,7 @@ TEST_F(McpFilterTest, BufferLimitSetForValidMcpPostRequest) {
                                          {"accept", "application/json"},
                                          {"accept", "text/event-stream"}};
 
-  EXPECT_CALL(decoder_callbacks_, setDecoderBufferLimit(8192));
+  EXPECT_CALL(decoder_callbacks_, setBufferLimit(8192));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
 }
 
@@ -481,7 +481,7 @@ TEST_F(McpFilterTest, BufferLimitNotSetWhenDisabled) {
                                          {"accept", "application/json"},
                                          {"accept", "text/event-stream"}};
 
-  EXPECT_CALL(decoder_callbacks_, setDecoderBufferLimit(_)).Times(0);
+  EXPECT_CALL(decoder_callbacks_, setBufferLimit(_)).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
 }
 
@@ -499,7 +499,7 @@ TEST_F(McpFilterTest, BodySizeLimitInPassThroughMode) {
                                          {"accept", "application/json"},
                                          {"accept", "text/event-stream"}};
 
-  EXPECT_CALL(decoder_callbacks_, setDecoderBufferLimit(50));
+  EXPECT_CALL(decoder_callbacks_, setBufferLimit(50));
   filter_->decodeHeaders(headers, false);
 
   // JSON body with required fields (jsonrpc, method, id) in the first 50 bytes.
@@ -710,7 +710,7 @@ TEST_F(McpFilterTest, PerRouteMaxBodySizeSmallerLimit) {
                                          {"accept", "text/event-stream"}};
 
   // Should use per-route limit of 100 bytes, not global 1024
-  EXPECT_CALL(decoder_callbacks_, setDecoderBufferLimit(100));
+  EXPECT_CALL(decoder_callbacks_, setBufferLimit(100));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
 }
 
@@ -737,7 +737,7 @@ TEST_F(McpFilterTest, PerRouteMaxBodySizeLargerLimit) {
                                          {"accept", "text/event-stream"}};
 
   // Should use per-route limit of 2048 bytes, not global 100
-  EXPECT_CALL(decoder_callbacks_, setDecoderBufferLimit(2048));
+  EXPECT_CALL(decoder_callbacks_, setBufferLimit(2048));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
 }
 
@@ -764,8 +764,80 @@ TEST_F(McpFilterTest, PerRouteMaxBodySizeFallbackToGlobal) {
                                          {"accept", "text/event-stream"}};
 
   // Should fallback to global limit of 512 bytes
-  EXPECT_CALL(decoder_callbacks_, setDecoderBufferLimit(512));
+  EXPECT_CALL(decoder_callbacks_, setBufferLimit(512));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+}
+
+// Test method group added to dynamic metadata when configured
+TEST_F(McpFilterTest, MethodGroupAddedToMetadata) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.mutable_parser_config()->set_group_metadata_key("method_group");
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+
+  filter_->decodeHeaders(headers, false);
+
+  std::string json =
+      R"({"jsonrpc": "2.0", "method": "tools/call", "params": {"name": "test"}, "id": 1})";
+  Buffer::OwnedImpl buffer(json);
+
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("mcp_proxy", _))
+      .WillOnce([&](const std::string&, const Protobuf::Struct& metadata) {
+        const auto& fields = metadata.fields();
+
+        // Check method_group is set to "tool" (built-in group for tools/call)
+        auto group_it = fields.find("method_group");
+        ASSERT_NE(group_it, fields.end());
+        EXPECT_EQ(group_it->second.string_value(), "tool");
+
+        // Check method is also set
+        auto method_it = fields.find("method");
+        ASSERT_NE(method_it, fields.end());
+        EXPECT_EQ(method_it->second.string_value(), "tools/call");
+      });
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+}
+
+// Test method group with custom override
+TEST_F(McpFilterTest, MethodGroupWithCustomOverride) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  auto* parser_config = proto_config.mutable_parser_config();
+  parser_config->set_group_metadata_key("group");
+
+  auto* method_config = parser_config->add_methods();
+  method_config->set_method("tools/list");
+  method_config->set_group("custom_tools");
+
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+
+  filter_->decodeHeaders(headers, false);
+
+  std::string json = R"({"jsonrpc": "2.0", "method": "tools/list", "id": 1})";
+  Buffer::OwnedImpl buffer(json);
+
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("mcp_proxy", _))
+      .WillOnce([&](const std::string&, const Protobuf::Struct& metadata) {
+        const auto& fields = metadata.fields();
+        auto group_it = fields.find("group");
+        ASSERT_NE(group_it, fields.end());
+        EXPECT_EQ(group_it->second.string_value(), "custom_tools");
+      });
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
 }
 
 } // namespace

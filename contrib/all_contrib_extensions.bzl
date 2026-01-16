@@ -20,9 +20,13 @@ ARM64_SKIP_CONTRIB_TARGETS = [
     "envoy.compression.qatzip.compressor",
     "envoy.compression.qatzstd.compressor",
 ]
+X86_SKIP_CONTRIB_TARGETS = [
+    "envoy.tls.key_providers.kae",
+]
 PPC_SKIP_CONTRIB_TARGETS = [
     "envoy.tls.key_providers.cryptomb",
     "envoy.tls.key_providers.qat",
+    "envoy.tls.key_providers.kae",
     "envoy.matching.input_matchers.hyperscan",
     "envoy.network.connection_balance.dlb",
     "envoy.regex_engines.hyperscan",
@@ -32,6 +36,7 @@ PPC_SKIP_CONTRIB_TARGETS = [
 
 FIPS_LINUX_X86_SKIP_CONTRIB_TARGETS = [
     "envoy.compression.qatzip.compressor",
+    "envoy.tls.key_providers.kae",
 ]
 
 def envoy_all_contrib_extensions(denylist = []):

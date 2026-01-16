@@ -12,11 +12,17 @@ namespace Extensions {
 namespace DynamicModules {
 namespace ListenerFilters {
 
+class DynamicModuleListenerFilter;
+using DynamicModuleListenerFilterSharedPtr = std::shared_ptr<DynamicModuleListenerFilter>;
+using DynamicModuleListenerFilterWeakPtr = std::weak_ptr<DynamicModuleListenerFilter>;
+
 /**
  * A listener filter that uses a dynamic module. Corresponds to a single accepted connection.
  */
-class DynamicModuleListenerFilter : public Network::ListenerFilter,
-                                    public Logger::Loggable<Logger::Id::dynamic_modules> {
+class DynamicModuleListenerFilter
+    : public Network::ListenerFilter,
+      public std::enable_shared_from_this<DynamicModuleListenerFilter>,
+      public Logger::Loggable<Logger::Id::dynamic_modules> {
 public:
   explicit DynamicModuleListenerFilter(DynamicModuleListenerFilterConfigSharedPtr config);
   ~DynamicModuleListenerFilter() override;
@@ -35,6 +41,7 @@ public:
   // Accessors for ABI callbacks.
   Network::ListenerFilterCallbacks* callbacks() { return callbacks_; }
   Network::ListenerFilterBuffer* currentBuffer() { return current_buffer_; }
+  Network::Address::InstanceConstSharedPtr& cachedOriginalDst() { return cached_original_dst_; }
 
   // Test-only setters.
   void setCallbacksForTest(Network::ListenerFilterCallbacks* callbacks) { callbacks_ = callbacks; }
@@ -49,6 +56,19 @@ public:
    * Get the filter configuration.
    */
   const DynamicModuleListenerFilterConfig& getFilterConfig() const { return *config_; }
+
+  /**
+   * This is called when an event is scheduled via DynamicModuleListenerFilterScheduler.
+   */
+  void onScheduled(uint64_t event_id);
+
+  /**
+   * Get the dispatcher for the worker thread this filter is running on.
+   * Returns nullptr if callbacks are not set.
+   */
+  Event::Dispatcher* dispatcher() {
+    return callbacks_ != nullptr ? &callbacks_->dispatcher() : nullptr;
+  }
 
 private:
   /**
@@ -71,10 +91,39 @@ private:
   // Current buffer, only valid during onData callback.
   Network::ListenerFilterBuffer* current_buffer_ = nullptr;
 
+  // Cached original destination address to ensure lifetime extends beyond ABI callback.
+  Network::Address::InstanceConstSharedPtr cached_original_dst_;
+
   bool destroyed_ = false;
 };
 
-using DynamicModuleListenerFilterSharedPtr = std::shared_ptr<DynamicModuleListenerFilter>;
+/**
+ * This class is used to schedule a listener filter event hook from a different thread
+ * than the one it was assigned to. This is created via
+ * envoy_dynamic_module_callback_listener_filter_scheduler_new and deleted via
+ * envoy_dynamic_module_callback_listener_filter_scheduler_delete.
+ */
+class DynamicModuleListenerFilterScheduler {
+public:
+  DynamicModuleListenerFilterScheduler(DynamicModuleListenerFilterWeakPtr filter,
+                                       Event::Dispatcher& dispatcher)
+      : filter_(std::move(filter)), dispatcher_(dispatcher) {}
+
+  void commit(uint64_t event_id) {
+    dispatcher_.post([filter = filter_, event_id]() {
+      if (DynamicModuleListenerFilterSharedPtr filter_shared = filter.lock()) {
+        filter_shared->onScheduled(event_id);
+      }
+    });
+  }
+
+private:
+  // The filter that this scheduler is associated with. Using a weak pointer to avoid unnecessarily
+  // extending the lifetime of the filter.
+  DynamicModuleListenerFilterWeakPtr filter_;
+  // The dispatcher is used to post the event to the worker thread that filter_ is assigned to.
+  Event::Dispatcher& dispatcher_;
+};
 
 } // namespace ListenerFilters
 } // namespace DynamicModules

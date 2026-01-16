@@ -39,8 +39,8 @@ protected:
     filter_.setEncoderFilterCallbacks(encoder_callbacks_);
 
     // Set buffer limit same as Envoy's default (1 MiB)
-    ON_CALL(decoder_callbacks_, decoderBufferLimit()).WillByDefault(Return(2 << 20));
-    ON_CALL(encoder_callbacks_, encoderBufferLimit()).WillByDefault(Return(2 << 20));
+    ON_CALL(decoder_callbacks_, bufferLimit()).WillByDefault(Return(2 << 20));
+    ON_CALL(encoder_callbacks_, bufferLimit()).WillByDefault(Return(2 << 20));
 
     ON_CALL(decoder_callbacks_, route()).WillByDefault(Return(nullptr));
   }
@@ -406,8 +406,8 @@ TEST_F(GrpcJsonReverseTranscoderFilterTest, TranscodeWithBufferExpansion) {
   filter.setDecoderFilterCallbacks(decoder_callbacks_);
   filter.setEncoderFilterCallbacks(encoder_callbacks_);
 
-  EXPECT_CALL(decoder_callbacks_, decoderBufferLimit()).WillRepeatedly(Return(2));
-  EXPECT_CALL(encoder_callbacks_, encoderBufferLimit()).WillRepeatedly(Return(2));
+  EXPECT_CALL(decoder_callbacks_, bufferLimit()).WillRepeatedly(Return(2));
+  EXPECT_CALL(encoder_callbacks_, bufferLimit()).WillRepeatedly(Return(2));
 
   Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
                                          {":path", "/bookstore.Bookstore/CreateBookHttpBody"},
@@ -437,7 +437,7 @@ TEST_F(GrpcJsonReverseTranscoderFilterTest, DecoderBufferLimitOverflow) {
   request.set_shelf(12345);
   request.set_book(6789);
   auto request_data = Grpc::Common::serializeToGrpcFrame(request);
-  EXPECT_CALL(decoder_callbacks_, decoderBufferLimit()).WillOnce(Return(3));
+  EXPECT_CALL(decoder_callbacks_, bufferLimit()).WillOnce(Return(3));
   EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::PayloadTooLarge, _, _, _, _));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_.decodeData(*request_data, true));
 }
@@ -454,7 +454,7 @@ TEST_F(GrpcJsonReverseTranscoderFilterTest, DecoderBufferLimitOverflowHttpBody) 
   request.set_shelf(12345);
   request.set_book(6789);
   auto request_data = Grpc::Common::serializeToGrpcFrame(request);
-  EXPECT_CALL(decoder_callbacks_, decoderBufferLimit()).WillOnce(Return(3));
+  EXPECT_CALL(decoder_callbacks_, bufferLimit()).WillOnce(Return(3));
   EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::PayloadTooLarge, _, _, _, _));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_.decodeData(*request_data, true));
 }
@@ -784,7 +784,7 @@ TEST_F(GrpcJsonReverseTranscoderFilterTest, EncoderBufferLimitOverflow) {
 
   Buffer::OwnedImpl response;
   response.add("This is a sample response");
-  EXPECT_CALL(encoder_callbacks_, encoderBufferLimit).WillOnce(Return(3));
+  EXPECT_CALL(encoder_callbacks_, bufferLimit).WillOnce(Return(3));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_.encodeData(response, false));
 }
 
@@ -797,7 +797,7 @@ TEST_F(GrpcJsonReverseTranscoderFilterTest, EncoderBufferLimitOverflowHttpBody) 
 
   Buffer::OwnedImpl response;
   response.add("This is a sample response");
-  EXPECT_CALL(encoder_callbacks_, encoderBufferLimit).WillOnce(Return(3));
+  EXPECT_CALL(encoder_callbacks_, bufferLimit).WillOnce(Return(3));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_.encodeData(response, false));
 }
 

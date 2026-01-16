@@ -32,7 +32,9 @@
 #include "source/common/http/request_id_extension_impl.h"
 #include "source/common/http/utility.h"
 #include "source/common/local_reply/local_reply.h"
+#include "source/common/matcher/matcher.h"
 #include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/network/http_connection_manager/forward_client_cert_details.h"
 
 #ifdef ENVOY_ENABLE_QUIC
 #include "source/common/quic/server_connection_factory.h"
@@ -590,45 +592,14 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     PANIC_DUE_TO_CORRUPT_ENUM;
   }
 
-  switch (config.forward_client_cert_details()) {
-    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
-  case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
-      SANITIZE:
-    forward_client_cert_ = Http::ForwardClientCertType::Sanitize;
-    break;
-  case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
-      FORWARD_ONLY:
-    forward_client_cert_ = Http::ForwardClientCertType::ForwardOnly;
-    break;
-  case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
-      APPEND_FORWARD:
-    forward_client_cert_ = Http::ForwardClientCertType::AppendForward;
-    break;
-  case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
-      SANITIZE_SET:
-    forward_client_cert_ = Http::ForwardClientCertType::SanitizeSet;
-    break;
-  case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
-      ALWAYS_FORWARD_ONLY:
-    forward_client_cert_ = Http::ForwardClientCertType::AlwaysForwardOnly;
-    break;
-  }
+  forward_client_cert_ = convertForwardClientCertDetailsType(config.forward_client_cert_details());
+  set_current_client_cert_details_ =
+      convertSetCurrentClientCertDetails(config.set_current_client_cert_details());
 
-  const auto& set_current_client_cert_details = config.set_current_client_cert_details();
-  if (set_current_client_cert_details.cert()) {
-    set_current_client_cert_details_.push_back(Http::ClientCertDetailsType::Cert);
-  }
-  if (set_current_client_cert_details.chain()) {
-    set_current_client_cert_details_.push_back(Http::ClientCertDetailsType::Chain);
-  }
-  if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(set_current_client_cert_details, subject, false)) {
-    set_current_client_cert_details_.push_back(Http::ClientCertDetailsType::Subject);
-  }
-  if (set_current_client_cert_details.uri()) {
-    set_current_client_cert_details_.push_back(Http::ClientCertDetailsType::URI);
-  }
-  if (set_current_client_cert_details.dns()) {
-    set_current_client_cert_details_.push_back(Http::ClientCertDetailsType::DNS);
+  // Initialize the forward client cert matcher if configured.
+  if (config.has_forward_client_cert_matcher()) {
+    forward_client_cert_matcher_ = createForwardClientCertMatcher(
+        config.forward_client_cert_matcher(), context_.serverFactoryContext());
   }
 
   if (config.has_add_user_agent() && config.add_user_agent().value()) {
@@ -734,6 +705,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
                           Server::Configuration::NamedHttpFilterConfigFactory>
       helper(filter_config_provider_manager_, context_.serverFactoryContext(),
              context_.serverFactoryContext().clusterManager(), context_, stats_prefix_);
+
   SET_AND_RETURN_IF_NOT_OK(
       helper.processFilters(config.http_filters(), "http", "http", filter_factories_),
       creation_status);
@@ -754,8 +726,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
           helper.processFilters(upgrade_config.filters(), name, "http upgrade", *factories),
           creation_status);
       // TODO(auni53): Validate encode dependencies too.
-      auto status = upgrade_dependency_manager.validDecodeDependencies();
-      SET_AND_RETURN_IF_NOT_OK(status, creation_status);
+      SET_AND_RETURN_IF_NOT_OK(upgrade_dependency_manager.validDecodeDependencies(),
+                               creation_status);
 
       upgrade_filter_factories_.emplace(
           std::make_pair(name, FilterConfig{std::move(factories), enabled}));
@@ -807,16 +779,16 @@ Http::ServerConnectionPtr HttpConnectionManagerConfig::createCodec(
   PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
-bool HttpConnectionManagerConfig::createFilterChain(Http::FilterChainManager& manager,
-                                                    const Http::FilterChainOptions& options) const {
-  Http::FilterChainUtility::createFilterChainForFactories(manager, options, filter_factories_);
+bool HttpConnectionManagerConfig::createFilterChain(
+    Http::FilterChainFactoryCallbacks& callbacks) const {
+  Http::FilterChainUtility::createFilterChainForFactories(callbacks, filter_factories_);
   return true;
 }
 
 bool HttpConnectionManagerConfig::createUpgradeFilterChain(
     absl::string_view upgrade_type,
     const Http::FilterChainFactory::UpgradeMap* per_route_upgrade_map,
-    Http::FilterChainManager& callbacks, const Http::FilterChainOptions& options) const {
+    Http::FilterChainFactoryCallbacks& callbacks) const {
   bool route_enabled = false;
   if (per_route_upgrade_map) {
     auto route_it = findUpgradeBoolCaseInsensitive(*per_route_upgrade_map, upgrade_type);
@@ -841,7 +813,7 @@ bool HttpConnectionManagerConfig::createUpgradeFilterChain(
     filters_to_use = it->second.filter_factories.get();
   }
 
-  Http::FilterChainUtility::createFilterChainForFactories(callbacks, options, *filters_to_use);
+  Http::FilterChainUtility::createFilterChainForFactories(callbacks, *filters_to_use);
   return true;
 }
 
