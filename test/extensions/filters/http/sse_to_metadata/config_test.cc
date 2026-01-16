@@ -123,24 +123,10 @@ TEST(SseToMetadataConfigTest, EmptyConfig) {
       *dynamic_cast<envoy::extensions::filters::http::sse_to_metadata::v3::SseToMetadata*>(
           factory.createEmptyConfigProto().get());
 
-  // Empty config should fail validation (no content_parser - required field)
+  // Empty config should fail validation (no response_rules - required field)
   EXPECT_THROW_WITH_REGEX(
       factory.createFilterFactoryFromProto(empty_proto_config, "stats", context).IgnoreError(),
       EnvoyException, "Proto constraint validation failed.*value is required");
-}
-
-TEST(SseToMetadataConfigTest, MissingContentParser) {
-  // Create config with response_rules but missing content_parser
-  envoy::extensions::filters::http::sse_to_metadata::v3::SseToMetadata proto_config;
-  proto_config.mutable_response_rules();
-
-  // Don't set content_parser
-  NiceMock<Server::Configuration::MockFactoryContext> context;
-  SseToMetadataConfig factory;
-
-  EXPECT_THROW_WITH_MESSAGE(
-      factory.createFilterFactoryFromProto(proto_config, "stats", context).IgnoreError(),
-      EnvoyException, "response_rules must have content_parser specified");
 }
 
 TEST(SseToMetadataConfigTest, InvalidConfigMissingPath) {
