@@ -1,7 +1,7 @@
 .. _config_http_filters_sse_to_metadata:
 
 SSE-To-Metadata Filter
-=========================
+======================
 * This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.sse_to_metadata.v3.SseToMetadata``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.sse_to_metadata.v3.SseToMetadata>`
 
@@ -114,7 +114,7 @@ Complete Example
     :caption: :download:`stream-to-metadata-filter.yaml <_include/stream-to-metadata-filter.yaml>`
 
 Key Configuration Options
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **response_rules**
   Configuration for processing SSE response streams. Contains:
@@ -306,7 +306,7 @@ For example, with the JSON content parser, the metrics will be under ``http.<sta
   resp.<parser_prefix>.event_too_large, Counter, Total number of events discarded because they exceeded max_event_size
 
 SSE Specification Compliance
------------------------------
+----------------------------
 
 The filter implements full `SSE specification <https://html.spec.whatwg.org/multipage/server-sent-events.html>`_ compliance:
 
@@ -318,7 +318,7 @@ The filter implements full `SSE specification <https://html.spec.whatwg.org/mult
 * **Chunked Transfer**: Handles events split across multiple TCP packets/HTTP chunks, properly buffering incomplete events
 
 Performance Considerations
----------------------------
+--------------------------
 
 * The filter buffers incomplete SSE events in memory until they are complete
 * Once a complete event is found, it is processed immediately and removed from the buffer
