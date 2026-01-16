@@ -59,6 +59,7 @@ public:
 
   uint32_t maxRequestBodySize() const { return max_request_body_size_; }
   const ParserConfig& parserConfig() const { return parser_config_; }
+  bool emitFilterState() const { return emit_filter_state_; }
 
   McpFilterStats& stats() { return stats_; }
 
@@ -66,6 +67,7 @@ private:
   const envoy::extensions::filters::http::mcp::v3::Mcp::TrafficMode traffic_mode_;
   const bool clear_route_cache_;
   const uint32_t max_request_body_size_;
+  const bool emit_filter_state_;
   ParserConfig parser_config_;
   McpFilterStats stats_;
 };

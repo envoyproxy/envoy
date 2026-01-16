@@ -1,7 +1,5 @@
 #include "source/extensions/filters/http/mcp/mcp_filter.h"
 
-#include <functional>
-
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/protobuf.h"
@@ -29,6 +27,7 @@ McpFilterConfig::McpFilterConfig(const envoy::extensions::filters::http::mcp::v3
       max_request_body_size_(proto_config.has_max_request_body_size()
                                  ? proto_config.max_request_body_size().value()
                                  : 8192), // Default: 8KB
+      emit_filter_state_(proto_config.emit_filter_state()),
       parser_config_(proto_config.has_parser_config()
                          ? McpParserConfig::fromProto(proto_config.parser_config())
                          : McpParserConfig::createDefault()),
@@ -246,10 +245,8 @@ Http::FilterDataStatus McpFilter::completeParsing() {
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
 
-  // Set dynamic metadata
   Protobuf::Struct metadata = parser_->metadata();
 
-  // Add method group if configured
   const std::string& group_metadata_key = config_->parserConfig().groupMetadataKey();
   if (!group_metadata_key.empty()) {
     std::string method_group = config_->parserConfig().getMethodGroup(parser_->getMethod());
@@ -258,35 +255,15 @@ Http::FilterDataStatus McpFilter::completeParsing() {
   }
 
   if (!metadata.fields().empty()) {
-    McpFilterStateObject::Builder builder;
+    if (config_->emitFilterState()) {
+      auto filter_state_obj =
+          std::make_shared<McpFilterStateObject>(parser_->getMethod(), metadata);
+      decoder_callbacks_->streamInfo().filterState()->setData(
+          std::string(McpFilterStateObject::FilterStateKey), std::move(filter_state_obj),
+          StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Request,
+          StreamInfo::StreamSharingMayImpactPooling::None);
+    }
 
-    // Helper to flatten nested structures
-    std::function<void(const Protobuf::Struct&, const std::string&)> flatten =
-        [&](const Protobuf::Struct& s, const std::string& prefix) {
-          for (const auto& [key, value] : s.fields()) {
-            std::string full_key = prefix.empty() ? key : absl::StrCat(prefix, ".", key);
-            if (value.has_string_value()) {
-              if (full_key == "method") {
-                builder.setMethod(value.string_value());
-              } else {
-                builder.addField(full_key, value.string_value());
-              }
-            } else if (value.has_number_value()) {
-              builder.addField(full_key, absl::StrCat(static_cast<int64_t>(value.number_value())));
-            } else if (value.has_bool_value()) {
-              builder.addField(full_key, value.bool_value() ? "true" : "false");
-            } else if (value.has_struct_value()) {
-              flatten(value.struct_value(), full_key);
-            }
-          }
-        };
-    flatten(metadata, "");
-
-    decoder_callbacks_->streamInfo().filterState()->setData(
-        std::string(McpFilterStateObject::FilterStateKey), builder.build(),
-        StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Request);
-
-    // Also set dynamic metadata.
     decoder_callbacks_->streamInfo().setDynamicMetadata(std::string(MetadataKeys::FilterName),
                                                         metadata);
     ENVOY_LOG(debug, "MCP filter set FilterState and dynamic metadata");

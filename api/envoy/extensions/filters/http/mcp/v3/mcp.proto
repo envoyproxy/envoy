@@ -54,6 +54,11 @@ message Mcp {
 
   // Parser configuration, this provide the attribute extraction override.
   ParserConfig parser_config = 4;
+
+  // If true, the filter maintains a filter state object with the parsed MCP attributes.
+  // This enables other filters to access MCP request fields via FilterState.
+  // Defaults to false.
+  bool emit_filter_state = 5;
 }
 
 // Parser configuration with method-specific rules.

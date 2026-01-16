@@ -1,10 +1,10 @@
 #pragma once
 
+#include "envoy/json/json_object.h"
 #include "envoy/stream_info/filter_state.h"
 
-#include "source/common/json/json_streamer.h"
-
-#include "absl/container/flat_hash_map.h"
+#include "source/common/json/json_loader.h"
+#include "source/common/protobuf/protobuf.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -13,98 +13,49 @@ namespace Mcp {
 
 /**
  * FilterState object that stores parsed MCP request attributes.
- * The method field is stored as a direct struct member for efficient access.
- * Other fields (jsonrpc, id, params.*) are stored in a flexible map.
  */
 class McpFilterStateObject : public StreamInfo::FilterState::Object {
 public:
   static constexpr absl::string_view FilterStateKey = "envoy.filters.http.mcp.request";
 
-  using FieldMap = absl::flat_hash_map<std::string, std::string>;
+  McpFilterStateObject(std::string method, Json::ObjectSharedPtr json)
+      : method_(std::move(method)), json_(std::move(json)) {}
 
-  class Builder {
-  public:
-    Builder& setMethod(std::string method) {
-      method_ = std::move(method);
-      return *this;
-    }
-
-    Builder& setId(std::string id) {
-      fields_["id"] = std::move(id);
-      return *this;
-    }
-
-    Builder& setJsonRpc(std::string version) {
-      fields_["jsonrpc"] = std::move(version);
-      return *this;
-    }
-
-    Builder& addField(std::string key, std::string value) {
-      fields_[std::move(key)] = std::move(value);
-      return *this;
-    }
-
-    std::shared_ptr<McpFilterStateObject> build() {
-      return std::make_shared<McpFilterStateObject>(std::move(method_), std::move(fields_));
-    }
-
-  private:
-    std::string method_;
-    FieldMap fields_;
-  };
-
-  McpFilterStateObject(std::string method, FieldMap&& fields)
-      : method_(std::move(method)), fields_(std::move(fields)) {
-    if (!method_.empty()) {
-      fields_["method"] = method_;
-    }
-  }
+  McpFilterStateObject(std::string method, const Protobuf::Struct& proto_struct)
+      : method_(std::move(method)), json_(Json::Factory::loadFromProtobufStruct(proto_struct)) {}
 
   bool hasFieldSupport() const override { return true; }
 
   FieldType getField(absl::string_view field_name) const override {
-    auto it = fields_.find(field_name);
-    if (it != fields_.end()) {
-      return absl::string_view(it->second);
+    if (json_ != nullptr && json_->hasObject(std::string(field_name))) {
+      auto result = json_->getString(std::string(field_name), "");
+      if (result.ok() && !result.value().empty()) {
+        return result.value();
+      }
     }
     return absl::monostate{};
   }
 
   absl::optional<std::string> serializeAsString() const override {
-    if (fields_.empty()) {
+    if (json_ == nullptr || json_->empty()) {
       return absl::nullopt;
     }
-    std::string output;
-    Json::StringStreamer streamer(output);
-    auto map = streamer.makeRootMap();
-    for (const auto& [key, value] : fields_) {
-      map->addKey(key);
-      map->addString(value);
-    }
-    return output;
+    return json_->asJsonString();
   }
 
   absl::optional<absl::string_view> method() const {
     return method_.empty() ? absl::nullopt : absl::optional<absl::string_view>(method_);
   }
-  absl::optional<absl::string_view> id() const {
-    auto it = fields_.find("id");
-    return it != fields_.end() ? absl::optional<absl::string_view>(it->second) : absl::nullopt;
-  }
-  absl::optional<absl::string_view> jsonrpc() const {
-    auto it = fields_.find("jsonrpc");
-    return it != fields_.end() ? absl::optional<absl::string_view>(it->second) : absl::nullopt;
-  }
 
   bool hasField(absl::string_view field_name) const {
-    return fields_.find(field_name) != fields_.end();
+    return json_ != nullptr && json_->hasObject(std::string(field_name));
   }
 
-  const FieldMap& fields() const { return fields_; }
+  const Json::ObjectSharedPtr& json() const { return json_; }
 
 private:
   std::string method_;
-  FieldMap fields_;
+  Json::ObjectSharedPtr json_;
 };
 
 } // namespace Mcp
