@@ -156,6 +156,7 @@ proto_library(
         "//envoy/extensions/clusters/composite/v3:pkg",
         "//envoy/extensions/clusters/dns/v3:pkg",
         "//envoy/extensions/clusters/dynamic_forward_proxy/v3:pkg",
+        "//envoy/extensions/clusters/dynamic_modules/v3:pkg",
         "//envoy/extensions/clusters/redis/v3:pkg",
         "//envoy/extensions/clusters/reverse_connection/v3:pkg",
         "//envoy/extensions/common/async_files/v3:pkg",
