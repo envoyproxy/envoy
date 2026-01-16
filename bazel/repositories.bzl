@@ -765,6 +765,7 @@ def _com_github_grpc_grpc():
         patch_args = ["-p1"],
         patches = [
             "@envoy//bazel:rules_apple.patch",
+            "@envoy//bazel:rules_apple_py.patch",
         ],
     )
 
