@@ -55,21 +55,6 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         license = "Apache-2.0",
         license_url = "https://github.com/bazelbuild/bazel-gazelle/blob/v{version}/LICENSE",
     ),
-    bazel_toolchains = dict(
-        project_name = "bazel-toolchains",
-        project_desc = "Bazel toolchain configs for RBE",
-        project_url = "https://github.com/bazelbuild/bazel-toolchains",
-        version = "5.1.2",
-        sha256 = "02e4f3744f1ce3f6e711e261fd322916ddd18cccd38026352f7a4c0351dbda19",
-        strip_prefix = "bazel-toolchains-{version}",
-        urls = [
-            "https://github.com/bazelbuild/bazel-toolchains/archive/v{version}.tar.gz",
-        ],
-        release_date = "2022-08-09",
-        use_category = ["build"],
-        license = "Apache-2.0",
-        license_url = "https://github.com/bazelbuild/bazel-toolchains/blob/v{version}/LICENSE",
-    ),
     build_bazel_rules_apple = dict(
         project_name = "Apple Rules for Bazel",
         project_desc = "Bazel rules for Apple platforms",
