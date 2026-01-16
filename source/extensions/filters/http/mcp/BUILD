@@ -24,10 +24,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "mcp_filter_lib",
     srcs = ["mcp_filter.cc"],
-    hdrs = [
-        "mcp_filter.h",
-        "mcp_filter_state.h",
-    ],
+    hdrs = ["mcp_filter.h"],
     deps = [
         ":mcp_json_parser_lib",
         "//envoy/http:filter_interface",
@@ -38,6 +35,7 @@ envoy_cc_library(
         "//source/common/http:utility_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/json:json_streamer_lib",
+        "//source/extensions/filters/common/mcp:filter_state_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "@envoy_api//envoy/extensions/filters/http/mcp/v3:pkg_cc_proto",
     ],

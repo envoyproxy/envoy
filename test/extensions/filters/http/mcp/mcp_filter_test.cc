@@ -1,5 +1,5 @@
+#include "source/extensions/filters/common/mcp/filter_state.h"
 #include "source/extensions/filters/http/mcp/mcp_filter.h"
-#include "source/extensions/filters/http/mcp/mcp_filter_state.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/factory_context.h"
@@ -13,6 +13,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Mcp {
 namespace {
+
+using McpFilterStateObject = Filters::Common::Mcp::FilterStateObject;
 
 using testing::_;
 using testing::NiceMock;
@@ -854,9 +856,9 @@ TEST(McpFilterStateObjectTest, Construction) {
   auto obj = std::make_shared<McpFilterStateObject>("tools/call", createTestStruct());
 
   EXPECT_EQ(obj->method().value(), "tools/call");
-  EXPECT_TRUE(obj->hasField("jsonrpc"));
-  EXPECT_TRUE(obj->hasField("id"));
-  EXPECT_TRUE(obj->hasField("params"));
+  EXPECT_TRUE(obj->json()->hasObject("jsonrpc"));
+  EXPECT_TRUE(obj->json()->hasObject("id"));
+  EXPECT_TRUE(obj->json()->hasObject("params"));
 }
 
 TEST(McpFilterStateObjectTest, MethodOnly) {
@@ -864,8 +866,8 @@ TEST(McpFilterStateObjectTest, MethodOnly) {
   auto obj = std::make_shared<McpFilterStateObject>("initialize", s);
 
   EXPECT_EQ(obj->method().value(), "initialize");
-  EXPECT_FALSE(obj->hasField("id"));
-  EXPECT_FALSE(obj->hasField("jsonrpc"));
+  EXPECT_FALSE(obj->json()->hasObject("id"));
+  EXPECT_FALSE(obj->json()->hasObject("jsonrpc"));
 }
 
 TEST(McpFilterStateObjectTest, AccessorsMissingFields) {
@@ -873,16 +875,16 @@ TEST(McpFilterStateObjectTest, AccessorsMissingFields) {
   auto obj = std::make_shared<McpFilterStateObject>("", s);
 
   EXPECT_FALSE(obj->method().has_value());
-  EXPECT_FALSE(obj->hasField("id"));
-  EXPECT_FALSE(obj->hasField("jsonrpc"));
+  EXPECT_FALSE(obj->json()->hasObject("id"));
+  EXPECT_FALSE(obj->json()->hasObject("jsonrpc"));
 }
 
 TEST(McpFilterStateObjectTest, HasFieldCheck) {
   auto obj = std::make_shared<McpFilterStateObject>("tools/call", createTestStruct());
 
-  EXPECT_TRUE(obj->hasField("jsonrpc"));
-  EXPECT_TRUE(obj->hasField("params"));
-  EXPECT_FALSE(obj->hasField("nonexistent"));
+  EXPECT_TRUE(obj->json()->hasObject("jsonrpc"));
+  EXPECT_TRUE(obj->json()->hasObject("params"));
+  EXPECT_FALSE(obj->json()->hasObject("nonexistent"));
 }
 
 TEST(McpFilterStateObjectTest, GetFieldMissing) {
@@ -908,12 +910,6 @@ TEST(McpFilterStateObjectTest, SerializationEmptyReturnsNullopt) {
 
   auto serialized = obj->serializeAsString();
   EXPECT_FALSE(serialized.has_value());
-}
-
-TEST(McpFilterStateObjectTest, HasFieldSupportEnabled) {
-  Protobuf::Struct s;
-  auto obj = std::make_shared<McpFilterStateObject>("", s);
-  EXPECT_TRUE(obj->hasFieldSupport());
 }
 
 TEST(McpFilterStateObjectTest, JsonAccessor) {
@@ -951,7 +947,7 @@ TEST_F(McpFilterTest, FilterStateSetAfterParsing) {
   ASSERT_NE(filter_state_obj, nullptr);
   EXPECT_TRUE(filter_state_obj->method().has_value());
   EXPECT_EQ(filter_state_obj->method().value(), "tools/call");
-  EXPECT_TRUE(filter_state_obj->hasField("params"));
+  EXPECT_TRUE(filter_state_obj->json()->hasObject("params"));
 }
 
 // Test FilterState is NOT set when emit_filter_state is disabled (default)

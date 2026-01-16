@@ -4,7 +4,7 @@
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
-#include "source/extensions/filters/http/mcp/mcp_filter_state.h"
+#include "source/extensions/filters/common/mcp/filter_state.h"
 
 #include "absl/strings/str_cat.h"
 
@@ -12,6 +12,8 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Mcp {
+
+using FilterStateObject = Filters::Common::Mcp::FilterStateObject;
 
 namespace {
 McpFilterStats generateStats(const std::string& prefix, Stats::Scope& scope) {
@@ -256,10 +258,9 @@ Http::FilterDataStatus McpFilter::completeParsing() {
 
   if (!metadata.fields().empty()) {
     if (config_->emitFilterState()) {
-      auto filter_state_obj =
-          std::make_shared<McpFilterStateObject>(parser_->getMethod(), metadata);
+      auto filter_state_obj = std::make_shared<FilterStateObject>(parser_->getMethod(), metadata);
       decoder_callbacks_->streamInfo().filterState()->setData(
-          std::string(McpFilterStateObject::FilterStateKey), std::move(filter_state_obj),
+          std::string(FilterStateObject::FilterStateKey), std::move(filter_state_obj),
           StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Request,
           StreamInfo::StreamSharingMayImpactPooling::None);
     }
