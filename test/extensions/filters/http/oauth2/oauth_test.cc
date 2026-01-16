@@ -390,16 +390,16 @@ TEST_F(OAuth2ClientTest, RequestRefreshAccessTokenSuccessBasicAuthType) {
 TEST_F(OAuth2ClientTest, RequestAccessTokenMutualTlsNoClientSecret) {
   EXPECT_CALL(request_, cancel()).Times(testing::AnyNumber());
   EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillRepeatedly(Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
-                                 const Http::AsyncClient::RequestOptions&)
-                                 -> Http::AsyncClient::Request* {
-        const std::string body = message->body().toString();
-        EXPECT_EQ(std::string::npos, body.find("client_secret="));
-        EXPECT_NE(std::string::npos, body.find("client_id=client_id"));
-        EXPECT_TRUE(message->headers().get(Http::CustomHeaders::get().Authorization).empty());
-        callbacks_.push_back(&cb);
-        return &request_;
-      }));
+      .WillRepeatedly(
+          Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            const std::string body = message->body().toString();
+            EXPECT_EQ(std::string::npos, body.find("client_secret="));
+            EXPECT_NE(std::string::npos, body.find("client_id=client_id"));
+            EXPECT_TRUE(message->headers().get(Http::CustomHeaders::get().Authorization).empty());
+            callbacks_.push_back(&cb);
+            return &request_;
+          }));
 
   client_->setCallbacks(*mock_callbacks_);
   client_->asyncGetAccessToken("auth_code", "client_id", "secret", "cb", "verifier",
@@ -410,16 +410,16 @@ TEST_F(OAuth2ClientTest, RequestAccessTokenMutualTlsNoClientSecret) {
 TEST_F(OAuth2ClientTest, RequestRefreshAccessTokenMutualTlsNoClientSecret) {
   EXPECT_CALL(request_, cancel()).Times(testing::AnyNumber());
   EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillRepeatedly(Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
-                                 const Http::AsyncClient::RequestOptions&)
-                                 -> Http::AsyncClient::Request* {
-        const std::string body = message->body().toString();
-        EXPECT_EQ(std::string::npos, body.find("client_secret="));
-        EXPECT_NE(std::string::npos, body.find("client_id=client_id"));
-        EXPECT_TRUE(message->headers().get(Http::CustomHeaders::get().Authorization).empty());
-        callbacks_.push_back(&cb);
-        return &request_;
-      }));
+      .WillRepeatedly(
+          Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            const std::string body = message->body().toString();
+            EXPECT_EQ(std::string::npos, body.find("client_secret="));
+            EXPECT_NE(std::string::npos, body.find("client_id=client_id"));
+            EXPECT_TRUE(message->headers().get(Http::CustomHeaders::get().Authorization).empty());
+            callbacks_.push_back(&cb);
+            return &request_;
+          }));
 
   client_->setCallbacks(*mock_callbacks_);
   client_->asyncRefreshAccessToken("refresh", "client_id", "secret", AuthType::MutualTls);

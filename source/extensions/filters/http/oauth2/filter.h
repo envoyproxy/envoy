@@ -48,11 +48,12 @@ public:
   SDSSecretReader(Secret::GenericSecretConfigProviderSharedPtr&& client_secret_provider,
                   Secret::GenericSecretConfigProviderSharedPtr&& hmac_secret_provider,
                   ThreadLocal::SlotAllocator& tls, Api::Api& api)
-      : client_secret_(client_secret_provider
-                           ? THROW_OR_RETURN_VALUE(Secret::ThreadLocalGenericSecretProvider::create(
-                                 std::move(client_secret_provider), tls, api),
-                             std::unique_ptr<Secret::ThreadLocalGenericSecretProvider>)
-                           : nullptr),
+      : client_secret_(
+            client_secret_provider
+                ? THROW_OR_RETURN_VALUE(Secret::ThreadLocalGenericSecretProvider::create(
+                                            std::move(client_secret_provider), tls, api),
+                                        std::unique_ptr<Secret::ThreadLocalGenericSecretProvider>)
+                : nullptr),
         hmac_secret_(
             THROW_OR_RETURN_VALUE(Secret::ThreadLocalGenericSecretProvider::create(
                                       std::move(hmac_secret_provider), tls, api),

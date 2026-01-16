@@ -199,7 +199,7 @@ config:
   EXPECT_CALL(context.server_factory_context_, clusterManager()).Times(2);
   EXPECT_CALL(context, scope());
   EXPECT_CALL(context.server_factory_context_, timeSource());
-  EXPECT_CALL(context, initManager()).Times(1);
+  EXPECT_CALL(context, initManager());
   Http::FilterFactoryCb cb =
       factory.createFilterFactoryFromProto(*proto_config, "stats", context).value();
   Http::MockFilterChainFactoryCallbacks filter_callback;
@@ -249,8 +249,7 @@ config:
 
   const auto result = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
   EXPECT_FALSE(result.ok());
-  EXPECT_EQ(result.status().message(),
-            "token_secret is required when auth_type is not MUTUAL_TLS");
+  EXPECT_EQ(result.status().message(), "token_secret is required when auth_type is not MUTUAL_TLS");
 }
 
 TEST(ConfigTest, InvalidTokenSecret) {
