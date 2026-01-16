@@ -17,7 +17,11 @@ bug_fixes:
 - area: drop_overload
   change: |
     Fixed a bug that drop_overload failed to use cached EDS resources.
-
+- area: http
+  change: |
+    Fixed upstream client to not close connection when idle timeout fires before the connection is established.
+    This behavior can be reverted by setting the runtime guard
+    ``envoy.reloadable_features.codec_client_enable_idle_timer_only_when_connected`` to ``false``.
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 

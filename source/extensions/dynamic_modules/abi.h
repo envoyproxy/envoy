@@ -399,6 +399,15 @@ typedef enum envoy_dynamic_module_type_address_type {
   envoy_dynamic_module_type_address_type_EnvoyInternal = 3,
 } envoy_dynamic_module_type_address_type;
 
+/**
+ * envoy_dynamic_module_type_socket_direction represents whether the socket option should be
+ * applied to the upstream (outgoing to backend) or downstream (incoming from client) connection.
+ */
+typedef enum envoy_dynamic_module_type_socket_direction {
+  envoy_dynamic_module_type_socket_direction_Upstream = 0,
+  envoy_dynamic_module_type_socket_direction_Downstream = 1,
+} envoy_dynamic_module_type_socket_direction;
+
 // =============================================================================
 // Common Event Hooks
 // =============================================================================
@@ -1909,6 +1918,81 @@ envoy_dynamic_module_type_http_filter_per_route_config_module_ptr
 envoy_dynamic_module_callback_get_most_specific_route_config(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
 
+// ---------------------- HTTP filter socket option callbacks --------------------
+
+/**
+ * envoy_dynamic_module_callback_http_set_socket_option_int sets an integer socket option with
+ * the given level, name, and state.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
+ * @param level is the socket option level (e.g., SOL_SOCKET).
+ * @param name is the socket option name (e.g., SO_KEEPALIVE).
+ * @param state is the socket state at which this option should be applied. For downstream
+ *        sockets, this is ignored since the socket is already connected.
+ * @param direction specifies whether to apply to upstream or downstream socket.
+ * @param value is the integer value for the socket option.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_set_socket_option_int(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, int64_t level, int64_t name,
+    envoy_dynamic_module_type_socket_option_state state,
+    envoy_dynamic_module_type_socket_direction direction, int64_t value);
+
+/**
+ * envoy_dynamic_module_callback_http_set_socket_option_bytes sets a bytes socket option with
+ * the given level, name, and state.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
+ * @param level is the socket option level.
+ * @param name is the socket option name.
+ * @param state is the socket state at which this option should be applied. For downstream
+ *        sockets, this is ignored since the socket is already connected.
+ * @param direction specifies whether to apply to upstream or downstream socket.
+ * @param value is the byte buffer value for the socket option.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_set_socket_option_bytes(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, int64_t level, int64_t name,
+    envoy_dynamic_module_type_socket_option_state state,
+    envoy_dynamic_module_type_socket_direction direction,
+    envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_http_get_socket_option_int retrieves an integer socket option
+ * value.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
+ * @param level is the socket option level.
+ * @param name is the socket option name.
+ * @param state is the socket state.
+ * @param direction specifies whether to get from upstream or downstream socket.
+ * @param value_out is the pointer to store the retrieved integer value.
+ * @return true if the option is found, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_get_socket_option_int(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, int64_t level, int64_t name,
+    envoy_dynamic_module_type_socket_option_state state,
+    envoy_dynamic_module_type_socket_direction direction, int64_t* value_out);
+
+/**
+ * envoy_dynamic_module_callback_http_get_socket_option_bytes retrieves a bytes socket option
+ * value.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
+ * @param level is the socket option level.
+ * @param name is the socket option name.
+ * @param state is the socket state.
+ * @param direction specifies whether to get from upstream or downstream socket.
+ * @param value_out is the pointer to store the retrieved buffer. The buffer is owned by Envoy and
+ * valid until the filter is destroyed.
+ * @return true if the option is found, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_get_socket_option_bytes(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, int64_t level, int64_t name,
+    envoy_dynamic_module_type_socket_option_state state,
+    envoy_dynamic_module_type_socket_direction direction,
+    envoy_dynamic_module_type_envoy_buffer* value_out);
+
 // =============================================================================
 // ============================= Network Filter ================================
 // =============================================================================
@@ -2488,6 +2572,8 @@ void envoy_dynamic_module_callback_network_filter_inject_read_data(
     envoy_dynamic_module_type_module_buffer data, bool end_stream);
 
 /**
+ * envoy_dynamic_module_type_socket_option_value_type represents the type of value stored in a
+ * socket option.
  * envoy_dynamic_module_callback_network_filter_inject_write_data is called by the module to inject
  * data into the write filter chain (after this filter).
  *
@@ -3456,6 +3542,7 @@ bool envoy_dynamic_module_callback_listener_filter_get_direct_local_address(
     envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer* address_out, uint32_t* port_out);
 
+// ---------------------- HTTP filter scheduler callbacks ------------------------
 /**
  * envoy_dynamic_module_callback_listener_filter_get_original_dst is called by the module to get the
  * original destination address obtained from the platform (e.g., iptables redirect).
@@ -4979,6 +5066,20 @@ typedef void* envoy_dynamic_module_type_bootstrap_extension_envoy_ptr;
  */
 typedef const void* envoy_dynamic_module_type_bootstrap_extension_module_ptr;
 
+/**
+ * envoy_dynamic_module_type_bootstrap_extension_config_scheduler_module_ptr is a raw pointer to
+ * the DynamicModuleBootstrapExtensionConfigScheduler class in Envoy.
+ *
+ * OWNERSHIP: The allocation is done by Envoy but the module is responsible for managing the
+ * lifetime of the pointer. Notably, it must be explicitly destroyed by the module
+ * when scheduling the bootstrap extension config event is done. The creation of this pointer is
+ * done by envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_new and the scheduling
+ * and destruction is done by
+ * envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_delete. Since its lifecycle is
+ * owned/managed by the module, this has _module_ptr suffix.
+ */
+typedef void* envoy_dynamic_module_type_bootstrap_extension_config_scheduler_module_ptr;
+
 // =============================================================================
 // Bootstrap Extension Event Hooks
 // =============================================================================
@@ -5059,6 +5160,76 @@ void envoy_dynamic_module_on_bootstrap_extension_worker_thread_initialized(
  */
 void envoy_dynamic_module_on_bootstrap_extension_destroy(
     envoy_dynamic_module_type_bootstrap_extension_module_ptr extension_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_bootstrap_extension_config_scheduled is called when the bootstrap
+ * extension configuration is scheduled to be executed on the main thread with
+ * envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_commit callback.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param extension_config_ptr is the pointer to the in-module bootstrap extension configuration
+ * created by envoy_dynamic_module_on_bootstrap_extension_config_new.
+ * @param event_id is the ID of the event passed to
+ * envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_commit.
+ */
+void envoy_dynamic_module_on_bootstrap_extension_config_scheduled(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_ptr,
+    uint64_t event_id);
+
+// =============================================================================
+// Bootstrap Extension Callbacks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_new is called by the module
+ * to create a new bootstrap extension configuration scheduler. The scheduler is used to dispatch
+ * bootstrap extension configuration operations to the main thread from any thread including the
+ * ones managed by the module.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @return envoy_dynamic_module_type_bootstrap_extension_config_scheduler_module_ptr is the pointer
+ * to the created bootstrap extension configuration scheduler.
+ *
+ * NOTE: it is caller's responsibility to delete the scheduler using
+ * envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_delete when it is no longer
+ * needed. See the comment on
+ * envoy_dynamic_module_type_bootstrap_extension_config_scheduler_module_ptr.
+ */
+envoy_dynamic_module_type_bootstrap_extension_config_scheduler_module_ptr
+envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_new(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_delete is called by the
+ * module to delete the bootstrap extension configuration scheduler created by
+ * envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_new.
+ *
+ * @param scheduler_module_ptr is the pointer to the bootstrap extension configuration scheduler
+ * created by envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_new.
+ */
+void envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_delete(
+    envoy_dynamic_module_type_bootstrap_extension_config_scheduler_module_ptr scheduler_module_ptr);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_commit is called by the
+ * module to schedule a generic event to the bootstrap extension configuration on the main thread.
+ *
+ * This will eventually end up invoking envoy_dynamic_module_on_bootstrap_extension_config_scheduled
+ * event hook on the main thread.
+ *
+ * This can be called multiple times to schedule multiple events to the same configuration.
+ *
+ * @param scheduler_module_ptr is the pointer to the bootstrap extension configuration scheduler
+ * created by envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_new.
+ * @param event_id is the ID of the event. This can be used to differentiate between multiple
+ * events scheduled to the same configuration. It can be any module-defined value.
+ */
+void envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_commit(
+    envoy_dynamic_module_type_bootstrap_extension_config_scheduler_module_ptr scheduler_module_ptr,
+    uint64_t event_id);
 
 #ifdef __cplusplus
 }

@@ -56,6 +56,8 @@ routing PRs, questions, etc. to the right place.
   * Build, tooling.
 * Jonh Wendell ([jwendell](https://github.com/jwendell)) (jwendell@redhat.com)
   * CI, Build.
+* Yanjun Xiang ([yanjunxiang-google](https://github.com/yanjunxiang-google)) (yanjunxiang@google.com)
+  * ext_proc, dataplane, security.
 
 # Envoy mobile maintainers
 
