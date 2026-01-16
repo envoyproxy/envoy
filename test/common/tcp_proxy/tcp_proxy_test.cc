@@ -2899,8 +2899,6 @@ public:
                                        factory_context_.server_factory_context_.cluster_manager_);
     EXPECT_CALL(filter_callbacks_.connection_, enableHalfClose(true));
 
-    // For TLS modes with TLS connections, the filter will call readDisable(true)
-    // when waiting for TLS handshake, regardless of receive_before_connect.
     if (expect_initial_read_disable) {
       EXPECT_CALL(filter_callbacks_.connection_, readDisable(true));
     }
@@ -2917,7 +2915,8 @@ public:
       upstream_connect_mode: ON_DOWNSTREAM_TLS_HANDSHAKE
       max_early_data_bytes: 0
     )EOF";
-
+    // receive_before_connect=true, expect_initial_read_disable=false
+    // For ON_DOWNSTREAM_TLS_HANDSHAKE mode, reads remain enabled until TLS handshake completes.
     setupFilter(yaml, true, false);
   }
 };
@@ -2954,8 +2953,9 @@ TEST_P(TcpProxyTlsHandshakeTest, TlsHandshakeMode_WithTlsConnection_WaitsForHand
 }
 
 TEST_P(TcpProxyTlsHandshakeTest, TlsHandshakeMode_WithNonTlsConnection_ImmediateConnect) {
+  // No SSL connection.
   EXPECT_CALL(filter_callbacks_.connection_, ssl()).WillRepeatedly(Return(nullptr));
-
+  // Set up connection pool expectations - should be called immediately for non-TLS.
   EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
               tcpConnPool(_, _, _))
       .WillOnce(Return(Upstream::TcpPoolData([]() {}, &conn_pool_)));
@@ -2972,6 +2972,7 @@ TEST_P(TcpProxyTlsHandshakeTest, TlsHandshakeMode_WithNonTlsConnection_Immediate
 
   // Non-TLS connection falls back to IMMEDIATE mode.
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+  // Connection should be established immediately.
   EXPECT_FALSE(conn_pool_callbacks_.empty());
 }
 
@@ -3104,7 +3105,7 @@ TEST(TcpProxyConfigTest, OrthogonalityTlsHandshakeModeWithEarlyData) {
 }
 
 // Test that ON_DOWNSTREAM_TLS_HANDSHAKE with max_early_data_bytes set to zero works.
-TEST(TcpProxyConfigTest, OrthogonalityTlsHandshakeModeWithoutEarlyData) {
+TEST(TcpProxyConfigTest, TlsHandshakeModeWithZeroMaxEarlyDataBytes) {
   const std::string yaml = R"EOF(
     stat_prefix: name
     cluster: fake_cluster
@@ -3157,7 +3158,7 @@ TEST_P(TcpProxyTest, BufferExactlyAtLimitDoesNotReadDisable) {
 
 // Test ON_DOWNSTREAM_TLS_HANDSHAKE mode with TLS connection.
 // Upstream connection is established after TLS handshake completes, not in onNewConnection().
-TEST_P(TcpProxyTest, TlsHandshakeModeReturnsStopIteration) {
+TEST_P(TcpProxyTest, TlsHandshakeModeReturnsContinue) {
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
   config.set_upstream_connect_mode(
       envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_TLS_HANDSHAKE);
