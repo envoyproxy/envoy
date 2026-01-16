@@ -31,13 +31,12 @@ Event::DispatcherPtr MockApi::allocateDispatcher(const std::string& name) {
 Event::DispatcherPtr
 MockApi::allocateDispatcher(const std::string& name,
                             const Event::ScaledRangeTimerManagerFactory& scaled_timer_factory) {
-  return Event::DispatcherPtr{
-      allocateDispatcher_(name, scaled_timer_factory, {}, time_system_)};
+  return Event::DispatcherPtr{allocateDispatcher_(name, scaled_timer_factory, {}, time_system_)};
 }
 Event::DispatcherPtr MockApi::allocateDispatcher(const std::string& name,
                                                  Buffer::WatermarkFactoryPtr&& watermark_factory) {
-  return Event::DispatcherPtr{allocateDispatcher_(name, {},
-                                                  std::move(watermark_factory), time_system_)};
+  return Event::DispatcherPtr{
+      allocateDispatcher_(name, {}, std::move(watermark_factory), time_system_)};
 }
 
 MockOsSysCalls::MockOsSysCalls() {

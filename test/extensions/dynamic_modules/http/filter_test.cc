@@ -30,11 +30,12 @@ TEST_P(DynamicModuleTestLanguages, Nop) {
   auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", language), false);
   EXPECT_TRUE(dynamic_module.ok());
 
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   Stats::IsolatedStoreImpl stats_store;
   auto filter_config_or_status =
       Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
           filter_name, filter_config, false, std::move(dynamic_module.value()),
-          *stats_store.createScope(""));
+          *stats_store.createScope(""), context);
   EXPECT_TRUE(filter_config_or_status.ok());
 
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
@@ -496,6 +497,12 @@ TEST(DynamicModulesTest, BodyCallbacks) {
 
 TEST(DynamicModulesTest, HttpFilterHttpCallout_non_existing_cluster) {
   const std::string filter_name = "http_callouts";
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  NiceMock<Server::MockOptions> options;
+  ON_CALL(options, concurrency()).WillByDefault(testing::Return(1));
+  ON_CALL(context, options()).WillByDefault(testing::ReturnRef(options));
+  ScopedThreadLocalServerContextSetter setter(context);
+
   // TODO: Add non-Rust test program once we have non-Rust SDK.
   auto dynamic_module =
       newDynamicModule(testSharedObjectPath("http_integration_test", "rust"), false);
@@ -503,8 +510,6 @@ TEST(DynamicModulesTest, HttpFilterHttpCallout_non_existing_cluster) {
     ENVOY_LOG_MISC(debug, "Failed to load dynamic module: {}", dynamic_module.status().message());
   }
   EXPECT_TRUE(dynamic_module.ok());
- 
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   Stats::IsolatedStoreImpl stats_store;
   auto stats_scope = stats_store.createScope("");
   Upstream::MockClusterManager cluster_manager;

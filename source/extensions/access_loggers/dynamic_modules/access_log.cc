@@ -28,12 +28,21 @@ DynamicModuleAccessLog::DynamicModuleAccessLog(AccessLog::FilterPtr&& filter,
     : Common::ImplBase(std::move(filter)), config_(config), tls_slot_(tls.allocateSlot()) {
 
   tls_slot_->set([config](Event::Dispatcher& dispatcher) {
-    const std::string& worker_name = dispatcher.name();
-    auto pos = worker_name.find_first_of('_');
-    ENVOY_BUG(pos != std::string::npos, "worker name is not in expected format worker_{index}");
     uint32_t worker_index;
-    if (!absl::SimpleAtoi(worker_name.substr(pos + 1), &worker_index)) {
-      IS_ENVOY_BUG("failed to parse worker index from name");
+    if (Envoy::Thread::MainThread::isMainThread()) {
+      auto context = Server::Configuration::ServerFactoryContextInstance::getExisting();
+      auto concurrency = context->options().concurrency();
+      worker_index = concurrency; // Set main thread on free index.
+    } else {
+      const std::string& worker_name = dispatcher.name();
+      auto pos = worker_name.find_first_of('_');
+      if (pos != std::string::npos) {
+        IS_ENVOY_BUG("worker name is not in expected format worker_{index}");
+      }
+      ENVOY_BUG(pos != std::string::npos, "worker name is not in expected format worker_{index}");
+      if (!absl::SimpleAtoi(worker_name.substr(pos + 1), &worker_index)) {
+        IS_ENVOY_BUG("failed to parse worker index from name");
+      }
     }
     // Create a thread-local logger wrapper first, then pass it to the module.
     auto tl_logger = std::make_shared<ThreadLocalLogger>(nullptr, config, worker_index);

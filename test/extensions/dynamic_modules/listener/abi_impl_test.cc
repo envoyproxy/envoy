@@ -55,8 +55,7 @@ private:
 class DynamicModuleListenerFilterAbiCallbackTest : public testing::Test {
 public:
   void SetUp() override {
-    auto dynamic_module =
-        newDynamicModule(testSharedObjectPath("listener_no_op", "c"), false);
+    auto dynamic_module = newDynamicModule(testSharedObjectPath("listener_no_op", "c"), false);
     EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
     auto filter_config_or_status =

@@ -37,8 +37,8 @@ DynamicModuleUdpListenerFilterConfigFactory::createFilterFactoryFromProto(
     if (!absl::SimpleAtoi(worker_name.substr(pos + 1), &worker_index)) {
       IS_ENVOY_BUG("failed to parse worker index from name");
     }
-    filter_manager.addReadFilter(std::make_unique<DynamicModuleUdpListenerFilter>(
-        callbacks, filter_config, worker_index));
+    filter_manager.addReadFilter(
+        std::make_unique<DynamicModuleUdpListenerFilter>(callbacks, filter_config, worker_index));
   };
 }
 

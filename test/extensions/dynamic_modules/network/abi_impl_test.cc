@@ -17,6 +17,8 @@
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/host.h"
 
+#include "gmock/gmock.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace DynamicModules {
@@ -25,8 +27,7 @@ namespace NetworkFilters {
 class DynamicModuleNetworkFilterAbiCallbackTest : public testing::Test {
 public:
   void SetUp() override {
-    auto dynamic_module =
-        newDynamicModule(testSharedObjectPath("network_no_op", "c"), false);
+    auto dynamic_module = newDynamicModule(testSharedObjectPath("network_no_op", "c"), false);
     EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
     auto filter_config_or_status = newDynamicModuleNetworkFilterConfig(
@@ -39,6 +40,7 @@ public:
     filter_->initializeInModuleFilter();
 
     ON_CALL(read_callbacks_, connection()).WillByDefault(testing::ReturnRef(connection_));
+    ON_CALL(connection_, dispatcher()).WillByDefault(testing::ReturnRef(worker_thread_dispatcher_));
     filter_->initializeReadFilterCallbacks(read_callbacks_);
     filter_->initializeWriteFilterCallbacks(write_callbacks_);
   }
@@ -61,6 +63,7 @@ public:
   NiceMock<Network::MockReadFilterCallbacks> read_callbacks_;
   NiceMock<Network::MockWriteFilterCallbacks> write_callbacks_;
   NiceMock<Network::MockConnection> connection_;
+  NiceMock<Event::MockDispatcher> worker_thread_dispatcher_{"worker_0"};
 };
 
 // =============================================================================
@@ -1238,8 +1241,7 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, ListSocketOptions) {
 class DynamicModuleNetworkFilterHttpCalloutTest : public testing::Test {
 public:
   void SetUp() override {
-    auto dynamic_module =
-        newDynamicModule(testSharedObjectPath("network_no_op", "c"), false);
+    auto dynamic_module = newDynamicModule(testSharedObjectPath("network_no_op", "c"), false);
     EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
     auto filter_config_or_status = newDynamicModuleNetworkFilterConfig(
@@ -1251,7 +1253,9 @@ public:
     filter_ = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
     filter_->initializeInModuleFilter();
 
+    ON_CALL(connection_, dispatcher()).WillByDefault(testing::ReturnRef(worker_thread_dispatcher_));
     ON_CALL(read_callbacks_, connection()).WillByDefault(testing::ReturnRef(connection_));
+
     filter_->initializeReadFilterCallbacks(read_callbacks_);
     filter_->initializeWriteFilterCallbacks(write_callbacks_);
   }
@@ -1273,6 +1277,7 @@ public:
   NiceMock<Network::MockReadFilterCallbacks> read_callbacks_;
   NiceMock<Network::MockWriteFilterCallbacks> write_callbacks_;
   NiceMock<Network::MockConnection> connection_;
+  NiceMock<Event::MockDispatcher> worker_thread_dispatcher_{"worker_0"};
 };
 
 TEST_F(DynamicModuleNetworkFilterHttpCalloutTest, SendHttpCalloutClusterNotFound) {

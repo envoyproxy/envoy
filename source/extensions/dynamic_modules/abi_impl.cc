@@ -48,16 +48,9 @@ void envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level level
 
 uint32_t envoy_dynamic_module_callback_get_concurrency() {
   using namespace Envoy;
-  TRY_ASSERT_MAIN_THREAD {
-    auto context = Server::Configuration::ServerFactoryContextInstance::getExisting();
-    return context->options().concurrency();
-  }
-  END_TRY
-  catch (const EnvoyException& e) {
-   ENVOY_LOG_MISC(critical, "error during get_concurrency: {}",
-            e.what());
-   return 0;
-  }
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+  auto context = Server::Configuration::ServerFactoryContextInstance::getExisting();
+  return context->options().concurrency();
 }
 
 // ---------------------- Bootstrap extension scheduler callbacks ------------------------

@@ -50,8 +50,8 @@ TEST_F(ExtensionTest, NullInModuleExtension) {
 
 TEST_F(ExtensionTest, IsDestroyedAndGetExtensionConfig) {
   // Test that isDestroyed and getExtensionConfig work correctly.
-  auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
-      testDataDir() + "/libbootstrap_no_op.so", false);
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
   auto config = newDynamicModuleBootstrapExtensionConfig(
@@ -76,8 +76,8 @@ TEST_F(ExtensionTest, IsDestroyedAndGetExtensionConfig) {
 
 TEST_F(ExtensionTest, LifecycleWithValidExtension) {
   // Test the full lifecycle of a valid extension.
-  auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
-      testDataDir() + "/libbootstrap_no_op.so", false);
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
   auto config = newDynamicModuleBootstrapExtensionConfig(

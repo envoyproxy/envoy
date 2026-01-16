@@ -84,8 +84,7 @@ TEST(DynamicModuleTestLanguages, LoadLibGlobally) {
 
   // The child module should be able to access the symbol from the global module.
   const auto child_path = testSharedObjectPath("program_child", "c");
-  absl::StatusOr<DynamicModulePtr> child_module =
-      newDynamicModule(child_path, false, context, false);
+  absl::StatusOr<DynamicModulePtr> child_module = newDynamicModule(child_path, false, false);
   EXPECT_TRUE(child_module.ok());
 
   using GetSomeVariableFuncType = int (*)(void);

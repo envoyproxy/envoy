@@ -83,9 +83,9 @@ newDynamicModule(const std::filesystem::path& object_file_absolute_path, const b
  * can share symbols with other dynamically loaded modules. This is useful for modules that need to
  * share symbols with other modules.
  */
-absl::StatusOr<DynamicModulePtr>
-newDynamicModuleByName(const absl::string_view module_name, const bool do_not_close,
-                       const bool load_globally = false);
+absl::StatusOr<DynamicModulePtr> newDynamicModuleByName(const absl::string_view module_name,
+                                                        const bool do_not_close,
+                                                        const bool load_globally = false);
 } // namespace DynamicModules
 } // namespace Extensions
 } // namespace Envoy

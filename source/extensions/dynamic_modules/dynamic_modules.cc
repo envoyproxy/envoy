@@ -72,9 +72,9 @@ newDynamicModule(const std::filesystem::path& object_file_absolute_path, const b
   return dynamic_module;
 }
 
-absl::StatusOr<DynamicModulePtr>
-newDynamicModuleByName(const absl::string_view module_name, const bool do_not_close,
-                       const bool load_globally) {
+absl::StatusOr<DynamicModulePtr> newDynamicModuleByName(const absl::string_view module_name,
+                                                        const bool do_not_close,
+                                                        const bool load_globally) {
   // First, try ENVOY_DYNAMIC_MODULES_SEARCH_PATH which falls back to the current directory.
   const char* module_search_path = getenv(DYNAMIC_MODULES_SEARCH_PATH);
   if (!module_search_path) {

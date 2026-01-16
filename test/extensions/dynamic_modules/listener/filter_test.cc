@@ -42,8 +42,7 @@ private:
 class DynamicModuleListenerFilterTest : public testing::Test {
 public:
   void SetUp() override {
-    auto dynamic_module =
-        newDynamicModule(testSharedObjectPath("listener_no_op", "c"), false);
+    auto dynamic_module = newDynamicModule(testSharedObjectPath("listener_no_op", "c"), false);
     EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
     auto filter_config_or_status =
@@ -59,7 +58,7 @@ public:
   DynamicModuleListenerFilterConfigSharedPtr filter_config_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<Network::MockListenerFilterCallbacks> callbacks_;
-  NiceMock<Event::MockDispatcher> dispatcher{"worker_0", 1};
+  NiceMock<Event::MockDispatcher> dispatcher{"worker_0"};
 };
 
 TEST_F(DynamicModuleListenerFilterTest, BasicFilterFlow) {
@@ -188,6 +187,8 @@ TEST_F(DynamicModuleListenerFilterTest, CallbackAccessor) {
   EXPECT_EQ(nullptr, filter->callbacks());
 
   NiceMock<Network::MockListenerFilterCallbacks> callbacks_;
+  NiceMock<Event::MockDispatcher> dispatcher{"worker_0"};
+  ON_CALL(callbacks_, dispatcher()).WillByDefault(testing::ReturnRef(dispatcher));
   filter->onAccept(callbacks_);
 
   // After onAccept, callbacks should be set.
@@ -206,8 +207,7 @@ TEST_F(DynamicModuleListenerFilterTest, GetFilterConfig) {
 TEST(DynamicModuleListenerFilterConfigTest, ConfigInitialization) {
   Stats::IsolatedStoreImpl stats;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher;
-  auto dynamic_module =
-      newDynamicModule(testSharedObjectPath("listener_no_op", "c"), false);
+  auto dynamic_module = newDynamicModule(testSharedObjectPath("listener_no_op", "c"), false);
   EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
   auto filter_config_or_status = newDynamicModuleListenerFilterConfig(
@@ -272,7 +272,7 @@ TEST(DynamicModuleListenerFilterConfigTest, StopIterationStatus) {
   filter->initializeInModuleFilter();
 
   NiceMock<Network::MockListenerFilterCallbacks> callbacks;
-  NiceMock<Event::MockDispatcher> dispatcher{"worker_0", 1};
+  NiceMock<Event::MockDispatcher> dispatcher{"worker_0"};
   ON_CALL(callbacks, dispatcher()).WillByDefault(testing::ReturnRef(dispatcher));
 
   // onAccept should return StopIteration.
@@ -299,7 +299,7 @@ TEST(DynamicModuleListenerFilterConfigTest, OnDataStopIterationStatus) {
   filter->initializeInModuleFilter();
 
   NiceMock<Network::MockListenerFilterCallbacks> callbacks;
-  NiceMock<Event::MockDispatcher> dispatcher{"worker_0", 1};
+  NiceMock<Event::MockDispatcher> dispatcher{"worker_0"};
   ON_CALL(callbacks, dispatcher()).WillByDefault(testing::ReturnRef(dispatcher));
   filter->onAccept(callbacks);
 

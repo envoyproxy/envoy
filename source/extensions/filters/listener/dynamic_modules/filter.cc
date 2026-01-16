@@ -40,7 +40,7 @@ void DynamicModuleListenerFilter::destroy() {
 
 Network::FilterStatus DynamicModuleListenerFilter::onAccept(Network::ListenerFilterCallbacks& cb) {
   callbacks_ = &cb;
-  
+
   const std::string& worker_name = cb.dispatcher().name();
   auto pos = worker_name.find_first_of('_');
   ENVOY_BUG(pos != std::string::npos, "worker name is not in expected format worker_{index}");

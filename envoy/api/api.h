@@ -54,8 +54,7 @@ public:
    * @return Event::DispatcherPtr which is owned by the caller.
    */
   virtual Event::DispatcherPtr
-  allocateDispatcher(const std::string& name,
-                     Buffer::WatermarkFactoryPtr&& watermark_factory) PURE;
+  allocateDispatcher(const std::string& name, Buffer::WatermarkFactoryPtr&& watermark_factory) PURE;
 
   /**
    * @return a reference to the ThreadFactory

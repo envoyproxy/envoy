@@ -378,7 +378,7 @@ bool envoy_dynamic_module_callback_access_logger_get_upstream_transport_failure_
     envoy_dynamic_module_type_envoy_buffer* result) {
   auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
   const auto upstream = logger->stream_info_->upstreamInfo();
-  if (!upstream.has_value() || !upstream->upstreamTransportFailureReason().empty()) {
+  if (!upstream.has_value() || upstream->upstreamTransportFailureReason().empty()) {
     return false;
   }
 

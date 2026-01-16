@@ -112,7 +112,7 @@ void RealThreadsTestHelper::tlsBlock() {
 void RealThreadsTestHelper::workerThreadFn(uint32_t thread_index,
                                            BlockingBarrier& blocking_barrier) {
   thread_dispatchers_[thread_index] =
-      api_->allocateDispatcher(absl::StrCat("test_worker_", thread_index), thread_index);
+      api_->allocateDispatcher(absl::StrCat("test_worker_", thread_index));
   blocking_barrier.decrementCount();
   thread_dispatchers_[thread_index]->run(Event::Dispatcher::RunType::RunUntilExit);
 }

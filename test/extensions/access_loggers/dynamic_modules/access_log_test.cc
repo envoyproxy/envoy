@@ -8,6 +8,8 @@
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/utility.h"
 
+#include "gmock/gmock.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace AccessLoggers {
@@ -140,6 +142,8 @@ TEST_F(DynamicModuleAccessLogTest, FlushNotCalledWhenNull) {
 
 TEST_F(DynamicModuleAccessLogTest, DynamicModuleAccessLogCreation) {
   NiceMock<ThreadLocal::MockInstance> tls;
+  NiceMock<Event::MockDispatcher> dispatcher{"worker_0"};
+  tls.setDispatcher(&dispatcher);
 
   // Use allocateSlotMock to get a properly functioning slot.
   EXPECT_CALL(tls, allocateSlot()).WillOnce(testing::Invoke([&tls]() {

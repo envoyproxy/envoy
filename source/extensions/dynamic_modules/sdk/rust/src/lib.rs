@@ -93,9 +93,7 @@ macro_rules! declare_init_functions {
 ///
 /// This function must be called on the main thread.
 pub unsafe fn get_server_concurrency() -> u32 {
-  unsafe {
-    abi::envoy_dynamic_module_callback_get_concurrency()
-  }
+  unsafe { abi::envoy_dynamic_module_callback_get_concurrency() }
 }
 
 /// Log a trace message to Envoy's logging system with [dynamic_modules] Id. Messages won't be
@@ -207,7 +205,7 @@ macro_rules! envoy_log {
 /// on failure. When it returns false, the dynamic module will not be loaded.
 ///
 /// This is useful to perform any process-wide initialization that the dynamic module needs.
-pub type ProgramInitFunction<ESC> = fn() -> bool;
+pub type ProgramInitFunction = fn() -> bool;
 
 /// The function signature for the new HTTP filter configuration function.
 ///

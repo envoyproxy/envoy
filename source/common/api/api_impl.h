@@ -27,8 +27,7 @@ public:
        Buffer::WatermarkFactorySharedPtr watermark_factory = nullptr);
 
   // Api::Api
-  Event::DispatcherPtr
-  allocateDispatcher(const std::string& name) override;
+  Event::DispatcherPtr allocateDispatcher(const std::string& name) override;
   Event::DispatcherPtr
   allocateDispatcher(const std::string& name,
                      const Event::ScaledRangeTimerManagerFactory& scaled_timer_factory) override;

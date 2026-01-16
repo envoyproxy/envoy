@@ -18,8 +18,7 @@ namespace Event {
 
 MockDispatcher::MockDispatcher() : MockDispatcher("test_thread") {}
 
-MockDispatcher::MockDispatcher(const std::string& name)
-    : name_(name) {
+MockDispatcher::MockDispatcher(const std::string& name) : name_(name) {
   time_system_ = std::make_unique<GlobalTimeSystem>();
   auto thread_factory = &Api::createApiForTest()->threadFactory();
   Envoy::Thread::ThreadId thread_id = thread_factory->currentThreadId();

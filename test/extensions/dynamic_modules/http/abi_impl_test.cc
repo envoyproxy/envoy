@@ -13,6 +13,8 @@
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/utility.h"
 
+#include "gmock/gmock.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace DynamicModules {
@@ -1885,10 +1887,12 @@ TEST(ABIImpl, Stats) {
 
 TEST_F(DynamicModuleHttpFilterTest, GetConcurrency) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  ON_CALL(context.options_, concurrency()).WillByDefault(testing::Return(1));
-  uint32_t concurrency =
-      envoy_dynamic_module_callback_server_factory_context_get_concurrency(&context);
-  EXPECT_EQ(concurrency, 1);
+  NiceMock<Server::MockOptions> options;
+  ON_CALL(options, concurrency()).WillByDefault(testing::Return(10));
+  ON_CALL(context, options()).WillByDefault(testing::ReturnRef(options));
+  ScopedThreadLocalServerContextSetter setter(context);
+  uint32_t concurrency = envoy_dynamic_module_callback_get_concurrency();
+  EXPECT_EQ(concurrency, 10);
 }
 
 TEST_F(DynamicModuleHttpFilterTest, GetWorkerIndex) {

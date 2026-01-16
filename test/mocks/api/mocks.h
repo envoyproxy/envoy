@@ -33,13 +33,14 @@ public:
   // Api::Api
   Event::DispatcherPtr allocateDispatcher(const std::string& name) override;
   Event::DispatcherPtr
-  allocateDispatcher(const std::string& name, const Event::ScaledRangeTimerManagerFactory& scaled_timer_factory) override;
-  Event::DispatcherPtr allocateDispatcher(const std::string& name, Buffer::WatermarkFactoryPtr&& watermark_factory) override;
+  allocateDispatcher(const std::string& name,
+                     const Event::ScaledRangeTimerManagerFactory& scaled_timer_factory) override;
+  Event::DispatcherPtr allocateDispatcher(const std::string& name,
+                                          Buffer::WatermarkFactoryPtr&& watermark_factory) override;
 
   TimeSource& timeSource() override { return time_system_; }
 
-  MOCK_METHOD(Event::Dispatcher*, allocateDispatcher_,
-              (const std::string&, Event::TimeSystem&));
+  MOCK_METHOD(Event::Dispatcher*, allocateDispatcher_, (const std::string&, Event::TimeSystem&));
   MOCK_METHOD(Event::Dispatcher*, allocateDispatcher_,
               (const std::string&,
                const Event::ScaledRangeTimerManagerFactory& scaled_timer_factory,

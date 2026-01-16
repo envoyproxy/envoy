@@ -30,7 +30,7 @@ public:
   }
 
   void* createThreadLocalLogger(const Formatter::Context& context,
-                                     const StreamInfo::StreamInfo& stream_info) {
+                                const StreamInfo::StreamInfo& stream_info) {
     logger_ = std::make_unique<ThreadLocalLogger>(nullptr, nullptr, 1);
     logger_->log_context_ = &context;
     logger_->stream_info_ = &stream_info;

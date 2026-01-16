@@ -15,10 +15,8 @@ ValidationImpl::ValidationImpl(Thread::ThreadFactory& thread_factory, Stats::Sto
            process_context),
       time_system_(time_system) {}
 
-Event::DispatcherPtr
-ValidationImpl::allocateDispatcher(const std::string& name) {
-  return Event::DispatcherPtr{
-      new Event::ValidationDispatcher(name, *this, time_system_)};
+Event::DispatcherPtr ValidationImpl::allocateDispatcher(const std::string& name) {
+  return Event::DispatcherPtr{new Event::ValidationDispatcher(name, *this, time_system_)};
 }
 
 Event::DispatcherPtr

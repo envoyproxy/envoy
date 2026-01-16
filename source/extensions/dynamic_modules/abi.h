@@ -5088,7 +5088,8 @@ envoy_dynamic_module_callback_access_logger_record_histogram_value(
  * worker-specific resources or perform worker-specific logic.
  * @param access_logger_envoy_ptr is the pointer to the DynamicModuleAccessLogger object of the
  * corresponding access logger.
- * @return the worker index assigned to the current access logger.
+ * @return the worker index assigned to the current access logger. For the main thread the index
+ * will be equal to envoy_dynamic_module_callback_get_concurrency result.
  */
 uint32_t envoy_dynamic_module_callback_access_logger_get_worker_index(
     envoy_dynamic_module_type_access_logger_envoy_ptr access_logger_envoy_ptr);
