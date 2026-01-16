@@ -606,9 +606,9 @@ TEST_P(TcpListenerImplTest, LoadShedPointRejectDeallocatesGlobalConnectionResour
       .WillByDefault(Return(true));
 
   // tryAllocateResource should succeed (return true) - connection is admitted.
-  ON_CALL(mock_overload_state,
-          tryAllocateResource(
-              Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections, 1))
+  ON_CALL(
+      mock_overload_state,
+      tryAllocateResource(Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections, 1))
       .WillByDefault(Return(true));
 
   Server::ThreadLocalOverloadStateOptRef overload_state_ref(mock_overload_state);
