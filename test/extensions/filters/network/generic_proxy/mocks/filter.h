@@ -88,16 +88,8 @@ public:
   MOCK_METHOD(void, addDecoderFilter, (DecoderFilterSharedPtr filter));
   MOCK_METHOD(void, addEncoderFilter, (EncoderFilterSharedPtr filter));
   MOCK_METHOD(void, addFilter, (StreamFilterSharedPtr filter));
-};
-
-class MockFilterChainManager : public FilterChainManager {
-public:
-  MockFilterChainManager();
-
-  MOCK_METHOD(void, applyFilterFactoryCb, (FilterContext context, FilterFactoryCb& factory));
-
-  testing::NiceMock<MockFilterChainFactoryCallbacks> callbacks_;
-  std::vector<FilterContext> contexts_;
+  MOCK_METHOD(absl::string_view, filterConfigName, (), (const));
+  MOCK_METHOD(void, setFilterConfigName, (absl::string_view name));
 };
 
 template <class Base> class MockStreamFilterCallbacks : public Base {
