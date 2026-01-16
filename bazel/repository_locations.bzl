@@ -457,13 +457,13 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         # from the icu source code, to prevent Bazel from treating the foreign library
         # as a Bazel project.
         # https://github.com/envoyproxy/envoy/issues/26395
-        version = "77-1",
-        sha256 = "ded3a96f6b7236d160df30af46593165b9c78a4ec72a414aa63cf50614e4c14e",
-        strip_prefix = "icu-release-{version}",
-        urls = ["https://github.com/unicode-org/icu/archive/release-{version}.tar.gz"],
+        version = "78.2",
+        sha256 = "af38c3d4904e47e1bc2dd7587922ee2aec312fefa677804582e3fecca3edb272",
+        strip_prefix = "icu",
+        urls = ["https://github.com/unicode-org/icu/releases/download/release-{version}/icu4c-{version}-sources.zip"],
         use_category = ["dataplane_ext"],
         extensions = ["envoy.filters.http.language"],
-        release_date = "2025-03-13",
+        release_date = "2026-01-09",
         cpe = "N/A",
         license = "ICU",
         license_url = "https://github.com/unicode-org/icu/blob/release-{version}/icu4c/LICENSE",

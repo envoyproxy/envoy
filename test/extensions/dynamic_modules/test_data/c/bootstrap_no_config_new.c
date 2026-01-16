@@ -53,3 +53,12 @@ void envoy_dynamic_module_on_bootstrap_extension_destroy(
   (void)extension_module_ptr;
 }
 
+
+void envoy_dynamic_module_on_bootstrap_extension_config_scheduled(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_ptr,
+    uint64_t event_id) {
+  (void)extension_config_envoy_ptr;
+  (void)extension_config_ptr;
+  (void)event_id;
+}

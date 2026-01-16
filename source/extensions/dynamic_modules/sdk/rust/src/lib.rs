@@ -6495,7 +6495,12 @@ pub type NewBootstrapExtensionConfigFunction = fn(
 /// EnvoyBootstrapExtensionConfig is the Envoy-side bootstrap extension configuration.
 /// This is a handle to the Envoy configuration object.
 #[automock]
-pub trait EnvoyBootstrapExtensionConfig {}
+pub trait EnvoyBootstrapExtensionConfig {
+  /// Create a new implementation of the [`EnvoyBootstrapExtensionConfigScheduler`] trait.
+  ///
+  /// This can be used to schedule an event to the main thread where the config is running.
+  fn new_scheduler(&self) -> Box<dyn EnvoyBootstrapExtensionConfigScheduler>;
+}
 
 /// EnvoyBootstrapExtension is the Envoy-side bootstrap extension.
 /// This is a handle to the Envoy extension object.
@@ -6519,6 +6524,19 @@ pub trait BootstrapExtensionConfig: Send + Sync {
     &self,
     envoy_extension: &mut dyn EnvoyBootstrapExtension,
   ) -> Box<dyn BootstrapExtension>;
+
+  /// This is called when a new event is scheduled via the
+  /// [`EnvoyBootstrapExtensionConfigScheduler::commit`] for this [`BootstrapExtensionConfig`].
+  ///
+  /// * `envoy_extension_config` can be used to interact with the underlying Envoy config object.
+  /// * `event_id` is the ID of the event that was scheduled with
+  ///   [`EnvoyBootstrapExtensionConfigScheduler::commit`] to distinguish multiple scheduled events.
+  fn on_scheduled(
+    &self,
+    _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _event_id: u64,
+  ) {
+  }
 }
 
 /// BootstrapExtension is the module-side bootstrap extension.
@@ -6541,13 +6559,49 @@ pub trait BootstrapExtension: Send + Sync {
   fn on_worker_thread_initialized(&mut self, _envoy_extension: &mut dyn EnvoyBootstrapExtension) {}
 }
 
+/// This represents a thread-safe object that can be used to schedule a generic event to the
+/// Envoy bootstrap extension config on the main thread.
+#[automock]
+pub trait EnvoyBootstrapExtensionConfigScheduler: Send + Sync {
+  /// Commit the scheduled event to the main thread.
+  fn commit(&self, event_id: u64);
+}
+
+struct EnvoyBootstrapExtensionConfigSchedulerImpl {
+  raw_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_scheduler_module_ptr,
+}
+
+unsafe impl Send for EnvoyBootstrapExtensionConfigSchedulerImpl {}
+unsafe impl Sync for EnvoyBootstrapExtensionConfigSchedulerImpl {}
+
+impl Drop for EnvoyBootstrapExtensionConfigSchedulerImpl {
+  fn drop(&mut self) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_delete(self.raw_ptr);
+    }
+  }
+}
+
+impl EnvoyBootstrapExtensionConfigScheduler for EnvoyBootstrapExtensionConfigSchedulerImpl {
+  fn commit(&self, event_id: u64) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_commit(
+        self.raw_ptr,
+        event_id,
+      );
+    }
+  }
+}
+
+impl EnvoyBootstrapExtensionConfigScheduler for Box<dyn EnvoyBootstrapExtensionConfigScheduler> {
+  fn commit(&self, event_id: u64) {
+    (**self).commit(event_id);
+  }
+}
+
 // Implementation of EnvoyBootstrapExtensionConfig
 
 struct EnvoyBootstrapExtensionConfigImpl {
-  // The raw pointer is stored for future callback implementations.
-  // Currently, the EnvoyBootstrapExtensionConfig trait has no methods, but
-  // callbacks may be added in the future (e.g., for metrics or other APIs).
-  #[allow(dead_code)]
   raw: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
 }
 
@@ -6557,7 +6611,17 @@ impl EnvoyBootstrapExtensionConfigImpl {
   }
 }
 
-impl EnvoyBootstrapExtensionConfig for EnvoyBootstrapExtensionConfigImpl {}
+impl EnvoyBootstrapExtensionConfig for EnvoyBootstrapExtensionConfigImpl {
+  fn new_scheduler(&self) -> Box<dyn EnvoyBootstrapExtensionConfigScheduler> {
+    unsafe {
+      let scheduler_ptr =
+        abi::envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_new(self.raw);
+      Box::new(EnvoyBootstrapExtensionConfigSchedulerImpl {
+        raw_ptr: scheduler_ptr,
+      })
+    }
+  }
+}
 
 // Implementation of EnvoyBootstrapExtension
 
@@ -6670,6 +6734,20 @@ pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_destroy(
   extension_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_module_ptr,
 ) {
   let _ = unsafe { Box::from_raw(extension_ptr as *mut Box<dyn BootstrapExtension>) };
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_config_scheduled(
+  envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
+  event_id: u64,
+) {
+  let extension_config = extension_config_ptr as *const *const dyn BootstrapExtensionConfig;
+  let extension_config = unsafe { &**extension_config };
+  extension_config.on_scheduled(
+    &mut EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr),
+    event_id,
+  );
 }
 
 /// Declare the init functions for the bootstrap extension dynamic module.

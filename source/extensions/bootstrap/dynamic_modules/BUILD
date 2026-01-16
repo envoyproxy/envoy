@@ -14,6 +14,7 @@ envoy_cc_library(
     srcs = ["extension_config.cc"],
     hdrs = ["extension_config.h"],
     deps = [
+        "//envoy/event:dispatcher_interface",
         "//source/common/common:assert_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
     ],
@@ -32,11 +33,21 @@ envoy_cc_library(
     ],
 )
 
+envoy_cc_library(
+    name = "abi_impl",
+    srcs = ["abi_impl.cc"],
+    deps = [
+        ":extension_config_lib",
+        "//source/extensions/dynamic_modules:dynamic_modules_lib",
+    ],
+)
+
 envoy_cc_extension(
     name = "config",
     srcs = ["factory.cc"],
     hdrs = ["factory.h"],
     deps = [
+        ":abi_impl",
         ":extension_lib",
         "//envoy/registry",
         "//envoy/server:bootstrap_extension_config_interface",
