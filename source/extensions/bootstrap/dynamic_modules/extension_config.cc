@@ -10,9 +10,10 @@ namespace DynamicModules {
 DynamicModuleBootstrapExtensionConfig::DynamicModuleBootstrapExtensionConfig(
     const absl::string_view extension_name, const absl::string_view extension_config,
     Extensions::DynamicModules::DynamicModulePtr dynamic_module,
-    Event::Dispatcher& main_thread_dispatcher, Server::Configuration::ServerFactoryContext& context)
+    Event::Dispatcher& main_thread_dispatcher, Server::Configuration::ServerFactoryContext& context,
+    Stats::Store& stats_store)
     : dynamic_module_(std::move(dynamic_module)), main_thread_dispatcher_(main_thread_dispatcher),
-      context_(context) {
+      context_(context), stats_store_(stats_store) {
   ASSERT(dynamic_module_ != nullptr);
   ASSERT(extension_name.data() != nullptr);
   ASSERT(extension_config.data() != nullptr);
@@ -147,8 +148,8 @@ absl::StatusOr<DynamicModuleBootstrapExtensionConfigSharedPtr>
 newDynamicModuleBootstrapExtensionConfig(
     const absl::string_view extension_name, const absl::string_view extension_config,
     Extensions::DynamicModules::DynamicModulePtr dynamic_module,
-    Event::Dispatcher& main_thread_dispatcher,
-    Server::Configuration::ServerFactoryContext& context) {
+    Event::Dispatcher& main_thread_dispatcher, Server::Configuration::ServerFactoryContext& context,
+    Stats::Store& stats_store) {
 
   // Resolve the required symbols from the dynamic module.
   auto constructor =
@@ -207,7 +208,8 @@ newDynamicModuleBootstrapExtensionConfig(
   }
 
   auto config = std::make_shared<DynamicModuleBootstrapExtensionConfig>(
-      extension_name, extension_config, std::move(dynamic_module), main_thread_dispatcher, context);
+      extension_name, extension_config, std::move(dynamic_module), main_thread_dispatcher, context,
+      stats_store);
 
   const void* extension_config_module_ptr = (*constructor.value())(
       static_cast<void*>(config.get()), {extension_name.data(), extension_name.size()},

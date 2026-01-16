@@ -6474,8 +6474,35 @@ pub trait EnvoyBootstrapExtensionConfig {
 
 /// EnvoyBootstrapExtension is the Envoy-side bootstrap extension.
 /// This is a handle to the Envoy extension object.
-#[automock]
-pub trait EnvoyBootstrapExtension {}
+pub trait EnvoyBootstrapExtension {
+  /// Get the current value of a counter by name.
+  ///
+  /// Returns `Some(value)` if the counter exists, `None` otherwise.
+  fn get_counter_value(&self, name: &str) -> Option<u64>;
+
+  /// Get the current value of a gauge by name.
+  ///
+  /// Returns `Some(value)` if the gauge exists, `None` otherwise.
+  fn get_gauge_value(&self, name: &str) -> Option<u64>;
+
+  /// Get the summary statistics of a histogram by name.
+  ///
+  /// Returns `Some((sample_count, sample_sum))` if the histogram exists, `None` otherwise.
+  /// These are cumulative statistics since the server started.
+  fn get_histogram_summary(&self, name: &str) -> Option<(u64, f64)>;
+
+  /// Iterate over all counters in the stats store.
+  ///
+  /// The callback receives the counter name and its current value.
+  /// Return `true` to continue iteration, `false` to stop.
+  fn iterate_counters(&self, callback: &mut dyn FnMut(&str, u64) -> bool);
+
+  /// Iterate over all gauges in the stats store.
+  ///
+  /// The callback receives the gauge name and its current value.
+  /// Return `true` to continue iteration, `false` to stop.
+  fn iterate_gauges(&self, callback: &mut dyn FnMut(&str, u64) -> bool);
+}
 
 /// BootstrapExtensionConfig is the module-side bootstrap extension configuration.
 ///
@@ -6655,10 +6682,6 @@ impl EnvoyBootstrapExtensionConfig for EnvoyBootstrapExtensionConfigImpl {
 // Implementation of EnvoyBootstrapExtension
 
 struct EnvoyBootstrapExtensionImpl {
-  // The raw pointer is stored for future callback implementations.
-  // Currently, the EnvoyBootstrapExtension trait has no methods, but
-  // callbacks may be added in the future.
-  #[allow(dead_code)]
   raw: abi::envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
 }
 
@@ -6668,7 +6691,135 @@ impl EnvoyBootstrapExtensionImpl {
   }
 }
 
-impl EnvoyBootstrapExtension for EnvoyBootstrapExtensionImpl {}
+impl EnvoyBootstrapExtension for EnvoyBootstrapExtensionImpl {
+  fn get_counter_value(&self, name: &str) -> Option<u64> {
+    let mut value: u64 = 0;
+    let found = unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_get_counter_value(
+        self.raw,
+        str_to_module_buffer(name),
+        &mut value,
+      )
+    };
+    if found {
+      Some(value)
+    } else {
+      None
+    }
+  }
+
+  fn get_gauge_value(&self, name: &str) -> Option<u64> {
+    let mut value: u64 = 0;
+    let found = unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_get_gauge_value(
+        self.raw,
+        str_to_module_buffer(name),
+        &mut value,
+      )
+    };
+    if found {
+      Some(value)
+    } else {
+      None
+    }
+  }
+
+  fn get_histogram_summary(&self, name: &str) -> Option<(u64, f64)> {
+    let mut sample_count: u64 = 0;
+    let mut sample_sum: f64 = 0.0;
+    let found = unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_get_histogram_summary(
+        self.raw,
+        str_to_module_buffer(name),
+        &mut sample_count,
+        &mut sample_sum,
+      )
+    };
+    if found {
+      Some((sample_count, sample_sum))
+    } else {
+      None
+    }
+  }
+
+  fn iterate_counters(&self, callback: &mut dyn FnMut(&str, u64) -> bool) {
+    // We use a wrapper struct to pass the closure through the C callback.
+    struct CallbackWrapper<'a> {
+      callback: &'a mut dyn FnMut(&str, u64) -> bool,
+      stopped: bool,
+    }
+
+    extern "C" fn counter_iterator_trampoline(
+      name: abi::envoy_dynamic_module_type_envoy_buffer,
+      value: u64,
+      user_data: *mut std::ffi::c_void,
+    ) -> abi::envoy_dynamic_module_type_stats_iteration_action {
+      let wrapper = unsafe { &mut *(user_data as *mut CallbackWrapper) };
+      if wrapper.stopped {
+        return abi::envoy_dynamic_module_type_stats_iteration_action::Stop;
+      }
+      let name_slice = unsafe { std::slice::from_raw_parts(name.ptr as *const u8, name.length) };
+      let name_str = std::str::from_utf8(name_slice).unwrap_or("");
+      if (wrapper.callback)(name_str, value) {
+        abi::envoy_dynamic_module_type_stats_iteration_action::Continue
+      } else {
+        wrapper.stopped = true;
+        abi::envoy_dynamic_module_type_stats_iteration_action::Stop
+      }
+    }
+
+    let mut wrapper = CallbackWrapper {
+      callback,
+      stopped: false,
+    };
+    unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_iterate_counters(
+        self.raw,
+        Some(counter_iterator_trampoline),
+        &mut wrapper as *mut _ as *mut std::ffi::c_void,
+      );
+    }
+  }
+
+  fn iterate_gauges(&self, callback: &mut dyn FnMut(&str, u64) -> bool) {
+    // We use a wrapper struct to pass the closure through the C callback.
+    struct CallbackWrapper<'a> {
+      callback: &'a mut dyn FnMut(&str, u64) -> bool,
+      stopped: bool,
+    }
+
+    extern "C" fn gauge_iterator_trampoline(
+      name: abi::envoy_dynamic_module_type_envoy_buffer,
+      value: u64,
+      user_data: *mut std::ffi::c_void,
+    ) -> abi::envoy_dynamic_module_type_stats_iteration_action {
+      let wrapper = unsafe { &mut *(user_data as *mut CallbackWrapper) };
+      if wrapper.stopped {
+        return abi::envoy_dynamic_module_type_stats_iteration_action::Stop;
+      }
+      let name_slice = unsafe { std::slice::from_raw_parts(name.ptr as *const u8, name.length) };
+      let name_str = std::str::from_utf8(name_slice).unwrap_or("");
+      if (wrapper.callback)(name_str, value) {
+        abi::envoy_dynamic_module_type_stats_iteration_action::Continue
+      } else {
+        wrapper.stopped = true;
+        abi::envoy_dynamic_module_type_stats_iteration_action::Stop
+      }
+    }
+
+    let mut wrapper = CallbackWrapper {
+      callback,
+      stopped: false,
+    };
+    unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_iterate_gauges(
+        self.raw,
+        Some(gauge_iterator_trampoline),
+        &mut wrapper as *mut _ as *mut std::ffi::c_void,
+      );
+    }
+  }
+}
 
 // Bootstrap Extension Event Hook Implementations
 

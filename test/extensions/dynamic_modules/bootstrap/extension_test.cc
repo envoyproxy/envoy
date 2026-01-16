@@ -31,7 +31,7 @@ TEST_F(ExtensionTest, NullInModuleExtension) {
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
   auto config = newDynamicModuleBootstrapExtensionConfig(
-      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_);
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
   auto extension = std::make_unique<DynamicModuleBootstrapExtension>(config.value());
@@ -57,7 +57,7 @@ TEST_F(ExtensionTest, IsDestroyedAndGetExtensionConfig) {
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
   auto config = newDynamicModuleBootstrapExtensionConfig(
-      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_);
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
   auto extension = std::make_unique<DynamicModuleBootstrapExtension>(config.value());
@@ -83,7 +83,7 @@ TEST_F(ExtensionTest, LifecycleWithValidExtension) {
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
   auto config = newDynamicModuleBootstrapExtensionConfig(
-      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_);
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
   auto extension = std::make_unique<DynamicModuleBootstrapExtension>(config.value());
