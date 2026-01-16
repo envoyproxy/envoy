@@ -1,4 +1,4 @@
-#include "envoy/extensions/filters/http/stream_to_metadata/v3/stream_to_metadata.pb.h"
+#include "envoy/extensions/filters/http/sse_to_metadata/v3/sse_to_metadata.pb.h"
 
 #include "test/integration/http_protocol_integration.h"
 #include "test/test_common/utility.h"
@@ -8,8 +8,7 @@
 namespace Envoy {
 namespace {
 
-class StreamToMetadataIntegrationTest : public Event::TestUsingSimulatedTime,
-                                        public HttpProtocolIntegrationTest {
+class SseToMetadataIntegrationTest : public HttpProtocolIntegrationTest {
 public:
   void initializeFilter() {
     config_helper_.prependFilter(filter_config_);
@@ -57,27 +56,28 @@ public:
   }
 
   const std::string filter_config_ = R"EOF(
-name: envoy.filters.http.stream_to_metadata
+name: envoy.filters.http.sse_to_metadata
 typed_config:
-  "@type": type.googleapis.com/envoy.extensions.filters.http.stream_to_metadata.v3.StreamToMetadata
+  "@type": type.googleapis.com/envoy.extensions.filters.http.sse_to_metadata.v3.SseToMetadata
   response_rules:
-    format: SERVER_SENT_EVENTS
-    rules:
-      - selector:
-          json_path:
-            path: ["usage", "total_tokens"]
-        on_present:
-          - metadata_namespace: "envoy.lb"
-            key: "tokens"
-            type: NUMBER
-      - selector:
-          json_path:
-            path: ["model"]
-        on_present:
-          - metadata_namespace: "envoy.lb"
-            key: "model_name"
-            type: STRING
-        stop_processing_on_match: false
+    content_parser:
+      name: envoy.sse_content_parsers.json
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.sse_content_parsers.json.v3.JsonContentParser
+        rules:
+          - selector:
+              path: ["usage", "total_tokens"]
+            on_present:
+              - metadata_namespace: "envoy.lb"
+                key: "tokens"
+                type: NUMBER
+          - selector:
+              path: ["model"]
+            on_present:
+              - metadata_namespace: "envoy.lb"
+                key: "model_name"
+                type: STRING
+            stop_processing_on_match: false
 )EOF";
 
   Http::TestRequestHeaderMapImpl request_headers_{
@@ -101,48 +101,51 @@ typed_config:
 
 // TODO(#26236): Fix test suite for HTTP/3.
 INSTANTIATE_TEST_SUITE_P(
-    Protocols, StreamToMetadataIntegrationTest,
+    Protocols, SseToMetadataIntegrationTest,
     testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParamsWithoutHTTP3()),
     HttpProtocolIntegrationTest::protocolTestParamsToString);
 
-TEST_P(StreamToMetadataIntegrationTest, BasicSseTokenExtraction) {
+TEST_P(SseToMetadataIntegrationTest, BasicSseTokenExtraction) {
   initializeFilter();
   runTest(request_headers_, "", response_headers_, sse_response_body_);
 
   // Verify stats
   // - Events 1,2: only model_name matches (2 successes)
   // - Event 3: both tokens and model_name match (2 successes)
-  // - Event 4: [DONE] is invalid JSON (1 invalid_json)
-  // Total: 4 successes, 1 invalid_json
-  EXPECT_EQ(4UL, test_server_->counter("stream_to_metadata.resp.success")->value());
-  EXPECT_EQ(0UL, test_server_->counter("stream_to_metadata.resp.mismatched_content_type")->value());
-  EXPECT_EQ(0UL, test_server_->counter("stream_to_metadata.resp.no_data_field")->value());
-  EXPECT_EQ(1UL, test_server_->counter("stream_to_metadata.resp.invalid_json")->value());
+  // - Event 4: [DONE] is invalid JSON (1 parse_error)
+  // Total: 4 successes, 1 parse_error
+  EXPECT_EQ(4UL, test_server_->counter("sse_to_metadata.resp.json.metadata_added")->value());
+  EXPECT_EQ(0UL,
+            test_server_->counter("sse_to_metadata.resp.json.mismatched_content_type")->value());
+  EXPECT_EQ(0UL, test_server_->counter("sse_to_metadata.resp.json.no_data_field")->value());
+  EXPECT_EQ(1UL, test_server_->counter("sse_to_metadata.resp.json.parse_error")->value());
 }
 
-TEST_P(StreamToMetadataIntegrationTest, SseWithSmallChunks) {
+TEST_P(SseToMetadataIntegrationTest, SseWithSmallChunks) {
   initializeFilter();
   // Test with very small chunks to ensure buffering works correctly
   runTest(request_headers_, "", response_headers_, sse_response_body_, 5);
 
-  EXPECT_EQ(4UL, test_server_->counter("stream_to_metadata.resp.success")->value());
-  EXPECT_EQ(0UL, test_server_->counter("stream_to_metadata.resp.mismatched_content_type")->value());
-  EXPECT_EQ(0UL, test_server_->counter("stream_to_metadata.resp.no_data_field")->value());
-  EXPECT_EQ(1UL, test_server_->counter("stream_to_metadata.resp.invalid_json")->value());
+  EXPECT_EQ(4UL, test_server_->counter("sse_to_metadata.resp.json.metadata_added")->value());
+  EXPECT_EQ(0UL,
+            test_server_->counter("sse_to_metadata.resp.json.mismatched_content_type")->value());
+  EXPECT_EQ(0UL, test_server_->counter("sse_to_metadata.resp.json.no_data_field")->value());
+  EXPECT_EQ(1UL, test_server_->counter("sse_to_metadata.resp.json.parse_error")->value());
 }
 
-TEST_P(StreamToMetadataIntegrationTest, SseWithLargeChunks) {
+TEST_P(SseToMetadataIntegrationTest, SseWithLargeChunks) {
   initializeFilter();
   // Test with large chunks
   runTest(request_headers_, "", response_headers_, sse_response_body_, 100);
 
-  EXPECT_EQ(4UL, test_server_->counter("stream_to_metadata.resp.success")->value());
-  EXPECT_EQ(0UL, test_server_->counter("stream_to_metadata.resp.mismatched_content_type")->value());
-  EXPECT_EQ(0UL, test_server_->counter("stream_to_metadata.resp.no_data_field")->value());
-  EXPECT_EQ(1UL, test_server_->counter("stream_to_metadata.resp.invalid_json")->value());
+  EXPECT_EQ(4UL, test_server_->counter("sse_to_metadata.resp.json.metadata_added")->value());
+  EXPECT_EQ(0UL,
+            test_server_->counter("sse_to_metadata.resp.json.mismatched_content_type")->value());
+  EXPECT_EQ(0UL, test_server_->counter("sse_to_metadata.resp.json.no_data_field")->value());
+  EXPECT_EQ(1UL, test_server_->counter("sse_to_metadata.resp.json.parse_error")->value());
 }
 
-TEST_P(StreamToMetadataIntegrationTest, MismatchedContentType) {
+TEST_P(SseToMetadataIntegrationTest, MismatchedContentType) {
   Http::TestResponseHeaderMapImpl json_headers{{":status", "200"},
                                                {"content-type", "application/json"}};
   initializeFilter();
@@ -150,13 +153,14 @@ TEST_P(StreamToMetadataIntegrationTest, MismatchedContentType) {
   runTest(request_headers_, "", json_headers, json_body);
 
   // Content-type mismatch should not process the response
-  EXPECT_EQ(0UL, test_server_->counter("stream_to_metadata.resp.success")->value());
-  EXPECT_EQ(1UL, test_server_->counter("stream_to_metadata.resp.mismatched_content_type")->value());
-  EXPECT_EQ(0UL, test_server_->counter("stream_to_metadata.resp.no_data_field")->value());
-  EXPECT_EQ(0UL, test_server_->counter("stream_to_metadata.resp.invalid_json")->value());
+  EXPECT_EQ(0UL, test_server_->counter("sse_to_metadata.resp.json.metadata_added")->value());
+  EXPECT_EQ(1UL,
+            test_server_->counter("sse_to_metadata.resp.json.mismatched_content_type")->value());
+  EXPECT_EQ(0UL, test_server_->counter("sse_to_metadata.resp.json.no_data_field")->value());
+  EXPECT_EQ(0UL, test_server_->counter("sse_to_metadata.resp.json.parse_error")->value());
 }
 
-TEST_P(StreamToMetadataIntegrationTest, VerifyMetadataValues) {
+TEST_P(SseToMetadataIntegrationTest, VerifyMetadataValues) {
   // Configure access log to capture and verify actual metadata values
   config_helper_.prependFilter(filter_config_);
   useAccessLog("%DYNAMIC_METADATA(envoy.lb)%");
@@ -190,8 +194,8 @@ TEST_P(StreamToMetadataIntegrationTest, VerifyMetadataValues) {
   EXPECT_THAT(log, testing::HasSubstr(R"("model_name":"gpt-4")"));
 
   // Also verify stats
-  EXPECT_EQ(4UL, test_server_->counter("stream_to_metadata.resp.success")->value());
-  EXPECT_EQ(1UL, test_server_->counter("stream_to_metadata.resp.invalid_json")->value());
+  EXPECT_EQ(4UL, test_server_->counter("sse_to_metadata.resp.json.metadata_added")->value());
+  EXPECT_EQ(1UL, test_server_->counter("sse_to_metadata.resp.json.parse_error")->value());
 }
 
 } // namespace

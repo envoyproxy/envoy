@@ -65,8 +65,8 @@ HTTP filters
   router_filter
   set_filter_state
   set_metadata_filter
+  sse_to_metadata_filter
   stateful_session_filter
-  stream_to_metadata_filter
   sxg_filter
   tap_filter
   thrift_to_metadata_filter

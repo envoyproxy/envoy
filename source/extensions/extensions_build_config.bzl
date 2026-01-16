@@ -211,7 +211,7 @@ EXTENSIONS = {
     "envoy.filters.http.thrift_to_metadata":            "//source/extensions/filters/http/thrift_to_metadata:config",
     "envoy.filters.http.wasm":                          "//source/extensions/filters/http/wasm:config",
     "envoy.filters.http.stateful_session":              "//source/extensions/filters/http/stateful_session:config",
-    "envoy.filters.http.stream_to_metadata":            "//source/extensions/filters/http/stream_to_metadata:config",
+    "envoy.filters.http.sse_to_metadata":               "//source/extensions/filters/http/sse_to_metadata:config",
     "envoy.filters.http.header_mutation":               "//source/extensions/filters/http/header_mutation:config",
     "envoy.filters.http.transform":                     "//source/extensions/filters/http/transform:config",
 
@@ -294,6 +294,12 @@ EXTENSIONS = {
     "envoy.stat_sinks.open_telemetry":                  "//source/extensions/stat_sinks/open_telemetry:config",
     "envoy.stat_sinks.statsd":                          "//source/extensions/stat_sinks/statsd:config",
     "envoy.stat_sinks.wasm":                            "//source/extensions/stat_sinks/wasm:config",
+
+    #
+    # SSE content parsers
+    #
+
+    "envoy.sse_content_parsers.json":                   "//source/extensions/sse_content_parsers/json:config",
 
     #
     # Thrift filters

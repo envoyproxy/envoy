@@ -1,19 +1,23 @@
-.. _config_http_filters_stream_to_metadata:
+.. _config_http_filters_sse_to_metadata:
 
-Stream-To-Metadata Filter
+SSE-To-Metadata Filter
 =========================
-* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.stream_to_metadata.v3.StreamToMetadata``.
-* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.stream_to_metadata.v3.StreamToMetadata>`
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.sse_to_metadata.v3.SseToMetadata``.
+* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.sse_to_metadata.v3.SseToMetadata>`
 
-The Stream-To-Metadata filter extracts values from streaming HTTP bodies and writes them to dynamic metadata.
+The SSE-To-Metadata filter extracts values from streaming HTTP bodies and writes them to dynamic metadata.
 Currently, the filter processes response bodies only. This is particularly useful for observability, logging, and
 custom filters that need to access values that only appear in streaming responses.
 
-The filter is configured with rules that specify:
+The filter uses a **typed extension architecture** for content parsing, allowing pluggable parser implementations
+for different data formats. The filter handles the SSE protocol parsing, while content parsers handle the payload
+format (e.g., JSON, XML, protobuf).
 
-* The streaming format to parse (currently only Server-Sent Events (SSE) is supported)
-* A selector path to extract values from JSON payloads within the stream
-* The namespace(s) for extracted values in dynamic metadata to be written to.
+The filter is configured with:
+
+* A **content parser** that specifies how to parse and extract values from event payloads (e.g., JSON parser)
+* **Rules** within the content parser that define selector paths and metadata actions
+* Configuration for the SSE protocol (allowed content types, max event size)
 
 When a rule matches, the extracted value is written to the configured metadata namespace and key.
 The metadata can then be consumed from access logs, used by custom filters, exported to metrics systems, or
@@ -56,35 +60,37 @@ Extract multiple values from streaming responses for logging and monitoring:
 .. code-block:: yaml
 
   response_rules:
-    rules:
-    - selector:
-        json_path:
-          path: ["usage", "total_tokens"]
-      on_present:
-      - metadata_namespace: envoy.audit
-        key: tokens
-        type: NUMBER
-    - selector:
-        json_path:
-          path: ["model"]
-      on_present:
-      - metadata_namespace: envoy.audit
-        key: model_name
-        type: STRING
-      stop_processing_on_match: false
+    content_parser:
+      name: envoy.sse_content_parsers.json
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.sse_content_parsers.json.v3.JsonContentParser
+        rules:
+        - selector:
+            path: ["usage", "total_tokens"]
+          on_present:
+          - metadata_namespace: envoy.audit
+            key: tokens
+            type: NUMBER
+        - selector:
+            path: ["model"]
+          on_present:
+          - metadata_namespace: envoy.audit
+            key: model_name
+            type: STRING
+          stop_processing_on_match: false
 
 How It Works
 ------------
 
-For Server-Sent Events (SSE) format:
+For Server-Sent Events (SSE) format with JSON content parser:
 
-1. The filter checks the response ``Content-Type`` header against allowed content types (default: ``text/event-stream``).
+1. The filter checks the response ``Content-Type`` header against the allowed content type (``text/event-stream``).
    Matching is performed on the media type (type/subtype) only, ignoring parameters like ``charset``.
 2. It parses the SSE stream according to the `SSE specification <https://html.spec.whatwg.org/multipage/server-sent-events.html>`_,
    handling CRLF, CR, and LF line endings, and properly managing events split across multiple data chunks
-3. For each complete SSE event, it extracts the value from the ``data`` field(s) and parses it as JSON
-4. It navigates the JSON object using the configured selector path (e.g., ``["usage", "total_tokens"]``)
-5. Based on the result, it writes metadata according to the configured rules:
+3. For each complete SSE event, it extracts the value from the ``data`` field(s) and delegates to the configured **content parser**
+4. The JSON content parser parses the data as JSON and navigates the object using the configured selector path (e.g., ``["usage", "total_tokens"]``)
+5. Based on the result, it writes metadata according to the configured rules defined in the content parser:
 
    * **on_present**: Executes immediately when the selector successfully extracts a value from any event
    * **on_missing**: Deferred until end-of-stream. Executes only if ``on_present`` never executed and the selector path was not found in at least one event
@@ -111,25 +117,32 @@ Key Configuration Options
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **response_rules**
-  Configuration for processing response streams. Contains:
+  Configuration for processing SSE response streams. Contains:
 
-**response_rules.format**
-  The streaming format to parse. Currently only :ref:`SERVER_SENT_EVENTS
-  <envoy_v3_api_enum_value_extensions.filters.http.stream_to_metadata.v3.StreamToMetadata.Format.SERVER_SENT_EVENTS>`
-  is supported.
+**response_rules.content_parser**
+  A :ref:`typed extension <envoy_v3_api_msg_config.core.v3.TypedExtensionConfig>` that specifies how to parse
+  and extract values from event payloads. Available parsers:
 
-**response_rules.rules**
+  * **envoy.sse_content_parsers.json**: Parses JSON content and extracts values using JSONPath-like selectors.
+    See :ref:`v3 API reference <envoy_v3_api_msg_extensions.sse_content_parsers.json.v3.JsonContentParser>`
+    for configuration options.
+
+**JSON Content Parser Configuration**
+
+When using ``envoy.sse_content_parsers.json``, configure rules within the typed_config:
+
+**rules**
   A list of rules to apply. Each rule contains:
 
-  * **selector**: Specifies how to extract a value from the stream payload. Currently supports:
+  * **selector**: Specifies how to extract a value from the JSON payload:
 
-    - **json_path**: A path through the JSON object (e.g., ``["usage", "total_tokens"]`` extracts
+    - **path**: A JSONPath-style array of keys to navigate the JSON object (e.g., ``["usage", "total_tokens"]`` extracts
       ``json_object["usage"]["total_tokens"]``)
 
   * **on_present**: Metadata to write when the selector successfully extracts a value.
     Executes immediately when a match is found. Each descriptor specifies:
 
-    - ``metadata_namespace``: The metadata namespace (e.g., ``envoy.lb``). If empty, defaults to ``envoy.filters.http.stream_to_metadata``.
+    - ``metadata_namespace``: The metadata namespace (e.g., ``envoy.lb``). If empty, defaults to ``envoy.filters.http.sse_to_metadata``.
     - ``key``: The metadata key
     - ``value``: Optional hardcoded value. If set, writes this instead of the extracted value.
     - ``type``: The value type (``PROTOBUF_VALUE``, ``STRING``, or ``NUMBER``)
@@ -176,17 +189,20 @@ Write the same value to multiple metadata namespaces, useful during migrations:
 .. code-block:: yaml
 
   response_rules:
-    rules:
-    - selector:
-        json_path:
-          path: ["usage", "total_tokens"]
-      on_present:
-      - metadata_namespace: old.namespace
-        key: tokens
-        type: NUMBER
-      - metadata_namespace: new.namespace
-        key: tokens
-        type: NUMBER
+    content_parser:
+      name: envoy.sse_content_parsers.json
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.sse_content_parsers.json.v3.JsonContentParser
+        rules:
+        - selector:
+            path: ["usage", "total_tokens"]
+          on_present:
+          - metadata_namespace: old.namespace
+            key: tokens
+            type: NUMBER
+          - metadata_namespace: new.namespace
+            key: tokens
+            type: NUMBER
 
 **Preserving Existing Metadata**
 
@@ -195,15 +211,18 @@ Avoid overwriting previously set metadata values:
 .. code-block:: yaml
 
   response_rules:
-    rules:
-    - selector:
-        json_path:
-          path: ["usage", "total_tokens"]
-      on_present:
-      - metadata_namespace: envoy.lb
-        key: tokens
-        type: NUMBER
-        preserve_existing_metadata_value: true
+    content_parser:
+      name: envoy.sse_content_parsers.json
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.sse_content_parsers.json.v3.JsonContentParser
+        rules:
+        - selector:
+            path: ["usage", "total_tokens"]
+          on_present:
+          - metadata_namespace: envoy.lb
+            key: tokens
+            type: NUMBER
+            preserve_existing_metadata_value: true
 
 **Using on_present, on_missing, and on_error Together**
 
@@ -212,25 +231,27 @@ Write fallback values when extraction fails to ensure metadata is always availab
 .. code-block:: yaml
 
   response_rules:
-    format: SERVER_SENT_EVENTS
-    rules:
-    - selector:
-        json_path:
-          path: ["usage", "total_tokens"]
-      on_present:
-      - metadata_namespace: envoy.lb
-        key: tokens
-        type: NUMBER
-      on_missing:
-      - metadata_namespace: envoy.lb
-        key: tokens
-        value:
-          number_value: -1
-      on_error:
-      - metadata_namespace: envoy.lb
-        key: tokens
-        value:
-          number_value: 0
+    content_parser:
+      name: envoy.sse_content_parsers.json
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.sse_content_parsers.json.v3.JsonContentParser
+        rules:
+        - selector:
+            path: ["usage", "total_tokens"]
+          on_present:
+          - metadata_namespace: envoy.lb
+            key: tokens
+            type: NUMBER
+          on_missing:
+          - metadata_namespace: envoy.lb
+            key: tokens
+            value:
+              number_value: -1
+          on_error:
+          - metadata_namespace: envoy.lb
+            key: tokens
+            value:
+              number_value: 0
 
 In this configuration:
 
@@ -246,12 +267,15 @@ Accept additional content types beyond the default:
 .. code-block:: yaml
 
   response_rules:
-    format: SERVER_SENT_EVENTS
     allowed_content_types:
     - "text/event-stream"
     - "application/stream+json"
-    rules:
-      # ... rules ...
+    content_parser:
+      name: envoy.sse_content_parsers.json
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.sse_content_parsers.json.v3.JsonContentParser
+        rules:
+          # ... rules ...
 
 .. note::
 
@@ -262,21 +286,24 @@ Accept additional content types beyond the default:
 Statistics
 ----------
 
-The stream_to_metadata filter outputs statistics in the ``http.<stat_prefix>.stream_to_metadata.*`` namespace.
+The sse_to_metadata filter outputs statistics in the ``http.<stat_prefix>.sse_to_metadata.resp.<parser_prefix>*`` namespace.
 The :ref:`stat prefix <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stat_prefix>`
-comes from the owning HTTP connection manager.
+comes from the owning HTTP connection manager, and ``<parser_prefix>`` comes from the content parser (e.g., ``json.`` for the JSON parser).
+
+For example, with the JSON content parser, the metrics will be under ``http.<stat_prefix>.sse_to_metadata.resp.json.*``.
 
 .. csv-table::
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
-  resp.success, Counter, Total number of values successfully extracted and written to metadata
-  resp.mismatched_content_type, Counter, Total number of responses with non-allowed content types
-  resp.no_data_field, Counter, Total number of SSE events without a data field
-  resp.invalid_json, Counter, Total number of data fields that could not be parsed as JSON
-  resp.selector_not_found, Counter, Total number of times the selector path was not found in the JSON
-  resp.preserved_existing_metadata, Counter, Total number of times metadata was not written due to preserve_existing_metadata_value being true
-  resp.event_too_large, Counter, Total number of events discarded because they exceeded max_event_size
+  resp.<parser_prefix>.metadata_added, Counter, Total number of metadata entries successfully written (includes both extracted values and fallback values)
+  resp.<parser_prefix>.metadata_from_fallback, Counter, Total number of metadata entries written using on_missing or on_error fallback values (subset of metadata_added)
+  resp.<parser_prefix>.mismatched_content_type, Counter, Total number of responses with content types that don't match the expected type
+  resp.<parser_prefix>.no_data_field, Counter, Total number of SSE events without a data field
+  resp.<parser_prefix>.parse_error, Counter, Total number of events where the content parser failed to parse the data field
+  resp.<parser_prefix>.selector_not_found, Counter, Total number of times the selector path was not found in the parsed content
+  resp.<parser_prefix>.preserved_existing_metadata, Counter, Total number of times metadata was not written due to preserve_existing_metadata_value being true
+  resp.<parser_prefix>.event_too_large, Counter, Total number of events discarded because they exceeded max_event_size
 
 SSE Specification Compliance
 -----------------------------

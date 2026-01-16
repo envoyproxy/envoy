@@ -10,17 +10,18 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 envoy_cc_library(
-    name = "stream_to_metadata_lib",
+    name = "sse_to_metadata_lib",
     srcs = ["filter.cc"],
     hdrs = ["filter.h"],
     deps = [
         "//envoy/server:filter_config_interface",
+        "//envoy/sse_content_parser:config_interface",
+        "//envoy/sse_content_parser:parser_interface",
         "//source/common/http:header_utility_lib",
         "//source/common/http:utility_lib",
         "//source/common/http/sse:sse_parser_lib",
-        "//source/common/json:json_loader_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
-        "@envoy_api//envoy/extensions/filters/http/stream_to_metadata/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/sse_to_metadata/v3:pkg_cc_proto",
     ],
 )
 
@@ -29,9 +30,11 @@ envoy_cc_extension(
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     deps = [
-        ":stream_to_metadata_lib",
+        ":sse_to_metadata_lib",
         "//envoy/registry",
+        "//envoy/sse_content_parser:config_interface",
         "//source/extensions/filters/http/common:factory_base_lib",
-        "@envoy_api//envoy/extensions/filters/http/stream_to_metadata/v3:pkg_cc_proto",
+        "//source/extensions/sse_content_parsers/json:config",
+        "@envoy_api//envoy/extensions/filters/http/sse_to_metadata/v3:pkg_cc_proto",
     ],
 )

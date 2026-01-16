@@ -23,27 +23,28 @@ static_resources:
                 route:
                   cluster: llm-cluster
           http_filters:
-          - name: envoy.filters.http.stream_to_metadata
+          - name: envoy.filters.http.sse_to_metadata
             typed_config:
-              "@type": type.googleapis.com/envoy.extensions.filters.http.stream_to_metadata.v3.StreamToMetadata
+              "@type": type.googleapis.com/envoy.extensions.filters.http.sse_to_metadata.v3.SseToMetadata
               response_rules:
-                format: SERVER_SENT_EVENTS
-                rules:
-                - selector:
-                    json_path:
-                      path: ["usage", "total_tokens"]
-                  on_present:
-                  - metadata_namespace: envoy.lb
-                    key: tokens
-                    type: NUMBER
-                - selector:
-                    json_path:
-                      path: ["model"]
-                  on_present:
-                  - metadata_namespace: envoy.lb
-                    key: model_name
-                    type: STRING
-                  stop_processing_on_match: false
+                content_parser:
+                  name: envoy.sse_content_parsers.json
+                  typed_config:
+                    "@type": type.googleapis.com/envoy.extensions.sse_content_parsers.json.v3.JsonContentParser
+                    rules:
+                    - selector:
+                        path: ["usage", "total_tokens"]
+                      on_present:
+                      - metadata_namespace: envoy.lb
+                        key: tokens
+                        type: NUMBER
+                    - selector:
+                        path: ["model"]
+                      on_present:
+                      - metadata_namespace: envoy.lb
+                        key: model_name
+                        type: STRING
+                      stop_processing_on_match: false
           - name: envoy.filters.http.router
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router

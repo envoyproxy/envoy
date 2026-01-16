@@ -1,0 +1,121 @@
+syntax = "proto3";
+
+package envoy.extensions.sse_content_parsers.json.v3;
+
+import "google/protobuf/struct.proto";
+import "google/protobuf/wrappers.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.sse_content_parsers.json.v3";
+option java_outer_classname = "JsonContentParserProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/sse_content_parsers/json/v3;jsonv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: JSON Content Parser for SSE]
+//
+// Parses JSON data from SSE events and extracts values using JSON path selectors.
+// This parser is designed to work with the SSE-To-Metadata filter.
+//
+// [#extension: envoy.sse_content_parsers.json]
+
+// Configuration for the JSON content parser.
+message JsonContentParser {
+  // Value type for extracted metadata.
+  enum ValueType {
+    // The value is a serialized protobuf.Value.
+    PROTOBUF_VALUE = 0;
+
+    // String value.
+    STRING = 1;
+
+    // Number value.
+    NUMBER = 2;
+  }
+
+  // Describes where to write a value in dynamic metadata.
+  // [#next-free-field: 6]
+  message MetadataDescriptor {
+    // The namespace in dynamic metadata where the key-value pair will be written.
+    // If empty, defaults to "envoy.filters.http.sse_to_metadata".
+    string metadata_namespace = 1;
+
+    // The key to use within the namespace.
+    // This field is required.
+    string key = 2 [(validate.rules).string = {min_len: 1}];
+
+    // The value to pair with the given key.
+    //
+    // When used for ``on_present``, if value is set, it will be used instead
+    // of the extracted value from the stream. If not set, the extracted value is used.
+    //
+    // When used for ``on_missing`` or ``on_error``, this field **must** be set
+    // to provide a fallback value (enforced by validation).
+    google.protobuf.Value value = 3;
+
+    // The value's type which defaults to PROTOBUF_VALUE.
+    // When value is not set: controls how the extracted value from the stream is converted.
+    // When value is set: the hardcoded value is used as-is, type is ignored.
+    ValueType type = 4 [(validate.rules).enum = {defined_only: true}];
+
+    // If set to true, do not overwrite existing metadata value for this key.
+    // If not set or set to false, overwrite existing values.
+    // Default (not set) is false (overwrite existing values).
+    google.protobuf.BoolValue preserve_existing_metadata_value = 5;
+  }
+
+  // Specifies a path to a value within a JSON object using a sequence of keys.
+  // For example, to extract the value "42" from {"usage": {"total_tokens": 42}},
+  // the path would be ["usage", "total_tokens"].
+  message Selector {
+    // The sequence of keys to traverse in the JSON object.
+    // For example: ["usage", "total_tokens"] will extract the value at
+    // json_obj["usage"]["total_tokens"].
+    repeated string path = 1 [(validate.rules).repeated = {min_items: 1}];
+  }
+
+  // A rule describes what value to extract from the JSON and where to write it.
+  // [#next-free-field: 6]
+  message Rule {
+    // Specifies how to extract the value from the JSON payload.
+    Selector selector = 1 [(validate.rules).message = {required: true}];
+
+    // Metadata to write when the selector successfully extracts a value.
+    // If descriptor.value is set, writes that hardcoded value.
+    // If descriptor.value is not set, writes the extracted value from the JSON.
+    repeated MetadataDescriptor on_present = 2;
+
+    // Metadata to write when the selector path is not found in the parsed JSON.
+    // Each descriptor **must** have the 'value' field set to provide a fallback value.
+    // This is validated at config load time.
+    repeated MetadataDescriptor on_missing = 3;
+
+    // Metadata to write when an error occurs during processing.
+    // Errors include: JSON parse failure, no data field in SSE event.
+    // Each descriptor **must** have the 'value' field set to provide a fallback value.
+    // This is validated at config load time.
+    repeated MetadataDescriptor on_error = 4;
+
+    // If true, stop processing the stream after this rule successfully matches (on_present executes).
+    // This picks the FIRST occurrence and is efficient when you know the desired value
+    // appears early in the stream or you don't need to wait for later values.
+    // (e.g., extracting a model name that appears in the first SSE event).
+    //
+    // If false, continue processing the entire stream. Combined with
+    // preserve_existing_metadata_value=false (default), later matches will overwrite
+    // earlier ones, effectively picking the LAST occurrence.
+    //
+    // Note: on_missing and on_error do not trigger stop_processing_on_match.
+    //
+    // Default is false (process entire stream). Set to true for better performance
+    // when you only need the first matching value.
+    bool stop_processing_on_match = 5;
+  }
+
+  // The rules to apply for extracting values from JSON in SSE events.
+  // Rules are evaluated in order for each event.
+  // At least one rule must be specified.
+  repeated Rule rules = 1 [(validate.rules).repeated = {min_items: 1}];
+}
