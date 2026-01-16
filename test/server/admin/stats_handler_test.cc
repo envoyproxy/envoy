@@ -185,12 +185,12 @@ TEST_F(AdminStatsTest, HandlerStatsPlainText) {
                               "cluster.mycluster.endpoint.127.0.0.1_80.g1: 13\n"
                               "cluster.mycluster.endpoint.127.0.0.1_80.g2: 14\n"
                               "cluster.mycluster.endpoint.127.0.0.1_80.healthy: 1\n"
-                              "h1: P0(200,200) P25(202.5,202.5) P50(205,205) P75(207.5,207.5) "
-                              "P90(209,209) P95(209.5,209.5) P99(209.9,209.9) P99.5(209.95,209.95) "
-                              "P99.9(209.99,209.99) P100(210,210)\n"
-                              "h2: P0(100,100) P25(102.5,102.5) P50(105,105) P75(107.5,107.5) "
-                              "P90(109,109) P95(109.5,109.5) P99(109.9,109.9) P99.5(109.95,109.95) "
-                              "P99.9(109.99,109.99) P100(110,110)\n";
+                              "h1: P0(205,205) P25(205,205) P50(205,205) P75(205,205) "
+                              "P90(205,205) P95(205,205) P99(205,205) P99.5(205,205) "
+                              "P99.9(205,205) P100(205,205)\n"
+                              "h2: P0(105,105) P25(105,105) P50(105,105) P75(105,105) "
+                              "P90(105,105) P95(105,105) P99(105,105) P99.5(105,105) "
+                              "P99.9(105,105) P100(105,105)\n";
   EXPECT_EQ(expected, code_response.second);
 }
 
@@ -368,8 +368,8 @@ TEST_F(AdminStatsFilterTest, HandlerStatsJsonHistogramBucketsCumulative) {
             "histograms": [
                 {
                     "name": "h1", "buckets": [
-                        {"upper_bound":1, "interval":0, "cumulative":0},
-                        {"upper_bound":2, "interval":0, "cumulative":1},
+                        {"upper_bound":1, "interval":0, "cumulative":1},
+                        {"upper_bound":2, "interval":1, "cumulative":3},
                         {"upper_bound":3, "interval":1, "cumulative":3},
                         {"upper_bound":4, "interval":1, "cumulative":3}
                     ]
@@ -398,8 +398,8 @@ TEST_F(AdminStatsFilterTest, HandlerStatsJsonHistogramBucketsCumulative) {
             "histograms": [
                 {
                     "name": "h1", "buckets": [
-                        {"upper_bound":1, "interval":0, "cumulative":0},
-                        {"upper_bound":2, "interval":0, "cumulative":1},
+                        {"upper_bound":1, "interval":0, "cumulative":1},
+                        {"upper_bound":2, "interval":1, "cumulative":3},
                         {"upper_bound":3, "interval":1, "cumulative":3},
                         {"upper_bound":4, "interval":1, "cumulative":3}
                     ]
@@ -419,8 +419,8 @@ TEST_F(AdminStatsFilterTest, HandlerStatsJsonHistogramBucketsCumulative) {
             "histograms": [
                 {
                     "name": "h1", "buckets": [
-                        {"upper_bound":1, "interval":0, "cumulative":0},
-                        {"upper_bound":2, "interval":0, "cumulative":1},
+                        {"upper_bound":1, "interval":0, "cumulative":1},
+                        {"upper_bound":2, "interval":1, "cumulative":3},
                         {"upper_bound":3, "interval":1, "cumulative":3},
                         {"upper_bound":4, "interval":1, "cumulative":3}
                     ]
@@ -524,10 +524,10 @@ TEST_F(AdminStatsFilterTest, HandlerStatsJsonHistogramBucketsDisjoint) {
             "histograms": [
                 {
                     "name": "h1", "buckets": [
-                        {"upper_bound":1, "interval":0, "cumulative":0},
-                        {"upper_bound":2, "interval":0, "cumulative":1},
-                        {"upper_bound":3, "interval":1, "cumulative":2},
-                        {"upper_bound":4, "interval":0, "cumulative":0}
+                        {"upper_bound":1,"interval":0,"cumulative":1},
+                        {"upper_bound":2,"interval":1,"cumulative":2},
+                        {"upper_bound":3,"interval":0,"cumulative":0},
+                        {"upper_bound":4,"interval":0,"cumulative":0}
                     ]
                 },
                 {
@@ -554,10 +554,10 @@ TEST_F(AdminStatsFilterTest, HandlerStatsJsonHistogramBucketsDisjoint) {
             "histograms": [
                 {
                     "name": "h1", "buckets": [
-                        {"upper_bound":1, "interval":0, "cumulative":0},
-                        {"upper_bound":2, "interval":0, "cumulative":1},
-                        {"upper_bound":3, "interval":1, "cumulative":2},
-                        {"upper_bound":4, "interval":0, "cumulative":0}
+                        {"upper_bound":1,"interval":0,"cumulative":1},
+                        {"upper_bound":2,"interval":1,"cumulative":2},
+                        {"upper_bound":3,"interval":0,"cumulative":0},
+                        {"upper_bound":4,"interval":0,"cumulative":0}
                     ]
                 }
             ]
@@ -575,10 +575,10 @@ TEST_F(AdminStatsFilterTest, HandlerStatsJsonHistogramBucketsDisjoint) {
             "histograms": [
                 {
                     "name": "h1", "buckets": [
-                        {"upper_bound":1, "interval":0, "cumulative":0},
-                        {"upper_bound":2, "interval":0, "cumulative":1},
-                        {"upper_bound":3, "interval":1, "cumulative":2},
-                        {"upper_bound":4, "interval":0, "cumulative":0}
+                        {"upper_bound":1,"interval":0,"cumulative":1},
+                        {"upper_bound":2,"interval":1,"cumulative":2},
+                        {"upper_bound":3,"interval":0,"cumulative":0},
+                        {"upper_bound":4,"interval":0,"cumulative":0}
                     ]
                 }
             ]
@@ -666,47 +666,47 @@ TEST_F(AdminStatsTest, HandlerStatsJson) {
                         "name":"h",
                         "values": [
                             {
-                                "cumulative":200,
-                                "interval":200
-                            },
-                            {
-                                "cumulative":202.5,
-                                "interval":202.5
+                                "cumulative":205,
+                                "interval":205
                             },
                             {
                                 "cumulative":205,
                                 "interval":205
                             },
                             {
-                                "cumulative":207.5,
-                                "interval":207.5
+                                "cumulative":205,
+                                "interval":205
                             },
                             {
-                                "cumulative":209,
-                                "interval":209
+                                "cumulative":205,
+                                "interval":205
                             },
                             {
-                                "cumulative":209.5,
-                                "interval":209.5
+                                "cumulative":205,
+                                "interval":205
                             },
                             {
-                                "cumulative":209.9,
-                                "interval":209.9
+                                "cumulative":205,
+                                "interval":205
                             },
                             {
-                                "cumulative":209.95,
-                                "interval":209.95
+                                "cumulative":205,
+                                "interval":205
                             },
                             {
-                                "cumulative":209.99,
-                                "interval":209.99
+                                "cumulative":205,
+                                "interval":205
                             },
                             {
-                                "cumulative":210,
-                                "interval":210
+                                "cumulative":205,
+                                "interval":205
+                            },
+                            {
+                                "cumulative":205,
+                                "interval":205
                             }
                         ]
-                    },
+                    }
                 ]
             }
         }
@@ -743,60 +743,60 @@ TEST_F(AdminStatsTest, StatsAsJson) {
         {
             "histograms": {
                 "supported_quantiles": [
-                    0.0,
-                    25.0,
-                    50.0,
-                    75.0,
-                    90.0,
-                    95.0,
-                    99.0,
+                    0,
+                    25,
+                    50,
+                    75,
+                    90,
+                    95,
+                    99,
                     99.5,
                     99.9,
-                    100.0
+                    100
                 ],
                 "computed_quantiles": [
                     {
                         "name": "h1",
                         "values": [
                             {
-                                "interval": 100.0,
-                                "cumulative": 100.0
+                                "interval": 105,
+                                "cumulative": 105
                             },
                             {
-                                "interval": 102.5,
-                                "cumulative": 105.0
+                                "interval": 105,
+                                "cumulative": 105
                             },
                             {
-                                "interval": 105.0,
-                                "cumulative": 110.0
+                                "interval": 105,
+                                "cumulative": 105
                             },
                             {
-                                "interval": 107.5,
-                                "cumulative": 205.0
+                                "interval": 105,
+                                "cumulative": 205
                             },
                             {
-                                "interval": 109.0,
-                                "cumulative": 208.0
+                                "interval": 105,
+                                "cumulative": 205
                             },
                             {
-                                "interval": 109.5,
-                                "cumulative": 209.0
+                                "interval": 105,
+                                "cumulative": 205
                             },
                             {
-                                "interval": 109.9,
-                                "cumulative": 209.8
+                                "interval": 105,
+                                "cumulative": 205
                             },
                             {
-                                "interval": 109.95,
-                                "cumulative": 209.9
+                                "interval": 105,
+                                "cumulative": 205
                             },
                             {
-                                "interval": 109.99,
-                                "cumulative": 209.98
+                                "interval": 105,
+                                "cumulative": 205
                             },
                             {
-                                "interval": 110.0,
-                                "cumulative": 210.0
+                                "interval": 105,
+                                "cumulative": 205
                             }
                         ]
                     },
@@ -805,43 +805,43 @@ TEST_F(AdminStatsTest, StatsAsJson) {
                         "values": [
                             {
                                 "interval": null,
-                                "cumulative": 100.0
+                                "cumulative": 105
                             },
                             {
                                 "interval": null,
-                                "cumulative": 102.5
+                                "cumulative": 105
                             },
                             {
                                 "interval": null,
-                                "cumulative": 105.0
+                                "cumulative": 105
                             },
                             {
                                 "interval": null,
-                                "cumulative": 107.5
+                                "cumulative": 105
                             },
                             {
                                 "interval": null,
-                                "cumulative": 109.0
+                                "cumulative": 105
                             },
                             {
                                 "interval": null,
-                                "cumulative": 109.5
+                                "cumulative": 105
                             },
                             {
                                 "interval": null,
-                                "cumulative": 109.9
+                                "cumulative": 105
                             },
                             {
                                 "interval": null,
-                                "cumulative": 109.95
+                                "cumulative": 105
                             },
                             {
                                 "interval": null,
-                                "cumulative": 109.99
+                                "cumulative": 105
                             },
                             {
                                 "interval": null,
-                                "cumulative": 110.0
+                                "cumulative": 105
                             }
                         ]
                     }
@@ -882,60 +882,60 @@ TEST_F(AdminStatsTest, UsedOnlyStatsAsJson) {
         {
             "histograms": {
                 "supported_quantiles": [
-                    0.0,
-                    25.0,
-                    50.0,
-                    75.0,
-                    90.0,
-                    95.0,
-                    99.0,
+                    0,
+                    25,
+                    50,
+                    75,
+                    90,
+                    95,
+                    99,
                     99.5,
                     99.9,
-                    100.0
+                    100
                 ],
                 "computed_quantiles": [
                     {
                         "name": "h1",
                         "values": [
                             {
-                                "interval": 100.0,
-                                "cumulative": 100.0
+                                "interval": 105,
+                                "cumulative": 105
                             },
                             {
-                                "interval": 102.5,
-                                "cumulative": 105.0
+                                "interval": 105,
+                                "cumulative": 105
                             },
                             {
-                                "interval": 105.0,
-                                "cumulative": 110.0
+                                "interval": 105,
+                                "cumulative": 105
                             },
                             {
-                                "interval": 107.5,
-                                "cumulative": 205.0
+                                "interval": 105,
+                                "cumulative": 205
                             },
                             {
-                                "interval": 109.0,
-                                "cumulative": 208.0
+                                "interval": 105,
+                                "cumulative": 205
                             },
                             {
-                                "interval": 109.5,
-                                "cumulative": 209.0
+                                "interval": 105,
+                                "cumulative": 205
                             },
                             {
-                                "interval": 109.9,
-                                "cumulative": 209.8
+                                "interval": 105,
+                                "cumulative": 205
                             },
                             {
-                                "interval": 109.95,
-                                "cumulative": 209.9
+                                "interval": 105,
+                                "cumulative": 205
                             },
                             {
-                                "interval": 109.99,
-                                "cumulative": 209.98
+                                "interval": 105,
+                                "cumulative": 205
                             },
                             {
-                                "interval": 110.0,
-                                "cumulative": 210.0
+                                "interval": 105,
+                                "cumulative": 205
                             }
                         ]
                     }
@@ -977,60 +977,60 @@ TEST_F(AdminStatsFilterTest, StatsAsJsonFilterString) {
         {
             "histograms": {
                 "supported_quantiles": [
-                    0.0,
-                    25.0,
-                    50.0,
-                    75.0,
-                    90.0,
-                    95.0,
-                    99.0,
+                    0,
+                    25,
+                    50,
+                    75,
+                    90,
+                    95,
+                    99,
                     99.5,
                     99.9,
-                    100.0
+                    100
                 ],
                 "computed_quantiles": [
                     {
                         "name": "h1",
                         "values": [
                             {
-                                "interval": 100.0,
-                                "cumulative": 100.0
+                                "interval": 105,
+                                "cumulative": 105
                             },
                             {
-                                "interval": 102.5,
-                                "cumulative": 105.0
+                                "interval": 105,
+                                "cumulative": 105
                             },
                             {
-                                "interval": 105.0,
-                                "cumulative": 110.0
+                                "interval": 105,
+                                "cumulative": 105
                             },
                             {
-                                "interval": 107.5,
-                                "cumulative": 205.0
+                                "interval": 105,
+                                "cumulative": 205
                             },
                             {
-                                "interval": 109.0,
-                                "cumulative": 208.0
+                                "interval": 105,
+                                "cumulative": 205
                             },
                             {
-                                "interval": 109.5,
-                                "cumulative": 209.0
+                                "interval": 105,
+                                "cumulative": 205
                             },
                             {
-                                "interval": 109.9,
-                                "cumulative": 209.8
+                                "interval": 105,
+                                "cumulative": 205
                             },
                             {
-                                "interval": 109.95,
-                                "cumulative": 209.9
+                                "interval": 105,
+                                "cumulative": 205
                             },
                             {
-                                "interval": 109.99,
-                                "cumulative": 209.98
+                                "interval": 105,
+                                "cumulative": 205
                             },
                             {
-                                "interval": 110.0,
-                                "cumulative": 210.0
+                                "interval": 105,
+                                "cumulative": 205
                             }
                         ]
                     }
@@ -1081,60 +1081,60 @@ TEST_F(AdminStatsFilterTest, UsedOnlyStatsAsJsonFilterString) {
         {
             "histograms": {
                 "supported_quantiles": [
-                    0.0,
-                    25.0,
-                    50.0,
-                    75.0,
-                    90.0,
-                    95.0,
-                    99.0,
+                    0,
+                    25,
+                    50,
+                    75,
+                    90,
+                    95,
+                    99,
                     99.5,
                     99.9,
-                    100.0
+                    100
                 ],
                 "computed_quantiles": [
                     {
                         "name": "h1_matches",
                         "values": [
                             {
-                                "interval": 100.0,
-                                "cumulative": 100.0
+                                "interval": 105,
+                                "cumulative": 105
                             },
                             {
-                                "interval": 102.5,
-                                "cumulative": 105.0
+                                "interval": 105,
+                                "cumulative": 105
                             },
                             {
-                                "interval": 105.0,
-                                "cumulative": 110.0
+                                "interval": 105,
+                                "cumulative": 105
                             },
                             {
-                                "interval": 107.5,
-                                "cumulative": 205.0
+                                "interval": 105,
+                                "cumulative": 205
                             },
                             {
-                                "interval": 109.0,
-                                "cumulative": 208.0
+                                "interval": 105,
+                                "cumulative": 205
                             },
                             {
-                                "interval": 109.5,
-                                "cumulative": 209.0
+                                "interval": 105,
+                                "cumulative": 205
                             },
                             {
-                                "interval": 109.9,
-                                "cumulative": 209.8
+                                "interval": 105,
+                                "cumulative": 205
                             },
                             {
-                                "interval": 109.95,
-                                "cumulative": 209.9
+                                "interval": 105,
+                                "cumulative": 205
                             },
                             {
-                                "interval": 109.99,
-                                "cumulative": 209.98
+                                "interval": 105,
+                                "cumulative": 205
                             },
                             {
-                                "interval": 110.0,
-                                "cumulative": 210.0
+                                "interval": 105,
+                                "cumulative": 205
                             }
                         ]
                     }
@@ -1451,7 +1451,7 @@ envoy_h1_bucket{le="600000"} 1
 envoy_h1_bucket{le="1800000"} 1
 envoy_h1_bucket{le="3600000"} 1
 envoy_h1_bucket{le="+Inf"} 1
-envoy_h1_sum{} 305
+envoy_h1_sum{} 304.91803278688524869721732102334
 envoy_h1_count{} 1
 )EOF";
 
@@ -1491,7 +1491,7 @@ envoy_h1_bucket{le="600000"} 1
 envoy_h1_bucket{le="1800000"} 1
 envoy_h1_bucket{le="3600000"} 1
 envoy_h1_bucket{le="+Inf"} 1
-envoy_h1_sum{} 305
+envoy_h1_sum{} 304.91803278688524869721732102334
 envoy_h1_count{} 1
 )EOF";
 
@@ -1511,17 +1511,17 @@ TEST_F(StatsHandlerPrometheusDefaultTest, HandlerStatsPrometheusSummaryEmission)
   store_->mergeHistograms([]() -> void {});
 
   const std::string expected_response = R"EOF(# TYPE envoy_h1 summary
-envoy_h1{quantile="0"} 300
-envoy_h1{quantile="0.25"} 302.5
+envoy_h1{quantile="0"} 305
+envoy_h1{quantile="0.25"} 305
 envoy_h1{quantile="0.5"} 305
-envoy_h1{quantile="0.75"} 307.5
-envoy_h1{quantile="0.9"} 309
-envoy_h1{quantile="0.95"} 309.5
-envoy_h1{quantile="0.99"} 309.89999999999997726263245567679
-envoy_h1{quantile="0.995"} 309.9499999999999886313162278384
-envoy_h1{quantile="0.999"} 309.99000000000000909494701772928
-envoy_h1{quantile="1"} 310
-envoy_h1_sum{} 305
+envoy_h1{quantile="0.75"} 305
+envoy_h1{quantile="0.9"} 305
+envoy_h1{quantile="0.95"} 305
+envoy_h1{quantile="0.99"} 305
+envoy_h1{quantile="0.995"} 305
+envoy_h1{quantile="0.999"} 305
+envoy_h1{quantile="1"} 305
+envoy_h1_sum{} 304.91803278688524869721732102334
 envoy_h1_count{} 1
 )EOF";
 

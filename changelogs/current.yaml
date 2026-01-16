@@ -5,6 +5,11 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: histograms
+  change: |
+    Update of libcircllhist to 0.3.2 has changed how bucket bounds are interpreted. This should not have an impact on
+    production monitoring if the number of samples in the histograms is high. Affected tests were adjusted to account for
+    histogram changes.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -14,6 +19,9 @@ bug_fixes:
     would not be properly closed when in draining state. This could occur when a response was sent before the request
     was fully received, causing connections to remain open indefinitely. This behavior change can be temporarily reverted
     by setting the runtime guard ``envoy.reloadable_features.http1_close_connection_on_zombie_stream_complete`` to ``false``.
+- area: drop_overload
+  change: |
+    Fixed a bug that drop_overload failed to use cached EDS resources.
 - area: http
   change: |
     Fixed upstream client to not close connection when idle timeout fires before the connection is established.
