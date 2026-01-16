@@ -229,6 +229,13 @@ bug_fixes:
   change: |
     Fixed the gRPC ext_authz client to respect ``status_on_error`` configuration when gRPC calls fail.
     Previously, gRPC call failures always returned 403 Forbidden regardless of the configured error status.
+- area: overload management
+  change: |
+    Fixed a resource leak in the global connection limit tracking where connections accepted from the kernel but
+    failing during address processing (e.g., ``localAddress()`` or ``peerAddress()`` errors) did not properly release
+    the allocated connection limit resource. This could cause the connection limit counter to become incorrect,
+    potentially preventing new connections from being accepted even when slots were available. This helps address
+    symptoms similar to those described in https://github.com/envoyproxy/envoy/issues/41867.
 - area: proto_api_scrubber
   change: |
     Fixed a crash in the :ref:`Proto API Scrubber <config_http_filters_proto_api_scrubber>` filter when internal buffer
