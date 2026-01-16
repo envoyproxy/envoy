@@ -14,6 +14,8 @@
 #include "source/common/http/utility.h"
 #include "source/extensions/filters/http/oauth2/oauth.h"
 
+#include "absl/status/status.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -29,14 +31,16 @@ using HttpUri = envoy::config::core::v3::HttpUri;
  */
 class OAuth2Client : public Http::AsyncClient::Callbacks {
 public:
-  virtual void asyncGetAccessToken(const std::string& auth_code, const std::string& client_id,
-                                   const std::string& secret, const std::string& cb_url,
-                                   const std::string& code_verifier,
-                                   AuthType auth_type = AuthType::UrlEncodedBody) PURE;
+  virtual absl::Status asyncGetAccessToken(const std::string& auth_code,
+                                           const std::string& client_id, const std::string& secret,
+                                           const std::string& cb_url,
+                                           const std::string& code_verifier,
+                                           AuthType auth_type = AuthType::UrlEncodedBody) PURE;
 
-  virtual void asyncRefreshAccessToken(const std::string& refresh_token,
-                                       const std::string& client_id, const std::string& secret,
-                                       AuthType auth_type = AuthType::UrlEncodedBody) PURE;
+  virtual absl::Status asyncRefreshAccessToken(const std::string& refresh_token,
+                                               const std::string& client_id,
+                                               const std::string& secret,
+                                               AuthType auth_type = AuthType::UrlEncodedBody) PURE;
 
   virtual void setCallbacks(FilterCallbacks& callbacks) PURE;
   virtual void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) PURE;
@@ -64,13 +68,16 @@ public:
   // OAuth2Client
   /**
    * Request the access token from the OAuth server. Calls the `onSuccess` on `onFailure` callbacks.
+   * Returns absl::OkStatus() if async work started successfully, or an error status if it failed
+   * synchronously (e.g., cluster not found).
    */
-  void asyncGetAccessToken(const std::string& auth_code, const std::string& client_id,
-                           const std::string& secret, const std::string& cb_url,
-                           const std::string& code_verifier, AuthType auth_type) override;
+  absl::Status asyncGetAccessToken(const std::string& auth_code, const std::string& client_id,
+                                   const std::string& secret, const std::string& cb_url,
+                                   const std::string& code_verifier, AuthType auth_type) override;
 
-  void asyncRefreshAccessToken(const std::string& refresh_token, const std::string& client_id,
-                               const std::string& secret, AuthType auth_type) override;
+  absl::Status asyncRefreshAccessToken(const std::string& refresh_token,
+                                       const std::string& client_id, const std::string& secret,
+                                       AuthType auth_type) override;
 
   void setCallbacks(FilterCallbacks& callbacks) override { parent_ = &callbacks; }
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
@@ -109,8 +116,10 @@ private:
    * Begins execution of an asynchronous request.
    *
    * @param request the HTTP request to be executed.
+   * @return absl::OkStatus() if async work started successfully, or an error status if it failed
+   *         synchronously (e.g., cluster not found).
    */
-  void dispatchRequest(Http::RequestMessagePtr&& request);
+  absl::Status dispatchRequest(Http::RequestMessagePtr&& request);
 
   Http::RequestMessagePtr createPostRequest() {
     auto request = Http::Utility::prepareHeaders(uri_);
