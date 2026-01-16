@@ -525,6 +525,8 @@ UTC
 UTF
 UUID
 UUIDs
+UUIDv4
+UUIDv7
 VC
 VCHAR
 VCL
@@ -1373,6 +1375,7 @@ socklen
 sockopt
 sockopts
 somestring
+sortability
 spanid
 spdlog
 splitter
