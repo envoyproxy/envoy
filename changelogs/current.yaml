@@ -5,6 +5,11 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: histograms
+  change: |
+    Update of libcircllhist to 0.3.2 has changed how bucket bounds are interpreted. This should not have an impact on
+    production monitoring if the number of samples in the histograms is high. Affected tests were adjusted to account for
+    histogram changes.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
