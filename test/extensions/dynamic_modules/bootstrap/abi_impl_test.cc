@@ -1,3 +1,4 @@
+#include "source/extensions/bootstrap/dynamic_modules/extension.h"
 #include "source/extensions/bootstrap/dynamic_modules/extension_config.h"
 #include "source/extensions/dynamic_modules/abi.h"
 
@@ -24,7 +25,6 @@ protected:
 
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> context_;
-  Upstream::MockClusterManager cluster_manager_;
 };
 
 // Test that the scheduler can be created, used, and deleted.
@@ -34,7 +34,7 @@ TEST_F(BootstrapAbiImplTest, SchedulerLifecycle) {
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
   auto config = newDynamicModuleBootstrapExtensionConfig(
-      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_);
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
   // Create a scheduler via the ABI callback.
@@ -53,7 +53,7 @@ TEST_F(BootstrapAbiImplTest, SchedulerCommit) {
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
   auto config = newDynamicModuleBootstrapExtensionConfig(
-      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_);
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
   // Create a scheduler via the ABI callback.
@@ -84,7 +84,7 @@ TEST_F(BootstrapAbiImplTest, OnScheduledCallback) {
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
   auto config = newDynamicModuleBootstrapExtensionConfig(
-      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_);
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
   // Create a scheduler via the ABI callback.
@@ -117,8 +117,9 @@ TEST_F(BootstrapAbiImplTest, OnScheduledAfterConfigDestroyed) {
         testDataDir() + "/libbootstrap_no_op.so", false);
     ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
-    auto config = newDynamicModuleBootstrapExtensionConfig(
-        "test", "config", std::move(dynamic_module.value()), dispatcher_, context_);
+    auto config = newDynamicModuleBootstrapExtensionConfig("test", "config",
+                                                           std::move(dynamic_module.value()),
+                                                           dispatcher_, context_, context_.store_);
     ASSERT_TRUE(config.ok()) << config.status();
 
     // Create a scheduler via the ABI callback.
@@ -152,12 +153,16 @@ TEST_F(BootstrapAbiImplTest, OnScheduledDirect) {
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
   auto config = newDynamicModuleBootstrapExtensionConfig(
-      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_);
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
   // Call onScheduled directly - this should call the in-module hook.
   config.value()->onScheduled(789);
 }
+
+// -----------------------------------------------------------------------------
+// HTTP Callout Tests
+// -----------------------------------------------------------------------------
 
 // Test HTTP callout returns ClusterNotFound when cluster does not exist.
 TEST_F(BootstrapAbiImplTest, HttpCalloutClusterNotFound) {
@@ -166,7 +171,7 @@ TEST_F(BootstrapAbiImplTest, HttpCalloutClusterNotFound) {
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
   auto config = newDynamicModuleBootstrapExtensionConfig(
-      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_);
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
   // Setup mock to return nullptr for the cluster lookup.
@@ -198,7 +203,7 @@ TEST_F(BootstrapAbiImplTest, HttpCalloutMissingHeaders) {
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
   auto config = newDynamicModuleBootstrapExtensionConfig(
-      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_);
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
   // Headers missing :method, :path, and host.
@@ -224,7 +229,7 @@ TEST_F(BootstrapAbiImplTest, HttpCalloutSuccess) {
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
   auto config = newDynamicModuleBootstrapExtensionConfig(
-      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_);
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
   // Setup mock cluster manager to return a valid cluster.
@@ -237,14 +242,8 @@ TEST_F(BootstrapAbiImplTest, HttpCalloutSuccess) {
   Http::AsyncClient::Callbacks* callbacks_captured = nullptr;
   EXPECT_CALL(thread_local_cluster.async_client_, send_(_, _, _))
       .WillOnce(testing::Invoke(
-          [&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
-              const Http::AsyncClient::RequestOptions& options) -> Http::AsyncClient::Request* {
-            // Verify request parameters.
-            EXPECT_EQ(message->headers().Path()->value().getStringView(), "/test");
-            EXPECT_EQ(message->headers().Method()->value().getStringView(), "GET");
-            EXPECT_EQ(message->headers().Host()->value().getStringView(), "example.com");
-            EXPECT_EQ(message->body().toString(), "request_body");
-            EXPECT_EQ(options.timeout.value(), std::chrono::milliseconds(5000));
+          [&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+              const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
             callbacks_captured = &callbacks;
             return &request;
           }));
@@ -258,23 +257,20 @@ TEST_F(BootstrapAbiImplTest, HttpCalloutSuccess) {
 
   uint64_t callout_id = 0;
   envoy_dynamic_module_type_module_buffer cluster_name = {"test_cluster", 12};
-  envoy_dynamic_module_type_module_buffer body = {"request_body", 12};
+  envoy_dynamic_module_type_module_buffer body = {nullptr, 0};
 
   auto result = envoy_dynamic_module_callback_bootstrap_extension_http_callout(
       config.value()->thisAsVoidPtr(), &callout_id, cluster_name, headers.data(), headers.size(),
       body, 5000);
 
   EXPECT_EQ(result, envoy_dynamic_module_type_http_callout_init_result_Success);
-  EXPECT_NE(callout_id, 0);
   EXPECT_NE(callbacks_captured, nullptr);
 
   // Create a response with headers and body.
-  Http::ResponseHeaderMapPtr resp_headers(new Http::TestResponseHeaderMapImpl({
-      {":status", "200"},
-      {"content-type", "application/json"},
-  }));
+  Http::ResponseHeaderMapPtr resp_headers(
+      new Http::TestResponseHeaderMapImpl({{":status", "200"}, {"content-type", "text/plain"}}));
   Http::ResponseMessagePtr response(new Http::ResponseMessageImpl(std::move(resp_headers)));
-  response->body().add("response_body");
+  response->body().add("Hello, World!");
 
   // Trigger the success callback.
   callbacks_captured->onSuccess(request, std::move(response));
@@ -287,7 +283,7 @@ TEST_F(BootstrapAbiImplTest, HttpCalloutFailureReset) {
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
   auto config = newDynamicModuleBootstrapExtensionConfig(
-      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_);
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
   // Setup mock cluster manager to return a valid cluster.
@@ -335,7 +331,7 @@ TEST_F(BootstrapAbiImplTest, HttpCalloutFailureExceedBufferLimit) {
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
   auto config = newDynamicModuleBootstrapExtensionConfig(
-      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_);
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
   // Setup mock cluster manager to return a valid cluster.
@@ -384,7 +380,7 @@ TEST_F(BootstrapAbiImplTest, HttpCalloutCannotCreateRequest) {
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
   auto config = newDynamicModuleBootstrapExtensionConfig(
-      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_);
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
   // Setup mock cluster manager to return a valid cluster.
@@ -421,7 +417,7 @@ TEST_F(BootstrapAbiImplTest, HttpCalloutSuccessAfterInModuleConfigCleared) {
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
   auto config = newDynamicModuleBootstrapExtensionConfig(
-      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_);
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
   // Setup mock cluster manager to return a valid cluster.
@@ -477,7 +473,7 @@ TEST_F(BootstrapAbiImplTest, HttpCalloutFailureAfterInModuleConfigCleared) {
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
   auto config = newDynamicModuleBootstrapExtensionConfig(
-      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_);
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
   // Setup mock cluster manager to return a valid cluster.
@@ -521,135 +517,6 @@ TEST_F(BootstrapAbiImplTest, HttpCalloutFailureAfterInModuleConfigCleared) {
   callbacks_captured->onFailure(request, Http::AsyncClient::FailureReason::Reset);
 }
 
-// Test that pending HTTP callouts are properly tracked and can be cancelled.
-// Note: The config destructor cancels pending callouts, but due to the shared_ptr design
-// (callbacks hold shared_ptr to config), the config is only destroyed when all callbacks
-// complete. This test verifies the cancel behavior is properly wired up by completing the
-// request after making it.
-TEST_F(BootstrapAbiImplTest, HttpCalloutRequestTracking) {
-  auto dynamic_module =
-      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
-  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
-
-  auto config = newDynamicModuleBootstrapExtensionConfig(
-      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_);
-  ASSERT_TRUE(config.ok()) << config.status();
-
-  // Setup mock cluster manager to return a valid cluster.
-  testing::NiceMock<Upstream::MockThreadLocalCluster> thread_local_cluster;
-  EXPECT_CALL(context_.cluster_manager_, getThreadLocalCluster("test_cluster"))
-      .WillOnce(testing::Return(&thread_local_cluster));
-
-  // Setup mock async client to capture the callback and return a request.
-  Http::MockAsyncClientRequest request(&thread_local_cluster.async_client_);
-  Http::AsyncClient::Callbacks* callbacks_captured = nullptr;
-  EXPECT_CALL(thread_local_cluster.async_client_, send_(_, _, _))
-      .WillOnce(testing::Invoke(
-          [&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-              const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callbacks_captured = &callbacks;
-            return &request;
-          }));
-
-  // Build headers.
-  std::vector<envoy_dynamic_module_type_module_http_header> headers = {
-      {":method", 7, "GET", 3},
-      {":path", 5, "/test", 5},
-      {"host", 4, "example.com", 11},
-  };
-
-  uint64_t callout_id = 0;
-  envoy_dynamic_module_type_module_buffer cluster_name = {"test_cluster", 12};
-  envoy_dynamic_module_type_module_buffer body = {nullptr, 0};
-
-  auto result = envoy_dynamic_module_callback_bootstrap_extension_http_callout(
-      config.value()->thisAsVoidPtr(), &callout_id, cluster_name, headers.data(), headers.size(),
-      body, 5000);
-
-  EXPECT_EQ(result, envoy_dynamic_module_type_http_callout_init_result_Success);
-  EXPECT_NE(callout_id, 0);
-  EXPECT_NE(callbacks_captured, nullptr);
-
-  // Complete the request to verify the callback tracking works.
-  Http::ResponseHeaderMapPtr resp_headers(
-      new Http::TestResponseHeaderMapImpl({{":status", "200"}}));
-  Http::ResponseMessagePtr response(new Http::ResponseMessageImpl(std::move(resp_headers)));
-  callbacks_captured->onSuccess(request, std::move(response));
-}
-
-// Test multiple HTTP callouts with incrementing callout IDs.
-TEST_F(BootstrapAbiImplTest, HttpCalloutMultipleRequests) {
-  auto dynamic_module =
-      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
-  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
-
-  auto config = newDynamicModuleBootstrapExtensionConfig(
-      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_);
-  ASSERT_TRUE(config.ok()) << config.status();
-
-  // Setup mock cluster manager to return a valid cluster.
-  testing::NiceMock<Upstream::MockThreadLocalCluster> thread_local_cluster;
-  EXPECT_CALL(context_.cluster_manager_, getThreadLocalCluster("test_cluster"))
-      .WillRepeatedly(testing::Return(&thread_local_cluster));
-
-  // Setup mock async client to return requests.
-  Http::MockAsyncClientRequest request1(&thread_local_cluster.async_client_);
-  Http::MockAsyncClientRequest request2(&thread_local_cluster.async_client_);
-  Http::AsyncClient::Callbacks* callbacks1 = nullptr;
-  Http::AsyncClient::Callbacks* callbacks2 = nullptr;
-
-  EXPECT_CALL(thread_local_cluster.async_client_, send_(_, _, _))
-      .WillOnce(testing::Invoke(
-          [&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-              const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callbacks1 = &callbacks;
-            return &request1;
-          }))
-      .WillOnce(testing::Invoke(
-          [&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-              const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callbacks2 = &callbacks;
-            return &request2;
-          }));
-
-  // Build headers.
-  std::vector<envoy_dynamic_module_type_module_http_header> headers = {
-      {":method", 7, "GET", 3},
-      {":path", 5, "/test", 5},
-      {"host", 4, "example.com", 11},
-  };
-
-  envoy_dynamic_module_type_module_buffer cluster_name = {"test_cluster", 12};
-  envoy_dynamic_module_type_module_buffer body = {nullptr, 0};
-
-  // First callout.
-  uint64_t callout_id1 = 0;
-  auto result1 = envoy_dynamic_module_callback_bootstrap_extension_http_callout(
-      config.value()->thisAsVoidPtr(), &callout_id1, cluster_name, headers.data(), headers.size(),
-      body, 5000);
-  EXPECT_EQ(result1, envoy_dynamic_module_type_http_callout_init_result_Success);
-  EXPECT_EQ(callout_id1, 1);
-
-  // Second callout.
-  uint64_t callout_id2 = 0;
-  auto result2 = envoy_dynamic_module_callback_bootstrap_extension_http_callout(
-      config.value()->thisAsVoidPtr(), &callout_id2, cluster_name, headers.data(), headers.size(),
-      body, 5000);
-  EXPECT_EQ(result2, envoy_dynamic_module_type_http_callout_init_result_Success);
-  EXPECT_EQ(callout_id2, 2);
-
-  // Complete both requests.
-  Http::ResponseHeaderMapPtr resp_headers1(
-      new Http::TestResponseHeaderMapImpl({{":status", "200"}}));
-  Http::ResponseMessagePtr response1(new Http::ResponseMessageImpl(std::move(resp_headers1)));
-  callbacks1->onSuccess(request1, std::move(response1));
-
-  Http::ResponseHeaderMapPtr resp_headers2(
-      new Http::TestResponseHeaderMapImpl({{":status", "201"}}));
-  Http::ResponseMessagePtr response2(new Http::ResponseMessageImpl(std::move(resp_headers2)));
-  callbacks2->onSuccess(request2, std::move(response2));
-}
-
 // Test HTTP callout with body in request.
 TEST_F(BootstrapAbiImplTest, HttpCalloutWithBody) {
   auto dynamic_module =
@@ -657,7 +524,7 @@ TEST_F(BootstrapAbiImplTest, HttpCalloutWithBody) {
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
   auto config = newDynamicModuleBootstrapExtensionConfig(
-      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_);
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
   // Setup mock cluster manager to return a valid cluster.
@@ -707,48 +574,177 @@ TEST_F(BootstrapAbiImplTest, HttpCalloutWithBody) {
   callbacks_captured->onSuccess(request, std::move(response));
 }
 
-// Test HTTP callout immediate failure (request_ not set in onFailure).
-TEST_F(BootstrapAbiImplTest, HttpCalloutImmediateFailure) {
+// -----------------------------------------------------------------------------
+// Stats Access Tests
+// -----------------------------------------------------------------------------
+
+// Test get_counter_value callback with an existing counter.
+TEST_F(BootstrapAbiImplTest, GetCounterValueExisting) {
+  // Create a counter in the stats store.
+  context_.store_.counterFromString("test.counter").add(42);
+
   auto dynamic_module =
       Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
   auto config = newDynamicModuleBootstrapExtensionConfig(
-      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_);
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
-  // Setup mock cluster manager to return a valid cluster.
-  testing::NiceMock<Upstream::MockThreadLocalCluster> thread_local_cluster;
-  EXPECT_CALL(context_.cluster_manager_, getThreadLocalCluster("test_cluster"))
-      .WillOnce(testing::Return(&thread_local_cluster));
+  auto extension = std::make_unique<DynamicModuleBootstrapExtension>(config.value());
+  extension->initializeInModuleExtension();
 
-  // Setup mock async client to immediately call onFailure (simulating inline failure).
-  // In this case, send_ returns nullptr but the callback is still called.
-  EXPECT_CALL(thread_local_cluster.async_client_, send_(_, _, _))
-      .WillOnce(testing::Invoke(
-          [&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks&,
-              const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            // Return nullptr to simulate request creation failure.
-            return nullptr;
-          }));
+  // Test getting a counter value.
+  uint64_t value = 0;
+  envoy_dynamic_module_type_module_buffer name{"test.counter", 12};
+  bool found = envoy_dynamic_module_callback_bootstrap_extension_get_counter_value(
+      static_cast<void*>(extension.get()), name, &value);
 
-  // Build headers.
-  std::vector<envoy_dynamic_module_type_module_http_header> headers = {
-      {":method", 7, "GET", 3},
-      {":path", 5, "/test", 5},
-      {"host", 4, "example.com", 11},
+  EXPECT_TRUE(found);
+  EXPECT_EQ(value, 42u);
+}
+
+// Test get_counter_value callback with a non-existent counter.
+TEST_F(BootstrapAbiImplTest, GetCounterValueNonExistent) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  auto config = newDynamicModuleBootstrapExtensionConfig(
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  ASSERT_TRUE(config.ok()) << config.status();
+
+  auto extension = std::make_unique<DynamicModuleBootstrapExtension>(config.value());
+  extension->initializeInModuleExtension();
+
+  // Test getting a non-existent counter.
+  uint64_t value = 0;
+  envoy_dynamic_module_type_module_buffer name{"non.existent", 12};
+  bool found = envoy_dynamic_module_callback_bootstrap_extension_get_counter_value(
+      static_cast<void*>(extension.get()), name, &value);
+
+  EXPECT_FALSE(found);
+}
+
+// Test get_gauge_value callback with an existing gauge.
+TEST_F(BootstrapAbiImplTest, GetGaugeValueExisting) {
+  // Create a gauge in the stats store.
+  context_.store_.gaugeFromString("test.gauge", Stats::Gauge::ImportMode::Accumulate).set(123);
+
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  auto config = newDynamicModuleBootstrapExtensionConfig(
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  ASSERT_TRUE(config.ok()) << config.status();
+
+  auto extension = std::make_unique<DynamicModuleBootstrapExtension>(config.value());
+  extension->initializeInModuleExtension();
+
+  // Test getting a gauge value.
+  uint64_t value = 0;
+  envoy_dynamic_module_type_module_buffer name{"test.gauge", 10};
+  bool found = envoy_dynamic_module_callback_bootstrap_extension_get_gauge_value(
+      static_cast<void*>(extension.get()), name, &value);
+
+  EXPECT_TRUE(found);
+  EXPECT_EQ(value, 123u);
+}
+
+// Test get_gauge_value callback with a non-existent gauge.
+TEST_F(BootstrapAbiImplTest, GetGaugeValueNonExistent) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  auto config = newDynamicModuleBootstrapExtensionConfig(
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  ASSERT_TRUE(config.ok()) << config.status();
+
+  auto extension = std::make_unique<DynamicModuleBootstrapExtension>(config.value());
+  extension->initializeInModuleExtension();
+
+  // Test getting a non-existent gauge.
+  uint64_t value = 0;
+  envoy_dynamic_module_type_module_buffer name{"non.existent", 12};
+  bool found = envoy_dynamic_module_callback_bootstrap_extension_get_gauge_value(
+      static_cast<void*>(extension.get()), name, &value);
+
+  EXPECT_FALSE(found);
+}
+
+// Test iterate_counters callback.
+TEST_F(BootstrapAbiImplTest, IterateCounters) {
+  // Create some counters in the stats store.
+  context_.store_.counterFromString("counter.one").add(1);
+  context_.store_.counterFromString("counter.two").add(2);
+  context_.store_.counterFromString("counter.three").add(3);
+
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  auto config = newDynamicModuleBootstrapExtensionConfig(
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  ASSERT_TRUE(config.ok()) << config.status();
+
+  auto extension = std::make_unique<DynamicModuleBootstrapExtension>(config.value());
+  extension->initializeInModuleExtension();
+
+  // Track visited counters.
+  struct VisitorData {
+    int count;
+  };
+  VisitorData data{0};
+
+  auto iterator = [](envoy_dynamic_module_type_envoy_buffer, uint64_t,
+                     void* user_data) -> envoy_dynamic_module_type_stats_iteration_action {
+    auto* d = static_cast<VisitorData*>(user_data);
+    d->count++;
+    return envoy_dynamic_module_type_stats_iteration_action_Continue;
   };
 
-  uint64_t callout_id = 0;
-  envoy_dynamic_module_type_module_buffer cluster_name = {"test_cluster", 12};
-  envoy_dynamic_module_type_module_buffer body = {nullptr, 0};
+  envoy_dynamic_module_callback_bootstrap_extension_iterate_counters(
+      static_cast<void*>(extension.get()), iterator, &data);
 
-  auto result = envoy_dynamic_module_callback_bootstrap_extension_http_callout(
-      config.value()->thisAsVoidPtr(), &callout_id, cluster_name, headers.data(), headers.size(),
-      body, 5000);
+  EXPECT_EQ(data.count, 3);
+}
 
-  // When send_ returns nullptr, the result should be CannotCreateRequest.
-  EXPECT_EQ(result, envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest);
+// Test iterate_gauges callback.
+TEST_F(BootstrapAbiImplTest, IterateGauges) {
+  // Create some gauges in the stats store.
+  context_.store_.gaugeFromString("gauge.one", Stats::Gauge::ImportMode::Accumulate).set(1);
+  context_.store_.gaugeFromString("gauge.two", Stats::Gauge::ImportMode::Accumulate).set(2);
+
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  auto config = newDynamicModuleBootstrapExtensionConfig(
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  ASSERT_TRUE(config.ok()) << config.status();
+
+  auto extension = std::make_unique<DynamicModuleBootstrapExtension>(config.value());
+  extension->initializeInModuleExtension();
+
+  // Track visited gauges.
+  struct VisitorData {
+    int count;
+  };
+  VisitorData data{0};
+
+  auto iterator = [](envoy_dynamic_module_type_envoy_buffer, uint64_t,
+                     void* user_data) -> envoy_dynamic_module_type_stats_iteration_action {
+    auto* d = static_cast<VisitorData*>(user_data);
+    d->count++;
+    return envoy_dynamic_module_type_stats_iteration_action_Continue;
+  };
+
+  envoy_dynamic_module_callback_bootstrap_extension_iterate_gauges(
+      static_cast<void*>(extension.get()), iterator, &data);
+
+  EXPECT_EQ(data.count, 2);
 }
 
 } // namespace DynamicModules

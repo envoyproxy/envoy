@@ -5,6 +5,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/http/async_client.h"
 #include "envoy/server/factory_context.h"
+#include "envoy/stats/store.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/http/message_impl.h"
@@ -49,12 +50,14 @@ public:
    * @param dynamic_module the dynamic module to use.
    * @param main_thread_dispatcher the main thread dispatcher.
    * @param context the server factory context for accessing cluster manager lazily.
+   * @param stats_store the stats store for accessing metrics.
    */
   DynamicModuleBootstrapExtensionConfig(const absl::string_view extension_name,
                                         const absl::string_view extension_config,
                                         Extensions::DynamicModules::DynamicModulePtr dynamic_module,
                                         Event::Dispatcher& main_thread_dispatcher,
-                                        Server::Configuration::ServerFactoryContext& context);
+                                        Server::Configuration::ServerFactoryContext& context,
+                                        Stats::Store& stats_store);
 
   ~DynamicModuleBootstrapExtensionConfig();
 
@@ -108,6 +111,9 @@ public:
   // available during bootstrap extension creation, so we store the context and access it when
   // needed.
   Server::Configuration::ServerFactoryContext& context_;
+
+  // The stats store for accessing metrics.
+  Stats::Store& stats_store_;
 
 private:
   /**
@@ -183,6 +189,7 @@ private:
  * @param dynamic_module the dynamic module to use.
  * @param main_thread_dispatcher the main thread dispatcher.
  * @param context the server factory context for accessing cluster manager lazily.
+ * @param stats_store the stats store for accessing metrics.
  * @return an error status if the module could not be loaded or the configuration could not be
  * created, or a shared pointer to the config.
  */
@@ -190,8 +197,8 @@ absl::StatusOr<DynamicModuleBootstrapExtensionConfigSharedPtr>
 newDynamicModuleBootstrapExtensionConfig(
     const absl::string_view extension_name, const absl::string_view extension_config,
     Extensions::DynamicModules::DynamicModulePtr dynamic_module,
-    Event::Dispatcher& main_thread_dispatcher,
-    Server::Configuration::ServerFactoryContext& context);
+    Event::Dispatcher& main_thread_dispatcher, Server::Configuration::ServerFactoryContext& context,
+    Stats::Store& stats_store);
 
 } // namespace DynamicModules
 } // namespace Bootstrap

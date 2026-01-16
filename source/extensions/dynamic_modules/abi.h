@@ -5287,6 +5287,109 @@ envoy_dynamic_module_callback_bootstrap_extension_http_callout(
     envoy_dynamic_module_type_module_http_header* headers, size_t headers_size,
     envoy_dynamic_module_type_module_buffer body, uint64_t timeout_milliseconds);
 
+// -------------------- Bootstrap Extension Callbacks - Stats Access --------------------
+
+/**
+ * envoy_dynamic_module_type_stats_iteration_action represents the action to take after each
+ * stat is visited during iteration.
+ */
+typedef enum {
+  // Continue iterating.
+  envoy_dynamic_module_type_stats_iteration_action_Continue = 0,
+  // Stop iterating.
+  envoy_dynamic_module_type_stats_iteration_action_Stop = 1,
+} envoy_dynamic_module_type_stats_iteration_action;
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_get_counter_value is called by the module to
+ * get the current value of a counter by name.
+ *
+ * @param extension_envoy_ptr is the pointer to the DynamicModuleBootstrapExtension object.
+ * @param name is the name of the counter to find.
+ * @param value_ptr is where the value will be stored if the counter is found.
+ * @return true if the counter was found and value_ptr was populated, false otherwise.
+ */
+bool envoy_dynamic_module_callback_bootstrap_extension_get_counter_value(
+    envoy_dynamic_module_type_bootstrap_extension_envoy_ptr extension_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name, uint64_t* value_ptr);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_get_gauge_value is called by the module to
+ * get the current value of a gauge by name.
+ *
+ * @param extension_envoy_ptr is the pointer to the DynamicModuleBootstrapExtension object.
+ * @param name is the name of the gauge to find.
+ * @param value_ptr is where the value will be stored if the gauge is found.
+ * @return true if the gauge was found and value_ptr was populated, false otherwise.
+ */
+bool envoy_dynamic_module_callback_bootstrap_extension_get_gauge_value(
+    envoy_dynamic_module_type_bootstrap_extension_envoy_ptr extension_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name, uint64_t* value_ptr);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_get_histogram_summary is called by the module
+ * to get the summary statistics of a histogram by name. This returns the cumulative statistics
+ * since the server started.
+ *
+ * @param extension_envoy_ptr is the pointer to the DynamicModuleBootstrapExtension object.
+ * @param name is the name of the histogram to find.
+ * @param sample_count_ptr is where the sample count will be stored if the histogram is found.
+ * @param sample_sum_ptr is where the sample sum will be stored if the histogram is found.
+ * @return true if the histogram was found and the output pointers were populated, false otherwise.
+ */
+bool envoy_dynamic_module_callback_bootstrap_extension_get_histogram_summary(
+    envoy_dynamic_module_type_bootstrap_extension_envoy_ptr extension_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name, uint64_t* sample_count_ptr,
+    double* sample_sum_ptr);
+
+/**
+ * The callback type for iterating counters.
+ *
+ * @param name is the name of the counter.
+ * @param value is the current value of the counter.
+ * @param user_data is the user data passed to the iterate function.
+ * @return the action to take after visiting this counter.
+ */
+typedef envoy_dynamic_module_type_stats_iteration_action (
+    *envoy_dynamic_module_type_counter_iterator_fn)(envoy_dynamic_module_type_envoy_buffer name,
+                                                    uint64_t value, void* user_data);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_iterate_counters is called by the module to
+ * iterate over all counters in the stats store.
+ *
+ * @param extension_envoy_ptr is the pointer to the DynamicModuleBootstrapExtension object.
+ * @param iterator_fn is the callback function to call for each counter.
+ * @param user_data is the user data to pass to the callback function.
+ */
+void envoy_dynamic_module_callback_bootstrap_extension_iterate_counters(
+    envoy_dynamic_module_type_bootstrap_extension_envoy_ptr extension_envoy_ptr,
+    envoy_dynamic_module_type_counter_iterator_fn iterator_fn, void* user_data);
+
+/**
+ * The callback type for iterating gauges.
+ *
+ * @param name is the name of the gauge.
+ * @param value is the current value of the gauge.
+ * @param user_data is the user data passed to the iterate function.
+ * @return the action to take after visiting this gauge.
+ */
+typedef envoy_dynamic_module_type_stats_iteration_action (
+    *envoy_dynamic_module_type_gauge_iterator_fn)(envoy_dynamic_module_type_envoy_buffer name,
+                                                  uint64_t value, void* user_data);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_iterate_gauges is called by the module to
+ * iterate over all gauges in the stats store.
+ *
+ * @param extension_envoy_ptr is the pointer to the DynamicModuleBootstrapExtension object.
+ * @param iterator_fn is the callback function to call for each gauge.
+ * @param user_data is the user data to pass to the callback function.
+ */
+void envoy_dynamic_module_callback_bootstrap_extension_iterate_gauges(
+    envoy_dynamic_module_type_bootstrap_extension_envoy_ptr extension_envoy_ptr,
+    envoy_dynamic_module_type_gauge_iterator_fn iterator_fn, void* user_data);
+
 #ifdef __cplusplus
 }
 #endif

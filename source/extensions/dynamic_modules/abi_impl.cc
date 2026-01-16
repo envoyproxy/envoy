@@ -87,4 +87,46 @@ envoy_dynamic_module_callback_bootstrap_extension_http_callout(
   return envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest;
 }
 
+// ---------------------- Bootstrap extension stats access callbacks ------------------------
+// These are weak symbols that provide default stub implementations. The actual implementations
+// are provided in the bootstrap extension abi_impl.cc when the bootstrap extension is used.
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_bootstrap_extension_get_counter_value(
+    envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer, uint64_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_bootstrap_extension_get_counter_value: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_bootstrap_extension_get_gauge_value(
+    envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer, uint64_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_bootstrap_extension_get_gauge_value: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_bootstrap_extension_get_histogram_summary(
+    envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer, uint64_t*, double*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_bootstrap_extension_get_histogram_summary: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) void envoy_dynamic_module_callback_bootstrap_extension_iterate_counters(
+    envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
+    envoy_dynamic_module_type_counter_iterator_fn, void*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_bootstrap_extension_iterate_counters: "
+               "not implemented in this context");
+}
+
+__attribute__((weak)) void envoy_dynamic_module_callback_bootstrap_extension_iterate_gauges(
+    envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
+    envoy_dynamic_module_type_gauge_iterator_fn, void*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_bootstrap_extension_iterate_gauges: "
+               "not implemented in this context");
+}
+
 } // extern "C"
