@@ -2154,9 +2154,7 @@ TEST_P(TcpProxyIntegrationTest, UpstreamConnectModeTlsHandshakeWithUpstreamTls) 
   tcp_client->close();
 }
 
-// Test that ON_DOWNSTREAM_TLS_HANDSHAKE mode works correctly with TLS termination.
-// This test validates that the TLS handshake can complete before establishing
-// the upstream connection, with max_early_data_bytes set to zero
+// Test ON_DOWNSTREAM_TLS_HANDSHAKE mode with max_early_data_bytes set to zero.
 TEST_P(TcpProxySslIntegrationTest, OnDownstreamTlsHandshakeMode) {
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
@@ -2168,8 +2166,6 @@ TEST_P(TcpProxySslIntegrationTest, OnDownstreamTlsHandshakeMode) {
         MessageUtil::anyConvert<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>(
             *config_blob);
 
-    // Set ON_DOWNSTREAM_TLS_HANDSHAKE mode with max_early_data_bytes set to zero.
-    // Zero value provides zero-memory-overhead behavior (no early data buffering).
     tcp_proxy_config.set_upstream_connect_mode(
         envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_TLS_HANDSHAKE);
     tcp_proxy_config.mutable_max_early_data_bytes()->set_value(0);
@@ -2181,9 +2177,7 @@ TEST_P(TcpProxySslIntegrationTest, OnDownstreamTlsHandshakeMode) {
   sendAndReceiveTlsData("hello", "world");
 }
 
-// Test that ON_DOWNSTREAM_TLS_HANDSHAKE with max_early_data_bytes works correctly.
-// This test validates that the upstream connection is delayed until TLS handshake completes
-// and that early data is buffered correctly.
+// Test ON_DOWNSTREAM_TLS_HANDSHAKE mode with early data buffering.
 TEST_P(TcpProxySslIntegrationTest, OnDownstreamTlsHandshakeModeWithEarlyData) {
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
@@ -2204,7 +2198,6 @@ TEST_P(TcpProxySslIntegrationTest, OnDownstreamTlsHandshakeModeWithEarlyData) {
 
   initialize();
 
-  // Local variables for SSL connection setup (similar to ClientSslConnection but with custom logic).
   MockWatermarkBuffer* client_write_buffer = nullptr;
   ConnectionStatusCallbacks connect_callbacks;
   std::shared_ptr<WaitForPayloadReader> payload_reader =
@@ -2243,7 +2236,7 @@ TEST_P(TcpProxySslIntegrationTest, OnDownstreamTlsHandshakeModeWithEarlyData) {
 
   // No upstream connection should be established yet (before TLS handshake completes).
   ASSERT_FALSE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection,
-                                                         std::chrono::milliseconds(500)));
+                                                        std::chrono::milliseconds(500)));
 
   // Wait for TLS handshake to complete. The Connected event fires after TLS handshake.
   while (!connect_callbacks.connected()) {
