@@ -37,6 +37,12 @@ constexpr const char* UrlBodyTemplateWithCredentialsForRefreshToken =
 constexpr const char* UrlBodyTemplateWithoutCredentialsForRefreshToken =
     "grant_type=refresh_token&refresh_token={0}";
 
+constexpr const char* UrlBodyTemplateWithoutSecretForAuthCode =
+    "grant_type=authorization_code&code={0}&client_id={1}&redirect_uri={2}&code_verifier={3}";
+
+constexpr const char* UrlBodyTemplateWithoutSecretForRefreshToken =
+    "grant_type=refresh_token&refresh_token={0}&client_id={1}";
+
 } // namespace
 
 void OAuth2ClientImpl::asyncGetAccessToken(const std::string& auth_code,
@@ -70,7 +76,8 @@ void OAuth2ClientImpl::asyncGetAccessToken(const std::string& auth_code,
   case AuthType::MutualTls:
     // For mTLS, authentication is done via the client certificate in the TLS handshake.
     // No client_secret is sent in the request body or headers.
-    body = fmt::format(UrlBodyTemplateWithoutCredentialsForAuthCode, auth_code, encoded_cb_url,
+    body = fmt::format(UrlBodyTemplateWithoutSecretForAuthCode, auth_code,
+                       Http::Utility::PercentEncoding::encode(client_id, ":/=&?"), encoded_cb_url,
                        code_verifier);
     break;
   }
@@ -110,8 +117,9 @@ void OAuth2ClientImpl::asyncRefreshAccessToken(const std::string& refresh_token,
   case AuthType::MutualTls:
     // For mTLS, authentication is done via the client certificate in the TLS handshake.
     // No client_secret is sent in the request body or headers.
-    body = fmt::format(UrlBodyTemplateWithoutCredentialsForRefreshToken,
-                       Http::Utility::PercentEncoding::encode(refresh_token));
+    body = fmt::format(UrlBodyTemplateWithoutSecretForRefreshToken,
+                       Http::Utility::PercentEncoding::encode(refresh_token, ":/=&?"),
+                       Http::Utility::PercentEncoding::encode(client_id, ":/=&?"));
     break;
   }
 
