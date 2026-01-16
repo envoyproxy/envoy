@@ -15,9 +15,7 @@ constexpr absl::string_view DefaultNamespace = "envoy.filters.http.sse_to_metada
 
 JsonContentParserImpl::Rule::Rule(const ProtoRule& rule) : rule_(rule) {
   // Parse selector path
-  if (rule_.selector().path().empty()) {
-    throw EnvoyException("Selector path must not be empty");
-  }
+  // Note: path cannot be empty - enforced by proto validation (min_items: 1)
   for (const auto& key : rule_.selector().path()) {
     selector_path_.push_back(key);
   }
@@ -82,10 +80,8 @@ JsonContentParserImpl::getDeferredActions(size_t rule_index, bool has_error,
                                           bool selector_not_found) {
   std::vector<SseContentParser::MetadataAction> actions;
 
-  if (rule_index >= rules_.size()) {
-    return actions;
-  }
-
+  // Note: rule_index is always valid - it comes from iterating rule_states_ which matches rules_
+  ASSERT(rule_index < rules_.size());
   const auto& rule = rules_[rule_index];
 
   // Priority: on_error over on_missing
@@ -105,9 +101,8 @@ JsonContentParserImpl::getDeferredActions(size_t rule_index, bool has_error,
 absl::StatusOr<Envoy::Json::ValueType>
 JsonContentParserImpl::extractValueFromJson(const Envoy::Json::ObjectSharedPtr& json_obj,
                                             const std::vector<std::string>& path) const {
-  if (path.empty()) {
-    return absl::InvalidArgumentError("Empty selector path");
-  }
+  // Note: path cannot be empty - validated in Rule constructor from proto (min_items: 1)
+  ASSERT(!path.empty());
 
   Envoy::Json::ObjectSharedPtr current = json_obj;
 
