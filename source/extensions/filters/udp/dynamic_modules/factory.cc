@@ -16,7 +16,7 @@ DynamicModuleUdpListenerFilterConfigFactory::createFilterFactoryFromProto(
 
   auto dynamic_module_or_error = Extensions::DynamicModules::newDynamicModuleByName(
       proto_config.dynamic_module_config().name(),
-      proto_config.dynamic_module_config().do_not_close(), context.serverFactoryContext(),
+      proto_config.dynamic_module_config().do_not_close(),
       proto_config.dynamic_module_config().load_globally());
 
   if (!dynamic_module_or_error.ok()) {
@@ -30,9 +30,15 @@ DynamicModuleUdpListenerFilterConfigFactory::createFilterFactoryFromProto(
 
   return [filter_config](Network::UdpListenerFilterManager& filter_manager,
                          Network::UdpReadFilterCallbacks& callbacks) -> void {
-    auto worker_thread_index = callbacks.udpListener().dispatcher().workerThreadIndex().value_or(0);
+    const std::string& worker_name = callbacks.udpListener().dispatcher().name();
+    auto pos = worker_name.find_first_of('_');
+    ENVOY_BUG(pos != std::string::npos, "worker name is not in expected format worker_{index}");
+    uint32_t worker_index;
+    if (!absl::SimpleAtoi(worker_name.substr(pos + 1), &worker_index)) {
+      IS_ENVOY_BUG("failed to parse worker index from name");
+    }
     filter_manager.addReadFilter(std::make_unique<DynamicModuleUdpListenerFilter>(
-        callbacks, filter_config, worker_thread_index));
+        callbacks, filter_config, worker_index));
   };
 }
 

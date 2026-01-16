@@ -8,7 +8,6 @@
 
 #include "test/extensions/dynamic_modules/util.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/server/server_factory_context.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -18,9 +17,8 @@ namespace DynamicModules {
 class DynamicModuleUdpListenerFilterAbiCallbackTest : public testing::Test {
 public:
   void SetUp() override {
-    NiceMock<Server::Configuration::MockServerFactoryContext> context;
     auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
-        Extensions::DynamicModules::testSharedObjectPath("udp_no_op", "c"), false, context);
+        Extensions::DynamicModules::testSharedObjectPath("udp_no_op", "c"), false);
     EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
     envoy::extensions::filters::udp::dynamic_modules::v3::DynamicModuleUdpListenerFilter

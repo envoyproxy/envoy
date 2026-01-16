@@ -1,7 +1,6 @@
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 
 #include "test/extensions/dynamic_modules/util.h"
-#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -11,8 +10,7 @@ namespace Extensions {
 namespace DynamicModules {
 
 TEST(DynamicModuleTestGeneral, InvalidPath) {
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  absl::StatusOr<DynamicModulePtr> result = newDynamicModule("invalid_name", false, context);
+  absl::StatusOr<DynamicModulePtr> result = newDynamicModule("invalid_name", false);
   EXPECT_FALSE(result.ok());
   EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
 }
@@ -23,9 +21,8 @@ INSTANTIATE_TEST_SUITE_P(LanguageTests, DynamicModuleTestLanguages, testing::Val
 TEST_P(DynamicModuleTestLanguages, DoNotClose) {
   std::string language = GetParam();
   using GetSomeVariableFuncType = int (*)(void);
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   absl::StatusOr<DynamicModulePtr> module =
-      newDynamicModule(testSharedObjectPath("no_op", language), false, context);
+      newDynamicModule(testSharedObjectPath("no_op", language), false);
   EXPECT_TRUE(module.ok());
   const auto getSomeVariable =
       module->get()->getFunctionPointer<GetSomeVariableFuncType>("getSomeVariable");
@@ -36,8 +33,7 @@ TEST_P(DynamicModuleTestLanguages, DoNotClose) {
 
   // Release the module, and reload it.
   module->reset();
-  module = newDynamicModule(testSharedObjectPath("no_op", language), true,
-                            context); // This time, do not close the module.
+  module = newDynamicModule(testSharedObjectPath("no_op", language), true);
   EXPECT_TRUE(module.ok());
 
   // This module must be reloaded and the variable must be reset.
@@ -50,7 +46,7 @@ TEST_P(DynamicModuleTestLanguages, DoNotClose) {
 
   // Release the module, and reload it.
   module->reset();
-  module = newDynamicModule(testSharedObjectPath("no_op", language), false, context);
+  module = newDynamicModule(testSharedObjectPath("no_op", language), false);
   EXPECT_TRUE(module.ok());
 
   // This module must be the already loaded one, and the variable must be kept.
@@ -61,31 +57,29 @@ TEST_P(DynamicModuleTestLanguages, DoNotClose) {
 }
 
 TEST(DynamicModuleTestLanguages, InitFunctionOnlyCalledOnce) {
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   const auto path = testSharedObjectPath("program_init_assert", "c");
-  absl::StatusOr<DynamicModulePtr> m1 = newDynamicModule(path, false, context);
+  absl::StatusOr<DynamicModulePtr> m1 = newDynamicModule(path, false);
   EXPECT_TRUE(m1.ok());
   // At this point, m1 is alive, so the init function should have been called.
   // When creating a new module with the same path, the init function should not be called again.
-  absl::StatusOr<DynamicModulePtr> m2 = newDynamicModule(path, false, context);
+  absl::StatusOr<DynamicModulePtr> m2 = newDynamicModule(path, false);
   EXPECT_TRUE(m2.ok());
   m1->reset();
   m2->reset();
 
   // Even with the do_not_close=true, init function should only be called once.
-  m1 = newDynamicModule(path, true, context);
+  m1 = newDynamicModule(path, true);
   EXPECT_TRUE(m1.ok());
   m1->reset(); // Closing the module, but the module is still alive in the process.
   // This m2 should point to the same module as m1 whose handle is already freed, but
   // the init function should not be called again.
-  m2 = newDynamicModule(path, true, context);
+  m2 = newDynamicModule(path, true);
   EXPECT_TRUE(m2.ok());
 }
 
 TEST(DynamicModuleTestLanguages, LoadLibGlobally) {
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   const auto path = testSharedObjectPath("program_global", "c");
-  absl::StatusOr<DynamicModulePtr> module = newDynamicModule(path, false, context, true);
+  absl::StatusOr<DynamicModulePtr> module = newDynamicModule(path, false, true);
   EXPECT_TRUE(module.ok());
 
   // The child module should be able to access the symbol from the global module.
@@ -102,10 +96,9 @@ TEST(DynamicModuleTestLanguages, LoadLibGlobally) {
 }
 
 TEST_P(DynamicModuleTestLanguages, NoProgramInit) {
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   std::string language = GetParam();
   absl::StatusOr<DynamicModulePtr> result =
-      newDynamicModule(testSharedObjectPath("no_program_init", language), false, context);
+      newDynamicModule(testSharedObjectPath("no_program_init", language), false);
   EXPECT_FALSE(result.ok());
   EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
   EXPECT_THAT(result.status().message(),
@@ -113,10 +106,9 @@ TEST_P(DynamicModuleTestLanguages, NoProgramInit) {
 }
 
 TEST_P(DynamicModuleTestLanguages, ProgramInitFail) {
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   std::string language = GetParam();
   absl::StatusOr<DynamicModulePtr> result =
-      newDynamicModule(testSharedObjectPath("program_init_fail", language), false, context);
+      newDynamicModule(testSharedObjectPath("program_init_fail", language), false);
   EXPECT_FALSE(result.ok());
   EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
   EXPECT_THAT(result.status().message(),
@@ -124,10 +116,9 @@ TEST_P(DynamicModuleTestLanguages, ProgramInitFail) {
 }
 
 TEST_P(DynamicModuleTestLanguages, ABIVersionMismatch) {
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   std::string language = GetParam();
   absl::StatusOr<DynamicModulePtr> result =
-      newDynamicModule(testSharedObjectPath("abi_version_mismatch", language), false, context);
+      newDynamicModule(testSharedObjectPath("abi_version_mismatch", language), false);
   EXPECT_FALSE(result.ok());
   EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
   EXPECT_THAT(result.status().message(),
@@ -135,37 +126,34 @@ TEST_P(DynamicModuleTestLanguages, ABIVersionMismatch) {
 }
 
 TEST(CreateDynamicModulesByName, EnvoyDynamicModulesSearchPathSet) {
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   TestEnvironment::setEnvVar(
       "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
       TestEnvironment::substitute(
           "{{ test_rundir }}/test/extensions/dynamic_modules/test_data/rust"),
       1);
 
-  absl::StatusOr<DynamicModulePtr> module = newDynamicModuleByName("no_op", false, context);
+  absl::StatusOr<DynamicModulePtr> module = newDynamicModuleByName("no_op", false);
   EXPECT_TRUE(module.ok()) << "Failed to load module: " << module.status().message();
   TestEnvironment::unsetEnvVar("ENVOY_DYNAMIC_MODULES_SEARCH_PATH");
 }
 
 TEST(CreateDynamicModulesByName, EnvoyDynamicModulesSearchPathNotSetFallbackToCwd) {
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   std::filesystem::path test_lib = testSharedObjectPath("no_op", "c");
   std::filesystem::path staged_lib = TestEnvironment::substitute("{{ test_rundir }}/libfoo.so");
   std::filesystem::copy(test_lib, staged_lib);
-  absl::StatusOr<DynamicModulePtr> module = newDynamicModuleByName("foo", false, context);
+  absl::StatusOr<DynamicModulePtr> module = newDynamicModuleByName("foo", false);
   EXPECT_TRUE(module.ok()) << "Failed to load module: " << module.status().message();
   std::filesystem::remove(staged_lib);
 }
 
 TEST(CreateDynamicModulesByName, DlopenDefaultSearchPath) {
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   TestEnvironment::setEnvVar("ENVOY_DYNAMIC_MODULES_SEARCH_PATH", "/should/not/find/this/path", 1);
 
   std::filesystem::path test_lib = testSharedObjectPath("no_op", "c");
   std::filesystem::path staged_lib =
       TestEnvironment::substitute("{{ test_rundir }}/libwhatever.so");
   std::filesystem::copy(test_lib, staged_lib);
-  absl::StatusOr<DynamicModulePtr> module = newDynamicModuleByName("whatever", false, context);
+  absl::StatusOr<DynamicModulePtr> module = newDynamicModuleByName("whatever", false);
   EXPECT_TRUE(module.ok()) << "Failed to load module: " << module.status().message();
 
   TestEnvironment::unsetEnvVar("ENVOY_DYNAMIC_MODULES_SEARCH_PATH");
@@ -173,8 +161,7 @@ TEST(CreateDynamicModulesByName, DlopenDefaultSearchPath) {
 }
 
 TEST(CreateDynamicModulesByName, ModuleNotFound) {
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  absl::StatusOr<DynamicModulePtr> module = newDynamicModuleByName("no_op", false, context);
+  absl::StatusOr<DynamicModulePtr> module = newDynamicModuleByName("no_op", false);
   EXPECT_FALSE(module.ok());
   EXPECT_EQ(module.status().code(), absl::StatusCode::kInvalidArgument);
   EXPECT_THAT(module.status().message(),

@@ -28,9 +28,15 @@ DynamicModuleAccessLog::DynamicModuleAccessLog(AccessLog::FilterPtr&& filter,
     : Common::ImplBase(std::move(filter)), config_(config), tls_slot_(tls.allocateSlot()) {
 
   tls_slot_->set([config](Event::Dispatcher& dispatcher) {
-    auto worker_thread_index = dispatcher.workerThreadIndex().value_or(0);
+    const std::string& worker_name = dispatcher.name();
+    auto pos = worker_name.find_first_of('_');
+    ENVOY_BUG(pos != std::string::npos, "worker name is not in expected format worker_{index}");
+    uint32_t worker_index;
+    if (!absl::SimpleAtoi(worker_name.substr(pos + 1), &worker_index)) {
+      IS_ENVOY_BUG("failed to parse worker index from name");
+    }
     // Create a thread-local logger wrapper first, then pass it to the module.
-    auto tl_logger = std::make_shared<ThreadLocalLogger>(nullptr, config, worker_thread_index);
+    auto tl_logger = std::make_shared<ThreadLocalLogger>(nullptr, config, worker_index);
     auto logger = config->on_logger_new_(config->in_module_config_, tl_logger->thisAsVoidPtr());
     tl_logger->logger_ = logger;
     return tl_logger;

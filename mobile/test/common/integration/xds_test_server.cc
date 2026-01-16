@@ -38,8 +38,8 @@ XdsTestServer::XdsTestServer()
     // Required by the Dispatcher.
     Envoy::Event::Libevent::Global::initialize();
   }
-  dispatcher_ =
-      api_->allocateDispatcher("test_thread", absl::nullopt, Buffer::WatermarkFactoryPtr{mock_buffer_factory_});
+  dispatcher_ = api_->allocateDispatcher("test_thread", absl::nullopt,
+                                         Buffer::WatermarkFactoryPtr{mock_buffer_factory_});
 
   ON_CALL(*mock_buffer_factory_, createBuffer_(_, _, _))
       .WillByDefault(Invoke([](std::function<void()> below_low, std::function<void()> above_high,

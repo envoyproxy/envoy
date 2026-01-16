@@ -5,7 +5,6 @@
 #include "test/extensions/dynamic_modules/util.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/utility.h"
 
@@ -17,10 +16,8 @@ namespace NetworkFilters {
 class DynamicModuleNetworkFilterTest : public testing::Test {
 public:
   void SetUp() override {
-    NiceMock<Server::Configuration::MockServerFactoryContext> context;
-
     auto dynamic_module =
-        newDynamicModule(testSharedObjectPath("network_no_op", "c"), false, context);
+        newDynamicModule(testSharedObjectPath("network_no_op", "c"), false);
     EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
     auto filter_config_or_status = newDynamicModuleNetworkFilterConfig(
@@ -115,9 +112,8 @@ TEST_F(DynamicModuleNetworkFilterTest, FilterDestroyWithoutInitialization) {
 }
 
 TEST_F(DynamicModuleNetworkFilterTest, FilterWithoutInModuleFilter) {
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   auto dynamic_module =
-      newDynamicModule(testSharedObjectPath("network_filter_new_fail", "c"), false, context);
+      newDynamicModule(testSharedObjectPath("network_filter_new_fail", "c"), false);
   EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
   auto filter_config_or_status = newDynamicModuleNetworkFilterConfig(
@@ -250,9 +246,8 @@ TEST_F(DynamicModuleNetworkFilterTest, CallbackAccessors) {
 }
 
 TEST(DynamicModuleNetworkFilterConfigTest, ConfigInitialization) {
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   auto dynamic_module =
-      newDynamicModule(testSharedObjectPath("network_no_op", "c"), false, context);
+      newDynamicModule(testSharedObjectPath("network_no_op", "c"), false);
   EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
   Stats::IsolatedStoreImpl stats;
@@ -276,8 +271,7 @@ TEST(DynamicModuleNetworkFilterConfigTest, ConfigInitialization) {
 
 TEST(DynamicModuleNetworkFilterConfigTest, MissingSymbols) {
   // Use the HTTP-only no_op module which lacks network filter symbols.
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", "c"), false, context);
+  auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", "c"), false);
   EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
   Stats::IsolatedStoreImpl stats;
@@ -291,9 +285,8 @@ TEST(DynamicModuleNetworkFilterConfigTest, MissingSymbols) {
 
 TEST(DynamicModuleNetworkFilterConfigTest, ConfigInitializationFailure) {
   // Use a module that returns nullptr from config_new.
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   auto dynamic_module =
-      newDynamicModule(testSharedObjectPath("network_config_new_fail", "c"), false, context);
+      newDynamicModule(testSharedObjectPath("network_config_new_fail", "c"), false);
   EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
   Stats::IsolatedStoreImpl stats;
@@ -308,9 +301,8 @@ TEST(DynamicModuleNetworkFilterConfigTest, ConfigInitializationFailure) {
 }
 
 TEST(DynamicModuleNetworkFilterConfigTest, StopIterationStatus) {
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   auto dynamic_module =
-      newDynamicModule(testSharedObjectPath("network_stop_iteration", "c"), false, context);
+      newDynamicModule(testSharedObjectPath("network_stop_iteration", "c"), false);
   EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
   Stats::IsolatedStoreImpl stats;

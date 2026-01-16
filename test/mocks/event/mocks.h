@@ -32,13 +32,11 @@ namespace Event {
 class MockDispatcher : public Dispatcher {
 public:
   MockDispatcher();
-  MockDispatcher(const std::string& name,
-                 absl::optional<uint32_t> worker_thread_index = absl::nullopt);
+  MockDispatcher(const std::string& name);
   ~MockDispatcher() override;
 
   // Dispatcher
   const std::string& name() override { return name_; }
-  absl::optional<uint32_t> workerThreadIndex() override { return worker_thread_index_; }
   TimeSource& timeSource() override { return *time_system_; }
   GlobalTimeSystem& globalTimeSystem() {
     return *(dynamic_cast<GlobalTimeSystem*>(time_system_.get()));
@@ -157,7 +155,6 @@ public:
 
 private:
   const std::string name_;
-  absl::optional<uint32_t> worker_thread_index_;
 };
 
 class MockTimer : public Timer {

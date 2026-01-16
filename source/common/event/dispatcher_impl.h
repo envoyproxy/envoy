@@ -37,16 +37,16 @@ class DispatcherImpl : Logger::Loggable<Logger::Id::main>,
                        public Dispatcher,
                        public FatalErrorHandlerInterface {
 public:
-  DispatcherImpl(const std::string& name, absl::optional<uint32_t> worker_thread_index,
+  DispatcherImpl(const std::string& name,
                  Api::Api& api, Event::TimeSystem& time_system);
-  DispatcherImpl(const std::string& name, absl::optional<uint32_t> worker_thread_index,
+  DispatcherImpl(const std::string& name,
                  Api::Api& api, Event::TimeSystem& time_system,
                  const Buffer::WatermarkFactorySharedPtr& watermark_factory);
-  DispatcherImpl(const std::string& name, absl::optional<uint32_t> worker_thread_index,
+  DispatcherImpl(const std::string& name,
                  Api::Api& api, Event::TimeSystem& time_system,
                  const ScaledRangeTimerManagerFactory& scaled_timer_factory,
                  const Buffer::WatermarkFactorySharedPtr& watermark_factory);
-  DispatcherImpl(const std::string& name, absl::optional<uint32_t> worker_thread_index,
+  DispatcherImpl(const std::string& name,
                  Thread::ThreadFactory& thread_factory, TimeSource& time_source,
                  Filesystem::Instance& file_system, Event::TimeSystem& time_system,
                  const ScaledRangeTimerManagerFactory& scaled_timer_factory,
@@ -60,7 +60,6 @@ public:
 
   // Event::Dispatcher
   const std::string& name() override { return name_; }
-  absl::optional<uint32_t> workerThreadIndex() override { return worker_thread_index_; }
   void registerWatchdog(const Server::WatchDogSharedPtr& watchdog,
                         std::chrono::milliseconds min_touch_interval) override;
   TimeSource& timeSource() override { return time_source_; }
@@ -145,7 +144,6 @@ private:
   }
 
   const std::string name_;
-  const absl::optional<uint32_t> worker_thread_index_;
   Thread::ThreadFactory& thread_factory_;
   TimeSource& time_source_;
   Filesystem::Instance& file_system_;

@@ -39,7 +39,6 @@ envoy_cc_test(
         ":util",
         "//source/extensions/dynamic_modules:abi_impl",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
-        "//test/mocks/server:server_factory_context_mocks",
     ],
 )
 

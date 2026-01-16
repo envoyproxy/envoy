@@ -11,10 +11,8 @@ declare_init_functions!(
   new_http_filter_per_route_config_fn
 );
 
-fn init(
-  server_factory_context: abi::envoy_dynamic_module_type_server_factory_context_envoy_ptr,
-) -> bool {
-  let concurrency = unsafe { get_server_concurrency(server_factory_context) };
+fn init() -> bool {
+  let concurrency = unsafe { get_server_concurrency() };
   assert_eq!(concurrency, 1);
   true
 }

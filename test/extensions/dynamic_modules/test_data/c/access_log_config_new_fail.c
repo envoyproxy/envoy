@@ -3,7 +3,7 @@
 
 // This module returns nullptr from config_new to test error handling.
 
-envoy_dynamic_module_type_abi_version_module_ptr envoy_dynamic_module_on_program_init(envoy_dynamic_module_type_server_factory_context_envoy_ptr _server_factory_context) {
+envoy_dynamic_module_type_abi_version_module_ptr envoy_dynamic_module_on_program_init(void) {
   return kAbiVersion;
 }
 

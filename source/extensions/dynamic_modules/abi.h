@@ -64,15 +64,6 @@ extern "C" {
 typedef const char* envoy_dynamic_module_type_abi_version_module_ptr;
 
 /**
- * envoy_dynamic_module_type_server_factory_context_envoy_ptr is a raw pointer to
- * the ServerFactoryContext class in Envoy. This is passed to the module on initialize
- * and used to access the server-wide scoped information such as cluster manager, concurrency, etc.
- *
- * OWNERSHIP: Envoy owns the pointer.
- */
-typedef void* envoy_dynamic_module_type_server_factory_context_envoy_ptr;
-
-/**
  * envoy_dynamic_module_type_buffer_module_ptr is a pointer to a buffer in the module. A buffer
  * represents a contiguous block of memory in bytes.
  *
@@ -440,13 +431,10 @@ typedef enum envoy_dynamic_module_type_socket_direction {
  * to check compatibility and gracefully fail the initialization because there is no way to
  * report an error to Envoy.
  *
- * @param server_factory_context_ptr is the pointer to the ServerFactoryContext object in Envoy.
- *
  * @return envoy_dynamic_module_type_abi_version_module_ptr is the ABI version of the dynamic
  * module. Null means the error and the module will be unloaded immediately.
  */
-envoy_dynamic_module_type_abi_version_module_ptr envoy_dynamic_module_on_program_init(
-    envoy_dynamic_module_type_server_factory_context_envoy_ptr server_factory_context_ptr);
+envoy_dynamic_module_type_abi_version_module_ptr envoy_dynamic_module_on_program_init();
 
 // =============================================================================
 // Common Callbacks
@@ -1943,18 +1931,6 @@ envoy_dynamic_module_callback_get_most_specific_route_config(
 uint32_t envoy_dynamic_module_callback_http_filter_get_worker_index(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
 
-// ------------------- Misc Callbacks for Server Context -------------------------
-
-/**
- * envoy_dynamic_module_callback_server_factory_context_get_concurrency may be called by the dynamic
- * module during server initialization to get the configured concurrency level of the server.
- *
- * @param server_factory_context_envoy_ptr is the pointer to the ServerFactoryContext object in
- * Envoy.
- * @return number of worker threads (concurrency) that the server is configured to use.
- */
-uint32_t envoy_dynamic_module_callback_server_factory_context_get_concurrency(
-    envoy_dynamic_module_type_server_factory_context_envoy_ptr server_factory_context_envoy_ptr);
 // ---------------------- HTTP filter socket option callbacks --------------------
 
 /**
@@ -5321,6 +5297,17 @@ void envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_delete(
 void envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_commit(
     envoy_dynamic_module_type_bootstrap_extension_config_scheduler_module_ptr scheduler_module_ptr,
     uint64_t event_id);
+
+// ------------------- Misc Global Callbacks -------------------------
+
+/**
+ * envoy_dynamic_module_callback_get_concurrency may be called by the dynamic
+ * module in envoy_dynamic_module_on_program_init to get the configured concurrency of the server.
+ * NOTE: This function must by called on the main thread.
+ *
+ * @return number of worker threads (concurrency) that the server is configured to use.
+ */
+uint32_t envoy_dynamic_module_callback_get_concurrency();
 
 #ifdef __cplusplus
 }

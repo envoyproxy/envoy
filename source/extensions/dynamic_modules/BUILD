@@ -19,7 +19,6 @@ envoy_cc_library(
     deps = [
         ":abi_version_lib",
         "//envoy/common:exception_lib",
-        "//envoy/server:factory_context_interface",
     ],
 )
 

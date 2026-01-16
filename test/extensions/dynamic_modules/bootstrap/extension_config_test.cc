@@ -1,6 +1,5 @@
 #include "source/extensions/bootstrap/dynamic_modules/extension_config.h"
 
-#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/event/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
@@ -22,9 +21,8 @@ protected:
 };
 
 TEST_F(ExtensionConfigTest, LoadOK) {
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
-      testDataDir() + "/libbootstrap_no_op.so", false, context);
+      testDataDir() + "/libbootstrap_no_op.so", false);
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
   auto config = newDynamicModuleBootstrapExtensionConfig(
@@ -40,9 +38,8 @@ TEST_F(ExtensionConfigTest, LoadOK) {
 }
 
 TEST_F(ExtensionConfigTest, ConfigNewFail) {
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
-      testDataDir() + "/libbootstrap_no_config_new.so", false, context);
+      testDataDir() + "/libbootstrap_no_config_new.so", false);
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
   auto config = newDynamicModuleBootstrapExtensionConfig(
@@ -52,9 +49,8 @@ TEST_F(ExtensionConfigTest, ConfigNewFail) {
 }
 
 TEST_F(ExtensionConfigTest, MissingConfigDestroy) {
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
-      testDataDir() + "/libbootstrap_no_config_destroy.so", false, context);
+      testDataDir() + "/libbootstrap_no_config_destroy.so", false);
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
   auto config = newDynamicModuleBootstrapExtensionConfig(
@@ -65,9 +61,8 @@ TEST_F(ExtensionConfigTest, MissingConfigDestroy) {
 }
 
 TEST_F(ExtensionConfigTest, MissingExtensionNew) {
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
-      testDataDir() + "/libbootstrap_no_extension_new.so", false, context);
+      testDataDir() + "/libbootstrap_no_extension_new.so", false);
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
   auto config = newDynamicModuleBootstrapExtensionConfig(
@@ -78,9 +73,8 @@ TEST_F(ExtensionConfigTest, MissingExtensionNew) {
 }
 
 TEST_F(ExtensionConfigTest, MissingServerInitialized) {
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
-      testDataDir() + "/libbootstrap_no_server_initialized.so", false, context);
+      testDataDir() + "/libbootstrap_no_server_initialized.so", false);
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
   auto config = newDynamicModuleBootstrapExtensionConfig(
@@ -91,9 +85,8 @@ TEST_F(ExtensionConfigTest, MissingServerInitialized) {
 }
 
 TEST_F(ExtensionConfigTest, MissingWorkerThreadInitialized) {
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
-      testDataDir() + "/libbootstrap_no_worker_initialized.so", false, context);
+      testDataDir() + "/libbootstrap_no_worker_initialized.so", false);
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
   auto config = newDynamicModuleBootstrapExtensionConfig(
@@ -105,9 +98,8 @@ TEST_F(ExtensionConfigTest, MissingWorkerThreadInitialized) {
 }
 
 TEST_F(ExtensionConfigTest, MissingExtensionDestroy) {
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
-      testDataDir() + "/libbootstrap_no_extension_destroy.so", false, context);
+      testDataDir() + "/libbootstrap_no_extension_destroy.so", false);
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
   auto config = newDynamicModuleBootstrapExtensionConfig(
@@ -120,9 +112,8 @@ TEST_F(ExtensionConfigTest, MissingExtensionDestroy) {
 TEST_F(ExtensionConfigTest, MissingConstructor) {
   // Test that config creation fails when envoy_dynamic_module_on_bootstrap_extension_config_new
   // symbol is missing.
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
-      testDataDir() + "/libbootstrap_no_constructor.so", false, context);
+      testDataDir() + "/libbootstrap_no_constructor.so", false);
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
   auto config = newDynamicModuleBootstrapExtensionConfig(

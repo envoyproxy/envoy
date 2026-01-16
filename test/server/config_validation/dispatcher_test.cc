@@ -27,7 +27,7 @@ public:
     validation_ = std::make_unique<Api::ValidationImpl>(
         Thread::threadFactoryForTest(), stats_store_, test_time_.timeSystem(),
         Filesystem::fileSystemForTest(), random_generator_, bootstrap_);
-    dispatcher_ = validation_->allocateDispatcher("test_thread");
+    dispatcher_ = validation_->allocateDispatcher("test_thread", absl::nullopt);
   }
 
   DangerousDeprecatedTestTime test_time_;

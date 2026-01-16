@@ -4,7 +4,6 @@
 
 #include "test/extensions/dynamic_modules/util.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {
@@ -15,9 +14,8 @@ namespace DynamicModules {
 class DynamicModuleUdpListenerFilterTest : public testing::Test {
 public:
   void SetUp() override {
-    NiceMock<Server::Configuration::MockServerFactoryContext> context;
     auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
-        Extensions::DynamicModules::testSharedObjectPath("udp_no_op", "c"), false, context);
+        Extensions::DynamicModules::testSharedObjectPath("udp_no_op", "c"), false);
     EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
     envoy::extensions::filters::udp::dynamic_modules::v3::DynamicModuleUdpListenerFilter
@@ -59,10 +57,9 @@ TEST_F(DynamicModuleUdpListenerFilterTest, ReceiveError) {
 }
 
 TEST_F(DynamicModuleUdpListenerFilterTest, ConfigMissingSymbols) {
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   // Use the no_op module which lacks UDP symbols.
   auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
-      Extensions::DynamicModules::testSharedObjectPath("no_op", "c"), false, context);
+      Extensions::DynamicModules::testSharedObjectPath("no_op", "c"), false);
   EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
   envoy::extensions::filters::udp::dynamic_modules::v3::DynamicModuleUdpListenerFilter proto_config;
@@ -79,10 +76,9 @@ TEST_F(DynamicModuleUdpListenerFilterTest, ConfigMissingSymbols) {
 TEST_F(DynamicModuleUdpListenerFilterTest, NullInModuleFilter) {
   NiceMock<Network::MockUdpReadFilterCallbacks> callbacks;
 
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   // Create a separate config that returns null from on_filter_new.
   auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
-      Extensions::DynamicModules::testSharedObjectPath("udp_no_op", "c"), false, context);
+      Extensions::DynamicModules::testSharedObjectPath("udp_no_op", "c"), false);
   EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
   envoy::extensions::filters::udp::dynamic_modules::v3::DynamicModuleUdpListenerFilter proto_config;
@@ -146,9 +142,8 @@ TEST_F(DynamicModuleUdpListenerFilterTest, MultipleReceiveErrors) {
 }
 
 TEST_F(DynamicModuleUdpListenerFilterTest, FilterConfigWithEmptyName) {
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
-      Extensions::DynamicModules::testSharedObjectPath("udp_no_op", "c"), false, context);
+      Extensions::DynamicModules::testSharedObjectPath("udp_no_op", "c"), false);
   EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
   envoy::extensions::filters::udp::dynamic_modules::v3::DynamicModuleUdpListenerFilter proto_config;
@@ -161,9 +156,8 @@ TEST_F(DynamicModuleUdpListenerFilterTest, FilterConfigWithEmptyName) {
 }
 
 TEST_F(DynamicModuleUdpListenerFilterTest, FilterConfigWithNoConfig) {
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
-      Extensions::DynamicModules::testSharedObjectPath("udp_no_op", "c"), false, context);
+      Extensions::DynamicModules::testSharedObjectPath("udp_no_op", "c"), false);
   EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
   envoy::extensions::filters::udp::dynamic_modules::v3::DynamicModuleUdpListenerFilter proto_config;
@@ -218,10 +212,8 @@ TEST_F(DynamicModuleUdpListenerFilterTest, CurrentDataAccessor) {
 class DynamicModuleUdpListenerFilterStopIterationTest : public testing::Test {
 public:
   void SetUp() override {
-    NiceMock<Server::Configuration::MockServerFactoryContext> context;
     auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
-        Extensions::DynamicModules::testSharedObjectPath("udp_stop_iteration", "c"), false,
-        context);
+        Extensions::DynamicModules::testSharedObjectPath("udp_stop_iteration", "c"), false);
     EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
     envoy::extensions::filters::udp::dynamic_modules::v3::DynamicModuleUdpListenerFilter
@@ -251,10 +243,8 @@ TEST_F(DynamicModuleUdpListenerFilterStopIterationTest, ReturnsStopIteration) {
 // Test for missing config_destroy symbol.
 TEST(DynamicModuleUdpListenerFilterConfigErrorTest, MissingConfigDestroy) {
   Stats::IsolatedStoreImpl stats;
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
-      Extensions::DynamicModules::testSharedObjectPath("udp_no_config_destroy", "c"), false,
-      context);
+      Extensions::DynamicModules::testSharedObjectPath("udp_no_config_destroy", "c"), false);
   EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
   envoy::extensions::filters::udp::dynamic_modules::v3::DynamicModuleUdpListenerFilter proto_config;
@@ -272,9 +262,8 @@ TEST(DynamicModuleUdpListenerFilterConfigErrorTest, MissingConfigDestroy) {
 // Test for missing filter_new symbol.
 TEST(DynamicModuleUdpListenerFilterConfigErrorTest, MissingFilterNew) {
   Stats::IsolatedStoreImpl stats;
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
-      Extensions::DynamicModules::testSharedObjectPath("udp_no_filter_new", "c"), false, context);
+      Extensions::DynamicModules::testSharedObjectPath("udp_no_filter_new", "c"), false);
   EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
   envoy::extensions::filters::udp::dynamic_modules::v3::DynamicModuleUdpListenerFilter proto_config;
@@ -291,9 +280,8 @@ TEST(DynamicModuleUdpListenerFilterConfigErrorTest, MissingFilterNew) {
 // Test for missing on_data symbol.
 TEST(DynamicModuleUdpListenerFilterConfigErrorTest, MissingOnData) {
   Stats::IsolatedStoreImpl stats;
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
-      Extensions::DynamicModules::testSharedObjectPath("udp_no_on_data", "c"), false, context);
+      Extensions::DynamicModules::testSharedObjectPath("udp_no_on_data", "c"), false);
   EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
   envoy::extensions::filters::udp::dynamic_modules::v3::DynamicModuleUdpListenerFilter proto_config;
@@ -310,10 +298,8 @@ TEST(DynamicModuleUdpListenerFilterConfigErrorTest, MissingOnData) {
 // Test for missing filter_destroy symbol.
 TEST(DynamicModuleUdpListenerFilterConfigErrorTest, MissingFilterDestroy) {
   Stats::IsolatedStoreImpl stats;
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
-      Extensions::DynamicModules::testSharedObjectPath("udp_no_filter_destroy", "c"), false,
-      context);
+      Extensions::DynamicModules::testSharedObjectPath("udp_no_filter_destroy", "c"), false);
   EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
   envoy::extensions::filters::udp::dynamic_modules::v3::DynamicModuleUdpListenerFilter proto_config;

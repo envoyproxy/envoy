@@ -17,7 +17,7 @@ constexpr char DYNAMIC_MODULES_SEARCH_PATH[] = "ENVOY_DYNAMIC_MODULES_SEARCH_PAT
 
 absl::StatusOr<DynamicModulePtr>
 newDynamicModule(const std::filesystem::path& object_file_absolute_path, const bool do_not_close,
-                 Server::Configuration::ServerFactoryContext& context, const bool load_globally) {
+                 const bool load_globally) {
   // From the man page of dlopen(3):
   //
   // > This can be used to test if the object is already resident (dlopen() returns NULL if it
@@ -59,7 +59,7 @@ newDynamicModule(const std::filesystem::path& object_file_absolute_path, const b
     return init_function.status();
   }
 
-  const char* abi_version = (*init_function.value())(&context);
+  const char* abi_version = (*init_function.value())();
   if (abi_version == nullptr) {
     return absl::InvalidArgumentError(
         absl::StrCat("Failed to initialize dynamic module: ", object_file_absolute_path.c_str()));
@@ -74,7 +74,6 @@ newDynamicModule(const std::filesystem::path& object_file_absolute_path, const b
 
 absl::StatusOr<DynamicModulePtr>
 newDynamicModuleByName(const absl::string_view module_name, const bool do_not_close,
-                       Server::Configuration::ServerFactoryContext& context,
                        const bool load_globally) {
   // First, try ENVOY_DYNAMIC_MODULES_SEARCH_PATH which falls back to the current directory.
   const char* module_search_path = getenv(DYNAMIC_MODULES_SEARCH_PATH);
@@ -86,7 +85,7 @@ newDynamicModuleByName(const absl::string_view module_name, const bool do_not_cl
   const std::filesystem::path file_path_absolute = std::filesystem::absolute(file_path);
   if (std::filesystem::exists(file_path_absolute)) {
     absl::StatusOr<DynamicModulePtr> dynamic_module =
-        newDynamicModule(file_path_absolute, do_not_close, context, load_globally);
+        newDynamicModule(file_path_absolute, do_not_close, load_globally);
     // If the file exists but failed to load, return the error without trying other paths.
     // This allows the user to get the detailed error message such as missing dependencies, ABI
     // mismatch, etc.
@@ -102,7 +101,7 @@ newDynamicModuleByName(const absl::string_view module_name, const bool do_not_cl
   //
   // which basically says dlopen searches for LD_LIBRARY_PATH and /usr/lib, etc.
   absl::StatusOr<DynamicModulePtr> dynamic_module =
-      newDynamicModule(fmt::format("lib{}.so", module_name), do_not_close, context, load_globally);
+      newDynamicModule(fmt::format("lib{}.so", module_name), do_not_close, load_globally);
   if (dynamic_module.ok()) {
     return dynamic_module;
   }

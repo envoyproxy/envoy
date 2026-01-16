@@ -11,7 +11,6 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
@@ -26,9 +25,8 @@ namespace NetworkFilters {
 class DynamicModuleNetworkFilterAbiCallbackTest : public testing::Test {
 public:
   void SetUp() override {
-    NiceMock<Server::Configuration::MockServerFactoryContext> context;
     auto dynamic_module =
-        newDynamicModule(testSharedObjectPath("network_no_op", "c"), false, context);
+        newDynamicModule(testSharedObjectPath("network_no_op", "c"), false);
     EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
     auto filter_config_or_status = newDynamicModuleNetworkFilterConfig(
@@ -1240,9 +1238,8 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, ListSocketOptions) {
 class DynamicModuleNetworkFilterHttpCalloutTest : public testing::Test {
 public:
   void SetUp() override {
-    NiceMock<Server::Configuration::MockServerFactoryContext> context;
     auto dynamic_module =
-        newDynamicModule(testSharedObjectPath("network_no_op", "c"), false, context);
+        newDynamicModule(testSharedObjectPath("network_no_op", "c"), false);
     EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
     auto filter_config_or_status = newDynamicModuleNetworkFilterConfig(

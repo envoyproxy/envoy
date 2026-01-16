@@ -46,11 +46,19 @@ void envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level level
   }
 }
 
-uint32_t envoy_dynamic_module_callback_server_factory_context_get_concurrency(
-    envoy_dynamic_module_type_server_factory_context_envoy_ptr server_factory_context_envoy_ptr) {
-  auto context = static_cast<Envoy::Server::Configuration::ServerFactoryContext*>(
-      server_factory_context_envoy_ptr);
-  return context->options().concurrency();
+uint32_t envoy_dynamic_module_callback_get_concurrency() {
+  using namespace Envoy;
+  TRY_ASSERT_MAIN_THREAD {
+    auto context = Server::Configuration::ServerFactoryContextInstance::getExisting();
+    return context->options().concurrency();
+  }
+  END_TRY
+  catch (const EnvoyException& e) {
+   ENVOY_LOG_MISC(critical, "error during get_concurrency: {}",
+            e.what());
+   return 0;
+  }
+}
 
 // ---------------------- Bootstrap extension scheduler callbacks ------------------------
 // These are weak symbols that provide default stub implementations. The actual implementations

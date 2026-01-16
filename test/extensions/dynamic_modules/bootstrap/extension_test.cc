@@ -1,6 +1,5 @@
 #include "source/extensions/bootstrap/dynamic_modules/extension.h"
 
-#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/event/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
@@ -25,9 +24,8 @@ TEST_F(ExtensionTest, NullInModuleExtension) {
   // Test that onServerInitialized and onWorkerThreadInitialized do not crash when
   // in_module_extension_ is nullptr (i.e., when initializeInModuleExtension is not called or
   // extension_new returns nullptr).
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
-      testDataDir() + "/libbootstrap_extension_new_null.so", false, context);
+      testDataDir() + "/libbootstrap_extension_new_null.so", false);
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
   auto config = newDynamicModuleBootstrapExtensionConfig(
@@ -52,9 +50,8 @@ TEST_F(ExtensionTest, NullInModuleExtension) {
 
 TEST_F(ExtensionTest, IsDestroyedAndGetExtensionConfig) {
   // Test that isDestroyed and getExtensionConfig work correctly.
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
-      testDataDir() + "/libbootstrap_no_op.so", false, context);
+      testDataDir() + "/libbootstrap_no_op.so", false);
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
   auto config = newDynamicModuleBootstrapExtensionConfig(
@@ -79,9 +76,8 @@ TEST_F(ExtensionTest, IsDestroyedAndGetExtensionConfig) {
 
 TEST_F(ExtensionTest, LifecycleWithValidExtension) {
   // Test the full lifecycle of a valid extension.
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
-      testDataDir() + "/libbootstrap_no_op.so", false, context);
+      testDataDir() + "/libbootstrap_no_op.so", false);
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
   auto config = newDynamicModuleBootstrapExtensionConfig(
