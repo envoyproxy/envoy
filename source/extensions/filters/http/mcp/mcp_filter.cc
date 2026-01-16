@@ -267,7 +267,7 @@ Http::FilterDataStatus McpFilter::completeParsing() {
 
     decoder_callbacks_->streamInfo().setDynamicMetadata(std::string(MetadataKeys::FilterName),
                                                         metadata);
-    ENVOY_LOG(debug, "MCP filter set FilterState and dynamic metadata");
+    ENVOY_LOG(debug, "MCP filter set dynamic metadata: {}", metadata.DebugString());
 
     if (config_->clearRouteCache()) {
       if (auto cb = decoder_callbacks_->downstreamCallbacks(); cb.has_value()) {

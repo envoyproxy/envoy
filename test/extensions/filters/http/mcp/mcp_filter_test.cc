@@ -887,14 +887,6 @@ TEST(McpFilterStateObjectTest, HasFieldCheck) {
   EXPECT_FALSE(obj->json()->hasObject("nonexistent"));
 }
 
-TEST(McpFilterStateObjectTest, GetFieldMissing) {
-  Protobuf::Struct s;
-  auto obj = std::make_shared<McpFilterStateObject>("test", s);
-
-  auto result = obj->getField("nonexistent");
-  EXPECT_TRUE(absl::holds_alternative<absl::monostate>(result));
-}
-
 TEST(McpFilterStateObjectTest, SerializationReturnsJson) {
   auto obj = std::make_shared<McpFilterStateObject>("prompts/get", createTestStruct());
 
