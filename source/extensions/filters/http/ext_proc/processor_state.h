@@ -289,6 +289,14 @@ public:
    */
   virtual bool canFailOpen() const;
 
+  // Check whether this is the last response from the ext_proc server after
+  // the header response is received and processed.
+  bool isLastResponseAfterHeaderResp() const;
+
+  // Check whether this is the last response from the ext_proc server after
+  // a body response is received and processed.
+  bool isLastResponseAfterBodyResp(bool eos_seen_in_body) const;
+
 protected:
   void setBodyMode(
       envoy::extensions::filters::http::ext_proc::v3::ProcessingMode_BodySendMode body_mode);
@@ -532,7 +540,7 @@ public:
     decoder_callbacks_->injectDecodedDataToFilterChain(data, end_stream);
   }
 
-  uint32_t bufferLimit() const override { return decoder_callbacks_->decoderBufferLimit(); }
+  uint32_t bufferLimit() const override { return decoder_callbacks_->bufferLimit(); }
 
   Http::HeaderMap* addTrailers() override {
     trailers_ = &decoder_callbacks_->addDecodedTrailers();
@@ -677,7 +685,7 @@ public:
     encoder_callbacks_->injectEncodedDataToFilterChain(data, end_stream);
   }
 
-  uint32_t bufferLimit() const override { return encoder_callbacks_->encoderBufferLimit(); }
+  uint32_t bufferLimit() const override { return encoder_callbacks_->bufferLimit(); }
 
   Http::HeaderMap* addTrailers() override {
     trailers_ = &encoder_callbacks_->addEncodedTrailers();

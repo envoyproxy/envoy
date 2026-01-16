@@ -15,6 +15,7 @@
 #include "source/extensions/filters/http/mcp_router/session_codec.h"
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/status/statusor.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -100,6 +101,8 @@ public:
 private:
   bool readMetadataFromMcpFilter();
   bool decodeAndParseSession();
+  absl::StatusOr<std::string> getAuthenticatedSubject();
+  bool validateSubjectIfRequired();
 
   std::pair<std::string, std::string> parseToolName(const std::string& prefixed_name);
   // Rewrites the tool name in the buffer. Returns the size delta (new_size - old_size).

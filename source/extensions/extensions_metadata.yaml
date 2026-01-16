@@ -1,3 +1,10 @@
+envoy.access_loggers.dynamic_modules:
+  categories:
+  - envoy.access_loggers
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.access_loggers.dynamic_modules.v3.DynamicModuleAccessLog
 envoy.access_loggers.file:
   categories:
   - envoy.access_loggers
@@ -89,6 +96,13 @@ envoy.bootstrap.wasm:
   status: alpha
   type_urls:
   - envoy.extensions.wasm.v3.WasmService
+envoy.bootstrap.dynamic_modules:
+  categories:
+  - envoy.bootstrap
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.bootstrap.dynamic_modules.v3.DynamicModuleBootstrapExtension
 envoy.bootstrap.reverse_tunnel.downstream_socket_interface:
   categories:
   - envoy.bootstrap
@@ -945,6 +959,13 @@ envoy.filters.udp.dns_filter:
   status: stable
   type_urls:
   - envoy.extensions.filters.udp.dns_filter.v3.DnsFilterConfig
+envoy.filters.udp_listener.dynamic_modules:
+  categories:
+  - envoy.filters.udp_listener
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.udp.dynamic_modules.v3.DynamicModuleUdpListenerFilter
 envoy.filters.udp_listener.udp_proxy:
   categories:
   - envoy.filters.udp_listener
@@ -1167,6 +1188,13 @@ envoy.path.rewrite.uri_template.uri_template_rewriter:
   undocumented: true
   type_urls:
   - envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
+envoy.quic.packet_writer.default:
+  categories:
+  - envoy.quic.client_packet_writer
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: stable
+  type_urls:
+  - envoy.extensions.quic.client_writer_factory.v3.DefaultClientWriter
 envoy.quic.proof_source.filter_chain:
   categories:
   - envoy.quic.proof_source

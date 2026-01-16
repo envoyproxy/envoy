@@ -1,8 +1,8 @@
 diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
-index 71f0010bb..84440477a 100644
+index 2400d01..780ddf0 100644
 --- a/src/CMakeLists.txt
 +++ b/src/CMakeLists.txt
-@@ -35,13 +35,7 @@ include(cmake/ccache.cmake)
+@@ -35,12 +35,7 @@ include(cmake/ccache.cmake)
  ##############################################################################
  # VPP Version
  ##############################################################################
@@ -12,24 +12,24 @@ index 71f0010bb..84440477a 100644
 -  OUTPUT_VARIABLE VPP_VERSION
 -  OUTPUT_STRIP_TRAILING_WHITESPACE
 -)
--
-+set(VPP_VERSION 25.10-dev)
++set(VPP_VERSION 26.02-dev)
+ 
  if (VPP_PLATFORM)
    set(VPP_VERSION ${VPP_VERSION}-${VPP_PLATFORM_NAME})
- endif()
-@@ -263,8 +257,8 @@ if(VPP_HOST_TOOLS_ONLY)
+@@ -264,9 +259,8 @@ if(VPP_HOST_TOOLS_ONLY)
  elseif(${CMAKE_SYSTEM_NAME} MATCHES "Linux|FreeBSD")
    find_package(OpenSSL)
    set(SUBDIRS
 -    vppinfra svm vlib vlibmemory vlibapi vnet vpp vat vat2 vcl vpp-api
--    plugins crypto_engines tools/vppapigen tools/g2 tools/perftool cmake pkg
+-    plugins drivers crypto_engines tools/vppapigen tools/g2 tools/perftool cmake
+-    pkg
 +    vppinfra svm vlib vnet vpp vcl
 +    cmake pkg
      tools/appimage
    )
  elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
 diff --git a/src/cmake/ccache.cmake b/src/cmake/ccache.cmake
-index a7b395bc6..d6a4c5b30 100644
+index a7b395b..d6a4c5b 100644
 --- a/src/cmake/ccache.cmake
 +++ b/src/cmake/ccache.cmake
 @@ -14,7 +14,7 @@
@@ -42,7 +42,7 @@ index a7b395bc6..d6a4c5b30 100644
    find_program(CCACHE_FOUND ccache)
    message(STATUS "Looking for ccache")
 diff --git a/src/cmake/library.cmake b/src/cmake/library.cmake
-index a06a795c6..eea0c73d3 100644
+index a06a795..eea0c73 100644
 --- a/src/cmake/library.cmake
 +++ b/src/cmake/library.cmake
 @@ -24,7 +24,7 @@ macro(add_vpp_library lib)
@@ -55,7 +55,7 @@ index a06a795c6..eea0c73d3 100644
  
    if(VPP_LIB_VERSION)
 diff --git a/src/vcl/CMakeLists.txt b/src/vcl/CMakeLists.txt
-index 473e40346..95d298268 100644
+index 473e403..95d2982 100644
 --- a/src/vcl/CMakeLists.txt
 +++ b/src/vcl/CMakeLists.txt
 @@ -20,7 +20,7 @@ if(NOT VPP_BUILD_VCL)
@@ -77,7 +77,7 @@ index 473e40346..95d298268 100644
    message("WARNING: vcl_ldpreload isn't supported on FreeBSD - disabled")
  else()
 diff --git a/src/vppinfra/CMakeLists.txt b/src/vppinfra/CMakeLists.txt
-index 131f5a5b5..2397ef6c9 100644
+index f0c7d58..a7c50d3 100644
 --- a/src/vppinfra/CMakeLists.txt
 +++ b/src/vppinfra/CMakeLists.txt
 @@ -27,7 +27,7 @@ vpp_find_library(LIBUNWIND_LIB NAMES unwind libunwind)
@@ -89,34 +89,18 @@ index 131f5a5b5..2397ef6c9 100644
  else()
    message(WARNING "libunwind not found - stack traces disabled")
    add_definitions(-DHAVE_LIBUNWIND=0)
-@@ -58,10 +58,6 @@ install(
+@@ -60,10 +60,6 @@ install(
  
  add_definitions(-fvisibility=hidden)
  
 -# Ensure symbols from cJSON are exported
--set_source_files_properties( cJSON.c jsonformat.c PROPERTIES
+-set_source_files_properties( cJSON.c PROPERTIES
 -  COMPILE_DEFINITIONS " CJSON_API_VISIBILITY " )
 -
  ##############################################################################
  # vppinfra sources
  ##############################################################################
-@@ -80,7 +76,6 @@ set(VPPINFRA_SRCS
-   hash.c
-   heap.c
-   interrupt.c
--  jsonformat.c
-   longjmp.S
-   macros.c
-   maplog.c
-@@ -169,7 +164,6 @@ set(VPPINFRA_HEADERS
-   hash.h
-   heap.h
-   interrupt.h
--  jsonformat.h
-   lb_hash_hash.h
-   llist.h
-   lock.h
-@@ -253,13 +247,26 @@ elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "FreeBSD")
+@@ -261,13 +257,26 @@ elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "FreeBSD")
     )
  endif()
  

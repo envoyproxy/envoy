@@ -50,13 +50,15 @@ using OnHttpFilterDownstreamAboveWriteBufferHighWatermark =
     decltype(&envoy_dynamic_module_on_http_filter_downstream_above_write_buffer_high_watermark);
 using OnHttpFilterDownstreamBelowWriteBufferLowWatermark =
     decltype(&envoy_dynamic_module_on_http_filter_downstream_below_write_buffer_low_watermark);
+using OnHttpFilterConfigScheduled = decltype(&envoy_dynamic_module_on_http_filter_config_scheduled);
 
 /**
  * A config to create http filters based on a dynamic module. This will be owned by multiple
  * filter instances. This resolves and holds the symbols used for the HTTP filters.
  * Each filter instance and the factory callback holds a shared pointer to this config.
  */
-class DynamicModuleHttpFilterConfig {
+class DynamicModuleHttpFilterConfig
+    : public std::enable_shared_from_this<DynamicModuleHttpFilterConfig> {
 public:
   /**
    * Constructor for the config.
@@ -99,8 +101,10 @@ public:
       on_http_filter_downstream_above_write_buffer_high_watermark_ = nullptr;
   OnHttpFilterDownstreamBelowWriteBufferLowWatermark
       on_http_filter_downstream_below_write_buffer_low_watermark_ = nullptr;
+  OnHttpFilterConfigScheduled on_http_filter_config_scheduled_ = nullptr;
 
   Envoy::Upstream::ClusterManager& cluster_manager_;
+  Event::Dispatcher& main_thread_dispatcher_;
   const Stats::ScopeSharedPtr stats_scope_;
   Stats::StatNamePool stat_name_pool_;
   // We only allow the module to create stats during envoy_dynamic_module_on_http_filter_config_new,
@@ -302,6 +306,31 @@ private:
 
   // The handle for the module.
   Extensions::DynamicModules::DynamicModulePtr dynamic_module_;
+
+public:
+  /**
+   * This is called when an event is scheduled via DynamicModuleHttpFilterConfigScheduler::commit.
+   */
+  void onScheduled(uint64_t event_id);
+};
+
+class DynamicModuleHttpFilterConfigScheduler {
+public:
+  DynamicModuleHttpFilterConfigScheduler(std::weak_ptr<DynamicModuleHttpFilterConfig> config,
+                                         Event::Dispatcher& dispatcher)
+      : config_(std::move(config)), dispatcher_(dispatcher) {}
+
+  void commit(uint64_t event_id) {
+    dispatcher_.post([config = config_, event_id]() {
+      if (std::shared_ptr<DynamicModuleHttpFilterConfig> config_shared = config.lock()) {
+        config_shared->onScheduled(event_id);
+      }
+    });
+  }
+
+private:
+  std::weak_ptr<DynamicModuleHttpFilterConfig> config_;
+  Event::Dispatcher& dispatcher_;
 };
 
 class DynamicModuleHttpPerRouteFilterConfig : public Router::RouteSpecificFilterConfig {

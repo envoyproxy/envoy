@@ -99,6 +99,7 @@ categories:
 - envoy.tls.certificate_mappers
 - envoy.tls.key_providers
 - envoy.upstream_options
+- envoy.quic.client_packet_writer
 - envoy.quic.connection_debug_visitor
 - envoy.quic.connection_id_generator
 - envoy.quic.proof_source

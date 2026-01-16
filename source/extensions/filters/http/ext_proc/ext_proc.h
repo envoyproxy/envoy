@@ -646,7 +646,7 @@ private:
   // This stream closing optimization only applies to STREAMED or FULL_DUPLEX_STREAMED body modes.
   // For other body modes like BUFFERED or BUFFERED_PARTIAL, it is ignored.
   void closeGrpcStreamIfLastRespReceived(const ProcessingResponse& response,
-                                         const bool is_last_body_resp);
+                                         const bool eos_seen_in_body);
   absl::Status handleStreamingImmediateResponse(
       const envoy::service::ext_proc::v3::StreamedImmediateResponse& response);
 
