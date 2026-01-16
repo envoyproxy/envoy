@@ -309,9 +309,10 @@ def envoy_benchmark_test(
     sh_test(
         name = name,
         srcs = [repository + "//bazel:test_for_benchmark_wrapper.sh"],
+        deps = ["@bazel_tools//tools/bash/runfiles"],
         data = [":" + benchmark_binary] + data,
         exec_properties = exec_properties,
-        args = ["%s/%s" % (native.package_name(), benchmark_binary)],
+        args = ["$(rlocationpath %s)" % native.package_relative_label(benchmark_binary)],
         tags = tags + ["nocoverage"],
         **kargs
     )
