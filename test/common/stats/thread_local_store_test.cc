@@ -1709,8 +1709,8 @@ TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithTlsRealSymbolTable) {
   Memory::TestUtil::MemoryTest memory_test;
   TestUtil::forEachSampleStat(
       100, true, [this](absl::string_view name) { scope_.counterFromString(std::string(name)); });
-  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 827616); // Sep 25, 2020
-  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 0.99 * million_);
+  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 994856); // Updated for tcmalloc bump 12f2552
+  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 1.05 * million_);  // Increased from 0.99 to 1.05
 }
 
 TEST_F(StatsThreadLocalStoreTest, ShuttingDown) {
