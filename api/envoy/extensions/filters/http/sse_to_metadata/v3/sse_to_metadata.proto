@@ -18,7 +18,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: SSE-To-Metadata Filter]
 //
 // The SSE-To-Metadata filter extracts values from Server-Sent Events (SSE) HTTP response bodies
-// and writes them to dynamic metadata. This is useful for LLM token usage tracking, 
+// and writes them to dynamic metadata. This is useful for LLM token usage tracking,
 // logging, and other observability use cases.
 //
 // The filter specifically handles SSE format (text/event-stream) and uses pluggable content

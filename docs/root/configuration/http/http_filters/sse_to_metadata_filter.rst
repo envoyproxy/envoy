@@ -31,7 +31,7 @@ Use Cases
 Large Language Model (LLM) APIs like OpenAI return token usage information at the end of streaming responses.
 This filter can extract the token count and other metadata, making it available for logging, metrics, and observability:
 
-.. literalinclude:: _include/stream-to-metadata-filter.yaml
+.. literalinclude:: _include/sse-to-metadata-filter.yaml
     :language: yaml
     :lines: 25-46
     :lineno-start: 25
@@ -106,12 +106,12 @@ Configuration
 Complete Example
 ~~~~~~~~~~~~~~~~
 
-.. literalinclude:: _include/stream-to-metadata-filter.yaml
+.. literalinclude:: _include/sse-to-metadata-filter.yaml
     :language: yaml
     :lines: 33-51
     :lineno-start: 33
     :linenos:
-    :caption: :download:`stream-to-metadata-filter.yaml <_include/stream-to-metadata-filter.yaml>`
+    :caption: :download:`sse-to-metadata-filter.yaml <_include/sse-to-metadata-filter.yaml>`
 
 Key Configuration Options
 ~~~~~~~~~~~~~~~~~~~~~~~~~
