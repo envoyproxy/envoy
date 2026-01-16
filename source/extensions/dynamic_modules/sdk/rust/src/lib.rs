@@ -6442,6 +6442,34 @@ pub trait EnvoyBootstrapExtensionConfig {
   ///
   /// This can be used to schedule an event to the main thread where the config is running.
   fn new_scheduler(&self) -> Box<dyn EnvoyBootstrapExtensionConfigScheduler>;
+
+  /// Send an HTTP callout to the given cluster with the given headers and optional body.
+  ///
+  /// Headers must contain the `:method`, `:path`, and `host` headers.
+  ///
+  /// This returns a tuple of (status, callout_id):
+  ///   * Success + valid callout_id: The callout was started successfully. The callout ID can be
+  ///     used to correlate the response in [`BootstrapExtensionConfig::on_http_callout_done`].
+  ///   * ClusterNotFound: The cluster does not exist.
+  ///   * MissingRequiredHeaders: The headers are missing required headers.
+  ///   * CannotCreateRequest: The request could not be created, e.g., there's no healthy upstream
+  ///     host in the cluster.
+  ///
+  /// The callout result will be delivered to the [`BootstrapExtensionConfig::on_http_callout_done`]
+  /// method.
+  ///
+  /// This must be called on the main thread. To call from other threads, use the scheduler
+  /// mechanism to post an event to the main thread first.
+  fn send_http_callout<'a>(
+    &mut self,
+    _cluster_name: &'a str,
+    _headers: Vec<(&'a str, &'a [u8])>,
+    _body: Option<&'a [u8]>,
+    _timeout_milliseconds: u64,
+  ) -> (
+    abi::envoy_dynamic_module_type_http_callout_init_result,
+    u64, // callout id
+  );
 }
 
 /// EnvoyBootstrapExtension is the Envoy-side bootstrap extension.
@@ -6477,6 +6505,24 @@ pub trait BootstrapExtensionConfig: Send + Sync {
     &self,
     _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
     _event_id: u64,
+  ) {
+  }
+
+  /// This is called when an HTTP callout response is received.
+  ///
+  /// * `envoy_extension_config` can be used to interact with the underlying Envoy config object.
+  /// * `callout_id` is the ID of the callout returned by
+  ///   [`EnvoyBootstrapExtensionConfig::send_http_callout`].
+  /// * `result` is the result of the callout.
+  /// * `response_headers` is a list of key-value pairs of the response headers. This is optional.
+  /// * `response_body` is the response body. This is optional.
+  fn on_http_callout_done(
+    &self,
+    _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _callout_id: u64,
+    _result: abi::envoy_dynamic_module_type_http_callout_result,
+    _response_headers: Option<&[(EnvoyBuffer, EnvoyBuffer)]>,
+    _response_body: Option<&[EnvoyBuffer]>,
   ) {
   }
 }
@@ -6562,6 +6608,47 @@ impl EnvoyBootstrapExtensionConfig for EnvoyBootstrapExtensionConfigImpl {
         raw_ptr: scheduler_ptr,
       })
     }
+  }
+
+  fn send_http_callout<'a>(
+    &mut self,
+    cluster_name: &'a str,
+    headers: Vec<(&'a str, &'a [u8])>,
+    body: Option<&'a [u8]>,
+    timeout_milliseconds: u64,
+  ) -> (abi::envoy_dynamic_module_type_http_callout_init_result, u64) {
+    let body_ptr = body.map(|s| s.as_ptr()).unwrap_or(std::ptr::null());
+    let body_length = body.map(|s| s.len()).unwrap_or(0);
+
+    // Convert headers to module HTTP headers.
+    let module_headers: Vec<abi::envoy_dynamic_module_type_module_http_header> = headers
+      .iter()
+      .map(|(k, v)| abi::envoy_dynamic_module_type_module_http_header {
+        key_ptr: k.as_ptr() as *const _,
+        key_length: k.len(),
+        value_ptr: v.as_ptr() as *const _,
+        value_length: v.len(),
+      })
+      .collect();
+
+    let mut callout_id: u64 = 0;
+
+    let result = unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_http_callout(
+        self.raw,
+        &mut callout_id as *mut _ as *mut _,
+        str_to_module_buffer(cluster_name),
+        module_headers.as_ptr() as *mut _,
+        module_headers.len(),
+        abi::envoy_dynamic_module_type_module_buffer {
+          ptr: body_ptr as *mut _,
+          length: body_length,
+        },
+        timeout_milliseconds,
+      )
+    };
+
+    (result, callout_id)
   }
 }
 
@@ -6689,6 +6776,48 @@ pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_config_scheduled(
   extension_config.on_scheduled(
     &mut EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr),
     event_id,
+  );
+}
+
+/// Event hook called by Envoy when an HTTP callout initiated by a bootstrap extension completes.
+///
+/// # Safety
+/// This function is unsafe because it dereferences raw pointers passed from Envoy. The caller
+/// must ensure that all pointers are valid and that the memory they point to remains valid for
+/// the duration of the function call.
+#[no_mangle]
+pub unsafe extern "C" fn envoy_dynamic_module_on_bootstrap_extension_http_callout_done(
+  envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
+  callout_id: u64,
+  result: abi::envoy_dynamic_module_type_http_callout_result,
+  headers: *const abi::envoy_dynamic_module_type_envoy_http_header,
+  headers_size: usize,
+  body_chunks: *const abi::envoy_dynamic_module_type_envoy_buffer,
+  body_chunks_size: usize,
+) {
+  let extension_config = extension_config_ptr as *const *const dyn BootstrapExtensionConfig;
+  let extension_config = unsafe { &**extension_config };
+
+  let headers = if headers_size > 0 {
+    Some(unsafe {
+      std::slice::from_raw_parts(headers as *const (EnvoyBuffer, EnvoyBuffer), headers_size)
+    })
+  } else {
+    None
+  };
+  let body = if body_chunks_size > 0 {
+    Some(unsafe { std::slice::from_raw_parts(body_chunks as *const EnvoyBuffer, body_chunks_size) })
+  } else {
+    None
+  };
+
+  extension_config.on_http_callout_done(
+    &mut EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr),
+    callout_id,
+    result,
+    headers,
+    body,
   );
 }
 

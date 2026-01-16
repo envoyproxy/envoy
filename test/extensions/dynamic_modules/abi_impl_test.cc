@@ -30,6 +30,20 @@ TEST(CommonAbiImplTest, SchedulerCommitEnvoyBug) {
       "not implemented in this context");
 }
 
+// Test that the weak symbol stub for http_callout triggers an ENVOY_BUG when called.
+TEST(CommonAbiImplTest, HttpCalloutEnvoyBug) {
+  uint64_t callout_id = 0;
+  envoy_dynamic_module_type_module_buffer cluster_name = {"cluster", 7};
+  envoy_dynamic_module_type_module_buffer body = {nullptr, 0};
+  EXPECT_ENVOY_BUG(
+      {
+        auto result = envoy_dynamic_module_callback_bootstrap_extension_http_callout(
+            nullptr, &callout_id, cluster_name, nullptr, 0, body, 5000);
+        EXPECT_EQ(result, envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest);
+      },
+      "not implemented in this context");
+}
+
 } // namespace
 } // namespace DynamicModules
 } // namespace Extensions

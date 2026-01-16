@@ -5231,6 +5231,62 @@ void envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_commit(
     envoy_dynamic_module_type_bootstrap_extension_config_scheduler_module_ptr scheduler_module_ptr,
     uint64_t event_id);
 
+// -----------------------------------------------------------------------------
+// Bootstrap Extension - HTTP Client
+// -----------------------------------------------------------------------------
+
+/**
+ * envoy_dynamic_module_on_bootstrap_extension_http_callout_done is called when the HTTP callout
+ * response is received initiated by a bootstrap extension.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param extension_config_module_ptr is the pointer to the in-module bootstrap extension
+ * configuration created by envoy_dynamic_module_on_bootstrap_extension_config_new.
+ * @param callout_id is the ID of the callout. This is used to differentiate between multiple
+ * calls.
+ * @param result is the result of the callout.
+ * @param headers is the headers of the response.
+ * @param headers_size is the size of the headers.
+ * @param body_chunks is the body of the response.
+ * @param body_chunks_size is the size of the body.
+ *
+ * headers and body_chunks are owned by Envoy, and they are guaranteed to be valid until the end of
+ * this event hook. They may be null if the callout fails or the response is empty.
+ */
+void envoy_dynamic_module_on_bootstrap_extension_http_callout_done(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_module_ptr,
+    uint64_t callout_id, envoy_dynamic_module_type_http_callout_result result,
+    envoy_dynamic_module_type_envoy_http_header* headers, size_t headers_size,
+    envoy_dynamic_module_type_envoy_buffer* body_chunks, size_t body_chunks_size);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_http_callout is called by the module to
+ * initiate an HTTP callout. The callout is initiated by the bootstrap extension and the response
+ * is received in envoy_dynamic_module_on_bootstrap_extension_http_callout_done.
+ *
+ * This must be called on the main thread. To call from other threads, use the scheduler mechanism
+ * to post an event to the main thread first.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param callout_id_out is a pointer to a variable where the callout ID will be stored. This can be
+ * arbitrary and is used to differentiate between multiple calls from the same extension.
+ * @param cluster_name is the name of the cluster to which the callout is sent.
+ * @param headers is the headers of the request. It must contain :method, :path and host headers.
+ * @param headers_size is the size of the headers.
+ * @param body is the body of the request.
+ * @param timeout_milliseconds is the timeout for the callout in milliseconds.
+ * @return envoy_dynamic_module_type_http_callout_init_result is the result of the callout.
+ */
+envoy_dynamic_module_type_http_callout_init_result
+envoy_dynamic_module_callback_bootstrap_extension_http_callout(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    uint64_t* callout_id_out, envoy_dynamic_module_type_module_buffer cluster_name,
+    envoy_dynamic_module_type_module_http_header* headers, size_t headers_size,
+    envoy_dynamic_module_type_module_buffer body, uint64_t timeout_milliseconds);
+
 #ifdef __cplusplus
 }
 #endif
