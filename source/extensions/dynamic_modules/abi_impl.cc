@@ -76,4 +76,15 @@ envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_commit(
                "not implemented in this context");
 }
 
+__attribute__((weak)) envoy_dynamic_module_type_http_callout_init_result
+envoy_dynamic_module_callback_bootstrap_extension_http_callout(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr, uint64_t* /* callout_id_out */,
+    envoy_dynamic_module_type_module_buffer /* cluster_name */,
+    envoy_dynamic_module_type_module_http_header* /* headers */, size_t /* headers_size */,
+    envoy_dynamic_module_type_module_buffer /* body */, uint64_t /* timeout_milliseconds */) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_bootstrap_extension_http_callout: "
+               "not implemented in this context");
+  return envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest;
+}
+
 } // extern "C"
