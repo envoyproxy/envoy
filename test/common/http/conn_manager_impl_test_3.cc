@@ -38,7 +38,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterStopIterationInjectBody) {
 
   // Decode filter 0 injects request body later.
   Buffer::OwnedImpl data("hello");
-  decoder_filters_[0]->callbacks_->injectDecodedDataToFilterChain(data, true);
+  decoder_filters_[0]->callbacks_->injectDecodedDataToFilterChain(data, true, false);
 
   // Encode filter 1 changes end_stream to false.
   EXPECT_CALL(*encoder_filters_[1], encodeHeaders(_, true))
@@ -60,7 +60,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterStopIterationInjectBody) {
 
   // Encode filter 1 injects request body later.
   Buffer::OwnedImpl data2("hello");
-  encoder_filters_[1]->callbacks_->injectEncodedDataToFilterChain(data2, true);
+  encoder_filters_[1]->callbacks_->injectEncodedDataToFilterChain(data2, true, false);
 }
 
 // Filter continues headers iteration without ending the stream, then injects a body later.
@@ -84,7 +84,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterContinueDontEndStreamInjectBody) {
 
   // Decode filter 0 injects request body later.
   Buffer::OwnedImpl data("hello");
-  decoder_filters_[0]->callbacks_->injectDecodedDataToFilterChain(data, true);
+  decoder_filters_[0]->callbacks_->injectDecodedDataToFilterChain(data, true, false);
 
   // Encode filter 1 changes end_stream to false.
   EXPECT_CALL(*encoder_filters_[1], encodeHeaders(_, true))
@@ -106,7 +106,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterContinueDontEndStreamInjectBody) {
 
   // Encode filter 1 injects request body later.
   Buffer::OwnedImpl data2("hello");
-  encoder_filters_[1]->callbacks_->injectEncodedDataToFilterChain(data2, true);
+  encoder_filters_[1]->callbacks_->injectEncodedDataToFilterChain(data2, true, false);
 }
 
 TEST_F(HttpConnectionManagerImplTest, FilterAddBodyContinuation) {
@@ -472,12 +472,12 @@ TEST_F(HttpConnectionManagerImplTest, FilterDirectDecodeEncodeDataNoTrailers) {
   decoded_data_to_forward.move(decode_buffer, 2);
   EXPECT_CALL(*decoder_filters_[1], decodeData(BufferStringEqual("he"), false))
       .WillOnce(Return(FilterDataStatus::StopIterationNoBuffer));
-  decoder_filters_[0]->callbacks_->injectDecodedDataToFilterChain(decoded_data_to_forward, false);
+  decoder_filters_[0]->callbacks_->injectDecodedDataToFilterChain(decoded_data_to_forward, false, false);
 
   EXPECT_CALL(*decoder_filters_[1], decodeData(BufferStringEqual("llo"), true))
       .WillOnce(Return(FilterDataStatus::StopIterationNoBuffer));
   EXPECT_CALL(*decoder_filters_[1], decodeComplete());
-  decoder_filters_[0]->callbacks_->injectDecodedDataToFilterChain(decode_buffer, true);
+  decoder_filters_[0]->callbacks_->injectDecodedDataToFilterChain(decode_buffer, true, false);
 
   // Response path.
   EXPECT_CALL(*encoder_filters_[1], encodeHeaders(_, false))
@@ -504,13 +504,13 @@ TEST_F(HttpConnectionManagerImplTest, FilterDirectDecodeEncodeDataNoTrailers) {
   encoded_data_to_forward.move(encoder_buffer, 3);
   EXPECT_CALL(*encoder_filters_[0], encodeData(BufferStringEqual("res"), false));
   EXPECT_CALL(response_encoder_, encodeData(_, false));
-  encoder_filters_[1]->callbacks_->injectEncodedDataToFilterChain(encoded_data_to_forward, false);
+  encoder_filters_[1]->callbacks_->injectEncodedDataToFilterChain(encoded_data_to_forward, false, false);
 
   EXPECT_CALL(*encoder_filters_[0], encodeData(BufferStringEqual("ponse"), true));
   EXPECT_CALL(*encoder_filters_[0], encodeComplete());
   EXPECT_CALL(response_encoder_, encodeData(_, true));
   expectOnDestroy();
-  encoder_filters_[1]->callbacks_->injectEncodedDataToFilterChain(encoder_buffer, true);
+  encoder_filters_[1]->callbacks_->injectEncodedDataToFilterChain(encoder_buffer, true, false);
 }
 
 // Use filter direct decode/encodeData() calls with trailers.
@@ -558,11 +558,11 @@ TEST_F(HttpConnectionManagerImplTest, FilterDirectDecodeEncodeDataTrailers) {
   decoded_data_to_forward.move(decode_buffer, 2);
   EXPECT_CALL(*decoder_filters_[1], decodeData(BufferStringEqual("he"), false))
       .WillOnce(Return(FilterDataStatus::StopIterationNoBuffer));
-  decoder_filters_[0]->callbacks_->injectDecodedDataToFilterChain(decoded_data_to_forward, false);
+  decoder_filters_[0]->callbacks_->injectDecodedDataToFilterChain(decoded_data_to_forward, false, false);
 
   EXPECT_CALL(*decoder_filters_[1], decodeData(BufferStringEqual("llo"), false))
       .WillOnce(Return(FilterDataStatus::StopIterationNoBuffer));
-  decoder_filters_[0]->callbacks_->injectDecodedDataToFilterChain(decode_buffer, false);
+  decoder_filters_[0]->callbacks_->injectDecodedDataToFilterChain(decode_buffer, false, false);
 
   EXPECT_CALL(*decoder_filters_[1], decodeTrailers(_));
   EXPECT_CALL(*decoder_filters_[1], decodeComplete());
@@ -597,11 +597,11 @@ TEST_F(HttpConnectionManagerImplTest, FilterDirectDecodeEncodeDataTrailers) {
   encoded_data_to_forward.move(encoder_buffer, 3);
   EXPECT_CALL(*encoder_filters_[0], encodeData(BufferStringEqual("res"), false));
   EXPECT_CALL(response_encoder_, encodeData(_, false));
-  encoder_filters_[1]->callbacks_->injectEncodedDataToFilterChain(encoded_data_to_forward, false);
+  encoder_filters_[1]->callbacks_->injectEncodedDataToFilterChain(encoded_data_to_forward, false, false);
 
   EXPECT_CALL(*encoder_filters_[0], encodeData(BufferStringEqual("ponse"), false));
   EXPECT_CALL(response_encoder_, encodeData(_, false));
-  encoder_filters_[1]->callbacks_->injectEncodedDataToFilterChain(encoder_buffer, false);
+  encoder_filters_[1]->callbacks_->injectEncodedDataToFilterChain(encoder_buffer, false, false);
 
   EXPECT_CALL(*encoder_filters_[0], encodeTrailers(_));
   EXPECT_CALL(*encoder_filters_[0], encodeComplete());

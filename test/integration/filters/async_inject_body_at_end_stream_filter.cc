@@ -66,9 +66,11 @@ private:
       // Emulate multiple injections to next filter.
       Envoy::Buffer::OwnedImpl split_request;
       split_request.move(request_buffer_, 1);
-      decoder_callbacks_->injectDecodedDataToFilterChain(split_request, /*end_stream=*/false);
+      decoder_callbacks_->injectDecodedDataToFilterChain(split_request, /*end_stream=*/false,
+                                                         /*update_state_end_stream=*/false);
       decoder_callbacks_->injectDecodedDataToFilterChain(request_buffer_,
-                                                         /*end_stream=*/!has_trailers);
+                                                         /*end_stream=*/!has_trailers,
+                                                         /*update_state_end_stream=*/false);
       if (has_trailers) {
         decoder_callbacks_->continueDecoding();
       }
@@ -80,9 +82,11 @@ private:
       // Emulate multiple injections to next filter.
       Envoy::Buffer::OwnedImpl split_response;
       split_response.move(response_buffer_, 1);
-      encoder_callbacks_->injectEncodedDataToFilterChain(split_response, /*end_stream=*/false);
+      encoder_callbacks_->injectEncodedDataToFilterChain(split_response, /*end_stream=*/false,
+                                                         /*update_state_end_stream=*/false);
       encoder_callbacks_->injectEncodedDataToFilterChain(response_buffer_,
-                                                         /*end_stream=*/!has_trailers);
+                                                         /*end_stream=*/!has_trailers,
+                                                         /*update_state_end_stream=*/false);
       if (has_trailers) {
         encoder_callbacks_->continueEncoding();
       }

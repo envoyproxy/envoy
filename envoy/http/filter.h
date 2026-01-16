@@ -651,8 +651,13 @@ public:
    * status will be propagated directly to further filters in the filter chain. This is different
    * from addDecodedData() where data is added to the HTTP connection manager's buffered data with
    * the assumption that standard HTTP connection manager buffering and continuation are being used.
+   *
+   * @param update_state_end_stream is used to indicate whether the filter manager state flag:
+   * observed_decode_end_stream_ should be updated or not. Set this parameter to true if called
+   * in the ext_proc context. And set it to false otherwise.
    */
-  virtual void injectDecodedDataToFilterChain(Buffer::Instance& data, bool end_stream) PURE;
+  virtual void injectDecodedDataToFilterChain(Buffer::Instance& data, bool end_stream,
+                                              bool update_state_end_stream) PURE;
 
   /**
    * Adds decoded trailers. May only be called in decodeData when end_stream is set to true.
@@ -1065,8 +1070,13 @@ public:
    * status will be propagated directly to further filters in the filter chain. This is different
    * from addEncodedData() where data is added to the HTTP connection manager's buffered data with
    * the assumption that standard HTTP connection manager buffering and continuation are being used.
+   *
+   * @param update_state_end_stream is used to indicate whether the filter manager state flag:
+   * observed_encode_end_stream_ should be updated or not. Set this parameter to true if called
+   * in the ext_proc context. And set it to false otherwise.
    */
-  virtual void injectEncodedDataToFilterChain(Buffer::Instance& data, bool end_stream) PURE;
+  virtual void injectEncodedDataToFilterChain(Buffer::Instance& data, bool end_stream,
+                                              bool update_state_end_stream) PURE;
 
   /**
    * Adds encoded trailers. May only be called in encodeData when end_stream is set to true.
