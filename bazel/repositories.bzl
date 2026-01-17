@@ -211,7 +211,6 @@ def envoy_dependencies(skip_targets = []):
     _rules_ruby()
     external_http_archive("com_github_google_flatbuffers")
     external_http_archive("bazel_features")
-    external_http_archive("bazel_toolchains")
     external_http_archive("bazel_compdb")
     external_http_archive(
         name = "envoy_examples",
