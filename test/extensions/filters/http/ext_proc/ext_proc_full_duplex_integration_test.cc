@@ -481,6 +481,106 @@ TEST_P(ExtProcIntegrationTest, ServerWaitforEnvoyHalfCloseThenCloseStream) {
   verifyDownstreamResponse(*response, 200);
 }
 
+TEST_P(ExtProcIntegrationTest,TwoExtProcFiltersInRequestProcessing) {
+  two_ext_proc_filters_ = true;
+  config_helper_.addConfigModifier([this](
+      envoy::config::bootstrap::v3::Bootstrap&) {
+    // Filter-1
+    proto_config_1_.mutable_processing_mode()->Clear();
+    auto* processing_mode_1 = proto_config_1_.mutable_processing_mode();
+    processing_mode_1->set_request_header_mode(ProcessingMode::SEND);
+    processing_mode_1->set_response_header_mode(ProcessingMode::SKIP);
+    addDownstreamExtProcFilter("ext_proc_server_1", grpc_upstreams_[1],
+                               proto_config_1_, "envoy.filters.http.ext_proc_1");
+    // Filter-0
+    proto_config_.mutable_processing_mode()->Clear();
+    auto* processing_mode = proto_config_.mutable_processing_mode();
+    processing_mode->set_request_header_mode(ProcessingMode::SEND);
+    processing_mode->set_response_header_mode(ProcessingMode::SKIP);
+    processing_mode->set_request_body_mode(ProcessingMode::FULL_DUPLEX_STREAMED);
+    processing_mode->set_request_trailer_mode(ProcessingMode::SEND);
+    addDownstreamExtProcFilter("ext_proc_server_0", grpc_upstreams_[0],
+                               proto_config_,   "envoy.filters.http.ext_proc");
+  });
+
+  const std::string body_sent(3 * 1024, 's');
+  IntegrationStreamDecoderPtr response = initAndSendDataDuplexStreamedMode(body_sent, true);
+
+  // The ext_proc_server_0 receives the headers.
+  ProcessingRequest header_request;
+  serverReceiveHeaderDuplexStreamed(header_request);
+  // The ext_proc_server_0 receives the body.
+  uint32_t total_req_body_msg = serverReceiveBodyDuplexStreamed(body_sent);
+  // The ext_proc_server_0 sends back the header response.
+  serverSendHeaderRespDuplexStreamed();
+  // The ext_proc_server_0 sends back a few chunks of the body responses.
+  const std::string body_upstream(total_req_body_msg, 'r');
+  serverSendBodyRespDuplexStreamed(total_req_body_msg-1, /*end_stream*/false, false, "");
+
+  // The ext_proc_server_1 receives the headers.
+  server1ReceiveHeaderDuplexStreamed(header_request);
+    // The ext_proc_server_1 sends back the header response.
+  server1SendHeaderRespDuplexStreamed();
+
+  std::this_thread::sleep_for(std::chrono::seconds(1));
+  // The ext_proc_server_0 now sends back the last chunk of the body responses.
+  serverSendBodyRespDuplexStreamed(1, /*end_stream*/true, false, "");
+
+  handleUpstreamRequest();
+  EXPECT_THAT(upstream_request_->headers(), ContainsHeader("x-new-header", "new"));
+  EXPECT_EQ(upstream_request_->body().toString(), body_upstream);
+  verifyDownstreamResponse(*response, 200);
+}
+
+TEST_P(ExtProcIntegrationTest,TwoExtProcFiltersInResponseProcessing) {
+  two_ext_proc_filters_ = true;
+  config_helper_.addConfigModifier([this](
+      envoy::config::bootstrap::v3::Bootstrap&) {
+    // Filter-0
+    proto_config_.mutable_processing_mode()->Clear();
+    auto* processing_mode = proto_config_.mutable_processing_mode();
+    processing_mode->set_response_header_mode(ProcessingMode::SEND);
+    processing_mode->set_request_header_mode(ProcessingMode::SKIP);
+    processing_mode->set_response_body_mode(ProcessingMode::FULL_DUPLEX_STREAMED);
+    processing_mode->set_response_trailer_mode(ProcessingMode::SEND);
+    addDownstreamExtProcFilter("ext_proc_server_0", grpc_upstreams_[0],
+                               proto_config_,   "envoy.filters.http.ext_proc");
+    // Filter-1
+    proto_config_1_.mutable_processing_mode()->Clear();
+    auto* processing_mode_1 = proto_config_1_.mutable_processing_mode();
+    processing_mode_1->set_response_header_mode(ProcessingMode::SEND);
+    processing_mode_1->set_request_header_mode(ProcessingMode::SKIP);
+    addDownstreamExtProcFilter("ext_proc_server_1", grpc_upstreams_[1],
+                               proto_config_1_, "envoy.filters.http.ext_proc_1");
+  });
+
+  const std::string body_sent(3 * 1024, 's');
+  IntegrationStreamDecoderPtr response = initAndSendDataDuplexStreamedMode(body_sent, true);
+  handleUpstreamRequest();
+
+  // The ext_proc_server_0 receives the responses from the backend server.
+  ProcessingRequest header_response;
+  serverReceiveHeaderDuplexStreamed(header_response, true, true);
+  (void)serverReceiveBodyDuplexStreamed("", true, false);
+  // The ext_proc_server_0 sends back the header response.
+  serverSendHeaderRespDuplexStreamed(true, true);
+  // The ext_proc_server_0 sends back a few chunks of the body responses.
+    uint32_t total_resp_body_msg = 5;
+  const std::string body_downstream(total_resp_body_msg, 'r');
+  serverSendBodyRespDuplexStreamed(total_resp_body_msg-1, /*end_stream*/false, /*response*/true, "");
+
+  // The ext_proc_server_1 receives the headers.
+  server1ReceiveHeaderDuplexStreamed(header_response, true, true);
+  // The ext_proc_server_1 sends back the header response.
+  server1SendHeaderRespDuplexStreamed(true, true);
+
+  std::this_thread::sleep_for(std::chrono::seconds(1));
+  // The ext_proc_server_0 now sends back the last chunk of the body responses.
+  serverSendBodyRespDuplexStreamed(1, /*end_stream*/true, /*response*/true, "");
+  verifyDownstreamResponse(*response, 200);
+  EXPECT_EQ(body_downstream, response->body());
+}
+
 } // namespace ExternalProcessing
 } // namespace HttpFilters
 } // namespace Extensions

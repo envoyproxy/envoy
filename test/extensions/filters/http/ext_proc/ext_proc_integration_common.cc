@@ -45,6 +45,18 @@ void ExtProcIntegrationTest::TearDown() {
   cleanupUpstreamAndDownstream();
 }
 
+void ExtProcIntegrationTest::addDownstreamExtProcFilter(const std::string& cluster_name,
+                                                        FakeUpstream* grpc_upstream,
+                                                        envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config,
+                                                        const std::string& ext_proc_filter_name) {
+  setGrpcService(*proto_config.mutable_grpc_service(), cluster_name,
+                 grpc_upstream->localAddress());
+  envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter ext_proc_filter;
+  ext_proc_filter.set_name(ext_proc_filter_name);
+  ext_proc_filter.mutable_typed_config()->PackFrom(proto_config);
+  config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_proc_filter));
+}
+
 void ExtProcIntegrationTest::initializeConfig(
     ConfigOptions config_option, const std::vector<std::pair<int, int>>& cluster_endpoints) {
   int total_cluster_endpoints = 0;
@@ -76,39 +88,41 @@ void ExtProcIntegrationTest::initializeConfig(
     }
 
     const std::string valid_grpc_cluster_name = "ext_proc_server_0";
-    if (config_option.valid_grpc_server) {
-      // Load configuration of the server from YAML and use a helper to add a grpc_service
-      // stanza pointing to the cluster that we just made
-      setGrpcService(*proto_config_.mutable_grpc_service(), valid_grpc_cluster_name,
-                     grpc_upstreams_[0]->localAddress());
-    } else {
-      // Set up the gRPC service with wrong cluster name and address.
-      setGrpcService(*proto_config_.mutable_grpc_service(), "ext_proc_wrong_server",
-                     std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234));
-    }
-
     std::string ext_proc_filter_name = "envoy.filters.http.ext_proc";
-    switch (config_option.filter_setup) {
-    case ConfigOptions::FilterSetup::kNone:
-      break;
-    case ConfigOptions::FilterSetup::kDownstream: {
-      // Construct a configuration proto for our filter and then re-write it
-      // to JSON so that we can add it to the overall config
-      envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter ext_proc_filter;
-      ext_proc_filter.set_name(ext_proc_filter_name);
-      ext_proc_filter.mutable_typed_config()->PackFrom(proto_config_);
-      config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_proc_filter));
-    } break;
-    case ConfigOptions::FilterSetup::kCompositeMatchOnRequestHeaders: {
-      envoy::type::matcher::v3::HttpRequestHeaderMatchInput request_match_input;
-      request_match_input.set_header_name("match-header");
-      prependExtProcCompositeFilter(request_match_input);
-    } break;
-    case ConfigOptions::FilterSetup::kCompositeMatchOnResponseHeaders: {
-      envoy::type::matcher::v3::HttpResponseHeaderMatchInput response_match_input;
-      response_match_input.set_header_name("match-header");
-      prependExtProcCompositeFilter(response_match_input);
-    } break;
+    if (!two_ext_proc_filters_) {
+      if (config_option.valid_grpc_server) {
+        // Load configuration of the server from YAML and use a helper to add a grpc_service
+        // stanza pointing to the cluster that we just made
+        setGrpcService(*proto_config_.mutable_grpc_service(), valid_grpc_cluster_name,
+                       grpc_upstreams_[0]->localAddress());
+      } else {
+        // Set up the gRPC service with wrong cluster name and address.
+        setGrpcService(*proto_config_.mutable_grpc_service(), "ext_proc_wrong_server",
+                       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234));
+      }
+
+      switch (config_option.filter_setup) {
+        case ConfigOptions::FilterSetup::kNone:
+          break;
+        case ConfigOptions::FilterSetup::kDownstream: {
+          // Construct a configuration proto for our filter and then re-write it
+          // to JSON so that we can add it to the overall config
+          envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter ext_proc_filter;
+          ext_proc_filter.set_name(ext_proc_filter_name);
+          ext_proc_filter.mutable_typed_config()->PackFrom(proto_config_);
+          config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_proc_filter));
+        } break;
+        case ConfigOptions::FilterSetup::kCompositeMatchOnRequestHeaders: {
+          envoy::type::matcher::v3::HttpRequestHeaderMatchInput request_match_input;
+          request_match_input.set_header_name("match-header");
+          prependExtProcCompositeFilter(request_match_input);
+        } break;
+        case ConfigOptions::FilterSetup::kCompositeMatchOnResponseHeaders: {
+          envoy::type::matcher::v3::HttpResponseHeaderMatchInput response_match_input;
+          response_match_input.set_header_name("match-header");
+          prependExtProcCompositeFilter(response_match_input);
+        } break;
+      }
     }
 
     // Add set_metadata filter to inject dynamic metadata used for testing
@@ -769,6 +783,20 @@ void ExtProcIntegrationTest::serverReceiveHeaderDuplexStreamed(ProcessingRequest
   }
 }
 
+void ExtProcIntegrationTest::server1ReceiveHeaderDuplexStreamed(ProcessingRequest& header,
+                                                               bool first_message, bool response) {
+  if (first_message) {
+    EXPECT_TRUE(grpc_upstreams_[1]->waitForHttpConnection(*dispatcher_, processor_connection_1_));
+    EXPECT_TRUE(processor_connection_1_->waitForNewStream(*dispatcher_, processor_stream_1_));
+  }
+  EXPECT_TRUE(processor_stream_1_->waitForGrpcMessage(*dispatcher_, header));
+  if (response) {
+    EXPECT_TRUE(header.has_response_headers());
+  } else {
+    EXPECT_TRUE(header.has_request_headers());
+  }
+}
+
 uint32_t ExtProcIntegrationTest::serverReceiveBodyDuplexStreamed(absl::string_view body_sent,
                                                                  bool response, bool compare_body) {
   std::string body_received;
@@ -813,6 +841,26 @@ void ExtProcIntegrationTest::serverSendHeaderRespDuplexStreamed(bool first_messa
   header->set_key("x-new-header");
   header->set_raw_value("new");
   processor_stream_->sendGrpcMessage(response_header);
+}
+
+void ExtProcIntegrationTest::server1SendHeaderRespDuplexStreamed(bool first_message, bool response) {
+  if (first_message) {
+    processor_stream_1_->startGrpcStream();
+  }
+  ProcessingResponse response_header;
+  HeadersResponse* header_resp;
+  if (response) {
+    header_resp = response_header.mutable_response_headers();
+  } else {
+    header_resp = response_header.mutable_request_headers();
+  }
+  auto* header_mutation = header_resp->mutable_response()->mutable_header_mutation();
+  auto* sh = header_mutation->add_set_headers();
+  auto* header = sh->mutable_header();
+  sh->mutable_append()->set_value(false);
+  header->set_key("x-new-header_1");
+  header->set_raw_value("new_1");
+  processor_stream_1_->sendGrpcMessage(response_header);
 }
 
 void ExtProcIntegrationTest::serverSendBodyRespDuplexStreamed(uint32_t total_resp_body_msg,
