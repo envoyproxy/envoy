@@ -2,9 +2,23 @@ date: Pending
 
 behavior_changes:
 # *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
+- area: tcp_proxy
+  change: |
+    The TCP proxy filter now requires :ref:`max_early_data_bytes
+    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.max_early_data_bytes>` to be
+    explicitly set when using :ref:`upstream_connect_mode
+    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.upstream_connect_mode>` modes
+    other than ``IMMEDIATE`` (i.e., ``ON_DOWNSTREAM_DATA`` or ``ON_DOWNSTREAM_TLS_HANDSHAKE``). The field
+    can be set to zero to disable early data buffering while still using delayed connection modes.
+    Configurations using these modes without ``max_early_data_bytes`` will now fail validation at startup.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: histograms
+  change: |
+    Update of libcircllhist to 0.3.2 has changed how bucket bounds are interpreted. This should not have an impact on
+    production monitoring if the number of samples in the histograms is high. Affected tests were adjusted to account for
+    histogram changes.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -23,7 +37,9 @@ bug_fixes:
     resulted in permanent connection rejections even after load subsided. The fix ensures that connection limit
     resources are properly released when connections are rejected due to load shedding. Also added defensive resource
     cleanup for edge cases where address processing fails (e.g., ``localAddress()`` or ``peerAddress()`` errors).
-
+- area: drop_overload
+  change: |
+    Fixed a bug that drop_overload failed to use cached EDS resources.
 - area: http
   change: |
     Fixed upstream client to not close connection when idle timeout fires before the connection is established.

@@ -5231,6 +5231,165 @@ void envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_commit(
     envoy_dynamic_module_type_bootstrap_extension_config_scheduler_module_ptr scheduler_module_ptr,
     uint64_t event_id);
 
+// -----------------------------------------------------------------------------
+// Bootstrap Extension - HTTP Client
+// -----------------------------------------------------------------------------
+
+/**
+ * envoy_dynamic_module_on_bootstrap_extension_http_callout_done is called when the HTTP callout
+ * response is received initiated by a bootstrap extension.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param extension_config_module_ptr is the pointer to the in-module bootstrap extension
+ * configuration created by envoy_dynamic_module_on_bootstrap_extension_config_new.
+ * @param callout_id is the ID of the callout. This is used to differentiate between multiple
+ * calls.
+ * @param result is the result of the callout.
+ * @param headers is the headers of the response.
+ * @param headers_size is the size of the headers.
+ * @param body_chunks is the body of the response.
+ * @param body_chunks_size is the size of the body.
+ *
+ * headers and body_chunks are owned by Envoy, and they are guaranteed to be valid until the end of
+ * this event hook. They may be null if the callout fails or the response is empty.
+ */
+void envoy_dynamic_module_on_bootstrap_extension_http_callout_done(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_module_ptr,
+    uint64_t callout_id, envoy_dynamic_module_type_http_callout_result result,
+    envoy_dynamic_module_type_envoy_http_header* headers, size_t headers_size,
+    envoy_dynamic_module_type_envoy_buffer* body_chunks, size_t body_chunks_size);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_http_callout is called by the module to
+ * initiate an HTTP callout. The callout is initiated by the bootstrap extension and the response
+ * is received in envoy_dynamic_module_on_bootstrap_extension_http_callout_done.
+ *
+ * This must be called on the main thread. To call from other threads, use the scheduler mechanism
+ * to post an event to the main thread first.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param callout_id_out is a pointer to a variable where the callout ID will be stored. This can be
+ * arbitrary and is used to differentiate between multiple calls from the same extension.
+ * @param cluster_name is the name of the cluster to which the callout is sent.
+ * @param headers is the headers of the request. It must contain :method, :path and host headers.
+ * @param headers_size is the size of the headers.
+ * @param body is the body of the request.
+ * @param timeout_milliseconds is the timeout for the callout in milliseconds.
+ * @return envoy_dynamic_module_type_http_callout_init_result is the result of the callout.
+ */
+envoy_dynamic_module_type_http_callout_init_result
+envoy_dynamic_module_callback_bootstrap_extension_http_callout(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    uint64_t* callout_id_out, envoy_dynamic_module_type_module_buffer cluster_name,
+    envoy_dynamic_module_type_module_http_header* headers, size_t headers_size,
+    envoy_dynamic_module_type_module_buffer body, uint64_t timeout_milliseconds);
+
+// -------------------- Bootstrap Extension Callbacks - Stats Access --------------------
+
+/**
+ * envoy_dynamic_module_type_stats_iteration_action represents the action to take after each
+ * stat is visited during iteration.
+ */
+typedef enum {
+  // Continue iterating.
+  envoy_dynamic_module_type_stats_iteration_action_Continue = 0,
+  // Stop iterating.
+  envoy_dynamic_module_type_stats_iteration_action_Stop = 1,
+} envoy_dynamic_module_type_stats_iteration_action;
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_get_counter_value is called by the module to
+ * get the current value of a counter by name.
+ *
+ * @param extension_envoy_ptr is the pointer to the DynamicModuleBootstrapExtension object.
+ * @param name is the name of the counter to find.
+ * @param value_ptr is where the value will be stored if the counter is found.
+ * @return true if the counter was found and value_ptr was populated, false otherwise.
+ */
+bool envoy_dynamic_module_callback_bootstrap_extension_get_counter_value(
+    envoy_dynamic_module_type_bootstrap_extension_envoy_ptr extension_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name, uint64_t* value_ptr);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_get_gauge_value is called by the module to
+ * get the current value of a gauge by name.
+ *
+ * @param extension_envoy_ptr is the pointer to the DynamicModuleBootstrapExtension object.
+ * @param name is the name of the gauge to find.
+ * @param value_ptr is where the value will be stored if the gauge is found.
+ * @return true if the gauge was found and value_ptr was populated, false otherwise.
+ */
+bool envoy_dynamic_module_callback_bootstrap_extension_get_gauge_value(
+    envoy_dynamic_module_type_bootstrap_extension_envoy_ptr extension_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name, uint64_t* value_ptr);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_get_histogram_summary is called by the module
+ * to get the summary statistics of a histogram by name. This returns the cumulative statistics
+ * since the server started.
+ *
+ * @param extension_envoy_ptr is the pointer to the DynamicModuleBootstrapExtension object.
+ * @param name is the name of the histogram to find.
+ * @param sample_count_ptr is where the sample count will be stored if the histogram is found.
+ * @param sample_sum_ptr is where the sample sum will be stored if the histogram is found.
+ * @return true if the histogram was found and the output pointers were populated, false otherwise.
+ */
+bool envoy_dynamic_module_callback_bootstrap_extension_get_histogram_summary(
+    envoy_dynamic_module_type_bootstrap_extension_envoy_ptr extension_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name, uint64_t* sample_count_ptr,
+    double* sample_sum_ptr);
+
+/**
+ * The callback type for iterating counters.
+ *
+ * @param name is the name of the counter.
+ * @param value is the current value of the counter.
+ * @param user_data is the user data passed to the iterate function.
+ * @return the action to take after visiting this counter.
+ */
+typedef envoy_dynamic_module_type_stats_iteration_action (
+    *envoy_dynamic_module_type_counter_iterator_fn)(envoy_dynamic_module_type_envoy_buffer name,
+                                                    uint64_t value, void* user_data);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_iterate_counters is called by the module to
+ * iterate over all counters in the stats store.
+ *
+ * @param extension_envoy_ptr is the pointer to the DynamicModuleBootstrapExtension object.
+ * @param iterator_fn is the callback function to call for each counter.
+ * @param user_data is the user data to pass to the callback function.
+ */
+void envoy_dynamic_module_callback_bootstrap_extension_iterate_counters(
+    envoy_dynamic_module_type_bootstrap_extension_envoy_ptr extension_envoy_ptr,
+    envoy_dynamic_module_type_counter_iterator_fn iterator_fn, void* user_data);
+
+/**
+ * The callback type for iterating gauges.
+ *
+ * @param name is the name of the gauge.
+ * @param value is the current value of the gauge.
+ * @param user_data is the user data passed to the iterate function.
+ * @return the action to take after visiting this gauge.
+ */
+typedef envoy_dynamic_module_type_stats_iteration_action (
+    *envoy_dynamic_module_type_gauge_iterator_fn)(envoy_dynamic_module_type_envoy_buffer name,
+                                                  uint64_t value, void* user_data);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_iterate_gauges is called by the module to
+ * iterate over all gauges in the stats store.
+ *
+ * @param extension_envoy_ptr is the pointer to the DynamicModuleBootstrapExtension object.
+ * @param iterator_fn is the callback function to call for each gauge.
+ * @param user_data is the user data to pass to the callback function.
+ */
+void envoy_dynamic_module_callback_bootstrap_extension_iterate_gauges(
+    envoy_dynamic_module_type_bootstrap_extension_envoy_ptr extension_envoy_ptr,
+    envoy_dynamic_module_type_gauge_iterator_fn iterator_fn, void* user_data);
+
 #ifdef __cplusplus
 }
 #endif

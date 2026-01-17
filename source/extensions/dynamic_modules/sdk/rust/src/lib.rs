@@ -6442,12 +6442,67 @@ pub trait EnvoyBootstrapExtensionConfig {
   ///
   /// This can be used to schedule an event to the main thread where the config is running.
   fn new_scheduler(&self) -> Box<dyn EnvoyBootstrapExtensionConfigScheduler>;
+
+  /// Send an HTTP callout to the given cluster with the given headers and optional body.
+  ///
+  /// Headers must contain the `:method`, `:path`, and `host` headers.
+  ///
+  /// This returns a tuple of (status, callout_id):
+  ///   * Success + valid callout_id: The callout was started successfully. The callout ID can be
+  ///     used to correlate the response in [`BootstrapExtensionConfig::on_http_callout_done`].
+  ///   * ClusterNotFound: The cluster does not exist.
+  ///   * MissingRequiredHeaders: The headers are missing required headers.
+  ///   * CannotCreateRequest: The request could not be created, e.g., there's no healthy upstream
+  ///     host in the cluster.
+  ///
+  /// The callout result will be delivered to the [`BootstrapExtensionConfig::on_http_callout_done`]
+  /// method.
+  ///
+  /// This must be called on the main thread. To call from other threads, use the scheduler
+  /// mechanism to post an event to the main thread first.
+  fn send_http_callout<'a>(
+    &mut self,
+    _cluster_name: &'a str,
+    _headers: Vec<(&'a str, &'a [u8])>,
+    _body: Option<&'a [u8]>,
+    _timeout_milliseconds: u64,
+  ) -> (
+    abi::envoy_dynamic_module_type_http_callout_init_result,
+    u64, // callout id
+  );
 }
 
 /// EnvoyBootstrapExtension is the Envoy-side bootstrap extension.
 /// This is a handle to the Envoy extension object.
-#[automock]
-pub trait EnvoyBootstrapExtension {}
+pub trait EnvoyBootstrapExtension {
+  /// Get the current value of a counter by name.
+  ///
+  /// Returns `Some(value)` if the counter exists, `None` otherwise.
+  fn get_counter_value(&self, name: &str) -> Option<u64>;
+
+  /// Get the current value of a gauge by name.
+  ///
+  /// Returns `Some(value)` if the gauge exists, `None` otherwise.
+  fn get_gauge_value(&self, name: &str) -> Option<u64>;
+
+  /// Get the summary statistics of a histogram by name.
+  ///
+  /// Returns `Some((sample_count, sample_sum))` if the histogram exists, `None` otherwise.
+  /// These are cumulative statistics since the server started.
+  fn get_histogram_summary(&self, name: &str) -> Option<(u64, f64)>;
+
+  /// Iterate over all counters in the stats store.
+  ///
+  /// The callback receives the counter name and its current value.
+  /// Return `true` to continue iteration, `false` to stop.
+  fn iterate_counters(&self, callback: &mut dyn FnMut(&str, u64) -> bool);
+
+  /// Iterate over all gauges in the stats store.
+  ///
+  /// The callback receives the gauge name and its current value.
+  /// Return `true` to continue iteration, `false` to stop.
+  fn iterate_gauges(&self, callback: &mut dyn FnMut(&str, u64) -> bool);
+}
 
 /// BootstrapExtensionConfig is the module-side bootstrap extension configuration.
 ///
@@ -6477,6 +6532,24 @@ pub trait BootstrapExtensionConfig: Send + Sync {
     &self,
     _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
     _event_id: u64,
+  ) {
+  }
+
+  /// This is called when an HTTP callout response is received.
+  ///
+  /// * `envoy_extension_config` can be used to interact with the underlying Envoy config object.
+  /// * `callout_id` is the ID of the callout returned by
+  ///   [`EnvoyBootstrapExtensionConfig::send_http_callout`].
+  /// * `result` is the result of the callout.
+  /// * `response_headers` is a list of key-value pairs of the response headers. This is optional.
+  /// * `response_body` is the response body. This is optional.
+  fn on_http_callout_done(
+    &self,
+    _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _callout_id: u64,
+    _result: abi::envoy_dynamic_module_type_http_callout_result,
+    _response_headers: Option<&[(EnvoyBuffer, EnvoyBuffer)]>,
+    _response_body: Option<&[EnvoyBuffer]>,
   ) {
   }
 }
@@ -6563,15 +6636,52 @@ impl EnvoyBootstrapExtensionConfig for EnvoyBootstrapExtensionConfigImpl {
       })
     }
   }
+
+  fn send_http_callout<'a>(
+    &mut self,
+    cluster_name: &'a str,
+    headers: Vec<(&'a str, &'a [u8])>,
+    body: Option<&'a [u8]>,
+    timeout_milliseconds: u64,
+  ) -> (abi::envoy_dynamic_module_type_http_callout_init_result, u64) {
+    let body_ptr = body.map(|s| s.as_ptr()).unwrap_or(std::ptr::null());
+    let body_length = body.map(|s| s.len()).unwrap_or(0);
+
+    // Convert headers to module HTTP headers.
+    let module_headers: Vec<abi::envoy_dynamic_module_type_module_http_header> = headers
+      .iter()
+      .map(|(k, v)| abi::envoy_dynamic_module_type_module_http_header {
+        key_ptr: k.as_ptr() as *const _,
+        key_length: k.len(),
+        value_ptr: v.as_ptr() as *const _,
+        value_length: v.len(),
+      })
+      .collect();
+
+    let mut callout_id: u64 = 0;
+
+    let result = unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_http_callout(
+        self.raw,
+        &mut callout_id as *mut _ as *mut _,
+        str_to_module_buffer(cluster_name),
+        module_headers.as_ptr() as *mut _,
+        module_headers.len(),
+        abi::envoy_dynamic_module_type_module_buffer {
+          ptr: body_ptr as *mut _,
+          length: body_length,
+        },
+        timeout_milliseconds,
+      )
+    };
+
+    (result, callout_id)
+  }
 }
 
 // Implementation of EnvoyBootstrapExtension
 
 struct EnvoyBootstrapExtensionImpl {
-  // The raw pointer is stored for future callback implementations.
-  // Currently, the EnvoyBootstrapExtension trait has no methods, but
-  // callbacks may be added in the future.
-  #[allow(dead_code)]
   raw: abi::envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
 }
 
@@ -6581,7 +6691,135 @@ impl EnvoyBootstrapExtensionImpl {
   }
 }
 
-impl EnvoyBootstrapExtension for EnvoyBootstrapExtensionImpl {}
+impl EnvoyBootstrapExtension for EnvoyBootstrapExtensionImpl {
+  fn get_counter_value(&self, name: &str) -> Option<u64> {
+    let mut value: u64 = 0;
+    let found = unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_get_counter_value(
+        self.raw,
+        str_to_module_buffer(name),
+        &mut value,
+      )
+    };
+    if found {
+      Some(value)
+    } else {
+      None
+    }
+  }
+
+  fn get_gauge_value(&self, name: &str) -> Option<u64> {
+    let mut value: u64 = 0;
+    let found = unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_get_gauge_value(
+        self.raw,
+        str_to_module_buffer(name),
+        &mut value,
+      )
+    };
+    if found {
+      Some(value)
+    } else {
+      None
+    }
+  }
+
+  fn get_histogram_summary(&self, name: &str) -> Option<(u64, f64)> {
+    let mut sample_count: u64 = 0;
+    let mut sample_sum: f64 = 0.0;
+    let found = unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_get_histogram_summary(
+        self.raw,
+        str_to_module_buffer(name),
+        &mut sample_count,
+        &mut sample_sum,
+      )
+    };
+    if found {
+      Some((sample_count, sample_sum))
+    } else {
+      None
+    }
+  }
+
+  fn iterate_counters(&self, callback: &mut dyn FnMut(&str, u64) -> bool) {
+    // We use a wrapper struct to pass the closure through the C callback.
+    struct CallbackWrapper<'a> {
+      callback: &'a mut dyn FnMut(&str, u64) -> bool,
+      stopped: bool,
+    }
+
+    extern "C" fn counter_iterator_trampoline(
+      name: abi::envoy_dynamic_module_type_envoy_buffer,
+      value: u64,
+      user_data: *mut std::ffi::c_void,
+    ) -> abi::envoy_dynamic_module_type_stats_iteration_action {
+      let wrapper = unsafe { &mut *(user_data as *mut CallbackWrapper) };
+      if wrapper.stopped {
+        return abi::envoy_dynamic_module_type_stats_iteration_action::Stop;
+      }
+      let name_slice = unsafe { std::slice::from_raw_parts(name.ptr as *const u8, name.length) };
+      let name_str = std::str::from_utf8(name_slice).unwrap_or("");
+      if (wrapper.callback)(name_str, value) {
+        abi::envoy_dynamic_module_type_stats_iteration_action::Continue
+      } else {
+        wrapper.stopped = true;
+        abi::envoy_dynamic_module_type_stats_iteration_action::Stop
+      }
+    }
+
+    let mut wrapper = CallbackWrapper {
+      callback,
+      stopped: false,
+    };
+    unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_iterate_counters(
+        self.raw,
+        Some(counter_iterator_trampoline),
+        &mut wrapper as *mut _ as *mut std::ffi::c_void,
+      );
+    }
+  }
+
+  fn iterate_gauges(&self, callback: &mut dyn FnMut(&str, u64) -> bool) {
+    // We use a wrapper struct to pass the closure through the C callback.
+    struct CallbackWrapper<'a> {
+      callback: &'a mut dyn FnMut(&str, u64) -> bool,
+      stopped: bool,
+    }
+
+    extern "C" fn gauge_iterator_trampoline(
+      name: abi::envoy_dynamic_module_type_envoy_buffer,
+      value: u64,
+      user_data: *mut std::ffi::c_void,
+    ) -> abi::envoy_dynamic_module_type_stats_iteration_action {
+      let wrapper = unsafe { &mut *(user_data as *mut CallbackWrapper) };
+      if wrapper.stopped {
+        return abi::envoy_dynamic_module_type_stats_iteration_action::Stop;
+      }
+      let name_slice = unsafe { std::slice::from_raw_parts(name.ptr as *const u8, name.length) };
+      let name_str = std::str::from_utf8(name_slice).unwrap_or("");
+      if (wrapper.callback)(name_str, value) {
+        abi::envoy_dynamic_module_type_stats_iteration_action::Continue
+      } else {
+        wrapper.stopped = true;
+        abi::envoy_dynamic_module_type_stats_iteration_action::Stop
+      }
+    }
+
+    let mut wrapper = CallbackWrapper {
+      callback,
+      stopped: false,
+    };
+    unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_iterate_gauges(
+        self.raw,
+        Some(gauge_iterator_trampoline),
+        &mut wrapper as *mut _ as *mut std::ffi::c_void,
+      );
+    }
+  }
+}
 
 // Bootstrap Extension Event Hook Implementations
 
@@ -6689,6 +6927,48 @@ pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_config_scheduled(
   extension_config.on_scheduled(
     &mut EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr),
     event_id,
+  );
+}
+
+/// Event hook called by Envoy when an HTTP callout initiated by a bootstrap extension completes.
+///
+/// # Safety
+/// This function is unsafe because it dereferences raw pointers passed from Envoy. The caller
+/// must ensure that all pointers are valid and that the memory they point to remains valid for
+/// the duration of the function call.
+#[no_mangle]
+pub unsafe extern "C" fn envoy_dynamic_module_on_bootstrap_extension_http_callout_done(
+  envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
+  callout_id: u64,
+  result: abi::envoy_dynamic_module_type_http_callout_result,
+  headers: *const abi::envoy_dynamic_module_type_envoy_http_header,
+  headers_size: usize,
+  body_chunks: *const abi::envoy_dynamic_module_type_envoy_buffer,
+  body_chunks_size: usize,
+) {
+  let extension_config = extension_config_ptr as *const *const dyn BootstrapExtensionConfig;
+  let extension_config = unsafe { &**extension_config };
+
+  let headers = if headers_size > 0 {
+    Some(unsafe {
+      std::slice::from_raw_parts(headers as *const (EnvoyBuffer, EnvoyBuffer), headers_size)
+    })
+  } else {
+    None
+  };
+  let body = if body_chunks_size > 0 {
+    Some(unsafe { std::slice::from_raw_parts(body_chunks as *const EnvoyBuffer, body_chunks_size) })
+  } else {
+    None
+  };
+
+  extension_config.on_http_callout_done(
+    &mut EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr),
+    callout_id,
+    result,
+    headers,
+    body,
   );
 }
 
