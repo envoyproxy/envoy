@@ -410,6 +410,14 @@ ExtProcLoggingInfo::processingEffects(envoy::config::core::v3::TrafficDirection 
              : encoding_processor_effects_;
 }
 
+const ExtProcLoggingInfo::ProcessingEffects& ExtProcLoggingInfo::processingEffects(
+    envoy::config::core::v3::TrafficDirection traffic_direction) const {
+  ASSERT(traffic_direction != envoy::config::core::v3::TrafficDirection::UNSPECIFIED);
+  return traffic_direction == envoy::config::core::v3::TrafficDirection::INBOUND
+             ? decoding_processor_effects_
+             : encoding_processor_effects_;
+}
+
 ProtobufTypes::MessagePtr ExtProcLoggingInfo::serializeAsProto() const {
   auto struct_msg = std::make_unique<Protobuf::Struct>();
 
