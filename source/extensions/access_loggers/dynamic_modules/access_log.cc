@@ -16,9 +16,9 @@ ThreadLocalLogger::~ThreadLocalLogger() {
   if (logger_ != nullptr) {
     // Flush any buffered logs before destroying the logger.
     if (config_->on_logger_flush_ != nullptr) {
-      config_->on_logger_flush_(thisAsVoidPtr(), logger_);
+      config_->on_logger_flush_(logger_);
     }
-    config_->on_logger_destroy_(thisAsVoidPtr(), logger_);
+    config_->on_logger_destroy_(logger_);
   }
 }
 
@@ -29,16 +29,13 @@ DynamicModuleAccessLog::DynamicModuleAccessLog(AccessLog::FilterPtr&& filter,
 
   tls_slot_->set([config](Event::Dispatcher& dispatcher) {
     uint32_t worker_index;
-    if (Envoy::Thread::MainThread::isMainThread()) {
+    if (Envoy::Thread::MainThread::isMainThread() || Thread::TestThread::isTestThread()) {
       auto context = Server::Configuration::ServerFactoryContextInstance::getExisting();
       auto concurrency = context->options().concurrency();
-      worker_index = concurrency; // Set main thread on free index.
+      worker_index = concurrency; // Set main/test thread on free index.
     } else {
       const std::string& worker_name = dispatcher.name();
       auto pos = worker_name.find_first_of('_');
-      if (pos != std::string::npos) {
-        IS_ENVOY_BUG("worker name is not in expected format worker_{index}");
-      }
       ENVOY_BUG(pos != std::string::npos, "worker name is not in expected format worker_{index}");
       if (!absl::SimpleAtoi(worker_name.substr(pos + 1), &worker_index)) {
         IS_ENVOY_BUG("failed to parse worker index from name");
@@ -68,6 +65,9 @@ void DynamicModuleAccessLog::emitLog(const Formatter::Context& context,
 
   // Invoke the module's log callback with the context pointer.
   config_->on_logger_log_(tl_logger.thisAsVoidPtr(), tl_logger.logger_, abi_log_type);
+
+  tl_logger.log_context_ = nullptr;
+  tl_logger.stream_info_ = nullptr;
 }
 
 } // namespace DynamicModules

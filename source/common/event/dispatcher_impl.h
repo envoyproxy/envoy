@@ -38,7 +38,7 @@ class DispatcherImpl : Logger::Loggable<Logger::Id::main>,
                        public FatalErrorHandlerInterface {
 public:
   DispatcherImpl(const std::string& name, Api::Api& api, Event::TimeSystem& time_system);
-  DispatcherImpl(const std::string& name, Api::Api& api, Event::TimeSystem& time_system,
+  DispatcherImpl(const std::string& name, Api::Api& api, Event::TimeSystem& time_systems,
                  const Buffer::WatermarkFactorySharedPtr& watermark_factory);
   DispatcherImpl(const std::string& name, Api::Api& api, Event::TimeSystem& time_system,
                  const ScaledRangeTimerManagerFactory& scaled_timer_factory,

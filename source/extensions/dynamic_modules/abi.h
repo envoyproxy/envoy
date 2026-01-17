@@ -434,7 +434,7 @@ typedef enum envoy_dynamic_module_type_socket_direction {
  * @return envoy_dynamic_module_type_abi_version_module_ptr is the ABI version of the dynamic
  * module. Null means the error and the module will be unloaded immediately.
  */
-envoy_dynamic_module_type_abi_version_module_ptr envoy_dynamic_module_on_program_init();
+envoy_dynamic_module_type_abi_version_module_ptr envoy_dynamic_module_on_program_init(void);
 
 // =============================================================================
 // Common Callbacks
@@ -463,6 +463,17 @@ void envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level level
  * @return true if the log level is enabled, false otherwise.
  */
 bool envoy_dynamic_module_callback_log_enabled(envoy_dynamic_module_type_log_level level);
+
+// --------------------------------- Threading -----------------------------------
+
+/**
+ * envoy_dynamic_module_callback_get_concurrency may be called by the dynamic
+ * module in envoy_dynamic_module_on_program_init to get the configured concurrency of the server.
+ * NOTE: This function must by called on the main thread.
+ *
+ * @return number of worker threads (concurrency) that the server is configured to use.
+ */
+uint32_t envoy_dynamic_module_callback_get_concurrency();
 
 // =============================================================================
 // ============================== HTTP Filter ==================================
@@ -4552,7 +4563,6 @@ void envoy_dynamic_module_on_access_logger_log(
  * @param logger_module_ptr is the pointer to the in-module logger instance.
  */
 void envoy_dynamic_module_on_access_logger_destroy(
-    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_access_logger_module_ptr logger_module_ptr);
 
 /**
@@ -4567,7 +4577,6 @@ void envoy_dynamic_module_on_access_logger_destroy(
  * @param logger_module_ptr is the pointer to the in-module logger instance.
  */
 void envoy_dynamic_module_on_access_logger_flush(
-    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_access_logger_module_ptr logger_module_ptr);
 
 // =============================================================================
@@ -5298,17 +5307,6 @@ void envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_delete(
 void envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_commit(
     envoy_dynamic_module_type_bootstrap_extension_config_scheduler_module_ptr scheduler_module_ptr,
     uint64_t event_id);
-
-// ------------------- Misc Global Callbacks -------------------------
-
-/**
- * envoy_dynamic_module_callback_get_concurrency may be called by the dynamic
- * module in envoy_dynamic_module_on_program_init to get the configured concurrency of the server.
- * NOTE: This function must by called on the main thread.
- *
- * @return number of worker threads (concurrency) that the server is configured to use.
- */
-uint32_t envoy_dynamic_module_callback_get_concurrency();
 
 #ifdef __cplusplus
 }

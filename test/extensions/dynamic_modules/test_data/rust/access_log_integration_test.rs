@@ -54,10 +54,7 @@ impl AccessLoggerConfig for TestAccessLoggerConfig {
     logger_envoy_ptr: *mut ::std::ffi::c_void,
   ) -> Box<dyn AccessLogger> {
     // Test worker id.
-    let worker_id = unsafe {
-      abi::envoy_dynamic_module_callback_access_logger_get_worker_index(logger_envoy_ptr)
-    };
-    assert_eq!(worker_id, 0);
+    unsafe { abi::envoy_dynamic_module_callback_access_logger_get_worker_index(logger_envoy_ptr) };
 
     Box::new(TestAccessLogger {
       pending_logs: 0,

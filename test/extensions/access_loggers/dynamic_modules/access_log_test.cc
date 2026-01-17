@@ -4,6 +4,7 @@
 
 #include "test/extensions/dynamic_modules/util.h"
 #include "test/mocks/access_log/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/utility.h"
@@ -95,12 +96,12 @@ TEST_F(DynamicModuleAccessLogTest, FlushCalledOnDestruction) {
   flush_before_destroy = false;
 
   // Override the callbacks to track call order.
-  config_->on_logger_flush_ = [](void*, envoy_dynamic_module_type_access_logger_module_ptr) {
+  config_->on_logger_flush_ = [](envoy_dynamic_module_type_access_logger_module_ptr) {
     flush_called = true;
     // flush should be called before destroy.
     flush_before_destroy = !destroy_called;
   };
-  config_->on_logger_destroy_ = [](void*, envoy_dynamic_module_type_access_logger_module_ptr) {
+  config_->on_logger_destroy_ = [](envoy_dynamic_module_type_access_logger_module_ptr) {
     destroy_called = true;
   };
 
@@ -127,7 +128,7 @@ TEST_F(DynamicModuleAccessLogTest, FlushNotCalledWhenNull) {
 
   // Set flush to nullptr to simulate module not implementing it.
   config_->on_logger_flush_ = nullptr;
-  config_->on_logger_destroy_ = [](void*, envoy_dynamic_module_type_access_logger_module_ptr) {
+  config_->on_logger_destroy_ = [](envoy_dynamic_module_type_access_logger_module_ptr) {
     destroy_called = true;
   };
 
@@ -149,6 +150,12 @@ TEST_F(DynamicModuleAccessLogTest, DynamicModuleAccessLogCreation) {
   EXPECT_CALL(tls, allocateSlot()).WillOnce(testing::Invoke([&tls]() {
     return tls.allocateSlotMock();
   }));
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  NiceMock<Server::MockOptions> options;
+  ON_CALL(options, concurrency()).WillByDefault(testing::Return(1));
+  ON_CALL(context, options()).WillByDefault(testing::ReturnRef(options));
+  ScopedThreadLocalServerContextSetter setter(context);
 
   // Test that the access log can be created.
   auto access_log = std::make_unique<DynamicModuleAccessLog>(

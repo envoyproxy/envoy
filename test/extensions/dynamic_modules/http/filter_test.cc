@@ -541,6 +541,12 @@ TEST(DynamicModulesTest, HttpFilterHttpCallout_non_existing_cluster) {
 
 TEST(DynamicModulesTest, HttpFilterHttpCallout_immediate_failing_cluster) {
   const std::string filter_name = "http_callouts";
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  NiceMock<Server::MockOptions> options;
+  ON_CALL(options, concurrency()).WillByDefault(testing::Return(1));
+  ON_CALL(context, options()).WillByDefault(testing::ReturnRef(options));
+  ScopedThreadLocalServerContextSetter setter(context);
+
   // TODO: Add non-Rust test program once we have non-Rust SDK.
   auto dynamic_module =
       newDynamicModule(testSharedObjectPath("http_integration_test", "rust"), false);
@@ -549,7 +555,6 @@ TEST(DynamicModulesTest, HttpFilterHttpCallout_immediate_failing_cluster) {
   }
   EXPECT_TRUE(dynamic_module.ok());
 
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   Stats::IsolatedStoreImpl stats_store;
   auto stats_scope = stats_store.createScope("");
   Upstream::MockClusterManager cluster_manager;
@@ -595,6 +600,12 @@ TEST(DynamicModulesTest, HttpFilterHttpCallout_immediate_failing_cluster) {
 
 TEST(DynamicModulesTest, HttpFilterHttpCallout_success) {
   const std::string filter_name = "http_callouts";
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  NiceMock<Server::MockOptions> options;
+  ON_CALL(options, concurrency()).WillByDefault(testing::Return(1));
+  ON_CALL(context, options()).WillByDefault(testing::ReturnRef(options));
+  ScopedThreadLocalServerContextSetter setter(context);
+
   // TODO: Add non-Rust test program once we have non-Rust SDK.
   auto dynamic_module =
       newDynamicModule(testSharedObjectPath("http_integration_test", "rust"), false);
@@ -603,7 +614,6 @@ TEST(DynamicModulesTest, HttpFilterHttpCallout_success) {
   }
   EXPECT_TRUE(dynamic_module.ok());
 
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   Stats::IsolatedStoreImpl stats_store;
   auto stats_scope = stats_store.createScope("");
   Upstream::MockClusterManager cluster_manager;
@@ -665,6 +675,12 @@ TEST(DynamicModulesTest, HttpFilterHttpCallout_success) {
 
 TEST(DynamicModulesTest, HttpFilterHttpCallout_resetting) {
   const std::string filter_name = "http_callouts";
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  NiceMock<Server::MockOptions> options;
+  ON_CALL(options, concurrency()).WillByDefault(testing::Return(1));
+  ON_CALL(context, options()).WillByDefault(testing::ReturnRef(options));
+  ScopedThreadLocalServerContextSetter setter(context);
+
   // TODO: Add non-Rust test program once we have non-Rust SDK.
   auto dynamic_module =
       newDynamicModule(testSharedObjectPath("http_integration_test", "rust"), false);
@@ -673,7 +689,6 @@ TEST(DynamicModulesTest, HttpFilterHttpCallout_resetting) {
   }
   EXPECT_TRUE(dynamic_module.ok());
 
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   Stats::IsolatedStoreImpl stats_store;
   auto stats_scope = stats_store.createScope("");
   Upstream::MockClusterManager cluster_manager;
@@ -720,6 +735,12 @@ TEST(DynamicModulesTest, HttpFilterHttpCallout_resetting) {
 // This test verifies that handling of per-route config is correct in terms of lifetimes.
 TEST(DynamicModulesTest, HttpFilterPerFilterConfigLifetimes) {
   const std::string filter_name = "per_route_config";
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  NiceMock<Server::MockOptions> options;
+  ON_CALL(options, concurrency()).WillByDefault(testing::Return(1));
+  ON_CALL(context, options()).WillByDefault(testing::ReturnRef(options));
+  ScopedThreadLocalServerContextSetter setter(context);
+
   auto dynamic_module =
       newDynamicModule(testSharedObjectPath("http_integration_test", "rust"), false);
   if (!dynamic_module.ok()) {
@@ -727,7 +748,6 @@ TEST(DynamicModulesTest, HttpFilterPerFilterConfigLifetimes) {
   }
   EXPECT_TRUE(dynamic_module.ok());
 
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   Stats::IsolatedStoreImpl stats_store;
   auto stats_scope = stats_store.createScope("");
   Upstream::MockClusterManager cluster_manager;

@@ -31,6 +31,5 @@ void envoy_dynamic_module_on_access_logger_log(
     envoy_dynamic_module_type_access_log_type log_type) {}
 
 void envoy_dynamic_module_on_access_logger_destroy(
-    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_access_logger_module_ptr logger_module_ptr) {}
 
