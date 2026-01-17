@@ -45,12 +45,11 @@ void ExtProcIntegrationTest::TearDown() {
   cleanupUpstreamAndDownstream();
 }
 
-void ExtProcIntegrationTest::addDownstreamExtProcFilter(const std::string& cluster_name,
-                                                        FakeUpstream* grpc_upstream,
-                                                        envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config,
-                                                        const std::string& ext_proc_filter_name) {
-  setGrpcService(*proto_config.mutable_grpc_service(), cluster_name,
-                 grpc_upstream->localAddress());
+void ExtProcIntegrationTest::addDownstreamExtProcFilter(
+    const std::string& cluster_name, FakeUpstream* grpc_upstream,
+    envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config,
+    const std::string& ext_proc_filter_name) {
+  setGrpcService(*proto_config.mutable_grpc_service(), cluster_name, grpc_upstream->localAddress());
   envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter ext_proc_filter;
   ext_proc_filter.set_name(ext_proc_filter_name);
   ext_proc_filter.mutable_typed_config()->PackFrom(proto_config);
@@ -102,26 +101,27 @@ void ExtProcIntegrationTest::initializeConfig(
       }
 
       switch (config_option.filter_setup) {
-        case ConfigOptions::FilterSetup::kNone:
-          break;
-        case ConfigOptions::FilterSetup::kDownstream: {
-          // Construct a configuration proto for our filter and then re-write it
-          // to JSON so that we can add it to the overall config
-          envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter ext_proc_filter;
-          ext_proc_filter.set_name(ext_proc_filter_name);
-          ext_proc_filter.mutable_typed_config()->PackFrom(proto_config_);
-          config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_proc_filter));
-        } break;
-        case ConfigOptions::FilterSetup::kCompositeMatchOnRequestHeaders: {
-          envoy::type::matcher::v3::HttpRequestHeaderMatchInput request_match_input;
-          request_match_input.set_header_name("match-header");
-          prependExtProcCompositeFilter(request_match_input);
-        } break;
-        case ConfigOptions::FilterSetup::kCompositeMatchOnResponseHeaders: {
-          envoy::type::matcher::v3::HttpResponseHeaderMatchInput response_match_input;
-          response_match_input.set_header_name("match-header");
-          prependExtProcCompositeFilter(response_match_input);
-        } break;
+      case ConfigOptions::FilterSetup::kNone:
+        break;
+      case ConfigOptions::FilterSetup::kDownstream: {
+        // Construct a configuration proto for our filter and then re-write it
+        // to JSON so that we can add it to the overall config
+        envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter
+            ext_proc_filter;
+        ext_proc_filter.set_name(ext_proc_filter_name);
+        ext_proc_filter.mutable_typed_config()->PackFrom(proto_config_);
+        config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_proc_filter));
+      } break;
+      case ConfigOptions::FilterSetup::kCompositeMatchOnRequestHeaders: {
+        envoy::type::matcher::v3::HttpRequestHeaderMatchInput request_match_input;
+        request_match_input.set_header_name("match-header");
+        prependExtProcCompositeFilter(request_match_input);
+      } break;
+      case ConfigOptions::FilterSetup::kCompositeMatchOnResponseHeaders: {
+        envoy::type::matcher::v3::HttpResponseHeaderMatchInput response_match_input;
+        response_match_input.set_header_name("match-header");
+        prependExtProcCompositeFilter(response_match_input);
+      } break;
       }
     }
 
@@ -784,7 +784,7 @@ void ExtProcIntegrationTest::serverReceiveHeaderDuplexStreamed(ProcessingRequest
 }
 
 void ExtProcIntegrationTest::server1ReceiveHeaderDuplexStreamed(ProcessingRequest& header,
-                                                               bool first_message, bool response) {
+                                                                bool first_message, bool response) {
   if (first_message) {
     EXPECT_TRUE(grpc_upstreams_[1]->waitForHttpConnection(*dispatcher_, processor_connection_1_));
     EXPECT_TRUE(processor_connection_1_->waitForNewStream(*dispatcher_, processor_stream_1_));
@@ -843,7 +843,8 @@ void ExtProcIntegrationTest::serverSendHeaderRespDuplexStreamed(bool first_messa
   processor_stream_->sendGrpcMessage(response_header);
 }
 
-void ExtProcIntegrationTest::server1SendHeaderRespDuplexStreamed(bool first_message, bool response) {
+void ExtProcIntegrationTest::server1SendHeaderRespDuplexStreamed(bool first_message,
+                                                                 bool response) {
   if (first_message) {
     processor_stream_1_->startGrpcStream();
   }

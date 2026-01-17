@@ -97,10 +97,10 @@ protected:
                         const std::vector<std::pair<int, int>>& cluster_endpoints = {{0, 1},
                                                                                      {1, 1}});
 
-  void addDownstreamExtProcFilter(const std::string& cluster_name,
-                                  FakeUpstream* grpc_upstream,
-                                  envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config,
-                                  const std::string& ext_proc_filter_name);
+  void addDownstreamExtProcFilter(
+      const std::string& cluster_name, FakeUpstream* grpc_upstream,
+      envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config,
+      const std::string& ext_proc_filter_name);
 
   bool IsEnvoyGrpc() { return std::get<1>(GetParam()) == Envoy::Grpc::ClientType::EnvoyGrpc; }
 

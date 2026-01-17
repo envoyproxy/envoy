@@ -143,8 +143,9 @@ TEST_F(HttpFilterTest, StreamingBodiesInObservabilityMode) {
   Buffer::OwnedImpl want_request_body;
   Buffer::OwnedImpl got_request_body;
   EXPECT_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, true, true))
-      .WillRepeatedly(Invoke(
-          [&got_request_body](Buffer::Instance& data, Unused, Unused) { got_request_body.move(data); }));
+      .WillRepeatedly(Invoke([&got_request_body](Buffer::Instance& data, Unused, Unused) {
+        got_request_body.move(data);
+      }));
 
   Buffer::OwnedImpl req_chunk_1;
   TestUtility::feedBufferWithRandomCharacters(req_chunk_1, 100);
@@ -165,8 +166,9 @@ TEST_F(HttpFilterTest, StreamingBodiesInObservabilityMode) {
   Buffer::OwnedImpl want_response_body;
   Buffer::OwnedImpl got_response_body;
   EXPECT_CALL(encoder_callbacks_, injectEncodedDataToFilterChain(_, _, true))
-      .WillRepeatedly(Invoke(
-          [&got_response_body](Buffer::Instance& data, Unused, Unused) { got_response_body.move(data); }));
+      .WillRepeatedly(Invoke([&got_response_body](Buffer::Instance& data, Unused, Unused) {
+        got_response_body.move(data);
+      }));
 
   for (int i = 0; i < 5; i++) {
     Buffer::OwnedImpl resp_chunk;

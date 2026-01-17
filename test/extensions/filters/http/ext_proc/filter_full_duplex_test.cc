@@ -122,8 +122,9 @@ TEST_F(HttpFilterTest, DuplexStreamedBodyProcessingTestNormal) {
   Buffer::OwnedImpl want_response_body;
   Buffer::OwnedImpl got_response_body;
   EXPECT_CALL(encoder_callbacks_, injectEncodedDataToFilterChain(_, _, true))
-      .WillRepeatedly(Invoke(
-          [&got_response_body](Buffer::Instance& data, Unused, Unused) { got_response_body.move(data); }));
+      .WillRepeatedly(Invoke([&got_response_body](Buffer::Instance& data, Unused, Unused) {
+        got_response_body.move(data);
+      }));
 
   // Test 7x3 streaming.
   for (int i = 0; i < 7; i++) {
@@ -215,8 +216,9 @@ TEST_F(HttpFilterTest, DuplexStreamedBodyProcessingTestWithTrailer) {
   Buffer::OwnedImpl want_response_body;
   Buffer::OwnedImpl got_response_body;
   EXPECT_CALL(encoder_callbacks_, injectEncodedDataToFilterChain(_, _, true))
-      .WillRepeatedly(Invoke(
-          [&got_response_body](Buffer::Instance& data, Unused, Unused) { got_response_body.move(data); }));
+      .WillRepeatedly(Invoke([&got_response_body](Buffer::Instance& data, Unused, Unused) {
+        got_response_body.move(data);
+      }));
 
   for (int i = 0; i < 7; i++) {
     // 7 request chunks are sent to the ext_proc server.
@@ -278,8 +280,9 @@ TEST_F(HttpFilterTest, DuplexStreamedBodyProcessingTestWithHeaderAndTrailer) {
   Buffer::OwnedImpl want_response_body;
   Buffer::OwnedImpl got_response_body;
   EXPECT_CALL(encoder_callbacks_, injectEncodedDataToFilterChain(_, _, true))
-      .WillRepeatedly(Invoke(
-          [&got_response_body](Buffer::Instance& data, Unused, Unused) { got_response_body.move(data); }));
+      .WillRepeatedly(Invoke([&got_response_body](Buffer::Instance& data, Unused, Unused) {
+        got_response_body.move(data);
+      }));
 
   for (int i = 0; i < 7; i++) {
     // 7 request chunks are sent to the ext_proc server.
