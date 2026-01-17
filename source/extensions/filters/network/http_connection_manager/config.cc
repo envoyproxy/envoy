@@ -828,29 +828,27 @@ const Network::Address::Instance& HttpConnectionManagerConfig::localAddress() {
 }
 
 absl::optional<std::chrono::milliseconds>
-HttpConnectionManagerConfig::calculateMaxConnectionDurationWithJitter() const {
-  const auto max_connection_duration = maxConnectionDuration();
-  if (!max_connection_duration) {
-    return max_connection_duration;
+HttpConnectionManagerConfig::maxConnectionDuration() const {
+  if (!max_connection_duration_) {
+    return absl::nullopt;
   }
 
-  const auto jitter_percentage = maxConnectionDurationJitter();
-  if (!jitter_percentage) {
-    return max_connection_duration;
+  if (!max_connection_duration_jitter_) {
+    return max_connection_duration_;
   }
 
   // Apply jitter: base_duration + random(0, base_duration * jitter_percentage / 100.0);
-  const uint64_t max_jitter_ms =
-      std::ceil(max_connection_duration.value().count() * (jitter_percentage.value() / 100.0));
+  const uint64_t max_jitter_ms = std::ceil(max_connection_duration_.value().count() *
+                                           (max_connection_duration_jitter_.value() / 100.0));
 
   if (max_jitter_ms == 0) {
-    return max_connection_duration;
+    return max_connection_duration_;
   }
 
   const uint64_t jitter_ms =
       context_.serverFactoryContext().api().randomGenerator().random() % max_jitter_ms;
   return std::chrono::milliseconds(
-      static_cast<uint64_t>(max_connection_duration.value().count() + jitter_ms));
+      static_cast<uint64_t>(max_connection_duration_.value().count() + jitter_ms));
 }
 
 /**

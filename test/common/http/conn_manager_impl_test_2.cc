@@ -2277,7 +2277,7 @@ TEST_F(HttpConnectionManagerImplTest, MaxConnectionDurationWithJitter) {
   // Calculate jittered duration multiple times to verify randomness
   std::set<uint64_t> durations;
   for (int i = 0; i < 10; i++) {
-    auto duration = calculateMaxConnectionDurationWithJitter();
+    auto duration = maxConnectionDuration();
     ASSERT_TRUE(duration.has_value());
     durations.insert(duration.value().count());
 
@@ -2297,7 +2297,7 @@ TEST_F(HttpConnectionManagerImplTest, MaxConnectionDurationWithoutJitter) {
 
   setup();
 
-  auto duration = calculateMaxConnectionDurationWithJitter();
+  auto duration = maxConnectionDuration();
   ASSERT_TRUE(duration.has_value());
   EXPECT_EQ(duration.value().count(), 10000);
 }
@@ -2307,7 +2307,7 @@ TEST_F(HttpConnectionManagerImplTest, NoMaxConnectionDuration) {
   // No max_connection_duration_ set
   setup();
 
-  auto duration = calculateMaxConnectionDurationWithJitter();
+  auto duration = maxConnectionDuration();
   EXPECT_FALSE(duration.has_value());
 }
 }

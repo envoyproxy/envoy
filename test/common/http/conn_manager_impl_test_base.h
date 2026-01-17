@@ -118,10 +118,6 @@ public:
   absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
   bool isRoutable() const override { return true; }
   absl::optional<std::chrono::milliseconds> maxConnectionDuration() const override {
-    return max_connection_duration_;
-  }
-  absl::optional<std::chrono::milliseconds>
-  calculateMaxConnectionDurationWithJitter() const override {
     if (!max_connection_duration_ || !max_connection_duration_jitter_) {
       return max_connection_duration_;
     }

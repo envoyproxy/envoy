@@ -147,9 +147,6 @@ public:
   absl::optional<std::chrono::milliseconds> maxConnectionDuration() const override {
     return max_connection_duration_;
   }
-  absl::optional<std::chrono::milliseconds> calculateMaxConnectionDurationWithJitter() const override {
-    return max_connection_duration_;  // No jitter for fuzz tests
-  }
   bool http1SafeMaxConnectionDuration() const override {
     return http1_safe_max_connection_duration_;
   }

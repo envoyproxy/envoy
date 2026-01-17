@@ -175,14 +175,7 @@ public:
   uint32_t maxRequestHeadersCount() const override { return max_request_headers_count_; }
   absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
   bool isRoutable() const override { return true; }
-  absl::optional<std::chrono::milliseconds> maxConnectionDuration() const override {
-    return max_connection_duration_;
-  }
-  const absl::optional<double>& maxConnectionDurationJitter() const {
-    return max_connection_duration_jitter_;
-  }
-  absl::optional<std::chrono::milliseconds>
-  calculateMaxConnectionDurationWithJitter() const override;
+  absl::optional<std::chrono::milliseconds> maxConnectionDuration() const override;
   bool http1SafeMaxConnectionDuration() const override {
     return http1_safe_max_connection_duration_;
   }

@@ -201,13 +201,12 @@ void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCal
     connection_idle_timer_->enableTimer(config_->idleTimeout().value());
   }
 
-  const auto max_connection_duration_with_jitter =
-      config_->calculateMaxConnectionDurationWithJitter();
-  if (max_connection_duration_with_jitter) {
+  const auto max_connection_duration = config_->maxConnectionDuration();
+  if (max_connection_duration) {
     connection_duration_timer_ =
         dispatcher_->createScaledTimer(Event::ScaledTimerType::HttpDownstreamMaxConnectionTimeout,
                                        [this]() -> void { onConnectionDurationTimeout(); });
-    connection_duration_timer_->enableTimer(max_connection_duration_with_jitter.value());
+    connection_duration_timer_->enableTimer(max_connection_duration.value());
   }
 
   read_callbacks_->connection().setDelayedCloseTimeout(config_->delayedCloseTimeout());
