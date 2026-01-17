@@ -2,6 +2,15 @@ date: Pending
 
 behavior_changes:
 # *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
+- area: tcp_proxy
+  change: |
+    The TCP proxy filter now requires :ref:`max_early_data_bytes
+    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.max_early_data_bytes>` to be
+    explicitly set when using :ref:`upstream_connect_mode
+    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.upstream_connect_mode>` modes
+    other than ``IMMEDIATE`` (i.e., ``ON_DOWNSTREAM_DATA`` or ``ON_DOWNSTREAM_TLS_HANDSHAKE``). The field
+    can be set to zero to disable early data buffering while still using delayed connection modes.
+    Configurations using these modes without ``max_early_data_bytes`` will now fail validation at startup.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*

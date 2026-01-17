@@ -2089,6 +2089,7 @@ TEST_P(TcpProxyIntegrationTest, UpstreamConnectModeTlsHandshakeNonTls) {
 
     tcp_proxy.set_upstream_connect_mode(
         envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_TLS_HANDSHAKE);
+    tcp_proxy.mutable_max_early_data_bytes()->set_value(0);
 
     filter->mutable_typed_config()->PackFrom(tcp_proxy);
   });
@@ -2129,6 +2130,7 @@ TEST_P(TcpProxyIntegrationTest, UpstreamConnectModeTlsHandshakeWithUpstreamTls) 
 
     tcp_proxy.set_upstream_connect_mode(
         envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_TLS_HANDSHAKE);
+    tcp_proxy.mutable_max_early_data_bytes()->set_value(0);
 
     filter->mutable_typed_config()->PackFrom(tcp_proxy);
   });
@@ -2150,6 +2152,126 @@ TEST_P(TcpProxyIntegrationTest, UpstreamConnectModeTlsHandshakeWithUpstreamTls) 
   tcp_client->waitForHalfClose();
 
   tcp_client->close();
+}
+
+// Test ON_DOWNSTREAM_TLS_HANDSHAKE mode with max_early_data_bytes set to zero.
+TEST_P(TcpProxySslIntegrationTest, OnDownstreamTlsHandshakeMode) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* filter_chain = listener->mutable_filter_chains(0);
+    auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
+
+    ASSERT_TRUE(config_blob->Is<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>());
+    auto tcp_proxy_config =
+        MessageUtil::anyConvert<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>(
+            *config_blob);
+
+    tcp_proxy_config.set_upstream_connect_mode(
+        envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_TLS_HANDSHAKE);
+    tcp_proxy_config.mutable_max_early_data_bytes()->set_value(0);
+
+    config_blob->PackFrom(tcp_proxy_config);
+  });
+
+  setupConnections();
+  sendAndReceiveTlsData("hello", "world");
+}
+
+// Test ON_DOWNSTREAM_TLS_HANDSHAKE mode with early data buffering.
+TEST_P(TcpProxySslIntegrationTest, OnDownstreamTlsHandshakeModeWithEarlyData) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* filter_chain = listener->mutable_filter_chains(0);
+    auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
+
+    ASSERT_TRUE(config_blob->Is<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>());
+    auto tcp_proxy_config =
+        MessageUtil::anyConvert<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>(
+            *config_blob);
+    // Set ON_DOWNSTREAM_TLS_HANDSHAKE mode with max_early_data_bytes.
+    tcp_proxy_config.set_upstream_connect_mode(
+        envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_TLS_HANDSHAKE);
+    tcp_proxy_config.mutable_max_early_data_bytes()->set_value(16384);
+
+    config_blob->PackFrom(tcp_proxy_config);
+  });
+
+  initialize();
+
+  MockWatermarkBuffer* client_write_buffer = nullptr;
+  ConnectionStatusCallbacks connect_callbacks;
+  std::shared_ptr<WaitForPayloadReader> payload_reader =
+      std::make_shared<WaitForPayloadReader>(*dispatcher_);
+  Network::ClientConnectionPtr ssl_client;
+  FakeRawConnectionPtr fake_upstream_connection;
+
+  // Set up the mock buffer factory so the newly created SSL client will have a mock write
+  // buffer. This allows us to track the bytes actually written to the socket.
+  EXPECT_CALL(*mock_buffer_factory_, createBuffer_(_, _, _))
+      .Times(AtLeast(1))
+      .WillOnce(Invoke([&](std::function<void()> below_low, std::function<void()> above_high,
+                           std::function<void()> above_overflow) -> Buffer::Instance* {
+        client_write_buffer =
+            new NiceMock<MockWatermarkBuffer>(below_low, above_high, above_overflow);
+        ON_CALL(*client_write_buffer, move(_))
+            .WillByDefault(Invoke(client_write_buffer, &MockWatermarkBuffer::baseMove));
+        ON_CALL(*client_write_buffer, drain(_))
+            .WillByDefault(Invoke(client_write_buffer, &MockWatermarkBuffer::trackDrains));
+        return client_write_buffer;
+      }));
+
+  // Set up the SSL client.
+  Network::Address::InstanceConstSharedPtr address =
+      Ssl::getSslAddress(version_, lookupPort("tcp_proxy"));
+  ssl_client = dispatcher_->createClientConnection(
+      address, Network::Address::InstanceConstSharedPtr(),
+      context_->createTransportSocket(nullptr, nullptr), nullptr, nullptr);
+
+  // Perform the SSL handshake. Loopback is allowlisted in tcp_proxy.json for the ssl_auth
+  // filter so there will be no pause waiting on auth data.
+  ssl_client->addConnectionCallbacks(connect_callbacks);
+  ssl_client->enableHalfClose(true);
+  ssl_client->addReadFilter(payload_reader);
+  ssl_client->connect();
+
+  // No upstream connection should be established yet (before TLS handshake completes).
+  ASSERT_FALSE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection,
+                                                        std::chrono::milliseconds(500)));
+
+  // Wait for TLS handshake to complete. The Connected event fires after TLS handshake.
+  while (!connect_callbacks.connected()) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+
+  // Now upstream connection should be established after TLS handshake completes.
+  AssertionResult result = fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection);
+  RELEASE_ASSERT(result, result.message());
+
+  // Send data after TLS handshake - this should be buffered if upstream isn't ready yet.
+  Buffer::OwnedImpl buffer("hello");
+  ssl_client->write(buffer, false);
+  while (client_write_buffer->bytesDrained() != 5) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+
+  // Verify data is forwarded (buffered and then sent once upstream is ready).
+  ASSERT_TRUE(fake_upstream_connection->waitForData(5));
+
+  // Send response back.
+  ASSERT_TRUE(fake_upstream_connection->write("world", true));
+  payload_reader->setDataToWaitFor("world");
+  ssl_client->dispatcher().run(Event::Dispatcher::RunType::Block);
+
+  // Clean up.
+  Buffer::OwnedImpl empty_buffer;
+  ssl_client->write(empty_buffer, true);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
+  ASSERT_TRUE(fake_upstream_connection->write("", true));
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+  ssl_client->dispatcher().run(Event::Dispatcher::RunType::Block);
+  EXPECT_TRUE(payload_reader->readLastByte());
+  EXPECT_TRUE(connect_callbacks.closed());
 }
 
 // Test connection close during wait for data trigger.
