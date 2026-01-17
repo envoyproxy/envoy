@@ -2757,23 +2757,18 @@ impl EnvoyHttpFilterConfigScheduler for Box<dyn EnvoyHttpFilterConfigScheduler> 
 #[no_mangle]
 unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_new(
   envoy_filter_config_ptr: abi::envoy_dynamic_module_type_http_filter_config_envoy_ptr,
-  name_ptr: *const u8,
-  name_size: usize,
-  config_ptr: *const u8,
-  config_size: usize,
+  name: abi::envoy_dynamic_module_type_envoy_buffer,
+  config: abi::envoy_dynamic_module_type_envoy_buffer,
 ) -> abi::envoy_dynamic_module_type_http_filter_config_module_ptr {
   // This assumes that the name is a valid UTF-8 string. Should we relax? At the moment,
   // it is a String at protobuf level.
-  let name = if !name_ptr.is_null() {
-    std::str::from_utf8(std::slice::from_raw_parts(name_ptr, name_size)).unwrap_or_default()
-  } else {
-    ""
+  let name_str = unsafe {
+    std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+      name.ptr as *const _,
+      name.length,
+    ))
   };
-  let config = if !config_ptr.is_null() {
-    std::slice::from_raw_parts(config_ptr, config_size)
-  } else {
-    b""
-  };
+  let config_slice = unsafe { std::slice::from_raw_parts(config.ptr as *const _, config.length) };
 
   let mut envoy_filter_config = EnvoyHttpFilterConfigImpl {
     raw_ptr: envoy_filter_config_ptr,
@@ -2781,8 +2776,8 @@ unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_new(
 
   envoy_dynamic_module_on_http_filter_config_new_impl(
     &mut envoy_filter_config,
-    name,
-    config,
+    name_str,
+    config_slice,
     NEW_HTTP_FILTER_CONFIG_FUNCTION
       .get()
       .expect("NEW_HTTP_FILTER_CONFIG_FUNCTION must be set"),
@@ -2854,27 +2849,22 @@ unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_scheduled(
 
 #[no_mangle]
 unsafe extern "C" fn envoy_dynamic_module_on_http_filter_per_route_config_new(
-  name_ptr: *const u8,
-  name_size: usize,
-  config_ptr: *const u8,
-  config_size: usize,
+  name: abi::envoy_dynamic_module_type_envoy_buffer,
+  config: abi::envoy_dynamic_module_type_envoy_buffer,
 ) -> abi::envoy_dynamic_module_type_http_filter_per_route_config_module_ptr {
   // This assumes that the name is a valid UTF-8 string. Should we relax? At the moment,
   // it is a String at protobuf level.
-  let name = if !name_ptr.is_null() {
-    std::str::from_utf8(std::slice::from_raw_parts(name_ptr, name_size)).unwrap_or_default()
-  } else {
-    ""
+  let name_str = unsafe {
+    std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+      name.ptr as *const _,
+      name.length,
+    ))
   };
-  let config = if !config_ptr.is_null() {
-    std::slice::from_raw_parts(config_ptr, config_size)
-  } else {
-    b""
-  };
+  let config_slice = unsafe { std::slice::from_raw_parts(config.ptr as *const _, config.length) };
 
   envoy_dynamic_module_on_http_filter_per_route_config_new_impl(
-    name,
-    config,
+    name_str,
+    config_slice,
     NEW_HTTP_FILTER_PER_ROUTE_CONFIG_FUNCTION
       .get()
       .expect("NEW_HTTP_FILTER_PER_ROUTE_CONFIG_FUNCTION must be set"),
@@ -4720,20 +4710,21 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
 #[no_mangle]
 pub extern "C" fn envoy_dynamic_module_on_network_filter_config_new(
   envoy_filter_config_ptr: abi::envoy_dynamic_module_type_network_filter_config_envoy_ptr,
-  name_ptr: *const i8,
-  name_size: usize,
-  config_ptr: *const i8,
-  config_size: usize,
+  name: abi::envoy_dynamic_module_type_envoy_buffer,
+  config: abi::envoy_dynamic_module_type_envoy_buffer,
 ) -> abi::envoy_dynamic_module_type_network_filter_config_module_ptr {
   let mut envoy_filter_config = EnvoyNetworkFilterConfigImpl::new(envoy_filter_config_ptr);
-  let name = unsafe {
-    std::str::from_utf8_unchecked(std::slice::from_raw_parts(name_ptr as *const _, name_size))
+  let name_str = unsafe {
+    std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+      name.ptr as *const _,
+      name.length,
+    ))
   };
-  let config = unsafe { std::slice::from_raw_parts(config_ptr as *const _, config_size) };
+  let config_slice = unsafe { std::slice::from_raw_parts(config.ptr as *const _, config.length) };
   init_network_filter_config(
     &mut envoy_filter_config,
-    name,
-    config,
+    name_str,
+    config_slice,
     NEW_NETWORK_FILTER_CONFIG_FUNCTION
       .get()
       .expect("NEW_NETWORK_FILTER_CONFIG_FUNCTION must be set"),
@@ -5772,20 +5763,21 @@ impl EnvoyListenerFilter for EnvoyListenerFilterImpl {
 #[no_mangle]
 pub extern "C" fn envoy_dynamic_module_on_listener_filter_config_new(
   envoy_filter_config_ptr: abi::envoy_dynamic_module_type_listener_filter_config_envoy_ptr,
-  name_ptr: *const i8,
-  name_size: usize,
-  config_ptr: *const i8,
-  config_size: usize,
+  name: abi::envoy_dynamic_module_type_envoy_buffer,
+  config: abi::envoy_dynamic_module_type_envoy_buffer,
 ) -> abi::envoy_dynamic_module_type_listener_filter_config_module_ptr {
   let mut envoy_filter_config = EnvoyListenerFilterConfigImpl::new(envoy_filter_config_ptr);
-  let name = unsafe {
-    std::str::from_utf8_unchecked(std::slice::from_raw_parts(name_ptr as *const _, name_size))
+  let name_str = unsafe {
+    std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+      name.ptr as *const _,
+      name.length,
+    ))
   };
-  let config = unsafe { std::slice::from_raw_parts(config_ptr as *const _, config_size) };
+  let config_slice = unsafe { std::slice::from_raw_parts(config.ptr as *const _, config.length) };
   init_listener_filter_config(
     &mut envoy_filter_config,
-    name,
-    config,
+    name_str,
+    config_slice,
     NEW_LISTENER_FILTER_CONFIG_FUNCTION
       .get()
       .expect("NEW_LISTENER_FILTER_CONFIG_FUNCTION must be set"),
@@ -6331,20 +6323,21 @@ impl EnvoyUdpListenerFilter for EnvoyUdpListenerFilterImpl {
 #[no_mangle]
 pub extern "C" fn envoy_dynamic_module_on_udp_listener_filter_config_new(
   envoy_filter_config_ptr: abi::envoy_dynamic_module_type_udp_listener_filter_config_envoy_ptr,
-  name_ptr: *const i8,
-  name_size: usize,
-  config_ptr: *const i8,
-  config_size: usize,
+  name: abi::envoy_dynamic_module_type_envoy_buffer,
+  config: abi::envoy_dynamic_module_type_envoy_buffer,
 ) -> abi::envoy_dynamic_module_type_udp_listener_filter_config_module_ptr {
   let mut envoy_filter_config = EnvoyUdpListenerFilterConfigImpl::new(envoy_filter_config_ptr);
-  let name = unsafe {
-    std::str::from_utf8_unchecked(std::slice::from_raw_parts(name_ptr as *const _, name_size))
+  let name_str = unsafe {
+    std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+      name.ptr as *const _,
+      name.length,
+    ))
   };
-  let config = unsafe { std::slice::from_raw_parts(config_ptr as *const _, config_size) };
+  let config_slice = unsafe { std::slice::from_raw_parts(config.ptr as *const _, config.length) };
   init_udp_listener_filter_config(
     &mut envoy_filter_config,
-    name,
-    config,
+    name_str,
+    config_slice,
     NEW_UDP_LISTENER_FILTER_CONFIG_FUNCTION
       .get()
       .expect("NEW_UDP_LISTENER_FILTER_CONFIG_FUNCTION must be set"),
