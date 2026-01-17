@@ -1108,10 +1108,10 @@ TEST_F(OAuth2Test, SetBearerToken) {
   EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_success").value(), 1);
 }
 
-TEST_F(OAuth2Test, SetBearerTokenWithMutualTls) {
+TEST_F(OAuth2Test, SetBearerTokenWithTlsClientAuth) {
   init(getConfig(false /* forward_bearer_token */, true /* use_refresh_token */,
                  ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
-                     OAuth2Config_AuthType_MUTUAL_TLS
+                     OAuth2Config_AuthType_TLS_CLIENT_AUTH
                  /* authType */));
 
   // Set SystemTime to a fixed point so we get consistent HMAC encodings between test runs.
@@ -1136,7 +1136,7 @@ TEST_F(OAuth2Test, SetBearerTokenWithMutualTls) {
 
   EXPECT_CALL(*oauth_client_, asyncGetAccessToken("123", TEST_CLIENT_ID, "asdf_client_secret_fdsa",
                                                   "https://traffic.example.com" + TEST_CALLBACK,
-                                                  TEST_CODE_VERIFIER, AuthType::MutualTls));
+                                                  TEST_CODE_VERIFIER, AuthType::TlsClientAuth));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
             filter_->decodeHeaders(request_headers, false));

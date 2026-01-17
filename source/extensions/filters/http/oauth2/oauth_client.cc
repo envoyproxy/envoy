@@ -73,7 +73,7 @@ void OAuth2ClientImpl::asyncGetAccessToken(const std::string& auth_code,
                        code_verifier);
     break;
   }
-  case AuthType::MutualTls:
+  case AuthType::TlsClientAuth:
     // For mTLS, authentication is done via the client certificate in the TLS handshake.
     // No client_secret is sent in the request body or headers.
     body = fmt::format(UrlBodyTemplateWithoutSecretForAuthCode, auth_code,
@@ -114,7 +114,7 @@ void OAuth2ClientImpl::asyncRefreshAccessToken(const std::string& refresh_token,
                        Http::Utility::PercentEncoding::encode(refresh_token));
     break;
   }
-  case AuthType::MutualTls:
+  case AuthType::TlsClientAuth:
     // For mTLS, authentication is done via the client certificate in the TLS handshake.
     // No client_secret is sent in the request body or headers.
     body = fmt::format(UrlBodyTemplateWithoutSecretForRefreshToken,

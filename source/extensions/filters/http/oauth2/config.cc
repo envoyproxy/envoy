@@ -53,11 +53,12 @@ absl::StatusOr<Http::FilterFactoryCb> OAuth2Config::createFilterFactoryFromProto
   auto& server_context = context.serverFactoryContext();
   auto& cluster_manager = context.serverFactoryContext().clusterManager();
 
-  // token_secret is required unless auth_type is MUTUAL_TLS
-  if (auth_type != envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType_MUTUAL_TLS) {
+  // token_secret is required unless auth_type is TLS_CLIENT_AUTH
+  if (auth_type !=
+      envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType_TLS_CLIENT_AUTH) {
     if (!credentials.has_token_secret()) {
       return absl::InvalidArgumentError(
-          "token_secret is required when auth_type is not MUTUAL_TLS");
+          "token_secret is required when auth_type is not TLS_CLIENT_AUTH");
     }
   }
 

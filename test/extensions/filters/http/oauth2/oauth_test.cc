@@ -387,7 +387,7 @@ TEST_F(OAuth2ClientTest, RequestRefreshAccessTokenSuccessBasicAuthType) {
       [&](auto* callback) { callback->onSuccess(request, std::move(mock_response)); }));
 }
 
-TEST_F(OAuth2ClientTest, RequestAccessTokenMutualTlsNoClientSecret) {
+TEST_F(OAuth2ClientTest, RequestAccessTokenTlsClientAuthNoClientSecret) {
   EXPECT_CALL(request_, cancel()).Times(testing::AnyNumber());
   EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
       .WillRepeatedly(
@@ -403,11 +403,11 @@ TEST_F(OAuth2ClientTest, RequestAccessTokenMutualTlsNoClientSecret) {
 
   client_->setCallbacks(*mock_callbacks_);
   client_->asyncGetAccessToken("auth_code", "client_id", "secret", "cb", "verifier",
-                               AuthType::MutualTls);
+                               AuthType::TlsClientAuth);
   EXPECT_EQ(1, callbacks_.size());
 }
 
-TEST_F(OAuth2ClientTest, RequestRefreshAccessTokenMutualTlsNoClientSecret) {
+TEST_F(OAuth2ClientTest, RequestRefreshAccessTokenTlsClientAuthNoClientSecret) {
   EXPECT_CALL(request_, cancel()).Times(testing::AnyNumber());
   EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
       .WillRepeatedly(
@@ -422,7 +422,7 @@ TEST_F(OAuth2ClientTest, RequestRefreshAccessTokenMutualTlsNoClientSecret) {
           }));
 
   client_->setCallbacks(*mock_callbacks_);
-  client_->asyncRefreshAccessToken("refresh", "client_id", "secret", AuthType::MutualTls);
+  client_->asyncRefreshAccessToken("refresh", "client_id", "secret", AuthType::TlsClientAuth);
   EXPECT_EQ(1, callbacks_.size());
 }
 

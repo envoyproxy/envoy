@@ -147,7 +147,7 @@ config:
   cb(filter_callback);
 }
 
-TEST(ConfigTest, CreateFilterMutualTlsWithoutTokenSecret) {
+TEST(ConfigTest, CreateFilterTlsClientAuthWithoutTokenSecret) {
   const std::string yaml = R"EOF(
 config:
   token_endpoint:
@@ -179,7 +179,7 @@ config:
   - oauth2-resource
   - http://example.com
   - https://example.com
-  auth_type: "MUTUAL_TLS"
+  auth_type: "TLS_CLIENT_AUTH"
     )EOF";
 
   OAuth2Config factory;
@@ -207,7 +207,7 @@ config:
   cb(filter_callback);
 }
 
-TEST(ConfigTest, MissingTokenSecretNonMutualTls) {
+TEST(ConfigTest, MissingTokenSecretNonTlsClientAuth) {
   const std::string yaml = R"EOF(
 config:
   token_endpoint:
@@ -249,7 +249,8 @@ config:
 
   const auto result = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
   EXPECT_FALSE(result.ok());
-  EXPECT_EQ(result.status().message(), "token_secret is required when auth_type is not MUTUAL_TLS");
+  EXPECT_EQ(result.status().message(),
+            "token_secret is required when auth_type is not TLS_CLIENT_AUTH");
 }
 
 TEST(ConfigTest, InvalidTokenSecret) {
