@@ -1251,6 +1251,243 @@ TEST(DynamicModulesTest, HttpFilterHttpStreamCalloutOnReset) {
   }
 }
 
+TEST(DynamicModulesTest, HttpFilterResetHttpStream) {
+  auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", "c"), false);
+  EXPECT_TRUE(dynamic_module.ok());
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::IsolatedStoreImpl stats_store;
+  auto stats_scope = stats_store.createScope("");
+
+  Upstream::MockClusterManager cluster_manager;
+  auto cluster = std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+
+  EXPECT_CALL(cluster_manager, getThreadLocalCluster(_))
+      .WillRepeatedly(testing::Return(cluster.get()));
+
+  EXPECT_CALL(context, clusterManager()).WillRepeatedly(testing::ReturnRef(cluster_manager));
+
+  auto filter_config_or_status =
+      Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
+          "filter", "", false, std::move(dynamic_module.value()), *stats_scope, context);
+  EXPECT_TRUE(filter_config_or_status.ok());
+
+  auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
+                                                          stats_scope->symbolTable(), 0);
+  filter->initializeInModuleFilter();
+
+  NiceMock<Event::MockDispatcher> dispatcher;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  EXPECT_CALL(decoder_callbacks, dispatcher()).WillRepeatedly(testing::ReturnRef(dispatcher));
+  filter->setDecoderFilterCallbacks(decoder_callbacks);
+
+  // Mock AsyncClient
+  NiceMock<Http::MockAsyncClientStream> stream;
+  EXPECT_CALL(cluster->async_client_, start(_, _))
+      .WillOnce(Invoke([&](Http::AsyncClient::StreamCallbacks&,
+                           const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
+        return &stream;
+      }));
+
+  // Start Stream
+  uint64_t stream_id;
+  auto headers = std::make_unique<Http::TestRequestHeaderMapImpl>(
+      std::initializer_list<std::pair<std::string, std::string>>{
+          {":method", "GET"}, {":path", "/"}, {":authority", "host"}});
+  auto message = std::make_unique<Http::RequestMessageImpl>(std::move(headers));
+  auto result = filter->startHttpStream(&stream_id, "cluster", std::move(message), false, 1000);
+  EXPECT_EQ(result, envoy_dynamic_module_type_http_callout_init_result_Success);
+
+  // Expect reset to be called on the stream - once by resetHttpStream and possibly again by
+  // onDestroy cleanup.
+  EXPECT_CALL(stream, reset()).Times(testing::AtLeast(1));
+  filter->resetHttpStream(stream_id);
+
+  // Resetting a non-existent stream should not crash.
+  filter->resetHttpStream(99999);
+
+  // Clean up properly.
+  filter->onDestroy();
+  dispatcher.clearDeferredDeleteList();
+}
+
+TEST(DynamicModulesTest, HttpFilterStartHttpStreamNoBodyEndStream) {
+  auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", "c"), false);
+  EXPECT_TRUE(dynamic_module.ok());
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::IsolatedStoreImpl stats_store;
+  auto stats_scope = stats_store.createScope("");
+
+  Upstream::MockClusterManager cluster_manager;
+  auto cluster = std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+
+  EXPECT_CALL(cluster_manager, getThreadLocalCluster(_))
+      .WillRepeatedly(testing::Return(cluster.get()));
+
+  EXPECT_CALL(context, clusterManager()).WillRepeatedly(testing::ReturnRef(cluster_manager));
+
+  auto filter_config_or_status =
+      Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
+          "filter", "", false, std::move(dynamic_module.value()), *stats_scope, context);
+  EXPECT_TRUE(filter_config_or_status.ok());
+
+  auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
+                                                          stats_scope->symbolTable(), 0);
+  filter->initializeInModuleFilter();
+
+  NiceMock<Event::MockDispatcher> dispatcher;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  EXPECT_CALL(decoder_callbacks, dispatcher()).WillRepeatedly(testing::ReturnRef(dispatcher));
+  filter->setDecoderFilterCallbacks(decoder_callbacks);
+
+  // Mock AsyncClient
+  NiceMock<Http::MockAsyncClientStream> stream;
+  EXPECT_CALL(cluster->async_client_, start(_, _))
+      .WillOnce(Invoke([&](Http::AsyncClient::StreamCallbacks&,
+                           const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
+        return &stream;
+      }));
+
+  // Expect sendHeaders with end_stream=true (no body, so headers end the stream).
+  EXPECT_CALL(stream, sendHeaders(_, true));
+
+  // Start Stream with end_stream=true and no body.
+  uint64_t stream_id;
+  auto headers = std::make_unique<Http::TestRequestHeaderMapImpl>(
+      std::initializer_list<std::pair<std::string, std::string>>{
+          {":method", "GET"}, {":path", "/"}, {":authority", "host"}});
+  auto message = std::make_unique<Http::RequestMessageImpl>(std::move(headers));
+  // No body added to the message.
+  auto result = filter->startHttpStream(&stream_id, "cluster", std::move(message), true, 1000);
+  EXPECT_EQ(result, envoy_dynamic_module_type_http_callout_init_result_Success);
+
+  // Clean up properly.
+  filter->onDestroy();
+  dispatcher.clearDeferredDeleteList();
+}
+
+TEST(DynamicModulesTest, HttpFilterStartHttpStreamInlineResetOnHeaders) {
+  auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", "c"), false);
+  EXPECT_TRUE(dynamic_module.ok());
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::IsolatedStoreImpl stats_store;
+  auto stats_scope = stats_store.createScope("");
+
+  Upstream::MockClusterManager cluster_manager;
+  auto cluster = std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+
+  EXPECT_CALL(cluster_manager, getThreadLocalCluster(_))
+      .WillRepeatedly(testing::Return(cluster.get()));
+
+  EXPECT_CALL(context, clusterManager()).WillRepeatedly(testing::ReturnRef(cluster_manager));
+
+  auto filter_config_or_status =
+      Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
+          "filter", "", false, std::move(dynamic_module.value()), *stats_scope, context);
+  EXPECT_TRUE(filter_config_or_status.ok());
+
+  auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
+                                                          stats_scope->symbolTable(), 0);
+  filter->initializeInModuleFilter();
+
+  NiceMock<Event::MockDispatcher> dispatcher;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  EXPECT_CALL(decoder_callbacks, dispatcher()).WillRepeatedly(testing::ReturnRef(dispatcher));
+  filter->setDecoderFilterCallbacks(decoder_callbacks);
+
+  // Mock AsyncClient - will reset inline when sendHeaders is called.
+  NiceMock<Http::MockAsyncClientStream> stream;
+  Http::AsyncClient::StreamCallbacks* captured_callbacks = nullptr;
+  EXPECT_CALL(cluster->async_client_, start(_, _))
+      .WillOnce(Invoke([&](Http::AsyncClient::StreamCallbacks& callbacks,
+                           const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
+        captured_callbacks = &callbacks;
+        return &stream;
+      }));
+
+  // When sendHeaders is called with end_stream=true, simulate an inline reset.
+  EXPECT_CALL(stream, sendHeaders(_, true)).WillOnce(Invoke([&](Http::RequestHeaderMap&, bool) {
+    // Simulate stream resetting inline.
+    captured_callbacks->onReset();
+  }));
+
+  // Start Stream with no body and end_stream=true.
+  uint64_t stream_id;
+  auto headers = std::make_unique<Http::TestRequestHeaderMapImpl>(
+      std::initializer_list<std::pair<std::string, std::string>>{
+          {":method", "GET"}, {":path", "/"}, {":authority", "host"}});
+  auto message = std::make_unique<Http::RequestMessageImpl>(std::move(headers));
+  auto result = filter->startHttpStream(&stream_id, "cluster", std::move(message), true, 1000);
+  // Should still return success even with inline reset.
+  EXPECT_EQ(result, envoy_dynamic_module_type_http_callout_init_result_Success);
+
+  // Clean up properly.
+  filter->onDestroy();
+  dispatcher.clearDeferredDeleteList();
+}
+
+TEST(DynamicModulesTest, HttpFilterStartHttpStreamInlineResetOnData) {
+  auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", "c"), false);
+  EXPECT_TRUE(dynamic_module.ok());
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::IsolatedStoreImpl stats_store;
+  auto stats_scope = stats_store.createScope("");
+
+  Upstream::MockClusterManager cluster_manager;
+  auto cluster = std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+
+  EXPECT_CALL(cluster_manager, getThreadLocalCluster(_))
+      .WillRepeatedly(testing::Return(cluster.get()));
+
+  EXPECT_CALL(context, clusterManager()).WillRepeatedly(testing::ReturnRef(cluster_manager));
+
+  auto filter_config_or_status =
+      Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
+          "filter", "", false, std::move(dynamic_module.value()), *stats_scope, context);
+  EXPECT_TRUE(filter_config_or_status.ok());
+
+  auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
+                                                          stats_scope->symbolTable(), 0);
+  filter->initializeInModuleFilter();
+
+  NiceMock<Event::MockDispatcher> dispatcher;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  EXPECT_CALL(decoder_callbacks, dispatcher()).WillRepeatedly(testing::ReturnRef(dispatcher));
+  filter->setDecoderFilterCallbacks(decoder_callbacks);
+
+  // Mock AsyncClient - will reset inline when sendData is called.
+  NiceMock<Http::MockAsyncClientStream> stream;
+  Http::AsyncClient::StreamCallbacks* captured_callbacks = nullptr;
+  EXPECT_CALL(cluster->async_client_, start(_, _))
+      .WillOnce(Invoke([&](Http::AsyncClient::StreamCallbacks& callbacks,
+                           const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
+        captured_callbacks = &callbacks;
+        return &stream;
+      }));
+
+  // sendHeaders succeeds.
+  EXPECT_CALL(stream, sendHeaders(_, false));
+  // When sendData is called, simulate an inline reset.
+  EXPECT_CALL(stream, sendData(_, true)).WillOnce(Invoke([&](Buffer::Instance&, bool) {
+    // Simulate stream resetting inline.
+    captured_callbacks->onReset();
+  }));
+
+  // Start Stream with body and end_stream=true.
+  uint64_t stream_id;
+  auto headers = std::make_unique<Http::TestRequestHeaderMapImpl>(
+      std::initializer_list<std::pair<std::string, std::string>>{
+          {":method", "POST"}, {":path", "/"}, {":authority", "host"}});
+  auto message = std::make_unique<Http::RequestMessageImpl>(std::move(headers));
+  message->body().add("request body");
+  auto result = filter->startHttpStream(&stream_id, "cluster", std::move(message), true, 1000);
+  // Should still return success even with inline reset on data.
+  EXPECT_EQ(result, envoy_dynamic_module_type_http_callout_init_result_Success);
+
+  // Clean up properly.
+  filter->onDestroy();
+  dispatcher.clearDeferredDeleteList();
+}
+
 } // namespace HttpFilters
 } // namespace DynamicModules
 } // namespace Extensions

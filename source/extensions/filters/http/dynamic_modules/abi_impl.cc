@@ -1,3 +1,4 @@
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 
@@ -8,6 +9,8 @@
 #include "source/common/http/utility.h"
 #include "source/common/network/socket_option_impl.h"
 #include "source/common/router/string_accessor_impl.h"
+#include "source/common/tracing/null_span_impl.h"
+#include "source/common/tracing/tracer_impl.h"
 #include "source/extensions/dynamic_modules/abi.h"
 #include "source/extensions/filters/http/dynamic_modules/filter.h"
 
@@ -1543,6 +1546,175 @@ uint32_t envoy_dynamic_module_callback_http_filter_get_worker_index(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
   return filter->workerIndex();
+}
+
+// ----------------------------- Tracing callbacks -----------------------------
+
+envoy_dynamic_module_type_span_envoy_ptr envoy_dynamic_module_callback_http_get_active_span(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr) {
+  auto* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  Tracing::Span& span = filter->activeSpan();
+  // Return nullptr if the span is a NullSpan (tracing is not enabled).
+  if (dynamic_cast<Tracing::NullSpan*>(&span) != nullptr) {
+    return nullptr;
+  }
+  return &span;
+}
+
+void envoy_dynamic_module_callback_http_span_set_tag(
+    envoy_dynamic_module_type_span_envoy_ptr span_ptr, envoy_dynamic_module_type_module_buffer key,
+    envoy_dynamic_module_type_module_buffer value) {
+  if (span_ptr == nullptr) {
+    return;
+  }
+  auto* span = static_cast<Tracing::Span*>(span_ptr);
+  absl::string_view key_view(key.ptr, key.length);
+  absl::string_view value_view(value.ptr, value.length);
+  span->setTag(key_view, value_view);
+}
+
+void envoy_dynamic_module_callback_http_span_set_operation(
+    envoy_dynamic_module_type_span_envoy_ptr span_ptr,
+    envoy_dynamic_module_type_module_buffer operation) {
+  if (span_ptr == nullptr) {
+    return;
+  }
+  auto* span = static_cast<Tracing::Span*>(span_ptr);
+  absl::string_view operation_view(operation.ptr, operation.length);
+  span->setOperation(operation_view);
+}
+
+void envoy_dynamic_module_callback_http_span_log(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_span_envoy_ptr span_ptr,
+    envoy_dynamic_module_type_module_buffer event) {
+  if (filter_envoy_ptr == nullptr || span_ptr == nullptr) {
+    return;
+  }
+  auto* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  auto* span = static_cast<Tracing::Span*>(span_ptr);
+  absl::string_view event_view(event.ptr, event.length);
+  auto* cb = filter->callbacks();
+  if (cb != nullptr) {
+    span->log(cb->dispatcher().timeSource().systemTime(), std::string(event_view));
+  }
+}
+
+void envoy_dynamic_module_callback_http_span_set_sampled(
+    envoy_dynamic_module_type_span_envoy_ptr span_ptr, bool sampled) {
+  if (span_ptr == nullptr) {
+    return;
+  }
+  auto* span = static_cast<Tracing::Span*>(span_ptr);
+  span->setSampled(sampled);
+}
+
+// Thread-local storage for temporary strings returned by tracing functions.
+// These strings are valid until the next call to a tracing function on the same thread.
+static thread_local std::string tls_trace_string_storage;
+
+bool envoy_dynamic_module_callback_http_span_get_baggage(
+    envoy_dynamic_module_type_span_envoy_ptr span_ptr, envoy_dynamic_module_type_module_buffer key,
+    envoy_dynamic_module_type_envoy_buffer* result) {
+  if (span_ptr == nullptr || result == nullptr) {
+    return false;
+  }
+  auto* span = static_cast<Tracing::Span*>(span_ptr);
+  absl::string_view key_view(key.ptr, key.length);
+  tls_trace_string_storage = span->getBaggage(key_view);
+  if (tls_trace_string_storage.empty()) {
+    result->ptr = nullptr;
+    result->length = 0;
+    return false;
+  }
+  result->ptr = tls_trace_string_storage.data();
+  result->length = tls_trace_string_storage.size();
+  return true;
+}
+
+void envoy_dynamic_module_callback_http_span_set_baggage(
+    envoy_dynamic_module_type_span_envoy_ptr span_ptr, envoy_dynamic_module_type_module_buffer key,
+    envoy_dynamic_module_type_module_buffer value) {
+  if (span_ptr == nullptr) {
+    return;
+  }
+  auto* span = static_cast<Tracing::Span*>(span_ptr);
+  absl::string_view key_view(key.ptr, key.length);
+  absl::string_view value_view(value.ptr, value.length);
+  span->setBaggage(key_view, value_view);
+}
+
+bool envoy_dynamic_module_callback_http_span_get_trace_id(
+    envoy_dynamic_module_type_span_envoy_ptr span_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result) {
+  if (span_ptr == nullptr || result == nullptr) {
+    return false;
+  }
+  auto* span = static_cast<Tracing::Span*>(span_ptr);
+  tls_trace_string_storage = span->getTraceId();
+  if (tls_trace_string_storage.empty()) {
+    result->ptr = nullptr;
+    result->length = 0;
+    return false;
+  }
+  result->ptr = tls_trace_string_storage.data();
+  result->length = tls_trace_string_storage.size();
+  return true;
+}
+
+bool envoy_dynamic_module_callback_http_span_get_span_id(
+    envoy_dynamic_module_type_span_envoy_ptr span_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result) {
+  if (span_ptr == nullptr || result == nullptr) {
+    return false;
+  }
+  auto* span = static_cast<Tracing::Span*>(span_ptr);
+  tls_trace_string_storage = span->getSpanId();
+  if (tls_trace_string_storage.empty()) {
+    result->ptr = nullptr;
+    result->length = 0;
+    return false;
+  }
+  result->ptr = tls_trace_string_storage.data();
+  result->length = tls_trace_string_storage.size();
+  return true;
+}
+
+envoy_dynamic_module_type_child_span_module_ptr envoy_dynamic_module_callback_http_span_spawn_child(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_span_envoy_ptr span_ptr,
+    envoy_dynamic_module_type_module_buffer operation_name) {
+  if (filter_envoy_ptr == nullptr || span_ptr == nullptr) {
+    return nullptr;
+  }
+  auto* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  auto* parent_span = static_cast<Tracing::Span*>(span_ptr);
+  absl::string_view operation_view(operation_name.ptr, operation_name.length);
+
+  auto* cb = filter->callbacks();
+  if (cb == nullptr) {
+    return nullptr;
+  }
+
+  // Create a child span with default egress tracing config.
+  Tracing::SpanPtr child =
+      parent_span->spawnChild(Tracing::EgressConfig::get(), std::string(operation_view),
+                              cb->dispatcher().timeSource().systemTime());
+  if (child == nullptr) {
+    return nullptr;
+  }
+  // Release ownership to the module - the module is responsible for calling finish.
+  return child.release();
+}
+
+void envoy_dynamic_module_callback_http_child_span_finish(
+    envoy_dynamic_module_type_child_span_module_ptr span_ptr) {
+  if (span_ptr == nullptr) {
+    return;
+  }
+  auto* span = static_cast<Tracing::Span*>(span_ptr);
+  span->finishSpan();
+  delete span;
 }
 
 } // extern "C"
