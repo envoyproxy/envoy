@@ -168,6 +168,8 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   ResponseHeaderMapOptRef informationalHeaders() override;
   ResponseHeaderMapOptRef responseHeaders() override;
   ResponseTrailerMapOptRef responseTrailers() override;
+  void setBufferLimit(uint64_t limit) override;
+  uint64_t bufferLimit() override;
 
   // Functions to set or get iteration state.
   bool canIterate() { return iteration_state_ == IterationState::Continue; }
@@ -289,8 +291,6 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   void addDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks& watermark_callbacks) override;
   void
   removeDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks& watermark_callbacks) override;
-  void setDecoderBufferLimit(uint64_t limit) override;
-  uint64_t decoderBufferLimit() override;
   bool recreateStream(const Http::ResponseHeaderMap* original_response_headers) override;
 
   void addUpstreamSocketOptions(const Network::Socket::OptionsSharedPtr& options) override;
@@ -362,8 +362,6 @@ struct ActiveStreamEncoderFilter : public ActiveStreamFilterBase,
   void addEncodedMetadata(MetadataMapPtr&& metadata_map) override;
   void onEncoderFilterAboveWriteBufferHighWatermark() override;
   void onEncoderFilterBelowWriteBufferLowWatermark() override;
-  void setEncoderBufferLimit(uint64_t limit) override;
-  uint64_t encoderBufferLimit() override;
   void continueEncoding() override;
   const Buffer::Instance* encodingBuffer() override;
   void modifyEncodingBuffer(std::function<void(Buffer::Instance&)> callback) override;

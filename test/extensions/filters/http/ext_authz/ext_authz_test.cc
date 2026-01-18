@@ -1949,7 +1949,7 @@ TEST_F(HttpFilterTest, RequestDataIsTooLarge) {
 
   ON_CALL(decoder_filter_callbacks_, connection())
       .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
-  EXPECT_CALL(decoder_filter_callbacks_, setDecoderBufferLimit(_));
+  EXPECT_CALL(decoder_filter_callbacks_, setBufferLimit(_));
   EXPECT_CALL(*client_, check(_, _, _, _)).Times(0);
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
@@ -1982,7 +1982,7 @@ TEST_F(HttpFilterTest, RequestDataWithPartialMessage) {
   ON_CALL(decoder_filter_callbacks_, decodingBuffer()).WillByDefault(Return(&data_));
   ON_CALL(decoder_filter_callbacks_, addDecodedData(_, _))
       .WillByDefault(Invoke([&](Buffer::Instance& data, bool) { data_.add(data); }));
-  EXPECT_CALL(decoder_filter_callbacks_, setDecoderBufferLimit(_)).Times(0);
+  EXPECT_CALL(decoder_filter_callbacks_, setBufferLimit(_)).Times(0);
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
   EXPECT_CALL(*client_, check(_, _, _, _));
@@ -2029,7 +2029,7 @@ TEST_F(HttpFilterTest, RequestDataWithPartialMessageThenContinueDecoding) {
   ON_CALL(decoder_filter_callbacks_, decodingBuffer()).WillByDefault(Return(&data_));
   ON_CALL(decoder_filter_callbacks_, addDecodedData(_, _))
       .WillByDefault(Invoke([&](Buffer::Instance& data, bool) { data_.add(data); }));
-  EXPECT_CALL(decoder_filter_callbacks_, setDecoderBufferLimit(_)).Times(0);
+  EXPECT_CALL(decoder_filter_callbacks_, setBufferLimit(_)).Times(0);
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
 
@@ -2091,7 +2091,7 @@ TEST_F(HttpFilterTest, RequestDataWithSmallBuffer) {
   ON_CALL(decoder_filter_callbacks_, decodingBuffer()).WillByDefault(Return(&data_));
   ON_CALL(decoder_filter_callbacks_, addDecodedData(_, _))
       .WillByDefault(Invoke([&](Buffer::Instance& data, bool) { data_.add(data); }));
-  EXPECT_CALL(decoder_filter_callbacks_, setDecoderBufferLimit(_)).Times(0);
+  EXPECT_CALL(decoder_filter_callbacks_, setBufferLimit(_)).Times(0);
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
   EXPECT_CALL(*client_, check(_, _, _, _));
@@ -3845,8 +3845,8 @@ TEST_P(HttpFilterTestParam, DisabledOnRouteWithRequestBody) {
   test_disable(false);
   ON_CALL(decoder_filter_callbacks_, connection())
       .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
-  // When filter is not disabled, setDecoderBufferLimit is called.
-  EXPECT_CALL(decoder_filter_callbacks_, setDecoderBufferLimit(_));
+  // When filter is not disabled, setBufferLimit is called.
+  EXPECT_CALL(decoder_filter_callbacks_, setBufferLimit(_));
   EXPECT_CALL(*client_, check(_, _, _, _)).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
@@ -3855,8 +3855,8 @@ TEST_P(HttpFilterTestParam, DisabledOnRouteWithRequestBody) {
   // To test that disabling the filter works.
   test_disable(true);
   EXPECT_CALL(*client_, check(_, _, _, _)).Times(0);
-  // Make sure that setDecoderBufferLimit is skipped.
-  EXPECT_CALL(decoder_filter_callbacks_, setDecoderBufferLimit(_)).Times(0);
+  // Make sure that setBufferLimit is skipped.
+  EXPECT_CALL(decoder_filter_callbacks_, setBufferLimit(_)).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
@@ -5044,7 +5044,7 @@ TEST_F(HttpFilterTest, PerRouteCheckSettingsWorks) {
   ON_CALL(decoder_filter_callbacks_, decodingBuffer()).WillByDefault(Return(&data_));
   ON_CALL(decoder_filter_callbacks_, addDecodedData(_, _))
       .WillByDefault(Invoke([&](Buffer::Instance& data, bool) { data_.add(data); }));
-  EXPECT_CALL(decoder_filter_callbacks_, setDecoderBufferLimit(_)).Times(0);
+  EXPECT_CALL(decoder_filter_callbacks_, setBufferLimit(_)).Times(0);
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
   EXPECT_CALL(*client_, check(_, _, _, _));
@@ -5128,7 +5128,7 @@ TEST_F(HttpFilterTest, PerRouteCheckSettingsOverrideWorks) {
   ON_CALL(decoder_filter_callbacks_, decodingBuffer()).WillByDefault(Return(&data_));
   ON_CALL(decoder_filter_callbacks_, addDecodedData(_, _))
       .WillByDefault(Invoke([&](Buffer::Instance& data, bool) { data_.add(data); }));
-  EXPECT_CALL(decoder_filter_callbacks_, setDecoderBufferLimit(_)).Times(0);
+  EXPECT_CALL(decoder_filter_callbacks_, setBufferLimit(_)).Times(0);
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
   EXPECT_CALL(*client_, check(_, _, _, _));
@@ -5183,16 +5183,16 @@ TEST_P(HttpFilterTestParam, DisableRequestBodyBufferingOnRoute) {
   test_disable_request_body_buffering(false);
   ON_CALL(decoder_filter_callbacks_, connection())
       .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
-  // When request body buffering is not skipped, setDecoderBufferLimit is called.
-  EXPECT_CALL(decoder_filter_callbacks_, setDecoderBufferLimit(_));
+  // When request body buffering is not skipped, setBufferLimit is called.
+  EXPECT_CALL(decoder_filter_callbacks_, setBufferLimit(_));
   EXPECT_CALL(*client_, check(_, _, _, _)).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data_, false));
 
   test_disable_request_body_buffering(true);
-  // When request body buffering is skipped, setDecoderBufferLimit is not called.
-  EXPECT_CALL(decoder_filter_callbacks_, setDecoderBufferLimit(_)).Times(0);
+  // When request body buffering is skipped, setBufferLimit is not called.
+  EXPECT_CALL(decoder_filter_callbacks_, setBufferLimit(_)).Times(0);
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
   EXPECT_CALL(*client_, check(_, _, _, _));

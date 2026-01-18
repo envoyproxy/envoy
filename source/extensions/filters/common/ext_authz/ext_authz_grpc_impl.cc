@@ -51,10 +51,10 @@ AppendActionResult getAppendAction(envoy::config::core::v3::HeaderValueOption& h
 // Moves header mutations from proto to the response vector, preserving order.
 // This is more efficient than copying strings since the proto data is not reused.
 void moveHeaderMutations(
-    Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption>* headers,
+    Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption>& headers,
     HeaderMutationVector& mutations, bool& saw_invalid_append_actions) {
-  mutations.reserve(mutations.size() + headers->size());
-  for (auto& header : *headers) {
+  mutations.reserve(mutations.size() + headers.size());
+  for (auto& header : headers) {
     AppendActionResult result = getAppendAction(header, saw_invalid_append_actions);
     mutations.push_back({std::move(*header.mutable_header()->mutable_key()),
                          std::move(*header.mutable_header()->mutable_value()), result.action,
@@ -62,28 +62,39 @@ void moveHeaderMutations(
   }
 }
 
+// Moves strings from proto repeated field to vector without copying.
+std::vector<std::string>
+moveStringsFromProto(Protobuf::RepeatedPtrField<std::string>& proto_strings) {
+  std::vector<std::string> result;
+  result.reserve(proto_strings.size());
+  for (auto& str : proto_strings) {
+    result.push_back(std::move(str));
+  }
+  return result;
+}
+
 } // namespace
 
 void copyOkResponseMutations(ResponsePtr& response,
                              envoy::service::auth::v3::OkHttpResponse* ok_response) {
   // Move upstream request header mutations.
-  moveHeaderMutations(ok_response->mutable_headers(), response->request_header_mutations,
+  moveHeaderMutations(*ok_response->mutable_headers(), response->request_header_mutations,
                       response->saw_invalid_append_actions);
 
   // Move downstream response header mutations.
-  moveHeaderMutations(ok_response->mutable_response_headers_to_add(),
+  moveHeaderMutations(*ok_response->mutable_response_headers_to_add(),
                       response->response_header_mutations, response->saw_invalid_append_actions);
 
-  response->headers_to_remove = std::vector<std::string>{ok_response->headers_to_remove().begin(),
-                                                         ok_response->headers_to_remove().end()};
+  // Move headers_to_remove to avoid copying strings.
+  response->headers_to_remove = moveStringsFromProto(*ok_response->mutable_headers_to_remove());
 
   for (const auto& query_parameter : ok_response->query_parameters_to_set()) {
     response->query_parameters_to_set.emplace_back(query_parameter.key(), query_parameter.value());
   }
 
+  // Move query_parameters_to_remove to avoid copying strings.
   response->query_parameters_to_remove =
-      std::vector<std::string>{ok_response->query_parameters_to_remove().begin(),
-                               ok_response->query_parameters_to_remove().end()};
+      moveStringsFromProto(*ok_response->mutable_query_parameters_to_remove());
 }
 
 GrpcClientImpl::GrpcClientImpl(const Grpc::RawAsyncClientSharedPtr& async_client,
@@ -133,7 +144,7 @@ void GrpcClientImpl::onSuccess(std::unique_ptr<envoy::service::auth::v3::CheckRe
     // Let the filter use status_on_error configuration.
     auto* error_response = response->mutable_error_response();
     // Move headers to local_response_header_mutations for local reply.
-    moveHeaderMutations(error_response->mutable_headers(),
+    moveHeaderMutations(*error_response->mutable_headers(),
                         authz_response->local_response_header_mutations,
                         authz_response->saw_invalid_append_actions);
 
@@ -151,7 +162,7 @@ void GrpcClientImpl::onSuccess(std::unique_ptr<envoy::service::auth::v3::CheckRe
     if (response->has_denied_response()) {
       auto* denied_response = response->mutable_denied_response();
       // Move headers to local_response_header_mutations for local reply.
-      moveHeaderMutations(denied_response->mutable_headers(),
+      moveHeaderMutations(*denied_response->mutable_headers(),
                           authz_response->local_response_header_mutations,
                           authz_response->saw_invalid_append_actions);
 

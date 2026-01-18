@@ -75,38 +75,47 @@ bool headersWithinLimits(const Http::HeaderMap& headers) {
 }
 
 // Applies a single header mutation to the given header map based on its append_action.
-// This is a reusable helper for applying header mutations in encodeHeaders and local replies.
-void applyHeaderMutation(Http::HeaderMap& headers, const HeaderMutation& mutation) {
+// Returns true if the mutation was applied, false if skipped due to conditional action.
+// When is_request_header is true, deprecated APPEND_IF_EXISTS_OR_ADD only appends to
+// existing headers (backward compatibility). For response headers, it always appends.
+bool applyHeaderMutation(Http::HeaderMap& headers, const HeaderMutation& mutation,
+                         bool is_request_header = false) {
   const Http::LowerCaseString key(mutation.key);
   switch (mutation.append_action) {
   case Filters::Common::ExtAuthz::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD:
-    // Set removes existing and adds new (equivalent to setCopy).
     headers.setCopy(key, mutation.value);
-    break;
+    return true;
   case Filters::Common::ExtAuthz::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD:
-    // For the deprecated 'append' boolean field on response headers, use appendCopy()
-    // which creates comma-separated values for existing headers or adds new headers.
-    // For the new append_action enum, use addCopy() which creates duplicate header entries.
+    // For the deprecated 'append' boolean field:
+    // - Request headers: only append to existing headers for backward compatibility.
+    // - Response headers: use appendCopy() which appends or adds new headers.
+    // For the new append_action enum: use addCopy() to create duplicate header entries.
     if (mutation.from_deprecated_append) {
+      if (is_request_header) {
+        if (headers.get(key).empty()) {
+          return false; // Skip: request header doesn't exist.
+        }
+      }
       headers.appendCopy(key, mutation.value);
     } else {
       headers.addCopy(key, mutation.value);
     }
-    break;
+    return true;
   case Filters::Common::ExtAuthz::HeaderValueOption::ADD_IF_ABSENT:
     if (headers.get(key).empty()) {
       headers.addCopy(key, mutation.value);
+      return true;
     }
-    break;
+    return false; // Skip: header already exists.
   case Filters::Common::ExtAuthz::HeaderValueOption::OVERWRITE_IF_EXISTS:
     if (!headers.get(key).empty()) {
       headers.setCopy(key, mutation.value);
+      return true;
     }
-    break;
+    return false; // Skip: header doesn't exist.
   default:
-    // For any unknown action, default to set behavior.
     headers.setCopy(key, mutation.value);
-    break;
+    return true;
   }
 }
 
@@ -495,7 +504,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
       max_request_bytes_ = check_settings.with_request_body().max_request_bytes();
     }
     if (!allow_partial_message_) {
-      decoder_callbacks_->setDecoderBufferLimit(max_request_bytes_);
+      decoder_callbacks_->setBufferLimit(max_request_bytes_);
     }
     return Http::FilterHeadersStatus::StopIteration;
   }
@@ -708,43 +717,8 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       CheckResult check_result = validateAndCheckDecoderHeaderMutation(check_op, key, value);
       switch (check_result) {
       case CheckResult::OK: {
-        Http::LowerCaseString lowercase_key(key);
-        switch (mutation.append_action) {
-        case Filters::Common::ExtAuthz::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD:
-          ENVOY_STREAM_LOG(trace, "Set '{}':'{}'", *decoder_callbacks_, key, value);
-          request_headers_->setCopy(lowercase_key, value);
-          break;
-        case Filters::Common::ExtAuthz::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD:
-          // For the deprecated 'append' boolean field, only append to existing headers
-          // and do not add the header if it doesn't exist. For the new append_action
-          // enum, add duplicate header entries via addCopy().
-          if (mutation.from_deprecated_append) {
-            if (!request_headers_->get(lowercase_key).empty()) {
-              ENVOY_STREAM_LOG(trace, "Append '{}':'{}'", *decoder_callbacks_, key, value);
-              request_headers_->appendCopy(lowercase_key, value);
-            }
-          } else {
-            ENVOY_STREAM_LOG(trace, "Add '{}':'{}'", *decoder_callbacks_, key, value);
-            request_headers_->addCopy(lowercase_key, value);
-          }
-          break;
-        case Filters::Common::ExtAuthz::HeaderValueOption::ADD_IF_ABSENT:
-          if (request_headers_->get(lowercase_key).empty()) {
-            ENVOY_STREAM_LOG(trace, "AddIfAbsent '{}':'{}'", *decoder_callbacks_, key, value);
-            request_headers_->addCopy(lowercase_key, value);
-          }
-          break;
-        case Filters::Common::ExtAuthz::HeaderValueOption::OVERWRITE_IF_EXISTS:
-          if (!request_headers_->get(lowercase_key).empty()) {
-            ENVOY_STREAM_LOG(trace, "OverwriteIfExists '{}':'{}'", *decoder_callbacks_, key, value);
-            request_headers_->setCopy(lowercase_key, value);
-          }
-          break;
-        default:
-          // For any unknown action, default to set behavior.
-          ENVOY_STREAM_LOG(trace, "Set (default) '{}':'{}'", *decoder_callbacks_, key, value);
-          request_headers_->setCopy(lowercase_key, value);
-          break;
+        if (applyHeaderMutation(*request_headers_, mutation, /*is_request_header=*/true)) {
+          ENVOY_STREAM_LOG(trace, "{} '{}':'{}'", *decoder_callbacks_, op_name, key, value);
         }
 
         if (!headersWithinLimits(*request_headers_)) {

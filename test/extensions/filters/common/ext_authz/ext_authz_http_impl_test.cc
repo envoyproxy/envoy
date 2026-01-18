@@ -551,8 +551,7 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationDenied) {
   auto authz_response = TestCommon::makeAuthzResponse(CheckStatus::Denied, Http::Code::Forbidden);
   authz_response.local_response_header_mutations.push_back(
       {":status", "403", HeaderValueOption::APPEND_IF_EXISTS_OR_ADD});
-  // HTTP impl adds empty string to headers_to_remove from parsing x-envoy-auth-headers-to-remove.
-  authz_response.headers_to_remove.push_back("");
+  // For denied responses, headers_to_remove is empty (parsing only happens for OK responses).
   auto check_response = TestCommon::makeMessageResponse(expected_headers);
 
   envoy::service::auth::v3::CheckRequest request;
@@ -591,8 +590,7 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationDeniedWithAllAttributes) {
   // x-foobar matches clientHeaderMatchers (X- prefix) → local_response_header_mutations.
   authz_response.local_response_header_mutations.push_back(
       {"x-foobar", "bar", HeaderValueOption::APPEND_IF_EXISTS_OR_ADD});
-  // HTTP impl adds empty string to headers_to_remove from parsing x-envoy-auth-headers-to-remove.
-  authz_response.headers_to_remove.push_back("");
+  // For denied responses, headers_to_remove is empty (parsing only happens for OK responses).
 
   envoy::service::auth::v3::CheckRequest request;
   client_->check(request_callbacks_, request, parent_span_, stream_info_);
@@ -628,8 +626,7 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationDeniedAndAllowedClientHeaders) {
   // foo matches clientHeaderMatchers (Foo exact) → local_response_header_mutations.
   authz_response.local_response_header_mutations.push_back(
       {"foo", "bar", HeaderValueOption::APPEND_IF_EXISTS_OR_ADD});
-  // HTTP impl adds empty string to headers_to_remove from parsing x-envoy-auth-headers-to-remove.
-  authz_response.headers_to_remove.push_back("");
+  // For denied responses, headers_to_remove is empty (parsing only happens for OK responses).
 
   envoy::service::auth::v3::CheckRequest request;
   client_->check(request_callbacks_, request, parent_span_, stream_info_);

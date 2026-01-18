@@ -21,6 +21,7 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:udp_stop_iteration",
     ],
     deps = [
+        "//source/common/stats:isolated_store_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
         "//source/extensions/filters/udp/dynamic_modules:filter_lib",
         "//test/extensions/dynamic_modules:util",
@@ -36,6 +37,7 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:udp_no_op",
     ],
     deps = [
+        "//source/common/stats:isolated_store_lib",
         "//source/extensions/filters/udp/dynamic_modules:filter_lib",
         "//test/extensions/dynamic_modules:util",
         "//test/mocks/network:network_mocks",

@@ -48,6 +48,13 @@ const Response& errorResponse() {
                                             Protobuf::Struct{}});
 }
 
+// Static matcher that never matches anything. Used for matchers that are not applicable
+// in certain response contexts (e.g., upstream headers for denied responses).
+const MatcherSharedPtr& neverMatchingMatcher() {
+  CONSTRUCT_ON_FIRST_USE(MatcherSharedPtr, std::make_shared<HeaderKeyMatcher>(
+                                               std::vector<Matchers::StringMatcherPtr>{}));
+}
+
 // SuccessResponse used for creating either DENIED or OK authorization responses.
 struct SuccessResponse {
   SuccessResponse(const Http::HeaderMap& headers, const MatcherSharedPtr& matchers,
@@ -439,9 +446,12 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
   }
 
   // Create a Denied authorization response.
+  // For denied responses, headers matching clientHeaderMatchers go to
+  // local_response_header_mutations for the local reply. The upstream request headers (matchers_,
+  // append_matchers_) are not used, so we pass never-matching matchers for those positions.
   SuccessResponse denied{message->headers(),
-                         config_->upstreamHeaderMatchers(),
-                         config_->upstreamHeaderToAppendMatchers(),
+                         neverMatchingMatcher(),
+                         neverMatchingMatcher(),
                          config_->clientHeaderMatchers(),
                          config_->dynamicMetadataMatchers(),
                          Response{CheckStatus::Denied,

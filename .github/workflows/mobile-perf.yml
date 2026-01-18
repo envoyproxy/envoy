@@ -49,7 +49,7 @@ jobs:
     uses: ./.github/workflows/_mobile_container_ci.yml
     with:
       args: ${{ matrix.args }}
-      command: ./bazelw
+      command: bazel
       ref: ${{ matrix.ref }}
       request: ${{ needs.load.outputs.request }}
       source: ${{ matrix.source }}

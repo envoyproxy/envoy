@@ -123,9 +123,13 @@ MATCHER_P(AuthzDeniedResponse, response, "") {
   if (arg->body.compare(response.body)) {
     return false;
   }
-  // Compare local_response_header_mutations for denied responses.
-  return TestCommon::compareHeaderMutationVector(response.local_response_header_mutations,
-                                                 arg->local_response_header_mutations);
+  // Compare local_response_header_mutations (used for denied local reply).
+  if (!TestCommon::compareHeaderMutationVector(response.local_response_header_mutations,
+                                               arg->local_response_header_mutations)) {
+    return false;
+  }
+  // Compare headers_to_remove.
+  return TestCommon::compareVectorOfHeaderName(response.headers_to_remove, arg->headers_to_remove);
 }
 
 MATCHER_P(AuthzOkResponse, response, "") {
