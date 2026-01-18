@@ -36,6 +36,10 @@ bug_fixes:
     Fixed upstream client to not close connection when idle timeout fires before the connection is established.
     This behavior can be reverted by setting the runtime guard
     ``envoy.reloadable_features.codec_client_enable_idle_timer_only_when_connected`` to ``false``.
+- area: ext_authz
+  change: |
+    Fixed a bug where headers from a denied authorization response (non-200s) were not properly propagated to the client.
+
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
