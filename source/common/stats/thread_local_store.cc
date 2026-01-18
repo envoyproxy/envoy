@@ -522,13 +522,19 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
     if constexpr (std::is_same_v<StatType, Counter>) {
       if (limits_.max_counters != 0 && central_cache_map.size() >= limits_.max_counters) {
         parent_.counters_overflow_->inc();
-        return parent_.null_counter_;
+        return null_stat;
       }
     } else if constexpr (std::is_same_v<StatType, Gauge>) {
       if (limits_.max_gauges != 0 && central_cache_map.size() >= limits_.max_gauges) {
         parent_.gauges_overflow_->inc();
-        return parent_.null_gauge_;
+        return null_stat;
       }
+    } else {
+      // TextReadouts are currently not limited, but we must ensure they are the only
+      // other type being handled. This static_assert will trigger a compilation error
+      // if a new StatType is introduced in the future, forcing the developer to
+      // explicitly decide how to handle its limits.
+      static_assert(std::is_same_v<StatType, TextReadout>, "Unexpected StatType");
     }
     StatNameTagHelper tag_helper(parent_, name_no_tags, stat_name_tags);
 
@@ -1247,18 +1253,27 @@ void ThreadLocalStoreImpl::extractAndAppendTags(absl::string_view name, StatName
 }
 
 void ThreadLocalStoreImpl::ensureOverflowStats(const ScopeStatsLimitSettings& limits) {
+  const bool need_counter_overflow_stat = limits.max_counters != 0 && counters_overflow_ == nullptr;
+  const bool need_gauge_overflow_stat = limits.max_gauges != 0 && gauges_overflow_ == nullptr;
+  const bool need_histogram_overflow_stat =
+      limits.max_histograms != 0 && histograms_overflow_ == nullptr;
+
+  if (!need_counter_overflow_stat && !need_gauge_overflow_stat && !need_histogram_overflow_stat) {
+    return;
+  }
+
   Thread::LockGuard lock(lock_);
-  if (limits.max_counters != 0 && counters_overflow_ == nullptr) {
+  if (need_counter_overflow_stat && counters_overflow_ == nullptr) {
     StatNamePool pool(symbolTable());
     StatName name = pool.add("server.stats_overflow.counter");
     counters_overflow_ = alloc_.makeCounter(name, name, {});
   }
-  if (limits.max_gauges != 0 && gauges_overflow_ == nullptr) {
+  if (need_gauge_overflow_stat && gauges_overflow_ == nullptr) {
     StatNamePool pool(symbolTable());
     StatName name = pool.add("server.stats_overflow.gauge");
     gauges_overflow_ = alloc_.makeCounter(name, name, {});
   }
-  if (limits.max_histograms != 0 && histograms_overflow_ == nullptr) {
+  if (need_histogram_overflow_stat && histograms_overflow_ == nullptr) {
     StatNamePool pool(symbolTable());
     StatName name = pool.add("server.stats_overflow.histogram");
     histograms_overflow_ = alloc_.makeCounter(name, name, {});

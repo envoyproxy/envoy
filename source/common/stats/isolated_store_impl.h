@@ -287,12 +287,8 @@ public:
   IsolatedScopeImpl(const std::string& prefix, IsolatedStoreImpl& store)
       : prefix_(prefix, store.symbolTable()), store_(store) {}
 
-  IsolatedScopeImpl(StatName prefix, IsolatedStoreImpl& store, bool evictable = false,
-                    const ScopeStatsLimitSettings& limits = {})
-      : prefix_(prefix, store.symbolTable()), store_(store) {
-    UNREFERENCED_PARAMETER(evictable);
-    UNREFERENCED_PARAMETER(limits);
-  }
+  IsolatedScopeImpl(StatName prefix, IsolatedStoreImpl& store)
+      : prefix_(prefix, store.symbolTable()), store_(store) {}
 
   ~IsolatedScopeImpl() override { prefix_.free(store_.symbolTable()); }
 
