@@ -540,7 +540,7 @@ public:
     decoder_callbacks_->injectDecodedDataToFilterChain(data, end_stream);
   }
 
-  uint32_t bufferLimit() const override { return decoder_callbacks_->decoderBufferLimit(); }
+  uint32_t bufferLimit() const override { return decoder_callbacks_->bufferLimit(); }
 
   Http::HeaderMap* addTrailers() override {
     trailers_ = &decoder_callbacks_->addDecodedTrailers();
@@ -685,7 +685,7 @@ public:
     encoder_callbacks_->injectEncodedDataToFilterChain(data, end_stream);
   }
 
-  uint32_t bufferLimit() const override { return encoder_callbacks_->encoderBufferLimit(); }
+  uint32_t bufferLimit() const override { return encoder_callbacks_->bufferLimit(); }
 
   Http::HeaderMap* addTrailers() override {
     trailers_ = &encoder_callbacks_->addEncodedTrailers();

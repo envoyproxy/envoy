@@ -93,9 +93,11 @@ public:
   const AccessLog::InstanceSharedPtrVector& accessLogs() const override { return access_logs_; }
 
   // FilterChainFactory
-  void createFilterChain(FilterChainManager& manager) override {
+  void createFilterChain(FilterChainFactoryCallbacks& callbacks) override {
     for (auto& factory : factories_) {
-      manager.applyFilterFactoryCb({factory.config_name_}, factory.callback_);
+      // Set the config name for the filter.
+      callbacks.setFilterConfigName(factory.config_name_);
+      factory.callback_(callbacks);
     }
   }
 
@@ -122,8 +124,7 @@ private:
   TimeSource& time_source_;
 };
 
-class ActiveStream : public FilterChainManager,
-                     public LinkedObject<ActiveStream>,
+class ActiveStream : public LinkedObject<ActiveStream>,
                      public Envoy::Event::DeferredDeletable,
                      public EncodingContext,
                      public Tracing::Config,
@@ -205,8 +206,7 @@ public:
 
   class FilterChainFactoryCallbacksHelper : public FilterChainFactoryCallbacks {
   public:
-    FilterChainFactoryCallbacksHelper(ActiveStream& parent, FilterContext context)
-        : parent_(parent), context_(context) {}
+    FilterChainFactoryCallbacksHelper(ActiveStream& parent) : parent_(parent) {}
 
     // FilterChainFactoryCallbacks
     void addDecoderFilter(DecoderFilterSharedPtr filter) override {
@@ -223,6 +223,9 @@ public:
       parent_.addEncoderFilter(
           std::make_unique<ActiveEncoderFilter>(parent_, context_, std::move(filter), true));
     }
+
+    absl::string_view filterConfigName() const override { return context_.config_name; }
+    void setFilterConfigName(absl::string_view name) override { context_.config_name = name; }
 
   private:
     ActiveStream& parent_;
@@ -252,12 +255,6 @@ public:
   void onResponseHeaderFrame(ResponseHeaderFramePtr response_header_frame);
   void onResponseCommonFrame(ResponseCommonFramePtr response_common_frame);
   void continueEncoding();
-
-  // FilterChainManager
-  void applyFilterFactoryCb(FilterContext context, FilterFactoryCb& factory) override {
-    FilterChainFactoryCallbacksHelper callbacks(*this, context);
-    factory(callbacks);
-  }
 
   // EncodingContext
   OptRef<const RouteEntry> routeEntry() const override {

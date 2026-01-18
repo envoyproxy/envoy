@@ -60,6 +60,12 @@ inline const Http::LowerCaseString& reverseTunnelTenantIdHeader() {
   return kHeader;
 }
 
+inline const Http::LowerCaseString& reverseTunnelUpstreamClusterNameHeader() {
+  static const Http::LowerCaseString kHeader{
+      absl::StrCat(Http::Headers::get().prefix(), "-reverse-tunnel-upstream-cluster-name")};
+  return kHeader;
+}
+
 class ReverseConnectionMessageHandlerFactory {
 public:
   static std::shared_ptr<class PingMessageHandler> createPingHandler();

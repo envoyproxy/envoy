@@ -431,7 +431,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
       max_request_bytes_ = check_settings.with_request_body().max_request_bytes();
     }
     if (!allow_partial_message_) {
-      decoder_callbacks_->setDecoderBufferLimit(max_request_bytes_);
+      decoder_callbacks_->setBufferLimit(max_request_bytes_);
     }
     return Http::FilterHeadersStatus::StopIteration;
   }

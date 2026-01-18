@@ -1061,6 +1061,18 @@ public:
    * finished sending and receiving.
    */
   virtual void setShouldDrainConnectionUponCompletion(bool should_drain) PURE;
+
+  /**
+   * @return the codec level stream ID for the associated stream.
+   * This should be implemented to call the codecStreamId() method on the
+   * associated Http::Stream object.
+   */
+  virtual absl::optional<uint32_t> codecStreamId() const PURE;
+
+  /**
+   * @param id the codec level stream ID for the associated stream.
+   */
+  virtual void setCodecStreamId(absl::optional<uint32_t> id) PURE;
 };
 
 // An enum representation of the Proxy-Status error space.

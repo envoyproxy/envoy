@@ -14,6 +14,23 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_extension_cc_test(
+    name = "otlp_log_utils_test",
+    srcs = ["otlp_log_utils_test.cc"],
+    extension_names = ["envoy.access_loggers.open_telemetry"],
+    deps = [
+        "//source/common/http:header_map_lib",
+        "//source/common/router:string_accessor_lib",
+        "//source/common/stream_info:filter_state_lib",
+        "//source/extensions/access_loggers/open_telemetry:otlp_log_utils_lib",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
+        "//test/test_common:utility_lib",
+        "@opentelemetry_proto//:logs_proto_cc",
+        "@opentelemetry_proto//:logs_service_proto_cc",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "grpc_access_log_impl_test",
     srcs = ["grpc_access_log_impl_test.cc"],
     extension_names = ["envoy.access_loggers.open_telemetry"],
@@ -30,6 +47,22 @@ envoy_extension_cc_test(
         "@envoy_api//envoy/extensions/access_loggers/grpc/v3:pkg_cc_proto",
         "@opentelemetry_proto//:logs_proto_cc",
         "@opentelemetry_proto//:logs_service_proto_cc",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "http_access_log_impl_test",
+    srcs = ["http_access_log_impl_test.cc"],
+    extension_names = ["envoy.access_loggers.open_telemetry"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/extensions/access_loggers/open_telemetry:http_access_log_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/stats:stats_mocks",
+        "//test/mocks/thread_local:thread_local_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/test_common:utility_lib",
     ],
 )
 

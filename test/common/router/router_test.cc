@@ -3361,7 +3361,7 @@ TEST_F(RouterTest, BufferLimitLogicCase2PerRequestSetRequestBodyNotSet) {
   EXPECT_CALL(callbacks_, addDecodedData(_, true))
       .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) { decoding_buffer.move(data); }));
   // Set up the connection buffer limit mock to return 40 as expected
-  EXPECT_CALL(callbacks_, decoderBufferLimit()).WillRepeatedly(Return(40));
+  EXPECT_CALL(callbacks_, bufferLimit()).WillRepeatedly(Return(40));
 
   // Case 2: per_request_buffer_limit_bytes=20, request_body_buffer_limit=not set
   // Should use min(20, connection_buffer_limit) = 20 (since connection limit is default 40)
@@ -3405,7 +3405,7 @@ TEST_F(RouterTest, BufferLimitLogicCase2ConnectionLimitSmaller) {
   EXPECT_CALL(callbacks_, addDecodedData(_, true))
       .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) { decoding_buffer.move(data); }));
   // Set up the connection buffer limit mock to return 40 as expected
-  EXPECT_CALL(callbacks_, decoderBufferLimit()).WillRepeatedly(Return(40));
+  EXPECT_CALL(callbacks_, bufferLimit()).WillRepeatedly(Return(40));
 
   // Case 2: per_request_buffer_limit_bytes=50, request_body_buffer_limit=not set
   // Should use min(50, connection_limit) = min(50, 40) = 40
@@ -3449,7 +3449,7 @@ TEST_F(RouterTest, BufferLimitLogicCase3NeitherFieldSet) {
   EXPECT_CALL(callbacks_, addDecodedData(_, true))
       .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) { decoding_buffer.move(data); }));
   // Set up the connection buffer limit mock to return 40 as expected
-  EXPECT_CALL(callbacks_, decoderBufferLimit()).WillRepeatedly(Return(40));
+  EXPECT_CALL(callbacks_, bufferLimit()).WillRepeatedly(Return(40));
 
   // Case 3: both fields not set
   // Should use connection_limit = 40 (default from RouterTestBase)
@@ -3529,7 +3529,7 @@ TEST_F(RouterTest, BufferLimitLogicMultipleDataChunks) {
   EXPECT_CALL(callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
   EXPECT_CALL(callbacks_, addDecodedData(_, true))
       .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) { decoding_buffer.move(data); }));
-  EXPECT_CALL(callbacks_, decoderBufferLimit()).WillRepeatedly(Return(40));
+  EXPECT_CALL(callbacks_, bufferLimit()).WillRepeatedly(Return(40));
 
   // Buffer limit that should allow multiple small chunks but fail on larger ones
   EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit()).WillRepeatedly(Return(25));
@@ -3577,7 +3577,7 @@ TEST_F(RouterTest, BufferLimitLogicMaxUint32Boundary) {
   EXPECT_CALL(callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
   EXPECT_CALL(callbacks_, addDecodedData(_, true))
       .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) { decoding_buffer.move(data); }));
-  EXPECT_CALL(callbacks_, decoderBufferLimit()).WillRepeatedly(Return(40));
+  EXPECT_CALL(callbacks_, bufferLimit()).WillRepeatedly(Return(40));
 
   // Test exactly at uint32_t max boundary
   const uint64_t large_limit = static_cast<uint64_t>(std::numeric_limits<uint32_t>::max()) + 100;
