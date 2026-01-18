@@ -578,6 +578,12 @@ TEST_F(DynamicModuleUdpListenerFilterAbiCallbackTest, SendDatagramIpv6) {
   filter_->setCurrentDataForTest(nullptr);
 }
 
+TEST_F(DynamicModuleUdpListenerFilterAbiCallbackTest, GetWorkerIndex) {
+  uint32_t worker_index =
+      envoy_dynamic_module_callback_udp_listener_filter_get_worker_index(filterPtr());
+  EXPECT_EQ(1u, worker_index);
+}
+
 } // namespace DynamicModules
 } // namespace UdpFilters
 } // namespace Extensions
