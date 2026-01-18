@@ -1561,6 +1561,8 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetWorkerIndex) {
   auto filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
   filter->onAccept(callbacks_);
   filter->setCallbacksForTest(nullptr);
+  // Callbacks not set.
+
   uint32_t worker_index =
       envoy_dynamic_module_callback_listener_filter_get_worker_index(filterPtr());
   EXPECT_EQ(0u, worker_index);
