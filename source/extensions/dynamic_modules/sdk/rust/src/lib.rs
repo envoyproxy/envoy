@@ -1419,7 +1419,7 @@ pub trait EnvoyHttpFilter {
   ///
   /// The returned span can be used to add tags, logs, or spawn child spans.
   /// The active span is managed by Envoy and should not be finished by the module.
-  fn get_active_span(&self) -> Option<EnvoySpan>;
+  fn get_active_span<'a>(&'a self) -> Option<EnvoySpan<'a>>;
 
   /// Create a child span from the active span with the given operation name.
   ///
@@ -1428,19 +1428,23 @@ pub trait EnvoyHttpFilter {
   ///
   /// The returned child span must be finished by calling [`EnvoyChildSpan::finish`]
   /// when done. Failing to finish the span will result in incomplete trace data.
-  fn spawn_child_span(&self, operation_name: &str) -> Option<EnvoyChildSpan>;
+  fn spawn_child_span<'a>(&'a self, operation_name: &str) -> Option<EnvoyChildSpan<'a>>;
 }
 
 /// Represents a reference to an Envoy tracing span.
 ///
 /// This is a wrapper around the raw span pointer from Envoy.
 /// The span is managed by Envoy and should not be finished by the module.
-pub struct EnvoySpan {
+//
+// Implementation note: The lifetime parameter `'a` is used to ensure that the span pointer and
+// filter pointer remain valid. The span is tied to the lifetime of the filter that returned it.
+pub struct EnvoySpan<'a> {
   raw_ptr: abi::envoy_dynamic_module_type_span_envoy_ptr,
   filter_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  _marker: std::marker::PhantomData<&'a ()>,
 }
 
-impl EnvoySpan {
+impl<'a> EnvoySpan<'a> {
   /// Set a tag on this span.
   ///
   /// Tags are key-value pairs that provide metadata about the span.
@@ -1578,7 +1582,8 @@ impl EnvoySpan {
   /// Create a child span with the given operation name.
   ///
   /// The child span must be finished by calling [`EnvoyChildSpan::finish`] when done.
-  pub fn spawn_child(&self, operation_name: &str) -> Option<EnvoyChildSpan> {
+  /// The child span's lifetime is tied to the same filter lifetime as this span.
+  pub fn spawn_child(&self, operation_name: &str) -> Option<EnvoyChildSpan<'a>> {
     let raw_ptr = unsafe {
       abi::envoy_dynamic_module_callback_http_span_spawn_child(
         self.filter_ptr,
@@ -1592,6 +1597,7 @@ impl EnvoySpan {
       Some(EnvoyChildSpan {
         raw_ptr,
         filter_ptr: self.filter_ptr,
+        _marker: std::marker::PhantomData,
       })
     }
   }
@@ -1601,12 +1607,17 @@ impl EnvoySpan {
 ///
 /// Child spans are owned by the module and must be finished by calling
 /// [`EnvoyChildSpan::finish`] when done.
-pub struct EnvoyChildSpan {
+//
+// Implementation note: The lifetime parameter `'a` is used to ensure that the filter pointer
+// remains valid. The child span needs access to the filter for operations like logging and
+// spawning nested children.
+pub struct EnvoyChildSpan<'a> {
   raw_ptr: abi::envoy_dynamic_module_type_child_span_module_ptr,
   filter_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  _marker: std::marker::PhantomData<&'a ()>,
 }
 
-impl EnvoyChildSpan {
+impl<'a> EnvoyChildSpan<'a> {
   /// Set a tag on this span.
   pub fn set_tag(&self, key: &str, value: &str) {
     unsafe {
@@ -1661,7 +1672,9 @@ impl EnvoyChildSpan {
   }
 
   /// Create a child span from this span with the given operation name.
-  pub fn spawn_child(&self, operation_name: &str) -> Option<EnvoyChildSpan> {
+  ///
+  /// The child span's lifetime is tied to the same filter lifetime as this span.
+  pub fn spawn_child(&self, operation_name: &str) -> Option<EnvoyChildSpan<'a>> {
     let raw_ptr = unsafe {
       abi::envoy_dynamic_module_callback_http_span_spawn_child(
         self.filter_ptr,
@@ -1675,6 +1688,7 @@ impl EnvoyChildSpan {
       Some(EnvoyChildSpan {
         raw_ptr,
         filter_ptr: self.filter_ptr,
+        _marker: std::marker::PhantomData,
       })
     }
   }
@@ -1692,7 +1706,7 @@ impl EnvoyChildSpan {
   }
 }
 
-impl Drop for EnvoyChildSpan {
+impl Drop for EnvoyChildSpan<'_> {
   fn drop(&mut self) {
     // If the span was not explicitly finished, finish it now.
     unsafe {
@@ -2839,7 +2853,7 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     }
   }
 
-  fn get_active_span(&self) -> Option<EnvoySpan> {
+  fn get_active_span<'a>(&'a self) -> Option<EnvoySpan<'a>> {
     let raw_ptr = unsafe { abi::envoy_dynamic_module_callback_http_get_active_span(self.raw_ptr) };
     if raw_ptr.is_null() {
       None
@@ -2847,13 +2861,34 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
       Some(EnvoySpan {
         raw_ptr,
         filter_ptr: self.raw_ptr,
+        _marker: std::marker::PhantomData,
       })
     }
   }
 
-  fn spawn_child_span(&self, operation_name: &str) -> Option<EnvoyChildSpan> {
-    let active_span = self.get_active_span()?;
-    active_span.spawn_child(operation_name)
+  fn spawn_child_span<'a>(&'a self, operation_name: &str) -> Option<EnvoyChildSpan<'a>> {
+    // Get the active span pointer directly.
+    let span_ptr = unsafe { abi::envoy_dynamic_module_callback_http_get_active_span(self.raw_ptr) };
+    if span_ptr.is_null() {
+      return None;
+    }
+    // Spawn the child span directly from the raw pointer.
+    let raw_ptr = unsafe {
+      abi::envoy_dynamic_module_callback_http_span_spawn_child(
+        self.raw_ptr,
+        span_ptr,
+        str_to_module_buffer(operation_name),
+      )
+    };
+    if raw_ptr.is_null() {
+      None
+    } else {
+      Some(EnvoyChildSpan {
+        raw_ptr,
+        filter_ptr: self.raw_ptr,
+        _marker: std::marker::PhantomData,
+      })
+    }
   }
 }
 
