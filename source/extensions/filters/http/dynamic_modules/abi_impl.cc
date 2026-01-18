@@ -1539,6 +1539,12 @@ void envoy_dynamic_module_callback_http_filter_continue_encoding(
   filter->continueEncoding();
 }
 
+uint32_t envoy_dynamic_module_callback_http_filter_get_worker_index(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr) {
+  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  return filter->workerIndex();
+}
+
 } // extern "C"
 } // namespace HttpFilters
 } // namespace DynamicModules

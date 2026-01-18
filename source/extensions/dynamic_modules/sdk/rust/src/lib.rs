@@ -88,6 +88,14 @@ macro_rules! declare_init_functions {
   };
 }
 
+/// Get the concurrency from the server context options.
+/// # Safety
+///
+/// This function must be called on the main thread.
+pub unsafe fn get_server_concurrency() -> u32 {
+  unsafe { abi::envoy_dynamic_module_callback_get_concurrency() }
+}
+
 /// Log a trace message to Envoy's logging system with [dynamic_modules] Id. Messages won't be
 /// allocated if the log level is not enabled on the Envoy side.
 ///
@@ -1357,6 +1365,9 @@ pub trait EnvoyHttpFilter {
     value: u64,
   ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
 
+  /// Get the index of the current worker thread.
+  fn get_worker_index(&self) -> u32;
+
   /// Set an integer socket option with the given level, name, state, and direction.
   /// Direction specifies whether to apply to upstream (outgoing to backend) or
   /// downstream (incoming from client) socket.
@@ -2437,6 +2448,10 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     Ok(())
   }
 
+  fn get_worker_index(&self) -> u32 {
+    unsafe { abi::envoy_dynamic_module_callback_http_filter_get_worker_index(self.raw_ptr) }
+  }
+
   fn set_socket_option_int(
     &mut self,
     level: i64,
@@ -3250,12 +3265,14 @@ macro_rules! declare_network_filter_init_functions {
 macro_rules! declare_all_init_functions {
   ($f:ident, $new_http_filter_config_fn:expr, $new_network_filter_config_fn:expr) => {
     #[no_mangle]
-    pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
+    pub extern "C" fn envoy_dynamic_module_on_program_init(
+      server_factory_context_ptr: abi::envoy_dynamic_module_type_server_factory_context_envoy_ptr,
+    ) -> *const ::std::os::raw::c_char {
       envoy_proxy_dynamic_modules_rust_sdk::NEW_HTTP_FILTER_CONFIG_FUNCTION
         .get_or_init(|| $new_http_filter_config_fn);
       envoy_proxy_dynamic_modules_rust_sdk::NEW_NETWORK_FILTER_CONFIG_FUNCTION
         .get_or_init(|| $new_network_filter_config_fn);
-      if ($f()) {
+      if ($f(server_factory_context_ptr)) {
         envoy_proxy_dynamic_modules_rust_sdk::abi::kAbiVersion.as_ptr()
           as *const ::std::os::raw::c_char
       } else {
@@ -3686,6 +3703,9 @@ pub trait EnvoyNetworkFilter {
   /// }
   /// ```
   fn new_scheduler(&self) -> impl EnvoyNetworkFilterScheduler + 'static;
+
+  /// Get the index of the current worker thread.
+  fn get_worker_index(&self) -> u32;
 }
 
 /// This represents a thread-safe object that can be used to schedule a generic event to the
@@ -4703,6 +4723,10 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
       }
     }
   }
+
+  fn get_worker_index(&self) -> u32 {
+    unsafe { abi::envoy_dynamic_module_callback_network_filter_get_worker_index(self.raw) }
+  }
 }
 
 // Network Filter Event Hook Implementations
@@ -4927,10 +4951,12 @@ pub extern "C" fn envoy_dynamic_module_on_network_filter_config_scheduled(
 macro_rules! declare_listener_filter_init_functions {
   ($f:ident, $new_listener_filter_config_fn:expr) => {
     #[no_mangle]
-    pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
+    pub extern "C" fn envoy_dynamic_module_on_program_init(
+      server_factory_context_ptr: abi::envoy_dynamic_module_type_server_factory_context_envoy_ptr,
+    ) -> *const ::std::os::raw::c_char {
       envoy_proxy_dynamic_modules_rust_sdk::NEW_LISTENER_FILTER_CONFIG_FUNCTION
         .get_or_init(|| $new_listener_filter_config_fn);
-      if ($f()) {
+      if ($f(server_factory_context_ptr)) {
         envoy_proxy_dynamic_modules_rust_sdk::abi::kAbiVersion.as_ptr()
           as *const ::std::os::raw::c_char
       } else {
@@ -5201,6 +5227,9 @@ pub trait EnvoyListenerFilter {
   /// }
   /// ```
   fn new_scheduler(&self) -> impl EnvoyListenerFilterScheduler + 'static;
+
+  /// Get the index of the current worker thread.
+  fn get_worker_index(&self) -> u32;
 }
 
 /// This represents a thread-safe object that can be used to schedule a generic event to the
@@ -5756,6 +5785,10 @@ impl EnvoyListenerFilter for EnvoyListenerFilterImpl {
       }
     }
   }
+
+  fn get_worker_index(&self) -> u32 {
+    unsafe { abi::envoy_dynamic_module_callback_listener_filter_get_worker_index(self.raw) }
+  }
 }
 
 // Listener Filter Event Hook Implementations
@@ -6053,6 +6086,9 @@ pub trait EnvoyUdpListenerFilter {
     id: EnvoyHistogramId,
     value: u64,
   ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result>;
+
+  /// Get the index of the current worker thread.
+  fn get_worker_index(&self) -> u32;
 }
 
 /// The implementation of [`EnvoyUdpListenerFilterConfig`] for the Envoy UDP listener filter
@@ -6315,6 +6351,10 @@ impl EnvoyUdpListenerFilter for EnvoyUdpListenerFilterImpl {
     } else {
       Err(res)
     }
+  }
+
+  fn get_worker_index(&self) -> u32 {
+    unsafe { abi::envoy_dynamic_module_callback_udp_listener_filter_get_worker_index(self.raw) }
   }
 }
 
