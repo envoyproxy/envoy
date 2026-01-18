@@ -795,9 +795,12 @@ TEST_F(ExtAuthzHttpClientTest, SetCookieHeaderOnDenied) {
 
   Response expected_response =
       TestCommon::makeAuthzResponse(CheckStatus::Denied, Http::Code::Forbidden, expected_body);
-  // For denied responses, headers matching allowed_client_headers go to response_headers_to_add.
-  expected_response.response_headers_to_add = {{"set-cookie", "error=invalid"},
-                                               {"x-auth-error", "invalid_token"}};
+  // For denied responses, headers matching allowed_client_headers populate headers_to_set
+  // which is used by the ext_authz filter for the local reply.
+  // Note: :status is included because toClientMatchers adds default matchers for Status,
+  // Content-Length, WWW-Authenticate, and Location when allowed_client_headers is non-empty.
+  expected_response.headers_to_set = {
+      {":status", "403"}, {"set-cookie", "error=invalid"}, {"x-auth-error", "invalid_token"}};
 
   envoy::service::auth::v3::CheckRequest request;
   client_->check(request_callbacks_, request, parent_span_, stream_info_);
