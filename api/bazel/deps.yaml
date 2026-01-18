@@ -1,0 +1,80 @@
+bazel_skylib:
+  use_category:
+  - api
+  license: "Apache-2.0"
+  license_url: "https://github.com/bazelbuild/bazel-skylib/blob/{version}/LICENSE"
+com_envoyproxy_protoc_gen_validate:
+  use_category:
+  - api
+  implied_untracked_deps:
+  - com_github_iancoleman_strcase
+  - com_github_lyft_protoc_gen_star_v2
+  - com_github_spf13_afero
+  - org_golang_google_genproto
+  - org_golang_x_text
+  - org_golang_x_mod
+  - org_golang_x_sys
+  license: "Apache-2.0"
+  license_url: "https://github.com/bufbuild/protoc-gen-validate/blob/v{version}/LICENSE"
+com_github_chrusty_protoc_gen_jsonschema:
+  use_category:
+  - build
+  license: "Apache-2.0"
+  license_url: "https://github.com/norbjd/protoc-gen-jsonschema/blob/{version}/LICENSE"
+com_github_cncf_xds:
+  use_category:
+  - api
+  license: "Apache-2.0"
+  license_url: "https://github.com/cncf/xds/blob/{version}/LICENSE"
+com_github_openzipkin_zipkinapi:
+  use_category:
+  - api
+  license: "Apache-2.0"
+  license_url: "https://github.com/openzipkin/zipkin-api/blob/{version}/LICENSE"
+com_google_googleapis:
+  use_category:
+  - api
+  license: "Apache-2.0"
+  license_url: "https://github.com/googleapis/googleapis/blob/{version}/LICENSE"
+dev_cel:
+  use_category:
+  - api
+  license: "Apache-2.0"
+  license_url: "https://github.com/google/cel-spec/blob/v{version}/LICENSE"
+envoy_toolshed:
+  use_category:
+  - build
+  - controlplane
+  - dataplane_core
+  implied_untracked_deps:
+  - sysroot_linux_amd64
+  - sysroot_linux_arm64
+  - tsan_libs
+  - msan_libs
+  license: "Apache-2.0"
+  license_url: "https://github.com/envoyproxy/toolshed/blob/bazel-v{version}/LICENSE"
+opentelemetry_proto:
+  use_category:
+  - api
+  license: "Apache-2.0"
+  license_url: "https://github.com/open-telemetry/opentelemetry-proto/blob/v{version}/LICENSE"
+prometheus_metrics_model:
+  use_category:
+  - api
+  license: "Apache-2.0"
+  license_url: "https://github.com/prometheus/client_model/blob/v{version}/LICENSE"
+rules_buf:
+  use_category:
+  - api
+  license: "Apache-2.0"
+  license_url: "https://github.com/bufbuild/rules_buf/blob/{version}/LICENSE"
+rules_jvm_external:
+  use_category:
+  - build
+  license: "Apache-2.0"
+  license_url: "https://github.com/bazelbuild/rules_jvm_external/blob/{version}/LICENSE"
+rules_proto:
+  use_category:
+  - api
+  license: "Apache-2.0"
+  license_url: "https://github.com/bazelbuild/rules_proto/blob/{version}/LICENSE"
