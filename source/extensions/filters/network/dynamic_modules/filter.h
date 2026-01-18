@@ -31,11 +31,6 @@ public:
   DynamicModuleNetworkFilter(DynamicModuleNetworkFilterConfigSharedPtr config);
   ~DynamicModuleNetworkFilter() override;
 
-  /**
-   * Initializes the in-module filter.
-   */
-  void initializeInModuleFilter();
-
   // ---------- Network::ReadFilter ----------
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;
   Network::FilterStatus onNewConnection() override;
@@ -59,6 +54,11 @@ public:
   // Test-only setters for buffer pointers.
   void setCurrentReadBufferForTest(Buffer::Instance* buffer) { current_read_buffer_ = buffer; }
   void setCurrentWriteBufferForTest(Buffer::Instance* buffer) { current_write_buffer_ = buffer; }
+
+  // Test-only setter for callbacks.
+  void setCallbacksForTest(Network::ReadFilterCallbacks* read_callbacks) {
+    read_callbacks_ = read_callbacks;
+  }
 
   /**
    * Continue reading after returning StopIteration.
@@ -154,6 +154,11 @@ public:
   uint32_t workerIndex() const { return worker_index_; }
 
 private:
+  /**
+   * Initializes the in-module filter.
+   */
+  void initializeInModuleFilter();
+
   /**
    * Helper to get the `this` pointer as a void pointer.
    */

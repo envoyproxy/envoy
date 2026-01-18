@@ -77,7 +77,7 @@ def decode_stacktrace_log(object_file, input_source, address_offset=0):
 #
 # Returns list of result lines
 def run_addr2line(obj_file, addr_to_resolve):
-    return subprocess.check_output(["addr2line", "-Cpie", obj_file,
+    return subprocess.check_output(["llvm-addr2line-18", "-Cpie", obj_file,
                                     addr_to_resolve]).decode('utf-8')
 
 

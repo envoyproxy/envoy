@@ -5308,17 +5308,6 @@ void envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_commit(
     envoy_dynamic_module_type_bootstrap_extension_config_scheduler_module_ptr scheduler_module_ptr,
     uint64_t event_id);
 
-// ------------------- Misc Global Callbacks -------------------------
-
-/**
- * envoy_dynamic_module_callback_get_concurrency may be called by the dynamic
- * module in envoy_dynamic_module_on_program_init to get the configured concurrency of the server.
- * NOTE: This function must by called on the main thread.
- *
- * @return number of worker threads (concurrency) that the server is configured to use.
- */
-uint32_t envoy_dynamic_module_callback_get_concurrency();
-
 // -----------------------------------------------------------------------------
 // Bootstrap Extension - HTTP Client
 // -----------------------------------------------------------------------------

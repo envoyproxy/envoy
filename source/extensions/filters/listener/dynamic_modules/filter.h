@@ -27,11 +27,6 @@ public:
   explicit DynamicModuleListenerFilter(DynamicModuleListenerFilterConfigSharedPtr config);
   ~DynamicModuleListenerFilter() override;
 
-  /**
-   * Initializes the in-module filter.
-   */
-  void initializeInModuleFilter();
-
   // ---------- Network::ListenerFilter ----------
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override;
   Network::FilterStatus onData(Network::ListenerFilterBuffer& buffer) override;
@@ -76,6 +71,11 @@ public:
   uint32_t workerIndex() const { return worker_index_; }
 
 private:
+  /**
+   * Initializes the in-module filter.
+   */
+  void initializeInModuleFilter();
+
   /**
    * Helper to get the `this` pointer as a void pointer.
    */
