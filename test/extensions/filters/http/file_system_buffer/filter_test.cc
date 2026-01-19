@@ -99,7 +99,8 @@ protected:
     ON_CALL(decoder_callbacks_, route())
         .WillByDefault(Return(std::shared_ptr<Router::MockRoute>()));
     ON_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, _, false))
-        .WillByDefault([this](Buffer::Instance& out, bool, bool) { request_sent_on_ += out.toString(); });
+        .WillByDefault(
+            [this](Buffer::Instance& out, bool, bool) { request_sent_on_ += out.toString(); });
     ON_CALL(encoder_callbacks_, injectEncodedDataToFilterChain(_, _, false))
         .WillByDefault(
             [this](Buffer::Instance& out, bool, bool) { response_sent_on_ += out.toString(); });
