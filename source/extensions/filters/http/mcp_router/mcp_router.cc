@@ -1,6 +1,7 @@
 #include "source/extensions/filters/http/mcp_router/mcp_router.h"
 
 #include "source/common/common/fmt.h"
+#include "source/common/common/macros.h"
 #include "source/common/config/metadata.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/message_impl.h"
@@ -9,6 +10,7 @@
 #include "source/common/json/json_streamer.h"
 #include "source/common/protobuf/utility.h"
 
+#include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
@@ -45,24 +47,30 @@ void copyRequestHeaders(const Http::RequestHeaderMap& source, Http::RequestHeade
 
 } // namespace
 
-McpMethod parseMethodString(absl::string_view method_str) {
-  if (method_str == "initialize")
-    return McpMethod::Initialize;
-  if (method_str == "tools/list")
-    return McpMethod::ToolsList;
-  if (method_str == "tools/call")
-    return McpMethod::ToolsCall;
-  if (method_str == "ping")
-    return McpMethod::Ping;
-  if (method_str == "notifications/initialized")
-    return McpMethod::NotificationInitialized;
+// Static map for MCP method string lookup.
+using McpMethodMap = absl::flat_hash_map<absl::string_view, McpMethod>;
+
+const McpMethodMap& mcpMethodMap() {
   // TODO(botengyao): Add support for more MCP methods:
-  // - resources/list, resources/read, resources/subscribe, resources/unsubscribe
   // - prompts/list, prompts/get
   // - completion/complete
   // - logging/setLevel
   // - notifications/* (other notifications)
-  return McpMethod::Unknown;
+  CONSTRUCT_ON_FIRST_USE(McpMethodMap,
+                         {{"initialize", McpMethod::Initialize},
+                          {"tools/list", McpMethod::ToolsList},
+                          {"tools/call", McpMethod::ToolsCall},
+                          {"resources/list", McpMethod::ResourcesList},
+                          {"resources/read", McpMethod::ResourcesRead},
+                          {"resources/subscribe", McpMethod::ResourcesSubscribe},
+                          {"resources/unsubscribe", McpMethod::ResourcesUnsubscribe},
+                          {"ping", McpMethod::Ping},
+                          {"notifications/initialized", McpMethod::NotificationInitialized}});
+}
+
+McpMethod parseMethodString(absl::string_view method_str) {
+  auto it = mcpMethodMap().find(method_str);
+  return it != mcpMethodMap().end() ? it->second : McpMethod::Unknown;
 }
 
 BackendStreamCallbacks::BackendStreamCallbacks(const std::string& backend_name,
@@ -169,7 +177,7 @@ Http::FilterDataStatus McpRouterFilter::decodeData(Buffer::Instance& data, bool 
       return Http::FilterDataStatus::StopIterationNoBuffer;
     }
 
-    // Initialize connections based on method type
+    // Initialize connections based on method type.
     switch (method_) {
     case McpMethod::Initialize:
       handleInitialize();
@@ -181,6 +189,22 @@ Http::FilterDataStatus McpRouterFilter::decodeData(Buffer::Instance& data, bool 
 
     case McpMethod::ToolsCall:
       handleToolsCall();
+      break;
+
+    case McpMethod::ResourcesList:
+      handleResourcesList();
+      break;
+
+    case McpMethod::ResourcesRead:
+      handleResourcesRead();
+      break;
+
+    case McpMethod::ResourcesSubscribe:
+      handleResourcesSubscribe();
+      break;
+
+    case McpMethod::ResourcesUnsubscribe:
+      handleResourcesUnsubscribe();
       break;
 
     case McpMethod::Ping:
@@ -198,11 +222,15 @@ Http::FilterDataStatus McpRouterFilter::decodeData(Buffer::Instance& data, bool 
 
     initialized_ = true;
 
-    // Perform body rewriting if needed (e.g., tool name prefix stripping)
+    // Perform body rewriting if needed (e.g., tool name or URI prefix stripping).
     // This is done once on the first data chunk after initialization.
-    // Future methods like resources/get can also use this pattern.
     if (needs_body_rewrite_) {
-      rewriteToolCallBody(data);
+      if (method_ == McpMethod::ToolsCall) {
+        rewriteToolCallBody(data);
+      } else if (method_ == McpMethod::ResourcesRead || method_ == McpMethod::ResourcesSubscribe ||
+                 method_ == McpMethod::ResourcesUnsubscribe) {
+        rewriteResourceUriBody(data);
+      }
       needs_body_rewrite_ = false;
     }
   }
@@ -247,14 +275,21 @@ bool McpRouterFilter::readMetadataFromMcpFilter() {
     request_id_ = static_cast<int64_t>(id_it->second.number_value());
   }
 
-  if (method_ == McpMethod::ToolsCall) {
-    const auto& fields = mcp_metadata.fields();
-    auto params_it = fields.find("params");
-    if (params_it != fields.end() && params_it->second.has_struct_value()) {
-      const auto& params_fields = params_it->second.struct_value().fields();
+  // Extract method-specific parameters from metadata.
+  auto params_it = fields.find("params");
+  if (params_it != fields.end() && params_it->second.has_struct_value()) {
+    const auto& params_fields = params_it->second.struct_value().fields();
+
+    if (method_ == McpMethod::ToolsCall) {
       auto name_it = params_fields.find("name");
       if (name_it != params_fields.end() && name_it->second.has_string_value()) {
         tool_name_ = name_it->second.string_value();
+      }
+    } else if (method_ == McpMethod::ResourcesRead || method_ == McpMethod::ResourcesSubscribe ||
+               method_ == McpMethod::ResourcesUnsubscribe) {
+      auto uri_it = params_fields.find("uri");
+      if (uri_it != params_fields.end() && uri_it->second.has_string_value()) {
+        resource_uri_ = uri_it->second.string_value();
       }
     }
   }
@@ -368,6 +403,41 @@ std::pair<std::string, std::string> McpRouterFilter::parseToolName(const std::st
   return {"", prefixed};
 }
 
+std::pair<std::string, std::string> McpRouterFilter::parseResourceUri(const std::string& uri) {
+  // Resource URIs use scheme-based routing: "backend://path" -> backend="backend",
+  // uri="file://path" In multiplexing mode, the scheme prefix identifies the backend. Example:
+  // "time://current" -> backend="time", rewritten_uri="file://current"
+  if (!config_->isMultiplexing()) {
+    return {config_->defaultBackendName(), uri};
+  }
+
+  // Find the scheme separator "://"
+  size_t scheme_end = uri.find("://");
+  if (scheme_end == std::string::npos) {
+    // No scheme, use default backend if available.
+    if (!config_->defaultBackendName().empty()) {
+      return {config_->defaultBackendName(), uri};
+    }
+    return {"", uri};
+  }
+
+  std::string scheme = uri.substr(0, scheme_end);
+  std::string path = uri.substr(scheme_end + 3); // Skip "://"
+
+  // Check if the scheme matches a known backend.
+  if (config_->findBackend(scheme) != nullptr) {
+    // Rewrite URI with generic "file" scheme for the backend.
+    return {scheme, "file://" + path};
+  }
+
+  // Scheme doesn't match a backend, use default backend without rewriting.
+  if (!config_->defaultBackendName().empty()) {
+    return {config_->defaultBackendName(), uri};
+  }
+
+  return {"", uri};
+}
+
 ssize_t McpRouterFilter::rewriteToolCallBody(Buffer::Instance& buffer) {
   if (tool_name_.empty() || tool_name_ == unprefixed_tool_name_) {
     return 0;
@@ -383,6 +453,20 @@ ssize_t McpRouterFilter::rewriteToolCallBody(Buffer::Instance& buffer) {
   }
 
   return rewriteAtPosition(buffer, pos, tool_name_, unprefixed_tool_name_);
+}
+
+ssize_t McpRouterFilter::rewriteResourceUriBody(Buffer::Instance& buffer) {
+  if (resource_uri_.empty() || resource_uri_ == rewritten_uri_) {
+    return 0;
+  }
+
+  // Search for the original URI and replace with the rewritten version.
+  ssize_t pos = buffer.search(resource_uri_.data(), resource_uri_.size(), 0);
+  if (pos < 0) {
+    return 0;
+  }
+
+  return rewriteAtPosition(buffer, pos, resource_uri_, rewritten_uri_);
 }
 
 ssize_t McpRouterFilter::rewriteAtPosition(Buffer::Instance& buffer, ssize_t pos,
@@ -648,6 +732,56 @@ void McpRouterFilter::handleNotificationInitialized() {
   });
 }
 
+void McpRouterFilter::handleResourcesList() {
+  ENVOY_LOG(debug, "resources/list: setting up fanout to {} backends", config_->backends().size());
+
+  initializeFanout([this](std::vector<BackendResponse> responses) {
+    std::string response_body = aggregateResourcesList(responses);
+    ENVOY_LOG(debug, "resources/list: response body: {}", response_body);
+    sendJsonResponse(response_body, encoded_session_id_);
+  });
+}
+
+void McpRouterFilter::handleSingleBackendResourceMethod(absl::string_view method_name) {
+  auto [backend_name, actual_uri] = parseResourceUri(resource_uri_);
+
+  if (backend_name.empty()) {
+    sendHttpError(
+        400, fmt::format("Invalid resource URI '{}': cannot determine backend", resource_uri_));
+    return;
+  }
+
+  const McpBackendConfig* backend = config_->findBackend(backend_name);
+  if (!backend) {
+    sendHttpError(400, fmt::format("Unknown backend '{}' in resource URI", backend_name));
+    return;
+  }
+
+  rewritten_uri_ = actual_uri;
+  needs_body_rewrite_ = (resource_uri_ != rewritten_uri_);
+
+  ENVOY_LOG(debug, "{}: backend='{}', uri='{}' -> '{}', needs_rewrite={}", method_name,
+            backend_name, resource_uri_, actual_uri, needs_body_rewrite_);
+
+  initializeSingleBackend(*backend, [this](BackendResponse resp) {
+    if (resp.success) {
+      sendJsonResponse(resp.body, encoded_session_id_);
+    } else {
+      sendHttpError(500, resp.error.empty() ? "Backend request failed" : resp.error);
+    }
+  });
+}
+
+void McpRouterFilter::handleResourcesRead() { handleSingleBackendResourceMethod("resources/read"); }
+
+void McpRouterFilter::handleResourcesSubscribe() {
+  handleSingleBackendResourceMethod("resources/subscribe");
+}
+
+void McpRouterFilter::handleResourcesUnsubscribe() {
+  handleSingleBackendResourceMethod("resources/unsubscribe");
+}
+
 std::string McpRouterFilter::aggregateInitialize(const std::vector<BackendResponse>& responses) {
   // Check if at least one backend succeeded.
   const bool any_success = std::any_of(responses.begin(), responses.end(),
@@ -747,6 +881,105 @@ std::string McpRouterFilter::aggregateToolsList(const std::vector<BackendRespons
   return output;
 }
 
+std::string McpRouterFilter::aggregateResourcesList(const std::vector<BackendResponse>& responses) {
+  const bool is_multiplexing = config_->isMultiplexing();
+
+  std::string output;
+  Json::StringStreamer streamer(output);
+  {
+    auto root = streamer.makeRootMap();
+    root->addKey("jsonrpc");
+    root->addString("2.0");
+    root->addKey("id");
+    root->addNumber(request_id_);
+    root->addKey("result");
+    {
+      auto result_map = root->addMap();
+      result_map->addKey("resources");
+      {
+        auto resources_array = result_map->addArray();
+
+        for (const auto& resp : responses) {
+          if (!resp.success) {
+            continue;
+          }
+          ENVOY_LOG(debug, "Aggregating resources list from backend '{}': {}", resp.backend_name,
+                    resp.body);
+          auto parsed_or = Json::Factory::loadFromString(resp.body);
+          if (!parsed_or.ok()) {
+            ENVOY_LOG(warn, "Failed to parse JSON from backend '{}': {}", resp.backend_name,
+                      parsed_or.status().message());
+            continue;
+          }
+
+          Json::ObjectSharedPtr parsed_body = *parsed_or;
+
+          auto result_or = parsed_body->getObject("result");
+          if (!result_or.ok() || !(*result_or)) {
+            continue;
+          }
+
+          auto resources_or = (*result_or)->getObjectArray("resources");
+          if (!resources_or.ok()) {
+            continue;
+          }
+
+          for (const auto& resource : *resources_or) {
+            if (!resource || !resource->isObject()) {
+              continue;
+            }
+
+            auto uri_or = resource->getString("uri");
+            if (!uri_or.ok()) {
+              continue;
+            }
+
+            auto resource_map = resources_array->addMap();
+
+            // Rewrite URI with backend prefix scheme in multiplexing mode.
+            // Example: "file://path" -> "time://path" (for backend "time").
+            resource_map->addKey("uri");
+            if (is_multiplexing) {
+              std::string original_uri = *uri_or;
+              size_t scheme_end = original_uri.find("://");
+              if (scheme_end != std::string::npos) {
+                // Replace original scheme with backend name.
+                std::string path = original_uri.substr(scheme_end + 3);
+                resource_map->addString(absl::StrCat(resp.backend_name, "://", path));
+              } else {
+                // No scheme, prepend backend name as scheme.
+                resource_map->addString(absl::StrCat(resp.backend_name, "://", original_uri));
+              }
+            } else {
+              resource_map->addString(*uri_or);
+            }
+
+            auto name_or = resource->getString("name", "");
+            if (name_or.ok() && !name_or->empty()) {
+              resource_map->addKey("name");
+              resource_map->addString(*name_or);
+            }
+
+            auto desc_or = resource->getString("description", "");
+            if (desc_or.ok() && !desc_or->empty()) {
+              resource_map->addKey("description");
+              resource_map->addString(*desc_or);
+            }
+
+            auto mime_or = resource->getString("mimeType", "");
+            if (mime_or.ok() && !mime_or->empty()) {
+              resource_map->addKey("mimeType");
+              resource_map->addString(*mime_or);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return output;
+}
+
 Http::RequestHeaderMapPtr
 McpRouterFilter::createUpstreamHeaders(const McpBackendConfig& backend,
                                        const std::string& backend_session_id) {
@@ -771,15 +1004,23 @@ McpRouterFilter::createUpstreamHeaders(const McpBackendConfig& backend,
   if (request_headers_) {
     copyRequestHeaders(*request_headers_, *headers);
 
-    // Adjust content-length when tool name rewriting changes body size.
-    // Size delta is negative when removing the backend prefix from tool names.
+    // Adjust content-length when body rewriting changes size.
     if (needs_body_rewrite_ && request_headers_->ContentLength()) {
       uint64_t original_length = 0;
       if (absl::SimpleAtoi(request_headers_->getContentLengthValue(), &original_length)) {
-        // Use signed arithmetic: unprefixed is shorter, so delta is negative
-        int64_t new_length = static_cast<int64_t>(original_length) +
-                             static_cast<int64_t>(unprefixed_tool_name_.size()) -
-                             static_cast<int64_t>(tool_name_.size());
+        int64_t size_delta = 0;
+        if (method_ == McpMethod::ToolsCall) {
+          // Tool name rewriting, delta = new_size - old_size.
+          size_delta = static_cast<int64_t>(unprefixed_tool_name_.size()) -
+                       static_cast<int64_t>(tool_name_.size());
+        } else if (method_ == McpMethod::ResourcesRead ||
+                   method_ == McpMethod::ResourcesSubscribe ||
+                   method_ == McpMethod::ResourcesUnsubscribe) {
+          // Resource URI rewriting, delta = new_size - old_size.
+          size_delta = static_cast<int64_t>(rewritten_uri_.size()) -
+                       static_cast<int64_t>(resource_uri_.size());
+        }
+        int64_t new_length = static_cast<int64_t>(original_length) + size_delta;
         headers->setContentLength(new_length);
         ENVOY_LOG(debug, "Adjusted content-length: {} -> {}", original_length, new_length);
       }
