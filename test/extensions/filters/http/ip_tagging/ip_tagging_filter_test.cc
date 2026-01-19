@@ -40,6 +40,12 @@ public:
   ipTagsRegistry(const IpTaggingFilterConfig& filter_config) {
     return filter_config.ip_tags_registry_;
   }
+
+  static void resetTrie(IpTaggingFilterConfig& filter_config) {
+    if (filter_config.trie_) {
+      filter_config.trie_.reset();
+    }
+  }
 };
 
 class IpTaggingFilterPeer {
@@ -62,25 +68,22 @@ ip_tags:
 
 const std::string internal_request_with_json_file_config = R"EOF(
  request_type: internal
- ip_tags_file_provider:
-  ip_tags_datasource:
-    filename: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/ip_tags_internal_request.json"
+ ip_tags_datasource:
+   filename: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/ip_tags_internal_request.json"
  )EOF";
 
 const std::string internal_request_with_yaml_file_with_reload_config = R"EOF(
  request_type: internal
- ip_tags_file_provider:
-  ip_tags_datasource:
-    filename: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/ip_tags_internal_request.yaml"
-    watched_directory:
-      path: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data"
+ ip_tags_datasource:
+   filename: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/ip_tags_internal_request.yaml"
+   watched_directory:
+     path: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data"
  )EOF";
 
 const std::string internal_request_with_yaml_file_config = R"EOF(
  request_type: internal
- ip_tags_file_provider:
-  ip_tags_datasource:
-    filename: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/ip_tags_internal_request.yaml"
+ ip_tags_datasource:
+   filename: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/ip_tags_internal_request.yaml"
  )EOF";
 
 const std::string external_request_config = R"EOF(
@@ -93,16 +96,14 @@ ip_tags:
 
 const std::string external_request_with_json_file_config = R"EOF(
  request_type: external
- ip_tags_file_provider:
-  ip_tags_datasource:
-    filename: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/ip_tags_external_request.json"
+ ip_tags_datasource:
+   filename: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/ip_tags_external_request.json"
  )EOF";
 
 const std::string external_request_with_yaml_file_config = R"EOF(
  request_type: external
- ip_tags_file_provider:
-  ip_tags_datasource:
-    filename: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/ip_tags_external_request.yaml"
+ ip_tags_datasource:
+   filename: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/ip_tags_external_request.yaml"
  )EOF";
 
 const std::string both_request_config = R"EOF(
@@ -118,16 +119,14 @@ ip_tags:
 
 const std::string both_request_with_json_file_config = R"EOF(
 request_type: both
-ip_tags_file_provider:
-  ip_tags_datasource:
-    filename: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/ip_tags_both.json"
+ip_tags_datasource:
+  filename: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/ip_tags_both.json"
 )EOF";
 
 const std::string both_request_with_yaml_file_config = R"EOF(
 request_type: both
-ip_tags_file_provider:
-  ip_tags_datasource:
-    filename: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/ip_tags_both.yaml"
+ip_tags_datasource:
+  filename: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/ip_tags_both.yaml"
 )EOF";
 
 const std::string internal_request_with_header_config = R"EOF(
@@ -144,18 +143,16 @@ const std::string internal_request_with_header_with_json_file_config = R"EOF(
 request_type: internal
 ip_tag_header:
   header: x-envoy-optional-header
-ip_tags_file_provider:
-  ip_tags_datasource:
-    filename: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/ip_tags_with_header.json"
+ip_tags_datasource:
+  filename: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/ip_tags_with_header.json"
 )EOF";
 
 const std::string internal_request_with_header_with_yaml_file_config = R"EOF(
 request_type: internal
 ip_tag_header:
   header: x-envoy-optional-header
-ip_tags_file_provider:
-  ip_tags_datasource:
-    filename: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/ip_tags_with_header.yaml"
+ip_tags_datasource:
+  filename: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/ip_tags_with_header.yaml"
 )EOF";
 
 const std::string internal_request_with_replace_header_config = R"EOF(
@@ -174,9 +171,8 @@ request_type: internal
 ip_tag_header:
   header: x-envoy-optional-header
   action: SANITIZE
-ip_tags_file_provider:
-  ip_tags_datasource:
-    filename: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/ip_tags_with_header.json"
+ip_tags_datasource:
+  filename: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/ip_tags_with_header.json"
 )EOF";
 
 const std::string internal_request_with_replace_header_with_yaml_file_config = R"EOF(
@@ -184,9 +180,8 @@ request_type: internal
 ip_tag_header:
   header: x-envoy-optional-header
   action: SANITIZE
-ip_tags_file_provider:
-  ip_tags_datasource:
-    filename: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/ip_tags_with_header.yaml"
+ip_tags_datasource:
+  filename: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/ip_tags_with_header.yaml"
 )EOF";
 
 const std::string internal_request_with_append_or_add_config = R"EOF(
@@ -205,9 +200,8 @@ request_type: internal
 ip_tag_header:
   header: x-envoy-optional-header
   action: APPEND_IF_EXISTS_OR_ADD
-ip_tags_file_provider:
-  ip_tags_datasource:
-    filename: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/ip_tags_with_header.json"
+ip_tags_datasource:
+  filename: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/ip_tags_with_header.json"
 )EOF";
 
 const std::string internal_request_with_append_or_add_with_yaml_file_config = R"EOF(
@@ -215,9 +209,8 @@ request_type: internal
 ip_tag_header:
   header: x-envoy-optional-header
   action: APPEND_IF_EXISTS_OR_ADD
-ip_tags_file_provider:
-  ip_tags_datasource:
-    filename: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/ip_tags_with_header.yaml"
+ip_tags_datasource:
+  filename: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/ip_tags_with_header.yaml"
 )EOF";
 
 const std::string duplicate_request_config = R"EOF(
@@ -233,16 +226,14 @@ ip_tags:
 
 const std::string duplicate_request_with_json_file_config = R"EOF(
 request_type: both
-ip_tags_file_provider:
-  ip_tags_datasource:
-    filename: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/ip_tags_with_duplicate_request.json"
+ip_tags_datasource:
+  filename: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/ip_tags_with_duplicate_request.json"
 )EOF";
 
 const std::string duplicate_request_with_yaml_file_config = R"EOF(
 request_type: both
-ip_tags_file_provider:
-  ip_tags_datasource:
-    filename: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/ip_tags_with_duplicate_request.yaml"
+ip_tags_datasource:
+  filename: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/ip_tags_with_duplicate_request.yaml"
 )EOF";
 
 const std::string ipv6_config = R"EOF(
@@ -253,15 +244,13 @@ ip_tags:
 )EOF";
 
 const std::string ipv6_with_yaml_file_config = R"EOF(
-ip_tags_file_provider:
-  ip_tags_datasource:
-    filename: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/ipv6_request.yaml"
+ip_tags_datasource:
+  filename: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/ipv6_request.yaml"
 )EOF";
 
 const std::string ipv6_with_json_file_config = R"EOF(
-ip_tags_file_provider:
-  ip_tags_datasource:
-    filename: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/ipv6_request.json"
+ip_tags_datasource:
+  filename: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/ipv6_request.json"
 )EOF";
 
 } // namespace
@@ -323,7 +312,7 @@ ip_tag_header:
   action: SANITIZE
 )EOF";
   initializeFilter(config_yaml, "INVALID_ARGUMENT: HTTP IP Tagging Filter requires either ip_tags "
-                                "or ip_tags_file_provider to be specified.");
+                                "or ip_tags_datasource to be specified.");
 }
 
 TEST_F(IpTaggingFilterTest, BothIpTagsAndIpTagsFileConfigured) {
@@ -336,31 +325,19 @@ ip_tags:
   - ip_tag_name: internal_request
     ip_list:
       - {address_prefix: 1.2.3.5, prefix_len: 32}
-ip_tags_file_provider:
-  ip_tags_datasource:
-    filename: /test/tags.yaml
+ip_tags_datasource:
+  filename: /test/tags.yaml
 )EOF";
   initializeFilter(
       config_yaml,
-      "INVALID_ARGUMENT: Only one of ip_tags or ip_tags_file_provider can be configured.");
-}
-
-TEST_F(IpTaggingFilterTest, EmptyDatasourceConfigured) {
-  const std::string config_yaml = R"EOF(
-request_type: internal
-ip_tags_file_provider:
-  ip_tags_datasource:
-)EOF";
-  initializeFilter(config_yaml, "INVALID_ARGUMENT: ip_tags_file_provider requires a valid "
-                                "ip_tags_datasource to be configured.");
+      "INVALID_ARGUMENT: Only one of ip_tags or ip_tags_datasource can be configured.");
 }
 
 TEST_F(IpTaggingFilterTest, EmptyIpTagsFile) {
   const std::string config_yaml = R"EOF(
 request_type: internal
-ip_tags_file_provider:
-  ip_tags_datasource:
-    filename: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/empty_file.yaml"
+ip_tags_datasource:
+  filename: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/empty_file.yaml"
 )EOF";
   std::string file = TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/empty_file.yaml");
@@ -372,9 +349,8 @@ ip_tags_file_provider:
 TEST_F(IpTaggingFilterTest, EmptyFilenameInDatasourceConfigured) {
   const std::string config_yaml = R"EOF(
 request_type: internal
-ip_tags_file_provider:
-  ip_tags_datasource:
-    filename:
+ip_tags_datasource:
+  filename:
 )EOF";
   initializeFilter(config_yaml,
                    "INVALID_ARGUMENT: Cannot load tags from empty filename in datasource.");
@@ -383,8 +359,7 @@ ip_tags_file_provider:
 TEST_F(IpTaggingFilterTest, UnsupportedFormatForIpTagsFile) {
   const std::string config_yaml = R"EOF(
 request_type: internal
-ip_tags_file_provider:
-  ip_tags_datasource:
+ip_tags_datasource:
     filename: /test/tags.csv
 )EOF";
   initializeFilter(config_yaml, "INVALID_ARGUMENT: Unsupported file format, unable to parse ip "
@@ -394,9 +369,8 @@ ip_tags_file_provider:
 TEST_F(IpTaggingFilterTest, InvalidYamlFile) {
   const std::string config_yaml = R"EOF(
  request_type: internal
- ip_tags_file_provider:
-  ip_tags_datasource:
-    filename: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/invalid_tags.yaml"
+ ip_tags_datasource:
+   filename: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/invalid_tags.yaml"
  )EOF";
   initializeFilter(
       config_yaml,
@@ -406,9 +380,8 @@ TEST_F(IpTaggingFilterTest, InvalidYamlFile) {
 TEST_F(IpTaggingFilterTest, InvalidJsonFile) {
   const std::string config_yaml = R"EOF(
  request_type: internal
- ip_tags_file_provider:
-  ip_tags_datasource:
-    filename: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/invalid_tags.json"
+ ip_tags_datasource:
+   filename: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/invalid_tags.json"
  )EOF";
   initializeFilter(config_yaml, "INVALID_ARGUMENT: unable to create data source");
 }
@@ -483,6 +456,34 @@ TEST_F(IpTaggingFilterTest, DifferentIpTagsProviderInstanceForDifferentFilePath)
 }
 
 class InternalRequestIpTaggingFilterTest : public IpTaggingFilterTest {};
+
+TEST_F(InternalRequestIpTaggingFilterTest, InternalRequestNoCrashWhenTrieIsNull) {
+  initializeFilter(internal_request_config);
+  EXPECT_EQ(FilterRequestType::INTERNAL, config_->requestType());
+  Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-internal", "true"}};
+
+  Network::Address::InstanceConstSharedPtr remote_address =
+      Network::Utility::parseInternetAddressNoThrow("1.2.3.5");
+  filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      remote_address);
+
+  IpTaggingFilterConfigPeer::resetTrie(*config_);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ("", request_headers.get_(Http::Headers::get().EnvoyIpTags));
+
+  EXPECT_EQ(stats_.counterFromString("prefix.ip_tagging.internal_request.hit").value(), 0);
+  EXPECT_EQ(stats_.counterFromString("prefix.ip_tagging.total").value(), 1);
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  Http::TestRequestTrailerMapImpl request_trailers;
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
+
+  // Check external requests don't get a tag.
+  request_headers = Http::TestRequestHeaderMapImpl{};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  EXPECT_FALSE(request_headers.has(Http::Headers::get().EnvoyIpTags));
+}
 
 TEST_P(InternalRequestIpTaggingFilterTest, InternalRequest) {
   const std::string config = GetParam();
@@ -901,11 +902,10 @@ TEST_F(IpTaggingFilterTest, InternalRequestWithReload) {
   const std::string yaml =
       fmt::format(R"EOF(
 request_type: internal
-ip_tags_file_provider:
-  ip_tags_datasource:
-      filename: "{}"
-      watched_directory:
-        path: "{}"
+ip_tags_datasource:
+  filename: "{}"
+  watched_directory:
+    path: "{}"
   )EOF",
                   TestEnvironment::temporaryPath("ip_tagging_test/watcher_target.yaml"),
                   TestEnvironment::temporaryPath("ip_tagging_test"));
@@ -997,11 +997,10 @@ TEST_F(IpTaggingFilterTest, InternalRequestWithFailedReloadUsesOldData) {
   const std::string yaml =
       fmt::format(R"EOF(
 request_type: internal
-ip_tags_file_provider:
-  ip_tags_datasource:
-      filename: "{}"
-      watched_directory:
-        path: "{}"
+ip_tags_datasource:
+  filename: "{}"
+  watched_directory:
+    path: "{}"
   )EOF",
                   TestEnvironment::temporaryPath("ip_tagging_test/watcher_target.yaml"),
                   TestEnvironment::temporaryPath("ip_tagging_test"));
@@ -1089,11 +1088,10 @@ TEST_F(IpTaggingFilterTest, IpTagsReloadedInFlightRequestsNotAffected) {
   const std::string yaml =
       fmt::format(R"EOF(
 request_type: internal
-ip_tags_file_provider:
-  ip_tags_datasource:
-      filename: "{}"
-      watched_directory:
-        path: "{}"
+ip_tags_datasource:
+  filename: "{}"
+  watched_directory:
+    path: "{}"
   )EOF",
                   TestEnvironment::temporaryPath("ip_tagging_test/watcher_target.yaml"),
                   TestEnvironment::temporaryPath("ip_tagging_test"));
@@ -1133,7 +1131,6 @@ ip_tags:
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
     EXPECT_EQ("internal_request", request_headers.get_(Http::Headers::get().EnvoyIpTags));
 
-    EXPECT_EQ(stats_.counterFromString("prefix.ip_tagging.internal_request.hit").value(), 1);
     EXPECT_EQ(stats_.counterFromString("prefix.ip_tagging.total").value(), 1);
 
     EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));

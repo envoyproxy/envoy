@@ -46,11 +46,10 @@ static_resources:
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.ip_tagging.v3.IPTagging
               request_type: both
-              ip_tags_file_provider:
-                ip_tags_datasource:
-                  filename: "/geoip/ip-tags.yaml"
-                  watched_directory:
-                    path: "/geoip/"
+              ip_tags_datasource:
+                filename: "/geoip/ip-tags.yaml"
+                watched_directory:
+                  path: "/geoip/"
           - name: envoy.filters.http.router
             typed_config:
               '@type': type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
@@ -78,11 +77,10 @@ static_resources:
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.ip_tagging.v3.IPTagging
               request_type: both
-              ip_tags_file_provider:
-                ip_tags_datasource:
-                  filename: "/geoip/ip-tags.json"
-                  watched_directory:
-                    path: "/geoip/"
+              ip_tags_datasource:
+                filename: "/geoip/ip-tags.json"
+                watched_directory:
+                  path: "/geoip/"
           - name: envoy.filters.http.router
             typed_config:
               '@type': type.googleapis.com/envoy.extensions.filters.http.router.v3.Router

@@ -43,11 +43,10 @@ TEST_P(IpTaggingIntegrationTest, FileBasedIpTaggingWithReload) {
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.filters.http.ip_tagging.v3.IPTagging
       request_type: both
-      ip_tags_file_provider:
-        ip_tags_datasource:
-            filename: "{}"
-            watched_directory:
-              path: "{}"
+      ip_tags_datasource:
+          filename: "{}"
+          watched_directory:
+            path: "{}"
   )EOF",
                   TestEnvironment::temporaryPath("ip_tagging_test/watcher_target.yaml"),
                   TestEnvironment::temporaryPath("ip_tagging_test"));
@@ -137,11 +136,10 @@ TEST_P(IpTaggingIntegrationTest, IptaggingFilterWithReloadNoCrashOnLdsUpdate) {
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.filters.http.ip_tagging.v3.IPTagging
       request_type: both
-      ip_tags_file_provider:
-        ip_tags_datasource:
-            filename: "{}"
-            watched_directory:
-              path: "{}"
+      ip_tags_datasource:
+          filename: "{}"
+          watched_directory:
+            path: "{}"
   )EOF",
                   TestEnvironment::temporaryPath("ip_tagging_test/watcher_target.yaml"),
                   TestEnvironment::temporaryPath("ip_tagging_test"));

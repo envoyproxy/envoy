@@ -14,6 +14,7 @@
 #include "envoy/stats/scope.h"
 #include "envoy/thread_local/thread_local.h"
 
+#include "source/common/common/callback_impl.h"
 #include "source/common/common/thread_synchronizer.h"
 #include "source/common/config/datasource.h"
 #include "source/common/network/cidr_range.h"
@@ -57,6 +58,12 @@ public:
   absl::StatusOr<LcTrieSharedPtr> getTags();
 
   /**
+   * Gets the most recently parsed tags.
+   * @return vector of most recently parsed tag keys.
+   */
+  std::vector<std::string> getTagKeys();
+
+  /**
    * Parses ip tags in a proto format into a trie structure.
    * @param ip_tags Collection of ip tags in proto format.
    * @return Valid LcTrieSharedPtr if parsing succeeded or error status otherwise.
@@ -65,7 +72,20 @@ public:
   parseIpTagsAsProto(const Protobuf::RepeatedPtrField<
                      envoy::extensions::filters::http::ip_tagging::v3::IPTagging::IPTag>& ip_tags);
 
-  void incIpTagsReloadSuccess() { incCounter(stat_name_set_->getBuiltin("success", unknown_tag_)); }
+  void incIpTagsReloadSuccess() {
+    incCounter(stat_name_set_->getBuiltin("success", unknown_tag_));
+    on_tags_reload_cb_manager_.runCallbacks(tags_);
+  }
+
+  /**
+   * Install a callback that will be invoked when tags are reloaded.
+   * @param callback supplies the callback to invoke.
+   * @return Common::CallbackHandlePtr the callback handle.
+   */
+  ABSL_MUST_USE_RESULT ::Envoy::Common::CallbackHandlePtr
+  addTagsReloadCb(std::function<void(const std::vector<std::string>& tags)> callback) const {
+    return on_tags_reload_cb_manager_.add(callback);
+  }
 
 private:
   Api::Api& api_;
@@ -76,7 +96,9 @@ private:
   Stats::StatNameSetPtr stat_name_set_;
   const Stats::StatName stats_prefix_;
   const Stats::StatName unknown_tag_;
-
+  mutable ::Envoy::Common::CallbackManager<void, const std::vector<std::string>&>
+      on_tags_reload_cb_manager_;
+  std::vector<std::string> tags_{};
   void incCounter(Stats::StatName name);
 };
 
@@ -99,6 +121,22 @@ public:
    * @return Valid LcTrieSharedPtr or absl::Status if failed to get tags data.
    */
   absl::StatusOr<LcTrieSharedPtr> ipTags();
+
+  /**
+   * Gets the most recently parsed tags.
+   * @return vector of most recently parsed tag keys.
+   */
+  std::vector<std::string> tagKeys();
+
+  /**
+   * Install a callback that will be invoked when tags are reloaded.
+   * @param callback supplies the callback to invoke.
+   * @return Common::CallbackHandlePtr the callback handle.
+   */
+  ABSL_MUST_USE_RESULT ::Envoy::Common::CallbackHandlePtr
+  addTagsReloadCb(std::function<void(const std::vector<std::string>& tags)> callback) const {
+    return tags_loader_.addTagsReloadCb(callback);
+  }
 
 private:
   IpTagsLoader tags_loader_;
@@ -141,7 +179,8 @@ enum class FilterRequestType { INTERNAL, EXTERNAL, BOTH };
 /**
  * Configuration for the HTTP IP Tagging filter.
  */
-class IpTaggingFilterConfig : public Logger::Loggable<Logger::Id::ip_tagging> {
+class IpTaggingFilterConfig : public std::enable_shared_from_this<IpTaggingFilterConfig>,
+                              public Logger::Loggable<Logger::Id::ip_tagging> {
 public:
   using HeaderAction =
       envoy::extensions::filters::http::ip_tagging::v3::IPTagging::IpTagHeader::HeaderAction;
@@ -154,40 +193,18 @@ public:
 
   Runtime::Loader& runtime() { return runtime_; }
   FilterRequestType requestType() const { return request_type_; }
-  const Network::LcTrie::LcTrie<std::string>& trie() const {
-    if (provider_) {
-      auto tags_or_error = provider_->ipTags();
-      if (tags_or_error.status().ok() && tags_or_error.value() != nullptr) {
-        return *(tags_or_error.value());
-      } else {
-        ENVOY_LOG(debug, "Failed to get trie data from provider, falling back to empty trie");
-        return empty_trie_;
-      }
-    } else {
-      if (trie_ != nullptr) {
-        return *trie_;
-      } else {
-        return empty_trie_;
-      }
-    }
-  }
+  const Network::LcTrie::LcTrie<std::string>& trie() const;
 
-  OptRef<const Http::LowerCaseString> ipTagHeader() const {
-    if (ip_tag_header_.get().empty()) {
-      return absl::nullopt;
-    }
-    return ip_tag_header_;
-  }
+  OptRef<const Http::LowerCaseString> ipTagHeader() const;
   HeaderAction ipTagHeaderAction() const { return ip_tag_header_action_; }
 
+  void onIpTagsReload() { ENVOY_LOG(debug, "IP tags reloaded successfully"); }
+
   void incHit(absl::string_view tag) {
-    const Stats::StatName tag_counter =
-        stat_name_set_->getBuiltin(absl::StrCat(tag, ".hit"), unknown_tag_);
-    if (tag_counter == unknown_tag_) {
-      stat_name_set_->rememberBuiltin(absl::StrCat(tag, ".hit"));
-    }
     incCounter(stat_name_set_->getBuiltin(absl::StrCat(tag, ".hit"), unknown_tag_));
   }
+
+  void initializeStats(const std::vector<std::string>& tags);
 
   void incNoHit() { incCounter(no_hit_); }
   void incTotal() { incCounter(total_); }
@@ -220,11 +237,12 @@ private:
   const FilterRequestType request_type_;
   Stats::Scope& scope_;
   Runtime::Loader& runtime_;
+  const std::string stats_prefix_str_;
   Stats::StatNameSetPtr stat_name_set_;
-  const Stats::StatName stats_prefix_;
-  const Stats::StatName no_hit_;
-  const Stats::StatName total_;
-  const Stats::StatName unknown_tag_;
+  Stats::StatName stats_prefix_;
+  Stats::StatName no_hit_;
+  Stats::StatName total_;
+  Stats::StatName unknown_tag_;
   const Http::LowerCaseString
       ip_tag_header_; // An empty string indicates that no ip_tag_header is set.
   const HeaderAction ip_tag_header_action_;
@@ -233,8 +251,8 @@ private:
   const std::shared_ptr<IpTagsRegistrySingleton> ip_tags_registry_;
   IpTagsLoader tags_loader_;
   LcTrieSharedPtr trie_;
-  Network::LcTrie::LcTrie<std::string> empty_trie_;
   std::shared_ptr<IpTagsProvider> provider_;
+  ::Envoy::Common::CallbackHandlePtr tags_reload_callback_handle_;
 };
 
 using IpTaggingFilterConfigSharedPtr = std::shared_ptr<IpTaggingFilterConfig>;

@@ -14,6 +14,10 @@ namespace Extensions {
 namespace HttpFilters {
 namespace IpTagging {
 
+namespace {
+static const Network::LcTrie::LcTrie<std::string> EMPTY_TRIE_{{}};
+}
+
 IpTagsProvider::IpTagsProvider(const envoy::config::core::v3::DataSource& ip_tags_datasource,
                                Event::Dispatcher& main_dispatcher, Api::Api& api,
                                ProtobufMessage::ValidationVisitor& validation_visitor,
@@ -31,6 +35,8 @@ IpTagsProvider::IpTagsProvider(const envoy::config::core::v3::DataSource& ip_tag
 IpTagsProvider::~IpTagsProvider() { ENVOY_LOG(debug, "Shutting down ip tags provider"); };
 
 absl::StatusOr<LcTrieSharedPtr> IpTagsProvider::ipTags() { return tags_loader_.getTags(); }
+
+std::vector<std::string> IpTagsProvider::tagKeys() { return tags_loader_.getTagKeys(); }
 
 absl::StatusOr<std::shared_ptr<IpTagsProvider>> IpTagsRegistrySingleton::getOrCreateProvider(
     const envoy::config::core::v3::DataSource& ip_tags_datasource, Api::Api& api,
@@ -131,6 +137,7 @@ IpTagsLoader::loadTags(const envoy::config::core::v3::DataSource& ip_tags_dataso
 absl::StatusOr<LcTrieSharedPtr> IpTagsLoader::parseIpTagsAsProto(
     const Protobuf::RepeatedPtrField<
         envoy::extensions::filters::http::ip_tagging::v3::IPTagging::IPTag>& ip_tags) {
+  tags_.clear();
   std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>> tag_data;
   tag_data.reserve(ip_tags.size());
   for (const auto& ip_tag : ip_tags) {
@@ -148,11 +155,14 @@ absl::StatusOr<LcTrieSharedPtr> IpTagsLoader::parseIpTagsAsProto(
       }
     }
     tag_data.emplace_back(ip_tag.ip_tag_name(), cidr_set);
+    tags_.emplace_back(ip_tag.ip_tag_name());
   }
   return std::make_shared<Network::LcTrie::LcTrie<std::string>>(tag_data);
 }
 
 absl::StatusOr<LcTrieSharedPtr> IpTagsLoader::getTags() { return data_source_provider_->data(); }
+
+std::vector<std::string> IpTagsLoader::getTagKeys() { return tags_; }
 
 SINGLETON_MANAGER_REGISTRATION(ip_tags_registry);
 
@@ -176,10 +186,7 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
     Event::Dispatcher& dispatcher, ProtobufMessage::ValidationVisitor& validation_visitor,
     absl::Status& creation_status)
     : request_type_(requestTypeEnum(config.request_type())), scope_(scope), runtime_(runtime),
-      stat_name_set_(scope.symbolTable().makeSet("IpTagging")),
-      stats_prefix_(stat_name_set_->add(stat_prefix + "ip_tagging")),
-      no_hit_(stat_name_set_->add("no_hit")), total_(stat_name_set_->add("total")),
-      unknown_tag_(stat_name_set_->add("unknown_tag.hit")),
+      stats_prefix_str_(stat_prefix),
       ip_tag_header_(config.has_ip_tag_header() ? config.ip_tag_header().header() : ""),
       ip_tag_header_action_(config.has_ip_tag_header()
                                 ? config.ip_tag_header().action()
@@ -187,17 +194,15 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
       ip_tags_registry_(singleton_manager.getTyped<IpTagsRegistrySingleton>(
           SINGLETON_MANAGER_REGISTERED_NAME(ip_tags_registry),
           [] { return std::make_shared<IpTagsRegistrySingleton>(); })),
-      tags_loader_(api, validation_visitor, scope),
-      empty_trie_(Network::LcTrie::LcTrie<std::string>({})) {
-
-  if (config.ip_tags().empty() && !config.has_ip_tags_file_provider()) {
+      tags_loader_(api, validation_visitor, scope) {
+  if (config.ip_tags().empty() && !config.has_ip_tags_datasource()) {
     creation_status = absl::InvalidArgumentError(
-        "HTTP IP Tagging Filter requires either ip_tags or ip_tags_file_provider to be specified.");
+        "HTTP IP Tagging Filter requires either ip_tags or ip_tags_datasource to be specified.");
   }
 
-  if (!config.ip_tags().empty() && config.has_ip_tags_file_provider()) {
-    creation_status = absl::InvalidArgumentError(
-        "Only one of ip_tags or ip_tags_file_provider can be configured.");
+  if (!config.ip_tags().empty() && config.has_ip_tags_datasource()) {
+    creation_status =
+        absl::InvalidArgumentError("Only one of ip_tags or ip_tags_datasource can be configured.");
   }
 
   RETURN_ONLY_IF_NOT_OK_REF(creation_status);
@@ -205,21 +210,25 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
     auto trie_or_error = tags_loader_.parseIpTagsAsProto(config.ip_tags());
     if (trie_or_error.status().ok()) {
       trie_ = trie_or_error.value();
+      initializeStats(tags_loader_.getTagKeys());
     } else {
       creation_status = trie_or_error.status();
       return;
     }
   } else {
-    if (!config.ip_tags_file_provider().has_ip_tags_datasource()) {
-      creation_status = absl::InvalidArgumentError(
-          "ip_tags_file_provider requires a valid ip_tags_datasource to be configured.");
-      return;
-    }
-    auto provider_or_error = ip_tags_registry_->getOrCreateProvider(
-        config.ip_tags_file_provider().ip_tags_datasource(), api, validation_visitor, tls,
-        dispatcher, scope, ip_tags_registry_);
+    auto provider_or_error =
+        ip_tags_registry_->getOrCreateProvider(config.ip_tags_datasource(), api, validation_visitor,
+                                               tls, dispatcher, scope, ip_tags_registry_);
     if (provider_or_error.status().ok()) {
       provider_ = provider_or_error.value();
+      initializeStats(provider_->tagKeys());
+      auto weak_self = weak_from_this();
+      tags_reload_callback_handle_ =
+          provider_->addTagsReloadCb([weak_self](const std::vector<std::string> tags) {
+            if (auto filter_config = weak_self.lock()) {
+              filter_config->initializeStats(tags);
+            }
+          });
     } else {
       creation_status = provider_or_error.status();
       return;
@@ -233,9 +242,48 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
   }
 }
 
+void IpTaggingFilterConfig::initializeStats(const std::vector<std::string>& tags) {
+  if (stat_name_set_ != nullptr) {
+    stat_name_set_.reset();
+  }
+  stat_name_set_ = scope_.symbolTable().makeSet("IpTagging");
+  stats_prefix_ = stat_name_set_->add(stats_prefix_str_ + "ip_tagging");
+  no_hit_ = stat_name_set_->add("no_hit");
+  total_ = stat_name_set_->add("total");
+  unknown_tag_ = stat_name_set_->add("unknown_tag.hit");
+  for (auto tag : tags) {
+    stat_name_set_->rememberBuiltin(absl::StrCat(tag, ".hit"));
+  }
+}
+
 void IpTaggingFilterConfig::incCounter(Stats::StatName name) {
   Stats::SymbolTable::StoragePtr storage = scope_.symbolTable().join({stats_prefix_, name});
   scope_.counterFromStatName(Stats::StatName(storage.get())).inc();
+}
+
+const Network::LcTrie::LcTrie<std::string>& IpTaggingFilterConfig::trie() const {
+  if (provider_) {
+    auto tags_or_error = provider_->ipTags();
+    if (tags_or_error.status().ok() && tags_or_error.value() != nullptr) {
+      return *(tags_or_error.value());
+    } else {
+      ENVOY_LOG(debug, "Failed to get trie data from provider, falling back to empty trie");
+      return EMPTY_TRIE_;
+    }
+  } else {
+    if (trie_ != nullptr) {
+      return *trie_;
+    } else {
+      return EMPTY_TRIE_;
+    }
+  }
+}
+
+OptRef<const Http::LowerCaseString> IpTaggingFilterConfig::ipTagHeader() const {
+  if (ip_tag_header_.get().empty()) {
+    return absl::nullopt;
+  }
+  return ip_tag_header_;
 }
 
 IpTaggingFilter::IpTaggingFilter(IpTaggingFilterConfigSharedPtr config) : config_(config) {}
