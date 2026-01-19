@@ -44,5 +44,14 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
+- area: tcp_proxy
+  change: |
+    Added :ref:`downstream_tlv_merge_policy
+    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.downstream_tlv_merge_policy>`
+    configuration option to the TCP proxy filter to control how TLVs specified in ``proxy_protocol_tlvs``
+    are merged with downstream proxy protocol TLVs. The policy supports three modes:
+    ``KEEP_DOWNSTREAM_ONLY`` (default), ``OVERRIDE_DOWNSTREAM_TLVS_BY_TYPE`` (overrides downstream
+    TLVs with matching types), and ``APPEND_TO_DOWNSTREAM_TLVS`` (appends all TLVs, preserving
+    duplicates per PROXY protocol v2 spec).
 
 deprecated:
