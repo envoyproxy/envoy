@@ -66,7 +66,6 @@ public:
   MOCK_METHOD(const Network::Address::InstanceConstSharedPtr&, upstreamRemoteAddress, (), (const));
   MOCK_METHOD(void, setUpstreamTransportFailureReason, (absl::string_view failure_reason));
   MOCK_METHOD(const std::string&, upstreamTransportFailureReason, (), (const));
-
   MOCK_METHOD(void, setUpstreamHost, (Upstream::HostDescriptionConstSharedPtr host));
   MOCK_METHOD(Upstream::HostDescriptionConstSharedPtr, upstreamHost, (), (const));
   MOCK_METHOD(const FilterStateSharedPtr&, upstreamFilterState, (), (const));
