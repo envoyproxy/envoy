@@ -23,7 +23,7 @@ message FilterChainConfig {
   // Default filter chain applied when no route level filter chain is specified
   // or when the route level filter chain name does not match any named filter chains in the
   // :ref:`filter chains map
-  // <envoy.extensions.filters.http.filter_chain.v3.FilterChainConfig.filter_chains>`.
+  // <envoy_v3_api_field_extensions.filters.http.filter_chain.v3.FilterChainConfig.filter_chains>`.
   //
   // This field is optional. If not specified and no route-level configuration matches,
   // the filter will pass through without applying any additional filters.
@@ -32,7 +32,7 @@ message FilterChainConfig {
   // Map of named filter chains. The key is an arbitrary name assigned to the filter chain.
   // These named filter chains can be referenced by the per-route configuration using
   // the :ref:`filter_chain_name
-  // <envoy.extensions.filters.http.filter_chain.v3.FilterChainConfigPerRoute.filter_chain_name>`.
+  // <envoy_v3_api_field_extensions.filters.http.filter_chain.v3.FilterChainConfigPerRoute.filter_chain_name>`.
   //
   // When Envoy initializing the filter chain for incoming requests, this special wrapper filter
   // will look up the appropriate filter chain from this map based on the route configuration and
@@ -50,18 +50,18 @@ message FilterChainConfig {
 // This could be used to implement route specific filter chains.
 message FilterChainConfigPerRoute {
   // Filter chain to be applied on current route.
-  // If specified, this filter chain takes precedence over filter_chain_name.
+  // If specified, this filter chain takes precedence over ``filter_chain_name``.
   FilterChain filter_chain = 1;
 
   // Name of the filter chain to be applied on this route. This name should match
-  // one of the names defined in the 
+  // one of the names defined in the
   // :ref:`filter chains map
-  // <envoy.extensions.filters.http.filter_chain.v3.FilterChainConfig.filter_chains>`. If no name
+  // <envoy_v3_api_field_extensions.filters.http.filter_chain.v3.FilterChainConfig.filter_chains>`. If no name
   // matches, the :ref:`default filter chain
-  // <envoy.extensions.filters.http.filter_chain.v3.FilterChainConfig.filter_chain>` will be used.
+  // <envoy_v3_api_field_extensions.filters.http.filter_chain.v3.FilterChainConfig.filter_chain>` will be used.
   // If even the default filter chain is not defined, the filter will pass through without applying
   // any additional filters.
-  // If filter_chain is also specified, this field is ignored.
+  // If ``filter_chain`` is also specified, this field is ignored.
   string filter_chain_name = 2;
 }
 
