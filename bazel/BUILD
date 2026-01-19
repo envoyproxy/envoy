@@ -538,7 +538,7 @@ config_setting(
 alias(
     name = "zlib",
     actual = select({
-        "//bazel:zlib_ng": "//bazel/foreign_cc:zlib_ng",
+        "//bazel:zlib_ng": "@com_github_zlib_ng_zlib_ng//:zlib",
         "//conditions:default": "@zlib",
     }),
 )
