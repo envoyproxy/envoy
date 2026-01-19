@@ -51,6 +51,12 @@ new_features:
 - area: mcp_router
   change: |
     Added support for MCP prompt methods ``prompts/list`` and ``prompts/get``.
+- area: mcp_router
+  change: |
+    Added support for MCP notification methods ``notifications/cancelled``, ``notifications/progress``,
+    ``notifications/roots/list_changed``, ``notifications/resources/list_changed``,
+    ``notifications/resources/updated``, ``notifications/tools/list_changed``, and
+    ``notifications/prompts/list_changed``.
 - area: formatter
   change: |
     Extended ``*_WITHOUT_PORT`` address formatters to accept an optional ``MASK_PREFIX_LEN`` parameter that masks IP addresses

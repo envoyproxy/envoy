@@ -46,15 +46,17 @@ void McpParserConfig::initializeDefaults() {
   addMethodConfig(Methods::INITIALIZE, {AttributeExtractionRule("params.protocolVersion"),
                                         AttributeExtractionRule("params.clientInfo.name")});
 
-  // Notifications
-  addMethodConfig(Methods::NOTIFICATION_RESOURCES_UPDATED, {AttributeExtractionRule("params.uri")});
-
+  // Notifications.
+  addMethodConfig(Methods::NOTIFICATION_INITIALIZED, {});
+  addMethodConfig(Methods::NOTIFICATION_CANCELLED, {AttributeExtractionRule("params.requestId")});
   addMethodConfig(Methods::NOTIFICATION_PROGRESS, {AttributeExtractionRule("params.progressToken"),
                                                    AttributeExtractionRule("params.progress")});
-
-  addMethodConfig(Methods::NOTIFICATION_CANCELLED, {AttributeExtractionRule("params.requestId")});
-
   addMethodConfig(Methods::NOTIFICATION_MESSAGE, {AttributeExtractionRule("params.level")});
+  addMethodConfig(Methods::NOTIFICATION_ROOTS_LIST_CHANGED, {});
+  addMethodConfig(Methods::NOTIFICATION_RESOURCES_LIST_CHANGED, {});
+  addMethodConfig(Methods::NOTIFICATION_RESOURCES_UPDATED, {AttributeExtractionRule("params.uri")});
+  addMethodConfig(Methods::NOTIFICATION_TOOLS_LIST_CHANGED, {});
+  addMethodConfig(Methods::NOTIFICATION_PROMPTS_LIST_CHANGED, {});
 }
 
 McpParserConfig
