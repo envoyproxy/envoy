@@ -220,7 +220,7 @@ void UberFilterFuzzer::perFilterSetup() {
   ON_CALL(decoder_callbacks_, dispatcher()).WillByDefault([this]() -> Event::Dispatcher& {
     return *worker_thread_dispatcher_;
   });
-  ON_CALL(encoder_callbacks_, injectEncodedDataToFilterChain(_, true))
+  ON_CALL(encoder_callbacks_, injectEncodedDataToFilterChain(_, true, false))
       .WillByDefault([this]() -> void { finishFilter(encoder_filter_.get()); });
   ON_CALL(encoder_callbacks_, addEncodedData(_, true)).WillByDefault([this]() -> void {
     finishFilter(encoder_filter_.get());
@@ -228,7 +228,7 @@ void UberFilterFuzzer::perFilterSetup() {
   ON_CALL(encoder_callbacks_, continueEncoding()).WillByDefault([this]() -> void {
     finishFilter(encoder_filter_.get());
   });
-  ON_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, true))
+  ON_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, true, false))
       .WillByDefault([this]() -> void { finishFilter(decoder_filter_.get()); });
   ON_CALL(decoder_callbacks_, addDecodedData(_, true)).WillByDefault([this]() -> void {
     finishFilter(decoder_filter_.get());

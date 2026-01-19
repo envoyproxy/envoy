@@ -181,15 +181,15 @@ protected:
                                                                 bool end_of_stream,
                                                                 bool both_direction = false);
 
-  void serverReceiveHeaderDuplexStreamed(ProcessingRequest& header, bool first_message = true,
-                                         bool response = false);
-  void server1ReceiveHeaderDuplexStreamed(ProcessingRequest& header, bool first_message = true,
+  void serverReceiveHeaderReq(ProcessingRequest& header, bool first_message = true,
+                              bool response = false);
+  void server1ReceiveHeaderReq(ProcessingRequest& header, bool first_message = true,
                                           bool response = false);
 
   uint32_t serverReceiveBodyDuplexStreamed(absl::string_view body_sent, bool response = false,
                                            bool compare_body = true);
-  void serverSendHeaderRespDuplexStreamed(bool first_message = true, bool response = false);
-  void server1SendHeaderRespDuplexStreamed(bool first_message = true, bool response = false);
+  void serverSendHeaderResp(bool first_message = true, bool response = false);
+  void server1SendHeaderResp(bool first_message = true, bool response = false);
   void serverSendBodyRespDuplexStreamed(uint32_t total_resp_body_msg, bool end_of_stream = true,
                                         bool response = false, absl::string_view body_sent = "");
   void serverSendTrailerRespDuplexStreamed();

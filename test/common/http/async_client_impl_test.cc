@@ -173,7 +173,7 @@ TEST_F(AsyncClientImplTest, BasicStream) {
         dynamic_cast<Http::AsyncStreamImpl*>(stream);
     filter_callbacks->continueDecoding(); // No-op.
     Buffer::OwnedImpl buffer;
-    filter_callbacks->injectDecodedDataToFilterChain(buffer, true);   // No-op.
+    filter_callbacks->injectDecodedDataToFilterChain(buffer, true, false);   // No-op.
     filter_callbacks->modifyDecodingBuffer([](Buffer::Instance&) {}); // No-op.
     filter_callbacks->encodeMetadata(nullptr);                        // No-op.
     EXPECT_EQ(false, filter_callbacks->recreateStream(nullptr));      // No-op.
