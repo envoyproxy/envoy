@@ -50,7 +50,15 @@ message FilterChainConfig {
 // This could be used to implement route specific filter chains.
 message FilterChainConfigPerRoute {
   // Filter chain to be applied on current route.
-  // If specified, this filter chain takes precedence over ``filter_chain_name``.
+  //
+  // .. note::
+  //   Not all HTTP filters are compatible to be used within this route level filter chain.
+  //   If one filter is not compatible and you attempt to use it, please configure the filter
+  //   at the :ref:`filter chains map
+  //   <envoy_v3_api_field_extensions.filters.http.filter_chain.v3.FilterChainConfig.filter_chains>`
+  //   and reference it by using ``filter_chain_name`` instead.
+  //
+  // One and only one of ``filter_chain`` or ``filter_chain_name`` SHOULD be specified.
   FilterChain filter_chain = 1;
 
   // Name of the filter chain to be applied on this route. This name should match
@@ -61,7 +69,8 @@ message FilterChainConfigPerRoute {
   // <envoy_v3_api_field_extensions.filters.http.filter_chain.v3.FilterChainConfig.filter_chain>` will be used.
   // If even the default filter chain is not defined, the filter will pass through without applying
   // any additional filters.
-  // If ``filter_chain`` is also specified, this field is ignored.
+  //
+  // One and only one of ``filter_chain`` or ``filter_chain_name`` SHOULD be specified.
   string filter_chain_name = 2;
 }
 
@@ -72,6 +81,16 @@ message FilterChain {
   // A list of HTTP filter configurations to be applied in order.
   // Each filter in the chain will process the request/response in sequence.
   // At least one filter must be specified.
+  //
+  // .. warning::
+  //   Please do not configure the ``filter_chain`` filter itself within this list recursively
+  //   to avoid undefined behavior.
+  //
+  // .. note::
+  //   It is possible to configure ``terminal`` filters (filters that do not expect next filter
+  //   in the chain, e.g., ``envoy.filters.http.router``) in the middle of the chain. However,
+  //   use it with caution to ensure the to avoid unexpected behavior.
+  //
   // [#extension-category: envoy.filters.http]
   repeated config.core.v3.TypedExtensionConfig filters = 1
       [(validate.rules).repeated = {min_items: 1}];

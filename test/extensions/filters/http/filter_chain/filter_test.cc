@@ -69,7 +69,7 @@ public:
     if (!yaml_config.empty()) {
       TestUtility::loadFromYaml(yaml_config, proto_config);
     }
-    auto callback_or_error = factory_.createFilterFactoryFromProto(proto_config, "test", context_);
+    auto callback_or_error = factory_.createFilterFactoryFromProto(proto_config, "test.", context_);
     EXPECT_TRUE(callback_or_error.status().ok());
 
     cb_ = callback_or_error.value();
@@ -102,6 +102,8 @@ TEST_F(FilterChainFactoryTest, EmptyConfig) {
   EXPECT_CALL(callbacks_, addStreamDecoderFilter(_)).Times(0);
   cb_(callbacks_);
   EXPECT_EQ(mock_factory_->filter_added_, 0);
+  EXPECT_EQ(context_.store_.counter("test.filter_chain.no_route").value(), 1);
+  EXPECT_EQ(context_.store_.counter("test.filter_chain.pass_through").value(), 1);
 }
 
 TEST_F(FilterChainFactoryTest, DefaultFilterChain) {
@@ -117,6 +119,8 @@ TEST_F(FilterChainFactoryTest, DefaultFilterChain) {
   EXPECT_CALL(callbacks_, addStreamDecoderFilter(_));
   cb_(callbacks_);
   EXPECT_EQ(mock_factory_->filter_added_, 1);
+  EXPECT_EQ(context_.store_.counter("test.filter_chain.no_route").value(), 1);
+  EXPECT_EQ(context_.store_.counter("test.filter_chain.use_default_filter_chain").value(), 1);
 }
 
 TEST_F(FilterChainFactoryTest, NamedFilterChainMatchButNoPerRoute) {
@@ -136,6 +140,8 @@ TEST_F(FilterChainFactoryTest, NamedFilterChainMatchButNoPerRoute) {
 
   cb_(callbacks_);
   EXPECT_EQ(mock_factory_->filter_added_, 0);
+  EXPECT_EQ(context_.store_.counter("test.filter_chain.no_route").value(), 1);
+  EXPECT_EQ(context_.store_.counter("test.filter_chain.pass_through").value(), 1);
 }
 
 TEST_F(FilterChainFactoryTest, NamedFilterChainMatchButNoConfig) {
@@ -158,6 +164,8 @@ TEST_F(FilterChainFactoryTest, NamedFilterChainMatchButNoConfig) {
 
   cb_(callbacks_);
   EXPECT_EQ(mock_factory_->filter_added_, 0);
+  EXPECT_EQ(context_.store_.counter("test.filter_chain.no_route_filter_config").value(), 1);
+  EXPECT_EQ(context_.store_.counter("test.filter_chain.pass_through").value(), 1);
 }
 
 TEST_F(FilterChainFactoryTest, NamedFilterChainMatch) {
@@ -183,6 +191,7 @@ TEST_F(FilterChainFactoryTest, NamedFilterChainMatch) {
   EXPECT_CALL(callbacks_, addStreamDecoderFilter(_));
   cb_(callbacks_);
   EXPECT_EQ(mock_factory_->filter_added_, 1);
+  EXPECT_EQ(context_.store_.counter("test.filter_chain.use_named_filter_chain").value(), 1);
 }
 
 TEST_F(FilterChainFactoryTest, NamedFilterChainMismatch) {
@@ -208,6 +217,8 @@ TEST_F(FilterChainFactoryTest, NamedFilterChainMismatch) {
   EXPECT_CALL(callbacks_, addStreamDecoderFilter(_)).Times(0);
   cb_(callbacks_);
   EXPECT_EQ(mock_factory_->filter_added_, 0);
+  EXPECT_EQ(context_.store_.counter("test.filter_chain.no_matched_filter_chain").value(), 1);
+  EXPECT_EQ(context_.store_.counter("test.filter_chain.pass_through").value(), 1);
 }
 
 TEST_F(FilterChainFactoryTest, InlinedPerRouteConfig) {
@@ -231,6 +242,7 @@ TEST_F(FilterChainFactoryTest, InlinedPerRouteConfig) {
   EXPECT_CALL(callbacks_, addStreamDecoderFilter(_)).Times(2);
   cb_(callbacks_);
   EXPECT_EQ(mock_factory_->filter_added_, 2);
+  EXPECT_EQ(context_.store_.counter("test.filter_chain.use_route_filter_chain").value(), 1);
 }
 
 } // namespace

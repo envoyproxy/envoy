@@ -80,8 +80,16 @@ FilterChain::FilterChain(
 FilterChainPerRouteConfig::FilterChainPerRouteConfig(
     const envoy::extensions::filters::http::filter_chain::v3::FilterChainConfigPerRoute&
         proto_config,
-    Server::Configuration::ServerFactoryContext& context, const std::string& stats_prefix)
+    Server::Configuration::ServerFactoryContext& context, const std::string& stats_prefix,
+    absl::Status& creation_status)
     : filter_chain_name_(proto_config.filter_chain_name()) {
+
+  if (proto_config.filter_chain_name().empty() == proto_config.has_filter_chain()) {
+    creation_status = absl::InvalidArgumentError(
+        "One and only one of filter_chain_name or filter_chain must be set");
+    return;
+  }
+
   if (proto_config.has_filter_chain()) {
     filter_chain_ =
         std::make_shared<FilterChain>(proto_config.filter_chain(), context, stats_prefix);
@@ -90,7 +98,8 @@ FilterChainPerRouteConfig::FilterChainPerRouteConfig(
 
 FilterChainConfig::FilterChainConfig(const FilterChainConfigProto& proto_config,
                                      Server::Configuration::FactoryContext& context,
-                                     const std::string& stats_prefix) {
+                                     const std::string& stats_prefix)
+    : stats_(createStats(stats_prefix, context.scope())) {
   if (proto_config.has_filter_chain()) {
     default_filter_chain_ =
         std::make_shared<FilterChain>(proto_config.filter_chain(), context, stats_prefix);
