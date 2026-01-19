@@ -29,17 +29,17 @@ void envoy_dynamic_module_on_listener_filter_config_destroy(
   assert(filter_config_ptr == &some_variable);
 }
 
+// Returns nullptr to simulate configuration initialization failure.
 envoy_dynamic_module_type_listener_filter_module_ptr envoy_dynamic_module_on_listener_filter_new(
     envoy_dynamic_module_type_listener_filter_config_module_ptr filter_config_ptr,
     envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr) {
-  return &some_variable + 1;
+  return 0;  // Return nullptr to indicate failure.
 }
 
 envoy_dynamic_module_type_on_listener_filter_status
 envoy_dynamic_module_on_listener_filter_on_accept(
     envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_listener_filter_module_ptr filter_module_ptr) {
-  assert(envoy_dynamic_module_callback_listener_filter_get_worker_index(filter_envoy_ptr) == 0);
   return envoy_dynamic_module_type_on_listener_filter_status_Continue;
 }
 
@@ -57,14 +57,11 @@ void envoy_dynamic_module_on_listener_filter_on_close(
 size_t envoy_dynamic_module_on_listener_filter_get_max_read_bytes(
     envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_listener_filter_module_ptr filter_module_ptr) {
-  // Return 0 to indicate no data inspection is needed.
   return 0;
 }
 
 void envoy_dynamic_module_on_listener_filter_destroy(
-    envoy_dynamic_module_type_listener_filter_module_ptr filter_module_ptr) {
-  assert(filter_module_ptr == &some_variable + 1);
-}
+    envoy_dynamic_module_type_listener_filter_module_ptr filter_module_ptr) {}
 
 void envoy_dynamic_module_on_listener_filter_scheduled(
     envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,

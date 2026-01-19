@@ -27,6 +27,7 @@ envoy_cc_library(
     srcs = ["abi_impl.cc"],
     deps = [
         ":dynamic_modules_lib",
+        "//envoy/server:factory_context_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
     ],

@@ -33,8 +33,7 @@ TEST_P(DynamicModuleTestLanguages, DoNotClose) {
 
   // Release the module, and reload it.
   module->reset();
-  module = newDynamicModule(testSharedObjectPath("no_op", language),
-                            true); // This time, do not close the module.
+  module = newDynamicModule(testSharedObjectPath("no_op", language), true);
   EXPECT_TRUE(module.ok());
 
   // This module must be reloaded and the variable must be reset.

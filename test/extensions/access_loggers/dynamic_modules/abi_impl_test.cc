@@ -29,13 +29,16 @@ public:
     stream_info_.protocol_ = Http::Protocol::Http11;
   }
 
-  void* createContext(const Formatter::Context& log_context) {
-    context_ = std::make_unique<DynamicModuleAccessLogContext>(log_context, stream_info_);
-    return static_cast<void*>(context_.get());
+  void* createThreadLocalLogger(const Formatter::Context& context,
+                                const StreamInfo::StreamInfo& stream_info) {
+    logger_ = std::make_unique<ThreadLocalLogger>(nullptr, nullptr, 1);
+    logger_->log_context_ = &context;
+    logger_->stream_info_ = &stream_info;
+    return static_cast<void*>(logger_.get());
   }
 
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
-  std::unique_ptr<DynamicModuleAccessLogContext> context_;
+  std::unique_ptr<ThreadLocalLogger> logger_;
   Http::TestRequestHeaderMapImpl request_headers_{{"x-request-id", "req-123"},
                                                   {"host", "example.com"}};
   Http::TestResponseHeaderMapImpl response_headers_{
@@ -49,7 +52,7 @@ public:
 
 TEST_F(DynamicModuleAccessLogAbiTest, HeadersSizeRequestHeaders) {
   Formatter::Context log_context(&request_headers_, &response_headers_, &response_trailers_);
-  void* env_ptr = createContext(log_context);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
   EXPECT_EQ(2, envoy_dynamic_module_callback_access_logger_get_headers_size(
                    env_ptr, envoy_dynamic_module_type_http_header_type_RequestHeader));
@@ -57,7 +60,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, HeadersSizeRequestHeaders) {
 
 TEST_F(DynamicModuleAccessLogAbiTest, HeadersSizeResponseHeaders) {
   Formatter::Context log_context(&request_headers_, &response_headers_, &response_trailers_);
-  void* env_ptr = createContext(log_context);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
   // 3 headers: content-type, x-custom, x-custom.
   EXPECT_EQ(3, envoy_dynamic_module_callback_access_logger_get_headers_size(
@@ -66,7 +69,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, HeadersSizeResponseHeaders) {
 
 TEST_F(DynamicModuleAccessLogAbiTest, HeadersSizeResponseTrailers) {
   Formatter::Context log_context(&request_headers_, &response_headers_, &response_trailers_);
-  void* env_ptr = createContext(log_context);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
   EXPECT_EQ(1, envoy_dynamic_module_callback_access_logger_get_headers_size(
                    env_ptr, envoy_dynamic_module_type_http_header_type_ResponseTrailer));
@@ -74,7 +77,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, HeadersSizeResponseTrailers) {
 
 TEST_F(DynamicModuleAccessLogAbiTest, HeadersSizeNullHeaders) {
   Formatter::Context log_context(nullptr, nullptr, nullptr);
-  void* env_ptr = createContext(log_context);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
   EXPECT_EQ(0, envoy_dynamic_module_callback_access_logger_get_headers_size(
                    env_ptr, envoy_dynamic_module_type_http_header_type_RequestHeader));
@@ -82,7 +85,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, HeadersSizeNullHeaders) {
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetHeaders) {
   Formatter::Context log_context(&request_headers_, &response_headers_, &response_trailers_);
-  void* env_ptr = createContext(log_context);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
   std::vector<envoy_dynamic_module_type_envoy_http_header> headers(2);
   EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_headers(
@@ -102,7 +105,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetHeaders) {
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetHeadersNull) {
   Formatter::Context log_context(nullptr, nullptr, nullptr);
-  void* env_ptr = createContext(log_context);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
   EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_headers(
       env_ptr, envoy_dynamic_module_type_http_header_type_RequestHeader, nullptr));
@@ -110,7 +113,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetHeadersNull) {
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetHeaderValueFound) {
   Formatter::Context log_context(&request_headers_, &response_headers_, &response_trailers_);
-  void* env_ptr = createContext(log_context);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
   envoy_dynamic_module_type_module_buffer key = {"x-request-id", 12};
   envoy_dynamic_module_type_envoy_buffer result;
@@ -124,7 +127,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetHeaderValueFound) {
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetHeaderValueMultiValue) {
   Formatter::Context log_context(&request_headers_, &response_headers_, &response_trailers_);
-  void* env_ptr = createContext(log_context);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
   envoy_dynamic_module_type_module_buffer key = {"x-custom", 8};
   envoy_dynamic_module_type_envoy_buffer result;
@@ -145,7 +148,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetHeaderValueMultiValue) {
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetHeaderValueNotFound) {
   Formatter::Context log_context(&request_headers_, &response_headers_, &response_trailers_);
-  void* env_ptr = createContext(log_context);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
   envoy_dynamic_module_type_module_buffer key = {"nonexistent", 11};
   envoy_dynamic_module_type_envoy_buffer result;
@@ -158,7 +161,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetHeaderValueNotFound) {
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetHeaderValueIndexOutOfBounds) {
   Formatter::Context log_context(&request_headers_, &response_headers_, &response_trailers_);
-  void* env_ptr = createContext(log_context);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
   envoy_dynamic_module_type_module_buffer key = {"x-request-id", 12};
   envoy_dynamic_module_type_envoy_buffer result;
@@ -175,7 +178,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetHeaderValueIndexOutOfBounds) {
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetResponseCode) {
   Formatter::Context log_context(nullptr, nullptr, nullptr);
-  void* env_ptr = createContext(log_context);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
   EXPECT_EQ(envoy_dynamic_module_callback_access_logger_get_response_code(env_ptr), 200);
 }
@@ -183,7 +186,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetResponseCode) {
 TEST_F(DynamicModuleAccessLogAbiTest, GetResponseCodeNotSet) {
   stream_info_.response_code_ = absl::nullopt;
   Formatter::Context log_context(nullptr, nullptr, nullptr);
-  void* env_ptr = createContext(log_context);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
   EXPECT_EQ(envoy_dynamic_module_callback_access_logger_get_response_code(env_ptr), 0);
 }
@@ -191,7 +194,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetResponseCodeNotSet) {
 TEST_F(DynamicModuleAccessLogAbiTest, GetResponseCodeDetails) {
   stream_info_.response_code_details_ = "details";
   Formatter::Context log_context(nullptr, nullptr, nullptr);
-  void* env_ptr = createContext(log_context);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
   envoy_dynamic_module_type_envoy_buffer result;
   EXPECT_TRUE(
@@ -202,7 +205,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetResponseCodeDetails) {
 TEST_F(DynamicModuleAccessLogAbiTest, GetResponseCodeDetailsNotSet) {
   stream_info_.response_code_details_ = absl::nullopt;
   Formatter::Context log_context(nullptr, nullptr, nullptr);
-  void* env_ptr = createContext(log_context);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
   envoy_dynamic_module_type_envoy_buffer result;
   EXPECT_FALSE(
@@ -211,7 +214,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetResponseCodeDetailsNotSet) {
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetProtocol) {
   Formatter::Context log_context(nullptr, nullptr, nullptr);
-  void* env_ptr = createContext(log_context);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
   envoy_dynamic_module_type_envoy_buffer protocol;
   EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_protocol(env_ptr, &protocol));
@@ -221,7 +224,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetProtocol) {
 TEST_F(DynamicModuleAccessLogAbiTest, GetProtocolHttp2) {
   stream_info_.protocol_ = Http::Protocol::Http2;
   Formatter::Context log_context(nullptr, nullptr, nullptr);
-  void* env_ptr = createContext(log_context);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
   envoy_dynamic_module_type_envoy_buffer protocol;
   EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_protocol(env_ptr, &protocol));
@@ -232,7 +235,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetResponseFlags) {
   stream_info_.setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamConnectionFailure);
   stream_info_.setResponseFlag(StreamInfo::CoreResponseFlag::NoRouteFound);
   Formatter::Context log_context(nullptr, nullptr, nullptr);
-  void* env_ptr = createContext(log_context);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
   EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_has_response_flag(
       env_ptr, envoy_dynamic_module_type_response_flag_UpstreamConnectionFailure));
@@ -249,7 +252,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetRouteName) {
   ON_CALL(stream_info_, getRouteName())
       .WillByDefault(testing::ReturnRefOfCopy(std::string("test_route")));
   Formatter::Context log_context(nullptr, nullptr, nullptr);
-  void* env_ptr = createContext(log_context);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
   envoy_dynamic_module_type_envoy_buffer result;
   EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_route_name(env_ptr, &result));
@@ -259,7 +262,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetRouteName) {
 TEST_F(DynamicModuleAccessLogAbiTest, GetRouteNameEmpty) {
   ON_CALL(stream_info_, getRouteName()).WillByDefault(testing::ReturnRefOfCopy(std::string("")));
   Formatter::Context log_context(nullptr, nullptr, nullptr);
-  void* env_ptr = createContext(log_context);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
   envoy_dynamic_module_type_envoy_buffer result;
   EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_route_name(env_ptr, &result));
@@ -268,7 +271,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetRouteNameEmpty) {
 TEST_F(DynamicModuleAccessLogAbiTest, IsHealthCheck) {
   ON_CALL(stream_info_, healthCheck()).WillByDefault(testing::Return(true));
   Formatter::Context log_context(nullptr, nullptr, nullptr);
-  void* env_ptr = createContext(log_context);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
   EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_is_health_check(env_ptr));
 }
@@ -276,7 +279,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, IsHealthCheck) {
 TEST_F(DynamicModuleAccessLogAbiTest, IsNotHealthCheck) {
   ON_CALL(stream_info_, healthCheck()).WillByDefault(testing::Return(false));
   Formatter::Context log_context(nullptr, nullptr, nullptr);
-  void* env_ptr = createContext(log_context);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
   EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_is_health_check(env_ptr));
 }
@@ -284,7 +287,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, IsNotHealthCheck) {
 TEST_F(DynamicModuleAccessLogAbiTest, GetAttemptCount) {
   stream_info_.attempt_count_ = 3;
   Formatter::Context log_context(nullptr, nullptr, nullptr);
-  void* env_ptr = createContext(log_context);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
   EXPECT_EQ(envoy_dynamic_module_callback_access_logger_get_attempt_count(env_ptr), 3);
 }
@@ -292,7 +295,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetAttemptCount) {
 TEST_F(DynamicModuleAccessLogAbiTest, GetAttemptCountNotSet) {
   stream_info_.attempt_count_ = absl::nullopt;
   Formatter::Context log_context(nullptr, nullptr, nullptr);
-  void* env_ptr = createContext(log_context);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
   EXPECT_EQ(envoy_dynamic_module_callback_access_logger_get_attempt_count(env_ptr), 0);
 }
@@ -303,7 +306,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetAttemptCountNotSet) {
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetTimingInfo) {
   Formatter::Context log_context(nullptr, nullptr, nullptr);
-  void* env_ptr = createContext(log_context);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
   envoy_dynamic_module_type_timing_info timing;
   envoy_dynamic_module_callback_access_logger_get_timing_info(env_ptr, &timing);
@@ -323,7 +326,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetTimingInfoNoDownstreamOrUpstream) {
       .WillByDefault(testing::Return(OptRef<const StreamInfo::UpstreamInfo>()));
 
   Formatter::Context log_context(nullptr, nullptr, nullptr);
-  void* env_ptr = createContext(log_context);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
   envoy_dynamic_module_type_timing_info timing;
   envoy_dynamic_module_callback_access_logger_get_timing_info(env_ptr, &timing);
@@ -362,7 +365,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetTimingInfoWithValues) {
       stream_info_.start_time_monotonic_ + std::chrono::milliseconds(7);
 
   Formatter::Context log_context(nullptr, nullptr, nullptr);
-  void* env_ptr = createContext(log_context);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
   envoy_dynamic_module_type_timing_info timing;
   envoy_dynamic_module_callback_access_logger_get_timing_info(env_ptr, &timing);
@@ -378,7 +381,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetTimingInfoWithValues) {
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetBytesInfo) {
   Formatter::Context log_context(nullptr, nullptr, nullptr);
-  void* env_ptr = createContext(log_context);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
   envoy_dynamic_module_type_bytes_info bytes;
   envoy_dynamic_module_callback_access_logger_get_bytes_info(env_ptr, &bytes);
@@ -395,7 +398,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetBytesInfoWithUpstreamBytesMeter) {
   stream_info_.setUpstreamBytesMeter(meter);
 
   Formatter::Context log_context(nullptr, nullptr, nullptr);
-  void* env_ptr = createContext(log_context);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
   envoy_dynamic_module_type_bytes_info bytes;
   envoy_dynamic_module_callback_access_logger_get_bytes_info(env_ptr, &bytes);
@@ -414,7 +417,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetUpstreamCluster) {
   stream_info_.setUpstreamClusterInfo(cluster_info);
 
   Formatter::Context log_context(nullptr, nullptr, nullptr);
-  void* env_ptr = createContext(log_context);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
   envoy_dynamic_module_type_envoy_buffer result;
   EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_upstream_cluster(env_ptr, &result));
@@ -423,7 +426,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetUpstreamCluster) {
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetUpstreamClusterMissing) {
   Formatter::Context log_context(nullptr, nullptr, nullptr);
-  void* env_ptr = createContext(log_context);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
   envoy_dynamic_module_type_envoy_buffer result;
   EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_upstream_cluster(env_ptr, &result));
@@ -436,7 +439,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetUpstreamHost) {
   stream_info_.upstream_info_->setUpstreamHost(upstream_host);
 
   Formatter::Context log_context(nullptr, nullptr, nullptr);
-  void* env_ptr = createContext(log_context);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
   envoy_dynamic_module_type_envoy_buffer result;
   EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_upstream_host(env_ptr, &result));
@@ -447,7 +450,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetUpstreamHostMissing) {
   stream_info_.upstream_info_->setUpstreamHost(Upstream::HostDescriptionConstSharedPtr{});
 
   Formatter::Context log_context(nullptr, nullptr, nullptr);
-  void* env_ptr = createContext(log_context);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
   envoy_dynamic_module_type_envoy_buffer result;
   EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_upstream_host(env_ptr, &result));
@@ -457,7 +460,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetUpstreamTransportFailureReason) {
   stream_info_.upstream_info_->setUpstreamTransportFailureReason("refused");
 
   Formatter::Context log_context(nullptr, nullptr, nullptr);
-  void* env_ptr = createContext(log_context);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
   envoy_dynamic_module_type_envoy_buffer result;
   EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_upstream_transport_failure_reason(
@@ -467,7 +470,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetUpstreamTransportFailureReason) {
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetUpstreamTransportFailureReasonMissing) {
   Formatter::Context log_context(nullptr, nullptr, nullptr);
-  void* env_ptr = createContext(log_context);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
   envoy_dynamic_module_type_envoy_buffer result;
   EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_upstream_transport_failure_reason(
@@ -482,14 +485,14 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetConnectionId) {
   stream_info_.downstream_connection_info_provider_->setConnectionID(98765);
 
   Formatter::Context log_context(nullptr, nullptr, nullptr);
-  void* env_ptr = createContext(log_context);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
   EXPECT_EQ(98765, envoy_dynamic_module_callback_access_logger_get_connection_id(env_ptr));
 }
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetConnectionIdMissing) {
   Formatter::Context log_context(nullptr, nullptr, nullptr);
-  void* env_ptr = createContext(log_context);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
   EXPECT_EQ(0, envoy_dynamic_module_callback_access_logger_get_connection_id(env_ptr));
 }
@@ -507,7 +510,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, DownstreamTlsFields) {
   stream_info_.downstream_connection_info_provider_->setRequestedServerName("example.test");
 
   Formatter::Context log_context(nullptr, nullptr, nullptr);
-  void* env_ptr = createContext(log_context);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
   envoy_dynamic_module_type_envoy_buffer buf;
   EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_requested_server_name(env_ptr, &buf));
@@ -530,7 +533,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, DownstreamTlsFields) {
 
 TEST_F(DynamicModuleAccessLogAbiTest, DownstreamTlsMissing) {
   Formatter::Context log_context(nullptr, nullptr, nullptr);
-  void* env_ptr = createContext(log_context);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
   envoy_dynamic_module_type_envoy_buffer buf;
   EXPECT_FALSE(
@@ -550,7 +553,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, DownstreamTlsMissing) {
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetRequestIdMissingProvider) {
   Formatter::Context log_context(nullptr, nullptr, nullptr);
-  void* env_ptr = createContext(log_context);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
   envoy_dynamic_module_type_envoy_buffer result;
   EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_request_id(env_ptr, &result));
@@ -558,7 +561,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetRequestIdMissingProvider) {
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetFilterStateAlwaysFalse) {
   Formatter::Context log_context(nullptr, nullptr, nullptr);
-  void* env_ptr = createContext(log_context);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
   envoy_dynamic_module_type_module_buffer key = {"k", 1};
   envoy_dynamic_module_type_envoy_buffer result;
@@ -579,7 +582,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetDownstreamAddresses) {
   stream_info_.downstream_connection_info_provider_->setRemoteAddress(remote_addr);
 
   Formatter::Context log_context(nullptr, nullptr, nullptr);
-  void* env_ptr = createContext(log_context);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
   envoy_dynamic_module_type_envoy_buffer addr;
   uint32_t port;
@@ -602,7 +605,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetDownstreamRemoteAddressNonIp) {
   stream_info_.downstream_connection_info_provider_->setRemoteAddress(non_ip);
 
   Formatter::Context log_context(nullptr, nullptr, nullptr);
-  void* env_ptr = createContext(log_context);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
   envoy_dynamic_module_type_envoy_buffer addr;
   uint32_t port;
@@ -623,7 +626,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetUpstreamAddresses) {
   stream_info_.upstream_info_->setUpstreamHost(upstream_host);
 
   Formatter::Context log_context(nullptr, nullptr, nullptr);
-  void* env_ptr = createContext(log_context);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
   envoy_dynamic_module_type_envoy_buffer addr;
   uint32_t port;
@@ -648,7 +651,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetUpstreamRemoteAddressNonIp) {
   stream_info_.upstream_info_->setUpstreamHost(upstream_host);
 
   Formatter::Context log_context(nullptr, nullptr, nullptr);
-  void* env_ptr = createContext(log_context);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
   envoy_dynamic_module_type_envoy_buffer addr;
   uint32_t port;
@@ -664,7 +667,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetUpstreamRemoteAddressMissingUpstream) {
       .WillByDefault(testing::Return(OptRef<const StreamInfo::UpstreamInfo>()));
 
   Formatter::Context log_context(nullptr, nullptr, nullptr);
-  void* env_ptr = createContext(log_context);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
   envoy_dynamic_module_type_envoy_buffer addr;
   uint32_t port;
@@ -681,7 +684,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetUpstreamLocalAddressMissingAndNonIp) {
   stream_info_.setUpstreamInfo(upstream_info);
 
   Formatter::Context log_context(nullptr, nullptr, nullptr);
-  void* env_ptr = createContext(log_context);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
   envoy_dynamic_module_type_envoy_buffer addr;
   uint32_t port;
   EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_upstream_local_address(
@@ -712,7 +715,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetUpstreamInfo) {
   stream_info_.upstream_info_->setUpstreamTransportFailureReason("connection_refused");
 
   Formatter::Context log_context(nullptr, nullptr, nullptr);
-  void* env_ptr = createContext(log_context);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
   envoy_dynamic_module_type_envoy_buffer result;
 
@@ -746,7 +749,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetConnectionInfo) {
   stream_info_.downstream_connection_info_provider_->setSslConnection(ssl_info);
 
   Formatter::Context log_context(nullptr, nullptr, nullptr);
-  void* env_ptr = createContext(log_context);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
   EXPECT_EQ(12345, envoy_dynamic_module_callback_access_logger_get_connection_id(env_ptr));
 
@@ -783,7 +786,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, DownstreamTlsEmptySubjectAndDigest) {
   stream_info_.downstream_connection_info_provider_->setSslConnection(ssl_info);
 
   Formatter::Context log_context(nullptr, nullptr, nullptr);
-  void* env_ptr = createContext(log_context);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
   envoy_dynamic_module_type_envoy_buffer result;
   EXPECT_FALSE(
@@ -810,7 +813,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetDynamicMetadata) {
   (*stream_info_.metadata_.mutable_filter_metadata())["test_filter"] = struct_obj;
 
   Formatter::Context log_context(nullptr, nullptr, nullptr);
-  void* env_ptr = createContext(log_context);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
   envoy_dynamic_module_type_module_buffer filter = {"test_filter", 11};
   envoy_dynamic_module_type_module_buffer key = {"key", 3};
@@ -824,7 +827,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetDynamicMetadata) {
 TEST_F(DynamicModuleAccessLogAbiTest, GetDynamicMetadataNotSet) {
   // No metadata set; should return false due to KIND_NOT_SET.
   Formatter::Context log_context(nullptr, nullptr, nullptr);
-  void* env_ptr = createContext(log_context);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
   envoy_dynamic_module_type_module_buffer filter = {"test_filter", 11};
   envoy_dynamic_module_type_module_buffer key = {"key", 3};
@@ -841,7 +844,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetDynamicMetadataNonStringValue) {
   (*stream_info_.metadata_.mutable_filter_metadata())["test_filter"] = struct_obj;
 
   Formatter::Context log_context(nullptr, nullptr, nullptr);
-  void* env_ptr = createContext(log_context);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
   envoy_dynamic_module_type_module_buffer filter = {"test_filter", 11};
   envoy_dynamic_module_type_module_buffer key = {"key", 3};
@@ -861,7 +864,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetRequestId) {
       .WillByDefault(testing::Return(makeOptRef<const StreamInfo::StreamIdProvider>(*provider)));
 
   Formatter::Context log_context(nullptr, nullptr, nullptr);
-  void* env_ptr = createContext(log_context);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
   envoy_dynamic_module_type_envoy_buffer result = {nullptr, 0};
   ASSERT_TRUE(envoy_dynamic_module_callback_access_logger_get_request_id(env_ptr, &result));
@@ -876,8 +879,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetLocalReplyBody) {
   Formatter::Context log_context(&request_headers, nullptr, nullptr, body,
                                  AccessLog::AccessLogType::NotSet, nullptr);
 
-  DynamicModuleAccessLogContext ctx(log_context, stream_info_);
-  void* env_ptr = static_cast<void*>(&ctx);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
   envoy_dynamic_module_type_envoy_buffer result;
   EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_local_reply_body(env_ptr, &result));
@@ -890,8 +892,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetLocalReplyBodyEmpty) {
   Formatter::Context log_context(&request_headers, nullptr, nullptr, body,
                                  AccessLog::AccessLogType::NotSet, nullptr);
 
-  DynamicModuleAccessLogContext ctx(log_context, stream_info_);
-  void* env_ptr = static_cast<void*>(&ctx);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
   envoy_dynamic_module_type_envoy_buffer result;
   EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_local_reply_body(env_ptr, &result));
@@ -902,7 +903,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetLocalReplyBodyEmpty) {
 
 TEST_F(DynamicModuleAccessLogAbiTest, TracingUnsupported) {
   Formatter::Context log_context(nullptr, nullptr, nullptr);
-  void* env_ptr = createContext(log_context);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
   envoy_dynamic_module_type_envoy_buffer result;
   EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_trace_id(env_ptr, &result));
@@ -911,7 +912,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, TracingUnsupported) {
 
 TEST_F(DynamicModuleAccessLogAbiTest, IsTraceSampled) {
   Formatter::Context log_context(nullptr, nullptr, nullptr);
-  void* env_ptr = createContext(log_context);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
   ON_CALL(stream_info_, traceReason())
       .WillByDefault(testing::Return(Tracing::Reason::NotTraceable));

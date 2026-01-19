@@ -17,6 +17,8 @@
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/host.h"
 
+#include "gmock/gmock.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace DynamicModules {
@@ -35,9 +37,9 @@ public:
     filter_config_ = filter_config_or_status.value();
 
     filter_ = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
-    filter_->initializeInModuleFilter();
 
     ON_CALL(read_callbacks_, connection()).WillByDefault(testing::ReturnRef(connection_));
+    ON_CALL(connection_, dispatcher()).WillByDefault(testing::ReturnRef(worker_thread_dispatcher_));
     filter_->initializeReadFilterCallbacks(read_callbacks_);
     filter_->initializeWriteFilterCallbacks(write_callbacks_);
   }
@@ -60,6 +62,7 @@ public:
   NiceMock<Network::MockReadFilterCallbacks> read_callbacks_;
   NiceMock<Network::MockWriteFilterCallbacks> write_callbacks_;
   NiceMock<Network::MockConnection> connection_;
+  NiceMock<Event::MockDispatcher> worker_thread_dispatcher_{"worker_0"};
 };
 
 // =============================================================================
@@ -426,7 +429,7 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, InjectReadDataEmptyEndStream) 
 
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, InjectReadDataNullCallbacks) {
   auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
-  filter->initializeInModuleFilter();
+  filter_->initializeReadFilterCallbacks(read_callbacks_);
 
   char data[] = "test";
   envoy_dynamic_module_type_module_buffer buf = {data, 4};
@@ -453,7 +456,7 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, InjectWriteDataEmptyEndStream)
 
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, InjectWriteDataNullCallbacks) {
   auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
-  filter->initializeInModuleFilter();
+  filter_->initializeReadFilterCallbacks(read_callbacks_);
 
   char data[] = "test";
   envoy_dynamic_module_type_module_buffer buf = {data, 4};
@@ -631,7 +634,7 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, DisableCloseFalse) {
 
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, DisableCloseNullCallbacks) {
   auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
-  filter->initializeInModuleFilter();
+  filter_->initializeReadFilterCallbacks(read_callbacks_);
 
   envoy_dynamic_module_callback_network_filter_disable_close(static_cast<void*>(filter.get()),
                                                              true);
@@ -1247,9 +1250,10 @@ public:
     filter_config_ = filter_config_or_status.value();
 
     filter_ = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
-    filter_->initializeInModuleFilter();
 
+    ON_CALL(connection_, dispatcher()).WillByDefault(testing::ReturnRef(worker_thread_dispatcher_));
     ON_CALL(read_callbacks_, connection()).WillByDefault(testing::ReturnRef(connection_));
+
     filter_->initializeReadFilterCallbacks(read_callbacks_);
     filter_->initializeWriteFilterCallbacks(write_callbacks_);
   }
@@ -1271,6 +1275,7 @@ public:
   NiceMock<Network::MockReadFilterCallbacks> read_callbacks_;
   NiceMock<Network::MockWriteFilterCallbacks> write_callbacks_;
   NiceMock<Network::MockConnection> connection_;
+  NiceMock<Event::MockDispatcher> worker_thread_dispatcher_{"worker_0"};
 };
 
 TEST_F(DynamicModuleNetworkFilterHttpCalloutTest, SendHttpCalloutClusterNotFound) {
@@ -1615,7 +1620,7 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetUpstreamHostAddressNoHost) 
 
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetUpstreamHostAddressNullCallbacks) {
   auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
-  filter->initializeInModuleFilter();
+  filter_->initializeReadFilterCallbacks(read_callbacks_);
 
   envoy_dynamic_module_type_envoy_buffer address_out = {nullptr, 0};
   uint32_t port_out = 0;
@@ -1685,7 +1690,7 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetUpstreamHostHostnameEmpty) 
 
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetUpstreamHostHostnameNullCallbacks) {
   auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
-  filter->initializeInModuleFilter();
+  filter_->initializeReadFilterCallbacks(read_callbacks_);
 
   envoy_dynamic_module_type_envoy_buffer hostname_out = {nullptr, 0};
   bool result = envoy_dynamic_module_callback_network_filter_get_upstream_host_hostname(
@@ -1724,7 +1729,7 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetUpstreamHostClusterNoHost) 
 
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetUpstreamHostClusterNullCallbacks) {
   auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
-  filter->initializeInModuleFilter();
+  filter_->initializeReadFilterCallbacks(read_callbacks_);
 
   envoy_dynamic_module_type_envoy_buffer cluster_name_out = {nullptr, 0};
   bool result = envoy_dynamic_module_callback_network_filter_get_upstream_host_cluster(
@@ -1751,7 +1756,7 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, HasUpstreamHostFalse) {
 
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, HasUpstreamHostNullCallbacks) {
   auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
-  filter->initializeInModuleFilter();
+  filter_->initializeReadFilterCallbacks(read_callbacks_);
 
   bool result = envoy_dynamic_module_callback_network_filter_has_upstream_host(
       static_cast<void*>(filter.get()));
@@ -1780,7 +1785,7 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, StartUpstreamSecureTransportFa
 
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, StartUpstreamSecureTransportNullCallbacks) {
   auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
-  filter->initializeInModuleFilter();
+  filter_->initializeReadFilterCallbacks(read_callbacks_);
 
   bool result = envoy_dynamic_module_callback_network_filter_start_upstream_secure_transport(
       static_cast<void*>(filter.get()));

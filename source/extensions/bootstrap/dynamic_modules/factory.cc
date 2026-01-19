@@ -40,7 +40,7 @@ Server::BootstrapExtensionPtr DynamicModuleBootstrapExtensionFactory::createBoot
 
   auto extension_config = newDynamicModuleBootstrapExtensionConfig(
       proto_config.extension_name(), extension_config_str, std::move(dynamic_module.value()),
-      context.mainThreadDispatcher());
+      context.mainThreadDispatcher(), context, context.serverScope().store());
 
   if (!extension_config.ok()) {
     throwEnvoyExceptionOrPanic("Failed to create extension config: " +
