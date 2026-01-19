@@ -48,6 +48,9 @@ new_features:
   change: |
     Added support for MCP resource methods ``resources/list``, ``resources/read``,
     ``resources/subscribe``, and ``resources/unsubscribe``.
+- area: mcp_router
+  change: |
+    Added support for MCP prompt methods ``prompts/list`` and ``prompts/get``.
 - area: formatter
   change: |
     Extended ``*_WITHOUT_PORT`` address formatters to accept an optional ``MASK_PREFIX_LEN`` parameter that masks IP addresses

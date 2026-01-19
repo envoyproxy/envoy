@@ -165,6 +165,19 @@ TEST_F(McpJsonParserTest, ResourcesUnsubscribeExtraction) {
   EXPECT_EQ(value->string_value(), "file:///config/settings.json");
 }
 
+TEST_F(McpJsonParserTest, PromptsListExtraction) {
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "prompts/list",
+    "id": 200
+  })";
+
+  EXPECT_OK(parser_->parse(json));
+
+  EXPECT_TRUE(parser_->isValidMcpRequest());
+  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::PROMPTS_LIST);
+}
+
 TEST_F(McpJsonParserTest, PromptsGetExtraction) {
   std::string json = R"({
     "jsonrpc": "2.0",
