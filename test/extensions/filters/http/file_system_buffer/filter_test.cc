@@ -98,11 +98,11 @@ protected:
     // By default return empty route so we use default config.
     ON_CALL(decoder_callbacks_, route())
         .WillByDefault(Return(std::shared_ptr<Router::MockRoute>()));
-    ON_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, _))
-        .WillByDefault([this](Buffer::Instance& out, bool) { request_sent_on_ += out.toString(); });
-    ON_CALL(encoder_callbacks_, injectEncodedDataToFilterChain(_, _))
+    ON_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, _, false))
+        .WillByDefault([this](Buffer::Instance& out, bool, bool) { request_sent_on_ += out.toString(); });
+    ON_CALL(encoder_callbacks_, injectEncodedDataToFilterChain(_, _, false))
         .WillByDefault(
-            [this](Buffer::Instance& out, bool) { response_sent_on_ += out.toString(); });
+            [this](Buffer::Instance& out, bool, bool) { response_sent_on_ += out.toString(); });
     ON_CALL(decoder_callbacks_, continueDecoding()).WillByDefault([this]() {
       ASSERT_FALSE(continued_decoding_);
       continued_decoding_ = true;
