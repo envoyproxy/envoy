@@ -58,6 +58,7 @@ using testing::SaveArg;
 using testing::Sequence;
 using testing::StartsWith;
 using testing::StrictMock;
+using Envoy::StreamInfo::DetectedCloseType;
 
 namespace Envoy {
 namespace Network {
