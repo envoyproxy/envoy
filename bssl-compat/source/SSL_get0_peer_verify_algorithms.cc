@@ -7,10 +7,6 @@ static void freefunc(void* parent, void* ptr, CRYPTO_EX_DATA* ad, int idx, long 
   delete[] static_cast<uint16_t*>(ptr);
 }
 
-// Allocate a new "exdata" index for holding on to return arrays
-static const int exindex =
-    ossl_CRYPTO_get_ex_new_index(ossl_CRYPTO_EX_INDEX_SSL, 0, nullptr, nullptr, nullptr, freefunc);
-
 // SSL_get0_peer_verify_algorithms sets |*out_sigalgs| to an array containing
 // the signature algorithms the peer is able to verify. It returns the length of
 // the array. Note these values are only sent starting TLS 1.2 and only
@@ -37,6 +33,9 @@ static const int exindex =
 // or when the SSL object gets freed, via the freefunc callback.
 OPENSSL_EXPORT size_t SSL_get0_peer_verify_algorithms(const SSL* ssl,
                                                       const uint16_t** out_sigalgs) {
+  // Allocate a new "exdata" index for holding on to return arrays
+  static const int exindex = ossl_CRYPTO_get_ex_new_index(ossl_CRYPTO_EX_INDEX_SSL, 0, nullptr,
+                                                          nullptr, nullptr, freefunc);
 
   // Delete the previous sigalgs array if there is one from a previous call
   uint16_t* oldsigalgs =
