@@ -84,7 +84,7 @@ FilterChainPerRouteConfig::FilterChainPerRouteConfig(
     absl::Status& creation_status)
     : filter_chain_name_(proto_config.filter_chain_name()) {
 
-  if (proto_config.filter_chain_name().empty() == proto_config.has_filter_chain()) {
+  if (!proto_config.filter_chain_name().empty() == proto_config.has_filter_chain()) {
     creation_status = absl::InvalidArgumentError(
         "One and only one of filter_chain_name or filter_chain must be set");
     return;

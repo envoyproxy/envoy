@@ -5,11 +5,11 @@
 
 #include "envoy/extensions/filters/http/filter_chain/v3/filter_chain.pb.h"
 #include "envoy/http/filter.h"
-#include "source/common/http/filter_chain_helper.h"
-#include "source/extensions/filters/http/common/pass_through_filter.h"
-
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
+
+#include "source/common/http/filter_chain_helper.h"
+#include "source/extensions/filters/http/common/pass_through_filter.h"
 
 namespace Envoy {
 namespace Extensions {
