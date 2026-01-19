@@ -36,7 +36,7 @@ IpTagsProvider::~IpTagsProvider() { ENVOY_LOG(debug, "Shutting down ip tags prov
 
 absl::StatusOr<LcTrieSharedPtr> IpTagsProvider::ipTags() { return tags_loader_.getTags(); }
 
-std::vector<std::string> IpTagsProvider::tagKeys() { return tags_loader_.getTagKeys(); }
+const std::vector<std::string> IpTagsProvider::tagKeys() const { return tags_loader_.getTagKeys(); }
 
 absl::StatusOr<std::shared_ptr<IpTagsProvider>> IpTagsRegistrySingleton::getOrCreateProvider(
     const envoy::config::core::v3::DataSource& ip_tags_datasource, Api::Api& api,
@@ -162,7 +162,7 @@ absl::StatusOr<LcTrieSharedPtr> IpTagsLoader::parseIpTagsAsProto(
 
 absl::StatusOr<LcTrieSharedPtr> IpTagsLoader::getTags() { return data_source_provider_->data(); }
 
-std::vector<std::string> IpTagsLoader::getTagKeys() { return tags_; }
+const std::vector<std::string> IpTagsLoader::getTagKeys() const { return tags_; }
 
 SINGLETON_MANAGER_REGISTRATION(ip_tags_registry);
 

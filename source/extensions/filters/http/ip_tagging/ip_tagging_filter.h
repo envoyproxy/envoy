@@ -61,7 +61,7 @@ public:
    * Gets the most recently parsed tags.
    * @return vector of most recently parsed tag keys.
    */
-  std::vector<std::string> getTagKeys();
+  const std::vector<std::string> getTagKeys() const;
 
   /**
    * Parses ip tags in a proto format into a trie structure.
