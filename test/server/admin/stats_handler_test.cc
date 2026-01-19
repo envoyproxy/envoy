@@ -1317,7 +1317,8 @@ TEST_F(AdminStatsFilterTest, StatsInvalidRegex) {
        {"/stats?filter=*.test", "/stats?format=prometheus&filter=*.test"}) {
     CodeResponse code_response;
     code_response = handlerStats(path);
-    EXPECT_EQ("Invalid re2 regex", code_response.second) << path;
+    EXPECT_EQ("Invalid re2 regex: no argument for repetition operator: *", code_response.second)
+        << path;
     EXPECT_EQ(Http::Code::BadRequest, code_response.first) << path;
   }
 }
