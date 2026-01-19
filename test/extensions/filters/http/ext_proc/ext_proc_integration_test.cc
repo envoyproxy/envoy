@@ -5472,20 +5472,19 @@ TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersInRequestProcessingStreamed) {
   // The ext_proc_server_0 sends back the header response.
   serverSendHeaderResp();
 
-  std::this_thread::sleep_for(std::chrono::milliseconds(20));
+  timeSystem().advanceTimeWaitImpl(20ms);
   codec_client_->sendData(*request_encoder_, "sss", false);
-  std::this_thread::sleep_for(std::chrono::milliseconds(20));
   codec_client_->sendData(*request_encoder_, "xxx", true);
 
   processRequestBodyMessage(*grpc_upstreams_[0], false, absl::nullopt);
 
-  std::this_thread::sleep_for(std::chrono::milliseconds(20));
+  timeSystem().advanceTimeWaitImpl(20ms);
   // The ext_proc_server_1 receives the headers.
   server1ReceiveHeaderReq(header_request);
   // The ext_proc_server_1 sends back the header response.
   server1SendHeaderResp();
 
-  std::this_thread::sleep_for(std::chrono::milliseconds(50));
+  timeSystem().advanceTimeWaitImpl(50ms);
   // The ext_proc_server_0 now sends back the last chunk of the body responses.
   processRequestBodyMessage(*grpc_upstreams_[0], false, absl::nullopt);
 
@@ -5531,19 +5530,18 @@ TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersInResponseProcessingStreamed) {
   // The ext_proc_server_0 sends back the header response.
   serverSendHeaderResp(true, true);
 
-  std::this_thread::sleep_for(std::chrono::milliseconds(20));
+  timeSystem().advanceTimeWaitImpl(20ms);
   upstream_request_->encodeData("mmmmm", false);
-  std::this_thread::sleep_for(std::chrono::milliseconds(20));
   upstream_request_->encodeData("nnnn", true);
 
   processResponseBodyMessage(*grpc_upstreams_[0], false, absl::nullopt);
-  std::this_thread::sleep_for(std::chrono::milliseconds(20));
+  timeSystem().advanceTimeWaitImpl(20ms);
   // The ext_proc_server_1 receives the headers.
   server1ReceiveHeaderReq(header_request, true, true);
   // The ext_proc_server_1 sends back the header response.
   server1SendHeaderResp(true, true);
 
-  std::this_thread::sleep_for(std::chrono::milliseconds(50));
+  timeSystem().advanceTimeWaitImpl(50ms);
   // The ext_proc_server_0 now sends back the last chunk of the body responses.
   processResponseBodyMessage(*grpc_upstreams_[0], false, absl::nullopt);
   verifyDownstreamResponse(*response, 200);

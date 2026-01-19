@@ -521,7 +521,7 @@ TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersInRequestProcessing) {
   // The ext_proc_server_1 sends back the header response.
   server1SendHeaderResp();
 
-  std::this_thread::sleep_for(std::chrono::milliseconds(50));
+  timeSystem().advanceTimeWaitImpl(20ms);
   // The ext_proc_server_0 now sends back the last chunk of the body responses.
   serverSendBodyRespDuplexStreamed(1, /*end_stream*/ true, false, "");
 
@@ -573,7 +573,7 @@ TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersInResponseProcessing) {
   // The ext_proc_server_1 sends back the header response.
   server1SendHeaderResp(true, true);
 
-  std::this_thread::sleep_for(std::chrono::milliseconds(50));
+  timeSystem().advanceTimeWaitImpl(20ms);
   // The ext_proc_server_0 now sends back the last chunk of the body responses.
   serverSendBodyRespDuplexStreamed(1, /*end_stream*/ true, /*response*/ true, "");
   verifyDownstreamResponse(*response, 200);
