@@ -70,6 +70,9 @@ public:
 
   Ssl::CurveNIDVector getClientEcdsaCapabilities(const SSL_CLIENT_HELLO& ssl_client_hello) const;
 
+  int sessionTicketProcess(SSL* ssl, uint8_t* key_name, uint8_t* iv, EVP_CIPHER_CTX* ctx,
+                           HMAC_CTX* hmac_ctx, int encrypt);
+
 protected:
   ServerContextImpl(
       Stats::Scope& scope, const Envoy::Ssl::ServerContextConfig& config,
@@ -82,8 +85,6 @@ private:
 
   int alpnSelectCallback(const unsigned char** out, unsigned char* outlen, const unsigned char* in,
                          unsigned int inlen);
-  int sessionTicketProcess(SSL* ssl, uint8_t* key_name, uint8_t* iv, EVP_CIPHER_CTX* ctx,
-                           HMAC_CTX* hmac_ctx, int encrypt);
 
   absl::StatusOr<SessionContextID>
   generateHashForSessionContextId(const std::vector<std::string>& server_names);

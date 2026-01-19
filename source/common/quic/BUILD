@@ -122,11 +122,25 @@ envoy_cc_library(
         ":quic_io_handle_wrapper_lib",
         ":quic_transport_socket_factory_lib",
         "//envoy/ssl:tls_certificate_config_interface",
+        "//source/common/common:macros",
         "//source/common/quic:cert_compression_lib",
         "//source/common/quic:quic_server_transport_socket_factory_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/server:listener_stats",
         "@com_github_google_quiche//:quic_core_crypto_certificate_view_lib",
+    ]),
+)
+
+envoy_cc_library(
+    name = "envoy_tls_server_handshaker_lib",
+    srcs = envoy_select_enable_http3(["envoy_tls_server_handshaker.cc"]),
+    hdrs = envoy_select_enable_http3(["envoy_tls_server_handshaker.h"]),
+    external_deps = ["ssl"],
+    deps = envoy_select_enable_http3([
+        ":envoy_quic_proof_source_lib",
+        "//source/common/common:assert_lib",
+        "@com_github_google_quiche//:quic_core_crypto_proof_source_lib",
+        "@com_github_google_quiche//:quic_server_session_lib",
     ]),
 )
 
