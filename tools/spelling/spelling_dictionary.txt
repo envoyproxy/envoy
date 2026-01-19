@@ -1396,6 +1396,7 @@ str
 streambuf
 strerr
 strerror
+string
 stringbuf
 stringified
 stringify
