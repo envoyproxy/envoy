@@ -101,15 +101,15 @@ TEST_F(StreamRateLimiterTest, RateLimitOnSingleStream) {
 
   EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(50), _));
   EXPECT_CALL(decoder_callbacks_, onDecoderFilterBelowWriteBufferLowWatermark());
-  EXPECT_CALL(decoder_callbacks_,
-              injectDecodedDataToFilterChain(BufferStringEqual(std::string(1024, 'a')), false, false));
+  EXPECT_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(
+                                      BufferStringEqual(std::string(1024, 'a')), false, false));
   token_timer->invokeCallback();
 
   // Fire timer, also advance time.
   time_system_.advanceTimeWait(std::chrono::milliseconds(50));
   EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(50), _));
-  EXPECT_CALL(decoder_callbacks_,
-              injectDecodedDataToFilterChain(BufferStringEqual(std::string(51, 'a')), false, false));
+  EXPECT_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(
+                                      BufferStringEqual(std::string(51, 'a')), false, false));
   token_timer->invokeCallback();
 
   // Get new data with current data buffered, not end_stream.
@@ -119,15 +119,15 @@ TEST_F(StreamRateLimiterTest, RateLimitOnSingleStream) {
   // Fire timer, also advance time.
   time_system_.advanceTimeWait(std::chrono::milliseconds(50));
   EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(50), _));
-  EXPECT_CALL(decoder_callbacks_,
-              injectDecodedDataToFilterChain(BufferStringEqual(std::string(51, 'a')), false, false));
+  EXPECT_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(
+                                      BufferStringEqual(std::string(51, 'a')), false, false));
   token_timer->invokeCallback();
 
   // Fire timer, also advance time. No timer enable because there is nothing
   // buffered.
   time_system_.advanceTimeWait(std::chrono::milliseconds(50));
-  EXPECT_CALL(decoder_callbacks_,
-              injectDecodedDataToFilterChain(BufferStringEqual(std::string(51, 'b')), false, false));
+  EXPECT_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(
+                                      BufferStringEqual(std::string(51, 'b')), false, false));
   token_timer->invokeCallback();
 
   // Advance time by 1s for a full refill.
@@ -138,8 +138,8 @@ TEST_F(StreamRateLimiterTest, RateLimitOnSingleStream) {
   EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(0), _));
   Buffer::OwnedImpl data4(std::string(1024, 'c'));
   limiter_->writeData(data4, true);
-  EXPECT_CALL(decoder_callbacks_,
-              injectDecodedDataToFilterChain(BufferStringEqual(std::string(1024, 'c')), true, false));
+  EXPECT_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(
+                                      BufferStringEqual(std::string(1024, 'c')), true, false));
   token_timer->invokeCallback();
 
   limiter_->destroy();

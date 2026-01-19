@@ -184,7 +184,7 @@ protected:
   void serverReceiveHeaderReq(ProcessingRequest& header, bool first_message = true,
                               bool response = false);
   void server1ReceiveHeaderReq(ProcessingRequest& header, bool first_message = true,
-                                          bool response = false);
+                               bool response = false);
 
   uint32_t serverReceiveBodyDuplexStreamed(absl::string_view body_sent, bool response = false,
                                            bool compare_body = true);

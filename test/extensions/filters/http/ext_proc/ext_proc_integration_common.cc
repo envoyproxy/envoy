@@ -769,8 +769,8 @@ ExtProcIntegrationTest::initAndSendDataDuplexStreamedMode(absl::string_view body
   return response;
 }
 
-void ExtProcIntegrationTest::serverReceiveHeaderReq(ProcessingRequest& header,
-                                                    bool first_message, bool response) {
+void ExtProcIntegrationTest::serverReceiveHeaderReq(ProcessingRequest& header, bool first_message,
+                                                    bool response) {
   if (first_message) {
     EXPECT_TRUE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, processor_connection_));
     EXPECT_TRUE(processor_connection_->waitForNewStream(*dispatcher_, processor_stream_));
@@ -783,8 +783,8 @@ void ExtProcIntegrationTest::serverReceiveHeaderReq(ProcessingRequest& header,
   }
 }
 
-void ExtProcIntegrationTest::server1ReceiveHeaderReq(ProcessingRequest& header,
-                                                     bool first_message, bool response) {
+void ExtProcIntegrationTest::server1ReceiveHeaderReq(ProcessingRequest& header, bool first_message,
+                                                     bool response) {
   if (first_message) {
     EXPECT_TRUE(grpc_upstreams_[1]->waitForHttpConnection(*dispatcher_, processor_connection_1_));
     EXPECT_TRUE(processor_connection_1_->waitForNewStream(*dispatcher_, processor_stream_1_));
@@ -843,8 +843,7 @@ void ExtProcIntegrationTest::serverSendHeaderResp(bool first_message, bool respo
   processor_stream_->sendGrpcMessage(response_header);
 }
 
-void ExtProcIntegrationTest::server1SendHeaderResp(bool first_message,
-                                                   bool response) {
+void ExtProcIntegrationTest::server1SendHeaderResp(bool first_message, bool response) {
   if (first_message) {
     processor_stream_1_->startGrpcStream();
   }

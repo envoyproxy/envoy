@@ -1022,7 +1022,8 @@ TEST_P(TcpProxyTest, StreamDecoderFilterCallbacks) {
   EXPECT_NO_THROW(stream_decoder_callbacks.tracingConfig());
   Buffer::OwnedImpl inject_data;
   EXPECT_NO_THROW(stream_decoder_callbacks.addDecodedData(inject_data, false));
-  EXPECT_NO_THROW(stream_decoder_callbacks.injectDecodedDataToFilterChain(inject_data, false, false));
+  EXPECT_NO_THROW(
+      stream_decoder_callbacks.injectDecodedDataToFilterChain(inject_data, false, false));
   EXPECT_NO_THROW(stream_decoder_callbacks.addDecodedData(inject_data, false));
   EXPECT_NO_THROW(stream_decoder_callbacks.addDecodedTrailers());
   EXPECT_NO_THROW(stream_decoder_callbacks.addDecodedMetadata());

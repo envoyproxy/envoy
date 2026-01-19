@@ -173,23 +173,23 @@ TEST_F(AsyncClientImplTest, BasicStream) {
         dynamic_cast<Http::AsyncStreamImpl*>(stream);
     filter_callbacks->continueDecoding(); // No-op.
     Buffer::OwnedImpl buffer;
-    filter_callbacks->injectDecodedDataToFilterChain(buffer, true, false);   // No-op.
-    filter_callbacks->modifyDecodingBuffer([](Buffer::Instance&) {}); // No-op.
-    filter_callbacks->encodeMetadata(nullptr);                        // No-op.
-    EXPECT_EQ(false, filter_callbacks->recreateStream(nullptr));      // No-op.
-    filter_callbacks->getUpstreamSocketOptions();                     // No-op.
-    filter_callbacks->addUpstreamSocketOptions(nullptr);              // No-op.
-    filter_callbacks->mostSpecificPerFilterConfig();                  // No-op.
-    filter_callbacks->perFilterConfigs();                             // No-op.
-    filter_callbacks->http1StreamEncoderOptions();                    // No-op.
-    filter_callbacks->downstreamCallbacks();                          // No-op.
-    filter_callbacks->upstreamCallbacks();                            // No-op.
-    filter_callbacks->resetIdleTimer();                               // No-op.
-    filter_callbacks->setUpstreamOverrideHost({});                    // No-op.
-    filter_callbacks->filterConfigName();                             // No-op.
-    filter_callbacks->informationalHeaders();                         // No-op.
-    filter_callbacks->responseHeaders();                              // No-op.
-    filter_callbacks->responseTrailers();                             // No-op.
+    filter_callbacks->injectDecodedDataToFilterChain(buffer, true, false); // No-op.
+    filter_callbacks->modifyDecodingBuffer([](Buffer::Instance&) {});      // No-op.
+    filter_callbacks->encodeMetadata(nullptr);                             // No-op.
+    EXPECT_EQ(false, filter_callbacks->recreateStream(nullptr));           // No-op.
+    filter_callbacks->getUpstreamSocketOptions();                          // No-op.
+    filter_callbacks->addUpstreamSocketOptions(nullptr);                   // No-op.
+    filter_callbacks->mostSpecificPerFilterConfig();                       // No-op.
+    filter_callbacks->perFilterConfigs();                                  // No-op.
+    filter_callbacks->http1StreamEncoderOptions();                         // No-op.
+    filter_callbacks->downstreamCallbacks();                               // No-op.
+    filter_callbacks->upstreamCallbacks();                                 // No-op.
+    filter_callbacks->resetIdleTimer();                                    // No-op.
+    filter_callbacks->setUpstreamOverrideHost({});                         // No-op.
+    filter_callbacks->filterConfigName();                                  // No-op.
+    filter_callbacks->informationalHeaders();                              // No-op.
+    filter_callbacks->responseHeaders();                                   // No-op.
+    filter_callbacks->responseTrailers();                                  // No-op.
   }
 
   response_decoder_->decode1xxHeaders(
