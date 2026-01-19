@@ -429,7 +429,7 @@ TEST_F(PrometheusStatsFormatterTest, HistogramWithScaledPercent) {
 envoy_histogram1_bucket{le="0.5"} 1
 envoy_histogram1_bucket{le="1"} 2
 envoy_histogram1_bucket{le="+Inf"} 3
-envoy_histogram1_sum{} 2.2599999999999997868371792719699
+envoy_histogram1_sum{} 2.2578688482015323302221077028662
 envoy_histogram1_count{} 3
 )EOF";
 
@@ -462,15 +462,15 @@ TEST_F(PrometheusStatsFormatterTest, HistogramWithHighCounts) {
 
   const std::string expected_output = R"EOF(# TYPE envoy_histogram1 histogram
 envoy_histogram1_bucket{le="0.5"} 0
-envoy_histogram1_bucket{le="1"} 0
+envoy_histogram1_bucket{le="1"} 100000
 envoy_histogram1_bucket{le="5"} 100000
 envoy_histogram1_bucket{le="10"} 100000
 envoy_histogram1_bucket{le="25"} 100000
 envoy_histogram1_bucket{le="50"} 100000
-envoy_histogram1_bucket{le="100"} 100000
+envoy_histogram1_bucket{le="100"} 1100000
 envoy_histogram1_bucket{le="250"} 1100000
 envoy_histogram1_bucket{le="500"} 1100000
-envoy_histogram1_bucket{le="1000"} 1100000
+envoy_histogram1_bucket{le="1000"} 101100000
 envoy_histogram1_bucket{le="2500"} 101100000
 envoy_histogram1_bucket{le="5000"} 101100000
 envoy_histogram1_bucket{le="10000"} 101100000
@@ -481,7 +481,7 @@ envoy_histogram1_bucket{le="600000"} 101100000
 envoy_histogram1_bucket{le="1800000"} 101100000
 envoy_histogram1_bucket{le="3600000"} 101100000
 envoy_histogram1_bucket{le="+Inf"} 101100000
-envoy_histogram1_sum{} 105105105000
+envoy_histogram1_sum{} 104866771428.571441650390625
 envoy_histogram1_count{} 101100000
 )EOF";
 
@@ -543,13 +543,13 @@ envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="1"}
 envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="5"} 0
 envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="10"} 0
 envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="25"} 1
-envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="50"} 2
-envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="100"} 4
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="50"} 3
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="100"} 5
 envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="250"} 6
 envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="500"} 6
 envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="1000"} 6
 envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="2500"} 6
-envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="5000"} 6
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="5000"} 7
 envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="10000"} 7
 envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="30000"} 7
 envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="60000"} 7
@@ -558,7 +558,7 @@ envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="600
 envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="1800000"} 7
 envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="3600000"} 7
 envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="+Inf"} 7
-envoy_cluster_test_1_upstream_rq_time_sum{key1="value1",key2="value2"} 5532
+envoy_cluster_test_1_upstream_rq_time_sum{key1="value1",key2="value2"} 5531.1160155998386471765115857124
 envoy_cluster_test_1_upstream_rq_time_count{key1="value1",key2="value2"} 7
 # TYPE envoy_cluster_endpoint_c1 counter
 envoy_cluster_endpoint_c1{a_tag_name="a.tag-value",envoy_cluster_name="cluster1",envoy_endpoint_address="127.0.0.1:80"} 11
@@ -674,13 +674,13 @@ envoy_cluster_upstream_response_time_bucket{cluster="aaa",le="1"} 0
 envoy_cluster_upstream_response_time_bucket{cluster="aaa",le="5"} 0
 envoy_cluster_upstream_response_time_bucket{cluster="aaa",le="10"} 0
 envoy_cluster_upstream_response_time_bucket{cluster="aaa",le="25"} 1
-envoy_cluster_upstream_response_time_bucket{cluster="aaa",le="50"} 2
-envoy_cluster_upstream_response_time_bucket{cluster="aaa",le="100"} 4
+envoy_cluster_upstream_response_time_bucket{cluster="aaa",le="50"} 3
+envoy_cluster_upstream_response_time_bucket{cluster="aaa",le="100"} 5
 envoy_cluster_upstream_response_time_bucket{cluster="aaa",le="250"} 6
 envoy_cluster_upstream_response_time_bucket{cluster="aaa",le="500"} 6
 envoy_cluster_upstream_response_time_bucket{cluster="aaa",le="1000"} 6
 envoy_cluster_upstream_response_time_bucket{cluster="aaa",le="2500"} 6
-envoy_cluster_upstream_response_time_bucket{cluster="aaa",le="5000"} 6
+envoy_cluster_upstream_response_time_bucket{cluster="aaa",le="5000"} 7
 envoy_cluster_upstream_response_time_bucket{cluster="aaa",le="10000"} 7
 envoy_cluster_upstream_response_time_bucket{cluster="aaa",le="30000"} 7
 envoy_cluster_upstream_response_time_bucket{cluster="aaa",le="60000"} 7
@@ -689,20 +689,20 @@ envoy_cluster_upstream_response_time_bucket{cluster="aaa",le="600000"} 7
 envoy_cluster_upstream_response_time_bucket{cluster="aaa",le="1800000"} 7
 envoy_cluster_upstream_response_time_bucket{cluster="aaa",le="3600000"} 7
 envoy_cluster_upstream_response_time_bucket{cluster="aaa",le="+Inf"} 7
-envoy_cluster_upstream_response_time_sum{cluster="aaa"} 5532
+envoy_cluster_upstream_response_time_sum{cluster="aaa"} 5531.1160155998386471765115857124
 envoy_cluster_upstream_response_time_count{cluster="aaa"} 7
 envoy_cluster_upstream_response_time_bucket{cluster="bbb",le="0.5"} 0
 envoy_cluster_upstream_response_time_bucket{cluster="bbb",le="1"} 0
 envoy_cluster_upstream_response_time_bucket{cluster="bbb",le="5"} 0
 envoy_cluster_upstream_response_time_bucket{cluster="bbb",le="10"} 0
 envoy_cluster_upstream_response_time_bucket{cluster="bbb",le="25"} 1
-envoy_cluster_upstream_response_time_bucket{cluster="bbb",le="50"} 2
-envoy_cluster_upstream_response_time_bucket{cluster="bbb",le="100"} 4
+envoy_cluster_upstream_response_time_bucket{cluster="bbb",le="50"} 3
+envoy_cluster_upstream_response_time_bucket{cluster="bbb",le="100"} 5
 envoy_cluster_upstream_response_time_bucket{cluster="bbb",le="250"} 6
 envoy_cluster_upstream_response_time_bucket{cluster="bbb",le="500"} 6
 envoy_cluster_upstream_response_time_bucket{cluster="bbb",le="1000"} 6
 envoy_cluster_upstream_response_time_bucket{cluster="bbb",le="2500"} 6
-envoy_cluster_upstream_response_time_bucket{cluster="bbb",le="5000"} 6
+envoy_cluster_upstream_response_time_bucket{cluster="bbb",le="5000"} 7
 envoy_cluster_upstream_response_time_bucket{cluster="bbb",le="10000"} 7
 envoy_cluster_upstream_response_time_bucket{cluster="bbb",le="30000"} 7
 envoy_cluster_upstream_response_time_bucket{cluster="bbb",le="60000"} 7
@@ -711,20 +711,20 @@ envoy_cluster_upstream_response_time_bucket{cluster="bbb",le="600000"} 7
 envoy_cluster_upstream_response_time_bucket{cluster="bbb",le="1800000"} 7
 envoy_cluster_upstream_response_time_bucket{cluster="bbb",le="3600000"} 7
 envoy_cluster_upstream_response_time_bucket{cluster="bbb",le="+Inf"} 7
-envoy_cluster_upstream_response_time_sum{cluster="bbb"} 5532
+envoy_cluster_upstream_response_time_sum{cluster="bbb"} 5531.1160155998386471765115857124
 envoy_cluster_upstream_response_time_count{cluster="bbb"} 7
 envoy_cluster_upstream_response_time_bucket{cluster="ccc",le="0.5"} 0
 envoy_cluster_upstream_response_time_bucket{cluster="ccc",le="1"} 0
 envoy_cluster_upstream_response_time_bucket{cluster="ccc",le="5"} 0
 envoy_cluster_upstream_response_time_bucket{cluster="ccc",le="10"} 0
 envoy_cluster_upstream_response_time_bucket{cluster="ccc",le="25"} 1
-envoy_cluster_upstream_response_time_bucket{cluster="ccc",le="50"} 2
-envoy_cluster_upstream_response_time_bucket{cluster="ccc",le="100"} 4
+envoy_cluster_upstream_response_time_bucket{cluster="ccc",le="50"} 3
+envoy_cluster_upstream_response_time_bucket{cluster="ccc",le="100"} 5
 envoy_cluster_upstream_response_time_bucket{cluster="ccc",le="250"} 6
 envoy_cluster_upstream_response_time_bucket{cluster="ccc",le="500"} 6
 envoy_cluster_upstream_response_time_bucket{cluster="ccc",le="1000"} 6
 envoy_cluster_upstream_response_time_bucket{cluster="ccc",le="2500"} 6
-envoy_cluster_upstream_response_time_bucket{cluster="ccc",le="5000"} 6
+envoy_cluster_upstream_response_time_bucket{cluster="ccc",le="5000"} 7
 envoy_cluster_upstream_response_time_bucket{cluster="ccc",le="10000"} 7
 envoy_cluster_upstream_response_time_bucket{cluster="ccc",le="30000"} 7
 envoy_cluster_upstream_response_time_bucket{cluster="ccc",le="60000"} 7
@@ -733,7 +733,7 @@ envoy_cluster_upstream_response_time_bucket{cluster="ccc",le="600000"} 7
 envoy_cluster_upstream_response_time_bucket{cluster="ccc",le="1800000"} 7
 envoy_cluster_upstream_response_time_bucket{cluster="ccc",le="3600000"} 7
 envoy_cluster_upstream_response_time_bucket{cluster="ccc",le="+Inf"} 7
-envoy_cluster_upstream_response_time_sum{cluster="ccc"} 5532
+envoy_cluster_upstream_response_time_sum{cluster="ccc"} 5531.1160155998386471765115857124
 envoy_cluster_upstream_response_time_count{cluster="ccc"} 7
 # TYPE envoy_cluster_upstream_rq_time histogram
 envoy_cluster_upstream_rq_time_bucket{cluster="aaa",le="0.5"} 0
@@ -741,13 +741,13 @@ envoy_cluster_upstream_rq_time_bucket{cluster="aaa",le="1"} 0
 envoy_cluster_upstream_rq_time_bucket{cluster="aaa",le="5"} 0
 envoy_cluster_upstream_rq_time_bucket{cluster="aaa",le="10"} 0
 envoy_cluster_upstream_rq_time_bucket{cluster="aaa",le="25"} 1
-envoy_cluster_upstream_rq_time_bucket{cluster="aaa",le="50"} 2
-envoy_cluster_upstream_rq_time_bucket{cluster="aaa",le="100"} 4
+envoy_cluster_upstream_rq_time_bucket{cluster="aaa",le="50"} 3
+envoy_cluster_upstream_rq_time_bucket{cluster="aaa",le="100"} 5
 envoy_cluster_upstream_rq_time_bucket{cluster="aaa",le="250"} 6
 envoy_cluster_upstream_rq_time_bucket{cluster="aaa",le="500"} 6
 envoy_cluster_upstream_rq_time_bucket{cluster="aaa",le="1000"} 6
 envoy_cluster_upstream_rq_time_bucket{cluster="aaa",le="2500"} 6
-envoy_cluster_upstream_rq_time_bucket{cluster="aaa",le="5000"} 6
+envoy_cluster_upstream_rq_time_bucket{cluster="aaa",le="5000"} 7
 envoy_cluster_upstream_rq_time_bucket{cluster="aaa",le="10000"} 7
 envoy_cluster_upstream_rq_time_bucket{cluster="aaa",le="30000"} 7
 envoy_cluster_upstream_rq_time_bucket{cluster="aaa",le="60000"} 7
@@ -756,20 +756,20 @@ envoy_cluster_upstream_rq_time_bucket{cluster="aaa",le="600000"} 7
 envoy_cluster_upstream_rq_time_bucket{cluster="aaa",le="1800000"} 7
 envoy_cluster_upstream_rq_time_bucket{cluster="aaa",le="3600000"} 7
 envoy_cluster_upstream_rq_time_bucket{cluster="aaa",le="+Inf"} 7
-envoy_cluster_upstream_rq_time_sum{cluster="aaa"} 5532
+envoy_cluster_upstream_rq_time_sum{cluster="aaa"} 5531.1160155998386471765115857124
 envoy_cluster_upstream_rq_time_count{cluster="aaa"} 7
 envoy_cluster_upstream_rq_time_bucket{cluster="bbb",le="0.5"} 0
 envoy_cluster_upstream_rq_time_bucket{cluster="bbb",le="1"} 0
 envoy_cluster_upstream_rq_time_bucket{cluster="bbb",le="5"} 0
 envoy_cluster_upstream_rq_time_bucket{cluster="bbb",le="10"} 0
 envoy_cluster_upstream_rq_time_bucket{cluster="bbb",le="25"} 1
-envoy_cluster_upstream_rq_time_bucket{cluster="bbb",le="50"} 2
-envoy_cluster_upstream_rq_time_bucket{cluster="bbb",le="100"} 4
+envoy_cluster_upstream_rq_time_bucket{cluster="bbb",le="50"} 3
+envoy_cluster_upstream_rq_time_bucket{cluster="bbb",le="100"} 5
 envoy_cluster_upstream_rq_time_bucket{cluster="bbb",le="250"} 6
 envoy_cluster_upstream_rq_time_bucket{cluster="bbb",le="500"} 6
 envoy_cluster_upstream_rq_time_bucket{cluster="bbb",le="1000"} 6
 envoy_cluster_upstream_rq_time_bucket{cluster="bbb",le="2500"} 6
-envoy_cluster_upstream_rq_time_bucket{cluster="bbb",le="5000"} 6
+envoy_cluster_upstream_rq_time_bucket{cluster="bbb",le="5000"} 7
 envoy_cluster_upstream_rq_time_bucket{cluster="bbb",le="10000"} 7
 envoy_cluster_upstream_rq_time_bucket{cluster="bbb",le="30000"} 7
 envoy_cluster_upstream_rq_time_bucket{cluster="bbb",le="60000"} 7
@@ -778,20 +778,20 @@ envoy_cluster_upstream_rq_time_bucket{cluster="bbb",le="600000"} 7
 envoy_cluster_upstream_rq_time_bucket{cluster="bbb",le="1800000"} 7
 envoy_cluster_upstream_rq_time_bucket{cluster="bbb",le="3600000"} 7
 envoy_cluster_upstream_rq_time_bucket{cluster="bbb",le="+Inf"} 7
-envoy_cluster_upstream_rq_time_sum{cluster="bbb"} 5532
+envoy_cluster_upstream_rq_time_sum{cluster="bbb"} 5531.1160155998386471765115857124
 envoy_cluster_upstream_rq_time_count{cluster="bbb"} 7
 envoy_cluster_upstream_rq_time_bucket{cluster="ccc",le="0.5"} 0
 envoy_cluster_upstream_rq_time_bucket{cluster="ccc",le="1"} 0
 envoy_cluster_upstream_rq_time_bucket{cluster="ccc",le="5"} 0
 envoy_cluster_upstream_rq_time_bucket{cluster="ccc",le="10"} 0
 envoy_cluster_upstream_rq_time_bucket{cluster="ccc",le="25"} 1
-envoy_cluster_upstream_rq_time_bucket{cluster="ccc",le="50"} 2
-envoy_cluster_upstream_rq_time_bucket{cluster="ccc",le="100"} 4
+envoy_cluster_upstream_rq_time_bucket{cluster="ccc",le="50"} 3
+envoy_cluster_upstream_rq_time_bucket{cluster="ccc",le="100"} 5
 envoy_cluster_upstream_rq_time_bucket{cluster="ccc",le="250"} 6
 envoy_cluster_upstream_rq_time_bucket{cluster="ccc",le="500"} 6
 envoy_cluster_upstream_rq_time_bucket{cluster="ccc",le="1000"} 6
 envoy_cluster_upstream_rq_time_bucket{cluster="ccc",le="2500"} 6
-envoy_cluster_upstream_rq_time_bucket{cluster="ccc",le="5000"} 6
+envoy_cluster_upstream_rq_time_bucket{cluster="ccc",le="5000"} 7
 envoy_cluster_upstream_rq_time_bucket{cluster="ccc",le="10000"} 7
 envoy_cluster_upstream_rq_time_bucket{cluster="ccc",le="30000"} 7
 envoy_cluster_upstream_rq_time_bucket{cluster="ccc",le="60000"} 7
@@ -800,7 +800,7 @@ envoy_cluster_upstream_rq_time_bucket{cluster="ccc",le="600000"} 7
 envoy_cluster_upstream_rq_time_bucket{cluster="ccc",le="1800000"} 7
 envoy_cluster_upstream_rq_time_bucket{cluster="ccc",le="3600000"} 7
 envoy_cluster_upstream_rq_time_bucket{cluster="ccc",le="+Inf"} 7
-envoy_cluster_upstream_rq_time_sum{cluster="ccc"} 5532
+envoy_cluster_upstream_rq_time_sum{cluster="ccc"} 5531.1160155998386471765115857124
 envoy_cluster_upstream_rq_time_count{cluster="ccc"} 7
 )EOF";
 
@@ -844,13 +844,13 @@ envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="1"}
 envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="5"} 0
 envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="10"} 0
 envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="25"} 1
-envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="50"} 2
-envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="100"} 4
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="50"} 3
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="100"} 5
 envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="250"} 6
 envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="500"} 6
 envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="1000"} 6
 envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="2500"} 6
-envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="5000"} 6
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="5000"} 7
 envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="10000"} 7
 envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="30000"} 7
 envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="60000"} 7
@@ -859,7 +859,7 @@ envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="600
 envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="1800000"} 7
 envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="3600000"} 7
 envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="+Inf"} 7
-envoy_cluster_test_1_upstream_rq_time_sum{key1="value1",key2="value2"} 5532
+envoy_cluster_test_1_upstream_rq_time_sum{key1="value1",key2="value2"} 5531.1160155998386471765115857124
 envoy_cluster_test_1_upstream_rq_time_count{key1="value1",key2="value2"} 7
 )EOF";
 

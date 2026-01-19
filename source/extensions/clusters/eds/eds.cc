@@ -32,9 +32,7 @@ EdsClusterImpl::EdsClusterImpl(const envoy::config::cluster::v3::Cluster& cluste
           cluster_context.messageValidationVisitor(), "cluster_name"),
       local_info_(cluster_context.serverFactoryContext().localInfo()),
       eds_resources_cache_(
-          Runtime::runtimeFeatureEnabled("envoy.restart_features.use_eds_cache_for_ads")
-              ? cluster_context.serverFactoryContext().clusterManager().edsResourcesCache()
-              : absl::nullopt) {
+          cluster_context.serverFactoryContext().clusterManager().edsResourcesCache()) {
   RETURN_ONLY_IF_NOT_OK_REF(creation_status);
   Event::Dispatcher& dispatcher = cluster_context.serverFactoryContext().mainThreadDispatcher();
   assignment_timeout_ = dispatcher.createTimer([this]() -> void { onAssignmentTimeout(); });
@@ -247,12 +245,6 @@ EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& re
     }
   }
 
-  // Drop overload configuration parsing.
-  absl::Status status = parseDropOverloadConfig(cluster_load_assignment);
-  if (!status.ok()) {
-    return status;
-  }
-
   // Pause LEDS messages until the EDS config is finished processing.
   Config::ScopedResume maybe_resume_leds;
   const auto type_url = Config::getTypeUrl<envoy::config::endpoint::v3::LbEndpoint>();
@@ -271,6 +263,9 @@ EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& re
 
 void EdsClusterImpl::update(
     const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment) {
+  // Drop overload configuration parsing.
+  THROW_IF_NOT_OK(parseDropOverloadConfig(cluster_load_assignment));
+
   // Compare the current set of LEDS localities (localities using LEDS) to the one received in the
   // update. A LEDS locality can either be added, removed, or kept. If it is added we add a
   // subscription to it, and if it is removed we delete the subscription.

@@ -20,8 +20,8 @@ class DynamicModuleHttpFilter : public Http::StreamFilter,
                                 public Http::DownstreamWatermarkCallbacks {
 public:
   DynamicModuleHttpFilter(DynamicModuleHttpFilterConfigSharedPtr config,
-                          Stats::SymbolTable& symbol_table)
-      : config_(config), stat_name_pool_(symbol_table) {}
+                          Stats::SymbolTable& symbol_table, uint32_t worker_index)
+      : config_(config), stat_name_pool_(symbol_table), worker_index_(worker_index) {}
   ~DynamicModuleHttpFilter() override;
 
   /**
@@ -176,7 +176,7 @@ public:
    * Sends an HTTP callout to the specified cluster with the given message.
    */
   envoy_dynamic_module_type_http_callout_init_result
-  sendHttpCallout(uint32_t callout_id, absl::string_view cluster_name,
+  sendHttpCallout(uint64_t* callout_id_out, absl::string_view cluster_name,
                   Http::RequestMessagePtr&& message, uint64_t timeout_milliseconds);
 
   /**
@@ -184,29 +184,32 @@ public:
    * Returns a stream handle that can be used to reset the stream.
    */
   envoy_dynamic_module_type_http_callout_init_result
-  startHttpStream(envoy_dynamic_module_type_http_stream_envoy_ptr* stream_ptr_out,
-                  absl::string_view cluster_name, Http::RequestMessagePtr&& message,
-                  bool end_stream, uint64_t timeout_milliseconds);
+  startHttpStream(uint64_t* stream_id_out, absl::string_view cluster_name,
+                  Http::RequestMessagePtr&& message, bool end_stream,
+                  uint64_t timeout_milliseconds);
 
   /**
    * Resets an ongoing streamable HTTP callout stream.
    */
-  void resetHttpStream(envoy_dynamic_module_type_http_stream_envoy_ptr stream_ptr);
+  void resetHttpStream(uint64_t stream_id);
 
   /**
    * Sends data on an ongoing streamable HTTP callout stream.
    */
-  bool sendStreamData(envoy_dynamic_module_type_http_stream_envoy_ptr stream_ptr,
-                      Buffer::Instance& data, bool end_stream);
+  bool sendStreamData(uint64_t stream_id, Buffer::Instance& data, bool end_stream);
 
   /**
    * Sends trailers on an ongoing streamable HTTP callout stream.
    */
-  bool sendStreamTrailers(envoy_dynamic_module_type_http_stream_envoy_ptr stream_ptr,
-                          Http::RequestTrailerMapPtr trailers);
+  bool sendStreamTrailers(uint64_t stream_id, Http::RequestTrailerMapPtr trailers);
 
   const DynamicModuleHttpFilterConfig& getFilterConfig() const { return *config_; }
   Stats::StatNameDynamicPool& getStatNamePool() { return stat_name_pool_; }
+
+  /**
+   * Returns the worker index assigned to this filter.
+   */
+  uint32_t workerIndex() const { return worker_index_; }
 
 private:
   /**
@@ -236,6 +239,7 @@ private:
   const DynamicModuleHttpFilterConfigSharedPtr config_ = nullptr;
   envoy_dynamic_module_type_http_filter_module_ptr in_module_filter_ = nullptr;
   Stats::StatNameDynamicPool stat_name_pool_;
+  uint32_t worker_index_;
 
   /**
    * This implementation of the AsyncClient::Callbacks is used to handle the response from the HTTP
@@ -243,7 +247,7 @@ private:
    */
   class HttpCalloutCallback : public Http::AsyncClient::Callbacks {
   public:
-    HttpCalloutCallback(std::shared_ptr<DynamicModuleHttpFilter> filter, uint32_t id)
+    HttpCalloutCallback(std::shared_ptr<DynamicModuleHttpFilter> filter, uint64_t id)
         : filter_(std::move(filter)), callout_id_(id) {}
     ~HttpCalloutCallback() override = default;
 
@@ -257,8 +261,8 @@ private:
     Http::AsyncClient::Request* request_ = nullptr;
 
   private:
-    std::shared_ptr<DynamicModuleHttpFilter> filter_;
-    uint32_t callout_id_;
+    const std::shared_ptr<DynamicModuleHttpFilter> filter_;
+    const uint64_t callout_id_{};
   };
 
   /**
@@ -268,8 +272,8 @@ private:
   class HttpStreamCalloutCallback : public Http::AsyncClient::StreamCallbacks,
                                     public Event::DeferredDeletable {
   public:
-    HttpStreamCalloutCallback(std::shared_ptr<DynamicModuleHttpFilter> filter)
-        : this_as_void_ptr_(static_cast<void*>(this)), filter_(std::move(filter)) {}
+    HttpStreamCalloutCallback(std::shared_ptr<DynamicModuleHttpFilter> filter, uint64_t callout_id)
+        : callout_id_(callout_id), filter_(std::move(filter)) {}
     ~HttpStreamCalloutCallback() override = default;
 
     // AsyncClient::StreamCallbacks
@@ -291,7 +295,7 @@ private:
     Http::RequestTrailerMapPtr request_trailers_ = nullptr;
 
     // Store this as void* so it can be passed directly to the module without casting.
-    void* this_as_void_ptr_;
+    const uint64_t callout_id_{};
 
     // Track if this callback has already been cleaned up to avoid double cleanup.
     bool cleaned_up_ = false;
@@ -300,13 +304,61 @@ private:
     std::shared_ptr<DynamicModuleHttpFilter> filter_;
   };
 
-  absl::flat_hash_map<uint32_t, std::unique_ptr<DynamicModuleHttpFilter::HttpCalloutCallback>>
-      http_callouts_;
+  uint64_t getNextCalloutId() { return next_callout_id_++; }
 
+  uint64_t next_callout_id_ = 1; // 0 is reserved as an invalid id.
+
+  absl::flat_hash_map<uint64_t, std::unique_ptr<DynamicModuleHttpFilter::HttpCalloutCallback>>
+      http_callouts_;
   // Unlike http_callouts_, we don't use an id-based map because the stream pointer itself is the
   // unique identifier. We store the callback objects here to manage their lifetime.
-  absl::flat_hash_map<void*, std::unique_ptr<DynamicModuleHttpFilter::HttpStreamCalloutCallback>>
+  absl::flat_hash_map<uint64_t, std::unique_ptr<DynamicModuleHttpFilter::HttpStreamCalloutCallback>>
       http_stream_callouts_;
+
+  // Socket options storage for HTTP filters.
+  struct StoredSocketOption {
+    int64_t level;
+    int64_t name;
+    envoy_dynamic_module_type_socket_option_state state;
+    envoy_dynamic_module_type_socket_direction direction;
+    bool is_int;
+    int64_t int_value;
+    std::string byte_value;
+  };
+
+  std::vector<StoredSocketOption> socket_options_;
+
+public:
+  /**
+   * Store an integer socket option for the current stream and Surface it back to modules.
+   */
+  void storeSocketOptionInt(int64_t level, int64_t name,
+                            envoy_dynamic_module_type_socket_option_state state,
+                            envoy_dynamic_module_type_socket_direction direction, int64_t value);
+
+  /**
+   * Store a bytes socket option for the current stream and Surface it back to modules.
+   */
+  void storeSocketOptionBytes(int64_t level, int64_t name,
+                              envoy_dynamic_module_type_socket_option_state state,
+                              envoy_dynamic_module_type_socket_direction direction,
+                              absl::string_view value);
+
+  /**
+   * Retrieve an integer socket option by level/name/state/direction.
+   */
+  bool tryGetSocketOptionInt(int64_t level, int64_t name,
+                             envoy_dynamic_module_type_socket_option_state state,
+                             envoy_dynamic_module_type_socket_direction direction,
+                             int64_t& value_out) const;
+
+  /**
+   * Retrieve a bytes socket option by level/name/state/direction.
+   */
+  bool tryGetSocketOptionBytes(int64_t level, int64_t name,
+                               envoy_dynamic_module_type_socket_option_state state,
+                               envoy_dynamic_module_type_socket_direction direction,
+                               absl::string_view& value_out) const;
 };
 
 using DynamicModuleHttpFilterSharedPtr = std::shared_ptr<DynamicModuleHttpFilter>;

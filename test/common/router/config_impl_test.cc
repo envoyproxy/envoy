@@ -9509,6 +9509,106 @@ virtual_hosts:
   }
 }
 
+TEST_F(RouteMatcherTest, CookieMatch) {
+
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: cookie
+    domains: ["*"]
+    routes:
+      - match:
+          prefix: "/"
+          cookies:
+            - name: session
+              string_match:
+                exact: foo
+            - name: build
+              string_match:
+                prefix: "1"
+        route: { cluster: cookie-cluster }
+      - match:
+          prefix: "/"
+        route: { cluster: default }
+  )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"cookie-cluster", "default"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+
+  {
+    auto headers = genHeaders("cookie.example.com", "/foo", "GET");
+    headers.addCopy("cookie", "session=foo; build=123");
+
+    EXPECT_EQ("cookie-cluster", config.route(headers, 0)->routeEntry()->clusterName());
+  }
+
+  {
+    auto headers = genHeaders("cookie.example.com", "/foo", "GET");
+    headers.addCopy("cookie", "session=foo; build=999");
+
+    EXPECT_EQ("default", config.route(headers, 0)->routeEntry()->clusterName());
+  }
+
+  {
+    auto headers = genHeaders("cookie.example.com", "/foo", "GET");
+    headers.addCopy("cookie", "session=bar; build=123");
+
+    EXPECT_EQ("default", config.route(headers, 0)->routeEntry()->clusterName());
+  }
+
+  {
+    auto headers = genHeaders("cookie.example.com", "/foo", "GET");
+    headers.addCopy("cookie", "session=foo");
+
+    EXPECT_EQ("default", config.route(headers, 0)->routeEntry()->clusterName());
+  }
+}
+
+TEST_F(RouteMatcherTest, CookieMatchInvert) {
+
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: cookie-invert
+    domains: ["*"]
+    routes:
+      - match:
+          prefix: "/"
+          cookies:
+            - name: blocked
+              string_match:
+                exact: nope
+              invert_match: true
+        route: { cluster: cookie-cluster }
+      - match:
+          prefix: "/"
+        route: { cluster: default }
+  )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"cookie-cluster", "default"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+
+  {
+    auto headers = genHeaders("cookie.example.com", "/foo", "GET");
+
+    EXPECT_EQ("cookie-cluster", config.route(headers, 0)->routeEntry()->clusterName());
+  }
+
+  {
+    auto headers = genHeaders("cookie.example.com", "/foo", "GET");
+    headers.addCopy("cookie", "blocked=nope");
+
+    EXPECT_EQ("default", config.route(headers, 0)->routeEntry()->clusterName());
+  }
+
+  {
+    auto headers = genHeaders("cookie.example.com", "/foo", "GET");
+    headers.addCopy("cookie", "blocked=maybe");
+
+    EXPECT_EQ("cookie-cluster", config.route(headers, 0)->routeEntry()->clusterName());
+  }
+}
+
 TEST_F(RouteConfigurationV2, RegexPrefixWithNoRewriteWorksWhenPathChanged) {
 
   // Setup regex route entry. the regex is trivial, that's ok as we only want to test that

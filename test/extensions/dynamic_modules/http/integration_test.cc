@@ -805,4 +805,28 @@ TEST_P(DynamicModulesIntegrationTest, HttpStreamUpstreamReset) {
             response->headers().get(Http::LowerCaseString("x-reset"))[0]->value().getStringView());
 }
 
+TEST_P(DynamicModulesIntegrationTest, ConfigScheduler) {
+  initializeFilter("http_config_scheduler");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  // Poll until the config is updated.
+  for (int i = 0; i < 20; ++i) {
+    auto response =
+        sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+    EXPECT_TRUE(upstream_request_->complete());
+    EXPECT_TRUE(response->complete());
+
+    auto status_header = upstream_request_->headers().get(Http::LowerCaseString("x-test-status"));
+    // It should be present.
+    ASSERT_FALSE(status_header.empty());
+    auto status = status_header[0]->value().getStringView();
+
+    if (status == "true") {
+      return;
+    }
+    absl::SleepFor(absl::Milliseconds(100));
+  }
+  FAIL() << "Config was not updated in time";
+}
+
 } // namespace Envoy

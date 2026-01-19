@@ -2,6 +2,7 @@
 
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/stats/isolated_store_impl.h"
 #include "source/extensions/filters/http/proto_api_scrubber/filter_config.h"
 #include "source/extensions/filters/http/proto_api_scrubber/scrubbing_util_lib/field_checker.h"
 
@@ -10,6 +11,7 @@
 #include "test/mocks/stream_info/mocks.h"
 #include "test/proto/apikeys.pb.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/substitute.h"
@@ -29,19 +31,38 @@ namespace ProtoApiScrubber {
 // mocked so that matching scenarios can be tested.
 class MockProtoApiScrubberFilterConfig : public ProtoApiScrubberFilterConfig {
 public:
+  MockProtoApiScrubberFilterConfig(Stats::Store& store, TimeSource& time_source)
+      : ProtoApiScrubberFilterConfig(ProtoApiScrubberStats(*store.rootScope(), "mock_prefix."),
+                                     time_source) {}
+
   MOCK_METHOD(MatchTreeHttpMatchingDataSharedPtr, getRequestFieldMatcher,
               (const std::string& method_name, const std::string& field_mask), (const, override));
 
   MOCK_METHOD(MatchTreeHttpMatchingDataSharedPtr, getResponseFieldMatcher,
               (const std::string& method_name, const std::string& field_mask), (const, override));
 
+  MOCK_METHOD(MatchTreeHttpMatchingDataSharedPtr, getMessageFieldMatcher,
+              (const std::string& message_name, const std::string& field_name), (const, override));
+
+  MOCK_METHOD(MatchTreeHttpMatchingDataSharedPtr, getMessageMatcher,
+              (const std::string& message_name), (const, override));
+
   MOCK_METHOD(absl::StatusOr<absl::string_view>, getEnumName,
               (absl::string_view enum_type_name, int enum_value), (const, override));
+
+  MOCK_METHOD(absl::StatusOr<const Protobuf::MethodDescriptor*>, getMethodDescriptor,
+              (const std::string& method_name), (const, override));
+
+  MOCK_METHOD(const Protobuf::Type*, getParentType, (const Protobuf::Field* field),
+              (const, override));
 };
 
 namespace {
 
 inline constexpr const char kApiKeysDescriptorRelativePath[] = "test/proto/apikeys.descriptor";
+inline constexpr const char kScrubberTestDescriptorRelativePath[] =
+    "test/extensions/filters/http/proto_api_scrubber/scrubber_test.descriptor";
+
 inline constexpr char kRemoveFieldActionType[] =
     "type.googleapis.com/envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction";
 inline constexpr char kRemoveFieldActionTypeWithoutPrefix[] =
@@ -136,21 +157,24 @@ protected:
     // config initialization. This mock setup ensures that test API is propagated properly to the
     // filter.
     ON_CALL(server_factory_context_, api()).WillByDefault(testing::ReturnRef(*api_));
+    ON_CALL(server_factory_context_, timeSource()).WillByDefault(testing::ReturnRef(time_system_));
+    ON_CALL(factory_context_, scope()).WillByDefault(testing::ReturnRef(*stats_store_.rootScope()));
     ON_CALL(factory_context_, serverFactoryContext())
         .WillByDefault(testing::ReturnRef(server_factory_context_));
   }
 
   // Helper to load descriptors (shared by all configs).
-  void loadDescriptors(ProtoApiScrubberConfig& config) {
+  void loadDescriptors(ProtoApiScrubberConfig& config, const std::string& descriptor_path) {
     *config.mutable_descriptor_set()->mutable_data_source()->mutable_inline_bytes() =
         api_->fileSystem()
-            .fileReadToEnd(Envoy::TestEnvironment::runfilesPath(kApiKeysDescriptorRelativePath))
+            .fileReadToEnd(Envoy::TestEnvironment::runfilesPath(descriptor_path))
             .value();
   }
 
   // Helper to initialize the filter config from a specific Proto config.
-  void initializeFilterConfig(ProtoApiScrubberConfig& config) {
-    loadDescriptors(config);
+  void initializeFilterConfig(ProtoApiScrubberConfig& config,
+                              const std::string& descriptor_path = kApiKeysDescriptorRelativePath) {
+    loadDescriptors(config, descriptor_path);
     absl::StatusOr<std::shared_ptr<const ProtoApiScrubberFilterConfig>> filter_config =
         ProtoApiScrubberFilterConfig::create(config, factory_context_);
     ASSERT_EQ(filter_config.status().code(), absl::StatusCode::kOk);
@@ -234,6 +258,8 @@ protected:
   std::shared_ptr<const ProtoApiScrubberFilterConfig> filter_config_;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
+  Stats::IsolatedStoreImpl stats_store_;
+  Event::SimulatedTimeSystem time_system_;
 };
 
 // This tests the scenarios where the underlying match tree returns incomplete matches for request
@@ -245,9 +271,13 @@ TEST_F(FieldCheckerTest, IncompleteMatch) {
   Protobuf::Field field;
   field.set_name(field_name);
 
-  NiceMock<MockProtoApiScrubberFilterConfig> mock_filter_config;
+  NiceMock<MockProtoApiScrubberFilterConfig> mock_filter_config(stats_store_, time_system_);
   NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
   auto mock_match_tree = std::make_shared<NiceMock<MockMatchTree>>();
+
+  // Return Not Found for method descriptor to bypass map logic (prevent segfault).
+  ON_CALL(mock_filter_config, getMethodDescriptor(testing::_))
+      .WillByDefault(testing::Return(absl::NotFoundError("Method not found")));
 
   EXPECT_CALL(*mock_match_tree, match(testing::_, testing::Eq(nullptr)))
       .WillRepeatedly(testing::Return(Matcher::MatchResult::insufficientData()));
@@ -298,8 +328,12 @@ TEST_F(FieldCheckerTest, CompleteMatchWithUnsupportedAction) {
   Protobuf::Field field;
   field.set_name(field_name);
 
-  NiceMock<MockProtoApiScrubberFilterConfig> mock_filter_config;
+  NiceMock<MockProtoApiScrubberFilterConfig> mock_filter_config(stats_store_, time_system_);
   NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
+
+  // Return Not Found for method descriptor.
+  ON_CALL(mock_filter_config, getMethodDescriptor(testing::_))
+      .WillByDefault(testing::Return(absl::NotFoundError("Method not found")));
 
   {
     // No match-action is configured.
@@ -342,6 +376,169 @@ TEST_F(FieldCheckerTest, CompleteMatchWithUnsupportedAction) {
     // if an action is unknown to this specific filter, it should default to preserving the field.
     EXPECT_EQ(field_checker.CheckField({"user"}, &field), FieldCheckResults::kInclude);
   }
+}
+
+TEST_F(FieldCheckerTest, MessageLevelFieldRestriction) {
+  const std::string method_name = "example.v1.Service/GetFoo";
+  const std::string field_name = "secret_field";
+  const std::string message_type = "example.v1.SensitiveMessage";
+
+  Protobuf::Type parent_type;
+  parent_type.set_name(message_type);
+
+  Protobuf::Field field;
+  field.set_name(field_name);
+
+  NiceMock<MockProtoApiScrubberFilterConfig> mock_filter_config(stats_store_, time_system_);
+  NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
+
+  ON_CALL(mock_filter_config, getMethodDescriptor(testing::_))
+      .WillByDefault(testing::Return(absl::NotFoundError("Method not found")));
+
+  // When CheckField calls getParentType(&field), we MUST return &parent_type for this test logic
+  // to succeed, mimicking the map lookup happening in the real config.
+  EXPECT_CALL(mock_filter_config, getParentType(&field)).WillOnce(testing::Return(&parent_type));
+
+  auto mock_match_tree = std::make_shared<NiceMock<MockMatchTree>>();
+  auto remove_action = std::make_shared<NiceMock<MockAction>>();
+  ON_CALL(*remove_action, typeUrl())
+      .WillByDefault(testing::Return(kRemoveFieldActionTypeWithoutPrefix));
+  ON_CALL(*mock_match_tree, match(testing::_, testing::_))
+      .WillByDefault(testing::Return(Matcher::MatchResult(remove_action)));
+
+  EXPECT_CALL(mock_filter_config, getMessageFieldMatcher(message_type, field_name))
+      .WillOnce(testing::Return(mock_match_tree));
+
+  FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info, {}, {}, {}, {},
+                             method_name, &mock_filter_config);
+
+  // We intentionally pass nullptr as the parent_type to simulate the ProtoScrubber calling from
+  // ScanField. The FieldChecker should recover the parent type using the mock_filter_config.
+  FieldCheckResults result =
+      field_checker.CheckField({"path", "to", "secret_field"}, &field, 0, nullptr);
+  EXPECT_EQ(result, FieldCheckResults::kExclude);
+}
+
+TEST_F(FieldCheckerTest, GlobalMessageRestriction) {
+  const std::string method_name = "example.v1.Service/GetFoo";
+  const std::string message_type = "example.v1.RestrictedMessage";
+
+  Protobuf::Field field;
+  field.set_name("restricted_field");
+  field.set_kind(Protobuf::Field::TYPE_MESSAGE);
+  field.set_type_url("type.googleapis.com/" + message_type);
+
+  NiceMock<MockProtoApiScrubberFilterConfig> mock_filter_config(stats_store_, time_system_);
+  NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
+
+  ON_CALL(mock_filter_config, getMethodDescriptor(testing::_))
+      .WillByDefault(testing::Return(absl::NotFoundError("Method not found")));
+
+  // Mock global message matcher to return Match + Remove Action.
+  auto mock_match_tree = std::make_shared<NiceMock<MockMatchTree>>();
+  auto remove_action = std::make_shared<NiceMock<MockAction>>();
+  ON_CALL(*remove_action, typeUrl())
+      .WillByDefault(testing::Return(kRemoveFieldActionTypeWithoutPrefix));
+  ON_CALL(*mock_match_tree, match(testing::_, testing::_))
+      .WillByDefault(testing::Return(Matcher::MatchResult(remove_action)));
+
+  EXPECT_CALL(mock_filter_config, getMessageMatcher(message_type))
+      .WillOnce(testing::Return(mock_match_tree));
+
+  FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info, {}, {}, {}, {},
+                             method_name, &mock_filter_config);
+
+  // Should return kExclude based purely on the field type.
+  EXPECT_EQ(field_checker.CheckField({"path", "to", "field"}, &field), FieldCheckResults::kExclude);
+}
+
+TEST_F(FieldCheckerTest, GlobalEnumRestriction) {
+  const std::string method_name = "example.v1.Service/GetFoo";
+  const std::string enum_type = "example.v1.RestrictedEnum";
+
+  Protobuf::Field field;
+  field.set_name("restricted_enum");
+  field.set_kind(Protobuf::Field::TYPE_ENUM);
+  field.set_type_url("type.googleapis.com/" + enum_type);
+
+  NiceMock<MockProtoApiScrubberFilterConfig> mock_filter_config(stats_store_, time_system_);
+  NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
+
+  ON_CALL(mock_filter_config, getMethodDescriptor(testing::_))
+      .WillByDefault(testing::Return(absl::NotFoundError("Method not found")));
+
+  // Mock global enum matcher to return Match + Remove Action.
+  auto mock_match_tree = std::make_shared<NiceMock<MockMatchTree>>();
+  auto remove_action = std::make_shared<NiceMock<MockAction>>();
+  ON_CALL(*remove_action, typeUrl())
+      .WillByDefault(testing::Return(kRemoveFieldActionTypeWithoutPrefix));
+  ON_CALL(*mock_match_tree, match(testing::_, testing::_))
+      .WillByDefault(testing::Return(Matcher::MatchResult(remove_action)));
+
+  EXPECT_CALL(mock_filter_config, getMessageMatcher(enum_type))
+      .WillOnce(testing::Return(mock_match_tree));
+
+  FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info, {}, {}, {}, {},
+                             method_name, &mock_filter_config);
+
+  // Should return kExclude based purely on the enum type.
+  EXPECT_EQ(field_checker.CheckField({"path", "to", "enum"}, &field), FieldCheckResults::kExclude);
+}
+
+TEST_F(FieldCheckerTest, CheckType_GlobalRestriction) {
+  const std::string message_type = "example.v1.RestrictedAnyPayload";
+  Protobuf::Type type;
+  type.set_name(message_type);
+
+  NiceMock<MockProtoApiScrubberFilterConfig> mock_filter_config(stats_store_, time_system_);
+  NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
+
+  ON_CALL(mock_filter_config, getMethodDescriptor(testing::_))
+      .WillByDefault(testing::Return(absl::NotFoundError("Method not found")));
+
+  // Mock global message matcher to return Match + Remove Action.
+  auto mock_match_tree = std::make_shared<NiceMock<MockMatchTree>>();
+  auto remove_action = std::make_shared<NiceMock<MockAction>>();
+  ON_CALL(*remove_action, typeUrl())
+      .WillByDefault(testing::Return(kRemoveFieldActionTypeWithoutPrefix));
+  ON_CALL(*mock_match_tree, match(testing::_, testing::_))
+      .WillByDefault(testing::Return(Matcher::MatchResult(remove_action)));
+
+  EXPECT_CALL(mock_filter_config, getMessageMatcher(message_type))
+      .WillOnce(testing::Return(mock_match_tree));
+
+  FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info, {}, {}, {}, {},
+                             "dummy_method", &mock_filter_config);
+
+  // CheckType is used when an Any field is unpacked. It should return kExclude.
+  EXPECT_EQ(field_checker.CheckType(&type), FieldCheckResults::kExclude);
+}
+
+TEST_F(FieldCheckerTest, EnumTraversals) {
+  const std::string enum_type = "example.v1.SafeEnum";
+  Protobuf::Field field;
+  field.set_name("safe_enum");
+  field.set_kind(Protobuf::Field::TYPE_ENUM);
+  field.set_type_url("type.googleapis.com/" + enum_type);
+
+  NiceMock<MockProtoApiScrubberFilterConfig> mock_filter_config(stats_store_, time_system_);
+  NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
+
+  ON_CALL(mock_filter_config, getMethodDescriptor(testing::_))
+      .WillByDefault(testing::Return(absl::NotFoundError("Method not found")));
+
+  // No global restrictions.
+  EXPECT_CALL(mock_filter_config, getMessageMatcher(enum_type)).WillOnce(testing::Return(nullptr));
+
+  // No path restrictions.
+  EXPECT_CALL(mock_filter_config, getRequestFieldMatcher(testing::_, testing::_))
+      .WillRepeatedly(testing::Return(nullptr));
+
+  FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info, {}, {}, {}, {},
+                             "dummy_method", &mock_filter_config);
+
+  // Crucial Check: Must return kPartial for Enum to trigger value inspection.
+  EXPECT_EQ(field_checker.CheckField({"safe_enum"}, &field), FieldCheckResults::kPartial);
 }
 
 using RequestFieldCheckerTest = FieldCheckerTest;
@@ -545,9 +742,14 @@ TEST_F(RequestFieldCheckerTest, ArrayType) {
 // Tests CheckField() specifically for enum fields in the request.
 TEST_F(RequestFieldCheckerTest, EnumType) {
   // Setup local mock config.
-  auto mock_config = std::make_shared<NiceMock<MockProtoApiScrubberFilterConfig>>();
+  auto mock_config =
+      std::make_shared<NiceMock<MockProtoApiScrubberFilterConfig>>(stats_store_, time_system_);
   NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
   const std::string method = "/pkg.Service/UpdateConfig";
+
+  // Default: Return Not Found for method descriptor (Enum test doesn't need maps).
+  ON_CALL(*mock_config, getMethodDescriptor(testing::_))
+      .WillByDefault(testing::Return(absl::NotFoundError("Method not found")));
 
   // Field-Level Rule: Remove 'legacy_status' entirely.
   // Path passed to `CheckField()` method: "config.legacy_status" (No integer suffix yet).
@@ -604,8 +806,9 @@ TEST_F(RequestFieldCheckerTest, EnumType) {
     field.set_kind(Protobuf::Field::TYPE_ENUM);
     field.set_type_url("type.googleapis.com/pkg.Status");
 
+    // Returning kPartial for enum leaf nodes effectively acts as kInclude.
     EXPECT_EQ(field_checker.CheckField({"config", "status", "0"}, &field),
-              FieldCheckResults::kInclude);
+              FieldCheckResults::kPartial);
   }
 
   {
@@ -619,11 +822,54 @@ TEST_F(RequestFieldCheckerTest, EnumType) {
     field.set_kind(Protobuf::Field::TYPE_ENUM);
     field.set_type_url("type.googleapis.com/pkg.Status");
 
+    // Returning kPartial for enum leaf nodes effectively acts as kInclude.
     EXPECT_LOG_CONTAINS("warn", "Enum translation skipped", {
       EXPECT_EQ(field_checker.CheckField({"config", "status", "123"}, &field),
-                FieldCheckResults::kInclude);
+                FieldCheckResults::kPartial);
     });
   }
+}
+
+TEST_F(RequestFieldCheckerTest, MapType) {
+  ProtoApiScrubberConfig config;
+  // Use a service/method that actually HAS map fields (scrubber_test.proto).
+  std::string method = "/test.extensions.filters.http.proto_api_scrubber.ScrubberTestService/Scrub";
+
+  // Configure rule to scrub the VALUES of the "tags" map.
+  // The normalized path for "tags" map is "tags.value".
+  addRestriction(config, method, "tags.value", FieldType::Request, true);
+
+  initializeFilterConfig(config, kScrubberTestDescriptorRelativePath);
+
+  NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
+  FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info, {}, {}, {}, {},
+                             method, filter_config_.get());
+
+  // Construct a fake map entry parent type to simulate traversal context.
+  // Type name must match what's in scrubber_test.proto:
+  // message ScrubRequest { map<string, string> tags = ... } -> ScrubRequest.TagsEntry
+  Protobuf::Type map_entry_type;
+  map_entry_type.set_name("test.extensions.filters.http.proto_api_scrubber.ScrubRequest.TagsEntry");
+  auto* option = map_entry_type.add_options();
+  option->set_name("map_entry");
+  option->mutable_value()->PackFrom(Protobuf::BoolValue()); // Value not strictly checked by logic.
+
+  // Test the CheckField call for a map value.
+  // Path: ["tags", "some_random_key"]
+  // Field: The 'value' field of the map entry (field #2).
+  Protobuf::Field value_field;
+  value_field.set_name("value");
+  value_field.set_number(2);
+  value_field.set_kind(Protobuf::Field_Kind_TYPE_STRING);
+
+  // Perform the check.
+  // The normalization logic should detect "tags" is a map, "some_random_key" is the key,
+  // and normalize the path to "tags.value".
+  FieldCheckResults result =
+      field_checker.CheckField({"tags", "some_random_key"}, &value_field, 0, &map_entry_type);
+
+  // Expect Exclusion because "tags.value" matches the configured rule.
+  EXPECT_EQ(result, FieldCheckResults::kExclude);
 }
 
 using ResponseFieldCheckerTest = FieldCheckerTest;
@@ -700,7 +946,7 @@ TEST_F(ResponseFieldCheckerTest, PrimitiveAndMessageType) {
     // The field `fulfillment.primary_location.exact_coordinates.bin_number` has a match tree
     // configured which always evaluates to true and has a match action configured of type
     // `envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction`
-    // and hence, CheckField returns kInclude.
+    // and hence, CheckField returns kExclude.
     Protobuf::Field field;
     field.set_name("fulfillment.primary_location.exact_coordinates.bin_number");
     field.set_kind(Protobuf::Field_Kind_TYPE_STRING);
@@ -795,9 +1041,14 @@ TEST_F(ResponseFieldCheckerTest, ArrayType) {
 
 // Tests CheckField() specifically for enum fields in the response.
 TEST_F(ResponseFieldCheckerTest, EnumType) {
-  auto mock_config = std::make_shared<NiceMock<MockProtoApiScrubberFilterConfig>>();
+  auto mock_config =
+      std::make_shared<NiceMock<MockProtoApiScrubberFilterConfig>>(stats_store_, time_system_);
   NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
   const std::string method = "/pkg.Service/GetConfig";
+
+  // Return Not Found for method descriptor.
+  ON_CALL(*mock_config, getMethodDescriptor(testing::_))
+      .WillByDefault(testing::Return(absl::NotFoundError("Method not found")));
 
   // Field-Level Rule: Remove 'internal_flags' entirely.
   auto exclude_tree = std::make_shared<NiceMock<MockMatchTree>>();
@@ -847,13 +1098,59 @@ TEST_F(ResponseFieldCheckerTest, EnumType) {
     field.set_kind(Protobuf::Field::TYPE_ENUM);
     field.set_type_url("type.googleapis.com/pkg.State");
 
-    // We didn't mock rule for 1, so getEnumName returns error,
-    // fallback to "1", no matcher found -> Include.
+    // kPartial for enum leaf nodes acts as kInclude.
     EXPECT_LOG_CONTAINS("warn", "Enum translation skipped", {
       EXPECT_EQ(field_checker.CheckField({"config", "state", "1"}, &field),
-                FieldCheckResults::kInclude);
+                FieldCheckResults::kPartial);
     });
   }
+}
+
+TEST_F(ResponseFieldCheckerTest, MapType) {
+  ProtoApiScrubberConfig config;
+  // Use a service/method that actually HAS map fields (scrubber_test.proto).
+  std::string method = "/test.extensions.filters.http.proto_api_scrubber.ScrubberTestService/Scrub";
+
+  // Configure rule to scrub the VALUES of the "tags" map.
+  // The normalized path for "tags" map is "tags.value".
+  addRestriction(config, method, "tags.value", FieldType::Response, true);
+
+  initializeFilterConfig(config, kScrubberTestDescriptorRelativePath);
+
+  NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
+  FieldChecker field_checker(ScrubberContext::kResponseScrubbing, &mock_stream_info, {}, {}, {}, {},
+                             method, filter_config_.get());
+
+  // Construct a fake map entry parent type to simulate traversal context.
+  // Map fields are repeated messages of a "MapEntry" type.
+  // This type must have the "map_entry" option set to true.
+  Protobuf::Type map_entry_type;
+  map_entry_type.set_name("test.extensions.filters.http.proto_api_scrubber.ScrubRequest.TagsEntry");
+
+  auto* option = map_entry_type.add_options();
+  option->set_name("map_entry");
+  Protobuf::BoolValue bool_val;
+  bool_val.set_value(true);
+  option->mutable_value()->PackFrom(bool_val);
+
+  // Test the CheckField call
+  // The proto_scrubber library passes:
+  // - path: ["tags", "specific_key"]
+  // - field: The 'value' field of the map entry (usually field #2)
+  // - parent_type: The MapEntry type we constructed
+  Protobuf::Field value_field;
+  value_field.set_name("value");
+  value_field.set_number(2);
+  value_field.set_kind(Protobuf::Field_Kind_TYPE_STRING);
+
+  // Perform the check
+  FieldCheckResults result =
+      field_checker.CheckField({"tags", "specific_key_123"}, &value_field, 0,
+                               &map_entry_type // Passing the parent type triggers the map logic
+      );
+
+  // Expect Exclusion because "tags.value" matches the configured rule
+  EXPECT_EQ(result, FieldCheckResults::kExclude);
 }
 
 TEST_F(FieldCheckerTest, UnsupportedScrubberContext) {
@@ -876,7 +1173,7 @@ TEST_F(FieldCheckerTest, UnsupportedScrubberContext) {
 
 TEST_F(FieldCheckerTest, ConstructorPropagatesHeadersAndTrailersToMatchTree) {
   NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
-  NiceMock<MockProtoApiScrubberFilterConfig> mock_config;
+  NiceMock<MockProtoApiScrubberFilterConfig> mock_config(stats_store_, time_system_);
   std::string method = "method";
   std::string field_name = "target_field";
   Http::TestRequestHeaderMapImpl request_headers{{"x-req-header", "true"}};
@@ -913,6 +1210,54 @@ TEST_F(FieldCheckerTest, ConstructorPropagatesHeadersAndTrailersToMatchTree) {
   field_checker.CheckField({field_name}, &field);
 }
 
+// Verifies that the match result is cached for duplicate matchers.
+TEST_F(FieldCheckerTest, MatchResultIsCached) {
+  const std::string method_name = "example.v1.Service/GetFoo";
+
+  // Two fields that map to the SAME matching rule (simulated by returning same Mock object).
+  const std::string field_name_1 = "field_one";
+  const std::string field_name_2 = "field_two";
+
+  Protobuf::Field field1;
+  field1.set_name(field_name_1);
+
+  Protobuf::Field field2;
+  field2.set_name(field_name_2);
+
+  NiceMock<MockProtoApiScrubberFilterConfig> mock_filter_config(stats_store_, time_system_);
+  NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
+
+  auto mock_match_tree = std::make_shared<NiceMock<MockMatchTree>>();
+  auto remove_action = std::make_shared<NiceMock<MockAction>>();
+
+  ON_CALL(*remove_action, typeUrl())
+      .WillByDefault(testing::Return(kRemoveFieldActionTypeWithoutPrefix));
+
+  // EXPECTATION: match() should be called EXACTLY ONCE.
+  // If caching fails, this expectation will fail because match() would be called twice.
+  EXPECT_CALL(*mock_match_tree, match(testing::_, testing::_))
+      .WillOnce(testing::Return(Matcher::MatchResult(remove_action)));
+
+  // Setup Config to return the SAME match tree instance for both fields.
+  // This simulates the behavior of the deduplication logic we added in FilterConfig.
+  ON_CALL(mock_filter_config, getRequestFieldMatcher(method_name, field_name_1))
+      .WillByDefault(testing::Return(mock_match_tree));
+  ON_CALL(mock_filter_config, getRequestFieldMatcher(method_name, field_name_2))
+      .WillByDefault(testing::Return(mock_match_tree));
+
+  ON_CALL(mock_filter_config, getMethodDescriptor(testing::_))
+      .WillByDefault(testing::Return(absl::NotFoundError("Method not found")));
+
+  FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info, {}, {}, {}, {},
+                             method_name, &mock_filter_config);
+
+  // First Call: Should trigger match() and cache the result.
+  EXPECT_EQ(field_checker.CheckField({field_name_1}, &field1), FieldCheckResults::kExclude);
+
+  // Second Call (Different field, same matcher): Should hit cache, NOT match().
+  EXPECT_EQ(field_checker.CheckField({field_name_2}, &field2), FieldCheckResults::kExclude);
+}
+
 TEST_F(FieldCheckerTest, IncludesType) {
   ProtoApiScrubberConfig config;
   initializeFilterConfig(config);
@@ -923,7 +1268,8 @@ TEST_F(FieldCheckerTest, IncludesType) {
 
   Protobuf::Type type;
   type.set_name("type");
-  EXPECT_EQ(field_checker.CheckType(&type), FieldCheckResults::kInclude);
+  // CheckType should now return kPartial to force unpacking of Any fields.
+  EXPECT_EQ(field_checker.CheckType(&type), FieldCheckResults::kPartial);
 }
 
 TEST_F(FieldCheckerTest, SupportAny) {
@@ -934,7 +1280,8 @@ TEST_F(FieldCheckerTest, SupportAny) {
   FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info, {}, {}, {}, {},
                              "/apikeys.ApiKeys/CreateApiKey", filter_config_.get());
 
-  EXPECT_FALSE(field_checker.SupportAny());
+  // SupportAny should now return true.
+  EXPECT_TRUE(field_checker.SupportAny());
 }
 
 TEST_F(FieldCheckerTest, FilterName) {
@@ -946,6 +1293,23 @@ TEST_F(FieldCheckerTest, FilterName) {
                              "/apikeys.ApiKeys/CreateApiKey", filter_config_.get());
 
   EXPECT_EQ(field_checker.FilterName(), FieldFilters::FieldMaskFilter);
+}
+
+// Tests that if no match tree is found for a field, and it is a message type, CheckField returns
+// kPartial.
+TEST_F(FieldCheckerTest, NoMatchFoundForMessageField) {
+  ProtoApiScrubberConfig config;
+  initializeFilterConfig(config);
+
+  NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
+  FieldChecker field_checker(ScrubberContext::kRequestScrubbing, &mock_stream_info, {}, {}, {}, {},
+                             "/apikeys.ApiKeys/CreateApiKey", filter_config_.get());
+
+  Protobuf::Field field;
+  field.set_name("some_message_field");
+  field.set_kind(Protobuf::Field_Kind_TYPE_MESSAGE);
+
+  EXPECT_EQ(field_checker.CheckField({"some_message_field"}, &field), FieldCheckResults::kPartial);
 }
 
 // Tests that when `field` is nullptr (indicating an unknown field), CheckField returns kInclude.

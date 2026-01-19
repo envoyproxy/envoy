@@ -24,6 +24,12 @@ public:
                              const std::vector<Matchers::StringMatcherPtr>& disallowed_headers,
                              envoy::config::core::v3::HeaderMap& proto_out);
 
+  // Convert a protobuf into a header map.
+  static absl::Status protoToHeaders(const envoy::config::core::v3::HeaderMap& headers_proto,
+                                     Http::HeaderMap& headers,
+                                     const Filters::Common::MutationRules::Checker& rule_checker,
+                                     Stats::Counter& rejected_mutations);
+
   // Modify header map based on a set of mutations from a protobuf. An error will be
   // returned if any mutations are not allowed and if the filter has been
   // configured to reject failed mutations. The "rejected_mutations" counter
@@ -62,6 +68,9 @@ private:
   responseHeaderSizeCheck(const Http::HeaderMap& headers,
                           const envoy::service::ext_proc::v3::HeaderMutation& mutation,
                           Stats::Counter& rejected_mutations);
+  static absl::Status responseHeaderSizeCheck(const Http::HeaderMap& headers, uint32_t set_size,
+                                              uint32_t remove_size,
+                                              Stats::Counter& rejected_mutations);
   // Check whether the header size after mutation is over the HCM size config.
   static absl::Status headerMutationResultCheck(const Http::HeaderMap& headers,
                                                 Stats::Counter& rejected_mutations);

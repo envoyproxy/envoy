@@ -251,12 +251,12 @@ Config::Config(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProx
     max_early_data_bytes_ = config.max_early_data_bytes().value();
   }
 
-  // Validate: ON_DOWNSTREAM_DATA requires max_early_data_bytes to be set.
-  if (upstream_connect_mode_ ==
-          envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_DATA &&
+  // Validate: Non-IMMEDIATE modes require max_early_data_bytes to be set.
+  // Setting it to zero is allowed and will disable early data buffering.
+  if (upstream_connect_mode_ != UpstreamConnectMode::IMMEDIATE &&
       !max_early_data_bytes_.has_value()) {
     throw EnvoyException(
-        "max_early_data_bytes must be set when upstream_connect_mode is ON_DOWNSTREAM_DATA");
+        "max_early_data_bytes must be set when upstream_connect_mode is not IMMEDIATE");
   }
 }
 
@@ -895,7 +895,7 @@ TunnelingConfigHelperImpl::TunnelingConfigHelperImpl(
                      context.serverFactoryContext().api().randomGenerator(),
                      std::make_unique<Router::ShadowWriterImpl>(
                          context.serverFactoryContext().clusterManager()),
-                     true, false, false, false, false, false, {},
+                     true, false, false, false, false, false, false, {},
                      context.serverFactoryContext().api().timeSource(),
                      context.serverFactoryContext().httpContext(),
                      context.serverFactoryContext().routerContext()),

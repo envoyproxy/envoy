@@ -125,6 +125,9 @@ ReverseTunnelInitiator::socket(Envoy::Network::Socket::Type socket_type,
     // Add the remote cluster configuration.
     RemoteClusterConnectionConfig cluster_config(config.remote_cluster, config.connection_count);
     socket_config.remote_clusters.push_back(cluster_config);
+    if (extension_ != nullptr) {
+      socket_config.request_path = extension_->handshakeRequestPath();
+    }
 
     // Pass config directly to helper method.
     return createReverseConnectionSocket(

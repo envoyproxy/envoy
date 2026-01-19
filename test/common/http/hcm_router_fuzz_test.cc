@@ -453,16 +453,15 @@ public:
         random_, Router::ShadowWriterPtr{shadow_writer_}, true /*emit_dynamic_stats*/,
         false /*start_child_span*/, true /*suppress_envoy_headers*/,
         false /*respect_expected_rq_timeout*/, true /*suppress_grpc_request_failure_code_stats*/,
-        false /*flush_upstream_log_on_upstream_stream*/, std::move(strict_headers_to_check),
+        false /*flush_upstream_log_on_upstream_stream*/,
+        false /*reject_connect_request_early_data*/, std::move(strict_headers_to_check),
         time_system_.timeSystem(), http_context_, router_context_);
     cluster_manager_.createDefaultClusters(*this);
     // Install the `RouterFuzzFilter` here
     ON_CALL(filter_factory_, createFilterChain(_))
-        .WillByDefault(Invoke([this](FilterChainManager& manager) -> bool {
-          FilterFactoryCb decoder_filter_factory = [this](FilterChainFactoryCallbacks& callbacks) {
-            callbacks.addStreamDecoderFilter(RouterFuzzFilter::create(filter_config_));
-          };
-          manager.applyFilterFactoryCb({}, decoder_filter_factory);
+        .WillByDefault(Invoke([this](FilterChainFactoryCallbacks& callbacks) -> bool {
+          callbacks.setFilterConfigName("");
+          callbacks.addStreamDecoderFilter(RouterFuzzFilter::create(filter_config_));
           return true;
         }));
     ON_CALL(*route_config_provider_.route_config_, route(_, _, _, _))

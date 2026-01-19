@@ -2959,13 +2959,7 @@ TEST_F(EdsTest, OnConfigUpdateLedsAndEndpoints) {
 
 class EdsCachedAssignmentTest : public testing::Test {
 public:
-  EdsCachedAssignmentTest() {
-    // TODO(adisuissa): setting the runtime guard is done because the runtime
-    // guard is false by default. The runtime environment should be removed
-    // once this guard is removed.
-    runtime_.mergeValues({{"envoy.restart_features.use_eds_cache_for_ads", "true"}});
-    resetCluster();
-  }
+  EdsCachedAssignmentTest() { resetCluster(); }
 
   void resetCluster() {
     resetCluster(R"EOF(
@@ -3165,53 +3159,6 @@ TEST_F(EdsCachedAssignmentTest, UseCachedAssignmentOnWarmingFailure) {
   }
   // Removing the cluster on test d'tor will trigger removeCallback.
   EXPECT_CALL(eds_resources_cache_, removeCallback("fare", _));
-}
-
-// Validates that no cached assignments are used if no EDS update for a cluster arrives.
-// This test should be deleted once the enable_eds_cache runtime flag is removed.
-TEST_F(EdsCachedAssignmentTest, UseCachedAssignmentOnWarmingFailureNoCache) {
-  // TODO(adisuissa): this test should be removed once the runtime guard is deprecated.
-  runtime_.mergeValues({{"envoy.restart_features.use_eds_cache_for_ads", "false"}});
-  // Set an initial assignment.
-  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
-  cluster_load_assignment.set_cluster_name("fare");
-  auto* endpoints = cluster_load_assignment.add_endpoints();
-  auto* endpoint = endpoints->add_lb_endpoints();
-  endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_address("1.2.3.4");
-  endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_port_value(80);
-  endpoint->mutable_load_balancing_weight()->set_value(10);
-
-  // Store in the cache an assignment with a different weight.
-  envoy::config::endpoint::v3::ClusterLoadAssignment cached_cluster_load_assignment;
-  cached_cluster_load_assignment.CopyFrom(cluster_load_assignment);
-  cached_cluster_load_assignment.mutable_endpoints(0)
-      ->mutable_lb_endpoints(0)
-      ->mutable_load_balancing_weight()
-      ->set_value(22);
-
-  initialize();
-  // No call to the cache to fetch the assignment, as it is being delivered as expected.
-  EXPECT_CALL(eds_resources_cache_, getResource("fare", _)).Times(0);
-  EXPECT_CALL(*interval_timer_pre_, enabled());
-  doOnConfigUpdateVerifyNoThrowPre(cluster_load_assignment);
-  EXPECT_TRUE(initialized_);
-  {
-    const auto& hosts = cluster_pre_->prioritySet().hostSetsPerPriority()[0]->hosts();
-    EXPECT_EQ(hosts.size(), 1);
-    EXPECT_EQ(hosts[0]->weight(), 10);
-  }
-
-  // Update the cluster and emulate a warming failure, and validate
-  // that the resource is not fetched from the cache because caching is disabled.
-  updateCluster();
-  {
-    EnvoyException dummy_ex("dummy exception");
-    EXPECT_CALL(eds_resources_cache_, getResource("fare", _)).Times(0);
-    eds_callbacks_post_->onConfigUpdateFailed(
-        Envoy::Config::ConfigUpdateFailureReason::FetchTimedout, &dummy_ex);
-    const auto& hosts = cluster_post_->prioritySet().hostSetsPerPriority()[0]->hosts();
-    EXPECT_EQ(hosts.size(), 0);
-  }
 }
 
 // Validates that after using a cached assignment, and receiving an update for it, the

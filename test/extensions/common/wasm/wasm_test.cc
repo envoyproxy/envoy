@@ -1360,9 +1360,10 @@ public:
   void setupContext() {
     WasmCommonContextTest::setupContext();
     ON_CALL(filter_factory_, createFilterChain(_))
-        .WillByDefault(Invoke([this](Http::FilterChainManager& manager) -> bool {
+        .WillByDefault(Invoke([this](Http::FilterChainFactoryCallbacks& callbacks) -> bool {
           auto factory = createWasmFilter();
-          manager.applyFilterFactoryCb({}, factory);
+          callbacks.setFilterConfigName("");
+          factory(callbacks);
           return true;
         }));
     ON_CALL(filter_manager_callbacks_, requestHeaders())
@@ -1549,7 +1550,7 @@ vm_config:
     // Create second context and reload the wasm vm will be reload automatically.
     createContext();
     EXPECT_NE(nullptr, context_.get());
-    Wasm* context_wasm = context_->wasm();
+    Wasm* context_wasm = context_->envoyWasm();
 
     EXPECT_NE(nullptr, context_wasm);
     EXPECT_NE(initial_wasm, context_wasm);

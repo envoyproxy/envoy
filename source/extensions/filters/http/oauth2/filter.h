@@ -175,16 +175,18 @@ public:
       const envoy::extensions::filters::http::oauth2::v3::OAuth2Config& proto_config) const;
   struct CookieSettings {
     CookieSettings(const envoy::extensions::filters::http::oauth2::v3::CookieConfig& config)
-        : same_site_(config.same_site()), path_(config.path().empty() ? "/" : config.path()) {}
+        : same_site_(config.same_site()), path_(config.path().empty() ? "/" : config.path()),
+          partitioned_(config.partitioned()) {}
 
     // Default constructor.
     CookieSettings()
         : same_site_(envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
                          CookieConfig_SameSite_DISABLED),
-          path_("/") {}
+          path_("/"), partitioned_(false) {}
 
     const envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite same_site_;
     const std::string path_;
+    const bool partitioned_;
   };
 
   const CookieSettings& bearerTokenCookieSettings() const { return bearer_token_cookie_settings_; }
@@ -299,6 +301,7 @@ struct CallbackValidationResult {
   bool is_valid_;
   std::string auth_code_;
   std::string original_request_url_;
+  std::string flow_id_;
   std::string error_details_;
 };
 
@@ -337,6 +340,7 @@ public:
   void finishRefreshAccessTokenFlow();
   void updateTokens(const std::string& access_token, const std::string& id_token,
                     const std::string& refresh_token, std::chrono::seconds expires_in);
+  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
 
 private:
   friend class OAuth2Test;
@@ -354,6 +358,7 @@ private:
   std::string new_expires_;
   absl::string_view host_;
   std::string original_request_url_;
+  std::string flow_id_;
   Http::RequestHeaderMap* request_headers_{nullptr};
   bool was_refresh_token_flow_{false};
 
@@ -375,13 +380,19 @@ private:
                                             const std::chrono::seconds& expires_in) const;
   std::string getExpiresTimeForIdToken(const std::string& id_token,
                                        const std::chrono::seconds& expires_in) const;
-  std::string buildCookieTail(int cookie_type) const;
-  void addResponseCookies(Http::ResponseHeaderMap& headers, const std::string& encoded_token) const;
+  std::string buildCookieTail(const FilterConfig::CookieSettings& settings,
+                              absl::string_view expires_time) const;
+  void setOAuthResponseCookies(Http::ResponseHeaderMap& headers,
+                               const std::string& encoded_token) const;
+  void addFlowCookieDeletionHeaders(Http::ResponseHeaderMap& headers,
+                                    absl::string_view flow_id) const;
   const std::string& bearerPrefix() const;
   CallbackValidationResult validateOAuthCallback(const Http::RequestHeaderMap& headers,
                                                  const absl::string_view path_str) const;
-  bool validateCsrfToken(const Http::RequestHeaderMap& headers,
-                         const std::string& csrf_token) const;
+  CallbackValidationResult validateState(const Http::RequestHeaderMap& headers,
+                                         const absl::string_view state) const;
+  bool validateCsrfToken(const Http::RequestHeaderMap& headers, const std::string& csrf_token,
+                         absl::string_view flow_id) const;
   void decryptAndUpdateOAuthTokenCookies(Http::RequestHeaderMap& headers) const;
   std::string encryptToken(const std::string& token) const;
   std::string decryptToken(const std::string& encrypted_token) const;

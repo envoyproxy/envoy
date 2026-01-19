@@ -130,7 +130,7 @@ Http::FilterHeadersStatus McpFilter::decodeHeaders(Http::RequestHeaderMap& heade
       // Set the buffer limit - Envoy will automatically send 413 if exceeded
       const uint32_t max_size = getMaxRequestBodySize();
       if (max_size > 0) {
-        decoder_callbacks_->setDecoderBufferLimit(max_size);
+        decoder_callbacks_->setBufferLimit(max_size);
         ENVOY_LOG(debug, "set decoder buffer limit to {} bytes", max_size);
       }
 
@@ -242,7 +242,16 @@ Http::FilterDataStatus McpFilter::completeParsing() {
   }
 
   // Set dynamic metadata
-  const auto& metadata = parser_->metadata();
+  Protobuf::Struct metadata = parser_->metadata();
+
+  // Add method group if configured
+  const std::string& group_metadata_key = config_->parserConfig().groupMetadataKey();
+  if (!group_metadata_key.empty()) {
+    std::string method_group = config_->parserConfig().getMethodGroup(parser_->getMethod());
+    (*metadata.mutable_fields())[group_metadata_key].set_string_value(method_group);
+    ENVOY_LOG(debug, "MCP filter set method group: {}={}", group_metadata_key, method_group);
+  }
+
   if (!metadata.fields().empty()) {
     decoder_callbacks_->streamInfo().setDynamicMetadata(std::string(MetadataKeys::FilterName),
                                                         metadata);
