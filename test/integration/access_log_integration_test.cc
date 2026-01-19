@@ -76,6 +76,30 @@ TEST_P(AccessLogIntegrationTest, CoalesceFormatterWithOtherFormatters) {
   EXPECT_THAT(log, HasSubstr("protocol=HTTP/1.1"));
 }
 
+// Test COALESCE formatter with max_length truncation.
+TEST_P(AccessLogIntegrationTest, CoalesceFormatterMaxLength) {
+  // The default :authority header is "sni.lyft.com", truncated to 3 chars should be "sni".
+  useAccessLog(R"(host=%COALESCE({"operators": [{"command": "REQ", "param": ":authority"}]}):3%)");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  std::string log = waitForAccessLog(access_log_name_);
+  // :authority is "sni.lyft.com", truncated to 3 chars should be "sni".
+  EXPECT_THAT(log, HasSubstr("host=sni"));
+}
+
+TEST_P(AccessLogIntegrationTest, DownstreamDisconnectBeforeHeadersResponseCode) {
+  useAccessLog("RESPONSE_CODE=%RESPONSE_CODE%;CEL_METHOD=%CEL(request.headers[':method'])%");
+  testRouterDownstreamDisconnectBeforeRequestComplete();
+  std::string log = waitForAccessLog(access_log_name_);
+  EXPECT_THAT(log, HasSubstr("RESPONSE_CODE=0;CEL_METHOD=GET"));
+}
+
 TEST_P(AccessLogIntegrationTest, DownstreamDetectedCloseType) {
   useAccessLog("CLOSE_TYPE=%DOWNSTREAM_DETECTED_CLOSE_TYPE%");
   testRouterDownstreamDisconnectBeforeRequestComplete();
