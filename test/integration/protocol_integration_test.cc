@@ -62,8 +62,6 @@ void setDoNotValidateRouteConfig(
   route_config->mutable_validate_clusters()->set_value(false);
 };
 
-#if 0
-
 TEST_P(ProtocolIntegrationTest, TrailerSupportHttp1) {
   config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
   config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
@@ -156,8 +154,6 @@ TEST_P(ProtocolIntegrationTest, UpstreamRequestsPerConnectionMetricHandshakeFail
   EXPECT_GE(test_server_->counter("cluster.cluster_0.upstream_cx_connect_fail")->value(), 1);
 }
 
-#endif
-
 TEST_P(ProtocolIntegrationTest, LogicalDns) {
   if (use_universal_header_validator_) {
     // TODO(#27132): auto_host_rewrite is broken for IPv6 and is failing UHV validation
@@ -210,7 +206,6 @@ TEST_P(ProtocolIntegrationTest, StrictDns) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
-#if 0
 // Change the default route to be restrictive, and send a request to an alternate route.
 TEST_P(DownstreamProtocolIntegrationTest, RouterNotFound) { testRouterNotFound(); }
 
@@ -5882,7 +5877,5 @@ TEST_P(DownstreamProtocolIntegrationTest, OptionsWithNoBodyNotChunked) {
   EXPECT_THAT(response->headers(), Http::HttpStatusIs("200"));
   EXPECT_EQ(response->headers().TransferEncoding(), nullptr);
 }
-
-#endif
 
 } // namespace Envoy
