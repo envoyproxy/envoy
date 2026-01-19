@@ -71,6 +71,7 @@ struct UpstreamInfoImpl : public UpstreamInfo {
   const std::string& upstreamTransportFailureReason() const override {
     return upstream_transport_failure_reason_;
   }
+
   void setUpstreamHost(Upstream::HostDescriptionConstSharedPtr host) override {
     upstream_host_ = host;
   }
@@ -392,6 +393,7 @@ struct StreamInfoImpl : public StreamInfo {
     start_time_ = info.startTime();
     start_time_monotonic_ = info.startTimeMonotonic();
     downstream_transport_failure_reason_ = std::string(info.downstreamTransportFailureReason());
+    downstream_local_close_reason_ = std::string(info.downstreamLocalCloseReason());
     bytes_retransmitted_ = info.bytesRetransmitted();
     packets_retransmitted_ = info.packetsRetransmitted();
     should_drain_connection_ = info.shouldDrainConnectionUponCompletion();
@@ -449,6 +451,14 @@ struct StreamInfoImpl : public StreamInfo {
 
   absl::string_view downstreamTransportFailureReason() const override {
     return downstream_transport_failure_reason_;
+  }
+
+  void setDownstreamLocalCloseReason(absl::string_view failure_reason) override {
+    downstream_local_close_reason_ = std::string(failure_reason);
+  }
+
+  absl::string_view downstreamLocalCloseReason() const override {
+    return downstream_local_close_reason_;
   }
 
   bool shouldSchemeMatchUpstream() const override { return should_scheme_match_upstream_; }
@@ -516,6 +526,7 @@ private:
   BytesMeterSharedPtr upstream_bytes_meter_{std::make_shared<BytesMeter>()};
   BytesMeterSharedPtr downstream_bytes_meter_;
   std::string downstream_transport_failure_reason_;
+  std::string downstream_local_close_reason_;
   OptRef<const StreamInfo> parent_stream_info_;
   uint64_t bytes_received_{};
   uint64_t bytes_retransmitted_{};
