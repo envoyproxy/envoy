@@ -1,21 +1,5 @@
 # This should match the schema defined in external_deps.bzl.
 
-PROTOBUF_VERSION = "33.2"
-
-# These names of these deps *must* match the names used in `/bazel/protobuf.patch`,
-# and both must match the names from the protobuf releases (see
-# https://github.com/protocolbuffers/protobuf/releases).
-# The names change in upcoming versions.
-# The shas are calculated from the downloads on the releases page.
-PROTOC_VERSIONS = dict(
-    linux_aarch_64 = "706662a332683aa2fffe1c4ea61588279d31679cd42d91c7d60a69651768edb8",
-    linux_x86_64 = "b24b53f87c151bfd48b112fe4c3a6e6574e5198874f38036aff41df3456b8caf",
-    linux_ppcle_64 = "16b4a36c07daab458bc040523b1f333ddd37e1440fa71634f297a458c7fef4c4",
-    osx_aarch_64 = "5be1427127788c9f7dd7d606c3e69843dd3587327dea993917ffcb77e7234b44",
-    osx_x86_64 = "dba51cfcc85076d56e7de01a647865c5a7f995c3dce427d5215b53e50b7be43f",
-    win64 = "376770cd4073beb63db56fdd339260edb9957b3c4472e05a75f5f9ec8f98d8f5",
-)
-
 REPOSITORY_LOCATIONS_SPEC = dict(
     bazel_compdb = dict(
         project_name = "bazel-compilation-database",
@@ -959,16 +943,16 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Protocol Buffers",
         project_desc = "Language-neutral, platform-neutral extensible mechanism for serializing structured data",
         project_url = "https://developers.google.com/protocol-buffers",
-        version = PROTOBUF_VERSION,
+        version = "33.3",
         # When upgrading the protobuf library, please re-run
         # test/common/json:gen_excluded_unicodes to recompute the ranges
         # excluded from differential fuzzing that are populated in
         # test/common/json/json_sanitizer_test_util.cc.
-        sha256 = "6b6599b54c88d75904b7471f5ca34a725fa0af92e134dd1a32d5b395aa4b4ca8",
+        sha256 = "1c9996fa0466206d5e4b8120b3fceb332369b64248e0649089aad586569d3896",
         strip_prefix = "protobuf-{version}",
         urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v{version}/protobuf-{version}.tar.gz"],
         use_category = ["dataplane_core", "controlplane"],
-        release_date = "2025-12-05",
+        release_date = "2026-01-10",
         cpe = "cpe:2.3:a:google:protobuf:*",
         license = "Protocol Buffers",
         license_url = "https://github.com/protocolbuffers/protobuf/blob/v{version}/LICENSE",
@@ -1796,21 +1780,3 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         license_url = "https://golang.org/LICENSE",
     ),
 )
-
-def _compiled_protoc_deps(locations, versions):
-    for platform, sha in versions.items():
-        locations["com_google_protobuf_protoc_%s" % platform] = dict(
-            project_name = "Protocol Buffers (protoc) %s" % platform,
-            project_desc = "Protoc compiler for protobuf (%s)" % platform,
-            project_url = "https://developers.google.com/protocol-buffers",
-            version = PROTOBUF_VERSION,
-            sha256 = sha,
-            urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v{version}/protoc-{version}-%s.zip" % platform.replace("_", "-", 1)],
-            use_category = ["dataplane_core", "controlplane"],
-            release_date = "2025-12-05",
-            cpe = "N/A",
-            license = "Protocol Buffers",
-            license_url = "https://github.com/protocolbuffers/protobuf/blob/v{version}/LICENSE",
-        )
-
-_compiled_protoc_deps(REPOSITORY_LOCATIONS_SPEC, PROTOC_VERSIONS)

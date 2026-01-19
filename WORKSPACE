@@ -16,6 +16,10 @@ load("//bazel:bazel_deps.bzl", "envoy_bazel_dependencies")
 
 envoy_bazel_dependencies()
 
+load("@com_google_protobuf//:protobuf_deps.bzl", "protobuf_deps")
+
+protobuf_deps()
+
 load("//bazel:repositories_extra.bzl", "envoy_dependencies_extra")
 
 envoy_dependencies_extra()
