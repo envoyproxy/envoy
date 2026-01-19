@@ -26,4 +26,3 @@ uncomment.sh "$1" --comment \
   --uncomment-func-impl CBS_get_any_asn1_element \
   --uncomment-func-impl CBS_peek_asn1_tag \
   --uncomment-func-impl CBS_get_asn1_bool
-  

@@ -4353,10 +4353,10 @@ TEST_P(ReadBufferLimitTest, NoLimit) { readBufferLimitTest(0, 256 * 1024); }
 // expected_chunk_size should be the read_buffer_limit + slice size.
 //
 // This test should be modified so that the partial read _always_ happens
-// determinitically, rather than depending on the buffering/scheduling in the
+// deterministically, rather than depending on the buffering/scheduling in the
 // network stack.
 //
-// These fixes will be done upstream on main branch, backported to 1.34, and
+// These fixes will be done upstream on main branch, back ported to 1.34, and
 // eventually sync'd back here, into envoy-openssl.
 //
 BORINGSSL_TEST_P(ReadBufferLimitTest, SomeLimit) {

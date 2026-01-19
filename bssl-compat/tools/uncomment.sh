@@ -2,7 +2,6 @@
 
 set -euo pipefail
 
-TOP_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 HDR_FILE="${1?"HDR_FILE not specified"}"
 shift
 
@@ -36,13 +35,13 @@ option_start() {
   OPTION=$1
 }
 option_add() {
-  while [[ $# > 0 ]]; do
+  while [[ $# -gt 0 ]]; do
     OPTION="$OPTION '$1'"
     shift
   done
 }
 option_end() {
-  option_add $*
+  option_add "$@"
   info "  $OPTION"
 }
 
@@ -67,18 +66,18 @@ uncomment_line_range() {
 uncomment_regex_range() {
   [[ $# == 2 ]] || error "uncomment_regex_range(): Two regexes required"
   L1=$(grep -n "^// $1" "$HDR_FILE" | sed -n 1p | cut -d: -f1)
-  L2=$(grep -n "^// $2" "$HDR_FILE" | awk -F: '$1 > '$L1' {print $1; exit}')
+  L2=$(grep -n "^// $2" "$HDR_FILE" | awk -F: '$1 > '"$L1"' {print $1; exit}')
   [ -z "$L1" ] && error "Failed to locate first pattern '$1'"
   [ -z "$L2" ] && error "Failed to locate second pattern '$2'"
-  uncomment_line_range $L1 $L2
+  uncomment_line_range "$L1" "$L2"
 }
 
 uncomment_preproc_directive() {
   [[ $# == 1 ]] || error "uncomment_preproc_directive(): One regex required"
-  for L1 in $(grep -n "^// #\s*$1" "$HDR_FILE" | cut -d: -f1); do
-    L2=$(awk '(NR == '$L1'),/[^\\]$/{print NR}' "$HDR_FILE" | tail -1)
-    uncomment_line_range $L1 $L2
-  done
+  while read -r L1; do
+    L2=$(awk '(NR == '"$L1"'),/[^\\]$/{print NR}' "$HDR_FILE" | tail -1)
+    uncomment_line_range "$L1" "$L2"
+  done < <(grep -n "^// #\s*$1" "$HDR_FILE" | cut -d: -f1)
 }
 
 comment_line_range() {
@@ -89,10 +88,10 @@ comment_line_range() {
 comment_regex_range() {
   [[ $# == 2 ]] || error "comment_regex_range(): Two regexes required"
   L1=$(grep -n "$1" "$HDR_FILE" | sed -n 1p | cut -d: -f1)
-  L2=$(awk '(NR == '$L1'),/'$2'/{print NR}' "$HDR_FILE" | tail -1)
+  L2=$(awk '(NR == '"$L1"'),/'"$2"'/{print NR}' "$HDR_FILE" | tail -1)
   [ -z "$L1" ] && error "comment_regex_range(): Failed to locate first pattern"
   [ -z "$L2" ] && error "comment_regex_range(): Failed to locate second pattern"
-  comment_line_range $L1 $L2
+  comment_line_range "$L1" "$L2"
 }
 
 
@@ -122,18 +121,18 @@ while [ $# -ne 0 ]; do
     ;;
     --uncomment-func-decl) # Function name
       [[ $2 ]] && [[ $2 != -* ]] || error "Insufficient arguments for $1"
-      option_end $2
+      option_end "$2"
       FUNC_SIG_MULTI_LINE="$(grep -Pzob "OPENSSL_EXPORT\s*[^;]*[^A-Za-z0-9_]$2\s*\([^;]*\)" "$HDR_FILE" | sed -e 's/OPENSSL_EXPORT\s*//g' -e 's%^// %%' -e 's/\x0//g')"
       FUNC_SIG_LINE_COUNT="$(echo "$FUNC_SIG_MULTI_LINE" | wc -l)"
       FUNC_SIG_OFFSET="$(echo "$FUNC_SIG_MULTI_LINE" | grep -o '^[0-9]*:' | cut -d: -f1)"
-      FUNC_SIG_LINE_FROM=$(($(head -c+$FUNC_SIG_OFFSET "$HDR_FILE" | wc -l) + 1))
-      FUNC_SIG_LINE_TO=$(($FUNC_SIG_LINE_FROM + $FUNC_SIG_LINE_COUNT - 1))
+      FUNC_SIG_LINE_FROM=$(($(head -c+"$FUNC_SIG_OFFSET" "$HDR_FILE" | wc -l) + 1))
+      FUNC_SIG_LINE_TO=$((FUNC_SIG_LINE_FROM + FUNC_SIG_LINE_COUNT - 1))
       uncomment_line_range ${FUNC_SIG_LINE_FROM} ${FUNC_SIG_LINE_TO}
       shift
     ;;
     --uncomment-regex) # Uncomment consecutive lines matching regexes
       PATTERNS=()
-      while [[ $# > 1 ]] && [[ $2 != -* ]]; do
+      while [[ $# -gt 1 ]] && [[ $2 != -* ]]; do
         shift && PATTERNS[${#PATTERNS[@]}]="$1"
         option_add "$1"
       done
@@ -141,17 +140,17 @@ while [ $# -ne 0 ]; do
       if [[ ${#PATTERNS[@]} == 1 ]]; then
         run_sed_expression "s%^// \(${PATTERNS[0]}\)%\1%"
       else
-        for L1 in $(grep -n "^// ${PATTERNS[0]}" "$HDR_FILE" | cut -d: -f1); do
+        while read -r L1; do
           for ((i=1; i < ${#PATTERNS[@]} ; i++)); do
             L2=$((L1 + i))
             if grep -n "^// ${PATTERNS[i]}" "$HDR_FILE" | cut -d: -f1 | grep -q "^$L2$"; then
               if (( i == ${#PATTERNS[@]} - 1 )); then
-                uncomment_line_range $L1 $L2
+                uncomment_line_range "$L1" "$L2"
                 break 2 # exit both loops
               fi
             fi
           done
-        done
+        done < <(grep -n "^// ${PATTERNS[0]}" "$HDR_FILE" | cut -d: -f1)
       fi
     ;;
     --uncomment-macro-redef) # -d Redefine macro <X> to be ossl_<x>
@@ -169,10 +168,10 @@ while [ $# -ne 0 ]; do
     --uncomment-macro) # Uncomment #define <X>.... (including continuation lines)
       [[ $2 ]] && [[ $2 != -* ]] || error "Insufficient arguments for $1"
       option_end "$2"
-      for L1 in $(grep -n "^// #\s*define\s*$2\>" "$HDR_FILE" | cut -d: -f1); do
-        L2=$(awk '(NR == '$L1'),/[^\\]$/{print NR}' "$HDR_FILE" | tail -1)
-        uncomment_line_range $L1 $L2
-      done
+      while read -r L1; do
+        L2=$(awk '(NR == '"$L1"'),/[^\\]$/{print NR}' "$HDR_FILE" | tail -1)
+        uncomment_line_range "$L1" "$L2"
+      done < <(grep -n "^// #\s*define\s*$2\>" "$HDR_FILE" | cut -d: -f1)
       shift
     ;;
     --uncomment-regex-range) # Uncomment multi-line matching regex
@@ -191,7 +190,7 @@ while [ $# -ne 0 ]; do
       [[ $3 ]] && [[ $2 != -* ]] && [[ $3 != -* ]] || error "Insufficient arguments for $1"
       option_end "$2" "$3"
       uncomment_regex_range "\(TEST\|TEST_P\)\s*($2\s*,\s*$3\s*)\s*{" "}"
-      run_sed_expression '/^\(TEST\|TEST_P\)\s*(\s*'$2'\s*,\s*'$3'\s*)\s*{/a #ifdef BSSL_COMPAT\nGTEST_SKIP() << "TODO: Investigate failure on BSSL_COMPAT";\n#endif'
+      run_sed_expression '/^\(TEST\|TEST_P\)\s*(\s*'"$2"'\s*,\s*'"$3"'\s*)\s*{/a #ifdef BSSL_COMPAT\nGTEST_SKIP() << "TODO: Investigate failure on BSSL_COMPAT";\n#endif'
       shift 2
     ;;
     --uncomment-struct) # Uncomment struct
@@ -224,9 +223,9 @@ while [ $# -ne 0 ]; do
       LINE=$(grep -n "^// \s*\<typedef\>.*\<$2\>.*" "$HDR_FILE" | sed -n 1p)
       L1=$(echo "$LINE" | cut -d: -f1) && L2=$L1
       if [[ ! "$LINE" =~ \;$ ]]; then # multi-line
-        L2=$(awk '(NR == '$L1'),/^\/\/ .*;$/{print NR}' "$HDR_FILE" | tail -1)
+        L2=$(awk '(NR == '"$L1"'),/^\/\/ .*;$/{print NR}' "$HDR_FILE" | tail -1)
       fi
-      uncomment_line_range $L1 $L2
+      uncomment_line_range "$L1" "$L2"
       shift
     ;;
     --uncomment-func-impl)
@@ -235,9 +234,9 @@ while [ $# -ne 0 ]; do
       LINE=$(grep -n "^// [^ !].*\b$2\s*(.*[^;]$" "$HDR_FILE" | sed -n 1p)
       L1=$(echo "$LINE" | cut -d: -f1) && L2=$L1
       if [[ ! "$LINE" =~ }$ ]]; then # multi-line
-        L2=$(awk '(NR == '$L1'),/^\/\/ }$/{print NR}' "$HDR_FILE" | tail -1)
+        L2=$(awk '(NR == '"$L1"'),/^\/\/ }$/{print NR}' "$HDR_FILE" | tail -1)
       fi
-      uncomment_line_range $L1 $L2
+      uncomment_line_range "$L1" "$L2"
       shift
     ;;
     --uncomment-static-func-impl)
@@ -246,9 +245,9 @@ while [ $# -ne 0 ]; do
       LINE=$(grep -n "^// static\s*.*\b$2\b\s*(" "$HDR_FILE" | sed -n 1p)
       L1=$(echo "$LINE" | cut -d: -f1) && L2=$L1
       if [[ ! "$LINE" =~ }$ ]]; then # multi-line
-        L2=$(awk '(NR == '$L1'),/^\/\/ }$/{print NR}' "$HDR_FILE" | tail -1)
+        L2=$(awk '(NR == '"$L1"'),/^\/\/ }$/{print NR}' "$HDR_FILE" | tail -1)
       fi
-      uncomment_line_range $L1 $L2
+      uncomment_line_range "$L1" "$L2"
       shift
     ;;
     --uncomment-using)
@@ -257,9 +256,9 @@ while [ $# -ne 0 ]; do
       LINE=$(grep -n "^// \s*\<using\>.*\<$2\>.*" "$HDR_FILE" | sed -n 1p)
       L1=$(echo "$LINE" | cut -d: -f1) && L2=$L1
       if [[ ! "$LINE" =~ \;$ ]]; then # multi-line
-        L2=$(awk '(NR == '$L1'),/^\/\/ .*;$/{print NR}' "$HDR_FILE" | tail -1)
+        L2=$(awk '(NR == '"$L1"'),/^\/\/ .*;$/{print NR}' "$HDR_FILE" | tail -1)
       fi
-      uncomment_line_range $L1 $L2
+      uncomment_line_range "$L1" "$L2"
       shift
     ;;
     --comment-regex-range) # comment multi-line matching regex
@@ -276,7 +275,7 @@ while [ $# -ne 0 ]; do
     ;;
     --comment-regex)
       [[ $2 ]] && [[ $2 != -* ]] || error "Insufficient arguments for $1"
-      option_end $2
+      option_end "$2"
       run_sed_expression "s%\($2\)%// \1%"
       shift
     ;;
@@ -302,7 +301,7 @@ while [ $# -ne 0 ]; do
       error "Unknown option $1"
     ;;
   esac
-  if (( $CHANGES == 0 )); then
+  if (( CHANGES == 0 )); then
     error "No changes were made"
   fi
   shift

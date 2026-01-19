@@ -11,4 +11,4 @@ uncomment.sh "$1" --comment -h \
 --uncomment-macro 'OPENSSL_\(WINDOWS\|LINUX\|FUCHSIA\|TRUSTY\|ANDROID\|FREEBSD\)' \
 --uncomment-macro 'OPENSSL_[ATM]SAN' \
 --uncomment-macro  OPENSSL_64_BIT \
---uncomment-macro  OPENSSL_32_BIT 
+--uncomment-macro  OPENSSL_32_BIT

@@ -1,6 +1,6 @@
 # Summary
 
-Compatibility layer for BoringSSL to OpenSSL.  
+Compatibility layer for BoringSSL to OpenSSL.
 
 This builds on the work of the original Maistra bssl_wrapper code, providing an
 inplementation of the BoringSSL API in terms of calls onto OpenSSL.
@@ -10,7 +10,7 @@ the BoringSSL API for Envoy to be built against it while reducing the
 refactoring needed to use OpenSSL on new releases of Envoy.
 
 The library is intended to be delivered as a static library with a C ABI profile
-(i.e. no name mangling from c++).  
+(i.e. no name mangling from c++).
 
 # Building
 
@@ -88,7 +88,7 @@ where simple 1-1 function mappings do not exist.
 
 ## OpenSSL Opaque Data Structures
 OpenSSL has some opaque data structures (e.g. `rsa_st`) with members that can
-not be accessed (this was changed in the OpenSSL code after 1.0).  
+not be accessed (this was changed in the OpenSSL code after 1.0).
 
 Some of these changes have not been matched with the BoringSSL code.
 
@@ -186,7 +186,7 @@ whereas in the OpenSSL source, the definition appears in `include/crypto/ec/ec_l
 
 ```c
 struct ECDSA_SIG_st {
-BIGNUM *r;                                                
+BIGNUM *r;
 BIGNUM *s;
 };
 ```
@@ -196,7 +196,7 @@ In this case the Prefixer will include the following in the converted `base.h`
 ```C
 ossl_ecdsa_sig_st {
     ...
-}; 
+};
 ```
 and as `ECDSA_SIG_st` definition is not available (it's in a `crypto` include file) a compile error is generated.
 
@@ -211,7 +211,7 @@ which instructs the Prefixer to:
 
 #### Non opaque, fully qualified types
 
-The `SHA256_CTX` structure is defined in the OpenSSL source `openssl/sha.h` as 
+The `SHA256_CTX` structure is defined in the OpenSSL source `openssl/sha.h` as
 
 ```c
 typedef struct SHA256state_st {

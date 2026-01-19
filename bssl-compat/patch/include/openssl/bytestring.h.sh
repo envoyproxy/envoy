@@ -49,5 +49,4 @@ uncomment.sh "$1" --comment -h \
   --uncomment-func-decl CBB_add_asn1_oid_from_text \
   --uncomment-func-decl CBB_add_asn1_uint64 \
   --uncomment-func-decl CBB_add_asn1_uint64_with_tag \
-  --uncomment-func-decl CBS_get_bytes \
- 
+  --uncomment-func-decl CBS_get_bytes

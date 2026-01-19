@@ -7,5 +7,5 @@ uncomment.sh "$1" --comment -h \
   --uncomment-macro-redef 'LN_[a-zA-Z0-9_]*' \
   --uncomment-macro-redef 'NID_[a-zA-Z0-9_]*' \
   --uncomment-macro-redef 'OBJ_[a-zA-Z0-9_]*' \
-	--sed 's|^// \s*1L, .*$||g' \
-	--sed 's|^// \s*"[^"]*"$||g'
+  --sed 's|^// \s*1L, .*$||g' \
+  --sed 's|^// \s*"[^"]*"$||g'

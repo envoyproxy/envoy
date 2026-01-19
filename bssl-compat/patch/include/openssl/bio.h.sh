@@ -75,5 +75,4 @@ uncomment.sh "$1" --comment -h \
   --uncomment-macro BIO_TYPE_SOURCE_SINK \
   --uncomment-typedef BIO_info_cb \
   --uncomment-func-decl BIO_wpending \
-  --uncomment-macro BIO_CTRL_WPENDING \
-  
+  --uncomment-macro BIO_CTRL_WPENDING

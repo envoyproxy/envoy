@@ -12,7 +12,7 @@ The only occurrence of direct access to the fields in a `BIO_METHOD` in the Envo
 
 The obvious solution to mapping between `ossl_BIO_METHOD` and `BIO_METHOD` objects would be to use the integer `type` value, which should act as a unique identifier. However, OpenSSL provides no `BIO_meth_get_type()` function to access the type. Also, the custom `BIO_METHOD` that envoy creates reuses the `BIO_TYPE_SOCKET` type.
 
-Therefore, the bssl-compat layer will assume that these objects are singletons (which currently is the case) and simply use their addresses to map between them. 
+Therefore, the bssl-compat layer will assume that these objects are singletons (which currently is the case) and simply use their addresses to map between them.
 
 ## BIO
 

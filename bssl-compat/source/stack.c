@@ -6,7 +6,7 @@
  * type is _STACK*. In both cases the types are effectively opaque so we can
  * simply use the OpenSSL stack directly by just casting back and forth between
  * it and the BoringSSL type.
- * 
+ *
  * We do this by patching BoringSSL's <openssl/stack.h> so that it's _STACK
  * type is redefined to be the underlying ossl_OPENSSL_STACK type from OpenSSL.
  */
@@ -18,7 +18,7 @@
  * sk_deep_copy performs a copy of |sk| and of each of the non-NULL elements in
  * |sk| by using |copy_func|. If an error occurs, |free_func| is used to free
  * any copies already made and NULL is returned.
- * 
+ *
  * OpenSSL
  * =======
  * sk_TYPE_deep_copy() returns a new stack where each element has been copied
@@ -40,7 +40,7 @@ _STACK *OPENSSL_sk_deep_copy(const _STACK *sk,
  * sk_delete removes the pointer at index |where|, moving other elements down
  * if needed. It returns the removed pointer, or NULL if |where| is out of
  * range.
- * 
+ *
  * OpenSSL
  * =======
  * sk_TYPE_delete() deletes element i from sk. It returns the deleted element
@@ -182,7 +182,7 @@ int OPENSSL_sk_find(const _STACK *sk, size_t *out_index, const void *p, OPENSSL_
  * =========
  * sk_free frees the given stack and array of pointers, but does nothing to
  * free the individual elements.
- * 
+ *
  * OpenSSL
  * =======
  * sk_TYPE_free() frees up the sk structure. It does not free up any elements
@@ -199,7 +199,7 @@ void sk_free(_STACK *sk) {
  * sk_insert inserts |p| into the stack at index |where|, moving existing
  * elements if needed. It returns the length of the new stack, or zero on
  * error.
- * 
+ *
  * OpenSSL
  * =======
  * sk_TYPE_insert() inserts ptr into sk at position idx. Any existing elements
@@ -241,7 +241,7 @@ int OPENSSL_sk_is_sorted(const _STACK *sk) {
  * BoringSSL
  * =========
  * sk_num returns the number of elements in |s|.
- * 
+ *
  * OpenSSL
  * =======
  * sk_TYPE_num() returns the number of elements in sk or -1 if sk is NULL.
@@ -273,7 +273,7 @@ _STACK *OPENSSL_sk_new(OPENSSL_sk_cmp_func comp) {
  * =========
  * sk_new_null creates a new, empty stack. It returns the new stack or NULL on
  * allocation failure.
- * 
+ *
  * OpenSSL
  * =======
  * sk_TYPE_new_null() allocates a new empty stack with no comparison function.
@@ -288,7 +288,7 @@ _STACK *sk_new_null(void) {
  * =========
  * sk_pop returns and removes the last element on the stack, or NULL if the
  * stack is empty.
- * 
+ *
  * OpenSSL
  * =======
  * sk_TYPE_pop() returns and removes the last element from sk.
@@ -304,7 +304,7 @@ void *sk_pop(_STACK *sk) {
  * the stack itself. Note this corresponds to |sk_FOO_pop_free|. It is named
  * |sk_pop_free_ex| as a workaround for existing code calling an older version
  * of |sk_pop_free|.
- * 
+ *
  * OpenSSL
  * =======
  * sk_TYPE_pop_free() frees up all elements of sk and sk itself. The free
@@ -322,7 +322,7 @@ OPENSSL_EXPORT void OPENSSL_sk_pop_free_ex(_STACK *sk,
  * =========
  * sk_push appends |p| to the stack and returns the length of the new stack, or
  * 0 on allocation failure.
- * 
+ *
  * OpenSSL
  * =======
  * sk_TYPE_push() appends ptr to sk.
@@ -338,7 +338,7 @@ size_t sk_push(_STACK *sk, void *p) {
  * =========
  * sk_set_cmp_func sets the comparison function to be used by |sk| and returns
  * the previous one.
- * 
+ *
  * OpenSSL
  * =======
  * sk_TYPE_set_cmp_func() sets the comparison function of sk to compare. The
@@ -354,7 +354,7 @@ OPENSSL_sk_cmp_func OPENSSL_sk_set_cmp_func(_STACK *sk, OPENSSL_sk_cmp_func comp
  * =========
  * sk_shift removes and returns the first element in the stack, or returns NULL
  * if the stack is empty.
- * 
+ *
  * OpenSSL
  * =======
  * sk_TYPE_shift() returns and removes the first element from sk.

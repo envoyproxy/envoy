@@ -183,7 +183,7 @@ ContextImpl::ContextImpl(
         // validation and always supply the callback to boring SSL.
         SSL_CTX_set_custom_verify(ctx, verify_mode, customVerifyCallback);
 #ifndef ENVOY_SSL_OPENSSL
-        // Not implemented in the bssl-compat layer for OpenSSL
+        // Not implemented in OpenSSL
         SSL_CTX_set_reverify_on_resume(ctx, /*reverify_on_resume_enabled)=*/1);
 #endif
       }
@@ -569,7 +569,7 @@ void ContextImpl::logHandshake(SSL* ssl) const {
   // error but is allowed because the enforcement that rsa key usage and tls usage need to be
   // matched has been disabled.
 #ifndef ENVOY_SSL_OPENSSL
-  // Not implemented in the bssl-compat layer for OpenSSL
+  // Not implemented in OpenSSL
   if (SSL_was_key_usage_invalid(ssl)) {
     stats_.was_key_usage_invalid_.inc();
   }

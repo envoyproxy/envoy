@@ -5,7 +5,7 @@ set -euo pipefail
 uncomment.sh "$1" --comment -h \
   --uncomment-func-decl TLS_method \
   --uncomment-func-decl OPENSSL_init_ssl \
-	--uncomment-func-decl DTLS_method \
+  --uncomment-func-decl DTLS_method \
   --uncomment-func-decl SSL_write \
   --uncomment-func-decl SSL_version \
   --uncomment-func-decl SSL_shutdown \
@@ -79,7 +79,7 @@ uncomment.sh "$1" --comment -h \
   --uncomment-func-decl SSL_CTX_set_alpn_protos \
   --uncomment-func-decl SSL_CTX_sess_set_new_cb \
   --uncomment-func-decl SSL_CTX_new \
-	--uncomment-func-decl SSL_CTX_up_ref \
+  --uncomment-func-decl SSL_CTX_up_ref \
   --uncomment-func-decl SSL_CTX_get0_param \
   --uncomment-func-decl SSL_CTX_get_verify_mode \
   --uncomment-func-decl SSL_CTX_get_options \
@@ -131,10 +131,10 @@ uncomment.sh "$1" --comment -h \
   --uncomment-func-decl SSL_get_rbio \
   --uncomment-func-decl SSL_connect \
   --uncomment-func-decl SSL_accept \
-	--uncomment-func-decl SSL_free \
-	--uncomment-macro-redef 'SSL_ERROR_[[:alnum:]_]*' \
-	--uncomment-macro-redef '\(DTLS1\|DTLS1_2\|SSL3\|TLS1\|TLS1_1\|TLS1_2\|TLS1_3\)_VERSION' \
-	--uncomment-macro-redef '\(DTLS1\|SSL3\)_VERSION_MAJOR' \
+  --uncomment-func-decl SSL_free \
+  --uncomment-macro-redef 'SSL_ERROR_[[:alnum:]_]*' \
+  --uncomment-macro-redef '\(DTLS1\|DTLS1_2\|SSL3\|TLS1\|TLS1_1\|TLS1_2\|TLS1_3\)_VERSION' \
+  --uncomment-macro-redef '\(DTLS1\|SSL3\)_VERSION_MAJOR' \
   --uncomment-func-decl SSL_CTX_get_min_proto_version \
   --uncomment-func-decl SSL_CTX_get_max_proto_version \
   --uncomment-macro-redef 'SSL_OP_[[:alnum:]_]*' \

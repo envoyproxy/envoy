@@ -1,5 +1,8 @@
 #pragma once
 
+namespace Envoy {
+namespace Ssl {
+
 #ifdef ENVOY_SSL_OPENSSL
 #define SSL_SELECT(BORINGSSL, OPENSSL) OPENSSL
 #else
@@ -17,3 +20,6 @@
 #else
 #define BORINGSSL_TEST_F(test_suite, test_name) TEST_F(test_suite, test_name)
 #endif
+
+} // namespace Ssl
+} // namespace Envoy

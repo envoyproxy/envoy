@@ -42,5 +42,4 @@ uncomment.sh "$1" --comment -h \
   --uncomment-macro DECLARE_ASN1_FUNCTIONS_const \
   --uncomment-macro DECLARE_ASN1_ALLOC_FUNCTIONS_name \
   --uncomment-macro ASN1_BOOLEAN_TRUE \
-  --uncomment-macro ASN1_BOOLEAN_FALSE \
-  
+  --uncomment-macro ASN1_BOOLEAN_FALSE

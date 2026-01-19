@@ -3055,7 +3055,7 @@ TEST_P(SslSocketTest, CertificatesWithPassword) {
 
 TEST_P(SslSocketTest, Pkcs12CertificatesWithPassword) {
 #ifdef ENVOY_SSL_OPENSSL
-  // The password_protected_certkey.p12 used in this test, uses the "RC2-40-CBC"
+  // The `password_protected_certkey.p12` used in this test, uses the "RC2-40-CBC"
   // encryption algorithm, which OpenSSL considers legacy and insecure.
   // Therefore, to get this test to pass, we need to temporarily load OpenSSL's
   // legacy provider (as well as the default one) and also unload it when finished.

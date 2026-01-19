@@ -4,7 +4,7 @@
 
 # Envoy OpenSSL
 
-This README deals with the specifics of this [envoyproxy/envoy-openssl](https://github.com/envoyproxy/envoy-openssl) repository, describing primarily how it differs from the regular [envoyproxy/envoy](https://github.com/envoyproxy/envoy) repository. The full README for the regular [envoyproxy/envoy](https://github.com/envoyproxy/envoy) repository can be found [here](https://github.com/envoyproxy/envoy/blob/main/README.md). 
+This README deals with the specifics of this [envoyproxy/envoy-openssl](https://github.com/envoyproxy/envoy-openssl) repository, describing primarily how it differs from the regular [envoyproxy/envoy](https://github.com/envoyproxy/envoy) repository. The full README for the regular [envoyproxy/envoy](https://github.com/envoyproxy/envoy) repository can be found [here](https://github.com/envoyproxy/envoy/blob/main/README.md).
 
 ## Repository Structure
 

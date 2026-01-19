@@ -48,11 +48,11 @@ cat client_1_cert.pem root_ca_cert.pem > client_1_cert_chain.pem
 cat server_2_cert.pem intermediate_ca_2_cert.pem intermediate_ca_1_cert.pem root_ca_cert.pem > server_2_cert_chain.pem
 cat client_2_cert.pem intermediate_ca_2_cert.pem intermediate_ca_1_cert.pem root_ca_cert.pem > client_2_cert_chain.pem
 
-for PEM in $(ls *.pem)
+for PEM in *.pem
 do
-  echo -n "static const char $(echo $PEM | sed 's/\./_/g')_str[] = R\"\"\"(" > $PEM.h
-  cat $PEM >> $PEM.h
-  echo ")\"\"\";" >> $PEM.h
+  echo -n "static const char ${PEM//./_}_str[] = R\"\"\"(" > "$PEM".h
+  cat "$PEM" >> "$PEM".h
+  echo ")\"\"\";" >> "$PEM".h
 done
 
-rm *.csr *.srl
+rm ./*.csr ./*.srl

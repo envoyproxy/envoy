@@ -9,4 +9,4 @@ uncomment.sh "$1" --comment \
   --uncomment-gtest-func ErrTest Overflow \
   --uncomment-gtest-func ErrTest ClearError \
   --uncomment-gtest-func ErrTest PreservesErrno \
-  --uncomment-gtest-func ErrTest UnknownError \
+  --uncomment-gtest-func ErrTest UnknownError

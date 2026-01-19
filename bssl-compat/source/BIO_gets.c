@@ -9,14 +9,14 @@
 
 // The OpenSSL documentation for BIO_gets() doesn't explicitly state how it
 // deals with null characters. However, it does say "On binary input there may
-// be NUL characters within the string; in this case the return value (if 
+// be NUL characters within the string; in this case the return value (if
 // nonnegative) may give an incorrect length".
 
 // Looking at the OpenSSL code, and tracing through it, it appears that
 // BIO_gets() on a memory bio reads null characters and returns the number of
 // bytes read, the same as BoringSSL. However, on a file BIO, it also reads null
 // characters, but returns the result of strlen() on the bytes that were read
-// i.e. it doesn't return the number of bytes read, but instead returns the 
+// i.e. it doesn't return the number of bytes read, but instead returns the
 // length only up to the first null character.
 
 // In order to provide exactly the same behaviour as BoringSSL, we use OpenSSL's

@@ -5,14 +5,14 @@
 /*
  * On error, it returns a negative value. On success, it returns the length of
  * the result and outputs it via outp as follows:
- * 
+ *
  * If outp is NULL, the function writes nothing. This mode can be used to size
- * buffers. 
- * 
+ * buffers.
+ *
  * If outp is non-NULL but *outp is NULL, the function sets *outp to a newly
  * allocated buffer containing the result. The caller is responsible for
  * releasing *outp with OPENSSL_free. This mode is recommended for most callers.
- * 
+ *
  * If outp and *outp are non-NULL, the function writes the result to *outp,
  * which must have enough space available, and advances *outp just past the
  * output.

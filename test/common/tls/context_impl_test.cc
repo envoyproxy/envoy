@@ -83,7 +83,7 @@ INSTANTIATE_TEST_SUITE_P(CipherSuites, SslLibraryCipherSuiteSupport,
 // Tests for whether new cipher suites are added. When they are, they must be added to
 // knownCipherSuites() so that this test can detect if they are removed in the future.
 // OpenSSL: Not sure how useful this test under OpenSSL is: cipher suites
-// change from version to vertsion, and also depend on the system-wide config.
+// change from version to version, and also depend on the system-wide config.
 // This is going to be a test-fail-fest. Disabling for now.
 BORINGSSL_TEST_F(SslLibraryCipherSuiteSupport, CipherSuitesNotAdded) {
   bssl::UniquePtr<SSL_CTX> ctx(SSL_CTX_new(TLS_method()));
