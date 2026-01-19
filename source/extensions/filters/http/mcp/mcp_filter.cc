@@ -258,7 +258,8 @@ Http::FilterDataStatus McpFilter::completeParsing() {
 
   if (!metadata.fields().empty()) {
     if (config_->emitFilterState()) {
-      auto filter_state_obj = std::make_shared<FilterStateObject>(parser_->getMethod(), metadata);
+      auto filter_state_obj =
+          std::make_shared<FilterStateObject>(parser_->getMethod(), metadata, is_mcp_request_);
       decoder_callbacks_->streamInfo().filterState()->setData(
           std::string(FilterStateObject::FilterStateKey), std::move(filter_state_obj),
           StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Request,

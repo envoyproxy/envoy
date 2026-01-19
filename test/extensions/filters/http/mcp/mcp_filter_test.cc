@@ -853,7 +853,7 @@ Protobuf::Struct createTestStruct() {
 }
 
 TEST(McpFilterStateObjectTest, Construction) {
-  auto obj = std::make_shared<McpFilterStateObject>("tools/call", createTestStruct());
+  auto obj = std::make_shared<McpFilterStateObject>("tools/call", createTestStruct(), true);
 
   EXPECT_EQ(obj->method().value(), "tools/call");
   EXPECT_TRUE(obj->json()->hasObject("jsonrpc"));
@@ -863,7 +863,7 @@ TEST(McpFilterStateObjectTest, Construction) {
 
 TEST(McpFilterStateObjectTest, MethodOnly) {
   Protobuf::Struct s;
-  auto obj = std::make_shared<McpFilterStateObject>("initialize", s);
+  auto obj = std::make_shared<McpFilterStateObject>("initialize", s, true);
 
   EXPECT_EQ(obj->method().value(), "initialize");
   EXPECT_FALSE(obj->json()->hasObject("id"));
@@ -872,7 +872,7 @@ TEST(McpFilterStateObjectTest, MethodOnly) {
 
 TEST(McpFilterStateObjectTest, AccessorsMissingFields) {
   Protobuf::Struct s;
-  auto obj = std::make_shared<McpFilterStateObject>("", s);
+  auto obj = std::make_shared<McpFilterStateObject>("", s, false);
 
   EXPECT_FALSE(obj->method().has_value());
   EXPECT_FALSE(obj->json()->hasObject("id"));
@@ -880,7 +880,7 @@ TEST(McpFilterStateObjectTest, AccessorsMissingFields) {
 }
 
 TEST(McpFilterStateObjectTest, HasFieldCheck) {
-  auto obj = std::make_shared<McpFilterStateObject>("tools/call", createTestStruct());
+  auto obj = std::make_shared<McpFilterStateObject>("tools/call", createTestStruct(), true);
 
   EXPECT_TRUE(obj->json()->hasObject("jsonrpc"));
   EXPECT_TRUE(obj->json()->hasObject("params"));
@@ -888,7 +888,7 @@ TEST(McpFilterStateObjectTest, HasFieldCheck) {
 }
 
 TEST(McpFilterStateObjectTest, SerializationReturnsJson) {
-  auto obj = std::make_shared<McpFilterStateObject>("prompts/get", createTestStruct());
+  auto obj = std::make_shared<McpFilterStateObject>("prompts/get", createTestStruct(), true);
 
   auto serialized = obj->serializeAsString();
   ASSERT_TRUE(serialized.has_value());
@@ -898,18 +898,27 @@ TEST(McpFilterStateObjectTest, SerializationReturnsJson) {
 
 TEST(McpFilterStateObjectTest, SerializationEmptyReturnsNullopt) {
   Protobuf::Struct s;
-  auto obj = std::make_shared<McpFilterStateObject>("", s);
+  auto obj = std::make_shared<McpFilterStateObject>("", s, false);
 
   auto serialized = obj->serializeAsString();
   EXPECT_FALSE(serialized.has_value());
 }
 
 TEST(McpFilterStateObjectTest, JsonAccessor) {
-  auto obj = std::make_shared<McpFilterStateObject>("test", createTestStruct());
+  auto obj = std::make_shared<McpFilterStateObject>("test", createTestStruct(), true);
 
   EXPECT_NE(obj->json(), nullptr);
   EXPECT_FALSE(obj->json()->empty());
   EXPECT_EQ(obj->method().value(), "test");
+}
+
+TEST(McpFilterStateObjectTest, IsMcpRequest) {
+  auto obj_true = std::make_shared<McpFilterStateObject>("tools/call", createTestStruct(), true);
+  EXPECT_TRUE(obj_true->isMcpRequest());
+
+  Protobuf::Struct s;
+  auto obj_false = std::make_shared<McpFilterStateObject>("", s, false);
+  EXPECT_FALSE(obj_false->isMcpRequest());
 }
 
 // Test FilterState is set correctly when emit_filter_state is enabled
@@ -940,6 +949,7 @@ TEST_F(McpFilterTest, FilterStateSetAfterParsing) {
   EXPECT_TRUE(filter_state_obj->method().has_value());
   EXPECT_EQ(filter_state_obj->method().value(), "tools/call");
   EXPECT_TRUE(filter_state_obj->json()->hasObject("params"));
+  EXPECT_TRUE(filter_state_obj->isMcpRequest());
 }
 
 // Test FilterState is NOT set when emit_filter_state is disabled (default)

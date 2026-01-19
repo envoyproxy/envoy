@@ -19,11 +19,12 @@ class FilterStateObject : public StreamInfo::FilterState::Object {
 public:
   static constexpr absl::string_view FilterStateKey = "envoy.filters.http.mcp.request";
 
-  FilterStateObject(std::string method, Json::ObjectSharedPtr json)
-      : method_(std::move(method)), json_(std::move(json)) {}
+  FilterStateObject(std::string method, Json::ObjectSharedPtr json, bool is_mcp_request)
+      : method_(std::move(method)), json_(std::move(json)), is_mcp_request_(is_mcp_request) {}
 
-  FilterStateObject(std::string method, const Protobuf::Struct& proto_struct)
-      : method_(std::move(method)), json_(Json::Factory::loadFromProtobufStruct(proto_struct)) {}
+  FilterStateObject(std::string method, const Protobuf::Struct& proto_struct, bool is_mcp_request)
+      : method_(std::move(method)), json_(Json::Factory::loadFromProtobufStruct(proto_struct)),
+        is_mcp_request_(is_mcp_request) {}
 
   absl::optional<std::string> serializeAsString() const override {
     if (json_ == nullptr || json_->empty()) {
@@ -38,9 +39,12 @@ public:
 
   const Json::ObjectSharedPtr& json() const { return json_; }
 
+  bool isMcpRequest() const { return is_mcp_request_; }
+
 private:
   std::string method_;
   Json::ObjectSharedPtr json_;
+  bool is_mcp_request_;
 };
 
 } // namespace Mcp
