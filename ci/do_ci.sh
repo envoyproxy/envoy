@@ -423,6 +423,14 @@ case $CI_TARGET in
             @envoy//source/exe:envoy-static \
             --build_tag_filters=-nofips
         collect_build_profile build
+        # Test zlib-ng explicitly to prevent regressions (Linux only).
+        echo "Testing zlib-ng compression..."
+        bazel_with_collection \
+            test "${BAZEL_BUILD_OPTIONS[@]}" \
+            --define zlib=ng \
+            -c fastbuild \
+            @envoy//test/extensions/compression/gzip/compressor:compressor_test \
+            @envoy//test/extensions/compression/gzip/decompressor:zlib_decompressor_impl_test
         ;;
 
     coverage|fuzz_coverage)
