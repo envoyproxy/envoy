@@ -1,5 +1,6 @@
 #pragma once
 
+#include "source/common/tracing/null_span_impl.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 #include "source/extensions/filters/http/dynamic_modules/filter_config.h"
@@ -153,6 +154,18 @@ public:
       return {};
     }
     return cb->connection();
+  }
+
+  /**
+   * Helper to get the active tracing span for this stream.
+   * Returns a reference to a NullSpan if tracing is not enabled.
+   */
+  Tracing::Span& activeSpan() {
+    auto cb = callbacks();
+    if (cb) {
+      return cb->activeSpan();
+    }
+    return Tracing::NullSpan::instance();
   }
 
   /**

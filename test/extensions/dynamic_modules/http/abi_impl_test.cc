@@ -11,6 +11,7 @@
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
+#include "test/mocks/tracing/mocks.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -1898,6 +1899,245 @@ TEST_F(DynamicModuleHttpFilterTest, GetConcurrency) {
 TEST_F(DynamicModuleHttpFilterTest, GetWorkerIndex) {
   uint32_t worker_index = envoy_dynamic_module_callback_http_filter_get_worker_index(filter_.get());
   EXPECT_EQ(worker_index, 3);
+}
+
+// ----------------------------- Tracing Tests -----------------------------
+
+TEST_F(DynamicModuleHttpFilterTest, GetActiveSpanReturnsNullWhenNoSpan) {
+  // When activeSpan() returns NullSpan, the callback should return nullptr.
+  EXPECT_CALL(decoder_callbacks_, activeSpan())
+      .WillOnce(testing::ReturnRef(Tracing::NullSpan::instance()));
+
+  auto* span = envoy_dynamic_module_callback_http_get_active_span(filter_.get());
+  EXPECT_EQ(span, nullptr);
+}
+
+TEST_F(DynamicModuleHttpFilterTest, GetActiveSpanReturnsSpan) {
+  NiceMock<Tracing::MockSpan> mock_span;
+  EXPECT_CALL(decoder_callbacks_, activeSpan()).WillOnce(testing::ReturnRef(mock_span));
+
+  auto* span = envoy_dynamic_module_callback_http_get_active_span(filter_.get());
+  EXPECT_NE(span, nullptr);
+  EXPECT_EQ(span, &mock_span);
+}
+
+TEST_F(DynamicModuleHttpFilterTest, SpanSetTag) {
+  NiceMock<Tracing::MockSpan> mock_span;
+  EXPECT_CALL(decoder_callbacks_, activeSpan()).WillOnce(testing::ReturnRef(mock_span));
+
+  std::string key = "test.key";
+  std::string value = "test.value";
+  EXPECT_CALL(mock_span, setTag(absl::string_view("test.key"), absl::string_view("test.value")));
+
+  auto* span = envoy_dynamic_module_callback_http_get_active_span(filter_.get());
+  ASSERT_NE(span, nullptr);
+
+  envoy_dynamic_module_callback_http_span_set_tag(span, {key.data(), key.size()},
+                                                  {value.data(), value.size()});
+}
+
+TEST_F(DynamicModuleHttpFilterTest, SpanSetOperation) {
+  NiceMock<Tracing::MockSpan> mock_span;
+  EXPECT_CALL(decoder_callbacks_, activeSpan()).WillOnce(testing::ReturnRef(mock_span));
+
+  std::string operation = "test.operation";
+  EXPECT_CALL(mock_span, setOperation(absl::string_view("test.operation")));
+
+  auto* span = envoy_dynamic_module_callback_http_get_active_span(filter_.get());
+  ASSERT_NE(span, nullptr);
+
+  envoy_dynamic_module_callback_http_span_set_operation(span, {operation.data(), operation.size()});
+}
+
+TEST_F(DynamicModuleHttpFilterTest, SpanLog) {
+  NiceMock<Tracing::MockSpan> mock_span;
+  EXPECT_CALL(decoder_callbacks_, activeSpan()).WillOnce(testing::ReturnRef(mock_span));
+
+  std::string event = "test.event";
+  EXPECT_CALL(mock_span, log(testing::_, std::string("test.event")));
+
+  auto* span = envoy_dynamic_module_callback_http_get_active_span(filter_.get());
+  ASSERT_NE(span, nullptr);
+
+  envoy_dynamic_module_callback_http_span_log(filter_.get(), span, {event.data(), event.size()});
+}
+
+TEST_F(DynamicModuleHttpFilterTest, SpanSetSampled) {
+  NiceMock<Tracing::MockSpan> mock_span;
+  EXPECT_CALL(decoder_callbacks_, activeSpan()).WillOnce(testing::ReturnRef(mock_span));
+
+  EXPECT_CALL(mock_span, setSampled(true));
+
+  auto* span = envoy_dynamic_module_callback_http_get_active_span(filter_.get());
+  ASSERT_NE(span, nullptr);
+
+  envoy_dynamic_module_callback_http_span_set_sampled(span, true);
+}
+
+TEST_F(DynamicModuleHttpFilterTest, SpanGetBaggage) {
+  NiceMock<Tracing::MockSpan> mock_span;
+  EXPECT_CALL(decoder_callbacks_, activeSpan()).WillOnce(testing::ReturnRef(mock_span));
+
+  std::string key = "baggage.key";
+  EXPECT_CALL(mock_span, getBaggage(absl::string_view("baggage.key")))
+      .WillOnce(testing::Return("baggage.value"));
+
+  auto* span = envoy_dynamic_module_callback_http_get_active_span(filter_.get());
+  ASSERT_NE(span, nullptr);
+
+  envoy_dynamic_module_type_envoy_buffer result{nullptr, 0};
+  bool success =
+      envoy_dynamic_module_callback_http_span_get_baggage(span, {key.data(), key.size()}, &result);
+  EXPECT_TRUE(success);
+  EXPECT_NE(result.ptr, nullptr);
+  EXPECT_EQ(result.length, 13);
+  EXPECT_EQ(std::string(result.ptr, result.length), "baggage.value");
+}
+
+TEST_F(DynamicModuleHttpFilterTest, SpanGetBaggageNotFound) {
+  NiceMock<Tracing::MockSpan> mock_span;
+  EXPECT_CALL(decoder_callbacks_, activeSpan()).WillOnce(testing::ReturnRef(mock_span));
+
+  std::string key = "nonexistent";
+  EXPECT_CALL(mock_span, getBaggage(absl::string_view("nonexistent")))
+      .WillOnce(testing::Return(""));
+
+  auto* span = envoy_dynamic_module_callback_http_get_active_span(filter_.get());
+  ASSERT_NE(span, nullptr);
+
+  envoy_dynamic_module_type_envoy_buffer result{nullptr, 0};
+  bool success =
+      envoy_dynamic_module_callback_http_span_get_baggage(span, {key.data(), key.size()}, &result);
+  EXPECT_FALSE(success);
+}
+
+TEST_F(DynamicModuleHttpFilterTest, SpanSetBaggage) {
+  NiceMock<Tracing::MockSpan> mock_span;
+  EXPECT_CALL(decoder_callbacks_, activeSpan()).WillOnce(testing::ReturnRef(mock_span));
+
+  std::string key = "baggage.key";
+  std::string value = "baggage.value";
+  EXPECT_CALL(mock_span,
+              setBaggage(absl::string_view("baggage.key"), absl::string_view("baggage.value")));
+
+  auto* span = envoy_dynamic_module_callback_http_get_active_span(filter_.get());
+  ASSERT_NE(span, nullptr);
+
+  envoy_dynamic_module_callback_http_span_set_baggage(span, {key.data(), key.size()},
+                                                      {value.data(), value.size()});
+}
+
+TEST_F(DynamicModuleHttpFilterTest, SpanGetTraceId) {
+  NiceMock<Tracing::MockSpan> mock_span;
+  EXPECT_CALL(decoder_callbacks_, activeSpan()).WillOnce(testing::ReturnRef(mock_span));
+
+  EXPECT_CALL(mock_span, getTraceId()).WillOnce(testing::Return("abc123def456"));
+
+  auto* span = envoy_dynamic_module_callback_http_get_active_span(filter_.get());
+  ASSERT_NE(span, nullptr);
+
+  envoy_dynamic_module_type_envoy_buffer result{nullptr, 0};
+  bool success = envoy_dynamic_module_callback_http_span_get_trace_id(span, &result);
+  EXPECT_TRUE(success);
+  EXPECT_NE(result.ptr, nullptr);
+  EXPECT_EQ(result.length, 12);
+  EXPECT_EQ(std::string(result.ptr, result.length), "abc123def456");
+}
+
+TEST_F(DynamicModuleHttpFilterTest, SpanGetTraceIdEmpty) {
+  NiceMock<Tracing::MockSpan> mock_span;
+  EXPECT_CALL(decoder_callbacks_, activeSpan()).WillOnce(testing::ReturnRef(mock_span));
+
+  EXPECT_CALL(mock_span, getTraceId()).WillOnce(testing::Return(""));
+
+  auto* span = envoy_dynamic_module_callback_http_get_active_span(filter_.get());
+  ASSERT_NE(span, nullptr);
+
+  envoy_dynamic_module_type_envoy_buffer result{nullptr, 0};
+  bool success = envoy_dynamic_module_callback_http_span_get_trace_id(span, &result);
+  EXPECT_FALSE(success);
+}
+
+TEST_F(DynamicModuleHttpFilterTest, SpanGetSpanId) {
+  NiceMock<Tracing::MockSpan> mock_span;
+  EXPECT_CALL(decoder_callbacks_, activeSpan()).WillOnce(testing::ReturnRef(mock_span));
+
+  EXPECT_CALL(mock_span, getSpanId()).WillOnce(testing::Return("span789"));
+
+  auto* span = envoy_dynamic_module_callback_http_get_active_span(filter_.get());
+  ASSERT_NE(span, nullptr);
+
+  envoy_dynamic_module_type_envoy_buffer result{nullptr, 0};
+  bool success = envoy_dynamic_module_callback_http_span_get_span_id(span, &result);
+  EXPECT_TRUE(success);
+  EXPECT_NE(result.ptr, nullptr);
+  EXPECT_EQ(result.length, 7);
+  EXPECT_EQ(std::string(result.ptr, result.length), "span789");
+}
+
+TEST_F(DynamicModuleHttpFilterTest, SpanSpawnChild) {
+  NiceMock<Tracing::MockSpan> mock_span;
+  NiceMock<Tracing::MockSpan>* child_span = new NiceMock<Tracing::MockSpan>();
+
+  EXPECT_CALL(decoder_callbacks_, activeSpan()).WillOnce(testing::ReturnRef(mock_span));
+  EXPECT_CALL(mock_span, spawnChild_(testing::_, std::string("child.operation"), testing::_))
+      .WillOnce(testing::Return(child_span));
+
+  auto* span = envoy_dynamic_module_callback_http_get_active_span(filter_.get());
+  ASSERT_NE(span, nullptr);
+
+  std::string operation = "child.operation";
+  auto* child = envoy_dynamic_module_callback_http_span_spawn_child(
+      filter_.get(), span, {operation.data(), operation.size()});
+  ASSERT_NE(child, nullptr);
+
+  // Verify the child span can have operations performed on it.
+  EXPECT_CALL(*child_span,
+              setTag(absl::string_view("child.key"), absl::string_view("child.value")));
+  std::string key = "child.key";
+  std::string value = "child.value";
+  envoy_dynamic_module_callback_http_span_set_tag(child, {key.data(), key.size()},
+                                                  {value.data(), value.size()});
+
+  // Finish the child span.
+  EXPECT_CALL(*child_span, finishSpan());
+  envoy_dynamic_module_callback_http_child_span_finish(child);
+}
+
+TEST_F(DynamicModuleHttpFilterTest, TracingCallbacksWithNullSpan) {
+  // Verify all tracing callbacks handle null span gracefully.
+  std::string key = "test";
+  std::string value = "value";
+  envoy_dynamic_module_type_envoy_buffer result{nullptr, 0};
+
+  // These should not crash with null span.
+  envoy_dynamic_module_callback_http_span_set_tag(nullptr, {key.data(), key.size()},
+                                                  {value.data(), value.size()});
+  envoy_dynamic_module_callback_http_span_set_operation(nullptr, {key.data(), key.size()});
+  envoy_dynamic_module_callback_http_span_log(nullptr, nullptr, {key.data(), key.size()});
+  envoy_dynamic_module_callback_http_span_set_sampled(nullptr, true);
+  envoy_dynamic_module_callback_http_span_set_baggage(nullptr, {key.data(), key.size()},
+                                                      {value.data(), value.size()});
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_span_get_baggage(
+      nullptr, {key.data(), key.size()}, &result));
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_span_get_trace_id(nullptr, &result));
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_span_get_span_id(nullptr, &result));
+  EXPECT_EQ(envoy_dynamic_module_callback_http_span_spawn_child(nullptr, nullptr,
+                                                                {key.data(), key.size()}),
+            nullptr);
+  // Null child span finish should not crash.
+  envoy_dynamic_module_callback_http_child_span_finish(nullptr);
+}
+
+TEST_F(DynamicModuleHttpFilterTest, GetActiveSpanReturnsNullWhenNoCallbacks) {
+  // Create a filter without any callbacks set.
+  Stats::SymbolTableImpl symbol_table;
+  auto filter_no_callbacks = std::make_unique<DynamicModuleHttpFilter>(nullptr, symbol_table, 0);
+
+  // When there are no callbacks, activeSpan() returns NullSpan, and the callback should return
+  // nullptr.
+  auto* span = envoy_dynamic_module_callback_http_get_active_span(filter_no_callbacks.get());
+  EXPECT_EQ(span, nullptr);
 }
 
 } // namespace HttpFilters

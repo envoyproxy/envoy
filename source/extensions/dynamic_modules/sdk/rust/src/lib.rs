@@ -1409,6 +1409,343 @@ pub trait EnvoyHttpFilter {
     state: abi::envoy_dynamic_module_type_socket_option_state,
     direction: abi::envoy_dynamic_module_type_socket_direction,
   ) -> Option<Vec<u8>>;
+
+  // ----------------------------- Tracing methods -----------------------------
+
+  /// Get the active tracing span for the current HTTP stream.
+  ///
+  /// Returns `Some(Box<dyn EnvoySpan>)` if tracing is enabled and a span is available,
+  /// otherwise returns `None`.
+  ///
+  /// The returned span can be used to add tags, logs, or spawn child spans.
+  /// The active span is managed by Envoy and should not be finished by the module.
+  fn get_active_span<'a>(&'a self) -> Option<Box<dyn EnvoySpan + 'a>>;
+
+  /// Create a child span from the active span with the given operation name.
+  ///
+  /// Returns `Some(Box<dyn EnvoyChildSpan>)` if the child span was created successfully,
+  /// otherwise returns `None`.
+  ///
+  /// The returned child span must be finished by calling [`EnvoyChildSpan::finish`]
+  /// when done. Failing to finish the span will result in incomplete trace data.
+  fn spawn_child_span<'a>(&'a self, operation_name: &str) -> Option<Box<dyn EnvoyChildSpan + 'a>>;
+}
+
+/// Trait representing a tracing span.
+///
+/// This trait provides methods to interact with a tracing span, such as setting tags,
+/// logging events, and spawning child spans.
+///
+/// The span is managed by Envoy and should not be finished by the module.
+pub trait EnvoySpan {
+  /// Set a tag on this span.
+  ///
+  /// Tags are key-value pairs that provide metadata about the span.
+  fn set_tag(&self, key: &str, value: &str);
+
+  /// Set the operation name on this span.
+  fn set_operation(&self, operation: &str);
+
+  /// Log an event on this span with the current timestamp.
+  fn log(&self, event: &str);
+
+  /// Override the sampling decision for this span.
+  ///
+  /// If sampled is false, this span and any subsequent child spans will not be
+  /// reported to the tracing system.
+  fn set_sampled(&self, sampled: bool);
+
+  /// Get a baggage value from this span.
+  ///
+  /// Baggage data may have been set by this span or any parent spans.
+  /// Returns `None` if the key was not found.
+  ///
+  /// Note: The returned string is temporary and should be copied if needed
+  /// beyond immediate use.
+  fn get_baggage(&self, key: &str) -> Option<String>;
+
+  /// Set a baggage value on this span.
+  ///
+  /// All subsequent child spans will have access to this baggage.
+  fn set_baggage(&self, key: &str, value: &str);
+
+  /// Get the trace ID from this span.
+  ///
+  /// Returns `None` if the trace ID is not available.
+  ///
+  /// Note: The returned string is temporary and should be copied if needed
+  /// beyond immediate use.
+  fn get_trace_id(&self) -> Option<String>;
+
+  /// Get the span ID from this span.
+  ///
+  /// Returns `None` if the span ID is not available.
+  ///
+  /// Note: The returned string is temporary and should be copied if needed
+  /// beyond immediate use.
+  fn get_span_id(&self) -> Option<String>;
+
+  /// Create a child span with the given operation name.
+  ///
+  /// The child span must be finished by calling [`EnvoyChildSpan::finish`] when done.
+  fn spawn_child(&self, operation_name: &str) -> Option<Box<dyn EnvoyChildSpan + '_>>;
+}
+
+/// Implementation of [`EnvoySpan`] that wraps the raw span pointer from Envoy.
+struct EnvoySpanImpl {
+  raw_ptr: abi::envoy_dynamic_module_type_span_envoy_ptr,
+  filter_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+}
+
+impl EnvoySpan for EnvoySpanImpl {
+  fn set_tag(&self, key: &str, value: &str) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_span_set_tag(
+        self.raw_ptr,
+        str_to_module_buffer(key),
+        str_to_module_buffer(value),
+      );
+    }
+  }
+
+  fn set_operation(&self, operation: &str) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_span_set_operation(
+        self.raw_ptr,
+        str_to_module_buffer(operation),
+      );
+    }
+  }
+
+  fn log(&self, event: &str) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_span_log(
+        self.filter_ptr,
+        self.raw_ptr,
+        str_to_module_buffer(event),
+      );
+    }
+  }
+
+  fn set_sampled(&self, sampled: bool) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_span_set_sampled(self.raw_ptr, sampled);
+    }
+  }
+
+  fn get_baggage(&self, key: &str) -> Option<String> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_span_get_baggage(
+        self.raw_ptr,
+        str_to_module_buffer(key),
+        &mut result as *mut _ as *mut _,
+      )
+    };
+    if success && !result.ptr.is_null() && result.length > 0 {
+      let slice = unsafe { std::slice::from_raw_parts(result.ptr as *const u8, result.length) };
+      Some(String::from_utf8_lossy(slice).to_string())
+    } else {
+      None
+    }
+  }
+
+  fn set_baggage(&self, key: &str, value: &str) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_span_set_baggage(
+        self.raw_ptr,
+        str_to_module_buffer(key),
+        str_to_module_buffer(value),
+      );
+    }
+  }
+
+  fn get_trace_id(&self) -> Option<String> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_span_get_trace_id(
+        self.raw_ptr,
+        &mut result as *mut _ as *mut _,
+      )
+    };
+    if success && !result.ptr.is_null() && result.length > 0 {
+      let slice = unsafe { std::slice::from_raw_parts(result.ptr as *const u8, result.length) };
+      Some(String::from_utf8_lossy(slice).to_string())
+    } else {
+      None
+    }
+  }
+
+  fn get_span_id(&self) -> Option<String> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_span_get_span_id(
+        self.raw_ptr,
+        &mut result as *mut _ as *mut _,
+      )
+    };
+    if success && !result.ptr.is_null() && result.length > 0 {
+      let slice = unsafe { std::slice::from_raw_parts(result.ptr as *const u8, result.length) };
+      Some(String::from_utf8_lossy(slice).to_string())
+    } else {
+      None
+    }
+  }
+
+  fn spawn_child(&self, operation_name: &str) -> Option<Box<dyn EnvoyChildSpan + '_>> {
+    let raw_ptr = unsafe {
+      abi::envoy_dynamic_module_callback_http_span_spawn_child(
+        self.filter_ptr,
+        self.raw_ptr,
+        str_to_module_buffer(operation_name),
+      )
+    };
+    if raw_ptr.is_null() {
+      None
+    } else {
+      Some(Box::new(EnvoyChildSpanImpl {
+        raw_ptr,
+        filter_ptr: self.filter_ptr,
+        finished: false,
+      }))
+    }
+  }
+}
+
+/// Trait representing a child tracing span created by the module.
+///
+/// Child spans are owned by the module and must be finished by calling
+/// [`EnvoyChildSpan::finish`] when done.
+pub trait EnvoyChildSpan {
+  /// Set a tag on this span.
+  fn set_tag(&self, key: &str, value: &str);
+
+  /// Set the operation name on this span.
+  fn set_operation(&self, operation: &str);
+
+  /// Log an event on this span with the current timestamp.
+  fn log(&self, event: &str);
+
+  /// Override the sampling decision for this span.
+  fn set_sampled(&self, sampled: bool);
+
+  /// Set a baggage value on this span.
+  fn set_baggage(&self, key: &str, value: &str);
+
+  /// Create a child span from this span with the given operation name.
+  fn spawn_child(&self, operation_name: &str) -> Option<Box<dyn EnvoyChildSpan + '_>>;
+
+  /// Finish and release this span.
+  ///
+  /// After calling this method, the span is no longer valid and should not be used.
+  /// Note: This takes `&mut self` instead of `self` to maintain object-safety.
+  /// The implementation should ensure the span is not used after this call.
+  fn finish(&mut self);
+}
+
+/// Implementation of [`EnvoyChildSpan`] that wraps the raw span pointer.
+struct EnvoyChildSpanImpl {
+  raw_ptr: abi::envoy_dynamic_module_type_child_span_module_ptr,
+  filter_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  finished: bool,
+}
+
+impl EnvoyChildSpan for EnvoyChildSpanImpl {
+  fn set_tag(&self, key: &str, value: &str) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_span_set_tag(
+        self.raw_ptr as abi::envoy_dynamic_module_type_span_envoy_ptr,
+        str_to_module_buffer(key),
+        str_to_module_buffer(value),
+      );
+    }
+  }
+
+  fn set_operation(&self, operation: &str) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_span_set_operation(
+        self.raw_ptr as abi::envoy_dynamic_module_type_span_envoy_ptr,
+        str_to_module_buffer(operation),
+      );
+    }
+  }
+
+  fn log(&self, event: &str) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_span_log(
+        self.filter_ptr,
+        self.raw_ptr as abi::envoy_dynamic_module_type_span_envoy_ptr,
+        str_to_module_buffer(event),
+      );
+    }
+  }
+
+  fn set_sampled(&self, sampled: bool) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_span_set_sampled(
+        self.raw_ptr as abi::envoy_dynamic_module_type_span_envoy_ptr,
+        sampled,
+      );
+    }
+  }
+
+  fn set_baggage(&self, key: &str, value: &str) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_span_set_baggage(
+        self.raw_ptr as abi::envoy_dynamic_module_type_span_envoy_ptr,
+        str_to_module_buffer(key),
+        str_to_module_buffer(value),
+      );
+    }
+  }
+
+  fn spawn_child(&self, operation_name: &str) -> Option<Box<dyn EnvoyChildSpan + '_>> {
+    let raw_ptr = unsafe {
+      abi::envoy_dynamic_module_callback_http_span_spawn_child(
+        self.filter_ptr,
+        self.raw_ptr as abi::envoy_dynamic_module_type_span_envoy_ptr,
+        str_to_module_buffer(operation_name),
+      )
+    };
+    if raw_ptr.is_null() {
+      None
+    } else {
+      Some(Box::new(EnvoyChildSpanImpl {
+        raw_ptr,
+        filter_ptr: self.filter_ptr,
+        finished: false,
+      }))
+    }
+  }
+
+  fn finish(&mut self) {
+    if !self.finished {
+      unsafe {
+        abi::envoy_dynamic_module_callback_http_child_span_finish(self.raw_ptr);
+      }
+      self.finished = true;
+    }
+  }
+}
+
+impl Drop for EnvoyChildSpanImpl {
+  fn drop(&mut self) {
+    // If the span was not explicitly finished, finish it now.
+    if !self.finished {
+      unsafe {
+        abi::envoy_dynamic_module_callback_http_child_span_finish(self.raw_ptr);
+      }
+    }
+  }
 }
 
 /// This implements the [`EnvoyHttpFilter`] trait with the given raw pointer to the Envoy HTTP
@@ -2546,6 +2883,43 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
       Some(slice.to_vec())
     } else {
       None
+    }
+  }
+
+  fn get_active_span<'a>(&'a self) -> Option<Box<dyn EnvoySpan + 'a>> {
+    let raw_ptr = unsafe { abi::envoy_dynamic_module_callback_http_get_active_span(self.raw_ptr) };
+    if raw_ptr.is_null() {
+      None
+    } else {
+      Some(Box::new(EnvoySpanImpl {
+        raw_ptr,
+        filter_ptr: self.raw_ptr,
+      }))
+    }
+  }
+
+  fn spawn_child_span<'a>(&'a self, operation_name: &str) -> Option<Box<dyn EnvoyChildSpan + 'a>> {
+    // Get the active span pointer directly.
+    let span_ptr = unsafe { abi::envoy_dynamic_module_callback_http_get_active_span(self.raw_ptr) };
+    if span_ptr.is_null() {
+      return None;
+    }
+    // Spawn the child span directly from the raw pointer.
+    let raw_ptr = unsafe {
+      abi::envoy_dynamic_module_callback_http_span_spawn_child(
+        self.raw_ptr,
+        span_ptr,
+        str_to_module_buffer(operation_name),
+      )
+    };
+    if raw_ptr.is_null() {
+      None
+    } else {
+      Some(Box::new(EnvoyChildSpanImpl {
+        raw_ptr,
+        filter_ptr: self.raw_ptr,
+        finished: false,
+      }))
     }
   }
 }
