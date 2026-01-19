@@ -641,7 +641,7 @@ Current supported substitution commands include:
 %DOWNSTREAM_LOCAL_CLOSE_REASON%
   HTTP/TCP
     If downstream connection was closed locally, provides the reason.
-  
+
   UDP
     Not implemented ("-")
 
