@@ -126,7 +126,7 @@ public:
    * Gets the most recently parsed tags.
    * @return vector of most recently parsed tag keys.
    */
-  std::vector<std::string> tagKeys();
+  const std::vector<std::string> tagKeys() const;
 
   /**
    * Install a callback that will be invoked when tags are reloaded.
