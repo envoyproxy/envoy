@@ -71,7 +71,6 @@ struct UpstreamInfoImpl : public UpstreamInfo {
   const std::string& upstreamTransportFailureReason() const override {
     return upstream_transport_failure_reason_;
   }
-
   void setUpstreamHost(Upstream::HostDescriptionConstSharedPtr host) override {
     upstream_host_ = host;
   }
