@@ -811,6 +811,56 @@ TEST_P(AdsIntegrationTest, CdsKeepEdsAfterWarmingFailure) {
   makeSingleRequest();
 }
 
+TEST_P(AdsIntegrationTest, CdsKeepEdsDropOverloadAfterWarmingFailure) {
+  // This test should be kept after the runtime guard is deprecated
+  config_helper_.addRuntimeOverride("envoy.restart_features.use_eds_cache_for_ads", "true");
+  initialize();
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "", {}, {}, {}, true));
+  envoy::config::cluster::v3::Cluster cluster = buildCluster("cluster_0");
+  // Set a small EDS subscription expiration.
+  cluster.mutable_eds_cluster_config()
+      ->mutable_eds_config()
+      ->mutable_initial_fetch_timeout()
+      ->set_nanos(100 * 1000 * 1000);
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TestTypeUrl::get().Cluster,
+                                                             {cluster}, {cluster}, {}, "1");
+
+  auto cluster_load_assignment = buildClusterLoadAssignment("cluster_0");
+  auto* policy = cluster_load_assignment.mutable_policy();
+  auto* drop_overload = policy->add_drop_overloads();
+  drop_overload->set_category("lb_drop_overload");
+  // Set drop_overload to drop everything.
+  drop_overload->mutable_drop_percentage()->set_numerator(100);
+  sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+      Config::TestTypeUrl::get().ClusterLoadAssignment, {cluster_load_assignment},
+      {cluster_load_assignment}, {}, "1");
+
+  sendDiscoveryResponse<envoy::config::listener::v3::Listener>(
+      Config::TestTypeUrl::get().Listener, {buildListener("listener_0", "route_config_0")},
+      {buildListener("listener_0", "route_config_0")}, {}, "1");
+
+  sendDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
+      Config::TestTypeUrl::get().RouteConfiguration,
+      {buildRouteConfig("route_config_0", "cluster_0")},
+      {buildRouteConfig("route_config_0", "cluster_0")}, {}, "1");
+
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  // Send a HTTP request and verify it is dropped with unconditional_drop_overload.
+  makeSingleRequestWithDropOverload();
+
+  // Update a cluster's field (connect_timeout) so the cluster in Envoy will be explicitly updated.
+  cluster.mutable_connect_timeout()->set_seconds(7);
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TestTypeUrl::get().Cluster,
+                                                             {cluster}, {cluster}, {}, "2");
+  // Avoid sending an EDS update, and wait for EDS update timeout (that results in
+  // a cluster update without resources).
+  test_server_->waitForCounterGe("cluster.cluster_0.init_fetch_timeout", 1);
+  // Envoy uses the cached resource.
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.assignment_use_cached")->value());
+  // Send a HTTP request again and verify it is dropped with unconditional_drop_overload.
+  makeSingleRequestWithDropOverload();
+}
+
 // Validate that an update to 2 Clusters that have the same ClusterLoadAssignment, and
 // that don't receive updated ClusterLoadAssignment use the previous (cached) cluster
 // load assignment.

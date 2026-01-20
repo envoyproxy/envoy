@@ -34,7 +34,9 @@ DynamicModuleNetworkFilterConfigFactory::createFilterFactoryFromProtoTyped(
       filter_config =
           Envoy::Extensions::DynamicModules::NetworkFilters::newDynamicModuleNetworkFilterConfig(
               proto_config.filter_name(), config, std::move(dynamic_module.value()),
-              context.serverFactoryContext().clusterManager());
+              context.serverFactoryContext().clusterManager(),
+              context.serverFactoryContext().scope(),
+              context.serverFactoryContext().mainThreadDispatcher());
 
   if (!filter_config.ok()) {
     return absl::InvalidArgumentError("Failed to create filter config: " +
@@ -44,7 +46,6 @@ DynamicModuleNetworkFilterConfigFactory::createFilterFactoryFromProtoTyped(
   return [config = filter_config.value()](Network::FilterManager& filter_manager) -> void {
     auto filter = std::make_shared<
         Envoy::Extensions::DynamicModules::NetworkFilters::DynamicModuleNetworkFilter>(config);
-    filter->initializeInModuleFilter();
     filter_manager.addFilter(filter);
   };
 }

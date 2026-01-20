@@ -40,6 +40,7 @@ NO_HTTP3_SKIP_TARGETS = [
     "envoy.quic.server_preferred_address.fixed",
     "envoy.quic.server_preferred_address.datasource",
     "envoy.quic.connection_debug_visitor.basic",
+    "envoy.quic.packet_writer.default",
 ]
 
 # Make all contents of an external repository accessible under a filegroup.  Used for external HTTP
@@ -143,7 +144,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_awslabs_aws_c_auth()
     _com_github_axboe_liburing()
     _com_github_bazel_buildtools()
-    _com_github_c_ares_c_ares()
+    _com_github_cares_cares()
     _com_github_openhistogram_libcircllhist()
     _com_github_cyan4973_xxhash()
     _com_github_datadog_dd_trace_cpp()
@@ -210,7 +211,6 @@ def envoy_dependencies(skip_targets = []):
     _rules_ruby()
     external_http_archive("com_github_google_flatbuffers")
     external_http_archive("bazel_features")
-    external_http_archive("bazel_toolchains")
     external_http_archive("bazel_compdb")
     external_http_archive(
         name = "envoy_examples",
@@ -218,6 +218,7 @@ def envoy_dependencies(skip_targets = []):
     external_http_archive("envoy_toolshed")
 
     _com_github_maxmind_libmaxminddb()
+    _thrift()
 
     external_http_archive("rules_license")
     external_http_archive("rules_pkg")
@@ -319,10 +320,10 @@ def _com_github_bazel_buildtools():
         name = "com_github_bazelbuild_buildtools",
     )
 
-def _com_github_c_ares_c_ares():
+def _com_github_cares_cares():
     external_http_archive(
-        name = "com_github_c_ares_c_ares",
-        build_file_content = BUILD_ALL_CONTENT,
+        name = "com_github_cares_cares",
+        build_file = "@envoy//bazel/external:c-ares.BUILD",
         patch_args = ["-p1"],
         patches = ["@envoy//bazel:c-ares.patch"],
     )
@@ -384,6 +385,10 @@ def _com_github_unicode_org_icu():
         name = "com_github_unicode_org_icu",
         patches = ["@envoy//bazel/foreign_cc:icu.patch"],
         patch_args = ["-p1"],
+        patch_cmds = [
+            "sed -i 's/^#![[:space:]]*/#!/' source/configure source/config.sub source/config.guess source/mkinstalldirs",
+            "sed -i 's/\\r$//' source/configure source/config.sub source/config.guess source/mkinstalldirs",
+        ],
         build_file_content = BUILD_ALL_CONTENT,
     )
 
@@ -916,6 +921,15 @@ def _foreign_cc_dependencies():
         name = "rules_foreign_cc",
         patches = ["@envoy//bazel:rules_foreign_cc.patch"],
         patch_args = ["-p1"],
+    )
+
+def _thrift():
+    external_http_archive(
+        name = "thrift",
+        build_file = "@envoy//bazel/external:thrift.BUILD",
+        patches = ["@envoy//bazel:thrift.patch"],
+        patch_args = ["-p1"],
+        patch_cmds = ["mv src thrift"],
     )
 
 def _com_github_maxmind_libmaxminddb():

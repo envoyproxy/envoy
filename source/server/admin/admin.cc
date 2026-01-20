@@ -319,6 +319,10 @@ void AdminImpl::addAllowlistedPath(Matchers::StringMatcherPtr matcher) {
   allowlisted_paths_.emplace_back(std::move(matcher));
 }
 
+const Matcher::MatchTreePtr<Http::HttpMatchingData>& AdminImpl::forwardClientCertMatcher() const {
+  return forward_client_cert_matcher_;
+}
+
 namespace {
 // Implements a chunked request for static text.
 class StaticTextRequest : public Admin::Request {

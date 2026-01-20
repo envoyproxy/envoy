@@ -139,7 +139,8 @@ public:
   Upstream::ClusterInfoConstSharedPtr clusterInfo() const { return cluster_info_; }
   Upstream::HostDescriptionConstSharedPtr upstreamHost() const { return upstream_host_; }
   const GrpcCalls& grpcCalls(envoy::config::core::v3::TrafficDirection traffic_direction) const;
-  ProcessingEffects& processingEffects(envoy::config::core::v3::TrafficDirection traffic_direction);
+  const ProcessingEffects&
+  processingEffects(envoy::config::core::v3::TrafficDirection traffic_direction) const;
   const Envoy::Protobuf::Struct& filterMetadata() const { return filter_metadata_; }
   const std::string& httpResponseCodeDetails() const { return http_response_code_details_; }
 
@@ -153,6 +154,7 @@ public:
 
 private:
   GrpcCalls& grpcCalls(envoy::config::core::v3::TrafficDirection traffic_direction);
+  ProcessingEffects& processingEffects(envoy::config::core::v3::TrafficDirection traffic_direction);
   GrpcCalls decoding_processor_grpc_calls_;
   GrpcCalls encoding_processor_grpc_calls_;
   ProcessingEffects encoding_processor_effects_{};
@@ -646,7 +648,7 @@ private:
   // This stream closing optimization only applies to STREAMED or FULL_DUPLEX_STREAMED body modes.
   // For other body modes like BUFFERED or BUFFERED_PARTIAL, it is ignored.
   void closeGrpcStreamIfLastRespReceived(const ProcessingResponse& response,
-                                         const bool is_last_body_resp);
+                                         const bool eos_seen_in_body);
   absl::Status handleStreamingImmediateResponse(
       const envoy::service::ext_proc::v3::StreamedImmediateResponse& response);
 

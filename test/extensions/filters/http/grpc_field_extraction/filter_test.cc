@@ -48,8 +48,7 @@ protected:
         api_->fileSystem()
             .fileReadToEnd(TestEnvironment::runfilesPath("test/proto/apikeys.descriptor"))
             .value();
-    ON_CALL(mock_decoder_callbacks_, decoderBufferLimit())
-        .WillByDefault(testing::Return(UINT32_MAX));
+    ON_CALL(mock_decoder_callbacks_, bufferLimit()).WillByDefault(testing::Return(UINT32_MAX));
     filter_config_ = std::make_shared<FilterConfig>(
         proto_config_, std::make_unique<ExtractorFactoryImpl>(), *api_);
     filter_ = std::make_unique<Filter>(filter_config_);
@@ -890,7 +889,7 @@ fields {
 using FilterTestExtractRejected = FilterTestBase;
 TEST_F(FilterTestExtractRejected, BufferLimitedExceeded) {
   setUp();
-  ON_CALL(mock_decoder_callbacks_, decoderBufferLimit()).WillByDefault(testing::Return(0));
+  ON_CALL(mock_decoder_callbacks_, bufferLimit()).WillByDefault(testing::Return(0));
 
   TestRequestHeaderMapImpl req_headers =
       TestRequestHeaderMapImpl{{":method", "POST"},
@@ -932,7 +931,7 @@ TEST_F(FilterTestExtractRejected, NotEnoughData) {
 
 TEST_F(FilterTestExtractRejected, MisformedGrpcPath) {
   setUp();
-  ON_CALL(mock_decoder_callbacks_, decoderBufferLimit()).WillByDefault(testing::Return(0));
+  ON_CALL(mock_decoder_callbacks_, bufferLimit()).WillByDefault(testing::Return(0));
 
   TestRequestHeaderMapImpl req_headers = TestRequestHeaderMapImpl{
       {":method", "POST"}, {":path", "/misformatted"}, {"content-type", "application/grpc"}};

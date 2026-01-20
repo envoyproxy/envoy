@@ -161,7 +161,7 @@ configure_make(
 configure_make(
     name = "unicode_icu_build",
     build_data = ["//bazel/foreign_cc:icu_data_filter.json"],
-    configure_command = "icu4c/source/configure",
+    configure_command = "source/configure",
     configure_options = [
         "--enable-option-checking",
         "--enable-static",
@@ -256,48 +256,6 @@ envoy_cmake(
     tags = ["skip_on_windows"],
     # Use boringssl alias to select fips vs non-fips version.
     deps = ["//bazel:boringssl"],
-)
-
-envoy_cmake(
-    name = "ares",
-    build_args = select({
-        "//bazel/foreign_cc:parallel_builds_enabled": ["-j"],
-        "//conditions:default": ["-j1"],
-    }),
-    cache_entries = {
-        "CARES_BUILD_TOOLS": "no",
-        "CARES_SHARED": "no",
-        "CARES_STATIC": "on",
-        "CMAKE_CXX_COMPILER_FORCED": "on",
-        "CMAKE_INSTALL_LIBDIR": "lib",
-    },
-    defines = ["CARES_STATICLIB"],
-    exec_properties = select({
-        "//bazel:engflow_rbe_x86_64": {
-            "Pool": "linux_x64_large",
-        },
-        "//bazel:engflow_rbe_aarch64": {
-            "Pool": "linux_arm64_small",
-        },
-        "//conditions:default": {},
-    }),
-    generate_args = [
-        "-G",
-        "Ninja",
-    ],
-    lib_source = "@com_github_c_ares_c_ares//:all",
-    linkopts = select({
-        "//bazel:apple": ["-lresolv"],
-        "//conditions:default": [],
-    }),
-    out_static_libs = select({
-        "//bazel:windows_x86_64": ["cares.lib"],
-        "//conditions:default": ["libcares.a"],
-    }),
-    postfix_script = select({
-        "//bazel:windows_x86_64": "cp -L $$EXT_BUILD_ROOT/external/com_github_c_ares_c_ares/src/lib/ares_nameser.h $$INSTALLDIR/include/ares_nameser.h && cp -L $$EXT_BUILD_ROOT/external/com_github_c_ares_c_ares/include/ares_dns.h $$INSTALLDIR/include/ares_dns.h",
-        "//conditions:default": "rm -f $$INSTALLDIR/include/ares_dns.h && cp -L $$EXT_BUILD_ROOT/external/com_github_c_ares_c_ares/include/ares_dns.h $$INSTALLDIR/include/ares_dns.h",
-    }),
 )
 
 envoy_cmake(
@@ -506,4 +464,54 @@ cc_library(
         "//conditions:default": [],
     }),
     alwayslink = 1,
+)
+
+# zlib-ng is a performance-optimized fork of zlib.
+# This is built using cmake and provides a drop-in replacement for zlib when
+# --define zlib=ng is specified.
+envoy_cmake(
+    name = "zlib_ng",
+    build_args = select({
+        "//bazel/foreign_cc:parallel_builds_enabled": ["-j"],
+        "//conditions:default": ["-j1"],
+    }),
+    cache_entries = {
+        "CMAKE_CXX_COMPILER_FORCED": "on",
+        "CMAKE_C_COMPILER_FORCED": "on",
+        "SKIP_BUILD_EXAMPLES": "on",
+        "BUILD_SHARED_LIBS": "off",
+        # zlib-ng specific options.
+        # Reference: https://github.com/zlib-ng/zlib-ng#build-options.
+        "ZLIB_COMPAT": "on",
+        "ZLIB_ENABLE_TESTS": "off",
+        # Warning: Turning WITH_OPTIM to "on" doesn't pass ZlibCompressorImplTest.CallingChecksum.
+        "WITH_OPTIM": "on",
+        # However turning off SSE4 fixes it.
+        "WITH_SSE4": "off",
+        # Warning: Turning WITH_NEW_STRATEGIES to "on" doesn't pass gzip compressor fuzz test.
+        # Turning this off means falling into NO_QUICK_STRATEGY route.
+        "WITH_NEW_STRATEGIES": "off",
+        # Only allow aligned address.
+        # Reference: https://github.com/zlib-ng/zlib-ng#advanced-build-options.
+        "UNALIGNED_OK": "off",
+    },
+    exec_properties = select({
+        "//bazel:engflow_rbe_x86_64": {
+            "Pool": "linux_x64_large",
+        },
+        "//bazel:engflow_rbe_aarch64": {
+            "Pool": "linux_arm64_small",
+        },
+        "//conditions:default": {},
+    }),
+    generate_args = [
+        "-G",
+        "Ninja",
+    ],
+    lib_source = "@com_github_zlib_ng_zlib_ng//:all",
+    out_static_libs = select({
+        "//bazel:windows_x86_64": ["zlib.lib"],
+        "//conditions:default": ["libz.a"],
+    }),
+    tags = ["skip_on_windows"],
 )
