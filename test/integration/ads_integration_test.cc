@@ -275,7 +275,8 @@ TEST_P(AdsIntegrationTest, DeltaSdsRemovals) {
   sendDeltaDiscoveryResponse<envoy::config::cluster::v3::Cluster>(cds_type_url, {cluster}, {}, "1");
 
   // The cluster needs this secret, so it's going to request it.
-  EXPECT_TRUE(compareDeltaDiscoveryRequest(sds_type_url, {"validation_context"}, {}, {}, {}, false));
+  EXPECT_TRUE(
+      compareDeltaDiscoveryRequest(sds_type_url, {"validation_context"}, {}, {}, {}, false));
 
   // Cluster should start off warming as the secret is being requested.
   test_server_->waitForGaugeEq("cluster.cluster_0.warming_state", 1);
@@ -1925,9 +1926,10 @@ public:
   }
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDeltaWildcard,
-                         AdsIntegrationTestWithRtdsAndSecondaryClusters, ADS_INTEGRATION_PARAMS,
-                         AdsIntegrationTestWithRtdsAndSecondaryClusters::protocolTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(
+    IpVersionsClientTypeDeltaWildcard, AdsIntegrationTestWithRtdsAndSecondaryClusters,
+    ADS_INTEGRATION_PARAMS,
+    AdsIntegrationTestWithRtdsAndSecondaryClusters::protocolTestParamsToString);
 
 TEST_P(AdsIntegrationTestWithRtdsAndSecondaryClusters, Basic) {
   initialize();
@@ -1977,9 +1979,9 @@ TEST_P(AdsIntegrationTest, ContextParameterUpdate) {
   EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().ClusterLoadAssignment, "1",
                                       {"cluster_0"}, {}, {}, true));
   EXPECT_EQ("b", last_node_.dynamic_parameters()
-                    .at(Config::TestTypeUrl::get().ClusterLoadAssignment)
-                    .params()
-                    .at("foo"));
+                     .at(Config::TestTypeUrl::get().ClusterLoadAssignment)
+                     .params()
+                     .at("foo"));
   EXPECT_EQ(
       "baz",
       last_node_.dynamic_parameters().at(Config::TestTypeUrl::get().Cluster).params().at("foo"));
@@ -2023,7 +2025,6 @@ public:
     });
     AdsIntegrationTest::initialize();
   }
-
 };
 
 INSTANTIATE_TEST_SUITE_P(

@@ -105,23 +105,23 @@ public:
           std::tuple<Network::Address::IpVersion, Grpc::ClientType, Grpc::SotwOrDelta>>& p) {
     absl::string_view sotw_or_delta_str;
     switch (std::get<2>(p.param)) {
-      case Grpc::SotwOrDelta::Sotw:
-        sotw_or_delta_str = "Sotw";
-        break;
-      case Grpc::SotwOrDelta::Delta:
-        sotw_or_delta_str = "Delta";
-        break;
-      case Grpc::SotwOrDelta::UnifiedSotw:
-        sotw_or_delta_str = "UnifiedSotw";
-        break;
-      case Grpc::SotwOrDelta::UnifiedDelta:
-        sotw_or_delta_str = "UnifiedDelta";
-        break;
+    case Grpc::SotwOrDelta::Sotw:
+      sotw_or_delta_str = "Sotw";
+      break;
+    case Grpc::SotwOrDelta::Delta:
+      sotw_or_delta_str = "Delta";
+      break;
+    case Grpc::SotwOrDelta::UnifiedSotw:
+      sotw_or_delta_str = "UnifiedSotw";
+      break;
+    case Grpc::SotwOrDelta::UnifiedDelta:
+      sotw_or_delta_str = "UnifiedDelta";
+      break;
     }
-    return fmt::format(
-        "{}_{}_{}", TestUtility::ipVersionToString(std::get<0>(p.param)),
-        std::get<1>(p.param) == Grpc::ClientType::GoogleGrpc ? "GoogleGrpc" : "EnvoyGrpc",
-        sotw_or_delta_str);
+    return fmt::format("{}_{}_{}", TestUtility::ipVersionToString(std::get<0>(p.param)),
+                       std::get<1>(p.param) == Grpc::ClientType::GoogleGrpc ? "GoogleGrpc"
+                                                                            : "EnvoyGrpc",
+                       sotw_or_delta_str);
   }
   Network::Address::IpVersion ipVersion() const override { return std::get<0>(GetParam()); }
   Grpc::ClientType clientType() const override { return std::get<1>(GetParam()); }

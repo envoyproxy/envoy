@@ -51,9 +51,9 @@ NewGrpcMuxImpl::NewGrpcMuxImpl(GrpcMuxContext& grpc_mux_context)
                 return absl::OkStatus();
               })),
       xds_config_tracker_(grpc_mux_context.xds_config_tracker_),
-      skip_subsequent_node_(
-          grpc_mux_context.skip_subsequent_node_ && Runtime::runtimeFeatureEnabled(
-              "envoy.reloadable_features.xds_legacy_delta_skip_subsequent_node")),
+      skip_subsequent_node_(grpc_mux_context.skip_subsequent_node_ &&
+                            Runtime::runtimeFeatureEnabled(
+                                "envoy.reloadable_features.xds_legacy_delta_skip_subsequent_node")),
       eds_resources_cache_(std::move(grpc_mux_context.eds_resources_cache_)) {
   AllMuxes::get().insert(this);
 }
@@ -405,7 +405,7 @@ void NewGrpcMuxImpl::trySendDiscoveryRequests() {
       request = sub->second->sub_state_.getNextRequestAckless();
     }
     const bool set_node = sub->second->sub_state_.dynamicContextChanged() ||
-        !skip_subsequent_node_ || first_request_on_stream_;
+                          !skip_subsequent_node_ || first_request_on_stream_;
     if (set_node) {
       first_request_on_stream_ = false;
       *request.mutable_node() = local_info_.node();

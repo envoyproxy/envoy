@@ -222,8 +222,7 @@ TEST_P(NewGrpcMuxImplTest, SkipSubsequentNode) {
   auto foo_sub = grpc_mux_->addWatch("foo", {"x", "y"}, callbacks_, resource_decoder_, {});
   auto bar_sub = grpc_mux_->addWatch("bar", {}, callbacks_, resource_decoder_, {});
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
-  expectSendMessage({.type_url = "foo", .resource_names_subscribe = {"x", "y"},
-                     .with_node = true});
+  expectSendMessage({.type_url = "foo", .resource_names_subscribe = {"x", "y"}, .with_node = true});
   // The node has been sent already, so it won't be sent again.
   expectSendMessage({.type_url = "bar", .with_node = false});
   grpc_mux_->start();
@@ -248,8 +247,7 @@ TEST_P(NewGrpcMuxImplTest, SkipSubsequentNode_SendNodeOnGrpcStreamReset) {
   InSequence s;
   auto foo_sub = grpc_mux_->addWatch("foo", {"x", "y"}, callbacks_, resource_decoder_, {});
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
-  expectSendMessage(
-      {.type_url = "foo", .resource_names_subscribe = {"x", "y"}, .with_node = true});
+  expectSendMessage({.type_url = "foo", .resource_names_subscribe = {"x", "y"}, .with_node = true});
   grpc_mux_->start();
 
   // Now disconnect.
@@ -259,8 +257,7 @@ TEST_P(NewGrpcMuxImplTest, SkipSubsequentNode_SendNodeOnGrpcStreamReset) {
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
 
   // On reconnection, node should be sent again with the first message.
-  expectSendMessage(
-      {.type_url = "foo", .resource_names_subscribe = {"x", "y"}, .with_node = true});
+  expectSendMessage({.type_url = "foo", .resource_names_subscribe = {"x", "y"}, .with_node = true});
   remoteClose();
 
   expectSendMessage(
@@ -276,15 +273,14 @@ TEST_P(NewGrpcMuxImplTest, SkipSubsequentNodeFeatureFlagDisabled) {
     delete async_client_;
     GTEST_SKIP() << "This test requires skip_subsequent_node to be true.";
   }
-  scoped_runtime_.mergeValues({{"envoy.reloadable_features.xds_legacy_delta_skip_subsequent_node",
-                                "false"}});
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.xds_legacy_delta_skip_subsequent_node", "false"}});
   setup();
   InSequence s;
   auto foo_sub = grpc_mux_->addWatch("foo", {"x", "y"}, callbacks_, resource_decoder_, {});
   auto bar_sub = grpc_mux_->addWatch("bar", {}, callbacks_, resource_decoder_, {});
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
-  expectSendMessage({.type_url = "foo", .resource_names_subscribe = {"x", "y"},
-                     .with_node = true});
+  expectSendMessage({.type_url = "foo", .resource_names_subscribe = {"x", "y"}, .with_node = true});
   // Though skip_subsequent_node is true, the feature flag is disabled, so the node will be sent
   // again.
   expectSendMessage({.type_url = "bar", .with_node = true});
@@ -469,7 +465,8 @@ TEST_P(NewGrpcMuxImplTest, ReconnectionResetsWildcardSubscription) {
     // the flag that triggers the initial-resource-versions population.
     expectSendMessage({.type_url = type_url});
   } else {
-    expectSendMessage({.type_url = type_url, .initial_resource_versions = {{"x", "1000"}, {"y", "2000"}}});
+    expectSendMessage(
+        {.type_url = type_url, .initial_resource_versions = {{"x", "1000"}, {"y", "2000"}}});
   }
   remoteClose();
   // Destruction of wildcard will not issue unsubscribe requests for the resources.
@@ -798,8 +795,9 @@ TEST_P(NewGrpcMuxImplTest, UpdateCacheEdsResource) {
 
   // Update the cache to another resource.
   EXPECT_CALL(*eds_resources_cache_, removeResource("x"));
-  expectSendMessage(
-      {.type_url = type_url, .resource_names_subscribe = {"y"}, .resource_names_unsubscribe = {"x"}});
+  expectSendMessage({.type_url = type_url,
+                     .resource_names_subscribe = {"y"},
+                     .resource_names_unsubscribe = {"x"}});
   watch->update({"y"});
 
   // Envoy will unsubscribe from all resources.
@@ -916,8 +914,8 @@ TEST_P(NewGrpcMuxImplTest, MuxDynamicReplacementWhenConnected) {
       .WillOnce(Return(&replaced_async_stream_));
   // Expect the initial messages to be sent to the new stream.
   expectSendMessage({.type_url = "type_url_foo",
-                       .resource_names_subscribe = {"x", "y"},
-                       .async_stream = &replaced_async_stream_});
+                     .resource_names_subscribe = {"x", "y"},
+                     .async_stream = &replaced_async_stream_});
   expectSendMessage({.type_url = "type_url_bar", .async_stream = &replaced_async_stream_});
   EXPECT_OK(grpc_mux_->updateMuxSource(
       /*primary_async_client=*/std::unique_ptr<Grpc::MockAsyncClient>(replaced_async_client_),
@@ -929,8 +927,8 @@ TEST_P(NewGrpcMuxImplTest, MuxDynamicReplacementWhenConnected) {
       empty_ads_config));
   // Ending test, removing subscriptions for type_url_foo.
   expectSendMessage({.type_url = "type_url_foo",
-                       .resource_names_unsubscribe = {"x", "y"},
-                       .async_stream = &replaced_async_stream_});
+                     .resource_names_unsubscribe = {"x", "y"},
+                     .async_stream = &replaced_async_stream_});
 }
 
 // Updating the mux object after receiving a response, sends the correct requests.
@@ -980,9 +978,9 @@ TEST_P(NewGrpcMuxImplTest, MuxDynamicReplacementFetchingResources) {
   // Expect the initial message to be sent to the new stream.
   // It will include "x" in its initial_resource_versions.
   expectSendMessage({.type_url = type_url,
-                       .resource_names_subscribe = {"x", "y"},
-                       .initial_resource_versions = {{"x", "x1"}},
-                       .async_stream = &replaced_async_stream_});
+                     .resource_names_subscribe = {"x", "y"},
+                     .initial_resource_versions = {{"x", "x1"}},
+                     .async_stream = &replaced_async_stream_});
   EXPECT_OK(grpc_mux_->updateMuxSource(
       /*primary_async_client=*/std::unique_ptr<Grpc::MockAsyncClient>(replaced_async_client_),
       /*failover_async_client=*/nullptr,
@@ -1020,8 +1018,8 @@ TEST_P(NewGrpcMuxImplTest, MuxDynamicReplacementFetchingResources) {
 
   // Ending test, removing subscriptions for the subscription.
   expectSendMessage({.type_url = type_url,
-                       .resource_names_unsubscribe = {"x", "y"},
-                       .async_stream = &replaced_async_stream_});
+                     .resource_names_unsubscribe = {"x", "y"},
+                     .async_stream = &replaced_async_stream_});
 }
 
 // Updating the mux object with wrong rate limit settings is rejected.
@@ -1060,8 +1058,8 @@ TEST_P(NewGrpcMuxImplTest, RejectMuxDynamicReplacementRateLimitSettingsError) {
                    .ok());
   // Ending test, removing subscriptions for type_url_foo.
   expectSendMessage({.type_url = type_url,
-                       .resource_names_unsubscribe = {"x", "y"},
-                       .async_stream = &async_stream_});
+                     .resource_names_unsubscribe = {"x", "y"},
+                     .async_stream = &async_stream_});
 }
 
 TEST(NewGrpcMuxFactoryTest, InvalidRateLimit) {
