@@ -404,16 +404,16 @@ std::pair<std::string, std::string> McpRouterFilter::parseToolName(const std::st
 }
 
 std::pair<std::string, std::string> McpRouterFilter::parseResourceUri(const std::string& uri) {
-  // Resource URIs use scheme-based routing: "backend://path" -> backend="backend",
-  // uri="file://path" In multiplexing mode, the scheme prefix identifies the backend. Example:
-  // "time://current" -> backend="time", rewritten_uri="file://current"
+  // Resource URIs use the format: <backend>+<scheme>://<path>
+  // Example: "time+file://current" -> backend="time", rewritten_uri="file://current"
+  // This avoids conflicts where backend names might match scheme names.
   if (!config_->isMultiplexing()) {
     return {config_->defaultBackendName(), uri};
   }
 
   // Find the scheme separator "://"
-  size_t scheme_end = uri.find("://");
-  if (scheme_end == std::string::npos) {
+  size_t scheme_sep = uri.find("://");
+  if (scheme_sep == std::string::npos) {
     // No scheme, use default backend if available.
     if (!config_->defaultBackendName().empty()) {
       return {config_->defaultBackendName(), uri};
@@ -421,13 +421,20 @@ std::pair<std::string, std::string> McpRouterFilter::parseResourceUri(const std:
     return {"", uri};
   }
 
-  std::string scheme = uri.substr(0, scheme_end);
-  std::string path = uri.substr(scheme_end + 3); // Skip "://"
+  // Look for the backend+scheme delimiter ('+') before "://"
+  std::string prefix = uri.substr(0, scheme_sep);
+  size_t plus_pos = prefix.find('+');
 
-  // Check if the scheme matches a known backend.
-  if (config_->findBackend(scheme) != nullptr) {
-    // Rewrite URI with generic "file" scheme for the backend.
-    return {scheme, "file://" + path};
+  if (plus_pos != std::string::npos) {
+    // Format: backend+scheme://path
+    std::string backend = prefix.substr(0, plus_pos);
+    std::string scheme = prefix.substr(plus_pos + 1);
+    std::string path = uri.substr(scheme_sep + 3); // Skip "://"
+
+    if (config_->findBackend(backend) != nullptr) {
+      // Rewrite URI with the original scheme for the backend.
+      return {backend, absl::StrCat(scheme, "://", path)};
+    }
   }
 
   // Scheme doesn't match a backend, use default backend without rewriting.
@@ -936,19 +943,20 @@ std::string McpRouterFilter::aggregateResourcesList(const std::vector<BackendRes
 
             auto resource_map = resources_array->addMap();
 
-            // Rewrite URI with backend prefix scheme in multiplexing mode.
-            // Example: "file://path" -> "time://path" (for backend "time").
+            // Prefix URI with backend name in multiplexing mode using format: backend+scheme://path
+            // Example: "file://path" -> "time+file://path" (for backend "time").
             resource_map->addKey("uri");
             if (is_multiplexing) {
               std::string original_uri = *uri_or;
               size_t scheme_end = original_uri.find("://");
               if (scheme_end != std::string::npos) {
-                // Replace original scheme with backend name.
-                std::string path = original_uri.substr(scheme_end + 3);
-                resource_map->addString(absl::StrCat(resp.backend_name, "://", path));
+                // Insert backend name before the scheme.
+                std::string scheme = original_uri.substr(0, scheme_end);
+                std::string rest = original_uri.substr(scheme_end); // Includes "://path"
+                resource_map->addString(absl::StrCat(resp.backend_name, "+", scheme, rest));
               } else {
-                // No scheme, prepend backend name as scheme.
-                resource_map->addString(absl::StrCat(resp.backend_name, "://", original_uri));
+                // No scheme, use backend name with empty scheme.
+                resource_map->addString(absl::StrCat(resp.backend_name, "+://", original_uri));
               }
             } else {
               resource_map->addString(*uri_or);

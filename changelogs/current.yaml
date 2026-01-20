@@ -46,8 +46,8 @@ removed_config_or_runtime:
 new_features:
 - area: mcp_router
   change: |
-    Added support for MCP resource methods: ``resources/list``, ``resources/read``, ``resources/subscribe``,
-    and ``resources/unsubscribe``.
+    Added support for MCP resource methods ``resources/list``, ``resources/read``,
+    ``resources/subscribe``, and ``resources/unsubscribe``.
 - area: formatter
   change: |
     Extended ``*_WITHOUT_PORT`` address formatters to accept an optional ``MASK_PREFIX_LEN`` parameter that masks IP addresses

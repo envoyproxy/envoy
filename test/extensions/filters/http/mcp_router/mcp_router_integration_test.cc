@@ -705,10 +705,11 @@ TEST_P(McpRouterIntegrationTest, ResourcesListFanoutAggregation) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("200", response->headers().getStatusValue());
 
-  // Verify the aggregated response contains resources from both backends with URI prefixes.
-  EXPECT_THAT(response->body(), testing::HasSubstr("time://current_time"));
-  EXPECT_THAT(response->body(), testing::HasSubstr("tools://config"));
-  EXPECT_THAT(response->body(), testing::HasSubstr("tools://data"));
+  // Verify the aggregated response contains resources from both backends with backend+scheme
+  // prefixes.
+  EXPECT_THAT(response->body(), testing::HasSubstr("time+file://current_time"));
+  EXPECT_THAT(response->body(), testing::HasSubstr("tools+file://config"));
+  EXPECT_THAT(response->body(), testing::HasSubstr("tools+file://data"));
 }
 
 // Test resources/read routes to correct backend based on URI scheme.
@@ -722,7 +723,7 @@ TEST_P(McpRouterIntegrationTest, ResourcesReadRoutesToCorrectBackend) {
     "method": "resources/read",
     "id": 21,
     "params": {
-      "uri": "time://current_time"
+      "uri": "time+file://current_time"
     }
   })";
 
@@ -736,15 +737,14 @@ TEST_P(McpRouterIntegrationTest, ResourcesReadRoutesToCorrectBackend) {
                                      {"content-type", "application/json"}},
       request_body);
 
-  // Request should be routed to time backend based on "time://" URI scheme.
+  // Request should be routed to time backend based on "time+" prefix in URI.
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, time_backend_connection_));
   ASSERT_TRUE(time_backend_connection_->waitForNewStream(*dispatcher_, time_backend_request_));
   ASSERT_TRUE(time_backend_request_->waitForEndStream(*dispatcher_));
 
-  // Verify upstream request body has URI rewritten.
+  // Verify upstream request body has URI rewritten (backend prefix stripped).
   EXPECT_THAT(time_backend_request_->body().toString(), testing::HasSubstr("file://current_time"));
-  EXPECT_THAT(time_backend_request_->body().toString(),
-              testing::Not(testing::HasSubstr("time://")));
+  EXPECT_THAT(time_backend_request_->body().toString(), testing::Not(testing::HasSubstr("time+")));
 
   const std::string backend_response = R"({
     "jsonrpc": "2.0",
@@ -775,7 +775,7 @@ TEST_P(McpRouterIntegrationTest, ResourcesSubscribeRoutesToBackend) {
     "method": "resources/subscribe",
     "id": 22,
     "params": {
-      "uri": "tools://config"
+      "uri": "tools+file://config"
     }
   })";
 
@@ -789,12 +789,12 @@ TEST_P(McpRouterIntegrationTest, ResourcesSubscribeRoutesToBackend) {
                                      {"content-type", "application/json"}},
       request_body);
 
-  // Request should be routed to tools backend based on "tools://" URI scheme.
+  // Request should be routed to tools backend based on "tools+" prefix in URI.
   ASSERT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, tools_backend_connection_));
   ASSERT_TRUE(tools_backend_connection_->waitForNewStream(*dispatcher_, tools_backend_request_));
   ASSERT_TRUE(tools_backend_request_->waitForEndStream(*dispatcher_));
 
-  // Verify upstream request body has URI rewritten.
+  // Verify upstream request body has URI rewritten (backend prefix stripped).
   EXPECT_THAT(tools_backend_request_->body().toString(), testing::HasSubstr("file://config"));
 
   // Subscribe returns empty result per MCP spec.
@@ -826,7 +826,7 @@ TEST_P(McpRouterIntegrationTest, ResourcesUnsubscribeRoutesToBackend) {
     "method": "resources/unsubscribe",
     "id": 23,
     "params": {
-      "uri": "time://current_time"
+      "uri": "time+file://current_time"
     }
   })";
 
@@ -840,7 +840,7 @@ TEST_P(McpRouterIntegrationTest, ResourcesUnsubscribeRoutesToBackend) {
                                      {"content-type", "application/json"}},
       request_body);
 
-  // Request should be routed to time backend based on "time://" URI scheme.
+  // Request should be routed to time backend based on "time+" prefix in URI.
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, time_backend_connection_));
   ASSERT_TRUE(time_backend_connection_->waitForNewStream(*dispatcher_, time_backend_request_));
   ASSERT_TRUE(time_backend_request_->waitForEndStream(*dispatcher_));
@@ -877,7 +877,7 @@ TEST_P(McpRouterIntegrationTest, ResourcesReadWithUnknownBackendReturns400) {
     "method": "resources/read",
     "id": 24,
     "params": {
-      "uri": "unknown://some_resource"
+      "uri": "unknown+file://some_resource"
     }
   })";
 
@@ -891,7 +891,7 @@ TEST_P(McpRouterIntegrationTest, ResourcesReadWithUnknownBackendReturns400) {
                                      {"content-type", "application/json"}},
       request_body);
 
-  // Unknown backend URI should return 400 Bad Request.
+  // Unknown backend prefix should return 400 Bad Request.
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("400", response->headers().getStatusValue());
 }
