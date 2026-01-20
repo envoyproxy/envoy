@@ -693,29 +693,56 @@ void extractAndPrefixTools(const std::string& body, absl::string_view backend_na
     if (!name.ok()) {
       continue;
     }
+
     if (!is_multiplexing) {
+      // No prefixing needed - use original JSON.
       out.push_back(tool->asJsonString());
       continue;
     }
-    // Build JSON with prefixed name using iterate.
-    std::string json = "{";
-    bool first = true;
-    tool->iterate([&](const std::string& key, const Json::Object& value) {
-          if (!first) {
-            json += ',';
-          }
-          first = false;
-          absl::StrAppend(&json, "\"", key, "\":");
-          if (key == "name") {
-            absl::StrAppend(&json, "\"", backend_name, kNameDelimiter, *name, "\"");
-          } else {
-            absl::StrAppend(&json, value.asJsonString());
-          }
-          return true;
-        })
-        .IgnoreError();
 
-    out.push_back(json + "}");
+    // Reconstruct JSON with prefixed name using Json::StringStreamer.
+    std::string json;
+    Json::StringStreamer streamer(json);
+    {
+      auto map = streamer.makeRootMap();
+
+      // name - prefix with backend name
+      map->addKey("name");
+      map->addString(absl::StrCat(backend_name, kNameDelimiter, *name));
+
+      // description
+      const auto desc = tool->getString("description");
+      if (desc.ok()) {
+        map->addKey("description");
+        map->addString(*desc);
+      }
+
+      // inputSchema
+      const auto schema = tool->getObject("inputSchema");
+      if (schema.ok() && *schema) {
+        map->addKey("inputSchema");
+        map->addRawJson((*schema)->asJsonString());
+      }
+
+      // annotations
+      const auto annotations = tool->getObject("annotations");
+      if (annotations.ok() && *annotations) {
+        map->addKey("annotations");
+        map->addRawJson((*annotations)->asJsonString());
+      }
+
+      // icons
+      const auto icons = tool->getObjectArray("icons");
+      if (icons.ok() && !icons->empty()) {
+        map->addKey("icons");
+        auto icons_array = map->addArray();
+        for (const auto& icon : *icons) {
+          icons_array->addRawJson(icon->asJsonString());
+        }
+      }
+    }
+
+    out.push_back(std::move(json));
   }
 }
 
@@ -728,8 +755,9 @@ std::string McpRouterFilter::aggregateToolsList(const std::vector<BackendRespons
     if (!resp.success) {
       continue;
     }
-    ENVOY_LOG(debug, "Aggregating tools from backend '{}': {}", resp.backend_name, resp.body);
-    extractAndPrefixTools(resp.body, resp.backend_name, is_multiplexing, all_tools);
+    std::string json_body = extractJsonRpcFromResponse(resp);
+    ENVOY_LOG(debug, "Aggregating tools from backend '{}': {}", resp.backend_name, json_body);
+    extractAndPrefixTools(json_body, resp.backend_name, is_multiplexing, all_tools);
   }
 
   return absl::StrCat(R"({"jsonrpc":"2.0","id":)", request_id_, R"(,"result":{"tools":[)",
