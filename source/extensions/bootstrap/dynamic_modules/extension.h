@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/server/bootstrap_extension_config.h"
+#include "envoy/stats/store.h"
 
 #include "source/common/common/logger.h"
 #include "source/extensions/bootstrap/dynamic_modules/extension_config.h"
@@ -37,6 +38,11 @@ public:
    * Get the extension configuration.
    */
   const DynamicModuleBootstrapExtensionConfig& getExtensionConfig() const { return *config_; }
+
+  /**
+   * Get the stats store.
+   */
+  Stats::Store& statsStore() { return config_->stats_store_; }
 
 private:
   /**

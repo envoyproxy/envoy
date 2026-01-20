@@ -211,7 +211,6 @@ def envoy_dependencies(skip_targets = []):
     _rules_ruby()
     external_http_archive("com_github_google_flatbuffers")
     external_http_archive("bazel_features")
-    external_http_archive("bazel_toolchains")
     external_http_archive("bazel_compdb")
     external_http_archive(
         name = "envoy_examples",
@@ -386,6 +385,10 @@ def _com_github_unicode_org_icu():
         name = "com_github_unicode_org_icu",
         patches = ["@envoy//bazel/foreign_cc:icu.patch"],
         patch_args = ["-p1"],
+        patch_cmds = [
+            "sed -i 's/^#![[:space:]]*/#!/' source/configure source/config.sub source/config.guess source/mkinstalldirs",
+            "sed -i 's/\\r$//' source/configure source/config.sub source/config.guess source/mkinstalldirs",
+        ],
         build_file_content = BUILD_ALL_CONTENT,
     )
 
@@ -471,7 +474,7 @@ def _zlib():
 def _com_github_zlib_ng_zlib_ng():
     external_http_archive(
         name = "com_github_zlib_ng_zlib_ng",
-        build_file_content = BUILD_ALL_CONTENT,
+        build_file = "@envoy//bazel/external:zlib_ng.BUILD",
     )
 
 # Boost in general is not approved for Envoy use, and the header-only

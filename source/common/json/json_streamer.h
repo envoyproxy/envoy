@@ -202,6 +202,24 @@ public:
       streamer_.addNull();
     }
 
+    /**
+     * Adds a pre-serialized JSON fragment to the current array or map.
+     * The fragment is inserted as-is without any escaping or validation.
+     * The caller is responsible for ensuring the fragment is valid JSON.
+     *
+     * Use case: embedding JSON objects/arrays from external sources
+     * (e.g., parsed JSON that was serialized via asJsonString()).
+     *
+     * It's a programming error to call this method on a map or array that's not
+     * the top level. It's also a programming error to call this on map that
+     * isn't expecting a value. You must call Map::addKey prior to calling this.
+     */
+    void addRawJson(absl::string_view json) {
+      ASSERT_THIS_IS_TOP_LEVEL;
+      nextField();
+      streamer_.addWithoutSanitizing(json);
+    }
+
   protected:
     /**
      * Initiates a new field, serializing a comma separator if this is not the
@@ -415,8 +433,7 @@ public:
 
 private:
   /**
-   * Adds a string to the output stream without sanitizing it. This is only used to push
-   * the delimiters to output buffer.
+   * Adds a string to the output stream without sanitizing it.
    */
   void addWithoutSanitizing(absl::string_view str) { response_.add(str); }
 
