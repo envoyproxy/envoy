@@ -431,8 +431,6 @@ public:
    */
   void addNull() { response_.add(Constants::Null); }
 
-
-
 private:
   /**
    * Adds a string to the output stream without sanitizing it.
