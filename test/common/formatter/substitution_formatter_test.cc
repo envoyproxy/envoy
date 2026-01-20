@@ -1006,6 +1006,125 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   }
 
   {
+    StreamInfoFormatter format("DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT", "24");
+    EXPECT_EQ("127.0.0.0/24", format.format({}, stream_info));
+    EXPECT_THAT(format.formatValue({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("127.0.0.0/24")));
+  }
+
+  {
+    StreamInfoFormatter format("DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT", "16");
+    EXPECT_EQ("127.0.0.0/16", format.format({}, stream_info));
+    EXPECT_THAT(format.formatValue({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("127.0.0.0/16")));
+  }
+
+  {
+    StreamInfoFormatter format("DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT", "32");
+    EXPECT_EQ("127.0.0.1/32", format.format({}, stream_info));
+    EXPECT_THAT(format.formatValue({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("127.0.0.1/32")));
+  }
+
+  {
+    auto original_address = stream_info.downstreamAddressProvider().remoteAddress();
+    auto masked_address = Network::Address::InstanceConstSharedPtr{
+        new Network::Address::Ipv4Instance("10.1.10.23", 8080)};
+    stream_info.downstream_connection_info_provider_->setRemoteAddress(masked_address);
+
+    StreamInfoFormatter format("DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT", "16");
+    EXPECT_EQ("10.1.0.0/16", format.format({}, stream_info));
+    EXPECT_THAT(format.formatValue({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("10.1.0.0/16")));
+
+    stream_info.downstream_connection_info_provider_->setRemoteAddress(original_address);
+  }
+
+  {
+    auto original_address = stream_info.downstreamAddressProvider().remoteAddress();
+    auto ipv6_address = Network::Address::InstanceConstSharedPtr{
+        new Network::Address::Ipv6Instance("2001:db8:1234:5678::1", 8080)};
+    stream_info.downstream_connection_info_provider_->setRemoteAddress(ipv6_address);
+
+    StreamInfoFormatter format128("DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT", "128");
+    EXPECT_EQ("2001:db8:1234:5678::1/128", format128.format({}, stream_info));
+
+    StreamInfoFormatter format64("DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT", "64");
+    EXPECT_EQ("2001:db8:1234:5678::/64", format64.format({}, stream_info));
+    EXPECT_THAT(format64.formatValue({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("2001:db8:1234:5678::/64")));
+
+    StreamInfoFormatter format48("DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT", "48");
+    EXPECT_EQ("2001:db8:1234::/48", format48.format({}, stream_info));
+
+    stream_info.downstream_connection_info_provider_->setRemoteAddress(original_address);
+  }
+
+  {
+    StreamInfoFormatter format("DOWNSTREAM_DIRECT_REMOTE_ADDRESS_WITHOUT_PORT", "24");
+    EXPECT_EQ("127.0.0.0/24", format.format({}, stream_info));
+    EXPECT_THAT(format.formatValue({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("127.0.0.0/24")));
+  }
+
+  {
+    StreamInfoFormatter format("DOWNSTREAM_DIRECT_REMOTE_ADDRESS_WITHOUT_PORT", "16");
+    EXPECT_EQ("127.0.0.0/16", format.format({}, stream_info));
+    EXPECT_THAT(format.formatValue({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("127.0.0.0/16")));
+  }
+
+  {
+    if (stream_info.downstreamAddressProvider().localAddress() &&
+        stream_info.downstreamAddressProvider().localAddress()->type() ==
+            Network::Address::Type::Ip) {
+      StreamInfoFormatter format("DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT", "24");
+      auto result = format.format({}, stream_info);
+      if (result.has_value()) {
+        EXPECT_TRUE(result.value().find('/') != std::string::npos);
+      }
+    }
+  }
+
+  {
+    if (stream_info.downstreamAddressProvider().directLocalAddress() &&
+        stream_info.downstreamAddressProvider().directLocalAddress()->type() ==
+            Network::Address::Type::Ip) {
+      StreamInfoFormatter format("DOWNSTREAM_DIRECT_LOCAL_ADDRESS_WITHOUT_PORT", "16");
+      auto result = format.format({}, stream_info);
+      if (result.has_value()) {
+        EXPECT_TRUE(result.value().find("127.0.0.0/16") != std::string::npos ||
+                    result.value().find('/') != std::string::npos);
+      }
+    }
+  }
+
+  {
+    StreamInfoFormatter format("UPSTREAM_REMOTE_ADDRESS_WITHOUT_PORT", "24");
+    EXPECT_EQ("10.0.0.0/24", format.format({}, stream_info));
+    EXPECT_THAT(format.formatValue({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("10.0.0.0/24")));
+  }
+
+  {
+    StreamInfoFormatter format("UPSTREAM_REMOTE_ADDRESS_WITHOUT_PORT", "16");
+    EXPECT_EQ("10.0.0.0/16", format.format({}, stream_info));
+    EXPECT_THAT(format.formatValue({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("10.0.0.0/16")));
+  }
+
+  {
+    auto address = Network::Address::InstanceConstSharedPtr{
+        new Network::Address::Ipv4Instance("127.0.0.5", 8443)};
+    stream_info.upstreamInfo()->setUpstreamLocalAddress(address);
+
+    StreamInfoFormatter format("UPSTREAM_LOCAL_ADDRESS_WITHOUT_PORT", "24");
+    EXPECT_EQ("127.0.0.0/24", format.format({}, stream_info));
+    EXPECT_THAT(format.formatValue({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("127.0.0.0/24")));
+  }
+
+  {
     StreamInfoFormatter downstream_format("DOWNSTREAM_LOCAL_ADDRESS_ENDPOINT_ID");
     auto internal_address =
         std::make_shared<Network::Address::EnvoyInternalInstance>("internal", "1234567890");
