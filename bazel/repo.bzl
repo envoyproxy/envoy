@@ -279,7 +279,7 @@ _envoy_repo = repository_rule(
         "envoy_api_version": attr.label(default = "@envoy//:API_VERSION.txt"),
         "envoy_ci_config": attr.label(default = "@envoy//:.github/config.yml"),
         "yq": attr.label(default = "@yq"),
-        "deps": attr.label_list(default = ["@yq_linux_amd64//:yq", "@yq_linux_arm64//:yq"]),
+        "deps": attr.label_list(default = ["@yq_linux_amd64//:yq", "@yq_linux_arm64//:yq", "@yq_darwin_amd64//:yq", "@ya_darwin_arm64//:yq"]),
     },
     environ = ["BAZEL_LLVM_PATH"],
 )
