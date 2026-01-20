@@ -5,6 +5,7 @@
 
 #include "envoy/config/trace/v3/opentelemetry.pb.h"
 
+#include "source/common/common/assert.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/common/hex.h"
 #include "source/common/tracing/common_values.h"
@@ -187,10 +188,10 @@ Tracer::Tracer(OpenTelemetryTraceExporterPtr exporter, Envoy::TimeSource& time_s
                Random::RandomGenerator& random, Runtime::Loader& runtime,
                Event::Dispatcher& dispatcher, OpenTelemetryTracerStats tracing_stats,
                const ResourceConstSharedPtr resource, SamplerSharedPtr sampler,
-               uint64_t max_cache_size)
+               uint64_t max_cache_size, TraceIdPattern trace_id_pattern)
     : exporter_(std::move(exporter)), time_source_(time_source), random_(random), runtime_(runtime),
       tracing_stats_(tracing_stats), resource_(resource), sampler_(sampler),
-      max_cache_size_(max_cache_size) {
+      max_cache_size_(max_cache_size), trace_id_pattern_(trace_id_pattern) {
   flush_timer_ = dispatcher.createTimer([this]() -> void {
     tracing_stats_.timer_flushed_.inc();
     flushSpans();
@@ -266,6 +267,53 @@ void Tracer::sendSpan(::opentelemetry::proto::trace::v1::Span& span) {
   }
 }
 
+std::string Tracer::generateTraceIdV4() {
+  // Generate random 128-bit trace ID (UUID-v4-style).
+  // Note: Explicitly store random values in variables to guarantee evaluation order.
+  // C++ does not define argument evaluation order, so compilers may vary (GCC vs Clang).
+  const uint64_t trace_id_high = random_.random();
+  const uint64_t trace_id_low = random_.random();
+  return absl::StrCat(Hex::uint64ToHex(trace_id_high), Hex::uint64ToHex(trace_id_low));
+}
+
+std::string Tracer::generateTraceIdV7() {
+  // UUID-v7 bit layout (RFC 9562):
+  //   High 64 bits: [timestamp_ms (48)] [version (4)] [rand_a (12)]
+  //   Low 64 bits:  [variant (2)] [rand_b (62)]
+
+  // Get current Unix timestamp in milliseconds.
+  const uint64_t timestamp_ms =
+      static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
+                                time_source_.systemTime().time_since_epoch())
+                                .count());
+  // Timestamp must fit in 48 bits (valid until year ~10889).
+  ASSERT((timestamp_ms >> 48) == 0);
+
+  // Generate random bits.
+  const uint64_t rand_a = random_.random() & 0x0FFFULL;             // 12 bits
+  const uint64_t rand_b = random_.random() & 0x3FFFFFFFFFFFFFFFULL; // 62 bits
+
+  // Assemble high 64 bits: [timestamp_ms(48)][version=7(4)][rand_a(12)]
+  constexpr uint64_t kVersion7 = 0x7ULL;
+  const uint64_t trace_id_high = (timestamp_ms << 16) | (kVersion7 << 12) | rand_a;
+
+  // Assemble low 64 bits: [variant=2(2)][rand_b(62)]
+  constexpr uint64_t kVariantRfc4122 = 0x2ULL;
+  const uint64_t trace_id_low = (kVariantRfc4122 << 62) | rand_b;
+
+  return absl::StrCat(Hex::uint64ToHex(trace_id_high), Hex::uint64ToHex(trace_id_low));
+}
+
+std::string Tracer::generateTraceId() {
+  switch (trace_id_pattern_) {
+  case OpenTelemetryConfig::UUID_V7:
+    return generateTraceIdV7();
+  case OpenTelemetryConfig::UUID_V4:
+  default:
+    return generateTraceIdV4();
+  }
+}
+
 Tracing::SpanPtr Tracer::startSpan(const std::string& operation_name,
                                    const StreamInfo::StreamInfo& stream_info, SystemTime start_time,
                                    Tracing::Decision tracing_decision,
@@ -279,9 +327,7 @@ Tracing::SpanPtr Tracer::startSpan(const std::string& operation_name,
   // Create an Tracers::OpenTelemetry::Span class that will contain the OTel span.
   auto new_span = std::make_unique<Span>(operation_name, stream_info, start_time, time_source_,
                                          *this, span_kind, use_local_decision);
-  uint64_t trace_id_high = random_.random();
-  uint64_t trace_id = random_.random();
-  new_span->setTraceId(absl::StrCat(Hex::uint64ToHex(trace_id_high), Hex::uint64ToHex(trace_id)));
+  new_span->setTraceId(generateTraceId());
   uint64_t span_id = random_.random();
   new_span->setId(Hex::uint64ToHex(span_id));
   if (sampler_) {

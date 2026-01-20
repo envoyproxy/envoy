@@ -21,8 +21,17 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // Configuration for the OpenTelemetry tracer.
 //  [#extension: envoy.tracers.opentelemetry]
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message OpenTelemetryConfig {
+  // Trace ID generation pattern.
+  enum TraceIdPattern {
+    // Use random 128-bit trace ID (UUID-v4-style, default for backward compatibility).
+    UUID_V4 = 0;
+
+    // Use UUID-v7 format trace ID (RFC 9562) with timestamp prefix for better sortability.
+    UUID_V7 = 1;
+  }
+
   // The upstream gRPC cluster that will receive OTLP traces.
   // Note that the tracer drops traces if the server does not read data fast enough.
   // This field can be left empty to disable reporting traces to the gRPC service.
@@ -64,4 +73,7 @@ message OpenTelemetryConfig {
   // This field specifies the maximum number of spans that can be cached. If not specified, the
   // default is 1024.
   google.protobuf.UInt32Value max_cache_size = 6;
+
+  // Trace ID generation pattern. Defaults to UUID_V4 for backward compatibility.
+  TraceIdPattern trace_id_pattern = 7;
 }

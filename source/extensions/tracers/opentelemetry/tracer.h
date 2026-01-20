@@ -37,10 +37,14 @@ struct OpenTelemetryTracerStats {
  */
 class Tracer : Logger::Loggable<Logger::Id::tracing> {
 public:
+  using OpenTelemetryConfig = envoy::config::trace::v3::OpenTelemetryConfig;
+  using TraceIdPattern = OpenTelemetryConfig::TraceIdPattern;
+
   Tracer(OpenTelemetryTraceExporterPtr exporter, Envoy::TimeSource& time_source,
          Random::RandomGenerator& random, Runtime::Loader& runtime, Event::Dispatcher& dispatcher,
          OpenTelemetryTracerStats tracing_stats, const ResourceConstSharedPtr resource,
-         SamplerSharedPtr sampler, uint64_t max_cache_size);
+         SamplerSharedPtr sampler, uint64_t max_cache_size,
+         TraceIdPattern trace_id_pattern = OpenTelemetryConfig::UUID_V4);
 
   void sendSpan(::opentelemetry::proto::trace::v1::Span& span);
 
@@ -65,6 +69,33 @@ private:
    * Removes all spans from the span buffer and sends them to the collector.
    */
   void flushSpans();
+  /**
+   * Generates a 128-bit random trace ID (UUID-v4-style).
+   *
+   * @return 32-character hex string (128-bit trace ID).
+   */
+  std::string generateTraceIdV4();
+
+  /**
+   * Generates a 128-bit trace ID following UUID-v7 format (RFC 9562).
+   *
+   * UUID-v7 layout (128 bits):
+   *   [0-47]   48-bit Unix timestamp (milliseconds)
+   *   [48-51]  4-bit version (0111 = 7)
+   *   [52-63]  12-bit rand_a
+   *   [64-65]  2-bit variant (10)
+   *   [66-127] 62-bit rand_b
+   *
+   * @return 32-character hex string (128-bit trace ID).
+   */
+  std::string generateTraceIdV7();
+
+  /**
+   * Generates trace ID based on the configured pattern.
+   *
+   * @return 32-character hex string (128-bit trace ID).
+   */
+  std::string generateTraceId();
 
   OpenTelemetryTraceExporterPtr exporter_;
   Envoy::TimeSource& time_source_;
@@ -76,6 +107,7 @@ private:
   const ResourceConstSharedPtr resource_;
   SamplerSharedPtr sampler_;
   uint64_t max_cache_size_;
+  TraceIdPattern trace_id_pattern_;
 };
 
 /**

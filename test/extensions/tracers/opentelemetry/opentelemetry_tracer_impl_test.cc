@@ -244,21 +244,21 @@ resource_spans:
 }
 
 // Verifies span is properly created when the incoming request has no traceparent/tracestate headers
+// Uses default UUID_V4 trace_id_pattern (random 128-bit)
 TEST_F(OpenTelemetryDriverTest, GenerateSpanContextWithoutHeadersTest) {
-  // Set up driver
+  // Set up driver with default UUID_V4 trace_id_pattern
   setupValidDriver();
 
   // Add the OTLP headers to the request headers
   Tracing::TestTraceContextImpl request_headers{
       {":authority", "test.com"}, {":path", "/"}, {":method", "GET"}};
 
-  // Mock the random call for generating trace and span IDs so we can check it later.
+  // Mock the random calls for generating trace_id (high, low) and span_id.
   const uint64_t trace_id_high = 1;
   const uint64_t trace_id_low = 2;
   const uint64_t new_span_id = 3;
   NiceMock<Random::MockRandomGenerator>& mock_random_generator_ =
       context_.server_factory_context_.api_.random_;
-  // The tracer should generate three random numbers for the trace high, trace low, and span id.
   {
     InSequence s;
 
@@ -278,8 +278,60 @@ TEST_F(OpenTelemetryDriverTest, GenerateSpanContextWithoutHeadersTest) {
 
   // Ends in 01 because span should be sampled. See
   // https://w3c.github.io/trace-context/#trace-flags.
+  // trace_id is UUID_V4: trace_id_high(1) + trace_id_low(2) concatenated
   EXPECT_EQ(sampled_entry.has_value(), true);
   EXPECT_EQ(sampled_entry.value(), "00-00000000000000010000000000000002-0000000000000003-01");
+}
+
+// Verifies span context generation with UUID-v7 trace_id_pattern
+TEST_F(OpenTelemetryDriverTest, GenerateSpanContextWithUuidV7Test) {
+  // Setup driver with UUID_V7 trace_id_pattern
+  const std::string yaml_string = R"EOF(
+    grpc_service:
+      envoy_grpc:
+        cluster_name: fake-cluster
+      timeout: 0.250s
+    trace_id_pattern: UUID_V7
+    )EOF";
+  envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
+  TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
+
+  // Override timeSource to use test's SimulatedTimeSystem for deterministic timestamp.
+  ON_CALL(context_.server_factory_context_, timeSource()).WillByDefault(ReturnRef(time_system_));
+  // Fix timestamp for deterministic UUID-v7 trace_id generation.
+  time_system_.setSystemTime(std::chrono::milliseconds(0));
+
+  setup(opentelemetry_config);
+
+  Tracing::TestTraceContextImpl request_headers{
+      {":authority", "test.com"}, {":path", "/"}, {":method", "GET"}};
+
+  const uint64_t rand_a = 1;
+  const uint64_t rand_b = 2;
+  const uint64_t new_span_id = 3;
+  NiceMock<Random::MockRandomGenerator>& mock_random_generator_ =
+      context_.server_factory_context_.api_.random_;
+  {
+    InSequence s;
+    EXPECT_CALL(mock_random_generator_, random()).WillOnce(Return(rand_a));
+    EXPECT_CALL(mock_random_generator_, random()).WillOnce(Return(rand_b));
+    EXPECT_CALL(mock_random_generator_, random()).WillOnce(Return(new_span_id));
+  }
+
+  Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
+                                             operation_name_, {Tracing::Reason::Sampling, true});
+
+  // Remove headers, then inject context into header from the span.
+  request_headers.remove(OpenTelemetryConstants::get().TRACE_PARENT.key());
+  span->injectContext(request_headers, Tracing::UpstreamContext());
+
+  auto sampled_entry = request_headers.get(OpenTelemetryConstants::get().TRACE_PARENT.key());
+
+  // Ends in 01 because span should be sampled. See
+  // https://w3c.github.io/trace-context/#trace-flags.
+  // trace_id is UUID-v7: timestamp(0) + version(7) + rand_a(1) | variant(2) + rand_b(2)
+  EXPECT_EQ(sampled_entry.has_value(), true);
+  EXPECT_EQ(sampled_entry.value(), "00-00000000000070018000000000000002-0000000000000003-01");
 }
 
 // Verifies a span it not created when an invalid traceparent header is received
@@ -602,6 +654,7 @@ TEST_F(OpenTelemetryDriverTest, SpanType) {
 }
 
 // Verifies spans are exported with their attributes
+// Uses default UUID_V4 trace_id_pattern
 TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanWithAttributes) {
   setupValidDriver();
   Tracing::TestTraceContextImpl request_headers{
@@ -660,12 +713,12 @@ resource_spans:
 
   TestUtility::loadFromYaml(fmt::format(request_yaml, envoy_version, timestamp_ns, timestamp_ns),
                             request_proto);
-  std::string generated_int_hex = Hex::uint64ToHex(generated_int);
   auto* expected_span =
       request_proto.mutable_resource_spans(0)->mutable_scope_spans(0)->mutable_spans(0);
-  expected_span->set_trace_id(
-      absl::HexStringToBytes(absl::StrCat(generated_int_hex, generated_int_hex)));
-  expected_span->set_span_id(absl::HexStringToBytes(absl::StrCat(generated_int_hex)));
+  // UUID_V4 trace_id: generated_int(1) concatenated twice
+  std::string generated_int_hex = Hex::uint64ToHex(generated_int);
+  expected_span->set_trace_id(absl::HexStringToBytes(generated_int_hex + generated_int_hex));
+  expected_span->set_span_id(absl::HexStringToBytes(generated_int_hex));
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.min_flush_spans", 5U))
       .Times(1)
@@ -678,6 +731,7 @@ resource_spans:
 }
 
 // Verifies spans are exported with their attributes and status
+// Uses default UUID_V4 trace_id_pattern
 TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanWithAttributesAndStatus) {
   setupValidDriver();
   Tracing::TestTraceContextImpl request_headers{
@@ -742,12 +796,12 @@ resource_spans:
 
   TestUtility::loadFromYaml(fmt::format(request_yaml, envoy_version, timestamp_ns, timestamp_ns),
                             request_proto);
-  std::string generated_int_hex = Hex::uint64ToHex(generated_int);
   auto* expected_span =
       request_proto.mutable_resource_spans(0)->mutable_scope_spans(0)->mutable_spans(0);
-  expected_span->set_trace_id(
-      absl::HexStringToBytes(absl::StrCat(generated_int_hex, generated_int_hex)));
-  expected_span->set_span_id(absl::HexStringToBytes(absl::StrCat(generated_int_hex)));
+  // UUID_V4 trace_id: generated_int(1) concatenated twice
+  std::string generated_int_hex = Hex::uint64ToHex(generated_int);
+  expected_span->set_trace_id(absl::HexStringToBytes(generated_int_hex + generated_int_hex));
+  expected_span->set_span_id(absl::HexStringToBytes(generated_int_hex));
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.min_flush_spans", 5U))
       .Times(1)
@@ -760,6 +814,7 @@ resource_spans:
 }
 
 // Verifies Grpc spans are exported with their attributes and status
+// Uses default UUID_V4 trace_id_pattern
 TEST_F(OpenTelemetryDriverTest, ExportOTLPGRPCSpanWithAttributesAndStatus) {
   setupValidDriver();
   Tracing::TestTraceContextImpl request_headers{
@@ -832,12 +887,12 @@ resource_spans:
 
   TestUtility::loadFromYaml(fmt::format(request_yaml, envoy_version, timestamp_ns, timestamp_ns),
                             request_proto);
-  std::string generated_int_hex = Hex::uint64ToHex(generated_int);
   auto* expected_span =
       request_proto.mutable_resource_spans(0)->mutable_scope_spans(0)->mutable_spans(0);
-  expected_span->set_trace_id(
-      absl::HexStringToBytes(absl::StrCat(generated_int_hex, generated_int_hex)));
-  expected_span->set_span_id(absl::HexStringToBytes(absl::StrCat(generated_int_hex)));
+  // UUID_V4 trace_id: generated_int(1) concatenated twice
+  std::string generated_int_hex = Hex::uint64ToHex(generated_int);
+  expected_span->set_trace_id(absl::HexStringToBytes(generated_int_hex + generated_int_hex));
+  expected_span->set_span_id(absl::HexStringToBytes(generated_int_hex));
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.min_flush_spans", 5U))
       .Times(1)
@@ -933,6 +988,7 @@ TEST_F(OpenTelemetryDriverTest, NoExportWithoutGrpcService) {
 }
 
 // Verifies a custom service name is properly set on exported spans
+// Uses default UUID_V4 trace_id_pattern (service_name is set but trace_id_pattern is not)
 TEST_F(OpenTelemetryDriverTest, ExportSpanWithCustomServiceName) {
   const std::string yaml_string = R"EOF(
     grpc_service:
@@ -986,12 +1042,12 @@ resource_spans:
 
   TestUtility::loadFromYaml(fmt::format(request_yaml, envoy_version, timestamp_ns, timestamp_ns),
                             request_proto);
-  std::string generated_int_hex = Hex::uint64ToHex(generated_int);
   auto* expected_span =
       request_proto.mutable_resource_spans(0)->mutable_scope_spans(0)->mutable_spans(0);
-  expected_span->set_trace_id(
-      absl::HexStringToBytes(absl::StrCat(generated_int_hex, generated_int_hex)));
-  expected_span->set_span_id(absl::HexStringToBytes(absl::StrCat(generated_int_hex)));
+  // UUID_V4 trace_id: generated_int(1) concatenated twice
+  std::string generated_int_hex = Hex::uint64ToHex(generated_int);
+  expected_span->set_trace_id(absl::HexStringToBytes(generated_int_hex + generated_int_hex));
+  expected_span->set_span_id(absl::HexStringToBytes(generated_int_hex));
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.min_flush_spans", 5U))
       .Times(1)
