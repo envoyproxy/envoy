@@ -72,6 +72,7 @@ jq(
         )}
       )
     """,
+    visibility = ["//visibility:public"],
 )
 
 json_data(

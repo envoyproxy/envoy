@@ -95,9 +95,11 @@ categories:
 - envoy.listener_manager_impl
 - envoy.matching.common_inputs
 - envoy.matching.input_matchers
-- envoy.tls.certificate_selectors
 - envoy.tls.certificate_mappers
+- envoy.tls.certificate_selectors
 - envoy.tls.key_providers
+- envoy.tls.upstream_certificate_mappers
+- envoy.tls.upstream_certificate_selectors
 - envoy.upstream_options
 - envoy.quic.client_packet_writer
 - envoy.quic.connection_debug_visitor
