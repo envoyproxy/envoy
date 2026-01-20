@@ -26,7 +26,8 @@ void McpParserConfig::initializeDefaults() {
   // Tools
   addMethodConfig(Methods::TOOLS_CALL, {AttributeExtractionRule("params.name")});
 
-  // Resources
+  // Resources.
+  addMethodConfig(Methods::RESOURCES_LIST, {});
   addMethodConfig(Methods::RESOURCES_READ, {AttributeExtractionRule("params.uri")});
   addMethodConfig(Methods::RESOURCES_SUBSCRIBE, {AttributeExtractionRule("params.uri")});
   addMethodConfig(Methods::RESOURCES_UNSUBSCRIBE, {AttributeExtractionRule("params.uri")});
