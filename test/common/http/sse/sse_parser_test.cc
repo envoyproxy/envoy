@@ -344,25 +344,25 @@ TEST_F(SseParserTest, FindEventEndTrailingCRWithData) {
   EXPECT_EQ(event_end, absl::string_view::npos);
 }
 
-// Test parseFieldLine with empty line
-TEST_F(SseParserTest, ParseFieldLineEmpty) {
-  auto [field_name, field_value] = SseParser::parseFieldLine("");
-  EXPECT_EQ(field_name, "");
-  EXPECT_EQ(field_value, "");
+// Test extractDataField with empty lines to exercise parseFieldLine empty line case
+TEST_F(SseParserTest, ExtractDataFieldWithEmptyLines) {
+  const std::string event = "\ndata: test\n\n";
+  EXPECT_EQ(SseParser::extractDataField(event), "test");
 }
 
-// Test findLineEnd with no line ending and end_stream=true
-TEST_F(SseParserTest, FindLineEndNoEndingEndStream) {
-  const std::string buffer = "data: test without newline";
-  auto [line_end, next_line] = SseParser::findLineEnd(buffer, true);
-  EXPECT_EQ(line_end, buffer.size());
-  EXPECT_EQ(next_line, buffer.size());
-}
-
-// Test extractDataField with no line ending and end_stream behavior
+// Test extractDataField with no line ending (exercises findLineEnd with end_stream=true)
 TEST_F(SseParserTest, ExtractDataFieldNoLineEnding) {
   const std::string event = "data: test";
   EXPECT_EQ(SseParser::extractDataField(event), "test");
+}
+
+// Test findEventEnd with data without newline and end_stream=true
+TEST_F(SseParserTest, FindEventEndNoLineEndingEndStream) {
+  const std::string buffer = "data: test";
+  auto [event_end, next_event] = SseParser::findEventEnd(buffer, true);
+
+  EXPECT_EQ(event_end, absl::string_view::npos);
+  EXPECT_EQ(next_event, absl::string_view::npos);
 }
 
 } // namespace
