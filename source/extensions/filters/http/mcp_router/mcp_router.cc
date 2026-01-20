@@ -755,9 +755,8 @@ std::string McpRouterFilter::aggregateToolsList(const std::vector<BackendRespons
     if (!resp.success) {
       continue;
     }
-    std::string json_body = extractJsonRpcFromResponse(resp);
-    ENVOY_LOG(debug, "Aggregating tools from backend '{}': {}", resp.backend_name, json_body);
-    extractAndPrefixTools(json_body, resp.backend_name, is_multiplexing, all_tools);
+    ENVOY_LOG(debug, "Aggregating tools from backend '{}'", resp.backend_name);
+    extractAndPrefixTools(resp.body, resp.backend_name, is_multiplexing, all_tools);
   }
 
   return absl::StrCat(R"({"jsonrpc":"2.0","id":)", request_id_, R"(,"result":{"tools":[)",
