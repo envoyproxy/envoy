@@ -31,6 +31,7 @@ TEST(ParseMethodStringTest, AllMethods) {
   EXPECT_EQ(parseMethodString("prompts/list"), McpMethod::PromptsList);
   EXPECT_EQ(parseMethodString("prompts/get"), McpMethod::PromptsGet);
   EXPECT_EQ(parseMethodString("completion/complete"), McpMethod::CompletionComplete);
+  EXPECT_EQ(parseMethodString("logging/setLevel"), McpMethod::LoggingSetLevel);
   EXPECT_EQ(parseMethodString("ping"), McpMethod::Ping);
   // Notifications (client -> server only).
   EXPECT_EQ(parseMethodString("notifications/initialized"), McpMethod::NotificationInitialized);

@@ -35,6 +35,7 @@ enum class McpMethod {
   PromptsList,
   PromptsGet,
   CompletionComplete,
+  LoggingSetLevel,
   Ping,
   // Notifications (client -> server, fire-and-forget).
   NotificationInitialized,
@@ -138,6 +139,7 @@ private:
   void handlePromptsList();
   void handlePromptsGet();
   void handleCompletionComplete();
+  void handleLoggingSetLevel();
   void handlePing();
   // Generic handler for client→server notifications (fanout to all backends).
   void handleNotification(absl::string_view notification_name);

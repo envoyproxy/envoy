@@ -51,8 +51,6 @@ void copyRequestHeaders(const Http::RequestHeaderMap& source, Http::RequestHeade
 using McpMethodMap = absl::flat_hash_map<absl::string_view, McpMethod>;
 
 const McpMethodMap& mcpMethodMap() {
-  // TODO(botengyao): Add support for more MCP methods:
-  // - logging/setLevel
   CONSTRUCT_ON_FIRST_USE(
       McpMethodMap,
       {{"initialize", McpMethod::Initialize},
@@ -65,6 +63,7 @@ const McpMethodMap& mcpMethodMap() {
        {"prompts/list", McpMethod::PromptsList},
        {"prompts/get", McpMethod::PromptsGet},
        {"completion/complete", McpMethod::CompletionComplete},
+       {"logging/setLevel", McpMethod::LoggingSetLevel},
        {"ping", McpMethod::Ping},
        // Notifications (client -> server).
        {"notifications/initialized", McpMethod::NotificationInitialized},
@@ -221,6 +220,10 @@ Http::FilterDataStatus McpRouterFilter::decodeData(Buffer::Instance& data, bool 
 
     case McpMethod::CompletionComplete:
       handleCompletionComplete();
+      break;
+
+    case McpMethod::LoggingSetLevel:
+      handleLoggingSetLevel();
       break;
 
     case McpMethod::Ping:
@@ -930,6 +933,32 @@ void McpRouterFilter::handlePromptsGet() {
     } else {
       sendHttpError(500, resp.error.empty() ? "Backend request failed" : resp.error);
     }
+  });
+}
+
+void McpRouterFilter::handleLoggingSetLevel() {
+  // Fan out to all backends and return empty result.
+  // https://modelcontextprotocol.io/specification/2025-06-18/server/utilities/logging
+  ENVOY_LOG(debug, "logging/setLevel: fanout to {} backends", config_->backends().size());
+
+  initializeFanout([this](std::vector<BackendResponse> responses) {
+    // Check if at least one backend succeeded.
+    bool any_success = false;
+    for (const auto& resp : responses) {
+      if (resp.success) {
+        any_success = true;
+        break;
+      }
+    }
+
+    if (!any_success) {
+      sendHttpError(500, "All backends failed to set logging level");
+      return;
+    }
+
+    // Return empty JSON-RPC result.
+    std::string response = fmt::format(R"({{"jsonrpc":"2.0","id":{},"result":{{}}}})", request_id_);
+    sendJsonResponse(response, encoded_session_id_);
   });
 }
 
