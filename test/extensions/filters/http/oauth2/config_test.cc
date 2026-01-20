@@ -141,14 +141,11 @@ config:
   EXPECT_CALL(context, scope());
   EXPECT_CALL(context.server_factory_context_, timeSource());
   EXPECT_CALL(context, initManager()).Times(2);
-  EXPECT_LOG_CONTAINS(
-      "warn", "OAuth2 filter: token_secret is ignored when auth_type is TLS_CLIENT_AUTH", {
-        Http::FilterFactoryCb cb =
-            factory.createFilterFactoryFromProto(*proto_config, "stats", context).value();
-        Http::MockFilterChainFactoryCallbacks filter_callback;
-        EXPECT_CALL(filter_callback, addStreamFilter(_));
-        cb(filter_callback);
-      });
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(*proto_config, "stats", context).value();
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamFilter(_));
+  cb(filter_callback);
 }
 
 TEST(ConfigTest, CreateFilterTlsClientAuthWithoutTokenSecret) {
@@ -266,11 +263,14 @@ config:
   EXPECT_CALL(context, scope());
   EXPECT_CALL(context.server_factory_context_, timeSource());
   EXPECT_CALL(context, initManager()).Times(2);
-  Http::FilterFactoryCb cb =
-      factory.createFilterFactoryFromProto(*proto_config, "stats", context).value();
-  Http::MockFilterChainFactoryCallbacks filter_callback;
-  EXPECT_CALL(filter_callback, addStreamFilter(_));
-  cb(filter_callback);
+  EXPECT_LOG_CONTAINS(
+      "warn", "OAuth2 filter: token_secret is ignored when auth_type is TLS_CLIENT_AUTH", {
+        Http::FilterFactoryCb cb =
+            factory.createFilterFactoryFromProto(*proto_config, "stats", context).value();
+        Http::MockFilterChainFactoryCallbacks filter_callback;
+        EXPECT_CALL(filter_callback, addStreamFilter(_));
+        cb(filter_callback);
+      });
 }
 
 TEST(ConfigTest, MissingTokenSecretNonTlsClientAuth) {
