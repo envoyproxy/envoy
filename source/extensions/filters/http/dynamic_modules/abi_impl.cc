@@ -1717,6 +1717,93 @@ void envoy_dynamic_module_callback_http_child_span_finish(
   delete span;
 }
 
+// ------------------- Cluster/Upstream Information Callbacks -------------------------
+
+bool envoy_dynamic_module_callback_http_get_cluster_name(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result) {
+  if (result == nullptr) {
+    return false;
+  }
+  auto* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  auto* callbacks = filter->callbacks();
+  if (callbacks == nullptr) {
+    return false;
+  }
+  auto cluster_info = callbacks->clusterInfo();
+  if (!cluster_info) {
+    return false;
+  }
+  const std::string& name = cluster_info->name();
+  result->ptr = name.data();
+  result->length = name.size();
+  return true;
+}
+
+bool envoy_dynamic_module_callback_http_get_cluster_host_count(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, uint32_t priority,
+    size_t* total_count, size_t* healthy_count, size_t* degraded_count) {
+  auto* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  auto* callbacks = filter->callbacks();
+  if (callbacks == nullptr) {
+    return false;
+  }
+  auto cluster_info = callbacks->clusterInfo();
+  if (!cluster_info) {
+    return false;
+  }
+  // Access the thread local cluster to get host information via the filter config's cluster
+  // manager.
+  if (!filter->hasConfig()) {
+    return false;
+  }
+  auto* tl_cluster =
+      filter->getFilterConfig().cluster_manager_.getThreadLocalCluster(cluster_info->name());
+  if (tl_cluster == nullptr) {
+    return false;
+  }
+  const auto& priority_set = tl_cluster->prioritySet();
+  if (priority >= priority_set.hostSetsPerPriority().size()) {
+    return false;
+  }
+  const auto& host_set = priority_set.hostSetsPerPriority()[priority];
+  if (host_set == nullptr) {
+    return false;
+  }
+  if (total_count != nullptr) {
+    *total_count = host_set->hosts().size();
+  }
+  if (healthy_count != nullptr) {
+    *healthy_count = host_set->healthyHosts().size();
+  }
+  if (degraded_count != nullptr) {
+    *degraded_count = host_set->degradedHosts().size();
+  }
+  return true;
+}
+
+bool envoy_dynamic_module_callback_http_set_upstream_override_host(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer host, bool strict) {
+  auto* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  if (filter->decoder_callbacks_ == nullptr) {
+    return false;
+  }
+  if (host.ptr == nullptr || host.length == 0) {
+    return false;
+  }
+  absl::string_view host_view(host.ptr, host.length);
+  // Validate that the host is a valid IP address.
+  if (!Http::Utility::parseAuthority(host_view).is_ip_address_) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "override host is not a valid IP address: {}", host_view);
+    return false;
+  }
+  filter->decoder_callbacks_->setUpstreamOverrideHost(
+      std::make_pair(std::string(host_view), strict));
+  return true;
+}
+
 } // extern "C"
 } // namespace HttpFilters
 } // namespace DynamicModules

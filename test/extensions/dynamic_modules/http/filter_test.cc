@@ -1488,6 +1488,57 @@ TEST(DynamicModulesTest, HttpFilterStartHttpStreamInlineResetOnData) {
   dispatcher.clearDeferredDeleteList();
 }
 
+// Test that startHttpStream returns CannotCreateRequest when async_client.start() returns nullptr.
+TEST(DynamicModulesTest, StartHttpStreamCannotCreateRequest) {
+  auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", "c"), false);
+  EXPECT_TRUE(dynamic_module.ok());
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::IsolatedStoreImpl stats_store;
+  auto stats_scope = stats_store.createScope("");
+
+  Upstream::MockClusterManager cluster_manager;
+  auto cluster = std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+
+  EXPECT_CALL(cluster_manager, getThreadLocalCluster(_))
+      .WillRepeatedly(testing::Return(cluster.get()));
+
+  EXPECT_CALL(context, clusterManager()).WillRepeatedly(testing::ReturnRef(cluster_manager));
+
+  auto filter_config_or_status =
+      Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
+          "filter", "", false, std::move(dynamic_module.value()), *stats_scope, context);
+  EXPECT_TRUE(filter_config_or_status.ok());
+
+  NiceMock<Event::MockDispatcher> dispatcher;
+  auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
+                                                          stats_scope->symbolTable(), 0);
+  filter->initializeInModuleFilter();
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  EXPECT_CALL(decoder_callbacks, dispatcher()).WillRepeatedly(testing::ReturnRef(dispatcher));
+  filter->setDecoderFilterCallbacks(decoder_callbacks);
+
+  // Mock AsyncClient to return nullptr when start() is called.
+  EXPECT_CALL(cluster->async_client_, start(_, _))
+      .WillOnce(Invoke([&](Http::AsyncClient::StreamCallbacks&,
+                           const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
+        return nullptr;
+      }));
+
+  uint64_t stream_id = 0;
+  auto headers = std::make_unique<Http::TestRequestHeaderMapImpl>(
+      std::initializer_list<std::pair<std::string, std::string>>{
+          {":method", "GET"}, {":path", "/"}, {":authority", "host"}});
+  auto message = std::make_unique<Http::RequestMessageImpl>(std::move(headers));
+  auto result = filter->startHttpStream(&stream_id, "cluster", std::move(message), false, 1000);
+  EXPECT_EQ(result, envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest);
+
+  // Stream ID should not be set on failure.
+  EXPECT_EQ(stream_id, 0);
+
+  // Clean up.
+  filter->onDestroy();
+}
+
 } // namespace HttpFilters
 } // namespace DynamicModules
 } // namespace Extensions

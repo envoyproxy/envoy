@@ -651,6 +651,17 @@ impl EnvoyHttpFilterConfig for EnvoyHttpFilterConfigImpl {
   }
 }
 
+/// Host count information for a cluster at a specific priority level.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ClusterHostCount {
+  /// Total number of hosts in the cluster at this priority level.
+  pub total: usize,
+  /// Number of healthy hosts in the cluster at this priority level.
+  pub healthy: usize,
+  /// Number of degraded hosts in the cluster at this priority level.
+  pub degraded: usize,
+}
+
 /// The identifier for an EnvoyCounter.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct EnvoyCounterId(usize);
@@ -1429,6 +1440,38 @@ pub trait EnvoyHttpFilter {
   /// The returned child span must be finished by calling [`EnvoyChildSpan::finish`]
   /// when done. Failing to finish the span will result in incomplete trace data.
   fn spawn_child_span<'a>(&'a self, operation_name: &str) -> Option<Box<dyn EnvoyChildSpan + 'a>>;
+
+  // ------------------- Cluster/Upstream Information methods -------------------------
+
+  /// Get the name of the cluster that the current request is routed to.
+  ///
+  /// Returns `None` if no route has been selected yet or if the cluster information
+  /// is not available.
+  ///
+  /// This is useful for making routing decisions or for logging.
+  fn get_cluster_name<'a>(&'a self) -> Option<EnvoyBuffer<'a>>;
+
+  /// Get host counts for the cluster that the current request is routed to.
+  ///
+  /// Returns a tuple of (total_count, healthy_count, degraded_count) for the specified
+  /// priority level. Returns `None` if the cluster is not available or if the priority
+  /// level does not exist.
+  ///
+  /// This is useful for implementing scale-to-zero logic or custom load balancing decisions.
+  fn get_cluster_host_count(&self, priority: u32) -> Option<ClusterHostCount>;
+
+  /// Set the override host to be used by the upstream load balancer.
+  ///
+  /// If the target host exists in the host list of the routed cluster, this host should
+  /// be selected first. This is useful for implementing sticky sessions, host affinity,
+  /// or custom load balancing logic.
+  ///
+  /// * `host` - The host address to override (e.g., "10.0.0.1:8080"). Must be a valid IP address.
+  /// * `strict` - If true, the request will fail if the override host is not available. If false,
+  ///   normal load balancing will be used as a fallback.
+  ///
+  /// Returns `true` if the override was set successfully, `false` if the host address is invalid.
+  fn set_upstream_override_host(&mut self, host: &str, strict: bool) -> bool;
 }
 
 /// Trait representing a tracing span.
@@ -2920,6 +2963,55 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
         filter_ptr: self.raw_ptr,
         finished: false,
       }))
+    }
+  }
+
+  fn get_cluster_name(&self) -> Option<EnvoyBuffer<'_>> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_cluster_name(self.raw_ptr, &mut result as *mut _)
+    };
+    if success && !result.ptr.is_null() {
+      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) })
+    } else {
+      None
+    }
+  }
+
+  fn get_cluster_host_count(&self, priority: u32) -> Option<ClusterHostCount> {
+    let mut total: usize = 0;
+    let mut healthy: usize = 0;
+    let mut degraded: usize = 0;
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_cluster_host_count(
+        self.raw_ptr,
+        priority,
+        &mut total as *mut _,
+        &mut healthy as *mut _,
+        &mut degraded as *mut _,
+      )
+    };
+    if success {
+      Some(ClusterHostCount {
+        total,
+        healthy,
+        degraded,
+      })
+    } else {
+      None
+    }
+  }
+
+  fn set_upstream_override_host(&mut self, host: &str, strict: bool) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_set_upstream_override_host(
+        self.raw_ptr,
+        str_to_module_buffer(host),
+        strict,
+      )
     }
   }
 }

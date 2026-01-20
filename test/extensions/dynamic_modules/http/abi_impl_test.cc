@@ -4,14 +4,20 @@
 #include <memory>
 
 #include "source/extensions/filters/http/dynamic_modules/filter.h"
+#include "source/extensions/filters/http/dynamic_modules/filter_config.h"
 
 #include "test/common/stats/stat_test_utility.h"
+#include "test/extensions/dynamic_modules/util.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/tracing/mocks.h"
+#include "test/mocks/upstream/cluster_manager.h"
+#include "test/mocks/upstream/host_set.h"
+#include "test/mocks/upstream/priority_set.h"
+#include "test/mocks/upstream/thread_local_cluster.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -2138,6 +2144,261 @@ TEST_F(DynamicModuleHttpFilterTest, GetActiveSpanReturnsNullWhenNoCallbacks) {
   // nullptr.
   auto* span = envoy_dynamic_module_callback_http_get_active_span(filter_no_callbacks.get());
   EXPECT_EQ(span, nullptr);
+}
+
+// ----------------------------- Cluster/Upstream Tests -----------------------------
+
+TEST_F(DynamicModuleHttpFilterTest, GetClusterNameNoCallbacks) {
+  // Create a filter without any callbacks set.
+  Stats::SymbolTableImpl symbol_table;
+  auto filter_no_callbacks = std::make_unique<DynamicModuleHttpFilter>(nullptr, symbol_table, 0);
+
+  envoy_dynamic_module_type_envoy_buffer result{nullptr, 0};
+  EXPECT_FALSE(
+      envoy_dynamic_module_callback_http_get_cluster_name(filter_no_callbacks.get(), &result));
+  EXPECT_EQ(result.ptr, nullptr);
+}
+
+TEST_F(DynamicModuleHttpFilterTest, GetClusterNameNoCluster) {
+  // When clusterInfo returns nullptr.
+  EXPECT_CALL(decoder_callbacks_, clusterInfo()).WillOnce(testing::Return(nullptr));
+
+  envoy_dynamic_module_type_envoy_buffer result{nullptr, 0};
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_cluster_name(filter_.get(), &result));
+  EXPECT_EQ(result.ptr, nullptr);
+}
+
+TEST_F(DynamicModuleHttpFilterTest, GetClusterNameSuccess) {
+  std::string cluster_name = "test_cluster";
+  EXPECT_CALL(*decoder_callbacks_.cluster_info_, name()).WillOnce(testing::ReturnRef(cluster_name));
+
+  envoy_dynamic_module_type_envoy_buffer result{nullptr, 0};
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_cluster_name(filter_.get(), &result));
+  EXPECT_NE(result.ptr, nullptr);
+  EXPECT_EQ(result.length, cluster_name.size());
+  EXPECT_EQ(std::string(result.ptr, result.length), cluster_name);
+}
+
+TEST_F(DynamicModuleHttpFilterTest, GetClusterHostCountNoCallbacks) {
+  // Create a filter without any callbacks set.
+  Stats::SymbolTableImpl symbol_table;
+  auto filter_no_callbacks = std::make_unique<DynamicModuleHttpFilter>(nullptr, symbol_table, 0);
+
+  size_t total = 0, healthy = 0, degraded = 0;
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_cluster_host_count(
+      filter_no_callbacks.get(), 0, &total, &healthy, &degraded));
+}
+
+TEST_F(DynamicModuleHttpFilterTest, GetClusterHostCountNoCluster) {
+  // When clusterInfo returns nullptr.
+  EXPECT_CALL(decoder_callbacks_, clusterInfo()).WillOnce(testing::Return(nullptr));
+
+  size_t total = 0, healthy = 0, degraded = 0;
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_cluster_host_count(filter_.get(), 0, &total,
+                                                                         &healthy, &degraded));
+}
+
+TEST_F(DynamicModuleHttpFilterTest, SetUpstreamOverrideHostNoCallbacks) {
+  // Create a filter without any callbacks set.
+  Stats::SymbolTableImpl symbol_table;
+  auto filter_no_callbacks = std::make_unique<DynamicModuleHttpFilter>(nullptr, symbol_table, 0);
+
+  std::string host = "10.0.0.1:8080";
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_set_upstream_override_host(
+      filter_no_callbacks.get(), {host.data(), host.size()}, true));
+}
+
+TEST_F(DynamicModuleHttpFilterTest, SetUpstreamOverrideHostEmptyHost) {
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_set_upstream_override_host(filter_.get(),
+                                                                             {nullptr, 0}, true));
+  EXPECT_FALSE(
+      envoy_dynamic_module_callback_http_set_upstream_override_host(filter_.get(), {"", 0}, true));
+}
+
+TEST_F(DynamicModuleHttpFilterTest, SetUpstreamOverrideHostInvalidHost) {
+  // Test with an invalid host (not an IP address).
+  std::string host = "invalid-host:8080";
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_set_upstream_override_host(
+      filter_.get(), {host.data(), host.size()}, true));
+}
+
+TEST_F(DynamicModuleHttpFilterTest, SetUpstreamOverrideHostSuccess) {
+  std::string host = "10.0.0.1:8080";
+  EXPECT_CALL(decoder_callbacks_, setUpstreamOverrideHost(testing::_))
+      .WillOnce(testing::Invoke([&host](Upstream::LoadBalancerContext::OverrideHost override_host) {
+        EXPECT_EQ(override_host.first, host);
+        EXPECT_TRUE(override_host.second);
+      }));
+
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_set_upstream_override_host(
+      filter_.get(), {host.data(), host.size()}, true));
+}
+
+TEST_F(DynamicModuleHttpFilterTest, SetUpstreamOverrideHostNonStrict) {
+  std::string host = "192.168.1.1:9000";
+  EXPECT_CALL(decoder_callbacks_, setUpstreamOverrideHost(testing::_))
+      .WillOnce(testing::Invoke([&host](Upstream::LoadBalancerContext::OverrideHost override_host) {
+        EXPECT_EQ(override_host.first, host);
+        EXPECT_FALSE(override_host.second);
+      }));
+
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_set_upstream_override_host(
+      filter_.get(), {host.data(), host.size()}, false));
+}
+
+// Test GetClusterHostCount with a properly configured filter and mocked cluster manager.
+// This fixture creates a filter with a real config that has a mocked cluster manager.
+class DynamicModuleHttpFilterWithConfigTest : public testing::Test {
+public:
+  void SetUp() override {
+    // Set up cluster manager mock.
+    EXPECT_CALL(context_, clusterManager()).WillRepeatedly(testing::ReturnRef(cluster_manager_));
+    EXPECT_CALL(cluster_manager_, getThreadLocalCluster(_))
+        .WillRepeatedly(testing::Return(&thread_local_cluster_));
+
+    // Create a real dynamic module and filter config.
+    auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", "c"), false);
+    ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
+
+    auto filter_config_or_status = newDynamicModuleHttpFilterConfig(
+        "test_filter", "", false, std::move(dynamic_module.value()), *stats_scope_, context_);
+    ASSERT_TRUE(filter_config_or_status.ok()) << filter_config_or_status.status().message();
+    filter_config_ = filter_config_or_status.value();
+
+    filter_ = std::make_unique<DynamicModuleHttpFilter>(filter_config_, symbol_table_, 0);
+    filter_->initializeInModuleFilter();
+    filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+    filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+  }
+
+  Stats::SymbolTableImpl symbol_table_;
+  Stats::IsolatedStoreImpl stats_store_;
+  Stats::ScopeSharedPtr stats_scope_{stats_store_.createScope("")};
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
+  Upstream::MockClusterManager cluster_manager_;
+  NiceMock<Upstream::MockThreadLocalCluster> thread_local_cluster_;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
+  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
+  DynamicModuleHttpFilterConfigSharedPtr filter_config_;
+  std::unique_ptr<DynamicModuleHttpFilter> filter_;
+};
+
+TEST_F(DynamicModuleHttpFilterWithConfigTest, GetClusterHostCountNoThreadLocalCluster) {
+  // When getThreadLocalCluster returns nullptr for the specific cluster.
+  std::string cluster_name = "test_cluster";
+  EXPECT_CALL(*decoder_callbacks_.cluster_info_, name()).WillOnce(testing::ReturnRef(cluster_name));
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(absl::string_view{cluster_name}))
+      .WillOnce(testing::Return(nullptr));
+
+  size_t total = 0, healthy = 0, degraded = 0;
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_cluster_host_count(filter_.get(), 0, &total,
+                                                                         &healthy, &degraded));
+}
+
+TEST_F(DynamicModuleHttpFilterWithConfigTest, GetClusterHostCountInvalidPriority) {
+  // When the priority level exceeds the available priority sets.
+  std::string cluster_name = "test_cluster";
+  EXPECT_CALL(*decoder_callbacks_.cluster_info_, name()).WillOnce(testing::ReturnRef(cluster_name));
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(absl::string_view{cluster_name}))
+      .WillOnce(testing::Return(&thread_local_cluster_));
+
+  // Priority 99 should exceed available priorities.
+  size_t total = 0, healthy = 0, degraded = 0;
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_cluster_host_count(filter_.get(), 99, &total,
+                                                                         &healthy, &degraded));
+}
+
+TEST_F(DynamicModuleHttpFilterWithConfigTest, GetClusterHostCountSuccess) {
+  std::string cluster_name = "test_cluster";
+  EXPECT_CALL(*decoder_callbacks_.cluster_info_, name()).WillOnce(testing::ReturnRef(cluster_name));
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(absl::string_view{cluster_name}))
+      .WillOnce(testing::Return(&thread_local_cluster_));
+
+  // Set up hosts in the mock host set.
+  auto* mock_host_set = thread_local_cluster_.cluster_.priority_set_.getMockHostSet(0);
+  // Add 5 hosts total, 3 healthy, 1 degraded.
+  mock_host_set->hosts_.resize(5);
+  mock_host_set->healthy_hosts_.resize(3);
+  mock_host_set->degraded_hosts_.resize(1);
+
+  size_t total = 0, healthy = 0, degraded = 0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_cluster_host_count(filter_.get(), 0, &total,
+                                                                        &healthy, &degraded));
+  EXPECT_EQ(total, 5);
+  EXPECT_EQ(healthy, 3);
+  EXPECT_EQ(degraded, 1);
+}
+
+TEST_F(DynamicModuleHttpFilterWithConfigTest, GetClusterHostCountNullOutputParams) {
+  // Test that null output parameters are handled correctly.
+  std::string cluster_name = "test_cluster";
+  EXPECT_CALL(*decoder_callbacks_.cluster_info_, name())
+      .WillRepeatedly(testing::ReturnRef(cluster_name));
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(absl::string_view{cluster_name}))
+      .WillRepeatedly(testing::Return(&thread_local_cluster_));
+
+  // Set up hosts.
+  auto* mock_host_set = thread_local_cluster_.cluster_.priority_set_.getMockHostSet(0);
+  mock_host_set->hosts_.resize(10);
+  mock_host_set->healthy_hosts_.resize(8);
+  mock_host_set->degraded_hosts_.resize(2);
+
+  // Call with nullptr for some output params - should still succeed.
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_cluster_host_count(filter_.get(), 0, nullptr,
+                                                                        nullptr, nullptr));
+
+  // Call with only total.
+  size_t total = 0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_cluster_host_count(filter_.get(), 0, &total,
+                                                                        nullptr, nullptr));
+  EXPECT_EQ(total, 10);
+}
+
+TEST_F(DynamicModuleHttpFilterWithConfigTest, GetClusterHostCountDifferentPriority) {
+  std::string cluster_name = "test_cluster";
+  EXPECT_CALL(*decoder_callbacks_.cluster_info_, name())
+      .WillRepeatedly(testing::ReturnRef(cluster_name));
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(absl::string_view{cluster_name}))
+      .WillRepeatedly(testing::Return(&thread_local_cluster_));
+
+  // Set up priority 0 with 5 hosts.
+  auto* mock_host_set_0 = thread_local_cluster_.cluster_.priority_set_.getMockHostSet(0);
+  mock_host_set_0->hosts_.resize(5);
+  mock_host_set_0->healthy_hosts_.resize(5);
+  mock_host_set_0->degraded_hosts_.resize(0);
+
+  // Set up priority 1 with 3 hosts.
+  auto* mock_host_set_1 = thread_local_cluster_.cluster_.priority_set_.getMockHostSet(1);
+  mock_host_set_1->hosts_.resize(3);
+  mock_host_set_1->healthy_hosts_.resize(2);
+  mock_host_set_1->degraded_hosts_.resize(1);
+
+  // Check priority 0.
+  size_t total = 0, healthy = 0, degraded = 0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_cluster_host_count(filter_.get(), 0, &total,
+                                                                        &healthy, &degraded));
+  EXPECT_EQ(total, 5);
+  EXPECT_EQ(healthy, 5);
+  EXPECT_EQ(degraded, 0);
+
+  // Check priority 1.
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_cluster_host_count(filter_.get(), 1, &total,
+                                                                        &healthy, &degraded));
+  EXPECT_EQ(total, 3);
+  EXPECT_EQ(healthy, 2);
+  EXPECT_EQ(degraded, 1);
+}
+
+TEST_F(DynamicModuleHttpFilterWithConfigTest, GetClusterNameWithConfig) {
+  // Verify that get_cluster_name also works with the properly configured filter.
+  std::string cluster_name = "my_upstream_cluster";
+  EXPECT_CALL(*decoder_callbacks_.cluster_info_, name()).WillOnce(testing::ReturnRef(cluster_name));
+
+  envoy_dynamic_module_type_envoy_buffer result{nullptr, 0};
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_cluster_name(filter_.get(), &result));
+  EXPECT_NE(result.ptr, nullptr);
+  EXPECT_EQ(result.length, cluster_name.size());
+  EXPECT_EQ(std::string(result.ptr, result.length), cluster_name);
 }
 
 } // namespace HttpFilters

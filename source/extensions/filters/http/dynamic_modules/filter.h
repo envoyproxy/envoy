@@ -216,6 +216,7 @@ public:
    */
   bool sendStreamTrailers(uint64_t stream_id, Http::RequestTrailerMapPtr trailers);
 
+  bool hasConfig() const { return config_ != nullptr; }
   const DynamicModuleHttpFilterConfig& getFilterConfig() const { return *config_; }
   Stats::StatNameDynamicPool& getStatNamePool() { return stat_name_pool_; }
 
