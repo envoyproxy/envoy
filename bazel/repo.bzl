@@ -80,7 +80,7 @@ def _envoy_repo_impl(repository_ctx):
     # we are working around that with this hack as the simplest way to deal
     # with it.
     for target in repository_ctx.attr.deps:
-      repository_ctx.read(target)
+        repository_ctx.read(target)
 
     # parse container information for use in RBE
     json_result = repository_ctx.execute([
@@ -278,8 +278,8 @@ _envoy_repo = repository_rule(
         "envoy_version": attr.label(default = "@envoy//:VERSION.txt"),
         "envoy_api_version": attr.label(default = "@envoy//:API_VERSION.txt"),
         "envoy_ci_config": attr.label(default = "@envoy//:.github/config.yml"),
-	"yq": attr.label(default = "@yq"),
-	"deps": attr.label_list(default = ["@yq_linux_amd64//:yq", "@yq_linux_arm64//:yq"]),
+        "yq": attr.label(default = "@yq"),
+        "deps": attr.label_list(default = ["@yq_linux_amd64//:yq", "@yq_linux_arm64//:yq"]),
     },
     environ = ["BAZEL_LLVM_PATH"],
 )
