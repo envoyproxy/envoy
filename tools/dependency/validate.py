@@ -77,7 +77,7 @@ class DependencyInfo:
 
         Returns:
           Set of dependency identifiers that match use_category.
-        
+
         Raises:
           MissingDependencyMetadataError: If a dependency has no use_category.
         """
