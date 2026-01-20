@@ -1,10 +1,16 @@
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
+
+#include "envoy/config/core/v3/socket_option.pb.h"
 
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
+#include "source/common/network/socket_option_impl.h"
 #include "source/common/router/string_accessor_impl.h"
+#include "source/common/tracing/null_span_impl.h"
+#include "source/common/tracing/tracer_impl.h"
 #include "source/extensions/dynamic_modules/abi.h"
 #include "source/extensions/filters/http/dynamic_modules/filter.h"
 
@@ -1240,6 +1246,144 @@ void envoy_dynamic_module_callback_http_add_custom_flag(
   filter->decoder_callbacks_->streamInfo().addCustomFlag(flag_name_view);
 }
 
+namespace {
+
+envoy::config::core::v3::SocketOption::SocketState
+mapHttpSocketState(envoy_dynamic_module_type_socket_option_state state) {
+  switch (state) {
+  case envoy_dynamic_module_type_socket_option_state_Prebind:
+    return envoy::config::core::v3::SocketOption::STATE_PREBIND;
+  case envoy_dynamic_module_type_socket_option_state_Bound:
+    return envoy::config::core::v3::SocketOption::STATE_BOUND;
+  case envoy_dynamic_module_type_socket_option_state_Listening:
+    return envoy::config::core::v3::SocketOption::STATE_LISTENING;
+  }
+  return envoy::config::core::v3::SocketOption::STATE_PREBIND;
+}
+
+bool validateHttpSocketState(envoy_dynamic_module_type_socket_option_state state) {
+  return state == envoy_dynamic_module_type_socket_option_state_Prebind ||
+         state == envoy_dynamic_module_type_socket_option_state_Bound ||
+         state == envoy_dynamic_module_type_socket_option_state_Listening;
+}
+
+} // namespace
+
+bool envoy_dynamic_module_callback_http_set_socket_option_int(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, int64_t level, int64_t name,
+    envoy_dynamic_module_type_socket_option_state state,
+    envoy_dynamic_module_type_socket_direction direction, int64_t value) {
+  ASSERT(validateHttpSocketState(state));
+  auto* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  if (filter->decoder_callbacks_ == nullptr) {
+    return false;
+  }
+
+  if (direction == envoy_dynamic_module_type_socket_direction_Downstream) {
+    // For downstream, apply directly to the existing connection socket
+    auto connection = filter->decoder_callbacks_->connection();
+    if (!connection.has_value()) {
+      return false;
+    }
+    int int_value = static_cast<int>(value);
+    auto value_span = absl::MakeSpan(reinterpret_cast<uint8_t*>(&int_value), sizeof(int_value));
+    Network::SocketOptionName option_name(static_cast<int>(level), static_cast<int>(name), "");
+    // const_cast is safe here because setSocketOption modifies the underlying socket,
+    // not the Connection object's logical state.
+    if (!const_cast<Network::Connection&>(*connection).setSocketOption(option_name, value_span)) {
+      return false;
+    }
+  } else {
+    // For upstream, add to upstream socket options (applied when connection is established)
+    auto option = std::make_shared<Network::SocketOptionImpl>(
+        mapHttpSocketState(state),
+        Network::SocketOptionName(static_cast<int>(level), static_cast<int>(name), ""),
+        static_cast<int>(value));
+    Network::Socket::OptionsSharedPtr option_list = std::make_shared<Network::Socket::Options>();
+    option_list->push_back(option);
+    filter->decoder_callbacks_->addUpstreamSocketOptions(option_list);
+  }
+
+  filter->storeSocketOptionInt(level, name, state, direction, value);
+  return true;
+}
+
+bool envoy_dynamic_module_callback_http_set_socket_option_bytes(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, int64_t level, int64_t name,
+    envoy_dynamic_module_type_socket_option_state state,
+    envoy_dynamic_module_type_socket_direction direction,
+    envoy_dynamic_module_type_module_buffer value) {
+  ASSERT(validateHttpSocketState(state));
+  if (value.ptr == nullptr) {
+    return false;
+  }
+  auto* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  if (filter->decoder_callbacks_ == nullptr) {
+    return false;
+  }
+
+  absl::string_view value_view(value.ptr, value.length);
+
+  if (direction == envoy_dynamic_module_type_socket_direction_Downstream) {
+    // For downstream, apply directly to the existing connection socket
+    auto connection = filter->decoder_callbacks_->connection();
+    if (!connection.has_value()) {
+      return false;
+    }
+    // Need to copy to a mutable buffer since setSocketOption takes non-const span
+    std::vector<uint8_t> mutable_value(value.ptr, value.ptr + value.length);
+    auto value_span = absl::MakeSpan(mutable_value);
+    Network::SocketOptionName option_name(static_cast<int>(level), static_cast<int>(name), "");
+    // const_cast is safe here because setSocketOption modifies the underlying socket,
+    // not the Connection object's logical state.
+    if (!const_cast<Network::Connection&>(*connection).setSocketOption(option_name, value_span)) {
+      return false;
+    }
+  } else {
+    // For upstream, add to upstream socket options (applied when connection is established)
+    auto option = std::make_shared<Network::SocketOptionImpl>(
+        mapHttpSocketState(state),
+        Network::SocketOptionName(static_cast<int>(level), static_cast<int>(name), ""), value_view);
+    Network::Socket::OptionsSharedPtr option_list = std::make_shared<Network::Socket::Options>();
+    option_list->push_back(option);
+    filter->decoder_callbacks_->addUpstreamSocketOptions(option_list);
+  }
+
+  filter->storeSocketOptionBytes(level, name, state, direction, value_view);
+  return true;
+}
+
+bool envoy_dynamic_module_callback_http_get_socket_option_int(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, int64_t level, int64_t name,
+    envoy_dynamic_module_type_socket_option_state state,
+    envoy_dynamic_module_type_socket_direction direction, int64_t* value_out) {
+  ASSERT(validateHttpSocketState(state));
+  if (value_out == nullptr) {
+    return false;
+  }
+  auto* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  return filter->tryGetSocketOptionInt(level, name, state, direction, *value_out);
+}
+
+bool envoy_dynamic_module_callback_http_get_socket_option_bytes(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, int64_t level, int64_t name,
+    envoy_dynamic_module_type_socket_option_state state,
+    envoy_dynamic_module_type_socket_direction direction,
+    envoy_dynamic_module_type_envoy_buffer* value_out) {
+  ASSERT(validateHttpSocketState(state));
+  if (value_out == nullptr) {
+    return false;
+  }
+  auto* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  absl::string_view value_view;
+  if (!filter->tryGetSocketOptionBytes(level, name, state, direction, value_view)) {
+    return false;
+  }
+  value_out->ptr = value_view.data();
+  value_out->length = value_view.size();
+  return true;
+}
+
 envoy_dynamic_module_type_http_callout_init_result
 envoy_dynamic_module_callback_http_filter_http_callout(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, uint64_t* callout_id,
@@ -1396,6 +1540,268 @@ void envoy_dynamic_module_callback_http_filter_continue_encoding(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr) {
   DynamicModuleHttpFilter* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
   filter->continueEncoding();
+}
+
+uint32_t envoy_dynamic_module_callback_http_filter_get_worker_index(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr) {
+  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  return filter->workerIndex();
+}
+
+// ----------------------------- Tracing callbacks -----------------------------
+
+envoy_dynamic_module_type_span_envoy_ptr envoy_dynamic_module_callback_http_get_active_span(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr) {
+  auto* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  Tracing::Span& span = filter->activeSpan();
+  // Return nullptr if the span is a NullSpan (tracing is not enabled).
+  if (dynamic_cast<Tracing::NullSpan*>(&span) != nullptr) {
+    return nullptr;
+  }
+  return &span;
+}
+
+void envoy_dynamic_module_callback_http_span_set_tag(
+    envoy_dynamic_module_type_span_envoy_ptr span_ptr, envoy_dynamic_module_type_module_buffer key,
+    envoy_dynamic_module_type_module_buffer value) {
+  if (span_ptr == nullptr) {
+    return;
+  }
+  auto* span = static_cast<Tracing::Span*>(span_ptr);
+  absl::string_view key_view(key.ptr, key.length);
+  absl::string_view value_view(value.ptr, value.length);
+  span->setTag(key_view, value_view);
+}
+
+void envoy_dynamic_module_callback_http_span_set_operation(
+    envoy_dynamic_module_type_span_envoy_ptr span_ptr,
+    envoy_dynamic_module_type_module_buffer operation) {
+  if (span_ptr == nullptr) {
+    return;
+  }
+  auto* span = static_cast<Tracing::Span*>(span_ptr);
+  absl::string_view operation_view(operation.ptr, operation.length);
+  span->setOperation(operation_view);
+}
+
+void envoy_dynamic_module_callback_http_span_log(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_span_envoy_ptr span_ptr,
+    envoy_dynamic_module_type_module_buffer event) {
+  if (filter_envoy_ptr == nullptr || span_ptr == nullptr) {
+    return;
+  }
+  auto* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  auto* span = static_cast<Tracing::Span*>(span_ptr);
+  absl::string_view event_view(event.ptr, event.length);
+  auto* cb = filter->callbacks();
+  if (cb != nullptr) {
+    span->log(cb->dispatcher().timeSource().systemTime(), std::string(event_view));
+  }
+}
+
+void envoy_dynamic_module_callback_http_span_set_sampled(
+    envoy_dynamic_module_type_span_envoy_ptr span_ptr, bool sampled) {
+  if (span_ptr == nullptr) {
+    return;
+  }
+  auto* span = static_cast<Tracing::Span*>(span_ptr);
+  span->setSampled(sampled);
+}
+
+// Thread-local storage for temporary strings returned by tracing functions.
+// These strings are valid until the next call to a tracing function on the same thread.
+static thread_local std::string tls_trace_string_storage;
+
+bool envoy_dynamic_module_callback_http_span_get_baggage(
+    envoy_dynamic_module_type_span_envoy_ptr span_ptr, envoy_dynamic_module_type_module_buffer key,
+    envoy_dynamic_module_type_envoy_buffer* result) {
+  if (span_ptr == nullptr || result == nullptr) {
+    return false;
+  }
+  auto* span = static_cast<Tracing::Span*>(span_ptr);
+  absl::string_view key_view(key.ptr, key.length);
+  tls_trace_string_storage = span->getBaggage(key_view);
+  if (tls_trace_string_storage.empty()) {
+    result->ptr = nullptr;
+    result->length = 0;
+    return false;
+  }
+  result->ptr = tls_trace_string_storage.data();
+  result->length = tls_trace_string_storage.size();
+  return true;
+}
+
+void envoy_dynamic_module_callback_http_span_set_baggage(
+    envoy_dynamic_module_type_span_envoy_ptr span_ptr, envoy_dynamic_module_type_module_buffer key,
+    envoy_dynamic_module_type_module_buffer value) {
+  if (span_ptr == nullptr) {
+    return;
+  }
+  auto* span = static_cast<Tracing::Span*>(span_ptr);
+  absl::string_view key_view(key.ptr, key.length);
+  absl::string_view value_view(value.ptr, value.length);
+  span->setBaggage(key_view, value_view);
+}
+
+bool envoy_dynamic_module_callback_http_span_get_trace_id(
+    envoy_dynamic_module_type_span_envoy_ptr span_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result) {
+  if (span_ptr == nullptr || result == nullptr) {
+    return false;
+  }
+  auto* span = static_cast<Tracing::Span*>(span_ptr);
+  tls_trace_string_storage = span->getTraceId();
+  if (tls_trace_string_storage.empty()) {
+    result->ptr = nullptr;
+    result->length = 0;
+    return false;
+  }
+  result->ptr = tls_trace_string_storage.data();
+  result->length = tls_trace_string_storage.size();
+  return true;
+}
+
+bool envoy_dynamic_module_callback_http_span_get_span_id(
+    envoy_dynamic_module_type_span_envoy_ptr span_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result) {
+  if (span_ptr == nullptr || result == nullptr) {
+    return false;
+  }
+  auto* span = static_cast<Tracing::Span*>(span_ptr);
+  tls_trace_string_storage = span->getSpanId();
+  if (tls_trace_string_storage.empty()) {
+    result->ptr = nullptr;
+    result->length = 0;
+    return false;
+  }
+  result->ptr = tls_trace_string_storage.data();
+  result->length = tls_trace_string_storage.size();
+  return true;
+}
+
+envoy_dynamic_module_type_child_span_module_ptr envoy_dynamic_module_callback_http_span_spawn_child(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_span_envoy_ptr span_ptr,
+    envoy_dynamic_module_type_module_buffer operation_name) {
+  if (filter_envoy_ptr == nullptr || span_ptr == nullptr) {
+    return nullptr;
+  }
+  auto* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  auto* parent_span = static_cast<Tracing::Span*>(span_ptr);
+  absl::string_view operation_view(operation_name.ptr, operation_name.length);
+
+  auto* cb = filter->callbacks();
+  if (cb == nullptr) {
+    return nullptr;
+  }
+
+  // Create a child span with default egress tracing config.
+  Tracing::SpanPtr child =
+      parent_span->spawnChild(Tracing::EgressConfig::get(), std::string(operation_view),
+                              cb->dispatcher().timeSource().systemTime());
+  if (child == nullptr) {
+    return nullptr;
+  }
+  // Release ownership to the module - the module is responsible for calling finish.
+  return child.release();
+}
+
+void envoy_dynamic_module_callback_http_child_span_finish(
+    envoy_dynamic_module_type_child_span_module_ptr span_ptr) {
+  if (span_ptr == nullptr) {
+    return;
+  }
+  auto* span = static_cast<Tracing::Span*>(span_ptr);
+  span->finishSpan();
+  delete span;
+}
+
+// ------------------- Cluster/Upstream Information Callbacks -------------------------
+
+bool envoy_dynamic_module_callback_http_get_cluster_name(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result) {
+  if (result == nullptr) {
+    return false;
+  }
+  auto* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  auto* callbacks = filter->callbacks();
+  if (callbacks == nullptr) {
+    return false;
+  }
+  auto cluster_info = callbacks->clusterInfo();
+  if (!cluster_info) {
+    return false;
+  }
+  const std::string& name = cluster_info->name();
+  result->ptr = name.data();
+  result->length = name.size();
+  return true;
+}
+
+bool envoy_dynamic_module_callback_http_get_cluster_host_count(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, uint32_t priority,
+    size_t* total_count, size_t* healthy_count, size_t* degraded_count) {
+  auto* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  auto* callbacks = filter->callbacks();
+  if (callbacks == nullptr) {
+    return false;
+  }
+  auto cluster_info = callbacks->clusterInfo();
+  if (!cluster_info) {
+    return false;
+  }
+  // Access the thread local cluster to get host information via the filter config's cluster
+  // manager.
+  if (!filter->hasConfig()) {
+    return false;
+  }
+  auto* tl_cluster =
+      filter->getFilterConfig().cluster_manager_.getThreadLocalCluster(cluster_info->name());
+  if (tl_cluster == nullptr) {
+    return false;
+  }
+  const auto& priority_set = tl_cluster->prioritySet();
+  if (priority >= priority_set.hostSetsPerPriority().size()) {
+    return false;
+  }
+  const auto& host_set = priority_set.hostSetsPerPriority()[priority];
+  if (host_set == nullptr) {
+    return false;
+  }
+  if (total_count != nullptr) {
+    *total_count = host_set->hosts().size();
+  }
+  if (healthy_count != nullptr) {
+    *healthy_count = host_set->healthyHosts().size();
+  }
+  if (degraded_count != nullptr) {
+    *degraded_count = host_set->degradedHosts().size();
+  }
+  return true;
+}
+
+bool envoy_dynamic_module_callback_http_set_upstream_override_host(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer host, bool strict) {
+  auto* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  if (filter->decoder_callbacks_ == nullptr) {
+    return false;
+  }
+  if (host.ptr == nullptr || host.length == 0) {
+    return false;
+  }
+  absl::string_view host_view(host.ptr, host.length);
+  // Validate that the host is a valid IP address.
+  if (!Http::Utility::parseAuthority(host_view).is_ip_address_) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "override host is not a valid IP address: {}", host_view);
+    return false;
+  }
+  filter->decoder_callbacks_->setUpstreamOverrideHost(
+      std::make_pair(std::string(host_view), strict));
+  return true;
 }
 
 } // extern "C"

@@ -33,7 +33,7 @@ public:
 
 TEST_F(DynamicModuleUdpListenerFilterTest, BasicDataFlow) {
   NiceMock<Network::MockUdpReadFilterCallbacks> callbacks;
-  auto filter = std::make_unique<DynamicModuleUdpListenerFilter>(callbacks, filter_config_);
+  auto filter = std::make_unique<DynamicModuleUdpListenerFilter>(callbacks, filter_config_, 1);
 
   Network::UdpRecvData data;
   data.buffer_ = std::make_unique<Buffer::OwnedImpl>("hello");
@@ -49,7 +49,7 @@ TEST_F(DynamicModuleUdpListenerFilterTest, BasicDataFlow) {
 
 TEST_F(DynamicModuleUdpListenerFilterTest, ReceiveError) {
   NiceMock<Network::MockUdpReadFilterCallbacks> callbacks;
-  auto filter = std::make_unique<DynamicModuleUdpListenerFilter>(callbacks, filter_config_);
+  auto filter = std::make_unique<DynamicModuleUdpListenerFilter>(callbacks, filter_config_, 1);
 
   // Just check it doesn't crash
   EXPECT_EQ(Network::FilterStatus::Continue,
@@ -94,7 +94,7 @@ TEST_F(DynamicModuleUdpListenerFilterTest, NullInModuleFilter) {
       -> envoy_dynamic_module_type_udp_listener_filter_module_ptr { return nullptr; };
   bad_filter_config->on_filter_new_ = null_returner;
 
-  auto filter = std::make_unique<DynamicModuleUdpListenerFilter>(callbacks, bad_filter_config);
+  auto filter = std::make_unique<DynamicModuleUdpListenerFilter>(callbacks, bad_filter_config, 1);
 
   Network::UdpRecvData data;
   data.buffer_ = std::make_unique<Buffer::OwnedImpl>("test");
@@ -106,7 +106,7 @@ TEST_F(DynamicModuleUdpListenerFilterTest, NullInModuleFilter) {
 
 TEST_F(DynamicModuleUdpListenerFilterTest, EmptyBuffer) {
   NiceMock<Network::MockUdpReadFilterCallbacks> callbacks;
-  auto filter = std::make_unique<DynamicModuleUdpListenerFilter>(callbacks, filter_config_);
+  auto filter = std::make_unique<DynamicModuleUdpListenerFilter>(callbacks, filter_config_, 1);
 
   Network::UdpRecvData data;
   data.buffer_ = std::make_unique<Buffer::OwnedImpl>();
@@ -118,7 +118,7 @@ TEST_F(DynamicModuleUdpListenerFilterTest, EmptyBuffer) {
 
 TEST_F(DynamicModuleUdpListenerFilterTest, LargeDataPayload) {
   NiceMock<Network::MockUdpReadFilterCallbacks> callbacks;
-  auto filter = std::make_unique<DynamicModuleUdpListenerFilter>(callbacks, filter_config_);
+  auto filter = std::make_unique<DynamicModuleUdpListenerFilter>(callbacks, filter_config_, 1);
 
   std::string large_data(65000, 'x');
   Network::UdpRecvData data;
@@ -131,7 +131,7 @@ TEST_F(DynamicModuleUdpListenerFilterTest, LargeDataPayload) {
 
 TEST_F(DynamicModuleUdpListenerFilterTest, MultipleReceiveErrors) {
   NiceMock<Network::MockUdpReadFilterCallbacks> callbacks;
-  auto filter = std::make_unique<DynamicModuleUdpListenerFilter>(callbacks, filter_config_);
+  auto filter = std::make_unique<DynamicModuleUdpListenerFilter>(callbacks, filter_config_, 1);
 
   EXPECT_EQ(Network::FilterStatus::Continue,
             filter->onReceiveError(Api::IoError::IoErrorCode::NoSupport));
@@ -173,8 +173,8 @@ TEST_F(DynamicModuleUdpListenerFilterTest, MultipleFiltersShareConfig) {
   NiceMock<Network::MockUdpReadFilterCallbacks> callbacks1;
   NiceMock<Network::MockUdpReadFilterCallbacks> callbacks2;
 
-  auto filter1 = std::make_unique<DynamicModuleUdpListenerFilter>(callbacks1, filter_config_);
-  auto filter2 = std::make_unique<DynamicModuleUdpListenerFilter>(callbacks2, filter_config_);
+  auto filter1 = std::make_unique<DynamicModuleUdpListenerFilter>(callbacks1, filter_config_, 1);
+  auto filter2 = std::make_unique<DynamicModuleUdpListenerFilter>(callbacks2, filter_config_, 1);
 
   Network::UdpRecvData data1;
   data1.buffer_ = std::make_unique<Buffer::OwnedImpl>("data1");
@@ -190,14 +190,14 @@ TEST_F(DynamicModuleUdpListenerFilterTest, MultipleFiltersShareConfig) {
 
 TEST_F(DynamicModuleUdpListenerFilterTest, CallbacksAccessor) {
   NiceMock<Network::MockUdpReadFilterCallbacks> callbacks;
-  auto filter = std::make_unique<DynamicModuleUdpListenerFilter>(callbacks, filter_config_);
+  auto filter = std::make_unique<DynamicModuleUdpListenerFilter>(callbacks, filter_config_, 1);
 
   EXPECT_EQ(&callbacks, filter->callbacks());
 }
 
 TEST_F(DynamicModuleUdpListenerFilterTest, CurrentDataAccessor) {
   NiceMock<Network::MockUdpReadFilterCallbacks> callbacks;
-  auto filter = std::make_unique<DynamicModuleUdpListenerFilter>(callbacks, filter_config_);
+  auto filter = std::make_unique<DynamicModuleUdpListenerFilter>(callbacks, filter_config_, 1);
 
   EXPECT_EQ(nullptr, filter->currentData());
 
@@ -231,7 +231,7 @@ public:
 
 TEST_F(DynamicModuleUdpListenerFilterStopIterationTest, ReturnsStopIteration) {
   NiceMock<Network::MockUdpReadFilterCallbacks> callbacks;
-  auto filter = std::make_unique<DynamicModuleUdpListenerFilter>(callbacks, filter_config_);
+  auto filter = std::make_unique<DynamicModuleUdpListenerFilter>(callbacks, filter_config_, 1);
 
   Network::UdpRecvData data;
   data.buffer_ = std::make_unique<Buffer::OwnedImpl>("test");
@@ -319,7 +319,7 @@ TEST(DynamicModuleUdpListenerFilterConfigErrorTest, MissingFilterDestroy) {
 
 TEST_F(DynamicModuleUdpListenerFilterTest, MetricsCounterDefineAndIncrement) {
   NiceMock<Network::MockUdpReadFilterCallbacks> callbacks;
-  auto filter = std::make_shared<DynamicModuleUdpListenerFilter>(callbacks, filter_config_);
+  auto filter = std::make_shared<DynamicModuleUdpListenerFilter>(callbacks, filter_config_, 1);
 
   // Define a counter via the config.
   size_t counter_id = 0;
@@ -343,7 +343,7 @@ TEST_F(DynamicModuleUdpListenerFilterTest, MetricsCounterDefineAndIncrement) {
 
 TEST_F(DynamicModuleUdpListenerFilterTest, MetricsGaugeDefineAndOperations) {
   NiceMock<Network::MockUdpReadFilterCallbacks> callbacks;
-  auto filter = std::make_shared<DynamicModuleUdpListenerFilter>(callbacks, filter_config_);
+  auto filter = std::make_shared<DynamicModuleUdpListenerFilter>(callbacks, filter_config_, 1);
 
   // Define a gauge.
   size_t gauge_id = 0;
@@ -376,7 +376,7 @@ TEST_F(DynamicModuleUdpListenerFilterTest, MetricsGaugeDefineAndOperations) {
 
 TEST_F(DynamicModuleUdpListenerFilterTest, MetricsHistogramDefineAndRecord) {
   NiceMock<Network::MockUdpReadFilterCallbacks> callbacks;
-  auto filter = std::make_shared<DynamicModuleUdpListenerFilter>(callbacks, filter_config_);
+  auto filter = std::make_shared<DynamicModuleUdpListenerFilter>(callbacks, filter_config_, 1);
 
   // Define a histogram.
   size_t histogram_id = 0;
@@ -393,7 +393,7 @@ TEST_F(DynamicModuleUdpListenerFilterTest, MetricsHistogramDefineAndRecord) {
 
 TEST_F(DynamicModuleUdpListenerFilterTest, MetricsNotFound) {
   NiceMock<Network::MockUdpReadFilterCallbacks> callbacks;
-  auto filter = std::make_shared<DynamicModuleUdpListenerFilter>(callbacks, filter_config_);
+  auto filter = std::make_shared<DynamicModuleUdpListenerFilter>(callbacks, filter_config_, 1);
 
   // Try to increment a counter that doesn't exist.
   auto result = envoy_dynamic_module_callback_udp_listener_filter_increment_counter(

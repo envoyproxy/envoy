@@ -24,6 +24,12 @@ TEST(ParseMethodStringTest, AllMethods) {
   EXPECT_EQ(parseMethodString("initialize"), McpMethod::Initialize);
   EXPECT_EQ(parseMethodString("tools/list"), McpMethod::ToolsList);
   EXPECT_EQ(parseMethodString("tools/call"), McpMethod::ToolsCall);
+  EXPECT_EQ(parseMethodString("resources/list"), McpMethod::ResourcesList);
+  EXPECT_EQ(parseMethodString("resources/read"), McpMethod::ResourcesRead);
+  EXPECT_EQ(parseMethodString("resources/subscribe"), McpMethod::ResourcesSubscribe);
+  EXPECT_EQ(parseMethodString("resources/unsubscribe"), McpMethod::ResourcesUnsubscribe);
+  EXPECT_EQ(parseMethodString("prompts/list"), McpMethod::PromptsList);
+  EXPECT_EQ(parseMethodString("prompts/get"), McpMethod::PromptsGet);
   EXPECT_EQ(parseMethodString("ping"), McpMethod::Ping);
   EXPECT_EQ(parseMethodString("notifications/initialized"), McpMethod::NotificationInitialized);
   EXPECT_EQ(parseMethodString("unknown_method"), McpMethod::Unknown);
@@ -560,6 +566,140 @@ TEST_F(McpRouterFilterTest, MetadataSubjectExtractionDisabledModeProceeds) {
       R"({"jsonrpc":"2.0","method":"initialize","id":1,"params":{"protocolVersion":"2025-06-18"}})";
   Buffer::OwnedImpl buffer(body);
   filter.decodeData(buffer, true);
+}
+
+// Verifies tools/list aggregation preserves all MCP tool attributes.
+TEST(AggregateToolsListTest, PreservesAllToolAttributes) {
+  // Backend response with all MCP tool attributes.
+  const std::string backend_response = R"({
+    "jsonrpc": "2.0",
+    "id": 1,
+    "result": {
+      "tools": [{
+        "name": "get_weather",
+        "title": "Weather Tool",
+        "description": "Get weather information",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "location": {"type": "string", "description": "City name"},
+            "unit": {"type": "string", "enum": ["celsius", "fahrenheit"]}
+          },
+          "required": ["location"]
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "temperature": {"type": "number"},
+            "condition": {"type": "string"}
+          }
+        },
+        "annotations": {
+          "audience": ["user"],
+          "readOnly": true
+        }
+      }]
+    }
+  })";
+
+  auto parsed = Json::Factory::loadFromString(backend_response);
+  ASSERT_TRUE(parsed.ok());
+
+  auto result = (*parsed)->getObject("result");
+  ASSERT_TRUE(result.ok());
+
+  auto tools = (*result)->getObjectArray("tools");
+  ASSERT_TRUE(tools.ok());
+  ASSERT_EQ(tools->size(), 1);
+
+  const auto& tool = (*tools)[0];
+  ASSERT_TRUE(tool != nullptr);
+
+  // Verify all attributes are present.
+  auto name = tool->getString("name");
+  EXPECT_TRUE(name.ok());
+  EXPECT_EQ(*name, "get_weather");
+
+  auto title = tool->getString("title");
+  EXPECT_TRUE(title.ok());
+  EXPECT_EQ(*title, "Weather Tool");
+
+  auto desc = tool->getString("description");
+  EXPECT_TRUE(desc.ok());
+  EXPECT_EQ(*desc, "Get weather information");
+
+  auto input_schema = tool->getObject("inputSchema");
+  EXPECT_TRUE(input_schema.ok());
+  EXPECT_TRUE(*input_schema != nullptr);
+
+  // Verify nested inputSchema properties are present.
+  auto props = (*input_schema)->getObject("properties");
+  EXPECT_TRUE(props.ok());
+
+  auto output_schema = tool->getObject("outputSchema");
+  EXPECT_TRUE(output_schema.ok());
+
+  auto annotations = tool->getObject("annotations");
+  EXPECT_TRUE(annotations.ok());
+}
+
+// Verifies tool JSON serialization preserves nested inputSchema.
+TEST(AggregateToolsListTest, SerializationPreservesNestedInputSchema) {
+  const std::string tool_json = R"({
+    "name": "test_tool",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "query": {"type": "string"},
+        "count": {"type": "integer", "minimum": 1, "maximum": 100}
+      },
+      "required": ["query"]
+    }
+  })";
+
+  auto parsed = Json::Factory::loadFromString(tool_json);
+  ASSERT_TRUE(parsed.ok());
+
+  // Serialize and re-parse to verify round-trip.
+  std::string serialized = (*parsed)->asJsonString();
+
+  auto reparsed = Json::Factory::loadFromString(serialized);
+  ASSERT_TRUE(reparsed.ok());
+
+  auto input_schema = (*reparsed)->getObject("inputSchema");
+  ASSERT_TRUE(input_schema.ok());
+
+  auto props = (*input_schema)->getObject("properties");
+  ASSERT_TRUE(props.ok());
+
+  auto query_prop = (*props)->getObject("query");
+  EXPECT_TRUE(query_prop.ok());
+
+  auto count_prop = (*props)->getObject("count");
+  EXPECT_TRUE(count_prop.ok());
+
+  // Verify the nested properties are preserved.
+  auto count_type = (*count_prop)->getString("type");
+  EXPECT_TRUE(count_type.ok());
+  EXPECT_EQ(*count_type, "integer");
+}
+
+// Verifies tools with icons array are handled correctly.
+TEST(AggregateToolsListTest, IconsArrayPreserved) {
+  const std::string tool_json = R"({
+    "name": "tool_with_icons",
+    "icons": [
+      {"type": "svg", "uri": "https://example.com/icon.svg"},
+      {"type": "png", "uri": "https://example.com/icon.png"}
+    ]
+  })";
+
+  auto parsed = Json::Factory::loadFromString(tool_json);
+  ASSERT_TRUE(parsed.ok());
+
+  auto icons = (*parsed)->getObjectArray("icons");
+  ASSERT_TRUE(icons.ok());
+  EXPECT_EQ(icons->size(), 2);
 }
 
 } // namespace

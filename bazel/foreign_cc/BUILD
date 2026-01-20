@@ -161,7 +161,7 @@ configure_make(
 configure_make(
     name = "unicode_icu_build",
     build_data = ["//bazel/foreign_cc:icu_data_filter.json"],
-    configure_command = "icu4c/source/configure",
+    configure_command = "source/configure",
     configure_options = [
         "--enable-option-checking",
         "--enable-static",

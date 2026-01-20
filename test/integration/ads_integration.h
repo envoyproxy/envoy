@@ -75,6 +75,7 @@ public:
                                                                 const std::string& cluster);
 
   void makeSingleRequest();
+  void makeSingleRequestWithDropOverload();
 
   void initialize() override;
   void initializeAds(const bool rate_limiting);
