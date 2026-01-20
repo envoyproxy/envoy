@@ -7,6 +7,8 @@
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/utility.h"
 
+#include "gmock/gmock.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace AccessLoggers {
@@ -41,6 +43,11 @@ TEST_F(DynamicModuleAccessLogFactoryTest, CreateEmptyConfigProto) {
 
 TEST_F(DynamicModuleAccessLogFactoryTest, ValidConfig) {
   NiceMock<Server::Configuration::MockGenericFactoryContext> context;
+  NiceMock<Server::MockOptions> options;
+  ON_CALL(options, concurrency()).WillByDefault(testing::Return(1));
+  ON_CALL(context.server_context_, options()).WillByDefault(testing::ReturnRef(options));
+  ScopedThreadLocalServerContextSetter setter(context.server_context_);
+
   const std::string yaml = R"EOF(
 dynamic_module_config:
   name: access_log_no_op
@@ -61,6 +68,11 @@ logger_config:
 
 TEST_F(DynamicModuleAccessLogFactoryTest, ValidConfigWithFilter) {
   NiceMock<Server::Configuration::MockGenericFactoryContext> context;
+  NiceMock<Server::MockOptions> options;
+  ON_CALL(options, concurrency()).WillByDefault(testing::Return(1));
+  ON_CALL(context.server_context_, options()).WillByDefault(testing::ReturnRef(options));
+  ScopedThreadLocalServerContextSetter setter(context.server_context_);
+
   const std::string yaml = R"EOF(
 dynamic_module_config:
   name: access_log_no_op

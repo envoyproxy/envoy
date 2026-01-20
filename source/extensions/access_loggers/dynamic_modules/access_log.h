@@ -1,5 +1,7 @@
 #pragma once
 
+#include <sys/types.h>
+
 #include "envoy/access_log/access_log.h"
 
 #include "source/extensions/access_loggers/common/access_log_base.h"
@@ -15,23 +17,21 @@ namespace DynamicModules {
  */
 struct ThreadLocalLogger : public ThreadLocal::ThreadLocalObject {
   ThreadLocalLogger(envoy_dynamic_module_type_access_logger_module_ptr logger,
-                    DynamicModuleAccessLogConfigSharedPtr config);
+                    DynamicModuleAccessLogConfigSharedPtr config, uint32_t worker_index);
   ~ThreadLocalLogger() override;
 
+public:
+  /**
+   * Helper to get the `this` pointer as a void pointer.
+   */
+  void* thisAsVoidPtr() { return static_cast<void*>(this); }
+
+public:
   envoy_dynamic_module_type_access_logger_module_ptr logger_;
   DynamicModuleAccessLogConfigSharedPtr config_;
-};
-
-/**
- * Context class that holds data during a log event, passed to module callbacks.
- */
-class DynamicModuleAccessLogContext {
-public:
-  DynamicModuleAccessLogContext(const Formatter::Context& log_context,
-                                const StreamInfo::StreamInfo& stream_info);
-
-  const Formatter::Context& log_context_;
-  const StreamInfo::StreamInfo& stream_info_;
+  const Formatter::Context* log_context_ = nullptr;
+  const StreamInfo::StreamInfo* stream_info_ = nullptr;
+  uint32_t worker_index_;
 };
 
 /**

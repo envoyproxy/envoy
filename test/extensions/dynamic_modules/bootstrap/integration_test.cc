@@ -62,6 +62,16 @@ TEST_P(DynamicModulesBootstrapIntegrationTest, BasicRust) {
       initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_integration_test"));
 }
 
+// This test verifies that the Rust bootstrap extension can access stats from the stats store.
+TEST_P(DynamicModulesBootstrapIntegrationTest, StatsAccessRust) {
+  EXPECT_LOG_CONTAINS_ALL_OF(
+      Envoy::ExpectedLogMessages({{"info", "Correctly returned None for non-existent counter"},
+                                  {"info", "Correctly returned None for non-existent gauge"},
+                                  {"info", "Correctly returned None for non-existent histogram"},
+                                  {"info", "Bootstrap stats access test completed successfully!"}}),
+      initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_stats_test"));
+}
+
 } // namespace DynamicModules
 } // namespace Bootstrap
 } // namespace Extensions

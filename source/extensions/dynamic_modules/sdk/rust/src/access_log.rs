@@ -207,7 +207,11 @@ pub trait AccessLoggerConfig: Sized + Send + Sync + 'static {
   /// Create a logger instance. Called per-thread for thread-local loggers.
   ///
   /// The `metrics` context is stored and can be used to update metrics during log events.
-  fn create_logger(&self, metrics: MetricsContext) -> Box<dyn AccessLogger>;
+  fn create_logger(
+    &self,
+    metrics: MetricsContext,
+    logger_envoy_ptr: *mut ::std::ffi::c_void,
+  ) -> Box<dyn AccessLogger>;
 }
 
 /// Logger trait that handles individual log events.
@@ -587,6 +591,11 @@ impl LogContext {
       None
     }
   }
+
+  /// Get the index of the current worker thread.
+  pub fn get_worker_index(&self) -> u32 {
+    unsafe { abi::envoy_dynamic_module_callback_access_logger_get_worker_index(self.envoy_ptr) }
+  }
 }
 
 /// Macro to declare access logger entry points.
@@ -699,11 +708,11 @@ macro_rules! declare_access_logger {
     #[no_mangle]
     pub extern "C" fn envoy_dynamic_module_on_access_logger_new(
       config_ptr: *const ::std::ffi::c_void,
-      _logger_envoy_ptr: *mut ::std::ffi::c_void,
+      logger_envoy_ptr: *mut ::std::ffi::c_void,
     ) -> *const ::std::ffi::c_void {
       let wrapper = unsafe { &*(config_ptr as *const AccessLoggerConfigWrapper) };
       let metrics = $crate::access_log::MetricsContext::new(wrapper.config_envoy_ptr);
-      let logger = wrapper.config.create_logger(metrics);
+      let logger = wrapper.config.create_logger(metrics, logger_envoy_ptr);
       Box::into_raw(Box::new(logger)) as *const ::std::ffi::c_void
     }
 
