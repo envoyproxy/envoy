@@ -13,6 +13,7 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/common/logger.h"
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/http/oauth2/filter.h"
 #include "source/extensions/filters/http/oauth2/oauth.h"
@@ -60,6 +61,12 @@ absl::StatusOr<Http::FilterFactoryCb> OAuth2Config::createFilterFactoryFromProto
       return absl::InvalidArgumentError(
           "token_secret is required when auth_type is not TLS_CLIENT_AUTH");
     }
+  }
+  if (auth_type ==
+          envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType_TLS_CLIENT_AUTH &&
+      credentials.has_token_secret()) {
+    ENVOY_LOG_MISC(warn,
+                   "OAuth2 filter: token_secret is ignored when auth_type is TLS_CLIENT_AUTH");
   }
 
   Secret::GenericSecretConfigProviderSharedPtr secret_provider_client_secret = nullptr;
