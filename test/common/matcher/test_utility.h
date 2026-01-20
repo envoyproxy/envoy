@@ -261,7 +261,7 @@ createSingleMatcher(absl::optional<absl::string_view> input,
       .value();
 }
 
-void PrintTo(const FieldMatchResult& result, std::ostream* os) {
+void PrintTo(const MatchResult& result, std::ostream* os) {
   if (result.isInsufficientData()) {
     *os << "InsufficientData";
   } else if (result.isNoMatch()) {

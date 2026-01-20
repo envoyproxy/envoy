@@ -18,7 +18,7 @@ public:
   ActionMatchResult match(const DataType& matching_data,
                     SkippedMatchCb skipped_match_cb = nullptr) override {
     for (const auto& matcher : matchers_) {
-      FieldMatchResult result = matcher.first->match(matching_data);
+      MatchResult result = matcher.first->match(matching_data);
 
       // One of the matchers don't have enough information, bail on evaluating the match.
       if (result.isInsufficientData()) {

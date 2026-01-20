@@ -69,6 +69,34 @@ template <class DataType> using MatchTreePtr = std::unique_ptr<MatchTree<DataTyp
 template <class DataType> using MatchTreeFactoryCb = std::function<MatchTreePtr<DataType>()>;
 
 /**
+ * The result of a match.
+ */
+class MatchResult {
+private:
+  // The match could not be completed, e.g. due to the required data
+  // not being available.
+  struct InsufficientData {};
+  // The match comparison was completed, and there was no match.
+  struct NoMatch {};
+  // The match comparison was completed, and there was a match.
+  struct Matched {};
+  using ResultType = absl::variant<InsufficientData, NoMatch, Matched>;
+  ResultType result_;
+  explicit MatchResult(ResultType r) : result_(r) {}
+
+public:
+  inline bool operator==(const MatchResult& other) const {
+    return result_.index() == other.result_.index();
+  }
+  static MatchResult insufficientData() { return MatchResult{InsufficientData{}}; }
+  static MatchResult matched() { return MatchResult{Matched{}}; }
+  static MatchResult noMatch() { return MatchResult{NoMatch{}}; }
+  bool isInsufficientData() const { return absl::holds_alternative<InsufficientData>(result_); }
+  bool isMatched() const { return absl::holds_alternative<Matched>(result_); }
+  bool isNoMatch() const { return absl::holds_alternative<NoMatch>(result_); }
+};
+
+/**
  * Action provides the interface for actions to perform when a match occurs. It provides no
  * functions, as implementors are expected to downcast this to a more specific action.
  */
