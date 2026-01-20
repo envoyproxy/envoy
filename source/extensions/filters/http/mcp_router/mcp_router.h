@@ -99,9 +99,8 @@ public:
    * @param streaming_enabled If true, enables SSE streaming pass-through mode.
    */
   BackendStreamCallbacks(const std::string& backend_name,
-                         std::function<void(BackendResponse)> on_complete,
-                         int64_t request_id = 0, bool aggregate_mode = false,
-                         std::weak_ptr<McpRouterFilter> parent = {},
+                         std::function<void(BackendResponse)> on_complete, int64_t request_id = 0,
+                         bool aggregate_mode = false, std::weak_ptr<McpRouterFilter> parent = {},
                          bool streaming_enabled = false);
 
   // AsyncClient::StreamCallbacks
@@ -119,11 +118,11 @@ private:
   std::function<void(BackendResponse)> on_complete_;
   int64_t request_id_{0};
   bool aggregate_mode_{false};
-  std::weak_ptr<McpRouterFilter> parent_;        // Safe handle to parent for streaming
-  bool streaming_enabled_{false};                // Enable streaming pass-through
-  bool streaming_started_{false};                // Track if streaming headers sent
-  size_t parse_offset_{0};  // Track SSE parse position for incremental parsing
-  bool found_response_{false};  // Cache result to avoid re-parsing
+  std::weak_ptr<McpRouterFilter> parent_; // Safe handle to parent for streaming
+  bool streaming_enabled_{false};         // Enable streaming pass-through
+  bool streaming_started_{false};         // Track if streaming headers sent
+  size_t parse_offset_{0};                // Track SSE parse position for incremental parsing
+  bool found_response_{false};            // Cache result to avoid re-parsing
   BackendResponse response_;
   bool completed_{false};
 };
@@ -193,7 +192,7 @@ private:
   // Initialize single backend connection.
   void initializeSingleBackend(const McpBackendConfig& backend,
                                std::function<void(BackendResponse)> callback);
-  
+
   // Initialize single backend connection with optional streaming mode for SSE.
   void initializeSingleBackend(const McpBackendConfig& backend,
                                std::function<void(BackendResponse)> callback,

@@ -972,108 +972,102 @@ std::string McpRouterFilter::aggregateInitialize(const std::vector<BackendRespon
       R"("instructions":"MCP gateway aggregating multiple backend servers.")", R"(}})");
 }
 
-std::string McpRouterFilter::aggregateToolsList(const std::vector<BackendResponse>& responses) {
-  const bool is_multiplexing = config_->isMultiplexing();
+namespace {
 
-  // Build tools array as a vector of JSON strings.
-  std::vector<std::string> tool_jsons;
-
-  for (const auto& resp : responses) {
-    if (!resp.success) {
-      ENVOY_LOG(debug, "Skipping failed backend '{}' in tools/list aggregation", resp.backend_name);
-      continue;
-    }
-
-    // Extract JSON-RPC body (handles both JSON and SSE responses).
-    std::string json_body = extractJsonRpcFromResponse(resp);
-    if (json_body.empty()) {
-      ENVOY_LOG(warn, "Empty response body from backend '{}'", resp.backend_name);
-      continue;
-    }
-
-    ENVOY_LOG(debug, "Aggregating tools list from backend '{}' (content_type={})",
-              resp.backend_name, static_cast<int>(resp.content_type));
-
-    auto parsed_or = Json::Factory::loadFromString(json_body);
-    if (!parsed_or.ok()) {
-      ENVOY_LOG(warn, "Failed to parse JSON from backend '{}': {}", resp.backend_name,
-                parsed_or.status().message());
-      continue;
-    }
-
-    Json::ObjectSharedPtr parsed_body = *parsed_or;
-
-    auto result_or = parsed_body->getObject("result");
-    if (!result_or.ok() || !(*result_or)) {
-      ENVOY_LOG(warn, "No 'result' object in response from backend '{}'", resp.backend_name);
-      continue;
-    }
-
-    auto tools_or = (*result_or)->getObjectArray("tools");
-    if (!tools_or.ok()) {
-      ENVOY_LOG(warn, "No 'tools' array in result from backend '{}'", resp.backend_name);
-      continue;
-    }
-
-    for (const auto& tool : *tools_or) {
-      if (!tool || !tool->isObject()) {
-        continue;
-      }
-
-      auto name_or = tool->getString("name");
-      if (!name_or.ok()) {
-        continue;
-      }
-
-      // Build each tool as a JSON object string.
-      std::string tool_json;
-      Json::StringStreamer tool_streamer(tool_json);
-      {
-        auto tool_map = tool_streamer.makeRootMap();
-
-        // Name (with optional prefix).
-        tool_map->addKey("name");
-        tool_map->addString(is_multiplexing
-                                ? absl::StrCat(resp.backend_name, kNameDelimiter, *name_or)
-                                : *name_or);
-
-        // Title (if present).
-        auto title_or = tool->getString("title", "");
-        if (title_or.ok() && !title_or->empty()) {
-          tool_map->addKey("title");
-          tool_map->addString(*title_or);
-        }
-
-        // Description (if present).
-        auto desc_or = tool->getString("description", "");
-        if (desc_or.ok() && !desc_or->empty()) {
-          tool_map->addKey("description");
-          tool_map->addString(*desc_or);
-        }
-
-        // InputSchema will be appended as raw JSON after the streamer scope closes.
-      }
-
-      // Append inputSchema as raw JSON if present.
-      auto input_schema_or = tool->getObject("inputSchema");
-      if (input_schema_or.ok() && *input_schema_or) {
-        // Remove trailing '}' from tool_json, add inputSchema, then close.
-        if (!tool_json.empty() && tool_json.back() == '}') {
-          tool_json.pop_back();
-          tool_json += ",\"inputSchema\":";
-          tool_json += (*input_schema_or)->asJsonString();
-          tool_json += "}";
-        }
-      }
-
-      tool_jsons.push_back(std::move(tool_json));
-    }
+// Extracts tools from JSON-RPC response, prefixing names if multiplexing.
+// Uses Json::StringStreamer for type-safe JSON construction.
+void extractAndPrefixTools(const std::string& body, absl::string_view backend_name,
+                           bool is_multiplexing, std::vector<std::string>& out) {
+  const auto parsed = Json::Factory::loadFromString(body);
+  if (!parsed.ok()) {
+    return;
+  }
+  const auto result = (*parsed)->getObject("result");
+  if (!result.ok() || !*result) {
+    return;
+  }
+  const auto tools = (*result)->getObjectArray("tools");
+  if (!tools.ok()) {
+    return;
   }
 
-  // Build the final response.
-  std::string tools_array = absl::StrJoin(tool_jsons, ",");
-  return absl::StrCat(R"({"jsonrpc":"2.0","id":)", request_id_,
-                      R"(,"result":{"tools":[)", tools_array, "]}}");
+  for (const auto& tool : *tools) {
+    if (!tool || !tool->isObject()) {
+      continue;
+    }
+    const auto name = tool->getString("name");
+    if (!name.ok()) {
+      continue;
+    }
+
+    if (!is_multiplexing) {
+      // No prefixing needed - use original JSON.
+      out.push_back(tool->asJsonString());
+      continue;
+    }
+
+    // Reconstruct JSON with prefixed name using Json::StringStreamer.
+    std::string json;
+    Json::StringStreamer streamer(json);
+    {
+      auto map = streamer.makeRootMap();
+
+      // name - prefix with backend name
+      map->addKey("name");
+      map->addString(absl::StrCat(backend_name, kNameDelimiter, *name));
+
+      // description
+      const auto desc = tool->getString("description");
+      if (desc.ok()) {
+        map->addKey("description");
+        map->addString(*desc);
+      }
+
+      // inputSchema
+      const auto schema = tool->getObject("inputSchema");
+      if (schema.ok() && *schema) {
+        map->addKey("inputSchema");
+        map->addRawJson((*schema)->asJsonString());
+      }
+
+      // annotations
+      const auto annotations = tool->getObject("annotations");
+      if (annotations.ok() && *annotations) {
+        map->addKey("annotations");
+        map->addRawJson((*annotations)->asJsonString());
+      }
+
+      // icons
+      const auto icons = tool->getObjectArray("icons");
+      if (icons.ok() && !icons->empty()) {
+        map->addKey("icons");
+        auto icons_array = map->addArray();
+        for (const auto& icon : *icons) {
+          icons_array->addRawJson(icon->asJsonString());
+        }
+      }
+    }
+
+    out.push_back(std::move(json));
+  }
+}
+
+} // namespace
+
+std::string McpRouterFilter::aggregateToolsList(const std::vector<BackendResponse>& responses) {
+  std::vector<std::string> all_tools;
+  const bool is_multiplexing = config_->isMultiplexing();
+  for (const auto& resp : responses) {
+    if (!resp.success) {
+      continue;
+    }
+    std::string json_body = extractJsonRpcFromResponse(resp);
+    ENVOY_LOG(debug, "Aggregating tools from backend '{}': {}", resp.backend_name, json_body);
+    extractAndPrefixTools(json_body, resp.backend_name, is_multiplexing, all_tools);
+  }
+
+  return absl::StrCat(R"({"jsonrpc":"2.0","id":)", request_id_, R"(,"result":{"tools":[)",
+                      absl::StrJoin(all_tools, ","), "]}}");
 }
 
 Http::RequestHeaderMapPtr
