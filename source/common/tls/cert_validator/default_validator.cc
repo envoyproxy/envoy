@@ -1,5 +1,8 @@
 #include "source/common/tls/cert_validator/default_validator.h"
 
+#include <fmt/format.h>
+#include <fmt/ranges.h>
+
 #include <algorithm>
 #include <array>
 #include <climits>
@@ -8,9 +11,6 @@
 #include <functional>
 #include <string>
 #include <vector>
-
-#include <fmt/format.h>
-#include <fmt/ranges.h>  
 
 #include "envoy/network/transport_socket.h"
 #include "envoy/ssl/context.h"
@@ -256,11 +256,10 @@ DefaultCertValidator::verifyCertificate(X509* cert, const std::vector<std::strin
                                         std::string* error_details, uint8_t* out_alert) {
   Envoy::Ssl::ClientValidationStatus validated = Envoy::Ssl::ClientValidationStatus::NotValidated;
   if (!verify_san_list.empty()) {
-    if (!verifySubjectAltName(cert, verify_san_list)) {   
-      const std::string error_msg = fmt::format(
-        "verify cert failed: verify SAN list, SAN List is [{}]",
-        fmt::join(verify_san_list, ", ")
-      );
+    if (!verifySubjectAltName(cert, verify_san_list)) {
+      const std::string error_msg =
+          fmt::format("verify cert failed: verify SAN list, SAN List is [{}]",
+                      fmt::join(verify_san_list, ", "));
 
       if (error_details != nullptr) {
         *error_details = error_msg.c_str();
