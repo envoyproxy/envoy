@@ -1,5 +1,6 @@
 #pragma once
 
+#include "source/common/tracing/null_span_impl.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 #include "source/extensions/filters/http/dynamic_modules/filter_config.h"
@@ -156,6 +157,18 @@ public:
   }
 
   /**
+   * Helper to get the active tracing span for this stream.
+   * Returns a reference to a NullSpan if tracing is not enabled.
+   */
+  Tracing::Span& activeSpan() {
+    auto cb = callbacks();
+    if (cb) {
+      return cb->activeSpan();
+    }
+    return Tracing::NullSpan::instance();
+  }
+
+  /**
    * This is called when an event is scheduled via DynamicModuleHttpFilterScheduler::commit.
    */
   void onScheduled(uint64_t event_id);
@@ -203,6 +216,7 @@ public:
    */
   bool sendStreamTrailers(uint64_t stream_id, Http::RequestTrailerMapPtr trailers);
 
+  bool hasConfig() const { return config_ != nullptr; }
   const DynamicModuleHttpFilterConfig& getFilterConfig() const { return *config_; }
   Stats::StatNameDynamicPool& getStatNamePool() { return stat_name_pool_; }
 

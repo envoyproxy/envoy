@@ -2017,6 +2017,210 @@ bool envoy_dynamic_module_callback_http_get_socket_option_bytes(
     envoy_dynamic_module_type_socket_direction direction,
     envoy_dynamic_module_type_envoy_buffer* value_out);
 
+// ----------------------------- Tracing callbacks -----------------------------
+
+/**
+ * envoy_dynamic_module_type_span_envoy_ptr is a raw pointer to the active Tracing::Span in Envoy.
+ * This is the span associated with the current HTTP stream.
+ *
+ * OWNERSHIP: Envoy owns the pointer. The span is valid for the lifetime of the HTTP stream.
+ * Modules must not call finish on the active span as Envoy manages its lifecycle.
+ */
+typedef void* envoy_dynamic_module_type_span_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_child_span_module_ptr is a pointer to a child span created by the
+ * module via envoy_dynamic_module_callback_http_span_spawn_child. Child spans are owned by the
+ * module and must be finished by calling envoy_dynamic_module_callback_http_child_span_finish.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime. The span must be finished
+ * by calling envoy_dynamic_module_callback_http_child_span_finish when done.
+ */
+typedef void* envoy_dynamic_module_type_child_span_module_ptr;
+
+/**
+ * envoy_dynamic_module_callback_http_get_active_span retrieves the active tracing span for the
+ * current HTTP stream. This span can be used to add tags, logs, or spawn child spans.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
+ * @return the pointer to the active span. Returns nullptr if tracing is not enabled
+ *         or no span is available for this stream.
+ */
+envoy_dynamic_module_type_span_envoy_ptr envoy_dynamic_module_callback_http_get_active_span(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_http_span_set_tag sets a tag on the given span.
+ * Tags are key-value pairs that provide metadata about the span.
+ *
+ * @param span is the pointer to the span (either active span or child span).
+ * @param key is the tag key.
+ * @param value is the tag value.
+ */
+void envoy_dynamic_module_callback_http_span_set_tag(envoy_dynamic_module_type_span_envoy_ptr span,
+                                                     envoy_dynamic_module_type_module_buffer key,
+                                                     envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_http_span_set_operation sets the operation name on the given span.
+ *
+ * @param span is the pointer to the span (either active span or child span).
+ * @param operation is the operation name to set.
+ */
+void envoy_dynamic_module_callback_http_span_set_operation(
+    envoy_dynamic_module_type_span_envoy_ptr span,
+    envoy_dynamic_module_type_module_buffer operation);
+
+/**
+ * envoy_dynamic_module_callback_http_span_log records an event on the given span.
+ * The event is recorded with the current timestamp from the filter's dispatcher.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
+ * @param span is the pointer to the span (either active span or child span).
+ * @param event is the event message to log.
+ */
+void envoy_dynamic_module_callback_http_span_log(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_span_envoy_ptr span, envoy_dynamic_module_type_module_buffer event);
+
+/**
+ * envoy_dynamic_module_callback_http_span_set_sampled overrides the sampling decision for the span.
+ * If sampled is false, this span and any subsequent child spans will not be reported
+ * to the tracing system.
+ *
+ * @param span is the pointer to the span (either active span or child span).
+ * @param sampled is true if the span should be sampled, false otherwise.
+ */
+void envoy_dynamic_module_callback_http_span_set_sampled(
+    envoy_dynamic_module_type_span_envoy_ptr span, bool sampled);
+
+/**
+ * envoy_dynamic_module_callback_http_span_get_baggage retrieves a baggage value from the span.
+ * Baggage data may have been set by this span or any parent spans.
+ *
+ * @param span is the pointer to the span (either active span or child span).
+ * @param key is the baggage key to retrieve.
+ * @param result is the pointer to store the baggage value. The buffer uses thread-local storage
+ *        and is valid until the next tracing callback on the same thread. The module should copy
+ *        the value if it needs to persist beyond immediate use.
+ * @return true if the baggage key was found, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_span_get_baggage(
+    envoy_dynamic_module_type_span_envoy_ptr span, envoy_dynamic_module_type_module_buffer key,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_http_span_set_baggage sets a baggage value on the span.
+ * All subsequent child spans will have access to this baggage.
+ *
+ * @param span is the pointer to the span (either active span or child span).
+ * @param key is the baggage key.
+ * @param value is the baggage value.
+ */
+void envoy_dynamic_module_callback_http_span_set_baggage(
+    envoy_dynamic_module_type_span_envoy_ptr span, envoy_dynamic_module_type_module_buffer key,
+    envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_http_span_get_trace_id retrieves the trace ID from the span.
+ * The trace ID may be generated for this span, propagated by parent spans, or not yet created.
+ *
+ * @param span is the pointer to the span (either active span or child span).
+ * @param result is the pointer to store the trace ID. The buffer uses thread-local storage
+ *        and is valid until the next tracing callback on the same thread. The module should copy
+ *        the value if it needs to persist beyond immediate use.
+ * @return true if the trace ID was retrieved successfully, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_span_get_trace_id(
+    envoy_dynamic_module_type_span_envoy_ptr span, envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_http_span_get_span_id retrieves the span ID from the span.
+ *
+ * @param span is the pointer to the span (either active span or child span).
+ * @param result is the pointer to store the span ID. The buffer uses thread-local storage
+ *        and is valid until the next tracing callback on the same thread. The module should copy
+ *        the value if it needs to persist beyond immediate use.
+ * @return true if the span ID was retrieved successfully, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_span_get_span_id(
+    envoy_dynamic_module_type_span_envoy_ptr span, envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_http_span_spawn_child creates a child span with the given
+ * operation name. The child span is owned by the module and must be finished by calling
+ * envoy_dynamic_module_callback_http_child_span_finish.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
+ * @param span is the pointer to the parent span (either active span or another child span).
+ * @param operation_name is the operation name for the child span.
+ * @return the pointer to the child span. Returns nullptr if the span could not be created.
+ */
+envoy_dynamic_module_type_child_span_module_ptr envoy_dynamic_module_callback_http_span_spawn_child(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_span_envoy_ptr span,
+    envoy_dynamic_module_type_module_buffer operation_name);
+
+/**
+ * envoy_dynamic_module_callback_http_child_span_finish finishes and releases a child span.
+ * After calling this function, the span pointer becomes invalid and must not be used.
+ *
+ * @param span is the pointer to the child span to finish.
+ */
+void envoy_dynamic_module_callback_http_child_span_finish(
+    envoy_dynamic_module_type_child_span_module_ptr span);
+
+// ------------------- Cluster/Upstream Information Callbacks -------------------------
+
+/**
+ * envoy_dynamic_module_callback_http_get_cluster_name retrieves the name of the cluster that the
+ * current request is routed to. This is useful for making routing decisions or for logging.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
+ * @param result is the pointer to store the cluster name. The buffer is owned by Envoy and is
+ * valid until the end of the current event hook or until the route changes.
+ * @return true if the cluster name was retrieved successfully, false otherwise (e.g., no route
+ * selected yet).
+ */
+bool envoy_dynamic_module_callback_http_get_cluster_name(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_http_get_cluster_host_count retrieves the host counts for the
+ * cluster that the current request is routed to. This provides visibility into the cluster's
+ * health state and can be used to implement scale-to-zero logic or custom load balancing decisions.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
+ * @param priority is the priority level to query (0 for default priority).
+ * @param total_count is the pointer to store the total number of hosts. Can be null if not needed.
+ * @param healthy_count is the pointer to store the number of healthy hosts. Can be null if not
+ * needed.
+ * @param degraded_count is the pointer to store the number of degraded hosts. Can be null if not
+ * needed.
+ * @return true if the counts were retrieved successfully, false otherwise (e.g., no cluster
+ * available).
+ */
+bool envoy_dynamic_module_callback_http_get_cluster_host_count(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, uint32_t priority,
+    size_t* total_count, size_t* healthy_count, size_t* degraded_count);
+
+/**
+ * envoy_dynamic_module_callback_http_set_upstream_override_host sets the override host to be used
+ * by the upstream load balancer. If the target host exists in the host list of the routed cluster,
+ * this host should be selected first. This is useful for implementing sticky sessions, host
+ * affinity, or custom load balancing logic.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
+ * @param host is the host address to override (e.g., "10.0.0.1:8080"). Must be a valid IP address.
+ * @param strict if true, the request will fail if the override host is not available. If false,
+ * normal load balancing will be used as a fallback.
+ * @return true if the override host was set successfully, false if the host address is invalid.
+ */
+bool envoy_dynamic_module_callback_http_set_upstream_override_host(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer host, bool strict);
+
 // =============================================================================
 // ============================= Network Filter ================================
 // =============================================================================

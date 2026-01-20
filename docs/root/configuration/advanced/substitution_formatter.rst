@@ -561,9 +561,20 @@ Current supported substitution commands include:
   Local address of the upstream connection. If the address is an IP address, it includes both
   address and port.
 
-``%UPSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%``
+``%UPSTREAM_LOCAL_ADDRESS_WITHOUT_PORT(MASK_PREFIX_LEN)%``
   Local address of the upstream connection, without any port component.
   IP addresses are the only address type with a port component.
+
+  - If ``MASK_PREFIX_LEN`` is specified, the IP address is masked to that many bits and returned in CIDR notation.
+  - If ``MASK_PREFIX_LEN`` is omitted, the unmasked address is returned (without port).
+  - For IPv4, ``MASK_PREFIX_LEN`` must be between 0-32.
+  - For IPv6, ``MASK_PREFIX_LEN`` must be between 0-128.
+
+  Examples:
+
+  - ``%UPSTREAM_LOCAL_ADDRESS_WITHOUT_PORT(16)%`` returns ``10.1.0.0/16`` for source IP ``10.1.10.23``
+  - ``%UPSTREAM_LOCAL_ADDRESS_WITHOUT_PORT(64)%`` returns ``2001:db8:1234:5678::/64`` for source IP ``2001:db8:1234:5678:9abc:def0:1234:5678``
+  - ``%UPSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%`` returns ``10.1.10.23`` for source IP ``10.1.10.23``
 
 ``%UPSTREAM_LOCAL_PORT%``
   Local port of the upstream connection.
@@ -576,9 +587,20 @@ Current supported substitution commands include:
   address and port. Identical to the :ref:`UPSTREAM_HOST <config_access_log_format_upstream_host>` value if the upstream
   host only has one address and connection is established successfully.
 
-``%UPSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%``
+``%UPSTREAM_REMOTE_ADDRESS_WITHOUT_PORT(MASK_PREFIX_LEN)%``
   Remote address of the upstream connection, without any port component.
   IP addresses are the only address type with a port component.
+
+  - If ``MASK_PREFIX_LEN`` is specified, the IP address is masked to that many bits and returned in CIDR notation.
+  - If ``MASK_PREFIX_LEN`` is omitted, the unmasked address is returned (without port).
+  - For IPv4, ``MASK_PREFIX_LEN`` must be between 0-32.
+  - For IPv6, ``MASK_PREFIX_LEN`` must be between 0-128.
+
+  Examples:
+
+  - ``%UPSTREAM_REMOTE_ADDRESS_WITHOUT_PORT(16)%`` returns ``10.1.0.0/16`` for upstream IP ``10.1.10.23``
+  - ``%UPSTREAM_REMOTE_ADDRESS_WITHOUT_PORT(64)%`` returns ``2001:db8:1234:5678::/64`` for upstream IP ``2001:db8:1234:5678:9abc:def0:1234:5678``
+  - ``%UPSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%`` returns ``10.1.10.23`` for upstream IP ``10.1.10.23``
 
 ``%UPSTREAM_REMOTE_PORT%``
   Remote port of the upstream connection.
@@ -624,9 +646,20 @@ Current supported substitution commands include:
     :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>` or :ref:`x-forwarded-for
     <config_http_conn_man_headers_x-forwarded-for>`.
 
-``%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%``
+``%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT(MASK_PREFIX_LEN)%``
   Remote address of the downstream connection, without any port component.
   IP addresses are the only address type with a port component.
+
+  - If ``MASK_PREFIX_LEN`` is specified, the IP address is masked to that many bits and returned in CIDR notation.
+  - If ``MASK_PREFIX_LEN`` is omitted, the unmasked address is returned (without port).
+  - For IPv4, ``MASK_PREFIX_LEN`` must be between 0-32.
+  - For IPv6, ``MASK_PREFIX_LEN`` must be between 0-128.
+
+  Examples:
+
+  - ``%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT(16)%`` returns ``10.1.0.0/16`` for client IP ``10.1.10.23``
+  - ``%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT(64)%`` returns ``2001:db8:1234:5678::/64`` for client IP ``2001:db8:1234:5678:9abc:def0:1234:5678``
+  - ``%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%`` returns ``10.1.10.23`` for client IP ``10.1.10.23``
 
   .. note::
 
@@ -654,9 +687,20 @@ Current supported substitution commands include:
     been inferred from :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>`
     or :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`.
 
-``%DOWNSTREAM_DIRECT_REMOTE_ADDRESS_WITHOUT_PORT%``
+``%DOWNSTREAM_DIRECT_REMOTE_ADDRESS_WITHOUT_PORT(MASK_PREFIX_LEN)%``
   Direct remote address of the downstream connection, without any port component.
   IP addresses are the only address type with a port component.
+
+  - If ``MASK_PREFIX_LEN`` is specified, the IP address is masked to that many bits and returned in CIDR notation.
+  - If ``MASK_PREFIX_LEN`` is omitted, the unmasked address is returned (without port).
+  - For IPv4, ``MASK_PREFIX_LEN`` must be between 0-32.
+  - For IPv6, ``MASK_PREFIX_LEN`` must be between 0-128.
+
+  Examples:
+
+  - ``%DOWNSTREAM_DIRECT_REMOTE_ADDRESS_WITHOUT_PORT(16)%`` returns ``10.1.0.0/16`` for client IP ``10.1.10.23``
+  - ``%DOWNSTREAM_DIRECT_REMOTE_ADDRESS_WITHOUT_PORT(64)%`` returns ``2001:db8:1234:5678::/64`` for client IP ``2001:db8:1234:5678:9abc:def0:1234:5678``
+  - ``%DOWNSTREAM_DIRECT_REMOTE_ADDRESS_WITHOUT_PORT%`` returns ``10.1.10.23`` for client IP ``10.1.10.23``
 
   .. note::
 
@@ -697,17 +741,39 @@ Current supported substitution commands include:
     This is always the physical local address even if the downstream remote address has been inferred from
     :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>`.
 
-``%DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%``
+``%DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT(MASK_PREFIX_LEN)%``
   Local address of the downstream connection, without any port component.
   IP addresses are the only address type with a port component.
+
+  - If ``MASK_PREFIX_LEN`` is specified, the IP address is masked to that many bits and returned in CIDR notation.
+  - If ``MASK_PREFIX_LEN`` is omitted, the unmasked address is returned (without port).
+  - For IPv4, ``MASK_PREFIX_LEN`` must be between 0-32.
+  - For IPv6, ``MASK_PREFIX_LEN`` must be between 0-128.
+
+  Examples:
+
+  - ``%DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT(16)%`` returns ``10.1.0.0/16`` for local IP ``10.1.10.23``
+  - ``%DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT(64)%`` returns ``2001:db8:1234:5678::/64`` for local IP ``2001:db8:1234:5678:9abc:def0:1234:5678``
+  - ``%DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%`` returns ``10.1.10.23`` for local IP ``10.1.10.23``
 
   .. note::
 
     This may not be the physical local address if the downstream local address has been inferred from
     :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>`.
 
-``%DOWNSTREAM_DIRECT_LOCAL_ADDRESS_WITHOUT_PORT%``
+``%DOWNSTREAM_DIRECT_LOCAL_ADDRESS_WITHOUT_PORT(MASK_PREFIX_LEN)%``
   Direct local address of the downstream connection, without any port component.
+
+  - If ``MASK_PREFIX_LEN`` is specified, the IP address is masked to that many bits and returned in CIDR notation.
+  - If ``MASK_PREFIX_LEN`` is omitted, the unmasked address is returned (without port).
+  - For IPv4, ``MASK_PREFIX_LEN`` must be between 0-32.
+  - For IPv6, ``MASK_PREFIX_LEN`` must be between 0-128.
+
+  Examples:
+
+  - ``%DOWNSTREAM_DIRECT_LOCAL_ADDRESS_WITHOUT_PORT(16)%`` returns ``10.1.0.0/16`` for local IP ``10.1.10.23``
+  - ``%DOWNSTREAM_DIRECT_LOCAL_ADDRESS_WITHOUT_PORT(64)%`` returns ``2001:db8:1234:5678::/64`` for local IP ``2001:db8:1234:5678:9abc:def0:1234:5678``
+  - ``%DOWNSTREAM_DIRECT_LOCAL_ADDRESS_WITHOUT_PORT%`` returns ``10.1.10.23`` for local IP ``10.1.10.23``
 
   .. note::
 

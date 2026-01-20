@@ -532,6 +532,17 @@ config_setting(
     values = {"define": "zlib=ng"},
 )
 
+# Alias pointing to the selected version of zlib:
+# - zlib-ng from //bazel/foreign_cc:zlib_ng when --define zlib=ng is specified (Linux only).
+# - Regular zlib from @zlib otherwise.
+alias(
+    name = "zlib",
+    actual = select({
+        "//bazel:zlib_ng": "//bazel/foreign_cc:zlib_ng",
+        "//conditions:default": "@zlib",
+    }),
+)
+
 config_setting(
     name = "wasm_v8",
     values = {"define": "wasm=v8"},
