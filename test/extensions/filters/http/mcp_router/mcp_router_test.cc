@@ -24,6 +24,10 @@ TEST(ParseMethodStringTest, AllMethods) {
   EXPECT_EQ(parseMethodString("initialize"), McpMethod::Initialize);
   EXPECT_EQ(parseMethodString("tools/list"), McpMethod::ToolsList);
   EXPECT_EQ(parseMethodString("tools/call"), McpMethod::ToolsCall);
+  EXPECT_EQ(parseMethodString("resources/list"), McpMethod::ResourcesList);
+  EXPECT_EQ(parseMethodString("resources/read"), McpMethod::ResourcesRead);
+  EXPECT_EQ(parseMethodString("resources/subscribe"), McpMethod::ResourcesSubscribe);
+  EXPECT_EQ(parseMethodString("resources/unsubscribe"), McpMethod::ResourcesUnsubscribe);
   EXPECT_EQ(parseMethodString("ping"), McpMethod::Ping);
   EXPECT_EQ(parseMethodString("notifications/initialized"), McpMethod::NotificationInitialized);
   EXPECT_EQ(parseMethodString("unknown_method"), McpMethod::Unknown);

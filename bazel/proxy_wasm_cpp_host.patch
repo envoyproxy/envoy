@@ -1,15 +1,5 @@
-From 23327ea30f714a6ac25f197e47764d1f8960986e Mon Sep 17 00:00:00 2001
-From: Matt Leon <mattleon@google.com>
-Date: Tue, 22 Jul 2025 10:45:41 -0400
-Subject: [PATCH 3/3] Use Envoy boringssl
-
-Signed-off-by: Matt Leon <mattleon@google.com>
----
- BUILD | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
 diff --git a/BUILD b/BUILD
-index 6db5fd9..aaf7bd2 100644
+index 91792a8..872131c 100644
 --- a/BUILD
 +++ b/BUILD
 @@ -91,7 +91,7 @@ cc_library(
@@ -21,88 +11,30 @@ index 6db5fd9..aaf7bd2 100644
      }),
      alwayslink = 1,
  )
--- 
-2.50.0.727.gbf7dc18ff4-goog
-
-
-From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
-From: Envoy CI <envoy-ci@users.noreply.github.com>
-Date: Mon, 24 Nov 2025 00:00:00 +0000
-Subject: [PATCH 4/4] Replace //external: bindings with direct references
-
-Replace //external: bindings with direct @repo// style references
-to reduce reliance on native.bind() for bzlmod migration.
----
- BUILD | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
-
-diff --git a/BUILD b/BUILD
-index aaf7bd2..b1234567 100644
---- a/BUILD
-+++ b/BUILD
-@@ -134,7 +134,7 @@ cc_library(
-     ],
+@@ -155,7 +155,7 @@ cc_library(
+     }),
      deps = [
          ":wasm_vm_headers",
--        "//external:wee8",
-+        "@v8//:wee8",
-     ],
- )
- 
-@@ -152,7 +152,7 @@ cc_library(
-     ],
-     deps = [
-         ":wasm_vm_headers",
--        "//external:wamr",
+-        "@com_github_bytecodealliance_wasm_micro_runtime//:wamr_lib",
 +        "@envoy//bazel/foreign_cc:wamr",
      ],
  )
  
-@@ -218,7 +218,7 @@ cc_library(
+@@ -221,7 +221,7 @@ cc_library(
      }),
      deps = [
          ":wasm_vm_headers",
--        "//external:wasmtime",
+-        "@com_github_bytecodealliance_wasmtime//:wasmtime_lib",
 +        "@com_github_wasmtime//:wasmtime_lib",
      ],
  )
  
-@@ -277,7 +277,7 @@ cc_library(
+@@ -280,7 +280,7 @@ cc_library(
      }),
      deps = [
          ":wasm_vm_headers",
--        "//external:prefixed_wasmtime",
+-        "@com_github_bytecodealliance_wasmtime//:prefixed_wasmtime_lib",
 +        "@com_github_wasmtime//:prefixed_wasmtime_lib",
      ],
  )
-
--- 
-2.50.0.727.gbf7dc18ff4-goog
-
-diff --git a/include/proxy-wasm/context.h b/include/proxy-wasm/context.h
-index 208633a..183eaab 100644
---- a/include/proxy-wasm/context.h
-+++ b/include/proxy-wasm/context.h
-@@ -150,7 +150,7 @@ public:
-               const std::shared_ptr<PluginHandleBase> &plugin_handle); // Stream context.
-   virtual ~ContextBase();
-
--  virtual WasmBase *wasm() const { return wasm_; }
-+  WasmBase *wasm() const { return wasm_; }
-   uint32_t id() const { return id_; }
-   // The VM Context used for calling "malloc" has an id_ == 0.
-   bool isVmContext() const { return id_ == 0; }
-diff --git a/include/proxy-wasm/wasm_vm.h b/include/proxy-wasm/wasm_vm.h
-index 9a2f0a6..e2e2ea0 100644
---- a/include/proxy-wasm/wasm_vm.h
-+++ b/include/proxy-wasm/wasm_vm.h
-@@ -161,7 +161,7 @@ struct WasmVmIntegration {
-   virtual proxy_wasm::LogLevel getLogLevel() = 0;
-   virtual void error(std::string_view message) = 0;
-   // Allow integrations to handle specific FailStates differently.
--  virtual void error(FailState fail_state, std::string_view message) { error(message); }
-+  virtual void error(FailState, std::string_view message) { error(message); }
-   virtual void trace(std::string_view message) = 0;
-   // Get a NullVm implementation of a function.
-   // @param function_name is the name of the function with the implementation specific prefix.
-   
+ 

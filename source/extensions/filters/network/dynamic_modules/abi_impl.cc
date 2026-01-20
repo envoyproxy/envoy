@@ -987,6 +987,16 @@ void envoy_dynamic_module_callback_network_filter_config_scheduler_commit(
   scheduler->commit(event_id);
 }
 
+// -----------------------------------------------------------------------------
+// Misc ABI Callbacks
+// -----------------------------------------------------------------------------
+
+uint32_t envoy_dynamic_module_callback_network_filter_get_worker_index(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr) {
+  auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
+  return filter->workerIndex();
+}
+
 } // extern "C"
 
 } // namespace NetworkFilters

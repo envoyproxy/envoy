@@ -119,7 +119,7 @@ public:
           PluginHandleSharedPtr plugin_handle); // Stream context.
   ~Context() override;
 
-  WasmBase* wasm() const;
+  WasmBase* wasm() const override;
   Wasm* envoyWasm() const;
   Plugin* plugin() const;
   Context* rootContext() const;
