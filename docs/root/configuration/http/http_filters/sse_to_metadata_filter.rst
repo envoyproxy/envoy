@@ -65,19 +65,20 @@ Extract multiple values from streaming responses for logging and monitoring:
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.sse_content_parsers.json.v3.JsonContentParser
         rules:
-        - selector:
-            path: ["usage", "total_tokens"]
+        - selectors:
+          - key: "usage"
+          - key: "total_tokens"
           on_present:
-          - metadata_namespace: envoy.audit
+            metadata_namespace: envoy.audit
             key: tokens
             type: NUMBER
-        - selector:
-            path: ["model"]
+        - selectors:
+          - key: "model"
           on_present:
-          - metadata_namespace: envoy.audit
+            metadata_namespace: envoy.audit
             key: model_name
             type: STRING
-          stop_processing_on_match: false
+        stop_processing_on_first_match: false
 
 How It Works
 ------------
@@ -88,17 +89,17 @@ For Server-Sent Events (SSE) format with JSON content parser:
    Matching is performed on the media type (type/subtype) only, ignoring parameters like ``charset``.
 2. It parses the SSE stream according to the `SSE specification <https://html.spec.whatwg.org/multipage/server-sent-events.html>`_,
    handling CRLF, CR, and LF line endings, and properly managing events split across multiple data chunks
-3. For each complete SSE event, it extracts the value from the ``data`` field(s) and delegates to the configured **content parser**
-4. The JSON content parser parses the data as JSON and navigates the object using the configured selector path (e.g., ``["usage", "total_tokens"]``)
-5. Based on the result, it writes metadata according to the configured rules defined in the content parser:
+3. For each complete SSE event, it extracts the value from the ``data`` field(s) and delegates to the configured **metadata extractor**
+4. The JSON metadata extractor parses the data as JSON and navigates the object using the configured selectors (e.g., ``selectors: [{key: "usage"}, {key: "total_tokens"}]`` extracts ``json["usage"]["total_tokens"]``)
+5. Based on the result, it writes metadata according to the configured rules defined in the metadata extractor:
 
    * **on_present**: Executes immediately when the selector successfully extracts a value from any event
    * **on_missing**: Deferred until end-of-stream. Executes only if ``on_present`` never executed and the selector path was not found in at least one event
    * **on_error**: Deferred until end-of-stream. Executes only if ``on_present`` never executed and an error occurred (JSON parse failure, no data field, content-type mismatch, etc.). Takes priority over ``on_missing`` if both conditions are met
 
 6. The deferred execution of ``on_missing`` and ``on_error`` ensures that early events without the desired field (common in LLM streams) don't prevent later successful extractions
-7. By default (``stop_processing_on_match: false``), it processes the entire stream. Set to ``true`` to stop
-   after the first match (only ``on_present`` triggers this), which is more efficient when you know the desired value appears early or only once
+7. By default (``stop_processing_on_first_match: false``), it processes the entire stream. Set to ``true`` to stop
+   after the first rule match (only ``on_present`` triggers this), which is more efficient when you know the desired value appears early or only once
 
 Configuration
 -------------
@@ -134,13 +135,10 @@ When using ``envoy.sse_content_parsers.json``, configure rules within the typed_
 **rules**
   A list of rules to apply. Each rule contains:
 
-  * **selector**: Specifies how to extract a value from the JSON payload:
-
-    - **path**: A JSONPath-style array of keys to navigate the JSON object (e.g., ``["usage", "total_tokens"]`` extracts
-      ``json_object["usage"]["total_tokens"]``)
+  * **selectors**: A list of selectors that specifies how to extract a value from the JSON payload. Each selector has a ``key`` field representing one level of nesting in the JSON object (e.g., ``selectors: [{key: "usage"}, {key: "total_tokens"}]`` extracts ``json_object["usage"]["total_tokens"]``). At least one selector must be specified.
 
   * **on_present**: Metadata to write when the selector successfully extracts a value.
-    Executes immediately when a match is found. Each descriptor specifies:
+    Executes immediately when a match is found. Specifies:
 
     - ``metadata_namespace``: The metadata namespace (e.g., ``envoy.lb``). If empty, defaults to ``envoy.filters.http.sse_to_metadata``.
     - ``key``: The metadata key
@@ -162,10 +160,11 @@ When using ``envoy.sse_content_parsers.json``, configure rules within the typed_
     The ``on_missing`` and ``on_error`` actions are deferred and only execute at the end of the stream if ``on_present`` never executes.
     This prevents early error/missing events from overwriting later successful extractions (common in LLM streams where usage data appears in the final event).
 
-  * **stop_processing_on_match**: If true, stop processing the stream after this rule successfully matches (``on_present`` executes).
-    If false (default), continue processing the entire stream. When combined with preserve_existing_metadata_value=false,
-    later matches overwrite earlier ones (picks LAST occurrence). Set to true for better performance when you only need the first matching value.
-    Note: ``on_missing`` and ``on_error`` do not trigger this.
+**stop_processing_on_first_match**
+  Config-level field (not per-rule). If true, stop processing the stream after the first rule successfully matches (``on_present`` executes).
+  If false (default), continue processing the entire stream. When combined with preserve_existing_metadata_value=false,
+  later matches overwrite earlier ones (picks LAST occurrence). Set to true for better performance when you only need the first matching value.
+  Note: ``on_missing`` and ``on_error`` do not trigger this.
 
 **response_rules.allowed_content_types**
   A list of content types to process. Defaults to ``["text/event-stream"]`` for SSE format.
@@ -194,13 +193,18 @@ Write the same value to multiple metadata namespaces, useful during migrations:
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.sse_content_parsers.json.v3.JsonContentParser
         rules:
-        - selector:
-            path: ["usage", "total_tokens"]
+        - selectors:
+          - key: "usage"
+          - key: "total_tokens"
           on_present:
-          - metadata_namespace: old.namespace
+            metadata_namespace: old.namespace
             key: tokens
             type: NUMBER
-          - metadata_namespace: new.namespace
+        - selectors:
+          - key: "usage"
+          - key: "total_tokens"
+          on_present:
+            metadata_namespace: new.namespace
             key: tokens
             type: NUMBER
 
@@ -216,10 +220,11 @@ Avoid overwriting previously set metadata values:
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.sse_content_parsers.json.v3.JsonContentParser
         rules:
-        - selector:
-            path: ["usage", "total_tokens"]
+        - selectors:
+          - key: "usage"
+          - key: "total_tokens"
           on_present:
-          - metadata_namespace: envoy.lb
+            metadata_namespace: envoy.lb
             key: tokens
             type: NUMBER
             preserve_existing_metadata_value: true
@@ -236,19 +241,20 @@ Write fallback values when extraction fails to ensure metadata is always availab
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.sse_content_parsers.json.v3.JsonContentParser
         rules:
-        - selector:
-            path: ["usage", "total_tokens"]
+        - selectors:
+          - key: "usage"
+          - key: "total_tokens"
           on_present:
-          - metadata_namespace: envoy.lb
+            metadata_namespace: envoy.lb
             key: tokens
             type: NUMBER
           on_missing:
-          - metadata_namespace: envoy.lb
+            metadata_namespace: envoy.lb
             key: tokens
             value:
               number_value: -1
           on_error:
-          - metadata_namespace: envoy.lb
+            metadata_namespace: envoy.lb
             key: tokens
             value:
               number_value: 0
@@ -288,9 +294,9 @@ Statistics
 
 The sse_to_metadata filter outputs statistics in the ``http.<stat_prefix>.sse_to_metadata.resp.<parser_prefix>*`` namespace.
 The :ref:`stat prefix <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stat_prefix>`
-comes from the owning HTTP connection manager, and ``<parser_prefix>`` comes from the content parser (e.g., ``json.`` for the JSON parser).
+comes from the owning HTTP connection manager, and ``<parser_prefix>`` comes from the metadata extractor (e.g., ``json.`` for the JSON parser).
 
-For example, with the JSON content parser, the metrics will be under ``http.<stat_prefix>.sse_to_metadata.resp.json.*``.
+For example, with the JSON metadata extractor, the metrics will be under ``http.<stat_prefix>.sse_to_metadata.resp.json.*``.
 
 .. csv-table::
   :header: Name, Type, Description
@@ -300,7 +306,7 @@ For example, with the JSON content parser, the metrics will be under ``http.<sta
   resp.<parser_prefix>.metadata_from_fallback, Counter, Total number of metadata entries written using on_missing or on_error fallback values (subset of metadata_added)
   resp.<parser_prefix>.mismatched_content_type, Counter, Total number of responses with content types that don't match the expected type
   resp.<parser_prefix>.no_data_field, Counter, Total number of SSE events without a data field
-  resp.<parser_prefix>.parse_error, Counter, Total number of events where the content parser failed to parse the data field
+  resp.<parser_prefix>.parse_error, Counter, Total number of events where the metadata extractor failed to parse the data field
   resp.<parser_prefix>.selector_not_found, Counter, Total number of times the selector path was not found in the parsed content
   resp.<parser_prefix>.preserved_existing_metadata, Counter, Total number of times metadata was not written due to preserve_existing_metadata_value being true
   resp.<parser_prefix>.event_too_large, Counter, Total number of events discarded because they exceeded max_event_size
@@ -322,10 +328,10 @@ Performance Considerations
 
 * The filter buffers incomplete SSE events in memory until they are complete
 * Once a complete event is found, it is processed immediately and removed from the buffer
-* By default, ``stop_processing_on_match: false`` processes the entire stream
-* Set ``stop_processing_on_match: true`` to stop after the first match for better performance
+* By default, ``stop_processing_on_first_match: false`` processes the entire stream
+* Set ``stop_processing_on_first_match: true`` to stop after the first rule match for better performance
   when you only need the first occurrence (e.g., a value that appears early in the stream)
-* For extracting multiple different values, use multiple rules with ``stop_processing_on_match: false``
+* For extracting multiple different values, use multiple rules with ``stop_processing_on_first_match: false``
 
 Security Considerations
 -----------------------

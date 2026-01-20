@@ -14,18 +14,14 @@ constexpr absl::string_view DefaultNamespace = "envoy.filters.http.sse_to_metada
 }
 
 JsonContentParserImpl::Rule::Rule(const ProtoRule& rule) : rule_(rule) {
-  // Parse selector path
-  // Note: path cannot be empty - enforced by proto validation (min_items: 1)
-  for (const auto& key : rule_.selector().path()) {
-    selector_path_.push_back(key);
+  for (const auto& selector : rule_.selectors()) {
+    selector_path_.push_back(selector.key());
   }
-
-  // Note: on_missing/on_error value validation is done at config load time
-  // in JsonContentParserConfigFactory::createParserFactory()
 }
 
 JsonContentParserImpl::JsonContentParserImpl(
-    const envoy::extensions::sse_content_parsers::json::v3::JsonContentParser& config) {
+    const envoy::extensions::sse_content_parsers::json::v3::JsonContentParser& config)
+    : stop_processing_on_first_match_(config.stop_processing_on_first_match()) {
   for (const auto& rule : config.rules()) {
     rules_.emplace_back(rule);
   }
@@ -49,18 +45,18 @@ SseContentParser::ParseResult JsonContentParserImpl::parse(absl::string_view dat
     auto value_or = extractValueFromJson(json_obj, rule.selector_path_);
 
     if (value_or.ok()) {
-      // Selector found. Execute on_present immediately.
+      // Selector found. Execute on_present immediately (if configured).
       const auto& value = value_or.value();
 
-      for (const auto& descriptor : rule.rule_.on_present()) {
-        result.immediate_actions.push_back(descriptorToAction(descriptor, value));
+      if (rule.rule_.has_on_present()) {
+        result.immediate_actions.push_back(keyValuePairToAction(rule.rule_.on_present(), value));
       }
 
       // Track that this rule matched
       result.matched_rules.push_back(i);
 
-      // Check if we should stop processing
-      if (rule.rule_.stop_processing_on_match()) {
+      // Stop processing if configured to stop on first match
+      if (stop_processing_on_first_match_) {
         result.stop_processing = true;
         return result;
       }
@@ -85,14 +81,10 @@ JsonContentParserImpl::getDeferredActions(size_t rule_index, bool has_error,
   const auto& rule = rules_[rule_index];
 
   // Priority: on_error over on_missing
-  if (has_error) {
-    for (const auto& descriptor : rule.rule_.on_error()) {
-      actions.push_back(descriptorToAction(descriptor, absl::nullopt));
-    }
-  } else if (selector_not_found) {
-    for (const auto& descriptor : rule.rule_.on_missing()) {
-      actions.push_back(descriptorToAction(descriptor, absl::nullopt));
-    }
+  if (has_error && rule.rule_.has_on_error()) {
+    actions.push_back(keyValuePairToAction(rule.rule_.on_error(), absl::nullopt));
+  } else if (selector_not_found && rule.rule_.has_on_missing()) {
+    actions.push_back(keyValuePairToAction(rule.rule_.on_missing(), absl::nullopt));
   }
 
   return actions;
@@ -148,25 +140,24 @@ JsonContentParserImpl::extractValueFromJson(const Envoy::Json::ObjectSharedPtr& 
   return absl::NotFoundError(absl::StrCat("Key '", final_key, "' not found"));
 }
 
-SseContentParser::MetadataAction JsonContentParserImpl::descriptorToAction(
-    const MetadataDescriptor& descriptor,
+SseContentParser::MetadataAction JsonContentParserImpl::keyValuePairToAction(
+    const KeyValuePair& kv_pair,
     const absl::optional<Envoy::Json::ValueType>& extracted_value) const {
   SseContentParser::MetadataAction action;
 
   // Namespace: Parser is responsible for applying the default namespace.
   // The filter expects namespace to always be populated.
-  action.namespace_ = descriptor.metadata_namespace().empty() ? std::string(DefaultNamespace)
-                                                              : descriptor.metadata_namespace();
-  action.key = descriptor.key();
-  action.preserve_existing = descriptor.preserve_existing_metadata_value().value();
+  action.namespace_ = kv_pair.metadata_namespace().empty() ? std::string(DefaultNamespace)
+                                                           : kv_pair.metadata_namespace();
+  action.key = kv_pair.key();
+  action.preserve_existing = kv_pair.preserve_existing_metadata_value();
 
-  // Value
-  if (descriptor.value().kind_case() != 0) {
-    // Use hardcoded value from descriptor (already a Protobuf::Value)
-    action.value = descriptor.value();
+  if (kv_pair.value_type_case() == KeyValuePair::kValue) {
+    // Use hardcoded value from kv_pair (already a Protobuf::Value)
+    action.value = kv_pair.value();
   } else if (extracted_value.has_value()) {
     // Convert extracted JSON value to Protobuf::Value
-    action.value = jsonValueToProtobufValue(extracted_value.value(), descriptor.type());
+    action.value = jsonValueToProtobufValue(extracted_value.value(), kv_pair.type());
   }
 
   return action;
@@ -177,7 +168,7 @@ Protobuf::Value JsonContentParserImpl::jsonValueToProtobufValue(const Envoy::Jso
   Protobuf::Value pb_value;
 
   switch (type) {
-  case ValueType::JsonContentParser_ValueType_STRING:
+  case ValueType::JsonToMetadata_ValueType_STRING:
     // Always convert to string
     if (absl::holds_alternative<std::string>(value)) {
       pb_value.set_string_value(absl::get<std::string>(value));
@@ -190,7 +181,7 @@ Protobuf::Value JsonContentParserImpl::jsonValueToProtobufValue(const Envoy::Jso
     }
     break;
 
-  case ValueType::JsonContentParser_ValueType_NUMBER:
+  case ValueType::JsonToMetadata_ValueType_NUMBER:
     // Convert to number
     if (absl::holds_alternative<int64_t>(value)) {
       pb_value.set_number_value(static_cast<double>(absl::get<int64_t>(value)));
@@ -211,7 +202,7 @@ Protobuf::Value JsonContentParserImpl::jsonValueToProtobufValue(const Envoy::Jso
     }
     break;
 
-  case ValueType::JsonContentParser_ValueType_PROTOBUF_VALUE:
+  case ValueType::JsonToMetadata_ValueType_PROTOBUF_VALUE:
   default:
     // Preserve original type
     if (absl::holds_alternative<std::string>(value)) {

@@ -25,17 +25,26 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // parsers to extract values from the SSE data fields. The content parser is a typed extension
 // that can be configured to handle different content types (JSON, plaintext, XML, etc.).
 //
+// The filter only processes responses with Content-Type "text/event-stream"
+// (the standard SSE content type). Content-Type parameters such as charset are ignored.
+//
+// See SSE-To-Metadata :ref:`configuration overview <config_http_filters_sse_to_metadata>` for more details.
 // [#extension: envoy.filters.http.sse_to_metadata]
 
-// SSE-To-Metadata :ref:`configuration overview <config_http_filters_sse_to_metadata>`.
 message SseToMetadata {
-  // Configuration for processing SSE response streams.
-  message ResponseRules {
-    // Content parser for extracting values from SSE event data fields.
-    // This is a typed extension that determines how to parse the content and extract metadata.
+  // Rules for processing SSE streams and extracting metadata.
+  //
+  // The filter parses the SSE protocol (events delimited by blank lines), then delegates
+  // to a content parser to parse event content and extract metadata. The content parser
+  // determines which values to extract and how to write them to metadata.
+  message ProcessingRules {
+    // Content parser configuration for parsing event content and extracting metadata.
     //
-    // Example parsers:
-    // - envoy.sse_content_parsers.json: Parses JSON data and extracts values using JSON paths
+    // The content parser specifies:
+    // - How to parse the event data (e.g., JSON, XML, plaintext)
+    // - Which values to extract from the parsed content (e.g., JSON paths like usage.total_tokens)
+    // - How to map extracted values to metadata (namespace, key, type conversions)
+    // - When to write metadata (on_present, on_missing, on_error actions)
     //
     // [#extension-category: envoy.sse_content_parsers]
     config.core.v3.TypedExtensionConfig content_parser = 1
@@ -45,18 +54,12 @@ message SseToMetadata {
     // and discarded. This protects against unbounded memory growth from malicious
     // or malformed streams that never send event delimiters (blank lines).
     //
-    // An SSE event consists of all lines from one blank line delimiter to the next.
-    //
     // Default is 8192 bytes (8KB), which is sufficient for most legitimate events.
     // Set to 0 to disable the limit (not recommended for production).
     // Maximum allowed value is 10485760 bytes (10MB).
-    //
-    // Note: The filter only processes responses with Content-Type "text/event-stream"
-    // (the standard SSE content type). Content-Type parameters such as charset are ignored.
     google.protobuf.UInt32Value max_event_size = 2 [(validate.rules).uint32 = {lte: 10485760}];
   }
 
-  // Rules for processing response streams.
-  // Currently, only response stream processing is implemented.
-  ResponseRules response_rules = 1 [(validate.rules).message = {required: true}];
+  // Rules for processing SSE response streams.
+  ProcessingRules response_rules = 1 [(validate.rules).message = {required: true}];
 }

@@ -32,19 +32,20 @@ static_resources:
                   typed_config:
                     "@type": type.googleapis.com/envoy.extensions.sse_content_parsers.json.v3.JsonContentParser
                     rules:
-                    - selector:
-                        path: ["usage", "total_tokens"]
+                    - selectors:
+                      - key: "usage"
+                      - key: "total_tokens"
                       on_present:
-                      - metadata_namespace: envoy.lb
+                        metadata_namespace: envoy.lb
                         key: tokens
                         type: NUMBER
-                    - selector:
-                        path: ["model"]
+                    - selectors:
+                      - key: "model"
                       on_present:
-                      - metadata_namespace: envoy.lb
+                        metadata_namespace: envoy.lb
                         key: model_name
                         type: STRING
-                      stop_processing_on_match: false
+                    stop_processing_on_first_match: false
           - name: envoy.filters.http.router
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router

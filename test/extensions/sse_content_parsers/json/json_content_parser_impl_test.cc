@@ -25,12 +25,13 @@ public:
 
   const std::string basic_config_ = R"EOF(
 rules:
-  - selector:
-      path: ["usage", "total_tokens"]
+  - selectors:
+      - key: "usage"
+      - key: "total_tokens"
     on_present:
-      - metadata_namespace: "envoy.lb"
-        key: "tokens"
-        type: NUMBER
+      metadata_namespace: "envoy.lb"
+      key: "tokens"
+      type: NUMBER
   )EOF";
 
   std::unique_ptr<JsonContentParserImpl> parser_;
@@ -92,11 +93,14 @@ TEST_F(JsonContentParserTest, PartialSelectorPath) {
 TEST_F(JsonContentParserTest, DeepNestedPath) {
   const std::string config = R"EOF(
 rules:
-  - selector:
-      path: ["level1", "level2", "level3", "value"]
+  - selectors:
+      - key: "level1"
+      - key: "level2"
+      - key: "level3"
+      - key: "value"
     on_present:
-      - metadata_namespace: "envoy.lb"
-        key: "deep_value"
+      metadata_namespace: "envoy.lb"
+      key: "deep_value"
   )EOF";
   setupParser(config);
 
@@ -123,11 +127,11 @@ TEST_F(JsonContentParserTest, IntermediatePathNotObject) {
 TEST_F(JsonContentParserTest, NullValueInJson) {
   setupParser(R"EOF(
 rules:
-  - selector:
-      path: ["usage"]
+  - selectors:
+      - key: "usage"
     on_present:
-      - metadata_namespace: "envoy.lb"
-        key: "value"
+      metadata_namespace: "envoy.lb"
+      key: "value"
   )EOF");
 
   const std::string data = R"({"usage":null})";
@@ -142,12 +146,12 @@ rules:
 TEST_F(JsonContentParserTest, NestedObjectValue) {
   const std::string config = R"EOF(
 rules:
-  - selector:
-      path: ["usage"]
+  - selectors:
+      - key: "usage"
     on_present:
-      - metadata_namespace: "envoy.lb"
-        key: "usage_obj"
-        type: STRING
+      metadata_namespace: "envoy.lb"
+      key: "usage_obj"
+      type: STRING
   )EOF";
   setupParser(config);
 
@@ -163,12 +167,12 @@ rules:
 TEST_F(JsonContentParserTest, StringValueType) {
   const std::string config = R"EOF(
 rules:
-  - selector:
-      path: ["model"]
+  - selectors:
+      - key: "model"
     on_present:
-      - metadata_namespace: "envoy.lb"
-        key: "model_name"
-        type: STRING
+      metadata_namespace: "envoy.lb"
+      key: "model_name"
+      type: STRING
   )EOF";
   setupParser(config);
 
@@ -183,12 +187,12 @@ rules:
 TEST_F(JsonContentParserTest, ProtobufValueType) {
   const std::string config = R"EOF(
 rules:
-  - selector:
-      path: ["value"]
+  - selectors:
+      - key: "value"
     on_present:
-      - metadata_namespace: "envoy.lb"
-        key: "test"
-        type: PROTOBUF_VALUE
+      metadata_namespace: "envoy.lb"
+      key: "test"
+      type: PROTOBUF_VALUE
   )EOF";
   setupParser(config);
 
@@ -203,11 +207,11 @@ rules:
 TEST_F(JsonContentParserTest, BooleanValue) {
   const std::string config = R"EOF(
 rules:
-  - selector:
-      path: ["enabled"]
+  - selectors:
+      - key: "enabled"
     on_present:
-      - metadata_namespace: "envoy.lb"
-        key: "flag"
+      metadata_namespace: "envoy.lb"
+      key: "flag"
   )EOF";
   setupParser(config);
 
@@ -222,12 +226,12 @@ rules:
 TEST_F(JsonContentParserTest, StringToNumberConversionFailure) {
   const std::string config = R"EOF(
 rules:
-  - selector:
-      path: ["value"]
+  - selectors:
+      - key: "value"
     on_present:
-      - metadata_namespace: "envoy.lb"
-        key: "result"
-        type: NUMBER
+      metadata_namespace: "envoy.lb"
+      key: "result"
+      type: NUMBER
   )EOF";
   setupParser(config);
 
@@ -244,12 +248,12 @@ rules:
 TEST_F(JsonContentParserTest, StringToNumberConversionSuccess) {
   const std::string config = R"EOF(
 rules:
-  - selector:
-      path: ["price"]
+  - selectors:
+      - key: "price"
     on_present:
-      - metadata_namespace: "envoy.lb"
-        key: "price_as_number"
-        type: NUMBER
+      metadata_namespace: "envoy.lb"
+      key: "price_as_number"
+      type: NUMBER
   )EOF";
   setupParser(config);
 
@@ -265,12 +269,12 @@ rules:
 TEST_F(JsonContentParserTest, BoolToNumberConversion) {
   const std::string config = R"EOF(
 rules:
-  - selector:
-      path: ["flag"]
+  - selectors:
+      - key: "flag"
     on_present:
-      - metadata_namespace: "envoy.lb"
-        key: "result"
-        type: NUMBER
+      metadata_namespace: "envoy.lb"
+      key: "result"
+      type: NUMBER
   )EOF";
   setupParser(config);
 
@@ -285,12 +289,12 @@ rules:
 TEST_F(JsonContentParserTest, BoolToStringConversion) {
   const std::string config = R"EOF(
 rules:
-  - selector:
-      path: ["flag"]
+  - selectors:
+      - key: "flag"
     on_present:
-      - metadata_namespace: "envoy.lb"
-        key: "result"
-        type: STRING
+      metadata_namespace: "envoy.lb"
+      key: "result"
+      type: STRING
   )EOF";
   setupParser(config);
 
@@ -305,12 +309,12 @@ rules:
 TEST_F(JsonContentParserTest, NumberToStringConversion) {
   const std::string config = R"EOF(
 rules:
-  - selector:
-      path: ["count"]
+  - selectors:
+      - key: "count"
     on_present:
-      - metadata_namespace: "envoy.lb"
-        key: "result"
-        type: STRING
+      metadata_namespace: "envoy.lb"
+      key: "result"
+      type: STRING
   )EOF";
   setupParser(config);
 
@@ -325,12 +329,12 @@ rules:
 TEST_F(JsonContentParserTest, DoubleToStringConversion) {
   const std::string config = R"EOF(
 rules:
-  - selector:
-      path: ["value"]
+  - selectors:
+      - key: "value"
     on_present:
-      - metadata_namespace: "envoy.lb"
-        key: "result"
-        type: STRING
+      metadata_namespace: "envoy.lb"
+      key: "result"
+      type: STRING
   )EOF";
   setupParser(config);
 
@@ -345,15 +349,18 @@ rules:
 TEST_F(JsonContentParserTest, IntegerValueExtraction) {
   const std::string config = R"EOF(
 rules:
-  - selector:
-      path: ["count"]
+  - selectors:
+      - key: "count"
     on_present:
-      - metadata_namespace: "envoy.lb"
-        key: "count_num"
-        type: NUMBER
-      - metadata_namespace: "envoy.lb"
-        key: "count_str"
-        type: STRING
+      metadata_namespace: "envoy.lb"
+      key: "count_num"
+      type: NUMBER
+  - selectors:
+      - key: "count"
+    on_present:
+      metadata_namespace: "envoy.lb"
+      key: "count_str"
+      type: STRING
   )EOF";
   setupParser(config);
 
@@ -374,15 +381,16 @@ TEST_F(JsonContentParserTest, OnMissing) {
   // Create config programmatically to properly set protobuf Value
   ProtoConfig proto_config;
   auto* rule = proto_config.add_rules();
-  rule->mutable_selector()->add_path("usage");
-  rule->mutable_selector()->add_path("total_tokens");
+  rule->add_selectors()->set_key("usage");
+  rule->add_selectors()->set_key("total_tokens");
 
-  auto* on_present = rule->add_on_present();
+  auto* on_present = rule->mutable_on_present();
   on_present->set_metadata_namespace("envoy.lb");
   on_present->set_key("tokens");
-  on_present->set_type(envoy::extensions::sse_content_parsers::json::v3::JsonContentParser::NUMBER);
+  on_present->set_type(
+      envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata::NUMBER);
 
-  auto* on_missing = rule->add_on_missing();
+  auto* on_missing = rule->mutable_on_missing();
   on_missing->set_metadata_namespace("envoy.lb");
   on_missing->set_key("tokens");
   on_missing->mutable_value()->set_number_value(-1);
@@ -410,10 +418,10 @@ TEST_F(JsonContentParserTest, OnPresentWithHardcodedValue) {
   // Create config programmatically to properly set protobuf Value
   ProtoConfig proto_config;
   auto* rule = proto_config.add_rules();
-  rule->mutable_selector()->add_path("usage");
-  rule->mutable_selector()->add_path("total_tokens");
+  rule->add_selectors()->set_key("usage");
+  rule->add_selectors()->set_key("total_tokens");
 
-  auto* on_present = rule->add_on_present();
+  auto* on_present = rule->mutable_on_present();
   on_present->set_metadata_namespace("envoy.lb");
   on_present->set_key("tokens");
   on_present->mutable_value()->set_number_value(999);

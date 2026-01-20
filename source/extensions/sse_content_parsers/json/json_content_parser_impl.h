@@ -16,10 +16,11 @@ namespace Extensions {
 namespace SseContentParsers {
 namespace Json {
 
-using ProtoRule = envoy::extensions::sse_content_parsers::json::v3::JsonContentParser::Rule;
-using MetadataDescriptor =
-    envoy::extensions::sse_content_parsers::json::v3::JsonContentParser::MetadataDescriptor;
-using ValueType = envoy::extensions::sse_content_parsers::json::v3::JsonContentParser::ValueType;
+using ProtoRule = envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata::Rule;
+using KeyValuePair =
+    envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata::KeyValuePair;
+using ValueType = envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata::ValueType;
+using Selector = envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata::Selector;
 
 /**
  * Parses JSON content from SSE events and extracts metadata based on JSON path selectors.
@@ -51,11 +52,11 @@ private:
                        const std::vector<std::string>& path) const;
 
   /**
-   * Convert metadata descriptor to action.
+   * Convert KeyValuePair to metadata action.
    */
   SseContentParser::MetadataAction
-  descriptorToAction(const MetadataDescriptor& descriptor,
-                     const absl::optional<Envoy::Json::ValueType>& extracted_value) const;
+  keyValuePairToAction(const KeyValuePair& kv_pair,
+                       const absl::optional<Envoy::Json::ValueType>& extracted_value) const;
 
   /**
    * Convert JSON value to Protobuf::Value for metadata.
@@ -64,6 +65,7 @@ private:
                                            ValueType type) const;
 
   std::vector<Rule> rules_;
+  bool stop_processing_on_first_match_;
 };
 
 /**
