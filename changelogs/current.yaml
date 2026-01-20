@@ -8,6 +8,9 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: load_report
+  change: |
+    Fixed an issue upon load-report shutdown race with ADS stream. Introduced proper cleanup of the gRPC stream.
 - area: http
   change: |
     Fixed a potential file descriptor leak where HTTP/1.1 connections with zombie streams (waiting for codec completion)
