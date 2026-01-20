@@ -2401,6 +2401,77 @@ TEST_F(DynamicModuleHttpFilterWithConfigTest, GetClusterNameWithConfig) {
   EXPECT_EQ(std::string(result.ptr, result.length), cluster_name);
 }
 
+TEST_F(DynamicModuleHttpFilterTest, GetBufferLimit) {
+  EXPECT_CALL(decoder_callbacks_, bufferLimit()).WillOnce(testing::Return(1024));
+  uint64_t limit = envoy_dynamic_module_callback_http_get_buffer_limit(filter_.get());
+  EXPECT_EQ(limit, 1024);
+}
+
+TEST_F(DynamicModuleHttpFilterTest, GetBufferLimitNoCallbacks) {
+  // Test with no callbacks set.
+  auto filter_no_callbacks = std::make_unique<DynamicModuleHttpFilter>(nullptr, symbol_table_, 3);
+  uint64_t limit = envoy_dynamic_module_callback_http_get_buffer_limit(filter_no_callbacks.get());
+  EXPECT_EQ(limit, 0);
+}
+
+TEST_F(DynamicModuleHttpFilterTest, SetBufferLimit) {
+  EXPECT_CALL(decoder_callbacks_, setBufferLimit(2048));
+  envoy_dynamic_module_callback_http_set_buffer_limit(filter_.get(), 2048);
+}
+
+TEST_F(DynamicModuleHttpFilterTest, SetBufferLimitNoCallbacks) {
+  // Test with no callbacks set. Should not crash.
+  auto filter_no_callbacks = std::make_unique<DynamicModuleHttpFilter>(nullptr, symbol_table_, 3);
+  envoy_dynamic_module_callback_http_set_buffer_limit(filter_no_callbacks.get(), 2048);
+}
+
+TEST_F(DynamicModuleHttpFilterTest, AddDownstreamWatermarkCallbacks) {
+  EXPECT_CALL(decoder_callbacks_, addDownstreamWatermarkCallbacks(testing::Ref(*filter_)));
+  filter_->addDownstreamWatermarkCallbacks();
+  EXPECT_TRUE(filter_->watermark_callbacks_registered_);
+}
+
+TEST_F(DynamicModuleHttpFilterTest, AddDownstreamWatermarkCallbacksAlreadyRegistered) {
+  // First registration.
+  EXPECT_CALL(decoder_callbacks_, addDownstreamWatermarkCallbacks(testing::Ref(*filter_)));
+  filter_->addDownstreamWatermarkCallbacks();
+  EXPECT_TRUE(filter_->watermark_callbacks_registered_);
+
+  // Second registration should be a no-op.
+  filter_->addDownstreamWatermarkCallbacks();
+  EXPECT_TRUE(filter_->watermark_callbacks_registered_);
+}
+
+TEST_F(DynamicModuleHttpFilterTest, RemoveDownstreamWatermarkCallbacks) {
+  // First register.
+  EXPECT_CALL(decoder_callbacks_, addDownstreamWatermarkCallbacks(testing::Ref(*filter_)));
+  filter_->addDownstreamWatermarkCallbacks();
+  EXPECT_TRUE(filter_->watermark_callbacks_registered_);
+
+  // Then unregister.
+  EXPECT_CALL(decoder_callbacks_, removeDownstreamWatermarkCallbacks(testing::Ref(*filter_)));
+  filter_->removeDownstreamWatermarkCallbacks();
+  EXPECT_FALSE(filter_->watermark_callbacks_registered_);
+}
+
+TEST_F(DynamicModuleHttpFilterTest, RemoveDownstreamWatermarkCallbacksNotRegistered) {
+  // Remove without registration should be a no-op.
+  filter_->removeDownstreamWatermarkCallbacks();
+  EXPECT_FALSE(filter_->watermark_callbacks_registered_);
+}
+
+TEST_F(DynamicModuleHttpFilterTest, WatermarkCallbacksCleanedUpOnDestroy) {
+  // Register for watermark callbacks.
+  EXPECT_CALL(decoder_callbacks_, addDownstreamWatermarkCallbacks(testing::Ref(*filter_)));
+  filter_->addDownstreamWatermarkCallbacks();
+  EXPECT_TRUE(filter_->watermark_callbacks_registered_);
+
+  // Destroy should clean up watermark callbacks.
+  EXPECT_CALL(decoder_callbacks_, removeDownstreamWatermarkCallbacks(testing::Ref(*filter_)));
+  filter_->onDestroy();
+  EXPECT_FALSE(filter_->watermark_callbacks_registered_);
+}
+
 } // namespace HttpFilters
 } // namespace DynamicModules
 } // namespace Extensions

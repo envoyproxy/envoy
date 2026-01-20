@@ -45,6 +45,7 @@ public:
     // whole filter chain.
     if (config_ && config_->terminal_filter_) {
       decoder_callbacks_->addDownstreamWatermarkCallbacks(*this);
+      watermark_callbacks_registered_ = true;
     }
   }
   void decodeComplete() override;
@@ -66,6 +67,10 @@ public:
   void onAboveWriteBufferHighWatermark() override;
   void onBelowWriteBufferLowWatermark() override;
 
+  // ----------  Downstream watermark registration  ----------
+  void addDownstreamWatermarkCallbacks();
+  void removeDownstreamWatermarkCallbacks();
+
   void sendLocalReply(Code code, absl::string_view body,
                       std::function<void(ResponseHeaderMap& headers)> modify_headers,
                       const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
@@ -75,6 +80,8 @@ public:
   StreamDecoderFilterCallbacks* decoder_callbacks_ = nullptr;
   StreamEncoderFilterCallbacks* encoder_callbacks_ = nullptr;
   bool destroyed_ = false;
+  // Tracks whether the filter has registered for downstream watermark callbacks.
+  bool watermark_callbacks_registered_ = false;
 
   // These are used to hold the current chunk of the request/response body during the decodeData and
   // encodeData callbacks. It is only valid during the call and should not be used outside of the

@@ -1421,6 +1421,47 @@ pub trait EnvoyHttpFilter {
     direction: abi::envoy_dynamic_module_type_socket_direction,
   ) -> Option<Vec<u8>>;
 
+  // ------------------- Buffer limit methods -------------------------
+
+  /// Get the current buffer limit for body data.
+  ///
+  /// This is the maximum amount of data that can be buffered for body data before backpressure
+  /// is applied. A buffer limit of 0 bytes indicates no limits are applied.
+  fn get_buffer_limit(&self) -> u64;
+
+  /// Set the buffer limit for body data.
+  ///
+  /// This controls the maximum amount of data that can be buffered for body data before
+  /// backpressure is applied.
+  ///
+  /// It is recommended (but not required) that filters calling this function should generally
+  /// only perform increases to the buffer limit, to avoid potentially conflicting with the
+  /// buffer requirements of other filters in the chain. For example:
+  ///
+  /// ```ignore
+  /// if desired_limit > envoy_filter.get_buffer_limit() {
+  ///   envoy_filter.set_buffer_limit(desired_limit);
+  /// }
+  /// ```
+  fn set_buffer_limit(&mut self, limit: u64);
+
+  // ------------------- Downstream watermark callbacks -------------------------
+
+  /// Subscribe to downstream watermark events.
+  ///
+  /// After calling this method, the filter will receive
+  /// [`HttpFilter::on_downstream_above_write_buffer_high_watermark`] and
+  /// [`HttpFilter::on_downstream_below_write_buffer_low_watermark`] callbacks when the
+  /// downstream connection's write buffer crosses the high and low watermarks respectively.
+  ///
+  /// This is useful for implementing flow control in streaming scenarios.
+  fn add_downstream_watermark_callbacks(&mut self);
+
+  /// Unsubscribe from downstream watermark events.
+  ///
+  /// After calling this method, the filter will no longer receive downstream watermark events.
+  fn remove_downstream_watermark_callbacks(&mut self);
+
   // ----------------------------- Tracing methods -----------------------------
 
   /// Get the active tracing span for the current HTTP stream.
@@ -2926,6 +2967,30 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
       Some(slice.to_vec())
     } else {
       None
+    }
+  }
+
+  fn get_buffer_limit(&self) -> u64 {
+    unsafe { abi::envoy_dynamic_module_callback_http_get_buffer_limit(self.raw_ptr) }
+  }
+
+  fn set_buffer_limit(&mut self, limit: u64) {
+    unsafe { abi::envoy_dynamic_module_callback_http_set_buffer_limit(self.raw_ptr, limit) }
+  }
+
+  fn add_downstream_watermark_callbacks(&mut self) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_add_downstream_watermark_callbacks(
+        self.raw_ptr,
+      )
+    }
+  }
+
+  fn remove_downstream_watermark_callbacks(&mut self) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_remove_downstream_watermark_callbacks(
+        self.raw_ptr,
+      )
     }
   }
 

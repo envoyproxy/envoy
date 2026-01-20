@@ -22,6 +22,11 @@ void DynamicModuleHttpFilter::onStreamComplete() {
 
 void DynamicModuleHttpFilter::onDestroy() {
   destroyed_ = true;
+  // Remove watermark callbacks before destroying.
+  if (watermark_callbacks_registered_ && decoder_callbacks_ != nullptr) {
+    decoder_callbacks_->removeDownstreamWatermarkCallbacks(*this);
+    watermark_callbacks_registered_ = false;
+  }
   destroy();
 };
 
@@ -294,6 +299,20 @@ void DynamicModuleHttpFilter::onAboveWriteBufferHighWatermark() {
 void DynamicModuleHttpFilter::onBelowWriteBufferLowWatermark() {
   config_->on_http_filter_downstream_below_write_buffer_low_watermark_(thisAsVoidPtr(),
                                                                        in_module_filter_);
+}
+
+void DynamicModuleHttpFilter::addDownstreamWatermarkCallbacks() {
+  if (decoder_callbacks_ != nullptr && !watermark_callbacks_registered_) {
+    decoder_callbacks_->addDownstreamWatermarkCallbacks(*this);
+    watermark_callbacks_registered_ = true;
+  }
+}
+
+void DynamicModuleHttpFilter::removeDownstreamWatermarkCallbacks() {
+  if (decoder_callbacks_ != nullptr && watermark_callbacks_registered_) {
+    decoder_callbacks_->removeDownstreamWatermarkCallbacks(*this);
+    watermark_callbacks_registered_ = false;
+  }
 }
 
 envoy_dynamic_module_type_http_callout_init_result
