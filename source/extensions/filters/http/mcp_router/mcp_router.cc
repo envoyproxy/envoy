@@ -4,6 +4,7 @@
 #include "source/common/config/metadata.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/message_impl.h"
+#include "source/common/http/sse/sse_parser.h"
 #include "source/common/http/utility.h"
 #include "source/common/json/json_loader.h"
 #include "source/common/json/json_streamer.h"
@@ -28,6 +29,9 @@ constexpr absl::string_view kGatewayName = "envoy-mcp-gateway";
 constexpr absl::string_view kGatewayVersion = "1.0.0";
 constexpr absl::string_view kProtocolVersion = "2025-06-18";
 
+constexpr absl::string_view kContentTypeJson = "application/json";
+constexpr absl::string_view kContentTypeSse = "text/event-stream";
+
 void copyRequestHeaders(const Http::RequestHeaderMap& source, Http::RequestHeaderMap& dest) {
   // Headers that we set explicitly or should not be forwarded
   static const absl::flat_hash_set<absl::string_view> kSkipHeaders = {
@@ -43,7 +47,93 @@ void copyRequestHeaders(const Http::RequestHeaderMap& source, Http::RequestHeade
   });
 }
 
+// Extract media type from Content-Type header (before any semicolon).
+absl::string_view extractMediaType(absl::string_view content_type) {
+  const std::vector<absl::string_view> parts =
+      absl::StrSplit(content_type, absl::MaxSplits(';', 1));
+  return absl::StripAsciiWhitespace(parts.front());
+}
+
+// Detect content type from Content-Type header with proper parsing.
+ResponseContentType detectContentType(absl::string_view content_type_header) {
+  if (content_type_header.empty()) {
+    return ResponseContentType::Unknown;
+  }
+  const absl::string_view media_type = extractMediaType(content_type_header);
+  if (absl::EqualsIgnoreCase(media_type,
+                             Http::Headers::get().ContentTypeValues.TextEventStream)) {
+    return ResponseContentType::Sse;
+  }
+  if (absl::EqualsIgnoreCase(media_type, Http::Headers::get().ContentTypeValues.Json)) {
+    return ResponseContentType::Json;
+  }
+  return ResponseContentType::Unknown;
+}
+
 } // namespace
+
+// BackendResponse implementation.
+std::string BackendResponse::getJsonRpcBody(int64_t request_id) const {
+  // Use cached result if available (populated during incremental SSE parsing).
+  if (!extracted_jsonrpc.empty()) {
+    return extracted_jsonrpc;
+  }
+
+  if (isJson() || body.empty()) {
+    return body;
+  }
+  if (isSse()) {
+    // Parse all SSE events and use the last one with matching request ID.
+    // SSE streams may contain multiple messages (e.g., server-to-client requests
+    // like roots/list).
+    absl::string_view remaining(body);
+    std::string last_data;
+
+    while (!remaining.empty()) {
+      // Try normal parsing first (looks for \n\n event terminator).
+      auto [event_end, next_start] = Http::Sse::SseParser::findEventEnd(remaining, false);
+      if (event_end == absl::string_view::npos) {
+        // No complete event found. Try end-of-stream mode for the last event.
+        std::tie(event_end, next_start) = Http::Sse::SseParser::findEventEnd(remaining, true);
+        if (event_end == absl::string_view::npos) {
+          break;
+        }
+      }
+
+      std::string data =
+          Http::Sse::SseParser::extractDataField(remaining.substr(0, event_end));
+      if (!data.empty()) {
+        last_data = std::move(data);
+      }
+
+      // Move to next event.
+      if (next_start >= remaining.size()) {
+        break;
+      }
+      remaining = remaining.substr(next_start);
+    }
+
+    if (last_data.empty()) {
+      return body;
+    }
+
+    // Verify the last event has matching request ID if one was provided.
+    if (request_id != 0) {
+      auto parsed_or = Json::Factory::loadFromString(last_data);
+      if (parsed_or.ok()) {
+        auto id_or = (*parsed_or)->getInteger("id");
+        if (id_or.ok() && *id_or == request_id) {
+          return last_data;
+        }
+      }
+      // ID didn't match - return body as fallback.
+      return body;
+    }
+
+    return last_data;
+  }
+  return body;
+}
 
 McpMethod parseMethodString(absl::string_view method_str) {
   if (method_str == "initialize")
@@ -66,8 +156,13 @@ McpMethod parseMethodString(absl::string_view method_str) {
 }
 
 BackendStreamCallbacks::BackendStreamCallbacks(const std::string& backend_name,
-                                               std::function<void(BackendResponse)> on_complete)
-    : backend_name_(backend_name), on_complete_(std::move(on_complete)) {
+                                               std::function<void(BackendResponse)> on_complete,
+                                               int64_t request_id, bool aggregate_mode,
+                                               std::weak_ptr<McpRouterFilter> parent,
+                                               bool streaming_enabled)
+    : backend_name_(backend_name), on_complete_(std::move(on_complete)), request_id_(request_id),
+      aggregate_mode_(aggregate_mode), parent_(std::move(parent)),
+      streaming_enabled_(streaming_enabled) {
   response_.backend_name = backend_name;
 }
 
@@ -76,10 +171,31 @@ void BackendStreamCallbacks::onHeaders(Http::ResponseHeaderMapPtr&& headers, boo
     response_.status_code = Http::Utility::getResponseStatus(*headers);
     response_.success = (response_.status_code >= 200 && response_.status_code < 300);
 
-    // Extract session ID from response header
+    // Detect content type.
+    if (headers->ContentType()) {
+      response_.content_type = detectContentType(headers->getContentTypeValue());
+      ENVOY_LOG(debug, "Backend '{}' response content-type: {} (detected: {})", backend_name_,
+                headers->getContentTypeValue(), static_cast<int>(response_.content_type));
+    }
+
+    // Extract session ID from response header.
     auto session_header = headers->get(Http::LowerCaseString(std::string(kSessionIdHeader)));
     if (!session_header.empty()) {
       response_.session_id = std::string(session_header[0]->value().getStringView());
+    }
+
+    // In streaming mode for SSE, forward headers immediately.
+    if (streaming_enabled_ && response_.isSse() && response_.success) {
+      if (auto parent = parent_.lock()) {
+        streaming_started_ = true;
+        parent->pushSseHeaders(std::move(headers), end_stream);
+        // For SSE streaming, we may get end_stream=false on headers.
+        // Don't complete yet - wait for data or actual end_stream.
+        if (end_stream) {
+          complete();
+        }
+        return;
+      }
     }
   }
 
@@ -89,10 +205,90 @@ void BackendStreamCallbacks::onHeaders(Http::ResponseHeaderMapPtr&& headers, boo
 }
 
 void BackendStreamCallbacks::onData(Buffer::Instance& data, bool end_stream) {
+  ENVOY_LOG(debug, "onData Backend '{}' data_size={}, end_stream: {}", backend_name_,
+            data.length(), end_stream);
+
+  // In streaming mode for SSE, forward data immediately without buffering.
+  if (streaming_started_ && streaming_enabled_) {
+    if (auto parent = parent_.lock()) {
+      ENVOY_LOG(debug, "onData Backend '{}': streaming SSE data directly, size={}", backend_name_,
+                data.length());
+      parent->pushSseData(data, end_stream);
+      if (end_stream) {
+        complete();
+      }
+      return;
+    }
+  }
+
+  // Buffer the body for aggregation mode or non-SSE responses.
   response_.body.append(data.toString());
-  if (end_stream) {
+  ENVOY_LOG(debug, "onData Backend '{}' buffered body_size: {}", backend_name_, response_.body.size());
+
+  // Complete on end_stream, or early for SSE aggregation when response is found.
+  ENVOY_LOG(debug, "onData Backend '{}': aggregate_mode={}, isSse={}", backend_name_,
+            aggregate_mode_, response_.isSse());
+  if (end_stream || (aggregate_mode_ && response_.isSse() && hasSseJsonRpcResponse())) {
+    if (!end_stream) {
+      ENVOY_LOG(debug, "Backend '{}' SSE aggregation: found valid response, completing early",
+                backend_name_);
+    }
     complete();
   }
+}
+
+bool BackendStreamCallbacks::hasSseJsonRpcResponse() {
+  // Return cached result if we already found a response.
+  if (found_response_) {
+    return true;
+  }
+
+  if (response_.body.size() <= parse_offset_) {
+    return false;
+  }
+
+  // Parse SSE events incrementally from where we left off.
+  absl::string_view remaining(response_.body);
+  remaining = remaining.substr(parse_offset_);
+
+  while (!remaining.empty()) {
+    // Look for complete SSE events (terminated by blank line).
+    auto [event_end, next_start] = Http::Sse::SseParser::findEventEnd(remaining, false);
+    ENVOY_LOG(debug, "hasSseJsonRpcResponse: remaining_size={}, event_end={}, next_start={}",
+              remaining.size(), event_end, next_start);
+    if (event_end == absl::string_view::npos) {
+      // No complete event found yet.
+      ENVOY_LOG(debug, "hasSseJsonRpcResponse: no complete event found yet");
+      return false;
+    }
+
+    std::string data = Http::Sse::SseParser::extractDataField(remaining.substr(0, event_end));
+    ENVOY_LOG(debug, "hasSseJsonRpcResponse: extracted data_size={}, data='{}'", data.size(),
+              data.substr(0, 100));
+    if (!data.empty()) {
+      // Check if this is a JSON-RPC response (has "result" or "error") with matching ID.
+      auto parsed_or = Json::Factory::loadFromString(data);
+      if (parsed_or.ok()) {
+        auto id_or = (*parsed_or)->getInteger("id");
+        ENVOY_LOG(debug, "hasSseJsonRpcResponse: parsed JSON, id_ok={}, id={}, request_id={}",
+                  id_or.ok(), id_or.ok() ? *id_or : -1, request_id_);
+        if (id_or.ok() && (request_id_ == 0 || *id_or == request_id_)) {
+          response_.extracted_jsonrpc = std::move(data);
+          found_response_ = true;
+          return true;
+        }
+      }
+    }
+
+    // Move to next event and update parse offset.
+    parse_offset_ += next_start;
+    if (next_start >= remaining.size()) {
+      break;
+    }
+    remaining = remaining.substr(next_start);
+  }
+
+  return false;
 }
 
 void BackendStreamCallbacks::onTrailers(Http::ResponseTrailerMapPtr&&) { complete(); }
@@ -102,15 +298,39 @@ void BackendStreamCallbacks::onComplete() { complete(); }
 void BackendStreamCallbacks::onReset() {
   response_.success = false;
   response_.error = "Stream reset";
+  // For streaming mode, notify via error callback if streaming hasn't started yet.
+  if (streaming_enabled_ && !streaming_started_) {
+    if (auto parent = parent_.lock()) {
+      parent->onStreamingError(response_.error);
+    }
+  }
   complete();
 }
 
 void BackendStreamCallbacks::complete() {
   if (!completed_) {
     completed_ = true;
-    ENVOY_LOG(debug, "Backend '{}' complete: status={}, body_size={}", backend_name_,
-              response_.status_code, response_.body.size());
-    on_complete_(std::move(response_));
+    ENVOY_LOG(debug, "Backend '{}' complete: status={}, content_type={}, body_size={}, streaming={}",
+              backend_name_, response_.status_code, static_cast<int>(response_.content_type),
+              response_.body.size(), streaming_started_);
+    
+    // In streaming mode, notify completion via parent method if parent is still alive.
+    if (streaming_enabled_) {
+      if (auto parent = parent_.lock()) {
+        if (streaming_started_) {
+          parent->onStreamingComplete();
+        }
+      } else {
+        ENVOY_LOG(debug, "Backend '{}' complete: parent filter destroyed, ignoring streaming callback",
+                  backend_name_);
+      }
+      return;
+    }
+    
+    // For non-streaming (aggregation) mode, call the regular on_complete.
+    if (on_complete_) {
+      on_complete_(std::move(response_));
+    }
   }
 }
 
@@ -125,6 +345,8 @@ void McpRouterFilter::onDestroy() {
   }
   stream_callbacks_.clear();
   upstream_headers_.clear();
+  aggregation_callback_ = nullptr;
+  single_backend_callback_ = nullptr;
 }
 
 Http::FilterHeadersStatus McpRouterFilter::decodeHeaders(Http::RequestHeaderMap& headers,
@@ -434,13 +656,18 @@ void McpRouterFilter::initializeFanout(AggregationCallback callback) {
     auto expected_count = expected;
     auto agg_callback = aggregation_callback_;
 
+    // Pass request_id and aggregate_mode=true for fanout operations.
+    // This enables early completion when SSE backends return a valid JSON-RPC response,
+    // avoiding the need to wait for end_stream (which never comes for SSE).
     auto stream_cb = std::make_shared<BackendStreamCallbacks>(
-        backend.name, [responses, count, expected_count, agg_callback](BackendResponse resp) {
+        backend.name,
+        [responses, count, expected_count, agg_callback](BackendResponse resp) {
           responses->push_back(std::move(resp));
           if (++(*count) >= expected_count && agg_callback) {
             agg_callback(std::move(*responses));
           }
-        });
+        },
+        request_id_, true /* aggregate_mode */);
 
     // Create per-backend StreamOptions with the backend-specific timeout.
     Http::AsyncClient::StreamOptions backend_options;
@@ -485,6 +712,13 @@ void McpRouterFilter::initializeFanout(AggregationCallback callback) {
 
 void McpRouterFilter::initializeSingleBackend(const McpBackendConfig& backend,
                                               std::function<void(BackendResponse)> callback) {
+  // Delegate to the streaming-aware version with streaming disabled.
+  initializeSingleBackend(backend, std::move(callback), false);
+}
+
+void McpRouterFilter::initializeSingleBackend(const McpBackendConfig& backend,
+                                              std::function<void(BackendResponse)> callback,
+                                              bool streaming_enabled) {
   if (!muxdemux_->isIdle()) {
     ENVOY_LOG(warn, "MuxDemux not idle, cannot start new single backend request for '{}'",
               backend.name);
@@ -495,7 +729,9 @@ void McpRouterFilter::initializeSingleBackend(const McpBackendConfig& backend,
   }
 
   single_backend_callback_ = std::move(callback);
-  auto stream_cb = std::make_shared<BackendStreamCallbacks>(backend.name, single_backend_callback_);
+  auto stream_cb = std::make_shared<BackendStreamCallbacks>(
+      backend.name, single_backend_callback_, 0 /* request_id */, 
+      false /* aggregate_mode */, weak_from_this(), streaming_enabled);
   stream_callbacks_.push_back(stream_cb);
 
   Http::AsyncClient::StreamOptions options;
@@ -544,6 +780,31 @@ void McpRouterFilter::streamData(Buffer::Instance& data, bool end_stream) {
   }
 }
 
+void McpRouterFilter::pushSseHeaders(Http::ResponseHeaderMapPtr&& headers, bool) {
+  // Remove backend's session ID and replace with the request's session ID.
+  headers->remove(Http::LowerCaseString("mcp-session-id"));
+  if (!encoded_session_id_.empty()) {
+    headers->addCopy(Http::LowerCaseString("mcp-session-id"), encoded_session_id_);
+  }
+  
+  ENVOY_LOG(debug, "SSE streaming: forwarding headers to client");
+  decoder_callbacks_->encodeHeaders(std::move(headers), false, "mcp_router");
+}
+
+void McpRouterFilter::pushSseData(Buffer::Instance& data, bool end_stream) {
+  ENVOY_LOG(debug, "SSE streaming: forwarding {} bytes, end_stream={}", data.length(), end_stream);
+  decoder_callbacks_->encodeData(data, end_stream);
+}
+
+void McpRouterFilter::onStreamingError(absl::string_view error) {
+  ENVOY_LOG(warn, "SSE streaming error: {}", error);
+  sendHttpError(500, std::string(error));
+}
+
+void McpRouterFilter::onStreamingComplete() {
+  ENVOY_LOG(debug, "SSE streaming: complete");
+}
+
 void McpRouterFilter::handleInitialize() {
   ENVOY_LOG(debug, "Initialize: setting up fanout to {} backends", config_->backends().size());
 
@@ -564,36 +825,47 @@ void McpRouterFilter::handleInitialize() {
     }
   }
 
-  initializeFanout([this, subject = std::move(subject)](std::vector<BackendResponse> responses) {
-    // TODO(botengyao): handle text/event-stream from backends.
-    std::string response_body = aggregateInitialize(responses);
+  initializeFanout(
+      [weak_self = weak_from_this(), subject = std::move(subject)](std::vector<BackendResponse> responses) {
+        auto self = weak_self.lock();
+        if (!self) {
+          ENVOY_LOG(debug, "Initialize callback ignored: filter destroyed");
+          return;
+        }
+        std::string response_body = self->aggregateInitialize(responses);
 
-    absl::flat_hash_map<std::string, std::string> sessions;
-    for (const auto& resp : responses) {
-      if (resp.success && !resp.session_id.empty()) {
-        sessions[resp.backend_name] = resp.session_id;
-      }
-    }
+        absl::flat_hash_map<std::string, std::string> sessions;
+        for (const auto& resp : responses) {
+          if (resp.success && !resp.session_id.empty()) {
+            sessions[resp.backend_name] = resp.session_id;
+          }
+        }
 
-    if (sessions.empty()) {
-      sendHttpError(500, "All backends failed to initialize");
-      return;
-    }
+        if (sessions.empty()) {
+          self->sendHttpError(500, "All backends failed to initialize");
+          return;
+        }
 
-    std::string composite = SessionCodec::buildCompositeSessionId(route_name_, subject, sessions);
-    std::string encoded_session = SessionCodec::encode(composite);
+        std::string composite =
+            SessionCodec::buildCompositeSessionId(self->route_name_, subject, sessions);
+        std::string encoded_session = SessionCodec::encode(composite);
 
-    sendJsonResponse(response_body, encoded_session);
-  });
+        self->sendJsonResponse(response_body, encoded_session);
+      });
 }
 
 void McpRouterFilter::handleToolsList() {
   ENVOY_LOG(debug, "tools/list: setting up fanout to {} backends", config_->backends().size());
 
-  initializeFanout([this](std::vector<BackendResponse> responses) {
-    std::string response_body = aggregateToolsList(responses);
+  initializeFanout([weak_self = weak_from_this()](std::vector<BackendResponse> responses) {
+    auto self = weak_self.lock();
+    if (!self) {
+      ENVOY_LOG(debug, "tools/list callback ignored: filter destroyed");
+      return;
+    }
+    std::string response_body = self->aggregateToolsList(responses);
     ENVOY_LOG(debug, "tools/list: response body: {}", response_body);
-    sendJsonResponse(response_body, encoded_session_id_);
+    self->sendJsonResponse(response_body, self->encoded_session_id_);
   });
 }
 
@@ -611,20 +883,37 @@ void McpRouterFilter::handleToolsCall() {
     return;
   }
 
-  // Store the unprefixed tool name for body rewriting
+  // Store the unprefixed tool name for body rewriting.
   unprefixed_tool_name_ = actual_tool;
   needs_body_rewrite_ = (tool_name_ != unprefixed_tool_name_);
 
   ENVOY_LOG(debug, "tools/call: backend='{}', tool='{}' -> '{}', needs_rewrite={}", backend_name,
             tool_name_, actual_tool, needs_body_rewrite_);
 
-  initializeSingleBackend(*backend, [this](BackendResponse resp) {
-    if (resp.success) {
-      sendJsonResponse(resp.body, encoded_session_id_);
-    } else {
-      sendHttpError(500, resp.error.empty() ? "Backend request failed" : resp.error);
-    }
-  });
+  // Use streaming mode for SSE pass-through, with fallback for JSON responses.
+  initializeSingleBackend(
+      *backend,
+      [weak_self = weak_from_this()](BackendResponse resp) {
+        auto self = weak_self.lock();
+        if (!self) {
+          ENVOY_LOG(debug, "tools/call callback ignored: filter destroyed");
+          return;
+        }
+        // This callback is invoked for non-SSE responses (JSON) or errors.
+        // SSE responses are streamed directly via pushSse* methods on the parent filter.
+        if (resp.success) {
+          if (resp.isSse()) {
+            // Should not reach here for successful SSE in streaming mode.
+            ENVOY_LOG(warn, "tools/call: SSE response reached non-streaming path");
+            self->sendHttpError(500, "Internal error: streaming failed for SSE response");
+          } else {
+            self->sendJsonResponse(resp.body, self->encoded_session_id_);
+          }
+        } else {
+          self->sendHttpError(500, resp.error.empty() ? "Backend request failed" : resp.error);
+        }
+      },
+      true /* streaming_enabled */);
 }
 
 void McpRouterFilter::handlePing() {
@@ -642,10 +931,26 @@ void McpRouterFilter::handleNotificationInitialized() {
             config_->backends().size());
 
   // Forward notifications/initialized to all backends and wait for responses.
-  initializeFanout([this](std::vector<BackendResponse>) {
+  initializeFanout([weak_self = weak_from_this()](std::vector<BackendResponse>) {
+    auto self = weak_self.lock();
+    if (!self) {
+      ENVOY_LOG(debug, "notifications/initialized callback ignored: filter destroyed");
+      return;
+    }
     // All backends have responded (or failed), send 202 to client.
-    sendAccepted();
+    self->sendAccepted();
   });
+}
+
+std::string McpRouterFilter::extractJsonRpcFromResponse(const BackendResponse& response) {
+  // Handle both JSON and SSE responses uniformly.
+  // For SSE responses, finds the event with matching request ID.
+  std::string result = response.getJsonRpcBody(request_id_);
+  ENVOY_LOG(debug, "extractJsonRpcFromResponse: backend='{}', content_type={}, body_size={}, "
+                   "extracted_size={}",
+            response.backend_name, static_cast<int>(response.content_type), response.body.size(),
+            result.size());
+  return result;
 }
 
 std::string McpRouterFilter::aggregateInitialize(const std::vector<BackendResponse>& responses) {
@@ -670,81 +975,105 @@ std::string McpRouterFilter::aggregateInitialize(const std::vector<BackendRespon
 std::string McpRouterFilter::aggregateToolsList(const std::vector<BackendResponse>& responses) {
   const bool is_multiplexing = config_->isMultiplexing();
 
-  std::string output;
-  Json::StringStreamer streamer(output);
-  {
-    auto root = streamer.makeRootMap();
-    root->addKey("jsonrpc");
-    root->addString("2.0");
-    root->addKey("id");
-    root->addNumber(request_id_);
-    root->addKey("result");
-    {
-      auto result_map = root->addMap();
-      result_map->addKey("tools");
+  // Build tools array as a vector of JSON strings.
+  std::vector<std::string> tool_jsons;
+
+  for (const auto& resp : responses) {
+    if (!resp.success) {
+      ENVOY_LOG(debug, "Skipping failed backend '{}' in tools/list aggregation", resp.backend_name);
+      continue;
+    }
+
+    // Extract JSON-RPC body (handles both JSON and SSE responses).
+    std::string json_body = extractJsonRpcFromResponse(resp);
+    if (json_body.empty()) {
+      ENVOY_LOG(warn, "Empty response body from backend '{}'", resp.backend_name);
+      continue;
+    }
+
+    ENVOY_LOG(debug, "Aggregating tools list from backend '{}' (content_type={})",
+              resp.backend_name, static_cast<int>(resp.content_type));
+
+    auto parsed_or = Json::Factory::loadFromString(json_body);
+    if (!parsed_or.ok()) {
+      ENVOY_LOG(warn, "Failed to parse JSON from backend '{}': {}", resp.backend_name,
+                parsed_or.status().message());
+      continue;
+    }
+
+    Json::ObjectSharedPtr parsed_body = *parsed_or;
+
+    auto result_or = parsed_body->getObject("result");
+    if (!result_or.ok() || !(*result_or)) {
+      ENVOY_LOG(warn, "No 'result' object in response from backend '{}'", resp.backend_name);
+      continue;
+    }
+
+    auto tools_or = (*result_or)->getObjectArray("tools");
+    if (!tools_or.ok()) {
+      ENVOY_LOG(warn, "No 'tools' array in result from backend '{}'", resp.backend_name);
+      continue;
+    }
+
+    for (const auto& tool : *tools_or) {
+      if (!tool || !tool->isObject()) {
+        continue;
+      }
+
+      auto name_or = tool->getString("name");
+      if (!name_or.ok()) {
+        continue;
+      }
+
+      // Build each tool as a JSON object string.
+      std::string tool_json;
+      Json::StringStreamer tool_streamer(tool_json);
       {
-        auto tools_array = result_map->addArray();
+        auto tool_map = tool_streamer.makeRootMap();
 
-        for (const auto& resp : responses) {
-          if (!resp.success) {
-            continue;
-          }
-          ENVOY_LOG(debug, "Aggregating tools list from backend '{}': {}", resp.backend_name,
-                    resp.body);
-          auto parsed_or = Json::Factory::loadFromString(resp.body);
-          if (!parsed_or.ok()) {
-            ENVOY_LOG(warn, "Failed to parse JSON from backend '{}': {}", resp.backend_name,
-                      parsed_or.status().message());
-            continue;
-          }
+        // Name (with optional prefix).
+        tool_map->addKey("name");
+        tool_map->addString(is_multiplexing
+                                ? absl::StrCat(resp.backend_name, kNameDelimiter, *name_or)
+                                : *name_or);
 
-          Json::ObjectSharedPtr parsed_body = *parsed_or;
+        // Title (if present).
+        auto title_or = tool->getString("title", "");
+        if (title_or.ok() && !title_or->empty()) {
+          tool_map->addKey("title");
+          tool_map->addString(*title_or);
+        }
 
-          auto result_or = parsed_body->getObject("result");
-          if (!result_or.ok() || !(*result_or)) {
-            continue;
-          }
+        // Description (if present).
+        auto desc_or = tool->getString("description", "");
+        if (desc_or.ok() && !desc_or->empty()) {
+          tool_map->addKey("description");
+          tool_map->addString(*desc_or);
+        }
 
-          auto tools_or = (*result_or)->getObjectArray("tools");
-          if (!tools_or.ok()) {
-            continue;
-          }
+        // InputSchema will be appended as raw JSON after the streamer scope closes.
+      }
 
-          for (const auto& tool : *tools_or) {
-            if (!tool || !tool->isObject()) {
-              continue;
-            }
-
-            auto name_or = tool->getString("name");
-            if (!name_or.ok()) {
-              continue;
-            }
-
-            auto tool_map = tools_array->addMap();
-            tool_map->addKey("name");
-            tool_map->addString(is_multiplexing
-                                    ? absl::StrCat(resp.backend_name, kNameDelimiter, *name_or)
-                                    : *name_or);
-
-            auto desc_or = tool->getString("description", "");
-            if (desc_or.ok() && !desc_or->empty()) {
-              tool_map->addKey("description");
-              tool_map->addString(*desc_or);
-            }
-
-            if (tool->hasObject("inputSchema")) {
-              tool_map->addKey("inputSchema");
-              auto schema_map = tool_map->addMap();
-              schema_map->addKey("type");
-              schema_map->addString("object");
-            }
-          }
+      // Append inputSchema as raw JSON if present.
+      auto input_schema_or = tool->getObject("inputSchema");
+      if (input_schema_or.ok() && *input_schema_or) {
+        // Remove trailing '}' from tool_json, add inputSchema, then close.
+        if (!tool_json.empty() && tool_json.back() == '}') {
+          tool_json.pop_back();
+          tool_json += ",\"inputSchema\":";
+          tool_json += (*input_schema_or)->asJsonString();
+          tool_json += "}";
         }
       }
+
+      tool_jsons.push_back(std::move(tool_json));
     }
   }
 
-  return output;
+  // Build the final response.
+  std::string tools_array = absl::StrJoin(tool_jsons, ",");
+  return absl::StrCat(R"({"jsonrpc":"2.0","id":)", request_id_,
+                      R"(,"result":{"tools":[)", tools_array, "]}}");
 }
 
 Http::RequestHeaderMapPtr
@@ -752,16 +1081,20 @@ McpRouterFilter::createUpstreamHeaders(const McpBackendConfig& backend,
                                        const std::string& backend_session_id) {
   auto headers = Http::RequestHeaderMapImpl::create();
 
-  // Set required headers for MCP backend
+  // Set required headers for MCP backend.
   headers->setMethod(Http::Headers::get().MethodValues.Post);
   headers->setPath(backend.path);
-  // Use host_rewrite_literal if configured, otherwise pass through original host
+  // Use host_rewrite_literal if configured, otherwise pass through original host.
   if (!backend.host_rewrite_literal.empty()) {
     headers->setHost(backend.host_rewrite_literal);
   } else if (request_headers_ != nullptr) {
     headers->setHost(request_headers_->getHostValue());
   }
-  headers->setContentType("application/json");
+  headers->setContentType(std::string(kContentTypeJson));
+
+  // Accept both JSON and SSE responses.
+  headers->addCopy(Http::LowerCaseString("accept"),
+                   absl::StrCat(kContentTypeSse, ", ", kContentTypeJson));
 
   if (!backend_session_id.empty()) {
     headers->addCopy(Http::LowerCaseString(std::string(kSessionIdHeader)), backend_session_id);
@@ -792,7 +1125,7 @@ McpRouterFilter::createUpstreamHeaders(const McpBackendConfig& backend,
 void McpRouterFilter::sendJsonResponse(const std::string& body, const std::string& session_id) {
   auto headers = Http::ResponseHeaderMapImpl::create();
   headers->setStatus(200);
-  headers->setContentType("application/json");
+  headers->setContentType(std::string(kContentTypeJson));
   headers->setContentLength(body.length());
 
   if (!session_id.empty()) {
@@ -806,6 +1139,7 @@ void McpRouterFilter::sendJsonResponse(const std::string& body, const std::strin
     decoder_callbacks_->encodeData(response_body, true);
   }
 }
+
 
 void McpRouterFilter::sendAccepted() {
   auto headers = Http::ResponseHeaderMapImpl::create();

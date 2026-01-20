@@ -639,6 +639,173 @@ TEST_P(McpRouterIntegrationTest, ToolCallWithUnknownBackendReturns400) {
   EXPECT_EQ("400", response->headers().getStatusValue());
 }
 
+// Test tools/call with SSE response from backend returns SSE to client
+TEST_P(McpRouterIntegrationTest, ToolCallWithSseResponse) {
+  initializeFilter();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  const std::string request_body = R"({
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "id": 1,
+    "params": {
+      "name": "time__get_current_time",
+      "arguments": {}
+    }
+  })";
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/mcp"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"accept", "application/json"},
+                                     {"accept", "text/event-stream"},
+                                     {"content-type", "application/json"}},
+      request_body);
+
+  // Request should be routed to time backend
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, time_backend_connection_));
+  ASSERT_TRUE(time_backend_connection_->waitForNewStream(*dispatcher_, time_backend_request_));
+  ASSERT_TRUE(time_backend_request_->waitForEndStream(*dispatcher_));
+
+  // Backend responds with SSE content type
+  const std::string sse_data =
+      R"({"jsonrpc":"2.0","id":1,"result":{"content":[{"type":"text","text":"2023-10-27T10:00:00Z"}]}})";
+  const std::string sse_response = "data: " + sse_data + "\n\n";
+
+  time_backend_request_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"},
+                                      {"content-type", "text/event-stream"}},
+      false);
+  Buffer::OwnedImpl response_body(sse_response);
+  time_backend_request_->encodeData(response_body, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  // Response should be SSE format
+  EXPECT_EQ("text/event-stream", response->headers().getContentTypeValue());
+  EXPECT_THAT(response->body(), testing::HasSubstr("data:"));
+  EXPECT_THAT(response->body(), testing::HasSubstr("2023-10-27T10:00:00Z"));
+}
+
+// Test tools/list aggregates SSE responses from backends into JSON
+TEST_P(McpRouterIntegrationTest, ToolsListAggregatesSseResponses) {
+  initializeFilter();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  const std::string request_body = R"({
+    "jsonrpc": "2.0",
+    "method": "tools/list",
+    "id": 2
+  })";
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/mcp"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"accept", "application/json"},
+                                     {"accept", "text/event-stream"},
+                                     {"content-type", "application/json"}},
+      request_body);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, time_backend_connection_));
+  ASSERT_TRUE(time_backend_connection_->waitForNewStream(*dispatcher_, time_backend_request_));
+  ASSERT_TRUE(time_backend_request_->waitForEndStream(*dispatcher_));
+
+  ASSERT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, tools_backend_connection_));
+  ASSERT_TRUE(tools_backend_connection_->waitForNewStream(*dispatcher_, tools_backend_request_));
+  ASSERT_TRUE(tools_backend_request_->waitForEndStream(*dispatcher_));
+
+  // Time backend responds with SSE
+  const std::string time_json =
+      R"({"jsonrpc":"2.0","id":2,"result":{"tools":[{"name":"get_current_time","description":"Get the current time"}]}})";
+  const std::string time_sse = "data: " + time_json + "\n\n";
+  time_backend_request_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"},
+                                      {"content-type", "text/event-stream"}},
+      false);
+  Buffer::OwnedImpl time_body(time_sse);
+  time_backend_request_->encodeData(time_body, true);
+
+  // Tools backend responds with regular JSON
+  const std::string tools_response = R"({
+    "jsonrpc": "2.0",
+    "id": 2,
+    "result": {
+      "tools": [
+        {"name": "calculator", "description": "Perform calculations"}
+      ]
+    }
+  })";
+  tools_backend_request_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
+      false);
+  Buffer::OwnedImpl tools_body(tools_response);
+  tools_backend_request_->encodeData(tools_body, true);
+
+  // Wait for aggregated response
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  // Aggregated response should be JSON (not SSE) and contain tools from both backends
+  EXPECT_EQ("application/json", response->headers().getContentTypeValue());
+  EXPECT_THAT(response->body(), testing::HasSubstr("time__get_current_time"));
+  EXPECT_THAT(response->body(), testing::HasSubstr("tools__calculator"));
+}
+
+// Test SSE response with multiple data events extracts last event for tools/call
+TEST_P(McpRouterIntegrationTest, SseResponseMultipleEventsExtractsLast) {
+  initializeFilter();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  const std::string request_body = R"({
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "id": 3,
+    "params": {
+      "name": "time__long_running_task",
+      "arguments": {}
+    }
+  })";
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/mcp"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"accept", "application/json"},
+                                     {"accept", "text/event-stream"},
+                                     {"content-type", "application/json"}},
+      request_body);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, time_backend_connection_));
+  ASSERT_TRUE(time_backend_connection_->waitForNewStream(*dispatcher_, time_backend_request_));
+  ASSERT_TRUE(time_backend_request_->waitForEndStream(*dispatcher_));
+
+  // Backend responds with SSE containing multiple events (progress + final result)
+  const std::string sse_response =
+      "data: {\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"progress\",\"params\":{\"progress\":50}}\n\n"
+      "data: {\"jsonrpc\":\"2.0\",\"id\":3,\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"completed\"}]}}\n\n";
+
+  time_backend_request_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"},
+                                      {"content-type", "text/event-stream"}},
+      false);
+  Buffer::OwnedImpl response_body(sse_response);
+  time_backend_request_->encodeData(response_body, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  // The final response should be SSE with the actual result
+  EXPECT_EQ("text/event-stream", response->headers().getContentTypeValue());
+  EXPECT_THAT(response->body(), testing::HasSubstr("completed"));
+}
+
 class McpRouterSubjectValidationIntegrationTest : public McpRouterIntegrationTest {
 public:
   void initializeFilterWithSubjectValidation() {
