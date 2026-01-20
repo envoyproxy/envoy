@@ -351,6 +351,10 @@ func envoyGoFilterOnHttpLog(r *C.httpRequest, logType uint64,
 //export envoyGoFilterOnHttpStreamComplete
 func envoyGoFilterOnHttpStreamComplete(r *C.httpRequest) {
 	req := getRequest(r)
+	if req == nil {
+		return
+	}
+
 	defer req.recoverPanic()
 
 	f := req.httpFilter
@@ -360,6 +364,10 @@ func envoyGoFilterOnHttpStreamComplete(r *C.httpRequest) {
 //export envoyGoFilterOnHttpDestroy
 func envoyGoFilterOnHttpDestroy(r *C.httpRequest, reason uint64) {
 	req := getRequest(r)
+	if req == nil {
+		return
+	}
+
 	// do nothing even when req.panic is true, since filter is already destroying.
 	defer req.recoverPanic()
 
