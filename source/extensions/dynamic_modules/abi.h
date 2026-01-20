@@ -5671,6 +5671,311 @@ void envoy_dynamic_module_callback_bootstrap_extension_iterate_gauges(
     envoy_dynamic_module_type_bootstrap_extension_envoy_ptr extension_envoy_ptr,
     envoy_dynamic_module_type_gauge_iterator_fn iterator_fn, void* user_data);
 
+// =============================================================================
+// ======================== Upstream HTTP-TCP Bridge ===========================
+// =============================================================================
+//
+// This extension enables custom HTTP-to-TCP protocol bridging via dynamic modules.
+// The bridge receives HTTP requests, transforms them to TCP data to send upstream,
+// and transforms TCP responses back to HTTP responses.
+//
+// The module does not manage TCP connections. Here, Envoy handles connection pooling.
+// The module only transforms data between HTTP and TCP protocols.
+
+// =============================================================================
+// Upstream HTTP-TCP Bridge Types
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_type_upstream_http_tcp_bridge_config_module_ptr is a pointer to an in-module
+ * bridge configuration. This is created by the module when the configuration is loaded.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer. The pointer can
+ * be released when envoy_dynamic_module_on_upstream_http_tcp_bridge_config_destroy is called.
+ */
+typedef const void* envoy_dynamic_module_type_upstream_http_tcp_bridge_config_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr is a raw pointer to the
+ * DynamicModuleHttpTcpBridge class in Envoy. This is passed to the module for callbacks.
+ *
+ * OWNERSHIP: Envoy owns the pointer. The pointer is valid only during the event hook calls.
+ */
+typedef void* envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_upstream_http_tcp_bridge_module_ptr is a pointer to an in-module
+ * bridge instance. This is created per HTTP stream.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer. The pointer can
+ * be released when envoy_dynamic_module_on_upstream_http_tcp_bridge_destroy is called.
+ */
+typedef const void* envoy_dynamic_module_type_upstream_http_tcp_bridge_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_upstream_http_tcp_bridge_status represents the status returned by
+ * the bridge event hooks.
+ */
+typedef enum {
+  // Continue processing and send the buffer to upstream (for encode) or downstream (for decode).
+  envoy_dynamic_module_type_upstream_http_tcp_bridge_status_Continue = 0,
+  // Stop and buffer data. Only valid when end_of_stream is false.
+  envoy_dynamic_module_type_upstream_http_tcp_bridge_status_StopAndBuffer = 1,
+  // End the stream. This terminates the request/response.
+  envoy_dynamic_module_type_upstream_http_tcp_bridge_status_EndStream = 2,
+} envoy_dynamic_module_type_upstream_http_tcp_bridge_status;
+
+// =============================================================================
+// Upstream HTTP-TCP Bridge Event Hooks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_on_upstream_http_tcp_bridge_config_new is called by the main thread when
+ * a new bridge configuration is loaded.
+ *
+ * @param name is the name identifying the bridge implementation in the module.
+ * @param config is the configuration bytes for the module.
+ * @return envoy_dynamic_module_type_upstream_http_tcp_bridge_config_module_ptr is the pointer to
+ * the in-module configuration. Returning nullptr indicates a failure and the configuration will
+ * be rejected.
+ */
+envoy_dynamic_module_type_upstream_http_tcp_bridge_config_module_ptr
+envoy_dynamic_module_on_upstream_http_tcp_bridge_config_new(
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config);
+
+/**
+ * envoy_dynamic_module_on_upstream_http_tcp_bridge_config_destroy is called when the bridge
+ * configuration is destroyed. The module should release any resources associated with it.
+ *
+ * @param config_ptr is the pointer to the in-module configuration.
+ */
+void envoy_dynamic_module_on_upstream_http_tcp_bridge_config_destroy(
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_config_module_ptr config_ptr);
+
+/**
+ * envoy_dynamic_module_on_upstream_http_tcp_bridge_new is called when a new bridge instance is
+ * created for each HTTP stream.
+ *
+ * @param config_ptr is the pointer to the in-module configuration.
+ * @param bridge_envoy_ptr is the pointer to the Envoy bridge object for callbacks.
+ * @return envoy_dynamic_module_type_upstream_http_tcp_bridge_module_ptr is the pointer to the
+ * in-module bridge instance. Returning nullptr indicates a failure.
+ */
+envoy_dynamic_module_type_upstream_http_tcp_bridge_module_ptr
+envoy_dynamic_module_on_upstream_http_tcp_bridge_new(
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_config_module_ptr config_ptr,
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_on_upstream_http_tcp_bridge_encode_headers is called when HTTP request
+ * headers are received from downstream. The module should transform the headers to TCP data.
+ *
+ * @param bridge_envoy_ptr is the pointer to the Envoy bridge object.
+ * @param bridge_module_ptr is the pointer to the in-module bridge instance.
+ * @param end_of_stream is true if this is the final data frame.
+ * @return envoy_dynamic_module_type_upstream_http_tcp_bridge_status is the processing status.
+ */
+envoy_dynamic_module_type_upstream_http_tcp_bridge_status
+envoy_dynamic_module_on_upstream_http_tcp_bridge_encode_headers(
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr,
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_module_ptr bridge_module_ptr,
+    bool end_of_stream);
+
+/**
+ * envoy_dynamic_module_on_upstream_http_tcp_bridge_encode_data is called when HTTP request body
+ * data is received from downstream. The module should transform the data to TCP data.
+ *
+ * @param bridge_envoy_ptr is the pointer to the Envoy bridge object.
+ * @param bridge_module_ptr is the pointer to the in-module bridge instance.
+ * @param end_of_stream is true if this is the final data frame.
+ * @return envoy_dynamic_module_type_upstream_http_tcp_bridge_status is the processing status.
+ */
+envoy_dynamic_module_type_upstream_http_tcp_bridge_status
+envoy_dynamic_module_on_upstream_http_tcp_bridge_encode_data(
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr,
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_module_ptr bridge_module_ptr,
+    bool end_of_stream);
+
+/**
+ * envoy_dynamic_module_on_upstream_http_tcp_bridge_on_upstream_data is called when TCP data is
+ * received from the upstream server. The module should transform it to HTTP response data.
+ *
+ * @param bridge_envoy_ptr is the pointer to the Envoy bridge object.
+ * @param bridge_module_ptr is the pointer to the in-module bridge instance.
+ * @param end_of_stream is true if this is the final data frame.
+ * @return envoy_dynamic_module_type_upstream_http_tcp_bridge_status is the processing status.
+ */
+envoy_dynamic_module_type_upstream_http_tcp_bridge_status
+envoy_dynamic_module_on_upstream_http_tcp_bridge_on_upstream_data(
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr,
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_module_ptr bridge_module_ptr,
+    bool end_of_stream);
+
+/**
+ * envoy_dynamic_module_on_upstream_http_tcp_bridge_destroy is called when the bridge instance is
+ * destroyed. The module should release any resources associated with it.
+ *
+ * @param bridge_module_ptr is the pointer to the in-module bridge instance.
+ */
+void envoy_dynamic_module_on_upstream_http_tcp_bridge_destroy(
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_module_ptr bridge_module_ptr);
+
+// =============================================================================
+// Upstream HTTP-TCP Bridge Callbacks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_headers_count returns the
+ * number of request headers.
+ *
+ * @param bridge_envoy_ptr is the pointer to the Envoy bridge object.
+ * @return the number of request headers.
+ */
+size_t envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_headers_count(
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_header returns a request
+ * header at the given index.
+ *
+ * @param bridge_envoy_ptr is the pointer to the Envoy bridge object.
+ * @param index is the index of the header to retrieve.
+ * @param key is the output for the header key.
+ * @param value is the output for the header value.
+ * @return true if the header was retrieved, false if the index is out of bounds.
+ */
+bool envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_header(
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr, size_t index,
+    envoy_dynamic_module_type_envoy_buffer* key, envoy_dynamic_module_type_envoy_buffer* value);
+
+/**
+ * envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_header_value returns the
+ * value of a request header by key. If there are multiple values, returns the first one.
+ *
+ * @param bridge_envoy_ptr is the pointer to the Envoy bridge object.
+ * @param key is the header key to look up.
+ * @param value is the output for the header value.
+ * @return true if the header was found, false otherwise.
+ */
+bool envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_header_value(
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* value);
+
+/**
+ * envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_upstream_buffer returns the current
+ * buffer that will be sent to upstream. The module can modify this buffer.
+ *
+ * @param bridge_envoy_ptr is the pointer to the Envoy bridge object.
+ * @param result_buffer_ptr is the output for the buffer instance pointer.
+ * @param result_buffer_length is the output for the buffer length.
+ */
+void envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_upstream_buffer(
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr,
+    uintptr_t* result_buffer_ptr, size_t* result_buffer_length);
+
+/**
+ * envoy_dynamic_module_callback_upstream_http_tcp_bridge_set_upstream_buffer replaces the content
+ * of the upstream buffer.
+ *
+ * @param bridge_envoy_ptr is the pointer to the Envoy bridge object.
+ * @param data is the new data to set.
+ */
+void envoy_dynamic_module_callback_upstream_http_tcp_bridge_set_upstream_buffer(
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer data);
+
+/**
+ * envoy_dynamic_module_callback_upstream_http_tcp_bridge_append_upstream_buffer appends data to
+ * the upstream buffer.
+ *
+ * @param bridge_envoy_ptr is the pointer to the Envoy bridge object.
+ * @param data is the data to append.
+ */
+void envoy_dynamic_module_callback_upstream_http_tcp_bridge_append_upstream_buffer(
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer data);
+
+/**
+ * envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_downstream_buffer returns the current
+ * buffer that contains data received from upstream, to be sent to downstream.
+ *
+ * @param bridge_envoy_ptr is the pointer to the Envoy bridge object.
+ * @param result_buffer_ptr is the output for the buffer instance pointer.
+ * @param result_buffer_length is the output for the buffer length.
+ */
+void envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_downstream_buffer(
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr,
+    uintptr_t* result_buffer_ptr, size_t* result_buffer_length);
+
+/**
+ * envoy_dynamic_module_callback_upstream_http_tcp_bridge_drain_downstream_buffer drains (removes)
+ * bytes from the beginning of the downstream buffer.
+ *
+ * @param bridge_envoy_ptr is the pointer to the Envoy bridge object.
+ * @param length is the number of bytes to drain.
+ */
+void envoy_dynamic_module_callback_upstream_http_tcp_bridge_drain_downstream_buffer(
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr, size_t length);
+
+/**
+ * envoy_dynamic_module_callback_upstream_http_tcp_bridge_set_response_header sets a response
+ * header. If the header already exists, it is replaced.
+ *
+ * @param bridge_envoy_ptr is the pointer to the Envoy bridge object.
+ * @param key is the header key.
+ * @param value is the header value.
+ * @return true if the header was set successfully, false otherwise.
+ */
+bool envoy_dynamic_module_callback_upstream_http_tcp_bridge_set_response_header(
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_upstream_http_tcp_bridge_add_response_header adds a response
+ * header. If the header already exists, the value is appended.
+ *
+ * @param bridge_envoy_ptr is the pointer to the Envoy bridge object.
+ * @param key is the header key.
+ * @param value is the header value.
+ * @return true if the header was added successfully, false otherwise.
+ */
+bool envoy_dynamic_module_callback_upstream_http_tcp_bridge_add_response_header(
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_upstream_http_tcp_bridge_send_response sends the response headers
+ * and any buffered body data to downstream. This should be called from on_upstream_data.
+ *
+ * @param bridge_envoy_ptr is the pointer to the Envoy bridge object.
+ * @param end_of_stream is true if this is the final response.
+ */
+void envoy_dynamic_module_callback_upstream_http_tcp_bridge_send_response(
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr,
+    bool end_of_stream);
+
+/**
+ * envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_route_name returns the name of the
+ * matched route.
+ *
+ * @param bridge_envoy_ptr is the pointer to the Envoy bridge object.
+ * @param result is the output for the route name.
+ */
+void envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_route_name(
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_cluster_name returns the name of the
+ * cluster the request is routed to.
+ *
+ * @param bridge_envoy_ptr is the pointer to the Envoy bridge object.
+ * @param result is the output for the cluster name.
+ */
+void envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_cluster_name(
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
 #ifdef __cplusplus
 }
 #endif
