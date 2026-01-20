@@ -65,6 +65,23 @@ def _envoy_repo_impl(repository_ctx):
 
     """
 
+    # This is a workaround for the issue in aspect_bazel_lib. The @yq repo
+    # created by that library creates a synlink to the actual yq tool, but
+    # it does not make sure that the yq tool actually has been downloaded,
+    # so sometimes, semi-randomly, we endup with a broken yq link.
+    #
+    # To force bazel to actually download the right yq tool, we explicitly
+    # add platfrom specific repositories as a dependency of this rule and
+    # then we try to explicitly read the files from those repositories
+    # (without actually executing them).
+    #
+    # It's a dirty hack, but this issue will not get addressed upstream in
+    # the aspect_bazel_lib and solving it with a patch is a bit tricky, so
+    # we are working around that with this hack as the simplest way to deal
+    # with it.
+    for target in repository_ctx.attr.deps:
+      repository_ctx.read(target)
+
     # parse container information for use in RBE
     json_result = repository_ctx.execute([
         repository_ctx.path(repository_ctx.attr.yq),
@@ -261,7 +278,8 @@ _envoy_repo = repository_rule(
         "envoy_version": attr.label(default = "@envoy//:VERSION.txt"),
         "envoy_api_version": attr.label(default = "@envoy//:API_VERSION.txt"),
         "envoy_ci_config": attr.label(default = "@envoy//:.github/config.yml"),
-        "yq": attr.label(default = "@yq"),
+	"yq": attr.label(default = "@yq"),
+	"deps": attr.label_list(default = ["@yq_linux_amd64//:yq", "@yq_linux_arm64//:yq"]),
     },
     environ = ["BAZEL_LLVM_PATH"],
 )
