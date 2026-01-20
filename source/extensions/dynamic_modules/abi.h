@@ -469,7 +469,7 @@ bool envoy_dynamic_module_callback_log_enabled(envoy_dynamic_module_type_log_lev
 /**
  * envoy_dynamic_module_callback_get_concurrency may be called by the dynamic
  * module in envoy_dynamic_module_on_program_init to get the configured concurrency of the server.
- * NOTE: This function must by called on the main thread.
+ * NOTE: This function must be called on the main thread.
  *
  * @return number of worker threads (concurrency) that the server is configured to use.
  */
@@ -4561,7 +4561,7 @@ envoy_dynamic_module_callback_udp_listener_filter_record_histogram_value(
     envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr, size_t id,
     uint64_t value);
 
-// --------------------- UDP Listener Filter Callbacks - Metrics ---------------
+// --------------------- UDP Listener Filter Callbacks - Misc ---------------
 
 /**
  * envoy_dynamic_module_callback_udp_listener_filter_get_worker_index is called by the module to get

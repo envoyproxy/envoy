@@ -1947,6 +1947,16 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest,
   envoy_dynamic_module_callback_network_filter_config_scheduler_delete(scheduler);
 }
 
+// =============================================================================
+// Misc ABI Callback Tests
+// =============================================================================
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetWorkerIndex) {
+  uint32_t worker_index =
+      envoy_dynamic_module_callback_network_filter_get_worker_index(filterPtr());
+  EXPECT_EQ(0u, worker_index);
+}
+
 } // namespace NetworkFilters
 } // namespace DynamicModules
 } // namespace Extensions
