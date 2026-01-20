@@ -34,23 +34,24 @@ TEST(JsonContentParserConfigTest, ValidConfig) {
 }
 
 TEST(JsonContentParserConfigTest, OnMissingWithEmptyValue) {
-  // Test that on_missing with explicit value but empty value throws exception
-  const std::string yaml = R"EOF(
-  rules:
-    - selectors:
-        - key: "usage"
-      on_present:
-        metadata_namespace: "envoy.lb"
-        key: "tokens"
-        type: NUMBER
-      on_missing:
-        metadata_namespace: "envoy.lb"
-        key: "missing"
-        value: {}
-  )EOF";
-
   envoy::extensions::sse_content_parsers::json::v3::JsonContentParser proto_config;
-  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+
+  auto* rule = proto_config.add_rules();
+  auto* selector = rule->add_selectors();
+  selector->set_key("usage");
+
+  // Set on_present (required to pass the "at least one action" validation)
+  auto* on_present = rule->mutable_on_present();
+  on_present->set_metadata_namespace("envoy.lb");
+  on_present->set_key("tokens");
+  on_present->set_type(
+      envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata::NUMBER);
+
+  // Set on_missing with explicit value field but leave the Value empty (kind_case == 0)
+  auto* on_missing = rule->mutable_on_missing();
+  on_missing->set_metadata_namespace("envoy.lb");
+  on_missing->set_key("missing");
+  on_missing->mutable_value(); // This sets the value oneof but leaves Value empty
 
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
@@ -60,23 +61,24 @@ TEST(JsonContentParserConfigTest, OnMissingWithEmptyValue) {
 }
 
 TEST(JsonContentParserConfigTest, OnErrorWithEmptyValue) {
-  // Test that on_error with explicit value but empty value throws exception
-  const std::string yaml = R"EOF(
-  rules:
-    - selectors:
-        - key: "usage"
-      on_present:
-        metadata_namespace: "envoy.lb"
-        key: "tokens"
-        type: NUMBER
-      on_error:
-        metadata_namespace: "envoy.lb"
-        key: "error"
-        value: {}
-  )EOF";
-
   envoy::extensions::sse_content_parsers::json::v3::JsonContentParser proto_config;
-  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+
+  auto* rule = proto_config.add_rules();
+  auto* selector = rule->add_selectors();
+  selector->set_key("usage");
+
+  // Set on_present (required to pass the "at least one action" validation)
+  auto* on_present = rule->mutable_on_present();
+  on_present->set_metadata_namespace("envoy.lb");
+  on_present->set_key("tokens");
+  on_present->set_type(
+      envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata::NUMBER);
+
+  // Set on_error with explicit value field but leave the Value empty (kind_case == 0)
+  auto* on_error = rule->mutable_on_error();
+  on_error->set_metadata_namespace("envoy.lb");
+  on_error->set_key("error");
+  on_error->mutable_value(); // This sets the value oneof but leaves Value empty
 
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
