@@ -162,10 +162,8 @@ message OAuth2Config {
     BASIC_AUTH = 1;
 
     // The client will be authenticated using mutual TLS (mTLS) with a client certificate.
-    // The ``client_secret`` is not required and will not be sent in the request to the
-    // authorization server.
-    // The client certificate must be configured in the cluster used by ``token_endpoint`` via
-    // transport socket configuration.
+    // The ``client_secret`` is not required and will not be sent in the request.
+    // The client certificate must be configured in the cluster's transport socket configuration.
     // This implements OAuth 2.0 Mutual-TLS Client Authentication as defined in RFC 8705.
     TLS_CLIENT_AUTH = 2;
   }
