@@ -32,7 +32,8 @@ void McpParserConfig::initializeDefaults() {
   addMethodConfig(Methods::RESOURCES_SUBSCRIBE, {AttributeExtractionRule("params.uri")});
   addMethodConfig(Methods::RESOURCES_UNSUBSCRIBE, {AttributeExtractionRule("params.uri")});
 
-  // Prompts
+  // Prompts.
+  addMethodConfig(Methods::PROMPTS_LIST, {});
   addMethodConfig(Methods::PROMPTS_GET, {AttributeExtractionRule("params.name")});
 
   // Completion

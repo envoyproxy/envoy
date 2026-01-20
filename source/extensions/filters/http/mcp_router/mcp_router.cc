@@ -52,7 +52,6 @@ using McpMethodMap = absl::flat_hash_map<absl::string_view, McpMethod>;
 
 const McpMethodMap& mcpMethodMap() {
   // TODO(botengyao): Add support for more MCP methods:
-  // - prompts/list, prompts/get
   // - completion/complete
   // - logging/setLevel
   // - notifications/* (other notifications)
@@ -64,6 +63,8 @@ const McpMethodMap& mcpMethodMap() {
                           {"resources/read", McpMethod::ResourcesRead},
                           {"resources/subscribe", McpMethod::ResourcesSubscribe},
                           {"resources/unsubscribe", McpMethod::ResourcesUnsubscribe},
+                          {"prompts/list", McpMethod::PromptsList},
+                          {"prompts/get", McpMethod::PromptsGet},
                           {"ping", McpMethod::Ping},
                           {"notifications/initialized", McpMethod::NotificationInitialized}});
 }
@@ -207,6 +208,14 @@ Http::FilterDataStatus McpRouterFilter::decodeData(Buffer::Instance& data, bool 
       handleResourcesUnsubscribe();
       break;
 
+    case McpMethod::PromptsList:
+      handlePromptsList();
+      break;
+
+    case McpMethod::PromptsGet:
+      handlePromptsGet();
+      break;
+
     case McpMethod::Ping:
       handlePing();
       return Http::FilterDataStatus::StopIterationNoBuffer;
@@ -222,7 +231,7 @@ Http::FilterDataStatus McpRouterFilter::decodeData(Buffer::Instance& data, bool 
 
     initialized_ = true;
 
-    // Perform body rewriting if needed (e.g., tool name or URI prefix stripping).
+    // Perform body rewriting if needed (e.g., tool/prompt name or URI prefix stripping).
     // This is done once on the first data chunk after initialization.
     if (needs_body_rewrite_) {
       if (method_ == McpMethod::ToolsCall) {
@@ -230,6 +239,8 @@ Http::FilterDataStatus McpRouterFilter::decodeData(Buffer::Instance& data, bool 
       } else if (method_ == McpMethod::ResourcesRead || method_ == McpMethod::ResourcesSubscribe ||
                  method_ == McpMethod::ResourcesUnsubscribe) {
         rewriteResourceUriBody(data);
+      } else if (method_ == McpMethod::PromptsGet) {
+        rewritePromptsGetBody(data);
       }
       needs_body_rewrite_ = false;
     }
@@ -290,6 +301,11 @@ bool McpRouterFilter::readMetadataFromMcpFilter() {
       auto uri_it = params_fields.find("uri");
       if (uri_it != params_fields.end() && uri_it->second.has_string_value()) {
         resource_uri_ = uri_it->second.string_value();
+      }
+    } else if (method_ == McpMethod::PromptsGet) {
+      auto name_it = params_fields.find("name");
+      if (name_it != params_fields.end() && name_it->second.has_string_value()) {
+        prompt_name_ = name_it->second.string_value();
       }
     }
   }
@@ -445,6 +461,31 @@ std::pair<std::string, std::string> McpRouterFilter::parseResourceUri(const std:
   return {"", uri};
 }
 
+std::pair<std::string, std::string> McpRouterFilter::parsePromptName(const std::string& prefixed) {
+  // Prompt names use the same "__" delimiter as tool names for backend routing.
+  // Example: "time__greeting" -> backend="time", prompt="greeting"
+  if (!config_->isMultiplexing()) {
+    return {config_->defaultBackendName(), prefixed};
+  }
+
+  size_t pos = prefixed.find(kNameDelimiter);
+  if (pos == std::string::npos) {
+    if (!config_->defaultBackendName().empty()) {
+      return {config_->defaultBackendName(), prefixed};
+    }
+    return {"", prefixed};
+  }
+
+  std::string backend = prefixed.substr(0, pos);
+  std::string prompt = prefixed.substr(pos + kNameDelimiter.size());
+
+  if (config_->findBackend(backend) != nullptr) {
+    return {backend, prompt};
+  }
+
+  return {"", prefixed};
+}
+
 ssize_t McpRouterFilter::rewriteToolCallBody(Buffer::Instance& buffer) {
   if (tool_name_.empty() || tool_name_ == unprefixed_tool_name_) {
     return 0;
@@ -474,6 +515,20 @@ ssize_t McpRouterFilter::rewriteResourceUriBody(Buffer::Instance& buffer) {
   }
 
   return rewriteAtPosition(buffer, pos, resource_uri_, rewritten_uri_);
+}
+
+ssize_t McpRouterFilter::rewritePromptsGetBody(Buffer::Instance& buffer) {
+  if (prompt_name_.empty() || prompt_name_ == unprefixed_prompt_name_) {
+    return 0;
+  }
+
+  // Search for the prefixed prompt name and replace with the unprefixed version.
+  ssize_t pos = buffer.search(prompt_name_.data(), prompt_name_.size(), 0);
+  if (pos < 0) {
+    return 0;
+  }
+
+  return rewriteAtPosition(buffer, pos, prompt_name_, unprefixed_prompt_name_);
 }
 
 ssize_t McpRouterFilter::rewriteAtPosition(Buffer::Instance& buffer, ssize_t pos,
@@ -789,6 +844,46 @@ void McpRouterFilter::handleResourcesUnsubscribe() {
   handleSingleBackendResourceMethod("resources/unsubscribe");
 }
 
+void McpRouterFilter::handlePromptsList() {
+  ENVOY_LOG(debug, "prompts/list: setting up fanout to {} backends", config_->backends().size());
+
+  initializeFanout([this](std::vector<BackendResponse> responses) {
+    std::string response_body = aggregatePromptsList(responses);
+    ENVOY_LOG(debug, "prompts/list: response body: {}", response_body);
+    sendJsonResponse(response_body, encoded_session_id_);
+  });
+}
+
+void McpRouterFilter::handlePromptsGet() {
+  auto [backend_name, actual_prompt] = parsePromptName(prompt_name_);
+
+  if (backend_name.empty()) {
+    sendHttpError(400,
+                  fmt::format("Invalid prompt name '{}': cannot determine backend", prompt_name_));
+    return;
+  }
+
+  const McpBackendConfig* backend = config_->findBackend(backend_name);
+  if (!backend) {
+    sendHttpError(400, fmt::format("Unknown backend '{}' in prompt name", backend_name));
+    return;
+  }
+
+  unprefixed_prompt_name_ = actual_prompt;
+  needs_body_rewrite_ = (prompt_name_ != unprefixed_prompt_name_);
+
+  ENVOY_LOG(debug, "prompts/get: backend='{}', prompt='{}' -> '{}', needs_rewrite={}", backend_name,
+            prompt_name_, actual_prompt, needs_body_rewrite_);
+
+  initializeSingleBackend(*backend, [this](BackendResponse resp) {
+    if (resp.success) {
+      sendJsonResponse(resp.body, encoded_session_id_);
+    } else {
+      sendHttpError(500, resp.error.empty() ? "Backend request failed" : resp.error);
+    }
+  });
+}
+
 std::string McpRouterFilter::aggregateInitialize(const std::vector<BackendResponse>& responses) {
   // Check if at least one backend succeeded.
   const bool any_success = std::any_of(responses.begin(), responses.end(),
@@ -988,6 +1083,115 @@ std::string McpRouterFilter::aggregateResourcesList(const std::vector<BackendRes
   return output;
 }
 
+std::string McpRouterFilter::aggregatePromptsList(const std::vector<BackendResponse>& responses) {
+  const bool is_multiplexing = config_->isMultiplexing();
+
+  std::string output;
+  Json::StringStreamer streamer(output);
+  {
+    auto root = streamer.makeRootMap();
+    root->addKey("jsonrpc");
+    root->addString("2.0");
+    root->addKey("id");
+    root->addNumber(request_id_);
+    root->addKey("result");
+    {
+      auto result_map = root->addMap();
+      result_map->addKey("prompts");
+      {
+        auto prompts_array = result_map->addArray();
+
+        for (const auto& resp : responses) {
+          if (!resp.success) {
+            continue;
+          }
+          ENVOY_LOG(debug, "Aggregating prompts list from backend '{}': {}", resp.backend_name,
+                    resp.body);
+          auto parsed_or = Json::Factory::loadFromString(resp.body);
+          if (!parsed_or.ok()) {
+            ENVOY_LOG(warn, "Failed to parse JSON from backend '{}': {}", resp.backend_name,
+                      parsed_or.status().message());
+            continue;
+          }
+
+          Json::ObjectSharedPtr parsed_body = *parsed_or;
+
+          auto result_or = parsed_body->getObject("result");
+          if (!result_or.ok() || !(*result_or)) {
+            continue;
+          }
+
+          auto prompts_or = (*result_or)->getObjectArray("prompts");
+          if (!prompts_or.ok()) {
+            continue;
+          }
+
+          for (const auto& prompt : *prompts_or) {
+            if (!prompt || !prompt->isObject()) {
+              continue;
+            }
+
+            auto name_or = prompt->getString("name");
+            if (!name_or.ok()) {
+              continue;
+            }
+
+            auto prompt_map = prompts_array->addMap();
+
+            // Prefix prompt name with backend name in multiplexing mode.
+            // Example: "greeting" -> "time__greeting" (for backend "time").
+            prompt_map->addKey("name");
+            if (is_multiplexing) {
+              prompt_map->addString(absl::StrCat(resp.backend_name, kNameDelimiter, *name_or));
+            } else {
+              prompt_map->addString(*name_or);
+            }
+
+            auto desc_or = prompt->getString("description", "");
+            if (desc_or.ok() && !desc_or->empty()) {
+              prompt_map->addKey("description");
+              prompt_map->addString(*desc_or);
+            }
+
+            // Handle arguments array if present.
+            auto args_or = prompt->getObjectArray("arguments");
+            if (args_or.ok() && !args_or->empty()) {
+              prompt_map->addKey("arguments");
+              auto args_array = prompt_map->addArray();
+              for (const auto& arg : *args_or) {
+                if (!arg || !arg->isObject()) {
+                  continue;
+                }
+                auto arg_map = args_array->addMap();
+
+                auto arg_name_or = arg->getString("name", "");
+                if (arg_name_or.ok() && !arg_name_or->empty()) {
+                  arg_map->addKey("name");
+                  arg_map->addString(*arg_name_or);
+                }
+
+                auto arg_desc_or = arg->getString("description", "");
+                if (arg_desc_or.ok() && !arg_desc_or->empty()) {
+                  arg_map->addKey("description");
+                  arg_map->addString(*arg_desc_or);
+                }
+
+                auto required_or = arg->getBoolean("required", false);
+                if (required_or.ok()) {
+                  arg_map->addKey("required");
+                  arg_map->addBool(*required_or);
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return output;
+}
+
 Http::RequestHeaderMapPtr
 McpRouterFilter::createUpstreamHeaders(const McpBackendConfig& backend,
                                        const std::string& backend_session_id) {
@@ -1027,6 +1231,10 @@ McpRouterFilter::createUpstreamHeaders(const McpBackendConfig& backend,
           // Resource URI rewriting, delta = new_size - old_size.
           size_delta = static_cast<int64_t>(rewritten_uri_.size()) -
                        static_cast<int64_t>(resource_uri_.size());
+        } else if (method_ == McpMethod::PromptsGet) {
+          // Prompt name rewriting, delta = new_size - old_size.
+          size_delta = static_cast<int64_t>(unprefixed_prompt_name_.size()) -
+                       static_cast<int64_t>(prompt_name_.size());
         }
         int64_t new_length = static_cast<int64_t>(original_length) + size_delta;
         headers->setContentLength(new_length);
