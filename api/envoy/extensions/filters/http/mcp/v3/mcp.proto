@@ -49,7 +49,7 @@ message Mcp {
     FILTER_STATE = 2;
 
     // Store request attributes in both dynamic metadata and filter state.
-    BOTH = 3;
+    DYNAMIC_METADATA_AND_FILTER_STATE = 3;
   }
 
   // Configures how the filter handles non-MCP traffic.

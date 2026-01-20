@@ -981,10 +981,11 @@ TEST_F(McpFilterTest, DefaultStorageModeDynamicMetadataOnly) {
   EXPECT_EQ(filter_state_obj, nullptr);
 }
 
-// Test BOTH mode: both dynamic metadata and filter state are set
+// Test DYNAMIC_METADATA_AND_FILTER_STATE mode: both dynamic metadata and filter state are set
 TEST_F(McpFilterTest, BothStorageModeSetsBothTargets) {
   envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
-  proto_config.set_request_storage_mode(envoy::extensions::filters::http::mcp::v3::Mcp::BOTH);
+  proto_config.set_request_storage_mode(
+      envoy::extensions::filters::http::mcp::v3::Mcp::DYNAMIC_METADATA_AND_FILTER_STATE);
   config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
   filter_ = std::make_unique<McpFilter>(config_);
   filter_->setDecoderFilterCallbacks(decoder_callbacks_);

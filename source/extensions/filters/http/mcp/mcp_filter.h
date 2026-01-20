@@ -64,11 +64,13 @@ public:
                envoy::extensions::filters::http::mcp::v3::Mcp::MODE_UNSPECIFIED ||
            request_storage_mode_ ==
                envoy::extensions::filters::http::mcp::v3::Mcp::DYNAMIC_METADATA ||
-           request_storage_mode_ == envoy::extensions::filters::http::mcp::v3::Mcp::BOTH;
+           request_storage_mode_ ==
+               envoy::extensions::filters::http::mcp::v3::Mcp::DYNAMIC_METADATA_AND_FILTER_STATE;
   }
   bool shouldStoreToFilterState() const {
     return request_storage_mode_ == envoy::extensions::filters::http::mcp::v3::Mcp::FILTER_STATE ||
-           request_storage_mode_ == envoy::extensions::filters::http::mcp::v3::Mcp::BOTH;
+           request_storage_mode_ ==
+               envoy::extensions::filters::http::mcp::v3::Mcp::DYNAMIC_METADATA_AND_FILTER_STATE;
   }
 
   McpFilterStats& stats() { return stats_; }
