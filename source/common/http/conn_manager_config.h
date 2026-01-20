@@ -1,5 +1,7 @@
 #pragma once
 
+#include "absl/container/flat_hash_map.h"
+
 #include "envoy/config/config_provider.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/http/early_header_mutation.h"
@@ -568,6 +570,16 @@ public:
    *         Connection Lifetime.
    */
   virtual bool addProxyProtocolConnectionState() const PURE;
+
+  /**
+   * @return a map of PROXY protocol destination port to scheme (http/https).
+   *         When configured and the local address was restored from PROXY protocol,
+   *         the x-forwarded-proto header will be set based on the destination port.
+   *         If the port is not in the map, falls back to current connection's TLS status.
+   *         If the map is empty, this feature is disabled.
+   */
+  virtual const absl::flat_hash_map<uint32_t, std::string>&
+  proxyProtocolPortSchemeMapping() const PURE;
 };
 
 using ConnectionManagerConfigSharedPtr = std::shared_ptr<ConnectionManagerConfig>;

@@ -39,7 +39,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 // [#extension: envoy.filters.network.http_connection_manager]
 
-// [#next-free-field: 61]
+// [#next-free-field: 62]
 message HttpConnectionManager {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager";
@@ -1051,6 +1051,57 @@ message HttpConnectionManager {
   // This should be set to ``false`` in cases where Envoy's view of the downstream address may not correspond to the
   // actual client address, for example, if there's another proxy in front of the Envoy.
   google.protobuf.BoolValue add_proxy_protocol_connection_state = 53;
+
+  // Configuration for inferring the original protocol (HTTP or HTTPS) from the PROXY protocol
+  // destination port. This is useful when a Layer 4 load balancer (such as AWS NLB) terminates
+  // TLS and uses PROXY protocol to communicate with Envoy.
+  //
+  // When enabled, if the local address was restored from PROXY protocol (indicating the original
+  // destination address is available), the ``x-forwarded-proto`` header will be set based on the
+  // destination port:
+  //
+  // * Port 443 → ``https``
+  // * Port 80 → ``http``
+  // * Other ports → falls back to the current connection's TLS status
+  //
+  // This allows Envoy to correctly determine the original protocol when behind an L4 load balancer
+  // that terminates TLS, enabling proper HTTP→HTTPS redirects and scheme-based routing decisions.
+  //
+  // Example configuration:
+  //
+  // .. code-block:: yaml
+  //
+  //   http_connection_manager:
+  //     set_forwarded_proto_from_proxy_protocol_destination_port:
+  //       port_scheme_mappings:
+  //         443: https
+  //         80: http
+  //         8443: https
+  //
+  // If not configured, defaults to disabled and the standard behavior applies (using connection
+  // TLS status or trusted downstream headers).
+  SetForwardedProtoFromProxyProtocolDestinationPort
+      set_forwarded_proto_from_proxy_protocol_destination_port = 61;
+}
+
+// Configuration for setting x-forwarded-proto based on PROXY protocol destination port.
+// This enables Envoy to infer the original protocol (HTTP/HTTPS) when behind an L4 load
+// balancer that terminates TLS and uses PROXY protocol.
+message SetForwardedProtoFromProxyProtocolDestinationPort {
+  // A map of destination port to scheme. When the PROXY protocol destination port matches
+  // a key in this map, the corresponding scheme will be used for the ``x-forwarded-proto`` header.
+  //
+  // Common mappings:
+  //
+  // * 443 → "https"
+  // * 80 → "http"
+  //
+  // If the destination port is not found in this map, the behavior falls back to using
+  // the current connection's TLS status.
+  //
+  // The scheme values must be either "http" or "https".
+  // Invalid scheme values will be rejected during configuration loading.
+  map<uint32, string> port_scheme_mappings = 1;
 }
 
 // The configuration to customize local reply returned by Envoy.

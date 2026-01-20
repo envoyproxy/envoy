@@ -38,6 +38,35 @@ absl::string_view getScheme(absl::string_view forwarded_proto, bool is_ssl) {
   return is_ssl ? Headers::get().SchemeValues.Https : Headers::get().SchemeValues.Http;
 }
 
+// Determines the scheme (http/https) based on PROXY protocol destination port if configured,
+// otherwise falls back to connection's TLS status.
+absl::string_view
+getSchemeFromProxyProtocolOrConnection(const Network::Connection& connection,
+                                       const ConnectionManagerConfig& config) {
+  const auto& port_scheme_map = config.proxyProtocolPortSchemeMapping();
+
+  // If the feature is configured and the local address was restored from PROXY protocol,
+  // try to infer the scheme from the destination port.
+  if (!port_scheme_map.empty() && connection.connectionInfoProvider().localAddressRestored()) {
+    const Envoy::Network::Address::Ip* ip =
+        connection.connectionInfoProvider().localAddress()->ip();
+    if (ip != nullptr) {
+      auto it = port_scheme_map.find(ip->port());
+      if (it != port_scheme_map.end()) {
+        // Return the configured scheme for this port.
+        if (it->second == "https") {
+          return Headers::get().SchemeValues.Https;
+        } else {
+          return Headers::get().SchemeValues.Http;
+        }
+      }
+    }
+  }
+
+  // Fall back to connection's TLS status.
+  return connection.ssl() ? Headers::get().SchemeValues.Https : Headers::get().SchemeValues.Http;
+}
+
 } // namespace
 std::string ConnectionManagerUtility::determineNextProtocol(Network::Connection& connection,
                                                             const Buffer::Instance& data) {
@@ -154,7 +183,7 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
     // x-forwarded-proto/x-forwarded-port header exists, add one if configured.
     if (xff_num_trusted_hops == 0 || request_headers.ForwardedProto() == nullptr) {
       request_headers.setReferenceForwardedProto(
-          connection.ssl() ? Headers::get().SchemeValues.Https : Headers::get().SchemeValues.Http);
+          getSchemeFromProxyProtocolOrConnection(connection, config));
     }
     if (config.appendXForwardedPort() &&
         (xff_num_trusted_hops == 0 || request_headers.ForwardedPort() == nullptr)) {
@@ -194,8 +223,8 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
   // If the x-forwarded-proto header is not set, set it here, since Envoy uses it for determining
   // scheme and communicating it upstream.
   if (!request_headers.ForwardedProto()) {
-    request_headers.setReferenceForwardedProto(connection.ssl() ? Headers::get().SchemeValues.Https
-                                                                : Headers::get().SchemeValues.Http);
+    request_headers.setReferenceForwardedProto(
+        getSchemeFromProxyProtocolOrConnection(connection, config));
   }
 
   // Usually, the x-forwarded-port header comes with x-forwarded-proto header. If the

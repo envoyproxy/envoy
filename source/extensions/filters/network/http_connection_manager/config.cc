@@ -441,10 +441,33 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       append_local_overload_(config.append_local_overload()),
       append_x_forwarded_port_(config.append_x_forwarded_port()),
       add_proxy_protocol_connection_state_(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, add_proxy_protocol_connection_state, true)) {
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, add_proxy_protocol_connection_state, true)),
+      proxy_protocol_port_scheme_mapping_(
+          config.has_set_forwarded_proto_from_proxy_protocol_destination_port()
+              ? absl::flat_hash_map<uint32_t, std::string>(
+                    config.set_forwarded_proto_from_proxy_protocol_destination_port()
+                        .port_scheme_mappings()
+                        .begin(),
+                    config.set_forwarded_proto_from_proxy_protocol_destination_port()
+                        .port_scheme_mappings()
+                        .end())
+              : absl::flat_hash_map<uint32_t, std::string>{}) {
   if (!creation_status.ok()) {
     return;
   }
+
+  // Validate port_scheme_mappings values are valid schemes (http or https).
+  for (const auto& [port, scheme] : proxy_protocol_port_scheme_mapping_) {
+    if (scheme != "http" && scheme != "https") {
+      creation_status = absl::InvalidArgumentError(
+          fmt::format("Invalid scheme '{}' for port {} in "
+                      "set_forwarded_proto_from_proxy_protocol_destination_port. "
+                      "Scheme must be 'http' or 'https'.",
+                      scheme, port));
+      return;
+    }
+  }
+
   auto local_reply_or_error = LocalReply::Factory::create(config.local_reply_config(), context);
   SET_AND_RETURN_IF_NOT_OK(local_reply_or_error.status(), creation_status);
   local_reply_ = std::move(*local_reply_or_error);

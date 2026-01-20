@@ -477,6 +477,14 @@ If the scheme is changed via the :ref:`scheme_header_transformation
 <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.scheme_header_transformation>`
 configuration option, ``x-forwarded-proto`` will be updated as well.
 
+When using an L4 load balancer (such as AWS NLB) that terminates TLS and uses PROXY protocol to
+communicate with Envoy, the :ref:`set_forwarded_proto_from_proxy_protocol_destination_port
+<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.set_forwarded_proto_from_proxy_protocol_destination_port>`
+configuration option can be used to infer the original protocol from the PROXY protocol destination
+port. For example, if the destination port is 443, ``x-forwarded-proto`` will be set to ``https``.
+This enables proper HTTP→HTTPS redirects and scheme-based routing decisions even when TLS is
+terminated at the L4 load balancer.
+
 The ``x-forwarded-proto`` header will be used by Envoy over ``:scheme`` where the underlying
 encryption is wanted, for example clearing default ports based on ``x-forwarded-proto``. See
 :ref:`why_is_envoy_using_xfp_or_scheme` for more details.

@@ -278,6 +278,10 @@ public:
   bool addProxyProtocolConnectionState() const override {
     return add_proxy_protocol_connection_state_;
   }
+  const absl::flat_hash_map<uint32_t, std::string>&
+  proxyProtocolPortSchemeMapping() const override {
+    return proxy_protocol_port_scheme_mapping_;
+  }
 
 private:
   enum class CodecType { HTTP1, HTTP2, HTTP3, AUTO };
@@ -376,6 +380,7 @@ private:
   const bool append_local_overload_;
   const bool append_x_forwarded_port_;
   const bool add_proxy_protocol_connection_state_;
+  const absl::flat_hash_map<uint32_t, std::string> proxy_protocol_port_scheme_mapping_;
 };
 
 /**

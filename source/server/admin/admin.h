@@ -249,6 +249,9 @@ public:
   bool appendLocalOverload() const override { return false; }
   bool appendXForwardedPort() const override { return false; }
   bool addProxyProtocolConnectionState() const override { return true; }
+  const absl::flat_hash_map<uint32_t, std::string>& proxyProtocolPortSchemeMapping() const override {
+    return proxy_protocol_port_scheme_mapping_;
+  }
 
 private:
   friend class AdminTestingPeer;
@@ -519,6 +522,7 @@ private:
   const bool ignore_global_conn_limit_;
   std::unique_ptr<HttpConnectionManagerProto::ProxyStatusConfig> proxy_status_config_;
   const Http::HeaderValidatorFactoryPtr header_validator_factory_;
+  const absl::flat_hash_map<uint32_t, std::string> proxy_protocol_port_scheme_mapping_;
 };
 
 } // namespace Server

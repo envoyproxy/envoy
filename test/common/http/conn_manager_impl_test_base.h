@@ -219,6 +219,9 @@ public:
   bool addProxyProtocolConnectionState() const override {
     return add_proxy_protocol_connection_state_;
   }
+  const absl::flat_hash_map<uint32_t, std::string>& proxyProtocolPortSchemeMapping() const override {
+    return proxy_protocol_port_scheme_mapping_;
+  }
 
   // Simple helper to wrapper filter to the factory function.
   FilterFactoryCb createDecoderFilterFactoryCb(StreamDecoderFilterSharedPtr filter) {
@@ -347,6 +350,7 @@ public:
       header_validator_config_;
   Extensions::Http::HeaderValidators::EnvoyDefault::ConfigOverrides
       header_validator_config_overrides_;
+  absl::flat_hash_map<uint32_t, std::string> proxy_protocol_port_scheme_mapping_;
 };
 
 class HttpConnectionManagerImplTest : public HttpConnectionManagerImplMixin,

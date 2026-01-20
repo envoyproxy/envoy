@@ -613,6 +613,8 @@ public:
     ON_CALL(*this, shouldSchemeMatchUpstream())
         .WillByDefault(testing::ReturnPointee(&scheme_match_upstream_));
     ON_CALL(*this, addProxyProtocolConnectionState()).WillByDefault(testing::Return(true));
+    ON_CALL(*this, proxyProtocolPortSchemeMapping())
+        .WillByDefault(testing::ReturnRef(proxy_protocol_port_scheme_mapping_));
   }
 
   // Http::ConnectionManagerConfig
@@ -701,6 +703,8 @@ public:
   MOCK_METHOD(bool, appendLocalOverload, (), (const));
   MOCK_METHOD(bool, appendXForwardedPort, (), (const));
   MOCK_METHOD(bool, addProxyProtocolConnectionState, (), (const));
+  MOCK_METHOD((const absl::flat_hash_map<uint32_t, std::string>&), proxyProtocolPortSchemeMapping,
+              (), (const));
 
   class AllowInternalAddressConfig : public Http::InternalAddressConfig {
   public:
@@ -714,6 +718,7 @@ public:
   std::vector<Http::EarlyHeaderMutationPtr> early_header_mutation_extensions_;
   absl::optional<std::string> scheme_;
   bool scheme_match_upstream_;
+  absl::flat_hash_map<uint32_t, std::string> proxy_protocol_port_scheme_mapping_;
 };
 
 class MockReceivedSettings : public ReceivedSettings {
