@@ -942,6 +942,7 @@ envoy_genjson(
       )
     """,
     yaml_srcs = [":deps.yaml"],
+    visibility = ["//visibility:public"],
 )
 
 json_data(
