@@ -474,7 +474,7 @@ def _zlib():
 def _com_github_zlib_ng_zlib_ng():
     external_http_archive(
         name = "com_github_zlib_ng_zlib_ng",
-        build_file_content = BUILD_ALL_CONTENT,
+        build_file = "@envoy//bazel/external:zlib_ng.BUILD",
     )
 
 # Boost in general is not approved for Envoy use, and the header-only

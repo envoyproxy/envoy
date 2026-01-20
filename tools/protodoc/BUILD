@@ -1,8 +1,9 @@
 load("@base_pip3//:requirements.bzl", "requirement")
 load("@com_github_grpc_grpc//bazel:python_rules.bzl", "py_proto_library")
 load("@com_google_protobuf//bazel:proto_library.bzl", "proto_library")
+load("@envoy_toolshed//:utils.bzl", "json_merge")
 load("@rules_python//python:defs.bzl", "py_binary", "py_library")
-load("//tools/base:envoy_python.bzl", "envoy_genjson", "envoy_jinja_env", "envoy_py_data")
+load("//tools/base:envoy_python.bzl", "envoy_jinja_env", "envoy_py_data")
 load("//tools/protodoc:protodoc.bzl", "protodoc_rule")
 
 licenses(["notice"])  # Apache 2
@@ -63,7 +64,7 @@ genrule(
     ],
 )
 
-envoy_genjson(
+json_merge(
     # This prepares the data for `protodoc`
     # As protodoc can be run many times while building the api docs, all
     # data is prepared, validated and normalized before being passed to

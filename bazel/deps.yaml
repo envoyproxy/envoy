@@ -1,0 +1,863 @@
+aspect_bazel_lib:
+  use_category:
+  - build
+  - test_only
+  license: "Apache-2.0"
+  license_url: "https://github.com/aspect-build/bazel-lib/blob/v{version}/LICENSE"
+aws_lc:
+  use_category:
+  - controlplane
+  - dataplane_core
+  cpe: "cpe:2.3:a:google:boringssl:*"
+bazel_compdb:
+  use_category:
+  - build
+  license: "Apache-2.0"
+  license_url: "https://github.com/grailbio/bazel-compilation-database/blob/{version}/LICENSE"
+bazel_features:
+  use_category:
+  - build
+  license: "Apache-2.0"
+  license_url: "https://github.com/bazel-contrib/bazel_features/blob/v{version}/LICENSE"
+bazel_gazelle:
+  use_category:
+  - build
+  license: "Apache-2.0"
+  license_url: "https://github.com/bazelbuild/bazel-gazelle/blob/v{version}/LICENSE"
+boringssl:
+  use_category:
+  - controlplane
+  - dataplane_core
+  cpe: "cpe:2.3:a:google:boringssl:*"
+  license: "Mixed"
+  license_url: "https://github.com/google/boringssl/blob/{version}/LICENSE"
+build_bazel_rules_apple:
+  use_category:
+  - build
+  license: "Apache-2.0"
+  license_url: "https://github.com/bazelbuild/rules_apple/blob/{version}/LICENSE"
+com_github_aignas_rules_shellcheck:
+  use_category:
+  - build
+  license: "MIT"
+  license_url: "https://github.com/aignas/rules_shellcheck/blob/{version}/LICENSE"
+com_github_alibaba_hessian2_codec:
+  use_category:
+  - dataplane_ext
+  extensions:
+  - envoy.filters.network.dubbo_proxy
+  - envoy.filters.network.generic_proxy
+  - envoy.generic_proxy.codecs.dubbo
+  license: "Apache-2.0"
+  license_url: "https://github.com/alibaba/hessian2-codec/blob/{version}/LICENSE"
+com_github_awslabs_aws_c_auth:
+  use_category:
+  - test_only
+  extensions:
+  - envoy.filters.http.aws_request_signing
+  license: "Apache-2.0"
+  license_url: "https://github.com/awslabs/aws-c-auth/blob/v{version}/LICENSE"
+com_github_axboe_liburing:
+  use_category:
+  - dataplane_core
+  - controlplane
+com_github_bazelbuild_buildtools:
+  use_category:
+  - test_only
+com_github_cares_cares:
+  use_category:
+  - dataplane_core
+  - controlplane
+  cpe: "cpe:2.3:a:c-ares_project:c-ares:*"
+  license: "c-ares"
+  license_url: "https://github.com/c-ares/c-ares/blob/cares-{underscore_version}/LICENSE.md"
+com_github_cyan4973_xxhash:
+  use_category:
+  - dataplane_core
+  - controlplane
+  license: "BSD-2-Clause"
+  license_url: "https://github.com/Cyan4973/xxHash/blob/v{version}/LICENSE"
+com_github_datadog_dd_trace_cpp:
+  use_category:
+  - observability_ext
+  extensions:
+  - envoy.tracers.datadog
+  license: "Apache-2.0"
+  license_url: "https://github.com/DataDog/dd-trace-cpp/blob/v{version}/LICENSE.md"
+com_github_envoyproxy_sqlparser:
+  use_category:
+  - dataplane_ext
+  extensions:
+  - envoy.filters.network.mysql_proxy
+  - envoy.filters.network.postgres_proxy
+  license: "MIT"
+  license_url: "https://github.com/envoyproxy/sql-parser/blob/{version}/LICENSE"
+com_github_fdio_vpp_vcl:
+  use_category:
+  - other
+  extensions:
+  - envoy.bootstrap.vcl
+  license: "Apache-2.0"
+  license_url: "https://github.com/FDio/vpp/blob/{version}/LICENSE"
+com_github_fmtlib_fmt:
+  use_category:
+  - dataplane_core
+  - controlplane
+  cpe: "cpe:2.3:a:fmt:fmt:*"
+  license: "fmt"
+  license_url: "https://github.com/fmtlib/fmt/blob/{version}/LICENSE"
+com_github_gabime_spdlog:
+  use_category:
+  - dataplane_core
+  - controlplane
+  license: "MIT"
+  license_url: "https://github.com/gabime/spdlog/blob/v{version}/LICENSE"
+com_github_google_benchmark:
+  use_category:
+  - test_only
+  license: "Apache-2.0"
+  license_url: "https://github.com/google/benchmark/blob/v{version}/LICENSE"
+com_github_google_flatbuffers:
+  use_category:
+  - dataplane_ext
+  extensions:
+  - envoy.access_loggers.extension_filters.cel
+  - envoy.access_loggers.wasm
+  - envoy.formatter.cel
+  - envoy.bootstrap.wasm
+  - envoy.rate_limit_descriptors.expr
+  - envoy.filters.http.ext_proc
+  - envoy.filters.http.rate_limit_quota
+  - envoy.filters.http.rbac
+  - envoy.filters.http.wasm
+  - envoy.filters.network.rbac
+  - envoy.filters.network.wasm
+  - envoy.http.ext_proc.processing_request_modifiers.mapped_attribute_builder
+  - envoy.stat_sinks.wasm
+  - envoy.rbac.matchers.upstream_ip_port
+  - envoy.matching.inputs.cel_data_input
+  - envoy.matching.matchers.cel_matcher
+  - envoy.tracers.opentelemetry
+  - envoy.tracers.opentelemetry.samplers.cel
+  cpe: "cpe:2.3:a:google:flatbuffers:*"
+  license: "Apache-2.0"
+  license_url: "https://github.com/google/flatbuffers/blob/v{version}/LICENSE"
+com_github_google_jwt_verify:
+  use_category:
+  - dataplane_ext
+  extensions:
+  - envoy.filters.http.jwt_authn
+  - envoy.filters.http.gcp_authn
+  - envoy.filters.http.oauth2
+  license: "Apache-2.0"
+  license_url: "https://github.com/google/jwt_verify_lib/blob/{version}/LICENSE"
+com_github_google_libprotobuf_mutator:
+  use_category:
+  - test_only
+  license: "Apache-2.0"
+  license_url: "https://github.com/google/libprotobuf-mutator/blob/v{version}/LICENSE"
+com_github_google_libsxg:
+  use_category:
+  - other
+  extensions:
+  - envoy.filters.http.sxg
+  license: "Apache-2.0"
+  license_url: "https://github.com/google/libsxg/blob/{version}/LICENSE"
+com_github_google_perfetto:
+  use_category:
+  - dataplane_core
+  - controlplane
+  license: "Apache-2.0"
+  license_url: "https://github.com/google/perfetto/blob/v{version}/LICENSE"
+com_github_google_quiche:
+  use_category:
+  - controlplane
+  - dataplane_core
+  license: "BSD-3-Clause"
+  license_url: "https://github.com/google/quiche/blob/{version}/LICENSE"
+com_github_google_tcmalloc:
+  use_category:
+  - dataplane_core
+  - controlplane
+  license: "Apache-2.0"
+  license_url: "https://github.com/google/tcmalloc/blob/{version}/LICENSE"
+com_github_grpc_grpc:
+  use_category:
+  - dataplane_core
+  - controlplane
+  cpe: "cpe:2.3:a:grpc:grpc:*"
+  license: "Apache-2.0"
+  license_url: "https://github.com/grpc/grpc/blob/v{version}/LICENSE"
+com_github_intel_ipp_crypto_crypto_mb:
+  use_category:
+  - dataplane_ext
+  extensions:
+  - envoy.tls.key_providers.cryptomb
+  cpe: "cpe:2.3:a:intel:cryptography_for_intel_integrated_performance_primitives:*"
+  license: "Apache-2.0"
+  license_url: "https://github.com/intel/cryptography-primitives/blob/ippcp_{version}/LICENSE"
+com_github_intel_qatlib:
+  use_category:
+  - dataplane_ext
+  extensions:
+  - envoy.tls.key_providers.qat
+  - envoy.compression.qatzip.compressor
+  - envoy.compression.qatzstd.compressor
+  license: "BSD-3-Clause"
+  license_url: "https://github.com/intel/qatlib/blob/{version}/LICENSE"
+com_github_intel_qatzip:
+  use_category:
+  - dataplane_ext
+  extensions:
+  - envoy.compression.qatzip.compressor
+  license: "BSD-3-Clause"
+  license_url: "https://github.com/intel/QATzip/blob/v{version}/LICENSE"
+com_github_jbeder_yaml_cpp:
+  use_category:
+  - controlplane
+  - dataplane_core
+  cpe: "cpe:2.3:a:yaml-cpp_project:yaml-cpp:*"
+  license: "MIT"
+  license_url: "https://github.com/jbeder/yaml-cpp/blob/{version}/LICENSE"
+com_github_libevent_libevent:
+  use_category:
+  - dataplane_core
+  - controlplane
+  cpe: "cpe:2.3:a:libevent_project:libevent:*"
+  license: "BSD-3-Clause"
+  license_url: "https://github.com/libevent/libevent/blob/{version}/LICENSE"
+com_github_luajit_luajit:
+  use_category:
+  - dataplane_ext
+  extensions:
+  - envoy.filters.http.lua
+  - envoy.router.cluster_specifier_plugin.lua
+  - envoy.string_matcher.lua
+  cpe: "cpe:2.3:a:luajit:luajit:*"
+  license: "MIT"
+  license_url: "https://github.com/LuaJIT/LuaJIT/blob/{version}/COPYRIGHT"
+com_github_lz4_lz4:
+  use_category:
+  - dataplane_ext
+  extensions:
+  - envoy.compression.qatzip.compressor
+com_github_maxmind_libmaxminddb:
+  use_category:
+  - dataplane_ext
+  extensions:
+  - envoy.geoip_providers.maxmind
+  cpe: "cpe:2.3:a:maxmind:libmaxminddb:*"
+  license: "Apache-2.0"
+  license_url: "https://github.com/maxmind/libmaxminddb/blob/{version}/LICENSE"
+com_github_mirror_tclap:
+  use_category:
+  - other
+  cpe: "cpe:2.3:a:tclap_project:tclap:*"
+  license: "MIT"
+  license_url: "https://github.com/mirror/tclap/blob/v{version}/COPYING"
+com_github_msgpack_cpp:
+  use_category:
+  - observability_ext
+  extensions:
+  - envoy.access_loggers.fluentd
+  - envoy.tracers.fluentd
+  cpe: "cpe:2.3:a:messagepack:messagepack:*"
+  license: "Boost"
+  license_url: "https://github.com/msgpack/msgpack-c/blob/cpp-{version}/LICENSE_1_0.txt"
+com_github_ncopa_suexec:
+  use_category:
+  - other
+  license: "MIT"
+  license_url: "https://github.com/ncopa/su-exec/blob/v{version}/LICENSE"
+com_github_nghttp2_nghttp2:
+  use_category:
+  - controlplane
+  - dataplane_core
+  cpe: "cpe:2.3:a:nghttp2:nghttp2:*"
+  license: "MIT"
+  license_url: "https://github.com/nghttp2/nghttp2/blob/v{version}/LICENSE"
+com_github_nlohmann_json:
+  use_category:
+  - controlplane
+  - dataplane_core
+  cpe: "cpe:2.3:a:json-for-modern-cpp_project:json-for-modern-cpp:*"
+  license: "MIT"
+  license_url: "https://github.com/nlohmann/json/blob/v{version}/LICENSE.MIT"
+com_github_openhistogram_libcircllhist:
+  use_category:
+  - controlplane
+  - observability_core
+  - dataplane_core
+  license: "Apache-2.0"
+  license_url: "https://github.com/openhistogram/libcircllhist/blob/{version}/LICENSE"
+com_github_qat_zstd:
+  use_category:
+  - dataplane_ext
+  extensions:
+  - envoy.compression.qatzstd.compressor
+com_github_skyapm_cpp2sky:
+  use_category:
+  - observability_ext
+  extensions:
+  - envoy.tracers.skywalking
+  license: "Apache-2.0"
+  license_url: "https://github.com/SkyAPM/cpp2sky/blob/v{version}/LICENSE"
+com_github_unicode_org_icu:
+  use_category:
+  - dataplane_ext
+  extensions:
+  - envoy.filters.http.language
+  license: "ICU"
+  license_url: "https://github.com/unicode-org/icu/blob/release-{version}/icu4c/LICENSE"
+com_github_wamr:
+  use_category:
+  - dataplane_ext
+  extensions:
+  - envoy.wasm.runtime.wamr
+  license: "Apache-2.0"
+  license_url: "https://github.com/bytecodealliance/wasm-micro-runtime/blob/{version}/LICENSE"
+com_github_wasmtime:
+  use_category:
+  - dataplane_ext
+  extensions:
+  - envoy.wasm.runtime.wasmtime
+  cpe: "cpe:2.3:a:bytecodealliance:wasmtime:*"
+  license: "Apache-2.0"
+  license_url: "https://github.com/bytecodealliance/wasmtime/blob/v{version}/LICENSE"
+com_github_zlib_ng_zlib_ng:
+  use_category:
+  - controlplane
+  - dataplane_core
+  license: "zlib"
+  license_url: "https://github.com/zlib-ng/zlib-ng/blob/{version}/LICENSE.md"
+com_google_absl:
+  use_category:
+  - dataplane_core
+  - controlplane
+  license: "Apache-2.0"
+  license_url: "https://github.com/abseil/abseil-cpp/blob/{version}/LICENSE"
+com_google_cel_cpp:
+  use_category:
+  - dataplane_ext
+  extensions:
+  - envoy.access_loggers.extension_filters.cel
+  - envoy.access_loggers.wasm
+  - envoy.bootstrap.wasm
+  - envoy.rate_limit_descriptors.expr
+  - envoy.filters.http.ext_proc
+  - envoy.filters.http.rate_limit_quota
+  - envoy.filters.http.rbac
+  - envoy.filters.http.wasm
+  - envoy.filters.network.rbac
+  - envoy.filters.network.wasm
+  - envoy.http.ext_proc.processing_request_modifiers.mapped_attribute_builder
+  - envoy.stat_sinks.wasm
+  - envoy.formatter.cel
+  - envoy.matching.inputs.cel_data_input
+  - envoy.matching.matchers.cel_matcher
+  - envoy.tracers.opentelemetry
+  - envoy.tracers.opentelemetry.samplers.cel
+  license: "Apache-2.0"
+  license_url: "https://github.com/google/cel-cpp/blob/v{version}/LICENSE"
+com_google_cel_spec:
+  use_category:
+  - dataplane_ext
+  extensions:
+  - envoy.access_loggers.extension_filters.cel
+  - envoy.access_loggers.wasm
+  - envoy.bootstrap.wasm
+  - envoy.rate_limit_descriptors.expr
+  - envoy.filters.http.ext_proc
+  - envoy.filters.http.rate_limit_quota
+  - envoy.filters.http.rbac
+  - envoy.filters.http.wasm
+  - envoy.filters.network.rbac
+  - envoy.filters.network.wasm
+  - envoy.http.ext_proc.processing_request_modifiers.mapped_attribute_builder
+  - envoy.stat_sinks.wasm
+  - envoy.formatter.cel
+  - envoy.matching.inputs.cel_data_input
+  - envoy.matching.matchers.cel_matcher
+  - envoy.tracers.opentelemetry
+  - envoy.tracers.opentelemetry.samplers.cel
+  license: "Apache-2.0"
+  license_url: "https://github.com/google/cel-spec/blob/v{version}/LICENSE"
+com_google_googletest:
+  use_category:
+  - test_only
+  cpe: "cpe:2.3:a:google:google_test:*"
+  license: "BSD-3-Clause"
+  license_url: "https://github.com/google/googletest/blob/{version}/LICENSE"
+com_google_protobuf:
+  use_category:
+  - dataplane_core
+  - controlplane
+  implied_untracked_deps:
+  - com_google_protobuf_protoc_linux_aarch_64
+  - com_google_protobuf_protoc_linux_x86_64
+  - com_google_protobuf_protoc_linux_ppcle_64
+  - com_google_protobuf_protoc_osx_aarch_64
+  - com_google_protobuf_protoc_osx_x86_64
+  - com_google_protobuf_protoc_win64
+  cpe: "cpe:2.3:a:google:protobuf:*"
+  license: "Protocol Buffers"
+  license_url: "https://github.com/protocolbuffers/protobuf/blob/v{version}/LICENSE"
+com_google_protobuf_protoc_linux_aarch_64:
+  use_category:
+  - build
+com_google_protobuf_protoc_linux_ppcle_64:
+  use_category:
+  - build
+com_google_protobuf_protoc_linux_x86_64:
+  use_category:
+  - build
+com_google_protobuf_protoc_osx_aarch_64:
+  use_category:
+  - build
+com_google_protobuf_protoc_osx_x86_64:
+  use_category:
+  - build
+com_google_protobuf_protoc_win64:
+  use_category:
+  - build
+com_google_protoconverter:
+  use_category:
+  - dataplane_core
+  - controlplane
+  - dataplane_ext
+  extensions:
+  - envoy.filters.http.grpc_json_transcoder
+  - envoy.filters.http.grpc_field_extraction
+  - envoy.filters.http.proto_message_extraction
+  - envoy.filters.http.proto_api_scrubber
+  - envoy.filters.http.grpc_json_reverse_transcoder
+  license: "Apache-2.0"
+  license_url: "https://github.com/grpc-ecosystem/proto-converter/blob/{version}/LICENSE"
+com_google_protofieldextraction:
+  use_category:
+  - dataplane_ext
+  extensions:
+  - envoy.filters.http.grpc_json_transcoder
+  - envoy.filters.http.grpc_field_extraction
+  - envoy.filters.http.proto_message_extraction
+  - envoy.filters.http.proto_api_scrubber
+  license: "Apache-2.0"
+  license_url: "https://github.com/grpc-ecosystem/proto-field-extraction/blob/{version}/LICENSE"
+com_google_protoprocessinglib:
+  use_category:
+  - dataplane_ext
+  extensions:
+  - envoy.filters.http.grpc_json_transcoder
+  - envoy.filters.http.grpc_field_extraction
+  - envoy.filters.http.proto_message_extraction
+  - envoy.filters.http.proto_api_scrubber
+  license: "Apache-2.0"
+  license_url: "https://github.com/grpc-ecosystem/proto_processing_lib/blob/{version}/LICENSE"
+com_googlesource_code_re2:
+  use_category:
+  - controlplane
+  - dataplane_core
+  license: "BSD-3-Clause"
+  license_url: "https://github.com/google/re2/blob/{version}/LICENSE"
+confluentinc_librdkafka:
+  use_category:
+  - dataplane_ext
+  extensions:
+  - envoy.filters.network.kafka_mesh
+  license: "librdkafka"
+  license_url: "https://github.com/confluentinc/librdkafka/blob/v{version}/LICENSE"
+dragonbox:
+  use_category:
+  - dataplane_ext
+  extensions:
+  - envoy.wasm.runtime.v8
+emsdk:
+  use_category:
+  - test_only
+  license: "Emscripten SDK"
+  license_url: "https://github.com/emscripten-core/emsdk/blob/{version}/LICENSE"
+envoy_examples:
+  use_category:
+  - test_only
+  license: "Apache-2.0"
+  license_url: "https://github.com/envoyproxy/examples/blob/v{version}/LICENSE"
+envoy_toolshed:
+  use_category:
+  - build
+  - controlplane
+  - dataplane_core
+  implied_untracked_deps:
+  - sysroot_linux_amd64
+  - sysroot_linux_arm64
+  - tsan_libs
+  - msan_libs
+  license: "Apache-2.0"
+  license_url: "https://github.com/envoyproxy/toolshed/blob/bazel-v{version}/LICENSE"
+fast_float:
+  use_category:
+  - dataplane_ext
+  extensions:
+  - envoy.wasm.runtime.v8
+fips_cmake_linux_aarch64:
+  use_category:
+  - build
+  - dataplane_core
+  - controlplane
+  cpe: "cpe:2.3:a:kitware:cmake:*"
+  license: "BSD-3-Clause"
+  license_url: "https://github.com/Kitware/CMake/blob/v{version}/Copyright.txt"
+fips_cmake_linux_x86_64:
+  use_category:
+  - build
+  - dataplane_core
+  - controlplane
+  cpe: "cpe:2.3:a:kitware:cmake:*"
+  license: "BSD-3-Clause"
+  license_url: "https://github.com/Kitware/CMake/blob/v{version}/Copyright.txt"
+fips_go_linux_amd64:
+  use_category:
+  - build
+  - dataplane_core
+  - controlplane
+  cpe: "cpe:2.3:a:golang:go:*"
+  license: "BSD-3-Clause"
+  license_url: "https://golang.org/LICENSE"
+fips_go_linux_arm64:
+  use_category:
+  - build
+  - dataplane_core
+  - controlplane
+  cpe: "cpe:2.3:a:golang:go:*"
+  license: "BSD-3-Clause"
+  license_url: "https://golang.org/LICENSE"
+fips_ninja:
+  use_category:
+  - build
+  - dataplane_core
+  - controlplane
+  cpe: "cpe:2.3:a:ninja-build:ninja:*"
+  license: "Apache-2.0"
+  license_url: "https://github.com/ninja-build/ninja/blob/v{version}/COPYING"
+fp16:
+  use_category:
+  - dataplane_ext
+  extensions:
+  - envoy.wasm.runtime.v8
+googleurl:
+  use_category:
+  - controlplane
+  - dataplane_core
+  license: "BSD-3-Clause"
+  license_url: "https://github.com/google/gurl/blob/{version}/LICENSE"
+gperftools:
+  use_category:
+  - dataplane_core
+  - controlplane
+  cpe: "cpe:2.3:a:gperftools_project:gperftools:*"
+  license: "BSD-3-Clause"
+  license_url: "https://github.com/gperftools/gperftools/blob/gperftools-{version}/COPYING"
+grpc_httpjson_transcoding:
+  use_category:
+  - dataplane_ext
+  extensions:
+  - envoy.filters.http.grpc_json_transcoder
+  - envoy.filters.http.grpc_field_extraction
+  - envoy.filters.http.proto_message_extraction
+  - envoy.filters.http.proto_api_scrubber
+  - envoy.filters.http.grpc_json_reverse_transcoder
+  - envoy.filters.http.mcp
+  license: "Apache-2.0"
+  license_url: "https://github.com/grpc-ecosystem/grpc-httpjson-transcoding/blob/{version}/LICENSE"
+highway:
+  use_category:
+  - dataplane_ext
+  extensions:
+  - envoy.wasm.runtime.v8
+intel_dlb:
+  use_category:
+  - dataplane_ext
+  extensions:
+  - envoy.network.connection_balance.dlb
+intel_ittapi:
+  use_category:
+  - dataplane_ext
+  extensions:
+  - envoy.wasm.runtime.v8
+io_bazel_rules_go:
+  use_category:
+  - build
+  - api
+  implied_untracked_deps:
+  - com_github_golang_protobuf
+  - io_bazel_rules_nogo
+  - org_golang_google_protobuf
+  - org_golang_x_tools
+  license: "Apache-2.0"
+  license_url: "https://github.com/bazelbuild/rules_go/blob/v{version}/LICENSE.txt"
+io_hyperscan:
+  use_category:
+  - dataplane_ext
+  extensions:
+  - envoy.matching.input_matchers.hyperscan
+  - envoy.regex_engines.hyperscan
+  license: "BSD-3-Clause"
+  license_url: "https://github.com/intel/hyperscan/blob/v{version}/LICENSE"
+io_opentelemetry_cpp:
+  use_category:
+  - observability_ext
+  extensions:
+  - envoy.tracers.opentelemetry
+  - envoy.tracers.opentelemetry.samplers.always_on
+  - envoy.tracers.opentelemetry.samplers.dynatrace
+  - envoy.tracers.opentelemetry.samplers.cel
+  - envoy.tracers.opentelemetry.samplers.parent_based
+  - envoy.tracers.opentelemetry.samplers.trace_id_ratio_based
+  - envoy.tracers.zipkin
+  license: "Apache-2.0"
+  license_url: "https://github.com/open-telemetry/opentelemetry-cpp/blob/v{version}/LICENSE"
+io_vectorscan:
+  use_category:
+  - dataplane_ext
+  extensions:
+  - envoy.matching.input_matchers.hyperscan
+  - envoy.regex_engines.hyperscan
+  license: "BSD-3-Clause"
+  license_url: "https://github.com/VectorCamp/vectorscan/blob/vectorscan/{version}/LICENSE"
+kafka_server_binary:
+  use_category:
+  - test_only
+kafka_source:
+  use_category:
+  - dataplane_ext
+  extensions:
+  - envoy.filters.network.kafka_broker
+  - envoy.filters.network.kafka_mesh
+  cpe: "cpe:2.3:a:apache:kafka:*"
+  license: "Apache-2.0"
+  license_url: "https://github.com/apache/kafka/blob/{version}/LICENSE"
+libpfm:
+  use_category:
+  - test_only
+net_colm_open_source_colm:
+  use_category:
+  - dataplane_ext
+  extensions:
+  - envoy.matching.input_matchers.hyperscan
+  - envoy.regex_engines.hyperscan
+  license: "MIT"
+  license_url: "https://github.com/adrian-thurston/colm/blob/{version}/COPYING"
+net_colm_open_source_ragel:
+  use_category:
+  - dataplane_ext
+  extensions:
+  - envoy.matching.input_matchers.hyperscan
+  - envoy.regex_engines.hyperscan
+  license: "MIT"
+  license_url: "https://github.com/adrian-thurston/ragel/blob/{version}/COPYING"
+numactl:
+  use_category:
+  - dataplane_ext
+  extensions:
+  - envoy.tls.key_providers.qat
+  - envoy.compression.qatzip.compressor
+  - envoy.compression.qatzstd.compressor
+  license: "LGPL-2.1"
+  license_url: "https://github.com/numactl/numactl/blob/{version}/LICENSE.LGPL2.1"
+ocp:
+  use_category:
+  - dataplane_ext
+  extensions:
+  - envoy.filters.http.grpc_field_extraction
+  - envoy.filters.http.proto_message_extraction
+  - envoy.filters.http.proto_api_scrubber
+  license: "Apache-2.0"
+  license_url: "https://github.com/opencomputeproject/ocp-diag-core/blob/{version}/LICENSE"
+org_boost:
+  use_category:
+  - dataplane_ext
+  extensions:
+  - envoy.matching.input_matchers.hyperscan
+  - envoy.regex_engines.hyperscan
+  cpe: "cpe:2.3:a:boost:boost:*"
+  license: "Boost"
+  license_url: "https://github.com/boostorg/boost/blob/boost-{version}/LICENSE_1_0.txt"
+org_brotli:
+  use_category:
+  - dataplane_ext
+  extensions:
+  - envoy.compression.brotli.compressor
+  - envoy.compression.brotli.decompressor
+  cpe: "cpe:2.3:a:google:brotli:*"
+  license: "MIT"
+  license_url: "https://github.com/google/brotli/blob/v{version}/LICENSE"
+org_llvm_releases_compiler_rt:
+  use_category:
+  - test_only
+  cpe: "cpe:2.3:a:llvm:compiler-rt:*"
+  license: "Apache-2.0"
+  license_url: "https://github.com/llvm/llvm-project/blob/llvmorg-{version}/compiler-rt/LICENSE.TXT"
+platforms:
+  use_category:
+  - build
+  license: "Apache-2.0"
+  license_url: "https://github.com/bazelbuild/platforms/blob/{version}/LICENSE"
+proxy_wasm_cpp_host:
+  use_category:
+  - dataplane_ext
+  extensions:
+  - envoy.access_loggers.wasm
+  - envoy.bootstrap.wasm
+  - envoy.filters.http.wasm
+  - envoy.filters.network.wasm
+  - envoy.stat_sinks.wasm
+  - envoy.wasm.runtime.null
+  - envoy.wasm.runtime.v8
+  - envoy.wasm.runtime.wamr
+  - envoy.wasm.runtime.wasmtime
+  license: "Apache-2.0"
+  license_url: "https://github.com/proxy-wasm/proxy-wasm-cpp-host/blob/{version}/LICENSE"
+proxy_wasm_cpp_sdk:
+  use_category:
+  - dataplane_ext
+  extensions:
+  - envoy.access_loggers.wasm
+  - envoy.bootstrap.wasm
+  - envoy.filters.http.wasm
+  - envoy.filters.network.wasm
+  - envoy.stat_sinks.wasm
+  - envoy.wasm.runtime.null
+  - envoy.wasm.runtime.v8
+  - envoy.wasm.runtime.wamr
+  - envoy.wasm.runtime.wasmtime
+  license: "Apache-2.0"
+  license_url: "https://github.com/proxy-wasm/proxy-wasm-cpp-sdk/blob/{version}/LICENSE"
+proxy_wasm_rust_sdk:
+  use_category:
+  - test_only
+  license: "Apache-2.0"
+  license_url: "https://github.com/proxy-wasm/proxy-wasm-rust-sdk/blob/v{version}/LICENSE"
+rules_cc:
+  use_category:
+  - build
+  - controlplane
+  - dataplane_core
+  license: "Apache-2.0"
+  license_url: "https://github.com/bazelbuild/rules_cc/blob/{version}/LICENSE"
+rules_foreign_cc:
+  use_category:
+  - build
+  - dataplane_core
+  - controlplane
+  license: "Apache-2.0"
+  license_url: "https://github.com/bazelbuild/rules_foreign_cc/blob/{version}/LICENSE"
+rules_fuzzing:
+  use_category:
+  - test_only
+  implied_untracked_deps:
+  - rules_fuzzing_oss_fuzz
+  license: "Apache-2.0"
+  license_url: "https://github.com/bazelbuild/rules_fuzzing/blob/v{version}/LICENSE"
+rules_java:
+  use_category:
+  - build
+  license: "Apache-2.0"
+  license_url: "https://github.com/bazelbuild/rules_java/blob/{version}/LICENSE"
+rules_license:
+  use_category:
+  - build
+  - dataplane_core
+  - controlplane
+  license: "Apache-2.0"
+  license_url: "https://github.com/bazelbuild/rules_license/blob/{version}/LICENSE"
+rules_pkg:
+  use_category:
+  - build
+  license: "Apache-2.0"
+  license_url: "https://github.com/bazelbuild/rules_pkg/blob/{version}/LICENSE"
+rules_proto_grpc:
+  use_category:
+  - dataplane_ext
+  extensions:
+  - envoy.transport_sockets.alts
+  license: "Apache-2.0"
+  license_url: "https://github.com/rules-proto-grpc/rules_proto_grpc/blob/{version}/LICENSE"
+rules_python:
+  use_category:
+  - build
+  - controlplane
+  - dataplane_core
+  license: "Apache-2.0"
+  license_url: "https://github.com/bazelbuild/rules_python/blob/{version}/LICENSE"
+rules_ruby:
+  use_category:
+  - build
+  license: "Apache-2.0"
+  license_url: "https://github.com/protocolbuffers/rules_ruby/blob/{version}/LICENSE"
+rules_rust:
+  use_category:
+  - controlplane
+  - dataplane_core
+  - dataplane_ext
+  extensions:
+  - envoy.wasm.runtime.wasmtime
+  license: "Apache-2.0"
+  license_url: "https://github.com/bazelbuild/rules_rust/blob/{version}/LICENSE.txt"
+rules_shell:
+  use_category:
+  - build
+  license: "Apache-2.0"
+  license_url: "https://github.com/protocolbuffers/rules_shell/blob/{version}/LICENSE"
+simdutf:
+  use_category:
+  - dataplane_ext
+  extensions:
+  - envoy.wasm.runtime.v8
+skywalking_data_collect_protocol:
+  use_category:
+  - observability_ext
+  extensions:
+  - envoy.tracers.skywalking
+  cpe: "cpe:2.3:a:apache:skywalking:*"
+  license: "Apache-2.0"
+thrift:
+  use_category:
+  - test_only
+  cpe: "cpe:2.3:a:apache:thrift:*"
+  license: "Apache-2.0"
+  license_url: "https://github.com/apache/thrift/blob/v{version}/LICENSE"
+toolchains_llvm:
+  use_category:
+  - build
+  - dataplane_core
+  - controlplane
+  implied_untracked_deps:
+  - llvm_toolchain_llvm
+  license: "Apache-2.0"
+  license_url: "https://github.com/bazel-contrib/toolchains_llvm/blob/v{version}/LICENSE"
+uadk:
+  use_category:
+  - dataplane_ext
+  extensions:
+  - envoy.tls.key_providers.kae
+  license: "Apache-2.0"
+  license_url: "https://github.com/Linaro/uadk/blob/v{version}/LICENSE"
+v8:
+  use_category:
+  - dataplane_ext
+  extensions:
+  - envoy.wasm.runtime.v8
+  cpe: "cpe:2.3:a:google:v8:*"
+zlib:
+  use_category:
+  - controlplane
+  - dataplane_core
+  cpe: "cpe:2.3:a:gnu:zlib:*"
+  license: "zlib"
+  license_url: "https://github.com/madler/zlib/blob/v{version}/zlib.h"
+zstd:
+  use_category:
+  - dataplane_ext
+  extensions:
+  - envoy.compression.zstd.compressor
+  - envoy.compression.zstd.decompressor
+  cpe: "cpe:2.3:a:facebook:zstandard:*"
