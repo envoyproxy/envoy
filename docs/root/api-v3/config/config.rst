@@ -30,6 +30,7 @@ Extensions
   http/header_formatters
   http/header_validators
   http/original_ip_detection
+  http/sse_content_parsers
   http/stateful_session
   injected_credentials/injected_credentials
   geoip_provider/geoip_provider
