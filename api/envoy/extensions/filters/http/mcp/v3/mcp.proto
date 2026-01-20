@@ -36,6 +36,22 @@ message Mcp {
     REJECT_NO_MCP = 1;
   }
 
+  // Where to store parsed MCP request attributes.
+  enum RequestStorageMode {
+    // Unspecified. Uses default behavior (same as DYNAMIC_METADATA).
+    MODE_UNSPECIFIED = 0;
+
+    // Store request attributes in dynamic metadata only.
+    // This is the default behavior.
+    DYNAMIC_METADATA = 1;
+
+    // Store request attributes in filter state only.
+    FILTER_STATE = 2;
+
+    // Store request attributes in both dynamic metadata and filter state.
+    BOTH = 3;
+  }
+
   // Configures how the filter handles non-MCP traffic.
   TrafficMode traffic_mode = 1 [(validate.rules).enum = {defined_only: true}];
 
@@ -56,10 +72,10 @@ message Mcp {
   // Parser configuration, this provide the attribute extraction override.
   ParserConfig parser_config = 4;
 
-  // If true, the filter maintains a filter state object with the parsed MCP attributes.
-  // This enables other filters to access MCP request fields via FilterState.
-  // Defaults to false.
-  bool emit_filter_state = 5;
+  // Where to store parsed MCP request attributes.
+  // Controls whether attributes are written to dynamic metadata, filter state, or both.
+  // Default is DYNAMIC_METADATA when unspecified.
+  RequestStorageMode request_storage_mode = 5 [(validate.rules).enum = {defined_only: true}];
 }
 
 // Parser configuration with method-specific rules.

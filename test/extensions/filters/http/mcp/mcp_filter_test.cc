@@ -921,10 +921,11 @@ TEST(McpFilterStateObjectTest, IsMcpRequest) {
   EXPECT_FALSE(obj_false->isMcpRequest());
 }
 
-// Test FilterState is set correctly when emit_filter_state is enabled
+// Test FilterState is set correctly when request_storage_mode is FILTER_STATE
 TEST_F(McpFilterTest, FilterStateSetAfterParsing) {
   envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
-  proto_config.set_emit_filter_state(true);
+  proto_config.set_request_storage_mode(
+      envoy::extensions::filters::http::mcp::v3::Mcp::FILTER_STATE);
   config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
   filter_ = std::make_unique<McpFilter>(config_);
   filter_->setDecoderFilterCallbacks(decoder_callbacks_);
@@ -940,6 +941,9 @@ TEST_F(McpFilterTest, FilterStateSetAfterParsing) {
       R"({"jsonrpc": "2.0", "method": "tools/call", "params": {"name": "my_tool"}, "id": 42})";
   Buffer::OwnedImpl buffer(json);
 
+  // Dynamic metadata should NOT be set when storage mode is FILTER_STATE only
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata(_, _)).Times(0);
+
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
 
   const auto* filter_state_obj =
@@ -952,8 +956,8 @@ TEST_F(McpFilterTest, FilterStateSetAfterParsing) {
   EXPECT_TRUE(filter_state_obj->isMcpRequest());
 }
 
-// Test FilterState is NOT set when emit_filter_state is disabled (default)
-TEST_F(McpFilterTest, FilterStateNotSetWhenEmitDisabled) {
+// Test default behavior: dynamic metadata is set, filter state is NOT set
+TEST_F(McpFilterTest, DefaultStorageModeDynamicMetadataOnly) {
   Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
                                          {"content-type", "application/json"},
                                          {"accept", "application/json"},
@@ -965,12 +969,49 @@ TEST_F(McpFilterTest, FilterStateNotSetWhenEmitDisabled) {
       R"({"jsonrpc": "2.0", "method": "tools/call", "params": {"name": "my_tool"}, "id": 42})";
   Buffer::OwnedImpl buffer(json);
 
+  // Dynamic metadata should be set by default
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("mcp_proxy", _));
+
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
 
+  // Filter state should NOT be set by default
   const auto* filter_state_obj =
       decoder_callbacks_.stream_info_.filterState()->getDataReadOnly<McpFilterStateObject>(
           std::string(McpFilterStateObject::FilterStateKey));
   EXPECT_EQ(filter_state_obj, nullptr);
+}
+
+// Test BOTH mode: both dynamic metadata and filter state are set
+TEST_F(McpFilterTest, BothStorageModeSetsBothTargets) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_request_storage_mode(envoy::extensions::filters::http::mcp::v3::Mcp::BOTH);
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+
+  filter_->decodeHeaders(headers, false);
+
+  std::string json =
+      R"({"jsonrpc": "2.0", "method": "tools/call", "params": {"name": "my_tool"}, "id": 42})";
+  Buffer::OwnedImpl buffer(json);
+
+  // Both should be set
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("mcp_proxy", _));
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+
+  // Filter state should also be set
+  const auto* filter_state_obj =
+      decoder_callbacks_.stream_info_.filterState()->getDataReadOnly<McpFilterStateObject>(
+          std::string(McpFilterStateObject::FilterStateKey));
+  ASSERT_NE(filter_state_obj, nullptr);
+  EXPECT_TRUE(filter_state_obj->method().has_value());
+  EXPECT_EQ(filter_state_obj->method().value(), "tools/call");
 }
 
 } // namespace

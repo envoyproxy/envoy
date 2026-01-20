@@ -59,7 +59,17 @@ public:
 
   uint32_t maxRequestBodySize() const { return max_request_body_size_; }
   const ParserConfig& parserConfig() const { return parser_config_; }
-  bool emitFilterState() const { return emit_filter_state_; }
+  bool shouldStoreToDynamicMetadata() const {
+    return request_storage_mode_ ==
+               envoy::extensions::filters::http::mcp::v3::Mcp::MODE_UNSPECIFIED ||
+           request_storage_mode_ ==
+               envoy::extensions::filters::http::mcp::v3::Mcp::DYNAMIC_METADATA ||
+           request_storage_mode_ == envoy::extensions::filters::http::mcp::v3::Mcp::BOTH;
+  }
+  bool shouldStoreToFilterState() const {
+    return request_storage_mode_ == envoy::extensions::filters::http::mcp::v3::Mcp::FILTER_STATE ||
+           request_storage_mode_ == envoy::extensions::filters::http::mcp::v3::Mcp::BOTH;
+  }
 
   McpFilterStats& stats() { return stats_; }
 
@@ -67,7 +77,7 @@ private:
   const envoy::extensions::filters::http::mcp::v3::Mcp::TrafficMode traffic_mode_;
   const bool clear_route_cache_;
   const uint32_t max_request_body_size_;
-  const bool emit_filter_state_;
+  const envoy::extensions::filters::http::mcp::v3::Mcp::RequestStorageMode request_storage_mode_;
   ParserConfig parser_config_;
   McpFilterStats stats_;
 };

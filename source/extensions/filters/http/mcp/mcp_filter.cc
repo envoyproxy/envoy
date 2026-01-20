@@ -29,7 +29,7 @@ McpFilterConfig::McpFilterConfig(const envoy::extensions::filters::http::mcp::v3
       max_request_body_size_(proto_config.has_max_request_body_size()
                                  ? proto_config.max_request_body_size().value()
                                  : 8192), // Default: 8KB
-      emit_filter_state_(proto_config.emit_filter_state()),
+      request_storage_mode_(proto_config.request_storage_mode()),
       parser_config_(proto_config.has_parser_config()
                          ? McpParserConfig::fromProto(proto_config.parser_config())
                          : McpParserConfig::createDefault()),
@@ -257,7 +257,7 @@ Http::FilterDataStatus McpFilter::completeParsing() {
   }
 
   if (!metadata.fields().empty()) {
-    if (config_->emitFilterState()) {
+    if (config_->shouldStoreToFilterState()) {
       auto filter_state_obj =
           std::make_shared<FilterStateObject>(parser_->getMethod(), metadata, is_mcp_request_);
       decoder_callbacks_->streamInfo().filterState()->setData(
@@ -266,9 +266,11 @@ Http::FilterDataStatus McpFilter::completeParsing() {
           StreamInfo::StreamSharingMayImpactPooling::None);
     }
 
-    decoder_callbacks_->streamInfo().setDynamicMetadata(std::string(MetadataKeys::FilterName),
-                                                        metadata);
-    ENVOY_LOG(debug, "MCP filter set dynamic metadata: {}", metadata.DebugString());
+    if (config_->shouldStoreToDynamicMetadata()) {
+      decoder_callbacks_->streamInfo().setDynamicMetadata(std::string(MetadataKeys::FilterName),
+                                                          metadata);
+      ENVOY_LOG(debug, "MCP filter set dynamic metadata: {}", metadata.DebugString());
+    }
 
     if (config_->clearRouteCache()) {
       if (auto cb = decoder_callbacks_->downstreamCallbacks(); cb.has_value()) {
