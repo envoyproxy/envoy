@@ -426,7 +426,7 @@ case $CI_TARGET in
         echo "Testing zlib-ng compression..."
         bazel_with_collection \
             test "${BAZEL_BUILD_OPTIONS[@]}" \
-            --define zlib=ng \
+            --define zlib=original \
             -c fastbuild \
             @envoy//test/extensions/compression/gzip/compressor:compressor_test \
             @envoy//test/extensions/compression/gzip/decompressor:zlib_decompressor_impl_test
