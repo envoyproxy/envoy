@@ -52,7 +52,6 @@ using McpMethodMap = absl::flat_hash_map<absl::string_view, McpMethod>;
 
 const McpMethodMap& mcpMethodMap() {
   // TODO(botengyao): Add support for more MCP methods:
-  // - completion/complete
   // - logging/setLevel
   CONSTRUCT_ON_FIRST_USE(
       McpMethodMap,
@@ -65,6 +64,7 @@ const McpMethodMap& mcpMethodMap() {
        {"resources/unsubscribe", McpMethod::ResourcesUnsubscribe},
        {"prompts/list", McpMethod::PromptsList},
        {"prompts/get", McpMethod::PromptsGet},
+       {"completion/complete", McpMethod::CompletionComplete},
        {"ping", McpMethod::Ping},
        // Notifications (client -> server).
        {"notifications/initialized", McpMethod::NotificationInitialized},
@@ -219,6 +219,15 @@ Http::FilterDataStatus McpRouterFilter::decodeData(Buffer::Instance& data, bool 
       handlePromptsGet();
       break;
 
+    case McpMethod::CompletionComplete:
+      // Parse ref info from body since fields are optional (ref.name XOR ref.uri).
+      if (!parseCompletionRefFromBody(data)) {
+        sendHttpError(400, "Invalid completion request: missing or malformed ref");
+        return Http::FilterDataStatus::StopIterationNoBuffer;
+      }
+      handleCompletionComplete();
+      break;
+
     case McpMethod::Ping:
       handlePing();
       return Http::FilterDataStatus::StopIterationNoBuffer;
@@ -252,6 +261,8 @@ Http::FilterDataStatus McpRouterFilter::decodeData(Buffer::Instance& data, bool 
         rewriteResourceUriBody(data);
       } else if (method_ == McpMethod::PromptsGet) {
         rewritePromptsGetBody(data);
+      } else if (method_ == McpMethod::CompletionComplete) {
+        rewriteCompletionCompleteBody(data);
       }
       needs_body_rewrite_ = false;
     }
@@ -497,6 +508,74 @@ std::pair<std::string, std::string> McpRouterFilter::parsePromptName(const std::
   return {"", prefixed};
 }
 
+bool McpRouterFilter::parseCompletionRefFromBody(Buffer::Instance& buffer) {
+  // Parse ref.type, ref.name, and ref.uri from the JSON body using simple string search.
+  // This avoids the early-stop issue where optional fields (name XOR uri) cause problems.
+  std::string body = buffer.toString();
+
+  // Find "ref" object in the body.
+  size_t ref_pos = body.find("\"ref\"");
+  if (ref_pos == std::string::npos) {
+    ENVOY_LOG(warn, "completion/complete: missing ref object");
+    return false;
+  }
+
+  // Find ref.type value.
+  size_t type_key = body.find("\"type\"", ref_pos);
+  if (type_key == std::string::npos) {
+    ENVOY_LOG(warn, "completion/complete: missing ref.type");
+    return false;
+  }
+
+  // Extract the type value (simple string extraction after "type": "...).
+  size_t type_colon = body.find(':', type_key);
+  size_t type_quote_start = body.find('"', type_colon + 1);
+  size_t type_quote_end = body.find('"', type_quote_start + 1);
+  if (type_quote_start == std::string::npos || type_quote_end == std::string::npos) {
+    ENVOY_LOG(warn, "completion/complete: malformed ref.type value");
+    return false;
+  }
+  completion_ref_type_ = body.substr(type_quote_start + 1, type_quote_end - type_quote_start - 1);
+
+  // Based on ref.type, extract name or uri.
+  if (completion_ref_type_ == "ref/prompt") {
+    size_t name_key = body.find("\"name\"", ref_pos);
+    if (name_key == std::string::npos) {
+      ENVOY_LOG(warn, "completion/complete (ref/prompt): missing ref.name");
+      return false;
+    }
+    size_t name_colon = body.find(':', name_key);
+    size_t name_quote_start = body.find('"', name_colon + 1);
+    size_t name_quote_end = body.find('"', name_quote_start + 1);
+    if (name_quote_start == std::string::npos || name_quote_end == std::string::npos) {
+      ENVOY_LOG(warn, "completion/complete: malformed ref.name value");
+      return false;
+    }
+    prompt_name_ = body.substr(name_quote_start + 1, name_quote_end - name_quote_start - 1);
+    ENVOY_LOG(debug, "completion/complete: parsed ref/prompt name='{}'", prompt_name_);
+  } else if (completion_ref_type_ == "ref/resource") {
+    size_t uri_key = body.find("\"uri\"", ref_pos);
+    if (uri_key == std::string::npos) {
+      ENVOY_LOG(warn, "completion/complete (ref/resource): missing ref.uri");
+      return false;
+    }
+    size_t uri_colon = body.find(':', uri_key);
+    size_t uri_quote_start = body.find('"', uri_colon + 1);
+    size_t uri_quote_end = body.find('"', uri_quote_start + 1);
+    if (uri_quote_start == std::string::npos || uri_quote_end == std::string::npos) {
+      ENVOY_LOG(warn, "completion/complete: malformed ref.uri value");
+      return false;
+    }
+    resource_uri_ = body.substr(uri_quote_start + 1, uri_quote_end - uri_quote_start - 1);
+    ENVOY_LOG(debug, "completion/complete: parsed ref/resource uri='{}'", resource_uri_);
+  } else {
+    ENVOY_LOG(warn, "completion/complete: unknown ref.type '{}'", completion_ref_type_);
+    return false;
+  }
+
+  return true;
+}
+
 ssize_t McpRouterFilter::rewriteToolCallBody(Buffer::Instance& buffer) {
   if (tool_name_.empty() || tool_name_ == unprefixed_tool_name_) {
     return 0;
@@ -540,6 +619,16 @@ ssize_t McpRouterFilter::rewritePromptsGetBody(Buffer::Instance& buffer) {
   }
 
   return rewriteAtPosition(buffer, pos, prompt_name_, unprefixed_prompt_name_);
+}
+
+ssize_t McpRouterFilter::rewriteCompletionCompleteBody(Buffer::Instance& buffer) {
+  // Rewrite based on ref type: prompt name for ref/prompt, resource URI for ref/resource.
+  if (completion_ref_type_ == "ref/prompt") {
+    return rewritePromptsGetBody(buffer);
+  } else if (completion_ref_type_ == "ref/resource") {
+    return rewriteResourceUriBody(buffer);
+  }
+  return 0;
 }
 
 ssize_t McpRouterFilter::rewriteAtPosition(Buffer::Instance& buffer, ssize_t pos,
@@ -885,6 +974,56 @@ void McpRouterFilter::handlePromptsGet() {
 
   ENVOY_LOG(debug, "prompts/get: backend='{}', prompt='{}' -> '{}', needs_rewrite={}", backend_name,
             prompt_name_, actual_prompt, needs_body_rewrite_);
+
+  initializeSingleBackend(*backend, [this](BackendResponse resp) {
+    if (resp.success) {
+      sendJsonResponse(resp.body, encoded_session_id_);
+    } else {
+      sendHttpError(500, resp.error.empty() ? "Backend request failed" : resp.error);
+    }
+  });
+}
+
+void McpRouterFilter::handleCompletionComplete() {
+  // Route based on ref type: ref/prompt uses prompt name, ref/resource uses resource URI.
+  // https://modelcontextprotocol.io/specification/2025-06-18/server/utilities/completion
+  std::string backend_name;
+
+  if (completion_ref_type_ == "ref/prompt") {
+    auto [name, actual_prompt] = parsePromptName(prompt_name_);
+    backend_name = name;
+    unprefixed_prompt_name_ = actual_prompt;
+    needs_body_rewrite_ = (prompt_name_ != unprefixed_prompt_name_);
+
+    ENVOY_LOG(debug,
+              "completion/complete (ref/prompt): backend='{}', name='{}' -> '{}', "
+              "needs_rewrite={}",
+              backend_name, prompt_name_, actual_prompt, needs_body_rewrite_);
+  } else if (completion_ref_type_ == "ref/resource") {
+    auto [name, actual_uri] = parseResourceUri(resource_uri_);
+    backend_name = name;
+    rewritten_uri_ = actual_uri;
+    needs_body_rewrite_ = (resource_uri_ != rewritten_uri_);
+
+    ENVOY_LOG(debug,
+              "completion/complete (ref/resource): backend='{}', uri='{}' -> '{}', "
+              "needs_rewrite={}",
+              backend_name, resource_uri_, actual_uri, needs_body_rewrite_);
+  } else {
+    sendHttpError(400, fmt::format("Invalid completion ref type '{}'", completion_ref_type_));
+    return;
+  }
+
+  if (backend_name.empty()) {
+    sendHttpError(400, "Cannot determine backend for completion request");
+    return;
+  }
+
+  const McpBackendConfig* backend = config_->findBackend(backend_name);
+  if (!backend) {
+    sendHttpError(400, fmt::format("Unknown backend '{}' in completion ref", backend_name));
+    return;
+  }
 
   initializeSingleBackend(*backend, [this](BackendResponse resp) {
     if (resp.success) {
@@ -1262,6 +1401,15 @@ McpRouterFilter::createUpstreamHeaders(const McpBackendConfig& backend,
           // Prompt name rewriting, delta = new_size - old_size.
           size_delta = static_cast<int64_t>(unprefixed_prompt_name_.size()) -
                        static_cast<int64_t>(prompt_name_.size());
+        } else if (method_ == McpMethod::CompletionComplete) {
+          // Completion ref rewriting: depends on ref type.
+          if (completion_ref_type_ == "ref/prompt") {
+            size_delta = static_cast<int64_t>(unprefixed_prompt_name_.size()) -
+                         static_cast<int64_t>(prompt_name_.size());
+          } else if (completion_ref_type_ == "ref/resource") {
+            size_delta = static_cast<int64_t>(rewritten_uri_.size()) -
+                         static_cast<int64_t>(resource_uri_.size());
+          }
         }
         int64_t new_length = static_cast<int64_t>(original_length) + size_delta;
         headers->setContentLength(new_length);

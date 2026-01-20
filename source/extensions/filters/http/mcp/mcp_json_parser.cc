@@ -36,7 +36,7 @@ void McpParserConfig::initializeDefaults() {
   addMethodConfig(Methods::PROMPTS_LIST, {});
   addMethodConfig(Methods::PROMPTS_GET, {AttributeExtractionRule("params.name")});
 
-  // Completion
+  // Completion. No field extraction needed. Router parses ref info from body.
   addMethodConfig(Methods::COMPLETION_COMPLETE, {});
 
   // Logging

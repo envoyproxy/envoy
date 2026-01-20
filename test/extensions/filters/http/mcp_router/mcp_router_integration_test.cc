@@ -1051,6 +1051,170 @@ TEST_P(McpRouterIntegrationTest, PromptsGetWithUnknownBackendReturns400) {
   EXPECT_EQ("400", response->headers().getStatusValue());
 }
 
+// Test completion/complete with ref/prompt routes to correct backend.
+TEST_P(McpRouterIntegrationTest, CompletionCompleteWithPromptRef) {
+  initializeFilter();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  const std::string request_body = R"({
+    "jsonrpc": "2.0",
+    "method": "completion/complete",
+    "id": 40,
+    "params": {
+      "ref": {
+        "type": "ref/prompt",
+        "name": "time__greeting"
+      },
+      "argument": {
+        "name": "prefix",
+        "value": "hel"
+      }
+    }
+  })";
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/mcp"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"accept", "application/json"},
+                                     {"accept", "text/event-stream"},
+                                     {"content-type", "application/json"}},
+      request_body);
+
+  // Request should be routed to time backend based on "time__" prefix in prompt name.
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, time_backend_connection_));
+  ASSERT_TRUE(time_backend_connection_->waitForNewStream(*dispatcher_, time_backend_request_));
+  ASSERT_TRUE(time_backend_request_->waitForEndStream(*dispatcher_));
+
+  // Verify upstream request body has prompt name rewritten (prefix stripped).
+  EXPECT_THAT(time_backend_request_->body().toString(), testing::HasSubstr("\"greeting\""));
+  EXPECT_THAT(time_backend_request_->body().toString(), testing::Not(testing::HasSubstr("time__")));
+
+  const std::string backend_response = R"({
+    "jsonrpc": "2.0",
+    "id": 40,
+    "result": {
+      "completion": {
+        "values": ["hello", "help", "helicopter"],
+        "hasMore": false
+      }
+    }
+  })";
+  time_backend_request_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
+      false);
+  Buffer::OwnedImpl response_body(backend_response);
+  time_backend_request_->encodeData(response_body, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_THAT(response->body(), testing::HasSubstr("\"values\""));
+  EXPECT_THAT(response->body(), testing::HasSubstr("hello"));
+}
+
+// Test completion/complete with ref/resource routes to correct backend.
+TEST_P(McpRouterIntegrationTest, CompletionCompleteWithResourceRef) {
+  initializeFilter();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  const std::string request_body = R"({
+    "jsonrpc": "2.0",
+    "method": "completion/complete",
+    "id": 41,
+    "params": {
+      "ref": {
+        "type": "ref/resource",
+        "uri": "time+file://current_time"
+      },
+      "argument": {
+        "name": "format",
+        "value": "YYYY"
+      }
+    }
+  })";
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/mcp"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"accept", "application/json"},
+                                     {"accept", "text/event-stream"},
+                                     {"content-type", "application/json"}},
+      request_body);
+
+  // Request should be routed to time backend based on "time+" prefix in resource URI.
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, time_backend_connection_));
+  ASSERT_TRUE(time_backend_connection_->waitForNewStream(*dispatcher_, time_backend_request_));
+  ASSERT_TRUE(time_backend_request_->waitForEndStream(*dispatcher_));
+
+  // Verify upstream request body has URI rewritten (backend prefix stripped).
+  EXPECT_THAT(time_backend_request_->body().toString(),
+              testing::HasSubstr("\"file://current_time\""));
+  EXPECT_THAT(time_backend_request_->body().toString(), testing::Not(testing::HasSubstr("time+")));
+
+  const std::string backend_response = R"({
+    "jsonrpc": "2.0",
+    "id": 41,
+    "result": {
+      "completion": {
+        "values": ["YYYY-MM-DD", "YYYY/MM/DD"],
+        "hasMore": false
+      }
+    }
+  })";
+  time_backend_request_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
+      false);
+  Buffer::OwnedImpl response_body(backend_response);
+  time_backend_request_->encodeData(response_body, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_THAT(response->body(), testing::HasSubstr("\"values\""));
+  EXPECT_THAT(response->body(), testing::HasSubstr("YYYY-MM-DD"));
+}
+
+// Test completion/complete with invalid ref type returns 400.
+TEST_P(McpRouterIntegrationTest, CompletionCompleteWithInvalidRefType) {
+  initializeFilter();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  const std::string request_body = R"({
+    "jsonrpc": "2.0",
+    "method": "completion/complete",
+    "id": 42,
+    "params": {
+      "ref": {
+        "type": "ref/invalid",
+        "name": "something"
+      },
+      "argument": {
+        "name": "prefix",
+        "value": "test"
+      }
+    }
+  })";
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/mcp"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"accept", "application/json"},
+                                     {"accept", "text/event-stream"},
+                                     {"content-type", "application/json"}},
+      request_body);
+
+  // Invalid ref type should return 400 Bad Request.
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("400", response->headers().getStatusValue());
+}
+
 // Test notifications/cancelled is forwarded to all backends.
 TEST_P(McpRouterIntegrationTest, NotificationCancelledFanout) {
   initializeFilter();
