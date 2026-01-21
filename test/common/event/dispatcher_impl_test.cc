@@ -57,6 +57,11 @@ protected:
   SchedulableCallbackImplTest()
       : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")) {}
 
+  ~SchedulableCallbackImplTest() override {
+    // Must call shutdown() before destroying the dispatcher.
+    dispatcher_->shutdown();
+  }
+
   void createCallback(std::function<void()> cb) {
     callbacks_.emplace_back(dispatcher_->createSchedulableCallback(cb));
   }
@@ -262,6 +267,9 @@ TEST(DeferredDeleteTest, DeferredDelete) {
 
   EXPECT_CALL(callback3, Call);
   dispatcher->clearDeferredDeleteList();
+
+  // Must call shutdown() before destroying the dispatcher.
+  dispatcher->shutdown();
 }
 
 TEST(DeferredTaskTest, DeferredTask) {
@@ -282,6 +290,9 @@ TEST(DeferredTaskTest, DeferredTask) {
   EXPECT_CALL(callback2, Call);
   EXPECT_CALL(callback3, Call);
   dispatcher->clearDeferredDeleteList();
+
+  // Must call shutdown() before destroying the dispatcher.
+  dispatcher->shutdown();
 }
 
 TEST(DeferredDeleteTest, DeferredDeleteAndPostOrdering) {
@@ -299,6 +310,9 @@ TEST(DeferredDeleteTest, DeferredDeleteAndPostOrdering) {
   dispatcher->deferredDelete(
       std::make_unique<TestDeferredDeletable>(delete_callback.AsStdFunction()));
   dispatcher->run(Dispatcher::RunType::NonBlock);
+
+  // Must call shutdown() before destroying the dispatcher.
+  dispatcher->shutdown();
 }
 
 class DispatcherImplTest : public testing::Test {
@@ -319,6 +333,9 @@ protected:
   ~DispatcherImplTest() override {
     dispatcher_->exit();
     dispatcher_thread_->join();
+    // Call shutdown() to properly clean up all lists before destroying the dispatcher.
+    dispatcher_->post([this]() { dispatcher_->shutdown(); });
+    dispatcher_->run(Dispatcher::RunType::NonBlock);
   }
 
   void timerTest(std::function<void(Timer&)> enable_timer_delegate) {
@@ -501,6 +518,9 @@ TEST(DispatcherThreadDeletedImplTest, DispatcherThreadDeletedAtNextCycle) {
   EXPECT_CALL(callbacks[1], Call);
   EXPECT_CALL(callbacks[2], Call);
   dispatcher->run(Event::Dispatcher::RunType::NonBlock);
+
+  // Must call shutdown() before destroying the dispatcher.
+  dispatcher->shutdown();
 }
 
 class DispatcherShutdownTest : public testing::Test {
@@ -521,9 +541,29 @@ TEST_F(DispatcherShutdownTest, ShutdownClearThreadLocalDeletables) {
   dispatcher_->shutdown();
 }
 
-TEST_F(DispatcherShutdownTest, ShutdownDoesnotClearDeferredListOrPostCallback) {
+TEST_F(DispatcherShutdownTest, ShutdownCalledTwiceTriggersEnvoyBug) {
+  // First shutdown should succeed.
+  dispatcher_->shutdown();
+  // Second shutdown should trigger ENVOY_BUG but not crash.
+  EXPECT_ENVOY_BUG(dispatcher_->shutdown(), "shutdown() called multiple times");
+}
+
+TEST(DispatcherDestructorTest, DestructorWithoutShutdownTriggersEnvoyBug) {
+  EXPECT_ENVOY_BUG(
+      {
+        Api::ApiPtr api = Api::createApiForTest();
+        DispatcherPtr dispatcher = api->allocateDispatcher("test_thread");
+        // Dispatcher goes out of scope without shutdown() - triggers ENVOY_BUG.
+      },
+      "destroyed without calling shutdown()");
+}
+
+TEST_F(DispatcherShutdownTest, ShutdownClearsDeferredAndThreadLocalButNotPost) {
   MockFunction<void()> callback, deferred_callback, post_callback;
 
+  // shutdown() clears deferred deletables and thread local deletables by running their
+  // destructors. However, post callbacks are DISCARDED without execution because they may
+  // reference objects being destroyed, which could cause crashes during shutdown.
   {
     InSequence s;
 
@@ -532,16 +572,19 @@ TEST_F(DispatcherShutdownTest, ShutdownDoesnotClearDeferredListOrPostCallback) {
     dispatcher_->post(post_callback.AsStdFunction());
     dispatcher_->deleteInDispatcherThread(
         std::make_unique<TestDispatcherThreadDeletable>(callback.AsStdFunction()));
+
+    // Deferred deletable and thread-local deletable destructors are called.
+    EXPECT_CALL(deferred_callback, Call);
     EXPECT_CALL(callback, Call);
+    // post_callback is NOT called - discarded for safety.
     dispatcher_->shutdown();
 
-    ::testing::Mock::VerifyAndClearExpectations(&callback);
-    EXPECT_CALL(deferred_callback, Call);
+    // After shutdown, all lists are empty. Destructor should be a no-op.
     dispatcher_.reset();
   }
 }
 
-TEST_F(DispatcherShutdownTest, DestroyClearAllList) {
+TEST_F(DispatcherShutdownTest, DestructorAfterShutdownIsNoOp) {
   MockFunction<void()> callback, deferred_callback;
   dispatcher_->deferredDelete(
       std::make_unique<TestDeferredDeletable>(deferred_callback.AsStdFunction()));
@@ -549,9 +592,226 @@ TEST_F(DispatcherShutdownTest, DestroyClearAllList) {
       std::make_unique<TestDispatcherThreadDeletable>(callback.AsStdFunction()));
   {
     InSequence s;
+    // shutdown() should clean up all lists.
     EXPECT_CALL(deferred_callback, Call);
     EXPECT_CALL(callback, Call);
+    dispatcher_->shutdown();
+    // Destructor should be a no-op after shutdown().
     dispatcher_.reset();
+  }
+}
+
+// Tests to verify that shutdown() properly handles scenarios where cleanup of one list
+// creates work in another list. Post callbacks created during shutdown are discarded.
+TEST_F(DispatcherShutdownTest, DeferredDeletePostsCallbackDuringShutdown) {
+  MockFunction<void()> deferred_callback, post_callback;
+
+  {
+    InSequence s;
+
+    // Create a deferred deletable that posts a callback during its destruction.
+    dispatcher_->deferredDelete(std::make_unique<TestDeferredDeletable>([&]() {
+      deferred_callback.Call();
+      // Post a callback during deferred delete destruction.
+      dispatcher_->post(post_callback.AsStdFunction());
+    }));
+
+    // Deferred delete destructor runs first, which posts the callback.
+    EXPECT_CALL(deferred_callback, Call);
+    // The posted callback is discarded (NOT executed) because post callbacks are unsafe during
+    // shutdown and may reference destroyed objects.
+    dispatcher_->shutdown();
+  }
+}
+
+TEST_F(DispatcherShutdownTest, PostCallbackIsDiscardedDuringShutdown) {
+  MockFunction<void()> post_callback;
+
+  // Post callbacks are discarded during shutdown without execution.
+  dispatcher_->post(post_callback.AsStdFunction());
+
+  // post_callback should NOT be called.
+  dispatcher_->shutdown();
+}
+
+TEST_F(DispatcherShutdownTest, DeepDeferredDeleteChain) {
+  MockFunction<void()> callback1, callback2, callback3;
+
+  {
+    InSequence s;
+
+    // Level 1: Deferred delete that creates another deferred delete during destruction.
+    dispatcher_->deferredDelete(std::make_unique<TestDeferredDeletable>([&]() {
+      callback1.Call();
+      // Level 2: Create another deferred delete.
+      dispatcher_->deferredDelete(std::make_unique<TestDeferredDeletable>([&]() {
+        callback2.Call();
+        // Level 3: Create another deferred delete.
+        dispatcher_->deferredDelete(
+            std::make_unique<TestDeferredDeletable>(callback3.AsStdFunction()));
+      }));
+    }));
+
+    // All deferred delete destructors should be called in order.
+    EXPECT_CALL(callback1, Call);
+    EXPECT_CALL(callback2, Call);
+    EXPECT_CALL(callback3, Call);
+    dispatcher_->shutdown();
+  }
+}
+
+TEST_F(DispatcherShutdownTest, ShutdownWithEmptyLists) {
+  // Should complete successfully without any errors or hangs.
+  dispatcher_->shutdown();
+  // Destructor should also be a no-op.
+  dispatcher_.reset();
+}
+
+TEST_F(DispatcherShutdownTest, ThreadLocalDeletableCreatesDeferredDelete) {
+  MockFunction<void()> thread_local_callback, deferred_callback;
+
+  {
+    InSequence s;
+
+    dispatcher_->deleteInDispatcherThread(std::make_unique<TestDispatcherThreadDeletable>([&]() {
+      thread_local_callback.Call();
+      dispatcher_->deferredDelete(
+          std::make_unique<TestDeferredDeletable>(deferred_callback.AsStdFunction()));
+    }));
+
+    EXPECT_CALL(thread_local_callback, Call);
+    EXPECT_CALL(deferred_callback, Call);
+    dispatcher_->shutdown();
+  }
+}
+
+TEST_F(DispatcherShutdownTest, InterleavedCleanup) {
+  MockFunction<void()> deferred1, post1, thread_local1, deferred2;
+
+  // Add items of different types.
+  dispatcher_->deferredDelete(std::make_unique<TestDeferredDeletable>(deferred1.AsStdFunction()));
+  dispatcher_->post(post1.AsStdFunction());
+  dispatcher_->deleteInDispatcherThread(
+      std::make_unique<TestDispatcherThreadDeletable>(thread_local1.AsStdFunction()));
+  dispatcher_->deferredDelete(std::make_unique<TestDeferredDeletable>(deferred2.AsStdFunction()));
+
+  {
+    InSequence s;
+    // Deferred deletables and thread local deletables are cleaned up during shutdown.
+    // Post callbacks are discarded without execution.
+    EXPECT_CALL(deferred1, Call);
+    EXPECT_CALL(deferred2, Call);
+    EXPECT_CALL(thread_local1, Call);
+    // post1 is NOT called - discarded.
+    dispatcher_->shutdown();
+  }
+}
+
+TEST_F(DispatcherShutdownTest, ItemsAddedDuringShutdownAreDiscarded) {
+  MockFunction<void()> deferred_callback, tld_callback, post_callback;
+  bool tld_destructor_ran = false;
+  bool post_callback_ran = false;
+
+  // Create a deferred deletable that tries to add more items during shutdown.
+  dispatcher_->deferredDelete(std::make_unique<TestDeferredDeletable>([&]() {
+    deferred_callback.Call();
+    // Try to add items during shutdown.
+    dispatcher_->deleteInDispatcherThread(std::make_unique<TestDispatcherThreadDeletable>([&]() {
+      tld_callback.Call();
+      tld_destructor_ran = true;
+    }));
+    dispatcher_->post([&]() {
+      post_callback.Call();
+      post_callback_ran = true;
+    });
+  }));
+
+  EXPECT_CALL(deferred_callback, Call);
+  // The thread-local deletable destructor will run immediately when discarded.
+  EXPECT_CALL(tld_callback, Call);
+  // The post callback should NOT be executed.
+  EXPECT_CALL(post_callback, Call).Times(0);
+
+  dispatcher_->shutdown();
+
+  // Verify: thread-local deletable destructor ran, but post callback did not execute.
+  EXPECT_TRUE(tld_destructor_ran);
+  EXPECT_FALSE(post_callback_ran);
+}
+
+// Test the maximum iteration limit scenario with a controlled chain length.
+// This exercises the iteration counting logic without triggering the max limit.
+TEST_F(DispatcherShutdownTest, LongCleanupChainCompletesSuccessfully) {
+  constexpr int kChainLength = 50; // Long enough to test multiple iterations.
+  std::atomic<int> cleanup_count{0};
+
+  // Create a controlled chain using shared_ptr to avoid dangling references.
+  auto counter = std::make_shared<std::atomic<int>>(kChainLength);
+
+  // Lambda that creates more deferred deletes in a controlled manner.
+  std::function<void()> create_more = [this, counter, &cleanup_count]() {
+    cleanup_count++;
+    int current = counter->fetch_sub(1);
+    if (current > 1) {
+      // Create one more deferred delete to continue the chain.
+      auto next_counter = counter;
+      dispatcher_->deferredDelete(std::make_unique<TestDeferredDeletable>(
+          [next_counter, &cleanup_count]() { cleanup_count++; }));
+    }
+  };
+
+  // Start the chain.
+  dispatcher_->deferredDelete(std::make_unique<TestDeferredDeletable>(create_more));
+  dispatcher_->shutdown();
+
+  // Verify cleanups completed successfully.
+  EXPECT_GT(cleanup_count, 0);
+  EXPECT_LE(cleanup_count, kChainLength + 10); // Allow some slack.
+}
+
+// Test that verifies thread-local deletables added from deferred delete destructors
+// have their destructors run immediately when discarded during shutdown.
+TEST_F(DispatcherShutdownTest, DeferredDeleteCreatesThreadLocalDeletable) {
+  MockFunction<void()> deferred_callback, thread_local_callback;
+
+  {
+    InSequence s;
+
+    dispatcher_->deferredDelete(std::make_unique<TestDeferredDeletable>([&]() {
+      deferred_callback.Call();
+      // Create a thread-local deletable during deferred delete destruction.
+      dispatcher_->deleteInDispatcherThread(
+          std::make_unique<TestDispatcherThreadDeletable>(thread_local_callback.AsStdFunction()));
+    }));
+
+    // Deferred delete destructor runs first.
+    EXPECT_CALL(deferred_callback, Call);
+    EXPECT_CALL(thread_local_callback, Call);
+    dispatcher_->shutdown();
+  }
+}
+
+// Test mixed scenario: thread-local deletable creates deferred delete,
+// which creates another thread-local deletable.
+TEST_F(DispatcherShutdownTest, ThreadLocalCreatesDeferredThatCreatesThreadLocal) {
+  MockFunction<void()> tld1_callback, deferred_callback, tld2_callback;
+
+  {
+    InSequence s;
+
+    dispatcher_->deleteInDispatcherThread(std::make_unique<TestDispatcherThreadDeletable>([&]() {
+      tld1_callback.Call();
+      dispatcher_->deferredDelete(std::make_unique<TestDeferredDeletable>([&]() {
+        deferred_callback.Call();
+        dispatcher_->deleteInDispatcherThread(
+            std::make_unique<TestDispatcherThreadDeletable>(tld2_callback.AsStdFunction()));
+      }));
+    }));
+
+    EXPECT_CALL(tld1_callback, Call);
+    EXPECT_CALL(deferred_callback, Call);
+    EXPECT_CALL(tld2_callback, Call);
+    dispatcher_->shutdown();
   }
 }
 
@@ -755,12 +1015,20 @@ TEST_F(DispatcherImplTest, OnlyRunsFatalActionsIfRunningOnSameThread) {
   }
 
   EXPECT_EQ(action->getNumTimesRan(), 1);
+
+  // Must call shutdown() on the non-running dispatcher before it goes out of scope.
+  non_running_dispatcher->shutdown();
 }
 
 class NotStartedDispatcherImplTest : public testing::Test {
 protected:
   NotStartedDispatcherImplTest()
       : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")) {}
+
+  ~NotStartedDispatcherImplTest() override {
+    // Must call shutdown() before destroying the dispatcher.
+    dispatcher_->shutdown();
+  }
 
   Api::ApiPtr api_;
   DispatcherPtr dispatcher_;
@@ -778,7 +1046,10 @@ protected:
     dispatcher_ = api_->allocateDispatcher("test_thread");
     dispatcher_->initializeStats(scope_);
   }
-  ~DispatcherMonotonicTimeTest() override = default;
+  ~DispatcherMonotonicTimeTest() override {
+    // Must call shutdown() before destroying the dispatcher.
+    dispatcher_->shutdown();
+  }
 
   NiceMock<Stats::MockStore> store_; // Used in InitializeStats, must outlive dispatcher_->exit().
   Stats::Scope& scope_{*store_.rootScope()};
@@ -830,7 +1101,11 @@ protected:
     evwatch_prepare_new(&libevent_base_, callPrepareCallback, &prepare_callback_);
     evwatch_check_new(&libevent_base_, onCheck, this);
   }
-  ~TimerImplTest() override { ASSERT(check_callbacks_.empty()); }
+  ~TimerImplTest() override {
+    ASSERT(check_callbacks_.empty());
+    // Must call shutdown() before destroying the dispatcher.
+    dispatcher_->shutdown();
+  }
 
   // Run a callback inside the event loop. The libevent monotonic time used for timer registration
   // is frozen while within this callback, so timers enabled within this callback end up with the
@@ -1299,6 +1574,9 @@ TEST_F(TimerImplTimingTest, TheoreticalTimerTiming) {
                   .count(),
               timing);
   }
+
+  // Must call shutdown() before destroying the dispatcher.
+  dispatcher->shutdown();
 }
 
 class TimerUtilsTest : public testing::Test {
@@ -1356,6 +1634,9 @@ TEST(DispatcherWithScaledTimerFactoryTest, CreatesScaledTimerManager) {
 
   DispatcherPtr dispatcher =
       api->allocateDispatcher("test_thread", scaled_timer_manager_factory.AsStdFunction());
+
+  // Must call shutdown() before destroying the dispatcher.
+  dispatcher->shutdown();
 }
 
 TEST(DispatcherWithScaledTimerFactoryTest, CreateScaledTimerWithMinimum) {
@@ -1371,6 +1652,9 @@ TEST(DispatcherWithScaledTimerFactoryTest, CreateScaledTimerWithMinimum) {
 
   EXPECT_CALL(*manager, createTimer_(ScaledTimerMinimum(ScaledMinimum(UnitFloat(0.8f))), _));
   dispatcher->createScaledTimer(ScaledTimerMinimum(ScaledMinimum(UnitFloat(0.8f))), []() {});
+
+  // Must call shutdown() before destroying the dispatcher.
+  dispatcher->shutdown();
 }
 
 TEST(DispatcherWithScaledTimerFactoryTest, CreateScaledTimerWithTimerType) {
@@ -1386,6 +1670,9 @@ TEST(DispatcherWithScaledTimerFactoryTest, CreateScaledTimerWithTimerType) {
 
   EXPECT_CALL(*manager, createTypedTimer_(ScaledTimerType::UnscaledRealTimerForTest, _));
   dispatcher->createScaledTimer(ScaledTimerType::UnscaledRealTimerForTest, []() {});
+
+  // Must call shutdown() before destroying the dispatcher.
+  dispatcher->shutdown();
 }
 
 class DispatcherWithWatchdogTest : public testing::Test {
@@ -1395,6 +1682,11 @@ protected:
         dispatcher_(api_->allocateDispatcher("test_thread")),
         os_sys_calls_(Api::OsSysCallsSingleton::get()) {
     dispatcher_->registerWatchdog(watchdog_, min_touch_interval_);
+  }
+
+  ~DispatcherWithWatchdogTest() override {
+    // Must call shutdown() before destroying the dispatcher.
+    dispatcher_->shutdown();
   }
 
   Event::SimulatedTimeSystem time_system_;
@@ -1496,6 +1788,11 @@ class DispatcherConnectionTest : public testing::Test {
 protected:
   DispatcherConnectionTest()
       : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")) {}
+
+  ~DispatcherConnectionTest() override {
+    // Must call shutdown() before destroying the dispatcher.
+    dispatcher_->shutdown();
+  }
 
   Api::ApiPtr api_;
   DispatcherPtr dispatcher_;

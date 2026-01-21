@@ -87,8 +87,11 @@ DispatcherImpl::DispatcherImpl(const std::string& name, Thread::ThreadFactory& t
 DispatcherImpl::~DispatcherImpl() {
   ENVOY_LOG(debug, "destroying dispatcher {}", name_);
   FatalErrorHandler::removeFatalErrorHandler(*this);
-  // TODO(lambdai): Resolve https://github.com/envoyproxy/envoy/issues/15072 and enable
-  // ASSERT(deletable_in_dispatcher_thread_.empty())
+  // shutdown() must be called before destruction to properly clean up all lists.
+  ENVOY_BUG(shutdown_called_,
+            fmt::format("Dispatcher {} destroyed without calling shutdown(). This may lead to "
+                        "non-deterministic cleanup order and memory leaks.",
+                        name_));
 }
 
 void DispatcherImpl::registerWatchdog(const Server::WatchDogSharedPtr& watchdog,
@@ -274,13 +277,17 @@ void DispatcherImpl::post(PostCb callback) {
 }
 
 void DispatcherImpl::deleteInDispatcherThread(DispatcherThreadDeletableConstPtr deletable) {
-  bool need_schedule;
+  bool need_schedule = false;
   {
     Thread::LockGuard lock(thread_local_deletable_lock_);
-    need_schedule = deletables_in_dispatcher_thread_.empty();
-    deletables_in_dispatcher_thread_.emplace_back(std::move(deletable));
-    // TODO(lambdai): Enable below after https://github.com/envoyproxy/envoy/issues/15072
-    // ASSERT(!shutdown_called_, "inserted after shutdown");
+    if (!shutdown_called_) {
+      need_schedule = deletables_in_dispatcher_thread_.empty();
+      deletables_in_dispatcher_thread_.emplace_back(std::move(deletable));
+    }
+    // If shutdown has been called, the deletable unique_ptr will be destroyed when this function
+    // returns, running its destructor immediately. This is not a leak! The object is cleaned up,
+    // just immediately rather than deferred. This can happen when destructors of objects being
+    // cleaned up during shutdown try to add more items.
   }
 
   if (need_schedule) {
@@ -303,32 +310,97 @@ MonotonicTime DispatcherImpl::approximateMonotonicTime() const {
 }
 
 void DispatcherImpl::shutdown() {
-  // TODO(lambdai): Resolve https://github.com/envoyproxy/envoy/issues/15072 and loop delete below
-  // below 3 lists until all lists are empty. The 3 lists are list of deferred delete objects, post
-  // callbacks and dispatcher thread deletable objects.
   ASSERT(isThreadSafe());
-  auto deferred_deletables_size = current_to_delete_->size();
-  std::list<std::function<void()>>::size_type post_callbacks_size;
-  {
-    Thread::LockGuard lock(post_lock_);
-    post_callbacks_size = post_callbacks_.size();
+
+  // shutdown() should only be called once. If called multiple times, it indicates a bug in the
+  // calling code.
+  ENVOY_BUG(!shutdown_called_,
+            fmt::format("Dispatcher {} shutdown() called multiple times.", name_));
+  if (shutdown_called_) {
+    return;
+  }
+  shutdown_called_ = true;
+
+  // Loop until all three lists are empty. Deleting objects from one list may add items to another
+  // list. For example, deferred delete destructors may post callbacks, and post callbacks may
+  // add deferred deletions. This ensures proper cleanup order and prevents dangling pointers.
+  // See https://github.com/envoyproxy/envoy/issues/15072 for details.
+  //
+  // The iteration limit protects against infinite loops where cleanup code continuously creates
+  // new work. While GoogleAsyncClient uses an unbounded loop, we use a high limit (1000) to catch
+  // pathological cases while allowing deep legitimate dependency chains. If this limit is reached,
+  // it likely indicates a bug in cleanup code that's creating an unbounded chain of work.
+  constexpr int kMaxIterations = 1000; // Safety limit to catch infinite loops.
+  int iteration = 0;
+  size_t total_deferred_deleted = 0;
+  size_t total_post_callbacks = 0;
+  size_t total_thread_local_deleted = 0;
+
+  bool has_pending_work = true;
+  while (has_pending_work && iteration < kMaxIterations) {
+    has_pending_work = false;
+
+    // Clean deferred delete list.
+    const auto deferred_size = current_to_delete_->size();
+    if (deferred_size > 0) {
+      total_deferred_deleted += deferred_size;
+      clearDeferredDeleteList();
+      has_pending_work = true;
+    }
+
+    // Discard post callbacks without running them. Post callbacks may reference objects that are
+    // being destroyed during shutdown, so executing them would be unsafe and can cause crashes.
+    // We only need to prevent new callbacks from being added (via shutdown_called_ check).
+    {
+      Thread::LockGuard lock(post_lock_);
+      const auto post_size = post_callbacks_.size();
+      if (post_size > 0) {
+        total_post_callbacks += post_size;
+        post_callbacks_.clear();
+        has_pending_work = true;
+      }
+    }
+
+    // Clean thread local deletables.
+    bool has_thread_local_deletables = false;
+    {
+      Thread::LockGuard lock(thread_local_deletable_lock_);
+      const auto thread_local_size = deletables_in_dispatcher_thread_.size();
+      has_thread_local_deletables = thread_local_size > 0;
+      total_thread_local_deleted += thread_local_size;
+    }
+    if (has_thread_local_deletables) {
+      runThreadLocalDelete();
+      has_pending_work = true;
+    }
+
+    iteration++;
   }
 
-  std::list<DispatcherThreadDeletableConstPtr> local_deletables;
-  {
-    Thread::LockGuard lock(thread_local_deletable_lock_);
-    local_deletables = std::move(deletables_in_dispatcher_thread_);
+  if (iteration >= kMaxIterations) {
+    size_t remaining_post_callbacks = 0;
+    size_t remaining_thread_local_deletables = 0;
+    {
+      Thread::LockGuard lock(post_lock_);
+      remaining_post_callbacks = post_callbacks_.size();
+    }
+    {
+      Thread::LockGuard lock(thread_local_deletable_lock_);
+      remaining_thread_local_deletables = deletables_in_dispatcher_thread_.size();
+    }
+    ENVOY_BUG(false,
+              fmt::format("Dispatcher {} shutdown reached maximum iterations ({}). This may "
+                          "indicate a cleanup loop. Remaining: {} deferred deletables, {} post "
+                          "callbacks, {} thread local deletables.",
+                          name_, kMaxIterations, current_to_delete_->size(),
+                          remaining_post_callbacks, remaining_thread_local_deletables));
   }
-  auto thread_local_deletables_size = local_deletables.size();
-  while (!local_deletables.empty()) {
-    local_deletables.pop_front();
-  }
-  ASSERT(!shutdown_called_);
-  shutdown_called_ = true;
-  ENVOY_LOG(
-      trace,
-      "{} destroyed {} thread local objects. Peek {} deferred deletables, {} post callbacks. ",
-      __FUNCTION__, deferred_deletables_size, post_callbacks_size, thread_local_deletables_size);
+
+  ENVOY_LOG(debug,
+            "Dispatcher {} shutdown completed in {} iterations. Cleaned up {} deferred deletables, "
+            "{} post callbacks, {} thread local deletables.",
+            name_, iteration, total_deferred_deleted, total_post_callbacks,
+            total_thread_local_deleted);
 }
 
 void DispatcherImpl::updateApproximateMonotonicTime() { updateApproximateMonotonicTimeInternal(); }
