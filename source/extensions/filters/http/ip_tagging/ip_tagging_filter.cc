@@ -176,6 +176,7 @@ absl::StatusOr<IpTaggingFilterConfigSharedPtr> IpTaggingFilterConfig::create(
       new IpTaggingFilterConfig(config, stat_prefix, singleton_manager, scope, runtime, api, tls,
                                 dispatcher, validation_visitor, creation_status));
   RETURN_IF_NOT_OK(creation_status);
+  config_ptr->addTagsReloadCb();
   return config_ptr;
 }
 
@@ -186,7 +187,10 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
     Event::Dispatcher& dispatcher, ProtobufMessage::ValidationVisitor& validation_visitor,
     absl::Status& creation_status)
     : request_type_(requestTypeEnum(config.request_type())), scope_(scope), runtime_(runtime),
-      stats_prefix_str_(stat_prefix),
+      stats_prefix_str_(stat_prefix), stat_name_set_(scope_.symbolTable().makeSet("IpTagging")),
+      stats_prefix_(stat_name_set_->add(stats_prefix_str_ + "ip_tagging")),
+      no_hit_(stat_name_set_->add("no_hit")), total_(stat_name_set_->add("total")),
+      unknown_tag_(stat_name_set_->add("unknown_tag.hit")),
       ip_tag_header_(config.has_ip_tag_header() ? config.ip_tag_header().header() : ""),
       ip_tag_header_action_(config.has_ip_tag_header()
                                 ? config.ip_tag_header().action()
@@ -210,7 +214,7 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
     auto trie_or_error = tags_loader_.parseIpTagsAsProto(config.ip_tags());
     if (trie_or_error.status().ok()) {
       trie_ = trie_or_error.value();
-      initializeStats(tags_loader_.getTagKeys());
+      initializeTagStats(tags_loader_.getTagKeys());
     } else {
       creation_status = trie_or_error.status();
       return;
@@ -221,14 +225,7 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
                                                tls, dispatcher, scope, ip_tags_registry_);
     if (provider_or_error.status().ok()) {
       provider_ = provider_or_error.value();
-      initializeStats(provider_->tagKeys());
-      auto weak_self = weak_from_this();
-      tags_reload_callback_handle_ =
-          provider_->addTagsReloadCb([weak_self](const std::vector<std::string> tags) {
-            if (auto filter_config = weak_self.lock()) {
-              filter_config->initializeStats(tags);
-            }
-          });
+      initializeTagStats(provider_->tagKeys());
     } else {
       creation_status = provider_or_error.status();
       return;
@@ -242,15 +239,19 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
   }
 }
 
-void IpTaggingFilterConfig::initializeStats(const std::vector<std::string>& tags) {
-  if (stat_name_set_ != nullptr) {
-    stat_name_set_.reset();
+void IpTaggingFilterConfig::addTagsReloadCb() {
+  if (provider_) {
+    auto weak_self = weak_from_this();
+    tags_reload_callback_handle_ =
+        provider_->addTagsReloadCb([weak_self](const std::vector<std::string> tags) {
+          if (auto filter_config = weak_self.lock()) {
+            filter_config->initializeTagStats(tags);
+          }
+        });
   }
-  stat_name_set_ = scope_.symbolTable().makeSet("IpTagging");
-  stats_prefix_ = stat_name_set_->add(stats_prefix_str_ + "ip_tagging");
-  no_hit_ = stat_name_set_->add("no_hit");
-  total_ = stat_name_set_->add("total");
-  unknown_tag_ = stat_name_set_->add("unknown_tag.hit");
+}
+
+void IpTaggingFilterConfig::initializeTagStats(const std::vector<std::string>& tags) {
   for (auto tag : tags) {
     stat_name_set_->rememberBuiltin(absl::StrCat(tag, ".hit"));
   }

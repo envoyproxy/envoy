@@ -204,7 +204,7 @@ public:
     incCounter(stat_name_set_->getBuiltin(absl::StrCat(tag, ".hit"), unknown_tag_));
   }
 
-  void initializeStats(const std::vector<std::string>& tags);
+  void initializeTagStats(const std::vector<std::string>& tags);
 
   void incNoHit() { incCounter(no_hit_); }
   void incTotal() { incCounter(total_); }
@@ -232,6 +232,7 @@ private:
   }
 
   void incCounter(Stats::StatName name);
+  void addTagsReloadCb();
   // Allow the unit test to have access to private members.
   friend class IpTaggingFilterConfigPeer;
   const FilterRequestType request_type_;
