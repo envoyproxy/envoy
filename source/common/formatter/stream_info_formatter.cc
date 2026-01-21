@@ -802,9 +802,10 @@ public:
         f, StreamInfoAddressFieldExtractionType::WithPort);
   }
 
-  static std::unique_ptr<StreamInfoAddressFormatterProvider> withoutPort(FieldExtractor f) {
+  static std::unique_ptr<StreamInfoAddressFormatterProvider>
+  withoutPort(FieldExtractor f, absl::optional<int> mask_prefix_len = absl::nullopt) {
     return std::make_unique<StreamInfoAddressFormatterProvider>(
-        f, StreamInfoAddressFieldExtractionType::WithoutPort);
+        f, StreamInfoAddressFieldExtractionType::WithoutPort, mask_prefix_len);
   }
 
   static std::unique_ptr<StreamInfoAddressFormatterProvider> justPort(FieldExtractor f) {
@@ -818,8 +819,9 @@ public:
   }
 
   StreamInfoAddressFormatterProvider(FieldExtractor f,
-                                     StreamInfoAddressFieldExtractionType extraction_type)
-      : field_extractor_(f), extraction_type_(extraction_type) {}
+                                     StreamInfoAddressFieldExtractionType extraction_type,
+                                     absl::optional<int> mask_prefix_len = absl::nullopt)
+      : field_extractor_(f), extraction_type_(extraction_type), mask_prefix_len_(mask_prefix_len) {}
 
   // StreamInfoFormatterProvider
   // Don't hide the other structure of format and formatValue.
@@ -854,7 +856,7 @@ private:
   std::string toString(const Network::Address::Instance& address) const {
     switch (extraction_type_) {
     case StreamInfoAddressFieldExtractionType::WithoutPort:
-      return StreamInfo::Utility::formatDownstreamAddressNoPort(address);
+      return StreamInfo::Utility::formatDownstreamAddressNoPort(address, mask_prefix_len_);
     case StreamInfoAddressFieldExtractionType::JustPort:
       return StreamInfo::Utility::formatDownstreamAddressJustPort(address);
     case StreamInfoAddressFieldExtractionType::JustEndpointId:
@@ -867,6 +869,7 @@ private:
 
   FieldExtractor field_extractor_;
   const StreamInfoAddressFieldExtractionType extraction_type_;
+  const absl::optional<int> mask_prefix_len_;
 };
 
 // Ssl::ConnectionInfo std::string field extractor.
@@ -1368,8 +1371,15 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                   });
             }}},
           {"UPSTREAM_LOCAL_ADDRESS_WITHOUT_PORT",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](absl::string_view, absl::optional<size_t>) {
+           {CommandSyntaxChecker::PARAMS_OPTIONAL,
+            [](absl::string_view format, absl::optional<size_t>) {
+              absl::optional<int> mask_prefix_len;
+              if (!format.empty()) {
+                int len;
+                if (absl::SimpleAtoi(format, &len)) {
+                  mask_prefix_len = len;
+                }
+              }
               return StreamInfoAddressFormatterProvider::withoutPort(
                   [](const StreamInfo::StreamInfo& stream_info)
                       -> Network::Address::InstanceConstSharedPtr {
@@ -1377,7 +1387,8 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                       return stream_info.upstreamInfo().value().get().upstreamLocalAddress();
                     }
                     return nullptr;
-                  });
+                  },
+                  mask_prefix_len);
             }}},
           {"UPSTREAM_LOCAL_PORT",
            {CommandSyntaxChecker::COMMAND_ONLY,
@@ -1401,13 +1412,21 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                   });
             }}},
           {"UPSTREAM_REMOTE_ADDRESS_WITHOUT_PORT",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](absl::string_view, absl::optional<size_t>) {
+           {CommandSyntaxChecker::PARAMS_OPTIONAL,
+            [](absl::string_view format, absl::optional<size_t>) {
+              absl::optional<int> mask_prefix_len;
+              if (!format.empty()) {
+                int len;
+                if (absl::SimpleAtoi(format, &len)) {
+                  mask_prefix_len = len;
+                }
+              }
               return StreamInfoAddressFormatterProvider::withoutPort(
                   [](const StreamInfo::StreamInfo& stream_info)
                       -> Network::Address::InstanceConstSharedPtr {
                     return getUpstreamRemoteAddress(stream_info);
-                  });
+                  },
+                  mask_prefix_len);
             }}},
           {"UPSTREAM_REMOTE_PORT",
            {CommandSyntaxChecker::COMMAND_ONLY,
@@ -1500,20 +1519,36 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                   });
             }}},
           {"DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](absl::string_view, absl::optional<size_t>) {
+           {CommandSyntaxChecker::PARAMS_OPTIONAL,
+            [](absl::string_view format, absl::optional<size_t>) {
+              absl::optional<int> mask_prefix_len;
+              if (!format.empty()) {
+                int len;
+                if (absl::SimpleAtoi(format, &len)) {
+                  mask_prefix_len = len;
+                }
+              }
               return StreamInfoAddressFormatterProvider::withoutPort(
                   [](const Envoy::StreamInfo::StreamInfo& stream_info) {
                     return stream_info.downstreamAddressProvider().localAddress();
-                  });
+                  },
+                  mask_prefix_len);
             }}},
           {"DOWNSTREAM_DIRECT_LOCAL_ADDRESS_WITHOUT_PORT",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](absl::string_view, absl::optional<size_t>) {
+           {CommandSyntaxChecker::PARAMS_OPTIONAL,
+            [](absl::string_view format, absl::optional<size_t>) {
+              absl::optional<int> mask_prefix_len;
+              if (!format.empty()) {
+                int len;
+                if (absl::SimpleAtoi(format, &len)) {
+                  mask_prefix_len = len;
+                }
+              }
               return StreamInfoAddressFormatterProvider::withoutPort(
                   [](const Envoy::StreamInfo::StreamInfo& stream_info) {
                     return stream_info.downstreamAddressProvider().directLocalAddress();
-                  });
+                  },
+                  mask_prefix_len);
             }}},
           {"DOWNSTREAM_LOCAL_PORT",
            {CommandSyntaxChecker::COMMAND_ONLY,
@@ -1556,12 +1591,20 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                   });
             }}},
           {"DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](absl::string_view, absl::optional<size_t>) {
+           {CommandSyntaxChecker::PARAMS_OPTIONAL,
+            [](absl::string_view format, absl::optional<size_t>) {
+              absl::optional<int> mask_prefix_len;
+              if (!format.empty()) {
+                int len;
+                if (absl::SimpleAtoi(format, &len)) {
+                  mask_prefix_len = len;
+                }
+              }
               return StreamInfoAddressFormatterProvider::withoutPort(
                   [](const StreamInfo::StreamInfo& stream_info) {
                     return stream_info.downstreamAddressProvider().remoteAddress();
-                  });
+                  },
+                  mask_prefix_len);
             }}},
           {"DOWNSTREAM_REMOTE_PORT",
            {CommandSyntaxChecker::COMMAND_ONLY,
@@ -1580,12 +1623,20 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                   });
             }}},
           {"DOWNSTREAM_DIRECT_REMOTE_ADDRESS_WITHOUT_PORT",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](absl::string_view, absl::optional<size_t>) {
+           {CommandSyntaxChecker::PARAMS_OPTIONAL,
+            [](absl::string_view format, absl::optional<size_t>) {
+              absl::optional<int> mask_prefix_len;
+              if (!format.empty()) {
+                int len;
+                if (absl::SimpleAtoi(format, &len)) {
+                  mask_prefix_len = len;
+                }
+              }
               return StreamInfoAddressFormatterProvider::withoutPort(
                   [](const StreamInfo::StreamInfo& stream_info) {
                     return stream_info.downstreamAddressProvider().directRemoteAddress();
-                  });
+                  },
+                  mask_prefix_len);
             }}},
           {"DOWNSTREAM_DIRECT_REMOTE_PORT",
            {CommandSyntaxChecker::COMMAND_ONLY,

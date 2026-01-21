@@ -278,4 +278,14 @@ envoy_dynamic_module_callback_udp_listener_filter_record_histogram_value(
   return envoy_dynamic_module_type_metrics_result_Success;
 }
 
+// -----------------------------------------------------------------------------
+// Misc ABI Callbacks
+// -----------------------------------------------------------------------------
+
+uint32_t envoy_dynamic_module_callback_udp_listener_filter_get_worker_index(
+    envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr) {
+  auto filter = static_cast<DynamicModuleUdpListenerFilter*>(filter_envoy_ptr);
+  return filter->workerIndex();
+}
+
 } // extern "C"

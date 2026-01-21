@@ -58,6 +58,11 @@ class DependencyError(Exception):
     pass
 
 
+class MissingDependencyMetadataError(DependencyError):
+    """Error when a dependency is missing required metadata."""
+    pass
+
+
 class DependencyInfo:
     """Models dependency info in bazel/repositories.bzl."""
 
@@ -72,10 +77,25 @@ class DependencyInfo:
 
         Returns:
           Set of dependency identifiers that match use_category.
+
+        Raises:
+          MissingDependencyMetadataError: If a dependency has no use_category.
         """
-        return set(
-            name for name, metadata in self.repository_locations.items()
-            if use_category in metadata['use_category'])
+        result = set()
+        missing_metadata = []
+        for name, metadata in self.repository_locations.items():
+            use_categories = metadata.get('use_category', [])
+            if not use_categories:
+                missing_metadata.append(name)
+            if use_category in use_categories:
+                result.add(name)
+
+        if missing_metadata:
+            raise MissingDependencyMetadataError(
+                f"Dependencies missing 'use_category' in bazel/deps.yaml or api/bazel/deps.yaml: "
+                f"{', '.join(sorted(missing_metadata))}")
+
+        return result
 
     def get_metadata(self, dependency):
         """Obtain repository metadata for a dependency.

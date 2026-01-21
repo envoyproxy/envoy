@@ -12,6 +12,8 @@
 #include "test/mocks/network/io_handle.h"
 #include "test/mocks/network/mocks.h"
 
+#include "gmock/gmock.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace DynamicModules {
@@ -64,10 +66,10 @@ public:
     EXPECT_TRUE(filter_config_or_status.ok()) << filter_config_or_status.status().message();
     filter_config_ = filter_config_or_status.value();
 
-    filter_ = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
-    filter_->initializeInModuleFilter();
+    ON_CALL(callbacks_, dispatcher()).WillByDefault(testing::ReturnRef(worker_thread_dispatcher_));
 
-    filter_->setCallbacksForTest(&callbacks_);
+    filter_ = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
+    filter_->onAccept(callbacks_);
   }
 
   void TearDown() override { filter_.reset(); }
@@ -79,6 +81,7 @@ public:
   std::shared_ptr<DynamicModuleListenerFilter> filter_;
   NiceMock<Network::MockListenerFilterCallbacks> callbacks_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
+  NiceMock<Event::MockDispatcher> worker_thread_dispatcher_{"worker_0"};
 };
 
 // =============================================================================
@@ -172,7 +175,8 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDetectedTransportProtocol)
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDetectedTransportProtocolNullCallbacks) {
   auto filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
-  filter->initializeInModuleFilter();
+  filter->onAccept(callbacks_);
+  filter->setCallbacksForTest(nullptr);
   // Callbacks not set.
 
   char protocol[] = "tls";
@@ -211,7 +215,8 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetRequestedServerName) {
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetRequestedServerNameNullCallbacks) {
   auto filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
-  filter->initializeInModuleFilter();
+  filter->onAccept(callbacks_);
+  filter->setCallbacksForTest(nullptr);
 
   char name[] = "example.com";
   envoy_dynamic_module_type_module_buffer name_buf = {name, 11};
@@ -243,7 +248,8 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetRequestedApplicationProtoc
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetRequestedApplicationProtocolsNullCallbacks) {
   auto filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
-  filter->initializeInModuleFilter();
+  filter->onAccept(callbacks_);
+  filter->setCallbacksForTest(nullptr);
 
   char proto1[] = "h2";
   envoy_dynamic_module_type_module_buffer protocols[] = {{proto1, 2}};
@@ -280,7 +286,8 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetJa3Hash) {
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetJa3HashNullCallbacks) {
   auto filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
-  filter->initializeInModuleFilter();
+  filter->onAccept(callbacks_);
+  filter->setCallbacksForTest(nullptr);
 
   char hash[] = "abc123";
   envoy_dynamic_module_type_module_buffer hash_buf = {hash, 6};
@@ -307,7 +314,8 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetJa4Hash) {
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetJa4HashNullCallbacks) {
   auto filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
-  filter->initializeInModuleFilter();
+  filter->onAccept(callbacks_);
+  filter->setCallbacksForTest(nullptr);
 
   char hash[] = "def456";
   envoy_dynamic_module_type_module_buffer hash_buf = {hash, 6};
@@ -338,7 +346,8 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetRemoteAddressWithIp) {
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetRemoteAddressNullCallbacks) {
   auto filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
-  filter->initializeInModuleFilter();
+  filter->onAccept(callbacks_);
+  filter->setCallbacksForTest(nullptr);
 
   envoy_dynamic_module_type_envoy_buffer address_out = {nullptr, 0};
   uint32_t port_out = 0;
@@ -391,7 +400,8 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetLocalAddressWithIp) {
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetLocalAddressNullCallbacks) {
   auto filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
-  filter->initializeInModuleFilter();
+  filter->onAccept(callbacks_);
+  filter->setCallbacksForTest(nullptr);
 
   envoy_dynamic_module_type_envoy_buffer address_out = {nullptr, 0};
   uint32_t port_out = 0;
@@ -445,7 +455,8 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetDirectRemoteAddressUsesDir
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetDirectRemoteAddressNullCallbacks) {
   auto filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
-  filter->initializeInModuleFilter();
+  filter->onAccept(callbacks_);
+  filter->setCallbacksForTest(nullptr);
 
   envoy_dynamic_module_type_envoy_buffer address_out = {nullptr, 0};
   uint32_t port_out = 0;
@@ -493,7 +504,8 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetDirectLocalAddressUsesDire
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetDirectLocalAddressNullCallbacks) {
   auto filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
-  filter->initializeInModuleFilter();
+  filter->onAccept(callbacks_);
+  filter->setCallbacksForTest(nullptr);
 
   envoy_dynamic_module_type_envoy_buffer address_out = {nullptr, 0};
   uint32_t port_out = 0;
@@ -544,7 +556,8 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetOriginalDstReturnsFalseWhe
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetOriginalDstNullCallbacks) {
   auto filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
-  filter->initializeInModuleFilter();
+  filter->onAccept(callbacks_);
+  filter->setCallbacksForTest(nullptr);
 
   envoy_dynamic_module_type_envoy_buffer address_out = {nullptr, 0};
   uint32_t port_out = 0;
@@ -652,7 +665,8 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetAddressTypeEnvoyInternal) 
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetAddressTypeNullCallbacks) {
   auto filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
-  filter->initializeInModuleFilter();
+  filter->onAccept(callbacks_);
+  filter->setCallbacksForTest(nullptr);
 
   auto type = envoy_dynamic_module_callback_listener_filter_get_address_type(
       static_cast<void*>(filter.get()));
@@ -680,7 +694,8 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, IsLocalAddressRestoredFalseBe
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, IsLocalAddressRestoredNullCallbacks) {
   auto filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
-  filter->initializeInModuleFilter();
+  filter->onAccept(callbacks_);
+  filter->setCallbacksForTest(nullptr);
 
   EXPECT_FALSE(envoy_dynamic_module_callback_listener_filter_is_local_address_restored(
       static_cast<void*>(filter.get())));
@@ -725,7 +740,8 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetRemoteAddressInvalidAddres
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetRemoteAddressNullCallbacks) {
   auto filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
-  filter->initializeInModuleFilter();
+  filter->onAccept(callbacks_);
+  filter->setCallbacksForTest(nullptr);
 
   char address[] = "10.0.0.1";
   envoy_dynamic_module_type_module_buffer addr_buf = {address, 8};
@@ -767,7 +783,8 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, RestoreLocalAddressInvalidAdd
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, RestoreLocalAddressNullCallbacks) {
   auto filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
-  filter->initializeInModuleFilter();
+  filter->onAccept(callbacks_);
+  filter->setCallbacksForTest(nullptr);
 
   char address[] = "10.0.0.1";
   envoy_dynamic_module_type_module_buffer addr_buf = {address, 8};
@@ -792,7 +809,8 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, ContinueFilterChainFailure) {
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, ContinueFilterChainNullCallbacks) {
   auto filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
-  filter->initializeInModuleFilter();
+  filter->onAccept(callbacks_);
+  filter->setCallbacksForTest(nullptr);
 
   // Should not crash.
   envoy_dynamic_module_callback_listener_filter_continue_filter_chain(
@@ -806,7 +824,8 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, UseOriginalDst) {
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, UseOriginalDstNullCallbacks) {
   auto filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
-  filter->initializeInModuleFilter();
+  filter->onAccept(callbacks_);
+  filter->setCallbacksForTest(nullptr);
 
   envoy_dynamic_module_callback_listener_filter_use_original_dst(static_cast<void*>(filter.get()),
                                                                  false);
@@ -818,7 +837,8 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, UseOriginalDstNullCallbacks) 
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, CloseSocketNullCallbacks) {
   auto filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
-  filter->initializeInModuleFilter();
+  filter->onAccept(callbacks_);
+  filter->setCallbacksForTest(nullptr);
 
   // Should not crash.
   envoy_dynamic_module_callback_listener_filter_close_socket(static_cast<void*>(filter.get()));
@@ -843,7 +863,8 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicMetadata) {
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicMetadataNullCallbacks) {
   auto filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
-  filter->initializeInModuleFilter();
+  filter->onAccept(callbacks_);
+  filter->setCallbacksForTest(nullptr);
 
   char ns[] = "test_ns";
   char key[] = "my_key";
@@ -912,7 +933,8 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetFilterState) {
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetFilterStateNullCallbacks) {
   auto filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
-  filter->initializeInModuleFilter();
+  filter->onAccept(callbacks_);
+  filter->setCallbacksForTest(nullptr);
 
   char key[] = "my_state_key";
   char value[] = "my_state_value";
@@ -974,7 +996,8 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetFilterStateNonExisting) {
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetFilterStateNullCallbacks) {
   auto filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
-  filter->initializeInModuleFilter();
+  filter->onAccept(callbacks_);
+  filter->setCallbacksForTest(nullptr);
 
   char key[] = "test_key";
   envoy_dynamic_module_type_module_buffer key_buf = {key, 8};
@@ -1019,7 +1042,8 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDownstreamTransportFailure
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest,
        SetDownstreamTransportFailureReasonNullCallbacks) {
   auto filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
-  filter->initializeInModuleFilter();
+  filter->onAccept(callbacks_);
+  filter->setCallbacksForTest(nullptr);
 
   char reason[] = "tls_error";
   envoy_dynamic_module_type_module_buffer reason_buf = {reason, 9};
@@ -1039,7 +1063,8 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetConnectionStartTimeMs) {
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetConnectionStartTimeMsNullCallbacks) {
   auto filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
-  filter->initializeInModuleFilter();
+  filter->onAccept(callbacks_);
+  filter->setCallbacksForTest(nullptr);
 
   const uint64_t millis =
       envoy_dynamic_module_callback_listener_filter_get_connection_start_time_ms(
@@ -1117,7 +1142,8 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetDynamicMetadataKeyNotFound
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetDynamicMetadataNullCallbacks) {
   auto filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
-  filter->initializeInModuleFilter();
+  filter->onAccept(callbacks_);
+  filter->setCallbacksForTest(nullptr);
 
   char ns[] = "test_ns";
   char key[] = "key1";
@@ -1149,7 +1175,8 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicTypedMetadataSucces
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicTypedMetadataNullCallbacks) {
   auto filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
-  filter->initializeInModuleFilter();
+  filter->onAccept(callbacks_);
+  filter->setCallbacksForTest(nullptr);
 
   char ns[] = "test_ns";
   char key[] = "key1";
@@ -1345,7 +1372,8 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetSocketFdSuccess) {
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetSocketFdNullCallbacks) {
   auto filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
-  filter->initializeInModuleFilter();
+  filter->onAccept(callbacks_);
+  filter->setCallbacksForTest(nullptr);
   // Callbacks not set.
 
   int64_t fd =
@@ -1375,7 +1403,8 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetSocketOptionIntFailure) {
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetSocketOptionIntNullCallbacks) {
   auto filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
-  filter->initializeInModuleFilter();
+  filter->onAccept(callbacks_);
+  filter->setCallbacksForTest(nullptr);
   // Callbacks not set.
 
   bool result = envoy_dynamic_module_callback_listener_filter_set_socket_option_int(
@@ -1416,7 +1445,8 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetSocketOptionBytesNullValue
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetSocketOptionBytesNullCallbacks) {
   auto filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
-  filter->initializeInModuleFilter();
+  filter->onAccept(callbacks_);
+  filter->setCallbacksForTest(nullptr);
   // Callbacks not set.
 
   char value[] = "hello";
@@ -1459,7 +1489,8 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetSocketOptionIntNullOut) {
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetSocketOptionIntNullCallbacks) {
   auto filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
-  filter->initializeInModuleFilter();
+  filter->onAccept(callbacks_);
+  filter->setCallbacksForTest(nullptr);
   // Callbacks not set.
 
   int64_t value_out = 0;
@@ -1515,7 +1546,8 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetSocketOptionBytesNullActua
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetSocketOptionBytesNullCallbacks) {
   auto filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
-  filter->initializeInModuleFilter();
+  filter->onAccept(callbacks_);
+  filter->setCallbacksForTest(nullptr);
   // Callbacks not set.
 
   char buffer[16] = {0};
@@ -1523,6 +1555,17 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetSocketOptionBytesNullCallb
   bool result = envoy_dynamic_module_callback_listener_filter_get_socket_option_bytes(
       static_cast<void*>(filter.get()), 1, 2, buffer, sizeof(buffer), &actual_size);
   EXPECT_FALSE(result);
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetWorkerIndex) {
+  auto filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
+  filter->onAccept(callbacks_);
+  filter->setCallbacksForTest(nullptr);
+  // Callbacks not set.
+
+  uint32_t worker_index =
+      envoy_dynamic_module_callback_listener_filter_get_worker_index(filterPtr());
+  EXPECT_EQ(0u, worker_index);
 }
 
 } // namespace ListenerFilters

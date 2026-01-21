@@ -4,6 +4,8 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
+#include "envoy/extensions/transport_sockets/tls/cert_mappers/filter_state_override/v3/config.pb.h"
+#include "envoy/extensions/transport_sockets/tls/cert_mappers/sni/v3/config.pb.h"
 #include "envoy/extensions/transport_sockets/tls/cert_mappers/static_name/v3/config.pb.h"
 #include "envoy/extensions/transport_sockets/tls/cert_selectors/on_demand_secret/v3/config.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
@@ -31,33 +33,90 @@ namespace {
 // Hack to force linking of the service: https://github.com/google/protobuf/issues/4221.
 const envoy::service::secret::v3::SdsDummy _sds_dummy;
 
-class OnDemandIntegrationTest : public TcpProxySslIntegrationTest {
+struct TestParams {
+  Network::Address::IpVersion ip_version;
+  bool upstream;
+};
+
+std::string testParamsToString(const testing::TestParamInfo<TestParams>& p) {
+  return fmt::format("{}_{}", TestUtility::ipVersionToString(p.param.ip_version),
+                     p.param.upstream ? "Upstream" : "Downstream");
+}
+
+std::vector<TestParams> testParams() {
+  std::vector<TestParams> ret;
+  for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
+    ret.push_back(TestParams{ip_version, true});
+    ret.push_back(TestParams{ip_version, false});
+  }
+  return ret;
+}
+
+class OnDemandIntegrationTest : public BaseTcpProxySslIntegrationTest,
+                                public testing::TestWithParam<TestParams> {
 public:
+  OnDemandIntegrationTest()
+      : BaseTcpProxySslIntegrationTest(GetParam().ip_version),
+        upstream_selector_(GetParam().upstream) {}
+
   void TearDown() override { cleanUpXdsConnection(); }
 
   void setup(const std::string& config = "") {
     const std::string on_demand_config = config.empty() ? defaultConfig() : config;
-    config_helper_.addConfigModifier(
-        [this, on_demand_config](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([this, on_demand_config](
+                                         envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      bootstrap.mutable_static_resources()->add_clusters()->MergeFrom(
+          bootstrap.static_resources().clusters(0));
+      auto* sds_cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+      sds_cluster->set_name("sds_cluster");
+      sds_cluster->mutable_load_assignment()->set_cluster_name("sds_cluster");
+      ConfigHelper::setHttp2(*sds_cluster);
+      if (upstream_selector_) {
+        bootstrap.mutable_static_resources()
+            ->mutable_listeners(0)
+            ->mutable_filter_chains(0)
+            ->clear_transport_socket();
+        auto* backend = bootstrap.mutable_static_resources()->mutable_clusters(1);
+        auto* transport_socket = backend->mutable_transport_socket();
+        transport_socket->set_name("envoy.transport_sockets.tls");
+        envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+        configToUseSds(*tls_context.mutable_common_tls_context(), on_demand_config);
+        transport_socket->mutable_typed_config()->PackFrom(tls_context);
+        if (!filter_state_value_.empty()) {
+          const std::string set_filter_state = fmt::format(R"EOF(
+          name: envoy.filters.network.set_filter_state
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.network.set_filter_state.v3.Config
+            on_new_connection:
+            - object_key: envoy.tls.certificate_mappers.on_demand_secret
+              factory_key: envoy.string
+              format_string:
+                text_format_source:
+                  inline_string: "{}"
+              shared_with_upstream: ONCE
+          )EOF",
+                                                           filter_state_value_);
+          envoy::config::listener::v3::Filter filter;
+          TestUtility::loadFromYaml(set_filter_state, filter);
           auto* filter_chain =
               bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
-          auto* transport_socket = filter_chain->mutable_transport_socket();
-          transport_socket->set_name("envoy.transport_sockets.tls");
-          envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
-          configToUseSds(*tls_context.mutable_common_tls_context(), on_demand_config);
-          tls_context.set_disable_stateless_session_resumption(true);
-          tls_context.set_disable_stateful_session_resumption(true);
-          tls_context.mutable_require_client_certificate()->set_value(mtls_);
-          transport_socket->mutable_typed_config()->PackFrom(tls_context);
-
-          bootstrap.mutable_static_resources()->add_clusters()->MergeFrom(
-              bootstrap.static_resources().clusters(0));
-          auto* sds_cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
-          sds_cluster->set_name("sds_cluster");
-          sds_cluster->mutable_load_assignment()->set_cluster_name("sds_cluster");
-          ConfigHelper::setHttp2(*sds_cluster);
-        });
-    TcpProxySslIntegrationTest::initialize();
+          filter_chain->add_filters()->MergeFrom(filter_chain->filters(0));
+          filter_chain->mutable_filters(0)->Swap(&filter);
+        }
+      } else {
+        auto* filter_chain =
+            bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
+        auto* transport_socket = filter_chain->mutable_transport_socket();
+        transport_socket->set_name("envoy.transport_sockets.tls");
+        envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+        configToUseSds(*tls_context.mutable_common_tls_context(), on_demand_config);
+        tls_context.set_disable_stateless_session_resumption(true);
+        tls_context.set_disable_stateful_session_resumption(true);
+        tls_context.mutable_require_client_certificate()->set_value(mtls_);
+        transport_socket->mutable_typed_config()->PackFrom(tls_context);
+      }
+    });
+    BaseTcpProxySslIntegrationTest::initialize();
     test_server_->waitUntilListenersReady();
   }
 
@@ -78,13 +137,18 @@ public:
 
     if (validation_sds_) {
       auto* validation_context = common_tls_context.mutable_validation_context_sds_secret_config();
-      validation_context->set_name("cacert");
+      validation_context->set_name(cacert());
       setConfigSource(validation_context->mutable_sds_config());
     } else {
       auto* validation_context = common_tls_context.mutable_validation_context();
-      validation_context->mutable_trusted_ca()->set_filename(
-          TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
-      validation_context->add_verify_certificate_hash(TEST_CLIENT_CERT_HASH);
+      if (upstream_selector_) {
+        validation_context->mutable_trusted_ca()->set_filename(
+            TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
+      } else {
+        validation_context->mutable_trusted_ca()->set_filename(
+            TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
+        validation_context->add_verify_certificate_hash(TEST_CLIENT_CERT_HASH);
+      }
     }
 
     // Parse on-demand TLS cert selector config.
@@ -112,15 +176,30 @@ public:
   void createUpstreams() override {
     // SDS cluster is H2, while the data cluster is H1.
     addFakeUpstream(Http::CodecType::HTTP2);
-    addFakeUpstream(Http::CodecType::HTTP1);
+    if (upstream_selector_) {
+      addFakeUpstream(createUpstreamTlsContext(upstreamConfig()), Http::CodecType::HTTP1, false);
+    } else {
+      addFakeUpstream(Http::CodecType::HTTP1);
+    }
     xds_upstream_ = fake_upstreams_.front().get();
   }
 
   FakeUpstream* dataStream() override { return fake_upstreams_.back().get(); }
 
+  std::unique_ptr<TestClientConnection> createClientConnection() {
+    if (upstream_selector_) {
+      return std::make_unique<ClientRawConnection>(*this);
+    }
+    return std::make_unique<ClientSslConnection>(*this);
+  }
+
+  std::string cacert() const { return upstream_selector_ ? "upstreamcacert" : "cacert"; }
+
 protected:
+  const bool upstream_selector_;
   bool mtls_{false};
   bool validation_sds_{false};
+  std::string filter_state_value_;
 
   envoy::extensions::transport_sockets::tls::v3::Secret makeSecret(absl::string_view name,
                                                                    absl::string_view cert) {
@@ -186,7 +265,8 @@ protected:
   }
 
   std::string onDemandStat(absl::string_view stat) {
-    return listenerStatPrefix(absl::StrCat("on_demand_secret.", stat));
+    return upstream_selector_ ? absl::StrCat("cluster.cluster_0.on_demand_secret.", stat)
+                              : listenerStatPrefix(absl::StrCat("on_demand_secret.", stat));
   }
 
   std::vector<FakeStreamPtr> xds_streams_;
@@ -208,16 +288,16 @@ TEST_P(OnDemandIntegrationTest, BasicSuccessWithPrefetch) {
   )EOF");
   // Open two connections sequentially.
   for (int i = 0; i < 2; i++) {
-    auto conn = std::make_unique<ClientSslConnection>(*this);
+    auto conn = createClientConnection();
     conn->waitForUpstreamConnection();
     conn->sendAndReceiveTlsData("hello", "world");
     conn.reset();
   }
-  EXPECT_EQ(1, test_server_->counter("sds.server.update_success")->value());
-  EXPECT_EQ(0, test_server_->counter("sds.server.update_rejected")->value());
   EXPECT_EQ(1, test_server_->counter(onDemandStat("cert_requested"))->value());
-  EXPECT_EQ(1, test_server_->counter(onDemandStat("cert_updated"))->value());
   EXPECT_EQ(1, test_server_->gauge(onDemandStat("cert_active"))->value());
+  test_server_->waitForCounterEq("sds.server.update_success", 1);
+  test_server_->waitForCounterEq(onDemandStat("cert_updated"), 1);
+  EXPECT_EQ(0, test_server_->counter("sds.server.update_rejected")->value());
 }
 
 TEST_P(OnDemandIntegrationTest, BasicSuccessWithoutPrefetch) {
@@ -229,30 +309,38 @@ TEST_P(OnDemandIntegrationTest, BasicSuccessWithoutPrefetch) {
       name: server
   )EOF");
   {
-    auto conn = std::make_unique<ClientSslConnection>(*this);
+    auto conn = createClientConnection();
+    if (upstream_selector_) {
+      conn->waitForUpstreamConnection();
+    }
     waitCertsRequested(1);
     createXdsConnection();
     waitSendSdsResponse("server");
-    conn->waitForUpstreamConnection();
+    if (!upstream_selector_) {
+      conn->waitForUpstreamConnection();
+    }
     conn->sendAndReceiveTlsData("hello", "world");
     conn.reset();
   }
 
   {
     // Open a second connection, without expecting SDS.
-    auto conn2 = std::make_unique<ClientSslConnection>(*this);
+    auto conn2 = createClientConnection();
     conn2->waitForUpstreamConnection();
     conn2->sendAndReceiveTlsData("hello", "world");
     conn2.reset();
   }
-  EXPECT_EQ(1, test_server_->counter("sds.server.update_success")->value());
-  EXPECT_EQ(0, test_server_->counter("sds.server.update_rejected")->value());
   EXPECT_EQ(1, test_server_->counter(onDemandStat("cert_requested"))->value());
-  EXPECT_EQ(1, test_server_->counter(onDemandStat("cert_updated"))->value());
   EXPECT_EQ(1, test_server_->gauge(onDemandStat("cert_active"))->value());
+  test_server_->waitForCounterEq("sds.server.update_success", 1);
+  test_server_->waitForCounterEq(onDemandStat("cert_updated"), 1);
+  EXPECT_EQ(0, test_server_->counter("sds.server.update_rejected")->value());
 }
 
 TEST_P(OnDemandIntegrationTest, BasicSuccessSNI) {
+  if (upstream_selector_) {
+    GTEST_SKIP() << "SNI mapper only works on downstream";
+  };
   ssl_options_.setSni("server");
   setup(R"EOF(
   certificate_mapper:
@@ -261,16 +349,16 @@ TEST_P(OnDemandIntegrationTest, BasicSuccessSNI) {
       "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.sni.v3.SNI
       default_value: "*"
   )EOF");
-  auto conn = std::make_unique<ClientSslConnection>(*this);
+  auto conn = createClientConnection();
   waitCertsRequested(1);
   createXdsConnection();
   waitSendSdsResponse("server");
   conn->waitForUpstreamConnection();
   conn->sendAndReceiveTlsData("hello", "world");
   conn.reset();
-  EXPECT_EQ(1, test_server_->counter("sds.server.update_success")->value());
-  EXPECT_EQ(0, test_server_->counter("sds.server.update_rejected")->value());
   EXPECT_EQ(1, test_server_->gauge(onDemandStat("cert_active"))->value());
+  test_server_->waitForCounterEq("sds.server.update_success", 1);
+  EXPECT_EQ(0, test_server_->counter("sds.server.update_rejected")->value());
 }
 
 TEST_P(OnDemandIntegrationTest, BasicSuccessMixed) {
@@ -286,52 +374,70 @@ TEST_P(OnDemandIntegrationTest, BasicSuccessMixed) {
 
   createXdsConnection();
   waitSendSdsResponse("server2");
-  auto conn = std::make_unique<ClientSslConnection>(*this);
+  auto conn = createClientConnection();
+  if (upstream_selector_) {
+    conn->waitForUpstreamConnection();
+  }
   waitCertsRequested(2);
   waitSendSdsResponse("server");
-  conn->waitForUpstreamConnection();
+  if (!upstream_selector_) {
+    conn->waitForUpstreamConnection();
+  }
   conn->sendAndReceiveTlsData("hello", "world");
   conn.reset();
-  EXPECT_EQ(1, test_server_->counter("sds.server.update_success")->value());
-  EXPECT_EQ(1, test_server_->counter("sds.server2.update_success")->value());
+  test_server_->waitForCounterEq("sds.server.update_success", 1);
+  test_server_->waitForCounterEq("sds.server2.update_success", 1);
   EXPECT_EQ(2, test_server_->gauge(onDemandStat("cert_active"))->value());
 }
 
 TEST_P(OnDemandIntegrationTest, BasicFail) {
   setup();
-  auto conn = std::make_unique<ClientSslConnection>(*this);
+  auto conn = createClientConnection();
+  if (upstream_selector_) {
+    conn->waitForUpstreamConnection();
+  }
   waitCertsRequested(1);
   createXdsConnection();
   waitSendSdsResponse("server", "", true);
-  while (!conn->connect_callbacks_.closed()) {
-    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  }
+  conn->waitForDisconnect();
   test_server_->waitForGaugeEq(onDemandStat("cert_active"), 0);
 }
 
 TEST_P(OnDemandIntegrationTest, TwoPendingConnections) {
   setup();
   // Queue two connections in pending state.
-  auto conn1 = std::make_unique<ClientSslConnection>(*this);
+  auto conn1 = createClientConnection();
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  auto conn2 = std::make_unique<ClientSslConnection>(*this);
+  auto conn2 = createClientConnection();
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  if (upstream_selector_) {
+    conn1->waitForUpstreamConnection();
+    conn2->waitForUpstreamConnection();
+  }
   waitCertsRequested(1);
   createXdsConnection();
   waitSendSdsResponse("server");
-  conn1->waitForUpstreamConnection();
-  conn2->waitForUpstreamConnection();
-  conn1->sendAndReceiveTlsData("hello", "world");
-  conn1.reset();
-  conn2->sendAndReceiveTlsData("lorem", "ipsum");
+  if (!upstream_selector_) {
+    conn1->waitForUpstreamConnection();
+    conn2->waitForUpstreamConnection();
+    conn1->sendAndReceiveTlsData("hello", "world");
+    conn1.reset();
+    conn2->sendAndReceiveTlsData("lorem", "ipsum");
+  } else {
+    conn1->close();
+    conn2->close();
+  }
   EXPECT_EQ(1, test_server_->gauge(onDemandStat("cert_active"))->value());
 }
 
 TEST_P(OnDemandIntegrationTest, ClientInterruptedHandshake) {
   setup();
-  auto conn1 = std::make_unique<ClientSslConnection>(*this);
+  auto conn1 = createClientConnection();
+  if (upstream_selector_) {
+    conn1->waitForUpstreamConnection();
+  }
   waitCertsRequested(1);
-  conn1->ssl_client_->close(Network::ConnectionCloseType::NoFlush);
+  conn1->close();
   conn1.reset();
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   // SDS request is still outstanding, so we can respond to it, and it will be used later.
@@ -340,7 +446,10 @@ TEST_P(OnDemandIntegrationTest, ClientInterruptedHandshake) {
   waitSendSdsResponse("server");
 }
 
-TEST_P(OnDemandIntegrationTest, ConnectTimeout) {
+TEST_P(OnDemandIntegrationTest, ListenerConnectTimeout) {
+  if (upstream_selector_) {
+    GTEST_SKIP() << "Upstream selector does not depend on listener socket timeout";
+  }
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     auto* filter_chain =
         bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
@@ -348,11 +457,11 @@ TEST_P(OnDemandIntegrationTest, ConnectTimeout) {
     connect_timeout->set_seconds(1);
   });
   setup();
-  auto conn = std::make_unique<ClientSslConnection>(*this);
+  auto conn = createClientConnection();
   test_server_->waitForCounterEq(
       listenerStatPrefix("downstream_cx_transport_socket_connect_timeout"), 1,
       TestUtility::DefaultTimeout, dispatcher_.get());
-  conn->ssl_client_->close(Network::ConnectionCloseType::NoFlush);
+  conn->close();
   conn.reset();
   // SDS request is still outstanding, so we can respond to it, and it will be used later.
   createXdsConnection();
@@ -362,11 +471,16 @@ TEST_P(OnDemandIntegrationTest, ConnectTimeout) {
 TEST_P(OnDemandIntegrationTest, SecretAddRemove) {
   setup();
   // Add successfully.
-  auto conn = std::make_unique<ClientSslConnection>(*this);
+  auto conn = createClientConnection();
+  if (upstream_selector_) {
+    conn->waitForUpstreamConnection();
+  }
   waitCertsRequested(1);
   createXdsConnection();
   auto& stream = waitSendSdsResponse("server");
-  conn->waitForUpstreamConnection();
+  if (!upstream_selector_) {
+    conn->waitForUpstreamConnection();
+  }
   conn->sendAndReceiveTlsData("hello", "world");
   conn.reset();
   EXPECT_EQ(1, test_server_->gauge(onDemandStat("cert_active"))->value());
@@ -376,20 +490,30 @@ TEST_P(OnDemandIntegrationTest, SecretAddRemove) {
   test_server_->waitForGaugeEq(onDemandStat("cert_active"), 0);
 
   // Request again.
-  auto conn2 = std::make_unique<ClientSslConnection>(*this);
+  auto conn2 = createClientConnection();
+  if (upstream_selector_) {
+    conn2->waitForUpstreamConnection();
+  }
   waitSendSdsResponse("server");
-  conn2->waitForUpstreamConnection();
+  if (!upstream_selector_) {
+    conn2->waitForUpstreamConnection();
+  }
   conn2->sendAndReceiveTlsData("hello", "world");
   EXPECT_EQ(1, test_server_->gauge(onDemandStat("cert_active"))->value());
 }
 
 TEST_P(OnDemandIntegrationTest, SecretUpdate) {
   setup();
-  auto conn1 = std::make_unique<ClientSslConnection>(*this);
+  auto conn1 = createClientConnection();
+  if (upstream_selector_) {
+    conn1->waitForUpstreamConnection();
+  }
   waitCertsRequested(1);
   createXdsConnection();
   auto& stream = waitSendSdsResponse("server");
-  conn1->waitForUpstreamConnection();
+  if (!upstream_selector_) {
+    conn1->waitForUpstreamConnection();
+  }
   conn1->sendAndReceiveTlsData("hello", "world");
   conn1.reset();
 
@@ -397,7 +521,7 @@ TEST_P(OnDemandIntegrationTest, SecretUpdate) {
   sendSecret(stream, "server", "server2");
   test_server_->waitForCounterEq(onDemandStat("cert_updated"), 2);
 
-  auto conn2 = std::make_unique<ClientSslConnection>(*this);
+  auto conn2 = createClientConnection();
   conn2->waitForUpstreamConnection();
   conn2->sendAndReceiveTlsData("hello", "world");
   conn2.reset();
@@ -406,9 +530,12 @@ TEST_P(OnDemandIntegrationTest, SecretUpdate) {
 }
 
 TEST_P(OnDemandIntegrationTest, BasicSuccessMtlsSuccess) {
+  if (upstream_selector_) {
+    GTEST_SKIP() << "mTLS only applies to downstream listener config";
+  }
   mtls_ = true;
   setup();
-  auto conn = std::make_unique<ClientSslConnection>(*this);
+  auto conn = createClientConnection();
   waitCertsRequested(1);
   createXdsConnection();
   waitSendSdsResponse("server");
@@ -418,17 +545,18 @@ TEST_P(OnDemandIntegrationTest, BasicSuccessMtlsSuccess) {
 }
 
 TEST_P(OnDemandIntegrationTest, BasicSuccessMtlsFail) {
+  if (upstream_selector_) {
+    GTEST_SKIP() << "mTLS only applies to downstream listener config";
+  }
   mtls_ = true;
   ssl_options_.no_cert_ = true;
   useListenerAccessLog("%DOWNSTREAM_TRANSPORT_FAILURE_REASON%");
   setup();
-  auto conn = std::make_unique<ClientSslConnection>(*this);
+  auto conn = createClientConnection();
   waitCertsRequested(1);
   createXdsConnection();
   waitSendSdsResponse("server");
-  while (!conn->connect_callbacks_.closed()) {
-    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  }
+  conn->waitForDisconnect();
   auto log_result = waitForAccessLog(listener_access_log_name_);
   EXPECT_THAT(log_result, ::testing::HasSubstr("PEER_DID_NOT_RETURN_A_CERTIFICATE"));
 }
@@ -439,58 +567,88 @@ TEST_P(OnDemandIntegrationTest, ValidationContextUpdate) {
   FakeStream* ca_stream = nullptr;
   on_server_init_function_ = [&]() {
     createXdsConnection();
-    // This is an invalid CA cert.
-    ca_stream = &waitSendSdsResponse("cacert");
+    // This is a valid CA cert.
+    ca_stream = &waitSendSdsResponse(cacert());
   };
   setup();
   // Connection should work as-expected.
   {
-    auto conn = std::make_unique<ClientSslConnection>(*this);
+    auto conn = createClientConnection();
+    if (upstream_selector_) {
+      conn->waitForUpstreamConnection();
+    }
     waitCertsRequested(1);
     waitSendSdsResponse("server");
-    conn->waitForUpstreamConnection();
+    if (!upstream_selector_) {
+      conn->waitForUpstreamConnection();
+    }
     conn->sendAndReceiveTlsData("hello", "world");
     conn.reset();
   }
-  EXPECT_EQ(1, test_server_->counter(onDemandStat("cert_updated"))->value());
+  test_server_->waitForCounterEq(onDemandStat("cert_updated"), 1);
 
   // Send a wrong CA via validation SDS and open a new connection that fails.
   {
-    sendSecret(*ca_stream, "cacert", "upstreamcacert");
+    sendSecret(*ca_stream, cacert(), upstream_selector_ ? "cacert" : "upstreamcacert");
     test_server_->waitForCounterEq(onDemandStat("cert_updated"), 2);
-    auto conn = std::make_unique<ClientSslConnection>(*this);
-    while (!conn->connect_callbacks_.closed()) {
-      dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+    auto conn = createClientConnection();
+    if (upstream_selector_) {
+      conn->waitForUpstreamConnection();
     }
+    conn->waitForDisconnect();
     conn.reset();
   }
 }
 
 TEST_P(OnDemandIntegrationTest, ValidationContextUpdateWithPending) {
+  if (upstream_selector_) {
+    GTEST_SKIP() << "Cannot test because upstream selector validates with the CA prior to sending "
+                    "a client cert";
+  }
   mtls_ = true;
   validation_sds_ = true;
   FakeStream* ca_stream = nullptr;
   on_server_init_function_ = [&]() {
     createXdsConnection();
     // This is an invalid CA cert.
-    ca_stream = &waitSendSdsResponse("cacert", "upstreamcacert");
+    ca_stream = &waitSendSdsResponse(cacert(), upstream_selector_ ? "cacert" : "upstreamcacert");
   };
   setup();
   // Queue a pending connection, then issue a context config update, and unblock the connection.
   // In this case, the original context might reference an older context config.
-  auto conn = std::make_unique<ClientSslConnection>(*this);
+  auto conn = createClientConnection();
   waitCertsRequested(1);
   // Fix the CA cert, then send the actual server cert.
-  sendSecret(*ca_stream, "cacert", "cacert");
+  sendSecret(*ca_stream, cacert(), cacert());
   waitSendSdsResponse("server");
   conn->waitForUpstreamConnection();
   conn->sendAndReceiveTlsData("hello", "world");
   conn.reset();
 }
 
+TEST_P(OnDemandIntegrationTest, BasicSuccessFilterStateOverride) {
+  if (!upstream_selector_) {
+    GTEST_SKIP() << "Filter state mapper only works on upstream";
+  };
+  filter_state_value_ = "server";
+  setup(R"EOF(
+  certificate_mapper:
+    name: filter_state_override
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.filter_state_override.v3.Config
+      default_value: "*"
+  )EOF");
+  auto conn = createClientConnection();
+  conn->waitForUpstreamConnection();
+  waitCertsRequested(1);
+  createXdsConnection();
+  waitSendSdsResponse("server");
+  conn->sendAndReceiveTlsData("hello", "world");
+  conn.reset();
+}
+
 INSTANTIATE_TEST_SUITE_P(TcpProxyIntegrationTestParams, OnDemandIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
+                         testing::ValuesIn(testParams()), testParamsToString);
 
 } // namespace
 } // namespace OnDemand

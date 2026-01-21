@@ -27,11 +27,6 @@ public:
   explicit DynamicModuleListenerFilter(DynamicModuleListenerFilterConfigSharedPtr config);
   ~DynamicModuleListenerFilter() override;
 
-  /**
-   * Initializes the in-module filter.
-   */
-  void initializeInModuleFilter();
-
   // ---------- Network::ListenerFilter ----------
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override;
   Network::FilterStatus onData(Network::ListenerFilterBuffer& buffer) override;
@@ -70,7 +65,17 @@ public:
     return callbacks_ != nullptr ? &callbacks_->dispatcher() : nullptr;
   }
 
+  /**
+   * Returns the worker index assigned to this filter.
+   */
+  uint32_t workerIndex() const { return worker_index_; }
+
 private:
+  /**
+   * Initializes the in-module filter.
+   */
+  void initializeInModuleFilter();
+
   /**
    * Helper to get the `this` pointer as a void pointer.
    */
@@ -95,6 +100,8 @@ private:
   Network::Address::InstanceConstSharedPtr cached_original_dst_;
 
   bool destroyed_ = false;
+
+  uint32_t worker_index_;
 };
 
 /**

@@ -88,6 +88,14 @@ macro_rules! declare_init_functions {
   };
 }
 
+/// Get the concurrency from the server context options.
+/// # Safety
+///
+/// This function must be called on the main thread.
+pub unsafe fn get_server_concurrency() -> u32 {
+  unsafe { abi::envoy_dynamic_module_callback_get_concurrency() }
+}
+
 /// Log a trace message to Envoy's logging system with [dynamic_modules] Id. Messages won't be
 /// allocated if the log level is not enabled on the Envoy side.
 ///
@@ -641,6 +649,17 @@ impl EnvoyHttpFilterConfig for EnvoyHttpFilterConfigImpl {
       })
     }
   }
+}
+
+/// Host count information for a cluster at a specific priority level.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ClusterHostCount {
+  /// Total number of hosts in the cluster at this priority level.
+  pub total: usize,
+  /// Number of healthy hosts in the cluster at this priority level.
+  pub healthy: usize,
+  /// Number of degraded hosts in the cluster at this priority level.
+  pub degraded: usize,
 }
 
 /// The identifier for an EnvoyCounter.
@@ -1356,6 +1375,420 @@ pub trait EnvoyHttpFilter {
     labels: &[&'a str],
     value: u64,
   ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Get the index of the current worker thread.
+  fn get_worker_index(&self) -> u32;
+
+  /// Set an integer socket option with the given level, name, state, and direction.
+  /// Direction specifies whether to apply to upstream (outgoing to backend) or
+  /// downstream (incoming from client) socket.
+  fn set_socket_option_int(
+    &mut self,
+    level: i64,
+    name: i64,
+    state: abi::envoy_dynamic_module_type_socket_option_state,
+    direction: abi::envoy_dynamic_module_type_socket_direction,
+    value: i64,
+  ) -> bool;
+
+  /// Set a bytes socket option with the given level, name, state, and direction.
+  /// Direction specifies whether to apply to upstream (outgoing to backend) or
+  /// downstream (incoming from client) socket.
+  fn set_socket_option_bytes(
+    &mut self,
+    level: i64,
+    name: i64,
+    state: abi::envoy_dynamic_module_type_socket_option_state,
+    direction: abi::envoy_dynamic_module_type_socket_direction,
+    value: &[u8],
+  ) -> bool;
+
+  /// Get an integer socket option value.
+  fn get_socket_option_int(
+    &self,
+    level: i64,
+    name: i64,
+    state: abi::envoy_dynamic_module_type_socket_option_state,
+    direction: abi::envoy_dynamic_module_type_socket_direction,
+  ) -> Option<i64>;
+
+  /// Get a bytes socket option value.
+  fn get_socket_option_bytes(
+    &self,
+    level: i64,
+    name: i64,
+    state: abi::envoy_dynamic_module_type_socket_option_state,
+    direction: abi::envoy_dynamic_module_type_socket_direction,
+  ) -> Option<Vec<u8>>;
+
+  // ----------------------------- Tracing methods -----------------------------
+
+  /// Get the active tracing span for the current HTTP stream.
+  ///
+  /// Returns `Some(Box<dyn EnvoySpan>)` if tracing is enabled and a span is available,
+  /// otherwise returns `None`.
+  ///
+  /// The returned span can be used to add tags, logs, or spawn child spans.
+  /// The active span is managed by Envoy and should not be finished by the module.
+  fn get_active_span<'a>(&'a self) -> Option<Box<dyn EnvoySpan + 'a>>;
+
+  /// Create a child span from the active span with the given operation name.
+  ///
+  /// Returns `Some(Box<dyn EnvoyChildSpan>)` if the child span was created successfully,
+  /// otherwise returns `None`.
+  ///
+  /// The returned child span must be finished by calling [`EnvoyChildSpan::finish`]
+  /// when done. Failing to finish the span will result in incomplete trace data.
+  fn spawn_child_span<'a>(&'a self, operation_name: &str) -> Option<Box<dyn EnvoyChildSpan + 'a>>;
+
+  // ------------------- Cluster/Upstream Information methods -------------------------
+
+  /// Get the name of the cluster that the current request is routed to.
+  ///
+  /// Returns `None` if no route has been selected yet or if the cluster information
+  /// is not available.
+  ///
+  /// This is useful for making routing decisions or for logging.
+  fn get_cluster_name<'a>(&'a self) -> Option<EnvoyBuffer<'a>>;
+
+  /// Get host counts for the cluster that the current request is routed to.
+  ///
+  /// Returns a tuple of (total_count, healthy_count, degraded_count) for the specified
+  /// priority level. Returns `None` if the cluster is not available or if the priority
+  /// level does not exist.
+  ///
+  /// This is useful for implementing scale-to-zero logic or custom load balancing decisions.
+  fn get_cluster_host_count(&self, priority: u32) -> Option<ClusterHostCount>;
+
+  /// Set the override host to be used by the upstream load balancer.
+  ///
+  /// If the target host exists in the host list of the routed cluster, this host should
+  /// be selected first. This is useful for implementing sticky sessions, host affinity,
+  /// or custom load balancing logic.
+  ///
+  /// * `host` - The host address to override (e.g., "10.0.0.1:8080"). Must be a valid IP address.
+  /// * `strict` - If true, the request will fail if the override host is not available. If false,
+  ///   normal load balancing will be used as a fallback.
+  ///
+  /// Returns `true` if the override was set successfully, `false` if the host address is invalid.
+  fn set_upstream_override_host(&mut self, host: &str, strict: bool) -> bool;
+}
+
+/// Trait representing a tracing span.
+///
+/// This trait provides methods to interact with a tracing span, such as setting tags,
+/// logging events, and spawning child spans.
+///
+/// The span is managed by Envoy and should not be finished by the module.
+pub trait EnvoySpan {
+  /// Set a tag on this span.
+  ///
+  /// Tags are key-value pairs that provide metadata about the span.
+  fn set_tag(&self, key: &str, value: &str);
+
+  /// Set the operation name on this span.
+  fn set_operation(&self, operation: &str);
+
+  /// Log an event on this span with the current timestamp.
+  fn log(&self, event: &str);
+
+  /// Override the sampling decision for this span.
+  ///
+  /// If sampled is false, this span and any subsequent child spans will not be
+  /// reported to the tracing system.
+  fn set_sampled(&self, sampled: bool);
+
+  /// Get a baggage value from this span.
+  ///
+  /// Baggage data may have been set by this span or any parent spans.
+  /// Returns `None` if the key was not found.
+  ///
+  /// Note: The returned string is temporary and should be copied if needed
+  /// beyond immediate use.
+  fn get_baggage(&self, key: &str) -> Option<String>;
+
+  /// Set a baggage value on this span.
+  ///
+  /// All subsequent child spans will have access to this baggage.
+  fn set_baggage(&self, key: &str, value: &str);
+
+  /// Get the trace ID from this span.
+  ///
+  /// Returns `None` if the trace ID is not available.
+  ///
+  /// Note: The returned string is temporary and should be copied if needed
+  /// beyond immediate use.
+  fn get_trace_id(&self) -> Option<String>;
+
+  /// Get the span ID from this span.
+  ///
+  /// Returns `None` if the span ID is not available.
+  ///
+  /// Note: The returned string is temporary and should be copied if needed
+  /// beyond immediate use.
+  fn get_span_id(&self) -> Option<String>;
+
+  /// Create a child span with the given operation name.
+  ///
+  /// The child span must be finished by calling [`EnvoyChildSpan::finish`] when done.
+  fn spawn_child(&self, operation_name: &str) -> Option<Box<dyn EnvoyChildSpan + '_>>;
+}
+
+/// Implementation of [`EnvoySpan`] that wraps the raw span pointer from Envoy.
+struct EnvoySpanImpl {
+  raw_ptr: abi::envoy_dynamic_module_type_span_envoy_ptr,
+  filter_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+}
+
+impl EnvoySpan for EnvoySpanImpl {
+  fn set_tag(&self, key: &str, value: &str) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_span_set_tag(
+        self.raw_ptr,
+        str_to_module_buffer(key),
+        str_to_module_buffer(value),
+      );
+    }
+  }
+
+  fn set_operation(&self, operation: &str) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_span_set_operation(
+        self.raw_ptr,
+        str_to_module_buffer(operation),
+      );
+    }
+  }
+
+  fn log(&self, event: &str) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_span_log(
+        self.filter_ptr,
+        self.raw_ptr,
+        str_to_module_buffer(event),
+      );
+    }
+  }
+
+  fn set_sampled(&self, sampled: bool) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_span_set_sampled(self.raw_ptr, sampled);
+    }
+  }
+
+  fn get_baggage(&self, key: &str) -> Option<String> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_span_get_baggage(
+        self.raw_ptr,
+        str_to_module_buffer(key),
+        &mut result as *mut _ as *mut _,
+      )
+    };
+    if success && !result.ptr.is_null() && result.length > 0 {
+      let slice = unsafe { std::slice::from_raw_parts(result.ptr as *const u8, result.length) };
+      Some(String::from_utf8_lossy(slice).to_string())
+    } else {
+      None
+    }
+  }
+
+  fn set_baggage(&self, key: &str, value: &str) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_span_set_baggage(
+        self.raw_ptr,
+        str_to_module_buffer(key),
+        str_to_module_buffer(value),
+      );
+    }
+  }
+
+  fn get_trace_id(&self) -> Option<String> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_span_get_trace_id(
+        self.raw_ptr,
+        &mut result as *mut _ as *mut _,
+      )
+    };
+    if success && !result.ptr.is_null() && result.length > 0 {
+      let slice = unsafe { std::slice::from_raw_parts(result.ptr as *const u8, result.length) };
+      Some(String::from_utf8_lossy(slice).to_string())
+    } else {
+      None
+    }
+  }
+
+  fn get_span_id(&self) -> Option<String> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_span_get_span_id(
+        self.raw_ptr,
+        &mut result as *mut _ as *mut _,
+      )
+    };
+    if success && !result.ptr.is_null() && result.length > 0 {
+      let slice = unsafe { std::slice::from_raw_parts(result.ptr as *const u8, result.length) };
+      Some(String::from_utf8_lossy(slice).to_string())
+    } else {
+      None
+    }
+  }
+
+  fn spawn_child(&self, operation_name: &str) -> Option<Box<dyn EnvoyChildSpan + '_>> {
+    let raw_ptr = unsafe {
+      abi::envoy_dynamic_module_callback_http_span_spawn_child(
+        self.filter_ptr,
+        self.raw_ptr,
+        str_to_module_buffer(operation_name),
+      )
+    };
+    if raw_ptr.is_null() {
+      None
+    } else {
+      Some(Box::new(EnvoyChildSpanImpl {
+        raw_ptr,
+        filter_ptr: self.filter_ptr,
+        finished: false,
+      }))
+    }
+  }
+}
+
+/// Trait representing a child tracing span created by the module.
+///
+/// Child spans are owned by the module and must be finished by calling
+/// [`EnvoyChildSpan::finish`] when done.
+pub trait EnvoyChildSpan {
+  /// Set a tag on this span.
+  fn set_tag(&self, key: &str, value: &str);
+
+  /// Set the operation name on this span.
+  fn set_operation(&self, operation: &str);
+
+  /// Log an event on this span with the current timestamp.
+  fn log(&self, event: &str);
+
+  /// Override the sampling decision for this span.
+  fn set_sampled(&self, sampled: bool);
+
+  /// Set a baggage value on this span.
+  fn set_baggage(&self, key: &str, value: &str);
+
+  /// Create a child span from this span with the given operation name.
+  fn spawn_child(&self, operation_name: &str) -> Option<Box<dyn EnvoyChildSpan + '_>>;
+
+  /// Finish and release this span.
+  ///
+  /// After calling this method, the span is no longer valid and should not be used.
+  /// Note: This takes `&mut self` instead of `self` to maintain object-safety.
+  /// The implementation should ensure the span is not used after this call.
+  fn finish(&mut self);
+}
+
+/// Implementation of [`EnvoyChildSpan`] that wraps the raw span pointer.
+struct EnvoyChildSpanImpl {
+  raw_ptr: abi::envoy_dynamic_module_type_child_span_module_ptr,
+  filter_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  finished: bool,
+}
+
+impl EnvoyChildSpan for EnvoyChildSpanImpl {
+  fn set_tag(&self, key: &str, value: &str) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_span_set_tag(
+        self.raw_ptr as abi::envoy_dynamic_module_type_span_envoy_ptr,
+        str_to_module_buffer(key),
+        str_to_module_buffer(value),
+      );
+    }
+  }
+
+  fn set_operation(&self, operation: &str) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_span_set_operation(
+        self.raw_ptr as abi::envoy_dynamic_module_type_span_envoy_ptr,
+        str_to_module_buffer(operation),
+      );
+    }
+  }
+
+  fn log(&self, event: &str) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_span_log(
+        self.filter_ptr,
+        self.raw_ptr as abi::envoy_dynamic_module_type_span_envoy_ptr,
+        str_to_module_buffer(event),
+      );
+    }
+  }
+
+  fn set_sampled(&self, sampled: bool) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_span_set_sampled(
+        self.raw_ptr as abi::envoy_dynamic_module_type_span_envoy_ptr,
+        sampled,
+      );
+    }
+  }
+
+  fn set_baggage(&self, key: &str, value: &str) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_span_set_baggage(
+        self.raw_ptr as abi::envoy_dynamic_module_type_span_envoy_ptr,
+        str_to_module_buffer(key),
+        str_to_module_buffer(value),
+      );
+    }
+  }
+
+  fn spawn_child(&self, operation_name: &str) -> Option<Box<dyn EnvoyChildSpan + '_>> {
+    let raw_ptr = unsafe {
+      abi::envoy_dynamic_module_callback_http_span_spawn_child(
+        self.filter_ptr,
+        self.raw_ptr as abi::envoy_dynamic_module_type_span_envoy_ptr,
+        str_to_module_buffer(operation_name),
+      )
+    };
+    if raw_ptr.is_null() {
+      None
+    } else {
+      Some(Box::new(EnvoyChildSpanImpl {
+        raw_ptr,
+        filter_ptr: self.filter_ptr,
+        finished: false,
+      }))
+    }
+  }
+
+  fn finish(&mut self) {
+    if !self.finished {
+      unsafe {
+        abi::envoy_dynamic_module_callback_http_child_span_finish(self.raw_ptr);
+      }
+      self.finished = true;
+    }
+  }
+}
+
+impl Drop for EnvoyChildSpanImpl {
+  fn drop(&mut self) {
+    // If the span was not explicitly finished, finish it now.
+    if !self.finished {
+      unsafe {
+        abi::envoy_dynamic_module_callback_http_child_span_finish(self.raw_ptr);
+      }
+    }
+  }
 }
 
 /// This implements the [`EnvoyHttpFilter`] trait with the given raw pointer to the Envoy HTTP
@@ -2394,6 +2827,193 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     })?;
     Ok(())
   }
+
+  fn get_worker_index(&self) -> u32 {
+    unsafe { abi::envoy_dynamic_module_callback_http_filter_get_worker_index(self.raw_ptr) }
+  }
+
+  fn set_socket_option_int(
+    &mut self,
+    level: i64,
+    name: i64,
+    state: abi::envoy_dynamic_module_type_socket_option_state,
+    direction: abi::envoy_dynamic_module_type_socket_direction,
+    value: i64,
+  ) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_set_socket_option_int(
+        self.raw_ptr,
+        level,
+        name,
+        state,
+        direction,
+        value,
+      )
+    }
+  }
+
+  fn set_socket_option_bytes(
+    &mut self,
+    level: i64,
+    name: i64,
+    state: abi::envoy_dynamic_module_type_socket_option_state,
+    direction: abi::envoy_dynamic_module_type_socket_direction,
+    value: &[u8],
+  ) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_set_socket_option_bytes(
+        self.raw_ptr,
+        level,
+        name,
+        state,
+        direction,
+        abi::envoy_dynamic_module_type_module_buffer {
+          ptr: value.as_ptr() as *const _,
+          length: value.len(),
+        },
+      )
+    }
+  }
+
+  fn get_socket_option_int(
+    &self,
+    level: i64,
+    name: i64,
+    state: abi::envoy_dynamic_module_type_socket_option_state,
+    direction: abi::envoy_dynamic_module_type_socket_direction,
+  ) -> Option<i64> {
+    let mut value: i64 = 0;
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_socket_option_int(
+        self.raw_ptr,
+        level,
+        name,
+        state,
+        direction,
+        &mut value,
+      )
+    };
+    if success {
+      Some(value)
+    } else {
+      None
+    }
+  }
+
+  fn get_socket_option_bytes(
+    &self,
+    level: i64,
+    name: i64,
+    state: abi::envoy_dynamic_module_type_socket_option_state,
+    direction: abi::envoy_dynamic_module_type_socket_direction,
+  ) -> Option<Vec<u8>> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_socket_option_bytes(
+        self.raw_ptr,
+        level,
+        name,
+        state,
+        direction,
+        &mut result as *mut _ as *mut _,
+      )
+    };
+    if success && !result.ptr.is_null() && result.length > 0 {
+      let slice = unsafe { std::slice::from_raw_parts(result.ptr as *const u8, result.length) };
+      Some(slice.to_vec())
+    } else {
+      None
+    }
+  }
+
+  fn get_active_span<'a>(&'a self) -> Option<Box<dyn EnvoySpan + 'a>> {
+    let raw_ptr = unsafe { abi::envoy_dynamic_module_callback_http_get_active_span(self.raw_ptr) };
+    if raw_ptr.is_null() {
+      None
+    } else {
+      Some(Box::new(EnvoySpanImpl {
+        raw_ptr,
+        filter_ptr: self.raw_ptr,
+      }))
+    }
+  }
+
+  fn spawn_child_span<'a>(&'a self, operation_name: &str) -> Option<Box<dyn EnvoyChildSpan + 'a>> {
+    // Get the active span pointer directly.
+    let span_ptr = unsafe { abi::envoy_dynamic_module_callback_http_get_active_span(self.raw_ptr) };
+    if span_ptr.is_null() {
+      return None;
+    }
+    // Spawn the child span directly from the raw pointer.
+    let raw_ptr = unsafe {
+      abi::envoy_dynamic_module_callback_http_span_spawn_child(
+        self.raw_ptr,
+        span_ptr,
+        str_to_module_buffer(operation_name),
+      )
+    };
+    if raw_ptr.is_null() {
+      None
+    } else {
+      Some(Box::new(EnvoyChildSpanImpl {
+        raw_ptr,
+        filter_ptr: self.raw_ptr,
+        finished: false,
+      }))
+    }
+  }
+
+  fn get_cluster_name(&self) -> Option<EnvoyBuffer<'_>> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_cluster_name(self.raw_ptr, &mut result as *mut _)
+    };
+    if success && !result.ptr.is_null() {
+      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) })
+    } else {
+      None
+    }
+  }
+
+  fn get_cluster_host_count(&self, priority: u32) -> Option<ClusterHostCount> {
+    let mut total: usize = 0;
+    let mut healthy: usize = 0;
+    let mut degraded: usize = 0;
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_cluster_host_count(
+        self.raw_ptr,
+        priority,
+        &mut total as *mut _,
+        &mut healthy as *mut _,
+        &mut degraded as *mut _,
+      )
+    };
+    if success {
+      Some(ClusterHostCount {
+        total,
+        healthy,
+        degraded,
+      })
+    } else {
+      None
+    }
+  }
+
+  fn set_upstream_override_host(&mut self, host: &str, strict: bool) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_set_upstream_override_host(
+        self.raw_ptr,
+        str_to_module_buffer(host),
+        strict,
+      )
+    }
+  }
 }
 
 impl EnvoyHttpFilterImpl {
@@ -2618,23 +3238,18 @@ impl EnvoyHttpFilterConfigScheduler for Box<dyn EnvoyHttpFilterConfigScheduler> 
 #[no_mangle]
 unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_new(
   envoy_filter_config_ptr: abi::envoy_dynamic_module_type_http_filter_config_envoy_ptr,
-  name_ptr: *const u8,
-  name_size: usize,
-  config_ptr: *const u8,
-  config_size: usize,
+  name: abi::envoy_dynamic_module_type_envoy_buffer,
+  config: abi::envoy_dynamic_module_type_envoy_buffer,
 ) -> abi::envoy_dynamic_module_type_http_filter_config_module_ptr {
   // This assumes that the name is a valid UTF-8 string. Should we relax? At the moment,
   // it is a String at protobuf level.
-  let name = if !name_ptr.is_null() {
-    std::str::from_utf8(std::slice::from_raw_parts(name_ptr, name_size)).unwrap_or_default()
-  } else {
-    ""
+  let name_str = unsafe {
+    std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+      name.ptr as *const _,
+      name.length,
+    ))
   };
-  let config = if !config_ptr.is_null() {
-    std::slice::from_raw_parts(config_ptr, config_size)
-  } else {
-    b""
-  };
+  let config_slice = unsafe { std::slice::from_raw_parts(config.ptr as *const _, config.length) };
 
   let mut envoy_filter_config = EnvoyHttpFilterConfigImpl {
     raw_ptr: envoy_filter_config_ptr,
@@ -2642,8 +3257,8 @@ unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_new(
 
   envoy_dynamic_module_on_http_filter_config_new_impl(
     &mut envoy_filter_config,
-    name,
-    config,
+    name_str,
+    config_slice,
     NEW_HTTP_FILTER_CONFIG_FUNCTION
       .get()
       .expect("NEW_HTTP_FILTER_CONFIG_FUNCTION must be set"),
@@ -2715,27 +3330,22 @@ unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_scheduled(
 
 #[no_mangle]
 unsafe extern "C" fn envoy_dynamic_module_on_http_filter_per_route_config_new(
-  name_ptr: *const u8,
-  name_size: usize,
-  config_ptr: *const u8,
-  config_size: usize,
+  name: abi::envoy_dynamic_module_type_envoy_buffer,
+  config: abi::envoy_dynamic_module_type_envoy_buffer,
 ) -> abi::envoy_dynamic_module_type_http_filter_per_route_config_module_ptr {
   // This assumes that the name is a valid UTF-8 string. Should we relax? At the moment,
   // it is a String at protobuf level.
-  let name = if !name_ptr.is_null() {
-    std::str::from_utf8(std::slice::from_raw_parts(name_ptr, name_size)).unwrap_or_default()
-  } else {
-    ""
+  let name_str = unsafe {
+    std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+      name.ptr as *const _,
+      name.length,
+    ))
   };
-  let config = if !config_ptr.is_null() {
-    std::slice::from_raw_parts(config_ptr, config_size)
-  } else {
-    b""
-  };
+  let config_slice = unsafe { std::slice::from_raw_parts(config.ptr as *const _, config.length) };
 
   envoy_dynamic_module_on_http_filter_per_route_config_new_impl(
-    name,
-    config,
+    name_str,
+    config_slice,
     NEW_HTTP_FILTER_PER_ROUTE_CONFIG_FUNCTION
       .get()
       .expect("NEW_HTTP_FILTER_PER_ROUTE_CONFIG_FUNCTION must be set"),
@@ -3121,12 +3731,14 @@ macro_rules! declare_network_filter_init_functions {
 macro_rules! declare_all_init_functions {
   ($f:ident, $new_http_filter_config_fn:expr, $new_network_filter_config_fn:expr) => {
     #[no_mangle]
-    pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
+    pub extern "C" fn envoy_dynamic_module_on_program_init(
+      server_factory_context_ptr: abi::envoy_dynamic_module_type_server_factory_context_envoy_ptr,
+    ) -> *const ::std::os::raw::c_char {
       envoy_proxy_dynamic_modules_rust_sdk::NEW_HTTP_FILTER_CONFIG_FUNCTION
         .get_or_init(|| $new_http_filter_config_fn);
       envoy_proxy_dynamic_modules_rust_sdk::NEW_NETWORK_FILTER_CONFIG_FUNCTION
         .get_or_init(|| $new_network_filter_config_fn);
-      if ($f()) {
+      if ($f(server_factory_context_ptr)) {
         envoy_proxy_dynamic_modules_rust_sdk::abi::kAbiVersion.as_ptr()
           as *const ::std::os::raw::c_char
       } else {
@@ -3557,6 +4169,9 @@ pub trait EnvoyNetworkFilter {
   /// }
   /// ```
   fn new_scheduler(&self) -> impl EnvoyNetworkFilterScheduler + 'static;
+
+  /// Get the index of the current worker thread.
+  fn get_worker_index(&self) -> u32;
 }
 
 /// This represents a thread-safe object that can be used to schedule a generic event to the
@@ -4574,6 +5189,10 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
       }
     }
   }
+
+  fn get_worker_index(&self) -> u32 {
+    unsafe { abi::envoy_dynamic_module_callback_network_filter_get_worker_index(self.raw) }
+  }
 }
 
 // Network Filter Event Hook Implementations
@@ -4581,20 +5200,21 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
 #[no_mangle]
 pub extern "C" fn envoy_dynamic_module_on_network_filter_config_new(
   envoy_filter_config_ptr: abi::envoy_dynamic_module_type_network_filter_config_envoy_ptr,
-  name_ptr: *const i8,
-  name_size: usize,
-  config_ptr: *const i8,
-  config_size: usize,
+  name: abi::envoy_dynamic_module_type_envoy_buffer,
+  config: abi::envoy_dynamic_module_type_envoy_buffer,
 ) -> abi::envoy_dynamic_module_type_network_filter_config_module_ptr {
   let mut envoy_filter_config = EnvoyNetworkFilterConfigImpl::new(envoy_filter_config_ptr);
-  let name = unsafe {
-    std::str::from_utf8_unchecked(std::slice::from_raw_parts(name_ptr as *const _, name_size))
+  let name_str = unsafe {
+    std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+      name.ptr as *const _,
+      name.length,
+    ))
   };
-  let config = unsafe { std::slice::from_raw_parts(config_ptr as *const _, config_size) };
+  let config_slice = unsafe { std::slice::from_raw_parts(config.ptr as *const _, config.length) };
   init_network_filter_config(
     &mut envoy_filter_config,
-    name,
-    config,
+    name_str,
+    config_slice,
     NEW_NETWORK_FILTER_CONFIG_FUNCTION
       .get()
       .expect("NEW_NETWORK_FILTER_CONFIG_FUNCTION must be set"),
@@ -4797,10 +5417,12 @@ pub extern "C" fn envoy_dynamic_module_on_network_filter_config_scheduled(
 macro_rules! declare_listener_filter_init_functions {
   ($f:ident, $new_listener_filter_config_fn:expr) => {
     #[no_mangle]
-    pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
+    pub extern "C" fn envoy_dynamic_module_on_program_init(
+      server_factory_context_ptr: abi::envoy_dynamic_module_type_server_factory_context_envoy_ptr,
+    ) -> *const ::std::os::raw::c_char {
       envoy_proxy_dynamic_modules_rust_sdk::NEW_LISTENER_FILTER_CONFIG_FUNCTION
         .get_or_init(|| $new_listener_filter_config_fn);
-      if ($f()) {
+      if ($f(server_factory_context_ptr)) {
         envoy_proxy_dynamic_modules_rust_sdk::abi::kAbiVersion.as_ptr()
           as *const ::std::os::raw::c_char
       } else {
@@ -5071,6 +5693,9 @@ pub trait EnvoyListenerFilter {
   /// }
   /// ```
   fn new_scheduler(&self) -> impl EnvoyListenerFilterScheduler + 'static;
+
+  /// Get the index of the current worker thread.
+  fn get_worker_index(&self) -> u32;
 }
 
 /// This represents a thread-safe object that can be used to schedule a generic event to the
@@ -5626,6 +6251,10 @@ impl EnvoyListenerFilter for EnvoyListenerFilterImpl {
       }
     }
   }
+
+  fn get_worker_index(&self) -> u32 {
+    unsafe { abi::envoy_dynamic_module_callback_listener_filter_get_worker_index(self.raw) }
+  }
 }
 
 // Listener Filter Event Hook Implementations
@@ -5633,20 +6262,21 @@ impl EnvoyListenerFilter for EnvoyListenerFilterImpl {
 #[no_mangle]
 pub extern "C" fn envoy_dynamic_module_on_listener_filter_config_new(
   envoy_filter_config_ptr: abi::envoy_dynamic_module_type_listener_filter_config_envoy_ptr,
-  name_ptr: *const i8,
-  name_size: usize,
-  config_ptr: *const i8,
-  config_size: usize,
+  name: abi::envoy_dynamic_module_type_envoy_buffer,
+  config: abi::envoy_dynamic_module_type_envoy_buffer,
 ) -> abi::envoy_dynamic_module_type_listener_filter_config_module_ptr {
   let mut envoy_filter_config = EnvoyListenerFilterConfigImpl::new(envoy_filter_config_ptr);
-  let name = unsafe {
-    std::str::from_utf8_unchecked(std::slice::from_raw_parts(name_ptr as *const _, name_size))
+  let name_str = unsafe {
+    std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+      name.ptr as *const _,
+      name.length,
+    ))
   };
-  let config = unsafe { std::slice::from_raw_parts(config_ptr as *const _, config_size) };
+  let config_slice = unsafe { std::slice::from_raw_parts(config.ptr as *const _, config.length) };
   init_listener_filter_config(
     &mut envoy_filter_config,
-    name,
-    config,
+    name_str,
+    config_slice,
     NEW_LISTENER_FILTER_CONFIG_FUNCTION
       .get()
       .expect("NEW_LISTENER_FILTER_CONFIG_FUNCTION must be set"),
@@ -5922,6 +6552,9 @@ pub trait EnvoyUdpListenerFilter {
     id: EnvoyHistogramId,
     value: u64,
   ) -> Result<(), abi::envoy_dynamic_module_type_metrics_result>;
+
+  /// Get the index of the current worker thread.
+  fn get_worker_index(&self) -> u32;
 }
 
 /// The implementation of [`EnvoyUdpListenerFilterConfig`] for the Envoy UDP listener filter
@@ -6185,6 +6818,10 @@ impl EnvoyUdpListenerFilter for EnvoyUdpListenerFilterImpl {
       Err(res)
     }
   }
+
+  fn get_worker_index(&self) -> u32 {
+    unsafe { abi::envoy_dynamic_module_callback_udp_listener_filter_get_worker_index(self.raw) }
+  }
 }
 
 // UDP Listener Filter Event Hook Implementations
@@ -6192,20 +6829,21 @@ impl EnvoyUdpListenerFilter for EnvoyUdpListenerFilterImpl {
 #[no_mangle]
 pub extern "C" fn envoy_dynamic_module_on_udp_listener_filter_config_new(
   envoy_filter_config_ptr: abi::envoy_dynamic_module_type_udp_listener_filter_config_envoy_ptr,
-  name_ptr: *const i8,
-  name_size: usize,
-  config_ptr: *const i8,
-  config_size: usize,
+  name: abi::envoy_dynamic_module_type_envoy_buffer,
+  config: abi::envoy_dynamic_module_type_envoy_buffer,
 ) -> abi::envoy_dynamic_module_type_udp_listener_filter_config_module_ptr {
   let mut envoy_filter_config = EnvoyUdpListenerFilterConfigImpl::new(envoy_filter_config_ptr);
-  let name = unsafe {
-    std::str::from_utf8_unchecked(std::slice::from_raw_parts(name_ptr as *const _, name_size))
+  let name_str = unsafe {
+    std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+      name.ptr as *const _,
+      name.length,
+    ))
   };
-  let config = unsafe { std::slice::from_raw_parts(config_ptr as *const _, config_size) };
+  let config_slice = unsafe { std::slice::from_raw_parts(config.ptr as *const _, config.length) };
   init_udp_listener_filter_config(
     &mut envoy_filter_config,
-    name,
-    config,
+    name_str,
+    config_slice,
     NEW_UDP_LISTENER_FILTER_CONFIG_FUNCTION
       .get()
       .expect("NEW_UDP_LISTENER_FILTER_CONFIG_FUNCTION must be set"),
@@ -6298,12 +6936,72 @@ pub type NewBootstrapExtensionConfigFunction = fn(
 /// EnvoyBootstrapExtensionConfig is the Envoy-side bootstrap extension configuration.
 /// This is a handle to the Envoy configuration object.
 #[automock]
-pub trait EnvoyBootstrapExtensionConfig {}
+pub trait EnvoyBootstrapExtensionConfig {
+  /// Create a new implementation of the [`EnvoyBootstrapExtensionConfigScheduler`] trait.
+  ///
+  /// This can be used to schedule an event to the main thread where the config is running.
+  fn new_scheduler(&self) -> Box<dyn EnvoyBootstrapExtensionConfigScheduler>;
+
+  /// Send an HTTP callout to the given cluster with the given headers and optional body.
+  ///
+  /// Headers must contain the `:method`, `:path`, and `host` headers.
+  ///
+  /// This returns a tuple of (status, callout_id):
+  ///   * Success + valid callout_id: The callout was started successfully. The callout ID can be
+  ///     used to correlate the response in [`BootstrapExtensionConfig::on_http_callout_done`].
+  ///   * ClusterNotFound: The cluster does not exist.
+  ///   * MissingRequiredHeaders: The headers are missing required headers.
+  ///   * CannotCreateRequest: The request could not be created, e.g., there's no healthy upstream
+  ///     host in the cluster.
+  ///
+  /// The callout result will be delivered to the [`BootstrapExtensionConfig::on_http_callout_done`]
+  /// method.
+  ///
+  /// This must be called on the main thread. To call from other threads, use the scheduler
+  /// mechanism to post an event to the main thread first.
+  fn send_http_callout<'a>(
+    &mut self,
+    _cluster_name: &'a str,
+    _headers: Vec<(&'a str, &'a [u8])>,
+    _body: Option<&'a [u8]>,
+    _timeout_milliseconds: u64,
+  ) -> (
+    abi::envoy_dynamic_module_type_http_callout_init_result,
+    u64, // callout id
+  );
+}
 
 /// EnvoyBootstrapExtension is the Envoy-side bootstrap extension.
 /// This is a handle to the Envoy extension object.
-#[automock]
-pub trait EnvoyBootstrapExtension {}
+pub trait EnvoyBootstrapExtension {
+  /// Get the current value of a counter by name.
+  ///
+  /// Returns `Some(value)` if the counter exists, `None` otherwise.
+  fn get_counter_value(&self, name: &str) -> Option<u64>;
+
+  /// Get the current value of a gauge by name.
+  ///
+  /// Returns `Some(value)` if the gauge exists, `None` otherwise.
+  fn get_gauge_value(&self, name: &str) -> Option<u64>;
+
+  /// Get the summary statistics of a histogram by name.
+  ///
+  /// Returns `Some((sample_count, sample_sum))` if the histogram exists, `None` otherwise.
+  /// These are cumulative statistics since the server started.
+  fn get_histogram_summary(&self, name: &str) -> Option<(u64, f64)>;
+
+  /// Iterate over all counters in the stats store.
+  ///
+  /// The callback receives the counter name and its current value.
+  /// Return `true` to continue iteration, `false` to stop.
+  fn iterate_counters(&self, callback: &mut dyn FnMut(&str, u64) -> bool);
+
+  /// Iterate over all gauges in the stats store.
+  ///
+  /// The callback receives the gauge name and its current value.
+  /// Return `true` to continue iteration, `false` to stop.
+  fn iterate_gauges(&self, callback: &mut dyn FnMut(&str, u64) -> bool);
+}
 
 /// BootstrapExtensionConfig is the module-side bootstrap extension configuration.
 ///
@@ -6322,6 +7020,37 @@ pub trait BootstrapExtensionConfig: Send + Sync {
     &self,
     envoy_extension: &mut dyn EnvoyBootstrapExtension,
   ) -> Box<dyn BootstrapExtension>;
+
+  /// This is called when a new event is scheduled via the
+  /// [`EnvoyBootstrapExtensionConfigScheduler::commit`] for this [`BootstrapExtensionConfig`].
+  ///
+  /// * `envoy_extension_config` can be used to interact with the underlying Envoy config object.
+  /// * `event_id` is the ID of the event that was scheduled with
+  ///   [`EnvoyBootstrapExtensionConfigScheduler::commit`] to distinguish multiple scheduled events.
+  fn on_scheduled(
+    &self,
+    _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _event_id: u64,
+  ) {
+  }
+
+  /// This is called when an HTTP callout response is received.
+  ///
+  /// * `envoy_extension_config` can be used to interact with the underlying Envoy config object.
+  /// * `callout_id` is the ID of the callout returned by
+  ///   [`EnvoyBootstrapExtensionConfig::send_http_callout`].
+  /// * `result` is the result of the callout.
+  /// * `response_headers` is a list of key-value pairs of the response headers. This is optional.
+  /// * `response_body` is the response body. This is optional.
+  fn on_http_callout_done(
+    &self,
+    _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _callout_id: u64,
+    _result: abi::envoy_dynamic_module_type_http_callout_result,
+    _response_headers: Option<&[(EnvoyBuffer, EnvoyBuffer)]>,
+    _response_body: Option<&[EnvoyBuffer]>,
+  ) {
+  }
 }
 
 /// BootstrapExtension is the module-side bootstrap extension.
@@ -6344,13 +7073,49 @@ pub trait BootstrapExtension: Send + Sync {
   fn on_worker_thread_initialized(&mut self, _envoy_extension: &mut dyn EnvoyBootstrapExtension) {}
 }
 
+/// This represents a thread-safe object that can be used to schedule a generic event to the
+/// Envoy bootstrap extension config on the main thread.
+#[automock]
+pub trait EnvoyBootstrapExtensionConfigScheduler: Send + Sync {
+  /// Commit the scheduled event to the main thread.
+  fn commit(&self, event_id: u64);
+}
+
+struct EnvoyBootstrapExtensionConfigSchedulerImpl {
+  raw_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_scheduler_module_ptr,
+}
+
+unsafe impl Send for EnvoyBootstrapExtensionConfigSchedulerImpl {}
+unsafe impl Sync for EnvoyBootstrapExtensionConfigSchedulerImpl {}
+
+impl Drop for EnvoyBootstrapExtensionConfigSchedulerImpl {
+  fn drop(&mut self) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_delete(self.raw_ptr);
+    }
+  }
+}
+
+impl EnvoyBootstrapExtensionConfigScheduler for EnvoyBootstrapExtensionConfigSchedulerImpl {
+  fn commit(&self, event_id: u64) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_commit(
+        self.raw_ptr,
+        event_id,
+      );
+    }
+  }
+}
+
+impl EnvoyBootstrapExtensionConfigScheduler for Box<dyn EnvoyBootstrapExtensionConfigScheduler> {
+  fn commit(&self, event_id: u64) {
+    (**self).commit(event_id);
+  }
+}
+
 // Implementation of EnvoyBootstrapExtensionConfig
 
 struct EnvoyBootstrapExtensionConfigImpl {
-  // The raw pointer is stored for future callback implementations.
-  // Currently, the EnvoyBootstrapExtensionConfig trait has no methods, but
-  // callbacks may be added in the future (e.g., for metrics or other APIs).
-  #[allow(dead_code)]
   raw: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
 }
 
@@ -6360,15 +7125,62 @@ impl EnvoyBootstrapExtensionConfigImpl {
   }
 }
 
-impl EnvoyBootstrapExtensionConfig for EnvoyBootstrapExtensionConfigImpl {}
+impl EnvoyBootstrapExtensionConfig for EnvoyBootstrapExtensionConfigImpl {
+  fn new_scheduler(&self) -> Box<dyn EnvoyBootstrapExtensionConfigScheduler> {
+    unsafe {
+      let scheduler_ptr =
+        abi::envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_new(self.raw);
+      Box::new(EnvoyBootstrapExtensionConfigSchedulerImpl {
+        raw_ptr: scheduler_ptr,
+      })
+    }
+  }
+
+  fn send_http_callout<'a>(
+    &mut self,
+    cluster_name: &'a str,
+    headers: Vec<(&'a str, &'a [u8])>,
+    body: Option<&'a [u8]>,
+    timeout_milliseconds: u64,
+  ) -> (abi::envoy_dynamic_module_type_http_callout_init_result, u64) {
+    let body_ptr = body.map(|s| s.as_ptr()).unwrap_or(std::ptr::null());
+    let body_length = body.map(|s| s.len()).unwrap_or(0);
+
+    // Convert headers to module HTTP headers.
+    let module_headers: Vec<abi::envoy_dynamic_module_type_module_http_header> = headers
+      .iter()
+      .map(|(k, v)| abi::envoy_dynamic_module_type_module_http_header {
+        key_ptr: k.as_ptr() as *const _,
+        key_length: k.len(),
+        value_ptr: v.as_ptr() as *const _,
+        value_length: v.len(),
+      })
+      .collect();
+
+    let mut callout_id: u64 = 0;
+
+    let result = unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_http_callout(
+        self.raw,
+        &mut callout_id as *mut _ as *mut _,
+        str_to_module_buffer(cluster_name),
+        module_headers.as_ptr() as *mut _,
+        module_headers.len(),
+        abi::envoy_dynamic_module_type_module_buffer {
+          ptr: body_ptr as *mut _,
+          length: body_length,
+        },
+        timeout_milliseconds,
+      )
+    };
+
+    (result, callout_id)
+  }
+}
 
 // Implementation of EnvoyBootstrapExtension
 
 struct EnvoyBootstrapExtensionImpl {
-  // The raw pointer is stored for future callback implementations.
-  // Currently, the EnvoyBootstrapExtension trait has no methods, but
-  // callbacks may be added in the future.
-  #[allow(dead_code)]
   raw: abi::envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
 }
 
@@ -6378,7 +7190,135 @@ impl EnvoyBootstrapExtensionImpl {
   }
 }
 
-impl EnvoyBootstrapExtension for EnvoyBootstrapExtensionImpl {}
+impl EnvoyBootstrapExtension for EnvoyBootstrapExtensionImpl {
+  fn get_counter_value(&self, name: &str) -> Option<u64> {
+    let mut value: u64 = 0;
+    let found = unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_get_counter_value(
+        self.raw,
+        str_to_module_buffer(name),
+        &mut value,
+      )
+    };
+    if found {
+      Some(value)
+    } else {
+      None
+    }
+  }
+
+  fn get_gauge_value(&self, name: &str) -> Option<u64> {
+    let mut value: u64 = 0;
+    let found = unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_get_gauge_value(
+        self.raw,
+        str_to_module_buffer(name),
+        &mut value,
+      )
+    };
+    if found {
+      Some(value)
+    } else {
+      None
+    }
+  }
+
+  fn get_histogram_summary(&self, name: &str) -> Option<(u64, f64)> {
+    let mut sample_count: u64 = 0;
+    let mut sample_sum: f64 = 0.0;
+    let found = unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_get_histogram_summary(
+        self.raw,
+        str_to_module_buffer(name),
+        &mut sample_count,
+        &mut sample_sum,
+      )
+    };
+    if found {
+      Some((sample_count, sample_sum))
+    } else {
+      None
+    }
+  }
+
+  fn iterate_counters(&self, callback: &mut dyn FnMut(&str, u64) -> bool) {
+    // We use a wrapper struct to pass the closure through the C callback.
+    struct CallbackWrapper<'a> {
+      callback: &'a mut dyn FnMut(&str, u64) -> bool,
+      stopped: bool,
+    }
+
+    extern "C" fn counter_iterator_trampoline(
+      name: abi::envoy_dynamic_module_type_envoy_buffer,
+      value: u64,
+      user_data: *mut std::ffi::c_void,
+    ) -> abi::envoy_dynamic_module_type_stats_iteration_action {
+      let wrapper = unsafe { &mut *(user_data as *mut CallbackWrapper) };
+      if wrapper.stopped {
+        return abi::envoy_dynamic_module_type_stats_iteration_action::Stop;
+      }
+      let name_slice = unsafe { std::slice::from_raw_parts(name.ptr as *const u8, name.length) };
+      let name_str = std::str::from_utf8(name_slice).unwrap_or("");
+      if (wrapper.callback)(name_str, value) {
+        abi::envoy_dynamic_module_type_stats_iteration_action::Continue
+      } else {
+        wrapper.stopped = true;
+        abi::envoy_dynamic_module_type_stats_iteration_action::Stop
+      }
+    }
+
+    let mut wrapper = CallbackWrapper {
+      callback,
+      stopped: false,
+    };
+    unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_iterate_counters(
+        self.raw,
+        Some(counter_iterator_trampoline),
+        &mut wrapper as *mut _ as *mut std::ffi::c_void,
+      );
+    }
+  }
+
+  fn iterate_gauges(&self, callback: &mut dyn FnMut(&str, u64) -> bool) {
+    // We use a wrapper struct to pass the closure through the C callback.
+    struct CallbackWrapper<'a> {
+      callback: &'a mut dyn FnMut(&str, u64) -> bool,
+      stopped: bool,
+    }
+
+    extern "C" fn gauge_iterator_trampoline(
+      name: abi::envoy_dynamic_module_type_envoy_buffer,
+      value: u64,
+      user_data: *mut std::ffi::c_void,
+    ) -> abi::envoy_dynamic_module_type_stats_iteration_action {
+      let wrapper = unsafe { &mut *(user_data as *mut CallbackWrapper) };
+      if wrapper.stopped {
+        return abi::envoy_dynamic_module_type_stats_iteration_action::Stop;
+      }
+      let name_slice = unsafe { std::slice::from_raw_parts(name.ptr as *const u8, name.length) };
+      let name_str = std::str::from_utf8(name_slice).unwrap_or("");
+      if (wrapper.callback)(name_str, value) {
+        abi::envoy_dynamic_module_type_stats_iteration_action::Continue
+      } else {
+        wrapper.stopped = true;
+        abi::envoy_dynamic_module_type_stats_iteration_action::Stop
+      }
+    }
+
+    let mut wrapper = CallbackWrapper {
+      callback,
+      stopped: false,
+    };
+    unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_iterate_gauges(
+        self.raw,
+        Some(gauge_iterator_trampoline),
+        &mut wrapper as *mut _ as *mut std::ffi::c_void,
+      );
+    }
+  }
+}
 
 // Bootstrap Extension Event Hook Implementations
 
@@ -6473,6 +7413,62 @@ pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_destroy(
   extension_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_module_ptr,
 ) {
   let _ = unsafe { Box::from_raw(extension_ptr as *mut Box<dyn BootstrapExtension>) };
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_config_scheduled(
+  envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
+  event_id: u64,
+) {
+  let extension_config = extension_config_ptr as *const *const dyn BootstrapExtensionConfig;
+  let extension_config = unsafe { &**extension_config };
+  extension_config.on_scheduled(
+    &mut EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr),
+    event_id,
+  );
+}
+
+/// Event hook called by Envoy when an HTTP callout initiated by a bootstrap extension completes.
+///
+/// # Safety
+/// This function is unsafe because it dereferences raw pointers passed from Envoy. The caller
+/// must ensure that all pointers are valid and that the memory they point to remains valid for
+/// the duration of the function call.
+#[no_mangle]
+pub unsafe extern "C" fn envoy_dynamic_module_on_bootstrap_extension_http_callout_done(
+  envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
+  callout_id: u64,
+  result: abi::envoy_dynamic_module_type_http_callout_result,
+  headers: *const abi::envoy_dynamic_module_type_envoy_http_header,
+  headers_size: usize,
+  body_chunks: *const abi::envoy_dynamic_module_type_envoy_buffer,
+  body_chunks_size: usize,
+) {
+  let extension_config = extension_config_ptr as *const *const dyn BootstrapExtensionConfig;
+  let extension_config = unsafe { &**extension_config };
+
+  let headers = if headers_size > 0 {
+    Some(unsafe {
+      std::slice::from_raw_parts(headers as *const (EnvoyBuffer, EnvoyBuffer), headers_size)
+    })
+  } else {
+    None
+  };
+  let body = if body_chunks_size > 0 {
+    Some(unsafe { std::slice::from_raw_parts(body_chunks as *const EnvoyBuffer, body_chunks_size) })
+  } else {
+    None
+  };
+
+  extension_config.on_http_callout_done(
+    &mut EnvoyBootstrapExtensionConfigImpl::new(envoy_ptr),
+    callout_id,
+    result,
+    headers,
+    body,
+  );
 }
 
 /// Declare the init functions for the bootstrap extension dynamic module.
