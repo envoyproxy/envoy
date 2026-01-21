@@ -811,7 +811,7 @@ void McpRouterFilter::handleToolsCall() {
           return;
         }
         // This callback is invoked for non-SSE responses (JSON) or errors.
-        // SSE responses are streamed directly via pushSse* methods on the parent filter.
+        // SSE responses are streamed directly by the parent filter.
         if (resp.success) {
           if (resp.isSse()) {
             // Should not reach here for successful SSE in streaming mode.

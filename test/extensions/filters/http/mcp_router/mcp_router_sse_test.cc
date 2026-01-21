@@ -30,7 +30,7 @@ TEST_F(SseResponseTest, SseResponseUsesExtractedJsonrpc) {
   BackendResponse response;
   response.content_type = ResponseContentType::Sse;
   response.body = "data: {\"first\":\"event\"}\n\ndata: {\"second\":\"event\"}\n\n";
-  response.extracted_jsonrpc = R"({"second":"event"})"; // Populated by tryParseSseResponse()
+  response.extracted_jsonrpc = R"({"second":"event"})";
 
   // For SSE responses, extracted_jsonrpc is preferred when available.
   EXPECT_FALSE(response.extracted_jsonrpc.empty());
@@ -49,7 +49,7 @@ TEST_F(SseResponseTest, EmptyExtractedJsonrpcFallsBackToBody) {
   EXPECT_EQ(response.body, "fallback body");
 }
 
-// Verifies isJson and isSse helper methods.
+// Verifies content type helper methods.
 TEST_F(SseResponseTest, ContentTypeHelpers) {
   {
     BackendResponse response;

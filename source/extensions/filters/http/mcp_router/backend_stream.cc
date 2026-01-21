@@ -195,6 +195,9 @@ bool BackendStreamCallbacks::tryParseSseResponse() {
         // Forward intermediate events immediately to client.
         if (auto parent = parent_.lock()) {
           parent->pushSseEvent(backend_name_, data, msg_type);
+        } else {
+          ENVOY_LOG(debug, "tryParseSseResponse: parent destroyed, cannot forward {} event",
+                    msg_type == SseMessageType::Notification ? "notification" : "server_request");
         }
         break;
       case SseMessageType::Unknown:

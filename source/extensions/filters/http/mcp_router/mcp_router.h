@@ -45,14 +45,6 @@ McpMethod parseMethodString(absl::string_view method_str);
 
 /**
  * HTTP filter that routes MCP requests to one or more backend servers.
- * Supports fanout to multiple backends for initialize/tools-list and
- * single-backend routing for tools-call based on tool name prefix.
- *
- * SSE Support:
- * - tools/list: Aggregates SSE responses from multiple backends into single JSON response
- * - tools/call: Passes through SSE response from single backend
- *
- * Implements SseStreamHandler to receive streaming callbacks from BackendStreamCallbacks.
  */
 class McpRouterFilter : public Http::StreamDecoderFilter,
                         public SseStreamHandler,
@@ -62,7 +54,7 @@ public:
   explicit McpRouterFilter(McpRouterConfigSharedPtr config);
   ~McpRouterFilter() override;
 
-  // SseStreamHandler implementation - called by BackendStreamCallbacks safely via weak_ptr.
+  // SSE stream handler interface implementation.
   void pushSseHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override;
   void pushSseData(Buffer::Instance& data, bool end_stream) override;
   void pushSseEvent(const std::string& backend_name, const std::string& event_data,
@@ -101,7 +93,6 @@ private:
   // Helper for resource methods that route to a single backend based on URI.
   void handleSingleBackendResourceMethod(absl::string_view method_name);
 
-  // Initialization handlers - set up connections, don't send body.
   void handleInitialize();
   void handleToolsList();
   void handleToolsCall();
@@ -181,9 +172,10 @@ private:
   AggregationCallback aggregation_callback_;
   std::function<void(BackendResponse)> single_backend_callback_;
 
-  bool initialized_{false}; // Track if fanout/backend has been initialized
-  bool sse_headers_sent_{
-      false}; // Track if SSE headers were sent (for aggregation with SSE backends)
+  // Track if fanout/backend has been initialized
+  bool initialized_{false};
+  // Track if SSE headers were sent (for aggregation with SSE backends)
+  bool sse_headers_sent_{false};
 };
 
 } // namespace McpRouter

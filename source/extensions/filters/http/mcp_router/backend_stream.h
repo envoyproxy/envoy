@@ -109,17 +109,12 @@ public:
  * Accumulates response data and invokes completion callback when stream ends.
  *
  * SSE Processing (aggregate mode):
- * - tryParseSseResponse() incrementally parses SSE events using classifyMessage()
- * - Response events: Cached in extracted_jsonrpc for aggregation
- * - Notification/ServerRequest events: Forwarded immediately via pushSseEvent()
+ * - Parses SSE events, forwarding notifications immediately while caching responses
  * - Completes early when Response is found (SSE streams may not have end_stream)
  *
- * SSE Pass-through (streaming mode):
- * - Buffers body and forwards via pushSseHeaders/pushSseData for tools/call
+ * SSE Pass-through: Buffers body and forwards directly for tools/call.
  *
- * Async Safety:
- * - Uses weak_ptr<SseStreamHandler> to safely handle filter destruction
- * - The parent filter may be destroyed before callbacks complete
+ * Async Safety: Uses weak_ptr to safely handle filter destruction during async callbacks.
  */
 class BackendStreamCallbacks : public Http::AsyncClient::StreamCallbacks,
                                public std::enable_shared_from_this<BackendStreamCallbacks>,
