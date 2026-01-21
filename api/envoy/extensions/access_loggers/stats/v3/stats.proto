@@ -136,8 +136,8 @@ message Config {
   //   on the memory overhead.
   message Gauge {
     // The operation to perform on the gauge.
+    // A non-``Unspecified`` operation type should be set.
     enum OperationType {
-      // No op for ``Unspecified``.
       Unspecified = 0;
       Add = 1;
       Subtract = 2;
