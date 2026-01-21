@@ -27,6 +27,7 @@ Currently, dynamic modules are supported at the following extension points:
 * As an :ref:`access logger <envoy_v3_api_msg_extensions.access_loggers.dynamic_modules.v3.DynamicModuleAccessLog>`.
 * As a :ref:`network filter <envoy_v3_api_msg_extensions.filters.network.dynamic_modules.v3.DynamicModuleNetworkFilter>`.
 * As an :ref:`HTTP filter <envoy_v3_api_msg_extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter>`.
+* As an :ref:`HTTP-TCP bridge upstream <envoy_v3_api_msg_extensions.upstreams.http.dynamic_modules.v3.DynamicModuleHttpTcpBridgeConfig>`.
 
 There are a few design goals for the dynamic modules:
 

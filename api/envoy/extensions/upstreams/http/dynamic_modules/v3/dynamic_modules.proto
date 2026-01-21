@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package envoy.extensions.upstreams.http.dynamic_modules.v3;
+
+import "envoy/extensions/dynamic_modules/v3/dynamic_modules.proto";
+
+import "google/protobuf/any.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.upstreams.http.dynamic_modules.v3";
+option java_outer_classname = "DynamicModulesProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/upstreams/http/dynamic_modules/v3;dynamic_modulesv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Dynamic Modules HTTP-TCP Bridge Upstream]
+
+// Configuration for a dynamic modules HTTP-TCP bridge upstream.
+// This enables custom HTTP-to-TCP protocol bridging via dynamic modules.
+// The bridge receives HTTP requests, transforms them to TCP data, sends them upstream,
+// and transforms TCP responses back to HTTP responses.
+// [#extension: envoy.upstreams.http.dynamic_modules]
+message DynamicModuleHttpTcpBridgeConfig {
+  // The dynamic module configuration.
+  envoy.extensions.dynamic_modules.v3.DynamicModuleConfig dynamic_module_config = 1
+      [(validate.rules).message = {required: true}];
+
+  // The name to identify the bridge implementation within the module.
+  // This is passed to the module's ``envoy_dynamic_module_on_upstream_http_tcp_bridge_config_new``
+  // function.
+  string bridge_name = 2 [(validate.rules).string = {min_len: 1}];
+
+  // The configuration for the module's bridge implementation.
+  // This is passed to the module's ``envoy_dynamic_module_on_upstream_http_tcp_bridge_config_new``
+  // function. The configuration can be any protobuf message. However, it is recommended to use
+  // ``google.protobuf.Struct``, ``google.protobuf.StringValue``, or ``google.protobuf.BytesValue``.
+  // These types are passed directly as bytes to the module, so the module does not need to have
+  // knowledge of protobuf encoding. Otherwise, the serialized bytes of the type are passed.
+  // If not specified, an empty configuration is passed.
+  google.protobuf.Any bridge_config = 3;
+}

@@ -10,6 +10,7 @@ package(default_visibility = [
     "//test/extensions/dynamic_modules/listener:__pkg__",
     "//test/extensions/dynamic_modules/network:__pkg__",
     "//test/extensions/dynamic_modules/udp:__pkg__",
+    "//test/extensions/upstreams/http/dynamic_modules:__pkg__",
 ])
 
 test_program(name = "no_op")
@@ -117,3 +118,11 @@ test_program(name = "access_log_missing_logger_log")
 test_program(name = "access_log_missing_logger_destroy")
 
 test_program(name = "access_log_config_new_fail")
+
+test_program(name = "http_tcp_bridge_no_op")
+
+test_program(name = "http_tcp_bridge_config_new_fail")
+
+test_program(name = "http_tcp_bridge_end_stream")
+
+test_program(name = "http_tcp_bridge_stop_and_buffer")

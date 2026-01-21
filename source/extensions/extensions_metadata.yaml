@@ -1599,6 +1599,13 @@ envoy.upstreams.http.udp:
   - envoy.upstreams
   security_posture: robust_to_untrusted_downstream
   status: alpha
+envoy.upstreams.http.dynamic_modules:
+  categories:
+  - envoy.upstreams
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.upstreams.http.dynamic_modules.v3.DynamicModuleHttpTcpBridgeConfig
 envoy.upstreams.tcp.generic:
   categories:
   - envoy.upstreams

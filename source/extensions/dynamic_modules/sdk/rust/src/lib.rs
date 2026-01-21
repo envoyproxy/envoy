@@ -7563,3 +7563,517 @@ macro_rules! declare_bootstrap_init_functions {
     }
   };
 }
+
+// =================================================================================================
+// HTTP-TCP Bridge Upstream Dynamic Module Support
+// =================================================================================================
+
+/// Represents the status returned by HTTP-TCP bridge event hooks.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HttpTcpBridgeStatus {
+  /// Continue processing and send the buffer to upstream (for encode) or downstream (for decode).
+  Continue,
+  /// Stop and buffer data. Only valid when end_of_stream is false.
+  StopAndBuffer,
+  /// End the stream.
+  EndStream,
+}
+
+impl From<HttpTcpBridgeStatus> for abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_status {
+  fn from(status: HttpTcpBridgeStatus) -> Self {
+    match status {
+      HttpTcpBridgeStatus::Continue => {
+        abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_status::Continue
+      },
+      HttpTcpBridgeStatus::StopAndBuffer => {
+        abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_status::StopAndBuffer
+      },
+      HttpTcpBridgeStatus::EndStream => {
+        abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_status::EndStream
+      },
+    }
+  }
+}
+
+/// Trait for interacting with the Envoy HTTP-TCP bridge.
+#[automock]
+pub trait EnvoyHttpTcpBridge {
+  /// Returns the number of request headers.
+  fn get_request_headers_count(&self) -> usize;
+
+  /// Returns a request header at the given index as owned strings.
+  fn get_request_header(&self, index: usize) -> Option<(String, String)>;
+
+  /// Returns the value of a request header by key as an owned string.
+  fn get_request_header_value(&self, key: &str) -> Option<String>;
+
+  /// Returns the length of the upstream buffer.
+  fn get_upstream_buffer_length(&self) -> usize;
+
+  /// Sets the upstream buffer content.
+  fn set_upstream_buffer(&mut self, data: &[u8]);
+
+  /// Appends data to the upstream buffer.
+  fn append_upstream_buffer(&mut self, data: &[u8]);
+
+  /// Returns the length of the downstream buffer.
+  fn get_downstream_buffer_length(&self) -> usize;
+
+  /// Drains bytes from the beginning of the downstream buffer.
+  fn drain_downstream_buffer(&mut self, length: usize);
+
+  /// Sets a response header. If the header already exists, it is replaced.
+  fn set_response_header(&mut self, key: &str, value: &str) -> bool;
+
+  /// Adds a response header. If the header already exists, the value is appended.
+  fn add_response_header(&mut self, key: &str, value: &str) -> bool;
+
+  /// Sends the response headers and buffered body data to downstream.
+  fn send_response(&mut self, end_of_stream: bool);
+
+  /// Returns the name of the matched route as an owned string.
+  fn get_route_name(&self) -> String;
+
+  /// Returns the name of the cluster as an owned string.
+  fn get_cluster_name(&self) -> String;
+}
+
+/// Implementation of EnvoyHttpTcpBridge that calls into the Envoy ABI.
+pub struct EnvoyHttpTcpBridgeImpl {
+  raw: abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr,
+}
+
+impl EnvoyHttpTcpBridgeImpl {
+  pub fn new(raw: abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr) -> Self {
+    Self { raw }
+  }
+}
+
+impl EnvoyHttpTcpBridge for EnvoyHttpTcpBridgeImpl {
+  fn get_request_headers_count(&self) -> usize {
+    unsafe {
+      abi::envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_headers_count(
+        self.raw,
+      )
+    }
+  }
+
+  fn get_request_header(&self, index: usize) -> Option<(String, String)> {
+    let mut key = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let mut value = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let found = unsafe {
+      abi::envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_header(
+        self.raw, index, &mut key, &mut value,
+      )
+    };
+    if found {
+      unsafe {
+        let key_str = std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+          key.ptr as *const _,
+          key.length,
+        ));
+        let value_str = std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+          value.ptr as *const _,
+          value.length,
+        ));
+        Some((key_str.to_string(), value_str.to_string()))
+      }
+    } else {
+      None
+    }
+  }
+
+  fn get_request_header_value(&self, key: &str) -> Option<String> {
+    let key_buffer = abi::envoy_dynamic_module_type_module_buffer {
+      ptr: key.as_ptr() as *const _,
+      length: key.len(),
+    };
+    let mut value = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let found = unsafe {
+      abi::envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_header_value(
+        self.raw, key_buffer, &mut value,
+      )
+    };
+    if found {
+      unsafe {
+        let value_str = std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+          value.ptr as *const _,
+          value.length,
+        ));
+        Some(value_str.to_string())
+      }
+    } else {
+      None
+    }
+  }
+
+  fn get_upstream_buffer_length(&self) -> usize {
+    let mut buffer_ptr: usize = 0;
+    let mut length: usize = 0;
+    unsafe {
+      abi::envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_upstream_buffer(
+        self.raw,
+        &mut buffer_ptr as *mut usize,
+        &mut length,
+      );
+      length
+    }
+  }
+
+  fn set_upstream_buffer(&mut self, data: &[u8]) {
+    let buffer = abi::envoy_dynamic_module_type_module_buffer {
+      ptr: data.as_ptr() as *const _,
+      length: data.len(),
+    };
+    unsafe {
+      abi::envoy_dynamic_module_callback_upstream_http_tcp_bridge_set_upstream_buffer(
+        self.raw, buffer,
+      );
+    }
+  }
+
+  fn append_upstream_buffer(&mut self, data: &[u8]) {
+    let buffer = abi::envoy_dynamic_module_type_module_buffer {
+      ptr: data.as_ptr() as *const _,
+      length: data.len(),
+    };
+    unsafe {
+      abi::envoy_dynamic_module_callback_upstream_http_tcp_bridge_append_upstream_buffer(
+        self.raw, buffer,
+      );
+    }
+  }
+
+  fn get_downstream_buffer_length(&self) -> usize {
+    let mut buffer_ptr: usize = 0;
+    let mut length: usize = 0;
+    unsafe {
+      abi::envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_downstream_buffer(
+        self.raw,
+        &mut buffer_ptr as *mut usize,
+        &mut length,
+      );
+      length
+    }
+  }
+
+  fn drain_downstream_buffer(&mut self, length: usize) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_upstream_http_tcp_bridge_drain_downstream_buffer(
+        self.raw, length,
+      );
+    }
+  }
+
+  fn set_response_header(&mut self, key: &str, value: &str) -> bool {
+    let key_buffer = abi::envoy_dynamic_module_type_module_buffer {
+      ptr: key.as_ptr() as *const _,
+      length: key.len(),
+    };
+    let value_buffer = abi::envoy_dynamic_module_type_module_buffer {
+      ptr: value.as_ptr() as *const _,
+      length: value.len(),
+    };
+    unsafe {
+      abi::envoy_dynamic_module_callback_upstream_http_tcp_bridge_set_response_header(
+        self.raw,
+        key_buffer,
+        value_buffer,
+      )
+    }
+  }
+
+  fn add_response_header(&mut self, key: &str, value: &str) -> bool {
+    let key_buffer = abi::envoy_dynamic_module_type_module_buffer {
+      ptr: key.as_ptr() as *const _,
+      length: key.len(),
+    };
+    let value_buffer = abi::envoy_dynamic_module_type_module_buffer {
+      ptr: value.as_ptr() as *const _,
+      length: value.len(),
+    };
+    unsafe {
+      abi::envoy_dynamic_module_callback_upstream_http_tcp_bridge_add_response_header(
+        self.raw,
+        key_buffer,
+        value_buffer,
+      )
+    }
+  }
+
+  fn send_response(&mut self, end_of_stream: bool) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_upstream_http_tcp_bridge_send_response(
+        self.raw,
+        end_of_stream,
+      );
+    }
+  }
+
+  fn get_route_name(&self) -> String {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    unsafe {
+      abi::envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_route_name(
+        self.raw,
+        &mut result,
+      );
+      if !result.ptr.is_null() && result.length > 0 {
+        std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+          result.ptr as *const _,
+          result.length,
+        ))
+        .to_string()
+      } else {
+        String::new()
+      }
+    }
+  }
+
+  fn get_cluster_name(&self) -> String {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    unsafe {
+      abi::envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_cluster_name(
+        self.raw,
+        &mut result,
+      );
+      if !result.ptr.is_null() && result.length > 0 {
+        std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+          result.ptr as *const _,
+          result.length,
+        ))
+        .to_string()
+      } else {
+        String::new()
+      }
+    }
+  }
+}
+
+/// Trait for the HTTP-TCP bridge configuration.
+pub trait HttpTcpBridgeConfig: Send + Sync {
+  /// Creates a new bridge instance for each HTTP stream.
+  fn new_bridge(&self, envoy_bridge: &mut dyn EnvoyHttpTcpBridge) -> Box<dyn HttpTcpBridge>;
+}
+
+/// Trait for an HTTP-TCP bridge instance.
+pub trait HttpTcpBridge: Send + Sync {
+  /// Called when HTTP request headers are received from downstream.
+  /// The module should transform the headers to TCP data by writing to the upstream buffer.
+  fn encode_headers(
+    &mut self,
+    envoy_bridge: &mut dyn EnvoyHttpTcpBridge,
+    end_of_stream: bool,
+  ) -> HttpTcpBridgeStatus;
+
+  /// Called when HTTP request body data is received from downstream.
+  /// The module should transform the data to TCP data by modifying the upstream buffer.
+  fn encode_data(
+    &mut self,
+    envoy_bridge: &mut dyn EnvoyHttpTcpBridge,
+    end_of_stream: bool,
+  ) -> HttpTcpBridgeStatus;
+
+  /// Called when TCP data is received from the upstream server.
+  /// The module should transform it to HTTP response data.
+  fn on_upstream_data(
+    &mut self,
+    envoy_bridge: &mut dyn EnvoyHttpTcpBridge,
+    end_of_stream: bool,
+  ) -> HttpTcpBridgeStatus;
+}
+
+/// The function signature for creating a new HTTP-TCP bridge configuration.
+pub type NewHttpTcpBridgeConfigFunction =
+  fn(name: &str, config: &[u8]) -> Option<Box<dyn HttpTcpBridgeConfig>>;
+
+/// Global function for creating HTTP-TCP bridge configurations.
+pub static NEW_HTTP_TCP_BRIDGE_CONFIG_FUNCTION: OnceLock<NewHttpTcpBridgeConfigFunction> =
+  OnceLock::new();
+
+#[no_mangle]
+unsafe extern "C" fn envoy_dynamic_module_on_upstream_http_tcp_bridge_config_new(
+  name: abi::envoy_dynamic_module_type_envoy_buffer,
+  config: abi::envoy_dynamic_module_type_envoy_buffer,
+) -> abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_config_module_ptr {
+  let name_str = std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+    name.ptr as *const _,
+    name.length,
+  ));
+  let config_slice = std::slice::from_raw_parts(config.ptr as *const _, config.length);
+  let new_config_fn = NEW_HTTP_TCP_BRIDGE_CONFIG_FUNCTION
+    .get()
+    .expect("NEW_HTTP_TCP_BRIDGE_CONFIG_FUNCTION must be set");
+  match new_config_fn(name_str, config_slice) {
+    Some(config) => wrap_into_c_void_ptr!(config),
+    None => std::ptr::null(),
+  }
+}
+
+#[no_mangle]
+unsafe extern "C" fn envoy_dynamic_module_on_upstream_http_tcp_bridge_config_destroy(
+  config_ptr: abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_config_module_ptr,
+) {
+  drop_wrapped_c_void_ptr!(config_ptr, HttpTcpBridgeConfig);
+}
+
+#[no_mangle]
+unsafe extern "C" fn envoy_dynamic_module_on_upstream_http_tcp_bridge_new(
+  config_ptr: abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_config_module_ptr,
+  bridge_envoy_ptr: abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr,
+) -> abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_module_ptr {
+  let mut envoy_bridge = EnvoyHttpTcpBridgeImpl::new(bridge_envoy_ptr);
+  let bridge_config = {
+    let raw = config_ptr as *const *const dyn HttpTcpBridgeConfig;
+    &**raw
+  };
+  let bridge = bridge_config.new_bridge(&mut envoy_bridge);
+  wrap_into_c_void_ptr!(bridge)
+}
+
+#[no_mangle]
+unsafe extern "C" fn envoy_dynamic_module_on_upstream_http_tcp_bridge_encode_headers(
+  bridge_envoy_ptr: abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr,
+  bridge_module_ptr: abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_module_ptr,
+  end_of_stream: bool,
+) -> abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_status {
+  let mut envoy_bridge = EnvoyHttpTcpBridgeImpl::new(bridge_envoy_ptr);
+  let bridge = {
+    let raw = bridge_module_ptr as *mut *mut dyn HttpTcpBridge;
+    &mut **raw
+  };
+  bridge
+    .encode_headers(&mut envoy_bridge, end_of_stream)
+    .into()
+}
+
+#[no_mangle]
+unsafe extern "C" fn envoy_dynamic_module_on_upstream_http_tcp_bridge_encode_data(
+  bridge_envoy_ptr: abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr,
+  bridge_module_ptr: abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_module_ptr,
+  end_of_stream: bool,
+) -> abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_status {
+  let mut envoy_bridge = EnvoyHttpTcpBridgeImpl::new(bridge_envoy_ptr);
+  let bridge = {
+    let raw = bridge_module_ptr as *mut *mut dyn HttpTcpBridge;
+    &mut **raw
+  };
+  bridge.encode_data(&mut envoy_bridge, end_of_stream).into()
+}
+
+#[no_mangle]
+unsafe extern "C" fn envoy_dynamic_module_on_upstream_http_tcp_bridge_on_upstream_data(
+  bridge_envoy_ptr: abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr,
+  bridge_module_ptr: abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_module_ptr,
+  end_of_stream: bool,
+) -> abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_status {
+  let mut envoy_bridge = EnvoyHttpTcpBridgeImpl::new(bridge_envoy_ptr);
+  let bridge = {
+    let raw = bridge_module_ptr as *mut *mut dyn HttpTcpBridge;
+    &mut **raw
+  };
+  bridge
+    .on_upstream_data(&mut envoy_bridge, end_of_stream)
+    .into()
+}
+
+#[no_mangle]
+unsafe extern "C" fn envoy_dynamic_module_on_upstream_http_tcp_bridge_destroy(
+  bridge_module_ptr: abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_module_ptr,
+) {
+  drop_wrapped_c_void_ptr!(bridge_module_ptr, HttpTcpBridge);
+}
+
+/// Declare the init functions for an HTTP-TCP bridge upstream dynamic module.
+///
+/// This macro generates the necessary `extern "C"` functions for the HTTP-TCP bridge module.
+///
+/// # Example
+///
+/// ```ignore
+/// use envoy_proxy_dynamic_modules_rust_sdk::*;
+///
+/// fn program_init() -> bool {
+///   true
+/// }
+///
+/// fn new_http_tcp_bridge_config(name: &str, config: &[u8]) -> Option<Box<dyn HttpTcpBridgeConfig>> {
+///   Some(Box::new(MyBridgeConfig {}))
+/// }
+///
+/// declare_http_tcp_bridge_init_functions!(program_init, new_http_tcp_bridge_config);
+///
+/// struct MyBridgeConfig {}
+///
+/// impl HttpTcpBridgeConfig for MyBridgeConfig {
+///   fn new_bridge(
+///     &self,
+///     _envoy_bridge: &mut dyn EnvoyHttpTcpBridge,
+///   ) -> Box<dyn HttpTcpBridge> {
+///     Box::new(MyBridge {})
+///   }
+/// }
+///
+/// struct MyBridge {}
+///
+/// impl HttpTcpBridge for MyBridge {
+///   fn encode_headers(
+///     &mut self,
+///     envoy_bridge: &mut dyn EnvoyHttpTcpBridge,
+///     end_of_stream: bool,
+///   ) -> HttpTcpBridgeStatus {
+///     // Transform HTTP headers to TCP data.
+///     envoy_bridge.set_upstream_buffer(b"HTTP/1.1 request data");
+///     HttpTcpBridgeStatus::Continue
+///   }
+///
+///   fn encode_data(
+///     &mut self,
+///     _envoy_bridge: &mut dyn EnvoyHttpTcpBridge,
+///     _end_of_stream: bool,
+///   ) -> HttpTcpBridgeStatus {
+///     HttpTcpBridgeStatus::Continue
+///   }
+///
+///   fn on_upstream_data(
+///     &mut self,
+///     envoy_bridge: &mut dyn EnvoyHttpTcpBridge,
+///     end_of_stream: bool,
+///   ) -> HttpTcpBridgeStatus {
+///     // Transform TCP data to HTTP response.
+///     envoy_bridge.set_response_header(":status", "200");
+///     envoy_bridge.send_response(end_of_stream);
+///     HttpTcpBridgeStatus::Continue
+///   }
+/// }
+/// ```
+#[macro_export]
+macro_rules! declare_http_tcp_bridge_init_functions {
+  ($f:ident, $new_http_tcp_bridge_config_fn:expr) => {
+    #[no_mangle]
+    pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_HTTP_TCP_BRIDGE_CONFIG_FUNCTION
+        .get_or_init(|| $new_http_tcp_bridge_config_fn);
+      if ($f()) {
+        envoy_proxy_dynamic_modules_rust_sdk::abi::kAbiVersion.as_ptr()
+          as *const ::std::os::raw::c_char
+      } else {
+        ::std::ptr::null()
+      }
+    }
+  };
+}

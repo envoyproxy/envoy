@@ -61,5 +61,10 @@ new_features:
     Extended ``*_WITHOUT_PORT`` address formatters to accept an optional ``MASK_PREFIX_LEN`` parameter that masks IP addresses
     and returns them in CIDR notation (e.g., ``%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT(16)%`` returns ``10.1.0.0/16`` for
     client IP ``10.1.10.23``).
+- area: dynamic_modules
+  change: |
+    Added :ref:`HTTP-TCP bridge upstream extension
+    <envoy_v3_api_msg_extensions.upstreams.http.dynamic_modules.v3.DynamicModuleHttpTcpBridgeConfig>`
+    support for dynamic modules, enabling custom HTTP-to-TCP protocol bridging via dynamic modules.
 
 deprecated:
