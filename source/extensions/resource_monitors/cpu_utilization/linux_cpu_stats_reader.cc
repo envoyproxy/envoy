@@ -340,8 +340,7 @@ CpuTimesV2 CgroupV2CpuStatsReader::getCpuTimes() {
     return {false, 0, 0, 0};
   }
 
-  absl::StatusOr<double> effective_cores =
-      parseEffectiveCores(max_result.value(), max_path_, N);
+  absl::StatusOr<double> effective_cores = parseEffectiveCores(max_result.value(), max_path_, N);
   if (!effective_cores.ok()) {
     return {false, 0, 0, 0};
   }

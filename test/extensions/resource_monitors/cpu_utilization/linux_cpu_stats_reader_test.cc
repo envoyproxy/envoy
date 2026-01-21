@@ -307,18 +307,17 @@ TEST_F(LinuxContainerCpuStatsReaderV2Test, ParsesEffectiveCpusAndCores) {
   };
 
   const Case cases[] = {
-      {"usage_usec 500000\n", "200000 100000\n", "0-3\n", 2.0},    // range, quota < N
-      {"usage_usec 750000\n", "50000 100000\n", "0\n", 0.5},       // single CPU
-      {"usage_usec 500000\n", "max 100000\n", "0-2,4\n", 4.0},     // mixed list, max quota
-      {"usage_usec 500000\n", "800000 100000\n", "0-3\n", 4.0},    // quota > N
-      {"usage_usec 100000\n", "25000 100000\n", "0-3\n", 0.25},    // fractional quota
-      {"usage_usec 500000\n", "max 100000\n", "0-3,5-7\n", 7.0},   // multiple ranges
-      {"usage_usec 500000\n", "max 100000\n", "0,2,4\n", 3.0},     // multiple singles
+      {"usage_usec 500000\n", "200000 100000\n", "0-3\n", 2.0},  // range, quota < N
+      {"usage_usec 750000\n", "50000 100000\n", "0\n", 0.5},     // single CPU
+      {"usage_usec 500000\n", "max 100000\n", "0-2,4\n", 4.0},   // mixed list, max quota
+      {"usage_usec 500000\n", "800000 100000\n", "0-3\n", 4.0},  // quota > N
+      {"usage_usec 100000\n", "25000 100000\n", "0-3\n", 0.25},  // fractional quota
+      {"usage_usec 500000\n", "max 100000\n", "0-3,5-7\n", 7.0}, // multiple ranges
+      {"usage_usec 500000\n", "max 100000\n", "0,2,4\n", 3.0},   // multiple singles
   };
 
   for (const auto& test_case : cases) {
-    CpuTimesV2 cpu_times =
-        get_cpu_times(test_case.stat, test_case.max, test_case.effective);
+    CpuTimesV2 cpu_times = get_cpu_times(test_case.stat, test_case.max, test_case.effective);
     EXPECT_TRUE(cpu_times.is_valid);
     EXPECT_DOUBLE_EQ(cpu_times.effective_cores, test_case.expected_effective_cores);
   }
