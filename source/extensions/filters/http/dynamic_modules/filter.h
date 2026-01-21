@@ -41,11 +41,9 @@ public:
   FilterMetadataStatus decodeMetadata(MetadataMap&) override;
   void setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callbacks) override {
     decoder_callbacks_ = &callbacks;
-    // config_ can only be nullptr in certain unit tests where we don't set up the
-    // whole filter chain.
-    if (config_ && config_->terminal_filter_) {
-      decoder_callbacks_->addDownstreamWatermarkCallbacks(*this);
-    }
+    // We always register for downstream watermark callbacks. This allows all filters
+    // including the terminal filter to receive flow control events.
+    decoder_callbacks_->addDownstreamWatermarkCallbacks(*this);
   }
   void decodeComplete() override;
 

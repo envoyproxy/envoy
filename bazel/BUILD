@@ -3,11 +3,11 @@ load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
 load("@envoy_api//bazel:repository_locations.bzl", API_REPOSITORY_LOCATIONS_SPEC = "REPOSITORY_LOCATIONS_SPEC")
 load("@envoy_api//bazel:repository_locations_utils.bzl", "load_repository_locations_spec", "merge_dicts")
 load("@envoy_toolshed//:macros.bzl", "json_data")
+load("@envoy_toolshed//:utils.bzl", "json_merge")
 load("@envoy_toolshed//dependency:macros.bzl", "updater")
 load("@rules_cc//cc:defs.bzl", "cc_library")
 load("@rules_shell//shell:sh_library.bzl", "sh_library")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
-load("//tools/base:envoy_python.bzl", "envoy_genjson")
 load(":repository_locations.bzl", "REPOSITORY_LOCATIONS_SPEC")
 
 licenses(["notice"])  # Apache 2
@@ -916,7 +916,7 @@ json_data(
     data = load_repository_locations_spec(REPOSITORY_LOCATIONS_SPEC),
 )
 
-envoy_genjson(
+json_merge(
     name = "repository_locations",
     srcs = [":repository_locations_version_info"],
     filter = """
@@ -950,7 +950,7 @@ json_data(
     ),
 )
 
-envoy_genjson(
+json_merge(
     name = "all_repository_locations",
     srcs = [":all_repository_locations_version_info"],
     filter = """

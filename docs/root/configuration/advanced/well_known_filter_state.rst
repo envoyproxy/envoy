@@ -101,6 +101,10 @@ The following lists the filter state object keys used by the Envoy extensions to
   value clears the network namespace. This object is expected to be shared from the downstream
   filters with the upstream connections.
 
+``envoy.tls.certificate_mappers.on_demand_secret``
+  Allows overriding the certificate to use per-connection using the :ref:`filter state certificate mapper
+  <envoy_v3_api_msg_extensions.transport_sockets.tls.cert_mappers.filter_state_override.v3.Config>`.
+
 Filter state object factories
 -----------------------------
 

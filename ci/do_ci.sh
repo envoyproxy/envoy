@@ -302,7 +302,7 @@ case $CI_TARGET in
         # ensure a debug build in CI.
         # echo "Validating integration test traffic tapping..."
         # bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" \
-            #   --run_under=@envoy//bazel/test:verify_tap_test.sh \
+            #   --run_under=@envoy//bazel/tests:verify_tap_test.sh \
             #   //test/extensions/transport_sockets/tls/integration:ssl_integration_test
         # fi
         ;;
@@ -649,6 +649,18 @@ case $CI_TARGET in
               --//tools/tarball:target=//docs:html \
               //tools/tarball:unpack \
               "$DOCS_OUTPUT_DIR"
+        ;;
+
+    external)
+        setup_clang_toolchain
+        echo "Testing external workspace build..."
+        if [[ -e repo.bazelrc ]]; then
+            cp -a repo.bazelrc "${ENVOY_SRCDIR}/bazel/tests/external"
+        fi
+        pushd "${ENVOY_SRCDIR}/bazel/tests/external"
+        export CARGO_BAZEL_REPIN=true
+        bazel build "${BAZEL_BUILD_OPTIONS[@]}" @envoy//docs
+        popd
         ;;
 
     fix_proto_format)
