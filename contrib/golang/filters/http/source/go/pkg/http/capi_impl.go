@@ -490,6 +490,12 @@ func (c *httpCApiImpl) HttpGetStringSecret(r unsafe.Pointer, key string) (string
 	return strings.Clone(unsafe.String((*byte)(unsafe.Pointer(uintptr(valueData))), int(valueLen))), true
 }
 
+func (c *httpCApiImpl) HttpSetDrainConnectionUponCompletion(r unsafe.Pointer) {
+	req := (*httpRequest)(r)
+	res := C.envoyGoFilterHttpSetDrainConnectionUponCompletion(unsafe.Pointer(req.req))
+	handleCApiStatus(res)
+}
+
 func (c *httpCApiImpl) HttpLog(level api.LogType, message string) {
 	C.envoyGoFilterLog(C.uint32_t(level), unsafe.Pointer(unsafe.StringData(message)), C.int(len(message)))
 }

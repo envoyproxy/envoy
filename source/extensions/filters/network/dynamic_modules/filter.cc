@@ -64,6 +64,18 @@ void DynamicModuleNetworkFilter::destroy() {
 void DynamicModuleNetworkFilter::initializeReadFilterCallbacks(
     Network::ReadFilterCallbacks& callbacks) {
   read_callbacks_ = &callbacks;
+
+  const std::string& worker_name = callbacks.connection().dispatcher().name();
+  auto pos = worker_name.find_first_of('_');
+  ENVOY_BUG(pos != std::string::npos, "worker name is not in expected format worker_{index}");
+  if (!absl::SimpleAtoi(worker_name.substr(pos + 1), &worker_index_)) {
+    IS_ENVOY_BUG("failed to parse worker index from name");
+  }
+
+  // Delay the in-module filter initialization until read callbacks are set
+  // to allow accessing worker index during filter creation.
+  initializeInModuleFilter();
+
   // Register for connection events.
   read_callbacks_->connection().addConnectionCallbacks(*this);
 }

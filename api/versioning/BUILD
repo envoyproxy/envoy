@@ -340,6 +340,7 @@ proto_library(
         "//envoy/extensions/transport_sockets/starttls/v3:pkg",
         "//envoy/extensions/transport_sockets/tap/v3:pkg",
         "//envoy/extensions/transport_sockets/tcp_stats/v3:pkg",
+        "//envoy/extensions/transport_sockets/tls/cert_mappers/filter_state_override/v3:pkg",
         "//envoy/extensions/transport_sockets/tls/cert_mappers/sni/v3:pkg",
         "//envoy/extensions/transport_sockets/tls/cert_mappers/static_name/v3:pkg",
         "//envoy/extensions/transport_sockets/tls/cert_selectors/on_demand_secret/v3:pkg",

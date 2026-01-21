@@ -18,6 +18,8 @@ test_program(name = "network_no_op")
 
 test_program(name = "network_config_new_fail")
 
+test_program(name = "network_filter_new_fail")
+
 test_program(name = "network_stop_iteration")
 
 test_program(name = "no_program_init")
@@ -64,6 +66,8 @@ test_program(name = "listener_no_op")
 
 test_program(name = "listener_config_new_fail")
 
+test_program(name = "listener_filter_new_fail")
+
 test_program(name = "listener_stop_iteration")
 
 test_program(name = "udp_no_op")
@@ -97,6 +101,8 @@ test_program(name = "bootstrap_no_extension_destroy")
 test_program(name = "bootstrap_extension_new_null")
 
 test_program(name = "bootstrap_no_config_scheduled")
+
+test_program(name = "bootstrap_no_http_callout_done")
 
 test_program(name = "access_log_no_op")
 

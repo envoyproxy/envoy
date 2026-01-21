@@ -15,7 +15,13 @@ envoy_cc_library(
     hdrs = ["extension_config.h"],
     deps = [
         "//envoy/event:dispatcher_interface",
+        "//envoy/http:async_client_interface",
+        "//envoy/server:factory_context_interface",
+        "//envoy/stats:stats_interface",
+        "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
+        "//source/common/common:logger_lib",
+        "//source/common/http:message_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
     ],
 )
@@ -27,6 +33,7 @@ envoy_cc_library(
     deps = [
         ":extension_config_lib",
         "//envoy/server:bootstrap_extension_config_interface",
+        "//envoy/stats:stats_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
@@ -38,6 +45,8 @@ envoy_cc_library(
     srcs = ["abi_impl.cc"],
     deps = [
         ":extension_config_lib",
+        ":extension_lib",
+        "//source/common/stats:symbol_table_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
     ],
 )
