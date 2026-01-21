@@ -1479,6 +1479,72 @@ TEST_P(McpRouterIntegrationTest, ToolsListSseWithServerToClientRequests) {
   EXPECT_THAT(response->body(), testing::HasSubstr("tools__ai_assist"));
 }
 
+// Test that tools/list with intermediate SSE events results in SSE response format.
+// Verifies: SSE headers sent to client, intermediate events forwarded, aggregated response as SSE.
+TEST_P(McpRouterIntegrationTest, ToolsListSseStreamingWithIntermediateEvents) {
+  initializeFilter();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  const std::string request_body = R"({
+    "jsonrpc": "2.0",
+    "method": "tools/list",
+    "id": 300
+  })";
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/mcp"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"accept", "application/json"},
+                                     {"accept", "text/event-stream"},
+                                     {"content-type", "application/json"}},
+      request_body);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, time_backend_connection_));
+  ASSERT_TRUE(time_backend_connection_->waitForNewStream(*dispatcher_, time_backend_request_));
+  ASSERT_TRUE(time_backend_request_->waitForEndStream(*dispatcher_));
+
+  ASSERT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, tools_backend_connection_));
+  ASSERT_TRUE(tools_backend_connection_->waitForNewStream(*dispatcher_, tools_backend_request_));
+  ASSERT_TRUE(tools_backend_request_->waitForEndStream(*dispatcher_));
+
+  // Time backend: SSE with notification (triggers SSE streaming mode) then response.
+  const std::string time_sse =
+      "data: {\"jsonrpc\":\"2.0\",\"method\":\"notifications/progress\","
+      "\"params\":{\"progressToken\":\"t1\",\"progress\":50}}\n\n"
+      "data: {\"jsonrpc\":\"2.0\",\"id\":300,\"result\":{\"tools\":[{\"name\":\"timer\"}]}}\n\n";
+  time_backend_request_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "text/event-stream"}},
+      false);
+  Buffer::OwnedImpl time_body(time_sse);
+  time_backend_request_->encodeData(time_body, true);
+
+  // Tools backend: Direct JSON response (no SSE).
+  const std::string tools_json =
+      R"({"jsonrpc":"2.0","id":300,"result":{"tools":[{"name":"calc"}]}})";
+  tools_backend_request_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
+      false);
+  Buffer::OwnedImpl tools_body(tools_json);
+  tools_backend_request_->encodeData(tools_body, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  // Since intermediate SSE event was received, response should be SSE format.
+  EXPECT_EQ("text/event-stream", response->headers().getContentTypeValue());
+
+  // Body should contain SSE events: forwarded notification + aggregated response.
+  // Check for notification event (forwarded intermediate event).
+  EXPECT_THAT(response->body(), testing::HasSubstr("event: message"));
+  EXPECT_THAT(response->body(), testing::HasSubstr("notifications/progress"));
+  // Check for aggregated tools in final response.
+  EXPECT_THAT(response->body(), testing::HasSubstr("time__timer"));
+  EXPECT_THAT(response->body(), testing::HasSubstr("tools__calc"));
+}
+
 } // namespace
 } // namespace McpRouter
 } // namespace HttpFilters

@@ -182,6 +182,8 @@ private:
   std::function<void(BackendResponse)> single_backend_callback_;
 
   bool initialized_{false}; // Track if fanout/backend has been initialized
+  bool sse_headers_sent_{
+      false}; // Track if SSE headers were sent (for aggregation with SSE backends)
 };
 
 } // namespace McpRouter

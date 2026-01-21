@@ -679,17 +679,34 @@ void McpRouterFilter::pushSseData(Buffer::Instance& data, bool end_stream) {
 
 void McpRouterFilter::pushSseEvent(const std::string& backend_name, const std::string& event_data,
                                    SseMessageType event_type) {
-  // Log the intermediate event. Actual forwarding requires sending SSE headers upfront,
-  // which would change the response format from JSON to SSE for aggregation operations.
-  // For now, we log and classify the events correctly, but only the final response is sent.
-  // TODO(botengyao): Implement full SSE streaming for aggregation by:
-  //   1. Send SSE headers in initializeFanout() before waiting for responses
-  //   2. Forward intermediate events here
-  //   3. Send merged response as final SSE event in aggregate*() functions
-  ENVOY_LOG(debug,
-            "SSE aggregation: detected {} event from backend '{}' (size {}), skipping forward",
+  ENVOY_LOG(debug, "SSE aggregation: forwarding {} event from backend '{}' (size {})",
             event_type == SseMessageType::Notification ? "notification" : "server_request",
             backend_name, event_data.size());
+
+  // Send SSE headers on first intermediate event (converts response from JSON to SSE).
+  if (!sse_headers_sent_) {
+    auto headers = Http::ResponseHeaderMapImpl::create();
+    headers->setStatus(200);
+    headers->setContentType("text/event-stream");
+    headers->addCopy(Http::LowerCaseString("cache-control"), "no-cache");
+    if (!encoded_session_id_.empty()) {
+      headers->addCopy(Http::LowerCaseString("mcp-session-id"), encoded_session_id_);
+    }
+    ENVOY_LOG(debug, "SSE aggregation: sending SSE headers to client");
+    decoder_callbacks_->encodeHeaders(std::move(headers), false, "mcp_router");
+    sse_headers_sent_ = true;
+  }
+
+  // TODO(botengyao): Transform server-to-client request IDs for proper routing.
+  // For ServerRequest events (roots/list, sampling/createMessage), the ID needs to be
+  // prefixed with backend_name so client responses can be routed back correctly.
+
+  // Format and send the SSE event to client.
+  Buffer::OwnedImpl buffer;
+  buffer.add("event: message\ndata: ");
+  buffer.add(event_data);
+  buffer.add("\n\n");
+  decoder_callbacks_->encodeData(buffer, false);
 }
 
 void McpRouterFilter::onStreamingError(absl::string_view error) {
@@ -1320,6 +1337,18 @@ McpRouterFilter::createUpstreamHeaders(const McpBackendConfig& backend,
 }
 
 void McpRouterFilter::sendJsonResponse(const std::string& body, const std::string& session_id) {
+  // If SSE headers were already sent (due to intermediate events), send response as SSE event.
+  if (sse_headers_sent_) {
+    ENVOY_LOG(debug, "Sending aggregated response as SSE event: {}", body);
+    Buffer::OwnedImpl response_body;
+    response_body.add("event: message\ndata: ");
+    response_body.add(body);
+    response_body.add("\n\n");
+    decoder_callbacks_->encodeData(response_body, true);
+    return;
+  }
+
+  // Standard JSON response path.
   auto headers = Http::ResponseHeaderMapImpl::create();
   headers->setStatus(200);
   headers->setContentType(std::string(kContentTypeJson));

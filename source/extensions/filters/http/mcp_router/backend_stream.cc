@@ -13,16 +13,12 @@ namespace Extensions {
 namespace HttpFilters {
 namespace McpRouter {
 
-namespace {
-
 // Extract media type from Content-Type header (before any semicolon).
 absl::string_view extractMediaType(absl::string_view content_type) {
   const std::vector<absl::string_view> parts =
       absl::StrSplit(content_type, absl::MaxSplits(';', 1));
   return absl::StripAsciiWhitespace(parts.front());
 }
-
-} // namespace
 
 ResponseContentType detectContentType(absl::string_view content_type_header) {
   if (content_type_header.empty()) {
@@ -182,7 +178,6 @@ bool BackendStreamCallbacks::tryParseSseResponse() {
     ENVOY_LOG(debug, "tryParseSseResponse: extracted data_size={}, data='{}'", data.size(),
               data.substr(0, 100));
     if (!data.empty()) {
-      // Classify the message using the unified classifier.
       SseMessageType msg_type = classifyMessage(data, request_id_);
       ENVOY_LOG(debug, "tryParseSseResponse: classified message type={}",
                 static_cast<int>(msg_type));
@@ -202,7 +197,6 @@ bool BackendStreamCallbacks::tryParseSseResponse() {
           parent->pushSseEvent(backend_name_, data, msg_type);
         }
         break;
-
       case SseMessageType::Unknown:
       default:
         ENVOY_LOG(debug, "tryParseSseResponse: unknown message type, skipping");

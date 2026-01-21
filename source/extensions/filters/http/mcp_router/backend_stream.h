@@ -26,8 +26,6 @@ enum class ResponseContentType {
 
 /**
  * Classifies JSON-RPC messages in SSE events.
- * Used for routing: Responses are buffered for aggregation,
- * Notifications/ServerRequests are forwarded immediately.
  */
 enum class SseMessageType {
   Notification,  // method with no id (notifications/*)
@@ -73,7 +71,7 @@ struct BackendResponse {
   bool isJson() const { return content_type == ResponseContentType::Json; }
   bool isSse() const { return content_type == ResponseContentType::Sse; }
 
-  /** Returns the JSON-RPC body: extracted_jsonrpc if populated (SSE), otherwise body (JSON). */
+  // Returns the JSON-RPC body: extracted_jsonrpc if populated (SSE), otherwise body (JSON).
   const std::string& getJsonRpc() const {
     return extracted_jsonrpc.empty() ? body : extracted_jsonrpc;
   }
@@ -83,8 +81,6 @@ using AggregationCallback = std::function<void(std::vector<BackendResponse>)>;
 
 /**
  * Interface for handling SSE streaming from backend to client.
- * This abstraction breaks the circular dependency between BackendStreamCallbacks
- * and McpRouterFilter - the filter implements this interface.
  */
 class SseStreamHandler {
 public:
