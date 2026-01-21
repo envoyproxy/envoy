@@ -888,16 +888,6 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/simdutf/simdutf/releases/download/v{version}/singleheader.zip"],
         release_date = "2025-08-01",
     ),
-    intel_ittapi = dict(
-        project_name = "Intel ITT API",
-        project_desc = "Intel Instrumentation and Tracing Technology API",
-        project_url = "https://github.com/intel/ittapi",
-        version = "a3911fff01a775023a06af8754f9ec1e5977dd97",
-        sha256 = "1d0dddfc5abb786f2340565c82c6edd1cff10c917616a18ce62ee0b94dbc2ed4",
-        urls = ["https://github.com/intel/ittapi/archive/{version}.tar.gz"],
-        strip_prefix = "ittapi-{version}",
-        release_date = "2021-05-25",
-    ),
     com_github_google_quiche = dict(
         project_name = "QUICHE",
         project_desc = "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols",
