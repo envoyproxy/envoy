@@ -733,3 +733,12 @@ envoy_cc_test(
         "@ocp//ocpdiag/core/testing:status_matchers",
     ],
 )
+
+envoy_cc_test(
+    name = "session_idle_list_test",
+    srcs = ["session_idle_list_test.cc"],
+    deps = [
+        "//source/common/http:session_idle_list_lib",
+        "//test/test_common:simulated_time_system_lib",
+    ],
+)
