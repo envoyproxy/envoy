@@ -1253,10 +1253,9 @@ void ThreadLocalStoreImpl::extractAndAppendTags(absl::string_view name, StatName
 }
 
 void ThreadLocalStoreImpl::ensureOverflowStats(const ScopeStatsLimitSettings& limits) {
-  const bool need_counter_overflow_stat = limits.max_counters != 0 && counters_overflow_ == nullptr;
-  const bool need_gauge_overflow_stat = limits.max_gauges != 0 && gauges_overflow_ == nullptr;
-  const bool need_histogram_overflow_stat =
-      limits.max_histograms != 0 && histograms_overflow_ == nullptr;
+  const bool need_counter_overflow_stat = limits.max_counters != 0;
+  const bool need_gauge_overflow_stat = limits.max_gauges != 0;
+  const bool need_histogram_overflow_stat = limits.max_histograms != 0;
 
   if (!need_counter_overflow_stat && !need_gauge_overflow_stat && !need_histogram_overflow_stat) {
     return;
