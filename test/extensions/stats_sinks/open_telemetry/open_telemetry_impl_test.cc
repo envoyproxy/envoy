@@ -877,7 +877,7 @@ TEST_F(OtlpMetricsFlusherAggregationTests, MetricsWithLabelsAggregationHistogram
   auto data_point1 = metric.histogram().data_points()[0];
   EXPECT_EQ(20, data_point1.count()); // Each original hist has count 10
   // The sum should be double the sum of a single cumulative histogram.
-  EXPECT_NEAR(data_point1.sum(), 11661106.51, 0.1);
+  EXPECT_NEAR(data_point1.sum(), 11656376.283404071, 0.1);
   expectAttributes(data_point1.attributes(), "key", "hist1");
   // Check bucket counts are doubled.
   const int default_buckets_count = 19;

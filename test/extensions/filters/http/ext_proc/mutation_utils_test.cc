@@ -705,6 +705,32 @@ TEST_F(MutationUtilsTest, ProtoToHeadersTooManyHeaders) {
                         "header_mutation_operation_count_exceeds_limit"));
 }
 
+TEST_F(MutationUtilsTest, ProtoToHeadersInvalidHeader) {
+  constexpr absl::string_view header_map = R"pb(
+    headers {
+      key: ":status"
+      raw_value: "200"
+    }
+    headers {
+      key: "some-header\n"
+      raw_value: "value\r"
+    }
+    headers {
+      key: "some-header-2"
+      raw_value: "value2"
+    }
+  )pb";
+  envoy::config::core::v3::HeaderMap headers_proto;
+  ASSERT_TRUE(Protobuf::TextFormat::ParseFromString(header_map, &headers_proto));
+  TestHeaderMapImplWithOverrides headers;
+  Checker checker(HeaderMutationRules::default_instance(), regex_engine_);
+  Envoy::Stats::MockCounter rejections;
+  EXPECT_CALL(rejections, inc());
+  EXPECT_THAT(MutationUtils::protoToHeaders(headers_proto, headers, checker, rejections),
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        "header_mutation_set_contains_invalid_character"));
+}
+
 TEST_F(MutationUtilsTest, ProtoToHeadersTooLargeHeader) {
   constexpr absl::string_view header_map = R"pb(
     headers {

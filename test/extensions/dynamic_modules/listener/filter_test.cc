@@ -50,26 +50,27 @@ public:
                                              *stats_.rootScope(), main_thread_dispatcher_);
     EXPECT_TRUE(filter_config_or_status.ok()) << filter_config_or_status.status().message();
     filter_config_ = filter_config_or_status.value();
+
+    ON_CALL(callbacks_, dispatcher()).WillByDefault(testing::ReturnRef(dispatcher));
   }
 
   Stats::IsolatedStoreImpl stats_;
   DynamicModuleListenerFilterConfigSharedPtr filter_config_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
+  NiceMock<Network::MockListenerFilterCallbacks> callbacks_;
+  NiceMock<Event::MockDispatcher> dispatcher{"worker_0"};
 };
 
 TEST_F(DynamicModuleListenerFilterTest, BasicFilterFlow) {
   auto filter = std::make_unique<DynamicModuleListenerFilter>(filter_config_);
-  filter->initializeInModuleFilter();
 
-  NiceMock<Network::MockListenerFilterCallbacks> callbacks;
-
-  EXPECT_EQ(Network::FilterStatus::Continue, filter->onAccept(callbacks));
-  EXPECT_EQ(&callbacks, filter->callbacks());
+  EXPECT_EQ(Network::FilterStatus::Continue, filter->onAccept(callbacks_));
+  EXPECT_EQ(&callbacks_, filter->callbacks());
 }
 
 TEST_F(DynamicModuleListenerFilterTest, MaxReadBytes) {
   auto filter = std::make_unique<DynamicModuleListenerFilter>(filter_config_);
-  filter->initializeInModuleFilter();
+  filter->onAccept(callbacks_);
 
   // The no_op module returns 0 for maxReadBytes.
   EXPECT_EQ(0, filter->maxReadBytes());
@@ -77,10 +78,7 @@ TEST_F(DynamicModuleListenerFilterTest, MaxReadBytes) {
 
 TEST_F(DynamicModuleListenerFilterTest, OnCloseDoesNotCrash) {
   auto filter = std::make_unique<DynamicModuleListenerFilter>(filter_config_);
-  filter->initializeInModuleFilter();
-
-  NiceMock<Network::MockListenerFilterCallbacks> callbacks;
-  filter->onAccept(callbacks);
+  filter->onAccept(callbacks_);
 
   // onClose should not crash.
   filter->onClose();
@@ -88,10 +86,7 @@ TEST_F(DynamicModuleListenerFilterTest, OnCloseDoesNotCrash) {
 
 TEST_F(DynamicModuleListenerFilterTest, FilterDestroyWithIsDestroyedCheck) {
   auto filter = std::make_unique<DynamicModuleListenerFilter>(filter_config_);
-  filter->initializeInModuleFilter();
-
-  NiceMock<Network::MockListenerFilterCallbacks> callbacks;
-  filter->onAccept(callbacks);
+  filter->onAccept(callbacks_);
 
   EXPECT_FALSE(filter->isDestroyed());
 
@@ -118,8 +113,17 @@ TEST_F(DynamicModuleListenerFilterTest, FilterWithNullInModuleFilterOnClose) {
 }
 
 TEST_F(DynamicModuleListenerFilterTest, OnAcceptWithNullInModuleFilterClosesSocket) {
-  auto filter = std::make_unique<DynamicModuleListenerFilter>(filter_config_);
-  // Deliberately not calling initializeInModuleFilter() to simulate a failure.
+  auto dynamic_module =
+      newDynamicModule(testSharedObjectPath("listener_filter_new_fail", "c"), false);
+  EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
+
+  auto filter_config_or_status =
+      newDynamicModuleListenerFilterConfig("test_filter", "", std::move(dynamic_module.value()),
+                                           *stats_.rootScope(), main_thread_dispatcher_);
+  EXPECT_TRUE(filter_config_or_status.ok()) << filter_config_or_status.status().message();
+  auto filter_config = filter_config_or_status.value();
+
+  auto filter = std::make_unique<DynamicModuleListenerFilter>(filter_config);
 
   // Create a real mock io handle so we can verify close is called.
   auto mock_io_handle = std::make_unique<NiceMock<Network::MockIoHandle>>();
@@ -127,14 +131,13 @@ TEST_F(DynamicModuleListenerFilterTest, OnAcceptWithNullInModuleFilterClosesSock
   EXPECT_CALL(*mock_io_handle_ptr, close())
       .WillOnce(testing::Return(Api::IoCallUint64Result(0, Api::IoError::none())));
 
-  NiceMock<Network::MockListenerFilterCallbacks> callbacks;
   // Replace the io_handle and update the ioHandle() mock to return a reference to it.
-  callbacks.socket_.io_handle_ = std::move(mock_io_handle);
-  ON_CALL(callbacks.socket_, ioHandle())
-      .WillByDefault(testing::ReturnRef(*callbacks.socket_.io_handle_));
+  callbacks_.socket_.io_handle_ = std::move(mock_io_handle);
+  ON_CALL(callbacks_.socket_, ioHandle())
+      .WillByDefault(testing::ReturnRef(*callbacks_.socket_.io_handle_));
 
   // When in_module_filter_ is null, onAccept should close the socket and return StopIteration.
-  EXPECT_EQ(Network::FilterStatus::StopIteration, filter->onAccept(callbacks));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter->onAccept(callbacks_));
 }
 
 TEST_F(DynamicModuleListenerFilterTest, OnDataWithNullInModuleFilter) {
@@ -150,10 +153,8 @@ TEST_F(DynamicModuleListenerFilterTest, OnDataWithNullInModuleFilter) {
 
 TEST_F(DynamicModuleListenerFilterTest, OnDataWithBuffer) {
   auto filter = std::make_unique<DynamicModuleListenerFilter>(filter_config_);
-  filter->initializeInModuleFilter();
 
-  NiceMock<Network::MockListenerFilterCallbacks> callbacks;
-  filter->onAccept(callbacks);
+  filter->onAccept(callbacks_);
 
   Buffer::OwnedImpl buffer("test data");
   TestListenerFilterBuffer test_buffer(buffer);
@@ -175,21 +176,22 @@ TEST_F(DynamicModuleListenerFilterTest, FilterWithNullInModuleFilterMaxReadBytes
 
 TEST_F(DynamicModuleListenerFilterTest, CallbackAccessor) {
   auto filter = std::make_unique<DynamicModuleListenerFilter>(filter_config_);
-  filter->initializeInModuleFilter();
 
   // Before onAccept, callbacks should be null.
   EXPECT_EQ(nullptr, filter->callbacks());
 
-  NiceMock<Network::MockListenerFilterCallbacks> callbacks;
-  filter->onAccept(callbacks);
+  NiceMock<Network::MockListenerFilterCallbacks> callbacks_;
+  NiceMock<Event::MockDispatcher> dispatcher{"worker_0"};
+  ON_CALL(callbacks_, dispatcher()).WillByDefault(testing::ReturnRef(dispatcher));
+  filter->onAccept(callbacks_);
 
   // After onAccept, callbacks should be set.
-  EXPECT_EQ(&callbacks, filter->callbacks());
+  EXPECT_EQ(&callbacks_, filter->callbacks());
 }
 
 TEST_F(DynamicModuleListenerFilterTest, GetFilterConfig) {
   auto filter = std::make_unique<DynamicModuleListenerFilter>(filter_config_);
-  filter->initializeInModuleFilter();
+  filter->onAccept(callbacks_);
 
   // Verify getFilterConfig() returns the correct config.
   const auto& config = filter->getFilterConfig();
@@ -261,9 +263,10 @@ TEST(DynamicModuleListenerFilterConfigTest, StopIterationStatus) {
   auto config = filter_config_or_status.value();
 
   auto filter = std::make_unique<DynamicModuleListenerFilter>(config);
-  filter->initializeInModuleFilter();
 
   NiceMock<Network::MockListenerFilterCallbacks> callbacks;
+  NiceMock<Event::MockDispatcher> dispatcher{"worker_0"};
+  ON_CALL(callbacks, dispatcher()).WillByDefault(testing::ReturnRef(dispatcher));
 
   // onAccept should return StopIteration.
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter->onAccept(callbacks));
@@ -285,10 +288,11 @@ TEST(DynamicModuleListenerFilterConfigTest, OnDataStopIterationStatus) {
   EXPECT_TRUE(filter_config_or_status.ok());
   auto config = filter_config_or_status.value();
 
-  auto filter = std::make_unique<DynamicModuleListenerFilter>(config);
-  filter->initializeInModuleFilter();
-
   NiceMock<Network::MockListenerFilterCallbacks> callbacks;
+  NiceMock<Event::MockDispatcher> dispatcher{"worker_0"};
+  ON_CALL(callbacks, dispatcher()).WillByDefault(testing::ReturnRef(dispatcher));
+
+  auto filter = std::make_unique<DynamicModuleListenerFilter>(config);
   filter->onAccept(callbacks);
 
   Buffer::OwnedImpl buffer("test data");
@@ -309,7 +313,7 @@ TEST_F(DynamicModuleListenerFilterTest, MetricsCounterDefineAndIncrement) {
   EXPECT_EQ(0, counter_id);
 
   auto filter = std::make_unique<DynamicModuleListenerFilter>(filter_config_);
-  filter->initializeInModuleFilter();
+  filter->onAccept(callbacks_);
 
   EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
             envoy_dynamic_module_callback_listener_filter_increment_counter(
@@ -332,7 +336,7 @@ TEST_F(DynamicModuleListenerFilterTest, MetricsGaugeDefineAndManipulate) {
   EXPECT_EQ(0, gauge_id);
 
   auto filter = std::make_unique<DynamicModuleListenerFilter>(filter_config_);
-  filter->initializeInModuleFilter();
+  filter->onAccept(callbacks_);
 
   EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
             envoy_dynamic_module_callback_listener_filter_set_gauge(
@@ -363,7 +367,8 @@ TEST_F(DynamicModuleListenerFilterTest, MetricsHistogramDefineAndRecord) {
   EXPECT_EQ(0, histogram_id);
 
   auto filter = std::make_unique<DynamicModuleListenerFilter>(filter_config_);
-  filter->initializeInModuleFilter();
+  filter->onAccept(callbacks_);
+  filter->setCallbacksForTest(nullptr);
 
   EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success,
             envoy_dynamic_module_callback_listener_filter_record_histogram_value(
@@ -374,7 +379,7 @@ TEST_F(DynamicModuleListenerFilterTest, MetricsHistogramDefineAndRecord) {
 
 TEST_F(DynamicModuleListenerFilterTest, MetricsInvalidId) {
   auto filter = std::make_unique<DynamicModuleListenerFilter>(filter_config_);
-  filter->initializeInModuleFilter();
+  filter->onAccept(callbacks_);
 
   // Test that using an invalid ID returns an error.
   EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,

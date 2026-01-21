@@ -139,6 +139,17 @@ void AdsIntegrationTestBase::makeSingleRequest() {
   cleanupUpstreamAndDownstream();
 }
 
+void AdsIntegrationTestBase::makeSingleRequestWithDropOverload() {
+  registerTestServerPorts({"http"});
+  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+      lookupPort("http"), "GET", "/cluster_0", "", downstream_protocol_, version_, "foo.com");
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("503", response->headers().getStatusValue());
+  EXPECT_THAT(response->headers(), ContainsHeader("x-envoy-unconditional-drop-overload", "true"));
+
+  cleanupUpstreamAndDownstream();
+}
+
 void AdsIntegrationTestBase::initialize() { initializeAds(false); }
 
 void AdsIntegrationTestBase::initializeAds(const bool rate_limiting) {
