@@ -137,6 +137,7 @@ message Config {
   message Gauge {
     // The operation to perform on the gauge.
     enum OperationType {
+      // No op for ``Unspecified``.
       Unspecified = 0;
       Add = 1;
       Subtract = 2;
