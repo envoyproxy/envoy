@@ -1,0 +1,64 @@
+#############################################################################
+# startup
+#############################################################################
+
+startup --host_jvm_args=-Xmx3g
+
+
+#############################################################################
+# global
+#############################################################################
+
+build --color=yes
+fetch --color=yes
+run --color=yes
+
+common --enable_workspace
+common --noenable_bzlmod
+
+common --incompatible_default_to_explicit_init_py
+
+build --action_env=SPHINX_RUNNER_ARGS
+# build --workspace_status_command="bash bazel/get_workspace_status"
+build --cxxopt=-std=c++17 --host_cxxopt=-std=c++17
+build --action_env=BUILD_DOCS_SHA
+build --jobs=HOST_CPUS*.8
+build --verbose_failures
+
+
+#############################################################################
+# ci
+#############################################################################
+
+common:ci --noshow_progress
+common:ci --noshow_loading_progress
+common:ci --test_output=errors
+
+
+#############################################################################
+# compiler
+#############################################################################
+
+# Common flags for Clang (shared between all clang variants)
+common:clang-common --linkopt=-fuse-ld=lld
+common:clang-common --@toolchains_llvm//toolchain/config:compiler-rt=false
+common:clang-common --@toolchains_llvm//toolchain/config:libunwind=false
+
+# Clang with libc++ (default)
+common:clang --config=clang-common
+common:clang --config=libc++
+common:clang --host_platform=@clang_platform
+common:clang --repo_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
+
+# Clang installed to non-standard location (ie not /opt/llvm/)
+common:clang-local --config=clang-common
+common:clang-local --config=libc++
+
+# libc++ - default for clang
+common:libc++ --action_env=CXXFLAGS=-stdlib=libc++
+common:libc++ --action_env=LDFLAGS="-stdlib=libc++ -fuse-ld=lld"
+common:libc++ --action_env=BAZEL_CXXOPTS=-stdlib=libc++
+common:libc++ --action_env=BAZEL_LINKLIBS=-l%:libc++.a:-l%:libc++abi.a
+common:libc++ --action_env=BAZEL_LINKOPTS=-lm:-pthread
+common:libc++ --define force_libcpp=enabled
+common:libc++ --@envoy//bazel:libc++=true

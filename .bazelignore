@@ -5,3 +5,4 @@ mobile
 tools/dev/src
 .project
 envoy-filter-example
+bazel/test/external

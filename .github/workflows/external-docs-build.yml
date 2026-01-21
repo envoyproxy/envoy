@@ -1,0 +1,44 @@
+name: External Docs Build Test
+
+permissions:
+  contents: read
+
+on:
+  pull_request:
+    paths:
+    - docs/**
+    - .github/workflows/external-docs-build.yml
+    - MODULE.bazel
+    - WORKSPACE
+    - bazel/**
+
+concurrency:
+  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  external-docs-build:
+    runs-on: ubuntu-22.04
+    if: github.repository == 'envoyproxy/envoy'
+    name: "Build docs from external WORKSPACE"
+    steps:
+    - name: Checkout Envoy repository
+      uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get -qq update --error-on=any
+        sudo apt-get -qq install --yes libtool libtinfo5 automake autoconf curl unzip
+
+    - name: Install Bazelisk
+      run: |
+        wget -q https://github.com/bazelbuild/bazelisk/releases/download/v1.20.0/bazelisk-linux-amd64
+        chmod +x bazelisk-linux-amd64
+        sudo mv bazelisk-linux-amd64 /usr/local/bin/bazel
+
+    - name: Build docs from external workspace
+      env:
+        CARGO_BAZEL_REPIN: true
+      run: |
+        bazel build --config=ci --config=clang @envoy//docs:rst
+      working-directory: bazel/test/external
