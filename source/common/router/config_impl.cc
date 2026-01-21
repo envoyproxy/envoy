@@ -1926,12 +1926,8 @@ RouteMatcher::RouteMatcher(const envoy::config::route::v3::RouteConfiguration& r
         validate_clusters, creation_status);
     SET_AND_RETURN_IF_NOT_OK(creation_status, creation_status);
     for (const std::string& domain_name : virtual_host_config.domains()) {
-      // Conditionally convert domain name to lowercase based on runtime flag
-      const std::string processed_domain_name =
-          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.vhds_case_insensitive_match")
-              ? absl::AsciiStrToLower(domain_name)
-              : domain_name;
-      absl::string_view domain = processed_domain_name;
+      const Http::LowerCaseString lower_case_domain_name(domain_name);
+      absl::string_view domain = lower_case_domain_name;
       bool duplicate_found = false;
       if ("*" == domain) {
         if (default_virtual_host_) {
@@ -1995,11 +1991,8 @@ const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::RequestHeaderMa
   }
   // TODO (@rshriram) Match Origin header in WebSocket
   // request with VHost, using wildcard match
-  // Conditionally lower-case the host header based on runtime flag.
-  const std::string host =
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.vhds_case_insensitive_match")
-          ? absl::AsciiStrToLower(host_header_value)
-          : std::string(host_header_value);
+  // Lower-case the value of the host header, as hostnames are case insensitive.
+  const std::string host = absl::AsciiStrToLower(host_header_value);
   const auto iter = virtual_hosts_.find(host);
   if (iter != virtual_hosts_.end()) {
     return iter->second.get();

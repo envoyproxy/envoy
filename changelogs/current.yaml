@@ -21,9 +21,10 @@ removed_config_or_runtime:
 new_features:
 - area: router
   change: |
-    Added runtime flag ``envoy.reloadable_features.vhds_case_insensitive_match`` to control case sensitivity
-    for host header matching in :ref:`VHDS (Virtual Host Discovery Service) <config_http_conn_man_vhds>`.
-    When enabled (default is ``true``), host headers are converted to lowercase for matching, maintaining backward
-    compatibility with previous behavior. Set to ``false`` to enable case-sensitive host header matching.
+    Added runtime flag ``envoy.reloadable_features.vhds_case_sensitive_query`` to control case sensitivity for VHDS
+    (Virtual Host Discovery Service) queries. When enabled (default is ``true``), VHDS queries use the original
+    case-sensitive host header value. When disabled, host headers are lowercased before VHDS query for backwards
+    compatibility. Note: Domain matching is always case-insensitive regardless of this flag.
+    See :ref:`VHDS <config_http_conn_man_vhds>` for more details.
 
 deprecated:
