@@ -407,7 +407,6 @@ TEST_F(LinuxContainerCpuStatsReaderV2Test, InvalidCpuMaxFormats) {
   EXPECT_FALSE(envoy_container_stats.is_valid);
 }
 
-
 // File read errors for V2
 TEST_F(LinuxContainerCpuStatsReaderV2Test, CannotReadCpuStatFile) {
   TimeSource& test_time_source = timeSource();
