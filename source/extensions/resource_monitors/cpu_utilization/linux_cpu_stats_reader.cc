@@ -24,6 +24,87 @@ namespace CpuUtilizationMonitor {
 constexpr uint64_t NUMBER_OF_CPU_TIMES_TO_PARSE =
     4; // we are interested in user, nice, system and idle times.
 
+namespace {
+
+absl::StatusOr<int> parseEffectiveCpus(absl::string_view effective_cpu_list,
+                                       const std::string& effective_path) {
+  int cpu_count = 0;
+  std::string cpu_list = std::string(absl::StripTrailingAsciiWhitespace(effective_cpu_list));
+
+  // Split by comma to handle multiple ranges/individual CPUs
+  std::vector<std::string> tokens = absl::StrSplit(cpu_list, ',');
+  for (const auto& token : tokens) {
+    const size_t dash_pos = token.find('-');
+    if (dash_pos == std::string::npos) {
+      // Single CPU (e.g., "0" or "4")
+      int single_cpu;
+      if (!absl::SimpleAtoi(token, &single_cpu)) {
+        ENVOY_LOG_MISC(error, "Failed to parse CPU value in {}: {}", effective_path, token);
+        return absl::InvalidArgumentError("Failed to parse CPU value");
+      }
+      if (single_cpu < 0) {
+        ENVOY_LOG_MISC(error, "Invalid CPU value in {}: {}", effective_path, token);
+        return absl::InvalidArgumentError("Invalid CPU value");
+      }
+      cpu_count += 1;
+    } else {
+      // CPU range (e.g., "0-3" means 4 cores)
+      int range_start, range_end;
+      if (!absl::SimpleAtoi(token.substr(0, dash_pos), &range_start) ||
+          !absl::SimpleAtoi(token.substr(dash_pos + 1), &range_end)) {
+        ENVOY_LOG_MISC(error, "Failed to parse CPU range in {}: {}", effective_path, token);
+        return absl::InvalidArgumentError("Failed to parse CPU range");
+      }
+      if (range_start < 0 || range_end < range_start) {
+        ENVOY_LOG_MISC(error, "Invalid CPU range in {}: {}", effective_path, token);
+        return absl::InvalidArgumentError("Invalid CPU range");
+      }
+      cpu_count += (range_end - range_start + 1);
+    }
+  }
+
+  if (cpu_count <= 0) {
+    ENVOY_LOG_MISC(error, "No CPUs found in {}", effective_path);
+    return absl::InvalidArgumentError("No CPUs found");
+  }
+
+  return cpu_count;
+}
+
+absl::StatusOr<double> parseEffectiveCores(absl::string_view cpu_max_contents,
+                                           const std::string& max_path, int cpu_count) {
+  // Parse cpu.max (format: "quota period" or "max period")
+  std::istringstream max_stream{std::string(cpu_max_contents)};
+  std::string quota_str, period_str;
+  max_stream >> quota_str >> period_str;
+
+  if (!max_stream) {
+    ENVOY_LOG_MISC(error, "Unexpected format in cpu.max file {}", max_path);
+    return absl::InvalidArgumentError("Unexpected cpu.max format");
+  }
+
+  if (quota_str == "max") {
+    ENVOY_LOG_MISC(trace, "cgroupv2 max quota found, using N: {}", cpu_count);
+    return static_cast<double>(cpu_count);
+  }
+
+  int quota, period;
+  if (!absl::SimpleAtoi(quota_str, &quota) || !absl::SimpleAtoi(period_str, &period)) {
+    ENVOY_LOG_MISC(error, "Failed to parse cpu.max values in {}: {} {}", max_path, quota_str,
+                   period_str);
+    return absl::InvalidArgumentError("Failed to parse cpu.max values");
+  }
+  if (period <= 0) {
+    ENVOY_LOG_MISC(error, "Invalid period value in {}: {}", max_path, period_str);
+    return absl::InvalidArgumentError("Invalid cpu.max period");
+  }
+
+  const double q_cores = static_cast<double>(quota) / static_cast<double>(period);
+  return std::min(static_cast<double>(cpu_count), q_cores);
+}
+
+} // namespace
+
 // LinuxCpuStatsReader (Host-level CPU monitoring)
 LinuxCpuStatsReader::LinuxCpuStatsReader(const std::string& cpu_stats_filename)
     : cpu_stats_filename_(cpu_stats_filename) {}
@@ -156,9 +237,8 @@ CpuTimesBase CgroupV1CpuStatsReader::getCpuTimes() {
   // cpu_times is in nanoseconds, cpu_allocated shares is in millicores
   const double work_time = (cpu_times_value * CONTAINER_MILLICORES_PER_CORE) / cpu_allocated_value;
 
-  ENVOY_LOG(trace, "cgroupv1 cpu_times_value: {}", cpu_times_value);
-  ENVOY_LOG(trace, "cgroupv1 cpu_allocated_value: {}", cpu_allocated_value);
-  ENVOY_LOG(trace, "cgroupv1 current_time: {}", current_time);
+  ENVOY_LOG(trace, "cgroupv1 cpu_times_value: {}, cpu_allocated_value: {}, current_time: {}",
+            cpu_times_value, cpu_allocated_value, current_time);
 
   return {true, work_time, current_time};
 }
@@ -247,45 +327,11 @@ CpuTimesV2 CgroupV2CpuStatsReader::getCpuTimes() {
 
   // Parse effective CPUs
   // Format can be: "0", "0-3", "0,2,4", "0-2,4", "0-3,5-7", etc.
-  int N = 0;
-  std::string cpu_list = std::string(absl::StripTrailingAsciiWhitespace(effective_result.value()));
-
-  // Split by comma to handle multiple ranges/individual CPUs
-  std::vector<std::string> tokens = absl::StrSplit(cpu_list, ',');
-  for (const auto& token : tokens) {
-    const size_t dash_pos = token.find('-');
-    if (dash_pos == std::string::npos) {
-      // Single CPU (e.g., "0" or "4")
-      int single_cpu;
-      if (!absl::SimpleAtoi(token, &single_cpu)) {
-        ENVOY_LOG(error, "Failed to parse CPU value in {}: {}", effective_path_, token);
-        return {false, 0, 0, 0};
-      }
-      if (single_cpu < 0) {
-        ENVOY_LOG(error, "Invalid CPU value in {}: {}", effective_path_, token);
-        return {false, 0, 0, 0};
-      }
-      N += 1;
-    } else {
-      // CPU range (e.g., "0-3" means 4 cores)
-      int range_start, range_end;
-      if (!absl::SimpleAtoi(token.substr(0, dash_pos), &range_start) ||
-          !absl::SimpleAtoi(token.substr(dash_pos + 1), &range_end)) {
-        ENVOY_LOG(error, "Failed to parse CPU range in {}: {}", effective_path_, token);
-        return {false, 0, 0, 0};
-      }
-      if (range_start < 0 || range_end < range_start) {
-        ENVOY_LOG(error, "Invalid CPU range in {}: {}", effective_path_, token);
-        return {false, 0, 0, 0};
-      }
-      N += (range_end - range_start + 1);
-    }
-  }
-
-  if (N <= 0) {
-    ENVOY_LOG(error, "No CPUs found in {}", effective_path_);
+  absl::StatusOr<int> cpu_count = parseEffectiveCpus(effective_result.value(), effective_path_);
+  if (!cpu_count.ok()) {
     return {false, 0, 0, 0};
   }
+  const int N = cpu_count.value();
 
   // Read cpu.max
   auto max_result = fs_.fileReadToEnd(max_path_);
@@ -294,33 +340,10 @@ CpuTimesV2 CgroupV2CpuStatsReader::getCpuTimes() {
     return {false, 0, 0, 0};
   }
 
-  // Parse cpu.max (format: "quota period" or "max period")
-  double effective_cores = 0;
-  std::istringstream max_stream(max_result.value());
-  std::string quota_str, period_str;
-  max_stream >> quota_str >> period_str;
-
-  if (!max_stream) {
-    ENVOY_LOG(error, "Unexpected format in cpu.max file {}", max_path_);
+  absl::StatusOr<double> effective_cores =
+      parseEffectiveCores(max_result.value(), max_path_, N);
+  if (!effective_cores.ok()) {
     return {false, 0, 0, 0};
-  }
-
-  if (quota_str == "max") {
-    ENVOY_LOG(trace, "cgroupv2 max quota found, using N: {}", N);
-    effective_cores = static_cast<double>(N);
-  } else {
-    int quota, period;
-    if (!absl::SimpleAtoi(quota_str, &quota) || !absl::SimpleAtoi(period_str, &period)) {
-      ENVOY_LOG(error, "Failed to parse cpu.max values in {}: {} {}", max_path_, quota_str,
-                period_str);
-      return {false, 0, 0, 0};
-    }
-    if (period <= 0) {
-      ENVOY_LOG(error, "Invalid period value in {}: {}", max_path_, period_str);
-      return {false, 0, 0, 0};
-    }
-    const double q_cores = static_cast<double>(quota) / static_cast<double>(period);
-    effective_cores = std::min(static_cast<double>(N), q_cores);
   }
 
   // Convert usage from usec to match our time units
@@ -329,11 +352,10 @@ CpuTimesV2 CgroupV2CpuStatsReader::getCpuTimes() {
                                     time_source_.monotonicTime().time_since_epoch())
                                     .count();
 
-  ENVOY_LOG(trace, "cgroupv2 usage_usec: {}", usage_usec);
-  ENVOY_LOG(trace, "cgroupv2 effective_cores: {}", effective_cores);
-  ENVOY_LOG(trace, "cgroupv2 current_time: {}", current_time);
+  ENVOY_LOG(trace, "cgroupv2 usage_usec: {}, effective_cores: {}, current_time: {}", usage_usec,
+            effective_cores.value(), current_time);
 
-  return {true, cpu_times_value_us, current_time, effective_cores};
+  return {true, cpu_times_value_us, current_time, effective_cores.value()};
 }
 
 absl::StatusOr<double> CgroupV2CpuStatsReader::getUtilization() {

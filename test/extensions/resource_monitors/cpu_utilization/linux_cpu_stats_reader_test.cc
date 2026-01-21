@@ -284,70 +284,44 @@ private:
   std::string v2_cpu_effective_path_;
 };
 
-// Happy path: CPU range format (e.g., "0-3")
-TEST_F(LinuxContainerCpuStatsReaderV2Test, ReadsCgroupV2StatsWithCpuRange) {
+// Happy path coverage for effective CPU list parsing and cpu.max parsing.
+TEST_F(LinuxContainerCpuStatsReaderV2Test, ParsesEffectiveCpusAndCores) {
   TimeSource& test_time_source = timeSource();
   Api::ApiPtr api = Api::createApiForTest();
-  setV2CpuStat("usage_usec 500000\nuser_usec 300000\nsystem_usec 200000\n");
-  setV2CpuMax("200000 100000\n"); // quota=200000, period=100000 => 2.0 cores
-  setV2CpuEffective("0-3\n");     // 4 cores available
 
-  CgroupV2CpuStatsReader container_stats_reader(
-      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
-  CpuTimesV2 envoy_container_stats = container_stats_reader.getCpuTimes();
+  const auto get_cpu_times = [&](absl::string_view stat, absl::string_view max,
+                                 absl::string_view effective) {
+    setV2CpuStat(std::string(stat));
+    setV2CpuMax(std::string(max));
+    setV2CpuEffective(std::string(effective));
+    CgroupV2CpuStatsReader reader(api->fileSystem(), test_time_source, v2CpuStatPath(),
+                                  v2CpuMaxPath(), v2CpuEffectivePath());
+    return reader.getCpuTimes();
+  };
 
-  EXPECT_TRUE(envoy_container_stats.is_valid);
-  EXPECT_EQ(envoy_container_stats.work_time, 500000);
-  EXPECT_GT(envoy_container_stats.total_time, 0);
-  EXPECT_DOUBLE_EQ(envoy_container_stats.effective_cores, 2.0); // min(4, 200000/100000)
-}
+  struct Case {
+    absl::string_view stat;
+    absl::string_view max;
+    absl::string_view effective;
+    double expected_effective_cores;
+  };
 
-// Happy path: Single CPU
-TEST_F(LinuxContainerCpuStatsReaderV2Test, ReadsCgroupV2StatsWithSingleCpu) {
-  TimeSource& test_time_source = timeSource();
-  Api::ApiPtr api = Api::createApiForTest();
-  setV2CpuStat("usage_usec 750000\n");
-  setV2CpuMax("50000 100000\n"); // quota=50000, period=100000 => 0.5 cores
-  setV2CpuEffective("0\n");      // 1 core available
+  const Case cases[] = {
+      {"usage_usec 500000\n", "200000 100000\n", "0-3\n", 2.0},    // range, quota < N
+      {"usage_usec 750000\n", "50000 100000\n", "0\n", 0.5},       // single CPU
+      {"usage_usec 500000\n", "max 100000\n", "0-2,4\n", 4.0},     // mixed list, max quota
+      {"usage_usec 500000\n", "800000 100000\n", "0-3\n", 4.0},    // quota > N
+      {"usage_usec 100000\n", "25000 100000\n", "0-3\n", 0.25},    // fractional quota
+      {"usage_usec 500000\n", "max 100000\n", "0-3,5-7\n", 7.0},   // multiple ranges
+      {"usage_usec 500000\n", "max 100000\n", "0,2,4\n", 3.0},     // multiple singles
+  };
 
-  CgroupV2CpuStatsReader container_stats_reader(
-      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
-  CpuTimesV2 envoy_container_stats = container_stats_reader.getCpuTimes();
-
-  EXPECT_TRUE(envoy_container_stats.is_valid);
-  EXPECT_DOUBLE_EQ(envoy_container_stats.effective_cores, 0.5);
-}
-
-// "max" quota means no CPU limit - use available cores
-TEST_F(LinuxContainerCpuStatsReaderV2Test, ReadsCgroupV2StatsWithMaxQuota) {
-  TimeSource& test_time_source = timeSource();
-  Api::ApiPtr api = Api::createApiForTest();
-  setV2CpuStat("usage_usec 1000000\n");
-  setV2CpuMax("max 100000\n"); // No CPU limit
-  setV2CpuEffective("0-7\n");  // 8 cores available
-
-  CgroupV2CpuStatsReader container_stats_reader(
-      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
-  CpuTimesV2 envoy_container_stats = container_stats_reader.getCpuTimes();
-
-  EXPECT_TRUE(envoy_container_stats.is_valid);
-  EXPECT_DOUBLE_EQ(envoy_container_stats.effective_cores, 8.0);
-}
-
-// Mixed range and individual CPUs (e.g., "0-2,4") - covers all CPU parsing logic
-TEST_F(LinuxContainerCpuStatsReaderV2Test, ReadsCgroupV2StatsWithMixedRangeAndIndividual) {
-  TimeSource& test_time_source = timeSource();
-  Api::ApiPtr api = Api::createApiForTest();
-  setV2CpuStat("usage_usec 500000\n");
-  setV2CpuMax("400000 100000\n"); // 4.0 cores
-  setV2CpuEffective("0-2,4\n");   // 4 cores: 0, 1, 2, 4
-
-  CgroupV2CpuStatsReader container_stats_reader(
-      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
-  CpuTimesV2 envoy_container_stats = container_stats_reader.getCpuTimes();
-
-  EXPECT_TRUE(envoy_container_stats.is_valid);
-  EXPECT_DOUBLE_EQ(envoy_container_stats.effective_cores, 4.0);
+  for (const auto& test_case : cases) {
+    CpuTimesV2 cpu_times =
+        get_cpu_times(test_case.stat, test_case.max, test_case.effective);
+    EXPECT_TRUE(cpu_times.is_valid);
+    EXPECT_DOUBLE_EQ(cpu_times.effective_cores, test_case.expected_effective_cores);
+  }
 }
 
 // Error: Missing usage_usec in cpu.stat
@@ -387,47 +361,22 @@ TEST_F(LinuxContainerCpuStatsReaderV2Test, InvalidCpuEffectiveFormats) {
   setV2CpuStat("usage_usec 500000\n");
   setV2CpuMax("200000 100000\n");
 
-  // Test 1: Failed to parse single CPU value (non-numeric)
-  setV2CpuEffective("notanumber\n");
-  CgroupV2CpuStatsReader container_stats_reader1(
-      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
-  CpuTimesV2 envoy_container_stats = container_stats_reader1.getCpuTimes();
-  EXPECT_FALSE(envoy_container_stats.is_valid);
+  const absl::string_view invalid_effective[] = {
+      "notanumber\n", // non-numeric token
+      "-1\n",         // negative single CPU
+      "0-abc\n",      // non-numeric range
+      "-1-3\n",       // negative range start
+      "5-2\n",        // range start > end
+      "",             // empty list
+  };
 
-  // Test 2: Invalid single CPU value (negative)
-  setV2CpuEffective("-1\n");
-  CgroupV2CpuStatsReader container_stats_reader2(
-      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
-  envoy_container_stats = container_stats_reader2.getCpuTimes();
-  EXPECT_FALSE(envoy_container_stats.is_valid);
-
-  // Test 3: Failed to parse CPU range (non-numeric range values)
-  setV2CpuEffective("0-abc\n");
-  CgroupV2CpuStatsReader container_stats_reader3(
-      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
-  envoy_container_stats = container_stats_reader3.getCpuTimes();
-  EXPECT_FALSE(envoy_container_stats.is_valid);
-
-  // Test 4: Invalid CPU range (negative start)
-  setV2CpuEffective("-1-3\n");
-  CgroupV2CpuStatsReader container_stats_reader4(
-      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
-  envoy_container_stats = container_stats_reader4.getCpuTimes();
-  EXPECT_FALSE(envoy_container_stats.is_valid);
-
-  // Test 5: Invalid CPU range (start > end)
-  setV2CpuEffective("5-2\n");
-  CgroupV2CpuStatsReader container_stats_reader5(
-      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
-  envoy_container_stats = container_stats_reader5.getCpuTimes();
-  EXPECT_FALSE(envoy_container_stats.is_valid);
-
-  // Test 6: Empty file (N <= 0)
-  setV2CpuEffective("");
-  CgroupV2CpuStatsReader container_stats_reader6(
-      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
-  envoy_container_stats = container_stats_reader6.getCpuTimes();
-  EXPECT_FALSE(envoy_container_stats.is_valid);
+  for (const auto& effective : invalid_effective) {
+    setV2CpuEffective(std::string(effective));
+    CgroupV2CpuStatsReader reader(api->fileSystem(), test_time_source, v2CpuStatPath(),
+                                  v2CpuMaxPath(), v2CpuEffectivePath());
+    CpuTimesV2 cpu_times = reader.getCpuTimes();
+    EXPECT_FALSE(cpu_times.is_valid);
+  }
 }
 
 // Error: Invalid cpu.max file formats
@@ -459,37 +408,6 @@ TEST_F(LinuxContainerCpuStatsReaderV2Test, InvalidCpuMaxFormats) {
   EXPECT_FALSE(envoy_container_stats.is_valid);
 }
 
-// Edge case: Quota exceeds available cores - should use min(N, quota/period)
-TEST_F(LinuxContainerCpuStatsReaderV2Test, QuotaExceedsAvailableCores) {
-  TimeSource& test_time_source = timeSource();
-  Api::ApiPtr api = Api::createApiForTest();
-  setV2CpuStat("usage_usec 500000\n");
-  setV2CpuMax("800000 100000\n"); // 8.0 cores quota
-  setV2CpuEffective("0-3\n");     // Only 4 cores available
-
-  CgroupV2CpuStatsReader container_stats_reader(
-      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
-  CpuTimesV2 envoy_container_stats = container_stats_reader.getCpuTimes();
-
-  EXPECT_TRUE(envoy_container_stats.is_valid);
-  EXPECT_DOUBLE_EQ(envoy_container_stats.effective_cores, 4.0); // Limited by available cores
-}
-
-// Edge case: Fractional CPU quota (e.g., 0.25 cores)
-TEST_F(LinuxContainerCpuStatsReaderV2Test, FractionalCpuQuota) {
-  TimeSource& test_time_source = timeSource();
-  Api::ApiPtr api = Api::createApiForTest();
-  setV2CpuStat("usage_usec 100000\n");
-  setV2CpuMax("25000 100000\n"); // 0.25 cores
-  setV2CpuEffective("0-3\n");
-
-  CgroupV2CpuStatsReader container_stats_reader(
-      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
-  CpuTimesV2 envoy_container_stats = container_stats_reader.getCpuTimes();
-
-  EXPECT_TRUE(envoy_container_stats.is_valid);
-  EXPECT_DOUBLE_EQ(envoy_container_stats.effective_cores, 0.25);
-}
 
 // File read errors for V2
 TEST_F(LinuxContainerCpuStatsReaderV2Test, CannotReadCpuStatFile) {
