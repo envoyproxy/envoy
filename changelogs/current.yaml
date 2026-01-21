@@ -61,5 +61,10 @@ new_features:
     Extended ``*_WITHOUT_PORT`` address formatters to accept an optional ``MASK_PREFIX_LEN`` parameter that masks IP addresses
     and returns them in CIDR notation (e.g., ``%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT(16)%`` returns ``10.1.0.0/16`` for
     client IP ``10.1.10.23``).
+- area: dynamic_modules
+  change: |
+    Added :ref:`load balancing policies
+    <envoy_v3_api_msg_extensions.load_balancing_policies.dynamic_modules.v3.DynamicModulesLoadBalancerConfig>`
+    support for dynamic modules, enabling custom load balancing algorithms to be implemented in dynamic modules.
 
 deprecated:
