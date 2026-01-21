@@ -39,6 +39,12 @@ bug_fixes:
   change: |
     Fixed a crash on listener removal with a process-level access log rate limiter
     :ref:`ProcessRateLimitFilter <envoy_v3_api_msg_extensions.access_loggers.filters.process_ratelimit.v3.ProcessRateLimitFilter>`.
+- area: http
+  change: |
+    Fixed an issue where filter chain execution could continue on HTTP streams that had been reset but not yet
+    destroyed. This could cause use-after-free conditions when filter callbacks were invoked on filters that
+    had already received ``onDestroy()``. The fix ensures that ``decodeHeaders()``, ``decodeData()``,
+    ``decodeTrailers()``, and ``decodeMetadata()`` are blocked after a downstream reset.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
