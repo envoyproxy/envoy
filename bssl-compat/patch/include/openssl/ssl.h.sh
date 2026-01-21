@@ -73,6 +73,7 @@ uncomment.sh "$1" --comment -h \
   --uncomment-func-decl SSL_CTX_set_min_proto_version \
   --uncomment-func-decl SSL_CTX_set_max_proto_version \
   --uncomment-func-decl SSL_CTX_set_client_CA_list \
+  --uncomment-func-decl SSL_CTX_set_cert_cb \
   --uncomment-func-decl SSL_CTX_set_cert_verify_callback \
   --uncomment-macro SSL_CTX_set_app_data \
   --uncomment-func-decl SSL_CTX_set_alpn_select_cb \

@@ -637,6 +637,7 @@ mapping_func_filegroup(
         "SSL_CTX_sess_set_new_cb",
         "SSL_CTX_set_alpn_protos",
         "SSL_CTX_set_alpn_select_cb",
+        "SSL_CTX_set_cert_cb",
         "SSL_CTX_set_cert_store",
         "SSL_CTX_set_cert_verify_callback",
         "SSL_CTX_set_cipher_list",
