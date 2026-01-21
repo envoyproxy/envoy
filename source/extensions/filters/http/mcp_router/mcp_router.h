@@ -32,6 +32,12 @@ enum class McpMethod {
   Initialize,
   ToolsList,
   ToolsCall,
+  ResourcesList,
+  ResourcesRead,
+  ResourcesSubscribe,
+  ResourcesUnsubscribe,
+  PromptsList,
+  PromptsGet,
   Ping,
   NotificationInitialized,
 };
@@ -105,22 +111,38 @@ private:
   bool validateSubjectIfRequired();
 
   std::pair<std::string, std::string> parseToolName(const std::string& prefixed_name);
+  std::pair<std::string, std::string> parseResourceUri(const std::string& uri);
+  std::pair<std::string, std::string> parsePromptName(const std::string& prefixed_name);
   // Rewrites the tool name in the buffer. Returns the size delta (new_size - old_size).
   ssize_t rewriteToolCallBody(Buffer::Instance& buffer);
+  // Rewrites the resource URI in the buffer. Returns the size delta (new_size - old_size).
+  ssize_t rewriteResourceUriBody(Buffer::Instance& buffer);
+  // Rewrites the prompt name in the buffer. Returns the size delta (new_size - old_size).
+  ssize_t rewritePromptsGetBody(Buffer::Instance& buffer);
   // Helper to replace content at a position in the buffer, and return the delta.
   ssize_t rewriteAtPosition(Buffer::Instance& buffer, ssize_t pos, const std::string& search_str,
                             const std::string& replacement);
+  // Helper for resource methods that route to a single backend based on URI.
+  void handleSingleBackendResourceMethod(absl::string_view method_name);
 
-  // Initialization handlers - set up connections, don't send body
+  // Initialization handlers - set up connections, don't send body.
   void handleInitialize();
   void handleToolsList();
   void handleToolsCall();
+  void handleResourcesList();
+  void handleResourcesRead();
+  void handleResourcesSubscribe();
+  void handleResourcesUnsubscribe();
+  void handlePromptsList();
+  void handlePromptsGet();
   void handlePing();
   void handleNotificationInitialized();
 
-  // Aggregation functions
+  // Aggregation functions.
   std::string aggregateInitialize(const std::vector<BackendResponse>& responses);
   std::string aggregateToolsList(const std::vector<BackendResponse>& responses);
+  std::string aggregateResourcesList(const std::vector<BackendResponse>& responses);
+  std::string aggregatePromptsList(const std::vector<BackendResponse>& responses);
 
   // Initialize fanout connections.
   void initializeFanout(AggregationCallback callback);
@@ -149,7 +171,11 @@ private:
   McpMethod method_{McpMethod::Unknown};
   std::string tool_name_;            // Original prefixed tool name (e.g., "time__get_current_time")
   std::string unprefixed_tool_name_; // Unprefixed tool name for backend (e.g., "get_current_time")
-  bool needs_body_rewrite_{false};   // Whether tool name rewriting is needed
+  std::string resource_uri_;         // Original resource URI (e.g., "time://path/to/resource")
+  std::string rewritten_uri_;        // Rewritten URI for backend (e.g., "file://path/to/resource")
+  std::string prompt_name_;          // Original prefixed prompt name (e.g., "time__greeting")
+  std::string unprefixed_prompt_name_; // Unprefixed prompt name for backend (e.g., "greeting")
+  bool needs_body_rewrite_{false};     // Whether tool/prompt name or URI rewriting is needed
 
   std::string route_name_{"default"};
   std::string session_subject_;
