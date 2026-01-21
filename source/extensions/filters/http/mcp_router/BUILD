@@ -34,10 +34,28 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "backend_stream_lib",
+    srcs = ["backend_stream.cc"],
+    hdrs = ["backend_stream.h"],
+    deps = [
+        "//envoy/http:async_client_interface",
+        "//envoy/http:filter_interface",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/common:logger_lib",
+        "//source/common/http:headers_lib",
+        "//source/common/http:utility_lib",
+        "//source/common/http/sse:sse_parser_lib",
+        "//source/common/json:json_loader_lib",
+        "@com_google_absl//absl/strings",
+    ],
+)
+
+envoy_cc_library(
     name = "mcp_router_lib",
     srcs = ["mcp_router.cc"],
     hdrs = ["mcp_router.h"],
     deps = [
+        ":backend_stream_lib",
         ":filter_config_lib",
         ":session_codec_lib",
         "//envoy/http:async_client_interface",
@@ -51,7 +69,6 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/http:muxdemux_lib",
         "//source/common/http:utility_lib",
-        "//source/common/http/sse:sse_parser_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/json:json_streamer_lib",
         "//source/common/protobuf:utility_lib",

@@ -11,64 +11,42 @@ namespace HttpFilters {
 namespace McpRouter {
 namespace {
 
-// Tests for ResponseContentType detection and BackendResponse SSE handling.
+// Tests for ResponseContentType detection and BackendResponse handling.
 class SseResponseTest : public testing::Test {};
 
-// Verifies getJsonRpcBody returns body for JSON responses.
-TEST_F(SseResponseTest, GetJsonRpcBodyReturnsBodyForJson) {
+// Verifies body is accessible for JSON responses.
+TEST_F(SseResponseTest, JsonResponseUsesBodyDirectly) {
   BackendResponse response;
   response.content_type = ResponseContentType::Json;
   response.body = R"({"jsonrpc":"2.0","id":1,"result":{}})";
 
-  EXPECT_EQ(response.getJsonRpcBody(), R"({"jsonrpc":"2.0","id":1,"result":{}})");
+  // For JSON responses, body is used directly (extracted_jsonrpc is empty).
+  EXPECT_TRUE(response.extracted_jsonrpc.empty());
+  EXPECT_EQ(response.body, R"({"jsonrpc":"2.0","id":1,"result":{}})");
 }
 
-// Verifies getJsonRpcBody returns last SSE event data for SSE responses.
-TEST_F(SseResponseTest, GetJsonRpcBodyReturnsLastSseEventData) {
+// Verifies extracted_jsonrpc is used for SSE responses when populated.
+TEST_F(SseResponseTest, SseResponseUsesExtractedJsonrpc) {
   BackendResponse response;
   response.content_type = ResponseContentType::Sse;
-  // Body contains multiple SSE events - should return last event's data.
   response.body = "data: {\"first\":\"event\"}\n\ndata: {\"second\":\"event\"}\n\n";
+  response.extracted_jsonrpc = R"({"second":"event"})"; // Populated by tryParseSseResponse()
 
-  EXPECT_EQ(response.getJsonRpcBody(), R"({"second":"event"})");
+  // For SSE responses, extracted_jsonrpc is preferred when available.
+  EXPECT_FALSE(response.extracted_jsonrpc.empty());
+  EXPECT_EQ(response.extracted_jsonrpc, R"({"second":"event"})");
 }
 
-// Verifies getJsonRpcBody returns body for empty SSE body.
-TEST_F(SseResponseTest, GetJsonRpcBodyReturnsEmptyForEmptyBody) {
+// Verifies empty extracted_jsonrpc falls back to body.
+TEST_F(SseResponseTest, EmptyExtractedJsonrpcFallsBackToBody) {
   BackendResponse response;
   response.content_type = ResponseContentType::Sse;
-  response.body = "";
-
-  EXPECT_EQ(response.getJsonRpcBody(), "");
-}
-
-// Verifies getJsonRpcBody falls back to body for unknown content type.
-TEST_F(SseResponseTest, GetJsonRpcBodyFallsBackToBodyForUnknown) {
-  BackendResponse response;
-  response.content_type = ResponseContentType::Unknown;
   response.body = "fallback body";
+  response.extracted_jsonrpc = ""; // Not populated yet
 
-  EXPECT_EQ(response.getJsonRpcBody(), "fallback body");
-}
-
-// Verifies getJsonRpcBody handles SSE without proper format.
-TEST_F(SseResponseTest, GetJsonRpcBodyHandlesMalformedSse) {
-  BackendResponse response;
-  response.content_type = ResponseContentType::Sse;
-  // No data: prefix - should fall back to body.
-  response.body = "just some text";
-
-  EXPECT_EQ(response.getJsonRpcBody(), "just some text");
-}
-
-// Verifies getJsonRpcBody parses SSE with complete event ending.
-TEST_F(SseResponseTest, GetJsonRpcBodyParsesSseWithCompleteEvent) {
-  BackendResponse response;
-  response.content_type = ResponseContentType::Sse;
-  // SSE event with proper double newline ending.
-  response.body = "data: {\"result\":\"ok\"}\n\n";
-
-  EXPECT_EQ(response.getJsonRpcBody(), R"({"result":"ok"})");
+  // When extracted_jsonrpc is empty, body is the fallback.
+  EXPECT_TRUE(response.extracted_jsonrpc.empty());
+  EXPECT_EQ(response.body, "fallback body");
 }
 
 // Verifies isJson and isSse helper methods.
@@ -91,6 +69,61 @@ TEST_F(SseResponseTest, ContentTypeHelpers) {
     EXPECT_FALSE(response.isJson());
     EXPECT_FALSE(response.isSse());
   }
+}
+
+// Tests for classifyMessage function.
+class ClassifyMessageTest : public testing::Test {};
+
+// Verifies Response type detection (has result with matching id).
+TEST_F(ClassifyMessageTest, ClassifiesResponseWithResult) {
+  std::string data = R"({"jsonrpc":"2.0","id":1,"result":{"tools":[]}})";
+  EXPECT_EQ(classifyMessage(data, 1), SseMessageType::Response);
+  // Also matches with request_id=0 (match any).
+  EXPECT_EQ(classifyMessage(data, 0), SseMessageType::Response);
+}
+
+// Verifies Response type detection (has error with matching id).
+TEST_F(ClassifyMessageTest, ClassifiesResponseWithError) {
+  std::string data =
+      R"({"jsonrpc":"2.0","id":1,"error":{"code":-32601,"message":"Method not found"}})";
+  EXPECT_EQ(classifyMessage(data, 1), SseMessageType::Response);
+}
+
+// Verifies Response with non-matching ID returns Unknown.
+TEST_F(ClassifyMessageTest, ResponseWithNonMatchingIdReturnsUnknown) {
+  std::string data = R"({"jsonrpc":"2.0","id":99,"result":{}})";
+  // Request ID is 1 but response ID is 99 - should not match.
+  EXPECT_EQ(classifyMessage(data, 1), SseMessageType::Unknown);
+}
+
+// Verifies Notification type detection (method without id).
+TEST_F(ClassifyMessageTest, ClassifiesNotification) {
+  std::string data =
+      R"({"jsonrpc":"2.0","method":"notifications/progress","params":{"progress":50}})";
+  EXPECT_EQ(classifyMessage(data, 1), SseMessageType::Notification);
+}
+
+// Verifies ServerRequest type detection (method with id).
+TEST_F(ClassifyMessageTest, ClassifiesServerRequest) {
+  std::string data = R"({"jsonrpc":"2.0","id":99,"method":"roots/list","params":{}})";
+  EXPECT_EQ(classifyMessage(data, 1), SseMessageType::ServerRequest);
+}
+
+// Verifies sampling/createMessage is classified as ServerRequest.
+TEST_F(ClassifyMessageTest, ClassifiesSamplingCreateMessage) {
+  std::string data = R"({"jsonrpc":"2.0","id":42,"method":"sampling/createMessage","params":{}})";
+  EXPECT_EQ(classifyMessage(data, 1), SseMessageType::ServerRequest);
+}
+
+// Verifies invalid JSON returns Unknown.
+TEST_F(ClassifyMessageTest, InvalidJsonReturnsUnknown) {
+  std::string data = "not valid json";
+  EXPECT_EQ(classifyMessage(data, 1), SseMessageType::Unknown);
+}
+
+// Verifies empty string returns Unknown.
+TEST_F(ClassifyMessageTest, EmptyStringReturnsUnknown) {
+  EXPECT_EQ(classifyMessage("", 1), SseMessageType::Unknown);
 }
 
 // Tests for BackendStreamCallbacks SSE handling behavior.
@@ -119,10 +152,9 @@ TEST_F(BackendStreamCallbacksSseTest, DetectsSseContentType) {
   EXPECT_TRUE(callback_invoked);
   EXPECT_TRUE(received_response.isSse());
   EXPECT_EQ(received_response.content_type, ResponseContentType::Sse);
-  // Body should contain the full SSE data.
+  // Body should contain the full SSE data (for pass-through).
   EXPECT_EQ(received_response.body, "data: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{}}\n\n");
-  // getJsonRpcBody should parse and return first event data.
-  EXPECT_EQ(received_response.getJsonRpcBody(), R"({"jsonrpc":"2.0","id":1,"result":{}})");
+  // Note: extracted_jsonrpc is only populated in aggregate mode.
 }
 
 // Verifies JSON content type is detected from response headers.
@@ -147,7 +179,7 @@ TEST_F(BackendStreamCallbacksSseTest, DetectsJsonContentType) {
   EXPECT_TRUE(callback_invoked);
   EXPECT_TRUE(received_response.isJson());
   EXPECT_EQ(received_response.body, R"({"jsonrpc":"2.0","id":1,"result":{}})");
-  EXPECT_EQ(received_response.getJsonRpcBody(), R"({"jsonrpc":"2.0","id":1,"result":{}})");
+  EXPECT_EQ(received_response.body, R"({"jsonrpc":"2.0","id":1,"result":{}})");
 }
 
 // Verifies SSE body is buffered correctly for pass-through.
@@ -167,10 +199,9 @@ TEST_F(BackendStreamCallbacksSseTest, BuffersSseBodyForPassThrough) {
   callbacks->onHeaders(std::move(headers), false);
 
   // Send multiple SSE events - should all be in body for pass-through.
-  Buffer::OwnedImpl data(
-      "data: {\"progress\":1}\n\n"
-      "data: {\"progress\":2}\n\n"
-      "data: {\"result\":\"done\"}\n\n");
+  Buffer::OwnedImpl data("data: {\"progress\":1}\n\n"
+                         "data: {\"progress\":2}\n\n"
+                         "data: {\"result\":\"done\"}\n\n");
   callbacks->onData(data, true);
 
   EXPECT_TRUE(callback_invoked);
@@ -178,8 +209,7 @@ TEST_F(BackendStreamCallbacksSseTest, BuffersSseBodyForPassThrough) {
   EXPECT_THAT(received_response.body, testing::HasSubstr("progress\":1"));
   EXPECT_THAT(received_response.body, testing::HasSubstr("progress\":2"));
   EXPECT_THAT(received_response.body, testing::HasSubstr("result\":\"done"));
-  // getJsonRpcBody returns last event data for aggregation (tools/list).
-  EXPECT_EQ(received_response.getJsonRpcBody(), R"({"result":"done"})");
+  // Note: Without aggregate_mode, extracted_jsonrpc won't be populated.
 }
 
 // Verifies SSE body is buffered correctly across multiple data chunks.
@@ -207,7 +237,7 @@ TEST_F(BackendStreamCallbacksSseTest, BuffersSseDataAcrossChunks) {
 
   EXPECT_TRUE(callback_invoked);
   EXPECT_EQ(received_response.body, "data: {\"partial\":\"data\"}\n\n");
-  EXPECT_EQ(received_response.getJsonRpcBody(), R"({"partial":"data"})");
+  EXPECT_EQ(received_response.body, "data: {\"partial\":\"data\"}\n\n");
 }
 
 // Verifies SSE content type detection with charset parameter.

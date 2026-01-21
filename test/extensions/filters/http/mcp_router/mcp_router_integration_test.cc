@@ -676,8 +676,7 @@ TEST_P(McpRouterIntegrationTest, ToolCallWithSseResponse) {
   const std::string sse_response = "data: " + sse_data + "\n\n";
 
   time_backend_request_->encodeHeaders(
-      Http::TestResponseHeaderMapImpl{{":status", "200"},
-                                      {"content-type", "text/event-stream"}},
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "text/event-stream"}},
       false);
   Buffer::OwnedImpl response_body(sse_response);
   time_backend_request_->encodeData(response_body, true);
@@ -725,8 +724,7 @@ TEST_P(McpRouterIntegrationTest, ToolsListAggregatesSseResponses) {
       R"({"jsonrpc":"2.0","id":2,"result":{"tools":[{"name":"get_current_time","description":"Get the current time"}]}})";
   const std::string time_sse = "data: " + time_json + "\n\n";
   time_backend_request_->encodeHeaders(
-      Http::TestResponseHeaderMapImpl{{":status", "200"},
-                                      {"content-type", "text/event-stream"}},
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "text/event-stream"}},
       false);
   Buffer::OwnedImpl time_body(time_sse);
   time_backend_request_->encodeData(time_body, true);
@@ -789,12 +787,14 @@ TEST_P(McpRouterIntegrationTest, SseResponseMultipleEventsExtractsLast) {
 
   // Backend responds with SSE containing multiple events (progress + final result)
   const std::string sse_response =
-      "data: {\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"progress\",\"params\":{\"progress\":50}}\n\n"
-      "data: {\"jsonrpc\":\"2.0\",\"id\":3,\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"completed\"}]}}\n\n";
+      "data: "
+      "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"progress\",\"params\":{\"progress\":50}}\n\n"
+      "data: "
+      "{\"jsonrpc\":\"2.0\",\"id\":3,\"result\":{\"content\":[{\"type\":\"text\",\"text\":"
+      "\"completed\"}]}}\n\n";
 
   time_backend_request_->encodeHeaders(
-      Http::TestResponseHeaderMapImpl{{":status", "200"},
-                                      {"content-type", "text/event-stream"}},
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "text/event-stream"}},
       false);
   Buffer::OwnedImpl response_body(sse_response);
   time_backend_request_->encodeData(response_body, true);
@@ -1342,6 +1342,141 @@ TEST_P(McpRouterSubjectValidationIntegrationTest, MissingAuthHeaderReturns403) {
 
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("403", response->headers().getStatusValue());
+}
+
+// Test tools/list with SSE responses containing intermediate events (notifications, server
+// requests) before the final response. Verifies intermediate events are classified and response is
+// aggregated.
+TEST_P(McpRouterIntegrationTest, ToolsListWithIntermediateSseEvents) {
+  initializeFilter();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  const std::string request_body = R"({
+    "jsonrpc": "2.0",
+    "method": "tools/list",
+    "id": 100
+  })";
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/mcp"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"accept", "application/json"},
+                                     {"accept", "text/event-stream"},
+                                     {"content-type", "application/json"}},
+      request_body);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, time_backend_connection_));
+  ASSERT_TRUE(time_backend_connection_->waitForNewStream(*dispatcher_, time_backend_request_));
+  ASSERT_TRUE(time_backend_request_->waitForEndStream(*dispatcher_));
+
+  ASSERT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, tools_backend_connection_));
+  ASSERT_TRUE(tools_backend_connection_->waitForNewStream(*dispatcher_, tools_backend_request_));
+  ASSERT_TRUE(tools_backend_request_->waitForEndStream(*dispatcher_));
+
+  // Time backend responds with SSE containing: notification -> response.
+  // The notification should be classified as intermediate event.
+  const std::string time_sse =
+      "data: "
+      "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/progress\",\"params\":{\"progress\":50}}\n\n"
+      "data: "
+      "{\"jsonrpc\":\"2.0\",\"id\":100,\"result\":{\"tools\":[{\"name\":\"get_time\","
+      "\"description\":\"Get current time\"}]}}\n\n";
+  time_backend_request_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "text/event-stream"}},
+      false);
+  Buffer::OwnedImpl time_body(time_sse);
+  time_backend_request_->encodeData(time_body, true);
+
+  // Tools backend responds with SSE containing: server request -> notification -> response.
+  const std::string tools_sse =
+      "data: {\"jsonrpc\":\"2.0\",\"id\":99,\"method\":\"roots/list\",\"params\":{}}\n\n"
+      "data: "
+      "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/"
+      "message\",\"params\":{\"level\":\"info\"}}\n\n"
+      "data: "
+      "{\"jsonrpc\":\"2.0\",\"id\":100,\"result\":{\"tools\":[{\"name\":\"calculator\","
+      "\"description\":\"Math ops\"}]}}\n\n";
+  tools_backend_request_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "text/event-stream"}},
+      false);
+  Buffer::OwnedImpl tools_body(tools_sse);
+  tools_backend_request_->encodeData(tools_body, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  // Aggregated response should contain tools from both backends with prefixes.
+  EXPECT_THAT(response->body(), testing::HasSubstr("time__get_time"));
+  EXPECT_THAT(response->body(), testing::HasSubstr("tools__calculator"));
+}
+
+// Test tools/list with SSE containing server-to-client requests (roots/list) that should be
+// classified as ServerRequest type and intermediate events are handled correctly.
+TEST_P(McpRouterIntegrationTest, ToolsListSseWithServerToClientRequests) {
+  initializeFilter();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  const std::string request_body = R"({
+    "jsonrpc": "2.0",
+    "method": "tools/list",
+    "id": 200
+  })";
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/mcp"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"accept", "application/json"},
+                                     {"accept", "text/event-stream"},
+                                     {"content-type", "application/json"}},
+      request_body);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, time_backend_connection_));
+  ASSERT_TRUE(time_backend_connection_->waitForNewStream(*dispatcher_, time_backend_request_));
+  ASSERT_TRUE(time_backend_request_->waitForEndStream(*dispatcher_));
+
+  ASSERT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, tools_backend_connection_));
+  ASSERT_TRUE(tools_backend_connection_->waitForNewStream(*dispatcher_, tools_backend_request_));
+  ASSERT_TRUE(tools_backend_request_->waitForEndStream(*dispatcher_));
+
+  // Backend 1: Direct response (JSON, not SSE).
+  const std::string time_response = R"({
+    "jsonrpc": "2.0",
+    "id": 200,
+    "result": {
+      "tools": [{"name": "clock", "description": "Show clock"}]
+    }
+  })";
+  time_backend_request_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
+      false);
+  Buffer::OwnedImpl time_body(time_response);
+  time_backend_request_->encodeData(time_body, true);
+
+  // Backend 2: SSE with sampling/createMessage server request before response.
+  const std::string tools_sse = "data: "
+                                "{\"jsonrpc\":\"2.0\",\"id\":42,\"method\":\"sampling/"
+                                "createMessage\",\"params\":{\"max_tokens\":100}}\n\n"
+                                "data: "
+                                "{\"jsonrpc\":\"2.0\",\"id\":200,\"result\":{\"tools\":[{\"name\":"
+                                "\"ai_assist\",\"description\":\"AI assistance\"}]}}\n\n";
+  tools_backend_request_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "text/event-stream"}},
+      false);
+  Buffer::OwnedImpl tools_body(tools_sse);
+  tools_backend_request_->encodeData(tools_body, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  // Aggregated response should contain tools from both backends.
+  EXPECT_THAT(response->body(), testing::HasSubstr("time__clock"));
+  EXPECT_THAT(response->body(), testing::HasSubstr("tools__ai_assist"));
 }
 
 } // namespace
