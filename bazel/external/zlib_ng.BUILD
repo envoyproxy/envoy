@@ -150,6 +150,7 @@ cc_library(
         # This ensures the functable is properly initialized on all platforms.
         "WITH_ALL_FALLBACKS",
     ] + select({
+        "@envoy//bazel:msan_build": ["Z_MEMORY_SANITIZER"],
         "@platforms//os:windows": ["_CRT_NONSTDC_NO_WARNINGS"],
         "//conditions:default": [],
     }),
