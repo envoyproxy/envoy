@@ -217,4 +217,17 @@ uncomment.sh "$1" --comment -h \
   --uncomment-func-decl SSL_CIPHER_get_version \
   --uncomment-func-decl SSL_set0_CA_names \
   --uncomment-func-decl SSL_clear \
-  --uncomment-macro DTLS1_3_VERSION \
+  --uncomment-macro DTLS1_3_VERSION
+
+# Append OpenSSL-specific constants that don't exist in BoringSSL.
+# SSL_ERROR_WANT_CLIENT_HELLO_CB is returned by SSL_get_error() when
+# the client_hello callback returns SSL_CLIENT_HELLO_RETRY.
+cat >> "$1" <<'EOF'
+
+// OpenSSL-specific error code for async client hello callback.
+// This is returned by SSL_get_error() when SSL_CTX_set_client_hello_cb's
+// callback returns SSL_CLIENT_HELLO_RETRY.
+#ifdef ossl_SSL_ERROR_WANT_CLIENT_HELLO_CB
+#define SSL_ERROR_WANT_CLIENT_HELLO_CB ossl_SSL_ERROR_WANT_CLIENT_HELLO_CB
+#endif
+EOF
