@@ -247,9 +247,13 @@ public:
   bool appendLocalOverload() const override { return false; }
   bool appendXForwardedPort() const override { return false; }
   bool addProxyProtocolConnectionState() const override { return true; }
+  const absl::flat_hash_map<uint32_t, std::string>& proxyProtocolPortSchemeMapping() const override {
+    return proxy_protocol_port_scheme_mapping_;
+  }
 
   const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
       config_;
+  absl::flat_hash_map<uint32_t, std::string> proxy_protocol_port_scheme_mapping_;
   NiceMock<Random::MockRandomGenerator> random_;
   RequestIDExtensionSharedPtr request_id_extension_;
   AccessLog::InstanceSharedPtrVector access_logs_;
