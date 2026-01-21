@@ -20,6 +20,22 @@ namespace Sse {
  * - Multiple data fields (concatenated with newlines)
  * - Partial events split across chunks
  * - End-of-stream handling
+ *
+ * Example usage:
+ *   std::string buffer_;
+ *   absl::string_view buffer_view(buffer_);
+ *   while (!buffer_view.empty()) {
+ *     auto [event_end, next_start] = findEventEnd(buffer_view, end_stream);
+ *     if (event_end == absl::string_view::npos) break;
+ *
+ *     auto event_str = buffer_view.substr(0, event_end);
+ *     auto event = parseEvent(event_str);
+ *     if (event.data.has_value()) {
+ *       // Process event.data.value()
+ *     }
+ *     buffer_view = buffer_view.substr(next_start);
+ *   }
+ *   buffer_.erase(0, buffer_.size() - buffer_view.size());
  */
 class SseParser {
 public:
