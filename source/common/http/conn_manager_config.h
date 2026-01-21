@@ -1,7 +1,5 @@
 #pragma once
 
-#include "absl/container/flat_hash_map.h"
-
 #include "envoy/config/config_provider.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/http/early_header_mutation.h"
@@ -21,6 +19,8 @@
 #include "source/common/network/utility.h"
 #include "source/common/stats/symbol_table.h"
 #include "source/common/tracing/tracer_config_impl.h"
+
+#include "absl/container/flat_hash_map.h"
 
 namespace Envoy {
 namespace Http {

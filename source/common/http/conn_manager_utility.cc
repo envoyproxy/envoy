@@ -40,9 +40,8 @@ absl::string_view getScheme(absl::string_view forwarded_proto, bool is_ssl) {
 
 // Determines the scheme (http/https) based on PROXY protocol destination port if configured,
 // otherwise falls back to connection's TLS status.
-absl::string_view
-getSchemeFromProxyProtocolOrConnection(const Network::Connection& connection,
-                                       const ConnectionManagerConfig& config) {
+absl::string_view getSchemeFromProxyProtocolOrConnection(const Network::Connection& connection,
+                                                         const ConnectionManagerConfig& config) {
   const auto& port_scheme_map = config.proxyProtocolPortSchemeMapping();
 
   // If the feature is configured and the local address was restored from PROXY protocol,
