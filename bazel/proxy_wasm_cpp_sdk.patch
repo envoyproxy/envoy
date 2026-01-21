@@ -9,7 +9,7 @@ diff --git a/bazel/defs.bzl b/bazel/defs.bzl
 +        "//command_line_option:fission": "no",
          "//command_line_option:collect_code_coverage": False,
      }
-
+ 
 @@ -30,6 +32,7 @@ _optimized_wasm_cc_binary_transition = transition(
          "//command_line_option:copt",
          "//command_line_option:cxxopt",
@@ -18,12 +18,3 @@ diff --git a/bazel/defs.bzl b/bazel/defs.bzl
          "//command_line_option:collect_code_coverage",
      ],
  )
-@@ -103,8 +106,6 @@ def proxy_wasm_cc_binary(
-             "-sEXPORTED_FUNCTIONS=_malloc",
-             # Allow allocating memory past initial heap size
-             "-sALLOW_MEMORY_GROWTH=1",
--            # Initial amount of heap memory. 64KB matches Rust SDK starting heap size.
--            "-sINITIAL_HEAP=64KB",
-         ],
-         tags = tags + [
-             "manual",
