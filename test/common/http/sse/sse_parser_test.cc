@@ -9,58 +9,75 @@ namespace {
 
 class SseParserTest : public testing::Test {};
 
-// Test extractDataField with single data field
-TEST_F(SseParserTest, ExtractDataFieldSingle) {
+// Test parseEvent with single data field
+TEST_F(SseParserTest, ParseEventSingle) {
   const std::string event = "data: hello world\n";
-  EXPECT_EQ(SseParser::extractDataField(event), "hello world");
+  auto parsed = SseParser::parseEvent(event);
+  ASSERT_TRUE(parsed.data.has_value());
+  EXPECT_EQ(parsed.data.value(), "hello world");
 }
 
-// Test extractDataField with multiple data fields
-TEST_F(SseParserTest, ExtractDataFieldMultiple) {
+// Test parseEvent with multiple data fields
+TEST_F(SseParserTest, ParseEventMultiple) {
   const std::string event = "data: first line\ndata: second line\n";
-  EXPECT_EQ(SseParser::extractDataField(event), "first line\nsecond line");
+  auto parsed = SseParser::parseEvent(event);
+  ASSERT_TRUE(parsed.data.has_value());
+  EXPECT_EQ(parsed.data.value(), "first line\nsecond line");
 }
 
-// Test extractDataField with no data field
-TEST_F(SseParserTest, ExtractDataFieldNone) {
+// Test parseEvent with no data field
+TEST_F(SseParserTest, ParseEventNone) {
   const std::string event = "event: ping\nid: 123\n";
-  EXPECT_EQ(SseParser::extractDataField(event), "");
+  auto parsed = SseParser::parseEvent(event);
+  EXPECT_FALSE(parsed.data.has_value());
 }
 
-// Test extractDataField with empty data field
-TEST_F(SseParserTest, ExtractDataFieldEmpty) {
+// Test parseEvent with empty data field
+TEST_F(SseParserTest, ParseEventEmpty) {
   const std::string event = "data:\n";
-  EXPECT_EQ(SseParser::extractDataField(event), "");
+  auto parsed = SseParser::parseEvent(event);
+  ASSERT_TRUE(parsed.data.has_value());
+  EXPECT_EQ(parsed.data.value(), "");
 }
 
-// Test extractDataField with data field without space after colon
-TEST_F(SseParserTest, ExtractDataFieldNoSpace) {
+// Test parseEvent with data field without space after colon
+TEST_F(SseParserTest, ParseEventNoSpace) {
   const std::string event = "data:nospace\n";
-  EXPECT_EQ(SseParser::extractDataField(event), "nospace");
+  auto parsed = SseParser::parseEvent(event);
+  ASSERT_TRUE(parsed.data.has_value());
+  EXPECT_EQ(parsed.data.value(), "nospace");
 }
 
-// Test extractDataField with comment lines
-TEST_F(SseParserTest, ExtractDataFieldWithComments) {
+// Test parseEvent with comment lines
+TEST_F(SseParserTest, ParseEventWithComments) {
   const std::string event = ": comment line\ndata: actual data\n: another comment\n";
-  EXPECT_EQ(SseParser::extractDataField(event), "actual data");
+  auto parsed = SseParser::parseEvent(event);
+  ASSERT_TRUE(parsed.data.has_value());
+  EXPECT_EQ(parsed.data.value(), "actual data");
 }
 
-// Test extractDataField with mixed fields
-TEST_F(SseParserTest, ExtractDataFieldMixed) {
+// Test parseEvent with mixed fields
+TEST_F(SseParserTest, ParseEventMixed) {
   const std::string event = "event: message\ndata: content\nid: 42\ndata: more content\n";
-  EXPECT_EQ(SseParser::extractDataField(event), "content\nmore content");
+  auto parsed = SseParser::parseEvent(event);
+  ASSERT_TRUE(parsed.data.has_value());
+  EXPECT_EQ(parsed.data.value(), "content\nmore content");
 }
 
-// Test extractDataField with CRLF line endings
-TEST_F(SseParserTest, ExtractDataFieldCRLF) {
+// Test parseEvent with CRLF line endings
+TEST_F(SseParserTest, ParseEventCRLF) {
   const std::string event = "data: test\r\n";
-  EXPECT_EQ(SseParser::extractDataField(event), "test");
+  auto parsed = SseParser::parseEvent(event);
+  ASSERT_TRUE(parsed.data.has_value());
+  EXPECT_EQ(parsed.data.value(), "test");
 }
 
-// Test extractDataField with CR line endings
-TEST_F(SseParserTest, ExtractDataFieldCR) {
+// Test parseEvent with CR line endings
+TEST_F(SseParserTest, ParseEventCR) {
   const std::string event = "data: test\r";
-  EXPECT_EQ(SseParser::extractDataField(event), "test");
+  auto parsed = SseParser::parseEvent(event);
+  ASSERT_TRUE(parsed.data.has_value());
+  EXPECT_EQ(parsed.data.value(), "test");
 }
 
 // Test findEventEnd with complete event (double newline)
@@ -175,70 +192,88 @@ TEST_F(SseParserTest, FindEventEndTrailingCREndStream) {
   EXPECT_EQ(next_event, absl::string_view::npos);
 }
 
-// Test extractDataField with JSON content
-TEST_F(SseParserTest, ExtractDataFieldJSON) {
+// Test parseEvent with JSON content
+TEST_F(SseParserTest, ParseEventJSON) {
   const std::string event = "data: {\"key\":\"value\"}\n";
-  EXPECT_EQ(SseParser::extractDataField(event), "{\"key\":\"value\"}");
+  auto parsed = SseParser::parseEvent(event);
+  ASSERT_TRUE(parsed.data.has_value());
+  EXPECT_EQ(parsed.data.value(), "{\"key\":\"value\"}");
 }
 
-// Test extractDataField with multiline JSON (multiple data fields)
-TEST_F(SseParserTest, ExtractDataFieldMultilineJSON) {
+// Test parseEvent with multiline JSON (multiple data fields)
+TEST_F(SseParserTest, ParseEventMultilineJSON) {
   const std::string event = "data: {\"start\":\n"
                             "data: \"middle\",\n"
                             "data: \"end\":true}\n";
-  EXPECT_EQ(SseParser::extractDataField(event), "{\"start\":\n\"middle\",\n\"end\":true}");
+  auto parsed = SseParser::parseEvent(event);
+  ASSERT_TRUE(parsed.data.has_value());
+  EXPECT_EQ(parsed.data.value(), "{\"start\":\n\"middle\",\n\"end\":true}");
 }
 
 // Test field line with colon in value
-TEST_F(SseParserTest, ExtractDataFieldColonInValue) {
+TEST_F(SseParserTest, ParseEventColonInValue) {
   const std::string event = "data: http://example.com\n";
-  EXPECT_EQ(SseParser::extractDataField(event), "http://example.com");
+  auto parsed = SseParser::parseEvent(event);
+  ASSERT_TRUE(parsed.data.has_value());
+  EXPECT_EQ(parsed.data.value(), "http://example.com");
 }
 
 // Test field line without colon
-TEST_F(SseParserTest, ExtractDataFieldNoColon) {
+TEST_F(SseParserTest, ParseEventNoColon) {
   const std::string event = "dataonly\n";
-  EXPECT_EQ(SseParser::extractDataField(event), "");
+  auto parsed = SseParser::parseEvent(event);
+  EXPECT_FALSE(parsed.data.has_value());
 }
 
 // Test with very long data field
-TEST_F(SseParserTest, ExtractDataFieldLong) {
+TEST_F(SseParserTest, ParseEventLong) {
   std::string long_data(10000, 'x');
   const std::string event = "data: " + long_data + "\n";
-  EXPECT_EQ(SseParser::extractDataField(event), long_data);
+  auto parsed = SseParser::parseEvent(event);
+  ASSERT_TRUE(parsed.data.has_value());
+  EXPECT_EQ(parsed.data.value(), long_data);
 }
 
-// Test extractDataField with Unicode
-TEST_F(SseParserTest, ExtractDataFieldUnicode) {
+// Test parseEvent with Unicode
+TEST_F(SseParserTest, ParseEventUnicode) {
   const std::string event = "data: Hello 世界 🌍\n";
-  EXPECT_EQ(SseParser::extractDataField(event), "Hello 世界 🌍");
+  auto parsed = SseParser::parseEvent(event);
+  ASSERT_TRUE(parsed.data.has_value());
+  EXPECT_EQ(parsed.data.value(), "Hello 世界 🌍");
 }
 
-// Test extractDataField with null bytes
-TEST_F(SseParserTest, ExtractDataFieldNullBytes) {
+// Test parseEvent with null bytes
+TEST_F(SseParserTest, ParseEventNullBytes) {
   const std::string event = std::string("data: hello\0world\n", 18);
-  const std::string result = SseParser::extractDataField(event);
-  EXPECT_EQ(result.size(), 11);
-  EXPECT_EQ(result, std::string("hello\0world", 11));
+  auto parsed = SseParser::parseEvent(event);
+  ASSERT_TRUE(parsed.data.has_value());
+  EXPECT_EQ(parsed.data.value().size(), 11);
+  EXPECT_EQ(parsed.data.value(), std::string("hello\0world", 11));
 }
 
-// Test extractDataField with data field followed by whitespace
-TEST_F(SseParserTest, ExtractDataFieldTrailingSpace) {
+// Test parseEvent with data field followed by whitespace
+TEST_F(SseParserTest, ParseEventTrailingSpace) {
   const std::string event = "data: value \n";
-  EXPECT_EQ(SseParser::extractDataField(event), "value ");
+  auto parsed = SseParser::parseEvent(event);
+  ASSERT_TRUE(parsed.data.has_value());
+  EXPECT_EQ(parsed.data.value(), "value ");
 }
 
-// Test extractDataField with multiple spaces after colon
-TEST_F(SseParserTest, ExtractDataFieldMultipleSpaces) {
+// Test parseEvent with multiple spaces after colon
+TEST_F(SseParserTest, ParseEventMultipleSpaces) {
   const std::string event = "data:  extra spaces\n";
-  EXPECT_EQ(SseParser::extractDataField(event), " extra spaces");
+  auto parsed = SseParser::parseEvent(event);
+  ASSERT_TRUE(parsed.data.has_value());
+  EXPECT_EQ(parsed.data.value(), " extra spaces");
 }
 
-// Test extractDataField with tab after colon
+// Test parseEvent with tab after colon
 // Per SSE spec, only space character (not tab) is stripped
-TEST_F(SseParserTest, ExtractDataFieldTab) {
+TEST_F(SseParserTest, ParseEventTab) {
   const std::string event = "data:\tvalue\n";
-  EXPECT_EQ(SseParser::extractDataField(event), "\tvalue");
+  auto parsed = SseParser::parseEvent(event);
+  ASSERT_TRUE(parsed.data.has_value());
+  EXPECT_EQ(parsed.data.value(), "\tvalue");
 }
 
 // Test findEventEnd with three consecutive blank lines
@@ -281,23 +316,27 @@ TEST_F(SseParserTest, FindEventEndDoubleCR) {
   EXPECT_EQ(next_event, 12);
 }
 
-// Test extractDataField with field name containing whitespace
-TEST_F(SseParserTest, ExtractDataFieldWhitespaceInFieldName) {
+// Test parseEvent with field name containing whitespace
+TEST_F(SseParserTest, ParseEventWhitespaceInFieldName) {
   const std::string event = "data extra: value\n";
   // Per SSE spec, field name is until first colon, so "data extra" is the field name
-  EXPECT_EQ(SseParser::extractDataField(event), "");
+  auto parsed = SseParser::parseEvent(event);
+  EXPECT_FALSE(parsed.data.has_value());
 }
 
-// Test extractDataField with only colon
-TEST_F(SseParserTest, ExtractDataFieldOnlyColon) {
+// Test parseEvent with only colon
+TEST_F(SseParserTest, ParseEventOnlyColon) {
   const std::string event = ":\n";
-  EXPECT_EQ(SseParser::extractDataField(event), "");
+  auto parsed = SseParser::parseEvent(event);
+  EXPECT_FALSE(parsed.data.has_value());
 }
 
-// Test extractDataField with data field mixed with event field
-TEST_F(SseParserTest, ExtractDataFieldWithEventField) {
+// Test parseEvent with data field mixed with event field
+TEST_F(SseParserTest, ParseEventWithEventField) {
   const std::string event = "event: custom\ndata: value\n";
-  EXPECT_EQ(SseParser::extractDataField(event), "value");
+  auto parsed = SseParser::parseEvent(event);
+  ASSERT_TRUE(parsed.data.has_value());
+  EXPECT_EQ(parsed.data.value(), "value");
 }
 
 // Test findEventEnd with very long line
@@ -308,10 +347,12 @@ TEST_F(SseParserTest, FindEventEndLongLine) {
   EXPECT_EQ(next_event, 10008);
 }
 
-// Test extractDataField with multiple data fields separated by other fields
-TEST_F(SseParserTest, ExtractDataFieldInterspersed) {
+// Test parseEvent with multiple data fields separated by other fields
+TEST_F(SseParserTest, ParseEventInterspersed) {
   const std::string event = "data: first\nid: 123\ndata: second\nevent: msg\ndata: third\n";
-  EXPECT_EQ(SseParser::extractDataField(event), "first\nsecond\nthird");
+  auto parsed = SseParser::parseEvent(event);
+  ASSERT_TRUE(parsed.data.has_value());
+  EXPECT_EQ(parsed.data.value(), "first\nsecond\nthird");
 }
 
 // Test findEventEnd with only comments
@@ -322,10 +363,11 @@ TEST_F(SseParserTest, FindEventEndOnlyComments) {
   EXPECT_EQ(next_event, 25);
 }
 
-// Test extractDataField with empty string
-TEST_F(SseParserTest, ExtractDataFieldEmptyString) {
+// Test parseEvent with empty string
+TEST_F(SseParserTest, ParseEventEmptyString) {
   const std::string event = "";
-  EXPECT_EQ(SseParser::extractDataField(event), "");
+  auto parsed = SseParser::parseEvent(event);
+  EXPECT_FALSE(parsed.data.has_value());
 }
 
 // Test findEventEnd with single newline at end
@@ -344,16 +386,20 @@ TEST_F(SseParserTest, FindEventEndTrailingCRWithData) {
   EXPECT_EQ(event_end, absl::string_view::npos);
 }
 
-// Test extractDataField with empty lines to exercise parseFieldLine empty line case
-TEST_F(SseParserTest, ExtractDataFieldWithEmptyLines) {
+// Test parseEvent with empty lines to exercise parseFieldLine empty line case
+TEST_F(SseParserTest, ParseEventWithEmptyLines) {
   const std::string event = "\ndata: test\n\n";
-  EXPECT_EQ(SseParser::extractDataField(event), "test");
+  auto parsed = SseParser::parseEvent(event);
+  ASSERT_TRUE(parsed.data.has_value());
+  EXPECT_EQ(parsed.data.value(), "test");
 }
 
-// Test extractDataField with no line ending (exercises findLineEnd with end_stream=true)
-TEST_F(SseParserTest, ExtractDataFieldNoLineEnding) {
+// Test parseEvent with no line ending (exercises findLineEnd with end_stream=true)
+TEST_F(SseParserTest, ParseEventNoLineEnding) {
   const std::string event = "data: test";
-  EXPECT_EQ(SseParser::extractDataField(event), "test");
+  auto parsed = SseParser::parseEvent(event);
+  ASSERT_TRUE(parsed.data.has_value());
+  EXPECT_EQ(parsed.data.value(), "test");
 }
 
 // Test findEventEnd with data without newline and end_stream=true

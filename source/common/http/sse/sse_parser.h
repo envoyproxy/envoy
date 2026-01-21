@@ -4,6 +4,7 @@
 #include <utility>
 
 #include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Http {
@@ -23,24 +24,36 @@ namespace Sse {
 class SseParser {
 public:
   /**
-   * Extracts and concatenates all 'data' field values from an SSE event.
-   * Per SSE spec, multiple data fields are joined with newlines.
+   * Represents a parsed SSE event.
+   * Currently only supports the 'data' field. Future versions may add 'id', 'event', and 'retry'.
+   */
+  struct ParsedEvent {
+    // The concatenated data field values. Per SSE spec, multiple data fields are joined with
+    // newlines. absl::nullopt if no data fields present, empty string if data field exists but
+    // empty.
+    absl::optional<std::string> data;
+  };
+
+  /**
+   * Parses an SSE event and extracts fields.
+   * Currently extracts only the 'data' field. Per SSE spec, multiple data fields are joined with
+   * newlines.
    *
    * @param event the complete SSE event string (from blank line to blank line).
-   * @return concatenated data field values, or empty string if no data fields found.
+   * @return parsed event with available fields populated.
    */
-  static std::string extractDataField(absl::string_view event);
+  static ParsedEvent parseEvent(absl::string_view event);
 
   /**
    * Finds the end of the next SSE event in the buffer.
    * An event ends with a blank line (two consecutive line breaks).
    *
-   * @param str the buffer to search for an event.
+   * @param buffer the buffer to search for an event.
    * @param end_stream whether this is the end of the stream (affects partial line handling).
    * @return a pair of {event_end, next_event_start} positions.
    *         Returns {npos, npos} if no complete event is found.
    */
-  static std::pair<size_t, size_t> findEventEnd(absl::string_view str, bool end_stream);
+  static std::pair<size_t, size_t> findEventEnd(absl::string_view buffer, bool end_stream);
 
 private:
   /**

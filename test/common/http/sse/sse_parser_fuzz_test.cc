@@ -10,8 +10,8 @@ namespace Fuzz {
 DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   const absl::string_view input(reinterpret_cast<const char*>(buf), len);
 
-  // Fuzz extractDataField with arbitrary input
-  Http::Sse::SseParser::extractDataField(input);
+  // Fuzz parseEvent with arbitrary input
+  Http::Sse::SseParser::parseEvent(input);
 
   // Fuzz findEventEnd with end_stream = false
   Http::Sse::SseParser::findEventEnd(input, false);
@@ -22,7 +22,7 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   auto [event_end, next_event] = Http::Sse::SseParser::findEventEnd(input, false);
   if (event_end != absl::string_view::npos) {
     absl::string_view event = input.substr(0, event_end);
-    Http::Sse::SseParser::extractDataField(event);
+    Http::Sse::SseParser::parseEvent(event);
 
     // If there's more data after the event, continue parsing
     if (next_event < input.size()) {
@@ -45,9 +45,9 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
       Http::Sse::SseParser::findEventEnd(first_chunk, false);
       Http::Sse::SseParser::findEventEnd(first_chunk, true);
 
-      // Extract data from each chunk
-      Http::Sse::SseParser::extractDataField(first_chunk);
-      Http::Sse::SseParser::extractDataField(second_chunk);
+      // Parse events from each chunk
+      Http::Sse::SseParser::parseEvent(first_chunk);
+      Http::Sse::SseParser::parseEvent(second_chunk);
 
       // Test concatenation: typical chunked streaming pattern
       if (split > 0 && split < len) {
@@ -56,7 +56,7 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
         if (chunk_event_end == absl::string_view::npos) {
           std::string combined = std::string(first_chunk) + std::string(second_chunk);
           Http::Sse::SseParser::findEventEnd(combined, false);
-          Http::Sse::SseParser::extractDataField(combined);
+          Http::Sse::SseParser::parseEvent(combined);
         }
       }
     }

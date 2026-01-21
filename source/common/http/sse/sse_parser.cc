@@ -9,7 +9,7 @@ namespace Envoy {
 namespace Http {
 namespace Sse {
 
-std::string SseParser::extractDataField(absl::string_view event) {
+SseParser::ParsedEvent SseParser::parseEvent(absl::string_view event) {
   std::vector<absl::string_view> data_fields;
   absl::string_view remaining = event;
 
@@ -24,13 +24,17 @@ std::string SseParser::extractDataField(absl::string_view event) {
     }
   }
 
-  // Per SSE spec, multiple data fields are concatenated with newline.
-  return absl::StrJoin(data_fields, "\n");
+  ParsedEvent parsed_event;
+  // Per SSE spec, multiple data fields are concatenated with newlines.
+  if (!data_fields.empty()) {
+    parsed_event.data = absl::StrJoin(data_fields, "\n");
+  }
+  return parsed_event;
 }
 
-std::pair<size_t, size_t> SseParser::findEventEnd(absl::string_view str, bool end_stream) {
+std::pair<size_t, size_t> SseParser::findEventEnd(absl::string_view buffer, bool end_stream) {
   size_t consumed = 0;
-  absl::string_view remaining = str;
+  absl::string_view remaining = buffer;
 
   while (!remaining.empty()) {
     auto [line_end, next_line] = findLineEnd(remaining, end_stream);
