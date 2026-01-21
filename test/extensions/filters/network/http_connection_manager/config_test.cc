@@ -3880,7 +3880,8 @@ http_filters:
 }
 
 // Test invalid scheme in set_forwarded_proto_from_proxy_protocol_destination_port.
-TEST_F(HttpConnectionManagerConfigTest, SetForwardedProtoFromProxyProtocolDestinationPortInvalidScheme) {
+TEST_F(HttpConnectionManagerConfigTest,
+       SetForwardedProtoFromProxyProtocolDestinationPortInvalidScheme) {
   const std::string yaml_string = R"EOF(
 codec_type: http1
 stat_prefix: router
@@ -3909,8 +3910,7 @@ http_filters:
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   EXPECT_FALSE(creation_status_.ok());
-  EXPECT_THAT(creation_status_.message(),
-              testing::HasSubstr("Invalid scheme 'ftp' for port 80"));
+  EXPECT_THAT(creation_status_.message(), testing::HasSubstr("Invalid scheme 'ftp' for port 80"));
 }
 
 // Test empty port_scheme_mappings is valid (feature disabled).
