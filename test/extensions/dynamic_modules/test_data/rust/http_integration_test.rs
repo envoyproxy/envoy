@@ -72,6 +72,7 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
       }))
     },
     "streaming_terminal_filter" => Some(Box::new(StreamingTerminalFilterConfig {})),
+    "buffer_limit_filter" => Some(Box::new(BufferLimitFilterConfig {})),
     "http_stream_basic" => Some(Box::new(HttpStreamBasicConfig {
       cluster_name: String::from_utf8(config.to_owned()).unwrap(),
     })),
@@ -1252,6 +1253,88 @@ impl StreamingTerminalHttpFilter {
     let chunk = vec![b'a'; chunk_size];
     envoy_filter.send_response_data(&chunk, false);
     self.large_response_bytes_sent += chunk_size;
+  }
+}
+
+// =============================================================================
+// Buffer Limit Test Filter
+// =============================================================================
+
+// Non-terminal filter that tests buffer limit and watermark callbacks.
+// This filter demonstrates:
+// - Getting and setting buffer limits via get_buffer_limit() and set_buffer_limit()
+// - Receiving downstream watermark events (automatically registered for all filters)
+//
+// The filter returns the buffer limit in a response header and tracks watermark events.
+struct BufferLimitFilterConfig {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for BufferLimitFilterConfig {
+  fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    Box::new(BufferLimitFilter {
+      initial_buffer_limit: 0,
+      above_watermark_count: 0,
+      below_watermark_count: 0,
+    })
+  }
+}
+
+struct BufferLimitFilter {
+  initial_buffer_limit: u64,
+  above_watermark_count: usize,
+  below_watermark_count: usize,
+}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BufferLimitFilter {
+  fn on_request_headers(
+    &mut self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> envoy_dynamic_module_type_on_http_filter_request_headers_status {
+    // Get the initial buffer limit.
+    self.initial_buffer_limit = envoy_filter.get_buffer_limit();
+
+    // Increase the buffer limit if it's below our desired value.
+    let desired_limit: u64 = 65536;
+    if self.initial_buffer_limit < desired_limit {
+      envoy_filter.set_buffer_limit(desired_limit);
+    }
+
+    envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
+  }
+
+  fn on_response_headers(
+    &mut self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> envoy_dynamic_module_type_on_http_filter_response_headers_status {
+    // Add headers with buffer limit and watermark info.
+    envoy_filter.add_response_header(
+      "x-initial-buffer-limit",
+      self.initial_buffer_limit.to_string().as_bytes(),
+    );
+    let current_limit = envoy_filter.get_buffer_limit();
+    envoy_filter.add_response_header(
+      "x-current-buffer-limit",
+      current_limit.to_string().as_bytes(),
+    );
+    envoy_filter.add_response_header(
+      "x-above-watermark-count",
+      self.above_watermark_count.to_string().as_bytes(),
+    );
+    envoy_filter.add_response_header(
+      "x-below-watermark-count",
+      self.below_watermark_count.to_string().as_bytes(),
+    );
+
+    envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
+  }
+
+  fn on_downstream_above_write_buffer_high_watermark(&mut self, _envoy_filter: &mut EHF) {
+    self.above_watermark_count += 1;
+  }
+
+  fn on_downstream_below_write_buffer_low_watermark(&mut self, _envoy_filter: &mut EHF) {
+    self.below_watermark_count += 1;
   }
 }
 

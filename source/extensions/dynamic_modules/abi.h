@@ -2017,6 +2017,34 @@ bool envoy_dynamic_module_callback_http_get_socket_option_bytes(
     envoy_dynamic_module_type_socket_direction direction,
     envoy_dynamic_module_type_envoy_buffer* value_out);
 
+// ------------------- HTTP filter buffer limit callbacks --------------------
+
+/**
+ * envoy_dynamic_module_callback_http_get_buffer_limit retrieves the current buffer limit for the
+ * HTTP filter. This is the maximum amount of data that can be buffered for body data before
+ * backpressure is applied. A buffer limit of 0 bytes indicates no limits are applied.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
+ * @return the current buffer limit in bytes.
+ */
+uint64_t envoy_dynamic_module_callback_http_get_buffer_limit(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_http_set_buffer_limit sets the buffer limit for the HTTP filter.
+ * This controls the maximum amount of data that can be buffered for body data before backpressure
+ * is applied.
+ *
+ * It is recommended (but not required) that filters calling this function should generally only
+ * perform increases to the buffer limit, to avoid potentially conflicting with the buffer
+ * requirements of other filters in the chain.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
+ * @param limit is the desired buffer limit in bytes.
+ */
+void envoy_dynamic_module_callback_http_set_buffer_limit(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, uint64_t limit);
+
 // ----------------------------- Tracing callbacks -----------------------------
 
 /**
