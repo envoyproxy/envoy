@@ -636,6 +636,15 @@ Current supported substitution commands include:
   UDP
     Not implemented. It will appear as ``"-"`` in the access logs.
 
+.. _config_access_log_format_downstream_local_close_reason:
+
+%DOWNSTREAM_LOCAL_CLOSE_REASON%
+  HTTP/TCP
+    If downstream connection was closed locally, provides the reason.
+
+  UDP
+    Not implemented ("-")
+
 ``%DOWNSTREAM_REMOTE_ADDRESS%``
   Remote address of the downstream connection. If the address is an IP address, it includes both
   address and port.
