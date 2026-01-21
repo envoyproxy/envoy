@@ -1,7 +1,8 @@
 load("@aspect_bazel_lib//lib:jq.bzl", "jq")
 load("@envoy_repo//:path.bzl", "PATH")
+load("@envoy_toolshed//:utils.bzl", "json_merge")
 load("@rules_python//python:defs.bzl", "py_binary")
-load("//tools/base:envoy_python.bzl", "envoy_genjson", "envoy_py_data")
+load("//tools/base:envoy_python.bzl", "envoy_py_data")
 
 licenses(["notice"])  # Apache 2
 
@@ -53,7 +54,7 @@ jq(
     """,
 )
 
-envoy_genjson(
+json_merge(
     name = "data_srcs",
     srcs = [
         ":proto_targets",

@@ -922,6 +922,19 @@ TEST_F(DynamicModuleAccessLogAbiTest, IsTraceSampled) {
   EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_is_trace_sampled(env_ptr));
 }
 
+// =============================================================================
+// Misc ABI Callback Tests
+// =============================================================================
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetWorkerIndex) {
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  // The worker_index is set to 1 in createThreadLocalLogger.
+  uint32_t worker_index = envoy_dynamic_module_callback_access_logger_get_worker_index(env_ptr);
+  EXPECT_EQ(1u, worker_index);
+}
+
 } // namespace
 } // namespace DynamicModules
 } // namespace AccessLoggers

@@ -92,6 +92,19 @@ TEST_F(McpJsonParserTest, ToolsCallExtraction) {
   EXPECT_EQ(value->string_value(), "calculator");
 }
 
+TEST_F(McpJsonParserTest, ResourcesListExtraction) {
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "resources/list",
+    "id": 100
+  })";
+
+  EXPECT_OK(parser_->parse(json));
+
+  EXPECT_TRUE(parser_->isValidMcpRequest());
+  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::RESOURCES_LIST);
+}
+
 TEST_F(McpJsonParserTest, ResourcesReadExtraction) {
   std::string json = R"({
     "jsonrpc": "2.0",
@@ -110,6 +123,59 @@ TEST_F(McpJsonParserTest, ResourcesReadExtraction) {
   const auto* value = parser_->getNestedValue("params.uri");
   ASSERT_NE(value, nullptr);
   EXPECT_EQ(value->string_value(), "file:///path/to/resource.txt");
+}
+
+TEST_F(McpJsonParserTest, ResourcesSubscribeExtraction) {
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "resources/subscribe",
+    "params": {
+      "uri": "file:///config/settings.json"
+    },
+    "id": 102
+  })";
+
+  EXPECT_OK(parser_->parse(json));
+
+  EXPECT_TRUE(parser_->isValidMcpRequest());
+  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::RESOURCES_SUBSCRIBE);
+
+  const auto* value = parser_->getNestedValue("params.uri");
+  ASSERT_NE(value, nullptr);
+  EXPECT_EQ(value->string_value(), "file:///config/settings.json");
+}
+
+TEST_F(McpJsonParserTest, ResourcesUnsubscribeExtraction) {
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "resources/unsubscribe",
+    "params": {
+      "uri": "file:///config/settings.json"
+    },
+    "id": 103
+  })";
+
+  EXPECT_OK(parser_->parse(json));
+
+  EXPECT_TRUE(parser_->isValidMcpRequest());
+  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::RESOURCES_UNSUBSCRIBE);
+
+  const auto* value = parser_->getNestedValue("params.uri");
+  ASSERT_NE(value, nullptr);
+  EXPECT_EQ(value->string_value(), "file:///config/settings.json");
+}
+
+TEST_F(McpJsonParserTest, PromptsListExtraction) {
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "prompts/list",
+    "id": 200
+  })";
+
+  EXPECT_OK(parser_->parse(json));
+
+  EXPECT_TRUE(parser_->isValidMcpRequest());
+  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::PROMPTS_LIST);
 }
 
 TEST_F(McpJsonParserTest, PromptsGetExtraction) {

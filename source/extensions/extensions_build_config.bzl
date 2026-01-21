@@ -614,8 +614,9 @@ EXTENSIONS = {
     "envoy.tls.certificate_selectors.on_demand_secret":                  "//source/extensions/transport_sockets/tls/cert_selectors/on_demand:config",
 
     # Certificate mappers
-    "envoy.tls.certificate_mappers.static_name":                  "//source/extensions/transport_sockets/tls/cert_mappers/static_name:config",
-    "envoy.tls.certificate_mappers.sni":                  "//source/extensions/transport_sockets/tls/cert_mappers/sni:config",
+    "envoy.tls.certificate_mappers.sni":                            "//source/extensions/transport_sockets/tls/cert_mappers/sni:config",
+    "envoy.tls.certificate_mappers.static_name":                    "//source/extensions/transport_sockets/tls/cert_mappers/static_name:config",
+    "envoy.tls.upstream_certificate_mappers.filter_state_override": "//source/extensions/transport_sockets/tls/cert_mappers/filter_state_override:config",
 
     # Local address selectors
     "envoy.upstream.local_address_selector.filter_state_override": "//source/extensions/local_address_selectors/filter_state_override:config",

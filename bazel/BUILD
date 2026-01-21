@@ -3,6 +3,7 @@ load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
 load("@envoy_api//bazel:repository_locations.bzl", API_REPOSITORY_LOCATIONS_SPEC = "REPOSITORY_LOCATIONS_SPEC")
 load("@envoy_api//bazel:repository_locations_utils.bzl", "load_repository_locations_spec", "merge_dicts")
 load("@envoy_toolshed//:macros.bzl", "json_data")
+load("@envoy_toolshed//:utils.bzl", "json_merge")
 load("@envoy_toolshed//dependency:macros.bzl", "updater")
 load("@rules_cc//cc:defs.bzl", "cc_library")
 load("@rules_shell//shell:sh_library.bzl", "sh_library")
@@ -18,6 +19,7 @@ exports_files([
     "sh_test_wrapper.sh",
     "test_for_benchmark_wrapper.sh",
     "repository_locations.bzl",
+    "deps.yaml",
     "exported_symbols.txt",
     "exported_symbols_apple.txt",
 ])
@@ -538,7 +540,7 @@ config_setting(
 alias(
     name = "zlib",
     actual = select({
-        "//bazel:zlib_ng": "//bazel/foreign_cc:zlib_ng",
+        "//bazel:zlib_ng": "@com_github_zlib_ng_zlib_ng//:zlib",
         "//conditions:default": "@zlib",
     }),
 )
@@ -913,16 +915,72 @@ alias(
 )
 
 json_data(
-    name = "repository_locations",
+    name = "repository_locations_version_info",
     data = load_repository_locations_spec(REPOSITORY_LOCATIONS_SPEC),
 )
 
+json_merge(
+    name = "repository_locations",
+    srcs = [":repository_locations_version_info"],
+    filter = """
+    .[0] as $versions
+    | .[1] as $metadata
+    | $versions
+    | keys
+    | reduce .[] as $k ({};
+        . + {($k): (
+          ($versions[$k] + ($metadata[$k] // {}))
+          | .version as $ver
+          | if .license_url and $ver then
+              .license_url |= (
+                gsub("{version}"; $ver)
+                | gsub("{dash_version}"; ($ver | gsub("[.]"; "-")))
+                | gsub("{underscore_version}"; ($ver | gsub("[.]"; "_")))
+              )
+            else . end
+        )}
+      )
+    """,
+    visibility = ["//visibility:public"],
+    yaml_srcs = [":deps.yaml"],
+)
+
 json_data(
-    name = "all_repository_locations",
+    name = "all_repository_locations_version_info",
     data = merge_dicts(
         load_repository_locations_spec(REPOSITORY_LOCATIONS_SPEC),
         load_repository_locations_spec(API_REPOSITORY_LOCATIONS_SPEC),
     ),
+)
+
+json_merge(
+    name = "all_repository_locations",
+    srcs = [":all_repository_locations_version_info"],
+    filter = """
+    .[0] as $versions
+    | .[1] as $metadata1
+    | .[2] as $metadata2
+    | ($metadata1 * $metadata2) as $metadata
+    | $versions
+    | keys
+    | reduce .[] as $k ({};
+        . + {($k): (
+          ($versions[$k] + ($metadata[$k] // {}))
+          | .version as $ver
+          | if .license_url and $ver then
+              .license_url |= (
+                gsub("{version}"; $ver)
+                | gsub("{dash_version}"; ($ver | gsub("[.]"; "-")))
+                | gsub("{underscore_version}"; ($ver | gsub("[.]"; "_")))
+              )
+            else . end
+        )}
+      )
+    """,
+    yaml_srcs = [
+        ":deps.yaml",
+        "@envoy_api//bazel:deps.yaml",
+    ],
 )
 
 # A dependency required by python protobuf
