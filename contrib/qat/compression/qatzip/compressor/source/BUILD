@@ -30,8 +30,8 @@ configure_make(
     # for the linker to find with -lnuma. Include zlib_ng_archive when building
     # with zlib-ng so that libz.a is available for the configure script.
     data = ["//bazel/external:numa_archive"] + select({
-        "//bazel:zlib_ng": ["//bazel/external:zlib_ng_archive"],
-        "//conditions:default": [],
+        "//bazel:zlib_original": [],
+        "//conditions:default": ["//bazel/external:zlib_ng_archive"],
     }),
     # Point to the directory containing the libnuma.a and libz.a archives.
     # The cc_library targets don't produce files that can be found with -lnuma
