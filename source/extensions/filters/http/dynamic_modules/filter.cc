@@ -22,6 +22,10 @@ void DynamicModuleHttpFilter::onStreamComplete() {
 
 void DynamicModuleHttpFilter::onDestroy() {
   destroyed_ = true;
+  // Remove watermark callbacks before destroying.
+  if (decoder_callbacks_ != nullptr) {
+    decoder_callbacks_->removeDownstreamWatermarkCallbacks(*this);
+  }
   destroy();
 };
 
