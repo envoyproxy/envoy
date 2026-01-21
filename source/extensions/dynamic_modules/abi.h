@@ -2045,36 +2045,6 @@ uint64_t envoy_dynamic_module_callback_http_get_buffer_limit(
 void envoy_dynamic_module_callback_http_set_buffer_limit(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, uint64_t limit);
 
-// ------------------- Downstream watermark callbacks --------------------
-
-/**
- * envoy_dynamic_module_callback_http_filter_add_downstream_watermark_callbacks subscribes the
- * filter to downstream watermark events.
- *
- * After calling this function, the filter will receive
- * envoy_dynamic_module_on_http_filter_downstream_above_write_buffer_high_watermark and
- * envoy_dynamic_module_on_http_filter_downstream_below_write_buffer_low_watermark callbacks when
- * the downstream connection's write buffer crosses the high and low watermarks respectively.
- *
- * This is useful for implementing flow control in streaming scenarios. Note that terminal filters
- * are automatically registered for these events.
- *
- * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
- */
-void envoy_dynamic_module_callback_http_filter_add_downstream_watermark_callbacks(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
-
-/**
- * envoy_dynamic_module_callback_http_filter_remove_downstream_watermark_callbacks unsubscribes the
- * filter from downstream watermark events.
- *
- * After calling this function, the filter will no longer receive downstream watermark events.
- *
- * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
- */
-void envoy_dynamic_module_callback_http_filter_remove_downstream_watermark_callbacks(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
-
 // ----------------------------- Tracing callbacks -----------------------------
 
 /**

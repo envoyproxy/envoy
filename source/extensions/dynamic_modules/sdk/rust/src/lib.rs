@@ -1445,23 +1445,6 @@ pub trait EnvoyHttpFilter {
   /// ```
   fn set_buffer_limit(&mut self, limit: u64);
 
-  // ------------------- Downstream watermark callbacks -------------------------
-
-  /// Subscribe to downstream watermark events.
-  ///
-  /// After calling this method, the filter will receive
-  /// [`HttpFilter::on_downstream_above_write_buffer_high_watermark`] and
-  /// [`HttpFilter::on_downstream_below_write_buffer_low_watermark`] callbacks when the
-  /// downstream connection's write buffer crosses the high and low watermarks respectively.
-  ///
-  /// This is useful for implementing flow control in streaming scenarios.
-  fn add_downstream_watermark_callbacks(&mut self);
-
-  /// Unsubscribe from downstream watermark events.
-  ///
-  /// After calling this method, the filter will no longer receive downstream watermark events.
-  fn remove_downstream_watermark_callbacks(&mut self);
-
   // ----------------------------- Tracing methods -----------------------------
 
   /// Get the active tracing span for the current HTTP stream.
@@ -2976,22 +2959,6 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
 
   fn set_buffer_limit(&mut self, limit: u64) {
     unsafe { abi::envoy_dynamic_module_callback_http_set_buffer_limit(self.raw_ptr, limit) }
-  }
-
-  fn add_downstream_watermark_callbacks(&mut self) {
-    unsafe {
-      abi::envoy_dynamic_module_callback_http_filter_add_downstream_watermark_callbacks(
-        self.raw_ptr,
-      )
-    }
-  }
-
-  fn remove_downstream_watermark_callbacks(&mut self) {
-    unsafe {
-      abi::envoy_dynamic_module_callback_http_filter_remove_downstream_watermark_callbacks(
-        self.raw_ptr,
-      )
-    }
   }
 
   fn get_active_span<'a>(&'a self) -> Option<Box<dyn EnvoySpan + 'a>> {

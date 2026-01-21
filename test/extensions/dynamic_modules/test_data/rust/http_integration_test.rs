@@ -1263,8 +1263,7 @@ impl StreamingTerminalHttpFilter {
 // Non-terminal filter that tests buffer limit and watermark callbacks.
 // This filter demonstrates:
 // - Getting and setting buffer limits via get_buffer_limit() and set_buffer_limit()
-// - Subscribing to downstream watermark events via add_downstream_watermark_callbacks()
-// - Unsubscribing via remove_downstream_watermark_callbacks()
+// - Receiving downstream watermark events (automatically registered for all filters)
 //
 // The filter returns the buffer limit in a response header and tracks watermark events.
 struct BufferLimitFilterConfig {}
@@ -1300,9 +1299,6 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BufferLimitFilter {
       envoy_filter.set_buffer_limit(desired_limit);
     }
 
-    // Subscribe to downstream watermark events.
-    envoy_filter.add_downstream_watermark_callbacks();
-
     envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
   }
 
@@ -1331,11 +1327,6 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BufferLimitFilter {
     );
 
     envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
-  }
-
-  fn on_stream_complete(&mut self, envoy_filter: &mut EHF) {
-    // Unsubscribe from watermark events before destruction.
-    envoy_filter.remove_downstream_watermark_callbacks();
   }
 
   fn on_downstream_above_write_buffer_high_watermark(&mut self, _envoy_filter: &mut EHF) {

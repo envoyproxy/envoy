@@ -260,26 +260,3 @@ fn test_buffer_limit_callbacks() {
 
   envoy_filter.set_buffer_limit(2048);
 }
-
-#[test]
-fn test_downstream_watermark_callbacks() {
-  use envoy_proxy_dynamic_modules_rust_sdk::*;
-
-  let mut envoy_filter = MockEnvoyHttpFilter::default();
-
-  // Test add_downstream_watermark_callbacks.
-  envoy_filter
-    .expect_add_downstream_watermark_callbacks()
-    .return_const(())
-    .once();
-
-  envoy_filter.add_downstream_watermark_callbacks();
-
-  // Test remove_downstream_watermark_callbacks.
-  envoy_filter
-    .expect_remove_downstream_watermark_callbacks()
-    .return_const(())
-    .once();
-
-  envoy_filter.remove_downstream_watermark_callbacks();
-}

@@ -1404,18 +1404,6 @@ void envoy_dynamic_module_callback_http_set_buffer_limit(
   callbacks->setBufferLimit(limit);
 }
 
-void envoy_dynamic_module_callback_http_filter_add_downstream_watermark_callbacks(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr) {
-  auto* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
-  filter->addDownstreamWatermarkCallbacks();
-}
-
-void envoy_dynamic_module_callback_http_filter_remove_downstream_watermark_callbacks(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr) {
-  auto* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
-  filter->removeDownstreamWatermarkCallbacks();
-}
-
 envoy_dynamic_module_type_http_callout_init_result
 envoy_dynamic_module_callback_http_filter_http_callout(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, uint64_t* callout_id,
