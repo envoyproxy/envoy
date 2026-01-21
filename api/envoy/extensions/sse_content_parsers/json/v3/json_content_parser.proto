@@ -22,12 +22,11 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.sse_content_parsers.json]
 
 // Configuration for the JSON content parser.
-// [#next-free-field: 3]
 message JsonContentParser {
   // The rules to apply for extracting values from JSON in SSE events.
   // Rules are evaluated in order for each event.
   // At least one rule must be specified.
-  repeated envoy.extensions.filters.http.json_to_metadata.v3.JsonToMetadata.Rule rules = 1
+  repeated filters.http.json_to_metadata.v3.JsonToMetadata.Rule rules = 1
       [(validate.rules).repeated = {min_items: 1}];
 
   // If true, stop processing the stream after the first rule successfully matches (on_present executes).
