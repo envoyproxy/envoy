@@ -306,7 +306,7 @@ TEST_F(StatsAccessLoggerTest, StatTagFilter) {
           tags:
             - name: foo
               value_format: bar
-          filter:
+          custom:
             matcher_tree:
               input:
                 name: stat_tag_value_input
@@ -337,7 +337,7 @@ TEST_F(StatsAccessLoggerTest, StatTagFilter) {
           tags:
             - name: foo
               value_format: baz
-          filter:
+          custom:
             matcher_tree:
               input:
                 name: stat_tag_value_input
@@ -370,7 +370,7 @@ TEST_F(StatsAccessLoggerTest, StatTagFilterErrorType) {
           tags:
             - name: error.type
               value_format: "-"
-          filter:
+          custom:
             matcher_tree:
               input:
                 name: stat_tag_value_input
@@ -401,7 +401,7 @@ TEST_F(StatsAccessLoggerTest, StatTagFilterErrorType) {
           tags:
             - name: error.type
               value_format: "UH"
-          filter:
+          custom:
             matcher_tree:
               input:
                 name: stat_tag_value_input
@@ -434,7 +434,7 @@ TEST_F(StatsAccessLoggerTest, StatTagFilterInsertTag) {
           tags:
             - name: foo
               value_format: bar
-          filter:
+          custom:
             matcher_tree:
               input:
                 name: stat_tag_value_input
@@ -478,7 +478,7 @@ TEST_F(StatsAccessLoggerTest, StatTagFilterDropTag) {
           tags:
             - name: foo
               value_format: bar
-          filter:
+          custom:
             matcher_tree:
               input:
                 name: stat_tag_value_input
