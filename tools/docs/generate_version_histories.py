@@ -43,7 +43,8 @@ Stable versions
   :maxdepth: 2
   :caption: Changelog
 {% for version in stable_versions %}
-  v{{ version.base_version }}: {{ version.release_version }} ({{ version.release_date }}) <v{{ version.base_version }}/v{{ version.base_version }}>
+  v{{ version.base_version }}: {{ version.release_version }} ({{ version.release_date }}) <v{{
+    version.base_version }}/v{{ version.base_version }}>
 {%- endfor %}
 
 Archived versions
@@ -55,7 +56,8 @@ Archived versions
   :titlesonly:
   :maxdepth: 1
 {% for version in archived_versions %}
-  v{{ version.base_version }}: {{ version.release_version }} ({{ version.release_date }}) <v{{ version.base_version }}/v{{ version.base_version }}>
+  v{{ version.base_version }}: {{ version.release_version }} ({{ version.release_date }}) <v{{
+    version.base_version }}/v{{ version.base_version }}>
 {%- endfor %}
 
 .. _deprecated:
@@ -64,7 +66,8 @@ Deprecation Policy
 ==================
 
 As of release 1.3.0, Envoy will follow a
-`Breaking Change Policy <https://github.com/envoyproxy/envoy/blob/main//CONTRIBUTING.md#breaking-change-policy>`_.
+`Breaking Change Policy <https://github.com/envoyproxy/envoy/blob/main/
+/CONTRIBUTING.md#breaking-change-policy>`_.
 
 Features in the deprecated list for each version have been DEPRECATED
 and will be removed in the specified release cycle. A logged warning
@@ -78,7 +81,8 @@ VERSION_HISTORY_MINOR_INDEX_TPL = """
 {{ "-" * minor_version|length }}
 
 Latest release:
-  `{{ current_release }} <https://github.com/envoyproxy/envoy/releases/tag/v{{ current_release }}>`_ ({{ release_date }})
+  `{{ current_release }} <https://github.com/envoyproxy/envoy/releases/tag/v{{
+    current_release }}>`_ ({{ release_date }})
 {% if current_release != original_release.version %}
 Initial release date:
   {{ original_release_date }}
@@ -141,8 +145,24 @@ class VersionHistories(runner.Runner):
 
     @cached_property
     def jinja_env(self) -> jinja2.Environment:
-        env = jinja2.Environment(
-            autoescape=jinja2.select_autoescape(['html', 'xml']),
+        # Autoescape is intentionally set to False for this script because:
+        # 1. This generates ReStructuredText (RST) files, not HTML or XML
+        # 2. RST files are not directly rendered in web browsers
+        # 3. RST has its own escaping rules that differ from HTML
+        # 4. Enabling HTML autoescape would break RST syntax (e.g., escaping < > & characters)
+        # 5. All input data comes from trusted internal sources:
+        #    - Version numbers from the codebase
+        #    - Release dates from changelog YAML files
+        #    - Changelog entries from repository YAML files
+        # 6. No user-provided or external untrusted input is processed
+        # 7. The generated RST files are later converted to HTML by Sphinx during
+        #    the documentation build process, which handles proper HTML escaping
+        #
+        # XSS protection via autoescape is only necessary when generating HTML/XML
+        # that will be directly rendered in web browsers. For other output formats
+        # like RST, autoescape should be disabled to prevent breaking the output format.
+      env = jinja2.Environment(
+            autoescape=False,
         )
         env.filters["versionize"] = versionize_filter
         return env
