@@ -1307,6 +1307,16 @@ v8:
   extensions:
   - envoy.wasm.runtime.v8
   cpe: "cpe:2.3:a:google:v8:*"
+yq_bzl:
+  project_name: "yq.bzl"
+  project_desc: "Bazel rules for yq"
+  project_url: "https://github.com/bazel-contrib/yq.bzl"
+  release_date: "2025-08-12"
+  use_category:
+  - build
+  cpe: "N/A"
+  license: "Apache-2.0"
+  license_url: "https://github.com/bazel-contrib/yq.bzl/blob/v{version}/LICENSE"
 zlib:
   project_name: "zlib"
   project_desc: "zlib compression library"

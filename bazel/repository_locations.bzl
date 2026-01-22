@@ -727,10 +727,6 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "b51d82b561a78ab21d265107b0edbf98d68a390b4103992d0b03258bb3819601",
         strip_prefix = "yq.bzl-{version}",
         urls = ["https://github.com/bazel-contrib/yq.bzl/releases/download/v{version}/yq.bzl-v{version}.tar.gz"],
-        use_category = ["build"],
-        cpe = "N/A",
-        license = "Apache-2.0",
-        license_url = "https://github.com/bazel-contrib/yq.bzl/blob/v{version}/LICENSE",
     ),
     # Dependencies for fips - VERSIONS SHOULD NOT BE CHANGED
     fips_ninja = dict(
