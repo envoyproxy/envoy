@@ -164,7 +164,7 @@ public:
   // ScopeTrackedObject
   void dumpState(std::ostream& os, int indent_level) const override;
 
-  DetectedCloseType detectedCloseType() const override { return detected_close_type_; }
+  StreamInfo::DetectedCloseType detectedCloseType() const override { return detected_close_type_; }
 
 protected:
   // A convenience function which returns true if
@@ -192,6 +192,9 @@ protected:
 
   void setFailureReason(absl::string_view failure_reason);
   const std::string& failureReason() const { return failure_reason_; }
+
+  // Set the detected close type for this connection.
+  virtual void setDetectedCloseType(StreamInfo::DetectedCloseType close_type);
 
   TransportSocketPtr transport_socket_;
   ConnectionSocketPtr socket_;
@@ -231,9 +234,6 @@ private:
   // Returns true iff end of stream has been both written and read.
   bool bothSidesHalfClosed();
 
-  // Set the detected close type for this connection.
-  void setDetectedCloseType(DetectedCloseType close_type);
-
   void closeInternal(ConnectionCloseType type);
 
   static std::atomic<uint64_t> next_global_id_;
@@ -248,7 +248,7 @@ private:
   uint64_t last_write_buffer_size_{};
   Buffer::Instance* current_write_buffer_{};
   uint32_t read_disable_count_{0};
-  DetectedCloseType detected_close_type_{DetectedCloseType::Normal};
+  StreamInfo::DetectedCloseType detected_close_type_{StreamInfo::DetectedCloseType::Normal};
   bool write_buffer_above_high_watermark_ : 1;
   bool detect_early_close_ : 1;
   bool enable_half_close_ : 1;
@@ -280,6 +280,11 @@ public:
   void setLocalCloseReason(absl::string_view reason) override {
     ConnectionImpl::setLocalCloseReason(reason);
     stream_info_.setDownstreamLocalCloseReason(reason);
+  }
+
+  void setDetectedCloseType(StreamInfo::DetectedCloseType close_type) override {
+    ConnectionImpl::setDetectedCloseType(close_type);
+    stream_info_.setDownstreamDetectedCloseType(close_type);
   }
 
 private:

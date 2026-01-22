@@ -39,7 +39,10 @@ enum class McpMethod {
   PromptsList,
   PromptsGet,
   Ping,
+  // Notifications (client -> server, fire-and-forget).
   NotificationInitialized,
+  NotificationCancelled,
+  NotificationRootsListChanged,
 };
 
 McpMethod parseMethodString(absl::string_view method_str);
@@ -136,7 +139,8 @@ private:
   void handlePromptsList();
   void handlePromptsGet();
   void handlePing();
-  void handleNotificationInitialized();
+  // Generic handler for client→server notifications (fanout to all backends).
+  void handleNotification(absl::string_view notification_name);
 
   // Aggregation functions.
   std::string aggregateInitialize(const std::vector<BackendResponse>& responses);

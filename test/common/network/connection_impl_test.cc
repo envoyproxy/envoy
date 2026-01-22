@@ -43,6 +43,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using Envoy::StreamInfo::DetectedCloseType;
 using testing::_;
 using testing::AnyNumber;
 using testing::DoAll;
