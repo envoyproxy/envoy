@@ -44,6 +44,9 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
+- area: stats
+  change: |
+    Added support to limit the number of stats stored in each stats scope in the stats libarary.
 - area: tls
   change: |
     Added support for fetching certificates on-demand via SDS in the upstream TLS transport socket
