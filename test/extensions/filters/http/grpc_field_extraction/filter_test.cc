@@ -174,9 +174,10 @@ TEST_F(FilterTestExtractOk, MissingFieldProducesListValue) {
   EXPECT_CALL(mock_decoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
       .WillOnce([](const std::string& ns, const Protobuf::Struct& new_dynamic_metadata) {
         EXPECT_EQ(ns, "envoy.filters.http.grpc_field_extraction");
-        EXPECT_TRUE(new_dynamic_metadata.fields().contains("key.display_name"));
-        const auto& value = new_dynamic_metadata.fields().at("key.display_name");
-        EXPECT_EQ(value.kind_case(), google::protobuf::Value::KindCase::kListValue);
+        const auto it = new_dynamic_metadata.fields().find("key.display_name");
+        EXPECT_TRUE(it != new_dynamic_metadata.fields().end());
+        const auto& value = it->second;
+        EXPECT_EQ(value.kind_case(), ProtobufWkt::Value::KindCase::kListValue);
         EXPECT_EQ(value.list_value().values_size(), 0);
       });
   EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(*request_data, true));
