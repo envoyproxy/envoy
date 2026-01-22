@@ -206,6 +206,11 @@ MockStreamInfo::MockStreamInfo()
       }));
   ON_CALL(*this, downstreamLocalCloseReason())
       .WillByDefault(ReturnPointee(&downstream_local_close_reason_));
+  ON_CALL(*this, setDownstreamDetectedCloseType(_))
+      .WillByDefault(Invoke(
+          [this](DetectedCloseType close_type) { downstream_detected_close_type_ = close_type; }));
+  ON_CALL(*this, downstreamDetectedCloseType())
+      .WillByDefault(ReturnPointee(&downstream_detected_close_type_));
   ON_CALL(*this, setUpstreamClusterInfo(_))
       .WillByDefault(Invoke([this](const Upstream::ClusterInfoConstSharedPtr& cluster_info) {
         upstream_cluster_info_ = std::move(cluster_info);

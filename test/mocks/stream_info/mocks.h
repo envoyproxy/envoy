@@ -171,6 +171,8 @@ public:
   MOCK_METHOD(absl::string_view, downstreamTransportFailureReason, (), (const));
   MOCK_METHOD(void, setDownstreamLocalCloseReason, (absl::string_view failure_reason));
   MOCK_METHOD(absl::string_view, downstreamLocalCloseReason, (), (const));
+  MOCK_METHOD(void, setDownstreamDetectedCloseType, (DetectedCloseType close_type));
+  MOCK_METHOD(DetectedCloseType, downstreamDetectedCloseType, (), (const));
   MOCK_METHOD(bool, shouldSchemeMatchUpstream, (), (const));
   MOCK_METHOD(void, setShouldSchemeMatchUpstream, (bool));
   MOCK_METHOD(bool, shouldDrainConnectionUponCompletion, (), (const));
@@ -208,6 +210,7 @@ public:
   DownstreamTiming downstream_timing_;
   std::string downstream_transport_failure_reason_;
   std::string downstream_local_close_reason_;
+  DetectedCloseType downstream_detected_close_type_{DetectedCloseType::Normal};
   std::string stream_flags_;
   Router::VirtualHostConstSharedPtr virtual_host_;
 };
