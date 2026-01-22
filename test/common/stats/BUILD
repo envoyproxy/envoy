@@ -144,18 +144,6 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "stat_match_input_test",
-    srcs = ["stat_match_input_test.cc"],
-    rbe_pool = "6gig",
-    deps = [
-        "//source/common/stats:stat_match_input_lib",
-        "//test/mocks/protobuf:protobuf_mocks",
-        "//test/mocks/stats:stats_mocks",
-        "//test/test_common:utility_lib",
-    ],
-)
-
-envoy_cc_test(
     name = "stats_matcher_impl_test",
     srcs = ["stats_matcher_impl_test.cc"],
     rbe_pool = "6gig",
