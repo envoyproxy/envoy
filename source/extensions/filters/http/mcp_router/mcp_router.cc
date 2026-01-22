@@ -807,7 +807,6 @@ void McpRouterFilter::handleToolsCall() {
       [weak_self = weak_from_this()](BackendResponse resp) {
         auto self = weak_self.lock();
         if (!self) {
-          ENVOY_LOG(debug, "tools/call callback ignored: filter destroyed");
           return;
         }
         // This callback is invoked for non-SSE responses (JSON) or errors.

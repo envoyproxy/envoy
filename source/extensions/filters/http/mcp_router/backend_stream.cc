@@ -223,6 +223,10 @@ void BackendStreamCallbacks::onTrailers(Http::ResponseTrailerMapPtr&&) { complet
 void BackendStreamCallbacks::onComplete() { complete(); }
 
 void BackendStreamCallbacks::onReset() {
+  if (completed_) {
+    return;
+  }
+
   response_.success = false;
   response_.error = "Stream reset";
   // For streaming mode, notify via error callback if streaming hasn't started yet.
@@ -243,11 +247,9 @@ void BackendStreamCallbacks::complete() {
               response_.body.size(), streaming_started_);
 
     // In streaming mode, notify completion via parent method if parent is still alive.
-    if (streaming_enabled_) {
+    if (streaming_enabled_ && streaming_started_) {
       if (auto parent = parent_.lock()) {
-        if (streaming_started_) {
-          parent->onStreamingComplete();
-        }
+        parent->onStreamingComplete();
       } else {
         ENVOY_LOG(debug,
                   "Backend '{}' complete: parent filter destroyed, ignoring streaming callback",
@@ -256,7 +258,7 @@ void BackendStreamCallbacks::complete() {
       return;
     }
 
-    // For non-streaming (aggregation) mode, call the regular on_complete.
+    // For non-streaming mode, call the regular on_complete.
     if (on_complete_) {
       on_complete_(std::move(response_));
     }
