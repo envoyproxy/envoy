@@ -63,17 +63,18 @@ constexpr absl::string_view PING = "ping";
 // Notification prefix
 constexpr absl::string_view NOTIFICATION_PREFIX = "notifications/";
 
-// Specific notifications
+// Specific notifications.
+constexpr absl::string_view NOTIFICATION_INITIALIZED = "notifications/initialized";
+constexpr absl::string_view NOTIFICATION_CANCELLED = "notifications/cancelled";
+constexpr absl::string_view NOTIFICATION_PROGRESS = "notifications/progress";
+constexpr absl::string_view NOTIFICATION_MESSAGE = "notifications/message";
+constexpr absl::string_view NOTIFICATION_ROOTS_LIST_CHANGED = "notifications/roots/list_changed";
 constexpr absl::string_view NOTIFICATION_RESOURCES_LIST_CHANGED =
     "notifications/resources/list_changed";
 constexpr absl::string_view NOTIFICATION_RESOURCES_UPDATED = "notifications/resources/updated";
 constexpr absl::string_view NOTIFICATION_TOOLS_LIST_CHANGED = "notifications/tools/list_changed";
 constexpr absl::string_view NOTIFICATION_PROMPTS_LIST_CHANGED =
     "notifications/prompts/list_changed";
-constexpr absl::string_view NOTIFICATION_PROGRESS = "notifications/progress";
-constexpr absl::string_view NOTIFICATION_MESSAGE = "notifications/message";
-constexpr absl::string_view NOTIFICATION_CANCELLED = "notifications/cancelled";
-constexpr absl::string_view NOTIFICATION_INITIALIZED = "notifications/initialized";
 } // namespace Methods
 
 // Method group names for classification
