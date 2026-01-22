@@ -527,17 +527,6 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/adrian-thurston/ragel/archive/{version}.tar.gz"],
         release_date = "2021-12-28",
     ),
-    # This should be removed, see https://github.com/envoyproxy/envoy/issues/13261.
-    zlib = dict(
-        project_name = "zlib",
-        project_desc = "zlib compression library",
-        project_url = "https://zlib.net",
-        version = "1.3.1",
-        sha256 = "17e88863f3600672ab49182f217281b6fc4d3c762bde361935e436a95214d05c",
-        strip_prefix = "zlib-{version}",
-        urls = ["https://github.com/madler/zlib/archive/v{version}.tar.gz"],
-        release_date = "2024-01-22",
-    ),
     org_boost = dict(
         project_name = "Boost",
         project_desc = "Boost C++ source libraries",
@@ -568,7 +557,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/facebook/zstd/archive/v{version}.tar.gz"],
         release_date = "2025-02-19",
     ),
-    com_github_zlib_ng_zlib_ng = dict(
+    zlib_ng = dict(
         project_name = "zlib-ng",
         project_desc = "zlib fork (higher performance)",
         project_url = "https://github.com/zlib-ng/zlib-ng",
