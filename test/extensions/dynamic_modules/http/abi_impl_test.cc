@@ -2538,27 +2538,27 @@ TEST_F(DynamicModuleHttpFilterTest, RecreateStreamNoCallbacks) {
                                                                          nullptr, 0));
 }
 
-TEST_F(DynamicModuleHttpFilterTest, RefreshRouteCluster) {
+TEST_F(DynamicModuleHttpFilterTest, ClearRouteClusterCache) {
   NiceMock<Http::MockDownstreamStreamFilterCallbacks> downstream_callbacks;
   EXPECT_CALL(decoder_callbacks_, downstreamCallbacks())
       .WillOnce(
           testing::Return(makeOptRef<Http::DownstreamStreamFilterCallbacks>(downstream_callbacks)));
   EXPECT_CALL(downstream_callbacks, refreshRouteCluster());
-  envoy_dynamic_module_callback_http_filter_refresh_route_cluster(filter_.get());
+  envoy_dynamic_module_callback_http_clear_route_cluster_cache(filter_.get());
 }
 
-TEST_F(DynamicModuleHttpFilterTest, RefreshRouteClusterNoDownstreamCallbacks) {
+TEST_F(DynamicModuleHttpFilterTest, ClearRouteClusterCacheNoDownstreamCallbacks) {
   EXPECT_CALL(decoder_callbacks_, downstreamCallbacks())
       .WillOnce(testing::Return(OptRef<Http::DownstreamStreamFilterCallbacks>{}));
   // Should not crash when downstreamCallbacks returns nullopt.
-  envoy_dynamic_module_callback_http_filter_refresh_route_cluster(filter_.get());
+  envoy_dynamic_module_callback_http_clear_route_cluster_cache(filter_.get());
 }
 
-TEST_F(DynamicModuleHttpFilterTest, RefreshRouteClusterNoCallbacks) {
+TEST_F(DynamicModuleHttpFilterTest, ClearRouteClusterCacheNoCallbacks) {
   // Create a filter without decoder callbacks set.
   auto filter_no_callbacks = std::make_unique<DynamicModuleHttpFilter>(nullptr, symbol_table_, 3);
   // Should not crash when decoder_callbacks_ is nullptr.
-  envoy_dynamic_module_callback_http_filter_refresh_route_cluster(filter_no_callbacks.get());
+  envoy_dynamic_module_callback_http_clear_route_cluster_cache(filter_no_callbacks.get());
 }
 
 } // namespace HttpFilters

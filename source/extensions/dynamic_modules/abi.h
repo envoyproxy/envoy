@@ -2350,17 +2350,17 @@ bool envoy_dynamic_module_callback_http_filter_recreate_stream(
     envoy_dynamic_module_type_module_http_header* headers, size_t headers_size);
 
 /**
- * envoy_dynamic_module_callback_http_filter_refresh_route_cluster refreshes only the cluster
- * selection for the current route without clearing the entire route cache. This is more efficient
- * than clearing the route cache when only the cluster needs to be updated.
+ * envoy_dynamic_module_callback_http_clear_route_cluster_cache clears only the cluster selection
+ * for the current route without clearing the entire route cache.
  *
- * This is useful when a filter modifies headers that affect cluster selection but not the route
- * itself.
+ * This is a subset of envoy_dynamic_module_callback_http_clear_route_cache. Use this when a filter
+ * modifies headers that affect cluster selection but not the route itself. This is more efficient
+ * than clearing the entire route cache.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
  * corresponding HTTP filter.
  */
-void envoy_dynamic_module_callback_http_filter_refresh_route_cluster(
+void envoy_dynamic_module_callback_http_clear_route_cluster_cache(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
 
 // =============================================================================

@@ -1557,13 +1557,13 @@ pub trait EnvoyHttpFilter {
   /// if the request body has not been fully received yet or if the stream cannot be recreated).
   fn recreate_stream<'a>(&mut self, headers: Option<Vec<(&'a str, &'a [u8])>>) -> bool;
 
-  /// Refresh only the cluster selection for the current route without clearing the entire route
+  /// Clear only the cluster selection for the current route without clearing the entire route
   /// cache.
   ///
-  /// This is more efficient than clearing the route cache when only the cluster needs to be
-  /// updated. This is useful when a filter modifies headers that affect cluster selection but not
-  /// the route itself.
-  fn refresh_route_cluster(&mut self);
+  /// This is a subset of [`EnvoyHttpFilter::clear_route_cache`]. Use this when a filter modifies
+  /// headers that affect cluster selection but not the route itself. This is more efficient than
+  /// clearing the entire route cache.
+  fn clear_route_cluster_cache(&mut self);
 }
 
 /// Trait representing a tracing span.
@@ -3167,8 +3167,8 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     }
   }
 
-  fn refresh_route_cluster(&mut self) {
-    unsafe { abi::envoy_dynamic_module_callback_http_filter_refresh_route_cluster(self.raw_ptr) }
+  fn clear_route_cluster_cache(&mut self) {
+    unsafe { abi::envoy_dynamic_module_callback_http_clear_route_cluster_cache(self.raw_ptr) }
   }
 }
 

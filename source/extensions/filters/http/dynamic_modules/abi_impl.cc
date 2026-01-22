@@ -1887,7 +1887,7 @@ bool envoy_dynamic_module_callback_http_filter_recreate_stream(
   return filter->decoder_callbacks_->recreateStream(response_headers);
 }
 
-void envoy_dynamic_module_callback_http_filter_refresh_route_cluster(
+void envoy_dynamic_module_callback_http_clear_route_cluster_cache(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr) {
   auto* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
   if (filter->decoder_callbacks_ == nullptr) {
