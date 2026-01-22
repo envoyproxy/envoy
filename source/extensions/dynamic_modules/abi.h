@@ -647,6 +647,29 @@ typedef enum envoy_dynamic_module_type_on_http_filter_response_trailers_status {
   envoy_dynamic_module_type_on_http_filter_response_trailers_status_StopIteration
 } envoy_dynamic_module_type_on_http_filter_response_trailers_status;
 
+/**
+ * envoy_dynamic_module_type_on_http_filter_local_reply_status represents the action to take after
+ * the onLocalReply hook completes. This corresponds to `LocalErrorStatus` in envoy/http/filter.h.
+ */
+typedef enum envoy_dynamic_module_type_on_http_filter_local_reply_status {
+  // Continue sending the local reply after onLocalReply has been sent to all filters.
+  envoy_dynamic_module_type_on_http_filter_local_reply_status_Continue,
+  // Continue sending onLocalReply to all filters, but reset the stream once all filters have been
+  // informed rather than sending the local reply.
+  envoy_dynamic_module_type_on_http_filter_local_reply_status_ContinueAndResetStream,
+} envoy_dynamic_module_type_on_http_filter_local_reply_status;
+
+/**
+ * envoy_dynamic_module_type_http_stream_reset_reason represents the reason for resetting the main
+ * HTTP stream. This corresponds to `Http::StreamResetReason` in envoy/http/stream_reset_handler.h.
+ */
+typedef enum envoy_dynamic_module_type_http_filter_stream_reset_reason {
+  // If a local codec level reset was sent on the stream.
+  envoy_dynamic_module_type_http_filter_stream_reset_reason_LocalReset,
+  // If a local codec level refused stream reset was sent on the stream (allowing for retry).
+  envoy_dynamic_module_type_http_filter_stream_reset_reason_LocalRefusedStreamReset,
+} envoy_dynamic_module_type_http_filter_stream_reset_reason;
+
 // =============================================================================
 // HTTP Filter Event Hooks
 // =============================================================================
@@ -1023,6 +1046,31 @@ void envoy_dynamic_module_on_http_filter_downstream_above_write_buffer_high_wate
 void envoy_dynamic_module_on_http_filter_downstream_below_write_buffer_low_watermark(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_http_filter_local_reply is called when sendLocalReply is invoked on the
+ * HTTP stream. This allows filters to be notified when a local reply is being generated, which is
+ * useful for logging local errors or modifying local reply behavior.
+ *
+ * The return value controls what happens after all filters have been informed:
+ * - Continue: Send the local reply as normal.
+ * - ContinueAndResetStream: Reset the stream instead of sending the local reply.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param filter_module_ptr is the pointer to the in-module HTTP filter created by
+ * envoy_dynamic_module_on_http_filter_new.
+ * @param response_code is the HTTP response code for the local reply.
+ * @param details is the response code details string.
+ * @param reset_imminent is true if a reset will occur rather than the local reply.
+ * @return envoy_dynamic_module_type_on_http_filter_local_reply_status indicating the action to take
+ * after the local reply hook completes.
+ */
+envoy_dynamic_module_type_on_http_filter_local_reply_status
+envoy_dynamic_module_on_http_filter_local_reply(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr, uint32_t response_code,
+    envoy_dynamic_module_type_envoy_buffer details, bool reset_imminent);
 
 // =============================================================================
 // HTTP Filter Callbacks
@@ -2248,6 +2296,72 @@ bool envoy_dynamic_module_callback_http_get_cluster_host_count(
 bool envoy_dynamic_module_callback_http_set_upstream_override_host(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer host, bool strict);
+
+// ------------------- Stream Control Callbacks -------------------------
+
+/**
+ * envoy_dynamic_module_callback_http_filter_reset_stream resets the HTTP stream with the specified
+ * reason. This is useful for terminating the stream when an error condition is detected or when
+ * the filter needs to abort processing.
+ *
+ * After calling this function, no further filter callbacks will be invoked for this stream except
+ * for the destroy callback.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param reason is the reason for resetting the stream.
+ * @param details is an optional details string explaining the reset reason. Can be empty.
+ */
+void envoy_dynamic_module_callback_http_filter_reset_stream(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_stream_reset_reason reason,
+    envoy_dynamic_module_type_module_buffer details);
+
+/**
+ * envoy_dynamic_module_callback_http_filter_send_go_away_and_close sends a GOAWAY frame to the
+ * downstream and closes the connection. This is useful for implementing graceful connection
+ * shutdown scenarios.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param graceful if true, initiates a graceful drain sequence before closing. If false,
+ * sends GOAWAY and closes immediately.
+ */
+void envoy_dynamic_module_callback_http_filter_send_go_away_and_close(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, bool graceful);
+
+/**
+ * envoy_dynamic_module_callback_http_filter_recreate_stream recreates the HTTP stream, optionally
+ * with new headers. This is useful for implementing internal redirects or request retries.
+ *
+ * After calling this function successfully, the current filter chain will be destroyed and a new
+ * stream will be created. The filter should return StopIteration from the current event hook.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param headers is an optional array of new headers to use for the recreated stream. If null,
+ * the original headers will be reused.
+ * @param headers_size is the size of the headers array.
+ * @return true if the stream recreation was initiated successfully, false otherwise (e.g., if
+ * the request body has not been fully received yet or if the stream cannot be recreated).
+ */
+bool envoy_dynamic_module_callback_http_filter_recreate_stream(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_http_header* headers, size_t headers_size);
+
+/**
+ * envoy_dynamic_module_callback_http_clear_route_cluster_cache clears only the cluster selection
+ * for the current route without clearing the entire route cache.
+ *
+ * This is a subset of envoy_dynamic_module_callback_http_clear_route_cache. Use this when a filter
+ * modifies headers that affect cluster selection but not the route itself. This is more efficient
+ * than clearing the entire route cache.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ */
+void envoy_dynamic_module_callback_http_clear_route_cluster_cache(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
 
 // =============================================================================
 // ============================= Network Filter ================================

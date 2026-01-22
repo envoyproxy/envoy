@@ -545,6 +545,19 @@ void DynamicModuleHttpFilter::HttpStreamCalloutCallback::onReset() {
   }
 }
 
+Http::LocalErrorStatus
+DynamicModuleHttpFilter::onLocalReply(const Http::StreamFilterBase::LocalReplyData& data) {
+  if (!in_module_filter_) {
+    return Http::LocalErrorStatus::Continue;
+  }
+  envoy_dynamic_module_type_envoy_buffer details_buffer{data.details_.data(), data.details_.size()};
+  const envoy_dynamic_module_type_on_http_filter_local_reply_status status =
+      config_->on_http_filter_local_reply_(thisAsVoidPtr(), in_module_filter_,
+                                           static_cast<uint32_t>(data.code_), details_buffer,
+                                           data.reset_imminent_);
+  return static_cast<Http::LocalErrorStatus>(status);
+}
+
 void DynamicModuleHttpFilter::storeSocketOptionInt(
     int64_t level, int64_t name, envoy_dynamic_module_type_socket_option_state state,
     envoy_dynamic_module_type_socket_direction direction, int64_t value) {
