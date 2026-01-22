@@ -39,6 +39,10 @@ bug_fixes:
 - area: ext_authz
   change: |
     Fixed a bug where headers from a denied authorization response (non-200s) were not properly propagated to the client.
+- area: formatter
+  change: |
+    Fixed the log formatter in http router upstream_logs by correctly setting the downstream connection's ConnectionInfoProvider
+    in the stream_info.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
