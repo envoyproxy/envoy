@@ -7,6 +7,11 @@
 #include "source/extensions/filters/network/common/redis/supported_commands.h"
 #include "source/extensions/filters/network/redis_proxy/cluster_response_handler.h"
 
+#include "absl/strings/str_split.h"
+#include "absl/strings/numbers.h"
+#include "envoy/common/exception.h"
+
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -464,28 +469,82 @@ SplitRequestPtr ScanRequest::create(Router& router, Common::Redis::RespValuePtr&
     return nullptr;
   }
 
+
+
+  // 1. Create the request object (The "Bucket" to hold results)
   std::unique_ptr<ScanRequest> request_ptr{
       new ScanRequest(callbacks, command_stats, time_source, delay_command_latency)};
-  request_ptr->num_pending_responses_ = shard_size;
-  request_ptr->pending_requests_.reserve(request_ptr->num_pending_responses_);
 
+  // 2. Prepare the response format (return an Array)
   request_ptr->pending_response_ = std::make_unique<Common::Redis::RespValue>();
   request_ptr->pending_response_->type(Common::Redis::RespType::Array);
 
+  // 3. Move the user's request into our local variable so we can read it
   Common::Redis::RespValueSharedPtr base_request = std::move(incoming_request);
-  for (uint32_t shard_index = 0; shard_index < shard_size; shard_index++) {
-    request_ptr->pending_requests_.emplace_back(*request_ptr, shard_index);
-    PendingRequest& pending_request = request_ptr->pending_requests_.back();
 
-    ENVOY_LOG(debug, "scan request shard index {}: {}", shard_index, base_request->toString());
-    pending_request.handle_ =
-        makeFragmentedRequestToShard(route, base_request->asArray()[0].asString(), shard_index,
-                                     *base_request, pending_request, callbacks.transaction());
+  // 4. PARSE THE CURSOR
+  // The user sends "SCAN 2:55". We need to split "2" (Server ID) and "55" (Cursor).
+  // base_request->asArray()[1] is the cursor string.
+  std::string& cursor_string = base_request->asArray()[1].asString();
+  std::vector<absl::string_view> parts = absl::StrSplit(cursor_string, ':');
 
-    if (!pending_request.handle_) {
-      pending_request.onResponse(Common::Redis::Utility::makeError(Response::get().NoUpstreamHost));
+  uint32_t target_shard = 0;
+  std::string upstream_cursor = "0";
+
+  if (parts.size() == 2) {
+      if (!absl::SimpleAtoi(parts[0], &target_shard)) {
+        command_stats.error_.inc();
+        callbacks.onResponse(Common::Redis::Utility::makeError("ERR Invalid cursor format"));
+        return nullptr;
+      }
+      
+      if (target_shard >= shard_size) {
+        command_stats.error_.inc();
+        callbacks.onResponse(Common::Redis::Utility::makeError("ERR Invalid cursor: shard index out of bounds"));
+        return nullptr;
+      }
+      
+      upstream_cursor = std::string(parts[1]);
+    } 
+    else if (parts.size() == 1) {
+      target_shard = 0;
+      upstream_cursor = std::string(parts[0]);
+    } 
+    else {
+      command_stats.error_.inc();
+      callbacks.onResponse(Common::Redis::Utility::makeError("ERR Invalid cursor format"));
+      return nullptr;
     }
+  // 5. UPDATE THE REQUEST
+  // We change the cursor string in the request from "2:55" to just "55".
+  // If we don't do this, the real Redis server will be confused.
+  cursor_string = upstream_cursor;
+
+  // 6. SINGLE SERVER MODE
+  // Unlike the old code, we are NOT asking all servers.
+  // We are waiting for exactly 1 response from 1 specific server.
+  request_ptr->num_pending_responses_ = 1;
+  request_ptr->pending_requests_.reserve(1);
+
+  // 7. FIRE THE REQUEST
+  // Create the pending request object for the target shard.
+  request_ptr->pending_requests_.emplace_back(*request_ptr, target_shard);
+  PendingRequest& pending_request = request_ptr->pending_requests_.back();
+
+  ENVOY_LOG(debug, "scan request target shard {}: {}", target_shard, base_request->toString());
+
+  // Send the message!
+  pending_request.handle_ = makeFragmentedRequestToShard(
+      route, base_request->asArray()[0].asString(), target_shard, *base_request, pending_request,
+      callbacks.transaction());
+
+  // 8. Error Handling
+  // If the connection failed immediately, report an error.
+  if (!pending_request.handle_) {
+    pending_request.onResponse(Common::Redis::Utility::makeError(Response::get().NoUpstreamHost));
   }
+
+  // --- END OF NEW LOGIC ---
 
   if (request_ptr->num_pending_responses_ > 0) {
     return request_ptr;
@@ -498,6 +557,22 @@ void ScanRequest::onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t 
   pending_requests_[index].handle_ = nullptr;
   switch (value->type()) {
   case Common::Redis::RespType::Array: {
+    // Check if it looks like a valid SCAN response: [cursor, [elements...]]
+    if (value->asArray().size() == 2 && 
+        value->asArray()[0].type() == Common::Redis::RespType::BulkString) {
+        
+        // 1. Get the raw cursor from the upstream shard (e.g., "15")
+        std::string original_cursor = value->asArray()[0].asString();
+
+        // 2. If scan isn't finished (cursor != "0"), prepend the Shard ID
+        //    Result becomes "2:15" so the client knows to come back to Shard 2.
+        if (original_cursor != "0") {
+            std::string encoded_cursor = fmt::format("{}:{}", index, original_cursor);
+            value->asArray()[0].asString() = encoded_cursor;
+        }
+    }
+
+    // Now append the (fixed) response to our result bucket
     pending_response_->asArray().insert(pending_response_->asArray().end(),
                                         value->asArray().begin(), value->asArray().end());
     break;
