@@ -1421,6 +1421,30 @@ pub trait EnvoyHttpFilter {
     direction: abi::envoy_dynamic_module_type_socket_direction,
   ) -> Option<Vec<u8>>;
 
+  // ------------------- Buffer limit methods -------------------------
+
+  /// Get the current buffer limit for body data.
+  ///
+  /// This is the maximum amount of data that can be buffered for body data before backpressure
+  /// is applied. A buffer limit of 0 bytes indicates no limits are applied.
+  fn get_buffer_limit(&self) -> u64;
+
+  /// Set the buffer limit for body data.
+  ///
+  /// This controls the maximum amount of data that can be buffered for body data before
+  /// backpressure is applied.
+  ///
+  /// It is recommended (but not required) that filters calling this function should generally
+  /// only perform increases to the buffer limit, to avoid potentially conflicting with the
+  /// buffer requirements of other filters in the chain. For example:
+  ///
+  /// ```ignore
+  /// if desired_limit > envoy_filter.get_buffer_limit() {
+  ///   envoy_filter.set_buffer_limit(desired_limit);
+  /// }
+  /// ```
+  fn set_buffer_limit(&mut self, limit: u64);
+
   // ----------------------------- Tracing methods -----------------------------
 
   /// Get the active tracing span for the current HTTP stream.
@@ -2927,6 +2951,14 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     } else {
       None
     }
+  }
+
+  fn get_buffer_limit(&self) -> u64 {
+    unsafe { abi::envoy_dynamic_module_callback_http_get_buffer_limit(self.raw_ptr) }
+  }
+
+  fn set_buffer_limit(&mut self, limit: u64) {
+    unsafe { abi::envoy_dynamic_module_callback_http_set_buffer_limit(self.raw_ptr, limit) }
   }
 
   fn get_active_span<'a>(&'a self) -> Option<Box<dyn EnvoySpan + 'a>> {

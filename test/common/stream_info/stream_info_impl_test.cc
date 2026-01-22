@@ -44,7 +44,7 @@ protected:
         // with --config=docker-msan
         sizeof(stream_info) == 720 ||
         // with --config=docker-clang
-        sizeof(stream_info) == 736 ||
+        sizeof(stream_info) == 744 ||
         // with --config=docker-clang-libc++
         sizeof(stream_info) == 696)
         << "If adding fields to StreamInfoImpl, please check to see if you "
