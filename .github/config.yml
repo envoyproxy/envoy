@@ -107,6 +107,7 @@ checks:
     name: Envoy/Prechecks
     on-run:
     - precheck-deps
+    - precheck-external
     - precheck-format
     - precheck-publish
     required: true
@@ -348,6 +349,9 @@ run:
     - "**/go.mod"
     - "**/Dockerfile*"
     push: paths
+  precheck-external:
+    paths:
+    - "**/*"
   precheck-format:
     paths:
     - "**/*"

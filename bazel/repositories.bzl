@@ -186,7 +186,6 @@ def envoy_dependencies(skip_targets = []):
     _dragonbox()
     _fp16()
     _simdutf()
-    _intel_ittapi()
     _com_github_google_quiche()
     _googleurl()
     _io_hyperscan()
@@ -223,11 +222,14 @@ def envoy_dependencies(skip_targets = []):
     external_http_archive("rules_license")
     external_http_archive("rules_pkg")
     external_http_archive("com_github_aignas_rules_shellcheck")
+
     external_http_archive(
-        "aspect_bazel_lib",
+        name = "yq.bzl",
+        location_name = "yq_bzl",
         patch_args = ["-p1"],
-        patches = ["@envoy//bazel:aspect.patch"],
+        patches = ["@envoy//bazel:yq.patch"],
     )
+    external_http_archive("aspect_bazel_lib")
 
     _com_github_fdio_vpp_vcl()
 
@@ -677,6 +679,7 @@ def _v8():
         name = "v8",
         patches = [
             "@envoy//bazel:v8.patch",
+            "@envoy//bazel:v8_novtune.patch",
             "@envoy//bazel:v8_ppc64le.patch",
             # https://issues.chromium.org/issues/423403090
             "@envoy//bazel:v8_python.patch",
@@ -724,12 +727,6 @@ def _simdutf():
     external_http_archive(
         name = "simdutf",
         build_file = "@envoy//bazel/external:simdutf.BUILD",
-    )
-
-def _intel_ittapi():
-    external_http_archive(
-        name = "intel_ittapi",
-        build_file = "@envoy//bazel/external:intel_ittapi.BUILD",
     )
 
 def _com_github_google_quiche():

@@ -200,6 +200,12 @@ MockStreamInfo::MockStreamInfo()
       }));
   ON_CALL(*this, downstreamTransportFailureReason())
       .WillByDefault(ReturnPointee(&downstream_transport_failure_reason_));
+  ON_CALL(*this, setDownstreamLocalCloseReason(_))
+      .WillByDefault(Invoke([this](absl::string_view failure_reason) {
+        downstream_local_close_reason_ = std::string(failure_reason);
+      }));
+  ON_CALL(*this, downstreamLocalCloseReason())
+      .WillByDefault(ReturnPointee(&downstream_local_close_reason_));
   ON_CALL(*this, setUpstreamClusterInfo(_))
       .WillByDefault(Invoke([this](const Upstream::ClusterInfoConstSharedPtr& cluster_info) {
         upstream_cluster_info_ = std::move(cluster_info);

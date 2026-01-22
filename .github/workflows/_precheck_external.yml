@@ -1,0 +1,46 @@
+name: Precheck/external
+
+permissions:
+  contents: read
+
+on:
+  workflow_call:
+    inputs:
+      request:
+        type: string
+        required: true
+      trusted:
+        type: boolean
+        required: true
+
+concurrency:
+  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}-external
+  cancel-in-progress: true
+
+
+jobs:
+  external:
+    permissions:
+      actions: read
+      contents: read
+      packages: read
+    uses: ./.github/workflows/_run.yml
+    name: ${{ matrix.target }}
+    with:
+      bazel-cache: true
+      bazel-extra: '--config=rbe'
+      cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
+      concurrency-suffix: -${{ matrix.target }}
+      request: ${{ inputs.request }}
+      error-match: |
+        ERROR
+        error:
+        Error:
+      rbe: true
+      target: ${{ matrix.target }}
+      timeout-minutes: 30
+      trusted: ${{ inputs.trusted }}
+    strategy:
+      matrix:
+        include:
+        - target: external

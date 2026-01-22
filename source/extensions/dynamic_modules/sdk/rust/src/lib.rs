@@ -1421,6 +1421,30 @@ pub trait EnvoyHttpFilter {
     direction: abi::envoy_dynamic_module_type_socket_direction,
   ) -> Option<Vec<u8>>;
 
+  // ------------------- Buffer limit methods -------------------------
+
+  /// Get the current buffer limit for body data.
+  ///
+  /// This is the maximum amount of data that can be buffered for body data before backpressure
+  /// is applied. A buffer limit of 0 bytes indicates no limits are applied.
+  fn get_buffer_limit(&self) -> u64;
+
+  /// Set the buffer limit for body data.
+  ///
+  /// This controls the maximum amount of data that can be buffered for body data before
+  /// backpressure is applied.
+  ///
+  /// It is recommended (but not required) that filters calling this function should generally
+  /// only perform increases to the buffer limit, to avoid potentially conflicting with the
+  /// buffer requirements of other filters in the chain. For example:
+  ///
+  /// ```ignore
+  /// if desired_limit > envoy_filter.get_buffer_limit() {
+  ///   envoy_filter.set_buffer_limit(desired_limit);
+  /// }
+  /// ```
+  fn set_buffer_limit(&mut self, limit: u64);
+
   // ----------------------------- Tracing methods -----------------------------
 
   /// Get the active tracing span for the current HTTP stream.
@@ -2929,6 +2953,14 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     }
   }
 
+  fn get_buffer_limit(&self) -> u64 {
+    unsafe { abi::envoy_dynamic_module_callback_http_get_buffer_limit(self.raw_ptr) }
+  }
+
+  fn set_buffer_limit(&mut self, limit: u64) {
+    unsafe { abi::envoy_dynamic_module_callback_http_set_buffer_limit(self.raw_ptr, limit) }
+  }
+
   fn get_active_span<'a>(&'a self) -> Option<Box<dyn EnvoySpan + 'a>> {
     let raw_ptr = unsafe { abi::envoy_dynamic_module_callback_http_get_active_span(self.raw_ptr) };
     if raw_ptr.is_null() {
@@ -3907,6 +3939,21 @@ pub trait NetworkFilter<ENF: EnvoyNetworkFilter> {
   ///
   /// See [`EnvoyNetworkFilter::new_scheduler`] for more details on how to use this.
   fn on_scheduled(&mut self, _envoy_filter: &mut ENF, _event_id: u64) {}
+
+  /// This is called when the write buffer for the connection goes over its high watermark.
+  /// This can be used to implement flow control by disabling reads when the write buffer is full.
+  ///
+  /// A typical implementation would call `envoy_filter.read_disable(true)` to stop reading
+  /// from the downstream connection until the write buffer drains.
+  fn on_above_write_buffer_high_watermark(&mut self, _envoy_filter: &mut ENF) {}
+
+  /// This is called when the write buffer for the connection goes from over its high watermark
+  /// to under its low watermark. This can be used to re-enable reads after flow control was
+  /// applied.
+  ///
+  /// A typical implementation would call `envoy_filter.read_disable(false)` to resume reading
+  /// from the downstream connection.
+  fn on_below_write_buffer_low_watermark(&mut self, _envoy_filter: &mut ENF) {}
 }
 
 /// The trait that represents the Envoy network filter.
@@ -4137,6 +4184,53 @@ pub trait EnvoyNetworkFilter {
   /// This is done when upstream connection's transport socket is of startTLS type.
   /// Returns true if the upstream transport was successfully converted to secure mode.
   fn start_upstream_secure_transport(&mut self) -> bool;
+
+  /// Get the current state of the connection (Open, Closing, or Closed).
+  fn get_connection_state(&self) -> abi::envoy_dynamic_module_type_network_connection_state;
+
+  /// Disable or enable reading from the connection. This is the primary mechanism for
+  /// implementing back-pressure in TCP filters.
+  ///
+  /// When reads are disabled, no more data will be read from the socket. When re-enabled,
+  /// if there is data in the input buffer, it will be re-dispatched through the filter chain.
+  ///
+  /// Note that this function reference counts calls. For example:
+  /// ```text
+  /// read_disable(true);  // Disables reading
+  /// read_disable(true);  // Notes the connection is blocked by two sources
+  /// read_disable(false); // Notes the connection is blocked by one source
+  /// read_disable(false); // Marks the connection as unblocked, so resumes reading
+  /// ```
+  fn read_disable(
+    &mut self,
+    disable: bool,
+  ) -> abi::envoy_dynamic_module_type_network_read_disable_status;
+
+  /// Check if reading is currently enabled on the connection.
+  fn read_enabled(&self) -> bool;
+
+  /// Check if half-close semantics are enabled on this connection.
+  /// When half-close is enabled, reading a remote half-close will not fully close the connection.
+  fn is_half_close_enabled(&self) -> bool;
+
+  /// Enable or disable half-close semantics on the connection.
+  /// When half-close is enabled, reading a remote half-close will not fully close the connection,
+  /// allowing the filter to continue writing data.
+  fn enable_half_close(&mut self, enabled: bool);
+
+  /// Get the current buffer limit set on the connection.
+  fn get_buffer_limit(&self) -> u32;
+
+  /// Set a soft limit on the size of buffers for the connection.
+  ///
+  /// For the read buffer, this limits the bytes read prior to flushing to further stages in the
+  /// processing pipeline. For the write buffer, it sets watermarks. When enough data is buffered,
+  /// [`NetworkFilter::on_above_write_buffer_high_watermark`] is called. When enough data is
+  /// drained, [`NetworkFilter::on_below_write_buffer_low_watermark`] is called.
+  fn set_buffer_limits(&mut self, limit: u32);
+
+  /// Check if the connection is currently above the high watermark.
+  fn above_high_watermark(&self) -> bool;
 
   /// Create a new implementation of the [`EnvoyNetworkFilterScheduler`] trait.
   ///
@@ -5181,6 +5275,43 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
     }
   }
 
+  fn get_connection_state(&self) -> abi::envoy_dynamic_module_type_network_connection_state {
+    unsafe { abi::envoy_dynamic_module_callback_network_filter_get_connection_state(self.raw) }
+  }
+
+  fn read_disable(
+    &mut self,
+    disable: bool,
+  ) -> abi::envoy_dynamic_module_type_network_read_disable_status {
+    unsafe { abi::envoy_dynamic_module_callback_network_filter_read_disable(self.raw, disable) }
+  }
+
+  fn read_enabled(&self) -> bool {
+    unsafe { abi::envoy_dynamic_module_callback_network_filter_read_enabled(self.raw) }
+  }
+
+  fn is_half_close_enabled(&self) -> bool {
+    unsafe { abi::envoy_dynamic_module_callback_network_filter_is_half_close_enabled(self.raw) }
+  }
+
+  fn enable_half_close(&mut self, enabled: bool) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_network_filter_enable_half_close(self.raw, enabled)
+    }
+  }
+
+  fn get_buffer_limit(&self) -> u32 {
+    unsafe { abi::envoy_dynamic_module_callback_network_filter_get_buffer_limit(self.raw) }
+  }
+
+  fn set_buffer_limits(&mut self, limit: u32) {
+    unsafe { abi::envoy_dynamic_module_callback_network_filter_set_buffer_limits(self.raw, limit) }
+  }
+
+  fn above_high_watermark(&self) -> bool {
+    unsafe { abi::envoy_dynamic_module_callback_network_filter_above_high_watermark(self.raw) }
+  }
+
   fn new_scheduler(&self) -> impl EnvoyNetworkFilterScheduler + 'static {
     unsafe {
       let scheduler_ptr = abi::envoy_dynamic_module_callback_network_filter_scheduler_new(self.raw);
@@ -5400,6 +5531,26 @@ pub extern "C" fn envoy_dynamic_module_on_network_filter_config_scheduled(
     unsafe { &**raw }
   };
   filter_config.on_config_scheduled(event_id);
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_on_network_filter_above_write_buffer_high_watermark(
+  envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+  filter_ptr: abi::envoy_dynamic_module_type_network_filter_module_ptr,
+) {
+  let filter = filter_ptr as *mut Box<dyn NetworkFilter<EnvoyNetworkFilterImpl>>;
+  let filter = unsafe { &mut *filter };
+  filter.on_above_write_buffer_high_watermark(&mut EnvoyNetworkFilterImpl::new(envoy_ptr));
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_on_network_filter_below_write_buffer_low_watermark(
+  envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+  filter_ptr: abi::envoy_dynamic_module_type_network_filter_module_ptr,
+) {
+  let filter = filter_ptr as *mut Box<dyn NetworkFilter<EnvoyNetworkFilterImpl>>;
+  let filter = unsafe { &mut *filter };
+  filter.on_below_write_buffer_low_watermark(&mut EnvoyNetworkFilterImpl::new(envoy_ptr));
 }
 
 // =============================================================================

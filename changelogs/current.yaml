@@ -44,6 +44,11 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
+- area: tls
+  change: |
+    Added support for fetching certificates on-demand via SDS in the upstream TLS transport socket
+    using the extension :ref:`on-demand certificate selector
+    <extension_envoy.tls.certificate_selectors.on_demand_secret>`.
 - area: mcp_router
   change: |
     Added support for MCP resource methods ``resources/list``, ``resources/read``,
@@ -61,5 +66,8 @@ new_features:
     Added support for `:ref:`set_node_on_first_message_only
     <envoy_api_field_core.ApiConfigSource.set_node_on_first_message_only>` to Delta-xDS. Guarded by
     flag ``envoy.reloadable_features.xds_legacy_delta_skip_subsequent_node``.
+- area: formatter
+  change: |
+    Added the new access log formatter support of ``DOWNSTREAM_LOCAL_CLOSE_REASON``.
 
 deprecated:

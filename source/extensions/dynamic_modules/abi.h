@@ -2017,6 +2017,34 @@ bool envoy_dynamic_module_callback_http_get_socket_option_bytes(
     envoy_dynamic_module_type_socket_direction direction,
     envoy_dynamic_module_type_envoy_buffer* value_out);
 
+// ------------------- HTTP filter buffer limit callbacks --------------------
+
+/**
+ * envoy_dynamic_module_callback_http_get_buffer_limit retrieves the current buffer limit for the
+ * HTTP filter. This is the maximum amount of data that can be buffered for body data before
+ * backpressure is applied. A buffer limit of 0 bytes indicates no limits are applied.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
+ * @return the current buffer limit in bytes.
+ */
+uint64_t envoy_dynamic_module_callback_http_get_buffer_limit(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_http_set_buffer_limit sets the buffer limit for the HTTP filter.
+ * This controls the maximum amount of data that can be buffered for body data before backpressure
+ * is applied.
+ *
+ * It is recommended (but not required) that filters calling this function should generally only
+ * perform increases to the buffer limit, to avoid potentially conflicting with the buffer
+ * requirements of other filters in the chain.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
+ * @param limit is the desired buffer limit in bytes.
+ */
+void envoy_dynamic_module_callback_http_set_buffer_limit(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, uint64_t limit);
+
 // ----------------------------- Tracing callbacks -----------------------------
 
 /**
@@ -2353,6 +2381,35 @@ typedef enum envoy_dynamic_module_type_network_connection_event {
   envoy_dynamic_module_type_network_connection_event_ConnectedZeroRtt,
 } envoy_dynamic_module_type_network_connection_event;
 
+/**
+ * envoy_dynamic_module_type_network_connection_state represents the current state of a connection.
+ * This corresponds to `Network::Connection::State` in envoy/network/connection.h.
+ */
+typedef enum envoy_dynamic_module_type_network_connection_state {
+  // Connection is open.
+  envoy_dynamic_module_type_network_connection_state_Open,
+  // Connection is closing.
+  envoy_dynamic_module_type_network_connection_state_Closing,
+  // Connection is closed.
+  envoy_dynamic_module_type_network_connection_state_Closed,
+} envoy_dynamic_module_type_network_connection_state;
+
+/**
+ * envoy_dynamic_module_type_network_read_disable_status represents the result of calling
+ * read_disable on a connection.
+ * This corresponds to `Network::Connection::ReadDisableStatus` in envoy/network/connection.h.
+ */
+typedef enum envoy_dynamic_module_type_network_read_disable_status {
+  // No transition occurred.
+  envoy_dynamic_module_type_network_read_disable_status_NoTransition,
+  // Reading is still disabled.
+  envoy_dynamic_module_type_network_read_disable_status_StillReadDisabled,
+  // Transitioned from disabled to enabled.
+  envoy_dynamic_module_type_network_read_disable_status_TransitionedToReadEnabled,
+  // Transitioned from enabled to disabled.
+  envoy_dynamic_module_type_network_read_disable_status_TransitionedToReadDisabled,
+} envoy_dynamic_module_type_network_read_disable_status;
+
 // =============================================================================
 // Network Filter Event Hooks
 // =============================================================================
@@ -2526,6 +2583,34 @@ void envoy_dynamic_module_on_network_filter_scheduled(
 void envoy_dynamic_module_on_network_filter_config_scheduled(
     envoy_dynamic_module_type_network_filter_config_module_ptr filter_config_ptr,
     uint64_t event_id);
+
+/**
+ * envoy_dynamic_module_on_network_filter_above_write_buffer_high_watermark is called when the
+ * write buffer for the connection goes over its high watermark. This can be used to implement
+ * flow control by disabling reads when the write buffer is full.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object of the
+ * corresponding network filter.
+ * @param filter_module_ptr is the pointer to the in-module network filter created by
+ * envoy_dynamic_module_on_network_filter_new.
+ */
+void envoy_dynamic_module_on_network_filter_above_write_buffer_high_watermark(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_network_filter_module_ptr filter_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_network_filter_below_write_buffer_low_watermark is called when the
+ * write buffer for the connection goes from over its high watermark to under its low watermark.
+ * This can be used to re-enable reads after flow control was applied.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object of the
+ * corresponding network filter.
+ * @param filter_module_ptr is the pointer to the in-module network filter created by
+ * envoy_dynamic_module_on_network_filter_new.
+ */
+void envoy_dynamic_module_on_network_filter_below_write_buffer_low_watermark(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_network_filter_module_ptr filter_module_ptr);
 
 // =============================================================================
 // Network Filter Callbacks
@@ -3285,6 +3370,112 @@ bool envoy_dynamic_module_callback_network_filter_has_upstream_host(
  * otherwise.
  */
 bool envoy_dynamic_module_callback_network_filter_start_upstream_secure_transport(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr);
+
+// ---------------------- Connection State and Flow Control Callbacks ----------
+
+/**
+ * envoy_dynamic_module_callback_network_filter_get_connection_state is called by the module to get
+ * the current state of the connection.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @return the current connection state (Open, Closing, or Closed).
+ */
+envoy_dynamic_module_type_network_connection_state
+envoy_dynamic_module_callback_network_filter_get_connection_state(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_read_disable is called by the module to disable
+ * or enable reading from the connection. This is the primary mechanism for implementing
+ * back-pressure in TCP filters.
+ *
+ * When reads are disabled, no more data will be read from the socket. When re-enabled, if there
+ * is data in the input buffer, it will be re-dispatched through the filter chain.
+ *
+ * Note that this function reference counts calls. For example:
+ *   read_disable(true);  // Disables reading
+ *   read_disable(true);  // Notes the connection is blocked by two sources
+ *   read_disable(false); // Notes the connection is blocked by one source
+ *   read_disable(false); // Marks the connection as unblocked, so resumes reading
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param disable is true to disable reading, false to enable reading.
+ * @return the status indicating the outcome of the operation.
+ */
+envoy_dynamic_module_type_network_read_disable_status
+envoy_dynamic_module_callback_network_filter_read_disable(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, bool disable);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_read_enabled is called by the module to check if
+ * reading is currently enabled on the connection.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @return true if reading is enabled, false if reading is disabled.
+ */
+bool envoy_dynamic_module_callback_network_filter_read_enabled(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_is_half_close_enabled is called by the module to
+ * check if half-close semantics are enabled on this connection.
+ *
+ * When half-close is enabled, reading a remote half-close will not fully close the connection.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @return true if half-close semantics are enabled, false otherwise.
+ */
+bool envoy_dynamic_module_callback_network_filter_is_half_close_enabled(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_enable_half_close is called by the module to enable
+ * or disable half-close semantics on the connection.
+ *
+ * When half-close is enabled, reading a remote half-close will not fully close the connection,
+ * allowing the filter to continue writing data.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param enabled is true to enable half-close semantics, false to disable.
+ */
+void envoy_dynamic_module_callback_network_filter_enable_half_close(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, bool enabled);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_get_buffer_limit is called by the module to get
+ * the current buffer limit set on the connection.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @return the current buffer limit in bytes.
+ */
+uint32_t envoy_dynamic_module_callback_network_filter_get_buffer_limit(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_set_buffer_limits is called by the module to set
+ * a soft limit on the size of buffers for the connection.
+ *
+ * For the read buffer, this limits the bytes read prior to flushing to further stages in the
+ * processing pipeline. For the write buffer, it sets watermarks. When enough data is buffered,
+ * it triggers envoy_dynamic_module_on_network_filter_above_write_buffer_high_watermark callback.
+ * When enough data is drained from the write buffer,
+ * envoy_dynamic_module_on_network_filter_below_write_buffer_low_watermark is called.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param limit is the buffer limit in bytes.
+ */
+void envoy_dynamic_module_callback_network_filter_set_buffer_limits(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, uint32_t limit);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_above_high_watermark is called by the module to
+ * check if the connection is currently above the high watermark.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @return true if the connection is above the high watermark, false otherwise.
+ */
+bool envoy_dynamic_module_callback_network_filter_above_high_watermark(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr);
 
 // ---------------------- Network filter scheduler callbacks -------------------

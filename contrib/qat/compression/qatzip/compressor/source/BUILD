@@ -27,11 +27,15 @@ configure_make(
         "--disable-shared",
     ],
     # Include the numa_archive genrule output so that libnuma.a is available
-    # for the linker to find with -lnuma.
-    data = ["//bazel/external:numa_archive"],
-    # Point to the directory containing the libnuma.a archive created by the
-    # numa_archive genrule. The cc_library doesn't produce a file that can be
-    # found with -lnuma, so we need to use the genrule output.
+    # for the linker to find with -lnuma. Include zlib_ng_archive when building
+    # with zlib-ng so that libz.a is available for the configure script.
+    data = ["//bazel/external:numa_archive"] + select({
+        "//bazel:zlib_ng": ["//bazel/external:zlib_ng_archive"],
+        "//conditions:default": [],
+    }),
+    # Point to the directory containing the libnuma.a and libz.a archives.
+    # The cc_library targets don't produce files that can be found with -lnuma
+    # or -lz, so we need to use the genrule outputs.
     env = select({
         "//bazel:clang_build": COMMON_ENV | {
             "CFLAGS": "-Wno-error=newline-eof -Wno-error=strict-prototypes -Wno-error=unused-but-set-variable",
