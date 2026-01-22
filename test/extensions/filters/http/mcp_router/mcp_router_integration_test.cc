@@ -755,8 +755,8 @@ TEST_P(McpRouterIntegrationTest, ToolsListAggregatesSseResponses) {
   EXPECT_THAT(response->body(), testing::HasSubstr("tools__calculator"));
 }
 
-// Test SSE response with multiple data events extracts last event for tools/call
-TEST_P(McpRouterIntegrationTest, SseResponseMultipleEventsExtractsLast) {
+// Test SSE response with multiple data events is passed through for tools/call
+TEST_P(McpRouterIntegrationTest, SseResponseMultipleEventsPassThrough) {
   initializeFilter();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));

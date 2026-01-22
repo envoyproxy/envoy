@@ -56,6 +56,11 @@ new_features:
 - area: mcp_router
   change: |
     Added support for MCP prompt methods ``prompts/list`` and ``prompts/get``.
+- area: mcp_router
+  change: |
+    Added SSE (Server-Sent Events) streaming support for MCP backend responses. The router now handles
+    SSE responses from backends for ``tools/call`` with direct pass-through streaming, and supports SSE
+    aggregation for fanout operations (``tools/list``, ``initialize``) with incremental event parsing.
 - area: formatter
   change: |
     Extended ``*_WITHOUT_PORT`` address formatters to accept an optional ``MASK_PREFIX_LEN`` parameter that masks IP addresses

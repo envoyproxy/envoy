@@ -179,7 +179,6 @@ TEST_F(BackendStreamCallbacksSseTest, DetectsJsonContentType) {
   EXPECT_TRUE(callback_invoked);
   EXPECT_TRUE(received_response.isJson());
   EXPECT_EQ(received_response.body, R"({"jsonrpc":"2.0","id":1,"result":{}})");
-  EXPECT_EQ(received_response.body, R"({"jsonrpc":"2.0","id":1,"result":{}})");
 }
 
 // Verifies SSE body is buffered correctly for pass-through.
@@ -236,7 +235,6 @@ TEST_F(BackendStreamCallbacksSseTest, BuffersSseDataAcrossChunks) {
   callbacks->onData(chunk2, true);
 
   EXPECT_TRUE(callback_invoked);
-  EXPECT_EQ(received_response.body, "data: {\"partial\":\"data\"}\n\n");
   EXPECT_EQ(received_response.body, "data: {\"partial\":\"data\"}\n\n");
 }
 
