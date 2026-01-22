@@ -161,7 +161,7 @@ class VersionHistories(runner.Runner):
         # XSS protection via autoescape is only necessary when generating HTML/XML
         # that will be directly rendered in web browsers. For other output formats
         # like RST, autoescape should be disabled to prevent breaking the output format.
-      env = jinja2.Environment(
+        env = jinja2.Environment(
             autoescape=False,
         )
         env.filters["versionize"] = versionize_filter
