@@ -14,6 +14,11 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: mcp
+  change: |
+    Changed the default metadata namespace for the MCP filter from ``mcp_proxy`` to ``envoy.filters.http.mcp``.
+    This can be reverted by setting the runtime guard
+    ``envoy.reloadable_features.mcp_filter_use_new_metadata_namespace`` to ``false``.
 - area: histograms
   change: |
     Update of libcircllhist to 0.3.2 has changed how bucket bounds are interpreted. This should not have an impact on
