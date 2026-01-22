@@ -35,6 +35,9 @@ Server related statistics are rooted at *server.* with following statistics:
   static_unknown_fields, Counter, Number of messages in static configuration with unknown fields
   dynamic_unknown_fields, Counter, Number of messages in dynamic configuration with unknown fields
   wip_protos, Counter, Number of messages and fields marked as work-in-progress being used
+  stats_overflow.counter, Counter, Total number of counter lookup or creation attempts dropped due to reaching the configured limit on label cardinality.
+  stats_overflow.gauge, Counter, Total number of gauge lookup or creation attempts dropped due to reaching the configured limit on label cardinality.
+  stats_overflow.histogram, Counter, Total number of histogram lookup or creation attempts dropped due to reaching the configured limit on label cardinality.
 
 .. _server_compilation_settings_statistics:
 
