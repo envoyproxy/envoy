@@ -36,6 +36,7 @@ envoy_cc_library(
         "//source/common/http:header_utility_lib",
         "//source/common/http:utility_lib",
         "//source/extensions/access_loggers/common:access_log_base",
+        "//source/extensions/dynamic_modules:abi_impl",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
     ],
 )

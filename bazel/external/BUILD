@@ -62,3 +62,23 @@ genrule(
     target_compatible_with = ["@platforms//os:linux"],
     visibility = ["//visibility:public"],
 )
+
+# Create a proper static library archive from zlib-ng cc_library.
+cc_static_library(
+    name = "zlib_ng_static",
+    target_compatible_with = ["@platforms//os:linux"],
+    deps = ["@com_github_zlib_ng_zlib_ng//:zlib-ng"],
+)
+
+# Create a properly named libz.a archive for foreign_cc dependencies.
+# The zlib-ng cc_library produces Bazel-internal archives, but foreign_cc
+# configure_make rules (like qatzip) expect a traditional libz.a file
+# that can be found with -lz.
+genrule(
+    name = "zlib_ng_archive",
+    srcs = [":zlib_ng_static"],
+    outs = ["lib/libz.a"],
+    cmd = "mkdir -p $$(dirname $@) && cp $< $@",
+    target_compatible_with = ["@platforms//os:linux"],
+    visibility = ["//visibility:public"],
+)

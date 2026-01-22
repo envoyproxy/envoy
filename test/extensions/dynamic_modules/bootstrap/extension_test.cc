@@ -1,5 +1,7 @@
 #include "source/extensions/bootstrap/dynamic_modules/extension.h"
 
+#include "test/mocks/event/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
@@ -15,6 +17,9 @@ protected:
   std::string testDataDir() {
     return TestEnvironment::runfilesPath("test/extensions/dynamic_modules/test_data/c");
   }
+
+  testing::NiceMock<Event::MockDispatcher> dispatcher_;
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context_;
 };
 
 TEST_F(ExtensionTest, NullInModuleExtension) {
@@ -25,8 +30,8 @@ TEST_F(ExtensionTest, NullInModuleExtension) {
       testDataDir() + "/libbootstrap_extension_new_null.so", false);
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
-  auto config =
-      newDynamicModuleBootstrapExtensionConfig("test", "config", std::move(dynamic_module.value()));
+  auto config = newDynamicModuleBootstrapExtensionConfig(
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
   auto extension = std::make_unique<DynamicModuleBootstrapExtension>(config.value());
@@ -51,8 +56,8 @@ TEST_F(ExtensionTest, IsDestroyedAndGetExtensionConfig) {
       Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
-  auto config =
-      newDynamicModuleBootstrapExtensionConfig("test", "config", std::move(dynamic_module.value()));
+  auto config = newDynamicModuleBootstrapExtensionConfig(
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
   auto extension = std::make_unique<DynamicModuleBootstrapExtension>(config.value());
@@ -77,8 +82,8 @@ TEST_F(ExtensionTest, LifecycleWithValidExtension) {
       Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
   ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
 
-  auto config =
-      newDynamicModuleBootstrapExtensionConfig("test", "config", std::move(dynamic_module.value()));
+  auto config = newDynamicModuleBootstrapExtensionConfig(
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
   auto extension = std::make_unique<DynamicModuleBootstrapExtension>(config.value());

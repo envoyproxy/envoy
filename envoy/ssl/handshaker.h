@@ -308,8 +308,68 @@ public:
   std::string category() const override { return "envoy.tls.certificate_selectors"; }
 };
 
-using TlsCertificateMapper = std::function<std::string(const SSL_CLIENT_HELLO&)>;
-using TlsCertificateMapperFactory = std::function<TlsCertificateMapper()>;
+class UpstreamTlsCertificateSelector {
+public:
+  virtual ~UpstreamTlsCertificateSelector() = default;
+
+  /**
+   * Select TLS context using a server hello and transport socket options.
+   * Please see BoringSSL documentation on the accessors to the SSL object.
+   */
+  virtual SelectionResult
+  selectTlsContext(const SSL& ssl, const Network::TransportSocketOptionsConstSharedPtr& options,
+                   CertificateSelectionCallbackPtr cb) PURE;
+};
+
+using UpstreamTlsCertificateSelectorPtr = std::unique_ptr<UpstreamTlsCertificateSelector>;
+
+class UpstreamTlsCertificateSelectorFactory {
+public:
+  virtual ~UpstreamTlsCertificateSelectorFactory() = default;
+
+  /** Creates a per-context certificate selector.*/
+  virtual UpstreamTlsCertificateSelectorPtr
+  createUpstreamTlsCertificateSelector(TlsCertificateSelectorContext&) PURE;
+
+  /** Notify about changes in the TLS context config, e.g. an SDS update to the certificates or the
+   * validation context. */
+  virtual absl::Status onConfigUpdate() PURE;
+};
+using UpstreamTlsCertificateSelectorFactoryPtr =
+    std::unique_ptr<UpstreamTlsCertificateSelectorFactory>;
+
+class UpstreamTlsCertificateSelectorConfigFactory : public Config::TypedFactory {
+public:
+  /**
+   * Creates a factory for the upstream TLS certificate selectors. The factory
+   * is bound to the client context config.
+   */
+  virtual absl::StatusOr<UpstreamTlsCertificateSelectorFactoryPtr>
+  createUpstreamTlsCertificateSelectorFactory(
+      const Protobuf::Message& proto_config,
+      Server::Configuration::GenericFactoryContext& factory_context,
+      const ClientContextConfig& tls_config) PURE;
+
+  std::string category() const override { return "envoy.tls.upstream_certificate_selectors"; }
+};
+
+class TlsCertificateMapper {
+public:
+  virtual ~TlsCertificateMapper() = default;
+  virtual std::string deriveFromClientHello(const SSL_CLIENT_HELLO&) PURE;
+};
+
+class UpstreamTlsCertificateMapper {
+public:
+  virtual ~UpstreamTlsCertificateMapper() = default;
+  virtual std::string
+  deriveFromServerHello(const SSL&, const Network::TransportSocketOptionsConstSharedPtr&) PURE;
+};
+
+using TlsCertificateMapperPtr = std::unique_ptr<TlsCertificateMapper>;
+using TlsCertificateMapperFactory = std::function<TlsCertificateMapperPtr()>;
+using UpstreamTlsCertificateMapperPtr = std::unique_ptr<UpstreamTlsCertificateMapper>;
+using UpstreamTlsCertificateMapperFactory = std::function<UpstreamTlsCertificateMapperPtr()>;
 
 class TlsCertificateMapperConfigFactory : public Config::TypedFactory {
 public:
@@ -323,6 +383,20 @@ public:
       Server::Configuration::GenericFactoryContext& factory_context) PURE;
 
   std::string category() const override { return "envoy.tls.certificate_mappers"; }
+};
+
+class UpstreamTlsCertificateMapperConfigFactory : public Config::TypedFactory {
+public:
+  /**
+   * Create an upstream certificate selector secret name mapper.
+   * @param config proto configuration.
+   * @param factory_context generic factory context.
+   */
+  virtual absl::StatusOr<UpstreamTlsCertificateMapperFactory> createTlsCertificateMapperFactory(
+      const Protobuf::Message& config,
+      Server::Configuration::GenericFactoryContext& factory_context) PURE;
+
+  std::string category() const override { return "envoy.tls.upstream_certificate_mappers"; }
 };
 
 } // namespace Ssl

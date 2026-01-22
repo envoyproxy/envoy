@@ -22,6 +22,10 @@ void DynamicModuleHttpFilter::onStreamComplete() {
 
 void DynamicModuleHttpFilter::onDestroy() {
   destroyed_ = true;
+  // Remove watermark callbacks before destroying.
+  if (decoder_callbacks_ != nullptr) {
+    decoder_callbacks_->removeDownstreamWatermarkCallbacks(*this);
+  }
   destroy();
 };
 
@@ -539,6 +543,46 @@ void DynamicModuleHttpFilter::HttpStreamCalloutCallback::onReset() {
     dispatcher.deferredDelete(std::move(deletable));
     filter->http_stream_callouts_.erase(it);
   }
+}
+
+void DynamicModuleHttpFilter::storeSocketOptionInt(
+    int64_t level, int64_t name, envoy_dynamic_module_type_socket_option_state state,
+    envoy_dynamic_module_type_socket_direction direction, int64_t value) {
+  socket_options_.push_back(
+      {level, name, state, direction, /*is_int=*/true, value, /*byte_value=*/std::string()});
+}
+
+void DynamicModuleHttpFilter::storeSocketOptionBytes(
+    int64_t level, int64_t name, envoy_dynamic_module_type_socket_option_state state,
+    envoy_dynamic_module_type_socket_direction direction, absl::string_view value) {
+  socket_options_.push_back(
+      {level, name, state, direction, /*is_int=*/false, /*int_value=*/0, std::string(value)});
+}
+
+bool DynamicModuleHttpFilter::tryGetSocketOptionInt(
+    int64_t level, int64_t name, envoy_dynamic_module_type_socket_option_state state,
+    envoy_dynamic_module_type_socket_direction direction, int64_t& value_out) const {
+  for (const auto& opt : socket_options_) {
+    if (opt.level == level && opt.name == name && opt.state == state &&
+        opt.direction == direction && opt.is_int) {
+      value_out = opt.int_value;
+      return true;
+    }
+  }
+  return false;
+}
+
+bool DynamicModuleHttpFilter::tryGetSocketOptionBytes(
+    int64_t level, int64_t name, envoy_dynamic_module_type_socket_option_state state,
+    envoy_dynamic_module_type_socket_direction direction, absl::string_view& value_out) const {
+  for (const auto& opt : socket_options_) {
+    if (opt.level == level && opt.name == name && opt.state == state &&
+        opt.direction == direction && !opt.is_int) {
+      value_out = opt.byte_value;
+      return true;
+    }
+  }
+  return false;
 }
 
 } // namespace HttpFilters

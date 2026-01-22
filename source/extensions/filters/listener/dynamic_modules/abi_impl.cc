@@ -793,6 +793,16 @@ void envoy_dynamic_module_callback_listener_filter_config_scheduler_commit(
   scheduler->commit(event_id);
 }
 
+// -----------------------------------------------------------------------------
+// Misc ABI Callbacks
+// -----------------------------------------------------------------------------
+
+uint32_t envoy_dynamic_module_callback_listener_filter_get_worker_index(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr) {
+  auto filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  return filter->workerIndex();
+}
+
 } // extern "C"
 
 } // namespace ListenerFilters
