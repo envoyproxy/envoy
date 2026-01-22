@@ -72,10 +72,7 @@ public:
   parseIpTagsAsProto(const Protobuf::RepeatedPtrField<
                      envoy::extensions::filters::http::ip_tagging::v3::IPTagging::IPTag>& ip_tags);
 
-  void incIpTagsReloadSuccess() {
-    incCounter(stat_name_set_->getBuiltin("success", unknown_tag_));
-    on_tags_reload_cb_manager_.runCallbacks(tags_);
-  }
+  void incIpTagsReloadSuccess();
 
   /**
    * Install a callback that will be invoked when tags are reloaded.
@@ -198,11 +195,7 @@ public:
   OptRef<const Http::LowerCaseString> ipTagHeader() const;
   HeaderAction ipTagHeaderAction() const { return ip_tag_header_action_; }
 
-  void onIpTagsReload() { ENVOY_LOG(debug, "IP tags reloaded successfully"); }
-
-  void incHit(absl::string_view tag) {
-    incCounter(stat_name_set_->getBuiltin(absl::StrCat(tag, ".hit"), unknown_tag_));
-  }
+  void incHit(absl::string_view tag);
 
   void initializeTagStats(const std::vector<std::string>& tags);
 
@@ -244,6 +237,7 @@ private:
   Stats::StatName no_hit_;
   Stats::StatName total_;
   Stats::StatName unknown_tag_;
+  absl::flat_hash_map<std::string, Stats::StatName> tag_hit_counters_;
   const Http::LowerCaseString
       ip_tag_header_; // An empty string indicates that no ip_tag_header is set.
   const HeaderAction ip_tag_header_action_;

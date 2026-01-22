@@ -84,6 +84,11 @@ void IpTagsLoader::incCounter(Stats::StatName name) {
   scope_->counterFromStatName(Stats::StatName(storage.get())).inc();
 }
 
+void IpTagsLoader::incIpTagsReloadSuccess() {
+  incCounter(stat_name_set_->getBuiltin("success", unknown_tag_));
+  on_tags_reload_cb_manager_.runCallbacks(tags_);
+}
+
 absl::StatusOr<LcTrieSharedPtr>
 IpTagsLoader::loadTags(const envoy::config::core::v3::DataSource& ip_tags_datasource,
                        Event::Dispatcher& main_dispatcher, ThreadLocal::SlotAllocator& tls) {
@@ -252,14 +257,27 @@ void IpTaggingFilterConfig::addTagsReloadCb() {
 }
 
 void IpTaggingFilterConfig::initializeTagStats(const std::vector<std::string>& tags) {
+  if (tag_hit_counters_.size() > 0) {
+    tag_hit_counters_.clear();
+  }
   for (auto tag : tags) {
-    stat_name_set_->rememberBuiltin(absl::StrCat(tag, ".hit"));
+    auto stat_name = stat_name_set_->add(absl::StrCat(tag, ".hit"));
+    tag_hit_counters_.emplace(tag, stat_name);
   }
 }
 
 void IpTaggingFilterConfig::incCounter(Stats::StatName name) {
   Stats::SymbolTable::StoragePtr storage = scope_.symbolTable().join({stats_prefix_, name});
   scope_.counterFromStatName(Stats::StatName(storage.get())).inc();
+}
+
+void IpTaggingFilterConfig::incHit(absl::string_view tag) {
+  if (auto it = tag_hit_counters_.find(std::string(tag)); it != tag_hit_counters_.end()) {
+    incCounter(it->second);
+  } else {
+    incCounter(unknown_tag_);
+  }
+  incCounter(stat_name_set_->getBuiltin(absl::StrCat(tag, ".hit"), unknown_tag_));
 }
 
 const Network::LcTrie::LcTrie<std::string>& IpTaggingFilterConfig::trie() const {
