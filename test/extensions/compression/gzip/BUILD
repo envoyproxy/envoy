@@ -22,9 +22,9 @@ envoy_cc_fuzz_test(
     deps = [
         ":compressor_fuzz_input_proto_cc_proto",
         "//source/common/buffer:buffer_lib",
-        "//test/fuzz:utility_lib",
         "//source/common/common:assert_lib",
         "//source/extensions/compression/gzip/compressor:compressor_lib",
         "//source/extensions/compression/gzip/decompressor:zlib_decompressor_impl_lib",
+        "//test/fuzz:utility_lib",
     ],
 )
