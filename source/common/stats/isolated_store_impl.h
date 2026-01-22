@@ -299,8 +299,10 @@ public:
                                        StatNameTagVectorOptConstRef tags) override {
     return store_.counters_.get(prefix(), name, tags, symbolTable());
   }
-  ScopeSharedPtr createScope(const std::string& name, bool evictable) override;
-  ScopeSharedPtr scopeFromStatName(StatName name, bool evictable) override;
+  ScopeSharedPtr createScope(const std::string& name, bool evictable = false,
+                             const ScopeStatsLimitSettings& limits = {}) override;
+  ScopeSharedPtr scopeFromStatName(StatName name, bool evictable = false,
+                                   const ScopeStatsLimitSettings& limits = {}) override;
   Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
                                    Gauge::ImportMode import_mode) override {
     Gauge& gauge = store_.gauges_.get(prefix(), name, tags, symbolTable(), import_mode);
