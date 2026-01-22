@@ -168,6 +168,56 @@ TEST(CreateDynamicModulesByName, ModuleNotFound) {
                   "Failed to load dynamic module: libno_op.so not found in any search path"));
 }
 
+// Tests for force_reload functionality.
+TEST(ForceReload, ForceReloadAndDoNotCloseConflict) {
+  // force_reload and do_not_close cannot both be true.
+  absl::StatusOr<DynamicModulePtr> result =
+      newDynamicModule(testSharedObjectPath("no_op", "c"), true, false, true);
+  EXPECT_FALSE(result.ok());
+  EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_THAT(result.status().message(),
+              testing::HasSubstr("force_reload and do_not_close cannot both be set to true"));
+}
+
+TEST(ForceReload, ForceReloadLoadsNewModule) {
+  using GetSomeVariableFuncType = int (*)(void);
+
+  const auto path = testSharedObjectPath("no_op", "c");
+
+  // Load the module normally. This will call init and set current_load_id to 1.
+  absl::StatusOr<DynamicModulePtr> module1 = newDynamicModule(path, false, false, false);
+  EXPECT_TRUE(module1.ok());
+  auto getSomeVariable1 =
+      module1->get()->getFunctionPointer<GetSomeVariableFuncType>("getSomeVariable");
+  EXPECT_TRUE(getSomeVariable1.ok());
+  EXPECT_EQ(getSomeVariable1.value()(), 1);
+  EXPECT_EQ(getSomeVariable1.value()(), 2);
+
+  // Load again without force_reload - should reuse the existing module via RTLD_NOLOAD.
+  absl::StatusOr<DynamicModulePtr> module2 = newDynamicModule(path, false, false, false);
+  EXPECT_TRUE(module2.ok());
+  auto getSomeVariable2 =
+      module2->get()->getFunctionPointer<GetSomeVariableFuncType>("getSomeVariable");
+  EXPECT_TRUE(getSomeVariable2.ok());
+  // Continues from where module1 left off because it's the same loaded module.
+  EXPECT_EQ(getSomeVariable2.value()(), 3);
+
+  // Release both modules. The module should be unloaded now.
+  module1->reset();
+  module2->reset();
+
+  // Now load with force_reload=true. Even if the module were still resident,
+  // force_reload would bypass RTLD_NOLOAD and load fresh.
+  absl::StatusOr<DynamicModulePtr> module3 = newDynamicModule(path, false, false, true);
+  EXPECT_TRUE(module3.ok());
+  auto getSomeVariable3 =
+      module3->get()->getFunctionPointer<GetSomeVariableFuncType>("getSomeVariable");
+  EXPECT_TRUE(getSomeVariable3.ok());
+  // Fresh load means init is called again, incrementing current_load_id, which resets
+  // some_variable.
+  EXPECT_EQ(getSomeVariable3.value()(), 1);
+}
+
 } // namespace DynamicModules
 } // namespace Extensions
 } // namespace Envoy

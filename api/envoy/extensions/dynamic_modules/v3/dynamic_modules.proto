@@ -30,6 +30,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // the ABI is stabilized, this restriction will be revisited. Until then, Envoy checks the hash of
 // the ABI header files to ensure that the dynamic modules are built against the same version of the
 // ABI.
+// [#next-free-field: 6]
 message DynamicModuleConfig {
   // The name of the dynamic module.
   //
@@ -45,7 +46,7 @@ message DynamicModuleConfig {
   //   There is some remaining work to make the search path configurable via command line options.
   string name = 1 [(validate.rules).string = {min_len: 1}];
 
-  // If true, prevents the module from being unloaded with ``dlclose``.
+  // If ``true``, prevents the module from being unloaded with ``dlclose``.
   //
   // This is useful for modules that have global state that should not be unloaded. A module is
   // closed when no more references to it exist in the process. For example, no HTTP filters are
@@ -54,7 +55,7 @@ message DynamicModuleConfig {
   // Defaults to ``false``.
   bool do_not_close = 3;
 
-  // If true, the dynamic module is loaded with the ``RTLD_GLOBAL`` flag.
+  // If ``true``, the dynamic module is loaded with the ``RTLD_GLOBAL`` flag.
   //
   // The dynamic module is loaded with the ``RTLD_LOCAL`` flag by default to avoid symbol conflicts
   // when multiple modules are loaded. Set this to ``true`` to load the module with the
@@ -69,4 +70,19 @@ message DynamicModuleConfig {
   //
   // Defaults to ``false``.
   bool load_globally = 4;
+
+  // If ``true``, forces the module to be loaded fresh even if a module with the same path is already
+  // loaded. This is useful for hot reloading scenarios where the module binary has been updated on
+  // disk and a new version needs to be loaded.
+  //
+  // When enabled, Envoy will bypass the check that normally prevents loading duplicate modules,
+  // allowing multiple versions of the same module to coexist temporarily. The old version will
+  // remain loaded until all references to it (e.g., in-flight requests) are released.
+  //
+  // .. warning::
+  //   This option cannot be used together with ``do_not_close``. The module must be unloadable
+  //   for hot reloading to work correctly.
+  //
+  // Defaults to ``false``.
+  bool force_reload = 5;
 }

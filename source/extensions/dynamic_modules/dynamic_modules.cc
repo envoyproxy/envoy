@@ -17,19 +17,29 @@ constexpr char DYNAMIC_MODULES_SEARCH_PATH[] = "ENVOY_DYNAMIC_MODULES_SEARCH_PAT
 
 absl::StatusOr<DynamicModulePtr>
 newDynamicModule(const std::filesystem::path& object_file_absolute_path, const bool do_not_close,
-                 const bool load_globally) {
-  // From the man page of dlopen(3):
+                 const bool load_globally, const bool force_reload) {
+  // Validate that force_reload and do_not_close are not both set.
+  if (force_reload && do_not_close) {
+    return absl::InvalidArgumentError(
+        "force_reload and do_not_close cannot both be set to true: force_reload requires the "
+        "module to be unloadable, but do_not_close prevents unloading");
+  }
+
+  // When force_reload is false, check if the module is already loaded to avoid duplicate
+  // initialization. From the man page of dlopen(3):
   //
   // > This can be used to test if the object is already resident (dlopen() returns NULL if it
   // > is not, or the object's handle if it is resident).
   //
   // So we can use RTLD_NOLOAD to check if the module is already loaded to avoid the duplicate call
   // to the init function.
-  void* handle = dlopen(object_file_absolute_path.c_str(), RTLD_NOLOAD | RTLD_LAZY);
-  if (handle != nullptr) {
-    // This means the module is already loaded, and the return value is the handle of the already
-    // loaded module. We don't need to call the init function again.
-    return std::make_unique<DynamicModule>(handle);
+  if (!force_reload) {
+    void* handle = dlopen(object_file_absolute_path.c_str(), RTLD_NOLOAD | RTLD_LAZY);
+    if (handle != nullptr) {
+      // This means the module is already loaded, and the return value is the handle of the already
+      // loaded module. We don't need to call the init function again.
+      return std::make_unique<DynamicModule>(handle);
+    }
   }
   // RTLD_LAZY is required for not only performance but also simply to load the module, otherwise
   // dlopen results in Invalid argument.
@@ -43,7 +53,7 @@ newDynamicModule(const std::filesystem::path& object_file_absolute_path, const b
   if (do_not_close) {
     mode |= RTLD_NODELETE;
   }
-  handle = dlopen(object_file_absolute_path.c_str(), mode);
+  void* handle = dlopen(object_file_absolute_path.c_str(), mode);
   if (handle == nullptr) {
     return absl::InvalidArgumentError(absl::StrCat(
         "Failed to load dynamic module: ", object_file_absolute_path.c_str(), " : ", dlerror()));
@@ -74,7 +84,8 @@ newDynamicModule(const std::filesystem::path& object_file_absolute_path, const b
 
 absl::StatusOr<DynamicModulePtr> newDynamicModuleByName(const absl::string_view module_name,
                                                         const bool do_not_close,
-                                                        const bool load_globally) {
+                                                        const bool load_globally,
+                                                        const bool force_reload) {
   // First, try ENVOY_DYNAMIC_MODULES_SEARCH_PATH which falls back to the current directory.
   const char* module_search_path = getenv(DYNAMIC_MODULES_SEARCH_PATH);
   if (!module_search_path) {
@@ -85,7 +96,7 @@ absl::StatusOr<DynamicModulePtr> newDynamicModuleByName(const absl::string_view 
   const std::filesystem::path file_path_absolute = std::filesystem::absolute(file_path);
   if (std::filesystem::exists(file_path_absolute)) {
     absl::StatusOr<DynamicModulePtr> dynamic_module =
-        newDynamicModule(file_path_absolute, do_not_close, load_globally);
+        newDynamicModule(file_path_absolute, do_not_close, load_globally, force_reload);
     // If the file exists but failed to load, return the error without trying other paths.
     // This allows the user to get the detailed error message such as missing dependencies, ABI
     // mismatch, etc.
@@ -100,8 +111,8 @@ absl::StatusOr<DynamicModulePtr> newDynamicModuleByName(const absl::string_view 
   // > searches for the object ...
   //
   // which basically says dlopen searches for LD_LIBRARY_PATH and /usr/lib, etc.
-  absl::StatusOr<DynamicModulePtr> dynamic_module =
-      newDynamicModule(fmt::format("lib{}.so", module_name), do_not_close, load_globally);
+  absl::StatusOr<DynamicModulePtr> dynamic_module = newDynamicModule(
+      fmt::format("lib{}.so", module_name), do_not_close, load_globally, force_reload);
   if (dynamic_module.ok()) {
     return dynamic_module;
   }

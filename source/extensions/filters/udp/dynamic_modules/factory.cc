@@ -17,7 +17,8 @@ DynamicModuleUdpListenerFilterConfigFactory::createFilterFactoryFromProto(
   auto dynamic_module_or_error = Extensions::DynamicModules::newDynamicModuleByName(
       proto_config.dynamic_module_config().name(),
       proto_config.dynamic_module_config().do_not_close(),
-      proto_config.dynamic_module_config().load_globally());
+      proto_config.dynamic_module_config().load_globally(),
+      proto_config.dynamic_module_config().force_reload());
 
   if (!dynamic_module_or_error.ok()) {
     throw EnvoyException(std::string(dynamic_module_or_error.status().message()));

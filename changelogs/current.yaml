@@ -72,5 +72,11 @@ new_features:
   change: |
     Added ``%DOWNSTREAM_DETECTED_CLOSE_TYPE%`` to expose the detected close type
     of downstream and connections. The possible values are ``Normal``, ``LocalReset``, and ``RemoteReset``.
+- area: dynamic_modules
+  change: |
+    Added support for hot-reloading dynamic modules via the ``force_reload`` option in the
+    :ref:`DynamicModuleConfig <envoy_v3_api_msg_extensions.dynamic_modules.v3.DynamicModuleConfig>`.
+    When enabled, Envoy will load a fresh copy of the module even if one with the same path is
+    already loaded, allowing module binaries to be updated on disk without restarting Envoy.
 
 deprecated:

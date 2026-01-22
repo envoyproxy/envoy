@@ -66,10 +66,12 @@ using DynamicModulePtr = std::unique_ptr<DynamicModule>;
  * @param load_globally if true, the dlopen will be called with RTLD_GLOBAL, so the loaded object
  * can share symbols with other dynamically loaded modules. This is useful for modules that need to
  * share symbols with other modules.
+ * @param force_reload if true, forces the module to be loaded fresh even if a module with the same
+ * path is already loaded. This bypasses the RTLD_NOLOAD check. Cannot be used with do_not_close.
  */
 absl::StatusOr<DynamicModulePtr>
 newDynamicModule(const std::filesystem::path& object_file_absolute_path, const bool do_not_close,
-                 const bool load_globally = false);
+                 const bool load_globally = false, const bool force_reload = false);
 
 /**
  * Creates a new DynamicModule by name under the search path specified by the environment variable
@@ -82,10 +84,13 @@ newDynamicModule(const std::filesystem::path& object_file_absolute_path, const b
  * @param load_globally if true, the dlopen will be called with RTLD_GLOBAL, so the loaded object
  * can share symbols with other dynamically loaded modules. This is useful for modules that need to
  * share symbols with other modules.
+ * @param force_reload if true, forces the module to be loaded fresh even if a module with the same
+ * path is already loaded. This bypasses the RTLD_NOLOAD check. Cannot be used with do_not_close.
  */
 absl::StatusOr<DynamicModulePtr> newDynamicModuleByName(const absl::string_view module_name,
                                                         const bool do_not_close,
-                                                        const bool load_globally = false);
+                                                        const bool load_globally = false,
+                                                        const bool force_reload = false);
 } // namespace DynamicModules
 } // namespace Extensions
 } // namespace Envoy
