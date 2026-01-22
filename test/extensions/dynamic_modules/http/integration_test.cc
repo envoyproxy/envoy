@@ -829,4 +829,39 @@ TEST_P(DynamicModulesIntegrationTest, ConfigScheduler) {
   FAIL() << "Config was not updated in time";
 }
 
+// Test buffer limit callbacks for non-terminal filters.
+TEST_P(DynamicModulesIntegrationTest, BufferLimitFilter) {
+  initializeFilter("buffer_limit_filter");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+
+  // Verify the buffer limit headers were set by the filter.
+  auto initial_limit_header =
+      response->headers().get(Http::LowerCaseString("x-initial-buffer-limit"));
+  ASSERT_FALSE(initial_limit_header.empty());
+  uint64_t initial_limit;
+  EXPECT_TRUE(absl::SimpleAtoi(initial_limit_header[0]->value().getStringView(), &initial_limit));
+
+  auto current_limit_header =
+      response->headers().get(Http::LowerCaseString("x-current-buffer-limit"));
+  ASSERT_FALSE(current_limit_header.empty());
+  uint64_t current_limit;
+  EXPECT_TRUE(absl::SimpleAtoi(current_limit_header[0]->value().getStringView(), &current_limit));
+
+  // The filter should have either kept the existing limit (if already >= 65536) or increased it.
+  // The default buffer limit in Envoy is 16MB (16777216), so the filter should have kept it.
+  EXPECT_GE(current_limit, 65536);
+  // The initial and current limits should be the same if initial was already >= 65536.
+  if (initial_limit >= 65536) {
+    EXPECT_EQ(current_limit, initial_limit);
+  } else {
+    EXPECT_EQ(current_limit, 65536);
+  }
+}
+
 } // namespace Envoy

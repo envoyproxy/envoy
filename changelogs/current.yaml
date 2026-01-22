@@ -2,9 +2,23 @@ date: Pending
 
 behavior_changes:
 # *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
+- area: tcp_proxy
+  change: |
+    The TCP proxy filter now requires :ref:`max_early_data_bytes
+    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.max_early_data_bytes>` to be
+    explicitly set when using :ref:`upstream_connect_mode
+    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.upstream_connect_mode>` modes
+    other than ``IMMEDIATE`` (i.e., ``ON_DOWNSTREAM_DATA`` or ``ON_DOWNSTREAM_TLS_HANDSHAKE``). The field
+    can be set to zero to disable early data buffering while still using delayed connection modes.
+    Configurations using these modes without ``max_early_data_bytes`` will now fail validation at startup.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: histograms
+  change: |
+    Update of libcircllhist to 0.3.2 has changed how bucket bounds are interpreted. This should not have an impact on
+    production monitoring if the number of samples in the histograms is high. Affected tests were adjusted to account for
+    histogram changes.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -14,6 +28,17 @@ bug_fixes:
     would not be properly closed when in draining state. This could occur when a response was sent before the request
     was fully received, causing connections to remain open indefinitely. This behavior change can be temporarily reverted
     by setting the runtime guard ``envoy.reloadable_features.http1_close_connection_on_zombie_stream_complete`` to ``false``.
+- area: drop_overload
+  change: |
+    Fixed a bug that drop_overload failed to use cached EDS resources.
+- area: http
+  change: |
+    Fixed upstream client to not close connection when idle timeout fires before the connection is established.
+    This behavior can be reverted by setting the runtime guard
+    ``envoy.reloadable_features.codec_client_enable_idle_timer_only_when_connected`` to ``false``.
+- area: ext_authz
+  change: |
+    Fixed a bug where headers from a denied authorization response (non-200s) were not properly propagated to the client.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -358,5 +383,33 @@ new_features:
     :ref:`endpoint_params <envoy_v3_api_field_extensions.http.injected_credentials.oauth2.v3.OAuth2.endpoint_params>`.
     This allows passing custom parameters required by authorization servers (such as Logto or EntraID) that expect
     additional body parameters during the token exchange.
+- area: tls
+  change: |
+    Added support for fetching certificates on-demand via SDS in the upstream TLS transport socket
+    using the extension :ref:`on-demand certificate selector
+    <extension_envoy.tls.certificate_selectors.on_demand_secret>`.
+- area: mcp_router
+  change: |
+    Added support for MCP resource methods ``resources/list``, ``resources/read``,
+    ``resources/subscribe``, and ``resources/unsubscribe``.
+- area: mcp_router
+  change: |
+    Added support for MCP prompt methods ``prompts/list`` and ``prompts/get``.
+- area: mcp_router
+  change: |
+    Added support for MCP client-to-server notification methods ``notifications/cancelled``
+    and ``notifications/roots/list_changed``.
+- area: formatter
+  change: |
+    Extended ``*_WITHOUT_PORT`` address formatters to accept an optional ``MASK_PREFIX_LEN`` parameter that masks IP addresses
+    and returns them in CIDR notation (e.g., ``%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT(16)%`` returns ``10.1.0.0/16`` for
+    client IP ``10.1.10.23``).
+- area: formatter
+  change: |
+    Added the new access log formatter support of ``DOWNSTREAM_LOCAL_CLOSE_REASON``.
+- area: formatter
+  change: |
+    Added ``%DOWNSTREAM_DETECTED_CLOSE_TYPE%`` to expose the detected close type
+    of downstream and connections. The possible values are ``Normal``, ``LocalReset``, and ``RemoteReset``.
 
 deprecated:
