@@ -136,14 +136,20 @@ void BackendStreamCallbacks::onData(Buffer::Instance& data, bool end_stream) {
   ENVOY_LOG(debug, "onData Backend '{}' buffered body_size: {}", backend_name_,
             response_.body.size());
 
-  // Complete on end_stream, or early for SSE aggregation when response is found.
+  // For SSE in aggregate mode, always try to parse to extract the JSON-RPC response.
+  // This must run even when end_stream=true to handle responses that arrive in a single chunk.
   ENVOY_LOG(debug, "onData Backend '{}': aggregate_mode={}, isSse={}", backend_name_,
             aggregate_mode_, response_.isSse());
-  if (end_stream || (aggregate_mode_ && response_.isSse() && tryParseSseResponse())) {
-    if (!end_stream) {
+  if (aggregate_mode_ && response_.isSse()) {
+    if (tryParseSseResponse() && !end_stream) {
       ENVOY_LOG(debug, "Backend '{}' SSE aggregation: found valid response, completing early",
                 backend_name_);
+      complete();
+      return;
     }
+  }
+
+  if (end_stream) {
     complete();
   }
 }
@@ -229,11 +235,15 @@ void BackendStreamCallbacks::onReset() {
 
   response_.success = false;
   response_.error = "Stream reset";
-  // For streaming mode, notify via error callback if streaming hasn't started yet.
+  // For streaming mode, notify via error callback only if streaming hasn't started yet.
+  // If streaming has already started (headers sent), we can't send error headers -
+  // fall through to complete() which will call onStreamingComplete().
   if (streaming_enabled_ && !streaming_started_) {
     if (auto parent = parent_.lock()) {
       parent->onStreamingError(response_.error);
     }
+    completed_ = true;
+    return;
   }
   complete();
 }

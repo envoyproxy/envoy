@@ -36,7 +36,7 @@ constexpr absl::string_view kContentTypeSse = "text/event-stream";
 void copyRequestHeaders(const Http::RequestHeaderMap& source, Http::RequestHeaderMap& dest) {
   // Headers that we set explicitly or should not be forwarded
   static const absl::flat_hash_set<absl::string_view> kSkipHeaders = {
-      ":method", ":path", ":authority", "host", "content-type", kSessionIdHeader};
+      ":method", ":path", ":authority", "host", "content-type", "accept", kSessionIdHeader};
 
   source.iterate([&dest](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
     absl::string_view key = header.key().getStringView();
@@ -593,7 +593,6 @@ void McpRouterFilter::initializeFanout(AggregationCallback callback) {
 
 void McpRouterFilter::initializeSingleBackend(const McpBackendConfig& backend,
                                               std::function<void(BackendResponse)> callback) {
-  // Delegate to the streaming-aware version with streaming disabled.
   initializeSingleBackend(backend, std::move(callback), false);
 }
 
@@ -661,15 +660,15 @@ void McpRouterFilter::streamData(Buffer::Instance& data, bool end_stream) {
   }
 }
 
-void McpRouterFilter::pushSseHeaders(Http::ResponseHeaderMapPtr&& headers, bool) {
+void McpRouterFilter::pushSseHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) {
   // Remove backend's session ID and replace with the request's session ID.
   headers->remove(Http::LowerCaseString("mcp-session-id"));
   if (!encoded_session_id_.empty()) {
     headers->addCopy(Http::LowerCaseString("mcp-session-id"), encoded_session_id_);
   }
 
-  ENVOY_LOG(debug, "SSE streaming: forwarding headers to client");
-  decoder_callbacks_->encodeHeaders(std::move(headers), false, "mcp_router");
+  ENVOY_LOG(debug, "SSE streaming: forwarding headers to client, end_stream={}", end_stream);
+  decoder_callbacks_->encodeHeaders(std::move(headers), end_stream, "mcp_router");
 }
 
 void McpRouterFilter::pushSseData(Buffer::Instance& data, bool end_stream) {
