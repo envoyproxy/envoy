@@ -262,7 +262,7 @@ DefaultCertValidator::verifyCertificate(X509* cert, const std::vector<std::strin
                       fmt::join(verify_san_list, ", "));
 
       if (error_details != nullptr) {
-        *error_details = error_msg.c_str();
+        *error_details = error_msg;
       }
       ENVOY_LOG(debug, error_msg.c_str());
       stats_.fail_verify_san_.inc();
