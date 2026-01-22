@@ -69,12 +69,7 @@ const McpMethodMap& mcpMethodMap() {
        // Notifications (client -> server).
        {"notifications/initialized", McpMethod::NotificationInitialized},
        {"notifications/cancelled", McpMethod::NotificationCancelled},
-       {"notifications/progress", McpMethod::NotificationProgress},
-       {"notifications/roots/list_changed", McpMethod::NotificationRootsListChanged},
-       {"notifications/resources/list_changed", McpMethod::NotificationResourcesListChanged},
-       {"notifications/resources/updated", McpMethod::NotificationResourcesUpdated},
-       {"notifications/tools/list_changed", McpMethod::NotificationToolsListChanged},
-       {"notifications/prompts/list_changed", McpMethod::NotificationPromptsListChanged}});
+       {"notifications/roots/list_changed", McpMethod::NotificationRootsListChanged}});
 }
 
 McpMethod parseMethodString(absl::string_view method_str) {
@@ -236,28 +231,8 @@ Http::FilterDataStatus McpRouterFilter::decodeData(Buffer::Instance& data, bool 
       handleNotification("notifications/cancelled");
       break;
 
-    case McpMethod::NotificationProgress:
-      handleNotification("notifications/progress");
-      break;
-
     case McpMethod::NotificationRootsListChanged:
       handleNotification("notifications/roots/list_changed");
-      break;
-
-    case McpMethod::NotificationResourcesListChanged:
-      handleNotification("notifications/resources/list_changed");
-      break;
-
-    case McpMethod::NotificationResourcesUpdated:
-      handleNotification("notifications/resources/updated");
-      break;
-
-    case McpMethod::NotificationToolsListChanged:
-      handleNotification("notifications/tools/list_changed");
-      break;
-
-    case McpMethod::NotificationPromptsListChanged:
-      handleNotification("notifications/prompts/list_changed");
       break;
 
     default:

@@ -31,20 +31,11 @@ TEST(ParseMethodStringTest, AllMethods) {
   EXPECT_EQ(parseMethodString("prompts/list"), McpMethod::PromptsList);
   EXPECT_EQ(parseMethodString("prompts/get"), McpMethod::PromptsGet);
   EXPECT_EQ(parseMethodString("ping"), McpMethod::Ping);
-  // Notifications.
+  // Notifications (client -> server only).
   EXPECT_EQ(parseMethodString("notifications/initialized"), McpMethod::NotificationInitialized);
   EXPECT_EQ(parseMethodString("notifications/cancelled"), McpMethod::NotificationCancelled);
-  EXPECT_EQ(parseMethodString("notifications/progress"), McpMethod::NotificationProgress);
   EXPECT_EQ(parseMethodString("notifications/roots/list_changed"),
             McpMethod::NotificationRootsListChanged);
-  EXPECT_EQ(parseMethodString("notifications/resources/list_changed"),
-            McpMethod::NotificationResourcesListChanged);
-  EXPECT_EQ(parseMethodString("notifications/resources/updated"),
-            McpMethod::NotificationResourcesUpdated);
-  EXPECT_EQ(parseMethodString("notifications/tools/list_changed"),
-            McpMethod::NotificationToolsListChanged);
-  EXPECT_EQ(parseMethodString("notifications/prompts/list_changed"),
-            McpMethod::NotificationPromptsListChanged);
   EXPECT_EQ(parseMethodString("unknown_method"), McpMethod::Unknown);
   EXPECT_EQ(parseMethodString(""), McpMethod::Unknown);
 }

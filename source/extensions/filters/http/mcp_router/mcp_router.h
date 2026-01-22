@@ -42,12 +42,7 @@ enum class McpMethod {
   // Notifications (client -> server, fire-and-forget).
   NotificationInitialized,
   NotificationCancelled,
-  NotificationProgress,
   NotificationRootsListChanged,
-  NotificationResourcesListChanged,
-  NotificationResourcesUpdated,
-  NotificationToolsListChanged,
-  NotificationPromptsListChanged,
 };
 
 McpMethod parseMethodString(absl::string_view method_str);
