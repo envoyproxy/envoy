@@ -86,9 +86,10 @@ absl::StatusOr<DynamicModulePtr> newDynamicModuleByName(const absl::string_view 
   if (std::filesystem::exists(file_path_absolute)) {
     absl::StatusOr<DynamicModulePtr> dynamic_module =
         newDynamicModule(file_path_absolute, do_not_close, load_globally);
-    if (dynamic_module.ok()) {
-      return dynamic_module;
-    }
+    // If the file exists but failed to load, return the error without trying other paths.
+    // This allows the user to get the detailed error message such as missing dependencies, ABI
+    // mismatch, etc.
+    return dynamic_module;
   }
 
   // If not found, pass only the library name to dlopen to search in the standard library paths.
@@ -108,7 +109,9 @@ absl::StatusOr<DynamicModulePtr> newDynamicModuleByName(const absl::string_view 
   return absl::InvalidArgumentError(
       absl::StrCat("Failed to load dynamic module: lib", module_name,
                    ".so not found in any search path: ", file_path_absolute.c_str(),
-                   " or standard library paths such as LD_LIBRARY_PATH, /usr/lib, etc."));
+                   " or standard library paths such as LD_LIBRARY_PATH, /usr/lib, etc. or failed "
+                   "to initialize: ",
+                   dynamic_module.status().message()));
 }
 
 DynamicModule::~DynamicModule() { dlclose(handle_); }

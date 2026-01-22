@@ -46,7 +46,6 @@ DynamicModuleNetworkFilterConfigFactory::createFilterFactoryFromProtoTyped(
   return [config = filter_config.value()](Network::FilterManager& filter_manager) -> void {
     auto filter = std::make_shared<
         Envoy::Extensions::DynamicModules::NetworkFilters::DynamicModuleNetworkFilter>(config);
-    filter->initializeInModuleFilter();
     filter_manager.addFilter(filter);
   };
 }

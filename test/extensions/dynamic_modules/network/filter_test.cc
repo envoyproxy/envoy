@@ -8,6 +8,8 @@
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/utility.h"
 
+#include "gmock/gmock.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace DynamicModules {
@@ -24,25 +26,26 @@ public:
         main_thread_dispatcher_);
     EXPECT_TRUE(filter_config_or_status.ok()) << filter_config_or_status.status().message();
     filter_config_ = filter_config_or_status.value();
+
+    ON_CALL(connection_, dispatcher()).WillByDefault(testing::ReturnRef(worker_thread_dispatcher_));
+    ON_CALL(read_callbacks_, connection()).WillByDefault(testing::ReturnRef(connection_));
   }
 
   Stats::IsolatedStoreImpl stats_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   DynamicModuleNetworkFilterConfigSharedPtr filter_config_;
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
+  NiceMock<Event::MockDispatcher> worker_thread_dispatcher_{"worker_0"};
+  NiceMock<Network::MockReadFilterCallbacks> read_callbacks_;
+  NiceMock<Network::MockConnection> connection_;
 };
 
 TEST_F(DynamicModuleNetworkFilterTest, BasicDataFlow) {
   auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
-  filter->initializeInModuleFilter();
 
-  NiceMock<Network::MockReadFilterCallbacks> read_callbacks;
   NiceMock<Network::MockWriteFilterCallbacks> write_callbacks;
-  NiceMock<Network::MockConnection> connection;
 
-  ON_CALL(read_callbacks, connection()).WillByDefault(testing::ReturnRef(connection));
-
-  filter->initializeReadFilterCallbacks(read_callbacks);
+  filter->initializeReadFilterCallbacks(read_callbacks_);
   filter->initializeWriteFilterCallbacks(write_callbacks);
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter->onNewConnection());
@@ -62,12 +65,8 @@ TEST_F(DynamicModuleNetworkFilterTest, BasicDataFlow) {
 
 TEST_F(DynamicModuleNetworkFilterTest, AllConnectionEvents) {
   auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
-  filter->initializeInModuleFilter();
 
-  NiceMock<Network::MockReadFilterCallbacks> read_callbacks;
-  NiceMock<Network::MockConnection> connection;
-  ON_CALL(read_callbacks, connection()).WillByDefault(testing::ReturnRef(connection));
-  filter->initializeReadFilterCallbacks(read_callbacks);
+  filter->initializeReadFilterCallbacks(read_callbacks_);
 
   // Test all connection events.
   filter->onEvent(Network::ConnectionEvent::Connected);
@@ -78,7 +77,8 @@ TEST_F(DynamicModuleNetworkFilterTest, AllConnectionEvents) {
 
 TEST_F(DynamicModuleNetworkFilterTest, WatermarkCallbacks) {
   auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
-  filter->initializeInModuleFilter();
+  filter->initializeReadFilterCallbacks(read_callbacks_);
+  filter->setCallbacksForTest(nullptr);
 
   // These should not crash.
   filter->onAboveWriteBufferHighWatermark();
@@ -87,12 +87,7 @@ TEST_F(DynamicModuleNetworkFilterTest, WatermarkCallbacks) {
 
 TEST_F(DynamicModuleNetworkFilterTest, FilterDestroyWithIsDestroyedCheck) {
   auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
-  filter->initializeInModuleFilter();
-
-  NiceMock<Network::MockReadFilterCallbacks> read_callbacks;
-  NiceMock<Network::MockConnection> connection;
-  ON_CALL(read_callbacks, connection()).WillByDefault(testing::ReturnRef(connection));
-  filter->initializeReadFilterCallbacks(read_callbacks);
+  filter->initializeReadFilterCallbacks(read_callbacks_);
 
   EXPECT_FALSE(filter->isDestroyed());
 
@@ -111,16 +106,20 @@ TEST_F(DynamicModuleNetworkFilterTest, FilterDestroyWithoutInitialization) {
 }
 
 TEST_F(DynamicModuleNetworkFilterTest, FilterWithoutInModuleFilter) {
-  auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
-  // Deliberately not calling initializeInModuleFilter().
+  auto dynamic_module =
+      newDynamicModule(testSharedObjectPath("network_filter_new_fail", "c"), false);
+  EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
-  NiceMock<Network::MockReadFilterCallbacks> read_callbacks;
-  NiceMock<Network::MockConnection> connection;
-  ON_CALL(read_callbacks, connection()).WillByDefault(testing::ReturnRef(connection));
-  filter->initializeReadFilterCallbacks(read_callbacks);
+  auto filter_config_or_status = newDynamicModuleNetworkFilterConfig(
+      "test_filter", "", std::move(dynamic_module.value()), cluster_manager_, *stats_.rootScope(),
+      main_thread_dispatcher_);
+  EXPECT_TRUE(filter_config_or_status.ok()) << filter_config_or_status.status().message();
+  auto filter_config = filter_config_or_status.value();
+  auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config);
+  filter->initializeReadFilterCallbacks(read_callbacks_);
 
   // These should return StopIteration and close connection when in_module_filter_ is null.
-  EXPECT_CALL(connection, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(connection_, close(Network::ConnectionCloseType::NoFlush));
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter->onNewConnection());
 
   Buffer::OwnedImpl read_data("hello");
@@ -135,7 +134,8 @@ TEST_F(DynamicModuleNetworkFilterTest, FilterWithoutInModuleFilter) {
 
 TEST_F(DynamicModuleNetworkFilterTest, ContinueReadingNullCallbacks) {
   auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
-  filter->initializeInModuleFilter();
+  filter->initializeReadFilterCallbacks(read_callbacks_);
+  filter->setCallbacksForTest(nullptr);
 
   // Without initializing callbacks, continueReading should not crash.
   filter->continueReading();
@@ -143,7 +143,8 @@ TEST_F(DynamicModuleNetworkFilterTest, ContinueReadingNullCallbacks) {
 
 TEST_F(DynamicModuleNetworkFilterTest, WriteNullCallbacks) {
   auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
-  filter->initializeInModuleFilter();
+  filter->initializeReadFilterCallbacks(read_callbacks_);
+  filter->setCallbacksForTest(nullptr);
 
   // Without initializing callbacks, write should not crash.
   Buffer::OwnedImpl data("test");
@@ -152,7 +153,8 @@ TEST_F(DynamicModuleNetworkFilterTest, WriteNullCallbacks) {
 
 TEST_F(DynamicModuleNetworkFilterTest, CloseNullCallbacks) {
   auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
-  filter->initializeInModuleFilter();
+  filter->initializeReadFilterCallbacks(read_callbacks_);
+  filter->setCallbacksForTest(nullptr);
 
   // Without initializing callbacks, close should not crash.
   filter->close(Network::ConnectionCloseType::NoFlush);
@@ -160,60 +162,41 @@ TEST_F(DynamicModuleNetworkFilterTest, CloseNullCallbacks) {
 
 TEST_F(DynamicModuleNetworkFilterTest, ContinueReadingWithCallbacks) {
   auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
-  filter->initializeInModuleFilter();
+  filter->initializeReadFilterCallbacks(read_callbacks_);
 
-  NiceMock<Network::MockReadFilterCallbacks> read_callbacks;
-  NiceMock<Network::MockConnection> connection;
-  ON_CALL(read_callbacks, connection()).WillByDefault(testing::ReturnRef(connection));
-  filter->initializeReadFilterCallbacks(read_callbacks);
-
-  EXPECT_CALL(read_callbacks, continueReading());
+  EXPECT_CALL(read_callbacks_, continueReading());
   filter->continueReading();
 }
 
 TEST_F(DynamicModuleNetworkFilterTest, WriteWithCallbacks) {
   auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
-  filter->initializeInModuleFilter();
-
-  NiceMock<Network::MockReadFilterCallbacks> read_callbacks;
-  NiceMock<Network::MockConnection> connection;
-  ON_CALL(read_callbacks, connection()).WillByDefault(testing::ReturnRef(connection));
-  filter->initializeReadFilterCallbacks(read_callbacks);
+  filter->initializeReadFilterCallbacks(read_callbacks_);
 
   Buffer::OwnedImpl data("test data");
-  EXPECT_CALL(connection, write(testing::_, false));
+  EXPECT_CALL(connection_, write(testing::_, false));
   filter->write(data, false);
 }
 
 TEST_F(DynamicModuleNetworkFilterTest, CloseWithCallbacks) {
   auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
-  filter->initializeInModuleFilter();
+  filter->initializeReadFilterCallbacks(read_callbacks_);
 
-  NiceMock<Network::MockReadFilterCallbacks> read_callbacks;
-  NiceMock<Network::MockConnection> connection;
-  ON_CALL(read_callbacks, connection()).WillByDefault(testing::ReturnRef(connection));
-  filter->initializeReadFilterCallbacks(read_callbacks);
-
-  EXPECT_CALL(connection, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(connection_, close(Network::ConnectionCloseType::NoFlush));
   filter->close(Network::ConnectionCloseType::NoFlush);
 }
 
 TEST_F(DynamicModuleNetworkFilterTest, ConnectionAccessor) {
   auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
-  filter->initializeInModuleFilter();
-
-  NiceMock<Network::MockReadFilterCallbacks> read_callbacks;
-  NiceMock<Network::MockConnection> connection;
-  ON_CALL(read_callbacks, connection()).WillByDefault(testing::ReturnRef(connection));
-  filter->initializeReadFilterCallbacks(read_callbacks);
+  filter->initializeReadFilterCallbacks(read_callbacks_);
 
   // Verify connection() accessor works.
-  EXPECT_EQ(&connection, &filter->connection());
+  EXPECT_EQ(&connection_, &filter->connection());
 }
 
 TEST_F(DynamicModuleNetworkFilterTest, GetFilterConfig) {
   auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
-  filter->initializeInModuleFilter();
+  filter->initializeReadFilterCallbacks(read_callbacks_);
+  filter->setCallbacksForTest(nullptr);
 
   // Verify getFilterConfig() returns the correct config.
   const auto& config = filter->getFilterConfig();
@@ -222,22 +205,18 @@ TEST_F(DynamicModuleNetworkFilterTest, GetFilterConfig) {
 
 TEST_F(DynamicModuleNetworkFilterTest, CallbackAccessors) {
   auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
-  filter->initializeInModuleFilter();
 
   // Before initialization, callbacks should be null.
   EXPECT_EQ(nullptr, filter->readCallbacks());
   EXPECT_EQ(nullptr, filter->writeCallbacks());
 
-  NiceMock<Network::MockReadFilterCallbacks> read_callbacks;
   NiceMock<Network::MockWriteFilterCallbacks> write_callbacks;
-  NiceMock<Network::MockConnection> connection;
-  ON_CALL(read_callbacks, connection()).WillByDefault(testing::ReturnRef(connection));
 
-  filter->initializeReadFilterCallbacks(read_callbacks);
+  filter->initializeReadFilterCallbacks(read_callbacks_);
   filter->initializeWriteFilterCallbacks(write_callbacks);
 
   // After initialization, callbacks should be set.
-  EXPECT_EQ(&read_callbacks, filter->readCallbacks());
+  EXPECT_EQ(&read_callbacks_, filter->readCallbacks());
   EXPECT_EQ(&write_callbacks, filter->writeCallbacks());
 }
 
@@ -309,12 +288,13 @@ TEST(DynamicModuleNetworkFilterConfigTest, StopIterationStatus) {
   EXPECT_TRUE(filter_config_or_status.ok());
   auto config = filter_config_or_status.value();
 
-  auto filter = std::make_shared<DynamicModuleNetworkFilter>(config);
-  filter->initializeInModuleFilter();
-
+  NiceMock<Event::MockDispatcher> worker_thread_dispatcher{"worker_0"};
   NiceMock<Network::MockReadFilterCallbacks> read_callbacks;
   NiceMock<Network::MockConnection> connection;
+  ON_CALL(connection, dispatcher()).WillByDefault(testing::ReturnRef(worker_thread_dispatcher));
   ON_CALL(read_callbacks, connection()).WillByDefault(testing::ReturnRef(connection));
+
+  auto filter = std::make_shared<DynamicModuleNetworkFilter>(config);
   filter->initializeReadFilterCallbacks(read_callbacks);
 
   // All filter operations should return StopIteration.
@@ -340,7 +320,8 @@ TEST_F(DynamicModuleNetworkFilterTest, DefineAndIncrementCounter) {
 
   // Create filter and increment counter.
   auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
-  filter->initializeInModuleFilter();
+  filter->initializeReadFilterCallbacks(read_callbacks_);
+  filter->setCallbacksForTest(nullptr);
 
   result =
       envoy_dynamic_module_callback_network_filter_increment_counter(filter.get(), counter_id, 5);
@@ -362,7 +343,8 @@ TEST_F(DynamicModuleNetworkFilterTest, DefineAndManipulateGauge) {
 
   // Create filter and manipulate gauge.
   auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
-  filter->initializeInModuleFilter();
+  filter->initializeReadFilterCallbacks(read_callbacks_);
+  filter->setCallbacksForTest(nullptr);
 
   result = envoy_dynamic_module_callback_network_filter_set_gauge(filter.get(), gauge_id, 100);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
@@ -389,7 +371,8 @@ TEST_F(DynamicModuleNetworkFilterTest, DefineAndRecordHistogram) {
 
   // Create filter and record histogram value.
   auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
-  filter->initializeInModuleFilter();
+  filter->initializeReadFilterCallbacks(read_callbacks_);
+  filter->setCallbacksForTest(nullptr);
 
   result = envoy_dynamic_module_callback_network_filter_record_histogram_value(filter.get(),
                                                                                histogram_id, 42);
@@ -403,7 +386,8 @@ TEST_F(DynamicModuleNetworkFilterTest, DefineAndRecordHistogram) {
 TEST_F(DynamicModuleNetworkFilterTest, MetricNotFound) {
   // Create filter without defining metrics.
   auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
-  filter->initializeInModuleFilter();
+  filter->initializeReadFilterCallbacks(read_callbacks_);
+  filter->setCallbacksForTest(nullptr);
 
   // Try to use invalid metric IDs.
   auto result =

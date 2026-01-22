@@ -32,6 +32,8 @@ envoy_dynamic_module_type_on_udp_listener_filter_status
 envoy_dynamic_module_on_udp_listener_filter_on_data(
     envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_udp_listener_filter_module_ptr filter_module_ptr) {
+  (void)filter_envoy_ptr;
+  (void)filter_module_ptr;
   return envoy_dynamic_module_type_on_udp_listener_filter_status_Continue;
 }
 

@@ -1,3 +1,4 @@
+#include "source/extensions/filters/common/mcp/filter_state.h"
 #include "source/extensions/filters/http/mcp/mcp_filter.h"
 
 #include "test/mocks/http/mocks.h"
@@ -12,6 +13,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Mcp {
 namespace {
+
+using McpFilterStateObject = Filters::Common::Mcp::FilterStateObject;
 
 using testing::_;
 using testing::NiceMock;
@@ -838,6 +841,178 @@ TEST_F(McpFilterTest, MethodGroupWithCustomOverride) {
       });
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+}
+
+Protobuf::Struct createTestStruct() {
+  Protobuf::Struct s;
+  (*s.mutable_fields())["jsonrpc"].set_string_value("2.0");
+  (*s.mutable_fields())["id"].set_string_value("123");
+  auto* params = (*s.mutable_fields())["params"].mutable_struct_value();
+  (*params->mutable_fields())["name"].set_string_value("my_tool");
+  return s;
+}
+
+TEST(McpFilterStateObjectTest, Construction) {
+  auto obj = std::make_shared<McpFilterStateObject>("tools/call", createTestStruct(), true);
+
+  EXPECT_EQ(obj->method().value(), "tools/call");
+  EXPECT_TRUE(obj->json()->hasObject("jsonrpc"));
+  EXPECT_TRUE(obj->json()->hasObject("id"));
+  EXPECT_TRUE(obj->json()->hasObject("params"));
+}
+
+TEST(McpFilterStateObjectTest, MethodOnly) {
+  Protobuf::Struct s;
+  auto obj = std::make_shared<McpFilterStateObject>("initialize", s, true);
+
+  EXPECT_EQ(obj->method().value(), "initialize");
+  EXPECT_FALSE(obj->json()->hasObject("id"));
+  EXPECT_FALSE(obj->json()->hasObject("jsonrpc"));
+}
+
+TEST(McpFilterStateObjectTest, AccessorsMissingFields) {
+  Protobuf::Struct s;
+  auto obj = std::make_shared<McpFilterStateObject>("", s, false);
+
+  EXPECT_FALSE(obj->method().has_value());
+  EXPECT_FALSE(obj->json()->hasObject("id"));
+  EXPECT_FALSE(obj->json()->hasObject("jsonrpc"));
+}
+
+TEST(McpFilterStateObjectTest, HasFieldCheck) {
+  auto obj = std::make_shared<McpFilterStateObject>("tools/call", createTestStruct(), true);
+
+  EXPECT_TRUE(obj->json()->hasObject("jsonrpc"));
+  EXPECT_TRUE(obj->json()->hasObject("params"));
+  EXPECT_FALSE(obj->json()->hasObject("nonexistent"));
+}
+
+TEST(McpFilterStateObjectTest, SerializationReturnsJson) {
+  auto obj = std::make_shared<McpFilterStateObject>("prompts/get", createTestStruct(), true);
+
+  auto serialized = obj->serializeAsString();
+  ASSERT_TRUE(serialized.has_value());
+  EXPECT_THAT(serialized.value(), testing::HasSubstr("\"jsonrpc\":"));
+  EXPECT_THAT(serialized.value(), testing::HasSubstr("\"id\":"));
+}
+
+TEST(McpFilterStateObjectTest, SerializationEmptyReturnsNullopt) {
+  Protobuf::Struct s;
+  auto obj = std::make_shared<McpFilterStateObject>("", s, false);
+
+  auto serialized = obj->serializeAsString();
+  EXPECT_FALSE(serialized.has_value());
+}
+
+TEST(McpFilterStateObjectTest, JsonAccessor) {
+  auto obj = std::make_shared<McpFilterStateObject>("test", createTestStruct(), true);
+
+  EXPECT_NE(obj->json(), nullptr);
+  EXPECT_FALSE(obj->json()->empty());
+  EXPECT_EQ(obj->method().value(), "test");
+}
+
+TEST(McpFilterStateObjectTest, IsMcpRequest) {
+  auto obj_true = std::make_shared<McpFilterStateObject>("tools/call", createTestStruct(), true);
+  EXPECT_TRUE(obj_true->isMcpRequest());
+
+  Protobuf::Struct s;
+  auto obj_false = std::make_shared<McpFilterStateObject>("", s, false);
+  EXPECT_FALSE(obj_false->isMcpRequest());
+}
+
+// Test FilterState is set correctly when request_storage_mode is FILTER_STATE
+TEST_F(McpFilterTest, FilterStateSetAfterParsing) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_request_storage_mode(
+      envoy::extensions::filters::http::mcp::v3::Mcp::FILTER_STATE);
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+
+  filter_->decodeHeaders(headers, false);
+
+  std::string json =
+      R"({"jsonrpc": "2.0", "method": "tools/call", "params": {"name": "my_tool"}, "id": 42})";
+  Buffer::OwnedImpl buffer(json);
+
+  // Dynamic metadata should NOT be set when storage mode is FILTER_STATE only
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata(_, _)).Times(0);
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+
+  const auto* filter_state_obj =
+      decoder_callbacks_.stream_info_.filterState()->getDataReadOnly<McpFilterStateObject>(
+          std::string(McpFilterStateObject::FilterStateKey));
+  ASSERT_NE(filter_state_obj, nullptr);
+  EXPECT_TRUE(filter_state_obj->method().has_value());
+  EXPECT_EQ(filter_state_obj->method().value(), "tools/call");
+  EXPECT_TRUE(filter_state_obj->json()->hasObject("params"));
+  EXPECT_TRUE(filter_state_obj->isMcpRequest());
+}
+
+// Test default behavior: dynamic metadata is set, filter state is NOT set
+TEST_F(McpFilterTest, DefaultStorageModeDynamicMetadataOnly) {
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+
+  filter_->decodeHeaders(headers, false);
+
+  std::string json =
+      R"({"jsonrpc": "2.0", "method": "tools/call", "params": {"name": "my_tool"}, "id": 42})";
+  Buffer::OwnedImpl buffer(json);
+
+  // Dynamic metadata should be set by default
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("mcp_proxy", _));
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+
+  // Filter state should NOT be set by default
+  const auto* filter_state_obj =
+      decoder_callbacks_.stream_info_.filterState()->getDataReadOnly<McpFilterStateObject>(
+          std::string(McpFilterStateObject::FilterStateKey));
+  EXPECT_EQ(filter_state_obj, nullptr);
+}
+
+// Test DYNAMIC_METADATA_AND_FILTER_STATE mode: both dynamic metadata and filter state are set
+TEST_F(McpFilterTest, BothStorageModeSetsBothTargets) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_request_storage_mode(
+      envoy::extensions::filters::http::mcp::v3::Mcp::DYNAMIC_METADATA_AND_FILTER_STATE);
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+
+  filter_->decodeHeaders(headers, false);
+
+  std::string json =
+      R"({"jsonrpc": "2.0", "method": "tools/call", "params": {"name": "my_tool"}, "id": 42})";
+  Buffer::OwnedImpl buffer(json);
+
+  // Both should be set
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("mcp_proxy", _));
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+
+  // Filter state should also be set
+  const auto* filter_state_obj =
+      decoder_callbacks_.stream_info_.filterState()->getDataReadOnly<McpFilterStateObject>(
+          std::string(McpFilterStateObject::FilterStateKey));
+  ASSERT_NE(filter_state_obj, nullptr);
+  EXPECT_TRUE(filter_state_obj->method().has_value());
+  EXPECT_EQ(filter_state_obj->method().value(), "tools/call");
 }
 
 } // namespace
