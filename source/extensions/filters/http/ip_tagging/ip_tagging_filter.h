@@ -233,10 +233,10 @@ private:
   Runtime::Loader& runtime_;
   const std::string stats_prefix_str_;
   Stats::StatNameSetPtr stat_name_set_;
-  Stats::StatName stats_prefix_;
-  Stats::StatName no_hit_;
-  Stats::StatName total_;
-  Stats::StatName unknown_tag_;
+  const Stats::StatName stats_prefix_;
+  const Stats::StatName no_hit_;
+  const Stats::StatName total_;
+  const Stats::StatName unknown_tag_;
   absl::flat_hash_map<std::string, Stats::StatName> tag_hit_counters_;
   const Http::LowerCaseString
       ip_tag_header_; // An empty string indicates that no ip_tag_header is set.
