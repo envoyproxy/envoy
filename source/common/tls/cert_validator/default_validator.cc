@@ -264,7 +264,7 @@ DefaultCertValidator::verifyCertificate(X509* cert, const std::vector<std::strin
       if (error_details != nullptr) {
         *error_details = error_msg;
       }
-      ENVOY_LOG(debug, error_msg.c_str());
+      ENVOY_LOG(debug, error_msg);
       stats_.fail_verify_san_.inc();
       return Envoy::Ssl::ClientValidationStatus::Failed;
     }
