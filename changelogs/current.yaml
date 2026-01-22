@@ -64,5 +64,9 @@ new_features:
 - area: formatter
   change: |
     Added the new access log formatter support of ``DOWNSTREAM_LOCAL_CLOSE_REASON``.
+- area: formatter
+  change: |
+    Added ``%DOWNSTREAM_DETECTED_CLOSE_TYPE%`` to expose the detected close type
+    of downstream and connections. The possible values are ``Normal``, ``LocalReset``, and ``RemoteReset``.
 
 deprecated:

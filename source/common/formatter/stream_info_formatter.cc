@@ -24,6 +24,18 @@ const re2::RE2& getSystemTimeFormatNewlinePattern() {
   CONSTRUCT_ON_FIRST_USE(re2::RE2, "%[-_0^#]*[1-9]*(E|O)?n");
 }
 
+std::string detectedCloseTypeToString(StreamInfo::DetectedCloseType type) {
+  switch (type) {
+  case StreamInfo::DetectedCloseType::LocalReset:
+    return "LocalReset";
+  case StreamInfo::DetectedCloseType::RemoteReset:
+    return "RemoteReset";
+  case StreamInfo::DetectedCloseType::Normal:
+    return "Normal";
+  }
+  return "";
+}
+
 Network::Address::InstanceConstSharedPtr
 getUpstreamRemoteAddress(const StreamInfo::StreamInfo& stream_info) {
   auto opt_ref = stream_info.upstreamInfo();
@@ -1558,6 +1570,16 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                                      [](const StreamInfo::StreamInfo& stream_info) {
                                        return stream_info.downstreamAddressProvider()
                                            .localAddress();
+                                     });
+                               }}},
+                             {"DOWNSTREAM_DETECTED_CLOSE_TYPE",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](absl::string_view, absl::optional<size_t>) {
+                                 return std::make_unique<StreamInfoStringFormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info)
+                                         -> absl::optional<std::string> {
+                                       return detectedCloseTypeToString(
+                                           stream_info.downstreamDetectedCloseType());
                                      });
                                }}},
                              {"DOWNSTREAM_DIRECT_LOCAL_ADDRESS",
