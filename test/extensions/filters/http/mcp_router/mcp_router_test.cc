@@ -108,7 +108,7 @@ TEST_F(McpRouterConfigTest, DefaultPathWhenNotSpecified) {
   EXPECT_EQ(backend->path, "/mcp");
 }
 
-// Verifies metadata namespace defaults to "mcp_proxy" when not specified.
+// Verifies metadata namespace defaults to "envoy.filters.http.mcp" when not specified.
 TEST_F(McpRouterConfigTest, DefaultMetadataNamespace) {
   envoy::extensions::filters::http::mcp_router::v3::McpRouter proto_config;
 
@@ -117,7 +117,7 @@ TEST_F(McpRouterConfigTest, DefaultMetadataNamespace) {
   server->mutable_mcp_cluster()->set_cluster("test_cluster");
 
   McpRouterConfig config(proto_config, factory_context_);
-  EXPECT_EQ(config.metadataNamespace(), "mcp_proxy");
+  EXPECT_EQ(config.metadataNamespace(), "envoy.filters.http.mcp");
 }
 
 // Verifies custom metadata namespace can be configured.
@@ -430,7 +430,7 @@ protected:
   }
 
   void setMcpMethodMetadata(const std::string& method, int64_t id = 1,
-                            const std::string& metadata_namespace = "mcp_proxy") {
+                            const std::string& metadata_namespace = "envoy.filters.http.mcp") {
     auto& mcp_metadata = (*dynamic_metadata_.mutable_filter_metadata())[metadata_namespace];
     (*mcp_metadata.mutable_fields())["method"].set_string_value(method);
     (*mcp_metadata.mutable_fields())["id"].set_number_value(static_cast<double>(id));
