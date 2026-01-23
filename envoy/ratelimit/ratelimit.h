@@ -54,9 +54,9 @@ using XRateLimitOption = RateLimitProto::XRateLimitOption;
  */
 struct Descriptor {
   DescriptorEntries entries_;
-  XRateLimitOption x_ratelimit_option_{};
   absl::optional<RateLimitOverride> limit_ = absl::nullopt;
   absl::optional<uint64_t> hits_addend_ = absl::nullopt;
+  XRateLimitOption x_ratelimit_option_{};
 
   std::string toString() const {
     return absl::StrJoin(entries_, ", ", [](std::string* out, const auto& e) {
