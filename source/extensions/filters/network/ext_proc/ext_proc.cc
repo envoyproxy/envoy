@@ -382,7 +382,6 @@ void NetworkExtProcFilter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&
                    read_callbacks_->connection(), data.data().size(), data.end_of_stream(),
                    more_responses_expected);
 
-    // Always inject data immediately
     Buffer::OwnedImpl buffer(data.data());
     read_callbacks_->injectReadDataToFilterChain(buffer, data.end_of_stream());
     stats_.read_data_injected_.inc();
@@ -408,7 +407,6 @@ void NetworkExtProcFilter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&
                    read_callbacks_->connection(), data.data().size(), data.end_of_stream(),
                    more_responses_expected);
 
-    // Always inject data immediately
     Buffer::OwnedImpl buffer(data.data());
     write_callbacks_->injectWriteDataToFilterChain(buffer, data.end_of_stream());
     stats_.write_data_injected_.inc();
