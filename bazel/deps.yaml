@@ -512,16 +512,6 @@ com_github_wasmtime:
   cpe: "cpe:2.3:a:bytecodealliance:wasmtime:*"
   license: "Apache-2.0"
   license_url: "https://github.com/bytecodealliance/wasmtime/blob/v{version}/LICENSE"
-zlib_ng:
-  project_name: "zlib-ng"
-  project_desc: "zlib fork (higher performance)"
-  project_url: "https://github.com/zlib-ng/zlib-ng"
-  release_date: "2025-12-02"
-  use_category:
-  - controlplane
-  - dataplane_core
-  license: "zlib"
-  license_url: "https://github.com/zlib-ng/zlib-ng/blob/{version}/LICENSE.md"
 com_google_absl:
   project_name: "Abseil"
   project_desc: "Open source collection of C++ libraries drawn from the most fundamental pieces of Google’s internal codebase"
@@ -1314,6 +1304,16 @@ v8:
   extensions:
   - envoy.wasm.runtime.v8
   cpe: "cpe:2.3:a:google:v8:*"
+zlib_ng:
+  project_name: "zlib-ng"
+  project_desc: "zlib fork (higher performance)"
+  project_url: "https://github.com/zlib-ng/zlib-ng"
+  release_date: "2025-12-02"
+  use_category:
+  - controlplane
+  - dataplane_core
+  license: "zlib"
+  license_url: "https://github.com/zlib-ng/zlib-ng/blob/{version}/LICENSE.md"
 yq_bzl:
   project_name: "yq.bzl"
   project_desc: "Bazel rules for yq"
@@ -1324,17 +1324,6 @@ yq_bzl:
   cpe: "N/A"
   license: "Apache-2.0"
   license_url: "https://github.com/bazel-contrib/yq.bzl/blob/v{version}/LICENSE"
-zlib:
-  project_name: "zlib"
-  project_desc: "zlib compression library"
-  project_url: "https://zlib.net"
-  release_date: "2024-01-22"
-  use_category:
-  - controlplane
-  - dataplane_core
-  cpe: "cpe:2.3:a:gnu:zlib:*"
-  license: "zlib"
-  license_url: "https://github.com/madler/zlib/blob/v{version}/zlib.h"
 zstd:
   project_name: "zstd"
   project_desc: "zstd compression library"
