@@ -273,11 +273,13 @@ DefaultCertValidator::verifyCertificate(X509* cert, const std::vector<std::strin
 
   if (!subject_alt_name_matchers.empty()) {
     if (!matchSubjectAltName(cert, stream_info, subject_alt_name_matchers)) {
-      const char* error = "verify cert failed: SAN matcher";
+      const std::string error_msg =
+          fmt::format("verify cert failed: SAN matcher, SAN List is [{}]",
+                      fmt::join(verify_san_list, ", "));
       if (error_details != nullptr) {
-        *error_details = error;
+        *error_details = error_msg;
       }
-      ENVOY_LOG(debug, error);
+      ENVOY_LOG(debug, error_msg);
       stats_.fail_verify_san_.inc();
       return Envoy::Ssl::ClientValidationStatus::Failed;
     }
