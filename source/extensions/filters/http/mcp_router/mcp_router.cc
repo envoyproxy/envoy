@@ -54,19 +54,22 @@ const McpMethodMap& mcpMethodMap() {
   // TODO(botengyao): Add support for more MCP methods:
   // - completion/complete
   // - logging/setLevel
-  // - notifications/* (other notifications)
-  CONSTRUCT_ON_FIRST_USE(McpMethodMap,
-                         {{"initialize", McpMethod::Initialize},
-                          {"tools/list", McpMethod::ToolsList},
-                          {"tools/call", McpMethod::ToolsCall},
-                          {"resources/list", McpMethod::ResourcesList},
-                          {"resources/read", McpMethod::ResourcesRead},
-                          {"resources/subscribe", McpMethod::ResourcesSubscribe},
-                          {"resources/unsubscribe", McpMethod::ResourcesUnsubscribe},
-                          {"prompts/list", McpMethod::PromptsList},
-                          {"prompts/get", McpMethod::PromptsGet},
-                          {"ping", McpMethod::Ping},
-                          {"notifications/initialized", McpMethod::NotificationInitialized}});
+  CONSTRUCT_ON_FIRST_USE(
+      McpMethodMap,
+      {{"initialize", McpMethod::Initialize},
+       {"tools/list", McpMethod::ToolsList},
+       {"tools/call", McpMethod::ToolsCall},
+       {"resources/list", McpMethod::ResourcesList},
+       {"resources/read", McpMethod::ResourcesRead},
+       {"resources/subscribe", McpMethod::ResourcesSubscribe},
+       {"resources/unsubscribe", McpMethod::ResourcesUnsubscribe},
+       {"prompts/list", McpMethod::PromptsList},
+       {"prompts/get", McpMethod::PromptsGet},
+       {"ping", McpMethod::Ping},
+       // Notifications (client -> server).
+       {"notifications/initialized", McpMethod::NotificationInitialized},
+       {"notifications/cancelled", McpMethod::NotificationCancelled},
+       {"notifications/roots/list_changed", McpMethod::NotificationRootsListChanged}});
 }
 
 McpMethod parseMethodString(absl::string_view method_str) {
@@ -221,7 +224,15 @@ Http::FilterDataStatus McpRouterFilter::decodeData(Buffer::Instance& data, bool 
       return Http::FilterDataStatus::StopIterationNoBuffer;
 
     case McpMethod::NotificationInitialized:
-      handleNotificationInitialized();
+      handleNotification("notifications/initialized");
+      break;
+
+    case McpMethod::NotificationCancelled:
+      handleNotification("notifications/cancelled");
+      break;
+
+    case McpMethod::NotificationRootsListChanged:
+      handleNotification("notifications/roots/list_changed");
       break;
 
     default:
@@ -783,11 +794,11 @@ void McpRouterFilter::handlePing() {
   sendJsonResponse(response_body, encoded_session_id_);
 }
 
-void McpRouterFilter::handleNotificationInitialized() {
-  ENVOY_LOG(debug, "notifications/initialized: forwarding to {} backends",
-            config_->backends().size());
+void McpRouterFilter::handleNotification(absl::string_view notification_name) {
+  ENVOY_LOG(debug, "{}: forwarding to {} backends", notification_name, config_->backends().size());
 
-  // Forward notifications/initialized to all backends and wait for responses.
+  // Forward notification to all backends and wait for responses.
+  // Notifications are fire-and-forget, so we respond with 202 Accepted once all backends respond.
   initializeFanout([this](std::vector<BackendResponse>) {
     // All backends have responded (or failed), send 202 to client.
     sendAccepted();
