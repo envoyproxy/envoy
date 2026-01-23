@@ -1113,6 +1113,71 @@ TEST_P(NetworkExtProcFilterIntegrationTest, ConnectionStatusRSTHandling) {
   tcp_client->waitForDisconnect();
 }
 
+// Test 1:N response pattern - one request yields multiple responses
+TEST_P(NetworkExtProcFilterIntegrationTest, OneToManyResponsePattern) {
+  initialize();
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("network_ext_proc_filter"));
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+
+  // Send data from client
+  ASSERT_TRUE(tcp_client->write("client_data", false));
+
+  // Wait for the processing request
+  ProcessingRequest request;
+  waitForFirstGrpcMessage(request);
+  EXPECT_EQ(request.has_read_data(), true);
+  EXPECT_EQ(request.read_data().data(), "client_data");
+
+  // Send first chunk with more_responses_expected = true
+  ProcessingResponse response1;
+  auto* read_data1 = response1.mutable_read_data();
+  read_data1->set_data("chunk1_");
+  read_data1->set_end_of_stream(false);
+  response1.set_more_responses_expected(true);
+
+  processor_stream_->startGrpcStream();
+  processor_stream_->sendGrpcMessage(response1);
+
+  // First chunk should be forwarded to upstream
+  ASSERT_TRUE(fake_upstream_connection->waitForData(7)); // "chunk1_"
+
+  // Send second chunk with more_responses_expected = true
+  ProcessingResponse response2;
+  auto* read_data2 = response2.mutable_read_data();
+  read_data2->set_data("chunk2_");
+  read_data2->set_end_of_stream(false);
+  response2.set_more_responses_expected(true);
+
+  processor_stream_->sendGrpcMessage(response2);
+
+  // Second chunk should be forwarded to upstream
+  ASSERT_TRUE(fake_upstream_connection->waitForData(14)); // "chunk1_chunk2_"
+
+  // Send final chunk with more_responses_expected = false (or omitted)
+  ProcessingResponse response3;
+  auto* read_data3 = response3.mutable_read_data();
+  read_data3->set_data("chunk3");
+  read_data3->set_end_of_stream(false);
+  // more_responses_expected defaults to false
+
+  processor_stream_->sendGrpcMessage(response3);
+
+  // Final chunk should be forwarded to upstream
+  ASSERT_TRUE(fake_upstream_connection->waitForData(20)); // "chunk1_chunk2_chunk3"
+
+  // Verify counters - 1 request sent, 3 responses received, 3 data chunks injected
+  verifyCounters({{"streams_started", 1},
+                  {"stream_msgs_sent", 1},
+                  {"stream_msgs_received", 3},
+                  {"read_data_sent", 1},
+                  {"read_data_injected", 3}});
+
+  ASSERT_TRUE(fake_upstream_connection->close());
+  tcp_client->close();
+}
+
 } // namespace ExtProc
 } // namespace NetworkFilters
 } // namespace Extensions

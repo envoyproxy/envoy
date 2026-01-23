@@ -1276,6 +1276,153 @@ TEST_F(NetworkExtProcFilterTest, LoggingInfoOnError) {
   EXPECT_EQ(logging_info->lastCallStatus(), Grpc::Status::WellKnownGrpcStatus::ResourceExhausted);
 }
 
+// Test 1:N response pattern for read data - multiple responses for single request
+TEST_F(NetworkExtProcFilterTest, OneToManyResponsePatternReadData) {
+  auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
+  auto* stream_ptr = stream.get();
+
+  EXPECT_CALL(*stream_ptr, send(_, false));
+  EXPECT_CALL(*client_, start(_, _, _, _))
+      .WillOnce(testing::Invoke(
+          [&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+              Http::AsyncClient::StreamOptions&,
+              Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+            return std::move(stream);
+          }));
+
+  // Send initial data
+  Buffer::OwnedImpl data("test");
+  EXPECT_CALL(read_callbacks_, disableClose(true));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+
+  // First response with more_responses_expected = true
+  envoy::service::network_ext_proc::v3::ProcessingResponse response1;
+  response1.mutable_read_data()->set_data("chunk1");
+  response1.mutable_read_data()->set_end_of_stream(false);
+  response1.set_more_responses_expected(true);
+
+  // Expect data injection but NOT close callback release (pending still active)
+  EXPECT_CALL(read_callbacks_, injectReadDataToFilterChain(_, false));
+  EXPECT_CALL(read_callbacks_, disableClose(false)).Times(0);
+
+  filter_->onReceiveMessage(
+      std::make_unique<envoy::service::network_ext_proc::v3::ProcessingResponse>(response1));
+
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.read_data_injected"));
+
+  // Second response with more_responses_expected = true
+  envoy::service::network_ext_proc::v3::ProcessingResponse response2;
+  response2.mutable_read_data()->set_data("chunk2");
+  response2.mutable_read_data()->set_end_of_stream(false);
+  response2.set_more_responses_expected(true);
+
+  EXPECT_CALL(read_callbacks_, injectReadDataToFilterChain(_, false));
+  EXPECT_CALL(read_callbacks_, disableClose(false)).Times(0);
+
+  filter_->onReceiveMessage(
+      std::make_unique<envoy::service::network_ext_proc::v3::ProcessingResponse>(response2));
+
+  EXPECT_EQ(2, getCounterValue("network_ext_proc.test_ext_proc.read_data_injected"));
+
+  // Final response with more_responses_expected = false (default)
+  envoy::service::network_ext_proc::v3::ProcessingResponse response3;
+  response3.mutable_read_data()->set_data("chunk3");
+  response3.mutable_read_data()->set_end_of_stream(false);
+  // more_responses_expected defaults to false
+
+  // Now close callback should be released
+  EXPECT_CALL(read_callbacks_, injectReadDataToFilterChain(_, false));
+  EXPECT_CALL(read_callbacks_, disableClose(false));
+
+  filter_->onReceiveMessage(
+      std::make_unique<envoy::service::network_ext_proc::v3::ProcessingResponse>(response3));
+
+  EXPECT_EQ(3, getCounterValue("network_ext_proc.test_ext_proc.read_data_injected"));
+  EXPECT_EQ(3, getCounterValue("network_ext_proc.test_ext_proc.stream_msgs_received"));
+}
+
+// Test 1:N response pattern for write data
+TEST_F(NetworkExtProcFilterTest, OneToManyResponsePatternWriteData) {
+  auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
+  auto* stream_ptr = stream.get();
+
+  EXPECT_CALL(*stream_ptr, send(_, false));
+  EXPECT_CALL(*client_, start(_, _, _, _))
+      .WillOnce(testing::Invoke(
+          [&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+              Http::AsyncClient::StreamOptions&,
+              Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+            return std::move(stream);
+          }));
+
+  // Send initial data
+  Buffer::OwnedImpl data("test");
+  EXPECT_CALL(write_callbacks_, disableClose(true));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onWrite(data, false));
+
+  // First response with more_responses_expected = true
+  envoy::service::network_ext_proc::v3::ProcessingResponse response1;
+  response1.mutable_write_data()->set_data("chunk1");
+  response1.mutable_write_data()->set_end_of_stream(false);
+  response1.set_more_responses_expected(true);
+
+  EXPECT_CALL(write_callbacks_, injectWriteDataToFilterChain(_, false));
+  EXPECT_CALL(write_callbacks_, disableClose(false)).Times(0);
+
+  filter_->onReceiveMessage(
+      std::make_unique<envoy::service::network_ext_proc::v3::ProcessingResponse>(response1));
+
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.write_data_injected"));
+
+  // Final response
+  envoy::service::network_ext_proc::v3::ProcessingResponse response2;
+  response2.mutable_write_data()->set_data("chunk2");
+  response2.mutable_write_data()->set_end_of_stream(false);
+  response2.set_more_responses_expected(false);
+
+  EXPECT_CALL(write_callbacks_, injectWriteDataToFilterChain(_, false));
+  EXPECT_CALL(write_callbacks_, disableClose(false));
+
+  filter_->onReceiveMessage(
+      std::make_unique<envoy::service::network_ext_proc::v3::ProcessingResponse>(response2));
+
+  EXPECT_EQ(2, getCounterValue("network_ext_proc.test_ext_proc.write_data_injected"));
+}
+
+// Test backward compatibility - responses without more_responses_expected behave as before
+TEST_F(NetworkExtProcFilterTest, BackwardCompatibleSingleResponse) {
+  auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
+  auto* stream_ptr = stream.get();
+
+  EXPECT_CALL(*stream_ptr, send(_, false));
+  EXPECT_CALL(*client_, start(_, _, _, _))
+      .WillOnce(testing::Invoke(
+          [&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+              Http::AsyncClient::StreamOptions&,
+              Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+            return std::move(stream);
+          }));
+
+  Buffer::OwnedImpl data("test");
+  EXPECT_CALL(read_callbacks_, disableClose(true));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+
+  // Response without setting more_responses_expected (defaults to false)
+  envoy::service::network_ext_proc::v3::ProcessingResponse response;
+  response.mutable_read_data()->set_data("modified");
+  response.mutable_read_data()->set_end_of_stream(false);
+  // Note: more_responses_expected not set, defaults to false
+
+  // Close callback should be released immediately (single response behavior)
+  EXPECT_CALL(read_callbacks_, injectReadDataToFilterChain(_, false));
+  EXPECT_CALL(read_callbacks_, disableClose(false));
+
+  filter_->onReceiveMessage(
+      std::make_unique<envoy::service::network_ext_proc::v3::ProcessingResponse>(response));
+
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.read_data_injected"));
+}
+
 } // namespace
 } // namespace ExtProc
 } // namespace NetworkFilters

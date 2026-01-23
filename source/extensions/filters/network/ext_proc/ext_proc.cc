@@ -371,33 +371,61 @@ void NetworkExtProcFilter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&
     return;
   }
 
+  // Check if more responses are expected (1:N pattern)
+  const bool more_responses_expected = response->more_responses_expected();
+
   if (response->has_read_data()) {
     const auto& data = response->read_data();
-    if (timeout_manager_ && read_pending_) {
-      timeout_manager_->stopTimer(true);
-    }
-    read_pending_ = false;
 
-    ENVOY_CONN_LOG(trace, "Processing READ data response: {} bytes, end_stream={}",
-                   read_callbacks_->connection(), data.data().size(), data.end_of_stream());
+    ENVOY_CONN_LOG(trace,
+                   "Processing READ data response: {} bytes, end_stream={}, more_expected={}",
+                   read_callbacks_->connection(), data.data().size(), data.end_of_stream(),
+                   more_responses_expected);
 
+    // Always inject data immediately
     Buffer::OwnedImpl buffer(data.data());
     read_callbacks_->injectReadDataToFilterChain(buffer, data.end_of_stream());
-    updateCloseCallbackStatus(false, true);
     stats_.read_data_injected_.inc();
-  } else if (response->has_write_data()) {
-    if (timeout_manager_ && write_pending_) {
-      timeout_manager_->stopTimer(true);
-    }
-    write_pending_ = false;
 
+    if (more_responses_expected) {
+      // More responses coming - reset timer, keep pending state
+      if (timeout_manager_ && read_pending_) {
+        timeout_manager_->stopTimer(true);
+        timeout_manager_->startTimer(true);
+      }
+    } else {
+      if (timeout_manager_ && read_pending_) {
+        timeout_manager_->stopTimer(true);
+      }
+      read_pending_ = false;
+      updateCloseCallbackStatus(false, true);
+    }
+  } else if (response->has_write_data()) {
     const auto& data = response->write_data();
-    ENVOY_CONN_LOG(trace, "Processing WRITE data response: {} bytes, end_stream={}",
-                   read_callbacks_->connection(), data.data().size(), data.end_of_stream());
+
+    ENVOY_CONN_LOG(trace,
+                   "Processing WRITE data response: {} bytes, end_stream={}, more_expected={}",
+                   read_callbacks_->connection(), data.data().size(), data.end_of_stream(),
+                   more_responses_expected);
+
+    // Always inject data immediately
     Buffer::OwnedImpl buffer(data.data());
     write_callbacks_->injectWriteDataToFilterChain(buffer, data.end_of_stream());
-    updateCloseCallbackStatus(false, false);
     stats_.write_data_injected_.inc();
+
+    if (more_responses_expected) {
+      // More responses coming - reset timer, keep pending state
+      if (timeout_manager_ && write_pending_) {
+        timeout_manager_->stopTimer(false);
+        timeout_manager_->startTimer(false);
+      }
+    } else {
+      if (timeout_manager_ && write_pending_) {
+        timeout_manager_->stopTimer(false);
+      }
+      write_pending_ = false;
+      updateCloseCallbackStatus(false, false);
+    }
   } else {
     ENVOY_CONN_LOG(debug, "Response contained no data, continuing", read_callbacks_->connection());
     stats_.empty_response_received_.inc();

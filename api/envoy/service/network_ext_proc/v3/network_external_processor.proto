@@ -95,7 +95,7 @@ message ProcessingRequest {
 // ProcessingResponse contains the response from the external processing server to Envoy.
 // Each response corresponds to a ProcessingRequest and indicates how the network
 // traffic should be handled.
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message ProcessingResponse {
   // DataProcessedStatus indicates whether the data was modified by the external processor.
   enum DataProcessedStatus {
@@ -157,4 +157,18 @@ message ProcessingResponse {
   // The metadata is not automatically propagated from request to response.
   // The external processor must include any needed metadata in its response.
   google.protobuf.Struct dynamic_metadata = 5;
+
+  // For 1:N response patterns: set to true if more responses will follow.
+  // When true, Envoy keeps the pending state and resets the timeout timer.
+  // When false or omitted (default), this is the final response and Envoy
+  // clears the pending state, allowing the next request to proceed.
+  //
+  // This enables streaming transformations where the external processor needs
+  // to send multiple response chunks for a single request. The processor
+  // signals completion by sending a response with this field set to false.
+  // If the processor crashes or hangs, the timeout will fire.
+  //
+  // Backward compatible: existing processors that don't set this field will
+  // have their responses treated as final (single response per request).
+  bool more_responses_expected = 6;
 }
