@@ -170,6 +170,7 @@ paths:
     - source/extensions/filters/http/cache
     - source/extensions/filters/http/common
     - source/extensions/filters/http/composite
+    - source/extensions/filters/http/dynamic_modules/factory.cc
     - source/extensions/filters/http/ext_authz
     - source/extensions/filters/http/ext_proc
     - source/extensions/filters/http/file_system_buffer

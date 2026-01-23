@@ -29,6 +29,10 @@ using OnNetworkFilterHttpCalloutDoneType =
 using OnNetworkFilterScheduledType = decltype(&envoy_dynamic_module_on_network_filter_scheduled);
 using OnNetworkFilterConfigScheduledType =
     decltype(&envoy_dynamic_module_on_network_filter_config_scheduled);
+using OnNetworkFilterAboveWriteBufferHighWatermarkType =
+    decltype(&envoy_dynamic_module_on_network_filter_above_write_buffer_high_watermark);
+using OnNetworkFilterBelowWriteBufferLowWatermarkType =
+    decltype(&envoy_dynamic_module_on_network_filter_below_write_buffer_low_watermark);
 
 // Custom namespace prefix for network filter stats.
 constexpr char NetworkFilterStatsNamespace[] = "dynamic_module_network_filter";
@@ -88,6 +92,11 @@ public:
   // Optional: modules that don't need scheduling don't need to implement this.
   OnNetworkFilterScheduledType on_network_filter_scheduled_ = nullptr;
   OnNetworkFilterConfigScheduledType on_network_filter_config_scheduled_ = nullptr;
+  // Optional: modules that don't need watermark notifications don't need to implement these.
+  OnNetworkFilterAboveWriteBufferHighWatermarkType
+      on_network_filter_above_write_buffer_high_watermark_ = nullptr;
+  OnNetworkFilterBelowWriteBufferLowWatermarkType
+      on_network_filter_below_write_buffer_low_watermark_ = nullptr;
 
   Envoy::Upstream::ClusterManager& cluster_manager_;
 
