@@ -526,23 +526,9 @@ selects.config_setting_group(
     ],
 )
 
-config_setting(
-    name = "zlib_ng",
-    constraint_values = [
-        "@platforms//os:linux",
-    ],
-    values = {"define": "zlib=ng"},
-)
-
-# Alias pointing to the selected version of zlib:
-# - zlib-ng from //bazel/foreign_cc:zlib_ng when --define zlib=ng is specified (Linux only).
-# - Regular zlib from @zlib otherwise.
-alias(
+label_flag(
     name = "zlib",
-    actual = select({
-        "//bazel:zlib_ng": "@com_github_zlib_ng_zlib_ng//:zlib",
-        "//conditions:default": "@zlib",
-    }),
+    build_setting_default = "@zlib_ng",
 )
 
 config_setting(

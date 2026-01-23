@@ -941,6 +941,93 @@ bool envoy_dynamic_module_callback_network_filter_start_upstream_secure_transpor
 }
 
 // -----------------------------------------------------------------------------
+// Connection State and Flow Control Callbacks
+// -----------------------------------------------------------------------------
+
+namespace {
+
+envoy_dynamic_module_type_network_connection_state
+toAbiConnectionState(Network::Connection::State state) {
+  switch (state) {
+  case Network::Connection::State::Open:
+    return envoy_dynamic_module_type_network_connection_state_Open;
+  case Network::Connection::State::Closing:
+    return envoy_dynamic_module_type_network_connection_state_Closing;
+  case Network::Connection::State::Closed:
+    return envoy_dynamic_module_type_network_connection_state_Closed;
+  }
+  return envoy_dynamic_module_type_network_connection_state_Closed;
+}
+
+envoy_dynamic_module_type_network_read_disable_status
+toAbiReadDisableStatus(Network::Connection::ReadDisableStatus status) {
+  switch (status) {
+  case Network::Connection::ReadDisableStatus::NoTransition:
+    return envoy_dynamic_module_type_network_read_disable_status_NoTransition;
+  case Network::Connection::ReadDisableStatus::StillReadDisabled:
+    return envoy_dynamic_module_type_network_read_disable_status_StillReadDisabled;
+  case Network::Connection::ReadDisableStatus::TransitionedToReadEnabled:
+    return envoy_dynamic_module_type_network_read_disable_status_TransitionedToReadEnabled;
+  case Network::Connection::ReadDisableStatus::TransitionedToReadDisabled:
+    return envoy_dynamic_module_type_network_read_disable_status_TransitionedToReadDisabled;
+  }
+  return envoy_dynamic_module_type_network_read_disable_status_NoTransition;
+}
+
+} // namespace
+
+envoy_dynamic_module_type_network_connection_state
+envoy_dynamic_module_callback_network_filter_get_connection_state(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr) {
+  auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
+  return toAbiConnectionState(filter->connection().state());
+}
+
+envoy_dynamic_module_type_network_read_disable_status
+envoy_dynamic_module_callback_network_filter_read_disable(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, bool disable) {
+  auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
+  auto status = filter->connection().readDisable(disable);
+  return toAbiReadDisableStatus(status);
+}
+
+bool envoy_dynamic_module_callback_network_filter_read_enabled(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr) {
+  auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
+  return filter->connection().readEnabled();
+}
+
+bool envoy_dynamic_module_callback_network_filter_is_half_close_enabled(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr) {
+  auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
+  return filter->connection().isHalfCloseEnabled();
+}
+
+void envoy_dynamic_module_callback_network_filter_enable_half_close(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, bool enabled) {
+  auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
+  filter->connection().enableHalfClose(enabled);
+}
+
+uint32_t envoy_dynamic_module_callback_network_filter_get_buffer_limit(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr) {
+  auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
+  return filter->connection().bufferLimit();
+}
+
+void envoy_dynamic_module_callback_network_filter_set_buffer_limits(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, uint32_t limit) {
+  auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
+  filter->connection().setBufferLimits(limit);
+}
+
+bool envoy_dynamic_module_callback_network_filter_above_high_watermark(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr) {
+  auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
+  return filter->connection().aboveHighWatermark();
+}
+
+// -----------------------------------------------------------------------------
 // Network filter scheduler callbacks.
 // -----------------------------------------------------------------------------
 

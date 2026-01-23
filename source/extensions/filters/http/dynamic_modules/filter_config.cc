@@ -148,6 +148,10 @@ absl::StatusOr<DynamicModuleHttpFilterConfigSharedPtr> newDynamicModuleHttpFilte
           "envoy_dynamic_module_on_http_filter_downstream_below_write_buffer_low_watermark");
   RETURN_IF_NOT_OK_REF(on_downstream_below_write_buffer_low_watermark.status());
 
+  auto on_local_reply = dynamic_module->getFunctionPointer<OnHttpFilterLocalReplyType>(
+      "envoy_dynamic_module_on_http_filter_local_reply");
+  RETURN_IF_NOT_OK_REF(on_local_reply.status());
+
   auto config = std::make_shared<DynamicModuleHttpFilterConfig>(
       filter_name, filter_config, std::move(dynamic_module), stats_scope, context);
 
@@ -186,6 +190,7 @@ absl::StatusOr<DynamicModuleHttpFilterConfigSharedPtr> newDynamicModuleHttpFilte
       on_downstream_above_write_buffer_high_watermark.value();
   config->on_http_filter_downstream_below_write_buffer_low_watermark_ =
       on_downstream_below_write_buffer_low_watermark.value();
+  config->on_http_filter_local_reply_ = on_local_reply.value();
   return config;
 }
 
