@@ -177,7 +177,7 @@ TEST_F(FilterTestExtractOk, MissingFieldProducesListValue) {
         const auto it = new_dynamic_metadata.fields().find("key.display_name");
         EXPECT_TRUE(it != new_dynamic_metadata.fields().end());
         const auto& value = it->second;
-        EXPECT_EQ(value.kind_case(), ProtobufWkt::Value::KindCase::kListValue);
+        EXPECT_EQ(value.kind_case(), Protobuf::Value::KindCase::kListValue);
         EXPECT_EQ(value.list_value().values_size(), 0);
       });
   EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(*request_data, true));
