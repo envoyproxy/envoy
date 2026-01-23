@@ -120,20 +120,6 @@ TEST_F(McpRouterConfigTest, DefaultMetadataNamespace) {
   EXPECT_EQ(config.metadataNamespace(), "envoy.filters.http.mcp");
 }
 
-// Verifies custom metadata namespace can be configured.
-TEST_F(McpRouterConfigTest, CustomMetadataNamespace) {
-  envoy::extensions::filters::http::mcp_router::v3::McpRouter proto_config;
-
-  auto* server = proto_config.add_servers();
-  server->set_name("test");
-  server->mutable_mcp_cluster()->set_cluster("test_cluster");
-
-  proto_config.set_metadata_namespace("custom_mcp_namespace");
-
-  McpRouterConfig config(proto_config, factory_context_);
-  EXPECT_EQ(config.metadataNamespace(), "custom_mcp_namespace");
-}
-
 class BackendStreamCallbacksTest : public testing::Test {};
 
 // Verifies successful response correctly populates BackendResponse fields.
@@ -595,68 +581,6 @@ TEST_F(McpRouterFilterTest, MetadataSubjectExtractionDisabledModeProceeds) {
 
   const std::string body =
       R"({"jsonrpc":"2.0","method":"initialize","id":1,"params":{"protocolVersion":"2025-06-18"}})";
-  Buffer::OwnedImpl buffer(body);
-  filter.decodeData(buffer, true);
-}
-
-// Verifies filter reads metadata from custom namespace.
-TEST_F(McpRouterFilterTest, CustomMetadataNamespace) {
-  envoy::extensions::filters::http::mcp_router::v3::McpRouter proto_config;
-  auto* server = proto_config.add_servers();
-  server->set_name("test");
-  server->mutable_mcp_cluster()->set_cluster("test_cluster");
-  proto_config.set_metadata_namespace("custom_namespace");
-
-  // Set metadata in the custom namespace.
-  setMcpMethodMetadata("ping", 42, "custom_namespace");
-
-  auto config = createConfig(proto_config);
-  McpRouterFilter filter(config);
-  filter.setDecoderFilterCallbacks(decoder_callbacks_);
-
-  Http::TestRequestHeaderMapImpl headers{
-      {":method", "POST"}, {":path", "/mcp"}, {"content-type", "application/json"}};
-
-  // Expect a 200 response for ping method.
-  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(testing::_, testing::_))
-      .WillOnce(testing::Invoke([](Http::ResponseHeaderMap& headers, bool) {
-        EXPECT_EQ("200", headers.getStatusValue());
-      }));
-
-  filter.decodeHeaders(headers, false);
-
-  const std::string body = R"({"jsonrpc":"2.0","method":"ping","id":42})";
-  Buffer::OwnedImpl buffer(body);
-  filter.decodeData(buffer, true);
-}
-
-// Verifies filter returns error when metadata is in wrong namespace.
-TEST_F(McpRouterFilterTest, MetadataInWrongNamespaceReturnsError) {
-  envoy::extensions::filters::http::mcp_router::v3::McpRouter proto_config;
-  auto* server = proto_config.add_servers();
-  server->set_name("test");
-  server->mutable_mcp_cluster()->set_cluster("test_cluster");
-  proto_config.set_metadata_namespace("expected_namespace");
-
-  // Set metadata in wrong namespace (default "mcp_proxy").
-  setMcpMethodMetadata("ping", 42, "mcp_proxy");
-
-  auto config = createConfig(proto_config);
-  McpRouterFilter filter(config);
-  filter.setDecoderFilterCallbacks(decoder_callbacks_);
-
-  Http::TestRequestHeaderMapImpl headers{
-      {":method", "POST"}, {":path", "/mcp"}, {"content-type", "application/json"}};
-
-  // Expect 400 error since metadata is not in expected namespace.
-  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(testing::_, testing::_))
-      .WillOnce(testing::Invoke([](Http::ResponseHeaderMap& headers, bool) {
-        EXPECT_EQ("400", headers.getStatusValue());
-      }));
-
-  filter.decodeHeaders(headers, false);
-
-  const std::string body = R"({"jsonrpc":"2.0","method":"ping","id":42})";
   Buffer::OwnedImpl buffer(body);
   filter.decodeData(buffer, true);
 }

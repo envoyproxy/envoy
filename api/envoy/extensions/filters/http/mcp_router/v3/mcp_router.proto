@@ -125,10 +125,4 @@ message McpRouter {
   // If set, extracts a request "subject" and binds it into the MCP session.
   // If not set, sessions are created without identity binding.
   SessionIdentity session_identity = 2;
-
-  // The filter metadata namespace to read MCP request information from.
-  // This should match the namespace used by an upstream filter (e.g., mcp_filter)
-  // that populates request metadata such as method, id, and params.
-  // Defaults to "mcp_proxy" if not specified.
-  string metadata_namespace = 3;
 }
