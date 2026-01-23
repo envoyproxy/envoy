@@ -273,7 +273,7 @@ com_github_google_quiche:
   project_name: "QUICHE"
   project_desc: "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols"
   project_url: "https://github.com/google/quiche"
-  release_date: "2026-01-07"
+  release_date: "2026-01-22"
   use_category:
   - controlplane
   - dataplane_core
