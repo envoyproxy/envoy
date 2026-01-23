@@ -21,7 +21,7 @@ public:
    * called at most once before `mergeInto`.
    */
   virtual void initialize(std::unique_ptr<envoy::config::core::v3::Metadata> metadata,
-                          const StreamInfo::FilterState::Objects& filter_state_objects) PURE;
+                          const StreamInfo::FilterStateObjectsSharedPtr& filter_state_objects) PURE;
 
   /**
    * Merge the passthrough state into a recipient stream metadata and its

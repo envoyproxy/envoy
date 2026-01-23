@@ -524,7 +524,7 @@ Host::CreateConnectionData HostImplBase::createConnection(
     Network::TransportSocketOptionsConstSharedPtr transport_socket_options) const {
   const bool needs_per_connection_resolution =
       cluster().transportSocketMatcher().usesFilterState() && transport_socket_options &&
-      !transport_socket_options->downstreamSharedFilterStateObjects().empty();
+      transport_socket_options->downstreamSharedFilterStateObjects();
 
   Network::UpstreamTransportSocketFactory& factory =
       needs_per_connection_resolution

@@ -96,7 +96,7 @@ Upstream::Host::CreateConnectionData LogicalHost::createConnection(
   // Per-connection resolution for filter state-based transport socket matching.
   const bool needs_per_connection_resolution =
       cluster().transportSocketMatcher().usesFilterState() && effective_options &&
-      !effective_options->downstreamSharedFilterStateObjects().empty();
+      effective_options->downstreamSharedFilterStateObjects() != nullptr;
 
   Network::UpstreamTransportSocketFactory& factory =
       needs_per_connection_resolution

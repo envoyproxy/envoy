@@ -133,25 +133,11 @@ void TransportSocketMatcherImpl::setupLegacySocketMatches(
 TransportSocketMatcher::MatchData TransportSocketMatcherImpl::resolveUsingMatcher(
     const envoy::config::core::v3::Metadata* endpoint_metadata,
     const envoy::config::core::v3::Metadata* locality_metadata,
-    Network::TransportSocketOptionsConstSharedPtr transport_socket_options) const {
+    Network::TransportSocketOptionsConstSharedPtr options) const {
   // Extract filter state from transport socket options if available.
-  StreamInfo::FilterStateSharedPtr filter_state;
-  if (transport_socket_options) {
-    const auto& shared_objects = transport_socket_options->downstreamSharedFilterStateObjects();
-    if (!shared_objects.empty()) {
-      // Create a temporary filter state to hold the shared objects for matching.
-      filter_state = std::make_shared<StreamInfo::FilterStateImpl>(
-          StreamInfo::FilterState::LifeSpan::Connection);
-      for (const auto& object : shared_objects) {
-        filter_state->setData(object.name_, object.data_, object.state_type_,
-                              StreamInfo::FilterState::LifeSpan::Connection,
-                              object.stream_sharing_);
-      }
-    }
-  }
-
-  Upstream::TransportSocketMatchingData data(endpoint_metadata, locality_metadata,
-                                             filter_state.get());
+  const StreamInfo::FilterStateObjects* filter_state =
+      options ? options->downstreamSharedFilterStateObjects().get() : nullptr;
+  Upstream::TransportSocketMatchingData data(endpoint_metadata, locality_metadata, filter_state);
   auto on_match = Matcher::evaluateMatch(*matcher_, data);
   if (on_match.isMatch()) {
     const auto action = on_match.action();

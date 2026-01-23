@@ -370,7 +370,18 @@ TEST_F(FilterStateImplTest, SharedWithUpstream) {
   filterState().setData("shared_7", std::make_shared<SimpleType>(7),
                         FilterState::StateType::ReadOnly, FilterState::LifeSpan::Connection,
                         StreamSharingMayImpactPooling::SharedWithUpstreamConnectionOnce);
-  auto objects = filterState().objectsSharedWithUpstreamConnection();
+  struct FilterObject {
+    std::shared_ptr<FilterState::Object> data_;
+    std::string name_;
+    FilterState::StateType state_type_;
+    StreamSharingMayImpactPooling stream_sharing_;
+  };
+  auto objects = std::make_shared<std::vector<FilterObject>>();
+  auto shared_objects = filterState().objectsSharedWithUpstreamConnection()->forEach(
+      [objects](absl::string_view name, std::shared_ptr<Object>& data, StateType state_type,
+                StreamSharingMayImpactPooling stream_sharing) {
+        objects->push_back({name, data, state_type, stream_sharing});
+      });
   EXPECT_EQ(objects->size(), 4);
   std::sort(objects->begin(), objects->end(),
             [](const auto& lhs, const auto& rhs) -> bool { return lhs.name_ < rhs.name_; });

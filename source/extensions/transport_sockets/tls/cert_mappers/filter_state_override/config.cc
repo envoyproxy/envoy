@@ -18,14 +18,13 @@ public:
   std::string deriveFromServerHello(const SSL&,
                                     const Network::TransportSocketOptionsConstSharedPtr& options) {
     if (options) {
-      for (const auto& obj : options->downstreamSharedFilterStateObjects()) {
-        if (obj.name_ == "envoy.tls.certificate_mappers.on_demand_secret") {
-          auto value = dynamic_cast<const Router::StringAccessor*>(obj.data_.get());
-          if (value) {
-            return std::string(value->asString());
-          }
-          break;
-        }
+      const StreamInfo::FilterStateObjectsSharedPtr& objects =
+          options->downstreamSharedFilterStateObjects();
+      const auto* data = objects ? objects->getDataReadOnly<Router::StringAccessor>(
+                                       "envoy.tls.certificate_mappers.on_demand_secret")
+                                 : nullptr;
+      if (data) {
+        return std::string(data->asString());
       }
     }
     return default_value_;
