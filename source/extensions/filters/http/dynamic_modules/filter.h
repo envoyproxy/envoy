@@ -33,6 +33,7 @@ public:
   // ---------- Http::StreamFilterBase ------------
   void onStreamComplete() override;
   void onDestroy() override;
+  Http::LocalErrorStatus onLocalReply(const Http::StreamFilterBase::LocalReplyData& data) override;
 
   // ----------  Http::StreamDecoderFilter  ----------
   FilterHeadersStatus decodeHeaders(RequestHeaderMap& headers, bool end_stream) override;
