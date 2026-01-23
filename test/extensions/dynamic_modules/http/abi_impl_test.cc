@@ -735,7 +735,7 @@ TEST(ABIImpl, metadata) {
       &result_buffer));
 
   // No namespace.
-  Http::MockStreamDecoderFilterCallbacks callbacks;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
   StreamInfo::MockStreamInfo stream_info;
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
   envoy::config::core::v3::Metadata metadata;
@@ -853,7 +853,7 @@ TEST(ABIImpl, filter_state) {
 
   // With stream info but non existing key.
   const std::string non_existing_key = "non_existing";
-  Http::MockStreamDecoderFilterCallbacks callbacks;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
   StreamInfo::MockStreamInfo stream_info;
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
   EXPECT_CALL(stream_info, filterState())
@@ -883,7 +883,7 @@ bufferVectorToString(const std::vector<envoy_dynamic_module_type_envoy_buffer>& 
 TEST(ABIImpl, RequestBody) {
   Stats::SymbolTableImpl symbol_table;
   DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
-  Http::MockStreamDecoderFilterCallbacks callbacks;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
   StreamInfo::MockStreamInfo stream_info;
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
   filter.setDecoderFilterCallbacks(callbacks);
@@ -997,7 +997,7 @@ TEST(ABIImpl, RequestBody) {
 TEST(ABIImpl, BufferedRequestBody) {
   Stats::SymbolTableImpl symbol_table;
   DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
-  Http::MockStreamDecoderFilterCallbacks callbacks;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
   StreamInfo::MockStreamInfo stream_info;
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
   filter.setDecoderFilterCallbacks(callbacks);
@@ -1331,7 +1331,7 @@ TEST(ABIImpl, BufferedResponseBody) {
 TEST(ABIImpl, ClearRouteCache) {
   Stats::SymbolTableImpl symbol_table;
   DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
-  Http::MockStreamDecoderFilterCallbacks callbacks;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
   StreamInfo::MockStreamInfo stream_info;
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
   filter.setDecoderFilterCallbacks(callbacks);
@@ -1346,7 +1346,7 @@ TEST(ABIImpl, GetAttributes) {
   Stats::SymbolTableImpl symbol_table;
   DynamicModuleHttpFilter filter_without_callbacks{nullptr, symbol_table, 0};
   DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
-  Http::MockStreamDecoderFilterCallbacks callbacks;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
   StreamInfo::MockStreamInfo stream_info;
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
   envoy::config::core::v3::Metadata metadata;
@@ -2399,6 +2399,166 @@ TEST_F(DynamicModuleHttpFilterWithConfigTest, GetClusterNameWithConfig) {
   EXPECT_NE(result.ptr, nullptr);
   EXPECT_EQ(result.length, cluster_name.size());
   EXPECT_EQ(std::string(result.ptr, result.length), cluster_name);
+}
+
+TEST_F(DynamicModuleHttpFilterTest, GetBufferLimit) {
+  EXPECT_CALL(decoder_callbacks_, bufferLimit()).WillOnce(testing::Return(1024));
+  uint64_t limit = envoy_dynamic_module_callback_http_get_buffer_limit(filter_.get());
+  EXPECT_EQ(limit, 1024);
+}
+
+TEST_F(DynamicModuleHttpFilterTest, GetBufferLimitNoCallbacks) {
+  // Test with no callbacks set.
+  auto filter_no_callbacks = std::make_unique<DynamicModuleHttpFilter>(nullptr, symbol_table_, 3);
+  uint64_t limit = envoy_dynamic_module_callback_http_get_buffer_limit(filter_no_callbacks.get());
+  EXPECT_EQ(limit, 0);
+}
+
+TEST_F(DynamicModuleHttpFilterTest, SetBufferLimit) {
+  EXPECT_CALL(decoder_callbacks_, setBufferLimit(2048));
+  envoy_dynamic_module_callback_http_set_buffer_limit(filter_.get(), 2048);
+}
+
+TEST_F(DynamicModuleHttpFilterTest, SetBufferLimitNoCallbacks) {
+  // Test with no callbacks set. Should not crash.
+  auto filter_no_callbacks = std::make_unique<DynamicModuleHttpFilter>(nullptr, symbol_table_, 3);
+  envoy_dynamic_module_callback_http_set_buffer_limit(filter_no_callbacks.get(), 2048);
+}
+
+TEST_F(DynamicModuleHttpFilterTest, WatermarkCallbacksAutoRegisteredAndCleanedUp) {
+  // Create a new filter with callbacks.
+  auto filter = std::make_unique<DynamicModuleHttpFilter>(nullptr, symbol_table_, 3);
+
+  // Watermark callbacks should be automatically registered when decoder callbacks are set.
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  EXPECT_CALL(decoder_callbacks, addDownstreamWatermarkCallbacks(testing::Ref(*filter)));
+  filter->setDecoderFilterCallbacks(decoder_callbacks);
+
+  // Destroy should clean up watermark callbacks.
+  EXPECT_CALL(decoder_callbacks, removeDownstreamWatermarkCallbacks(testing::Ref(*filter)));
+  filter->onDestroy();
+}
+
+// =============================================================================
+// Tests for stream control callbacks.
+// =============================================================================
+
+TEST_F(DynamicModuleHttpFilterTest, ResetStreamLocalReset) {
+  std::string details = "dynamic_module_reset";
+  EXPECT_CALL(decoder_callbacks_,
+              resetStream(Http::StreamResetReason::LocalReset, testing::Eq(details)));
+  envoy_dynamic_module_callback_http_filter_reset_stream(
+      filter_.get(), envoy_dynamic_module_type_http_filter_stream_reset_reason_LocalReset,
+      {details.data(), details.size()});
+}
+
+TEST_F(DynamicModuleHttpFilterTest, ResetStreamLocalRefusedStreamReset) {
+  std::string details = "refused_stream";
+  EXPECT_CALL(decoder_callbacks_,
+              resetStream(Http::StreamResetReason::LocalRefusedStreamReset, testing::Eq(details)));
+  envoy_dynamic_module_callback_http_filter_reset_stream(
+      filter_.get(),
+      envoy_dynamic_module_type_http_filter_stream_reset_reason_LocalRefusedStreamReset,
+      {details.data(), details.size()});
+}
+
+TEST_F(DynamicModuleHttpFilterTest, ResetStreamEmptyDetails) {
+  EXPECT_CALL(decoder_callbacks_,
+              resetStream(Http::StreamResetReason::LocalReset, testing::Eq("")));
+  envoy_dynamic_module_callback_http_filter_reset_stream(
+      filter_.get(), envoy_dynamic_module_type_http_filter_stream_reset_reason_LocalReset,
+      {nullptr, 0});
+}
+
+TEST_F(DynamicModuleHttpFilterTest, ResetStreamNoCallbacks) {
+  // Create a filter without decoder callbacks set.
+  auto filter_no_callbacks = std::make_unique<DynamicModuleHttpFilter>(nullptr, symbol_table_, 3);
+  // Should not crash when decoder_callbacks_ is nullptr.
+  envoy_dynamic_module_callback_http_filter_reset_stream(
+      filter_no_callbacks.get(),
+      envoy_dynamic_module_type_http_filter_stream_reset_reason_LocalReset, {nullptr, 0});
+}
+
+TEST_F(DynamicModuleHttpFilterTest, SendGoAwayAndCloseGraceful) {
+  EXPECT_CALL(decoder_callbacks_, sendGoAwayAndClose(true));
+  envoy_dynamic_module_callback_http_filter_send_go_away_and_close(filter_.get(), true);
+}
+
+TEST_F(DynamicModuleHttpFilterTest, SendGoAwayAndCloseImmediate) {
+  EXPECT_CALL(decoder_callbacks_, sendGoAwayAndClose(false));
+  envoy_dynamic_module_callback_http_filter_send_go_away_and_close(filter_.get(), false);
+}
+
+TEST_F(DynamicModuleHttpFilterTest, SendGoAwayAndCloseNoCallbacks) {
+  // Create a filter without decoder callbacks set.
+  auto filter_no_callbacks = std::make_unique<DynamicModuleHttpFilter>(nullptr, symbol_table_, 3);
+  // Should not crash when decoder_callbacks_ is nullptr.
+  envoy_dynamic_module_callback_http_filter_send_go_away_and_close(filter_no_callbacks.get(), true);
+}
+
+TEST_F(DynamicModuleHttpFilterTest, RecreateStreamNoHeaders) {
+  EXPECT_CALL(decoder_callbacks_, recreateStream(nullptr)).WillOnce(testing::Return(true));
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_recreate_stream(filter_.get(), nullptr, 0));
+}
+
+TEST_F(DynamicModuleHttpFilterTest, RecreateStreamWithHeaders) {
+  std::list<std::pair<std::string, std::string>> headers = {{":status", "302"},
+                                                            {"location", "/new-location"}};
+  size_t header_count = headers.size();
+  auto header_array =
+      std::make_unique<envoy_dynamic_module_type_module_http_header[]>(header_count);
+
+  size_t index = 0;
+  for (const auto& [key, value] : headers) {
+    header_array[index].key_length = key.size();
+    header_array[index].key_ptr = const_cast<char*>(key.c_str());
+    header_array[index].value_length = value.size();
+    header_array[index].value_ptr = const_cast<char*>(value.c_str());
+    ++index;
+  }
+
+  // The call should pass headers to recreateStream.
+  EXPECT_CALL(decoder_callbacks_, recreateStream(testing::NotNull()))
+      .WillOnce(testing::Return(true));
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_recreate_stream(filter_.get(),
+                                                                        header_array.get(), 2));
+}
+
+TEST_F(DynamicModuleHttpFilterTest, RecreateStreamFailure) {
+  EXPECT_CALL(decoder_callbacks_, recreateStream(nullptr)).WillOnce(testing::Return(false));
+  EXPECT_FALSE(
+      envoy_dynamic_module_callback_http_filter_recreate_stream(filter_.get(), nullptr, 0));
+}
+
+TEST_F(DynamicModuleHttpFilterTest, RecreateStreamNoCallbacks) {
+  // Create a filter without decoder callbacks set.
+  auto filter_no_callbacks = std::make_unique<DynamicModuleHttpFilter>(nullptr, symbol_table_, 3);
+  // Should return false when decoder_callbacks_ is nullptr.
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_filter_recreate_stream(filter_no_callbacks.get(),
+                                                                         nullptr, 0));
+}
+
+TEST_F(DynamicModuleHttpFilterTest, ClearRouteClusterCache) {
+  NiceMock<Http::MockDownstreamStreamFilterCallbacks> downstream_callbacks;
+  EXPECT_CALL(decoder_callbacks_, downstreamCallbacks())
+      .WillOnce(
+          testing::Return(makeOptRef<Http::DownstreamStreamFilterCallbacks>(downstream_callbacks)));
+  EXPECT_CALL(downstream_callbacks, refreshRouteCluster());
+  envoy_dynamic_module_callback_http_clear_route_cluster_cache(filter_.get());
+}
+
+TEST_F(DynamicModuleHttpFilterTest, ClearRouteClusterCacheNoDownstreamCallbacks) {
+  EXPECT_CALL(decoder_callbacks_, downstreamCallbacks())
+      .WillOnce(testing::Return(OptRef<Http::DownstreamStreamFilterCallbacks>{}));
+  // Should not crash when downstreamCallbacks returns nullopt.
+  envoy_dynamic_module_callback_http_clear_route_cluster_cache(filter_.get());
+}
+
+TEST_F(DynamicModuleHttpFilterTest, ClearRouteClusterCacheNoCallbacks) {
+  // Create a filter without decoder callbacks set.
+  auto filter_no_callbacks = std::make_unique<DynamicModuleHttpFilter>(nullptr, symbol_table_, 3);
+  // Should not crash when decoder_callbacks_ is nullptr.
+  envoy_dynamic_module_callback_http_clear_route_cluster_cache(filter_no_callbacks.get());
 }
 
 } // namespace HttpFilters
