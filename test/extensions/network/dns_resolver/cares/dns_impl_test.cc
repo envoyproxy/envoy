@@ -390,10 +390,10 @@ private:
   bool refused_{};
   bool error_on_a_{};
   bool error_on_aaaa_{};
+  StreamInfo::StreamInfoImpl stream_info_;
   // All queries are tracked so we can do resource reclamation when the test is
   // over.
   std::vector<std::unique_ptr<TestDnsServerQuery>> queries_;
-  StreamInfo::StreamInfoImpl stream_info_;
   const bool no_response_{false};
 };
 

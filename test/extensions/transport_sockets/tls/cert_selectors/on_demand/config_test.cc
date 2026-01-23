@@ -1,7 +1,11 @@
+#include "envoy/extensions/transport_sockets/tls/cert_mappers/filter_state_override/v3/config.pb.h"
+#include "envoy/extensions/transport_sockets/tls/cert_mappers/sni/v3/config.pb.h"
 #include "envoy/extensions/transport_sockets/tls/cert_mappers/static_name/v3/config.pb.h"
 #include "envoy/extensions/transport_sockets/tls/cert_selectors/on_demand_secret/v3/config.pb.h"
 
 #include "source/common/config/utility.h"
+#include "source/common/network/transport_socket_options_impl.h"
+#include "source/common/router/string_accessor_impl.h"
 #include "source/common/tls/context_impl.h"
 #include "source/extensions/transport_sockets/tls/cert_selectors/on_demand/config.h"
 
@@ -11,6 +15,7 @@
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
+#include "openssl/ssl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -90,6 +95,30 @@ TEST_F(OnDemandTest, QuicCall) {
   bool sni;
   absl::InlinedVector<int, 3> curve;
   EXPECT_DEATH(selector->findTlsContext("", curve, false, &sni), "Not supported with QUIC");
+}
+
+TEST(FilterStateMapper, Derivation) {
+  NiceMock<Server::Configuration::MockGenericFactoryContext> factory_context;
+  Ssl::UpstreamTlsCertificateMapperConfigFactory& mapper_factory =
+      Config::Utility::getAndCheckFactoryByName<Ssl::UpstreamTlsCertificateMapperConfigFactory>(
+          "envoy.tls.upstream_certificate_mappers.filter_state_override");
+  envoy::extensions::transport_sockets::tls::cert_mappers::filter_state_override::v3::Config config;
+  TestUtility::loadFromYaml("default_value: test", config);
+  auto mapper_status = mapper_factory.createTlsCertificateMapperFactory(config, factory_context);
+  ASSERT_OK(mapper_status);
+  auto mapper = mapper_status.value()();
+  bssl::UniquePtr<SSL_CTX> ctx(SSL_CTX_new(TLS_method()));
+  bssl::UniquePtr<SSL> ssl(SSL_new(ctx.get()));
+  EXPECT_EQ("test", mapper->deriveFromServerHello(*ssl, nullptr));
+  auto filter_state_object = std::make_shared<Router::StringAccessorImpl>("new_value");
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
+  filter_state.setData("envoy.tls.certificate_mappers.on_demand_secret", filter_state_object,
+                       StreamInfo::FilterState::StateType::ReadOnly,
+                       StreamInfo::FilterState::LifeSpan::Connection,
+                       StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
+  auto transport_socket_options =
+      Network::TransportSocketOptionsUtility::fromFilterState(filter_state);
+  EXPECT_EQ("new_value", mapper->deriveFromServerHello(*ssl, transport_socket_options));
 }
 
 } // namespace

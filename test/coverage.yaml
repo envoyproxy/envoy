@@ -70,6 +70,7 @@ directories:
   source/extensions/stat_sinks/statsd: 85.2  # Death tests don't report LCOV
   source/extensions/tracers/zipkin: 95.6
   source/extensions/transport_sockets/proxy_protocol: 96.2
+  source/extensions/transport_sockets/tls/cert_mappers/filter_state_override: 96.2
   source/extensions/wasm_runtime/wamr: 0.0  # Not enabled in coverage build
   source/extensions/wasm_runtime/wasmtime: 0.0  # Not enabled in coverage build
   source/extensions/watchdog: 83.3  # Death tests within extensions
