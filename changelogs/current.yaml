@@ -56,6 +56,11 @@ new_features:
 - area: mcp_router
   change: |
     Added support for MCP prompt methods ``prompts/list`` and ``prompts/get``.
+- area: ratelimit
+  change: |
+    Added per-descriptor ``x-ratelimit-*`` headers support. See the
+    :ref:`x_ratelimit_option <envoy_v3_api_field_envoy.config.route.v3.RateLimit.x_ratelimit_option>`
+    field documentation for more details.
 - area: formatter
   change: |
     Extended ``*_WITHOUT_PORT`` address formatters to accept an optional ``MASK_PREFIX_LEN`` parameter that masks IP addresses

@@ -207,8 +207,10 @@ TEST_F(RateLimitConfigTest, MultiplePoliciesAndMultipleActions) {
   - actions:
     - remote_address: {}
     - destination_cluster: {}
+    x_ratelimit_option: DRAFT_VERSION_03
   - actions:
     - destination_cluster: {}
+    x_ratelimit_option: "OFF"
   )EOF";
 
   setupTest(yaml);
@@ -222,6 +224,10 @@ TEST_F(RateLimitConfigTest, MultiplePoliciesAndMultipleActions) {
                        {{"remote_address", "10.0.0.1"}, {"destination_cluster", "fake_cluster"}}},
                    Envoy::RateLimit::Descriptor{{{"destination_cluster", "fake_cluster"}}}}),
               testing::ContainerEq(descriptors));
+
+  EXPECT_EQ(envoy::config::route::v3::RateLimit::DRAFT_VERSION_03,
+            descriptors[0].x_ratelimit_option_);
+  EXPECT_EQ(envoy::config::route::v3::RateLimit::OFF, descriptors[1].x_ratelimit_option_);
 }
 
 TEST_F(RateLimitConfigTest, MultiplePoliciesAndMultipleActionsAndOneForStreamDone) {

@@ -25,7 +25,8 @@ class LocalRateLimiter {
 public:
   struct Result {
     bool allowed{};
-    std::shared_ptr<const TokenBucketContext> token_bucket_context{};
+    std::shared_ptr<const TokenBucketContext> token_bucket_context;
+    RateLimit::XRateLimitOption x_ratelimit_option{};
   };
 
   virtual ~LocalRateLimiter() = default;
