@@ -116,7 +116,6 @@ class ClusterFactory : public Upstream::ConfigurableClusterFactoryBase<
 public:
   ClusterFactory() : ConfigurableClusterFactoryBase("envoy.clusters.composite") {}
 
-private:
   absl::StatusOr<
       std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>>
   createClusterWithConfig(

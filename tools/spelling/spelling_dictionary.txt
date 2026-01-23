@@ -378,6 +378,7 @@ middlewildcard
 monostate
 mpd
 msan
+multicluster
 mutators
 mybucket
 myobject
@@ -504,6 +505,7 @@ STDSTRING
 STL
 STRLEN
 STS
+subcluster
 SUBCOMMAND
 SVG
 SVID
