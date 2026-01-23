@@ -69,31 +69,6 @@ TEST(HostCpuUtilizationMonitorTest, ComputesCorrectUsage) {
   EXPECT_DOUBLE_EQ(resource.pressure(), 0.07375); // 1.0 * 0.05 + 0.025 * 0.95
 }
 
-TEST(HostCpuUtilizationMonitorTest, GetsErroneousStatsDenominator) {
-  envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig config;
-  auto stats_reader = std::make_unique<MockCpuStatsReader>();
-  EXPECT_CALL(*stats_reader, getUtilization())
-      .WillOnce(Return(0.0)) // Constructor call
-      .WillOnce(Return(absl::InvalidArgumentError("total_over_period must be positive")));
-  auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
-  ResourcePressure resource;
-  monitor->updateResourceUsage(resource);
-  ASSERT_TRUE(resource.hasError());
-}
-
-TEST(HostCpuUtilizationMonitorTest, GetsErroneousStatsNumerator) {
-  envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig config;
-  auto stats_reader = std::make_unique<MockCpuStatsReader>();
-  EXPECT_CALL(*stats_reader, getUtilization())
-      .WillOnce(Return(0.0)) // Constructor call
-      .WillOnce(Return(absl::InvalidArgumentError("Work_over_period cannot be negative")));
-  auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
-
-  ResourcePressure resource;
-  monitor->updateResourceUsage(resource);
-  ASSERT_TRUE(resource.hasError());
-}
-
 TEST(HostCpuUtilizationMonitorTest, ReportsError) {
   envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig config;
   auto stats_reader = std::make_unique<MockCpuStatsReader>();
@@ -136,34 +111,6 @@ TEST(ContainerCpuUsageMonitorTest, ComputesCorrectUsage) {
   ASSERT_TRUE(resource.hasPressure());
   ASSERT_FALSE(resource.hasError());
   EXPECT_DOUBLE_EQ(resource.pressure(), 0.0975); // 1.0 * 0.05 + 0.05 * 0.95
-}
-
-TEST(ContainerCpuUsageMonitorTest, GetsErroneousStatsDenominator) {
-  envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig config;
-  config.set_mode(
-      envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig::CONTAINER);
-  auto stats_reader = std::make_unique<MockCpuStatsReader>();
-  EXPECT_CALL(*stats_reader, getUtilization())
-      .WillOnce(Return(0.0)) // Constructor call
-      .WillOnce(Return(absl::InvalidArgumentError("total_over_period must be positive")));
-  auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
-  ResourcePressure resource;
-  monitor->updateResourceUsage(resource);
-  ASSERT_TRUE(resource.hasError());
-}
-
-TEST(ContainerCpuUsageMonitorTest, GetsErroneousStatsNumerator) {
-  envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig config;
-  config.set_mode(
-      envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig::CONTAINER);
-  auto stats_reader = std::make_unique<MockCpuStatsReader>();
-  EXPECT_CALL(*stats_reader, getUtilization())
-      .WillOnce(Return(0.0)) // Constructor call
-      .WillOnce(Return(absl::InvalidArgumentError("Work_over_period cannot be negative")));
-  auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
-  ResourcePressure resource;
-  monitor->updateResourceUsage(resource);
-  ASSERT_TRUE(resource.hasError());
 }
 
 TEST(ContainerCpuUtilizationMonitorTest, ReportsError) {

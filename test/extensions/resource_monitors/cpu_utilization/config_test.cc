@@ -75,16 +75,12 @@ TEST(CpuUtilizationMonitorFactoryTest, CreateContainerCPUMonitor) {
   Server::Configuration::ResourceMonitorFactoryContextImpl context(
       dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor());
 
-  // Factory will either create a monitor (if cgroup files exist) or throw (if they don't)
-  // Both behaviors are acceptable depending on the test environment
-  try {
-    auto monitor = factory->createResourceMonitor(config, context);
-    // If cgroup files exist (Linux CI), monitor should be created successfully
-    EXPECT_NE(monitor, nullptr);
-  } catch (const EnvoyException&) {
-    // If no cgroup files exist (macOS, non-containerized), exception is expected
-    // This is acceptable
-  }
+#if defined(__linux__)
+  auto monitor = factory->createResourceMonitor(config, context);
+  EXPECT_NE(monitor, nullptr);
+#else
+  EXPECT_THROW(factory->createResourceMonitor(config, context), EnvoyException);
+#endif
 }
 
 TEST(CpuUtilizationMonitorFactoryTest, HostMonitorFunctional) {
@@ -124,22 +120,19 @@ TEST(CpuUtilizationMonitorFactoryTest, ContainerMonitorFunctional) {
   Server::Configuration::ResourceMonitorFactoryContextImpl context(
       dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor());
 
-  // Factory will either create a monitor (if cgroup files exist) or throw (if they don't)
-  // Test both behaviors
-  try {
-    auto monitor = factory->createResourceMonitor(config, context);
-    // If cgroup files exist (Linux CI), monitor should be created and functional
-    ASSERT_NE(monitor, nullptr);
+#if defined(__linux__)
+  auto monitor = factory->createResourceMonitor(config, context);
+  // If cgroup files exist (Linux CI), monitor should be created and functional
+  ASSERT_NE(monitor, nullptr);
 
-    // Exercise the monitor by calling updateResourceUsage
-    TestResourcePressureCallbacks callbacks;
-    monitor->updateResourceUsage(callbacks);
-    // Either success or error is acceptable depending on system state
-    EXPECT_TRUE(callbacks.hasSuccess() || callbacks.hasError());
-  } catch (const EnvoyException&) {
-    // If no cgroup files exist (macOS, non-containerized), exception is expected
-    // This is acceptable - the test passes
-  }
+  // Exercise the monitor by calling updateResourceUsage
+  TestResourcePressureCallbacks callbacks;
+  monitor->updateResourceUsage(callbacks);
+  // Either success or error is acceptable depending on system state
+  EXPECT_TRUE(callbacks.hasSuccess() || callbacks.hasError());
+#else
+  EXPECT_THROW(factory->createResourceMonitor(config, context), EnvoyException);
+#endif
 }
 
 TEST(CpuUtilizationMonitorFactoryTest, FactoryRegistered) {

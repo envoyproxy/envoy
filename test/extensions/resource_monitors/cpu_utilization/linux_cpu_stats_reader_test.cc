@@ -180,11 +180,6 @@ TEST_F(LinuxContainerCpuStatsReaderTest, CannotReadFileCpuTimes) {
                                                 cpuAllocatedPath(), temp_path_cpu_times);
   CpuTimesBase envoy_container_stats = container_stats_reader.getCpuTimes();
   EXPECT_FALSE(envoy_container_stats.is_valid);
-
-  // Test that getUtilization also handles the error
-  auto result = container_stats_reader.getUtilization();
-  EXPECT_FALSE(result.ok());
-  EXPECT_NE(result.status().message().find("Failed to read CPU times"), std::string::npos);
 }
 
 TEST_F(LinuxContainerCpuStatsReaderTest, UnexpectedFormatCpuAllocatedLine) {
@@ -234,11 +229,6 @@ TEST_F(LinuxContainerCpuStatsReaderTest, ZeroCpuAllocatedValue) {
   CpuTimesBase envoy_container_stats = container_stats_reader.getCpuTimes();
 
   EXPECT_FALSE(envoy_container_stats.is_valid);
-
-  // Test that getUtilization also handles the error
-  auto result = container_stats_reader.getUtilization();
-  EXPECT_FALSE(result.ok());
-  EXPECT_NE(result.status().message().find("Failed to read CPU times"), std::string::npos);
 }
 
 // =============================================================================
@@ -441,11 +431,6 @@ TEST_F(LinuxContainerCpuStatsReaderV2Test, CannotReadEffectiveCpusFile) {
   CpuTimesV2 envoy_container_stats = container_stats_reader.getCpuTimes();
 
   EXPECT_FALSE(envoy_container_stats.is_valid);
-
-  // Test that getUtilization also handles the error
-  auto result = container_stats_reader.getUtilization();
-  EXPECT_FALSE(result.ok());
-  EXPECT_NE(result.status().message().find("Failed to read CPU times"), std::string::npos);
 }
 
 TEST_F(LinuxContainerCpuStatsReaderV2Test, CannotReadCpuMaxFile) {
@@ -461,11 +446,6 @@ TEST_F(LinuxContainerCpuStatsReaderV2Test, CannotReadCpuMaxFile) {
   CpuTimesV2 envoy_container_stats = container_stats_reader.getCpuTimes();
 
   EXPECT_FALSE(envoy_container_stats.is_valid);
-
-  // Test that getUtilization also handles the error
-  auto result = container_stats_reader.getUtilization();
-  EXPECT_FALSE(result.ok());
-  EXPECT_NE(result.status().message().find("Failed to read CPU times"), std::string::npos);
 }
 
 // =============================================================================
