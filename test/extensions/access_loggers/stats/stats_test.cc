@@ -297,7 +297,7 @@ TEST_F(StatsAccessLoggerTest, EmptyTagFormatter) {
   logger_->log(formatter_context_, stream_info_);
 }
 
-TEST_F(StatsAccessLoggerTest, StatTagFilter) {
+TEST_F(StatsAccessLoggerTest, DropStatAction) {
   const std::string yaml = R"EOF(
     stat_prefix: test_stat_prefix
     counters:
@@ -317,7 +317,7 @@ TEST_F(StatsAccessLoggerTest, StatTagFilter) {
                 map:
                   "bar":
                     action:
-                      name: envoy.extensions.access_loggers.stats.v3.DropStatAction
+                      name: drop_stat_action
                       typed_config:
                         "@type": type.googleapis.com/envoy.extensions.access_loggers.stats.v3.DropStatAction
         value_fixed: 1
@@ -348,7 +348,7 @@ TEST_F(StatsAccessLoggerTest, StatTagFilter) {
                 map:
                   "bar":
                     action:
-                      name: envoy.extensions.access_loggers.stats.v3.DropStatAction
+                      name: drop_stat_action
                       typed_config:
                         "@type": type.googleapis.com/envoy.extensions.access_loggers.stats.v3.DropStatAction
         value_fixed: 1
@@ -358,6 +358,74 @@ TEST_F(StatsAccessLoggerTest, StatTagFilter) {
   // Case 2: Filter does not match (tag foo=baz), so drop action is NOT executed.
   EXPECT_CALL(store_, counter(_));
   EXPECT_CALL(store_.counter_, add(1));
+  logger_->log(formatter_context_, stream_info_);
+}
+
+TEST_F(StatsAccessLoggerTest, DropStatActionOnHistogram) {
+  const std::string yaml = R"EOF(
+    stat_prefix: test_stat_prefix
+    histograms:
+      - stat:
+          name: histogram
+          tags:
+            - name: foo
+              value_format: bar
+          custom:
+            matcher_tree:
+              input:
+                name: stat_tag_value_input
+                typed_config:
+                  "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.stats.v3.StatTagValueInput
+                  tag_name: foo
+              exact_match_map:
+                map:
+                  "bar":
+                    action:
+                      name: drop_stat_action
+                      typed_config:
+                        "@type": type.googleapis.com/envoy.extensions.access_loggers.stats.v3.DropStatAction
+        unit: Bytes
+        value_format: '%BYTES_RECEIVED%'
+)EOF";
+
+  initialize(yaml);
+
+  // Case 1: Filter matches (tag foo=bar), so drop action is executed.
+  EXPECT_CALL(store_, histogram(_, _)).Times(0);
+  logger_->log(formatter_context_, stream_info_);
+
+  const std::string yaml2 = R"EOF(
+    stat_prefix: test_stat_prefix
+    histograms:
+      - stat:
+          name: histogram
+          tags:
+            - name: foo
+              value_format: baz
+          custom:
+            matcher_tree:
+              input:
+                name: stat_tag_value_input
+                typed_config:
+                  "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.stats.v3.StatTagValueInput
+                  tag_name: foo
+              exact_match_map:
+                map:
+                  "bar":
+                    action:
+                      name: drop_stat_action
+                      typed_config:
+                        "@type": type.googleapis.com/envoy.extensions.access_loggers.stats.v3.DropStatAction
+        unit: Bytes
+        value_format: '%BYTES_RECEIVED%'
+)EOF";
+  initialize(yaml2);
+
+  // Case 2: Filter does not match (tag foo=baz), so drop action is NOT executed.
+  Stats::MockHistogram mock_histogram;
+  EXPECT_CALL(store_, histogram(_, Stats::Histogram::Unit::Bytes))
+      .WillOnce(testing::ReturnRef(mock_histogram));
+  EXPECT_CALL(mock_histogram, recordValue(_));
   logger_->log(formatter_context_, stream_info_);
 }
 
@@ -381,7 +449,7 @@ TEST_F(StatsAccessLoggerTest, StatTagFilterErrorType) {
                 map:
                   "-":
                     action:
-                      name: envoy.extensions.access_loggers.stats.v3.DropStatAction
+                      name: drop_stat_action
                       typed_config:
                         "@type": type.googleapis.com/envoy.extensions.access_loggers.stats.v3.DropStatAction
         value_fixed: 1
@@ -412,7 +480,7 @@ TEST_F(StatsAccessLoggerTest, StatTagFilterErrorType) {
                 map:
                   "-":
                     action:
-                      name: envoy.extensions.access_loggers.stats.v3.DropStatAction
+                      name: drop_stat_action
                       typed_config:
                         "@type": type.googleapis.com/envoy.extensions.access_loggers.stats.v3.DropStatAction
         value_fixed: 1
@@ -445,7 +513,7 @@ TEST_F(StatsAccessLoggerTest, StatTagFilterInsertTag) {
                 map:
                   "bar":
                     action:
-                      name: envoy.extensions.access_loggers.stats.v3.InsertTagAction
+                      name: insert_tag_action
                       typed_config:
                         "@type": type.googleapis.com/envoy.extensions.access_loggers.stats.v3.InsertTagAction
                         tag_name: foo
@@ -489,7 +557,7 @@ TEST_F(StatsAccessLoggerTest, StatTagFilterDropTag) {
                 map:
                   "bar":
                     action:
-                      name: envoy.extensions.access_loggers.stats.v3.DropTagAction
+                      name: drop_tag_action
                       typed_config:
                         "@type": type.googleapis.com/envoy.extensions.access_loggers.stats.v3.DropTagAction
                         target_tag_name: foo

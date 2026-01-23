@@ -4,10 +4,11 @@ package envoy.extensions.access_loggers.stats.v3;
 
 import "google/protobuf/wrappers.proto";
 
-import "udpa/annotations/status.proto";
-import "validate/validate.proto";
 import "xds/annotations/v3/status.proto";
 import "xds/type/matcher/v3/matcher.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.access_loggers.stats.v3";
 option java_outer_classname = "StatsProto";
@@ -33,17 +34,17 @@ message Config {
   // Defines a tag on a stat.
   message Tag {
     // The name of the tag.
-    string name = 1 [(validate.rules).string = { min_len: 1 }];
+    string name = 1 [(validate.rules).string = {min_len: 1}];
 
     // The value of the tag, using :ref:`command operators
     // <config_access_log_command_operators>`.
-    string value_format = 2 [(validate.rules).string = { min_len: 1 }];
+    string value_format = 2 [(validate.rules).string = {min_len: 1}];
   }
 
   // Defines the name and tags of a stat.
   message Stats {
     // The name of the stat.
-    string name = 1 [(validate.rules).string = { min_len: 1 }];
+    string name = 1 [(validate.rules).string = {min_len: 1}];
 
     // The tags for the stat.
     repeated Tag tags = 2;
@@ -77,38 +78,35 @@ message Config {
     }
 
     // The name and tags of this histogram.
-    Stats stat = 1 [(validate.rules).message = { required: true }];
+    Stats stat = 1 [(validate.rules).message = {required: true}];
 
     // The units for this histogram.
-    Unit unit = 2 [(validate.rules).enum = { defined_only: true }];
+    Unit unit = 2 [(validate.rules).enum = {defined_only: true}];
 
     // The format string for the value of this histogram, using :ref:`command
     // operators <config_access_log_command_operators>`. This must evaluate to a
     // positive number.
-    string value_format = 3
-        [(validate.rules).string = { min_len: 1 prefix: "%" suffix: "%" }];
+    string value_format = 3 [(validate.rules).string = {min_len: 1 prefix: "%" suffix: "%"}];
   }
 
   // Configuration for a counter stat.
   message Counter {
     // The name and tags of this counter.
-    Stats stat = 1 [(validate.rules).message = { required: true }];
+    Stats stat = 1 [(validate.rules).message = {required: true}];
 
     // The format string for the value to add to this counter, using
     // :ref:`command operators <config_access_log_command_operators>`. One of
     // ``value_format`` or ``value_fixed`` must be configured.
-    string value_format = 2 [
-      (validate.rules).string = { prefix: "%" suffix: "%" ignore_empty: true }
-    ];
+    string value_format = 2
+        [(validate.rules).string = {prefix: "%" suffix: "%" ignore_empty: true}];
 
     // A fixed value to add to this counter.
     // One of ``value_format`` or ``value_fixed`` must be configured.
-    google.protobuf.UInt64Value value_fixed = 3
-        [(validate.rules).uint64 = { gt: 0 }];
+    google.protobuf.UInt64Value value_fixed = 3 [(validate.rules).uint64 = {gt: 0}];
   }
 
   // The stat prefix for the generated stats.
-  string stat_prefix = 1 [(validate.rules).string = { min_len: 1 }];
+  string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
 
   // The histograms this logger will emit.
   repeated Histogram histograms = 3;
@@ -118,7 +116,8 @@ message Config {
 }
 
 // Action that drops the stat.
-message DropStatAction {}
+message DropStatAction {
+}
 
 // Action that drops the tag.
 message DropTagAction {
