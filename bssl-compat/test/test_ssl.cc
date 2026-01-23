@@ -1985,3 +1985,30 @@ TEST(SSLTest, test_SSL_get_all_curve_names) {
     // printf("%s\n", names2.get()[i]);
   }
 }
+
+// This is a leak test to verify tha our SSL_CTX_set_cert_cb() implementation
+// correctly manages the lifecycle of its callback wrapper objects i.e it should
+// run clean under tools such as vagrind.
+TEST(SSLTest, test_SSL_CTX_set_cert_cb_leaks) {
+  // Test setting a null callback
+  SSL_CTX* ctx = SSL_CTX_new(TLS_client_method());
+  SSL_CTX_set_cert_cb(ctx, nullptr, nullptr);
+  SSL_CTX_free(ctx);  // Wrapper should be freed
+
+  // Test set callback once
+  ctx = SSL_CTX_new(TLS_client_method());
+  SSL_CTX_set_cert_cb(ctx, [](SSL*, void*) { return 1; }, nullptr);
+  SSL_CTX_free(ctx);  // Wrapper should be freed
+
+  // Test replace callback
+  ctx = SSL_CTX_new(TLS_client_method());
+  SSL_CTX_set_cert_cb(ctx, [](SSL*, void*) { return 1; }, (void*)1);
+  SSL_CTX_set_cert_cb(ctx, [](SSL*, void*) { return 1; }, (void*)2);  // Old wrapper freed
+  SSL_CTX_free(ctx);  // New wrapper freed
+
+  // Test set then clear callback
+  ctx = SSL_CTX_new(TLS_client_method());
+  SSL_CTX_set_cert_cb(ctx, [](SSL*, void*) { return 1; }, nullptr);
+  SSL_CTX_set_cert_cb(ctx, nullptr, nullptr);  // Wrapper freed
+  SSL_CTX_free(ctx);  // Nothing to free
+}
