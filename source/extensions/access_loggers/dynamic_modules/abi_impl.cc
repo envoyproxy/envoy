@@ -8,6 +8,7 @@
 #include "source/extensions/dynamic_modules/abi.h"
 
 #include "absl/strings/str_split.h"
+#include "access_log.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -18,15 +19,15 @@ namespace {
 
 using HeadersMapOptConstRef = OptRef<const Http::HeaderMap>;
 
-HeadersMapOptConstRef getHeaderMapByType(DynamicModuleAccessLogContext* context,
+HeadersMapOptConstRef getHeaderMapByType(ThreadLocalLogger* logger,
                                          envoy_dynamic_module_type_http_header_type header_type) {
   switch (header_type) {
   case envoy_dynamic_module_type_http_header_type_RequestHeader:
-    return context->log_context_.requestHeaders();
+    return logger->log_context_->requestHeaders();
   case envoy_dynamic_module_type_http_header_type_ResponseHeader:
-    return context->log_context_.responseHeaders();
+    return logger->log_context_->responseHeaders();
   case envoy_dynamic_module_type_http_header_type_ResponseTrailer:
-    return context->log_context_.responseTrailers();
+    return logger->log_context_->responseTrailers();
   default:
     return {};
   }
@@ -100,8 +101,8 @@ extern "C" {
 size_t envoy_dynamic_module_callback_access_logger_get_headers_size(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_http_header_type header_type) {
-  auto* context = static_cast<DynamicModuleAccessLogContext*>(logger_envoy_ptr);
-  HeadersMapOptConstRef map = getHeaderMapByType(context, header_type);
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  HeadersMapOptConstRef map = getHeaderMapByType(logger, header_type);
   return map.has_value() ? map->size() : 0;
 }
 
@@ -109,8 +110,8 @@ bool envoy_dynamic_module_callback_access_logger_get_headers(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_http_header_type header_type,
     envoy_dynamic_module_type_envoy_http_header* result_headers) {
-  auto* context = static_cast<DynamicModuleAccessLogContext*>(logger_envoy_ptr);
-  return getHeadersImpl(getHeaderMapByType(context, header_type), result_headers);
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  return getHeadersImpl(getHeaderMapByType(logger, header_type), result_headers);
 }
 
 bool envoy_dynamic_module_callback_access_logger_get_header_value(
@@ -118,8 +119,8 @@ bool envoy_dynamic_module_callback_access_logger_get_header_value(
     envoy_dynamic_module_type_http_header_type header_type,
     envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result,
     size_t index, size_t* total_count_out) {
-  auto* context = static_cast<DynamicModuleAccessLogContext*>(logger_envoy_ptr);
-  return getHeaderValueImpl(getHeaderMapByType(context, header_type), key, result, index,
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  return getHeaderValueImpl(getHeaderMapByType(logger, header_type), key, result, index,
                             total_count_out);
 }
 
@@ -129,18 +130,18 @@ bool envoy_dynamic_module_callback_access_logger_get_header_value(
 
 uint32_t envoy_dynamic_module_callback_access_logger_get_response_code(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr) {
-  auto* context = static_cast<DynamicModuleAccessLogContext*>(logger_envoy_ptr);
-  return context->stream_info_.responseCode().value_or(0);
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  return logger->stream_info_->responseCode().value_or(0);
 }
 
 bool envoy_dynamic_module_callback_access_logger_get_response_code_details(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer* result) {
-  auto* context = static_cast<DynamicModuleAccessLogContext*>(logger_envoy_ptr);
-  if (!context->stream_info_.responseCodeDetails().has_value()) {
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  if (!logger->stream_info_->responseCodeDetails().has_value()) {
     return false;
   }
-  const auto& details = context->stream_info_.responseCodeDetails().value();
+  const auto& details = logger->stream_info_->responseCodeDetails().value();
   *result = {const_cast<char*>(details.data()), details.size()};
   return true;
 }
@@ -148,27 +149,27 @@ bool envoy_dynamic_module_callback_access_logger_get_response_code_details(
 bool envoy_dynamic_module_callback_access_logger_has_response_flag(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_response_flag flag) {
-  auto* context = static_cast<DynamicModuleAccessLogContext*>(logger_envoy_ptr);
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
   // Convert ABI flag to Envoy flag. The enum values are expected to match CoreResponseFlag.
-  return context->stream_info_.hasResponseFlag(
+  return logger->stream_info_->hasResponseFlag(
       StreamInfo::ResponseFlag(static_cast<StreamInfo::CoreResponseFlag>(flag)));
 }
 
 uint64_t envoy_dynamic_module_callback_access_logger_get_response_flags(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr) {
-  auto* context = static_cast<DynamicModuleAccessLogContext*>(logger_envoy_ptr);
-  return context->stream_info_.legacyResponseFlags();
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  return logger->stream_info_->legacyResponseFlags();
 }
 
 bool envoy_dynamic_module_callback_access_logger_get_protocol(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer* result) {
-  auto* context = static_cast<DynamicModuleAccessLogContext*>(logger_envoy_ptr);
-  if (!context->stream_info_.protocol().has_value()) {
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  if (!logger->stream_info_->protocol().has_value()) {
     return false;
   }
   const auto& protocol_str =
-      Http::Utility::getProtocolString(context->stream_info_.protocol().value());
+      Http::Utility::getProtocolString(logger->stream_info_->protocol().value());
   *result = {const_cast<char*>(protocol_str.data()), protocol_str.size()};
   return true;
 }
@@ -176,8 +177,8 @@ bool envoy_dynamic_module_callback_access_logger_get_protocol(
 void envoy_dynamic_module_callback_access_logger_get_timing_info(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_timing_info* timing_out) {
-  auto* context = static_cast<DynamicModuleAccessLogContext*>(logger_envoy_ptr);
-  const auto& info = context->stream_info_;
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  const auto& info = *logger->stream_info_;
   const MonotonicTime start_time = info.startTimeMonotonic();
 
   timing_out->start_time_unix_ns =
@@ -222,8 +223,8 @@ void envoy_dynamic_module_callback_access_logger_get_timing_info(
 void envoy_dynamic_module_callback_access_logger_get_bytes_info(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_bytes_info* bytes_out) {
-  auto* context = static_cast<DynamicModuleAccessLogContext*>(logger_envoy_ptr);
-  const auto& info = context->stream_info_;
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  const auto& info = *logger->stream_info_;
   bytes_out->bytes_received = info.bytesReceived();
   bytes_out->bytes_sent = info.bytesSent();
 
@@ -240,8 +241,8 @@ void envoy_dynamic_module_callback_access_logger_get_bytes_info(
 bool envoy_dynamic_module_callback_access_logger_get_route_name(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer* result) {
-  auto* context = static_cast<DynamicModuleAccessLogContext*>(logger_envoy_ptr);
-  const auto& name = context->stream_info_.getRouteName();
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  const auto& name = logger->stream_info_->getRouteName();
   if (name.empty()) {
     return false;
   }
@@ -251,14 +252,14 @@ bool envoy_dynamic_module_callback_access_logger_get_route_name(
 
 bool envoy_dynamic_module_callback_access_logger_is_health_check(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr) {
-  auto* context = static_cast<DynamicModuleAccessLogContext*>(logger_envoy_ptr);
-  return context->stream_info_.healthCheck();
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  return logger->stream_info_->healthCheck();
 }
 
 uint32_t envoy_dynamic_module_callback_access_logger_get_attempt_count(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr) {
-  auto* context = static_cast<DynamicModuleAccessLogContext*>(logger_envoy_ptr);
-  return context->stream_info_.attemptCount().value_or(0);
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  return logger->stream_info_->attemptCount().value_or(0);
 }
 
 // -----------------------------------------------------------------------------
@@ -268,8 +269,8 @@ uint32_t envoy_dynamic_module_callback_access_logger_get_attempt_count(
 bool envoy_dynamic_module_callback_access_logger_get_downstream_remote_address(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer* address_out, uint32_t* port_out) {
-  auto* context = static_cast<DynamicModuleAccessLogContext*>(logger_envoy_ptr);
-  const auto& provider = context->stream_info_.downstreamAddressProvider();
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  const auto& provider = logger->stream_info_->downstreamAddressProvider();
   if (!provider.remoteAddress() || provider.remoteAddress()->type() != Network::Address::Type::Ip) {
     return false;
   }
@@ -284,8 +285,8 @@ bool envoy_dynamic_module_callback_access_logger_get_downstream_remote_address(
 bool envoy_dynamic_module_callback_access_logger_get_downstream_local_address(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer* address_out, uint32_t* port_out) {
-  auto* context = static_cast<DynamicModuleAccessLogContext*>(logger_envoy_ptr);
-  const auto& provider = context->stream_info_.downstreamAddressProvider();
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  const auto& provider = logger->stream_info_->downstreamAddressProvider();
   if (!provider.localAddress() || provider.localAddress()->type() != Network::Address::Type::Ip) {
     return false;
   }
@@ -300,8 +301,8 @@ bool envoy_dynamic_module_callback_access_logger_get_downstream_local_address(
 bool envoy_dynamic_module_callback_access_logger_get_upstream_remote_address(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer* address_out, uint32_t* port_out) {
-  auto* context = static_cast<DynamicModuleAccessLogContext*>(logger_envoy_ptr);
-  const auto upstream = context->stream_info_.upstreamInfo();
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  const auto upstream = logger->stream_info_->upstreamInfo();
   if (!upstream.has_value() || !upstream->upstreamHost() || !upstream->upstreamHost()->address()) {
     return false;
   }
@@ -321,8 +322,8 @@ bool envoy_dynamic_module_callback_access_logger_get_upstream_remote_address(
 bool envoy_dynamic_module_callback_access_logger_get_upstream_local_address(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer* address_out, uint32_t* port_out) {
-  auto* context = static_cast<DynamicModuleAccessLogContext*>(logger_envoy_ptr);
-  const auto upstream = context->stream_info_.upstreamInfo();
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  const auto upstream = logger->stream_info_->upstreamInfo();
   if (!upstream.has_value() || !upstream->upstreamLocalAddress()) {
     return false;
   }
@@ -346,9 +347,9 @@ bool envoy_dynamic_module_callback_access_logger_get_upstream_local_address(
 bool envoy_dynamic_module_callback_access_logger_get_upstream_cluster(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer* result) {
-  auto* context = static_cast<DynamicModuleAccessLogContext*>(logger_envoy_ptr);
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
   // upstreamClusterInfo is on StreamInfo, not UpstreamInfo.
-  const auto cluster_info = context->stream_info_.upstreamClusterInfo();
+  const auto cluster_info = logger->stream_info_->upstreamClusterInfo();
   if (!cluster_info.has_value() || cluster_info.value() == nullptr) {
     return false;
   }
@@ -361,8 +362,8 @@ bool envoy_dynamic_module_callback_access_logger_get_upstream_cluster(
 bool envoy_dynamic_module_callback_access_logger_get_upstream_host(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer* result) {
-  auto* context = static_cast<DynamicModuleAccessLogContext*>(logger_envoy_ptr);
-  const auto upstream = context->stream_info_.upstreamInfo();
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  const auto upstream = logger->stream_info_->upstreamInfo();
   if (!upstream.has_value() || !upstream->upstreamHost()) {
     return false;
   }
@@ -375,8 +376,8 @@ bool envoy_dynamic_module_callback_access_logger_get_upstream_host(
 bool envoy_dynamic_module_callback_access_logger_get_upstream_transport_failure_reason(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer* result) {
-  auto* context = static_cast<DynamicModuleAccessLogContext*>(logger_envoy_ptr);
-  const auto upstream = context->stream_info_.upstreamInfo();
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  const auto upstream = logger->stream_info_->upstreamInfo();
   if (!upstream.has_value() || upstream->upstreamTransportFailureReason().empty()) {
     return false;
   }
@@ -392,8 +393,8 @@ bool envoy_dynamic_module_callback_access_logger_get_upstream_transport_failure_
 
 uint64_t envoy_dynamic_module_callback_access_logger_get_connection_id(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr) {
-  auto* context = static_cast<DynamicModuleAccessLogContext*>(logger_envoy_ptr);
-  const auto& provider = context->stream_info_.downstreamAddressProvider();
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  const auto& provider = logger->stream_info_->downstreamAddressProvider();
   if (!provider.connectionID().has_value()) {
     return 0;
   }
@@ -402,8 +403,8 @@ uint64_t envoy_dynamic_module_callback_access_logger_get_connection_id(
 
 bool envoy_dynamic_module_callback_access_logger_is_mtls(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr) {
-  auto* context = static_cast<DynamicModuleAccessLogContext*>(logger_envoy_ptr);
-  const auto& provider = context->stream_info_.downstreamAddressProvider();
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  const auto& provider = logger->stream_info_->downstreamAddressProvider();
   if (!provider.sslConnection()) {
     return false;
   }
@@ -413,8 +414,8 @@ bool envoy_dynamic_module_callback_access_logger_is_mtls(
 bool envoy_dynamic_module_callback_access_logger_get_requested_server_name(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer* result) {
-  auto* context = static_cast<DynamicModuleAccessLogContext*>(logger_envoy_ptr);
-  const auto& provider = context->stream_info_.downstreamAddressProvider();
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  const auto& provider = logger->stream_info_->downstreamAddressProvider();
   const auto& sni = provider.requestedServerName();
   if (sni.empty()) {
     return false;
@@ -426,8 +427,8 @@ bool envoy_dynamic_module_callback_access_logger_get_requested_server_name(
 bool envoy_dynamic_module_callback_access_logger_get_downstream_tls_version(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer* result) {
-  auto* context = static_cast<DynamicModuleAccessLogContext*>(logger_envoy_ptr);
-  const auto& provider = context->stream_info_.downstreamAddressProvider();
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  const auto& provider = logger->stream_info_->downstreamAddressProvider();
   if (!provider.sslConnection()) {
     return false;
   }
@@ -440,8 +441,8 @@ bool envoy_dynamic_module_callback_access_logger_get_downstream_tls_version(
 bool envoy_dynamic_module_callback_access_logger_get_downstream_peer_subject(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer* result) {
-  auto* context = static_cast<DynamicModuleAccessLogContext*>(logger_envoy_ptr);
-  const auto& provider = context->stream_info_.downstreamAddressProvider();
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  const auto& provider = logger->stream_info_->downstreamAddressProvider();
   if (!provider.sslConnection()) {
     return false;
   }
@@ -457,8 +458,8 @@ bool envoy_dynamic_module_callback_access_logger_get_downstream_peer_subject(
 bool envoy_dynamic_module_callback_access_logger_get_downstream_peer_cert_digest(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer* result) {
-  auto* context = static_cast<DynamicModuleAccessLogContext*>(logger_envoy_ptr);
-  const auto& provider = context->stream_info_.downstreamAddressProvider();
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  const auto& provider = logger->stream_info_->downstreamAddressProvider();
   if (!provider.sslConnection()) {
     return false;
   }
@@ -479,12 +480,12 @@ bool envoy_dynamic_module_callback_access_logger_get_dynamic_metadata(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_module_buffer filter_name,
     envoy_dynamic_module_type_module_buffer path, envoy_dynamic_module_type_envoy_buffer* result) {
-  auto* context = static_cast<DynamicModuleAccessLogContext*>(logger_envoy_ptr);
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
   std::string filter_name_str(filter_name.ptr, filter_name.length);
   std::string path_str(path.ptr, path.length);
   std::vector<std::string> path_parts = absl::StrSplit(path_str, '.');
 
-  const auto& metadata = context->stream_info_.dynamicMetadata();
+  const auto& metadata = logger->stream_info_->dynamicMetadata();
   const auto& value =
       Envoy::Config::Metadata::metadataValue(&metadata, filter_name_str, path_parts);
 
@@ -517,8 +518,8 @@ bool envoy_dynamic_module_callback_access_logger_get_filter_state(
 bool envoy_dynamic_module_callback_access_logger_get_request_id(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer* result) {
-  auto* context = static_cast<DynamicModuleAccessLogContext*>(logger_envoy_ptr);
-  const auto provider = context->stream_info_.getStreamIdProvider();
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  const auto provider = logger->stream_info_->getStreamIdProvider();
   if (provider.has_value() && provider->toStringView().has_value()) {
     absl::string_view view = provider->toStringView().value();
     *result = {const_cast<char*>(view.data()), view.size()};
@@ -530,8 +531,8 @@ bool envoy_dynamic_module_callback_access_logger_get_request_id(
 bool envoy_dynamic_module_callback_access_logger_get_local_reply_body(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer* result) {
-  auto* context = static_cast<DynamicModuleAccessLogContext*>(logger_envoy_ptr);
-  absl::string_view body = context->log_context_.localReplyBody();
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  absl::string_view body = logger->log_context_->localReplyBody();
   if (body.empty()) {
     return false;
   }
@@ -565,9 +566,9 @@ bool envoy_dynamic_module_callback_access_logger_get_span_id(
 
 bool envoy_dynamic_module_callback_access_logger_is_trace_sampled(
     envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr) {
-  auto* context = static_cast<DynamicModuleAccessLogContext*>(logger_envoy_ptr);
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
   // Note: The Span interface doesn't expose a sampled() method. We check trace reason instead.
-  return context->stream_info_.traceReason() != Tracing::Reason::NotTraceable;
+  return logger->stream_info_->traceReason() != Tracing::Reason::NotTraceable;
 }
 
 // -----------------------------------------------------------------------------
@@ -674,6 +675,15 @@ envoy_dynamic_module_callback_access_logger_record_histogram_value(
   }
   histogram->recordValue(value);
   return envoy_dynamic_module_type_metrics_result_Success;
+}
+
+// -----------------------------------------------------------------------------
+// Misc Callbacks
+// -----------------------------------------------------------------------------
+uint32_t envoy_dynamic_module_callback_access_logger_get_worker_index(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr) {
+  auto* logger = static_cast<ThreadLocalLogger*>(logger_envoy_ptr);
+  return logger->worker_index_;
 }
 
 } // extern "C"

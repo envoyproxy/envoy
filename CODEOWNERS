@@ -60,8 +60,9 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/transport_sockets/tls/cert_validator/spiffe @mathetake @botengyao @tyxia
 # On demand secret provider
 /*/extensions/transport_sockets/tls/cert_selectors/on_demand @kyessenov @tonya11en
-/*/extensions/transport_sockets/tls/cert_mappers/static_name @kyessenov @tonya11en
+/*/extensions/transport_sockets/tls/cert_mappers/filter_state_override @kyessenov @tonya11en
 /*/extensions/transport_sockets/tls/cert_mappers/sni @kyessenov @tonya11en
+/*/extensions/transport_sockets/tls/cert_mappers/static_name @kyessenov @tonya11en
 # proxy protocol socket extension
 /*/extensions/transport_sockets/proxy_protocol @botengyao @wez470
 # common transport socket
@@ -321,9 +322,9 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/tracers/zipkin @wbpcode @Shikugawa @basvanbeek
 /*/extensions/tracers/common @wbpcode @Shikugawa @basvanbeek
 # ext_authz
-/*/extensions/filters/common/ext_authz @esmet @tyxia @ggreenway
-/*/extensions/filters/http/ext_authz @esmet @tyxia @ggreenway
-/*/extensions/filters/network/ext_authz @esmet @tyxia @ggreenway
+/*/extensions/filters/common/ext_authz @esmet @tyxia @ggreenway @antoniovleonti
+/*/extensions/filters/http/ext_authz @esmet @tyxia @ggreenway @antoniovleonti
+/*/extensions/filters/network/ext_authz @esmet @tyxia @ggreenway @antoniovleonti
 # original dst
 /*/extensions/filters/listener/original_dst @kyessenov @cpakulski @lambdai @nezdolik
 # mongo proxy
