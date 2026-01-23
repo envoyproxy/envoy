@@ -199,6 +199,8 @@ ServerContextImpl::ServerContextImpl(
       RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
     }
 
+    // tls_contexts_ is resized to be max(1, tls_certificates.size()) to it may be larger than
+    // the number of certificates.
     if (i < tls_certificates.size()) {
       auto& ocsp_resp_bytes = tls_certificates[i].get().ocspStaple();
       if (ocsp_resp_bytes.empty()) {
