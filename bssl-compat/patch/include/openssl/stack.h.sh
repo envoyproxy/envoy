@@ -10,7 +10,7 @@ uncomment.sh "$1" --comment -h \
   --uncomment-macro DEFINE_STACK_OF \
   --uncomment-macro DEFINE_CONST_STACK_OF \
   --uncomment-regex 'template <typename Stack>'\
-  --uncomment-regex 'namespace internal {' 'template <typename T>' 'struct StackTraits \{\};' '}' \
+  --uncomment-regex 'namespace internal {' 'template <typename T>' 'struct StackTraits {};' '}' \
   --uncomment-macro BORINGSSL_DEFINE_STACK_TRAITS \
   --uncomment-macro BORINGSSL_DEFINE_STACK_OF_IMPL \
   --uncomment-struct DeleterImpl \

@@ -62,7 +62,7 @@
  fLULTZnynuQUULQkRcF7S7T2WpIL
  -----END CERTIFICATE-----
  )";
-+#endif
++#endif // BSSL_COMPAT
  static const char kRSANoParam[] = R"(
  -----BEGIN CERTIFICATE-----
  MIIBWzCBx6ADAgECAgIE0jALBgkqhkiG9w0BAQswDzENMAsGA1UEAxMEVGVzdDAg
@@ -79,7 +79,7 @@
  -----END CERTIFICATE-----
  )";
 -
-+#endif
++#endif // BSSL_COMPAT
  TEST(X509Test, AlgorithmParameters) {
    // P-256 parameters should be omitted, but we accept NULL ones.
    bssl::UniquePtr<EVP_PKEY> key = PrivateKeyFromPEM(kP256Key);

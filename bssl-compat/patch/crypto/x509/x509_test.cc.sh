@@ -31,6 +31,8 @@ uncomment.sh "$1" --comment \
   --uncomment-gtest-func X509Test TrustedFirst \
   --uncomment-gtest-func-skip X509Test BER \
   --uncomment-func-impl MakeTestName \
+  --uncomment-regex '#ifndef BSSL_COMPAT' \
+  --uncomment-regex '#endif // BSSL_COMPAT'
 
 for VAR in kCrossSigningRootPEM kRootCAPEM kRootCrossSignedPEM kIntermediatePEM kIntermediateSelfSignedPEM kLeafPEM kLeafNoKeyUsagePEM kForgeryPEM kBadPSSCertPEM kRSAKey kP256Key kBasicCRL kEd25519Cert kSANTypesRoot kNoBasicConstraintsCertSignIntermediate kNoBasicConstraintsCertSignLeaf kNoBasicConstraintsNetscapeCAIntermediate kNoBasicConstraintsNetscapeCALeaf kP256NoParam kP256NullParam kP256InvalidParam kRSANoParam kRSANullParam kRSAInvalidParam kConstructedBitString kConstructedOctetString kIndefiniteLength kNonZeroPadding kHighTagNumber kNonMinimalLengthSerial kNonMinimalLengthOuter kNonMinimalLengthSignature; do
   uncomment.sh "$1" --uncomment-regex-range 'static\s*const\s*.*\<'$VAR'\[\]\s*=' '[^;]*;\s*$'
