@@ -1293,6 +1293,15 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     EXPECT_THAT(upstream_format.formatValue({}, stream_info), ProtoEq(ValueUtil::nullValue()));
   }
   {
+    StreamInfoFormatter ds_close_type_format("DOWNSTREAM_DETECTED_CLOSE_TYPE");
+    stream_info.setDownstreamDetectedCloseType(StreamInfo::DetectedCloseType::Normal);
+    EXPECT_EQ("Normal", ds_close_type_format.format({}, stream_info));
+    stream_info.setDownstreamDetectedCloseType(StreamInfo::DetectedCloseType::LocalReset);
+    EXPECT_EQ("LocalReset", ds_close_type_format.format({}, stream_info));
+    stream_info.setDownstreamDetectedCloseType(StreamInfo::DetectedCloseType::RemoteReset);
+    EXPECT_EQ("RemoteReset", ds_close_type_format.format({}, stream_info));
+  }
+  {
     StreamInfoFormatter upstream_connection_pool_callback_duration_format(
         "UPSTREAM_CONNECTION_POOL_READY_DURATION");
     EXPECT_EQ(absl::nullopt,
