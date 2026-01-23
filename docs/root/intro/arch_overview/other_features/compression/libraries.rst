@@ -17,4 +17,4 @@ Currently Envoy uses `zlib-ng <https://github.com/zlib-ng/zlib-ng>`_, `brotli <h
   Envoy is built using `zlib-ng <https://github.com/zlib-ng/zlib-ng>`_, you can link an alternative implementation
   using e.g. `--@envoy//bazel:zlib=@zlib`. This would require registering the zlib repository with Bazel.
   Bazel option. The relevant build options used to build `zlib-ng <https://github.com/zlib-ng/zlib-ng>`_ can be
-  evaluated in :repo:`here <bazel/foreign_cc/BUILD>`.
+  evaluated in :repo:`here <bazel/external/zlib_ng.BUILD>`.
