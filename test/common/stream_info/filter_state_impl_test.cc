@@ -370,37 +370,33 @@ TEST_F(FilterStateImplTest, SharedWithUpstream) {
   filterState().setData("shared_7", std::make_shared<SimpleType>(7),
                         FilterState::StateType::ReadOnly, FilterState::LifeSpan::Connection,
                         StreamSharingMayImpactPooling::SharedWithUpstreamConnectionOnce);
-  struct FilterObject {
-    std::shared_ptr<FilterState::Object> data_;
-    std::string name_;
-    FilterState::StateType state_type_;
-    StreamSharingMayImpactPooling stream_sharing_;
-  };
-  auto objects = std::make_shared<std::vector<FilterObject>>();
-  auto shared_objects = filterState().objectsSharedWithUpstreamConnection()->forEach(
-      [objects](absl::string_view name, std::shared_ptr<Object>& data, StateType state_type,
-                StreamSharingMayImpactPooling stream_sharing) {
-        objects->push_back({name, data, state_type, stream_sharing});
+  absl::flat_hash_map<std::string, FilterStateObjects::FilterObject> objects;
+  filterState().objectsSharedWithUpstreamConnection()->forEach(
+      [&](absl::string_view name, const FilterStateObjects::FilterObject& object) {
+        objects[name] = object;
       });
-  EXPECT_EQ(objects->size(), 4);
-  std::sort(objects->begin(), objects->end(),
-            [](const auto& lhs, const auto& rhs) -> bool { return lhs.name_ < rhs.name_; });
-  EXPECT_EQ(objects->at(0).name_, "shared_1");
-  EXPECT_EQ(objects->at(0).state_type_, FilterState::StateType::ReadOnly);
-  EXPECT_EQ(objects->at(0).stream_sharing_,
-            StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
-  EXPECT_EQ(objects->at(0).data_.get(), shared.get());
-  EXPECT_EQ(objects->at(1).name_, "shared_4");
-  EXPECT_EQ(objects->at(1).state_type_, FilterState::StateType::Mutable);
-  EXPECT_EQ(objects->at(1).stream_sharing_,
-            StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
-  EXPECT_EQ(objects->at(2).name_, "shared_5");
-  EXPECT_EQ(objects->at(2).state_type_, FilterState::StateType::ReadOnly);
-  EXPECT_EQ(objects->at(2).stream_sharing_,
-            StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
-  EXPECT_EQ(objects->at(3).name_, "shared_7");
-  EXPECT_EQ(objects->at(3).state_type_, FilterState::StateType::ReadOnly);
-  EXPECT_EQ(objects->at(3).stream_sharing_, StreamSharingMayImpactPooling::None);
+  EXPECT_EQ(4, objects.size());
+  {
+    const auto object = objects["shared_1"];
+    EXPECT_EQ(object.state_type_, FilterState::StateType::ReadOnly);
+    EXPECT_EQ(object.stream_sharing_, StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
+    EXPECT_EQ(object.data_.get(), shared.get());
+  }
+  {
+    const auto object = objects["shared_4"];
+    EXPECT_EQ(object.state_type_, FilterState::StateType::Mutable);
+    EXPECT_EQ(object.stream_sharing_, StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
+  }
+  {
+    const auto object = objects["shared_5"];
+    EXPECT_EQ(object.state_type_, FilterState::StateType::ReadOnly);
+    EXPECT_EQ(object.stream_sharing_, StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
+  }
+  {
+    const auto object = objects["shared_7"];
+    EXPECT_EQ(object.state_type_, FilterState::StateType::ReadOnly);
+    EXPECT_EQ(object.stream_sharing_, StreamSharingMayImpactPooling::None);
+  }
 }
 
 TEST_F(FilterStateImplTest, HasDataAtOrAboveLifeSpan) {

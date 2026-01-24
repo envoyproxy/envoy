@@ -182,11 +182,11 @@ TEST_F(TransportSocketOptionsImplTest, NetworkNamespaceSharedWithUpstream) {
 
   auto objects = transport_socket_options->downstreamSharedFilterStateObjects();
   EXPECT_NE(nullptr, objects);
-  EXPECT_TRUE(objects->hasDataWithName(DownstreamNetworkNamespace::key());
+  EXPECT_TRUE(objects->hasDataWithName(DownstreamNetworkNamespace::key()));
 
   // Verify we can retrieve the network namespace from the filter state object.
   const auto* network_namespace_state =
-      dynamic_cast<const DownstreamNetworkNamespace*>(objects.at(0).data_.get());
+      objects->getDataReadOnly<DownstreamNetworkNamespace>(DownstreamNetworkNamespace::key());
   ASSERT_NE(nullptr, network_namespace_state);
   EXPECT_EQ(network_namespace_filepath, network_namespace_state->value());
 }

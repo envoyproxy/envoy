@@ -136,7 +136,6 @@ void FilterStateImpl::forEach(absl::AnyInvocable<void(absl::string_view, const F
   }
 }
 
-// TODO TESTS
 bool FilterStateImpl::empty() const {
   return data_storage_.empty() && (parent_ == nullptr || parent_->empty());
 }
