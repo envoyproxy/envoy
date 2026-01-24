@@ -39,11 +39,18 @@ bug_fixes:
 - area: ext_authz
   change: |
     Fixed a bug where headers from a denied authorization response (non-200s) were not properly propagated to the client.
+- area: formatter
+  change: |
+    Fixed the log formatter in http router upstream_logs by correctly setting the downstream connection's ConnectionInfoProvider
+    in the stream_info.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
+- area: stats
+  change: |
+    Added support to limit the number of stats stored in each stats scope in the stats libarary.
 - area: tls
   change: |
     Added support for fetching certificates on-demand via SDS in the upstream TLS transport socket
@@ -56,6 +63,10 @@ new_features:
 - area: mcp_router
   change: |
     Added support for MCP prompt methods ``prompts/list`` and ``prompts/get``.
+- area: mcp_router
+  change: |
+    Added support for MCP client-to-server notification methods ``notifications/cancelled``
+    and ``notifications/roots/list_changed``.
 - area: formatter
   change: |
     Extended ``*_WITHOUT_PORT`` address formatters to accept an optional ``MASK_PREFIX_LEN`` parameter that masks IP addresses
@@ -64,5 +75,17 @@ new_features:
 - area: ratelimit
   change: |
     Added support for shadow mode in local rate limit filter.
+- area: config
+  change: |
+    Added support for `:ref:`set_node_on_first_message_only
+    <envoy_api_field_core.ApiConfigSource.set_node_on_first_message_only>` to Delta-xDS. Guarded by
+    flag ``envoy.reloadable_features.xds_legacy_delta_skip_subsequent_node``.
+- area: formatter
+  change: |
+    Added the new access log formatter support of ``DOWNSTREAM_LOCAL_CLOSE_REASON``.
+- area: formatter
+  change: |
+    Added ``%UPSTREAM_DETECTED_CLOSE_TYPE%`` and ``%DOWNSTREAM_DETECTED_CLOSE_TYPE%`` to expose the detected close type
+    of downstream and connections. The possible values are ``Normal``, ``LocalReset``, and ``RemoteReset``.
 
 deprecated:

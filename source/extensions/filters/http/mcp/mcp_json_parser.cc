@@ -37,7 +37,7 @@ void McpParserConfig::initializeDefaults() {
   addMethodConfig(Methods::PROMPTS_GET, {AttributeExtractionRule("params.name")});
 
   // Completion
-  addMethodConfig(Methods::COMPLETION_COMPLETE, {});
+  addMethodConfig(Methods::COMPLETION_COMPLETE, {AttributeExtractionRule("params.ref")});
 
   // Logging
   addMethodConfig(Methods::LOGGING_SET_LEVEL, {AttributeExtractionRule("params.level")});
@@ -46,15 +46,17 @@ void McpParserConfig::initializeDefaults() {
   addMethodConfig(Methods::INITIALIZE, {AttributeExtractionRule("params.protocolVersion"),
                                         AttributeExtractionRule("params.clientInfo.name")});
 
-  // Notifications
-  addMethodConfig(Methods::NOTIFICATION_RESOURCES_UPDATED, {AttributeExtractionRule("params.uri")});
-
+  // Notifications.
+  addMethodConfig(Methods::NOTIFICATION_INITIALIZED, {});
+  addMethodConfig(Methods::NOTIFICATION_CANCELLED, {AttributeExtractionRule("params.requestId")});
   addMethodConfig(Methods::NOTIFICATION_PROGRESS, {AttributeExtractionRule("params.progressToken"),
                                                    AttributeExtractionRule("params.progress")});
-
-  addMethodConfig(Methods::NOTIFICATION_CANCELLED, {AttributeExtractionRule("params.requestId")});
-
   addMethodConfig(Methods::NOTIFICATION_MESSAGE, {AttributeExtractionRule("params.level")});
+  addMethodConfig(Methods::NOTIFICATION_ROOTS_LIST_CHANGED, {});
+  addMethodConfig(Methods::NOTIFICATION_RESOURCES_LIST_CHANGED, {});
+  addMethodConfig(Methods::NOTIFICATION_RESOURCES_UPDATED, {AttributeExtractionRule("params.uri")});
+  addMethodConfig(Methods::NOTIFICATION_TOOLS_LIST_CHANGED, {});
+  addMethodConfig(Methods::NOTIFICATION_PROMPTS_LIST_CHANGED, {});
 }
 
 McpParserConfig
@@ -215,6 +217,15 @@ McpFieldExtractor* McpFieldExtractor::EndObject() {
   }
 
   if (depth_ > 0) {
+    // Before updating path, mark object path as collected for early-stop optimization.
+    // This enables extraction rules targeting object paths (e.g., "params.ref") to work
+    // with early termination, since objects themselves are not rendered as primitives.
+    if (!current_path_cache_.empty()) {
+      if (collected_fields_.insert(current_path_cache_).second) {
+        fields_collected_count_++;
+      }
+    }
+
     depth_--;
     if (!path_stack_.empty()) {
       // Update cached path before removing from stack

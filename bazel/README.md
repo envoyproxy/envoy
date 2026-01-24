@@ -714,8 +714,8 @@ The following optional features can be enabled on the Bazel build command-line:
 * Process logging for Android applications can be enabled with `--define logger=android`.
 * Excluding assertions for known issues with `--define disable_known_issue_asserts=true`.
   A KNOWN_ISSUE_ASSERT is an assertion that should pass (like all assertions), but sometimes fails for some as-yet unidentified or unresolved reason. Because it is known to potentially fail, it can be compiled out even when DEBUG is true, when this flag is set. This allows Envoy to be run in production with assertions generally enabled, without crashing for known issues. KNOWN_ISSUE_ASSERT should only be used for newly-discovered issues that represent benign violations of expectations.
-* Envoy can be linked to [`zlib-ng`](https://github.com/zlib-ng/zlib-ng) instead of
-  [`zlib`](https://zlib.net) with `--define zlib=ng`.
+* Envoy is built using [`zlib-ng`](https://github.com/zlib-ng/zlib-ng), you can link an alternative implementation
+  using e.g. `--@envoy//bazel:zlib=@zlib`. This would require registering the zlib repository with Bazel.
 
 ## Enabling and disabling extensions
 
