@@ -194,7 +194,7 @@ public:
   Http::StreamFilterCallbacks* getFilterCallbacks() const override { return decoder_callbacks_; }
 
   void injectDataToFilterChain(Buffer::Instance& data, bool end_stream) override {
-    decoder_callbacks_->injectDecodedDataToFilterChain(data, end_stream);
+    decoder_callbacks_->injectDecodedDataToFilterChain(data, end_stream, false);
   }
 
   void addBufferData(Buffer::Instance& data) override;
@@ -239,7 +239,7 @@ public:
   Http::StreamFilterCallbacks* getFilterCallbacks() const override { return encoder_callbacks_; }
 
   void injectDataToFilterChain(Buffer::Instance& data, bool end_stream) override {
-    encoder_callbacks_->injectEncodedDataToFilterChain(data, end_stream);
+    encoder_callbacks_->injectEncodedDataToFilterChain(data, end_stream, false);
   }
 
   void addBufferData(Buffer::Instance& data) override;

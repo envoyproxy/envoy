@@ -214,7 +214,7 @@ private:
     buffered_body_->move(data);
   }
   MetadataMapVector& addDecodedMetadata() override { PANIC("not implemented"); }
-  void injectDecodedDataToFilterChain(Buffer::Instance&, bool) override {}
+  void injectDecodedDataToFilterChain(Buffer::Instance&, bool, bool) override {}
   const Buffer::Instance* decodingBuffer() override { return buffered_body_.get(); }
   void modifyDecodingBuffer(std::function<void(Buffer::Instance&)>) override {}
   void sendLocalReply(Code code, absl::string_view body,

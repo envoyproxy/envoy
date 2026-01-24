@@ -31,12 +31,12 @@ public:
     ON_CALL(encoder_callbacks_, encodingBuffer()).WillByDefault(Return(&buffer_));
     ON_CALL(decoder_callbacks_, bufferLimit()).WillByDefault(Return(1024));
     ON_CALL(encoder_callbacks_, bufferLimit()).WillByDefault(Return(1024));
-    ON_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, _))
+    ON_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, _, true))
         .WillByDefault(
-            Invoke([&](Buffer::Instance& data, bool) -> void { data.drain(data.length()); }));
-    ON_CALL(encoder_callbacks_, injectEncodedDataToFilterChain(_, _))
+            Invoke([&](Buffer::Instance& data, bool, bool) -> void { data.drain(data.length()); }));
+    ON_CALL(encoder_callbacks_, injectEncodedDataToFilterChain(_, _, true))
         .WillByDefault(
-            Invoke([&](Buffer::Instance& data, bool) -> void { data.drain(data.length()); }));
+            Invoke([&](Buffer::Instance& data, bool, bool) -> void { data.drain(data.length()); }));
   }
 
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;

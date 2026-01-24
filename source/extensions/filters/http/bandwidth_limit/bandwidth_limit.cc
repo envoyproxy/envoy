@@ -104,7 +104,7 @@ Http::FilterHeadersStatus BandwidthLimiter::decodeHeaders(Http::RequestHeaderMap
           if (end_stream) {
             updateStatsOnDecodeFinish();
           }
-          decoder_callbacks_->injectDecodedDataToFilterChain(data, end_stream);
+          decoder_callbacks_->injectDecodedDataToFilterChain(data, end_stream, false);
         },
         [this] {
           updateStatsOnDecodeFinish();
@@ -171,7 +171,7 @@ Http::FilterHeadersStatus BandwidthLimiter::encodeHeaders(Http::ResponseHeaderMa
           if (end_stream) {
             updateStatsOnEncodeFinish();
           }
-          encoder_callbacks_->injectEncodedDataToFilterChain(data, end_stream);
+          encoder_callbacks_->injectEncodedDataToFilterChain(data, end_stream, false);
         },
         [this] {
           updateStatsOnEncodeFinish();

@@ -24,7 +24,7 @@ public:
     decoder_callbacks_->dispatcher().post([this]() -> void {
       request_injected_ = true;
       Buffer::OwnedImpl buffer(body_);
-      decoder_callbacks_->injectDecodedDataToFilterChain(buffer, true);
+      decoder_callbacks_->injectDecodedDataToFilterChain(buffer, true, false);
       if (request_decoded_) {
         decoder_callbacks_->continueDecoding();
       }
@@ -42,7 +42,7 @@ public:
     encoder_callbacks_->dispatcher().post([this, end_stream]() -> void {
       response_injected_ = true;
       Buffer::OwnedImpl buffer(body_);
-      encoder_callbacks_->injectEncodedDataToFilterChain(buffer, end_stream);
+      encoder_callbacks_->injectEncodedDataToFilterChain(buffer, end_stream, false);
       if (response_encoded_) {
         encoder_callbacks_->continueEncoding();
       }

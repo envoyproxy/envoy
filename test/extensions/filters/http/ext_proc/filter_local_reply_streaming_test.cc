@@ -177,7 +177,7 @@ public:
     // Decoding should not be continued since ext_proc is the terminal filter for local responses.
     EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(0);
     // In local reply mode no data should be injected back into deciding chain.
-    EXPECT_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, _)).Times(0);
+    EXPECT_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, _, true)).Times(0);
     EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
 
     EXPECT_CALL(encoder_callbacks_, sendLocalReply(::Envoy::Http::Code::InternalServerError, "", _,
@@ -236,7 +236,7 @@ TEST_F(StreamingLocalReplyTest, LocalHeadersOnlyRequestAndResponseWithBody) {
   // Decoding should not be continued since ext_proc is the terminal filter for local responses.
   EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(0);
   // In local reply mode no data should be injected back into deciding chain.
-  EXPECT_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, _)).Times(0);
+  EXPECT_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, _, true)).Times(0);
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, true));
 
   Envoy::Http::TestResponseHeaderMapImpl expected_response_headers{{":status", "200"},
@@ -272,7 +272,7 @@ TEST_F(StreamingLocalReplyTest, LocalHeadersOnlyRequestAndResponseWithBodyInMult
   // Decoding should not be continued since ext_proc is the terminal filter for local responses.
   EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(0);
   // In local reply mode no data should be injected back into deciding chain.
-  EXPECT_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, _)).Times(0);
+  EXPECT_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, _, true)).Times(0);
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, true));
 
   Envoy::Http::TestResponseHeaderMapImpl expected_response_headers{{":status", "200"},
@@ -312,7 +312,7 @@ TEST_F(StreamingLocalReplyTest, LocalHeadersOnlyRequestAndResponseWithBodyAndTra
   // Decoding should not be continued since ext_proc is the terminal filter for local responses.
   EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(0);
   // In local reply mode no data should be injected back into deciding chain.
-  EXPECT_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, _)).Times(0);
+  EXPECT_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, _, true)).Times(0);
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, true));
 
   Envoy::Http::TestResponseHeaderMapImpl expected_response_headers{{":status", "200"},
@@ -402,7 +402,7 @@ TEST_F(StreamingLocalReplyTest, RequestWithBodySkipAndLocalResponseWithBody) {
               encodeHeaders_(HeaderMapEqualRef(&expected_response_headers), false));
   // Decoding should not be continued since ext_proc is the terminal filter for local responses.
   EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(0);
-  EXPECT_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, _)).Times(0);
+  EXPECT_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, _, true)).Times(0);
   processRequestHeadersAndStartLocalResponse(
       [](const HttpHeaders&, ProcessingResponse&, HttpHeaders& header_resp) {
         makeLocalResponseHeaders(header_resp, false);
@@ -446,7 +446,7 @@ TEST_F(StreamingLocalReplyTest, RequestWithBodyAndTrailersSkipAndLocalResponseWi
               encodeHeaders_(HeaderMapEqualRef(&expected_response_headers), false));
   // Decoding should not be continued since ext_proc is the terminal filter for local responses.
   EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(0);
-  EXPECT_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, _)).Times(0);
+  EXPECT_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, _, true)).Times(0);
   processRequestHeadersAndStartLocalResponse(
       [](const HttpHeaders&, ProcessingResponse&, HttpHeaders& header_resp) {
         makeLocalResponseHeaders(header_resp, false);
@@ -564,7 +564,7 @@ TEST_F(StreamingLocalReplyTest, DISABLED_RequestWithBodyTogetherDuplexAndLocalRe
               encodeHeaders_(HeaderMapEqualRef(&expected_response_headers), false));
   // Decoding should not be continued since ext_proc is the terminal filter for local responses.
   EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(0);
-  EXPECT_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, _)).Times(0);
+  EXPECT_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, _, true)).Times(0);
   processRequestHeadersAndStartLocalResponse(
       [](const HttpHeaders&, ProcessingResponse&, HttpHeaders& header_resp) {
         makeLocalResponseHeaders(header_resp, false);
@@ -622,7 +622,7 @@ TEST_F(StreamingLocalReplyTest, RequestWithBodyDuplexAndLocalResponseWithBody) {
               encodeHeaders_(HeaderMapEqualRef(&expected_response_headers), false));
   // Decoding should not be continued since ext_proc is the terminal filter for local responses.
   EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(0);
-  EXPECT_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, _)).Times(0);
+  EXPECT_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, _, true)).Times(0);
   processRequestHeadersAndStartLocalResponse(
       [](const HttpHeaders&, ProcessingResponse&, HttpHeaders& header_resp) {
         makeLocalResponseHeaders(header_resp, false);
@@ -676,7 +676,7 @@ TEST_F(StreamingLocalReplyTest, RequestWithLargeBodyDuplexAndLocalResponseWithBo
               encodeHeaders_(HeaderMapEqualRef(&expected_response_headers), false));
   // Decoding should not be continued since ext_proc is the terminal filter for local responses.
   EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(0);
-  EXPECT_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, _)).Times(0);
+  EXPECT_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, _, true)).Times(0);
   processRequestHeadersAndStartLocalResponse(
       [](const HttpHeaders&, ProcessingResponse&, HttpHeaders& header_resp) {
         makeLocalResponseHeaders(header_resp, false);
@@ -746,7 +746,7 @@ TEST_F(StreamingLocalReplyTest,
               encodeHeaders_(HeaderMapEqualRef(&expected_response_headers), false));
   // Decoding should not be continued since ext_proc is the terminal filter for local responses.
   EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(0);
-  EXPECT_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, _)).Times(0);
+  EXPECT_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, _, true)).Times(0);
   processRequestHeadersAndStartLocalResponse(
       [](const HttpHeaders&, ProcessingResponse&, HttpHeaders& header_resp) {
         makeLocalResponseHeaders(header_resp, false);
@@ -800,7 +800,7 @@ TEST_F(StreamingLocalReplyTest,
               encodeHeaders_(HeaderMapEqualRef(&expected_response_headers), false));
   // Decoding should not be continued since ext_proc is the terminal filter for local responses.
   EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(0);
-  EXPECT_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, _)).Times(0);
+  EXPECT_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, _, true)).Times(0);
   processRequestHeadersAndStartLocalResponse(
       [](const HttpHeaders&, ProcessingResponse&, HttpHeaders& header_resp) {
         makeLocalResponseHeaders(header_resp, false);
@@ -854,7 +854,7 @@ TEST_F(StreamingLocalReplyTest,
               encodeHeaders_(HeaderMapEqualRef(&expected_response_headers), false));
   // Decoding should not be continued since ext_proc is the terminal filter for local responses.
   EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(0);
-  EXPECT_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, _)).Times(0);
+  EXPECT_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, _, true)).Times(0);
   processRequestHeadersAndStartLocalResponse(
       [](const HttpHeaders&, ProcessingResponse&, HttpHeaders& header_resp) {
         makeLocalResponseHeaders(header_resp, false);
@@ -907,7 +907,7 @@ TEST_F(StreamingLocalReplyTest, LocalBodyWithoutHeadersResponse) {
   // responses.
   EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(0);
   // In local reply mode no data should be injected back into deciding chain.
-  EXPECT_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, _)).Times(0);
+  EXPECT_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, _, true)).Times(0);
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
 
   EXPECT_CALL(encoder_callbacks_,
@@ -940,7 +940,7 @@ TEST_F(StreamingLocalReplyTest, LocalTrailersWithoutHeadersResponse) {
   // responses.
   EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(0);
   // In local reply mode no data should be injected back into deciding chain.
-  EXPECT_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, _)).Times(0);
+  EXPECT_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, _, true)).Times(0);
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
 
   EXPECT_CALL(encoder_callbacks_,
@@ -1053,7 +1053,7 @@ TEST_F(StreamingLocalReplyTest, InvalidBodyMessageAfterLocalResponseStarted) {
   // responses.
   EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(0);
   // In local reply mode no data should be injected back into deciding chain.
-  EXPECT_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, _)).Times(0);
+  EXPECT_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, _, true)).Times(0);
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, false));
   // Start local response streaming.
@@ -1093,7 +1093,7 @@ TEST_F(StreamingLocalReplyTest, InvalidTrailersMessageAfterLocalResponseStarted)
   // responses.
   EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(0);
   // In local reply mode no data should be injected back into deciding chain.
-  EXPECT_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, _)).Times(0);
+  EXPECT_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, _, true)).Times(0);
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, false));
   // Start local response streaming.
@@ -1138,7 +1138,7 @@ TEST_F(StreamingLocalReplyTest, InvalidBodyMessageAfterLocalResponseStartedWithF
   // responses.
   EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(0);
   // In local reply mode no data should be injected back into deciding chain.
-  EXPECT_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, _)).Times(0);
+  EXPECT_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, _, true)).Times(0);
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, false));
   // Start local response streaming.

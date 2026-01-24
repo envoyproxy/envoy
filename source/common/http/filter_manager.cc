@@ -462,10 +462,14 @@ MetadataMapVector& ActiveStreamDecoderFilter::addDecodedMetadata() {
 }
 
 void ActiveStreamDecoderFilter::injectDecodedDataToFilterChain(Buffer::Instance& data,
-                                                               bool end_stream) {
+                                                               bool end_stream,
+                                                               bool update_state_end_stream) {
   if (!headers_continued_) {
     headers_continued_ = true;
     doHeaders(false);
+  }
+  if (update_state_end_stream) {
+    parent_.state().observed_decode_end_stream_ = end_stream;
   }
   parent_.decodeData(this, data, end_stream,
                      FilterManager::FilterIterationStartState::CanStartFromCurrent);
@@ -1867,10 +1871,14 @@ void ActiveStreamEncoderFilter::addEncodedData(Buffer::Instance& data, bool stre
 }
 
 void ActiveStreamEncoderFilter::injectEncodedDataToFilterChain(Buffer::Instance& data,
-                                                               bool end_stream) {
+                                                               bool end_stream,
+                                                               bool update_state_end_stream) {
   if (!headers_continued_) {
     headers_continued_ = true;
     doHeaders(false);
+  }
+  if (update_state_end_stream) {
+    parent_.state_.observed_encode_end_stream_ = end_stream;
   }
   parent_.encodeData(this, data, end_stream,
                      FilterManager::FilterIterationStartState::CanStartFromCurrent);

@@ -215,7 +215,7 @@ void FaultFilter::maybeSetupResponseRateLimit(const Http::RequestHeaderMap& requ
       [this] { encoder_callbacks_->onEncoderFilterAboveWriteBufferHighWatermark(); },
       [this] { encoder_callbacks_->onEncoderFilterBelowWriteBufferLowWatermark(); },
       [this](Buffer::Instance& data, bool end_stream) {
-        encoder_callbacks_->injectEncodedDataToFilterChain(data, end_stream);
+        encoder_callbacks_->injectEncodedDataToFilterChain(data, end_stream, false);
       },
       [this] { encoder_callbacks_->continueEncoding(); },
       [](uint64_t, bool, std::chrono::milliseconds) {
