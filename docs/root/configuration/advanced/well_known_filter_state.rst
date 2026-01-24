@@ -90,6 +90,11 @@ The following lists the filter state object keys used by the Envoy extensions to
   * ``isp``: ISP name;
   * ``apple_private_relay``: iCloud Private Relay check result (``true`` or ``false``).
 
+``envoy.filters.http.mcp.request``
+  :ref:`MCP filter <config_http_filters_mcp>` stores parsed MCP (Model Context Protocol) JSON-RPC
+  request attributes when ``emit_filter_state`` is enabled. The object stores extracted fields
+  from the parsed request.
+
 ``envoy.network.network_namespace``
   Contains the value of the downstream connection's Linux network namespace if it differs from the default.
 
@@ -100,6 +105,10 @@ The following lists the filter state object keys used by the Envoy extensions to
   extension. The object should serialize to the network namespace filepath, and the empty string
   value clears the network namespace. This object is expected to be shared from the downstream
   filters with the upstream connections.
+
+``envoy.tls.certificate_mappers.on_demand_secret``
+  Allows overriding the certificate to use per-connection using the :ref:`filter state certificate mapper
+  <envoy_v3_api_msg_extensions.transport_sockets.tls.cert_mappers.filter_state_override.v3.Config>`.
 
 Filter state object factories
 -----------------------------

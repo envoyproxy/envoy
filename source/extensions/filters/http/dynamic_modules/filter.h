@@ -1,5 +1,6 @@
 #pragma once
 
+#include "source/common/tracing/null_span_impl.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 #include "source/extensions/filters/http/dynamic_modules/filter_config.h"
@@ -20,8 +21,8 @@ class DynamicModuleHttpFilter : public Http::StreamFilter,
                                 public Http::DownstreamWatermarkCallbacks {
 public:
   DynamicModuleHttpFilter(DynamicModuleHttpFilterConfigSharedPtr config,
-                          Stats::SymbolTable& symbol_table)
-      : config_(config), stat_name_pool_(symbol_table) {}
+                          Stats::SymbolTable& symbol_table, uint32_t worker_index)
+      : config_(config), stat_name_pool_(symbol_table), worker_index_(worker_index) {}
   ~DynamicModuleHttpFilter() override;
 
   /**
@@ -32,6 +33,7 @@ public:
   // ---------- Http::StreamFilterBase ------------
   void onStreamComplete() override;
   void onDestroy() override;
+  Http::LocalErrorStatus onLocalReply(const Http::StreamFilterBase::LocalReplyData& data) override;
 
   // ----------  Http::StreamDecoderFilter  ----------
   FilterHeadersStatus decodeHeaders(RequestHeaderMap& headers, bool end_stream) override;
@@ -40,11 +42,9 @@ public:
   FilterMetadataStatus decodeMetadata(MetadataMap&) override;
   void setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callbacks) override {
     decoder_callbacks_ = &callbacks;
-    // config_ can only be nullptr in certain unit tests where we don't set up the
-    // whole filter chain.
-    if (config_ && config_->terminal_filter_) {
-      decoder_callbacks_->addDownstreamWatermarkCallbacks(*this);
-    }
+    // We always register for downstream watermark callbacks. This allows all filters
+    // including the terminal filter to receive flow control events.
+    decoder_callbacks_->addDownstreamWatermarkCallbacks(*this);
   }
   void decodeComplete() override;
 
@@ -156,6 +156,18 @@ public:
   }
 
   /**
+   * Helper to get the active tracing span for this stream.
+   * Returns a reference to a NullSpan if tracing is not enabled.
+   */
+  Tracing::Span& activeSpan() {
+    auto cb = callbacks();
+    if (cb) {
+      return cb->activeSpan();
+    }
+    return Tracing::NullSpan::instance();
+  }
+
+  /**
    * This is called when an event is scheduled via DynamicModuleHttpFilterScheduler::commit.
    */
   void onScheduled(uint64_t event_id);
@@ -203,8 +215,14 @@ public:
    */
   bool sendStreamTrailers(uint64_t stream_id, Http::RequestTrailerMapPtr trailers);
 
+  bool hasConfig() const { return config_ != nullptr; }
   const DynamicModuleHttpFilterConfig& getFilterConfig() const { return *config_; }
   Stats::StatNameDynamicPool& getStatNamePool() { return stat_name_pool_; }
+
+  /**
+   * Returns the worker index assigned to this filter.
+   */
+  uint32_t workerIndex() const { return worker_index_; }
 
 private:
   /**
@@ -234,6 +252,7 @@ private:
   const DynamicModuleHttpFilterConfigSharedPtr config_ = nullptr;
   envoy_dynamic_module_type_http_filter_module_ptr in_module_filter_ = nullptr;
   Stats::StatNameDynamicPool stat_name_pool_;
+  uint32_t worker_index_;
 
   /**
    * This implementation of the AsyncClient::Callbacks is used to handle the response from the HTTP
@@ -308,6 +327,51 @@ private:
   // unique identifier. We store the callback objects here to manage their lifetime.
   absl::flat_hash_map<uint64_t, std::unique_ptr<DynamicModuleHttpFilter::HttpStreamCalloutCallback>>
       http_stream_callouts_;
+
+  // Socket options storage for HTTP filters.
+  struct StoredSocketOption {
+    int64_t level;
+    int64_t name;
+    envoy_dynamic_module_type_socket_option_state state;
+    envoy_dynamic_module_type_socket_direction direction;
+    bool is_int;
+    int64_t int_value;
+    std::string byte_value;
+  };
+
+  std::vector<StoredSocketOption> socket_options_;
+
+public:
+  /**
+   * Store an integer socket option for the current stream and Surface it back to modules.
+   */
+  void storeSocketOptionInt(int64_t level, int64_t name,
+                            envoy_dynamic_module_type_socket_option_state state,
+                            envoy_dynamic_module_type_socket_direction direction, int64_t value);
+
+  /**
+   * Store a bytes socket option for the current stream and Surface it back to modules.
+   */
+  void storeSocketOptionBytes(int64_t level, int64_t name,
+                              envoy_dynamic_module_type_socket_option_state state,
+                              envoy_dynamic_module_type_socket_direction direction,
+                              absl::string_view value);
+
+  /**
+   * Retrieve an integer socket option by level/name/state/direction.
+   */
+  bool tryGetSocketOptionInt(int64_t level, int64_t name,
+                             envoy_dynamic_module_type_socket_option_state state,
+                             envoy_dynamic_module_type_socket_direction direction,
+                             int64_t& value_out) const;
+
+  /**
+   * Retrieve a bytes socket option by level/name/state/direction.
+   */
+  bool tryGetSocketOptionBytes(int64_t level, int64_t name,
+                               envoy_dynamic_module_type_socket_option_state state,
+                               envoy_dynamic_module_type_socket_direction direction,
+                               absl::string_view& value_out) const;
 };
 
 using DynamicModuleHttpFilterSharedPtr = std::shared_ptr<DynamicModuleHttpFilter>;

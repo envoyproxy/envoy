@@ -92,6 +92,19 @@ TEST_F(McpJsonParserTest, ToolsCallExtraction) {
   EXPECT_EQ(value->string_value(), "calculator");
 }
 
+TEST_F(McpJsonParserTest, ResourcesListExtraction) {
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "resources/list",
+    "id": 100
+  })";
+
+  EXPECT_OK(parser_->parse(json));
+
+  EXPECT_TRUE(parser_->isValidMcpRequest());
+  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::RESOURCES_LIST);
+}
+
 TEST_F(McpJsonParserTest, ResourcesReadExtraction) {
   std::string json = R"({
     "jsonrpc": "2.0",
@@ -110,6 +123,59 @@ TEST_F(McpJsonParserTest, ResourcesReadExtraction) {
   const auto* value = parser_->getNestedValue("params.uri");
   ASSERT_NE(value, nullptr);
   EXPECT_EQ(value->string_value(), "file:///path/to/resource.txt");
+}
+
+TEST_F(McpJsonParserTest, ResourcesSubscribeExtraction) {
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "resources/subscribe",
+    "params": {
+      "uri": "file:///config/settings.json"
+    },
+    "id": 102
+  })";
+
+  EXPECT_OK(parser_->parse(json));
+
+  EXPECT_TRUE(parser_->isValidMcpRequest());
+  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::RESOURCES_SUBSCRIBE);
+
+  const auto* value = parser_->getNestedValue("params.uri");
+  ASSERT_NE(value, nullptr);
+  EXPECT_EQ(value->string_value(), "file:///config/settings.json");
+}
+
+TEST_F(McpJsonParserTest, ResourcesUnsubscribeExtraction) {
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "resources/unsubscribe",
+    "params": {
+      "uri": "file:///config/settings.json"
+    },
+    "id": 103
+  })";
+
+  EXPECT_OK(parser_->parse(json));
+
+  EXPECT_TRUE(parser_->isValidMcpRequest());
+  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::RESOURCES_UNSUBSCRIBE);
+
+  const auto* value = parser_->getNestedValue("params.uri");
+  ASSERT_NE(value, nullptr);
+  EXPECT_EQ(value->string_value(), "file:///config/settings.json");
+}
+
+TEST_F(McpJsonParserTest, PromptsListExtraction) {
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "prompts/list",
+    "id": 200
+  })";
+
+  EXPECT_OK(parser_->parse(json));
+
+  EXPECT_TRUE(parser_->isValidMcpRequest());
+  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::PROMPTS_LIST);
 }
 
 TEST_F(McpJsonParserTest, PromptsGetExtraction) {
@@ -157,6 +223,21 @@ TEST_F(McpJsonParserTest, CompletionCompleteExtraction) {
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
   EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::COMPLETION_COMPLETE);
+
+  // Verify that params.ref object was extracted
+  const auto* ref = parser_->getNestedValue("params.ref");
+  ASSERT_NE(ref, nullptr);
+  ASSERT_TRUE(ref->has_struct_value());
+
+  // Verify nested fields within the extracted object
+  const auto& ref_struct = ref->struct_value();
+  auto type_it = ref_struct.fields().find("type");
+  ASSERT_NE(type_it, ref_struct.fields().end());
+  EXPECT_EQ(type_it->second.string_value(), "ref/resource");
+
+  auto uri_it = ref_struct.fields().find("uri");
+  ASSERT_NE(uri_it, ref_struct.fields().end());
+  EXPECT_EQ(uri_it->second.string_value(), "file:///document.md");
 }
 
 TEST_F(McpJsonParserTest, InitializeExtraction) {
@@ -365,6 +446,37 @@ TEST_F(McpJsonParserTest, EarlyTerminationWithUnorderedFields) {
   const auto* uri = parser_->getNestedValue("params.uri");
   ASSERT_NE(uri, nullptr);
   EXPECT_EQ(uri->string_value(), "file:///test.txt");
+}
+
+TEST_F(McpJsonParserTest, EarlyTerminationWithObjectField) {
+  // Verify early termination works when extracting object fields (params.ref)
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "completion/complete",
+    "params": {
+      "ref": {
+        "type": "ref/resource",
+        "uri": "file:///doc.md"
+      }
+    },
+    "id": 1,
+    "extra_field_1": "should not be parsed",
+    "extra_field_2": {"nested": {"deeply": {"more": "data"}}}
+  })";
+
+  parseJson(json);
+
+  EXPECT_TRUE(parser_->isValidMcpRequest());
+  EXPECT_TRUE(parser_->isAllFieldsCollected()); // Verify early-stop worked
+
+  // Verify params.ref was extracted correctly
+  const auto* ref = parser_->getNestedValue("params.ref");
+  ASSERT_NE(ref, nullptr);
+  ASSERT_TRUE(ref->has_struct_value());
+
+  // Extra fields should not be extracted
+  const auto* extra = parser_->getNestedValue("extra_field_1");
+  EXPECT_EQ(extra, nullptr);
 }
 
 TEST_F(McpJsonParserTest, DeeplyNestedStructures) {
