@@ -1,8 +1,5 @@
 #include "source/common/http/sse/sse_parser.h"
 
-#include <vector>
-
-#include "absl/strings/str_join.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -12,7 +9,7 @@ namespace Sse {
 SseParser::ParsedEvent SseParser::parseEvent(absl::string_view event) {
   // TODO(optimization): Consider merging findEventEnd and parseEvent into a single-pass
   // algorithm to avoid traversing the buffer twice.
-  std::vector<absl::string_view> data_fields;
+  ParsedEvent parsed_event;
   absl::string_view remaining = event;
 
   while (!remaining.empty()) {
@@ -22,15 +19,20 @@ SseParser::ParsedEvent SseParser::parseEvent(absl::string_view event) {
 
     auto [field_name, field_value] = parseFieldLine(line);
     if (field_name == "data") {
-      data_fields.push_back(field_value);
+      if (!parsed_event.data.has_value()) {
+        // Optimization: Reserve memory to avoid reallocations during append.
+        // The total data cannot be larger than the input event string.
+        parsed_event.data = std::string();
+        parsed_event.data->reserve(event.size());
+        parsed_event.data->append(field_value.data(), field_value.size());
+      } else {
+        // Per SSE spec, multiple data fields are concatenated with newlines.
+        parsed_event.data->append("\n");
+        parsed_event.data->append(field_value.data(), field_value.size());
+      }
     }
   }
 
-  ParsedEvent parsed_event;
-  // Per SSE spec, multiple data fields are concatenated with newlines.
-  if (!data_fields.empty()) {
-    parsed_event.data = absl::StrJoin(data_fields, "\n");
-  }
   return parsed_event;
 }
 
