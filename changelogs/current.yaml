@@ -22,6 +22,12 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: ext_authz
+  change: |
+    Added support for the ``append_action`` enum in gRPC ExtAuthz ``OkHttpResponse.headers`` for upstream request header
+    mutations. Previously, only the deprecated ``append`` boolean was checked. Now ``APPEND_IF_EXISTS_OR_ADD``,
+    ``ADD_IF_ABSENT``, ``OVERWRITE_IF_EXISTS``, and ``OVERWRITE_IF_EXISTS_OR_ADD`` actions are fully supported,
+    providing parity with ``response_headers_to_add`` handling.
 - area: http
   change: |
     Fixed a potential file descriptor leak where HTTP/1.1 connections with zombie streams (waiting for codec completion)
@@ -36,6 +42,9 @@ bug_fixes:
     Fixed upstream client to not close connection when idle timeout fires before the connection is established.
     This behavior can be reverted by setting the runtime guard
     ``envoy.reloadable_features.codec_client_enable_idle_timer_only_when_connected`` to ``false``.
+- area: oauth2
+  change: |
+    Fixed OAuth2 refresh requests so host rewriting no longer overrides the original Host value.
 - area: ext_authz
   change: |
     Fixed a bug where headers from a denied authorization response (non-200s) were not properly propagated to the client.
