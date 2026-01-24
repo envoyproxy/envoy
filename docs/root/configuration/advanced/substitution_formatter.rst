@@ -624,7 +624,7 @@ Current supported substitution commands include:
 
 .. _config_access_log_format_upstream_detected_close_type:
 
-%UPSTREAM_DETECTED_CLOSE_TYPE%
+``%UPSTREAM_DETECTED_CLOSE_TYPE%``
     The detected close type of the upstream connection. This is only available on access logs recorded after the connection has been closed.
     Possible values are ``Normal``, ``LocalReset``, and ``RemoteReset``.
 
@@ -638,15 +638,6 @@ Current supported substitution commands include:
 
     .. note::
       It only works in listener access config, and the HTTP or TCP access logs would observe empty values.
-
-.. _config_access_log_format_downstream_detected_close_type:
-
-%DOWNSTREAM_DETECTED_CLOSE_TYPE%
-    The detected close type of the downstream connection. This is only available on access logs recorded after the connection has been closed.
-    Possible values are ``Undefined``, ``Normal``, ``LocalReset``, and ``RemoteReset``.
-
-  UDP
-    Not implemented. It will appear as ``"-"`` in the access logs.
 
 .. _config_access_log_format_downstream_local_close_reason:
 
