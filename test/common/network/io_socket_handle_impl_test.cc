@@ -10,6 +10,7 @@
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
+#include "absl/status/statusor.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -106,14 +107,17 @@ TEST(IoSocketHandleImpl, InterfaceNameWithPipe) {
 
   const mode_t mode = 0777;
   Address::InstanceConstSharedPtr address = *Address::PipeInstance::create(path, mode);
-  SocketImpl socket(Socket::Type::Stream, address, nullptr, {});
+  absl::StatusOr<std::unique_ptr<SocketImpl>> socket_or =
+      SocketImpl::create(Socket::Type::Stream, address, nullptr, {});
+  ASSERT_TRUE(socket_or.ok()) << socket_or.status();
+  std::unique_ptr<SocketImpl> socket = std::move(*socket_or);
 
-  EXPECT_TRUE(socket.ioHandle().isOpen()) << address->asString();
+  EXPECT_TRUE(socket->ioHandle().isOpen()) << address->asString();
 
-  Api::SysCallIntResult result = socket.bind(address);
+  Api::SysCallIntResult result = socket->bind(address);
   ASSERT_EQ(result.return_value_, 0);
 
-  EXPECT_FALSE(socket.ioHandle().interfaceName().has_value());
+  EXPECT_FALSE(socket->ioHandle().interfaceName().has_value());
 }
 
 TEST(IoSocketHandleImpl, ExplicitDoesNotSupportGetifaddrs) {

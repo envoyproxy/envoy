@@ -1,8 +1,12 @@
 #include "contrib/tap_sinks/udp_sink/source/udp_sink_impl.h"
 
+#include <memory>
+#include <utility>
+
 #include "source/common/common/assert.h"
 #include "source/common/network/utility.h"
 
+#include "absl/status/statusor.h"
 #include "contrib/envoy/extensions/tap_sinks/udp_sink/v3alpha/udp_sink.pb.validate.h"
 
 namespace Envoy {
@@ -28,9 +32,12 @@ UdpTapSink::UdpTapSink(const envoy::extensions::tap_sinks::udp_sink::v3alpha::Ud
   }
 
   // Create socket.
-  udp_socket_ =
-      std::make_unique<Network::SocketImpl>(Network::Socket::Type::Datagram, udp_server_address_,
-                                            nullptr, Network::SocketCreationOptions{});
+  absl::StatusOr<std::unique_ptr<Network::SocketImpl>> udp_socket_or =
+      Network::SocketImpl::create(Network::Socket::Type::Datagram, udp_server_address_, nullptr,
+                                  Network::SocketCreationOptions{});
+  RELEASE_ASSERT(udp_socket_or.ok(),
+                 absl::StrCat("failed to create socket: ", udp_socket_or.status()));
+  udp_socket_ = std::move(*udp_socket_or);
 
   // Create udp writer.
   udp_packet_writer_ = std::make_unique<Network::UdpDefaultWriter>(udp_socket_->ioHandle());

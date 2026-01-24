@@ -1,6 +1,7 @@
 #include <iostream>
 #include <memory>
 #include <string>
+#include <utility>
 
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
@@ -18,6 +19,7 @@
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
+#include "absl/status/statusor.h"
 #include "gtest/gtest.h"
 
 using testing::_;
@@ -53,43 +55,54 @@ void testSocketBindAndConnect(Network::Address::IpVersion ip_version, bool v6onl
   ASSERT_NE(addr_port->ip(), nullptr);
 
   // Create a socket on which we'll listen for connections from clients.
-  SocketImpl sock(Socket::Type::Stream, addr_port, nullptr, {});
-  EXPECT_TRUE(sock.ioHandle().isOpen()) << addr_port->asString();
+  absl::StatusOr<std::unique_ptr<SocketImpl>> socket_or =
+      SocketImpl::create(Socket::Type::Stream, addr_port, nullptr, {});
+  ASSERT_TRUE(socket_or.ok()) << socket_or.status();
+
+  std::unique_ptr<SocketImpl> socket = std::move(*socket_or);
+  ASSERT_NE(socket, nullptr);
+
+  EXPECT_TRUE(socket->ioHandle().isOpen()) << addr_port->asString();
 
   // Check that IPv6 sockets accept IPv6 connections only.
   if (addr_port->ip()->version() == IpVersion::v6) {
     int socket_v6only = 0;
     socklen_t size_int = sizeof(socket_v6only);
     ASSERT_GE(
-        sock.getSocketOption(IPPROTO_IPV6, IPV6_V6ONLY, &socket_v6only, &size_int).return_value_,
+        socket->getSocketOption(IPPROTO_IPV6, IPV6_V6ONLY, &socket_v6only, &size_int).return_value_,
         0);
     EXPECT_EQ(v6only, socket_v6only != 0);
   }
 
   // Bind the socket to the desired address and port.
-  const Api::SysCallIntResult result = sock.bind(addr_port);
+  const Api::SysCallIntResult result = socket->bind(addr_port);
   ASSERT_EQ(result.return_value_, 0)
       << addr_port->asString() << "\nerror: " << errorDetails(result.errno_)
       << "\nerrno: " << result.errno_;
 
   // Do a bare listen syscall. Not bothering to accept connections as that would
   // require another thread.
-  ASSERT_EQ(sock.listen(128).return_value_, 0);
+  ASSERT_EQ(socket->listen(128).return_value_, 0);
 
   auto client_connect = [](Address::InstanceConstSharedPtr addr_port) {
     // Create a client socket and connect to the server.
-    SocketImpl client_sock(Socket::Type::Stream, addr_port, nullptr, {});
+    absl::StatusOr<std::unique_ptr<SocketImpl>> client_socket_or =
+        SocketImpl::create(Socket::Type::Stream, addr_port, nullptr, {});
+    ASSERT_TRUE(client_socket_or.ok()) << client_socket_or.status();
 
-    EXPECT_TRUE(client_sock.ioHandle().isOpen()) << addr_port->asString();
+    std::unique_ptr<SocketImpl> client_socket = std::move(*client_socket_or);
+    ASSERT_NE(client_socket, nullptr);
+
+    EXPECT_TRUE(client_socket->ioHandle().isOpen()) << addr_port->asString();
 
     // Instance::socket creates a non-blocking socket, which that extends all the way to the
     // operation of ::connect(), so connect returns with errno==EWOULDBLOCK before the tcp
     // handshake can complete. For testing convenience, re-enable blocking on the socket
     // so that connect will wait for the handshake to complete.
-    ASSERT_EQ(client_sock.setBlockingForTest(true).return_value_, 0);
+    ASSERT_EQ(client_socket->setBlockingForTest(true).return_value_, 0);
 
     // Connect to the server.
-    const Api::SysCallIntResult result = client_sock.connect(addr_port);
+    const Api::SysCallIntResult result = client_socket->connect(addr_port);
     ASSERT_EQ(result.return_value_, 0)
         << addr_port->asString() << "\nerror: " << errorDetails(result.errno_)
         << "\nerrno: " << result.errno_;
@@ -564,11 +577,17 @@ TEST(PipeInstanceTest, BasicPermission) {
   const mode_t mode = 0777;
   std::shared_ptr<PipeInstance> address =
       THROW_OR_RETURN_VALUE(PipeInstance::create(path, mode), std::unique_ptr<PipeInstance>);
-  SocketImpl sock(Socket::Type::Stream, address, nullptr, {});
 
-  EXPECT_TRUE(sock.ioHandle().isOpen()) << address->asString();
+  absl::StatusOr<std::unique_ptr<SocketImpl>> socket_or =
+      SocketImpl::create(Socket::Type::Stream, address, nullptr, {});
+  ASSERT_TRUE(socket_or.ok()) << socket_or.status();
 
-  Api::SysCallIntResult result = sock.bind(address);
+  std::unique_ptr<SocketImpl> socket = std::move(*socket_or);
+  ASSERT_NE(socket, nullptr);
+
+  EXPECT_TRUE(socket->ioHandle().isOpen()) << address->asString();
+
+  Api::SysCallIntResult result = socket->bind(address);
   ASSERT_EQ(result.return_value_, 0)
       << address->asString() << "\nerror: " << errorDetails(result.errno_)
       << "\terrno: " << result.errno_;
@@ -592,13 +611,19 @@ TEST(PipeInstanceTest, PermissionFail) {
   const mode_t mode = 0777;
   InstanceConstSharedPtr address =
       THROW_OR_RETURN_VALUE(PipeInstance::create(path, mode), std::unique_ptr<PipeInstance>);
-  SocketImpl sock(Socket::Type::Stream, address, nullptr, {});
 
-  EXPECT_TRUE(sock.ioHandle().isOpen()) << address->asString();
+  absl::StatusOr<std::unique_ptr<SocketImpl>> socket_or =
+      SocketImpl::create(Socket::Type::Stream, address, nullptr, {});
+  ASSERT_TRUE(socket_or.ok()) << socket_or.status();
+
+  std::unique_ptr<SocketImpl> socket = std::move(*socket_or);
+  ASSERT_NE(socket, nullptr);
+
+  EXPECT_TRUE(socket->ioHandle().isOpen()) << address->asString();
 
   EXPECT_CALL(os_sys_calls, bind(_, _, _)).WillOnce(Return(Api::SysCallIntResult{0, 0}));
   EXPECT_CALL(os_sys_calls, chmod(_, _)).WillOnce(Return(Api::SysCallIntResult{-1, 0}));
-  EXPECT_NE(sock.bind(address).return_value_, 0);
+  EXPECT_NE(socket->bind(address).return_value_, 0);
 }
 
 TEST(PipeInstanceTest, AbstractNamespacePermission) {
@@ -666,11 +691,17 @@ TEST(PipeInstanceTest, UnlinksExistingFile) {
   const auto bind_uds_socket = [](const std::string& path) {
     std::shared_ptr<PipeInstance> address =
         THROW_OR_RETURN_VALUE(PipeInstance::create(path), std::unique_ptr<PipeInstance>);
-    SocketImpl sock(Socket::Type::Stream, address, nullptr, {});
 
-    EXPECT_TRUE(sock.ioHandle().isOpen()) << address->asString();
+    absl::StatusOr<std::unique_ptr<SocketImpl>> socket_or =
+        SocketImpl::create(Socket::Type::Stream, address, nullptr, {});
+    ASSERT_TRUE(socket_or.ok()) << socket_or.status();
 
-    const Api::SysCallIntResult result = sock.bind(address);
+    std::unique_ptr<SocketImpl> socket = std::move(*socket_or);
+    ASSERT_NE(socket, nullptr);
+
+    EXPECT_TRUE(socket->ioHandle().isOpen()) << address->asString();
+
+    const Api::SysCallIntResult result = socket->bind(address);
 
     ASSERT_EQ(result.return_value_, 0)
         << address->asString() << "\nerror: " << errorDetails(result.errno_)

@@ -1,9 +1,11 @@
 #include "library/common/extensions/quic_packet_writer/platform/platform_packet_writer_factory.h"
 
+#include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/network/udp_packet_writer_handler_impl.h"
 #include "source/common/quic/envoy_quic_packet_writer.h"
 #include "source/common/quic/envoy_quic_utils.h"
 
+#include "absl/status/statusor.h"
 #include "library/common/system/system_helper.h"
 
 namespace Envoy {
@@ -18,8 +20,14 @@ QuicPlatformPacketWriterFactory::createSocketAndQuicPacketWriter(
     SystemHelper::getInstance().bindSocketToNetwork(socket, net);
   };
 
-  Network::ConnectionSocketPtr connection_socket =
+  absl::StatusOr<Network::ConnectionSocketPtr> connection_socket_or =
       createConnectionSocket(server_addr, local_addr, options, network, custom_bind_func);
+
+  Network::ConnectionSocketPtr connection_socket =
+      connection_socket_or.ok() ? std::move(*connection_socket_or)
+                                : std::make_unique<Network::ConnectionSocketImpl>(
+                                      std::make_unique<Network::IoSocketHandleImpl>(INVALID_SOCKET),
+                                      local_addr, server_addr);
 
   Network::IoHandle& io_handle = connection_socket->ioHandle();
   return {std::make_unique<EnvoyQuicPacketWriter>(

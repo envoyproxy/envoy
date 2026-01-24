@@ -326,10 +326,12 @@ envoy_cc_library(
     name = "connection_socket_lib",
     hdrs = ["connection_socket_impl.h"],
     deps = [
+        ":socket_interface_lib",
         ":socket_lib",
         ":utility_lib",
         "//envoy/network:exception_interface",
         "//source/common/common:assert_lib",
+        "@com_google_absl//absl/status:statusor",
     ],
 )
 

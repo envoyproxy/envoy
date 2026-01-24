@@ -6,6 +6,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
+#include "absl/status/statusor.h"
 #include "gtest/gtest.h"
 
 #ifdef __linux__
@@ -130,9 +131,10 @@ TEST_P(SocketInterfaceIntegrationTest, UdpRecvFromInternalAddressWithSocketInter
       std::make_shared<Network::Address::EnvoyInternalInstance>("listener_0", "endpoint_id_0",
                                                                 sock_interface);
 
-  ASSERT_DEATH(std::make_unique<Network::SocketImpl>(Network::Socket::Type::Datagram, address,
-                                                     nullptr, Network::SocketCreationOptions{}),
-               "");
+  ASSERT_DEATH(
+      static_cast<void>(Network::SocketImpl::create(Network::Socket::Type::Datagram, address,
+                                                    nullptr, Network::SocketCreationOptions{})),
+      "");
 }
 
 // Test that send to internal address will return io error.
@@ -147,16 +149,18 @@ TEST_P(SocketInterfaceIntegrationTest, UdpSendToInternalAddressWithSocketInterfa
   Network::Address::InstanceConstSharedPtr local_valid_address =
       Network::Test::getCanonicalLoopbackAddress(version_);
 
-  auto socket =
-      std::make_unique<Network::SocketImpl>(Network::Socket::Type::Datagram, local_valid_address,
-                                            nullptr, Network::SocketCreationOptions{});
+  absl::StatusOr<std::unique_ptr<Network::SocketImpl>> socket_or =
+      Network::SocketImpl::create(Network::Socket::Type::Datagram, local_valid_address, nullptr,
+                                  Network::SocketCreationOptions{});
+  ASSERT_TRUE(socket_or.ok()) << socket_or.status();
 
   Buffer::OwnedImpl buffer;
   auto reservation = buffer.reserveSingleSlice(100);
 
   auto slice = reservation.slice();
-  auto result =
-      socket->ioHandle().sendmsg(&slice, 1, 0, local_valid_address->ip(), *peer_internal_address);
+  auto result = (*socket_or)
+                    ->ioHandle()
+                    .sendmsg(&slice, 1, 0, local_valid_address->ip(), *peer_internal_address);
   ASSERT_FALSE(result.ok());
   ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::NoSupport);
 }

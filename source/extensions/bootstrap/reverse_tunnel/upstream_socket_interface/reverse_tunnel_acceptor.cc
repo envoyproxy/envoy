@@ -10,6 +10,8 @@
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor_extension.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/upstream_socket_manager.h"
 
+#include "absl/status/statusor.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Bootstrap {
@@ -21,18 +23,18 @@ ReverseTunnelAcceptor::ReverseTunnelAcceptor(Server::Configuration::ServerFactor
   ENVOY_LOG(debug, "reverse_tunnel: created acceptor");
 }
 
-Envoy::Network::IoHandlePtr
+absl::StatusOr<Envoy::Network::IoHandlePtr>
 ReverseTunnelAcceptor::socket(Envoy::Network::Socket::Type, Envoy::Network::Address::Type,
                               Envoy::Network::Address::IpVersion, bool,
                               const Envoy::Network::SocketCreationOptions&) const {
 
-  ENVOY_LOG(warn, "reverse_tunnel: socket() called without address; returning nullptr");
+  ENVOY_LOG(warn, "reverse_tunnel: socket() called without address; returning error");
 
   // Reverse connection sockets should always have an address.
-  return nullptr;
+  return absl::InvalidArgumentError("reverse_tunnel: socket() called without address");
 }
 
-Envoy::Network::IoHandlePtr
+absl::StatusOr<Envoy::Network::IoHandlePtr>
 ReverseTunnelAcceptor::socket(Envoy::Network::Socket::Type socket_type,
                               const Envoy::Network::Address::InstanceConstSharedPtr addr,
                               const Envoy::Network::SocketCreationOptions& options) const {

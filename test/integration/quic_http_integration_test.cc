@@ -316,8 +316,10 @@ TEST_P(QuicHttpIntegrationTest, MimicNatRebinding) {
   // Change to a new port by switching socket, and connection should still continue.
   Network::Address::InstanceConstSharedPtr local_addr =
       Network::Test::getCanonicalLoopbackAddress(version_);
-  quic_connection_->switchConnectionSocket(
-      createConnectionSocket(server_addr_, local_addr, nullptr));
+  absl::StatusOr<Network::ConnectionSocketPtr> socket_or =
+      createConnectionSocket(server_addr_, local_addr, nullptr);
+  ASSERT_TRUE(socket_or.ok()) << socket_or.status();
+  quic_connection_->switchConnectionSocket(std::move(*socket_or));
   EXPECT_NE(old_port, local_addr->ip()->port());
   // Send the rest data.
   codec_client_->sendData(*request_encoder_, 1024u, true);
@@ -347,8 +349,9 @@ TEST_P(QuicHttpIntegrationTest, MimicNatRebinding) {
           }));
   auto options = std::make_shared<Network::Socket::Options>();
   options->push_back(option);
-  quic_connection_->switchConnectionSocket(
-      createConnectionSocket(server_addr_, local_addr, options));
+  socket_or = createConnectionSocket(server_addr_, local_addr, options);
+  ASSERT_TRUE(socket_or.ok()) << socket_or.status();
+  quic_connection_->switchConnectionSocket(std::move(*socket_or));
   EXPECT_TRUE(codec_client_->disconnected());
   cleanupUpstreamAndDownstream();
 }

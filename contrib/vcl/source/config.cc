@@ -1,5 +1,6 @@
 #include "contrib/vcl/source/config.h"
 
+#include "absl/status/statusor.h"
 #include "contrib/envoy/extensions/vcl/v3alpha/vcl_socket_interface.pb.h"
 #include "contrib/vcl/source/vcl_interface.h"
 #include "contrib/vcl/source/vcl_io_handle.h"
@@ -21,7 +22,7 @@ ProtobufTypes::MessagePtr VclSocketInterface::createEmptyConfigProto() {
   return std::make_unique<envoy::extensions::vcl::v3alpha::VclSocketInterface>();
 }
 
-Envoy::Network::IoHandlePtr VclSocketInterface::socket(
+absl::StatusOr<Envoy::Network::IoHandlePtr> VclSocketInterface::socket(
     Envoy::Network::Socket::Type socket_type, Envoy::Network::Address::Type addr_type,
     Envoy::Network::Address::IpVersion, bool, const Envoy::Network::SocketCreationOptions&) const {
   if (vppcom_worker_index() == -1) {
@@ -39,7 +40,7 @@ Envoy::Network::IoHandlePtr VclSocketInterface::socket(
   return std::make_unique<VclIoHandle>(sh, VclInvalidFd);
 }
 
-Envoy::Network::IoHandlePtr
+absl::StatusOr<Envoy::Network::IoHandlePtr>
 VclSocketInterface::socket(Envoy::Network::Socket::Type socket_type,
                            const Envoy::Network::Address::InstanceConstSharedPtr addr,
                            const Envoy::Network::SocketCreationOptions& creation_options) const {

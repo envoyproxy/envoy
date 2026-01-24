@@ -15,6 +15,7 @@
 #include "test/test_common/network_utility.h"
 #include "test/test_common/utility.h"
 
+#include "absl/status/statusor.h"
 #include "gtest/gtest.h"
 
 using testing::_;
@@ -33,16 +34,23 @@ TEST_P(ConnectionSocketImplTest, LowerCaseRequestedServerName) {
   absl::string_view serverName("www.EXAMPLE.com");
   absl::string_view expectedServerName("www.example.com");
   auto loopback_addr = Network::Test::getCanonicalLoopbackAddress(Address::IpVersion::v4);
-  auto conn_socket_ = ConnectionSocketImpl(Socket::Type::Stream, loopback_addr, loopback_addr, {});
-  conn_socket_.setRequestedServerName(serverName);
-  EXPECT_EQ(expectedServerName, conn_socket_.requestedServerName());
-  conn_socket_.setRequestedApplicationProtocols({"h2", "http/1.1"});
-  EXPECT_THAT(conn_socket_.requestedApplicationProtocols(), testing::ElementsAre("h2", "http/1.1"));
+  absl::StatusOr<std::unique_ptr<ConnectionSocketImpl>> conn_socket_or =
+      ConnectionSocketImpl::create(Socket::Type::Stream, loopback_addr, loopback_addr, {});
+  ASSERT_TRUE(conn_socket_or.ok()) << conn_socket_or.status();
+  std::unique_ptr<ConnectionSocketImpl> conn_socket_ = std::move(*conn_socket_or);
+  conn_socket_->setRequestedServerName(serverName);
+  EXPECT_EQ(expectedServerName, conn_socket_->requestedServerName());
+  conn_socket_->setRequestedApplicationProtocols({"h2", "http/1.1"});
+  EXPECT_THAT(conn_socket_->requestedApplicationProtocols(),
+              testing::ElementsAre("h2", "http/1.1"));
 }
 
 TEST_P(ConnectionSocketImplTest, IpVersion) {
-  ClientSocketImpl socket(Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr);
-  EXPECT_EQ(socket.ipVersion(), GetParam());
+  absl::StatusOr<std::unique_ptr<ClientSocketImpl>> socket_or =
+      ClientSocketImpl::create(Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr);
+  ASSERT_TRUE(socket_or.ok()) << socket_or.status();
+  std::unique_ptr<ClientSocketImpl> socket = std::move(*socket_or);
+  EXPECT_EQ(socket->ipVersion(), GetParam());
 }
 
 template <Network::Socket::Type Type>

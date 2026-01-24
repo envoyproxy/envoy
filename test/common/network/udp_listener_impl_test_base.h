@@ -24,6 +24,7 @@ protected:
   useHotRestartSocket(OptRef<ParentDrainedCallbackRegistrar> parent_drained_callback_registrar) {
     auto io_handle = std::make_unique<testing::NiceMock<MockIoHandle>>();
     MockIoHandle& ret = *io_handle;
+    ON_CALL(ret, isOpen()).WillByDefault(testing::Return(true));
     server_socket_ = createServerSocketFromExistingHandle(std::move(io_handle),
                                                           parent_drained_callback_registrar);
     return ret;

@@ -1,6 +1,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <utility>
 
 #include "envoy/common/platform.h"
 #include "envoy/config/core/v3/base.pb.h"
@@ -40,6 +41,7 @@
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
+#include "absl/status/statusor.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -171,9 +173,15 @@ protected:
         listener_config.bindToPort(), listener_config.ignoreGlobalConnLimit(),
         listener_config.shouldBypassOverloadManager(),
         listener_config.maxConnectionsToAcceptPerSocketEvent(), overload_state);
+
+    absl::StatusOr<std::unique_ptr<Network::ClientSocketImpl>> socket_or =
+        Network::ClientSocketImpl::create(socket_->connectionInfoProvider().localAddress(),
+                                          socket_options_);
+    ASSERT_TRUE(socket_or.ok()) << socket_or.status();
+
     client_connection_ = std::make_unique<Network::TestClientConnectionImpl>(
-        *dispatcher_, socket_->connectionInfoProvider().localAddress(), source_address_,
-        createTransportSocket(), socket_options_, transport_socket_options_);
+        *dispatcher_, std::move(*socket_or), source_address_, createTransportSocket(),
+        socket_options_, transport_socket_options_);
     client_connection_->addConnectionCallbacks(client_callbacks_);
     EXPECT_EQ(nullptr, client_connection_->ssl());
     const Network::ClientConnection& const_connection = *client_connection_;

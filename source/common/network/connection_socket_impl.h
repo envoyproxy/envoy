@@ -15,6 +15,8 @@
 #include "source/common/network/socket_impl.h"
 #include "source/common/network/socket_interface.h"
 
+#include "absl/status/statusor.h"
+
 namespace Envoy {
 namespace Network {
 
@@ -38,11 +40,15 @@ public:
                        const Address::InstanceConstSharedPtr& remote_address)
       : SocketImpl(std::move(io_handle), local_address, remote_address) {}
 
-  ConnectionSocketImpl(Socket::Type type, const Address::InstanceConstSharedPtr& local_address,
-                       const Address::InstanceConstSharedPtr& remote_address,
-                       const SocketCreationOptions& options)
-      : SocketImpl(type, local_address, remote_address, options) {
-    connection_info_provider_->setLocalAddress(local_address);
+  static absl::StatusOr<std::unique_ptr<ConnectionSocketImpl>>
+  create(Socket::Type type, const Address::InstanceConstSharedPtr& local_address,
+         const Address::InstanceConstSharedPtr& remote_address,
+         const SocketCreationOptions& options) {
+    absl::StatusOr<IoHandlePtr> io_handle_or = ioHandleForAddr(type, local_address, options);
+    RETURN_IF_NOT_OK(io_handle_or.status());
+
+    return std::unique_ptr<ConnectionSocketImpl>(new ConnectionSocketImpl(
+        std::move(*io_handle_or), type, local_address->type(), local_address, remote_address));
   }
 
   // Network::ConnectionSocket
@@ -91,16 +97,33 @@ public:
   }
 
 protected:
+  ConnectionSocketImpl(IoHandlePtr&& io_handle, Socket::Type sock_type, Address::Type addr_type,
+                       const Address::InstanceConstSharedPtr& local_address,
+                       const Address::InstanceConstSharedPtr& remote_address)
+      : SocketImpl(std::move(io_handle), sock_type, addr_type, remote_address) {
+    connection_info_provider_->setLocalAddress(local_address);
+  }
+
   std::string transport_protocol_;
 };
 
 // ConnectionSocket used with client connections.
 class ClientSocketImpl : public ConnectionSocketImpl {
 public:
-  ClientSocketImpl(const Address::InstanceConstSharedPtr& remote_address,
+  static absl::StatusOr<std::unique_ptr<ClientSocketImpl>>
+  create(const Address::InstanceConstSharedPtr& remote_address, const OptionsSharedPtr& options) {
+    absl::StatusOr<IoHandlePtr> io_handle_or =
+        ioHandleForAddr(Socket::Type::Stream, remote_address, {});
+    RETURN_IF_NOT_OK(io_handle_or.status());
+
+    return std::unique_ptr<ClientSocketImpl>(
+        new ClientSocketImpl(std::move(*io_handle_or), remote_address, options));
+  }
+
+protected:
+  ClientSocketImpl(IoHandlePtr&& io_handle, const Address::InstanceConstSharedPtr& remote_address,
                    const OptionsSharedPtr& options)
-      : ConnectionSocketImpl(Network::ioHandleForAddr(Socket::Type::Stream, remote_address, {}),
-                             nullptr, remote_address) {
+      : ConnectionSocketImpl(std::move(io_handle), nullptr, remote_address) {
     if (options) {
       addOptions(options);
     }

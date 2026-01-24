@@ -6,8 +6,10 @@
 #include <cstring>
 #include <memory>
 #include <string>
+#include <utility>
 
 #include "envoy/api/os_sys_calls_common.h"
+#include "envoy/common/exception.h"
 #include "envoy/http/header_map.h"
 #include "envoy/http/stream_reset_handler.h"
 #include "envoy/network/address.h"
@@ -29,6 +31,7 @@
 #include "source/common/runtime/runtime_features.h"
 
 #include "absl/numeric/int128.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "openssl/crypto.h"
@@ -217,7 +220,7 @@ Http::StreamResetReason quicErrorCodeToEnvoyRemoteResetReason(quic::QuicErrorCod
   }
 }
 
-Network::ConnectionSocketPtr createConnectionSocket(
+absl::StatusOr<Network::ConnectionSocketPtr> createConnectionSocket(
     const Network::Address::InstanceConstSharedPtr& peer_addr,
     Network::Address::InstanceConstSharedPtr& local_addr,
     const Network::ConnectionSocket::OptionsSharedPtr& options, quic::QuicNetworkHandle network,
@@ -234,12 +237,19 @@ Network::ConnectionSocketPtr createConnectionSocket(
           "envoy.reloadable_features.quic_upstream_socket_use_address_cache_for_read")
           ? 4u
           : 0u;
-  auto connection_socket = std::make_unique<Network::ConnectionSocketImpl>(
-      Network::Socket::Type::Datagram,
-      // Use the loopback address if `local_addr` is null, to pass in the socket interface used to
-      // create the IoHandle, without having to make the more expensive `getifaddrs` call.
-      local_addr ? local_addr : getLoopbackAddress(peer_addr), peer_addr,
-      Network::SocketCreationOptions{false, max_addresses_cache_size});
+
+  absl::StatusOr<std::unique_ptr<Network::ConnectionSocketImpl>> connection_socket_or =
+      Network::ConnectionSocketImpl::create(
+          Network::Socket::Type::Datagram,
+          // Use the loopback address if `local_addr` is null, to pass in the socket interface used
+          // to create the IoHandle, without having to make the more expensive `getifaddrs` call.
+          local_addr ? local_addr : getLoopbackAddress(peer_addr), peer_addr,
+          Network::SocketCreationOptions{false, max_addresses_cache_size});
+
+  RETURN_IF_NOT_OK(connection_socket_or.status());
+
+  std::unique_ptr<Network::ConnectionSocketImpl> connection_socket =
+      std::move(*connection_socket_or);
   connection_socket->setDetectedTransportProtocol("quic");
   if (!connection_socket->isOpen()) {
     ENVOY_LOG_MISC(error, "Failed to create quic socket");
@@ -283,7 +293,7 @@ Network::ConnectionSocketPtr createConnectionSocket(
                                      envoy::config::core::v3::SocketOption::STATE_PREBIND)) {
     connection_socket->close();
     ENVOY_LOG_MISC(error, "Fail to apply pre-bind options");
-    return connection_socket;
+    return absl::InternalError("Failed to apply pre-bind socket options");
   }
 
   if (local_addr != nullptr) {
@@ -301,7 +311,8 @@ Network::ConnectionSocketPtr createConnectionSocket(
     connection_socket->close();
     ENVOY_LOG_MISC(error, "Fail to connect socket: ({}) {}", result.errno_,
                    errorDetails(result.errno_));
-    return connection_socket;
+    return absl::InternalError(
+        absl::StrCat("Failed to connect socket: ", errorDetails(result.errno_)));
   }
 
   local_addr = connection_socket->connectionInfoProvider().localAddress();
@@ -311,6 +322,7 @@ Network::ConnectionSocketPtr createConnectionSocket(
                                      envoy::config::core::v3::SocketOption::STATE_BOUND)) {
     ENVOY_LOG_MISC(error, "Fail to apply post-bind options");
     connection_socket->close();
+    return absl::InternalError("Failed to apply post-bind socket options");
   }
   return connection_socket;
 }

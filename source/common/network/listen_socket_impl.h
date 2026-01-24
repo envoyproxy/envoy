@@ -48,9 +48,11 @@ public:
   NetworkListenSocket(const Address::InstanceConstSharedPtr& address,
                       const Network::Socket::OptionsSharedPtr& options, bool bind_to_port,
                       const SocketCreationOptions& creation_options = {})
-      : ListenSocketImpl(bind_to_port ? Network::ioHandleForAddr(T::type, address, creation_options)
-                                      : nullptr,
-                         address) {
+      : ListenSocketImpl(
+            bind_to_port
+                ? Network::ioHandleForAddr(T::type, address, creation_options).value_or(nullptr)
+                : nullptr,
+            address) {
     // Prebind is applied if the socket is bind to port.
     if (bind_to_port) {
       RELEASE_ASSERT(io_handle_ && io_handle_->isOpen(), "");

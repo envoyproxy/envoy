@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <utility>
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
@@ -46,6 +47,8 @@
 #include "test/test_common/global.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
+
+#include "absl/status/statusor.h"
 
 using testing::_;
 using testing::AtLeast;
@@ -377,9 +380,13 @@ public:
   // Create a Grpc::AsyncClientImpl instance backed by enough fake/mock
   // infrastructure to initiate a loopback TCP connection to fake_upstream_.
   RawAsyncClientPtr createAsyncClientImpl(uint32_t envoy_grpc_max_recv_msg_length = 0) {
+    absl::StatusOr<std::unique_ptr<Network::ClientSocketImpl>> socket_or =
+        Network::ClientSocketImpl::create(fake_upstream_->localAddress(), nullptr);
+    ASSERT(socket_or.ok(), absl::StrCat("failed to create socket: ", socket_or.status()));
+
     client_connection_ = std::make_unique<Network::ClientConnectionImpl>(
-        *dispatcher_, fake_upstream_->localAddress(), nullptr,
-        std::move(async_client_transport_socket_), nullptr, nullptr);
+        *dispatcher_, std::move(*socket_or), nullptr, std::move(async_client_transport_socket_),
+        nullptr, nullptr);
     if (connection_buffer_limits_ != 0) {
       client_connection_->setBufferLimits(connection_buffer_limits_);
     }
