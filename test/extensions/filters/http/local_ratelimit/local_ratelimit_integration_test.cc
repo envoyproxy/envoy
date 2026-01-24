@@ -316,6 +316,48 @@ typed_config:
   local_rate_limit_per_downstream_connection: {}
 )EOF";
 
+  static constexpr absl::string_view filter_config_with_shadow_mode_ =
+      R"EOF(
+name: envoy.filters.http.local_ratelimit
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.local_ratelimit.v3.LocalRateLimit
+  stat_prefix: http_local_rate_limiter
+  max_dynamic_descriptors: {}
+  token_bucket:
+    max_tokens: 2
+    tokens_per_fill: 1
+    fill_interval: 1000s
+  filter_enabled:
+    runtime_key: local_rate_limit_enabled
+    default_value:
+      numerator: 100
+      denominator: HUNDRED
+  filter_enforced:
+    runtime_key: local_rate_limit_enforced
+    default_value:
+      numerator: 100
+      denominator: HUNDRED
+  response_headers_to_add:
+    - append_action: OVERWRITE_IF_EXISTS_OR_ADD
+      header:
+        key: x-local-rate-limit
+        value: 'true'
+  descriptors:
+  - entries:
+    - key: client_cluster
+    token_bucket:
+      max_tokens: 1
+      tokens_per_fill: 1
+      fill_interval: 1000s
+    shadow_mode: true
+  rate_limits:
+  - actions:  # any actions in here
+    - request_headers:
+        header_name: x-envoy-downstream-service-cluster
+        descriptor_key: client_cluster
+  local_rate_limit_per_downstream_connection: {}
+)EOF";
+
   const std::string filter_config_with_local_cluster_rate_limit_ =
       R"EOF(
 name: envoy.filters.http.local_ratelimit
@@ -476,6 +518,43 @@ TEST_P(LocalRateLimitFilterIntegrationTest, DynamicDesciptorsBasicTest) {
   codec_client_ = makeHttpConnection(lookupPort("http"));
   sendRateLimitedRequest("bar");
   cleanupUpstreamAndDownstream();
+}
+
+TEST_P(LocalRateLimitFilterIntegrationTest, ShadowModeTest) {
+  initializeFilter(fmt::format(filter_config_with_shadow_mode_, 20, "false"));
+  // filter is adding dynamic descriptors based on the request header
+  // 'x-envoy-downstream-service-cluster' and the token bucket is set to 1 token per fill interval
+  // of 1000s which means only one request is allowed per 1000s for each unique value of
+  // 'x-envoy-downstream-service-cluster' header.
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  sendAndVerifyRequest("foo", "200", 0);
+  cleanupUpstreamAndDownstream();
+
+  // Since shadow mode is true, should be allowed.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  sendAndVerifyRequest("foo", "200", 0);
+  cleanupUpstreamAndDownstream();
+
+  test_server_->waitForCounterEq("http_local_rate_limiter.http_local_rate_limit.shadow_mode", 2);
+  EXPECT_EQ(
+      2,
+      test_server_->counter("http_local_rate_limiter.http_local_rate_limit.shadow_mode")->value());
+
+  // The next request with a different cluster, 'bar', should be allowed.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  sendAndVerifyRequest("bar", "200", 0);
+  cleanupUpstreamAndDownstream();
+
+  // Since shadow mode is true, should be allowed.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  sendAndVerifyRequest("bar", "200", 0);
+  cleanupUpstreamAndDownstream();
+
+  test_server_->waitForCounterEq("http_local_rate_limiter.http_local_rate_limit.shadow_mode", 4);
+  EXPECT_EQ(
+      4,
+      test_server_->counter("http_local_rate_limiter.http_local_rate_limit.shadow_mode")->value());
 }
 
 TEST_P(LocalRateLimitFilterIntegrationTest, DesciptorsBasicTestWithMinimumMaxDynamicDescriptors) {
