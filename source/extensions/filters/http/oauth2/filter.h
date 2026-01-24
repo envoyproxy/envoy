@@ -290,7 +290,7 @@ private:
   std::string expires_;
   std::string hmac_;
   std::vector<uint8_t> secret_;
-  absl::string_view host_;
+  std::string host_;
   TimeSource& time_source_;
   const CookieNames cookie_names_;
   const std::string cookie_domain_;
@@ -352,7 +352,7 @@ private:
   std::string expires_refresh_token_in_;
   std::string expires_id_token_in_;
   std::string new_expires_;
-  absl::string_view host_;
+  std::string host_;
   std::string original_request_url_;
   Http::RequestHeaderMap* request_headers_{nullptr};
   bool was_refresh_token_flow_{false};
