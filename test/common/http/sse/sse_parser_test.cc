@@ -437,7 +437,7 @@ TEST_F(SseParserTest, FindEventEndNoLineEndingEndStream) {
 }
 
 TEST_F(SseParserTest, FindEventEndWithBOM) {
-  // UTF-8 BOM (U+FEFF = 0xEF 0xBB 0xBF) should be stripped at stream start
+  // UTF-8 BOM (0xEF 0xBB 0xBF) should be stripped at stream start
   const std::string buffer = std::string("\xEF\xBB\xBF") + "data: hello\n\n";
   auto [event_start, event_end, next_event] = SseParser::findEventEnd(buffer, false);
   EXPECT_EQ(event_start, 3); // Event starts after BOM

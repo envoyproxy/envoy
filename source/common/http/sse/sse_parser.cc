@@ -22,7 +22,7 @@ SseParser::ParsedEvent SseParser::parseEvent(absl::string_view event) {
     auto [field_name, field_value] = parseFieldLine(line);
     if (field_name == "data") {
       if (!parsed_event.data.has_value()) {
-        // Optimization: Reserve memory to avoid reallocations during append.
+        // Optimization: Reserve memory to avoid allocations during append.
         // The total data cannot be larger than the input event string.
         parsed_event.data = std::string();
         parsed_event.data->reserve(event.size());
@@ -43,7 +43,7 @@ std::tuple<size_t, size_t, size_t> SseParser::findEventEnd(absl::string_view buf
   size_t event_start = 0;
   absl::string_view remaining = buffer;
 
-  // Per SSE spec: Strip UTF-8 BOM (U+FEFF = 0xEF 0xBB 0xBF) if present at stream start.
+  // Per SSE spec: Strip UTF-8 BOM (0xEF 0xBB 0xBF) if present at stream start.
   if (consumed == 0 && remaining.size() >= 3 && static_cast<uint8_t>(remaining[0]) == 0xEF &&
       static_cast<uint8_t>(remaining[1]) == 0xBB && static_cast<uint8_t>(remaining[2]) == 0xBF) {
     remaining = remaining.substr(3);
