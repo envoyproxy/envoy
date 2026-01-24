@@ -667,9 +667,7 @@ TEST_P(TcpProxyIntegrationTest, AccessLogOnStart) {
   initialize();
   auto tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
   auto log_result = waitForAccessLog(access_log_path);
-  EXPECT_EQ(
-      AccessLogType_Name(AccessLog::AccessLogType::TcpConnectionStart),
-      log_result);
+  EXPECT_EQ(AccessLogType_Name(AccessLog::AccessLogType::TcpConnectionStart), log_result);
   FakeRawConnectionPtr fake_upstream_connection;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   tcp_client->close();
