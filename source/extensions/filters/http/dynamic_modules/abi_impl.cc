@@ -1824,6 +1824,82 @@ bool envoy_dynamic_module_callback_http_set_upstream_override_host(
   return true;
 }
 
+// ------------------- Stream Control Callbacks -------------------------
+
+void envoy_dynamic_module_callback_http_filter_reset_stream(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_stream_reset_reason reason,
+    envoy_dynamic_module_type_module_buffer details) {
+  auto* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  if (filter->decoder_callbacks_ == nullptr) {
+    return;
+  }
+  Http::StreamResetReason envoy_reason;
+  switch (reason) {
+  case envoy_dynamic_module_type_http_filter_stream_reset_reason_LocalReset:
+    envoy_reason = Http::StreamResetReason::LocalReset;
+    break;
+  case envoy_dynamic_module_type_http_filter_stream_reset_reason_LocalRefusedStreamReset:
+    envoy_reason = Http::StreamResetReason::LocalRefusedStreamReset;
+    break;
+  default:
+    envoy_reason = Http::StreamResetReason::LocalReset;
+    break;
+  }
+  absl::string_view details_view;
+  if (details.ptr != nullptr && details.length > 0) {
+    details_view = absl::string_view(details.ptr, details.length);
+  }
+  filter->decoder_callbacks_->resetStream(envoy_reason, details_view);
+}
+
+void envoy_dynamic_module_callback_http_filter_send_go_away_and_close(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, bool graceful) {
+  auto* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  if (filter->decoder_callbacks_ == nullptr) {
+    return;
+  }
+  filter->decoder_callbacks_->sendGoAwayAndClose(graceful);
+}
+
+bool envoy_dynamic_module_callback_http_filter_recreate_stream(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_http_header* headers, size_t headers_size) {
+  auto* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  if (filter->decoder_callbacks_ == nullptr) {
+    return false;
+  }
+
+  const Http::ResponseHeaderMap* response_headers = nullptr;
+
+  // If headers are provided, build a response header map for internal redirects.
+  std::unique_ptr<Http::ResponseHeaderMapImpl> custom_headers;
+  if (headers != nullptr && headers_size > 0) {
+    custom_headers = Http::ResponseHeaderMapImpl::create();
+    for (size_t i = 0; i < headers_size; ++i) {
+      absl::string_view key(headers[i].key_ptr, headers[i].key_length);
+      absl::string_view value(headers[i].value_ptr, headers[i].value_length);
+      custom_headers->addCopy(Http::LowerCaseString(key), value);
+    }
+    response_headers = custom_headers.get();
+  }
+
+  return filter->decoder_callbacks_->recreateStream(response_headers);
+}
+
+void envoy_dynamic_module_callback_http_clear_route_cluster_cache(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr) {
+  auto* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  if (filter->decoder_callbacks_ == nullptr) {
+    return;
+  }
+  auto downstream_callbacks = filter->decoder_callbacks_->downstreamCallbacks();
+  if (!downstream_callbacks.has_value()) {
+    return;
+  }
+  downstream_callbacks->refreshRouteCluster();
+}
+
 } // extern "C"
 } // namespace HttpFilters
 } // namespace DynamicModules
