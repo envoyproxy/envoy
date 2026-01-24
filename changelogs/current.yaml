@@ -72,6 +72,11 @@ new_features:
     Extended ``*_WITHOUT_PORT`` address formatters to accept an optional ``MASK_PREFIX_LEN`` parameter that masks IP addresses
     and returns them in CIDR notation (e.g., ``%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT(16)%`` returns ``10.1.0.0/16`` for
     client IP ``10.1.10.23``).
+- area: config
+  change: |
+    Added support for `:ref:`set_node_on_first_message_only
+    <envoy_api_field_core.ApiConfigSource.set_node_on_first_message_only>` to Delta-xDS. Guarded by
+    flag ``envoy.reloadable_features.xds_legacy_delta_skip_subsequent_node``.
 - area: formatter
   change: |
     Added the new access log formatter support of ``DOWNSTREAM_LOCAL_CLOSE_REASON``.

@@ -29,7 +29,7 @@ using testing::AssertionResult;
 namespace Envoy {
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDeltaWildcard, AdsIntegrationTest,
-                         ADS_INTEGRATION_PARAMS);
+                         ADS_INTEGRATION_PARAMS, AdsIntegrationTest::protocolTestParamsToString);
 
 // Validate basic config delivery and upgrade.
 TEST_P(AdsIntegrationTest, Basic) {
@@ -275,13 +275,14 @@ TEST_P(AdsIntegrationTest, DeltaSdsRemovals) {
   sendDeltaDiscoveryResponse<envoy::config::cluster::v3::Cluster>(cds_type_url, {cluster}, {}, "1");
 
   // The cluster needs this secret, so it's going to request it.
-  EXPECT_TRUE(compareDeltaDiscoveryRequest(sds_type_url, {"validation_context"}, {}));
+  EXPECT_TRUE(
+      compareDeltaDiscoveryRequest(sds_type_url, {"validation_context"}, {}, {}, {}, false));
 
   // Cluster should start off warming as the secret is being requested.
   test_server_->waitForGaugeEq("cluster.cluster_0.warming_state", 1);
 
   // Ack the original CDS sub.
-  EXPECT_TRUE(compareDeltaDiscoveryRequest(cds_type_url, {}, {}));
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(cds_type_url, {}, {}, {}, {}, false));
 
   // Before we send the secret, we'll send a delta removal to make sure we don't get a NACK.
   sendDeltaDiscoveryResponse<envoy::extensions::transport_sockets::tls::v3::Secret>(
@@ -292,10 +293,10 @@ TEST_P(AdsIntegrationTest, DeltaSdsRemovals) {
   test_server_->waitForGaugeEq("cluster.cluster_0.warming_state", 0);
 
   // Ack the original LDS subscription.
-  EXPECT_TRUE(compareDeltaDiscoveryRequest(lds_type_url, {}, {}));
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(lds_type_url, {}, {}, {}, {}, false));
 
   // Ack the removal itself.
-  EXPECT_TRUE(compareDeltaDiscoveryRequest(sds_type_url, {}, {}));
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(sds_type_url, {}, {}, {}, {}, false));
 
   envoy::extensions::transport_sockets::tls::v3::Secret validation_context;
   TestUtility::loadFromYaml(fmt::format(R"EOF(
@@ -313,7 +314,7 @@ TEST_P(AdsIntegrationTest, DeltaSdsRemovals) {
       sds_type_url, {validation_context}, {}, "2");
 
   // Ack the secret we just sent.
-  EXPECT_TRUE(compareDeltaDiscoveryRequest(sds_type_url, {}, {}));
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(sds_type_url, {}, {}, {}, {}, false));
 
   // Remove the cluster that owns the secret.
   sendDeltaDiscoveryResponse<envoy::config::cluster::v3::Cluster>(cds_type_url, {}, {"cluster_0"},
@@ -323,9 +324,9 @@ TEST_P(AdsIntegrationTest, DeltaSdsRemovals) {
       sds_type_url, {}, {"validation_context"}, "3");
   test_server_->waitForCounterEq("cluster_manager.cluster_removed", 1);
   // Ack the CDS removal.
-  EXPECT_TRUE(compareDeltaDiscoveryRequest(cds_type_url, {}, {}));
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(cds_type_url, {}, {}, {}, {}, false));
   // Should be an ACK, not a NACK since the SDS removal is ignored.
-  EXPECT_TRUE(compareDeltaDiscoveryRequest(sds_type_url, {}, {}));
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(sds_type_url, {}, {}, {}, {}, false));
 }
 
 // Make sure two clusters sharing same secret are both kept warming before secret
@@ -1573,7 +1574,8 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDeltaWildcard, AdsFailIntegrationTest,
-                         ADS_INTEGRATION_PARAMS);
+                         ADS_INTEGRATION_PARAMS,
+                         AdsFailIntegrationTest::protocolTestParamsToString);
 
 // Validate that we don't crash on failed ADS stream.
 TEST_P(AdsFailIntegrationTest, ConnectDisconnect) {
@@ -1630,7 +1632,8 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDeltaWildcard, AdsConfigIntegrationTest,
-                         ADS_INTEGRATION_PARAMS);
+                         ADS_INTEGRATION_PARAMS,
+                         AdsConfigIntegrationTest::protocolTestParamsToString);
 
 // This is s regression validating that we don't crash on EDS static Cluster that uses ADS.
 TEST_P(AdsConfigIntegrationTest, EdsClusterWithAdsConfigSource) {
@@ -1853,7 +1856,8 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDeltaWildcard, AdsClusterFromFileIntegrationTest,
-                         ADS_INTEGRATION_PARAMS);
+                         ADS_INTEGRATION_PARAMS,
+                         AdsClusterFromFileIntegrationTest::protocolTestParamsToString);
 
 // Validate if ADS cluster defined as EDS will be loaded from file and connection with ADS cluster
 // will be established.
@@ -1917,7 +1921,8 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDeltaWildcard, AdsIntegrationTestWithRtds,
-                         ADS_INTEGRATION_PARAMS);
+                         ADS_INTEGRATION_PARAMS,
+                         AdsIntegrationTestWithRtds::protocolTestParamsToString);
 
 TEST_P(AdsIntegrationTestWithRtds, Basic) {
   initialize();
@@ -1971,15 +1976,17 @@ public:
   }
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDeltaWildcard,
-                         AdsIntegrationTestWithRtdsAndSecondaryClusters, ADS_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(
+    IpVersionsClientTypeDeltaWildcard, AdsIntegrationTestWithRtdsAndSecondaryClusters,
+    ADS_INTEGRATION_PARAMS,
+    AdsIntegrationTestWithRtdsAndSecondaryClusters::protocolTestParamsToString);
 
 TEST_P(AdsIntegrationTestWithRtdsAndSecondaryClusters, Basic) {
   initialize();
   testBasicFlow();
 }
 
-// Node is resent on a dynamic context parameter update.
+// Node is present on a dynamic context parameter update.
 TEST_P(AdsIntegrationTest, ContextParameterUpdate) {
   initialize();
 
@@ -2068,11 +2075,6 @@ public:
     });
     AdsIntegrationTest::initialize();
   }
-
-  bool isSotw() const {
-    return sotwOrDelta() == Grpc::SotwOrDelta::Sotw ||
-           sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw;
-  }
 };
 
 INSTANTIATE_TEST_SUITE_P(
@@ -2081,7 +2083,8 @@ INSTANTIATE_TEST_SUITE_P(
                      // There should be no variation across clients.
                      testing::Values(Grpc::ClientType::EnvoyGrpc),
                      testing::Values(Grpc::SotwOrDelta::Sotw, Grpc::SotwOrDelta::UnifiedSotw,
-                                     Grpc::SotwOrDelta::Delta, Grpc::SotwOrDelta::UnifiedDelta)));
+                                     Grpc::SotwOrDelta::Delta, Grpc::SotwOrDelta::UnifiedDelta)),
+    XdsTpAdsIntegrationTest::protocolTestParamsToString);
 
 TEST_P(XdsTpAdsIntegrationTest, Basic) {
   initialize();
@@ -2922,7 +2925,8 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDeltaWildcard, AdsReplacementIntegrationTest,
-                         ADS_INTEGRATION_PARAMS);
+                         ADS_INTEGRATION_PARAMS,
+                         AdsReplacementIntegrationTest::protocolTestParamsToString);
 
 TEST_P(AdsReplacementIntegrationTest, ReplaceAdsConfig) {
   initializeTwoAds();
