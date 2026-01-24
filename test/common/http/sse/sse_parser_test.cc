@@ -411,6 +411,37 @@ TEST_F(SseParserTest, FindEventEndNoLineEndingEndStream) {
   EXPECT_EQ(next_event, absl::string_view::npos);
 }
 
+TEST_F(SseParserTest, FindEventEndWithBOM) {
+  // UTF-8 BOM (U+FEFF = 0xEF 0xBB 0xBF) should be stripped at stream start
+  const std::string buffer = std::string("\xEF\xBB\xBF") + "data: hello\n\n";
+  auto [event_end, next_event] = SseParser::findEventEnd(buffer, false);
+
+  EXPECT_EQ(event_end, 15);  // BOM (3) + "data: hello\n" (12) = 15
+  EXPECT_EQ(next_event, 16); // BOM (3) + "data: hello\n\n" (13) = 16
+
+  // Verify the event content after BOM is stripped
+  auto event_str = absl::string_view(buffer).substr(3, event_end - 3);
+  auto event = SseParser::parseEvent(event_str);
+  ASSERT_TRUE(event.data.has_value());
+  EXPECT_EQ(event.data.value(), "hello");
+}
+
+TEST_F(SseParserTest, FindEventEndBOMNotInMiddle) {
+  // BOM should only be stripped at the start, not in the middle of the stream
+  const std::string buffer = std::string("data: first\n\n") + "\xEF\xBB\xBF" + "data: second\n\n";
+  auto [event_end, next_event] = SseParser::findEventEnd(buffer, false);
+
+  // First event should be found normally
+  EXPECT_EQ(event_end, 12);
+  EXPECT_EQ(next_event, 13);
+
+  // Second event should include the BOM as part of the data (not stripped)
+  auto remaining = absl::string_view(buffer).substr(next_event);
+  auto [event_end2, next_event2] = SseParser::findEventEnd(remaining, false);
+  // BOM (3) + "data: second\n" (13) = 16
+  EXPECT_EQ(event_end2, 16);
+}
+
 } // namespace
 } // namespace Sse
 } // namespace Http

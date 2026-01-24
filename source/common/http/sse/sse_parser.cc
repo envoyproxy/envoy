@@ -10,6 +10,8 @@ namespace Http {
 namespace Sse {
 
 SseParser::ParsedEvent SseParser::parseEvent(absl::string_view event) {
+  // TODO(optimization): Consider merging findEventEnd and parseEvent into a single-pass
+  // algorithm to avoid traversing the buffer twice.
   std::vector<absl::string_view> data_fields;
   absl::string_view remaining = event;
 
@@ -36,6 +38,13 @@ std::pair<size_t, size_t> SseParser::findEventEnd(absl::string_view buffer, bool
   size_t consumed = 0;
   absl::string_view remaining = buffer;
 
+  // Per SSE spec: Strip UTF-8 BOM (U+FEFF = 0xEF 0xBB 0xBF) if present at stream start.
+  if (consumed == 0 && remaining.size() >= 3 && static_cast<uint8_t>(remaining[0]) == 0xEF &&
+      static_cast<uint8_t>(remaining[1]) == 0xBB && static_cast<uint8_t>(remaining[2]) == 0xBF) {
+    remaining = remaining.substr(3);
+    consumed = 3;
+  }
+
   while (!remaining.empty()) {
     auto [line_end, next_line] = findLineEnd(remaining, end_stream);
 
@@ -51,6 +60,8 @@ std::pair<size_t, size_t> SseParser::findEventEnd(absl::string_view buffer, bool
     remaining = remaining.substr(next_line);
   }
 
+  // Per SSE spec: Once the end of the file is reached, any pending data must be discarded.
+  // (i.e., incomplete events without a closing blank line are dropped)
   return {absl::string_view::npos, absl::string_view::npos};
 }
 
@@ -83,6 +94,7 @@ std::pair<absl::string_view, absl::string_view> SseParser::parseFieldLine(absl::
 std::pair<size_t, size_t> SseParser::findLineEnd(absl::string_view str, bool end_stream) {
   const auto pos = str.find_first_of("\r\n");
 
+  // Case 1: No delimiter found
   if (pos == absl::string_view::npos) {
     if (end_stream) {
       return {str.size(), str.size()};
@@ -90,11 +102,12 @@ std::pair<size_t, size_t> SseParser::findLineEnd(absl::string_view str, bool end
     return {absl::string_view::npos, absl::string_view::npos};
   }
 
+  // Case 2: LF (\n)
   if (str[pos] == '\n') {
     return {pos, pos + 1};
   }
 
-  // Per SSE spec, handle CR (\r) and CRLF (\r\n) line endings.
+  // Case 3: CR (\r) or CRLF (\r\n), handle per SSE spec
   if (pos + 1 < str.size()) {
     if (str[pos + 1] == '\n') {
       return {pos, pos + 2};
@@ -102,6 +115,7 @@ std::pair<size_t, size_t> SseParser::findLineEnd(absl::string_view str, bool end
     return {pos, pos + 1};
   }
 
+  // Case 4: Split CRLF edge case
   // If '\r' is at the end and more data may come, wait to see if it's CRLF.
   if (end_stream) {
     return {pos, pos + 1};
