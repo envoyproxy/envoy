@@ -1,5 +1,7 @@
 #include "source/common/http/sse/sse_parser.h"
 
+#include <cstdint>
+
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
