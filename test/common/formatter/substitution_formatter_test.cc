@@ -1302,6 +1302,17 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     EXPECT_EQ("RemoteReset", ds_close_type_format.format({}, stream_info));
   }
   {
+    StreamInfoFormatter us_close_type_format("UPSTREAM_DETECTED_CLOSE_TYPE");
+    stream_info.upstreamInfo()->setUpstreamDetectedCloseType(StreamInfo::DetectedCloseType::Normal);
+    EXPECT_EQ("Normal", us_close_type_format.format({}, stream_info));
+    stream_info.upstreamInfo()->setUpstreamDetectedCloseType(
+        StreamInfo::DetectedCloseType::LocalReset);
+    EXPECT_EQ("LocalReset", us_close_type_format.format({}, stream_info));
+    stream_info.upstreamInfo()->setUpstreamDetectedCloseType(
+        StreamInfo::DetectedCloseType::RemoteReset);
+    EXPECT_EQ("RemoteReset", us_close_type_format.format({}, stream_info));
+  }
+  {
     StreamInfoFormatter upstream_connection_pool_callback_duration_format(
         "UPSTREAM_CONNECTION_POOL_READY_DURATION");
     EXPECT_EQ(absl::nullopt,

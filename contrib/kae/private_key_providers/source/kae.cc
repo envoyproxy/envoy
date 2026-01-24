@@ -211,12 +211,16 @@ bool KaeHandle::isDone() { return done_; }
 // KAE Section
 KaeSection::KaeSection(LibUadkCryptoSharedPtr libuadk) : libuadk_(libuadk) {};
 
-bool KaeSection::startSection(Api::Api& api, std::chrono::milliseconds poll_delay) {
+bool KaeSection::startSection(Api::Api& api, std::chrono::milliseconds poll_delay,
+                              uint32_t max_instances) {
   int ret = libuadk_->kaeGetNumInstances(&num_instances_);
   ENVOY_LOG(info, "found {} KAE instances", num_instances_);
   if (ret != WD_SUCCESS) {
     return false;
   }
+
+  num_instances_ = std::min(num_instances_, max_instances);
+  ENVOY_LOG(info, "use {} KAE instances", num_instances_);
 
   kae_handles_ = std::vector<KaeHandle>(num_instances_);
 
