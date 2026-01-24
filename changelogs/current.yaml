@@ -22,6 +22,12 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: ext_authz
+  change: |
+    Added support for the ``append_action`` enum in gRPC ExtAuthz ``OkHttpResponse.headers`` for upstream request header
+    mutations. Previously, only the deprecated ``append`` boolean was checked. Now ``APPEND_IF_EXISTS_OR_ADD``,
+    ``ADD_IF_ABSENT``, ``OVERWRITE_IF_EXISTS``, and ``OVERWRITE_IF_EXISTS_OR_ADD`` actions are fully supported,
+    providing parity with ``response_headers_to_add`` handling.
 - area: http
   change: |
     Fixed a potential file descriptor leak where HTTP/1.1 connections with zombie streams (waiting for codec completion)
