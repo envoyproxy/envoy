@@ -160,6 +160,10 @@ type StreamInfo interface {
 	VirtualClusterName() (string, bool)
 	// WorkerID returns the ID of the Envoy worker thread
 	WorkerID() uint32
+	// DrainConnectionUponCompletion marks the connection to be drained after the current request completes.
+	// For HTTP/1.x, this will add a "Connection: close" header to the response.
+	// For HTTP/2 and HTTP/3, this will send a GOAWAY frame after the response is sent.
+	DrainConnectionUponCompletion()
 	// Some fields in stream info can be fetched via GetProperty
 	// For example, startTime() is equal to GetProperty("request.time")
 }

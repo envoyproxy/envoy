@@ -18,7 +18,6 @@ envoy_py_test(
         "//contrib/exe:envoy-static",
         "@kafka_server_binary//:all",
     ] + glob(["*.j2"]),
-    flaky = True,
     deps = [
         requirement("Jinja2"),
         requirement("kafka-python-ng"),

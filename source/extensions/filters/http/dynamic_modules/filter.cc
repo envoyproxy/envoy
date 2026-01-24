@@ -22,6 +22,10 @@ void DynamicModuleHttpFilter::onStreamComplete() {
 
 void DynamicModuleHttpFilter::onDestroy() {
   destroyed_ = true;
+  // Remove watermark callbacks before destroying.
+  if (decoder_callbacks_ != nullptr) {
+    decoder_callbacks_->removeDownstreamWatermarkCallbacks(*this);
+  }
   destroy();
 };
 
@@ -539,6 +543,59 @@ void DynamicModuleHttpFilter::HttpStreamCalloutCallback::onReset() {
     dispatcher.deferredDelete(std::move(deletable));
     filter->http_stream_callouts_.erase(it);
   }
+}
+
+Http::LocalErrorStatus
+DynamicModuleHttpFilter::onLocalReply(const Http::StreamFilterBase::LocalReplyData& data) {
+  if (!in_module_filter_) {
+    return Http::LocalErrorStatus::Continue;
+  }
+  envoy_dynamic_module_type_envoy_buffer details_buffer{data.details_.data(), data.details_.size()};
+  const envoy_dynamic_module_type_on_http_filter_local_reply_status status =
+      config_->on_http_filter_local_reply_(thisAsVoidPtr(), in_module_filter_,
+                                           static_cast<uint32_t>(data.code_), details_buffer,
+                                           data.reset_imminent_);
+  return static_cast<Http::LocalErrorStatus>(status);
+}
+
+void DynamicModuleHttpFilter::storeSocketOptionInt(
+    int64_t level, int64_t name, envoy_dynamic_module_type_socket_option_state state,
+    envoy_dynamic_module_type_socket_direction direction, int64_t value) {
+  socket_options_.push_back(
+      {level, name, state, direction, /*is_int=*/true, value, /*byte_value=*/std::string()});
+}
+
+void DynamicModuleHttpFilter::storeSocketOptionBytes(
+    int64_t level, int64_t name, envoy_dynamic_module_type_socket_option_state state,
+    envoy_dynamic_module_type_socket_direction direction, absl::string_view value) {
+  socket_options_.push_back(
+      {level, name, state, direction, /*is_int=*/false, /*int_value=*/0, std::string(value)});
+}
+
+bool DynamicModuleHttpFilter::tryGetSocketOptionInt(
+    int64_t level, int64_t name, envoy_dynamic_module_type_socket_option_state state,
+    envoy_dynamic_module_type_socket_direction direction, int64_t& value_out) const {
+  for (const auto& opt : socket_options_) {
+    if (opt.level == level && opt.name == name && opt.state == state &&
+        opt.direction == direction && opt.is_int) {
+      value_out = opt.int_value;
+      return true;
+    }
+  }
+  return false;
+}
+
+bool DynamicModuleHttpFilter::tryGetSocketOptionBytes(
+    int64_t level, int64_t name, envoy_dynamic_module_type_socket_option_state state,
+    envoy_dynamic_module_type_socket_direction direction, absl::string_view& value_out) const {
+  for (const auto& opt : socket_options_) {
+    if (opt.level == level && opt.name == name && opt.state == state &&
+        opt.direction == direction && !opt.is_int) {
+      value_out = opt.byte_value;
+      return true;
+    }
+  }
+  return false;
 }
 
 } // namespace HttpFilters

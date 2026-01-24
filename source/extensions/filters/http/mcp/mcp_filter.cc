@@ -4,11 +4,16 @@
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/common/mcp/filter_state.h"
+
+#include "absl/strings/str_cat.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Mcp {
+
+using FilterStateObject = Filters::Common::Mcp::FilterStateObject;
 
 namespace {
 McpFilterStats generateStats(const std::string& prefix, Stats::Scope& scope) {
@@ -24,6 +29,7 @@ McpFilterConfig::McpFilterConfig(const envoy::extensions::filters::http::mcp::v3
       max_request_body_size_(proto_config.has_max_request_body_size()
                                  ? proto_config.max_request_body_size().value()
                                  : 8192), // Default: 8KB
+      request_storage_mode_(proto_config.request_storage_mode()),
       parser_config_(proto_config.has_parser_config()
                          ? McpParserConfig::fromProto(proto_config.parser_config())
                          : McpParserConfig::createDefault()),
@@ -130,7 +136,7 @@ Http::FilterHeadersStatus McpFilter::decodeHeaders(Http::RequestHeaderMap& heade
       // Set the buffer limit - Envoy will automatically send 413 if exceeded
       const uint32_t max_size = getMaxRequestBodySize();
       if (max_size > 0) {
-        decoder_callbacks_->setDecoderBufferLimit(max_size);
+        decoder_callbacks_->setBufferLimit(max_size);
         ENVOY_LOG(debug, "set decoder buffer limit to {} bytes", max_size);
       }
 
@@ -241,12 +247,30 @@ Http::FilterDataStatus McpFilter::completeParsing() {
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
 
-  // Set dynamic metadata
-  const auto& metadata = parser_->metadata();
+  Protobuf::Struct metadata = parser_->metadata();
+
+  const std::string& group_metadata_key = config_->parserConfig().groupMetadataKey();
+  if (!group_metadata_key.empty()) {
+    std::string method_group = config_->parserConfig().getMethodGroup(parser_->getMethod());
+    (*metadata.mutable_fields())[group_metadata_key].set_string_value(method_group);
+    ENVOY_LOG(debug, "MCP filter set method group: {}={}", group_metadata_key, method_group);
+  }
+
   if (!metadata.fields().empty()) {
-    decoder_callbacks_->streamInfo().setDynamicMetadata(std::string(MetadataKeys::FilterName),
-                                                        metadata);
-    ENVOY_LOG(debug, "MCP filter set dynamic metadata: {}", metadata.DebugString());
+    if (config_->shouldStoreToFilterState()) {
+      auto filter_state_obj =
+          std::make_shared<FilterStateObject>(parser_->getMethod(), metadata, is_mcp_request_);
+      decoder_callbacks_->streamInfo().filterState()->setData(
+          std::string(FilterStateObject::FilterStateKey), std::move(filter_state_obj),
+          StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Request,
+          StreamInfo::StreamSharingMayImpactPooling::None);
+    }
+
+    if (config_->shouldStoreToDynamicMetadata()) {
+      decoder_callbacks_->streamInfo().setDynamicMetadata(std::string(MetadataKeys::FilterName),
+                                                          metadata);
+      ENVOY_LOG(debug, "MCP filter set dynamic metadata: {}", metadata.DebugString());
+    }
 
     if (config_->clearRouteCache()) {
       if (auto cb = decoder_callbacks_->downstreamCallbacks(); cb.has_value()) {

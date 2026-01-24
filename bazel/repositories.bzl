@@ -40,6 +40,7 @@ NO_HTTP3_SKIP_TARGETS = [
     "envoy.quic.server_preferred_address.fixed",
     "envoy.quic.server_preferred_address.datasource",
     "envoy.quic.connection_debug_visitor.basic",
+    "envoy.quic.packet_writer.default",
 ]
 
 # Make all contents of an external repository accessible under a filegroup.  Used for external HTTP
@@ -143,7 +144,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_awslabs_aws_c_auth()
     _com_github_axboe_liburing()
     _com_github_bazel_buildtools()
-    _com_github_c_ares_c_ares()
+    _com_github_cares_cares()
     _com_github_openhistogram_libcircllhist()
     _com_github_cyan4973_xxhash()
     _com_github_datadog_dd_trace_cpp()
@@ -185,7 +186,6 @@ def envoy_dependencies(skip_targets = []):
     _dragonbox()
     _fp16()
     _simdutf()
-    _intel_ittapi()
     _com_github_google_quiche()
     _googleurl()
     _io_hyperscan()
@@ -193,9 +193,8 @@ def envoy_dependencies(skip_targets = []):
     _io_opentelemetry_api_cpp()
     _net_colm_open_source_colm()
     _net_colm_open_source_ragel()
-    _zlib()
     _intel_dlb()
-    _com_github_zlib_ng_zlib_ng()
+    _zlib_ng()
     _org_boost()
     _org_brotli()
     _zstd()
@@ -210,25 +209,26 @@ def envoy_dependencies(skip_targets = []):
     _rules_ruby()
     external_http_archive("com_github_google_flatbuffers")
     external_http_archive("bazel_features")
-    external_http_archive("bazel_toolchains")
     external_http_archive("bazel_compdb")
     external_http_archive(
         name = "envoy_examples",
-        patch_args = ["-p1"],
-        patches = ["@envoy//bazel:envoy_examples.patch"],
     )
     external_http_archive("envoy_toolshed")
 
     _com_github_maxmind_libmaxminddb()
+    _thrift()
 
     external_http_archive("rules_license")
     external_http_archive("rules_pkg")
     external_http_archive("com_github_aignas_rules_shellcheck")
+
     external_http_archive(
-        "aspect_bazel_lib",
+        name = "yq.bzl",
+        location_name = "yq_bzl",
         patch_args = ["-p1"],
-        patches = ["@envoy//bazel:aspect.patch"],
+        patches = ["@envoy//bazel:yq.patch"],
     )
+    external_http_archive("aspect_bazel_lib")
 
     _com_github_fdio_vpp_vcl()
 
@@ -321,10 +321,10 @@ def _com_github_bazel_buildtools():
         name = "com_github_bazelbuild_buildtools",
     )
 
-def _com_github_c_ares_c_ares():
+def _com_github_cares_cares():
     external_http_archive(
-        name = "com_github_c_ares_c_ares",
-        build_file_content = BUILD_ALL_CONTENT,
+        name = "com_github_cares_cares",
+        build_file = "@envoy//bazel/external:c-ares.BUILD",
         patch_args = ["-p1"],
         patches = ["@envoy//bazel:c-ares.patch"],
     )
@@ -386,6 +386,10 @@ def _com_github_unicode_org_icu():
         name = "com_github_unicode_org_icu",
         patches = ["@envoy//bazel/foreign_cc:icu.patch"],
         patch_args = ["-p1"],
+        patch_cmds = [
+            "sed -i 's/^#![[:space:]]*/#!/' source/configure source/config.sub source/config.guess source/mkinstalldirs",
+            "sed -i 's/\\r$//' source/configure source/config.sub source/config.guess source/mkinstalldirs",
+        ],
         build_file_content = BUILD_ALL_CONTENT,
     )
 
@@ -462,16 +466,10 @@ def _net_colm_open_source_ragel():
         build_file_content = BUILD_ALL_CONTENT,
     )
 
-def _zlib():
+def _zlib_ng():
     external_http_archive(
-        name = "zlib",
-        build_file = "@envoy//bazel/external:zlib.BUILD",
-    )
-
-def _com_github_zlib_ng_zlib_ng():
-    external_http_archive(
-        name = "com_github_zlib_ng_zlib_ng",
-        build_file_content = BUILD_ALL_CONTENT,
+        name = "zlib_ng",
+        build_file = "@envoy//bazel/external:zlib_ng.BUILD",
     )
 
 # Boost in general is not approved for Envoy use, and the header-only
@@ -674,6 +672,7 @@ def _v8():
         name = "v8",
         patches = [
             "@envoy//bazel:v8.patch",
+            "@envoy//bazel:v8_novtune.patch",
             "@envoy//bazel:v8_ppc64le.patch",
             # https://issues.chromium.org/issues/423403090
             "@envoy//bazel:v8_python.patch",
@@ -721,12 +720,6 @@ def _simdutf():
     external_http_archive(
         name = "simdutf",
         build_file = "@envoy//bazel/external:simdutf.BUILD",
-    )
-
-def _intel_ittapi():
-    external_http_archive(
-        name = "intel_ittapi",
-        build_file = "@envoy//bazel/external:intel_ittapi.BUILD",
     )
 
 def _com_github_google_quiche():
@@ -918,6 +911,15 @@ def _foreign_cc_dependencies():
         name = "rules_foreign_cc",
         patches = ["@envoy//bazel:rules_foreign_cc.patch"],
         patch_args = ["-p1"],
+    )
+
+def _thrift():
+    external_http_archive(
+        name = "thrift",
+        build_file = "@envoy//bazel/external:thrift.BUILD",
+        patches = ["@envoy//bazel:thrift.patch"],
+        patch_args = ["-p1"],
+        patch_cmds = ["mv src thrift"],
     )
 
 def _com_github_maxmind_libmaxminddb():

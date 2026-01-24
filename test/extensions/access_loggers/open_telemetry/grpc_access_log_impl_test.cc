@@ -475,6 +475,77 @@ values:
             1);
 }
 
+// Test that top-level log_name is preferred over common_config.log_name.
+class GrpcAccessLoggerTopLevelLogNameTest : public testing::Test {
+public:
+  GrpcAccessLoggerTopLevelLogNameTest()
+      : async_client_(new Grpc::MockAsyncClient), factory_(new Grpc::MockAsyncClientFactory),
+        logger_cache_(async_client_manager_, scope_, tls_, local_info_),
+        grpc_access_logger_impl_test_helper_(local_info_, async_client_, true) {
+    EXPECT_CALL(async_client_manager_, factoryForGrpcService(_, _, true))
+        .WillOnce(Invoke([this](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
+          EXPECT_CALL(*factory_, createUncachedRawAsyncClient()).WillOnce(Invoke([this] {
+            return Grpc::RawAsyncClientPtr{async_client_};
+          }));
+          return Grpc::AsyncClientFactoryPtr{factory_};
+        }));
+  }
+
+  Grpc::MockAsyncClient* async_client_;
+  Grpc::MockAsyncClientFactory* factory_;
+  Grpc::MockAsyncClientManager async_client_manager_;
+  LocalInfo::MockLocalInfo local_info_;
+  NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
+  Stats::Scope& scope_{*stats_store_.rootScope()};
+  NiceMock<ThreadLocal::MockInstance> tls_;
+  GrpcAccessLoggerCacheImpl logger_cache_;
+  GrpcAccessLoggerImplTestHelper grpc_access_logger_impl_test_helper_;
+};
+
+// Verifies that top-level log_name takes precedence over common_config.log_name.
+TEST_F(GrpcAccessLoggerTopLevelLogNameTest, TopLevelLogNamePreferred) {
+  envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig config;
+  // Set both top-level and common_config log_name.
+  config.set_log_name("top_level_log_name");
+  config.mutable_common_config()->set_log_name("common_config_log_name");
+  config.mutable_common_config()->set_transport_api_version(
+      envoy::config::core::v3::ApiVersion::V3);
+  // Force a flush for every log entry.
+  config.mutable_common_config()->mutable_buffer_size_bytes()->set_value(BUFFER_SIZE_BYTES);
+
+  GrpcAccessLoggerSharedPtr logger =
+      logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP);
+  // Verify that top_level_log_name is used, not common_config_log_name.
+  grpc_access_logger_impl_test_helper_.expectSentMessage(R"EOF(
+  resource_logs:
+    resource:
+      attributes:
+        - key: "log_name"
+          value:
+            string_value: "top_level_log_name"
+        - key: "zone_name"
+          value:
+            string_value: "zone_name"
+        - key: "cluster_name"
+          value:
+            string_value: "cluster_name"
+        - key: "node_name"
+          value:
+            string_value: "node_name"
+    scope_logs:
+      - log_records:
+          - severity_text: "test-severity-text"
+  )EOF");
+  opentelemetry::proto::logs::v1::LogRecord entry;
+  entry.set_severity_text("test-severity-text");
+  logger->log(opentelemetry::proto::logs::v1::LogRecord(entry));
+  EXPECT_EQ(stats_store_.findCounterByString("access_logs.open_telemetry_access_log.logs_written")
+                .value()
+                .get()
+                .value(),
+            1);
+}
+
 } // namespace
 } // namespace OpenTelemetry
 } // namespace AccessLoggers

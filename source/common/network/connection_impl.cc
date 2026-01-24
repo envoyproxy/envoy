@@ -154,7 +154,7 @@ void ConnectionImpl::close(ConnectionCloseType type) {
     ENVOY_CONN_LOG(
         trace, "connection closing type=AbortReset, setting LocalReset to the detected close type.",
         *this);
-    setDetectedCloseType(DetectedCloseType::LocalReset);
+    setDetectedCloseType(StreamInfo::DetectedCloseType::LocalReset);
     closeSocket(ConnectionEvent::LocalClose);
     return;
   }
@@ -279,7 +279,7 @@ bool ConnectionImpl::filterChainWantsData() {
          (read_disable_count_ == 1 && read_buffer_->highWatermarkTriggered());
 }
 
-void ConnectionImpl::setDetectedCloseType(DetectedCloseType close_type) {
+void ConnectionImpl::setDetectedCloseType(StreamInfo::DetectedCloseType close_type) {
   detected_close_type_ = close_type;
 }
 
@@ -325,8 +325,8 @@ void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
 
   connection_stats_.reset();
 
-  if (detected_close_type_ == DetectedCloseType::RemoteReset ||
-      detected_close_type_ == DetectedCloseType::LocalReset) {
+  if (detected_close_type_ == StreamInfo::DetectedCloseType::RemoteReset ||
+      detected_close_type_ == StreamInfo::DetectedCloseType::LocalReset) {
 #if ENVOY_PLATFORM_ENABLE_SEND_RST
     const bool ok = Network::Socket::applyOptions(
         Network::SocketOptionFactory::buildZeroSoLingerOptions(), *socket_,
@@ -746,7 +746,7 @@ void ConnectionImpl::onReadReady() {
   if (result.err_code_.has_value() &&
       result.err_code_ == Api::IoError::IoErrorCode::ConnectionReset) {
     ENVOY_CONN_LOG(trace, "read: rst close from peer", *this);
-    setDetectedCloseType(DetectedCloseType::RemoteReset);
+    setDetectedCloseType(StreamInfo::DetectedCloseType::RemoteReset);
     if (result.bytes_processed_ != 0) {
       onRead(new_buffer_size);
       // In some cases, the transport socket could read data along with an RST (Reset) flag.
@@ -841,7 +841,7 @@ void ConnectionImpl::onWriteReady() {
       result.err_code_ == Api::IoError::IoErrorCode::ConnectionReset) {
     // Discard anything in the buffer.
     ENVOY_CONN_LOG(debug, "write: rst close from peer.", *this);
-    setDetectedCloseType(DetectedCloseType::RemoteReset);
+    setDetectedCloseType(StreamInfo::DetectedCloseType::RemoteReset);
     closeSocket(ConnectionEvent::RemoteClose);
     return;
   }

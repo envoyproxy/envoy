@@ -34,6 +34,7 @@ using StageCallbackWithCompletion =
 using testing::AtMost;
 using testing::Eq;
 using testing::HasSubstr;
+using testing::MatchesRegex;
 using testing::Return;
 
 namespace Envoy {
@@ -483,8 +484,12 @@ TEST_P(WasmCommonTest, Foreign) {
   wasm->setCreateContextForTesting(
       nullptr, [](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) -> ContextBase* {
         auto root_context = new TestContext(wasm, plugin);
-        EXPECT_CALL(*root_context, log_(spdlog::level::trace, Eq("compress 2000 -> 23")));
-        EXPECT_CALL(*root_context, log_(spdlog::level::debug, Eq("uncompress 23 -> 2000")));
+        // Use regex matchers because `zlib` and `zlib-ng` produce slightly different
+        // compressed sizes (23 vs 24 bytes) due to different optimization strategies.
+        EXPECT_CALL(*root_context,
+                    log_(spdlog::level::trace, MatchesRegex("compress 2000 -> 2[0-9]")));
+        EXPECT_CALL(*root_context,
+                    log_(spdlog::level::debug, MatchesRegex("uncompress 2[0-9] -> 2000")));
         return root_context;
       });
   wasm->start(plugin);
@@ -1360,9 +1365,10 @@ public:
   void setupContext() {
     WasmCommonContextTest::setupContext();
     ON_CALL(filter_factory_, createFilterChain(_))
-        .WillByDefault(Invoke([this](Http::FilterChainManager& manager) -> bool {
+        .WillByDefault(Invoke([this](Http::FilterChainFactoryCallbacks& callbacks) -> bool {
           auto factory = createWasmFilter();
-          manager.applyFilterFactoryCb({}, factory);
+          callbacks.setFilterConfigName("");
+          factory(callbacks);
           return true;
         }));
     ON_CALL(filter_manager_callbacks_, requestHeaders())

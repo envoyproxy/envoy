@@ -8,6 +8,7 @@ EXTENSIONS = {
     "envoy.access_loggers.extension_filters.cel":       "//source/extensions/access_loggers/filters/cel:config",
     "envoy.access_loggers.extension_filters.process_ratelimit":       "//source/extensions/access_loggers/filters/process_ratelimit:config",
     "envoy.access_loggers.fluentd"  :                   "//source/extensions/access_loggers/fluentd:config",
+    "envoy.access_loggers.dynamic_modules":             "//source/extensions/access_loggers/dynamic_modules:config",
     "envoy.access_loggers.http_grpc":                   "//source/extensions/access_loggers/grpc:http_config",
     "envoy.access_loggers.tcp_grpc":                    "//source/extensions/access_loggers/grpc:tcp_config",
     "envoy.access_loggers.open_telemetry":              "//source/extensions/access_loggers/open_telemetry:config",
@@ -21,6 +22,7 @@ EXTENSIONS = {
     #
 
     "envoy.clusters.aggregate":                         "//source/extensions/clusters/aggregate:cluster",
+    "envoy.clusters.composite":                         "//source/extensions/clusters/composite:cluster",
     "envoy.clusters.dns":                               "//source/extensions/clusters/dns:dns_cluster_lib",
     "envoy.clusters.dynamic_forward_proxy":             "//source/extensions/clusters/dynamic_forward_proxy:cluster",
     "envoy.clusters.eds":                               "//source/extensions/clusters/eds:eds_lib",
@@ -59,6 +61,7 @@ EXTENSIONS = {
     #
 
     "envoy.bootstrap.wasm":                             "//source/extensions/bootstrap/wasm:config",
+    "envoy.bootstrap.dynamic_modules":                  "//source/extensions/bootstrap/dynamic_modules:config",
 
     #
     # Reverse Connection
@@ -229,6 +232,7 @@ EXTENSIONS = {
     "envoy.filters.listener.proxy_protocol":            "//source/extensions/filters/listener/proxy_protocol:config",
     "envoy.filters.listener.tls_inspector":             "//source/extensions/filters/listener/tls_inspector:config",
     "envoy.filters.listener.dynamic_modules":           "//source/extensions/filters/listener/dynamic_modules:config",
+    "envoy.filters.udp_listener.dynamic_modules":       "//source/extensions/filters/udp/dynamic_modules:config",
 
     #
     # Network filters
@@ -475,6 +479,7 @@ EXTENSIONS = {
     "envoy.quic.server_preferred_address.datasource":   "//source/extensions/quic/server_preferred_address:datasource_server_preferred_address_config_factory_config",
     "envoy.quic.connection_debug_visitor.basic":        "//source/extensions/quic/connection_debug_visitor/basic:envoy_quic_connection_debug_visitor_basic",
     "envoy.quic.connection_debug_visitor.quic_stats":   "//source/extensions/quic/connection_debug_visitor/quic_stats:config",
+    "envoy.quic.packet_writer.default":                 "//source/extensions/quic/client_packet_writer:default_quic_client_packet_writer_factory_config",
 
     #
     # UDP packet writers
@@ -609,8 +614,9 @@ EXTENSIONS = {
     "envoy.tls.certificate_selectors.on_demand_secret":                  "//source/extensions/transport_sockets/tls/cert_selectors/on_demand:config",
 
     # Certificate mappers
-    "envoy.tls.certificate_mappers.static_name":                  "//source/extensions/transport_sockets/tls/cert_mappers/static_name:config",
-    "envoy.tls.certificate_mappers.sni":                  "//source/extensions/transport_sockets/tls/cert_mappers/sni:config",
+    "envoy.tls.certificate_mappers.sni":                            "//source/extensions/transport_sockets/tls/cert_mappers/sni:config",
+    "envoy.tls.certificate_mappers.static_name":                    "//source/extensions/transport_sockets/tls/cert_mappers/static_name:config",
+    "envoy.tls.upstream_certificate_mappers.filter_state_override": "//source/extensions/transport_sockets/tls/cert_mappers/filter_state_override:config",
 
     # Local address selectors
     "envoy.upstream.local_address_selector.filter_state_override": "//source/extensions/local_address_selectors/filter_state_override:config",

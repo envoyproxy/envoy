@@ -8,6 +8,7 @@
 #include "envoy/thread_local/thread_local.h"
 
 #include "source/common/ssl/tls_certificate_config_impl.h"
+#include "source/common/tls/client_context_impl.h"
 #include "source/common/tls/server_context_impl.h"
 
 namespace Envoy {
@@ -30,6 +31,10 @@ using CertSelectionStatsSharedPtr = std::shared_ptr<CertSelectionStats>;
 
 class AsyncContext;
 using AsyncContextConstSharedPtr = std::shared_ptr<const AsyncContext>;
+using AsyncContextFactory = absl::AnyInvocable<AsyncContextConstSharedPtr(
+    Stats::Scope&, Server::Configuration::ServerFactoryContext&, const Ssl::TlsCertificateConfig&,
+    absl::Status&)>;
+
 using ConfigProto =
     envoy::extensions::transport_sockets::tls::cert_selectors::on_demand_secret::v3::Config;
 using UpdateCb = std::function<absl::Status(absl::string_view, const Ssl::TlsCertificateConfig&)>;
@@ -57,24 +62,57 @@ private:
 };
 using AsyncContextConfigConstPtr = std::unique_ptr<AsyncContextConfig>;
 
-class AsyncContext : public Extensions::TransportSockets::Tls::ServerContextImpl {
+class AsyncContext {
 public:
-  AsyncContext(Stats::Scope& scope, Server::Configuration::ServerFactoryContext& factory_context,
-               const Ssl::ServerContextConfig& tls_config,
-               const Ssl::TlsCertificateConfig& cert_config, absl::Status& creation_status)
+  virtual ~AsyncContext() = default;
+
+  /**
+   * @return OCSP policy for the certificate, only needed by the server TLS context.
+   */
+  virtual Ssl::ServerContextConfig::OcspStaplePolicy ocspStaplePolicy() const PURE;
+
+  /**
+   * @return the low-level TLS context stored in this context.
+   */
+  virtual const Ssl::TlsContext& tlsContext() const PURE;
+};
+
+class ServerAsyncContext : public Extensions::TransportSockets::Tls::ServerContextImpl,
+                           public AsyncContext {
+public:
+  ServerAsyncContext(Stats::Scope& scope,
+                     Server::Configuration::ServerFactoryContext& factory_context,
+                     const Ssl::ServerContextConfig& tls_config,
+                     const Ssl::TlsCertificateConfig& cert_config, absl::Status& creation_status)
       : ServerContextImpl(
             scope, tls_config,
             std::vector<std::reference_wrapper<const Ssl::TlsCertificateConfig>>{cert_config},
             false, factory_context, /** used by quic */ nullptr, creation_status) {}
 
-  Ssl::ServerContextConfig::OcspStaplePolicy ocspStaplePolicy() const {
+  Ssl::ServerContextConfig::OcspStaplePolicy ocspStaplePolicy() const override {
     return ocsp_staple_policy_;
   }
+  const Ssl::TlsContext& tlsContext() const override;
+};
 
-  /**
-   * @return the low-level TLS context stored in this context.
-   */
-  const Ssl::TlsContext& tlsContext() const;
+class ClientAsyncContext : public Extensions::TransportSockets::Tls::ClientContextImpl,
+                           public AsyncContext {
+public:
+  ClientAsyncContext(Stats::Scope& scope,
+                     Server::Configuration::ServerFactoryContext& factory_context,
+                     const Ssl::ClientContextConfig& tls_config,
+                     const Ssl::TlsCertificateConfig& cert_config, absl::Status& creation_status)
+      : ClientContextImpl(
+            scope, tls_config,
+            std::vector<std::reference_wrapper<const Ssl::TlsCertificateConfig>>{cert_config},
+            false, factory_context, creation_status) {}
+
+  Ssl::ServerContextConfig::OcspStaplePolicy ocspStaplePolicy() const override {
+    // This is unused but we must return something.
+    return Ssl::ServerContextConfig::OcspStaplePolicy::LenientStapling;
+  }
+
+  const Ssl::TlsContext& tlsContext() const override;
 };
 
 class Handle : public Ssl::SelectionHandle {
@@ -115,7 +153,7 @@ class SecretManager : public std::enable_shared_from_this<SecretManager>,
 public:
   SecretManager(const ConfigProto& config,
                 Server::Configuration::GenericFactoryContext& factory_context,
-                const Ssl::ServerContextConfig& tls_config);
+                AsyncContextFactory&& context_factory);
 
   /**
    * Start a subscription to the secret and register a handle on updates.
@@ -165,11 +203,7 @@ private:
   CertSelectionStatsSharedPtr stats_;
   Server::Configuration::ServerFactoryContext& factory_context_;
   const envoy::config::core::v3::ConfigSource config_source_;
-  // Envoy ensures that per-worker TLS sockets are destroyed before the
-  // filter chain holding the TLS socket factory using a completion. This
-  // means the TLS context config will outlive each AsyncSelector, and it is
-  // safe to refer to TLS context config by reference.
-  const Ssl::ServerContextConfig& tls_config_;
+  AsyncContextFactory context_factory_;
 
   // Main-thread accessible context config subscriptions and callbacks.
   struct CacheEntry {
@@ -186,17 +220,29 @@ private:
   ThreadLocal::TypedSlot<ThreadLocalCerts> cert_contexts_;
 };
 
+class BaseAsyncSelector : protected Logger::Loggable<Logger::Id::connection> {
+public:
+  BaseAsyncSelector(std::shared_ptr<SecretManager>& secret_manager)
+      : secret_manager_(secret_manager) {}
+
+protected:
+  Ssl::SelectionResult doSelectTlsContext(const std::string& name, const bool client_ocsp_capable,
+                                          Ssl::CertificateSelectionCallbackPtr cb);
+  std::shared_ptr<SecretManager> secret_manager_;
+};
+
 /**
  * An asynchronous certificate selector is created for each TLS socket on each worker.
  */
-class AsyncSelector : public Ssl::TlsCertificateSelector,
-                      protected Logger::Loggable<Logger::Id::connection> {
+class AsyncSelector : public BaseAsyncSelector, public Ssl::TlsCertificateSelector {
 public:
-  AsyncSelector(Ssl::TlsCertificateMapper&& mapper, std::shared_ptr<SecretManager>& secret_manager)
-      : mapper_(std::move(mapper)), secret_manager_(secret_manager) {}
+  AsyncSelector(Ssl::TlsCertificateMapperPtr&& mapper,
+                std::shared_ptr<SecretManager>& secret_manager)
+      : BaseAsyncSelector(secret_manager), mapper_(std::move(mapper)) {}
 
+  // Ssl::TlsCertificateSelector
   bool providesCertificates() const override { return true; }
-  Ssl::SelectionResult selectTlsContext(const SSL_CLIENT_HELLO&,
+  Ssl::SelectionResult selectTlsContext(const SSL_CLIENT_HELLO& ssl_client_hello,
                                         Ssl::CertificateSelectionCallbackPtr cb) override;
 
   std::pair<const Ssl::TlsContext&, Ssl::OcspStapleAction>
@@ -205,22 +251,68 @@ public:
   };
 
 private:
-  Ssl::TlsCertificateMapper mapper_;
+  Ssl::TlsCertificateMapperPtr mapper_;
+};
+
+class UpstreamAsyncSelector : public BaseAsyncSelector, public Ssl::UpstreamTlsCertificateSelector {
+public:
+  UpstreamAsyncSelector(Ssl::UpstreamTlsCertificateMapperPtr&& mapper,
+                        std::shared_ptr<SecretManager>& secret_manager)
+      : BaseAsyncSelector(secret_manager), mapper_(std::move(mapper)) {}
+  // Ssl::UpstreamTlsCertificateSelector
+  Ssl::SelectionResult
+  selectTlsContext(const SSL& ssl, const Network::TransportSocketOptionsConstSharedPtr& options,
+                   Ssl::CertificateSelectionCallbackPtr cb) override;
+
+private:
+  Ssl::UpstreamTlsCertificateMapperPtr mapper_;
+};
+
+class BaseCertificateSelectorFactory {
+public:
+  BaseCertificateSelectorFactory(std::shared_ptr<SecretManager>&& secret_manager)
+      : secret_manager_(std::move(secret_manager)) {}
+  absl::Status onConfigUpdate();
+
+protected:
   std::shared_ptr<SecretManager> secret_manager_;
 };
 
-class OnDemandTlsCertificateSelectorFactory : public Ssl::TlsCertificateSelectorFactory {
+class OnDemandTlsCertificateSelectorFactory : public BaseCertificateSelectorFactory,
+                                              public Ssl::TlsCertificateSelectorFactory {
 public:
-  OnDemandTlsCertificateSelectorFactory(Ssl::TlsCertificateMapperFactory&& mapper_factory_,
+  OnDemandTlsCertificateSelectorFactory(Ssl::TlsCertificateMapperFactory&& mapper_factory,
                                         std::shared_ptr<SecretManager>&& secret_manager)
-      : mapper_factory_(std::move(mapper_factory_)), secret_manager_(std::move(secret_manager)) {}
+      : BaseCertificateSelectorFactory(std::move(secret_manager)),
+        mapper_factory_(std::move(mapper_factory)) {}
   // Ssl::TlsCertificateSelectorFactory
   Ssl::TlsCertificateSelectorPtr create(Ssl::TlsCertificateSelectorContext&) override;
-  absl::Status onConfigUpdate() override;
+  absl::Status onConfigUpdate() override {
+    return BaseCertificateSelectorFactory::onConfigUpdate();
+  }
 
 private:
   Ssl::TlsCertificateMapperFactory mapper_factory_;
-  std::shared_ptr<SecretManager> secret_manager_;
+};
+
+class UpstreamOnDemandTlsCertificateSelectorFactory
+    : public BaseCertificateSelectorFactory,
+      public Ssl::UpstreamTlsCertificateSelectorFactory {
+public:
+  UpstreamOnDemandTlsCertificateSelectorFactory(
+      Ssl::UpstreamTlsCertificateMapperFactory&& mapper_factory,
+      std::shared_ptr<SecretManager>&& secret_manager)
+      : BaseCertificateSelectorFactory(std::move(secret_manager)),
+        mapper_factory_(std::move(mapper_factory)) {}
+  // Ssl::UpstreamTlsCertificateSelectorFactory
+  Ssl::UpstreamTlsCertificateSelectorPtr
+  createUpstreamTlsCertificateSelector(Ssl::TlsCertificateSelectorContext&) override;
+  absl::Status onConfigUpdate() override {
+    return BaseCertificateSelectorFactory::onConfigUpdate();
+  }
+
+private:
+  Ssl::UpstreamTlsCertificateMapperFactory mapper_factory_;
 };
 
 class OnDemandTlsCertificateSelectorConfigFactory
@@ -240,6 +332,24 @@ public:
 };
 
 DECLARE_FACTORY(OnDemandTlsCertificateSelectorConfigFactory);
+
+class UpstreamOnDemandTlsCertificateSelectorConfigFactory
+    : public Ssl::UpstreamTlsCertificateSelectorConfigFactory {
+public:
+  absl::StatusOr<Ssl::UpstreamTlsCertificateSelectorFactoryPtr>
+  createUpstreamTlsCertificateSelectorFactory(
+      const Protobuf::Message& proto_config,
+      Server::Configuration::GenericFactoryContext& factory_context,
+      const Ssl::ClientContextConfig& tls_config) override;
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<ConfigProto>();
+  }
+
+  std::string name() const override { return "envoy.tls.certificate_selectors.on_demand_secret"; }
+};
+
+DECLARE_FACTORY(UpstreamOnDemandTlsCertificateSelectorConfigFactory);
 
 } // namespace OnDemand
 } // namespace CertificateSelectors
