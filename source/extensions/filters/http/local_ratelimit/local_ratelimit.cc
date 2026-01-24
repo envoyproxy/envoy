@@ -163,10 +163,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
   if (ENVOY_LOG_CHECK_LEVEL(debug)) {
     for (const auto& request_descriptor : descriptors) {
-      ENVOY_LOG(debug, "populate descriptor: {} and x_ratelimit_option: {}",
-                request_descriptor.toString(),
-                envoy::config::route::v3::RateLimit::XRateLimitOption_Name(
-                    request_descriptor.x_ratelimit_option_));
+      ENVOY_LOG(debug, "populate descriptor: {}", request_descriptor.toString());
     }
   }
 
