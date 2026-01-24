@@ -24,20 +24,21 @@ SseParser::ParsedEvent SseParser::parseEvent(absl::string_view event) {
         // The total data cannot be larger than the input event string.
         parsed_event.data = std::string();
         parsed_event.data->reserve(event.size());
-        parsed_event.data->append(field_value.data(), field_value.size());
       } else {
         // Per SSE spec, multiple data fields are concatenated with newlines.
         parsed_event.data->append("\n");
-        parsed_event.data->append(field_value.data(), field_value.size());
       }
+      parsed_event.data->append(field_value.data(), field_value.size());
     }
   }
 
   return parsed_event;
 }
 
-std::pair<size_t, size_t> SseParser::findEventEnd(absl::string_view buffer, bool end_stream) {
+std::tuple<size_t, size_t, size_t> SseParser::findEventEnd(absl::string_view buffer,
+                                                           bool end_stream) {
   size_t consumed = 0;
+  size_t event_start = 0;
   absl::string_view remaining = buffer;
 
   // Per SSE spec: Strip UTF-8 BOM (U+FEFF = 0xEF 0xBB 0xBF) if present at stream start.
@@ -45,17 +46,19 @@ std::pair<size_t, size_t> SseParser::findEventEnd(absl::string_view buffer, bool
       static_cast<uint8_t>(remaining[1]) == 0xBB && static_cast<uint8_t>(remaining[2]) == 0xBF) {
     remaining = remaining.substr(3);
     consumed = 3;
+    event_start = 3; // Event content starts after BOM
   }
 
   while (!remaining.empty()) {
     auto [line_end, next_line] = findLineEnd(remaining, end_stream);
 
     if (line_end == absl::string_view::npos) {
-      return {absl::string_view::npos, absl::string_view::npos};
+      return {absl::string_view::npos, absl::string_view::npos, absl::string_view::npos};
     }
 
     if (line_end == 0) {
-      return {consumed, consumed + next_line};
+      // Found blank line so this is the end of event
+      return {event_start, consumed, consumed + next_line};
     }
 
     consumed += next_line;
@@ -64,7 +67,7 @@ std::pair<size_t, size_t> SseParser::findEventEnd(absl::string_view buffer, bool
 
   // Per SSE spec: Once the end of the file is reached, any pending data must be discarded.
   // (i.e., incomplete events without a closing blank line are dropped)
-  return {absl::string_view::npos, absl::string_view::npos};
+  return {absl::string_view::npos, absl::string_view::npos, absl::string_view::npos};
 }
 
 std::pair<absl::string_view, absl::string_view> SseParser::parseFieldLine(absl::string_view line) {

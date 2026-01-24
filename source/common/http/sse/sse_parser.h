@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <tuple>
 #include <utility>
 
 #include "absl/strings/string_view.h"
@@ -25,10 +26,10 @@ namespace Sse {
  *   std::string buffer_;
  *   absl::string_view buffer_view(buffer_);
  *   while (!buffer_view.empty()) {
- *     auto [event_end, next_start] = findEventEnd(buffer_view, end_stream);
- *     if (event_end == absl::string_view::npos) break;
+ *     auto [event_start, event_end, next_start] = findEventEnd(buffer_view, end_stream);
+ *     if (event_start == absl::string_view::npos) break;
  *
- *     auto event_str = buffer_view.substr(0, event_end);
+ *     auto event_str = buffer_view.substr(event_start, event_end - event_start);
  *     auto event = parseEvent(event_str);
  *     if (event.data.has_value()) {
  *       // Process event.data.value()
@@ -63,13 +64,17 @@ public:
   /**
    * Finds the end of the next SSE event in the buffer.
    * An event ends with a blank line (two consecutive line breaks).
+   * Automatically handles UTF-8 BOM at the start of the stream.
    *
    * @param buffer the buffer to search for an event.
    * @param end_stream whether this is the end of the stream (affects partial line handling).
-   * @return a pair of {event_end, next_event_start} positions.
-   *         Returns {npos, npos} if no complete event is found.
+   * @return a tuple of {event_start, event_end, next_event_start} positions.
+   *         event_start: where the event content begins (after BOM if present)
+   *         event_end: where the event content ends (excluding trailing blank line)
+   *         next_event_start: where to continue parsing for the next event
+   *         Returns {npos, npos, npos} if no complete event is found.
    */
-  static std::pair<size_t, size_t> findEventEnd(absl::string_view buffer, bool end_stream);
+  static std::tuple<size_t, size_t, size_t> findEventEnd(absl::string_view buffer, bool end_stream);
 
 private:
   /**
