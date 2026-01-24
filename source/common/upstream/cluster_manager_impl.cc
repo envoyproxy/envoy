@@ -1562,8 +1562,9 @@ ClusterManagerImpl::allocateOdCdsApi(OdCdsCreationFunction creation_function,
 
   auto it = odcds_subscriptions_.find(config_hash);
   if (it != odcds_subscriptions_.end()) {
+    auto handle = OdCdsApiHandleImpl::create(*this, config_hash);
     it->second->ref_count.fetch_add(1, std::memory_order_relaxed);
-    return OdCdsApiHandleImpl::create(*this, config_hash);
+    return handle;
   }
 
   auto odcds_or_error =
@@ -1584,6 +1585,9 @@ ClusterManagerImpl::OdCdsApiHandleImpl::~OdCdsApiHandleImpl() {
     parent_.releaseOdCdsSubscription(subscription_key_);
   } else {
     parent_.dispatcher_.post([subscription_key = subscription_key_, &parent = parent_] {
+      if (parent.shutdown_.load()) {
+        return;
+      }
       parent.releaseOdCdsSubscription(subscription_key);
     });
   }
