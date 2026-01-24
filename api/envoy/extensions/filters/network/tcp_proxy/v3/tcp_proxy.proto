@@ -209,6 +209,9 @@ message TcpProxy {
     // If set to true, the access log is flushed when the TCP proxy successfully establishes a
     // connection with the upstream. If the connection fails, the access log is not flushed.
     bool flush_access_log_on_connected = 2;
+
+    // If set to true, the access log is flushed when the TCP proxy accepts a connection.
+    bool flush_access_log_on_start = 3;
   }
 
   reserved 6;
