@@ -1,5 +1,8 @@
 #pragma once
 
+#include <string>
+#include <vector>
+
 #include "openssl/x509v3.h"
 
 namespace Envoy {
@@ -14,6 +17,9 @@ public:
 
   // Configures `store` to ignore certificate expiration.
   static void setIgnoreCertificateExpiration(X509_STORE* store);
+
+  // Returns a list of all Subject Alternative Names from the certificate.
+  static std::vector<std::string> getCertificateSans(X509* cert);
 };
 
 } // namespace Tls
