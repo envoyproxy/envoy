@@ -11,6 +11,9 @@ bug_fixes:
 - area: ext_authz
   change: |
     Fixed a bug where headers from a denied authorization response (non-200s) were not properly propagated to the client.
+- area: oauth2
+  change: |
+    Fixed OAuth2 refresh requests so host rewriting no longer overrides the original Host value.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
