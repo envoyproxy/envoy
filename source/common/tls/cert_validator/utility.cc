@@ -42,7 +42,7 @@ void CertValidatorUtil::setIgnoreCertificateExpiration(X509_STORE* store) {
 
 std::vector<std::string> CertValidatorUtil::getCertificateSans(X509* cert) {
   std::vector<std::string> sans;
-  //X509_get_ext_d2i should be available in all supported BoringSSL versions.
+  // X509_get_ext_d2i should be available in all supported BoringSSL versions.
   bssl::UniquePtr<GENERAL_NAMES> san_names(
       static_cast<GENERAL_NAMES*>(X509_get_ext_d2i(cert, NID_subject_alt_name, nullptr, nullptr)));
   if (san_names != nullptr) {
