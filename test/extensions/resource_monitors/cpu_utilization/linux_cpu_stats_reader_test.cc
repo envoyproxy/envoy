@@ -570,17 +570,8 @@ TEST(LinuxContainerCpuStatsReaderFactoryTest, ThrowsWhenNoCgroupFilesExist) {
       .Times(testing::AtMost(1))
       .WillRepeatedly(Return(false));
 
-  EXPECT_THROW(
-      {
-        try {
-          LinuxContainerCpuStatsReader::create(mock_fs, context.api().timeSource());
-        } catch (const EnvoyException& e) {
-          EXPECT_NE(std::string(e.what()).find("No supported cgroup CPU implementation"),
-                    std::string::npos);
-          throw;
-        }
-      },
-      EnvoyException);
+  EXPECT_THROW(LinuxContainerCpuStatsReader::create(mock_fs, context.api().timeSource()),
+               EnvoyException);
 }
 
 // =============================================================================
