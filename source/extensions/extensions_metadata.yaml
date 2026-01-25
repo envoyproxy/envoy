@@ -726,7 +726,7 @@ envoy.sse_content_parsers.json:
   security_posture: robust_to_untrusted_downstream
   status: alpha
   type_urls:
-  - envoy.extensions.sse_content_parsers.json.v3.JsonContentParser
+  - envoy.extensions.http.sse_content_parsers.json.v3.JsonContentParser
 envoy.filters.http.header_mutation:
   categories:
   - envoy.filters.http
