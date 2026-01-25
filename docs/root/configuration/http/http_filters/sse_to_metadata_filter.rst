@@ -99,8 +99,7 @@ For Server-Sent Events (SSE) format with JSON content parser:
    * **on_error**: Deferred until end-of-stream. Executes only if ``on_present`` never executed and an error occurred (JSON parse failure, no data field, content-type mismatch, etc.). Takes priority over ``on_missing`` if both conditions are met
 
 6. The deferred execution of ``on_missing`` and ``on_error`` ensures that early events without the desired field (common in LLM streams) don't prevent later successful extractions
-7. By default (``stop_processing_on_first_match: false``), it processes the entire stream. Set to ``true`` to stop
-   after the first rule match (only ``on_present`` triggers this), which is more efficient when you know the desired value appears early or only once
+7. By default, each rule processes the entire stream (``stop_processing_after_matches: 0``). Set ``stop_processing_after_matches: 1`` on a rule to stop evaluating that rule after its first match. The filter only stops processing the entire stream when ALL rules have limits AND they've all been reached (see :ref:`Performance Considerations <config_http_filters_sse_to_metadata_performance>` for details)
 
 Configuration
 -------------
@@ -330,16 +329,68 @@ The filter implements full `SSE specification <https://html.spec.whatwg.org/mult
 * **Field Ordering**: Correctly processes events regardless of field order
 * **Chunked Transfer**: Handles events split across multiple TCP packets/HTTP chunks, properly buffering incomplete events
 
+.. _config_http_filters_sse_to_metadata_performance:
+
 Performance Considerations
 --------------------------
 
+**Memory Usage**
+
 * The filter buffers incomplete SSE events in memory until they are complete
 * Once a complete event is found, it is processed immediately and removed from the buffer
-* By default, ``stop_processing_after_matches: 0`` processes all content items for a rule
-* Set ``stop_processing_after_matches: 1`` on individual rules to stop evaluating that rule after the first match for better performance
-  when you only need the first occurrence (e.g., a model name that appears early in the stream)
-* For extracting values that appear at the end (e.g., token usage), use ``stop_processing_after_matches: 0`` (default)
-* Mix strategies: some rules with ``stop_processing_after_matches: 1`` (early values) and others with ``0`` (final values)
+* The ``max_event_size`` configuration (default: 8KB) protects against unbounded memory growth
+
+**Stream Processing Optimization**
+
+* By default, ``stop_processing_after_matches: 0`` processes all events for a rule throughout the entire stream
+* Set ``stop_processing_after_matches: 1`` on a rule to stop evaluating that specific rule after its first match
+* For extracting values that appear at the end (e.g., LLM token usage), use ``stop_processing_after_matches: 0`` (default)
+
+**When Early Termination Occurs**
+
+The filter can stop processing the SSE stream early **only when ALL rules** have ``stop_processing_after_matches > 0`` AND
+all those limits have been reached. This provides significant performance benefits by avoiding parsing of remaining events:
+
+.. code-block:: yaml
+
+  rules:
+  - rule:
+      selectors: [{ key: "request_id" }]
+      on_present: { ... }
+    stop_processing_after_matches: 1  # Stop after first match
+  - rule:
+      selectors: [{ key: "model" }]
+      on_present: { ... }
+    stop_processing_after_matches: 1  # Stop after first match
+
+In this example, after both ``request_id`` and ``model`` are extracted from the first event, the filter stops processing
+the stream entirely, providing **substantial CPU and memory savings** for long-running streams.
+
+**Mixed Strategies - Limited Performance Benefit**
+
+When mixing rules with different strategies (some with limits, some without), the performance benefit is **minimal**:
+
+.. code-block:: yaml
+
+  rules:
+  - rule:
+      selectors: [{ key: "model" }]
+      on_present: { ... }
+    stop_processing_after_matches: 1  # Extract first occurrence
+  - rule:
+      selectors: [{ key: "usage" }, { key: "total_tokens" }]
+      on_present: { ... }
+    # Default: 0 - extract last occurrence
+
+**Result**: The filter must process the **entire stream** to get the final token count. The only savings are skipping
+the ``model`` selector evaluation after the first match (negligible CPU cost compared to JSON parsing).
+
+.. note::
+
+  For the common LLM streaming use case (extracting final token usage along with early metadata), the filter
+  must process the entire stream regardless of per-rule ``stop_processing_after_matches`` settings.
+  The real performance benefit comes from scenarios where ALL metadata can be extracted early, such as
+  pure request/response correlation without needing end-of-stream values
 
 Security Considerations
 -----------------------

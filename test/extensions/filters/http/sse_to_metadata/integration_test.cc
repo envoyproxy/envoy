@@ -63,22 +63,23 @@ typed_config:
     content_parser:
       name: envoy.sse_content_parsers.json
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.sse_content_parsers.json.v3.JsonContentParser
+        "@type": type.googleapis.com/envoy.extensions.http.sse_content_parsers.json.v3.JsonContentParser
         rules:
-          - selectors:
-              - key: "usage"
-              - key: "total_tokens"
-            on_present:
-              metadata_namespace: "envoy.lb"
-              key: "tokens"
-              type: NUMBER
-          - selectors:
-              - key: "model"
-            on_present:
-              metadata_namespace: "envoy.lb"
-              key: "model_name"
-              type: STRING
-        stop_processing_on_first_match: false
+          - rule:
+              selectors:
+                - key: "usage"
+                - key: "total_tokens"
+              on_present:
+                metadata_namespace: "envoy.lb"
+                key: "tokens"
+                type: NUMBER
+          - rule:
+              selectors:
+                - key: "model"
+              on_present:
+                metadata_namespace: "envoy.lb"
+                key: "model_name"
+                type: STRING
 )EOF";
 
   Http::TestRequestHeaderMapImpl request_headers_{

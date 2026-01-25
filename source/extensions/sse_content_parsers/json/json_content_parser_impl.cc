@@ -72,17 +72,23 @@ SseContentParser::ParseResult JsonContentParserImpl::parse(absl::string_view dat
     }
   }
 
-  // Check if all rules with stop_processing_after_matches > 0 have reached their limits
+  // Check if we should stop processing future events for this stream
+  // We stop processing when ALL rules have limits AND all those limits have been reached
+  // If ANY rule has no limit (stop_processing_after_matches == 0), we never stop
+  bool all_rules_have_limits = true;
   bool all_limited_rules_satisfied = true;
   for (const auto& rule : rules_) {
-    if (rule.stop_processing_after_matches_ > 0 &&
-        rule.match_count_ < rule.stop_processing_after_matches_) {
+    if (rule.stop_processing_after_matches_ == 0) {
+      all_rules_have_limits = false;
+      break;
+    }
+    if (rule.match_count_ < rule.stop_processing_after_matches_) {
       all_limited_rules_satisfied = false;
       break;
     }
   }
 
-  result.stop_processing = all_limited_rules_satisfied;
+  result.stop_processing = all_rules_have_limits && all_limited_rules_satisfied;
   return result;
 }
 

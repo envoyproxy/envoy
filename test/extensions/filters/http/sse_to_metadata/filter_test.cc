@@ -64,15 +64,16 @@ public:
     content_parser:
       name: envoy.sse_content_parsers.json
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.sse_content_parsers.json.v3.JsonContentParser
+        "@type": type.googleapis.com/envoy.extensions.http.sse_content_parsers.json.v3.JsonContentParser
         rules:
-          - selectors:
-              - key: "usage"
-              - key: "total_tokens"
-            on_present:
-              metadata_namespace: "envoy.lb"
-              key: "tokens"
-              type: NUMBER
+          - rule:
+              selectors:
+                - key: "usage"
+                - key: "total_tokens"
+              on_present:
+                metadata_namespace: "envoy.lb"
+                key: "tokens"
+                type: NUMBER
   )EOF";
 
   const std::string multi_namespace_config_ = R"EOF(
@@ -80,22 +81,24 @@ public:
     content_parser:
       name: envoy.sse_content_parsers.json
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.sse_content_parsers.json.v3.JsonContentParser
+        "@type": type.googleapis.com/envoy.extensions.http.sse_content_parsers.json.v3.JsonContentParser
         rules:
-          - selectors:
-              - key: "usage"
-              - key: "total_tokens"
-            on_present:
-              metadata_namespace: "envoy.lb"
-              key: "tokens"
-              type: NUMBER
-          - selectors:
-              - key: "usage"
-              - key: "total_tokens"
-            on_present:
-              metadata_namespace: "envoy.audit"
-              key: "token_count"
-              type: NUMBER
+          - rule:
+              selectors:
+                - key: "usage"
+                - key: "total_tokens"
+              on_present:
+                metadata_namespace: "envoy.lb"
+                key: "tokens"
+                type: NUMBER
+          - rule:
+              selectors:
+                - key: "usage"
+                - key: "total_tokens"
+              on_present:
+                metadata_namespace: "envoy.audit"
+                key: "token_count"
+                type: NUMBER
   )EOF";
 
   const std::string preserve_config_ = R"EOF(
@@ -103,16 +106,17 @@ public:
     content_parser:
       name: envoy.sse_content_parsers.json
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.sse_content_parsers.json.v3.JsonContentParser
+        "@type": type.googleapis.com/envoy.extensions.http.sse_content_parsers.json.v3.JsonContentParser
         rules:
-          - selectors:
-              - key: "usage"
-              - key: "total_tokens"
-            on_present:
-              metadata_namespace: "envoy.lb"
-              key: "tokens"
-              type: NUMBER
-              preserve_existing_metadata_value: true
+          - rule:
+              selectors:
+                - key: "usage"
+                - key: "total_tokens"
+              on_present:
+                metadata_namespace: "envoy.lb"
+                key: "tokens"
+                type: NUMBER
+                preserve_existing_metadata_value: true
   )EOF";
 
   const std::string multi_rule_config_ = R"EOF(
@@ -120,22 +124,23 @@ public:
     content_parser:
       name: envoy.sse_content_parsers.json
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.sse_content_parsers.json.v3.JsonContentParser
+        "@type": type.googleapis.com/envoy.extensions.http.sse_content_parsers.json.v3.JsonContentParser
         rules:
-          - selectors:
-              - key: "usage"
-              - key: "total_tokens"
-            on_present:
-              metadata_namespace: "envoy.lb"
-              key: "tokens"
-              type: NUMBER
-          - selectors:
-              - key: "model"
-            on_present:
-              metadata_namespace: "envoy.lb"
-              key: "model_name"
-              type: STRING
-        stop_processing_on_first_match: false
+          - rule:
+              selectors:
+                - key: "usage"
+                - key: "total_tokens"
+              on_present:
+                metadata_namespace: "envoy.lb"
+                key: "tokens"
+                type: NUMBER
+          - rule:
+              selectors:
+                - key: "model"
+              on_present:
+                metadata_namespace: "envoy.lb"
+                key: "model_name"
+                type: STRING
   )EOF";
 
   const std::string no_stop_config_ = R"EOF(
@@ -143,16 +148,16 @@ public:
     content_parser:
       name: envoy.sse_content_parsers.json
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.sse_content_parsers.json.v3.JsonContentParser
+        "@type": type.googleapis.com/envoy.extensions.http.sse_content_parsers.json.v3.JsonContentParser
         rules:
-          - selectors:
-              - key: "usage"
-              - key: "total_tokens"
-            on_present:
-              metadata_namespace: "envoy.lb"
-              key: "tokens"
-              type: NUMBER
-        stop_processing_on_first_match: false
+          - rule:
+              selectors:
+                - key: "usage"
+                - key: "total_tokens"
+              on_present:
+                metadata_namespace: "envoy.lb"
+                key: "tokens"
+                type: NUMBER
   )EOF";
 
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
@@ -542,15 +547,16 @@ TEST_F(SseToMetadataFilterTest, EventExceedsMaxSize) {
     content_parser:
       name: envoy.sse_content_parsers.json
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.sse_content_parsers.json.v3.JsonContentParser
+        "@type": type.googleapis.com/envoy.extensions.http.sse_content_parsers.json.v3.JsonContentParser
         rules:
-          - selectors:
-              - key: "usage"
-              - key: "total_tokens"
-            on_present:
-              metadata_namespace: "envoy.lb"
-              key: "tokens"
-              type: NUMBER
+          - rule:
+              selectors:
+                - key: "usage"
+                - key: "total_tokens"
+              on_present:
+                metadata_namespace: "envoy.lb"
+                key: "tokens"
+                type: NUMBER
   )EOF";
 
   setupFilter(config_with_small_limit);
@@ -581,15 +587,16 @@ TEST_F(SseToMetadataFilterTest, EventWithinMaxSize) {
     content_parser:
       name: envoy.sse_content_parsers.json
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.sse_content_parsers.json.v3.JsonContentParser
+        "@type": type.googleapis.com/envoy.extensions.http.sse_content_parsers.json.v3.JsonContentParser
         rules:
-          - selectors:
-              - key: "usage"
-              - key: "total_tokens"
-            on_present:
-              metadata_namespace: "envoy.lb"
-              key: "tokens"
-              type: NUMBER
+          - rule:
+              selectors:
+                - key: "usage"
+                - key: "total_tokens"
+              on_present:
+                metadata_namespace: "envoy.lb"
+                key: "tokens"
+                type: NUMBER
   )EOF";
 
   setupFilter(config_with_large_limit);
@@ -611,15 +618,16 @@ TEST_F(SseToMetadataFilterTest, MaxSizeDisabled) {
     content_parser:
       name: envoy.sse_content_parsers.json
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.sse_content_parsers.json.v3.JsonContentParser
+        "@type": type.googleapis.com/envoy.extensions.http.sse_content_parsers.json.v3.JsonContentParser
         rules:
-          - selectors:
-              - key: "usage"
-              - key: "total_tokens"
-            on_present:
-              metadata_namespace: "envoy.lb"
-              key: "tokens"
-              type: NUMBER
+          - rule:
+              selectors:
+                - key: "usage"
+                - key: "total_tokens"
+              on_present:
+                metadata_namespace: "envoy.lb"
+                key: "tokens"
+                type: NUMBER
   )EOF";
 
   setupFilter(config_no_limit);
@@ -658,16 +666,17 @@ TEST_F(SseToMetadataFilterTest, StopProcessingOnMatch) {
     content_parser:
       name: envoy.sse_content_parsers.json
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.sse_content_parsers.json.v3.JsonContentParser
+        "@type": type.googleapis.com/envoy.extensions.http.sse_content_parsers.json.v3.JsonContentParser
         rules:
-          - selectors:
-              - key: "usage"
-              - key: "total_tokens"
-            on_present:
-              metadata_namespace: "envoy.lb"
-              key: "tokens"
-              type: NUMBER
-        stop_processing_on_first_match: true
+          - rule:
+              selectors:
+                - key: "usage"
+                - key: "total_tokens"
+              on_present:
+                metadata_namespace: "envoy.lb"
+                key: "tokens"
+                type: NUMBER
+            stop_processing_after_matches: 1
   )EOF";
   setupFilter(config);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
@@ -770,20 +779,21 @@ TEST_F(SseToMetadataFilterTest, OnErrorJsonParseFails) {
     content_parser:
       name: envoy.sse_content_parsers.json
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.sse_content_parsers.json.v3.JsonContentParser
+        "@type": type.googleapis.com/envoy.extensions.http.sse_content_parsers.json.v3.JsonContentParser
         rules:
-          - selectors:
-              - key: "usage"
-              - key: "total_tokens"
-            on_present:
-              metadata_namespace: "envoy.lb"
-              key: "tokens"
-              type: NUMBER
-            on_error:
+          - rule:
+              selectors:
+                - key: "usage"
+                - key: "total_tokens"
+              on_present:
                 metadata_namespace: "envoy.lb"
                 key: "tokens"
-                value:
-                  number_value: 0
+                type: NUMBER
+              on_error:
+                  metadata_namespace: "envoy.lb"
+                  key: "tokens"
+                  value:
+                    number_value: 0
   )EOF";
 
   setupFilter(config);
@@ -841,20 +851,21 @@ TEST_F(SseToMetadataFilterTest, OnErrorDoesNotOverwriteOnPresent) {
     content_parser:
       name: envoy.sse_content_parsers.json
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.sse_content_parsers.json.v3.JsonContentParser
+        "@type": type.googleapis.com/envoy.extensions.http.sse_content_parsers.json.v3.JsonContentParser
         rules:
-          - selectors:
-              - key: "usage"
-              - key: "total_tokens"
-            on_present:
-              metadata_namespace: "envoy.lb"
-              key: "tokens"
-              type: NUMBER
-            on_error:
+          - rule:
+              selectors:
+                - key: "usage"
+                - key: "total_tokens"
+              on_present:
                 metadata_namespace: "envoy.lb"
                 key: "tokens"
-                value:
-                  number_value: 0
+                type: NUMBER
+              on_error:
+                  metadata_namespace: "envoy.lb"
+                  key: "tokens"
+                  value:
+                    number_value: 0
   )EOF";
 
   setupFilter(config);
@@ -884,21 +895,22 @@ TEST_F(SseToMetadataFilterTest, OnErrorPriorityOverOnMissing) {
     content_parser:
       name: envoy.sse_content_parsers.json
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.sse_content_parsers.json.v3.JsonContentParser
+        "@type": type.googleapis.com/envoy.extensions.http.sse_content_parsers.json.v3.JsonContentParser
         rules:
-          - selectors:
-              - key: "usage"
-              - key: "total_tokens"
-            on_missing:
-              metadata_namespace: "envoy.lb"
-              key: "tokens"
-              value:
-                number_value: -1
-            on_error:
-              metadata_namespace: "envoy.lb"
-              key: "tokens"
-              value:
-                number_value: 0
+          - rule:
+              selectors:
+                - key: "usage"
+                - key: "total_tokens"
+              on_missing:
+                metadata_namespace: "envoy.lb"
+                key: "tokens"
+                value:
+                  number_value: -1
+              on_error:
+                metadata_namespace: "envoy.lb"
+                key: "tokens"
+                value:
+                  number_value: 0
   )EOF";
 
   setupFilter(config);
@@ -968,16 +980,17 @@ TEST_F(SseToMetadataFilterTest, TrailersWithContentTypeMismatch) {
     content_parser:
       name: envoy.sse_content_parsers.json
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.sse_content_parsers.json.v3.JsonContentParser
+        "@type": type.googleapis.com/envoy.extensions.http.sse_content_parsers.json.v3.JsonContentParser
         rules:
-          - selectors:
-              - key: "usage"
-              - key: "total_tokens"
-            on_error:
-              metadata_namespace: "envoy.lb"
-              key: "tokens"
-              value:
-                number_value: 0
+          - rule:
+              selectors:
+                - key: "usage"
+                - key: "total_tokens"
+              on_error:
+                metadata_namespace: "envoy.lb"
+                key: "tokens"
+                value:
+                  number_value: 0
   )EOF";
 
   setupFilter(config);
