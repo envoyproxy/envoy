@@ -194,8 +194,7 @@ LocalRateLimiterImpl::requestAllowed(absl::Span<const RateLimit::Descriptor> req
             share_factor, match_result.request_descriptor.get().hits_addend_.value_or(1))) {
       // If the request is forbidden by a descriptor, return the result and the descriptor
       // token bucket.
-      return {match_result.token_bucket->shadowMode(),
-              std::shared_ptr<TokenBucketContext>(match_result.token_bucket)};
+      return {false, std::shared_ptr<TokenBucketContext>(match_result.token_bucket)};
     }
     ENVOY_LOG(trace,
               "request allowed by descriptor with fill rate: {}, maxToken: {}, remainingToken {}",
@@ -215,8 +214,7 @@ LocalRateLimiterImpl::requestAllowed(absl::Span<const RateLimit::Descriptor> req
     if (const bool result = default_token_bucket_->consume(share_factor); !result) {
       // If the request is forbidden by the default token bucket, return the result and the
       // default token bucket.
-      return {default_token_bucket_->shadowMode(),
-              std::shared_ptr<TokenBucketContext>(default_token_bucket_)};
+      return {false, std::shared_ptr<TokenBucketContext>(default_token_bucket_)};
     }
 
     // If the request is allowed then return the result the token bucket. The descriptor
