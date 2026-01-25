@@ -48,7 +48,7 @@ private:
 
   class NameAndTags {
   public:
-    NameAndTags(const envoy::extensions::access_loggers::stats::v3::Config::Stats& cfg,
+    NameAndTags(const envoy::extensions::access_loggers::stats::v3::Config::Stat& cfg,
                 Envoy::Stats::StatNamePool& pool,
                 const std::vector<Formatter::CommandParserPtr>& commands,
                 Server::Configuration::GenericFactoryContext& context);

@@ -42,7 +42,7 @@ message Config {
   }
 
   // Defines the name and tags of a stat.
-  message Stats {
+  message Stat {
     // The name of the stat.
     string name = 1 [(validate.rules).string = {min_len: 1}];
 
@@ -82,7 +82,7 @@ message Config {
     }
 
     // The name and tags of this histogram.
-    Stats stat = 1 [(validate.rules).message = {required: true}];
+    Stat stat = 1 [(validate.rules).message = {required: true}];
 
     // The units for this histogram.
     Unit unit = 2 [(validate.rules).enum = {defined_only: true}];
@@ -96,7 +96,7 @@ message Config {
   // Configuration for a counter stat.
   message Counter {
     // The name and tags of this counter.
-    Stats stat = 1 [(validate.rules).message = {required: true}];
+    Stat stat = 1 [(validate.rules).message = {required: true}];
 
     // The format string for the value to add to this counter, using
     // :ref:`command operators <config_access_log_command_operators>`. One of

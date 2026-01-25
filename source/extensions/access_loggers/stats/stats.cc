@@ -128,7 +128,7 @@ StatsAccessLog::StatsAccessLog(const envoy::extensions::access_loggers::stats::v
       }()) {}
 
 StatsAccessLog::NameAndTags::NameAndTags(
-    const envoy::extensions::access_loggers::stats::v3::Config::Stats& cfg,
+    const envoy::extensions::access_loggers::stats::v3::Config::Stat& cfg,
     Envoy::Stats::StatNamePool& pool, const std::vector<Formatter::CommandParserPtr>& commands,
     Server::Configuration::GenericFactoryContext& context)
     : str_name_(cfg.name()) {
