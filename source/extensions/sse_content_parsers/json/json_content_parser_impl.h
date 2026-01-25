@@ -2,7 +2,7 @@
 
 #include <vector>
 
-#include "envoy/extensions/sse_content_parsers/json/v3/json_content_parser.pb.h"
+#include "envoy/extensions/http/sse_content_parsers/json/v3/json_content_parser.pb.h"
 #include "envoy/json/json_object.h"
 #include "envoy/sse_content_parser/factory.h"
 #include "envoy/sse_content_parser/parser.h"
@@ -29,7 +29,7 @@ class JsonContentParserImpl : public SseContentParser::Parser,
                               public Logger::Loggable<Logger::Id::filter> {
 public:
   JsonContentParserImpl(
-      const envoy::extensions::sse_content_parsers::json::v3::JsonContentParser& config);
+      const envoy::extensions::http::sse_content_parsers::json::v3::JsonContentParser& config);
 
   // SseContentParser::Parser
   SseContentParser::ParseResult parse(absl::string_view data) override;
@@ -39,9 +39,11 @@ public:
 
 private:
   struct Rule {
-    Rule(const ProtoRule& rule);
+    Rule(const ProtoRule& rule, uint32_t stop_processing_after_matches);
     const ProtoRule rule_;
     std::vector<std::string> selector_path_;
+    uint32_t stop_processing_after_matches_;
+    size_t match_count_ = 0;
   };
 
   /**
@@ -65,7 +67,6 @@ private:
                                            ValueType type) const;
 
   std::vector<Rule> rules_;
-  bool stop_processing_on_first_match_;
 };
 
 /**
@@ -74,14 +75,14 @@ private:
 class JsonContentParserFactory : public SseContentParser::ParserFactory {
 public:
   JsonContentParserFactory(
-      const envoy::extensions::sse_content_parsers::json::v3::JsonContentParser& config);
+      const envoy::extensions::http::sse_content_parsers::json::v3::JsonContentParser& config);
 
   // SseContentParser::ParserFactory
   SseContentParser::ParserPtr createParser() override;
   const std::string& statsPrefix() const override;
 
 private:
-  const envoy::extensions::sse_content_parsers::json::v3::JsonContentParser config_;
+  const envoy::extensions::http::sse_content_parsers::json::v3::JsonContentParser config_;
 };
 
 } // namespace Json

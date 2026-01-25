@@ -17,7 +17,7 @@ envoy_cc_library(
         "//envoy/sse_content_parser:factory_interface",
         "//envoy/sse_content_parser:parser_interface",
         "//source/common/json:json_loader_lib",
-        "@envoy_api//envoy/extensions/sse_content_parsers/json/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/http/sse_content_parsers/json/v3:pkg_cc_proto",
     ],
 )
 
@@ -29,6 +29,6 @@ envoy_cc_extension(
         ":json_content_parser_lib",
         "//envoy/registry",
         "//envoy/sse_content_parser:config_interface",
-        "@envoy_api//envoy/extensions/sse_content_parsers/json/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/http/sse_content_parsers/json/v3:pkg_cc_proto",
     ],
 )

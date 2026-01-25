@@ -63,22 +63,23 @@ Extract multiple values from streaming responses for logging and monitoring:
     content_parser:
       name: envoy.sse_content_parsers.json
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.sse_content_parsers.json.v3.JsonContentParser
+        "@type": type.googleapis.com/envoy.extensions.http.sse_content_parsers.json.v3.JsonContentParser
         rules:
-        - selectors:
-          - key: "usage"
-          - key: "total_tokens"
-          on_present:
-            metadata_namespace: envoy.audit
-            key: tokens
-            type: NUMBER
-        - selectors:
-          - key: "model"
-          on_present:
-            metadata_namespace: envoy.audit
-            key: model_name
-            type: STRING
-        stop_processing_on_first_match: false
+        - rule:
+            selectors:
+            - key: "usage"
+            - key: "total_tokens"
+            on_present:
+              metadata_namespace: envoy.audit
+              key: tokens
+              type: NUMBER
+        - rule:
+            selectors:
+            - key: "model"
+            on_present:
+              metadata_namespace: envoy.audit
+              key: model_name
+              type: STRING
 
 How It Works
 ------------
@@ -125,7 +126,7 @@ Key Configuration Options
   and extract values from event payloads. Available parsers:
 
   * **envoy.sse_content_parsers.json**: Parses JSON content and extracts values using JSONPath-like selectors.
-    See :ref:`v3 API reference <envoy_v3_api_msg_extensions.sse_content_parsers.json.v3.JsonContentParser>`
+    See :ref:`v3 API reference <envoy_v3_api_msg_extensions.http.sse_content_parsers.json.v3.JsonContentParser>`
     for configuration options.
 
 **JSON Content Parser Configuration**
@@ -135,36 +136,38 @@ When using ``envoy.sse_content_parsers.json``, configure rules within the typed_
 **rules**
   A list of rules to apply. Each rule contains:
 
-  * **selectors**: A list of selectors that specifies how to extract a value from the JSON payload. Each selector has a ``key`` field representing one level of nesting in the JSON object (e.g., ``selectors: [{key: "usage"}, {key: "total_tokens"}]`` extracts ``json_object["usage"]["total_tokens"]``). At least one selector must be specified.
+  * **rule**: The json-to-metadata rule configuration with the following fields:
 
-  * **on_present**: Metadata to write when the selector successfully extracts a value.
-    Executes immediately when a match is found. Specifies:
+    - **selectors**: A list of selectors that specifies how to extract a value from the JSON payload. Each selector has a ``key`` field representing one level of nesting in the JSON object (e.g., ``selectors: [{key: "usage"}, {key: "total_tokens"}]`` extracts ``json_object["usage"]["total_tokens"]``). At least one selector must be specified.
 
-    - ``metadata_namespace``: The metadata namespace (e.g., ``envoy.lb``). If empty, defaults to ``envoy.filters.http.sse_to_metadata``.
-    - ``key``: The metadata key
-    - ``value``: Optional hardcoded value. If set, writes this instead of the extracted value.
-    - ``type``: The value type (``PROTOBUF_VALUE``, ``STRING``, or ``NUMBER``)
-    - ``preserve_existing_metadata_value``: If true, don't overwrite existing metadata. Default false.
+    - **on_present**: Metadata to write when the selector successfully extracts a value.
+      Executes immediately when a match is found. Specifies:
 
-  * **on_missing**: Metadata to write when the selector path is not found in the JSON.
-    Executes at end-of-stream if ``on_present`` never executed. Write a fallback/sentinel value (e.g., -1) to ensure metadata is always present for downstream consumers.
-    **Must** have ``value`` set to a fallback. This handles the case where legitimate JSON exists but lacks the expected field.
+      * ``metadata_namespace``: The metadata namespace (e.g., ``envoy.lb``). If empty, defaults to ``envoy.filters.http.sse_to_metadata``.
+      * ``key``: The metadata key
+      * ``value``: Optional hardcoded value. If set, writes this instead of the extracted value.
+      * ``type``: The value type (``PROTOBUF_VALUE``, ``STRING``, or ``NUMBER``)
+      * ``preserve_existing_metadata_value``: If true, don't overwrite existing metadata. Default false.
 
-  * **on_error**: Metadata to write when an error occurs (JSON parse failure, no data field, content-type mismatch, etc.).
-    Executes at end-of-stream if ``on_present`` never executed and takes priority over ``on_missing``. Write a safe default (e.g., 0) to ensure metadata is always present even when errors occur.
-    **Must** have ``value`` set to a fallback. This handles malformed or missing data.
+    - **on_missing**: Metadata to write when the selector path is not found in the JSON.
+      Executes at end-of-stream if ``on_present`` never executed. Write a fallback/sentinel value (e.g., -1) to ensure metadata is always present for downstream consumers.
+      **Must** have ``value`` set to a fallback. This handles the case where legitimate JSON exists but lacks the expected field.
+
+    - **on_error**: Metadata to write when an error occurs (JSON parse failure, no data field, content-type mismatch, etc.).
+      Executes at end-of-stream if ``on_present`` never executed and takes priority over ``on_missing``. Write a safe default (e.g., 0) to ensure metadata is always present even when errors occur.
+      **Must** have ``value`` set to a fallback. This handles malformed or missing data.
+
+  * **stop_processing_after_matches**: Optional per-rule field that controls processing behavior.
+
+    - If set to ``0`` (default): Process all content items. Later matches overwrite earlier values (unless ``preserve_existing_metadata_value`` is set), effectively extracting the LAST occurrence.
+    - If set to ``1``: Stop evaluating this specific rule after the first successful match. Use this for values that appear early in the stream.
+    - If set to ``N > 1``: Reserved for future use (e.g., aggregating multiple values).
 
   .. note::
 
     At least one of ``on_present``, ``on_missing``, or ``on_error`` must be specified in each rule.
     The ``on_missing`` and ``on_error`` actions are deferred and only execute at the end of the stream if ``on_present`` never executes.
-    This prevents early error/missing events from overwriting later successful extractions (common in LLM streams where usage data appears in the final event).
-
-**stop_processing_on_first_match**
-  Config-level field (not per-rule). If true, stop processing the stream after the first rule successfully matches (``on_present`` executes).
-  If false (default), continue processing the entire stream. When combined with preserve_existing_metadata_value=false,
-  later matches overwrite earlier ones (picks LAST occurrence). Set to true for better performance when you only need the first matching value.
-  Note: ``on_missing`` and ``on_error`` do not trigger this.
+    This prevents early error/missing content from overwriting later successful extractions (common in LLM streams where usage data appears in the final content).
 
 **response_rules.allowed_content_types**
   A list of content types to process. Defaults to ``["text/event-stream"]`` for SSE format.
@@ -191,22 +194,24 @@ Write the same value to multiple metadata namespaces, useful during migrations:
     content_parser:
       name: envoy.sse_content_parsers.json
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.sse_content_parsers.json.v3.JsonContentParser
+        "@type": type.googleapis.com/envoy.extensions.http.sse_content_parsers.json.v3.JsonContentParser
         rules:
-        - selectors:
-          - key: "usage"
-          - key: "total_tokens"
-          on_present:
-            metadata_namespace: old.namespace
-            key: tokens
-            type: NUMBER
-        - selectors:
-          - key: "usage"
-          - key: "total_tokens"
-          on_present:
-            metadata_namespace: new.namespace
-            key: tokens
-            type: NUMBER
+        - rule:
+            selectors:
+            - key: "usage"
+            - key: "total_tokens"
+            on_present:
+              metadata_namespace: old.namespace
+              key: tokens
+              type: NUMBER
+        - rule:
+            selectors:
+            - key: "usage"
+            - key: "total_tokens"
+            on_present:
+              metadata_namespace: new.namespace
+              key: tokens
+              type: NUMBER
 
 **Preserving Existing Metadata**
 
@@ -218,16 +223,17 @@ Avoid overwriting previously set metadata values:
     content_parser:
       name: envoy.sse_content_parsers.json
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.sse_content_parsers.json.v3.JsonContentParser
+        "@type": type.googleapis.com/envoy.extensions.http.sse_content_parsers.json.v3.JsonContentParser
         rules:
-        - selectors:
-          - key: "usage"
-          - key: "total_tokens"
-          on_present:
-            metadata_namespace: envoy.lb
-            key: tokens
-            type: NUMBER
-            preserve_existing_metadata_value: true
+        - rule:
+            selectors:
+            - key: "usage"
+            - key: "total_tokens"
+            on_present:
+              metadata_namespace: envoy.lb
+              key: tokens
+              type: NUMBER
+              preserve_existing_metadata_value: true
 
 **Using on_present, on_missing, and on_error Together**
 
@@ -239,25 +245,26 @@ Write fallback values when extraction fails to ensure metadata is always availab
     content_parser:
       name: envoy.sse_content_parsers.json
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.sse_content_parsers.json.v3.JsonContentParser
+        "@type": type.googleapis.com/envoy.extensions.http.sse_content_parsers.json.v3.JsonContentParser
         rules:
-        - selectors:
-          - key: "usage"
-          - key: "total_tokens"
-          on_present:
-            metadata_namespace: envoy.lb
-            key: tokens
-            type: NUMBER
-          on_missing:
-            metadata_namespace: envoy.lb
-            key: tokens
-            value:
-              number_value: -1
-          on_error:
-            metadata_namespace: envoy.lb
-            key: tokens
-            value:
-              number_value: 0
+        - rule:
+            selectors:
+            - key: "usage"
+            - key: "total_tokens"
+            on_present:
+              metadata_namespace: envoy.lb
+              key: tokens
+              type: NUMBER
+            on_missing:
+              metadata_namespace: envoy.lb
+              key: tokens
+              value:
+                number_value: -1
+            on_error:
+              metadata_namespace: envoy.lb
+              key: tokens
+              value:
+                number_value: 0
 
 In this configuration:
 
@@ -279,7 +286,7 @@ Accept additional content types beyond the default:
     content_parser:
       name: envoy.sse_content_parsers.json
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.sse_content_parsers.json.v3.JsonContentParser
+        "@type": type.googleapis.com/envoy.extensions.http.sse_content_parsers.json.v3.JsonContentParser
         rules:
           # ... rules ...
 
@@ -328,10 +335,11 @@ Performance Considerations
 
 * The filter buffers incomplete SSE events in memory until they are complete
 * Once a complete event is found, it is processed immediately and removed from the buffer
-* By default, ``stop_processing_on_first_match: false`` processes the entire stream
-* Set ``stop_processing_on_first_match: true`` to stop after the first rule match for better performance
-  when you only need the first occurrence (e.g., a value that appears early in the stream)
-* For extracting multiple different values, use multiple rules with ``stop_processing_on_first_match: false``
+* By default, ``stop_processing_after_matches: 0`` processes all content items for a rule
+* Set ``stop_processing_after_matches: 1`` on individual rules to stop evaluating that rule after the first match for better performance
+  when you only need the first occurrence (e.g., a model name that appears early in the stream)
+* For extracting values that appear at the end (e.g., token usage), use ``stop_processing_after_matches: 0`` (default)
+* Mix strategies: some rules with ``stop_processing_after_matches: 1`` (early values) and others with ``0`` (final values)
 
 Security Considerations
 -----------------------

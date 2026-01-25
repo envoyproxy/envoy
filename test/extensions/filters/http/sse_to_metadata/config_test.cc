@@ -1,4 +1,4 @@
-#include "envoy/extensions/sse_content_parsers/json/v3/json_content_parser.pb.h"
+#include "envoy/extensions/http/sse_content_parsers/json/v3/json_content_parser.pb.h"
 
 #include "source/extensions/filters/http/sse_to_metadata/config.h"
 #include "source/extensions/filters/http/sse_to_metadata/filter.h"
@@ -20,15 +20,16 @@ TEST(SseToMetadataConfigTest, ValidConfig) {
     content_parser:
       name: envoy.sse_content_parsers.json
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.sse_content_parsers.json.v3.JsonContentParser
+        "@type": type.googleapis.com/envoy.extensions.http.sse_content_parsers.json.v3.JsonContentParser
         rules:
-          - selectors:
-              - key: "usage"
-              - key: "total_tokens"
-            on_present:
-              metadata_namespace: "envoy.lb"
-              key: "tokens"
-              type: NUMBER
+          - rule:
+              selectors:
+                - key: "usage"
+                - key: "total_tokens"
+              on_present:
+                metadata_namespace: "envoy.lb"
+                key: "tokens"
+                type: NUMBER
   )EOF";
 
   envoy::extensions::filters::http::sse_to_metadata::v3::SseToMetadata proto_config;
@@ -51,23 +52,25 @@ TEST(SseToMetadataConfigTest, MultipleMetadataDescriptors) {
     content_parser:
       name: envoy.sse_content_parsers.json
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.sse_content_parsers.json.v3.JsonContentParser
+        "@type": type.googleapis.com/envoy.extensions.http.sse_content_parsers.json.v3.JsonContentParser
         rules:
-          - selectors:
-              - key: "usage"
-              - key: "total_tokens"
-            on_present:
-              metadata_namespace: "envoy.lb"
-              key: "tokens"
-              type: NUMBER
-          - selectors:
-              - key: "usage"
-              - key: "total_tokens"
-            on_present:
-              metadata_namespace: "envoy.audit"
-              key: "token_count"
-              type: NUMBER
-              preserve_existing_metadata_value: true
+          - rule:
+              selectors:
+                - key: "usage"
+                - key: "total_tokens"
+              on_present:
+                metadata_namespace: "envoy.lb"
+                key: "tokens"
+                type: NUMBER
+          - rule:
+              selectors:
+                - key: "usage"
+                - key: "total_tokens"
+              on_present:
+                metadata_namespace: "envoy.audit"
+                key: "token_count"
+                type: NUMBER
+                preserve_existing_metadata_value: true
   )EOF";
 
   envoy::extensions::filters::http::sse_to_metadata::v3::SseToMetadata proto_config;
@@ -90,22 +93,23 @@ TEST(SseToMetadataConfigTest, MultipleRules) {
     content_parser:
       name: envoy.sse_content_parsers.json
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.sse_content_parsers.json.v3.JsonContentParser
+        "@type": type.googleapis.com/envoy.extensions.http.sse_content_parsers.json.v3.JsonContentParser
         rules:
-          - selectors:
-              - key: "usage"
-              - key: "total_tokens"
-            on_present:
-              metadata_namespace: "envoy.lb"
-              key: "tokens"
-              type: NUMBER
-          - selectors:
-              - key: "model"
-            on_present:
-              metadata_namespace: "envoy.lb"
-              key: "model_name"
-              type: STRING
-        stop_processing_on_first_match: false
+          - rule:
+              selectors:
+                - key: "usage"
+                - key: "total_tokens"
+              on_present:
+                metadata_namespace: "envoy.lb"
+                key: "tokens"
+                type: NUMBER
+          - rule:
+              selectors:
+                - key: "model"
+              on_present:
+                metadata_namespace: "envoy.lb"
+                key: "model_name"
+                type: STRING
   )EOF";
 
   envoy::extensions::filters::http::sse_to_metadata::v3::SseToMetadata proto_config;
@@ -139,11 +143,12 @@ TEST(SseToMetadataConfigTest, InvalidConfigMissingPath) {
     content_parser:
       name: envoy.sse_content_parsers.json
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.sse_content_parsers.json.v3.JsonContentParser
+        "@type": type.googleapis.com/envoy.extensions.http.sse_content_parsers.json.v3.JsonContentParser
         rules:
-          - on_present:
-              metadata_namespace: "envoy.lb"
-              key: "tokens"
+          - rule:
+              on_present:
+                metadata_namespace: "envoy.lb"
+                key: "tokens"
   )EOF";
 
   envoy::extensions::filters::http::sse_to_metadata::v3::SseToMetadata proto_config;
@@ -163,12 +168,13 @@ TEST(SseToMetadataConfigTest, InvalidConfigEmptyPath) {
     content_parser:
       name: envoy.sse_content_parsers.json
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.sse_content_parsers.json.v3.JsonContentParser
+        "@type": type.googleapis.com/envoy.extensions.http.sse_content_parsers.json.v3.JsonContentParser
         rules:
-          - selectors: []
-            on_present:
-              metadata_namespace: "envoy.lb"
-              key: "tokens"
+          - rule:
+              selectors: []
+              on_present:
+                metadata_namespace: "envoy.lb"
+                key: "tokens"
   )EOF";
 
   envoy::extensions::filters::http::sse_to_metadata::v3::SseToMetadata proto_config;
@@ -188,12 +194,13 @@ TEST(SseToMetadataConfigTest, EmptyNamespaceDefaultsToFilterName) {
     content_parser:
       name: envoy.sse_content_parsers.json
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.sse_content_parsers.json.v3.JsonContentParser
+        "@type": type.googleapis.com/envoy.extensions.http.sse_content_parsers.json.v3.JsonContentParser
         rules:
-          - selectors:
-              - key: "usage"
-            on_present:
-              key: "tokens"
+          - rule:
+              selectors:
+                - key: "usage"
+              on_present:
+                key: "tokens"
   )EOF";
 
   // Empty namespace is now valid - it defaults to filter name
@@ -212,12 +219,13 @@ TEST(SseToMetadataConfigTest, InvalidConfigMissingKey) {
     content_parser:
       name: envoy.sse_content_parsers.json
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.sse_content_parsers.json.v3.JsonContentParser
+        "@type": type.googleapis.com/envoy.extensions.http.sse_content_parsers.json.v3.JsonContentParser
         rules:
-          - selectors:
-              - key: "usage"
-            on_present:
-              metadata_namespace: "envoy.lb"
+          - rule:
+              selectors:
+                - key: "usage"
+              on_present:
+                metadata_namespace: "envoy.lb"
   )EOF";
 
   envoy::extensions::filters::http::sse_to_metadata::v3::SseToMetadata proto_config;
@@ -237,11 +245,12 @@ TEST(SseToMetadataConfigTest, InvalidConfigNoSelector) {
     content_parser:
       name: envoy.sse_content_parsers.json
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.sse_content_parsers.json.v3.JsonContentParser
+        "@type": type.googleapis.com/envoy.extensions.http.sse_content_parsers.json.v3.JsonContentParser
         rules:
-          - on_present:
-              metadata_namespace: "envoy.lb"
-              key: "tokens"
+          - rule:
+              on_present:
+                metadata_namespace: "envoy.lb"
+                key: "tokens"
   )EOF";
 
   envoy::extensions::filters::http::sse_to_metadata::v3::SseToMetadata proto_config;
@@ -262,11 +271,12 @@ TEST(SseToMetadataConfigTest, RequiresAtLeastOneAction) {
     content_parser:
       name: envoy.sse_content_parsers.json
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.sse_content_parsers.json.v3.JsonContentParser
+        "@type": type.googleapis.com/envoy.extensions.http.sse_content_parsers.json.v3.JsonContentParser
         rules:
-          - selectors:
-              - key: "usage"
-              - key: "total_tokens"
+          - rule:
+              selectors:
+                - key: "usage"
+                - key: "total_tokens"
   )EOF";
 
   envoy::extensions::filters::http::sse_to_metadata::v3::SseToMetadata proto_config;

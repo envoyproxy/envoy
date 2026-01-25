@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/extensions/sse_content_parsers/json/v3/json_content_parser.pb.h"
-#include "envoy/extensions/sse_content_parsers/json/v3/json_content_parser.pb.validate.h"
+#include "envoy/extensions/http/sse_content_parsers/json/v3/json_content_parser.pb.h"
+#include "envoy/extensions/http/sse_content_parsers/json/v3/json_content_parser.pb.validate.h"
 #include "envoy/sse_content_parser/config.h"
 
 namespace Envoy {
@@ -19,7 +19,8 @@ public:
                       Server::Configuration::ServerFactoryContext& context) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<envoy::extensions::sse_content_parsers::json::v3::JsonContentParser>();
+    return std::make_unique<
+        envoy::extensions::http::sse_content_parsers::json::v3::JsonContentParser>();
   }
 
   std::string name() const override { return "envoy.sse_content_parsers.json"; }

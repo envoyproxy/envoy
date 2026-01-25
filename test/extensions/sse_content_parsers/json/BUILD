@@ -18,7 +18,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/sse_content_parsers/json:json_content_parser_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/extensions/sse_content_parsers/json/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/http/sse_content_parsers/json/v3:pkg_cc_proto",
     ],
 )
 

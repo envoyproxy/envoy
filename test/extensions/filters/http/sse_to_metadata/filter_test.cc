@@ -1,4 +1,4 @@
-#include "envoy/extensions/sse_content_parsers/json/v3/json_content_parser.pb.h"
+#include "envoy/extensions/http/sse_content_parsers/json/v3/json_content_parser.pb.h"
 
 #include "source/common/config/metadata.h"
 #include "source/extensions/filters/http/sse_to_metadata/config.h"
@@ -218,8 +218,8 @@ TEST_F(SseToMetadataFilterTest, BadContentTypeTriggersOnError) {
   auto* content_parser = response_rules->mutable_content_parser();
   content_parser->set_name("envoy.sse_content_parsers.json");
 
-  envoy::extensions::sse_content_parsers::json::v3::JsonContentParser json_config;
-  auto* rule = json_config.add_rules();
+  envoy::extensions::http::sse_content_parsers::json::v3::JsonContentParser json_config;
+  auto* rule = json_config.add_rules()->mutable_rule();
   rule->add_selectors()->set_key("usage");
   rule->add_selectors()->set_key("total_tokens");
 
@@ -807,8 +807,8 @@ TEST_F(SseToMetadataFilterTest, OnErrorNoDataField) {
   auto* content_parser = response_rules->mutable_content_parser();
   content_parser->set_name("envoy.sse_content_parsers.json");
 
-  envoy::extensions::sse_content_parsers::json::v3::JsonContentParser json_config;
-  auto* rule = json_config.add_rules();
+  envoy::extensions::http::sse_content_parsers::json::v3::JsonContentParser json_config;
+  auto* rule = json_config.add_rules()->mutable_rule();
   rule->add_selectors()->set_key("usage");
   rule->add_selectors()->set_key("total_tokens");
 
@@ -926,8 +926,8 @@ TEST_F(SseToMetadataFilterTest, TrailersFinalizesRules) {
   auto* content_parser = response_rules->mutable_content_parser();
   content_parser->set_name("envoy.sse_content_parsers.json");
 
-  envoy::extensions::sse_content_parsers::json::v3::JsonContentParser json_config;
-  auto* rule = json_config.add_rules();
+  envoy::extensions::http::sse_content_parsers::json::v3::JsonContentParser json_config;
+  auto* rule = json_config.add_rules()->mutable_rule();
   rule->add_selectors()->set_key("usage");
   rule->add_selectors()->set_key("total_tokens");
 

@@ -13,17 +13,17 @@ namespace {
 constexpr absl::string_view DefaultNamespace = "envoy.filters.http.sse_to_metadata";
 }
 
-JsonContentParserImpl::Rule::Rule(const ProtoRule& rule) : rule_(rule) {
+JsonContentParserImpl::Rule::Rule(const ProtoRule& rule, uint32_t stop_processing_after_matches)
+    : rule_(rule), stop_processing_after_matches_(stop_processing_after_matches) {
   for (const auto& selector : rule_.selectors()) {
     selector_path_.push_back(selector.key());
   }
 }
 
 JsonContentParserImpl::JsonContentParserImpl(
-    const envoy::extensions::sse_content_parsers::json::v3::JsonContentParser& config)
-    : stop_processing_on_first_match_(config.stop_processing_on_first_match()) {
-  for (const auto& rule : config.rules()) {
-    rules_.emplace_back(rule);
+    const envoy::extensions::http::sse_content_parsers::json::v3::JsonContentParser& config) {
+  for (const auto& rule_config : config.rules()) {
+    rules_.emplace_back(rule_config.rule(), rule_config.stop_processing_after_matches());
   }
 }
 
@@ -41,7 +41,14 @@ SseContentParser::ParseResult JsonContentParserImpl::parse(absl::string_view dat
 
   // Apply each rule
   for (size_t i = 0; i < rules_.size(); ++i) {
-    const auto& rule = rules_[i];
+    auto& rule = rules_[i];
+
+    // Skip rules that have already reached their match limit
+    if (rule.stop_processing_after_matches_ > 0 &&
+        rule.match_count_ >= rule.stop_processing_after_matches_) {
+      continue;
+    }
+
     auto value_or = extractValueFromJson(json_obj, rule.selector_path_);
 
     if (value_or.ok()) {
@@ -55,11 +62,8 @@ SseContentParser::ParseResult JsonContentParserImpl::parse(absl::string_view dat
       // Track that this rule matched
       result.matched_rules.push_back(i);
 
-      // Stop processing if configured to stop on first match
-      if (stop_processing_on_first_match_) {
-        result.stop_processing = true;
-        return result;
-      }
+      // Increment match count for this rule
+      rule.match_count_++;
     } else {
       // Selector not found. Mark for on_missing (will execute at end if on_present never
       // executes).
@@ -68,6 +72,17 @@ SseContentParser::ParseResult JsonContentParserImpl::parse(absl::string_view dat
     }
   }
 
+  // Check if all rules with stop_processing_after_matches > 0 have reached their limits
+  bool all_limited_rules_satisfied = true;
+  for (const auto& rule : rules_) {
+    if (rule.stop_processing_after_matches_ > 0 &&
+        rule.match_count_ < rule.stop_processing_after_matches_) {
+      all_limited_rules_satisfied = false;
+      break;
+    }
+  }
+
+  result.stop_processing = all_limited_rules_satisfied;
   return result;
 }
 
@@ -221,7 +236,7 @@ Protobuf::Value JsonContentParserImpl::jsonValueToProtobufValue(const Envoy::Jso
 }
 
 JsonContentParserFactory::JsonContentParserFactory(
-    const envoy::extensions::sse_content_parsers::json::v3::JsonContentParser& config)
+    const envoy::extensions::http::sse_content_parsers::json::v3::JsonContentParser& config)
     : config_(config) {}
 
 SseContentParser::ParserPtr JsonContentParserFactory::createParser() {

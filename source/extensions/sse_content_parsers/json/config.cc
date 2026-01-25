@@ -12,10 +12,11 @@ namespace Json {
 SseContentParser::ParserFactoryPtr JsonContentParserConfigFactory::createParserFactory(
     const Protobuf::Message& config, Server::Configuration::ServerFactoryContext& context) {
   const auto& json_config = MessageUtil::downcastAndValidate<
-      const envoy::extensions::sse_content_parsers::json::v3::JsonContentParser&>(
+      const envoy::extensions::http::sse_content_parsers::json::v3::JsonContentParser&>(
       config, context.messageValidationVisitor());
 
-  for (const auto& rule : json_config.rules()) {
+  for (const auto& rule_config : json_config.rules()) {
+    const auto& rule = rule_config.rule();
     if (rule.has_on_missing()) {
       const auto& kv_pair = rule.on_missing();
       if (kv_pair.value_type_case() == envoy::extensions::filters::http::json_to_metadata::v3::

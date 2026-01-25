@@ -1,4 +1,4 @@
-#include "envoy/extensions/sse_content_parsers/json/v3/json_content_parser.pb.h"
+#include "envoy/extensions/http/sse_content_parsers/json/v3/json_content_parser.pb.h"
 
 #include "source/extensions/sse_content_parsers/json/json_content_parser_impl.h"
 
@@ -13,7 +13,7 @@ namespace SseContentParsers {
 namespace Json {
 namespace {
 
-using ProtoConfig = envoy::extensions::sse_content_parsers::json::v3::JsonContentParser;
+using ProtoConfig = envoy::extensions::http::sse_content_parsers::json::v3::JsonContentParser;
 
 class JsonContentParserTest : public testing::Test {
 public:
@@ -25,13 +25,14 @@ public:
 
   const std::string basic_config_ = R"EOF(
 rules:
-  - selectors:
-      - key: "usage"
-      - key: "total_tokens"
-    on_present:
-      metadata_namespace: "envoy.lb"
-      key: "tokens"
-      type: NUMBER
+  - rule:
+      selectors:
+        - key: "usage"
+        - key: "total_tokens"
+      on_present:
+        metadata_namespace: "envoy.lb"
+        key: "tokens"
+        type: NUMBER
   )EOF";
 
   std::unique_ptr<JsonContentParserImpl> parser_;
@@ -93,14 +94,15 @@ TEST_F(JsonContentParserTest, PartialSelectorPath) {
 TEST_F(JsonContentParserTest, DeepNestedPath) {
   const std::string config = R"EOF(
 rules:
-  - selectors:
-      - key: "level1"
-      - key: "level2"
-      - key: "level3"
-      - key: "value"
-    on_present:
-      metadata_namespace: "envoy.lb"
-      key: "deep_value"
+  - rule:
+      selectors:
+        - key: "level1"
+        - key: "level2"
+        - key: "level3"
+        - key: "value"
+      on_present:
+        metadata_namespace: "envoy.lb"
+        key: "deep_value"
   )EOF";
   setupParser(config);
 
@@ -127,11 +129,12 @@ TEST_F(JsonContentParserTest, IntermediatePathNotObject) {
 TEST_F(JsonContentParserTest, NullValueInJson) {
   setupParser(R"EOF(
 rules:
-  - selectors:
-      - key: "usage"
-    on_present:
-      metadata_namespace: "envoy.lb"
-      key: "value"
+  - rule:
+      selectors:
+        - key: "usage"
+      on_present:
+        metadata_namespace: "envoy.lb"
+        key: "value"
   )EOF");
 
   const std::string data = R"({"usage":null})";
@@ -146,12 +149,13 @@ rules:
 TEST_F(JsonContentParserTest, NestedObjectValue) {
   const std::string config = R"EOF(
 rules:
-  - selectors:
-      - key: "usage"
-    on_present:
-      metadata_namespace: "envoy.lb"
-      key: "usage_obj"
-      type: STRING
+  - rule:
+      selectors:
+        - key: "usage"
+      on_present:
+        metadata_namespace: "envoy.lb"
+        key: "usage_obj"
+        type: STRING
   )EOF";
   setupParser(config);
 
@@ -167,12 +171,13 @@ rules:
 TEST_F(JsonContentParserTest, StringValueType) {
   const std::string config = R"EOF(
 rules:
-  - selectors:
-      - key: "model"
-    on_present:
-      metadata_namespace: "envoy.lb"
-      key: "model_name"
-      type: STRING
+  - rule:
+      selectors:
+        - key: "model"
+      on_present:
+        metadata_namespace: "envoy.lb"
+        key: "model_name"
+        type: STRING
   )EOF";
   setupParser(config);
 
@@ -187,12 +192,13 @@ rules:
 TEST_F(JsonContentParserTest, ProtobufValueType) {
   const std::string config = R"EOF(
 rules:
-  - selectors:
-      - key: "value"
-    on_present:
-      metadata_namespace: "envoy.lb"
-      key: "test"
-      type: PROTOBUF_VALUE
+  - rule:
+      selectors:
+        - key: "value"
+      on_present:
+        metadata_namespace: "envoy.lb"
+        key: "test"
+        type: PROTOBUF_VALUE
   )EOF";
   setupParser(config);
 
@@ -207,11 +213,12 @@ rules:
 TEST_F(JsonContentParserTest, BooleanValue) {
   const std::string config = R"EOF(
 rules:
-  - selectors:
-      - key: "enabled"
-    on_present:
-      metadata_namespace: "envoy.lb"
-      key: "flag"
+  - rule:
+      selectors:
+        - key: "enabled"
+      on_present:
+        metadata_namespace: "envoy.lb"
+        key: "flag"
   )EOF";
   setupParser(config);
 
@@ -226,12 +233,13 @@ rules:
 TEST_F(JsonContentParserTest, StringToNumberConversionFailure) {
   const std::string config = R"EOF(
 rules:
-  - selectors:
-      - key: "value"
-    on_present:
-      metadata_namespace: "envoy.lb"
-      key: "result"
-      type: NUMBER
+  - rule:
+      selectors:
+        - key: "value"
+      on_present:
+        metadata_namespace: "envoy.lb"
+        key: "result"
+        type: NUMBER
   )EOF";
   setupParser(config);
 
@@ -248,12 +256,13 @@ rules:
 TEST_F(JsonContentParserTest, StringToNumberConversionSuccess) {
   const std::string config = R"EOF(
 rules:
-  - selectors:
-      - key: "price"
-    on_present:
-      metadata_namespace: "envoy.lb"
-      key: "price_as_number"
-      type: NUMBER
+  - rule:
+      selectors:
+        - key: "price"
+      on_present:
+        metadata_namespace: "envoy.lb"
+        key: "price_as_number"
+        type: NUMBER
   )EOF";
   setupParser(config);
 
@@ -269,12 +278,13 @@ rules:
 TEST_F(JsonContentParserTest, BoolToNumberConversion) {
   const std::string config = R"EOF(
 rules:
-  - selectors:
-      - key: "flag"
-    on_present:
-      metadata_namespace: "envoy.lb"
-      key: "result"
-      type: NUMBER
+  - rule:
+      selectors:
+        - key: "flag"
+      on_present:
+        metadata_namespace: "envoy.lb"
+        key: "result"
+        type: NUMBER
   )EOF";
   setupParser(config);
 
@@ -289,12 +299,13 @@ rules:
 TEST_F(JsonContentParserTest, BoolToStringConversion) {
   const std::string config = R"EOF(
 rules:
-  - selectors:
-      - key: "flag"
-    on_present:
-      metadata_namespace: "envoy.lb"
-      key: "result"
-      type: STRING
+  - rule:
+      selectors:
+        - key: "flag"
+      on_present:
+        metadata_namespace: "envoy.lb"
+        key: "result"
+        type: STRING
   )EOF";
   setupParser(config);
 
@@ -309,12 +320,13 @@ rules:
 TEST_F(JsonContentParserTest, NumberToStringConversion) {
   const std::string config = R"EOF(
 rules:
-  - selectors:
-      - key: "count"
-    on_present:
-      metadata_namespace: "envoy.lb"
-      key: "result"
-      type: STRING
+  - rule:
+      selectors:
+        - key: "count"
+      on_present:
+        metadata_namespace: "envoy.lb"
+        key: "result"
+        type: STRING
   )EOF";
   setupParser(config);
 
@@ -329,12 +341,13 @@ rules:
 TEST_F(JsonContentParserTest, DoubleToStringConversion) {
   const std::string config = R"EOF(
 rules:
-  - selectors:
-      - key: "value"
-    on_present:
-      metadata_namespace: "envoy.lb"
-      key: "result"
-      type: STRING
+  - rule:
+      selectors:
+        - key: "value"
+      on_present:
+        metadata_namespace: "envoy.lb"
+        key: "result"
+        type: STRING
   )EOF";
   setupParser(config);
 
@@ -349,18 +362,20 @@ rules:
 TEST_F(JsonContentParserTest, IntegerValueExtraction) {
   const std::string config = R"EOF(
 rules:
-  - selectors:
-      - key: "count"
-    on_present:
-      metadata_namespace: "envoy.lb"
-      key: "count_num"
-      type: NUMBER
-  - selectors:
-      - key: "count"
-    on_present:
-      metadata_namespace: "envoy.lb"
-      key: "count_str"
-      type: STRING
+  - rule:
+      selectors:
+        - key: "count"
+      on_present:
+        metadata_namespace: "envoy.lb"
+        key: "count_num"
+        type: NUMBER
+  - rule:
+      selectors:
+        - key: "count"
+      on_present:
+        metadata_namespace: "envoy.lb"
+        key: "count_str"
+        type: STRING
   )EOF";
   setupParser(config);
 
@@ -380,7 +395,7 @@ rules:
 TEST_F(JsonContentParserTest, OnMissing) {
   // Create config programmatically to properly set protobuf Value
   ProtoConfig proto_config;
-  auto* rule = proto_config.add_rules();
+  auto* rule = proto_config.add_rules()->mutable_rule();
   rule->add_selectors()->set_key("usage");
   rule->add_selectors()->set_key("total_tokens");
 
@@ -417,7 +432,7 @@ TEST_F(JsonContentParserTest, OnMissing) {
 TEST_F(JsonContentParserTest, OnPresentWithHardcodedValue) {
   // Create config programmatically to properly set protobuf Value
   ProtoConfig proto_config;
-  auto* rule = proto_config.add_rules();
+  auto* rule = proto_config.add_rules()->mutable_rule();
   rule->add_selectors()->set_key("usage");
   rule->add_selectors()->set_key("total_tokens");
 
@@ -436,6 +451,175 @@ TEST_F(JsonContentParserTest, OnPresentWithHardcodedValue) {
   EXPECT_EQ(result.immediate_actions.size(), 1);
   ASSERT_TRUE(result.immediate_actions[0].value.has_value());
   EXPECT_EQ(result.immediate_actions[0].value->number_value(), 999); // Hardcoded value, not 42
+}
+
+TEST_F(JsonContentParserTest, StopProcessingAfterFirstMatch) {
+  // Create config with stop_processing_after_matches = 1
+  ProtoConfig proto_config;
+  auto* rule_config = proto_config.add_rules();
+  rule_config->set_stop_processing_after_matches(1);
+
+  auto* rule = rule_config->mutable_rule();
+  rule->add_selectors()->set_key("model");
+
+  auto* on_present = rule->mutable_on_present();
+  on_present->set_metadata_namespace("envoy.lb");
+  on_present->set_key("model_name");
+  on_present->set_type(
+      envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata::STRING);
+
+  parser_ = std::make_unique<JsonContentParserImpl>(proto_config);
+
+  // First event - should match and extract
+  const std::string data1 = R"({"model":"gpt-4"})";
+  auto result1 = parser_->parse(data1);
+
+  EXPECT_FALSE(result1.has_error);
+  EXPECT_EQ(result1.immediate_actions.size(), 1);
+  EXPECT_EQ(result1.immediate_actions[0].value->string_value(), "gpt-4");
+  EXPECT_EQ(result1.matched_rules.size(), 1);
+  EXPECT_TRUE(result1.stop_processing); // Should stop after first match
+
+  // Second event - should NOT process (rule already matched once)
+  const std::string data2 = R"({"model":"gpt-3.5"})";
+  auto result2 = parser_->parse(data2);
+
+  EXPECT_FALSE(result2.has_error);
+  EXPECT_EQ(result2.immediate_actions.size(), 0); // No action, rule skipped
+  EXPECT_EQ(result2.matched_rules.size(), 0);
+  EXPECT_TRUE(result2.stop_processing); // Still stopped
+}
+
+TEST_F(JsonContentParserTest, StopProcessingAfterMatchesDefault) {
+  // Create config without setting stop_processing_after_matches (defaults to 0)
+  ProtoConfig proto_config;
+  auto* rule_config = proto_config.add_rules();
+  // NOT setting stop_processing_after_matches - should default to 0
+
+  auto* rule = rule_config->mutable_rule();
+  rule->add_selectors()->set_key("value");
+
+  auto* on_present = rule->mutable_on_present();
+  on_present->set_metadata_namespace("envoy.lb");
+  on_present->set_key("last_value");
+  on_present->set_type(
+      envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata::NUMBER);
+
+  parser_ = std::make_unique<JsonContentParserImpl>(proto_config);
+
+  // First event
+  auto result1 = parser_->parse(R"({"value":10})");
+  EXPECT_FALSE(result1.has_error);
+  EXPECT_EQ(result1.immediate_actions.size(), 1);
+  EXPECT_EQ(result1.immediate_actions[0].value->number_value(), 10);
+  EXPECT_FALSE(result1.stop_processing); // Should NOT stop (default = 0)
+
+  // Second event - should still process
+  auto result2 = parser_->parse(R"({"value":20})");
+  EXPECT_FALSE(result2.has_error);
+  EXPECT_EQ(result2.immediate_actions.size(), 1);
+  EXPECT_EQ(result2.immediate_actions[0].value->number_value(), 20); // Overwrites to 20
+  EXPECT_FALSE(result2.stop_processing);
+
+  // Third event - should still process (gets LAST value)
+  auto result3 = parser_->parse(R"({"value":30})");
+  EXPECT_FALSE(result3.has_error);
+  EXPECT_EQ(result3.immediate_actions.size(), 1);
+  EXPECT_EQ(result3.immediate_actions[0].value->number_value(), 30); // Gets last value
+  EXPECT_FALSE(result3.stop_processing);
+}
+
+TEST_F(JsonContentParserTest, MultipleRulesWithDifferentStopBehavior) {
+  // Create config with two rules:
+  // Rule 1: stop after 1 match (extract model from first event)
+  // Rule 2: default (0) - process all events (extract tokens from last event)
+  ProtoConfig proto_config;
+
+  // Rule 1: Stop after first match
+  auto* rule_config1 = proto_config.add_rules();
+  rule_config1->set_stop_processing_after_matches(1);
+  auto* rule1 = rule_config1->mutable_rule();
+  rule1->add_selectors()->set_key("model");
+  auto* on_present1 = rule1->mutable_on_present();
+  on_present1->set_metadata_namespace("envoy.lb");
+  on_present1->set_key("model_name");
+  on_present1->set_type(
+      envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata::STRING);
+
+  // Rule 2: Process all events (default stop_processing_after_matches = 0)
+  auto* rule_config2 = proto_config.add_rules();
+  // NOT setting stop_processing_after_matches
+  auto* rule2 = rule_config2->mutable_rule();
+  rule2->add_selectors()->set_key("usage");
+  rule2->add_selectors()->set_key("total_tokens");
+  auto* on_present2 = rule2->mutable_on_present();
+  on_present2->set_metadata_namespace("envoy.lb");
+  on_present2->set_key("tokens");
+  on_present2->set_type(
+      envoy::extensions::filters::http::json_to_metadata::v3::JsonToMetadata::NUMBER);
+
+  parser_ = std::make_unique<JsonContentParserImpl>(proto_config);
+
+  // Event 1: Has model but no tokens
+  auto result1 = parser_->parse(R"({"model":"gpt-4","id":"1"})");
+  EXPECT_FALSE(result1.has_error);
+  EXPECT_EQ(result1.immediate_actions.size(), 1); // Only rule 1 matched
+  EXPECT_EQ(result1.immediate_actions[0].key, "model_name");
+  EXPECT_EQ(result1.immediate_actions[0].value->string_value(), "gpt-4");
+  EXPECT_FALSE(result1.stop_processing); // Rule 2 hasn't matched yet
+
+  // Event 2: Has model again and partial tokens
+  auto result2 = parser_->parse(R"({"model":"gpt-3.5","usage":{"total_tokens":10}})");
+  EXPECT_FALSE(result2.has_error);
+  EXPECT_EQ(result2.immediate_actions.size(), 1); // Only rule 2 (rule 1 already stopped)
+  EXPECT_EQ(result2.immediate_actions[0].key, "tokens");
+  EXPECT_EQ(result2.immediate_actions[0].value->number_value(), 10);
+  EXPECT_FALSE(result2.stop_processing); // Rule 2 continues processing
+
+  // Event 3: Final tokens (last event)
+  auto result3 = parser_->parse(R"({"usage":{"total_tokens":30}})");
+  EXPECT_FALSE(result3.has_error);
+  EXPECT_EQ(result3.immediate_actions.size(), 1);                    // Only rule 2
+  EXPECT_EQ(result3.immediate_actions[0].value->number_value(), 30); // Gets last value
+  EXPECT_FALSE(result3.stop_processing); // Rule 2 still doesn't stop (default = 0)
+}
+
+TEST_F(JsonContentParserTest, AllRulesStopAfterMatchCausesStreamStop) {
+  // Create config where ALL rules have stop_processing_after_matches = 1
+  ProtoConfig proto_config;
+
+  auto* rule_config1 = proto_config.add_rules();
+  rule_config1->set_stop_processing_after_matches(1);
+  auto* rule1 = rule_config1->mutable_rule();
+  rule1->add_selectors()->set_key("model");
+  auto* on_present1 = rule1->mutable_on_present();
+  on_present1->set_metadata_namespace("envoy.lb");
+  on_present1->set_key("model_name");
+
+  auto* rule_config2 = proto_config.add_rules();
+  rule_config2->set_stop_processing_after_matches(1);
+  auto* rule2 = rule_config2->mutable_rule();
+  rule2->add_selectors()->set_key("id");
+  auto* on_present2 = rule2->mutable_on_present();
+  on_present2->set_metadata_namespace("envoy.lb");
+  on_present2->set_key("request_id");
+
+  parser_ = std::make_unique<JsonContentParserImpl>(proto_config);
+
+  // Event 1: Only rule 1 matches
+  auto result1 = parser_->parse(R"({"model":"gpt-4"})");
+  EXPECT_EQ(result1.immediate_actions.size(), 1);
+  EXPECT_FALSE(result1.stop_processing); // Rule 2 hasn't matched yet
+
+  // Event 2: Only rule 2 matches - NOW both rules have matched
+  auto result2 = parser_->parse(R"({"id":"req-123"})");
+  EXPECT_EQ(result2.immediate_actions.size(), 1);
+  EXPECT_TRUE(result2.stop_processing); // ALL rules with stop > 0 have matched!
+
+  // Event 3: Should not process any rules
+  auto result3 = parser_->parse(R"({"model":"gpt-3.5","id":"req-456"})");
+  EXPECT_EQ(result3.immediate_actions.size(), 0); // Both rules already stopped
+  EXPECT_TRUE(result3.stop_processing);
 }
 
 } // namespace
