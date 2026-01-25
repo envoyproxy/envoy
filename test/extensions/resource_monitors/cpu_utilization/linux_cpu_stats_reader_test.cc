@@ -231,6 +231,26 @@ TEST_F(LinuxContainerCpuStatsReaderTest, ZeroCpuAllocatedValue) {
   EXPECT_FALSE(envoy_container_stats.is_valid);
 }
 
+TEST_F(LinuxContainerCpuStatsReaderTest, V1GetUtilizationFirstCallReturnsZero) {
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  setCpuAllocated("2000\n");
+  setCpuTimes("1000\n");
+
+  CgroupV1CpuStatsReader container_stats_reader(api->fileSystem(), test_time_source,
+                                                cpuAllocatedPath(), cpuTimesPath());
+  auto result = container_stats_reader.getUtilization();
+
+  ASSERT_TRUE(result.ok());
+  EXPECT_DOUBLE_EQ(result.value(), 0.0);
+
+  // Also test negative work_over_period error scenario (cpu_times decreased)
+  setCpuTimes("500\n");
+  result = container_stats_reader.getUtilization();
+  EXPECT_FALSE(result.ok());
+  EXPECT_NE(result.status().message().find("Work_over_period"), std::string::npos);
+}
+
 // =============================================================================
 // LinuxContainerCpuStatsReaderV2Test - Cgroup V2
 // =============================================================================
@@ -459,6 +479,27 @@ TEST_F(LinuxContainerCpuStatsReaderV2Test, CannotReadCpuMaxFile) {
   EXPECT_FALSE(envoy_container_stats.is_valid);
 }
 
+TEST_F(LinuxContainerCpuStatsReaderV2Test, V2GetUtilizationFirstCallReturnsZero) {
+  TimeSource& test_time_source = timeSource();
+  Api::ApiPtr api = Api::createApiForTest();
+  setV2CpuStat("usage_usec 500000\n");
+  setV2CpuMax("200000 100000\n");
+  setV2CpuEffective("0-3\n");
+
+  CgroupV2CpuStatsReader container_stats_reader(
+      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
+  auto result = container_stats_reader.getUtilization();
+
+  ASSERT_TRUE(result.ok());
+  EXPECT_DOUBLE_EQ(result.value(), 0.0);
+
+  // Also test negative work_over_period error scenario (usage decreased)
+  setV2CpuStat("usage_usec 400000\n");
+  result = container_stats_reader.getUtilization();
+  EXPECT_FALSE(result.ok());
+  EXPECT_NE(result.status().message().find("Work_over_period"), std::string::npos);
+}
+
 // =============================================================================
 // Factory Method Tests
 // =============================================================================
@@ -606,47 +647,6 @@ TEST(LinuxCpuStatsReaderUtilizationTest, NegativeWorkDeltaReturnsError) {
 
   EXPECT_FALSE(result.ok());
   EXPECT_NE(result.status().message().find("total_over_period"), std::string::npos);
-}
-
-TEST_F(LinuxContainerCpuStatsReaderTest, V1GetUtilizationFirstCallReturnsZero) {
-  TimeSource& test_time_source = timeSource();
-  Api::ApiPtr api = Api::createApiForTest();
-  setCpuAllocated("2000\n");
-  setCpuTimes("1000\n");
-
-  CgroupV1CpuStatsReader container_stats_reader(api->fileSystem(), test_time_source,
-                                                cpuAllocatedPath(), cpuTimesPath());
-  auto result = container_stats_reader.getUtilization();
-
-  ASSERT_TRUE(result.ok());
-  EXPECT_DOUBLE_EQ(result.value(), 0.0);
-
-  // Also test negative work_over_period error scenario (cpu_times decreased)
-  setCpuTimes("500\n");
-  result = container_stats_reader.getUtilization();
-  EXPECT_FALSE(result.ok());
-  EXPECT_NE(result.status().message().find("Work_over_period"), std::string::npos);
-}
-
-TEST_F(LinuxContainerCpuStatsReaderV2Test, V2GetUtilizationFirstCallReturnsZero) {
-  TimeSource& test_time_source = timeSource();
-  Api::ApiPtr api = Api::createApiForTest();
-  setV2CpuStat("usage_usec 500000\n");
-  setV2CpuMax("200000 100000\n");
-  setV2CpuEffective("0-3\n");
-
-  CgroupV2CpuStatsReader container_stats_reader(
-      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
-  auto result = container_stats_reader.getUtilization();
-
-  ASSERT_TRUE(result.ok());
-  EXPECT_DOUBLE_EQ(result.value(), 0.0);
-
-  // Also test negative work_over_period error scenario (usage decreased)
-  setV2CpuStat("usage_usec 400000\n");
-  result = container_stats_reader.getUtilization();
-  EXPECT_FALSE(result.ok());
-  EXPECT_NE(result.status().message().find("Work_over_period"), std::string::npos);
 }
 
 } // namespace
