@@ -106,5 +106,8 @@ new_features:
   change: |
     Added ``%UPSTREAM_DETECTED_CLOSE_TYPE%`` and ``%DOWNSTREAM_DETECTED_CLOSE_TYPE%`` to expose the detected close type
     of downstream and connections. The possible values are ``Normal``, ``LocalReset``, and ``RemoteReset``.
+- area: tcp_proxy
+  change: |
+    Added an option to emit a log entry when the connection is accepted.
 
 deprecated:
