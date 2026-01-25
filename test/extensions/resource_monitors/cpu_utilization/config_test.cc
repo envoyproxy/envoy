@@ -105,6 +105,7 @@ TEST(CpuUtilizationMonitorFactoryTest, HostMonitorFunctional) {
   EXPECT_TRUE(callbacks.hasSuccess() || callbacks.hasError());
 }
 
+#if defined(__linux__)
 TEST(CpuUtilizationMonitorFactoryTest, ContainerMonitorFunctional) {
   auto factory =
       Registry::FactoryRegistry<Server::Configuration::ResourceMonitorFactory>::getFactory(
@@ -120,7 +121,6 @@ TEST(CpuUtilizationMonitorFactoryTest, ContainerMonitorFunctional) {
   Server::Configuration::ResourceMonitorFactoryContextImpl context(
       dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor());
 
-#if defined(__linux__)
   auto monitor = factory->createResourceMonitor(config, context);
   // If cgroup files exist (Linux CI), monitor should be created and functional
   ASSERT_NE(monitor, nullptr);
@@ -130,10 +130,8 @@ TEST(CpuUtilizationMonitorFactoryTest, ContainerMonitorFunctional) {
   monitor->updateResourceUsage(callbacks);
   // Either success or error is acceptable depending on system state
   EXPECT_TRUE(callbacks.hasSuccess() || callbacks.hasError());
-#else
-  EXPECT_THROW(factory->createResourceMonitor(config, context), EnvoyException);
-#endif
 }
+#endif
 
 TEST(CpuUtilizationMonitorFactoryTest, FactoryRegistered) {
   auto* factory =

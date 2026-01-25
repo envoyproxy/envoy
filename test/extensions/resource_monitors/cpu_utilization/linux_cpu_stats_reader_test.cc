@@ -366,6 +366,14 @@ TEST_F(LinuxContainerCpuStatsReaderV2Test, InvalidCpuEffectiveFormats) {
     CpuTimesV2 cpu_times = reader.getCpuTimes();
     EXPECT_FALSE(cpu_times.is_valid);
   }
+
+  // getUtilization should surface the same error path for an invalid effective CPU list.
+  setV2CpuEffective("notanumber\n");
+  CgroupV2CpuStatsReader reader(api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(),
+                                v2CpuEffectivePath());
+  auto result = reader.getUtilization();
+  EXPECT_FALSE(result.ok());
+  EXPECT_NE(result.status().message().find("Failed to read CPU times"), std::string::npos);
 }
 
 // Error: Invalid cpu.max file formats
@@ -377,10 +385,13 @@ TEST_F(LinuxContainerCpuStatsReaderV2Test, InvalidCpuMaxFormats) {
 
   // Test 1: Unexpected format - missing second value
   setV2CpuMax("200000\n");
-  CgroupV2CpuStatsReader container_stats_reader1(
-      api->fileSystem(), test_time_source, v2CpuStatPath(), v2CpuMaxPath(), v2CpuEffectivePath());
+  CgroupV2CpuStatsReader container_stats_reader1(api->fileSystem(), test_time_source, v2CpuStatPath(),
+                                                 v2CpuMaxPath(), v2CpuEffectivePath());
   CpuTimesV2 envoy_container_stats = container_stats_reader1.getCpuTimes();
   EXPECT_FALSE(envoy_container_stats.is_valid);
+  auto result = container_stats_reader1.getUtilization();
+  EXPECT_FALSE(result.ok());
+  EXPECT_NE(result.status().message().find("Failed to read CPU times"), std::string::npos);
 
   // Test 2: Failed to parse - non-numeric quota
   setV2CpuMax("notanumber 100000\n");
