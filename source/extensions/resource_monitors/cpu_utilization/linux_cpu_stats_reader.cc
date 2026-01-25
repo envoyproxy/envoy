@@ -67,8 +67,7 @@ absl::StatusOr<int> parseEffectiveCpus(absl::string_view effective_cpu_list,
   return cpu_count;
 }
 
-absl::StatusOr<double> parseEffectiveCores(absl::string_view cpu_max_contents,
-                                           const std::string& max_path, int cpu_count) {
+absl::StatusOr<double> parseEffectiveCores(absl::string_view cpu_max_contents, int cpu_count) {
   // Parse cpu.max (format: "quota period" or "max period")
   std::istringstream max_stream{std::string(cpu_max_contents)};
   std::string quota_str, period_str;
@@ -333,7 +332,7 @@ CpuTimesV2 CgroupV2CpuStatsReader::getCpuTimes() {
     return {false, 0, 0, 0};
   }
 
-  absl::StatusOr<double> effective_cores = parseEffectiveCores(max_result.value(), max_path_, N);
+  absl::StatusOr<double> effective_cores = parseEffectiveCores(max_result.value(), N);
   if (!effective_cores.ok()) {
     ENVOY_LOG(error, "Failed to parse cpu.max file {}: {}", max_path_,
               effective_cores.status().message());
