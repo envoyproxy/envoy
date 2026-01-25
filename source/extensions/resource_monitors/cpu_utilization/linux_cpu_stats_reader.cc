@@ -39,11 +39,9 @@ absl::StatusOr<int> parseEffectiveCpus(absl::string_view effective_cpu_list,
       // Single CPU (e.g., "0" or "4")
       int single_cpu;
       if (!absl::SimpleAtoi(token, &single_cpu)) {
-        ENVOY_LOG_MISC(error, "Failed to parse CPU value in {}: {}", effective_path, token);
         return absl::InvalidArgumentError("Failed to parse CPU value");
       }
       if (single_cpu < 0) {
-        ENVOY_LOG_MISC(error, "Invalid CPU value in {}: {}", effective_path, token);
         return absl::InvalidArgumentError("Invalid CPU value");
       }
       cpu_count += 1;
@@ -52,11 +50,9 @@ absl::StatusOr<int> parseEffectiveCpus(absl::string_view effective_cpu_list,
       int range_start, range_end;
       if (!absl::SimpleAtoi(token.substr(0, dash_pos), &range_start) ||
           !absl::SimpleAtoi(token.substr(dash_pos + 1), &range_end)) {
-        ENVOY_LOG_MISC(error, "Failed to parse CPU range in {}: {}", effective_path, token);
         return absl::InvalidArgumentError("Failed to parse CPU range");
       }
       if (range_start < 0 || range_end < range_start) {
-        ENVOY_LOG_MISC(error, "Invalid CPU range in {}: {}", effective_path, token);
         return absl::InvalidArgumentError("Invalid CPU range");
       }
       cpu_count += (range_end - range_start + 1);
@@ -79,23 +75,18 @@ absl::StatusOr<double> parseEffectiveCores(absl::string_view cpu_max_contents,
   max_stream >> quota_str >> period_str;
 
   if (!max_stream) {
-    ENVOY_LOG_MISC(error, "Unexpected format in cpu.max file {}", max_path);
     return absl::InvalidArgumentError("Unexpected cpu.max format");
   }
 
   if (quota_str == "max") {
-    ENVOY_LOG_MISC(trace, "cgroupv2 max quota found, using N: {}", cpu_count);
     return static_cast<double>(cpu_count);
   }
 
   int quota, period;
   if (!absl::SimpleAtoi(quota_str, &quota) || !absl::SimpleAtoi(period_str, &period)) {
-    ENVOY_LOG_MISC(error, "Failed to parse cpu.max values in {}: {} {}", max_path, quota_str,
-                   period_str);
     return absl::InvalidArgumentError("Failed to parse cpu.max values");
   }
   if (period <= 0) {
-    ENVOY_LOG_MISC(error, "Invalid period value in {}: {}", max_path, period_str);
     return absl::InvalidArgumentError("Invalid cpu.max period");
   }
 
@@ -329,6 +320,8 @@ CpuTimesV2 CgroupV2CpuStatsReader::getCpuTimes() {
   // Format can be: "0", "0-3", "0,2,4", "0-2,4", "0-3,5-7", etc.
   absl::StatusOr<int> cpu_count = parseEffectiveCpus(effective_result.value(), effective_path_);
   if (!cpu_count.ok()) {
+    ENVOY_LOG(error, "Failed to parse effective CPUs file {}: {}", effective_path_,
+              cpu_count.status().message());
     return {false, 0, 0, 0};
   }
   const int N = cpu_count.value();
@@ -342,6 +335,8 @@ CpuTimesV2 CgroupV2CpuStatsReader::getCpuTimes() {
 
   absl::StatusOr<double> effective_cores = parseEffectiveCores(max_result.value(), max_path_, N);
   if (!effective_cores.ok()) {
+    ENVOY_LOG(error, "Failed to parse cpu.max file {}: {}", max_path_,
+              effective_cores.status().message());
     return {false, 0, 0, 0};
   }
 
