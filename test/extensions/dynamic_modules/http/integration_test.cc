@@ -2,13 +2,19 @@
 
 #include "source/common/common/base64.h"
 
+#include "test/extensions/dynamic_modules/util.h"
 #include "test/integration/http_integration.h"
 
 namespace Envoy {
-class DynamicModulesIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+
+class DynamicModulesIntegrationTest : public testing::TestWithParam<std::string>,
                                       public HttpIntegrationTest {
 public:
-  DynamicModulesIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, GetParam()) {
+  // To reduce tests, we use v4 for Rust tests and v6 for C++ and Golang tests.
+  DynamicModulesIntegrationTest()
+      : HttpIntegrationTest(Http::CodecType::HTTP2, GetParam() == "Rust"
+                                                        ? Envoy::Network::Address::IpVersion::v4
+                                                        : Envoy::Network::Address::IpVersion::v6) {
     setUpstreamProtocol(Http::CodecType::HTTP2);
   };
 
@@ -19,9 +25,10 @@ public:
                    bool upstream_filter = false) {
     TestEnvironment::setEnvVar(
         "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
-        TestEnvironment::substitute(
-            "{{ test_rundir }}/test/extensions/dynamic_modules/test_data/rust"),
+        TestEnvironment::substitute("{{ test_rundir }}/test/extensions/dynamic_modules/test_data/" +
+                                    GetParam()),
         1);
+    TestEnvironment::setEnvVar("GODEBUG", "cgocheck=0", 1);
 
     constexpr auto filter_config = R"EOF(
 name: envoy.extensions.filters.http.dynamic_modules
@@ -120,9 +127,9 @@ filter_config:
   }
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, DynamicModulesIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(
+    IpVersions, DynamicModulesIntegrationTest, testing::Values("rust", "cpp", "go"),
+    Extensions::DynamicModules::DynamicModuleTestLanguages::languageParamToTestName);
 
 TEST_P(DynamicModulesIntegrationTest, PassThrough) {
   initializeFilter("passthrough");

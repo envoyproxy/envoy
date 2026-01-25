@@ -5,7 +5,7 @@
 // regardless of which extension point is being used (HTTP/Network/Listener/UDP/Bootstrap/etc).
 
 #include "source/common/common/logger.h"
-#include "source/extensions/dynamic_modules/abi.h"
+#include "source/extensions/dynamic_modules/abi/abi.h"
 
 extern "C" {
 
