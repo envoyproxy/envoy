@@ -14,16 +14,17 @@ namespace {
 TEST(JsonContentParserConfigTest, ValidConfig) {
   const std::string yaml = R"EOF(
   rules:
-    - selectors:
-        - key: "usage"
-        - key: "total_tokens"
-      on_present:
-        metadata_namespace: "envoy.lb"
-        key: "tokens"
-        type: NUMBER
+    - rule:
+        selectors:
+          - key: "usage"
+          - key: "total_tokens"
+        on_present:
+          metadata_namespace: "envoy.lb"
+          key: "tokens"
+          type: NUMBER
   )EOF";
 
-  envoy::extensions::sse_content_parsers::json::v3::JsonContentParser proto_config;
+  envoy::extensions::http::sse_content_parsers::json::v3::JsonContentParser proto_config;
   TestUtility::loadFromYamlAndValidate(yaml, proto_config);
 
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
@@ -34,9 +35,10 @@ TEST(JsonContentParserConfigTest, ValidConfig) {
 }
 
 TEST(JsonContentParserConfigTest, OnMissingWithEmptyValue) {
-  envoy::extensions::sse_content_parsers::json::v3::JsonContentParser proto_config;
+  envoy::extensions::http::sse_content_parsers::json::v3::JsonContentParser proto_config;
 
-  auto* rule = proto_config.add_rules();
+  auto* rule_config = proto_config.add_rules();
+  auto* rule = rule_config->mutable_rule();
   auto* selector = rule->add_selectors();
   selector->set_key("usage");
 
@@ -61,9 +63,10 @@ TEST(JsonContentParserConfigTest, OnMissingWithEmptyValue) {
 }
 
 TEST(JsonContentParserConfigTest, OnErrorWithEmptyValue) {
-  envoy::extensions::sse_content_parsers::json::v3::JsonContentParser proto_config;
+  envoy::extensions::http::sse_content_parsers::json::v3::JsonContentParser proto_config;
 
-  auto* rule = proto_config.add_rules();
+  auto* rule_config = proto_config.add_rules();
+  auto* rule = rule_config->mutable_rule();
   auto* selector = rule->add_selectors();
   selector->set_key("usage");
 
@@ -91,11 +94,12 @@ TEST(JsonContentParserConfigTest, RequiresAtLeastOneAction) {
   // Test that at least one of on_present, on_missing, or on_error must be specified
   const std::string yaml = R"EOF(
   rules:
-    - selectors:
-        - key: "usage"
+    - rule:
+        selectors:
+          - key: "usage"
   )EOF";
 
-  envoy::extensions::sse_content_parsers::json::v3::JsonContentParser proto_config;
+  envoy::extensions::http::sse_content_parsers::json::v3::JsonContentParser proto_config;
   TestUtility::loadFromYamlAndValidate(yaml, proto_config);
 
   NiceMock<Server::Configuration::MockServerFactoryContext> context;

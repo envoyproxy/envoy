@@ -5,4 +5,4 @@ SSE content parsers
   :glob:
   :maxdepth: 2
 
-  ../../extensions/sse_content_parsers/*/v3/*
+  ../../extensions/http/sse_content_parsers/*/v3/*
