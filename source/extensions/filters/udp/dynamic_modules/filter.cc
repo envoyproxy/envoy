@@ -9,8 +9,8 @@ namespace DynamicModules {
 
 DynamicModuleUdpListenerFilter::DynamicModuleUdpListenerFilter(
     Network::UdpReadFilterCallbacks& callbacks,
-    DynamicModuleUdpListenerFilterConfigSharedPtr config)
-    : UdpListenerReadFilter(callbacks), config_(config) {
+    DynamicModuleUdpListenerFilterConfigSharedPtr config, uint32_t worker_index)
+    : UdpListenerReadFilter(callbacks), config_(config), worker_index_(worker_index) {
   in_module_filter_ = config_->on_filter_new_(config_->in_module_config_, thisAsVoidPtr());
 }
 

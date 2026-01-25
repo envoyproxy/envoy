@@ -2195,13 +2195,22 @@ envoy.filters.http.dynamic_modules:
 envoy.tls.certificate_selectors.on_demand_secret:
   categories:
   - envoy.tls.certificate_selectors
+  - envoy.tls.upstream_certificate_selectors
   security_posture: unknown
   status: alpha
   type_urls:
   - envoy.extensions.transport_sockets.tls.cert_selectors.on_demand_secret.v3.Config
+envoy.tls.upstream_certificate_mappers.filter_state_override:
+  categories:
+  - envoy.tls.upstream_certificate_mappers
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.transport_sockets.tls.cert_mappers.filter_state_override.v3.Config
 envoy.tls.certificate_mappers.static_name:
   categories:
   - envoy.tls.certificate_mappers
+  - envoy.tls.upstream_certificate_mappers
   security_posture: unknown
   status: alpha
   type_urls:

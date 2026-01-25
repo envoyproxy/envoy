@@ -496,6 +496,91 @@ TEST_P(TcpProxyIntegrationTest, AccessLogUpstreamConnectFailure) {
   EXPECT_THAT(log_result, testing::StartsWith("delayed_connect_error:"));
 }
 
+// Verifies that access log value for `DOWNSTREAM_LOCAL_CLOSE_REASON` matches
+// the failure message when there is a session idle timeout.
+TEST_P(TcpProxyIntegrationTest, AccessLogSessionIdleTimeout) {
+  std::string access_log_path = TestEnvironment::temporaryPath(
+      fmt::format("access_log{}{}.txt", version_ == Network::Address::IpVersion::v4 ? "v4" : "v6",
+                  TestUtility::uniqueFilename()));
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* filter_chain = listener->mutable_filter_chains(0);
+    auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
+    ASSERT_TRUE(config_blob->Is<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>());
+    auto tcp_proxy_config =
+        MessageUtil::anyConvert<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>(
+            *config_blob);
+    auto* access_log = tcp_proxy_config.add_access_log();
+    access_log->set_name("accesslog");
+    envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
+    access_log_config.set_path(access_log_path);
+    access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
+        "%DOWNSTREAM_LOCAL_CLOSE_REASON%");
+    access_log->mutable_typed_config()->PackFrom(access_log_config);
+    tcp_proxy_config.mutable_idle_timeout()->set_nanos(
+        std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::milliseconds(500))
+            .count());
+    config_blob->PackFrom(tcp_proxy_config);
+  });
+  enableHalfClose(false);
+  initialize();
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  // Session should idle timeout, causing disconnect.
+  tcp_client->waitForDisconnect();
+  // Guarantee client is done writing to the log.
+  auto log_result = waitForAccessLog(access_log_path);
+  EXPECT_EQ(log_result, "tcp_session_idle_timeout");
+}
+
+// Verifies that access log value for `UPSTREAM_DETECTED_CLOSE_TYPE` matches the
+// upstream close type.
+TEST_P(TcpProxyIntegrationTest, AccessLogUpstreamDetectedCloseType) {
+  std::string access_log_path = TestEnvironment::temporaryPath(
+      fmt::format("access_log{}{}.txt", version_ == Network::Address::IpVersion::v4 ? "v4" : "v6",
+                  TestUtility::uniqueFilename()));
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* filter_chain = listener->mutable_filter_chains(0);
+    auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
+    ASSERT_TRUE(config_blob->Is<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>());
+    auto tcp_proxy_config =
+        MessageUtil::anyConvert<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>(
+            *config_blob);
+    auto* access_log = tcp_proxy_config.add_access_log();
+    access_log->set_name("accesslog");
+    envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
+    access_log_config.set_path(access_log_path);
+    access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
+        "%UPSTREAM_DETECTED_CLOSE_TYPE%");
+    access_log->mutable_typed_config()->PackFrom(access_log_config);
+    config_blob->PackFrom(tcp_proxy_config);
+  });
+  initialize();
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+
+  ASSERT_TRUE(tcp_client->write("hello"));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(5));
+
+  // Close the upstream connection.
+  ASSERT_TRUE(fake_upstream_connection->close(Network::ConnectionCloseType::AbortReset));
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+
+  // Wait for the upstream to close to ensure we get the correct close type.
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_destroy_remote", 1,
+                                 TestUtility::DefaultTimeout * 100);
+
+  // Downstream should be closed by proxy.
+  tcp_client->close();
+
+  // Guarantee client is done writing to the log.
+  auto log_result = waitForAccessLog(access_log_path);
+  EXPECT_THAT(log_result, testing::Eq("RemoteReset"));
+}
+
 TEST_P(TcpProxyIntegrationTest, AccessLogOnUpstreamConnect) {
   std::string access_log_path = TestEnvironment::temporaryPath(
       fmt::format("access_log{}{}.txt", version_ == Network::Address::IpVersion::v4 ? "v4" : "v6",
@@ -550,6 +635,43 @@ TEST_P(TcpProxyIntegrationTest, AccessLogOnUpstreamConnect) {
   EXPECT_EQ(AccessLogType_Name(AccessLog::AccessLogType::TcpConnectionEnd), access_log_parts[0]);
   ASSERT_TRUE(absl::SimpleAtoi(access_log_parts[1], &upstream_connection_id));
   EXPECT_GT(upstream_connection_id, 0);
+}
+
+TEST_P(TcpProxyIntegrationTest, AccessLogOnStart) {
+  std::string access_log_path = TestEnvironment::temporaryPath(
+      fmt::format("access_log{}{}.txt", version_ == Network::Address::IpVersion::v4 ? "v4" : "v6",
+                  TestUtility::uniqueFilename()));
+
+  setupByteMeterAccessLog();
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* filter_chain = listener->mutable_filter_chains(0);
+    auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
+
+    ASSERT_TRUE(config_blob->Is<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>());
+    auto tcp_proxy_config =
+        MessageUtil::anyConvert<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>(
+            *config_blob);
+
+    tcp_proxy_config.mutable_access_log_options()->set_flush_access_log_on_start(true);
+    auto* access_log = tcp_proxy_config.add_access_log();
+    access_log->set_name("accesslog");
+    envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
+    access_log_config.set_path(access_log_path);
+    access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
+        "%ACCESS_LOG_TYPE%\n");
+    access_log->mutable_typed_config()->PackFrom(access_log_config);
+    config_blob->PackFrom(tcp_proxy_config);
+  });
+
+  initialize();
+  auto tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  auto log_result = waitForAccessLog(access_log_path);
+  EXPECT_EQ(AccessLogType_Name(AccessLog::AccessLogType::TcpConnectionStart), log_result);
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  tcp_client->close();
+  ASSERT_TRUE(fake_upstream_connection->close());
 }
 
 TEST_P(TcpProxyIntegrationTest, PeriodicAccessLog) {

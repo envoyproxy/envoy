@@ -1453,3 +1453,282 @@ fn test_upstream_host_full_ipv6_address() {
   assert_eq!(addr, "2001:0db8:85a3:0000:0000:8a2e:0370:7334");
   assert_eq!(port, 443);
 }
+
+// =============================================================================
+// Connection State and Flow Control FFI stubs for testing.
+// =============================================================================
+
+static MOCK_CONNECTION_STATE: std::sync::Mutex<
+  abi::envoy_dynamic_module_type_network_connection_state,
+> = std::sync::Mutex::new(abi::envoy_dynamic_module_type_network_connection_state::Open);
+static MOCK_HALF_CLOSE_ENABLED: AtomicBool = AtomicBool::new(false);
+static MOCK_READ_ENABLED: AtomicBool = AtomicBool::new(true);
+static MOCK_BUFFER_LIMIT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+static MOCK_ABOVE_HIGH_WATERMARK: AtomicBool = AtomicBool::new(false);
+
+fn set_mock_connection_state(state: abi::envoy_dynamic_module_type_network_connection_state) {
+  *MOCK_CONNECTION_STATE.lock().unwrap() = state;
+}
+
+fn reset_mock_connection_state() {
+  *MOCK_CONNECTION_STATE.lock().unwrap() =
+    abi::envoy_dynamic_module_type_network_connection_state::Open;
+  MOCK_HALF_CLOSE_ENABLED.store(false, std::sync::atomic::Ordering::SeqCst);
+  MOCK_READ_ENABLED.store(true, std::sync::atomic::Ordering::SeqCst);
+  MOCK_BUFFER_LIMIT.store(0, std::sync::atomic::Ordering::SeqCst);
+  MOCK_ABOVE_HIGH_WATERMARK.store(false, std::sync::atomic::Ordering::SeqCst);
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_network_filter_get_connection_state(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+) -> abi::envoy_dynamic_module_type_network_connection_state {
+  *MOCK_CONNECTION_STATE.lock().unwrap()
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_network_filter_is_half_close_enabled(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+) -> bool {
+  MOCK_HALF_CLOSE_ENABLED.load(std::sync::atomic::Ordering::SeqCst)
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_network_filter_enable_half_close(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+  enabled: bool,
+) {
+  MOCK_HALF_CLOSE_ENABLED.store(enabled, std::sync::atomic::Ordering::SeqCst);
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_network_filter_read_disable(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+  disable: bool,
+) -> abi::envoy_dynamic_module_type_network_read_disable_status {
+  let was_enabled = MOCK_READ_ENABLED.load(std::sync::atomic::Ordering::SeqCst);
+  MOCK_READ_ENABLED.store(!disable, std::sync::atomic::Ordering::SeqCst);
+  // Return the appropriate status based on transition.
+  if was_enabled && disable {
+    abi::envoy_dynamic_module_type_network_read_disable_status::TransitionedToReadDisabled
+  } else if !was_enabled && !disable {
+    abi::envoy_dynamic_module_type_network_read_disable_status::TransitionedToReadEnabled
+  } else if !was_enabled && disable {
+    abi::envoy_dynamic_module_type_network_read_disable_status::StillReadDisabled
+  } else {
+    abi::envoy_dynamic_module_type_network_read_disable_status::NoTransition
+  }
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_network_filter_read_enabled(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+) -> bool {
+  MOCK_READ_ENABLED.load(std::sync::atomic::Ordering::SeqCst)
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_network_filter_get_buffer_limit(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+) -> u32 {
+  MOCK_BUFFER_LIMIT.load(std::sync::atomic::Ordering::SeqCst)
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_network_filter_set_buffer_limits(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+  limit: u32,
+) {
+  MOCK_BUFFER_LIMIT.store(limit, std::sync::atomic::Ordering::SeqCst);
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_network_filter_above_high_watermark(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_network_filter_envoy_ptr,
+) -> bool {
+  MOCK_ABOVE_HIGH_WATERMARK.load(std::sync::atomic::Ordering::SeqCst)
+}
+
+// =============================================================================
+// Connection State and Flow Control Tests
+// =============================================================================
+
+#[test]
+fn test_get_connection_state() {
+  reset_mock_connection_state();
+
+  let filter = EnvoyNetworkFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  // Default state is Open.
+  assert_eq!(
+    filter.get_connection_state(),
+    abi::envoy_dynamic_module_type_network_connection_state::Open
+  );
+
+  // Test Closing state.
+  set_mock_connection_state(abi::envoy_dynamic_module_type_network_connection_state::Closing);
+  assert_eq!(
+    filter.get_connection_state(),
+    abi::envoy_dynamic_module_type_network_connection_state::Closing
+  );
+
+  // Test Closed state.
+  set_mock_connection_state(abi::envoy_dynamic_module_type_network_connection_state::Closed);
+  assert_eq!(
+    filter.get_connection_state(),
+    abi::envoy_dynamic_module_type_network_connection_state::Closed
+  );
+}
+
+#[test]
+fn test_half_close_enabled() {
+  reset_mock_connection_state();
+
+  let mut filter = EnvoyNetworkFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  // Default is disabled.
+  assert!(!filter.is_half_close_enabled());
+
+  // Enable half-close.
+  filter.enable_half_close(true);
+  assert!(filter.is_half_close_enabled());
+
+  // Disable half-close.
+  filter.enable_half_close(false);
+  assert!(!filter.is_half_close_enabled());
+}
+
+#[test]
+fn test_read_disable() {
+  reset_mock_connection_state();
+
+  let mut filter = EnvoyNetworkFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  // Default read is enabled.
+  assert!(filter.read_enabled());
+
+  // Disable reads (should transition to disabled).
+  let status = filter.read_disable(true);
+  assert_eq!(
+    status,
+    abi::envoy_dynamic_module_type_network_read_disable_status::TransitionedToReadDisabled
+  );
+  assert!(!filter.read_enabled());
+
+  // Disable reads again (should indicate still disabled).
+  let status = filter.read_disable(true);
+  assert_eq!(
+    status,
+    abi::envoy_dynamic_module_type_network_read_disable_status::StillReadDisabled
+  );
+  assert!(!filter.read_enabled());
+
+  // Enable reads (should transition to enabled).
+  let status = filter.read_disable(false);
+  assert_eq!(
+    status,
+    abi::envoy_dynamic_module_type_network_read_disable_status::TransitionedToReadEnabled
+  );
+  assert!(filter.read_enabled());
+
+  // Enable reads again (should indicate no transition).
+  let status = filter.read_disable(false);
+  assert_eq!(
+    status,
+    abi::envoy_dynamic_module_type_network_read_disable_status::NoTransition
+  );
+  assert!(filter.read_enabled());
+}
+
+#[test]
+fn test_buffer_limits() {
+  reset_mock_connection_state();
+
+  let mut filter = EnvoyNetworkFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  // Default buffer limit is 0.
+  assert_eq!(filter.get_buffer_limit(), 0);
+
+  // Set buffer limit.
+  filter.set_buffer_limits(16384);
+  assert_eq!(filter.get_buffer_limit(), 16384);
+
+  // Set different buffer limit.
+  filter.set_buffer_limits(32768);
+  assert_eq!(filter.get_buffer_limit(), 32768);
+}
+
+#[test]
+fn test_above_high_watermark() {
+  reset_mock_connection_state();
+
+  let filter = EnvoyNetworkFilterImpl {
+    raw: std::ptr::null_mut(),
+  };
+
+  // Default is not above high watermark.
+  assert!(!filter.above_high_watermark());
+
+  // Set above high watermark.
+  MOCK_ABOVE_HIGH_WATERMARK.store(true, std::sync::atomic::Ordering::SeqCst);
+  assert!(filter.above_high_watermark());
+
+  // Clear above high watermark.
+  MOCK_ABOVE_HIGH_WATERMARK.store(false, std::sync::atomic::Ordering::SeqCst);
+  assert!(!filter.above_high_watermark());
+}
+
+#[test]
+fn test_network_filter_watermark_callbacks() {
+  struct TestNetworkFilterConfig;
+  impl<ENF: EnvoyNetworkFilter> NetworkFilterConfig<ENF> for TestNetworkFilterConfig {
+    fn new_network_filter(&self, _envoy: &mut ENF) -> Box<dyn NetworkFilter<ENF>> {
+      Box::new(TestNetworkFilter)
+    }
+  }
+
+  static ON_ABOVE_HIGH_WATERMARK_CALLED: AtomicBool = AtomicBool::new(false);
+  static ON_BELOW_LOW_WATERMARK_CALLED: AtomicBool = AtomicBool::new(false);
+
+  struct TestNetworkFilter;
+  impl<ENF: EnvoyNetworkFilter> NetworkFilter<ENF> for TestNetworkFilter {
+    fn on_above_write_buffer_high_watermark(&mut self, _envoy_filter: &mut ENF) {
+      ON_ABOVE_HIGH_WATERMARK_CALLED.store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    fn on_below_write_buffer_low_watermark(&mut self, _envoy_filter: &mut ENF) {
+      ON_BELOW_LOW_WATERMARK_CALLED.store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+  }
+
+  let mut filter_config = TestNetworkFilterConfig;
+  let filter = envoy_dynamic_module_on_network_filter_new_impl(
+    &mut EnvoyNetworkFilterImpl {
+      raw: std::ptr::null_mut(),
+    },
+    &mut filter_config,
+  );
+
+  // Call the watermark event hooks.
+  envoy_dynamic_module_on_network_filter_above_write_buffer_high_watermark(
+    std::ptr::null_mut(),
+    filter,
+  );
+  envoy_dynamic_module_on_network_filter_below_write_buffer_low_watermark(
+    std::ptr::null_mut(),
+    filter,
+  );
+
+  envoy_dynamic_module_on_network_filter_destroy(filter);
+
+  assert!(ON_ABOVE_HIGH_WATERMARK_CALLED.load(std::sync::atomic::Ordering::SeqCst));
+  assert!(ON_BELOW_LOW_WATERMARK_CALLED.load(std::sync::atomic::Ordering::SeqCst));
+}

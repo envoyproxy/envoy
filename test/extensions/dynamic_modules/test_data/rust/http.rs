@@ -235,6 +235,8 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeaderCallbacksFilter {
       std::str::from_utf8(downstream_addr.unwrap().as_slice()).unwrap(),
       "1.1.1.1:1234"
     );
+    let worker_index = envoy_filter.get_worker_index();
+    assert_eq!(worker_index, 0);
 
     abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
   }
