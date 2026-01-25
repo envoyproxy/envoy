@@ -8,7 +8,7 @@
 
 #include "source/common/common/statusor.h"
 #include "source/common/stats/utility.h"
-#include "source/extensions/dynamic_modules/abi.h"
+#include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 
 namespace Envoy {

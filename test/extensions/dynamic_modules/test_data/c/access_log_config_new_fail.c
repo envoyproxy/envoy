@@ -1,5 +1,5 @@
-#include "source/extensions/dynamic_modules/abi.h"
-#include "source/extensions/dynamic_modules/abi_version.h"
+#include "source/extensions/dynamic_modules/abi/abi.h"
+#include "source/extensions/dynamic_modules/abi/abi_version.h"
 
 // This module returns nullptr from config_new to test error handling.
 
@@ -32,4 +32,3 @@ void envoy_dynamic_module_on_access_logger_log(
 
 void envoy_dynamic_module_on_access_logger_destroy(
     envoy_dynamic_module_type_access_logger_module_ptr logger_module_ptr) {}
-
