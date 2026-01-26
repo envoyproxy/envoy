@@ -114,8 +114,6 @@ protected:
       }
       bool initializeReadFilters() override { return true; }
 
-
-
       // Network::Connection
       void addConnectionCallbacks(Network::ConnectionCallbacks& cb) override {
         callbacks_.push_back(&cb);
