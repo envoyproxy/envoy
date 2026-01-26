@@ -97,7 +97,7 @@ JsonContentParserImpl::getDeferredActions(size_t rule_index, bool has_error,
                                           bool selector_not_found) {
   std::vector<SseContentParser::MetadataAction> actions;
 
-  // Note: rule_index is always valid - it comes from iterating rule_states_ which matches rules_
+  // Note: rule_index is always valid
   ASSERT(rule_index < rules_.size());
   const auto& rule = rules_[rule_index];
 
@@ -114,7 +114,7 @@ JsonContentParserImpl::getDeferredActions(size_t rule_index, bool has_error,
 absl::StatusOr<Envoy::Json::ValueType>
 JsonContentParserImpl::extractValueFromJson(const Envoy::Json::ObjectSharedPtr& json_obj,
                                             const std::vector<std::string>& path) const {
-  // Note: path cannot be empty - validated in Rule constructor from proto (min_items: 1)
+  // Note: path cannot be empty
   ASSERT(!path.empty());
 
   Envoy::Json::ObjectSharedPtr current = json_obj;

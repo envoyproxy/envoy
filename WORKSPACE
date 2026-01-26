@@ -26,7 +26,7 @@ envoy_python_dependencies()
 
 load("//bazel:dependency_imports.bzl", "envoy_dependency_imports")
 
-envoy_dependency_imports()
+envoy_dependency_imports(go_version = "host")
 
 load("//bazel:repo.bzl", "envoy_repo")
 
