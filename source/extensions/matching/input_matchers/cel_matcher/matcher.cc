@@ -33,11 +33,15 @@ Matcher::MatchResult CelInputMatcher::match(const MatchingDataType& input) {
     ASSERT(cel_data != nullptr);
 
     auto eval_result = compiled_expr_.evaluate(*cel_data->activation_, &arena);
-    if (eval_result.ok() && eval_result.value().IsBool() && eval_result.value().BoolOrDie()) {
-      return Matcher::MatchResult::matched();
+    if (eval_result.ok() && eval_result.value().IsBool()) {
+      if (eval_result.value().BoolOrDie()) {
+        return Matcher::MatchResult::matched();
+      }
+    }
+    if (cel_data->needs_response() && !cel_data->has_response_data()) {
+      return Matcher::MatchResult::insufficientData();
     }
   }
-
   return Matcher::MatchResult::noMatch();
 }
 
