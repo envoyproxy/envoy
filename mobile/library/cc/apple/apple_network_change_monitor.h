@@ -19,9 +19,9 @@ class AppleNetworkChangeMonitor : public NetworkChangeMonitor {
 public:
   /**
    * Construct an AppleNetworkChangeMonitor.
-   * @param engine reference to a NetworkChangeListener.
+   * @param network_change_listener reference to a NetworkChangeListener.
    */
-  explicit AppleNetworkChangeMonitor(NetworkChangeListener& engine);
+  explicit AppleNetworkChangeMonitor(NetworkChangeListener& network_change_listener);
 
   ~AppleNetworkChangeMonitor() override;
 
