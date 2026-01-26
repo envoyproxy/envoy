@@ -1,84 +1,84 @@
 #include "source/common/http/session_idle_list.h"
 
-#include "source/common/common/logger.h"
+#include <algorithm>
 
 #include "absl/log/check.h"
+#include "absl/strings/str_format.h"
 #include "absl/time/time.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/logger.h"
 
 namespace Envoy {
 namespace Http {
 
-void SessionIdleList::AddSession(IdleSessionInterface* session) {
-  if (session != nullptr) {
-    idle_sessions_.AddSessionToList(absl::FromChrono(time_system_.systemTime()), session);
-  }
+void SessionIdleList::AddSession(IdleSessionInterface& session) {
+  idle_sessions_.AddSessionToList(dispatcher_.approximateMonotonicTime(), session);
 }
 
-void SessionIdleList::RemoveSession(IdleSessionInterface* session) {
-  if (session != nullptr) {
-    idle_sessions_.RemoveSessionFromList(session);
-  }
+void SessionIdleList::RemoveSession(IdleSessionInterface& session) {
+  idle_sessions_.RemoveSessionFromList(session);
 }
 
 void SessionIdleList::MaybeTerminateIdleSessions() {
   const int max_sessions_to_terminate = MaxSessionsToTerminateInOneRound();
-  int num_terminated;
-  for (num_terminated = 0; num_terminated < max_sessions_to_terminate; ++num_terminated) {
-    auto next_session = idle_sessions_.next_session_to_terminate();
-    absl::Duration time_since_enqueue =
-        absl::FromChrono(time_system_.systemTime()) - idle_sessions_.GetEnqueueTime(next_session);
+  size_t num_terminated;
+  for (num_terminated = 0;
+       num_terminated <
+       std::min(idle_sessions_.size(), static_cast<size_t>(max_sessions_to_terminate));
+       ++num_terminated) {
+    IdleSessionInterface& next_session = idle_sessions_.next_session_to_terminate();
+    absl::Duration time_since_enqueue = absl::FromChrono(
+        dispatcher_.approximateMonotonicTime() - idle_sessions_.GetEnqueueTime(next_session));
     if (time_since_enqueue < min_time_before_purge_allowed_) {
       break;
     }
     idle_sessions_.RemoveSessionFromList(next_session);
-    next_session->TerminateIdleSession();
+    next_session.TerminateIdleSession();
   }
-  ENVOY_LOG(info, "Terminated {} idle sessions.", num_terminated);
+  ENVOY_LOG(debug, "Terminated {} idle sessions.", num_terminated);
 };
 
-void SessionIdleList::IdleSessions::AddSessionToList(absl::Time enqueue_time,
-                                                     IdleSessionInterface* session) {
-  DCHECK(session != nullptr);
-  if (map_.find(session) != map_.end()) {
-    ENVOY_LOG(info, "Session {} is already on the idle list.", static_cast<void*>(session));
+void SessionIdleList::IdleSessions::AddSessionToList(MonotonicTime enqueue_time,
+                                                     IdleSessionInterface& session) {
+  if (map_.find(&session) != map_.end()) {
+    ENVOY_LOG(debug, "Session {} is already on the idle list.", static_cast<void*>(&session));
     ResetSessionEnqueueTime(enqueue_time, session);
     return;
   }
 
   auto [iter, added] = set_.emplace(SessionInfo(session, enqueue_time));
   if (!added) {
-    ENVOY_LOG(info, "Attempt to add session {} which is already in the idle set.",
-              static_cast<void*>(session));
+    IS_ENVOY_BUG(absl::StrFormat("Attempt to add session %p which is already in the idle set.",
+                                 static_cast<void*>(&session)));
   }
-  map_[session] = *iter;
+  map_[&session] = *iter;
   ++size_;
 }
 
-void SessionIdleList::IdleSessions::RemoveSessionFromList(IdleSessionInterface* session) {
-  DCHECK(session != nullptr);
-  typename IdleSessionMap::iterator it = map_.find(session);
+void SessionIdleList::IdleSessions::RemoveSessionFromList(IdleSessionInterface& session) {
+  typename IdleSessionMap::iterator it = map_.find(&session);
   if (it != map_.end()) {
     set_.erase(it->second);
     map_.erase(it);
     --size_;
   } else {
-    ENVOY_LOG(info, "Session {} is not on the idle list.", static_cast<void*>(session));
+    IS_ENVOY_BUG(
+        absl::StrFormat("Session %p is not on the idle list.", static_cast<void*>(&session)));
   }
 }
 
-absl::Time SessionIdleList::IdleSessions::GetEnqueueTime(IdleSessionInterface* session) const {
-  DCHECK(session != nullptr);
-  auto it = map_.find(session);
+MonotonicTime SessionIdleList::IdleSessions::GetEnqueueTime(IdleSessionInterface& session) const {
+  auto it = map_.find(&session);
   if (it != map_.end()) {
     return it->second.enqueue_time;
   }
-  return absl::UnixEpoch(); // Should not happen if session is in list
+  return MonotonicTime{}; // Should not happen if session is in list
 }
 
-void SessionIdleList::IdleSessions::ResetSessionEnqueueTime(absl::Time enqueue_time,
-                                                            IdleSessionInterface* session) {
-  this->RemoveSessionFromList(session);
-  this->AddSessionToList(enqueue_time, session);
+void SessionIdleList::IdleSessions::ResetSessionEnqueueTime(MonotonicTime enqueue_time,
+                                                            IdleSessionInterface& session) {
+  RemoveSessionFromList(session);
+  AddSessionToList(enqueue_time, session);
 }
 
 } // namespace Http
