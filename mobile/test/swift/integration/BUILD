@@ -261,6 +261,22 @@ envoy_mobile_swift_test(
 )
 
 envoy_mobile_swift_test(
+    name = "enable_network_change_monitor_test",
+    srcs = [
+        "EnableNetworkChangeMonitorTest.swift",
+    ],
+    exec_properties = {
+        "sandboxNetwork": "standard",
+    },
+    visibility = ["//visibility:public"],
+    deps = [
+        ":test_extensions",
+        "//library/objective-c:envoy_engine_objc_lib",
+        "//test/objective-c:envoy_test_server",
+    ],
+)
+
+envoy_mobile_swift_test(
     name = "cancel_grpc_stream_test",
     srcs = [
         "CancelGRPCStreamTest.swift",
