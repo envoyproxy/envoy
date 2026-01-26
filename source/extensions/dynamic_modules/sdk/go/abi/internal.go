@@ -391,7 +391,8 @@ type dymHttpFilterHandle struct {
 
 	plugin            shared.HttpFilter
 	scheduler         *dymScheduler
-	onDestroyed       bool
+	streamCompleted   bool
+	streamDestoried   bool
 	localResponseSent bool
 	// nextCalloutID was removed because callout ID is now returned by the host.
 
@@ -1190,11 +1191,10 @@ func envoy_dynamic_module_on_http_filter_destroy(
 	pluginPtr C.envoy_dynamic_module_type_http_filter_module_ptr,
 ) {
 	pluginWrapper := pluginManager.unwrap(unsafe.Pointer(pluginPtr))
-	if pluginWrapper == nil || pluginWrapper.onDestroyed {
+	if pluginWrapper == nil || pluginWrapper.streamDestoried {
 		return
 	}
-	pluginWrapper.clearData()
-	pluginWrapper.onDestroyed = true
+	pluginWrapper.streamDestoried = true
 	pluginManager.remove(unsafe.Pointer(pluginPtr))
 }
 
@@ -1291,6 +1291,9 @@ func envoy_dynamic_module_on_http_filter_stream_complete(
 	if pluginWrapper == nil || pluginWrapper.plugin == nil {
 		return
 	}
+	pluginWrapper.streamCompleted = true
+	pluginWrapper.clearData()
+	pluginWrapper.scheduler = nil
 	pluginWrapper.plugin.OnStreamComplete()
 }
 
@@ -1301,7 +1304,7 @@ func envoy_dynamic_module_on_http_filter_scheduled(
 	taskID C.uint64_t,
 ) {
 	pluginWrapper := pluginManager.unwrap(unsafe.Pointer(pluginPtr))
-	if pluginWrapper == nil || pluginWrapper.scheduler == nil || pluginWrapper.onDestroyed {
+	if pluginWrapper == nil || pluginWrapper.scheduler == nil || pluginWrapper.streamCompleted {
 		return
 	}
 	pluginWrapper.scheduler.onScheduled(uint64(taskID))
@@ -1319,7 +1322,7 @@ func envoy_dynamic_module_on_http_filter_http_callout_done(
 	chunksSize C.size_t,
 ) {
 	pluginWrapper := pluginManager.unwrap(unsafe.Pointer(pluginPtr))
-	if pluginWrapper == nil || pluginWrapper.onDestroyed {
+	if pluginWrapper == nil || pluginWrapper.streamCompleted {
 		return
 	}
 
@@ -1348,7 +1351,7 @@ func envoy_dynamic_module_on_http_filter_http_stream_headers(
 	endOfStream C.bool,
 ) {
 	pluginWrapper := pluginManager.unwrap(unsafe.Pointer(pluginPtr))
-	if pluginWrapper == nil || pluginWrapper.onDestroyed {
+	if pluginWrapper == nil || pluginWrapper.streamCompleted {
 		return
 	}
 
@@ -1371,7 +1374,7 @@ func envoy_dynamic_module_on_http_filter_http_stream_data(
 	endOfStream C.bool,
 ) {
 	pluginWrapper := pluginManager.unwrap(unsafe.Pointer(pluginPtr))
-	if pluginWrapper == nil || pluginWrapper.onDestroyed {
+	if pluginWrapper == nil || pluginWrapper.streamCompleted {
 		return
 	}
 
@@ -1393,7 +1396,7 @@ func envoy_dynamic_module_on_http_filter_http_stream_trailers(
 	trailersSize C.size_t,
 ) {
 	pluginWrapper := pluginManager.unwrap(unsafe.Pointer(pluginPtr))
-	if pluginWrapper == nil || pluginWrapper.onDestroyed {
+	if pluginWrapper == nil || pluginWrapper.streamCompleted {
 		return
 	}
 
@@ -1413,7 +1416,7 @@ func envoy_dynamic_module_on_http_filter_http_stream_complete(
 	streamID C.uint64_t,
 ) {
 	pluginWrapper := pluginManager.unwrap(unsafe.Pointer(pluginPtr))
-	if pluginWrapper == nil || pluginWrapper.onDestroyed {
+	if pluginWrapper == nil || pluginWrapper.streamCompleted {
 		return
 	}
 
@@ -1432,7 +1435,7 @@ func envoy_dynamic_module_on_http_filter_http_stream_reset(
 	reason C.envoy_dynamic_module_type_http_stream_reset_reason,
 ) {
 	pluginWrapper := pluginManager.unwrap(unsafe.Pointer(pluginPtr))
-	if pluginWrapper == nil || pluginWrapper.onDestroyed {
+	if pluginWrapper == nil || pluginWrapper.streamCompleted {
 		return
 	}
 
@@ -1449,7 +1452,7 @@ func envoy_dynamic_module_on_http_filter_downstream_above_write_buffer_high_wate
 	pluginPtr C.envoy_dynamic_module_type_http_filter_module_ptr,
 ) {
 	pluginWrapper := pluginManager.unwrap(unsafe.Pointer(pluginPtr))
-	if pluginWrapper == nil || pluginWrapper.onDestroyed {
+	if pluginWrapper == nil || pluginWrapper.streamCompleted {
 		return
 	}
 
@@ -1464,7 +1467,7 @@ func envoy_dynamic_module_on_http_filter_downstream_below_write_buffer_low_water
 	pluginPtr C.envoy_dynamic_module_type_http_filter_module_ptr,
 ) {
 	pluginWrapper := pluginManager.unwrap(unsafe.Pointer(pluginPtr))
-	if pluginWrapper == nil || pluginWrapper.onDestroyed {
+	if pluginWrapper == nil || pluginWrapper.streamCompleted {
 		return
 	}
 
