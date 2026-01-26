@@ -63,6 +63,12 @@ enum OutlierEjectionType {
   // Runs over aggregated success rate statistics for local origin failures from every host in
   // cluster and selects hosts for which ratio of failed replies is above configured value.
   FAILURE_PERCENTAGE_LOCAL_ORIGIN = 6;
+
+  // Host is detected as degraded via passive health checking (outlier detection).
+  // The host returns responses with the x-envoy-degraded header, indicating it is under stress
+  // but still able to serve traffic. Degraded hosts are deprioritized in load balancing but not
+  // fully ejected.
+  DEGRADED = 7;
 }
 
 // Represents possible action applied to upstream host
