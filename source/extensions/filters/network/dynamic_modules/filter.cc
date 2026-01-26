@@ -135,11 +135,19 @@ void DynamicModuleNetworkFilter::onScheduled(uint64_t event_id) {
 }
 
 void DynamicModuleNetworkFilter::onAboveWriteBufferHighWatermark() {
-  // Not currently exposed to dynamic modules.
+  if (in_module_filter_ == nullptr ||
+      config_->on_network_filter_above_write_buffer_high_watermark_ == nullptr) {
+    return;
+  }
+  config_->on_network_filter_above_write_buffer_high_watermark_(thisAsVoidPtr(), in_module_filter_);
 }
 
 void DynamicModuleNetworkFilter::onBelowWriteBufferLowWatermark() {
-  // Not currently exposed to dynamic modules.
+  if (in_module_filter_ == nullptr ||
+      config_->on_network_filter_below_write_buffer_low_watermark_ == nullptr) {
+    return;
+  }
+  config_->on_network_filter_below_write_buffer_low_watermark_(thisAsVoidPtr(), in_module_filter_);
 }
 
 void DynamicModuleNetworkFilter::continueReading() {

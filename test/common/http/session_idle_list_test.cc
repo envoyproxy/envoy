@@ -1,19 +1,21 @@
-#include "source/common/http/session_idle_list.h"
-
 #include <chrono>
 
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
-#include "absl/time/time.h"
 #include "envoy/event/timer.h"
+
+#include "source/common/http/session_idle_list.h"
+
 #include "test/mocks/event/mocks.h"
 #include "test/test_common/simulated_time_system.h"
+
+#include "absl/time/time.h"
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Http {
 
 class TestIdleSession : public IdleSessionInterface {
- public:
+public:
   TestIdleSession() = default;
   virtual ~TestIdleSession() = default;
 
@@ -21,14 +23,13 @@ class TestIdleSession : public IdleSessionInterface {
 
   bool is_closed() const { return is_closed_; }
 
- private:
+private:
   bool is_closed_ = false;
 };
 
 class TestSessionIdleList : public SessionIdleList {
- public:
-  explicit TestSessionIdleList(Event::Dispatcher& dispatcher)
-      : SessionIdleList(dispatcher) {};
+public:
+  explicit TestSessionIdleList(Event::Dispatcher& dispatcher) : SessionIdleList(dispatcher) {};
 
   // This type is neither copyable nor movable.
   TestSessionIdleList(const TestSessionIdleList&) = delete;
@@ -38,16 +39,17 @@ class TestSessionIdleList : public SessionIdleList {
 };
 
 class SessionIdleListTest : public ::testing::Test {
- public:
+public:
   SessionIdleListTest() : idle_list_(dispatcher_) {
     auto sim_time = std::make_unique<Event::SimulatedTimeSystem>();
     time_system_ = sim_time.get();
     dispatcher_.time_system_ = std::move(sim_time);
-    ON_CALL(dispatcher_, approximateMonotonicTime())
-        .WillByDefault([this]() { return time_system_->monotonicTime(); });
+    ON_CALL(dispatcher_, approximateMonotonicTime()).WillByDefault([this]() {
+      return time_system_->monotonicTime();
+    });
   }
 
- protected:
+protected:
   Event::SimulatedTimeSystem* time_system_;
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
   TestSessionIdleList idle_list_;
@@ -104,5 +106,5 @@ TEST_F(SessionIdleListTest, TerminateIdleSessionsByOrder) {
   EXPECT_TRUE(idle_list_.idle_sessions()->ContainsForTest(session2));
 }
 
-}  // namespace Http
-}  // namespace Envoy
+} // namespace Http
+} // namespace Envoy

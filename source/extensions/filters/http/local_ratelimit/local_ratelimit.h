@@ -34,7 +34,8 @@ namespace LocalRateLimitFilter {
   COUNTER(enabled)                                                                                 \
   COUNTER(enforced)                                                                                \
   COUNTER(rate_limited)                                                                            \
-  COUNTER(ok)
+  COUNTER(ok)                                                                                      \
+  COUNTER(shadow_mode)
 
 /**
  * Struct definition for all local rate limit stats. @see stats_macros.h

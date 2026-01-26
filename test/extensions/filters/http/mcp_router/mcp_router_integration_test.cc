@@ -1051,6 +1051,86 @@ TEST_P(McpRouterIntegrationTest, PromptsGetWithUnknownBackendReturns400) {
   EXPECT_EQ("400", response->headers().getStatusValue());
 }
 
+// Test notifications/cancelled is forwarded to all backends.
+TEST_P(McpRouterIntegrationTest, NotificationCancelledFanout) {
+  initializeFilter();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Notifications don't have an 'id' field per JSON-RPC spec.
+  const std::string request_body = R"({
+    "jsonrpc": "2.0",
+    "method": "notifications/cancelled",
+    "params": {
+      "requestId": "req-123",
+      "reason": "User cancelled"
+    }
+  })";
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/mcp"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"accept", "application/json"},
+                                     {"accept", "text/event-stream"},
+                                     {"content-type", "application/json"}},
+      request_body);
+
+  // Both backends should receive the notification.
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, time_backend_connection_));
+  ASSERT_TRUE(time_backend_connection_->waitForNewStream(*dispatcher_, time_backend_request_));
+  ASSERT_TRUE(time_backend_request_->waitForEndStream(*dispatcher_));
+
+  ASSERT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, tools_backend_connection_));
+  ASSERT_TRUE(tools_backend_connection_->waitForNewStream(*dispatcher_, tools_backend_request_));
+  ASSERT_TRUE(tools_backend_request_->waitForEndStream(*dispatcher_));
+
+  // Backends respond with 202 Accepted (notifications don't return content).
+  time_backend_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "202"}}, true);
+  tools_backend_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "202"}}, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("202", response->headers().getStatusValue());
+}
+
+// Test notifications/roots/list_changed is forwarded to all backends.
+TEST_P(McpRouterIntegrationTest, NotificationRootsListChangedFanout) {
+  initializeFilter();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  const std::string request_body = R"({
+    "jsonrpc": "2.0",
+    "method": "notifications/roots/list_changed"
+  })";
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/mcp"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"accept", "application/json"},
+                                     {"accept", "text/event-stream"},
+                                     {"content-type", "application/json"}},
+      request_body);
+
+  // Both backends should receive the notification.
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, time_backend_connection_));
+  ASSERT_TRUE(time_backend_connection_->waitForNewStream(*dispatcher_, time_backend_request_));
+  ASSERT_TRUE(time_backend_request_->waitForEndStream(*dispatcher_));
+
+  ASSERT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, tools_backend_connection_));
+  ASSERT_TRUE(tools_backend_connection_->waitForNewStream(*dispatcher_, tools_backend_request_));
+  ASSERT_TRUE(tools_backend_request_->waitForEndStream(*dispatcher_));
+
+  time_backend_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "202"}}, true);
+  tools_backend_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "202"}}, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("202", response->headers().getStatusValue());
+}
+
 class McpRouterSubjectValidationIntegrationTest : public McpRouterIntegrationTest {
 public:
   void initializeFilterWithSubjectValidation() {

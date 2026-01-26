@@ -2,11 +2,12 @@
 
 #include <algorithm>
 
+#include "source/common/common/assert.h"
+#include "source/common/common/logger.h"
+
 #include "absl/log/check.h"
 #include "absl/strings/str_format.h"
 #include "absl/time/time.h"
-#include "source/common/common/assert.h"
-#include "source/common/common/logger.h"
 
 namespace Envoy {
 namespace Http {
