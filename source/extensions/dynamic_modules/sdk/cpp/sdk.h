@@ -819,8 +819,8 @@ using HttpFilterConfigFactoryPtr = std::unique_ptr<HttpFilterConfigFactory>;
 class HttpFilterConfigFactoryRegistry {
 private:
   static auto& getMutableRegistry() {
-    static auto registry = new absl::flat_hash_map<std::string, HttpFilterConfigFactoryPtr>();
-    return *registry;
+    static absl::flat_hash_map<std::string, HttpFilterConfigFactoryPtr> registry;
+    return registry;
   }
   friend class HttpFilterConfigFactoryRegister;
 
@@ -849,7 +849,8 @@ private:
 #define REGISTER_HTTP_FILTER_CONFIG_FACTORY(FACTORY_CLASS, NAME)                                   \
   static Envoy::DynamicModules::HttpFilterConfigFactoryRegister                                    \
       HttpFilterConfigFactoryRegister_##FACTORY_CLASS##_register_NAME(                             \
-          NAME, std::make_unique<FACTORY_CLASS>());
+          NAME,                                                                                    \
+          std::unique_ptr<Envoy::DynamicModules::HttpFilterConfigFactory>(new FACTORY_CLASS()));
 
 // Macro to log messages
 #define DYM_LOG(HANDLE, LEVEL, FORMAT_STRING, ...)                                                 \
