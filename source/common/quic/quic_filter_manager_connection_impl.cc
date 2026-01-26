@@ -52,8 +52,8 @@ bool QuicFilterManagerConnectionImpl::initializeReadFilters() {
   return filter_manager_->initializeReadFilters();
 }
 
-void QuicFilterManagerConnectionImpl::addAccessLogHandler(AccessLog::InstanceSharedPtr) {
-  IS_ENVOY_BUG("Unexpected call to addAccessLogHandler for QUIC connection");
+void QuicFilterManagerConnectionImpl::addAccessLogHandler(AccessLog::InstanceSharedPtr handler) {
+  filter_manager_->addAccessLogHandler(handler);
 }
 
 void QuicFilterManagerConnectionImpl::enableHalfClose(bool enabled) {
