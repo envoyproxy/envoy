@@ -2,7 +2,6 @@
 
 #include <cassert>
 #include <cstddef>
-#include <format>
 #include <memory>
 
 #include "absl/container/flat_hash_map.h"
