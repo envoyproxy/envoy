@@ -75,7 +75,7 @@ Example of a LocalReplyConfig with ``body_format`` field.
             default_value: 500
             runtime_key: key_b
     status_code: 501
-  body_format:
-    text_format: "%LOCAL_REPLY_BODY% %RESPONSE_CODE%"
+    body_format:
+      text_format: "%LOCAL_REPLY_BODY% %RESPONSE_CODE%"
 
 In above example, there is a ``body_format_override`` inside the first ``mapper`` with a filter matching ``status_code == 400``. It generates the response body in plain text format by concatenating %LOCAL_REPLY_BODY% with the ``:path`` request header. It is only used when the first mapper is matched. There is a ``body_format`` at the bottom of the config and at the same level as field ``mappers``. It is used when non of the mappers is matched or the matched mapper doesn't have its own ``body_format_override`` specified.
