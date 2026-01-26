@@ -18,6 +18,36 @@ absl::Status validateWeightedClusterSpecifier(const ClusterWeightProto& cluster)
   return absl::InvalidArgumentError(error);
 }
 
+uint64_t WeightedClusterSpecifierPlugin::healthawareClusterWeight(const std::string& cluster_name,
+                                                                  uint64_t config_weight) const {
+  if (!health_aware_lb_ || config_weight == 0) {
+    return config_weight;
+  }
+
+  auto* cluster = cluster_manager_.getThreadLocalCluster(cluster_name);
+  if (cluster == nullptr) {
+    return config_weight; // cannot tell cluster health.
+  }
+
+  bool has_healthy = false;
+  for (const auto& ps : cluster->prioritySet().hostSetsPerPriority()) {
+    if (!ps->healthyHosts().empty()) {
+      has_healthy = true;
+      break;
+    }
+  }
+  if (!has_healthy) {
+    const auto& stats = cluster->info()->endpointStats();
+    uint64_t healthy_count = stats.membership_healthy_.value();
+    uint64_t total_count = stats.membership_total_.value();
+    ENVOY_LOG(debug, "unhealthy cluster {} has {} healthy hosts out of {} total hosts",
+              cluster_name, healthy_count, total_count);
+    return 0;
+  }
+
+  return config_weight;
+}
+
 absl::StatusOr<std::shared_ptr<WeightedClustersConfigEntry>> WeightedClustersConfigEntry::create(
     const ClusterWeightProto& cluster, const MetadataMatchCriteria* parent_metadata_match,
     std::string&& runtime_key, Server::Configuration::ServerFactoryContext& context) {
@@ -70,7 +100,8 @@ WeightedClusterSpecifierPlugin::WeightedClusterSpecifierPlugin(
     const WeightedClusterProto& weighted_clusters,
     const MetadataMatchCriteria* parent_metadata_match, absl::string_view route_name,
     Server::Configuration::ServerFactoryContext& context, absl::Status& creation_status)
-    : loader_(context.runtime()), random_value_header_(weighted_clusters.header_name()),
+    : loader_(context.runtime()), cluster_manager_(context.clusterManager()),
+      random_value_header_(weighted_clusters.header_name()),
       runtime_key_prefix_(weighted_clusters.runtime_key_prefix()),
       use_hash_policy_(weighted_clusters.random_value_specifier_case() ==
                                WeightedClusterProto::kUseHashPolicy
@@ -252,6 +283,7 @@ RouteConstSharedPtr WeightedClusterSpecifierPlugin::pickWeightedCluster(
   const bool runtime_key_prefix_configured = !runtime_key_prefix_.empty();
   uint32_t total_cluster_weight = total_cluster_weight_;
   absl::InlinedVector<uint32_t, 4> cluster_weights;
+  bool use_weight_override = false;
 
   // if runtime config is used, we need to recompute total_weight.
   if (runtime_key_prefix_configured) {
@@ -273,12 +305,37 @@ RouteConstSharedPtr WeightedClusterSpecifierPlugin::pickWeightedCluster(
       }
       total_cluster_weight += cluster_weight;
     }
+    use_weight_override = true;
   }
 
+  // if total_weight is zero, it means the config is invalid.
   if (total_cluster_weight == 0) {
     IS_ENVOY_BUG("Sum of weight cannot be zero");
     return nullptr;
   }
+
+  // recompute total_weight based on cluster health, overrides config values.
+  // This step is not needed for a single cluster.
+  if (health_aware_lb_ && weighted_clusters_.size() > 1) {
+    absl::InlinedVector<uint32_t, 4> healthy_cluster_weights;
+    healthy_cluster_weights.reserve(weighted_clusters_.size());
+    uint32_t total_healthy_weight = 0;
+    for (const auto& cluster : weighted_clusters_) {
+      auto cluster_weight = cluster->clusterWeight(loader_);
+      cluster_weight = healthawareClusterWeight(cluster->cluster_name_, cluster_weight);
+
+      healthy_cluster_weights.push_back(cluster_weight);
+      total_healthy_weight += cluster_weight;
+    }
+    if (total_healthy_weight > 0) {
+      total_cluster_weight = total_healthy_weight;
+      cluster_weights = std::move(healthy_cluster_weights);
+      use_weight_override = true;
+    } else {
+      ENVOY_LOG(debug, "All clusters are unhealthy, weighted panic mode");
+    }
+  }
+
   const uint64_t selected_value =
       (random_value_from_header.has_value() ? random_value_from_header.value() : selection_value) %
       total_cluster_weight;
@@ -291,7 +348,7 @@ RouteConstSharedPtr WeightedClusterSpecifierPlugin::pickWeightedCluster(
   // [0, cluster1_weight), [cluster1_weight, cluster1_weight+cluster2_weight),..
   for (const auto& cluster : weighted_clusters_) {
 
-    if (runtime_key_prefix_configured) {
+    if (use_weight_override) {
       end = begin + *cluster_weight++;
     } else {
       end = begin + cluster->clusterWeight(loader_);

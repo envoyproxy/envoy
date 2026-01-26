@@ -69,11 +69,14 @@ private:
                                           const Http::RequestHeaderMap& headers,
                                           const StreamInfo::StreamInfo& stream_info,
                                           uint64_t random_value) const;
+  uint64_t healthawareClusterWeight(const std::string& cluster_name, uint64_t config_weight) const;
 
   Runtime::Loader& loader_;
+  Upstream::ClusterManager& cluster_manager_;
   const Http::LowerCaseString random_value_header_;
   const std::string runtime_key_prefix_;
   const bool use_hash_policy_{};
+  const bool health_aware_lb_{true};
   std::vector<WeightedClustersConfigEntryConstSharedPtr> weighted_clusters_;
   uint64_t total_cluster_weight_{0};
 };
