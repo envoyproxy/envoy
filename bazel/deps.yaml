@@ -1056,16 +1056,6 @@ org_brotli:
   cpe: "cpe:2.3:a:google:brotli:*"
   license: "MIT"
   license_url: "https://github.com/google/brotli/blob/v{version}/LICENSE"
-org_llvm_releases_compiler_rt:
-  project_name: "compiler-rt"
-  project_desc: "LLVM compiler runtime library"
-  project_url: "https://compiler-rt.llvm.org"
-  release_date: "2024-06-19"
-  use_category:
-  - test_only
-  cpe: "cpe:2.3:a:llvm:compiler-rt:*"
-  license: "Apache-2.0"
-  license_url: "https://github.com/llvm/llvm-project/blob/llvmorg-{version}/compiler-rt/LICENSE.TXT"
 platforms:
   project_name: "platforms"
   project_desc: "Constraint values for specifying platforms and toolchains"
