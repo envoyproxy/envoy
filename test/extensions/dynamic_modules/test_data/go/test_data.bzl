@@ -21,4 +21,4 @@ def test_program(name):
             ],
             "//conditions:default": [],
         }),
-    ),
+    )
