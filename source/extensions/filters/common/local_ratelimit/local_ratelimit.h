@@ -18,6 +18,7 @@ public:
   virtual uint64_t maxTokens() const PURE;
   virtual uint64_t remainingTokens() const PURE;
   virtual uint64_t resetSeconds() const PURE;
+  virtual bool shadowMode() const PURE;
 };
 
 // Interface for a local rate limiter.

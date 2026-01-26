@@ -119,7 +119,8 @@ Config::SharedConfig::SharedConfig(
     const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config,
     Server::Configuration::FactoryContext& context)
     : stats_scope_(context.scope().createScope(fmt::format("tcp.{}", config.stat_prefix()))),
-      stats_(generateStats(*stats_scope_)) {
+      stats_(generateStats(*stats_scope_)),
+      flush_access_log_on_start_(config.access_log_options().flush_access_log_on_start()) {
   if (config.has_idle_timeout()) {
     const uint64_t timeout = DurationUtil::durationToMilliseconds(config.idle_timeout());
     if (timeout > 0) {
@@ -1071,6 +1072,9 @@ Network::FilterStatus Filter::onNewConnection() {
   // Set UUID for the connection. This is used for logging and tracing.
   getStreamInfo().setStreamIdProvider(
       std::make_shared<StreamInfo::StreamIdProviderImpl>(config_->randomGenerator().uuid()));
+  if (config_->flushAccessLogOnStart()) {
+    flushAccessLog(AccessLog::AccessLogType::TcpConnectionStart);
+  }
 
   ASSERT(upstream_ == nullptr);
 

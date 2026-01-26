@@ -1,5 +1,6 @@
 #include "source/extensions/filters/http/local_ratelimit/local_ratelimit.h"
 
+#include <cstddef>
 #include <memory>
 #include <string>
 #include <vector>
@@ -179,6 +180,11 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   }
 
   used_config_->stats().rate_limited_.inc();
+
+  if (token_bucket_context_ != nullptr && token_bucket_context_->shadowMode()) {
+    used_config_->stats().shadow_mode_.inc();
+    return Http::FilterHeadersStatus::Continue;
+  }
 
   if (!used_config_->enforced()) {
     used_config_->requestHeadersParser().evaluateHeaders(headers, decoder_callbacks_->streamInfo());

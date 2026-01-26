@@ -1477,6 +1477,7 @@ Current supported substitution commands include:
   * ``TcpUpstreamConnected`` - When TCP Proxy filter has successfully established an upstream connection.
   * ``TcpPeriodic`` - On any TCP Proxy filter periodic log record.
   * ``TcpConnectionEnd`` - When a TCP connection is ended on TCP Proxy filter.
+  * ``TcpConnectionStart`` - When a TCP connection is accepted by the TCP Proxy filter.
   * ``DownstreamStart`` - When HTTP Connection Manager filter receives a new HTTP request.
   * ``DownstreamTunnelSuccessfullyEstablished`` - When the HTTP Connection Manager sends response headers indicating a successful HTTP tunnel.
   * ``DownstreamPeriodic`` - On any HTTP Connection Manager periodic log record.

@@ -14,6 +14,16 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: ext_authz
+  change: |
+    Changed the behavior of ``timeout: 0s`` in the HTTP ext_authz filter to mean "no timeout" (infinite)
+    instead of immediate timeout. Previously, ``timeout: 0s`` would cause requests to fail immediately.
+    This aligns with other Envoy timeout configurations where 0 means disabled/infinite.
+- area: ratelimit
+  change: |
+    Changed the behavior of ``timeout: 0s`` in the HTTP rate limit filter to mean "no timeout" (infinite)
+    instead of immediate timeout. Previously, ``timeout: 0s`` would cause requests to fail immediately.
+    This aligns with other Envoy timeout configurations where 0 means disabled/infinite.
 - area: histograms
   change: |
     Update of libcircllhist to 0.3.2 has changed how bucket bounds are interpreted. This should not have an impact on
@@ -34,6 +44,15 @@ bug_fixes:
     would not be properly closed when in draining state. This could occur when a response was sent before the request
     was fully received, causing connections to remain open indefinitely. This behavior change can be temporarily reverted
     by setting the runtime guard ``envoy.reloadable_features.http1_close_connection_on_zombie_stream_complete`` to ``false``.
+- area: overload_manager
+  change: |
+    Fixed a resource leak in global connection limit tracking that caused permanent connection rejections when using
+    load shedding (e.g., ``envoy.load_shed_points.tcp_listener_accept``). When connections were rejected due to load
+    shedding after passing the global connection limit check, the allocated connection limit resource was not released,
+    causing the connection counter to become incorrect and leading to ``failed_updates`` in the resource monitor. This
+    resulted in permanent connection rejections even after load subsided. The fix ensures that connection limit
+    resources are properly released when connections are rejected due to load shedding. Also added defensive resource
+    cleanup for edge cases where address processing fails (e.g., ``localAddress()`` or ``peerAddress()`` errors).
 - area: drop_overload
   change: |
     Fixed a bug that drop_overload failed to use cached EDS resources.
@@ -86,6 +105,9 @@ new_features:
     Extended ``*_WITHOUT_PORT`` address formatters to accept an optional ``MASK_PREFIX_LEN`` parameter that masks IP addresses
     and returns them in CIDR notation (e.g., ``%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT(16)%`` returns ``10.1.0.0/16`` for
     client IP ``10.1.10.23``).
+- area: ratelimit
+  change: |
+    Added support for shadow mode in local rate limit filter.
 - area: config
   change: |
     Added support for `:ref:`set_node_on_first_message_only
@@ -98,5 +120,8 @@ new_features:
   change: |
     Added ``%UPSTREAM_DETECTED_CLOSE_TYPE%`` and ``%DOWNSTREAM_DETECTED_CLOSE_TYPE%`` to expose the detected close type
     of downstream and connections. The possible values are ``Normal``, ``LocalReset``, and ``RemoteReset``.
+- area: tcp_proxy
+  change: |
+    Added an option to emit a log entry when the connection is accepted.
 
 deprecated:
