@@ -473,26 +473,23 @@ protected:
    */
   class OdCdsApiHandleImpl : public OdCdsApiHandle {
   public:
-    static OdCdsApiHandlePtr create(ClusterManagerImpl& parent, uint64_t subscription_key) {
-      return std::make_unique<OdCdsApiHandleImpl>(parent, subscription_key);
+    static OdCdsApiHandlePtr create(ClusterManagerImpl& parent, uint64_t config_source_key) {
+      return std::make_unique<OdCdsApiHandleImpl>(parent, config_source_key);
     }
 
-    OdCdsApiHandleImpl(ClusterManagerImpl& parent, uint64_t subscription_key)
-        : parent_(parent), subscription_key_(subscription_key) {}
-
-    // Ref count cleanup follows ThreadLocal::SlotImpl::~SlotImpl() pattern.
-    ~OdCdsApiHandleImpl() override;
+    OdCdsApiHandleImpl(ClusterManagerImpl& parent, uint64_t config_source_key)
+        : parent_(parent), config_source_key_(config_source_key) {}
 
     ClusterDiscoveryCallbackHandlePtr
     requestOnDemandClusterDiscovery(absl::string_view name, ClusterDiscoveryCallbackPtr callback,
                                     std::chrono::milliseconds timeout) override {
-      return parent_.requestOnDemandClusterDiscovery(subscription_key_, std::string(name),
+      return parent_.requestOnDemandClusterDiscovery(config_source_key_, std::string(name),
                                                      std::move(callback), timeout);
     }
 
   private:
     ClusterManagerImpl& parent_;
-    uint64_t subscription_key_;
+    uint64_t config_source_key_;
   };
 
   virtual void postThreadLocalClusterUpdate(ClusterManagerCluster& cm_cluster,
@@ -904,21 +901,12 @@ private:
 
   void notifyClusterDiscoveryStatus(absl::string_view name, ClusterDiscoveryStatus status);
 
-  // Must be called on the main thread.
-  void releaseOdCdsSubscription(uint64_t subscription_key);
-
 protected:
-  struct OdCdsSubscriptionEntry {
-    OdCdsApiSharedPtr subscription;
-    std::atomic<uint32_t> ref_count;
-
-    explicit OdCdsSubscriptionEntry(OdCdsApiSharedPtr sub)
-        : subscription(std::move(sub)), ref_count(1) {}
-  };
-
   ClusterInitializationMap cluster_initialization_map_;
-  // OdCDS subscriptions keyed by config hash, with ref counting for cleanup.
-  absl::flat_hash_map<uint64_t, std::unique_ptr<OdCdsSubscriptionEntry>> odcds_subscriptions_;
+  // OdCDS subscriptions keyed by config source hash. Subscriptions persist for the lifetime
+  // of ClusterManagerImpl to avoid complexity around cleanup. A future optimization could
+  // add proper lifetime management to close unnecessary connections.
+  absl::flat_hash_map<uint64_t, OdCdsApiSharedPtr> odcds_subscriptions_;
 
 private:
   /**

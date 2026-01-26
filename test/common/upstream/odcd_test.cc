@@ -284,21 +284,14 @@ TEST_F(ODCDTest, TestMainThreadDiscoveryInProgressDetection) {
 }
 
 // Test that destroying an OdCdsApiHandle from a worker thread does not cause SIGABRT.
-// This simulates the scenario where a filter is removed during VHDS updates, causing
-// the handle to be destroyed on a worker thread. The destructor posts cleanup to the
-// main thread dispatcher.
+// The handle no longer accesses the subscription directly, so destruction is safe
+// from any thread. The subscription itself persists in ClusterManagerImpl.
 TEST_F(ODCDTest, TestDestroyHandleFromWorkerThread) {
   auto handle_to_destroy = cluster_manager_->createOdCdsApiHandle(odcds_);
 
   bool destruction_completed = false;
-  Event::PostCb posted_callback;
   Api::ApiPtr api = Api::createApiForTest();
   Event::DispatcherPtr worker_dispatcher(api->allocateDispatcher("test_worker_thread"));
-
-  // Expect the destructor to post the ref count decrement to the main thread.
-  // Capture the callback so we can run it after the worker thread completes.
-  EXPECT_CALL(factory_.server_context_.dispatcher_, post(_))
-      .WillOnce(Invoke([&posted_callback](Event::PostCb cb) { posted_callback = std::move(cb); }));
 
   Thread::ThreadPtr worker_thread = Thread::threadFactoryForTest().createThread(
       [&handle_to_destroy, &destruction_completed, &worker_dispatcher]() {
@@ -314,10 +307,6 @@ TEST_F(ODCDTest, TestDestroyHandleFromWorkerThread) {
 
   worker_thread->join();
   EXPECT_TRUE(destruction_completed);
-
-  // Run the posted cleanup callback on the main thread.
-  ASSERT_TRUE(posted_callback != nullptr);
-  posted_callback();
 }
 
 } // namespace
