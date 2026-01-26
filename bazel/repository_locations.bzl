@@ -335,13 +335,6 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "ragel-{version}",
         urls = ["https://github.com/adrian-thurston/ragel/archive/{version}.tar.gz"],
     ),
-    # This should be removed, see https://github.com/envoyproxy/envoy/issues/13261.
-    zlib = dict(
-        version = "1.3.1",
-        sha256 = "17e88863f3600672ab49182f217281b6fc4d3c762bde361935e436a95214d05c",
-        strip_prefix = "zlib-{version}",
-        urls = ["https://github.com/madler/zlib/archive/v{version}.tar.gz"],
-    ),
     org_boost = dict(
         version = "1.89.0",
         sha256 = "9de758db755e8330a01d995b0a24d09798048400ac25c03fc5ea9be364b13c93",
@@ -360,7 +353,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "zstd-{version}",
         urls = ["https://github.com/facebook/zstd/archive/v{version}.tar.gz"],
     ),
-    com_github_zlib_ng_zlib_ng = dict(
+    zlib_ng = dict(
         version = "2.3.2",
         sha256 = "6a0561b50b8f5f6434a6a9e667a67026f2b2064a1ffa959c6b2dae320161c2a8",
         strip_prefix = "zlib-ng-{version}",
@@ -561,10 +554,14 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/simdutf/simdutf/releases/download/v{version}/singleheader.zip"],
     ),
     com_github_google_quiche = dict(
-        version = "1eb9b26af7a84f13ee208803c4704306b2ceec9a",
-        sha256 = "35aaa73ff8eb748fd84a526730a0e4952c8810acd9532754bc773017ea732131",
+        project_name = "QUICHE",
+        project_desc = "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols",
+        project_url = "https://github.com/google/quiche",
+        version = "f9b729501753d7d4dd61f8e868a1f4a38e5ece26",
+        sha256 = "0ed32ce64d6d3a9acd542c60301977fbbbb36a9bc0dc6b46d2f97cabbbcae3eb",
         urls = ["https://github.com/google/quiche/archive/{version}.tar.gz"],
         strip_prefix = "quiche-{version}",
+        release_date = "2026-01-22",
     ),
     googleurl = dict(
         version = "dd4080fec0b443296c0ed0036e1e776df8813aa7",
