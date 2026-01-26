@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cmath>
+
 #include "source/common/http/conn_manager_impl.h"
 #include "source/common/http/context_impl.h"
 #include "source/common/http/date_provider_impl.h"
@@ -116,7 +118,17 @@ public:
   absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
   bool isRoutable() const override { return true; }
   absl::optional<std::chrono::milliseconds> maxConnectionDuration() const override {
-    return max_connection_duration_;
+    if (!max_connection_duration_ || !max_connection_duration_jitter_) {
+      return max_connection_duration_;
+    }
+    const uint64_t max_jitter_ms = std::ceil(max_connection_duration_.value().count() *
+                                             (max_connection_duration_jitter_.value() / 100.0));
+    if (max_jitter_ms == 0) {
+      return max_connection_duration_;
+    }
+    const uint64_t jitter_ms = random_.random() % max_jitter_ms;
+    return std::chrono::milliseconds(
+        static_cast<uint64_t>(max_connection_duration_.value().count() + jitter_ms));
   }
   bool http1SafeMaxConnectionDuration() const override {
     return http1_safe_max_connection_duration_;
@@ -290,6 +302,7 @@ public:
   uint32_t max_requests_per_connection_{};
   absl::optional<std::chrono::milliseconds> idle_timeout_;
   absl::optional<std::chrono::milliseconds> max_connection_duration_;
+  absl::optional<double> max_connection_duration_jitter_;
   bool http1_safe_max_connection_duration_{false};
   std::chrono::milliseconds stream_idle_timeout_{};
   absl::optional<std::chrono::milliseconds> stream_flush_timeout_;
@@ -297,7 +310,7 @@ public:
   std::chrono::milliseconds request_headers_timeout_{};
   std::chrono::milliseconds delayed_close_timeout_{};
   absl::optional<std::chrono::milliseconds> max_stream_duration_;
-  NiceMock<Random::MockRandomGenerator> random_;
+  mutable NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   RequestDecoder* decoder_{};

@@ -1,6 +1,7 @@
 #include "source/extensions/filters/network/http_connection_manager/config.h"
 
 #include <chrono>
+#include <cmath>
 #include <memory>
 #include <string>
 #include <vector>
@@ -392,6 +393,11 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       idle_timeout_(PROTOBUF_GET_OPTIONAL_MS(config.common_http_protocol_options(), idle_timeout)),
       max_connection_duration_(
           PROTOBUF_GET_OPTIONAL_MS(config.common_http_protocol_options(), max_connection_duration)),
+      max_connection_duration_jitter_(
+          config.common_http_protocol_options().has_max_connection_duration_jitter()
+              ? absl::optional<double>(
+                    config.common_http_protocol_options().max_connection_duration_jitter().value())
+              : absl::nullopt),
       http1_safe_max_connection_duration_(config.http1_safe_max_connection_duration()),
       max_stream_duration_(
           PROTOBUF_GET_OPTIONAL_MS(config.common_http_protocol_options(), max_stream_duration)),
@@ -819,6 +825,30 @@ bool HttpConnectionManagerConfig::createUpgradeFilterChain(
 
 const Network::Address::Instance& HttpConnectionManagerConfig::localAddress() {
   return *context_.serverFactoryContext().localInfo().address();
+}
+
+absl::optional<std::chrono::milliseconds>
+HttpConnectionManagerConfig::maxConnectionDuration() const {
+  if (!max_connection_duration_) {
+    return absl::nullopt;
+  }
+
+  if (!max_connection_duration_jitter_) {
+    return max_connection_duration_;
+  }
+
+  // Apply jitter: base_duration + random(0, base_duration * jitter_percentage / 100.0);
+  const uint64_t max_jitter_ms = std::ceil(max_connection_duration_.value().count() *
+                                           (max_connection_duration_jitter_.value() / 100.0));
+
+  if (max_jitter_ms == 0) {
+    return max_connection_duration_;
+  }
+
+  const uint64_t jitter_ms =
+      context_.serverFactoryContext().api().randomGenerator().random() % max_jitter_ms;
+  return std::chrono::milliseconds(
+      static_cast<uint64_t>(max_connection_duration_.value().count() + jitter_ms));
 }
 
 /**

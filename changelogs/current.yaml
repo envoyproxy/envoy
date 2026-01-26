@@ -108,6 +108,14 @@ new_features:
 - area: ratelimit
   change: |
     Added support for shadow mode in local rate limit filter.
+- area: http
+  change: |
+    Added :ref:`max_connection_duration_jitter
+    <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_connection_duration_jitter>` to
+    :ref:`HttpProtocolOptions <envoy_v3_api_msg_config.core.v3.HttpProtocolOptions>` to prevent the "thundering herd"
+    problem when many HTTP/2 connections hit their maximum duration simultaneously. The jitter adds a random duration
+    (up to the specified percentage) to ``max_connection_duration``, staggering connection closures and preventing
+    service disruptions during synchronized connection draining.
 - area: config
   change: |
     Added support for `:ref:`set_node_on_first_message_only
