@@ -541,6 +541,10 @@ TEST_P(OnDemandIntegrationTest, BasicSuccessMtlsSuccess) {
   waitSendSdsResponse("server");
   conn->waitForUpstreamConnection();
   conn->sendAndReceiveTlsData("hello", "world");
+  // Ensure that the session ID is not issued: this is an indirect evidence that TLS resumption
+  // is disabled on the server-side.
+  EXPECT_EQ("", conn->tlsSessionId())
+      << "Unexpected TLS session ID: " << conn->tlsSessionId().value_or("<none>");
   conn.reset();
 }
 

@@ -37,6 +37,9 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: tls
+  change: |
+    Fix on-demand TLS selector to enforce session resumption settings.
 - area: ext_authz
   change: |
     Added support for the ``append_action`` enum in gRPC ext_authz ``OkHttpResponse.headers`` for upstream
