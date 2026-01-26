@@ -81,6 +81,14 @@ absl::StatusOr<DynamicModuleNetworkFilterConfigSharedPtr> newDynamicModuleNetwor
   auto on_config_scheduled = dynamic_module->getFunctionPointer<OnNetworkFilterConfigScheduledType>(
       "envoy_dynamic_module_on_network_filter_config_scheduled");
 
+  // Optional: modules that don't need watermark notifications don't need to implement these.
+  auto on_above_write_buffer_high_watermark =
+      dynamic_module->getFunctionPointer<OnNetworkFilterAboveWriteBufferHighWatermarkType>(
+          "envoy_dynamic_module_on_network_filter_above_write_buffer_high_watermark");
+  auto on_below_write_buffer_low_watermark =
+      dynamic_module->getFunctionPointer<OnNetworkFilterBelowWriteBufferLowWatermarkType>(
+          "envoy_dynamic_module_on_network_filter_below_write_buffer_low_watermark");
+
   auto config = std::make_shared<DynamicModuleNetworkFilterConfig>(
       filter_name, filter_config, std::move(dynamic_module), cluster_manager, stats_scope,
       main_thread_dispatcher);
@@ -99,6 +107,12 @@ absl::StatusOr<DynamicModuleNetworkFilterConfigSharedPtr> newDynamicModuleNetwor
       on_filter_scheduled.ok() ? on_filter_scheduled.value() : nullptr;
   config->on_network_filter_config_scheduled_ =
       on_config_scheduled.ok() ? on_config_scheduled.value() : nullptr;
+  config->on_network_filter_above_write_buffer_high_watermark_ =
+      on_above_write_buffer_high_watermark.ok() ? on_above_write_buffer_high_watermark.value()
+                                                : nullptr;
+  config->on_network_filter_below_write_buffer_low_watermark_ =
+      on_below_write_buffer_low_watermark.ok() ? on_below_write_buffer_low_watermark.value()
+                                               : nullptr;
 
   // Create the in-module configuration.
   envoy_dynamic_module_type_envoy_buffer name_buffer = {const_cast<char*>(filter_name.data()),

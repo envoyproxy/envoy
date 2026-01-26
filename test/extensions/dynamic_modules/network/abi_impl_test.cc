@@ -1957,6 +1957,96 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetWorkerIndex) {
   EXPECT_EQ(0u, worker_index);
 }
 
+// =============================================================================
+// Connection State and Flow Control Callback Tests
+// =============================================================================
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetConnectionState) {
+  EXPECT_CALL(connection_, state())
+      .WillOnce(testing::Return(Network::Connection::State::Open))
+      .WillOnce(testing::Return(Network::Connection::State::Closing))
+      .WillOnce(testing::Return(Network::Connection::State::Closed));
+
+  EXPECT_EQ(envoy_dynamic_module_type_network_connection_state_Open,
+            envoy_dynamic_module_callback_network_filter_get_connection_state(filterPtr()));
+  EXPECT_EQ(envoy_dynamic_module_type_network_connection_state_Closing,
+            envoy_dynamic_module_callback_network_filter_get_connection_state(filterPtr()));
+  EXPECT_EQ(envoy_dynamic_module_type_network_connection_state_Closed,
+            envoy_dynamic_module_callback_network_filter_get_connection_state(filterPtr()));
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, ReadDisable) {
+  EXPECT_CALL(connection_, readDisable(true))
+      .WillOnce(
+          testing::Return(Network::Connection::ReadDisableStatus::TransitionedToReadDisabled));
+  EXPECT_CALL(connection_, readDisable(false))
+      .WillOnce(testing::Return(Network::Connection::ReadDisableStatus::TransitionedToReadEnabled));
+
+  auto status = envoy_dynamic_module_callback_network_filter_read_disable(filterPtr(), true);
+  EXPECT_EQ(envoy_dynamic_module_type_network_read_disable_status_TransitionedToReadDisabled,
+            status);
+
+  status = envoy_dynamic_module_callback_network_filter_read_disable(filterPtr(), false);
+  EXPECT_EQ(envoy_dynamic_module_type_network_read_disable_status_TransitionedToReadEnabled,
+            status);
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, ReadDisableStillDisabled) {
+  EXPECT_CALL(connection_, readDisable(true))
+      .WillOnce(testing::Return(Network::Connection::ReadDisableStatus::StillReadDisabled));
+
+  auto status = envoy_dynamic_module_callback_network_filter_read_disable(filterPtr(), true);
+  EXPECT_EQ(envoy_dynamic_module_type_network_read_disable_status_StillReadDisabled, status);
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, ReadEnabled) {
+  EXPECT_CALL(connection_, readEnabled())
+      .WillOnce(testing::Return(true))
+      .WillOnce(testing::Return(false));
+
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_filter_read_enabled(filterPtr()));
+  EXPECT_FALSE(envoy_dynamic_module_callback_network_filter_read_enabled(filterPtr()));
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, IsHalfCloseEnabled) {
+  EXPECT_CALL(connection_, isHalfCloseEnabled())
+      .WillOnce(testing::Return(true))
+      .WillOnce(testing::Return(false));
+
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_filter_is_half_close_enabled(filterPtr()));
+  EXPECT_FALSE(envoy_dynamic_module_callback_network_filter_is_half_close_enabled(filterPtr()));
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, EnableHalfClose) {
+  EXPECT_CALL(connection_, enableHalfClose(true));
+  EXPECT_CALL(connection_, enableHalfClose(false));
+
+  envoy_dynamic_module_callback_network_filter_enable_half_close(filterPtr(), true);
+  envoy_dynamic_module_callback_network_filter_enable_half_close(filterPtr(), false);
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetBufferLimit) {
+  EXPECT_CALL(connection_, bufferLimit()).WillOnce(testing::Return(65536));
+
+  uint32_t limit = envoy_dynamic_module_callback_network_filter_get_buffer_limit(filterPtr());
+  EXPECT_EQ(65536u, limit);
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, SetBufferLimits) {
+  EXPECT_CALL(connection_, setBufferLimits(32768));
+
+  envoy_dynamic_module_callback_network_filter_set_buffer_limits(filterPtr(), 32768);
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, AboveHighWatermark) {
+  EXPECT_CALL(connection_, aboveHighWatermark())
+      .WillOnce(testing::Return(true))
+      .WillOnce(testing::Return(false));
+
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_filter_above_high_watermark(filterPtr()));
+  EXPECT_FALSE(envoy_dynamic_module_callback_network_filter_above_high_watermark(filterPtr()));
+}
+
 } // namespace NetworkFilters
 } // namespace DynamicModules
 } // namespace Extensions

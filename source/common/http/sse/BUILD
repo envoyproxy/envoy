@@ -14,5 +14,6 @@ envoy_cc_library(
     hdrs = ["sse_parser.h"],
     deps = [
         "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:optional",
     ],
 )

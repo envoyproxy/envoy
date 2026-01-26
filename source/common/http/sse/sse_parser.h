@@ -1,9 +1,11 @@
 #pragma once
 
 #include <string>
+#include <tuple>
 #include <utility>
 
 #include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Http {
@@ -19,28 +21,60 @@ namespace Sse {
  * - Multiple data fields (concatenated with newlines)
  * - Partial events split across chunks
  * - End-of-stream handling
+ *
+ * Example usage:
+ *   std::string buffer_;
+ *   absl::string_view buffer_view(buffer_);
+ *   while (!buffer_view.empty()) {
+ *     auto [event_start, event_end, next_start] = findEventEnd(buffer_view, end_stream);
+ *     if (event_start == absl::string_view::npos) break;
+ *
+ *     auto event_str = buffer_view.substr(event_start, event_end - event_start);
+ *     auto event = parseEvent(event_str);
+ *     if (event.data.has_value()) {
+ *       // Process event.data.value()
+ *     }
+ *     buffer_view = buffer_view.substr(next_start);
+ *   }
+ *   buffer_.erase(0, buffer_.size() - buffer_view.size());
  */
 class SseParser {
 public:
   /**
-   * Extracts and concatenates all 'data' field values from an SSE event.
-   * Per SSE spec, multiple data fields are joined with newlines.
+   * Represents a parsed SSE event.
+   * Currently only supports the 'data' field. Future versions may add 'id', 'event', and 'retry'.
+   */
+  struct ParsedEvent {
+    // The concatenated data field values. Per SSE spec, multiple data fields are joined with
+    // newlines. absl::nullopt if no data fields present, empty string if data field exists but
+    // empty.
+    absl::optional<std::string> data;
+  };
+
+  /**
+   * Parses an SSE event and extracts fields.
+   * Currently extracts only the 'data' field. Per SSE spec, multiple data fields are joined with
+   * newlines.
    *
    * @param event the complete SSE event string (from blank line to blank line).
-   * @return concatenated data field values, or empty string if no data fields found.
+   * @return parsed event with available fields populated.
    */
-  static std::string extractDataField(absl::string_view event);
+  static ParsedEvent parseEvent(absl::string_view event);
 
   /**
    * Finds the end of the next SSE event in the buffer.
    * An event ends with a blank line (two consecutive line breaks).
+   * Automatically handles UTF-8 BOM at the start of the stream.
    *
-   * @param str the buffer to search for an event.
+   * @param buffer the buffer to search for an event.
    * @param end_stream whether this is the end of the stream (affects partial line handling).
-   * @return a pair of {event_end, next_event_start} positions.
-   *         Returns {npos, npos} if no complete event is found.
+   * @return a tuple of {event_start, event_end, next_event_start} positions.
+   *         event_start: where the event content begins (after BOM if present)
+   *         event_end: where the event content ends (excluding trailing blank line)
+   *         next_event_start: where to continue parsing for the next event
+   *         Returns {npos, npos, npos} if no complete event is found.
    */
-  static std::pair<size_t, size_t> findEventEnd(absl::string_view str, bool end_stream);
+  static std::tuple<size_t, size_t, size_t> findEventEnd(absl::string_view buffer, bool end_stream);
 
 private:
   /**
