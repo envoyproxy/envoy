@@ -117,9 +117,9 @@ void Filter::processBuffer(bool end_stream) {
   absl::string_view buffer_view(buffer_);
 
   while (!buffer_view.empty() && !processing_complete_) {
-    auto [event_end, next_event] = Http::Sse::SseParser::findEventEnd(buffer_view, end_stream);
+    auto [event_start, event_end, next_event_start] = Http::Sse::SseParser::findEventEnd(buffer_view, end_stream);
 
-    if (event_end == absl::string_view::npos) {
+    if (event_start == absl::string_view::npos) {
       // No complete event found. Check if buffer exceeds max size.
       const uint32_t max_size = config_->maxEventSize();
       if (max_size > 0 && buffer_view.size() > max_size) {
@@ -134,7 +134,7 @@ void Filter::processBuffer(bool end_stream) {
       break;
     }
 
-    absl::string_view event = buffer_view.substr(0, event_end);
+    absl::string_view event = buffer_view.substr(event_start, event_end - event_start);
     ENVOY_LOG(trace, "Processing SSE event: {}", absl::CEscape(event));
 
     if (processSseEvent(event)) {
@@ -142,7 +142,7 @@ void Filter::processBuffer(bool end_stream) {
       break;
     }
 
-    buffer_view = buffer_view.substr(next_event);
+    buffer_view = buffer_view.substr(next_event_start);
   }
 
   // Keep only the unprocessed tail substring (remove processed bytes from front).
@@ -150,9 +150,9 @@ void Filter::processBuffer(bool end_stream) {
 }
 
 bool Filter::processSseEvent(absl::string_view event) {
-  const std::string data_field = Http::Sse::SseParser::extractDataField(event);
+  auto parsed_event = Http::Sse::SseParser::parseEvent(event);
 
-  if (data_field.empty()) {
+  if (!parsed_event.data.has_value() || parsed_event.data.value().empty()) {
     ENVOY_LOG(debug, "Event does not contain 'data' field");
     config_->stats().no_data_field_.inc();
     // Track error for all rules (will execute on_error at end if on_present never executes)
@@ -163,7 +163,7 @@ bool Filter::processSseEvent(absl::string_view event) {
   }
 
   // Delegate to parser
-  auto result = parser_->parse(data_field);
+  auto result = parser_->parse(parsed_event.data.value());
 
   if (result.has_error) {
     ENVOY_LOG(debug, "Parser reported error parsing data field");

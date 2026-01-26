@@ -1,4 +1,3 @@
-
 #include "source/common/http/sse/sse_parser.h"
 
 #include <cstdint>
