@@ -68,10 +68,18 @@ TEST_P(DynamicModuleTestLanguages, Nop) {
   filter->onDestroy();
 }
 
+#ifndef __SANITIZE_ADDRESS__
+// TODO(wbpcode): address sanitizer cannot handle the cross shared libraries vptr casts.
+// and we need to figure out a way to fix it.
+auto DynamicModuleHttpLanguageTestsValues = testing::Values("rust", "go", "cpp");
+#else
+auto DynamicModuleHttpLanguageTestsValues = testing::Values("rust", "go");
+#endif
+
 class DynamicModuleHttpLanguageTests : public DynamicModuleTestLanguages {};
 
 INSTANTIATE_TEST_SUITE_P(HttpLanguageTests, DynamicModuleHttpLanguageTests,
-                         testing::Values("rust", "go", "cpp"),
+                         DynamicModuleHttpLanguageTestsValues,
                          DynamicModuleTestLanguages::languageParamToTestName);
 
 TEST_P(DynamicModuleHttpLanguageTests, ConfigInitializationFailure) {

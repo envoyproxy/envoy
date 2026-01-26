@@ -49,6 +49,7 @@ go_library(
         "sdk/go/shared/api.go",
         "sdk/go/shared/base.go",
     ],
+    cgo = True,
     importpath = "github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go/shared",
     visibility = ["//visibility:public"],
 )
@@ -56,6 +57,7 @@ go_library(
 go_library(
     name = "go_sdk",
     srcs = ["sdk/go/sdk.go"],
+    cgo = True,
     importpath = "github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go",
     visibility = ["//visibility:public"],
     deps = [
@@ -70,6 +72,12 @@ go_library(
         "//source/extensions/dynamic_modules/abi:abi.h",
     ],
     cgo = True,
+    clinkopts = select({
+        "//bazel:darwin_any": [
+            "-Wl,-undefined,dynamic_lookup",
+        ],
+        "//conditions:default": [],
+    }),
     importpath = "github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go/abi",
     visibility = ["//visibility:public"],
     deps = [

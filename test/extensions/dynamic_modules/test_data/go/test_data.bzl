@@ -15,10 +15,4 @@ def test_program(name):
             "@envoy//source/extensions/dynamic_modules:go_sdk_shared",
             "@envoy//source/extensions/dynamic_modules:go_sdk_abi",
         ],
-        clinkopts = select({
-            "@io_bazel_rules_go//go/platform:darwin": [
-                "-Wl,-undefined,dynamic_lookup",
-            ],
-            "//conditions:default": [],
-        }),
     )
