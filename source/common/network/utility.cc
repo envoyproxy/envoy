@@ -316,10 +316,18 @@ const std::string& Utility::getIpv6CidrCatchAllAddress() {
 Address::InstanceConstSharedPtr Utility::getAddressWithPort(const Address::Instance& address,
                                                             uint32_t port) {
   switch (address.ip()->version()) {
-  case Address::IpVersion::v4:
-    return std::make_shared<Address::Ipv4Instance>(address.ip()->addressAsString(), port);
-  case Address::IpVersion::v6:
-    return std::make_shared<Address::Ipv6Instance>(address.ip()->addressAsString(), port);
+  case Address::IpVersion::v4: {
+    // Copy the sockaddr and update the port to preserve all address properties.
+    sockaddr_in addr = *reinterpret_cast<const sockaddr_in*>(address.sockAddr());
+    addr.sin_port = htons(static_cast<uint16_t>(port));
+    return std::make_shared<Address::Ipv4Instance>(&addr);
+  }
+  case Address::IpVersion::v6: {
+    // Copy the sockaddr and update the port to preserve all address properties including scope ID.
+    sockaddr_in6 addr = *reinterpret_cast<const sockaddr_in6*>(address.sockAddr());
+    addr.sin6_port = htons(static_cast<uint16_t>(port));
+    return std::make_shared<Address::Ipv6Instance>(addr, address.ip()->ipv6()->v6only());
+  }
   }
   PANIC("not handled");
 }
