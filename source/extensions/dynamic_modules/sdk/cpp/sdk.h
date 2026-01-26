@@ -817,29 +817,18 @@ public:
 using HttpFilterConfigFactoryPtr = std::unique_ptr<HttpFilterConfigFactory>;
 
 class HttpFilterConfigFactoryRegistry {
-private:
-  static auto& getMutableRegistry() {
-    static absl::flat_hash_map<std::string, HttpFilterConfigFactoryPtr> registry;
-    return registry;
-  }
-  friend class HttpFilterConfigFactoryRegister;
-
 public:
-  static const auto& getRegistry() { return getMutableRegistry(); };
+  static const absl::flat_hash_map<std::string, HttpFilterConfigFactoryPtr>& getRegistry();
+
+private:
+  static absl::flat_hash_map<std::string, HttpFilterConfigFactoryPtr>& getMutableRegistry();
+  friend class HttpFilterConfigFactoryRegister;
 };
 
 class HttpFilterConfigFactoryRegister {
 public:
-  HttpFilterConfigFactoryRegister(absl::string_view name, HttpFilterConfigFactoryPtr factory)
-      : name_(name) {
-    auto r =
-        HttpFilterConfigFactoryRegistry::getMutableRegistry().emplace(name_, std::move(factory));
-    assert(
-        (void(std::format("Factory with the same name {} already registered", name_)), r.second));
-  }
-  ~HttpFilterConfigFactoryRegister() {
-    HttpFilterConfigFactoryRegistry::getMutableRegistry().erase(name_);
-  }
+  HttpFilterConfigFactoryRegister(absl::string_view name, HttpFilterConfigFactoryPtr factory);
+  ~HttpFilterConfigFactoryRegister();
 
 private:
   const std::string name_;

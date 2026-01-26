@@ -6,6 +6,7 @@ licenses(["notice"])  # Apache 2
 cc_library(
     name = "sdk",
     hdrs = ["sdk.h"],
+    srcs = ["sdk.cc"],
     visibility = ["//visibility:public"],
     deps = [
         "@com_google_absl//absl/container:flat_hash_map",
