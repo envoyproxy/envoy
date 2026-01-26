@@ -18,8 +18,8 @@ message CompressorFuzzInput {
     RLE = 3;
   }
 
-  CompressionLevel compression_level = 1;
-  CompressionStrategy compression_strategy = 2;
+  CompressionLevel compression_level = 1 [(validate.rules).enum.defined_only = true];
+  CompressionStrategy compression_strategy = 2 [(validate.rules).enum.defined_only = true];
   int32 window_bits = 3 [(validate.rules).int32 = {gte: 9, lte: 15}];
   int32 memory_level = 4 [(validate.rules).int32 = {gte: 1, lte: 9}];
 
