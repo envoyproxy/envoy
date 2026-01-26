@@ -1,5 +1,7 @@
 #include "source/extensions/matching/input_matchers/cel_matcher/matcher.h"
 
+#include "envoy/matcher/matcher.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Matching {
@@ -21,7 +23,7 @@ CelInputMatcher::CelInputMatcher(CelMatcherSharedPtr cel_matcher,
         return std::move(compiled_expr.value());
       }()) {}
 
-bool CelInputMatcher::match(const MatchingDataType& input) {
+Matcher::MatchResult CelInputMatcher::match(const MatchingDataType& input) {
   Protobuf::Arena arena;
   if (auto* ptr = absl::get_if<std::shared_ptr<::Envoy::Matcher::CustomMatchData>>(&input);
       ptr != nullptr) {
@@ -31,12 +33,12 @@ bool CelInputMatcher::match(const MatchingDataType& input) {
     ASSERT(cel_data != nullptr);
 
     auto eval_result = compiled_expr_.evaluate(*cel_data->activation_, &arena);
-    if (eval_result.ok() && eval_result.value().IsBool()) {
-      return eval_result.value().BoolOrDie();
+    if (eval_result.ok() && eval_result.value().IsBool() && eval_result.value().BoolOrDie()) {
+      return Matcher::MatchResult::matched();
     }
   }
 
-  return false;
+  return Matcher::MatchResult::noMatch();
 }
 
 } // namespace CelMatcher

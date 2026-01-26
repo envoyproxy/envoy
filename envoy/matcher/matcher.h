@@ -88,6 +88,11 @@ public:
   inline bool operator==(const MatchResult& other) const {
     return result_.index() == other.result_.index();
   }
+  std::string toString() const {
+    if (isInsufficientData()) return "insufficient data";
+    if (isMatched()) return "match";
+    return "no match";
+  }
   static MatchResult insufficientData() { return MatchResult{InsufficientData{}}; }
   static MatchResult matched() { return MatchResult{Matched{}}; }
   static MatchResult noMatch() { return MatchResult{NoMatch{}}; }
@@ -250,7 +255,7 @@ public:
    * @param Matcher::MatchingDataType the value to match on. Will be absl::monostate() if the
    * lookup failed.
    */
-  virtual bool match(const Matcher::MatchingDataType& input) PURE;
+  virtual MatchResult match(const Matcher::MatchingDataType& input) PURE;
 
   /**
    * A set of data input types supported by InputMatcher.
