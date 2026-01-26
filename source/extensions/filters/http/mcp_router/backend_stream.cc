@@ -170,17 +170,23 @@ bool BackendStreamCallbacks::tryParseSseResponse() {
 
   while (!remaining.empty()) {
     // Look for complete SSE events (terminated by blank line).
-    auto [event_end, next_start] = Http::Sse::SseParser::findEventEnd(remaining, false);
-    ENVOY_LOG(debug, "tryParseSseResponse: remaining_size={}, event_end={}, next_start={}",
-              remaining.size(), event_end, next_start);
-    if (event_end == absl::string_view::npos) {
+    // findEventEnd returns {event_start, event_end, next_event_start}.
+    auto [event_start, event_end, next_start] =
+        Http::Sse::SseParser::findEventEnd(remaining, false);
+    ENVOY_LOG(debug,
+              "tryParseSseResponse: remaining_size={}, event_start={}, event_end={}, next_start={}",
+              remaining.size(), event_start, event_end, next_start);
+    if (event_start == absl::string_view::npos) {
       // No complete event found yet.
       ENVOY_LOG(debug, "tryParseSseResponse: no complete event found yet");
       return false;
     }
 
     // TODO(botengyao): also handle event id for resumption with composite Last-Event-ID.
-    std::string data = Http::Sse::SseParser::extractDataField(remaining.substr(0, event_end));
+    // Parse the event to extract the data field.
+    auto event_str = remaining.substr(event_start, event_end - event_start);
+    auto parsed_event = Http::Sse::SseParser::parseEvent(event_str);
+    std::string data = parsed_event.data.value_or("");
     ENVOY_LOG(debug, "tryParseSseResponse: extracted data_size={}, data='{}'", data.size(),
               data.substr(0, 100));
     if (!data.empty()) {
