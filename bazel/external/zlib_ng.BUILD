@@ -40,7 +40,7 @@ genrule(
 )
 
 cc_library(
-    name = "zlib-ng",
+    name = "zlib_ng",
     srcs = [
         "adler32.c",
         "adler32_p.h",
@@ -154,12 +154,5 @@ cc_library(
         "//conditions:default": [],
     }),
     strip_include_prefix = ".",
-    visibility = ["//visibility:public"],
-)
-
-# Alias for compatibility with references expecting `:zlib`.
-alias(
-    name = "zlib",
-    actual = ":zlib-ng",
     visibility = ["//visibility:public"],
 )

@@ -622,6 +622,12 @@ Current supported substitution commands include:
   TCP/UDP
     Not implemented. It will appear as ``"-"`` in the access logs.
 
+.. _config_access_log_format_upstream_detected_close_type:
+
+``%UPSTREAM_DETECTED_CLOSE_TYPE%``
+    The detected close type of the upstream connection. This is only available on access logs recorded after the connection has been closed.
+    Possible values are ``Normal``, ``LocalReset``, and ``RemoteReset``.
+
 .. _config_access_log_format_downstream_transport_failure_reason:
 
 ``%DOWNSTREAM_TRANSPORT_FAILURE_REASON%``
@@ -632,6 +638,22 @@ Current supported substitution commands include:
 
     .. note::
       It only works in listener access config, and the HTTP or TCP access logs would observe empty values.
+
+.. _config_access_log_format_downstream_local_close_reason:
+
+``%DOWNSTREAM_LOCAL_CLOSE_REASON%``
+  HTTP/TCP
+    If downstream connection was closed locally, provides the reason.
+
+  UDP
+    Not implemented ("-")
+
+.. _config_access_log_format_downstream_detected_close_type:
+
+``%DOWNSTREAM_DETECTED_CLOSE_TYPE%``
+  HTTP/TCP
+    The detected close type of the downstream connection. This is only available on access logs recorded after the connection has been closed.
+    Possible values are ``Normal``, ``LocalReset``, and ``RemoteReset``.
 
   UDP
     Not implemented. It will appear as ``"-"`` in the access logs.
@@ -1455,6 +1477,7 @@ Current supported substitution commands include:
   * ``TcpUpstreamConnected`` - When TCP Proxy filter has successfully established an upstream connection.
   * ``TcpPeriodic`` - On any TCP Proxy filter periodic log record.
   * ``TcpConnectionEnd`` - When a TCP connection is ended on TCP Proxy filter.
+  * ``TcpConnectionStart`` - When a TCP connection is accepted by the TCP Proxy filter.
   * ``DownstreamStart`` - When HTTP Connection Manager filter receives a new HTTP request.
   * ``DownstreamTunnelSuccessfullyEstablished`` - When the HTTP Connection Manager sends response headers indicating a successful HTTP tunnel.
   * ``DownstreamPeriodic`` - On any HTTP Connection Manager periodic log record.
