@@ -59,6 +59,55 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "client_engine_builder_lib",
+    srcs = [
+        "client_engine_builder.cc",
+    ],
+    hdrs = [
+        "client_engine_builder.h",
+    ],
+    repository = "@envoy",
+    visibility = ["//visibility:public"],
+    deps = [
+        ":engine_builder_lib",
+        ":envoy_engine_cc_lib_no_stamp",
+        "@com_google_absl//absl/container:flat_hash_map",
+        "@com_google_absl//absl/debugging:leak_check",
+        "@com_google_absl//absl/functional:any_invocable",
+        "@com_google_absl//absl/types:optional",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/metrics/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/compression/brotli/decompressor/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/compression/gzip/decompressor/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/alternate_protocols_cache/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/decompressor/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/dynamic_forward_proxy/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/router/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/http/header_formatters/preserve_case/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/network/dns_resolver/apple/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/network/dns_resolver/getaddrinfo/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/http_11_proxy/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/raw_buffer/v3:pkg_cc_proto",
+        "//library/common:engine_types_lib",
+        "//library/common/config:certificates_lib",
+        "//library/common/extensions/cert_validator/platform_bridge:platform_bridge_cc_proto",
+        "//library/common/extensions/filters/http/local_error:filter_cc_proto",
+        "//library/common/extensions/filters/http/network_configuration:filter_cc_proto",
+        "//library/common/extensions/filters/http/socket_tag:filter_cc_proto",
+        "//library/common/extensions/key_value/platform:platform_cc_proto",
+        "//library/common/types:matcher_data_lib",
+        "@envoy//source/common/common:assert_lib",
+        "@envoy//source/common/protobuf",
+        "@envoy//source/server:options_lib",
+        "@com_github_gabime_spdlog//:spdlog",
+    ],
+)
+
+envoy_cc_library(
     name = "envoy_engine_cc_lib_no_stamp",
     srcs = [
         "engine.cc",
@@ -97,6 +146,7 @@ envoy_cc_library(
     repository = "@envoy",
     visibility = ["//visibility:public"],
     deps = [
+        ":client_engine_builder_lib",
         ":engine_builder_lib",
         ":envoy_engine_cc_lib_no_stamp",
         "//library/common:engine_common_lib_stamped",

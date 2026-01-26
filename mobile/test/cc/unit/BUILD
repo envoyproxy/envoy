@@ -5,6 +5,22 @@ licenses(["notice"])  # Apache 2
 envoy_mobile_package()
 
 envoy_cc_test(
+    name = "client_envoy_config_test",
+    srcs = ["client_envoy_config_test.cc"],
+    repository = "@envoy",
+    deps = [
+        "@com_google_absl//absl/strings",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto_library",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto_library",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto_library",
+        "@envoy_api//envoy/extensions/filters/http/buffer/v3:pkg_cc_proto_library",
+        "@envoy_api//envoy/extensions/filters/http/router/v3:pkg_cc_proto_library",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto_library",
+        "//library/cc:client_engine_builder_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "envoy_config_test",
     srcs = ["envoy_config_test.cc"],
     linkopts = select({

@@ -36,6 +36,7 @@ private:
 
   // required to access private constructor
   friend class EngineBuilder;
+  friend class ClientEngineBuilder;
   // required to use envoy_engine_t without exposing it publicly
   friend class StreamPrototype;
   // for testing only

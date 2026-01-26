@@ -121,6 +121,31 @@ envoy_cc_test_library(
     ],
 )
 
+envoy_cc_test_library(
+    name = "client_engine_with_test_server",
+    srcs = [
+        "client_engine_with_test_server.cc",
+    ],
+    hdrs = [
+        "client_engine_with_test_server.h",
+    ],
+    repository = "@envoy",
+    deps = [
+        ":test_server_lib",
+        "//library/cc:client_engine_builder_lib",
+        "//library/cc:envoy_engine_cc_lib_no_stamp",
+        "@com_google_absl//absl/container:flat_hash_map",
+        "@com_google_absl//absl/strings",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/http_11_proxy/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/upstreams/http/v3:pkg_cc_proto",
+    ],
+)
+
 envoy_cc_test(
     name = "rtds_integration_test",
     srcs = envoy_select_envoy_mobile_xds(
