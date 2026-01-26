@@ -61,6 +61,7 @@ public:
   void addReadFilter(ReadFilterSharedPtr filter) override;
   void removeReadFilter(ReadFilterSharedPtr filter) override;
   bool initializeReadFilters() override;
+  void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) override;
 
   const ConnectionSocketPtr& getSocket() const override { return socket_; }
 
@@ -167,6 +168,10 @@ public:
   StreamInfo::DetectedCloseType detectedCloseType() const override { return detected_close_type_; }
 
 protected:
+  // Indicates if the access log has been written. This is used to ensure that the access log is
+  // written exactly once, even if close() is called multiple times.
+  bool access_log_written_{false};
+
   // A convenience function which returns true if
   // 1) The read disable count is zero or
   // 2) The read disable count is one due to the read buffer being overrun.
@@ -235,6 +240,9 @@ private:
   bool bothSidesHalfClosed();
 
   void closeInternal(ConnectionCloseType type);
+
+  // Write access log if it hasn't been written yet.
+  void ensureAccessLogWritten();
 
   static std::atomic<uint64_t> next_global_id_;
 
@@ -314,6 +322,8 @@ public:
                        Network::TransportSocketPtr&& transport_socket,
                        const Network::ConnectionSocket::OptionsSharedPtr& options,
                        const Network::TransportSocketOptionsConstSharedPtr& transport_options);
+
+  ~ClientConnectionImpl() override;
 
   // Network::ClientConnection
   void connect() override;

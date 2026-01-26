@@ -142,10 +142,22 @@ void ConnectionImpl::removeReadFilter(ReadFilterSharedPtr filter) {
 
 bool ConnectionImpl::initializeReadFilters() { return filter_manager_.initializeReadFilters(); }
 
+void ConnectionImpl::addAccessLogHandler(AccessLog::InstanceSharedPtr handler) {
+  filter_manager_.addAccessLogHandler(handler);
+}
+
+void ConnectionImpl::ensureAccessLogWritten() {
+  if (!access_log_written_) {
+    access_log_written_ = true;
+    filter_manager_.log(AccessLog::AccessLogType::TcpConnectionEnd);
+  }
+}
+
 void ConnectionImpl::close(ConnectionCloseType type) {
   if (!socket_->isOpen()) {
     ENVOY_CONN_LOG_EVENT(debug, "connection_closing", "Not closing conn, socket is not open",
                          *this);
+    ensureAccessLogWritten();
     return;
   }
 
@@ -156,11 +168,13 @@ void ConnectionImpl::close(ConnectionCloseType type) {
         *this);
     setDetectedCloseType(StreamInfo::DetectedCloseType::LocalReset);
     closeSocket(ConnectionEvent::LocalClose);
+    ensureAccessLogWritten();
     return;
   }
 
   if (type == ConnectionCloseType::Abort || type == ConnectionCloseType::NoFlush) {
     closeInternal(type);
+    ensureAccessLogWritten();
     return;
   }
 
@@ -169,6 +183,7 @@ void ConnectionImpl::close(ConnectionCloseType type) {
   ASSERT(type == ConnectionCloseType::FlushWrite ||
          type == ConnectionCloseType::FlushWriteAndDelay);
   closeThroughFilterManager(ConnectionCloseAction{ConnectionEvent::LocalClose, false, type});
+  ensureAccessLogWritten();
 }
 
 void ConnectionImpl::closeInternal(ConnectionCloseType type) {
@@ -1107,6 +1122,12 @@ ClientConnectionImpl::ClientConnectionImpl(
       ioHandle().activateFileEvents(Event::FileReadyType::Write);
     }
   }
+}
+
+ClientConnectionImpl::~ClientConnectionImpl() {
+  // Ensure that the connection is closed and the access log is written before the
+  // StreamInfo is destroyed.
+  close(ConnectionCloseType::NoFlush);
 }
 
 void ClientConnectionImpl::connect() {

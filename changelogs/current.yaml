@@ -44,6 +44,10 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
+- area: network
+  change: |
+    Added support access logging in network filters like http filters, by allowing network filters to register as access logger
+    instances.
 - area: stats
   change: |
     Added support to limit the number of stats stored in each stats scope in the stats libarary.
