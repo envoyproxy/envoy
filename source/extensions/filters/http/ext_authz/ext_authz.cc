@@ -288,8 +288,13 @@ Filter::createPerRouteGrpcClient(const envoy::config::core::v3::GrpcService& grp
   }
 
   // Use the timeout from the gRPC service configuration, use default if not specified.
+  // A timeout of 0 means infinite (no timeout). Convert to nullopt in that case.
   const uint32_t timeout_ms =
       PROTOBUF_GET_MS_OR_DEFAULT(grpc_service, timeout, kDefaultPerRouteTimeoutMs);
+  const absl::optional<std::chrono::milliseconds> timeout =
+      timeout_ms == 0
+          ? absl::nullopt
+          : absl::optional<std::chrono::milliseconds>(std::chrono::milliseconds(timeout_ms));
 
   // We can skip transport version check for per-route gRPC service here.
   // The transport version is already validated at the main configuration level.
@@ -313,8 +318,8 @@ Filter::createPerRouteGrpcClient(const envoy::config::core::v3::GrpcService& grp
                    grpc_service.has_envoy_grpc() ? grpc_service.envoy_grpc().cluster_name()
                                                  : "google_grpc");
 
-  return std::make_unique<Filters::Common::ExtAuthz::GrpcClientImpl>(
-      client_or_error.value(), std::chrono::milliseconds(timeout_ms));
+  return std::make_unique<Filters::Common::ExtAuthz::GrpcClientImpl>(client_or_error.value(),
+                                                                     timeout);
 }
 
 Filters::Common::ExtAuthz::ClientPtr Filter::createPerRouteHttpClient(

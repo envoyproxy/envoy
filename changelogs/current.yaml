@@ -9,49 +9,79 @@ behavior_changes:
     explicitly set when using :ref:`upstream_connect_mode
     <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.upstream_connect_mode>` modes
     other than ``IMMEDIATE`` (i.e., ``ON_DOWNSTREAM_DATA`` or ``ON_DOWNSTREAM_TLS_HANDSHAKE``). The field
-    can be set to zero to disable early data buffering while still using delayed connection modes.
+    can be set to ``0`` to disable early data buffering while still using delayed connection modes.
     Configurations using these modes without ``max_early_data_bytes`` will now fail validation at startup.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: mcp
+  change: |
+    Changed the default metadata namespace for the MCP filter from ``mcp_proxy`` to ``envoy.filters.http.mcp``.
+    This change can be reverted by setting the runtime guard
+    ``envoy.reloadable_features.mcp_filter_use_new_metadata_namespace`` to ``false``.
+- area: ext_authz
+  change: |
+    Changed the behavior of ``timeout: 0s`` in the HTTP ext_authz filter to mean "no timeout" (infinite)
+    instead of immediate timeout. Previously, ``timeout: 0s`` would cause requests to fail immediately.
+    This aligns with other Envoy timeout configurations where ``0`` means disabled or infinite.
+- area: ratelimit
+  change: |
+    Changed the behavior of ``timeout: 0s`` in the HTTP rate limit filter to mean "no timeout" (infinite)
+    instead of immediate timeout. Previously, ``timeout: 0s`` would cause requests to fail immediately.
+    This aligns with other Envoy timeout configurations where ``0`` means disabled or infinite.
 - area: histograms
   change: |
-    Update of libcircllhist to 0.3.2 has changed how bucket bounds are interpreted. This should not have an impact on
-    production monitoring if the number of samples in the histograms is high. Affected tests were adjusted to account for
-    histogram changes.
+    Updated libcircllhist to 0.3.2, which changes how bucket bounds are interpreted. This should not impact
+    production monitoring if the number of samples in the histograms is high. Affected tests were adjusted
+    to account for histogram changes.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: tls
+  change: |
+    Fix on-demand TLS selector to enforce session resumption settings.
 - area: ext_authz
   change: |
-    Added support for the ``append_action`` enum in gRPC ExtAuthz ``OkHttpResponse.headers`` for upstream request header
-    mutations. Previously, only the deprecated ``append`` boolean was checked. Now ``APPEND_IF_EXISTS_OR_ADD``,
-    ``ADD_IF_ABSENT``, ``OVERWRITE_IF_EXISTS``, and ``OVERWRITE_IF_EXISTS_OR_ADD`` actions are fully supported,
-    providing parity with ``response_headers_to_add`` handling.
+    Added support for the ``append_action`` enum in gRPC ext_authz ``OkHttpResponse.headers`` for upstream
+    request header mutations. Previously, only the deprecated ``append`` boolean was checked. Now
+    ``APPEND_IF_EXISTS_OR_ADD``, ``ADD_IF_ABSENT``, ``OVERWRITE_IF_EXISTS``, and ``OVERWRITE_IF_EXISTS_OR_ADD``
+    actions are fully supported, providing parity with ``response_headers_to_add`` handling.
 - area: http
   change: |
-    Fixed a potential file descriptor leak where HTTP/1.1 connections with zombie streams (waiting for codec completion)
-    would not be properly closed when in draining state. This could occur when a response was sent before the request
-    was fully received, causing connections to remain open indefinitely. This behavior change can be temporarily reverted
-    by setting the runtime guard ``envoy.reloadable_features.http1_close_connection_on_zombie_stream_complete`` to ``false``.
+    Fixed a potential file descriptor leak where HTTP/1.1 connections with zombie streams (waiting for codec
+    completion) would not be properly closed when in draining state. This could occur when a response was
+    sent before the request was fully received, causing connections to remain open indefinitely. This change
+    can be reverted by setting the runtime guard
+    ``envoy.reloadable_features.http1_close_connection_on_zombie_stream_complete`` to ``false``.
+- area: overload_manager
+  change: |
+    Fixed a resource leak in global connection limit tracking that caused permanent connection rejections
+    when using load shedding (e.g., ``envoy.load_shed_points.tcp_listener_accept``). When connections were
+    rejected due to load shedding after passing the global connection limit check, the allocated connection
+    limit resource was not released, causing the connection counter to become incorrect and leading to
+    ``failed_updates`` in the resource monitor. This resulted in permanent connection rejections even after
+    load subsided. The fix ensures that connection limit resources are properly released when connections
+    are rejected due to load shedding. Also added defensive resource cleanup for edge cases where address
+    processing fails (e.g., ``localAddress()`` or ``peerAddress()`` errors).
 - area: drop_overload
   change: |
-    Fixed a bug that drop_overload failed to use cached EDS resources.
+    Fixed a bug where ``drop_overload`` failed to use cached EDS resources.
 - area: http
   change: |
-    Fixed upstream client to not close connection when idle timeout fires before the connection is established.
-    This behavior can be reverted by setting the runtime guard
+    Fixed upstream client to not close connection when idle timeout fires before the connection is
+    established. This change can be reverted by setting the runtime guard
     ``envoy.reloadable_features.codec_client_enable_idle_timer_only_when_connected`` to ``false``.
 - area: oauth2
   change: |
-    Fixed OAuth2 refresh requests so host rewriting no longer overrides the original Host value.
+    Fixed OAuth2 refresh requests so host rewriting no longer overrides the original ``Host`` header value.
 - area: ext_authz
   change: |
-    Fixed a bug where headers from a denied authorization response (non-200s) were not properly propagated to the client.
+    Fixed a bug where headers from a denied authorization response (non-200) were not properly propagated
+    to the client.
 - area: formatter
   change: |
-    Fixed the log formatter in http router upstream_logs by correctly setting the downstream connection's ConnectionInfoProvider
-    in the stream_info.
+    Fixed the log formatter in HTTP router upstream logs by correctly setting the downstream connection's
+    ``ConnectionInfoProvider`` in the ``StreamInfo``.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -59,7 +89,7 @@ removed_config_or_runtime:
 new_features:
 - area: stats
   change: |
-    Added support to limit the number of stats stored in each stats scope in the stats libarary.
+    Added support to limit the number of stats stored in each stats scope in the stats library.
 - area: tls
   change: |
     Added support for fetching certificates on-demand via SDS in the upstream TLS transport socket
@@ -78,23 +108,27 @@ new_features:
     and ``notifications/roots/list_changed``.
 - area: formatter
   change: |
-    Extended ``*_WITHOUT_PORT`` address formatters to accept an optional ``MASK_PREFIX_LEN`` parameter that masks IP addresses
-    and returns them in CIDR notation (e.g., ``%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT(16)%`` returns ``10.1.0.0/16`` for
-    client IP ``10.1.10.23``).
+    Extended ``*_WITHOUT_PORT`` address formatters to accept an optional ``MASK_PREFIX_LEN`` parameter
+    that masks IP addresses and returns them in CIDR notation (e.g., ``%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT(16)%``
+    returns ``10.1.0.0/16`` for client IP ``10.1.10.23``).
 - area: ratelimit
   change: |
-    Added support for shadow mode in local rate limit filter.
+    Added support for shadow mode in the local rate limit filter.
 - area: config
   change: |
-    Added support for `:ref:`set_node_on_first_message_only
-    <envoy_api_field_core.ApiConfigSource.set_node_on_first_message_only>` to Delta-xDS. Guarded by
-    flag ``envoy.reloadable_features.xds_legacy_delta_skip_subsequent_node``.
+    Added support for :ref:`set_node_on_first_message_only
+    <envoy_v3_api_field_config.core.v3.ApiConfigSource.set_node_on_first_message_only>` to Delta-xDS.
+    Guarded by runtime flag ``envoy.reloadable_features.xds_legacy_delta_skip_subsequent_node``.
 - area: formatter
   change: |
-    Added the new access log formatter support of ``DOWNSTREAM_LOCAL_CLOSE_REASON``.
+    Added the new access log formatter ``DOWNSTREAM_LOCAL_CLOSE_REASON``.
 - area: formatter
   change: |
-    Added ``%UPSTREAM_DETECTED_CLOSE_TYPE%`` and ``%DOWNSTREAM_DETECTED_CLOSE_TYPE%`` to expose the detected close type
-    of downstream and connections. The possible values are ``Normal``, ``LocalReset``, and ``RemoteReset``.
+    Added ``%UPSTREAM_DETECTED_CLOSE_TYPE%`` and ``%DOWNSTREAM_DETECTED_CLOSE_TYPE%`` to expose the detected
+    close type of downstream and upstream connections. The possible values are ``Normal``, ``LocalReset``,
+    and ``RemoteReset``.
+- area: tcp_proxy
+  change: |
+    Added an option to emit a log entry when the connection is accepted.
 
 deprecated:

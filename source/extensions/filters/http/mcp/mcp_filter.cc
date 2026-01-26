@@ -30,6 +30,7 @@ McpFilterConfig::McpFilterConfig(const envoy::extensions::filters::http::mcp::v3
                                  ? proto_config.max_request_body_size().value()
                                  : 8192), // Default: 8KB
       request_storage_mode_(proto_config.request_storage_mode()),
+      metadata_namespace_(Filters::Common::Mcp::metadataNamespace()),
       parser_config_(proto_config.has_parser_config()
                          ? McpParserConfig::fromProto(proto_config.parser_config())
                          : McpParserConfig::createDefault()),
@@ -267,8 +268,7 @@ Http::FilterDataStatus McpFilter::completeParsing() {
     }
 
     if (config_->shouldStoreToDynamicMetadata()) {
-      decoder_callbacks_->streamInfo().setDynamicMetadata(std::string(MetadataKeys::FilterName),
-                                                          metadata);
+      decoder_callbacks_->streamInfo().setDynamicMetadata(config_->metadataNamespace(), metadata);
       ENVOY_LOG(debug, "MCP filter set dynamic metadata: {}", metadata.DebugString());
     }
 
