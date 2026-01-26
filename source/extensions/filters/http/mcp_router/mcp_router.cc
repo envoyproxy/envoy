@@ -272,8 +272,7 @@ Http::FilterTrailersStatus McpRouterFilter::decodeTrailers(Http::RequestTrailerM
 bool McpRouterFilter::readMetadataFromMcpFilter() {
   const auto& metadata = decoder_callbacks_->streamInfo().dynamicMetadata();
 
-  // TODO(botengyao): make this filter_metadata configurable.
-  auto filter_it = metadata.filter_metadata().find("mcp_proxy");
+  auto filter_it = metadata.filter_metadata().find(config_->metadataNamespace());
   if (filter_it == metadata.filter_metadata().end()) {
     return false;
   }
