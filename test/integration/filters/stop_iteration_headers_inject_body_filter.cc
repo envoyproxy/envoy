@@ -32,8 +32,7 @@ public:
     return Http::FilterHeadersStatus::StopIteration;
   }
 
-  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
-                                          bool) override {
+  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers, bool) override {
     headers.setContentLength(body_.length());
     encoder_callbacks_->dispatcher().post([this]() -> void {
       response_injected_ = true;
