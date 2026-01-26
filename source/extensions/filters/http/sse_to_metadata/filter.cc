@@ -117,7 +117,8 @@ void Filter::processBuffer(bool end_stream) {
   absl::string_view buffer_view(buffer_);
 
   while (!buffer_view.empty() && !processing_complete_) {
-    auto [event_start, event_end, next_event_start] = Http::Sse::SseParser::findEventEnd(buffer_view, end_stream);
+    auto [event_start, event_end, next_event_start] =
+        Http::Sse::SseParser::findEventEnd(buffer_view, end_stream);
 
     if (event_start == absl::string_view::npos) {
       // No complete event found. Check if buffer exceeds max size.
