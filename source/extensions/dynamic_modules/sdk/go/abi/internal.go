@@ -879,7 +879,7 @@ func (h *dymHttpFilterHandle) RecordHistogramValue(id shared.MetricID,
 		(C.size_t)(idUint64),
 		unsafe.SliceData(tagValueViews),
 		(C.size_t)(len(tagValueViews)),
-		(C.size_t)(value),
+		(C.uint64_t)(value),
 	)
 
 	runtime.KeepAlive(tagsValues)
@@ -898,7 +898,7 @@ func (h *dymHttpFilterHandle) SetGaugeValue(id shared.MetricID,
 		(C.size_t)(idUint64),
 		unsafe.SliceData(tagValueViews),
 		(C.size_t)(len(tagValueViews)),
-		(C.size_t)(value),
+		(C.uint64_t)(value),
 	)
 
 	runtime.KeepAlive(tagsValues)
@@ -915,7 +915,7 @@ func (h *dymHttpFilterHandle) IncrementGaugeValue(id shared.MetricID,
 		(C.size_t)(uint64(id)),
 		unsafe.SliceData(tagValueViews),
 		(C.size_t)(len(tagValueViews)),
-		(C.size_t)(value),
+		(C.uint64_t)(value),
 	)
 	runtime.KeepAlive(tagsValues)
 	runtime.KeepAlive(tagValueViews)
@@ -931,7 +931,7 @@ func (h *dymHttpFilterHandle) DecrementGaugeValue(id shared.MetricID,
 		(C.size_t)(uint64(id)),
 		unsafe.SliceData(tagValueViews),
 		(C.size_t)(len(tagValueViews)),
-		(C.size_t)(value),
+		(C.uint64_t)(value),
 	)
 	runtime.KeepAlive(tagsValues)
 	runtime.KeepAlive(tagValueViews)
@@ -947,7 +947,7 @@ func (h *dymHttpFilterHandle) IncrementCounterValue(id shared.MetricID,
 		(C.size_t)(uint64(id)),
 		unsafe.SliceData(tagValueViews),
 		(C.size_t)(len(tagValueViews)),
-		(C.size_t)(value),
+		(C.uint64_t)(value),
 	)
 	runtime.KeepAlive(tagsValues)
 	runtime.KeepAlive(tagValueViews)

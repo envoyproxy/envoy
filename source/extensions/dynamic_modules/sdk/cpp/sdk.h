@@ -94,7 +94,7 @@ private:
 /** BodyBuffer interface */
 class BodyBuffer {
 public:
-  virtual ~BodyBuffer() = default;
+  virtual ~BodyBuffer();
 
   /**
    * Returns all data chunks in the buffer.
@@ -124,7 +124,7 @@ public:
 /** HeaderMap interface */
 class HeaderMap {
 public:
-  virtual ~HeaderMap() = default;
+  virtual ~HeaderMap();
 
   /**
    * Returns all values for a given header key.
@@ -258,7 +258,7 @@ enum class HttpCalloutResult : uint32_t { Success, Reset, ExceedResponseBufferLi
 
 class HttpCalloutCallback {
 public:
-  virtual ~HttpCalloutCallback() = default;
+  virtual ~HttpCalloutCallback();
 
   /**
    * Invokes the callback with the HTTP callout result, headers, and body chunks.
@@ -283,7 +283,7 @@ enum class HttpStreamResetReason : uint32_t {
 
 class HttpStreamCallback {
 public:
-  virtual ~HttpStreamCallback() = default;
+  virtual ~HttpStreamCallback();
 
   /**
    * Called when response headers are received.
@@ -326,12 +326,12 @@ public:
 
 class RouteSpecificConfig {
 public:
-  virtual ~RouteSpecificConfig() = default;
+  virtual ~RouteSpecificConfig();
 };
 
 class Scheduler {
 public:
-  virtual ~Scheduler() = default;
+  virtual ~Scheduler();
 
   /**
    * Schedules a function for deferred execution.
@@ -342,7 +342,7 @@ public:
 
 class DownstreamWatermarkCallbacks {
 public:
-  virtual ~DownstreamWatermarkCallbacks() = default;
+  virtual ~DownstreamWatermarkCallbacks();
 
   /**
    * Called when the downstream write buffer exceeds the high watermark.
@@ -360,7 +360,7 @@ enum class MetricsResult : uint32_t { Success, NotFound, InvalidTags, Frozen };
 
 class HttpFilterHandle {
 public:
-  virtual ~HttpFilterHandle() = default;
+  virtual ~HttpFilterHandle();
 
   /**
    * Retrieves a string metadata value by namespace and key.
@@ -655,7 +655,7 @@ public:
 
 class HttpFilterConfigHandle {
 public:
-  virtual ~HttpFilterConfigHandle() = default;
+  virtual ~HttpFilterConfigHandle();
 
   /**
    * Defines a histogram metric with a name and optional tag keys.
@@ -723,7 +723,7 @@ enum class TrailersStatus : uint32_t {
 
 class HttpFilter {
 public:
-  virtual ~HttpFilter() = default;
+  virtual ~HttpFilter();
 
   /**
    * Processes request headers. Returns status indicating how to proceed.
@@ -779,7 +779,7 @@ public:
 
 class HttpFilterFactory {
 public:
-  virtual ~HttpFilterFactory() = default;
+  virtual ~HttpFilterFactory();
 
   /**
    * Creates a StreamPlugin instance for a given stream handle.
@@ -791,7 +791,7 @@ public:
 
 class HttpFilterConfigFactory {
 public:
-  virtual ~HttpFilterConfigFactory() = default;
+  virtual ~HttpFilterConfigFactory();
 
   /**
    * Creates a HttpFilterFactory from configuration data.

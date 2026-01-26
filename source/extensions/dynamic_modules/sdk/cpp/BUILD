@@ -5,8 +5,8 @@ licenses(["notice"])  # Apache 2
 # All necessary abstractions for creating plugins.
 cc_library(
     name = "sdk",
-    hdrs = ["sdk.h"],
     srcs = ["sdk.cc"],
+    hdrs = ["sdk.h"],
     visibility = ["//visibility:public"],
     deps = [
         "@com_google_absl//absl/container:flat_hash_map",

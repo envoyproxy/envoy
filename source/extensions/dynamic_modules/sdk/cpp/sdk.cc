@@ -3,6 +3,30 @@
 namespace Envoy {
 namespace DynamicModules {
 
+HttpFilterConfigFactory::~HttpFilterConfigFactory() = default;
+
+HttpFilterFactory::~HttpFilterFactory() = default;
+
+HttpFilter::~HttpFilter() = default;
+
+BodyBuffer::~BodyBuffer() = default;
+
+HeaderMap::~HeaderMap() = default;
+
+HttpCalloutCallback::~HttpCalloutCallback() = default;
+
+HttpStreamCallback::~HttpStreamCallback() = default;
+
+RouteSpecificConfig::~RouteSpecificConfig() = default;
+
+Scheduler::~Scheduler() = default;
+
+DownstreamWatermarkCallbacks::~DownstreamWatermarkCallbacks() = default;
+
+HttpFilterHandle::~HttpFilterHandle() = default;
+
+HttpFilterConfigHandle::~HttpFilterConfigHandle() = default;
+
 HttpFilterConfigFactoryRegister::HttpFilterConfigFactoryRegister(absl::string_view name,
                                                                  HttpFilterConfigFactoryPtr factory)
     : name_(name) {
