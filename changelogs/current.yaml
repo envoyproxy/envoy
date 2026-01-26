@@ -9,7 +9,7 @@ behavior_changes:
     explicitly set when using :ref:`upstream_connect_mode
     <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.upstream_connect_mode>` modes
     other than ``IMMEDIATE`` (i.e., ``ON_DOWNSTREAM_DATA`` or ``ON_DOWNSTREAM_TLS_HANDSHAKE``). The field
-    can be set to zero to disable early data buffering while still using delayed connection modes.
+    can be set to ``0`` to disable early data buffering while still using delayed connection modes.
     Configurations using these modes without ``max_early_data_bytes`` will now fail validation at startup.
 
 minor_behavior_changes:
@@ -23,12 +23,12 @@ minor_behavior_changes:
   change: |
     Changed the behavior of ``timeout: 0s`` in the HTTP ext_authz filter to mean "no timeout" (infinite)
     instead of immediate timeout. Previously, ``timeout: 0s`` would cause requests to fail immediately.
-    This aligns with other Envoy timeout configurations where zero means disabled or infinite.
+    This aligns with other Envoy timeout configurations where ``0`` means disabled or infinite.
 - area: ratelimit
   change: |
     Changed the behavior of ``timeout: 0s`` in the HTTP rate limit filter to mean "no timeout" (infinite)
     instead of immediate timeout. Previously, ``timeout: 0s`` would cause requests to fail immediately.
-    This aligns with other Envoy timeout configurations where zero means disabled or infinite.
+    This aligns with other Envoy timeout configurations where ``0`` means disabled or infinite.
 - area: histograms
   change: |
     Updated libcircllhist to 0.3.2, which changes how bucket bounds are interpreted. This should not impact
