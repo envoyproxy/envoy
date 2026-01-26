@@ -1,3 +1,4 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
 load(
     "@rules_fuzzing//fuzzing:cc_defs.bzl",
     "cc_fuzzing_engine",
@@ -22,6 +23,15 @@ envoy_proto_library(
 )
 
 exports_files(["headers.dict"])
+
+# FuzzedDataProvider from LLVM toolchain
+# The LLVM toolchain already provides this header at lib/clang/18/include/fuzzer/FuzzedDataProvider.h
+cc_library(
+    name = "fuzzed_data_provider",
+    hdrs = ["@llvm_toolchain_llvm//:lib/clang/18/include/fuzzer/FuzzedDataProvider.h"],
+    includes = ["external/llvm_toolchain_llvm/lib/clang/18/include"],
+    visibility = ["//visibility:public"],
+)
 
 envoy_cc_test_library(
     name = "main",
@@ -51,7 +61,7 @@ envoy_cc_test_library(
         "//source/exe:process_wide_lib",
         "//test/test_common:environment_lib",
         "@com_github_google_libprotobuf_mutator//:libprotobuf_mutator",
-        "@org_llvm_releases_compiler_rt//:fuzzed_data_provider",
+        "//test/fuzz:fuzzed_data_provider",
     ],
 )
 

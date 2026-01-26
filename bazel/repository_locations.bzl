@@ -593,20 +593,6 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "re2-{version}",
         urls = ["https://github.com/google/re2/archive/{version}.tar.gz"],
     ),
-    # Included to access FuzzedDataProvider.h. This is compiler agnostic but
-    # provided as part of the compiler-rt source distribution. We can't use the
-    # Clang variant as we are not a Clang-LLVM only shop today.
-    org_llvm_releases_compiler_rt = dict(
-        # Note: the llvm/clang version should match the version specified in:
-        #  - .github/workflows/codeql-daily.yml
-        #  - .github/workflows/codeql-push.yml
-        #  - https://github.com/envoyproxy/envoy-build-tools/blob/main/build_container/build_container_ubuntu.sh#L84
-        version = "18.1.8",
-        sha256 = "e054e99a9c9240720616e927cb52363abbc8b4f1ef0286bad3df79ec8fdf892f",
-        # Only allow peeking at fuzzer related files for now.
-        strip_prefix = "compiler-rt-{version}.src",
-        urls = ["https://github.com/llvm/llvm-project/releases/download/llvmorg-{version}/compiler-rt-{version}.src.tar.xz"],
-    ),
     kafka_source = dict(
         version = "3.9.1",
         sha256 = "c15b82940cfb9f67fce909d8600dc8bcfc42d2795da2c26c149d03a627f85234",
