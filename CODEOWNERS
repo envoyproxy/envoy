@@ -322,9 +322,9 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/tracers/zipkin @wbpcode @Shikugawa @basvanbeek
 /*/extensions/tracers/common @wbpcode @Shikugawa @basvanbeek
 # ext_authz
-/*/extensions/filters/common/ext_authz @esmet @tyxia @ggreenway
-/*/extensions/filters/http/ext_authz @esmet @tyxia @ggreenway
-/*/extensions/filters/network/ext_authz @esmet @tyxia @ggreenway
+/*/extensions/filters/common/ext_authz @esmet @tyxia @ggreenway @antoniovleonti
+/*/extensions/filters/http/ext_authz @esmet @tyxia @ggreenway @antoniovleonti
+/*/extensions/filters/network/ext_authz @esmet @tyxia @ggreenway @antoniovleonti
 # original dst
 /*/extensions/filters/listener/original_dst @kyessenov @cpakulski @lambdai @nezdolik
 # mongo proxy

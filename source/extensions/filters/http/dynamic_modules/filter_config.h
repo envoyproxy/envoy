@@ -50,6 +50,7 @@ using OnHttpFilterDownstreamAboveWriteBufferHighWatermark =
     decltype(&envoy_dynamic_module_on_http_filter_downstream_above_write_buffer_high_watermark);
 using OnHttpFilterDownstreamBelowWriteBufferLowWatermark =
     decltype(&envoy_dynamic_module_on_http_filter_downstream_below_write_buffer_low_watermark);
+using OnHttpFilterLocalReplyType = decltype(&envoy_dynamic_module_on_http_filter_local_reply);
 using OnHttpFilterConfigScheduled = decltype(&envoy_dynamic_module_on_http_filter_config_scheduled);
 
 /**
@@ -101,6 +102,7 @@ public:
       on_http_filter_downstream_above_write_buffer_high_watermark_ = nullptr;
   OnHttpFilterDownstreamBelowWriteBufferLowWatermark
       on_http_filter_downstream_below_write_buffer_low_watermark_ = nullptr;
+  OnHttpFilterLocalReplyType on_http_filter_local_reply_ = nullptr;
   OnHttpFilterConfigScheduled on_http_filter_config_scheduled_ = nullptr;
 
   Envoy::Upstream::ClusterManager& cluster_manager_;

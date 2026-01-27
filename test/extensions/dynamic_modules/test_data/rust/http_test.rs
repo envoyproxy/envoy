@@ -236,3 +236,27 @@ fn test_body_callbacks_filter_on_bodies() {
     "coolcoolcoolcoolcoolcool"
   );
 }
+
+#[test]
+fn test_buffer_limit_callbacks() {
+  use envoy_proxy_dynamic_modules_rust_sdk::*;
+
+  let mut envoy_filter = MockEnvoyHttpFilter::default();
+
+  // Test get_buffer_limit.
+  envoy_filter
+    .expect_get_buffer_limit()
+    .return_const(1024u64)
+    .once();
+
+  assert_eq!(envoy_filter.get_buffer_limit(), 1024);
+
+  // Test set_buffer_limit.
+  envoy_filter
+    .expect_set_buffer_limit()
+    .withf(|limit| *limit == 2048)
+    .return_const(())
+    .once();
+
+  envoy_filter.set_buffer_limit(2048);
+}
