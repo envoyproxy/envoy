@@ -753,7 +753,10 @@ def _rules_proto_grpc():
     external_http_archive("rules_proto_grpc")
 
 def _re2():
-    external_http_archive("com_googlesource_code_re2")
+    external_http_archive(
+        "com_googlesource_code_re2",
+        repo_mapping = {"@abseil-cpp": "@com_google_absl"},
+    )
 
 def _proxy_wasm_cpp_sdk():
     external_http_archive(

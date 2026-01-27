@@ -695,7 +695,7 @@ com_googlesource_code_re2:
   project_name: "RE2"
   project_desc: "RE2, a regular expression library"
   project_url: "https://github.com/google/re2"
-  release_date: "2023-10-31"
+  release_date: "2024-07-01"
   use_category:
   - controlplane
   - dataplane_core
