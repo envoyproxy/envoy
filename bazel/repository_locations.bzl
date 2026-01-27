@@ -584,10 +584,10 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/google/flatbuffers/archive/v{version}.tar.gz"],
     ),
     com_googlesource_code_re2 = dict(
-        version = "2023-11-01",
-        sha256 = "4e6593ac3c71de1c0f322735bc8b0492a72f66ffccfad76e259fa21c41d27d8a",
+        version = "2024-07-02",
+        sha256 = "a835fe55fbdcd8e80f38584ab22d0840662c67f2feb36bd679402da9641dc71e",
         strip_prefix = "re2-{version}",
-        urls = ["https://github.com/google/re2/archive/{version}.tar.gz"],
+        urls = ["https://github.com/google/re2/releases/download/{version}/re2-{version}.zip"],
     ),
     kafka_source = dict(
         version = "3.9.1",
