@@ -215,27 +215,6 @@ std::string swapPrefix(std::string name) {
 
 } // namespace
 
-// This is a singleton class to map Envoy style flag names to absl flags
-class RuntimeFeatures {
-public:
-  RuntimeFeatures();
-
-  // Get the command line flag corresponding to the Envoy style feature name, or
-  // nullptr if it is not a registered flag.
-  absl::CommandLineFlag* getFlag(absl::string_view feature) const {
-    auto it = all_features_.find(feature);
-    if (it == all_features_.end()) {
-      return nullptr;
-    }
-    return it->second;
-  }
-
-private:
-  absl::flat_hash_map<std::string, absl::CommandLineFlag*> all_features_;
-};
-
-using RuntimeFeaturesDefaults = ConstSingleton<RuntimeFeatures>;
-
 RuntimeFeatures::RuntimeFeatures() {
   absl::flat_hash_map<absl::string_view, absl::CommandLineFlag*> flags = absl::GetAllFlags();
   for (auto& it : flags) {
@@ -248,6 +227,14 @@ RuntimeFeatures::RuntimeFeatures() {
     std::string envoy_name = swapPrefix(std::string(name));
     all_features_.emplace(envoy_name, it.second);
   }
+}
+
+absl::CommandLineFlag* RuntimeFeatures::getFlag(absl::string_view feature) const {
+  auto it = all_features_.find(feature);
+  if (it == all_features_.end()) {
+    return nullptr;
+  }
+  return it->second;
 }
 
 bool hasRuntimePrefix(absl::string_view feature) {

@@ -115,6 +115,9 @@ new_features:
   change: |
     Added support for MCP completion method ``completion/complete`` with routing based on
     ``ref/prompt`` or ``ref/resource``.
+- area: mcp_router
+  change: |
+    Added support for MCP logging method ``logging/setLevel``.
 - area: formatter
   change: |
     Extended ``*_WITHOUT_PORT`` address formatters to accept an optional ``MASK_PREFIX_LEN`` parameter
@@ -144,5 +147,11 @@ new_features:
     Extended the SSE parser utility to support all standard SSE fields: ``id``, ``event`` (as ``event_type``),
     and ``retry``, in addition to the existing ``data`` field. The ``retry`` field is parsed as a ``uint32_t``
     and only accepts values consisting of ASCII digits per the SSE specification.
+- area: resource_monitors
+  change: |
+    Added cgroup v2 support to the CPU utilization resource monitor. The monitor now automatically
+    detects and selects between cgroup v1 and v2 at runtime by checking available cgroup files on
+    the system. This enables the resource monitor to work correctly in both cgroup v1 and v2
+    environments without configuration changes.
 
 deprecated:
