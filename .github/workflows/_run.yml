@@ -236,23 +236,26 @@ jobs:
 
     - run: |
         mkdir ${{ runner.temp }}/container
+        MNT_AVAILABLE=false
         if mountpoint -q /mnt; then
+            MNT_AVAILABLE=true
             USAGE="$(df --output=pcent /mnt | tail -n 1 | tr -d ' %')"
             if [[ "$USAGE" -ge 100 ]]; then
                 echo "should-remnt=true" >> "$GITHUB_OUTPUT"
                 echo "::warning::Disk usage for /mnt is at 100% ... remounting"
             fi
         fi
+        echo "mnt-available=$MNT_AVAILABLE" >> "$GITHUB_OUTPUT"
       id: disk
     - uses: envoyproxy/toolshed/actions/github/remnt@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
       if: steps.disk.outputs.should-remnt == 'true'
     - uses: envoyproxy/toolshed/actions/bind-mounts@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
-      if: inputs.bind-mount && ! github.event.repository.private
+      if: inputs.bind-mount && steps.disk.outputs.mnt-available == 'true'
       with:
         mounts: ${{ inputs.bind-mounts }}
     - name: Free diskspace
       uses: envoyproxy/toolshed/actions/diskspace@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
-      if: inputs.diskspace-hack || github.event.repository.private
+      if: inputs.diskspace-hack || steps.disk.outputs.mnt-available != 'true'
       with:
         to_remove: ${{ inputs.diskspace-hack-paths }}
     - run: |

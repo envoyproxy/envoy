@@ -141,7 +141,7 @@ message TcpProxy {
 
     // The path used with the POST method. The default path is ``/``. If this field is specified and
     // :ref:`use_post field <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TunnelingConfig.use_post>`
-    // is not set to true, the configuration will be rejected.
+    // is not set to ``true``, the configuration will be rejected.
     string post_path = 5;
 
     // Save response trailers to the downstream connection's filter state for consumption
@@ -206,9 +206,12 @@ message TcpProxy {
     google.protobuf.Duration access_log_flush_interval = 1
         [(validate.rules).duration = {gte {nanos: 1000000}}];
 
-    // If set to true, the access log is flushed when the TCP proxy successfully establishes a
+    // If set to ``true``, the access log is flushed when the TCP proxy successfully establishes a
     // connection with the upstream. If the connection fails, the access log is not flushed.
     bool flush_access_log_on_connected = 2;
+
+    // If set to ``true``, the access log is flushed when the TCP proxy accepts a connection.
+    bool flush_access_log_on_start = 3;
   }
 
   reserved 6;

@@ -554,10 +554,14 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/simdutf/simdutf/releases/download/v{version}/singleheader.zip"],
     ),
     com_github_google_quiche = dict(
-        version = "1eb9b26af7a84f13ee208803c4704306b2ceec9a",
-        sha256 = "35aaa73ff8eb748fd84a526730a0e4952c8810acd9532754bc773017ea732131",
+        project_name = "QUICHE",
+        project_desc = "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols",
+        project_url = "https://github.com/google/quiche",
+        version = "f9b729501753d7d4dd61f8e868a1f4a38e5ece26",
+        sha256 = "0ed32ce64d6d3a9acd542c60301977fbbbb36a9bc0dc6b46d2f97cabbbcae3eb",
         urls = ["https://github.com/google/quiche/archive/{version}.tar.gz"],
         strip_prefix = "quiche-{version}",
+        release_date = "2026-01-22",
     ),
     googleurl = dict(
         version = "dd4080fec0b443296c0ed0036e1e776df8813aa7",
@@ -588,20 +592,6 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "4e6593ac3c71de1c0f322735bc8b0492a72f66ffccfad76e259fa21c41d27d8a",
         strip_prefix = "re2-{version}",
         urls = ["https://github.com/google/re2/archive/{version}.tar.gz"],
-    ),
-    # Included to access FuzzedDataProvider.h. This is compiler agnostic but
-    # provided as part of the compiler-rt source distribution. We can't use the
-    # Clang variant as we are not a Clang-LLVM only shop today.
-    org_llvm_releases_compiler_rt = dict(
-        # Note: the llvm/clang version should match the version specified in:
-        #  - .github/workflows/codeql-daily.yml
-        #  - .github/workflows/codeql-push.yml
-        #  - https://github.com/envoyproxy/envoy-build-tools/blob/main/build_container/build_container_ubuntu.sh#L84
-        version = "18.1.8",
-        sha256 = "e054e99a9c9240720616e927cb52363abbc8b4f1ef0286bad3df79ec8fdf892f",
-        # Only allow peeking at fuzzer related files for now.
-        strip_prefix = "compiler-rt-{version}.src",
-        urls = ["https://github.com/llvm/llvm-project/releases/download/llvmorg-{version}/compiler-rt-{version}.src.tar.xz"],
     ),
     kafka_source = dict(
         version = "3.9.1",

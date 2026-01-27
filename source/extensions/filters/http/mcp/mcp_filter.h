@@ -19,11 +19,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Mcp {
 
-namespace MetadataKeys {
-// Core MCP fields
-constexpr absl::string_view FilterName = "mcp_proxy";
-} // namespace MetadataKeys
-
 /**
  * All MCP filter stats. @see stats_macros.h
  */
@@ -72,6 +67,7 @@ public:
            request_storage_mode_ ==
                envoy::extensions::filters::http::mcp::v3::Mcp::DYNAMIC_METADATA_AND_FILTER_STATE;
   }
+  const std::string& metadataNamespace() const { return metadata_namespace_; }
 
   McpFilterStats& stats() { return stats_; }
 
@@ -80,6 +76,7 @@ private:
   const bool clear_route_cache_;
   const uint32_t max_request_body_size_;
   const envoy::extensions::filters::http::mcp::v3::Mcp::RequestStorageMode request_storage_mode_;
+  const std::string metadata_namespace_;
   ParserConfig parser_config_;
   McpFilterStats stats_;
 };
