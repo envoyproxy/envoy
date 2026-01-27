@@ -1076,7 +1076,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   for (auto& guard_and_value : runtime_guards_) {
     if (Runtime::RuntimeFeaturesDefaults::get().getFlag(absl::StrJoin(
             {"envoy", "reloadable_features", guard_and_value.first}, ".")) == nullptr) {
-      // Not a valid runtime guard, skip it.
+      // Not a registered runtime guard, skip it.
       continue;
     }
     (*reloadable_features.mutable_fields())[guard_and_value.first].set_bool_value(
@@ -1087,7 +1087,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   for (auto& guard_and_value : restart_runtime_guards_) {
     if (Runtime::RuntimeFeaturesDefaults::get().getFlag(
             absl::StrJoin({"envoy", "restart_features", guard_and_value.first}, ".")) == nullptr) {
-      // Not a valid runtime guard, skip it.
+      // Not a registered runtime guard, skip it.
       continue;
     }
     (*restart_features.mutable_fields())[guard_and_value.first].set_bool_value(
