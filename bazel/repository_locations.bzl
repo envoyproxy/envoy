@@ -554,14 +554,10 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/simdutf/simdutf/releases/download/v{version}/singleheader.zip"],
     ),
     com_github_google_quiche = dict(
-        project_name = "QUICHE",
-        project_desc = "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols",
-        project_url = "https://github.com/google/quiche",
         version = "b7b4c0cfe393a57b8706b0f1be81518595daaa44",
         sha256 = "9d8344faf932165b6013f8fdd2cbfe2be7c2e7a5129c5e572036d13718a3f1bf",
         urls = ["https://github.com/google/quiche/archive/{version}.tar.gz"],
         strip_prefix = "quiche-{version}",
-        release_date = "2026-01-26",
     ),
     googleurl = dict(
         version = "dd4080fec0b443296c0ed0036e1e776df8813aa7",
