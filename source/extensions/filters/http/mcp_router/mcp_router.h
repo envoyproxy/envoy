@@ -22,10 +22,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace McpRouter {
 
-namespace MetadataKeys {
-constexpr absl::string_view kFilterNamespace = "envoy.filters.http.mcp";
-} // namespace MetadataKeys
-
 /** Enumeration of supported MCP protocol methods. */
 enum class McpMethod {
   Unknown,
