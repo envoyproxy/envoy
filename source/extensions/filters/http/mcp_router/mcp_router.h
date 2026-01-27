@@ -138,8 +138,6 @@ private:
   void handlePromptsList();
   void handlePromptsGet();
   void handleCompletionComplete();
-  // Parses completion ref info (type, name, uri) from JSON body.
-  bool parseCompletionRefFromBody(Buffer::Instance& buffer);
   void handlePing();
   // Generic handler for client→server notifications (fanout to all backends).
   void handleNotification(absl::string_view notification_name);
