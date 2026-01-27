@@ -164,7 +164,7 @@ Http::FilterDataStatus McpFilter::decodeData(Buffer::Instance& data, bool end_st
     return Http::FilterDataStatus::Continue;
   }
 
-  size_t chunk_size = data.length();
+  const size_t chunk_size = data.length();
 
   ENVOY_LOG(trace, "decodeData: chunk_size={}, total_parsed={}, end_stream={}", chunk_size,
             bytes_parsed_, end_stream);
