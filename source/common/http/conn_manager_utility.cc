@@ -42,22 +42,22 @@ absl::string_view getScheme(absl::string_view forwarded_proto, bool is_ssl) {
 // otherwise falls back to connection's TLS status.
 absl::string_view getSchemeFromProxyProtocolOrConnection(const Network::Connection& connection,
                                                          const ConnectionManagerConfig& config) {
-  const auto& port_scheme_map = config.proxyProtocolPortSchemeMapping();
+  const auto& https_ports = config.httpsDestinationPorts();
+  const auto& http_ports = config.httpDestinationPorts();
 
   // If the feature is configured and the local address was restored from PROXY protocol,
   // try to infer the scheme from the destination port.
-  if (!port_scheme_map.empty() && connection.connectionInfoProvider().localAddressRestored()) {
+  if ((!https_ports.empty() || !http_ports.empty()) &&
+      connection.connectionInfoProvider().localAddressRestored()) {
     const Envoy::Network::Address::Ip* ip =
         connection.connectionInfoProvider().localAddress()->ip();
     if (ip != nullptr) {
-      auto it = port_scheme_map.find(ip->port());
-      if (it != port_scheme_map.end()) {
-        // Return the configured scheme for this port.
-        if (it->second == "https") {
-          return Headers::get().SchemeValues.Https;
-        } else {
-          return Headers::get().SchemeValues.Http;
-        }
+      uint32_t port = ip->port();
+      if (https_ports.contains(port)) {
+        return Headers::get().SchemeValues.Https;
+      }
+      if (http_ports.contains(port)) {
+        return Headers::get().SchemeValues.Http;
       }
     }
   }

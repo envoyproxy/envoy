@@ -148,9 +148,11 @@ public:
   bool addProxyProtocolConnectionState() const override {
     return parent_.addProxyProtocolConnectionState();
   }
-  const absl::flat_hash_map<uint32_t, std::string>&
-  proxyProtocolPortSchemeMapping() const override {
-    return parent_.proxyProtocolPortSchemeMapping();
+  const absl::flat_hash_set<uint32_t>& httpsDestinationPorts() const override {
+    return parent_.httpsDestinationPorts();
+  }
+  const absl::flat_hash_set<uint32_t>& httpDestinationPorts() const override {
+    return parent_.httpDestinationPorts();
   }
 
 private:

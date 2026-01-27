@@ -488,16 +488,17 @@ When Envoy is deployed behind a Layer 4 load balancer (such as AWS NLB) that ter
 forwards traffic using PROXY protocol, Envoy receives unencrypted traffic but needs to know the
 original protocol for correct redirect behavior and routing decisions.
 
-The :ref:`set_forwarded_proto_from_proxy_protocol_destination_port
-<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.set_forwarded_proto_from_proxy_protocol_destination_port>`
-configuration option allows mapping PROXY protocol destination ports to schemes. When configured:
+The :ref:`forwarded_proto_config
+<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.forwarded_proto_config>`
+configuration option allows specifying which destination ports should be treated as HTTPS or HTTP.
+When configured:
 
 1. If the connection's local address was restored from PROXY protocol (indicated by the
    :ref:`proxy_protocol <config_listener_filters_proxy_protocol>` listener filter)
-2. And the destination port matches a key in the configured ``port_scheme_mappings``
-3. Then ``x-forwarded-proto`` is set to the corresponding scheme value
+2. And the destination port is in ``https_destination_ports``, ``x-forwarded-proto`` is set to ``https``
+3. Or if the destination port is in ``http_destination_ports``, ``x-forwarded-proto`` is set to ``http``
 
-If the port is not in the mapping or the address was not restored from PROXY protocol, the behavior
+If the port is not in either list or the address was not restored from PROXY protocol, the behavior
 falls back to using the current connection's TLS status.
 
 Example configuration:
@@ -505,11 +506,9 @@ Example configuration:
 .. code-block:: yaml
 
   http_connection_manager:
-    set_forwarded_proto_from_proxy_protocol_destination_port:
-      port_scheme_mappings:
-        443: "https"
-        80: "http"
-        8443: "https"
+    forwarded_proto_config:
+      https_destination_ports: [443, 8443]
+      http_destination_ports: [80, 8080]
 
 This is particularly useful for the following deployment pattern:
 
@@ -518,9 +517,9 @@ This is particularly useful for the following deployment pattern:
   Client (HTTPS:443) → L4 Load Balancer (TLS termination) → PROXY protocol → Envoy (HTTP)
 
 In this scenario, without this configuration, Envoy would set ``x-forwarded-proto: http`` because
-it sees an unencrypted connection. With the port mapping configured, Envoy correctly sets
-``x-forwarded-proto: https`` based on the original destination port (443) from the PROXY protocol
-header.
+it sees an unencrypted connection. With ``https_destination_ports`` configured to include 443,
+Envoy correctly sets ``x-forwarded-proto: https`` based on the original destination port from the
+PROXY protocol header.
 
 .. _config_http_conn_man_headers_x-envoy-local-overloaded:
 

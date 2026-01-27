@@ -249,9 +249,11 @@ public:
   bool appendLocalOverload() const override { return false; }
   bool appendXForwardedPort() const override { return false; }
   bool addProxyProtocolConnectionState() const override { return true; }
-  const absl::flat_hash_map<uint32_t, std::string>&
-  proxyProtocolPortSchemeMapping() const override {
-    return proxy_protocol_port_scheme_mapping_;
+  const absl::flat_hash_set<uint32_t>& httpsDestinationPorts() const override {
+    return https_destination_ports_;
+  }
+  const absl::flat_hash_set<uint32_t>& httpDestinationPorts() const override {
+    return http_destination_ports_;
   }
 
 private:
@@ -523,7 +525,8 @@ private:
   const bool ignore_global_conn_limit_;
   std::unique_ptr<HttpConnectionManagerProto::ProxyStatusConfig> proxy_status_config_;
   const Http::HeaderValidatorFactoryPtr header_validator_factory_;
-  const absl::flat_hash_map<uint32_t, std::string> proxy_protocol_port_scheme_mapping_;
+  const absl::flat_hash_set<uint32_t> https_destination_ports_;
+  const absl::flat_hash_set<uint32_t> http_destination_ports_;
 };
 
 } // namespace Server

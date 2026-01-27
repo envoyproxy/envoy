@@ -3840,8 +3840,8 @@ TEST_F(HttpConnectionManagerMobileConfigTest, Mobile) {
   EXPECT_FALSE(hcm->clearHopByHopResponseHeaders());
 }
 
-// Test valid configuration for set_forwarded_proto_from_proxy_protocol_destination_port.
-TEST_F(HttpConnectionManagerConfigTest, SetForwardedProtoFromProxyProtocolDestinationPortValid) {
+// Test valid configuration for forwarded_proto_config.
+TEST_F(HttpConnectionManagerConfigTest, ForwardedProtoConfigValid) {
   const std::string yaml_string = R"EOF(
 codec_type: http1
 stat_prefix: router
@@ -3855,11 +3855,9 @@ route_config:
         prefix: "/"
       route:
         cluster: cluster
-set_forwarded_proto_from_proxy_protocol_destination_port:
-  port_scheme_mappings:
-    443: "https"
-    80: "http"
-    8443: "https"
+forwarded_proto_config:
+  https_destination_ports: [443, 8443]
+  http_destination_ports: [80, 8080]
 http_filters:
 - name: envoy.filters.http.router
   typed_config:
@@ -3872,16 +3870,19 @@ http_filters:
                                      filter_config_provider_manager_, creation_status_);
   EXPECT_TRUE(creation_status_.ok());
 
-  const auto& mapping = config.proxyProtocolPortSchemeMapping();
-  EXPECT_EQ(3, mapping.size());
-  EXPECT_EQ("https", mapping.at(443));
-  EXPECT_EQ("http", mapping.at(80));
-  EXPECT_EQ("https", mapping.at(8443));
+  const auto& https_ports = config.httpsDestinationPorts();
+  EXPECT_EQ(2, https_ports.size());
+  EXPECT_TRUE(https_ports.contains(443));
+  EXPECT_TRUE(https_ports.contains(8443));
+
+  const auto& http_ports = config.httpDestinationPorts();
+  EXPECT_EQ(2, http_ports.size());
+  EXPECT_TRUE(http_ports.contains(80));
+  EXPECT_TRUE(http_ports.contains(8080));
 }
 
-// Test invalid scheme in set_forwarded_proto_from_proxy_protocol_destination_port.
-TEST_F(HttpConnectionManagerConfigTest,
-       SetForwardedProtoFromProxyProtocolDestinationPortInvalidScheme) {
+// Test empty forwarded_proto_config is valid (feature disabled).
+TEST_F(HttpConnectionManagerConfigTest, ForwardedProtoConfigEmpty) {
   const std::string yaml_string = R"EOF(
 codec_type: http1
 stat_prefix: router
@@ -3895,41 +3896,7 @@ route_config:
         prefix: "/"
       route:
         cluster: cluster
-set_forwarded_proto_from_proxy_protocol_destination_port:
-  port_scheme_mappings:
-    443: "https"
-    80: "ftp"
-http_filters:
-- name: envoy.filters.http.router
-  typed_config:
-    "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
-  )EOF";
-
-  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
-                                     &scoped_routes_config_provider_manager_, tracer_manager_,
-                                     filter_config_provider_manager_, creation_status_);
-  EXPECT_FALSE(creation_status_.ok());
-  EXPECT_THAT(creation_status_.message(), testing::HasSubstr("Invalid scheme 'ftp' for port 80"));
-}
-
-// Test empty port_scheme_mappings is valid (feature disabled).
-TEST_F(HttpConnectionManagerConfigTest, SetForwardedProtoFromProxyProtocolDestinationPortEmpty) {
-  const std::string yaml_string = R"EOF(
-codec_type: http1
-stat_prefix: router
-route_config:
-  virtual_hosts:
-  - name: service
-    domains:
-    - "*"
-    routes:
-    - match:
-        prefix: "/"
-      route:
-        cluster: cluster
-set_forwarded_proto_from_proxy_protocol_destination_port:
-  port_scheme_mappings: {}
+forwarded_proto_config: {}
 http_filters:
 - name: envoy.filters.http.router
   typed_config:
@@ -3941,7 +3908,8 @@ http_filters:
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      filter_config_provider_manager_, creation_status_);
   EXPECT_TRUE(creation_status_.ok());
-  EXPECT_TRUE(config.proxyProtocolPortSchemeMapping().empty());
+  EXPECT_TRUE(config.httpsDestinationPorts().empty());
+  EXPECT_TRUE(config.httpDestinationPorts().empty());
 }
 
 } // namespace

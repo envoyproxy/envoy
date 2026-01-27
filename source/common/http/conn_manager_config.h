@@ -21,6 +21,7 @@
 #include "source/common/tracing/tracer_config_impl.h"
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/container/flat_hash_set.h"
 
 namespace Envoy {
 namespace Http {
@@ -572,14 +573,16 @@ public:
   virtual bool addProxyProtocolConnectionState() const PURE;
 
   /**
-   * @return a map of PROXY protocol destination port to scheme (http/https).
-   *         When configured and the local address was restored from PROXY protocol,
-   *         the x-forwarded-proto header will be set based on the destination port.
-   *         If the port is not in the map, falls back to current connection's TLS status.
-   *         If the map is empty, this feature is disabled.
+   * @return a set of destination ports that should be treated as HTTPS when the
+   *         local address was restored from PROXY protocol.
    */
-  virtual const absl::flat_hash_map<uint32_t, std::string>&
-  proxyProtocolPortSchemeMapping() const PURE;
+  virtual const absl::flat_hash_set<uint32_t>& httpsDestinationPorts() const PURE;
+
+  /**
+   * @return a set of destination ports that should be treated as HTTP when the
+   *         local address was restored from PROXY protocol.
+   */
+  virtual const absl::flat_hash_set<uint32_t>& httpDestinationPorts() const PURE;
 };
 
 using ConnectionManagerConfigSharedPtr = std::shared_ptr<ConnectionManagerConfig>;

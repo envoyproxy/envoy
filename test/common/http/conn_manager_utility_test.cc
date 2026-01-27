@@ -2756,8 +2756,9 @@ TEST_F(ConnectionManagerUtilityTest, DiscardTEHeaderWithoutTrailers) {
 TEST_F(ConnectionManagerUtilityTest, ForwardedProtoFromProxyProtocolPort443) {
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
   ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(0));
-  // Configure port 443 to map to https.
-  config_.proxy_protocol_port_scheme_mapping_ = {{443, "https"}, {80, "http"}};
+  // Configure port 443 as HTTPS destination port.
+  config_.https_destination_ports_ = {443, 8443};
+  config_.http_destination_ports_ = {80, 8080};
 
   // Set local address as restored (simulating PROXY protocol) with port 443.
   connection_.stream_info_.downstream_connection_info_provider_->restoreLocalAddress(
@@ -2778,7 +2779,8 @@ TEST_F(ConnectionManagerUtilityTest, ForwardedProtoFromProxyProtocolPort80) {
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
   ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(0));
   // Configure port mappings.
-  config_.proxy_protocol_port_scheme_mapping_ = {{443, "https"}, {80, "http"}};
+  config_.https_destination_ports_ = {443};
+  config_.http_destination_ports_ = {80};
 
   // Set local address as restored (simulating PROXY protocol) with port 80.
   connection_.stream_info_.downstream_connection_info_provider_->restoreLocalAddress(
@@ -2797,7 +2799,8 @@ TEST_F(ConnectionManagerUtilityTest, ForwardedProtoFromProxyProtocolPortNotInMap
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
   ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(0));
   // Configure port mappings without 8443.
-  config_.proxy_protocol_port_scheme_mapping_ = {{443, "https"}, {80, "http"}};
+  config_.https_destination_ports_ = {443};
+  config_.http_destination_ports_ = {80};
 
   // Set local address as restored with a port not in the mapping (8443).
   connection_.stream_info_.downstream_connection_info_provider_->restoreLocalAddress(
@@ -2816,7 +2819,7 @@ TEST_F(ConnectionManagerUtilityTest, ForwardedProtoFromProxyProtocolPortNotInMap
 TEST_F(ConnectionManagerUtilityTest, ForwardedProtoFromProxyProtocolDisabledWhenEmpty) {
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
   ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(0));
-  // Empty mapping (default) - feature disabled.
+  // Empty mappings (default) - feature disabled.
 
   // Set local address as restored with port 443.
   connection_.stream_info_.downstream_connection_info_provider_->restoreLocalAddress(
@@ -2836,7 +2839,8 @@ TEST_F(ConnectionManagerUtilityTest, ForwardedProtoFromProxyProtocolNotRestoredA
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
   ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(0));
   // Configure port mappings.
-  config_.proxy_protocol_port_scheme_mapping_ = {{443, "https"}, {80, "http"}};
+  config_.https_destination_ports_ = {443};
+  config_.http_destination_ports_ = {80};
 
   // Set local address without restoring (not from PROXY protocol).
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
@@ -2856,7 +2860,8 @@ TEST_F(ConnectionManagerUtilityTest, ForwardedProtoFromProxyProtocolCustomPort) 
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
   ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(0));
   // Configure custom port mapping.
-  config_.proxy_protocol_port_scheme_mapping_ = {{443, "https"}, {80, "http"}, {8443, "https"}};
+  config_.https_destination_ports_ = {443, 8443};
+  config_.http_destination_ports_ = {80};
 
   // Set local address as restored with custom HTTPS port.
   connection_.stream_info_.downstream_connection_info_provider_->restoreLocalAddress(
