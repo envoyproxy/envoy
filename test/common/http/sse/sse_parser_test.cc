@@ -548,12 +548,11 @@ TEST_F(SseParserTest, ParseEventMultipleEventTypes) {
   EXPECT_EQ(parsed.event_type.value(), "type2");
 }
 
-// Test parseEvent with retry overflow (should cap at uint32 max)
+// Test parseEvent with retry overflow.
 TEST_F(SseParserTest, ParseEventRetryOverflow) {
   const std::string event = "retry: 99999999999999999999\ndata: test\n";
   auto parsed = SseParser::parseEvent(event);
-  ASSERT_TRUE(parsed.retry.has_value());
-  EXPECT_EQ(parsed.retry.value(), std::numeric_limits<uint32_t>::max());
+  EXPECT_FALSE(parsed.retry.has_value());
 }
 
 // Test parseEvent with no data field but other fields present

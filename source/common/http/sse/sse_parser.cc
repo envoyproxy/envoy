@@ -1,8 +1,9 @@
 #include "source/common/http/sse/sse_parser.h"
 
+#include <algorithm>
 #include <cstdint>
-#include <limits>
 
+#include "absl/strings/numbers.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -46,24 +47,24 @@ SseParser::ParsedEvent SseParser::parseEvent(absl::string_view event) {
     } else if (field_name == "retry") {
       // Per SSE spec, the retry field must consist of only ASCII digits.
       // If it contains any other character, the field is ignored.
-      bool valid = true;
-      for (char c : field_value) {
-        if (c < '0' || c > '9') {
-          valid = false;
-          break;
-        }
-      }
-      if (valid && !field_value.empty()) {
+      if (!field_value.empty()) {
         uint64_t value = 0;
+        bool valid = true;
         for (char c : field_value) {
-          value = value * 10 + static_cast<uint64_t>(c - '0');
-          // Prevent overflow: cap at uint32 max
-          if (value > std::numeric_limits<uint32_t>::max()) {
-            value = std::numeric_limits<uint32_t>::max();
+          if (c < '0' || c > '9') {
+            valid = false;
             break;
           }
+          uint64_t new_value = value * 10 + static_cast<uint64_t>(c - '0');
+          if (new_value < value) {
+            valid = false;
+            break;
+          }
+          value = new_value;
         }
-        parsed_event.retry = static_cast<uint32_t>(value);
+        if (valid) {
+          parsed_event.retry = value;
+        }
       }
     }
   }

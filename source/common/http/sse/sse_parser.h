@@ -55,7 +55,7 @@ public:
     // The event type. absl::nullopt if no event field is present.
     absl::optional<std::string> event_type;
     // The reconnection time in milliseconds. absl::nullopt if no retry field is present.
-    absl::optional<uint32_t> retry;
+    absl::optional<uint64_t> retry;
   };
 
   /**
