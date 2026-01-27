@@ -76,7 +76,7 @@ private:
   const Http::LowerCaseString random_value_header_;
   const std::string runtime_key_prefix_;
   const bool use_hash_policy_{};
-  const bool health_aware_lb_{true};
+  const bool health_aware_lb_{false};
   std::vector<WeightedClustersConfigEntryConstSharedPtr> weighted_clusters_;
   uint64_t total_cluster_weight_{0};
 };
