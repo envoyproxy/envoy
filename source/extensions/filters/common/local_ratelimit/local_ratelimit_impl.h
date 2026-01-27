@@ -140,10 +140,10 @@ public:
           envoy::extensions::common::ratelimit::v3::LocalRateLimitDescriptor>& descriptors,
       bool always_consume_default_token_bucket = true,
       ShareProviderSharedPtr shared_provider = nullptr, const uint32_t lru_size = 20);
-  ~LocalRateLimiterImpl();
+  ~LocalRateLimiterImpl() override;
 
   LocalRateLimiter::Result
-  requestAllowed(absl::Span<const RateLimit::Descriptor> request_descriptors);
+  requestAllowed(absl::Span<const RateLimit::Descriptor> request_descriptors) override;
 
 private:
   RateLimitTokenBucketSharedPtr default_token_bucket_;
