@@ -140,6 +140,6 @@ new_features:
     Added cgroup v2 support to the CPU utilization resource monitor. The monitor now automatically
     detects and selects between cgroup v1 and v2 at runtime by checking available cgroup files on
     the system. This enables the resource monitor to work correctly in both cgroup v1 and v2
-    environments without configuration changes.    
+    environments without configuration changes.
 
 deprecated:
