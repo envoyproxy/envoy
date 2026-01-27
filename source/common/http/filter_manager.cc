@@ -471,6 +471,17 @@ void ActiveStreamDecoderFilter::injectDecodedDataToFilterChain(Buffer::Instance&
                      FilterManager::FilterIterationStartState::CanStartFromCurrent);
 }
 
+void ActiveStreamDecoderFilter::injectDecodedDataToFilterChainWithStateUpdate(
+    Buffer::Instance& data, bool end_stream) {
+  if (!headers_continued_) {
+    headers_continued_ = true;
+    doHeaders(false);
+  }
+  parent_.state().observed_decode_end_stream_ = end_stream;
+  parent_.decodeData(this, data, end_stream,
+                     FilterManager::FilterIterationStartState::CanStartFromCurrent);
+}
+
 void ActiveStreamDecoderFilter::continueDecoding() { commonContinue(); }
 const Buffer::Instance* ActiveStreamDecoderFilter::decodingBuffer() {
   return parent_.buffered_request_data_.get();
@@ -1872,6 +1883,17 @@ void ActiveStreamEncoderFilter::injectEncodedDataToFilterChain(Buffer::Instance&
     headers_continued_ = true;
     doHeaders(false);
   }
+  parent_.encodeData(this, data, end_stream,
+                     FilterManager::FilterIterationStartState::CanStartFromCurrent);
+}
+
+void ActiveStreamEncoderFilter::injectEncodedDataToFilterChainWithStateUpdate(
+    Buffer::Instance& data, bool end_stream) {
+  if (!headers_continued_) {
+    headers_continued_ = true;
+    doHeaders(false);
+  }
+  parent_.state_.observed_encode_end_stream_ = end_stream;
   parent_.encodeData(this, data, end_stream,
                      FilterManager::FilterIterationStartState::CanStartFromCurrent);
 }

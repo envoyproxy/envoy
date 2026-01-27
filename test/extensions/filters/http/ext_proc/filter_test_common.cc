@@ -534,7 +534,7 @@ void HttpFilterTest::streamingSmallChunksWithBodyMutation(bool empty_last_chunk,
 
   Buffer::OwnedImpl want_response_body;
   Buffer::OwnedImpl got_response_body;
-  EXPECT_CALL(encoder_callbacks_, injectEncodedDataToFilterChain(_, _))
+  EXPECT_CALL(encoder_callbacks_, injectEncodedDataToFilterChainWithStateUpdate(_, _))
       .WillRepeatedly(Invoke(
           [&got_response_body](Buffer::Instance& data, Unused) { got_response_body.move(data); }));
   uint32_t chunk_number = 3;

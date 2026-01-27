@@ -537,7 +537,7 @@ public:
   }
 
   void injectDataToFilterChain(Buffer::Instance& data, bool end_stream) override {
-    decoder_callbacks_->injectDecodedDataToFilterChain(data, end_stream);
+    decoder_callbacks_->injectDecodedDataToFilterChainWithStateUpdate(data, end_stream);
   }
 
   uint32_t bufferLimit() const override { return decoder_callbacks_->bufferLimit(); }
@@ -682,7 +682,7 @@ public:
   }
 
   void injectDataToFilterChain(Buffer::Instance& data, bool end_stream) override {
-    encoder_callbacks_->injectEncodedDataToFilterChain(data, end_stream);
+    encoder_callbacks_->injectEncodedDataToFilterChainWithStateUpdate(data, end_stream);
   }
 
   uint32_t bufferLimit() const override { return encoder_callbacks_->bufferLimit(); }

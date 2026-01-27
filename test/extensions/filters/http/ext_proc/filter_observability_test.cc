@@ -142,7 +142,7 @@ TEST_F(HttpFilterTest, StreamingBodiesInObservabilityMode) {
 
   Buffer::OwnedImpl want_request_body;
   Buffer::OwnedImpl got_request_body;
-  EXPECT_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, true))
+  EXPECT_CALL(decoder_callbacks_, injectDecodedDataToFilterChainWithStateUpdate(_, true))
       .WillRepeatedly(Invoke(
           [&got_request_body](Buffer::Instance& data, Unused) { got_request_body.move(data); }));
 
@@ -164,7 +164,7 @@ TEST_F(HttpFilterTest, StreamingBodiesInObservabilityMode) {
 
   Buffer::OwnedImpl want_response_body;
   Buffer::OwnedImpl got_response_body;
-  EXPECT_CALL(encoder_callbacks_, injectEncodedDataToFilterChain(_, _))
+  EXPECT_CALL(encoder_callbacks_, injectEncodedDataToFilterChainWithStateUpdate(_, _))
       .WillRepeatedly(Invoke(
           [&got_response_body](Buffer::Instance& data, Unused) { got_response_body.move(data); }));
 
