@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <cstdint>
 
-#include "absl/strings/numbers.h"
+#include "absl/strings/ascii.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -51,7 +51,7 @@ SseParser::ParsedEvent SseParser::parseEvent(absl::string_view event) {
         uint64_t value = 0;
         bool valid = true;
         for (char c : field_value) {
-          if (c < '0' || c > '9') {
+          if (!absl::ascii_isdigit(c)) {
             valid = false;
             break;
           }
