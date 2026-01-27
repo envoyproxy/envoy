@@ -169,8 +169,7 @@ void ReverseTunnelAcceptorExtension::updateConnectionStats(const std::string& no
       return;
     }
     Stats::StatNameManagedStorage stat_name_storage(stat_name, stats_store.symbolTable());
-    auto& gauge =
-        stats_store.gaugeFromStatName(stat_name_storage.statName(), import_mode);
+    auto& gauge = stats_store.gaugeFromStatName(stat_name_storage.statName(), import_mode);
     if (is_increment) {
       gauge.inc();
       ENVOY_LOG(trace, "reverse_tunnel: incremented stat {} to {}", stat_name, gauge.value());
@@ -191,11 +190,9 @@ void ReverseTunnelAcceptorExtension::updateConnectionStats(const std::string& no
         fmt::format("{}.nodes.{}", stat_prefix_, base_node_identifier);
     adjust_gauge(node_stat_name, increment, Stats::Gauge::ImportMode::HiddenAccumulate);
     if (tenant_isolation_enabled && scoped_node.hasTenant()) {
-      const std::string tenant_node_stat_name =
-          fmt::format("{}.tenants.{}.nodes.{}", stat_prefix_, scoped_node.tenant,
-                      scoped_node.identifier);
-      adjust_gauge(tenant_node_stat_name, increment,
-                   Stats::Gauge::ImportMode::HiddenAccumulate);
+      const std::string tenant_node_stat_name = fmt::format(
+          "{}.tenants.{}.nodes.{}", stat_prefix_, scoped_node.tenant, scoped_node.identifier);
+      adjust_gauge(tenant_node_stat_name, increment, Stats::Gauge::ImportMode::HiddenAccumulate);
     }
   }
 
@@ -207,8 +204,7 @@ void ReverseTunnelAcceptorExtension::updateConnectionStats(const std::string& no
       const std::string tenant_cluster_stat_name =
           fmt::format("{}.tenants.{}.clusters.{}", stat_prefix_, scoped_cluster.tenant,
                       scoped_cluster.identifier);
-      adjust_gauge(tenant_cluster_stat_name, increment,
-                   Stats::Gauge::ImportMode::HiddenAccumulate);
+      adjust_gauge(tenant_cluster_stat_name, increment, Stats::Gauge::ImportMode::HiddenAccumulate);
     }
   }
 
@@ -216,9 +212,10 @@ void ReverseTunnelAcceptorExtension::updateConnectionStats(const std::string& no
   updatePerWorkerConnectionStats(node_id, cluster_id, increment, tenant_isolation_enabled);
 }
 
-void ReverseTunnelAcceptorExtension::updatePerWorkerConnectionStats(
-    const std::string& node_id, const std::string& cluster_id, bool increment,
-    bool tenant_isolation_enabled) {
+void ReverseTunnelAcceptorExtension::updatePerWorkerConnectionStats(const std::string& node_id,
+                                                                    const std::string& cluster_id,
+                                                                    bool increment,
+                                                                    bool tenant_isolation_enabled) {
   auto& stats_store = context_.scope();
 
   // Get dispatcher name from the thread local dispatcher.

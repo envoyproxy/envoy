@@ -454,13 +454,11 @@ TEST_F(ReverseTunnelFilterUnitTest, TenantIsolationRejectsDelimiterInIdentifiers
 
   EXPECT_CALL(callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
 
-  Buffer::OwnedImpl request(
-      makeHttpRequestWithRtHeaders("GET", "/reverse_connections/request", "node@foo", "cluster",
-                                   "tenant"));
+  Buffer::OwnedImpl request(makeHttpRequestWithRtHeaders("GET", "/reverse_connections/request",
+                                                         "node@foo", "cluster", "tenant"));
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter.onData(request, false));
 
-  auto parse_error =
-      TestUtility::findCounter(stats_store_, "reverse_tunnel.handshake.parse_error");
+  auto parse_error = TestUtility::findCounter(stats_store_, "reverse_tunnel.handshake.parse_error");
   ASSERT_NE(nullptr, parse_error);
   EXPECT_EQ(1, parse_error->value());
 }

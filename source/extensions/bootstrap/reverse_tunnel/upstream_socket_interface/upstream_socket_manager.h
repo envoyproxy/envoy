@@ -145,6 +145,7 @@ public:
    */
   UpstreamSocketManager& pickLeastLoadedSocketManager(const std::string& node_id,
                                                       const std::string& cluster_id);
+
 private:
   /**
    * Helper method to check if a node has any reverse connection sockets (idle or used).

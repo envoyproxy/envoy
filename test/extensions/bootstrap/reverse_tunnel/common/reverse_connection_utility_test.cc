@@ -230,6 +230,41 @@ TEST_F(ReverseConnectionUtilityTest, PingMessageHandlerGetPingCount) {
   EXPECT_EQ(handler->getPingCount(), 1);
 }
 
+TEST_F(ReverseConnectionUtilityTest, SplitTenantScopedIdentifierWithDelimiter) {
+  const absl::string_view composite = "tenant-alpha@node-1";
+  const auto result = ReverseConnectionUtility::splitTenantScopedIdentifier(composite);
+  EXPECT_TRUE(result.hasTenant());
+  EXPECT_EQ(result.tenant, "tenant-alpha");
+  EXPECT_EQ(result.identifier, "node-1");
+}
+
+TEST_F(ReverseConnectionUtilityTest, SplitTenantScopedIdentifierWithoutDelimiter) {
+  const absl::string_view composite = "node-plain";
+  const auto result = ReverseConnectionUtility::splitTenantScopedIdentifier(composite);
+  EXPECT_FALSE(result.hasTenant());
+  EXPECT_TRUE(result.tenant.empty());
+  EXPECT_EQ(result.identifier, "node-plain");
+}
+
+TEST_F(ReverseConnectionUtilityTest, SplitTenantScopedIdentifierEmptyValue) {
+  const auto result = ReverseConnectionUtility::splitTenantScopedIdentifier("");
+  EXPECT_FALSE(result.hasTenant());
+  EXPECT_TRUE(result.tenant.empty());
+  EXPECT_TRUE(result.identifier.empty());
+}
+
+TEST_F(ReverseConnectionUtilityTest, BuildTenantScopedIdentifierWithTenant) {
+  const std::string composite =
+      ReverseConnectionUtility::buildTenantScopedIdentifier("tenant-alpha", "node-1");
+  EXPECT_EQ(composite, "tenant-alpha@node-1");
+}
+
+TEST_F(ReverseConnectionUtilityTest, BuildTenantScopedIdentifierWithoutTenant) {
+  const std::string composite =
+      ReverseConnectionUtility::buildTenantScopedIdentifier("", "node-1");
+  EXPECT_EQ(composite, "node-1");
+}
+
 } // namespace ReverseConnection
 } // namespace Bootstrap
 } // namespace Extensions

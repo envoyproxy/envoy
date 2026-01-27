@@ -325,7 +325,8 @@ void ReverseTunnelFilter::RequestDecoderImpl::processIfComplete(bool end_stream)
     const auto contains_delimiter = [&](absl::string_view value) -> bool {
       return value.find(delimiter) != absl::string_view::npos;
     };
-    if (contains_delimiter(node_id) || contains_delimiter(cluster_id) || contains_delimiter(tenant_id)) {
+    if (contains_delimiter(node_id) || contains_delimiter(cluster_id) ||
+        contains_delimiter(tenant_id)) {
       parent_.stats_.parse_error_.inc();
       ENVOY_CONN_LOG(debug,
                      "reverse_tunnel: identifier contains reserved delimiter '{}' while tenant "
@@ -491,8 +492,8 @@ void ReverseTunnelFilter::processAcceptedConnection(absl::string_view node_id,
   if (socket_manager != nullptr) {
     ENVOY_CONN_LOG(trace, "reverse_tunnel: registering wrapped socket for reuse", connection);
     socket_manager->setTenantIsolationEnabled(tenant_isolation_enabled);
-    socket_manager->addConnectionSocket(socket_node_id, socket_cluster_id, std::move(wrapped_socket),
-                                        ping_seconds);
+    socket_manager->addConnectionSocket(socket_node_id, socket_cluster_id,
+                                        std::move(wrapped_socket), ping_seconds);
     ENVOY_CONN_LOG(debug, "reverse_tunnel: successfully registered wrapped socket for reuse",
                    connection);
   }
