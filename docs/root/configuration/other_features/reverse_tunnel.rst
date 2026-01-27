@@ -299,6 +299,15 @@ mapping, or custom filter implementations. The Lua filter checks request headers
 sets the ``x-computed-host-id`` header, which the reverse connection cluster uses to look up the appropriate
 tunnel connection.
 
+For deployments that enable :ref:`tenant isolation <config_network_filters_reverse_tunnel>`, the repository
+includes a companion configuration
+:download:`responder-envoy-tenant-isolation.yaml </_configs/reverse_connection/responder-envoy-tenant-isolation.yaml>`.
+That variant extends the Lua script to require an ``x-tenant-id`` header and automatically emit composite
+identifiers such as ``tenant-a@example-node`` before routing through the reverse connection cluster.
+Enabling or disabling tenant isolation therefore only changes the Envoy bootstrap configuration; the
+downstream contract remains consistent: supply ``x-tenant-id`` alongside ``x-node-id`` (or ``x-cluster-id``)
+when tenant-aware isolation is required.
+
 The header priority order is:
 
 #. **x-node-id header**: Highest priority—targets a specific downstream node.
@@ -324,6 +333,17 @@ The header priority order is:
       x-cluster-id: example-cluster
 
    The filter sets ``host_id = "example-cluster"`` and routes to any node in that cluster.
+
+#. **Request with tenant + node IDs** (tenant isolation enabled):
+
+   .. code-block:: http
+
+      GET /downstream_service HTTP/1.1
+      x-tenant-id: tenant-a
+      x-node-id: example-node
+
+   The tenant-aware configuration derives ``host_id = "tenant-a@example-node"`` so that the correct tunnel
+   socket is reused while keeping tenants isolated.
 
 .. _config_reverse_connection_security:
 
