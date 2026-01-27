@@ -71,7 +71,7 @@ genrule(
         "//source/extensions:extensions_metadata.yaml",
         "//contrib:extensions_metadata.yaml",
     ],
-    outs = ["extensions_security_rst.tar.gz"],
+    outs = ["extensions_security_rst.tar"],
     cmd = """
     $(location //tools/docs:generate_extensions_security_rst) \\
         $(location //source/extensions:extensions_metadata.yaml) \\
@@ -82,7 +82,7 @@ genrule(
 
 genrule(
     name = "external_deps_rst",
-    outs = ["external_deps_rst.tar.gz"],
+    outs = ["external_deps_rst.tar"],
     cmd = """
     $(location //tools/docs:generate_external_deps_rst) \
         $(location //bazel:all_repository_locations) \
@@ -123,7 +123,7 @@ genrule(
 genrule(
     name = "empty_protos_rst",
     srcs = [":empty_extensions.json"],
-    outs = ["empty_protos_rst.tar.gz"],
+    outs = ["empty_protos_rst.tar"],
     cmd = """
     $(location //tools/protodoc:generate_empty) \
         $(location empty_extensions.json) $@
@@ -137,7 +137,7 @@ genrule(
         "//tools/protodoc:api_v3_protodoc",
         ":proto_srcs",
     ],
-    outs = ["api_rst.tar.gz"],
+    outs = ["api_rst.tar"],
     cmd = """
     $(location //tools/docs:generate_api_rst) \\
         $(location proto_srcs) $(locations //tools/protodoc:api_v3_protodoc) $@
@@ -182,7 +182,7 @@ pkg_files(
 
 genrule(
     name = "version_histories",
-    outs = ["version_histories.tar.gz"],
+    outs = ["version_histories.tar"],
     cmd = """
     $(location //tools/docs:generate_version_histories) --path=$$(dirname $(location //:VERSION.txt)) $@
     """,
