@@ -6,11 +6,38 @@
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/common/matchers.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Upstreams {
 namespace Http {
+
+/**
+ * Compiled endpoint-specific options with pre-constructed matchers.
+ */
+struct CompiledEpSpecificOptions {
+  CompiledEpSpecificOptions(
+      const envoy::extensions::upstreams::http::v3::EpSpecificHttpProtocolOptions::EpSpecificOptions&
+          options,
+      Server::Configuration::CommonFactoryContext& context)
+      : http2_protocol_options(options.has_http2_protocol_options()
+                                   ? absl::optional<envoy::config::core::v3::Http2ProtocolOptions>(
+                                         options.http2_protocol_options())
+                                   : absl::nullopt),
+        http_protocol_options(options.has_http_protocol_options()
+                                  ? absl::optional<envoy::config::core::v3::HttpProtocolOptions>(
+                                        options.http_protocol_options())
+                                  : absl::nullopt),
+        metadata_matcher(options.has_ep_metadata_match()
+                             ? absl::optional<Matchers::MetadataMatcher>(
+                                   Matchers::MetadataMatcher(options.ep_metadata_match(), context))
+                             : absl::nullopt) {}
+
+  absl::optional<envoy::config::core::v3::Http2ProtocolOptions> http2_protocol_options;
+  absl::optional<envoy::config::core::v3::HttpProtocolOptions> http_protocol_options;
+  absl::optional<Matchers::MetadataMatcher> metadata_matcher;
+};
 
 /**
  * Config implementation for EpSpecificHttpProtocolOptions.
@@ -19,15 +46,19 @@ namespace Http {
 class EpSpecificProtocolOptionsConfigImpl : public Upstream::ProtocolOptionsConfig {
 public:
   EpSpecificProtocolOptionsConfigImpl(
-      const envoy::extensions::upstreams::http::v3::EpSpecificHttpProtocolOptions& config)
-      : config_(config) {}
+      const envoy::extensions::upstreams::http::v3::EpSpecificHttpProtocolOptions& config,
+      Server::Configuration::CommonFactoryContext& context) {
+    for (const auto& ep_option : config.ep_specific_options()) {
+      compiled_options_.emplace_back(ep_option, context);
+    }
+  }
 
-  const envoy::extensions::upstreams::http::v3::EpSpecificHttpProtocolOptions& config() const {
-    return config_;
+  const std::vector<CompiledEpSpecificOptions>& compiledOptions() const {
+    return compiled_options_;
   }
 
 private:
-  const envoy::extensions::upstreams::http::v3::EpSpecificHttpProtocolOptions config_;
+  std::vector<CompiledEpSpecificOptions> compiled_options_;
 };
 
 /**
@@ -42,7 +73,8 @@ public:
     const auto& typed_config = MessageUtil::downcastAndValidate<
         const envoy::extensions::upstreams::http::v3::EpSpecificHttpProtocolOptions&>(
         config, context.messageValidationVisitor());
-    return std::make_shared<EpSpecificProtocolOptionsConfigImpl>(typed_config);
+    return std::make_shared<EpSpecificProtocolOptionsConfigImpl>(typed_config,
+                                                                  context.serverFactoryContext());
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {

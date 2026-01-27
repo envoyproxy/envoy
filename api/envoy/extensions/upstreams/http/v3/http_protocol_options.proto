@@ -7,6 +7,7 @@ import "envoy/config/core/v3/extension.proto";
 import "envoy/config/core/v3/protocol.proto";
 import "envoy/config/route/v3/route_components.proto";
 import "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto";
+import "envoy/type/matcher/v3/metadata.proto";
 
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
@@ -237,16 +238,20 @@ message EpSpecificHttpProtocolOptions {
     // Endpoint-specific HTTP protocol options.
     config.core.v3.HttpProtocolOptions http_protocol_options = 2;
 
-    // Defines a string that will be used to match against the endpoints
-    // these configurations should be applied to. The endpoint must have 
-    // a  filter metadata set as follows:
+    // Defines metadata matcher that will be used to match against the endpoints
+    // these configurations should be applied to.
     //
-    //      metadata:
-    //        filter_metadata:
-    //          ep_specific_protocol_options:
-    //            match: <string>
+    // Example:
     //
-    string ep_metadata_match = 3 [(validate.rules).string = {min_len: 1}];
+    //      ep_metadata_match:
+    //        filter: ep_specific_protocol_options
+    //        path:
+    //        - key: type
+    //        value:
+    //          string_match:
+    //            exact: "high_throughput"
+    //
+    type.matcher.v3.MetadataMatcher ep_metadata_match = 3 [(validate.rules).message = {required: true}];
   }
 
   repeated EpSpecificOptions ep_specific_options = 1;

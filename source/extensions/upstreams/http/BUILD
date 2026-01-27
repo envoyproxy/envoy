@@ -41,6 +41,7 @@ envoy_cc_extension(
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
         "//envoy/upstream:upstream_interface",
+        "//source/common/common:matchers_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/extensions/upstreams/http/v3:pkg_cc_proto",

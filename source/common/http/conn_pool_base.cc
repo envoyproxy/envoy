@@ -205,20 +205,13 @@ uint32_t MultiplexedActiveClientBase::maxStreamsPerConnection(uint32_t max_strea
       "envoy.extensions.upstreams.http.v3.EpSpecificHttpProtocolOptions");
 
   if (ep_specific_protocol_options != nullptr) {
-    const auto& config = ep_specific_protocol_options->config();
-    for (const auto& ep_option : config.ep_specific_options()) {
-      const std::string& match_value = ep_option.ep_metadata_match();
-
-      const auto& filter_metadata = 
-          Envoy::Config::Metadata::metadataValue(host->metadata().get(), 
-                                                  "ep_specific_protocol_options",
-                                                  "match");
-      
-      if (filter_metadata.has_string_value() &&
-          filter_metadata.string_value() == match_value) {
-        if (ep_option.has_http_protocol_options() &&
-            ep_option.http_protocol_options().has_max_requests_per_connection()) {
-          max_requests = ep_option.http_protocol_options().max_requests_per_connection().value();
+    for (const auto& ep_option : ep_specific_protocol_options->compiledOptions()) {
+      // Check if the metadata matcher matches this endpoint's metadata
+      if (ep_option.metadata_matcher.has_value() &&
+          ep_option.metadata_matcher->match(*host->metadata())) {
+        if (ep_option.http_protocol_options.has_value() &&
+            ep_option.http_protocol_options->has_max_requests_per_connection()) {
+          max_requests = ep_option.http_protocol_options->max_requests_per_connection().value();
         }
         break;
       }

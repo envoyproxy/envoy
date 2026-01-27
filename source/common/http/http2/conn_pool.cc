@@ -6,7 +6,6 @@
 #include "envoy/server/overload/overload_manager.h"
 #include "envoy/upstream/upstream.h"
 
-#include "source/common/config/metadata.h"
 #include "source/common/http/http2/codec_impl.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/extensions/upstreams/http/ep_specific_config.h"
@@ -27,21 +26,14 @@ uint32_t ActiveClient::calculateInitialStreamsLimit(
       Extensions::Upstreams::Http::EpSpecificProtocolOptionsConfigImpl>(
       "envoy.extensions.upstreams.http.v3.EpSpecificHttpProtocolOptions");
 
-  if (ep_specific_protocol_options != nullptr) {
-    const auto& config = ep_specific_protocol_options->config();
-    for (const auto& ep_option : config.ep_specific_options()) {
-      const std::string& match_value = ep_option.ep_metadata_match();
-
-      const auto& filter_metadata = 
-          Envoy::Config::Metadata::metadataValue(host->metadata().get(), 
-                                                  "ep_specific_protocol_options",
-                                                  "match");
-      
-      if (filter_metadata.has_string_value() &&
-          filter_metadata.string_value() == match_value) {
-        if (ep_option.has_http2_protocol_options() &&
-            ep_option.http2_protocol_options().has_max_concurrent_streams()) {
-          initial_streams = ep_option.http2_protocol_options().max_concurrent_streams().value();
+  if (ep_specific_protocol_options != nullptr && host->metadata() != nullptr) {
+    for (const auto& ep_option : ep_specific_protocol_options->compiledOptions()) {
+      // Use the MetadataMatcher to check if the endpoint metadata matches
+      if (ep_option.metadata_matcher.has_value() &&
+          ep_option.metadata_matcher->match(*host->metadata())) {
+        if (ep_option.http2_protocol_options.has_value() &&
+            ep_option.http2_protocol_options->has_max_concurrent_streams()) {
+          initial_streams = ep_option.http2_protocol_options->max_concurrent_streams().value();
         }
         break;
       }
