@@ -404,6 +404,7 @@ TEST_F(ReverseTunnelFilterUnitTest, ConfigurationCustomPingInterval) {
   proto_config.set_auto_close_connections(true);
   proto_config.set_request_path("/custom/path");
   proto_config.set_request_method(envoy::config::core::v3::PUT);
+  proto_config.set_enable_tenant_isolation(true);
 
   auto config_or_error = ReverseTunnelFilterConfig::create(proto_config, factory_context_);
   ASSERT_TRUE(config_or_error.ok());
@@ -412,6 +413,7 @@ TEST_F(ReverseTunnelFilterUnitTest, ConfigurationCustomPingInterval) {
   EXPECT_TRUE(config->autoCloseConnections());
   EXPECT_EQ("/custom/path", config->requestPath());
   EXPECT_EQ("PUT", config->requestMethod());
+  EXPECT_TRUE(config->enableTenantIsolation());
 }
 
 // Ensure defaults remain stable.
@@ -421,6 +423,7 @@ TEST_F(ReverseTunnelFilterUnitTest, ConfigurationDefaultsRemainStable) {
   ASSERT_TRUE(config_or_error.ok());
   auto config = config_or_error.value();
   EXPECT_EQ("/reverse_connections/request", config->requestPath());
+  EXPECT_FALSE(config->enableTenantIsolation());
 }
 
 // Test configuration with default values.
@@ -435,6 +438,31 @@ TEST_F(ReverseTunnelFilterUnitTest, ConfigurationDefaults) {
   EXPECT_FALSE(config->autoCloseConnections());
   EXPECT_EQ("/reverse_connections/request", config->requestPath());
   EXPECT_EQ("GET", config->requestMethod());
+  EXPECT_FALSE(config->enableTenantIsolation());
+}
+
+TEST_F(ReverseTunnelFilterUnitTest, TenantIsolationRejectsDelimiterInIdentifiers) {
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  cfg.set_enable_tenant_isolation(true);
+
+  auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
+  ASSERT_TRUE(config_or_error.ok());
+  auto local_config = config_or_error.value();
+  ReverseTunnelFilter filter(local_config, *stats_store_.rootScope(), overload_manager_);
+  EXPECT_CALL(callbacks_, connection()).WillRepeatedly(ReturnRef(callbacks_.connection_));
+  filter.initializeReadFilterCallbacks(callbacks_);
+
+  EXPECT_CALL(callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
+
+  Buffer::OwnedImpl request(
+      makeHttpRequestWithRtHeaders("GET", "/reverse_connections/request", "node@foo", "cluster",
+                                   "tenant"));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter.onData(request, false));
+
+  auto parse_error =
+      TestUtility::findCounter(stats_store_, "reverse_tunnel.handshake.parse_error");
+  ASSERT_NE(nullptr, parse_error);
+  EXPECT_EQ(1, parse_error->value());
 }
 
 // Test RequestDecoder methods not fully covered.

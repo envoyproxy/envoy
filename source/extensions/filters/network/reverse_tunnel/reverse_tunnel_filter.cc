@@ -114,7 +114,8 @@ ReverseTunnelFilterConfig::ReverseTunnelFilterConfig(
                   !proto_config.validation().dynamic_metadata_namespace().empty()
               ? proto_config.validation().dynamic_metadata_namespace()
               : "envoy.filters.network.reverse_tunnel"),
-      required_cluster_name_(proto_config.required_cluster_name()) {}
+      required_cluster_name_(proto_config.required_cluster_name()),
+      enable_tenant_isolation_(proto_config.enable_tenant_isolation()) {}
 
 bool ReverseTunnelFilterConfig::validateIdentifiers(
     absl::string_view node_id, absl::string_view cluster_id,
@@ -319,6 +320,26 @@ void ReverseTunnelFilter::RequestDecoderImpl::processIfComplete(bool end_stream)
   const absl::string_view cluster_id = cluster_vals[0]->value().getStringView();
   const absl::string_view tenant_id = tenant_vals[0]->value().getStringView();
 
+  if (parent_.config_->enableTenantIsolation()) {
+    const absl::string_view delimiter = ReverseTunnelFilterConfig::tenantDelimiter();
+    const auto contains_delimiter = [&](absl::string_view value) -> bool {
+      return value.find(delimiter) != absl::string_view::npos;
+    };
+    if (contains_delimiter(node_id) || contains_delimiter(cluster_id) || contains_delimiter(tenant_id)) {
+      parent_.stats_.parse_error_.inc();
+      ENVOY_CONN_LOG(debug,
+                     "reverse_tunnel: identifier contains reserved delimiter '{}' while tenant "
+                     "isolation is enabled",
+                     parent_.read_callbacks_->connection(), delimiter);
+      sendLocalReply(Http::Code::BadRequest,
+                     "Reverse tunnel identifiers must not contain '@' when tenant isolation is "
+                     "enabled",
+                     nullptr, absl::nullopt, "reverse_tunnel_invalid_identifier");
+      parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
+      return;
+    }
+  }
+
   // Check for upstream cluster name header and validate if required.
   if (!parent_.config_->requiredClusterName().empty()) {
     const auto upstream_cluster_vals = headers_->get(
@@ -455,10 +476,23 @@ void ReverseTunnelFilter::processAcceptedConnection(absl::string_view node_id,
 
   // Register the wrapped socket for reuse under the provided identifiers.
   // Note: The socket manager is expected to be thread-safe.
+  const bool tenant_isolation_enabled = config_->enableTenantIsolation();
+  const std::string socket_node_id =
+      tenant_isolation_enabled
+          ? Extensions::Bootstrap::ReverseConnection::ReverseConnectionUtility::
+                buildTenantScopedIdentifier(tenant_id, node_id)
+          : std::string(node_id);
+  const std::string socket_cluster_id =
+      tenant_isolation_enabled
+          ? Extensions::Bootstrap::ReverseConnection::ReverseConnectionUtility::
+                buildTenantScopedIdentifier(tenant_id, cluster_id)
+          : std::string(cluster_id);
+
   if (socket_manager != nullptr) {
     ENVOY_CONN_LOG(trace, "reverse_tunnel: registering wrapped socket for reuse", connection);
-    socket_manager->addConnectionSocket(std::string(node_id), std::string(cluster_id),
-                                        std::move(wrapped_socket), ping_seconds);
+    socket_manager->setTenantIsolationEnabled(tenant_isolation_enabled);
+    socket_manager->addConnectionSocket(socket_node_id, socket_cluster_id, std::move(wrapped_socket),
+                                        ping_seconds);
     ENVOY_CONN_LOG(debug, "reverse_tunnel: successfully registered wrapped socket for reuse",
                    connection);
   }

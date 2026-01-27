@@ -160,7 +160,7 @@ public:
    * @param increment whether to increment (true) or decrement (false) the connection count.
    */
   void updateConnectionStats(const std::string& node_id, const std::string& cluster_id,
-                             bool increment);
+                             bool increment, bool tenant_isolation_enabled);
 
   /**
    * Get per-worker connection stats for debugging.
@@ -227,7 +227,7 @@ private:
    * @param increment whether to increment (true) or decrement (false) the connection count.
    */
   void updatePerWorkerConnectionStats(const std::string& node_id, const std::string& cluster_id,
-                                      bool increment);
+                                      bool increment, bool tenant_isolation_enabled);
 };
 
 } // namespace ReverseConnection

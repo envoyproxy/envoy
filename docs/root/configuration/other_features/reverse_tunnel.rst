@@ -208,6 +208,12 @@ The ``envoy.filters.network.reverse_tunnel`` network filter implements the rever
 protocol. It validates incoming connection requests and accepts or rejects them based on the handshake
 parameters.
 
+When ``enable_tenant_isolation`` is set to ``true`` on the filter configuration, Envoy scopes cached
+reverse tunnel sockets by tenant. The filter concatenates the tenant identifier with the node and cluster
+identifiers using the ``@`` delimiter (for example ``tenant-a@node-1``). Because the delimiter is part of
+the composite key, handshake requests that include ``@`` in any of the reverse tunnel headers are rejected
+with ``400`` to prevent ambiguous lookups. The flag defaults to ``false`` to preserve existing behaviour.
+
 .. literalinclude:: /_configs/reverse_connection/responder-envoy.yaml
     :language: yaml
     :lines: 17-28
