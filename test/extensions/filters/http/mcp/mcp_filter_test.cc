@@ -672,7 +672,7 @@ TEST_F(McpFilterTest, ParsingCompleteIgnoresExtraData) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(extra_buffer, true));
 }
 
-// Test that partial valid JSON returns StopIterationAndBuffer
+// Test that partial valid JSON returns StopIterationAndWatermark
 TEST_F(McpFilterTest, PartialValidJsonBuffers) {
   Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
                                          {"content-type", "application/json"},
@@ -687,7 +687,7 @@ TEST_F(McpFilterTest, PartialValidJsonBuffers) {
   Buffer::OwnedImpl buffer(json);
 
   // Should buffer and wait for more data
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(buffer, false));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(buffer, false));
 }
 
 // Test per-route max body size override with smaller limit
