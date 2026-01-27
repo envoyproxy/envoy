@@ -260,8 +260,7 @@ TEST_F(ReverseConnectionUtilityTest, BuildTenantScopedIdentifierWithTenant) {
 }
 
 TEST_F(ReverseConnectionUtilityTest, BuildTenantScopedIdentifierWithoutTenant) {
-  const std::string composite =
-      ReverseConnectionUtility::buildTenantScopedIdentifier("", "node-1");
+  const std::string composite = ReverseConnectionUtility::buildTenantScopedIdentifier("", "node-1");
   EXPECT_EQ(composite, "node-1");
 }
 
