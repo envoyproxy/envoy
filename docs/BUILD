@@ -222,7 +222,6 @@ pkg_filegroup(
 
 pkg_tar(
     name = "version_history_rst",
-    extension = "tar.gz",
     package_dir = "version_history",
     deps = [":version_histories"],
 )
