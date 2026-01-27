@@ -1,6 +1,6 @@
-#include "source/common/http/sse/sse_parser.h"
-
 #include <limits>
+
+#include "source/common/http/sse/sse_parser.h"
 
 #include "gtest/gtest.h"
 
