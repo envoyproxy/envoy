@@ -36,6 +36,7 @@ cc_library(
         "abi_version.h",
     ],
     visibility = ["//visibility:public"],
+    alwayslink = True,
 )
 
 cc_library(
@@ -43,4 +44,5 @@ cc_library(
     hdrs = ["abi.h"],
     visibility = ["//visibility:public"],
     deps = [":abi_version_lib"],
+    alwayslink = True,
 )

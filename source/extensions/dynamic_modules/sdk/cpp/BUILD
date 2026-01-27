@@ -5,6 +5,7 @@ licenses(["notice"])  # Apache 2
 # All necessary abstractions for creating plugins.
 cc_library(
     name = "sdk",
+    srcs = ["sdk.cc"],
     hdrs = ["sdk.h"],
     visibility = ["//visibility:public"],
     deps = [

@@ -42,14 +42,18 @@ envoy_cc_test(
     srcs = ["filter_test.cc"],
     data = [
         "//test/extensions/dynamic_modules/test_data/c:no_op",
-        "//test/extensions/dynamic_modules/test_data/cpp:http",
-        "//test/extensions/dynamic_modules/test_data/cpp:http_integration_test",
         "//test/extensions/dynamic_modules/test_data/go:http",
         "//test/extensions/dynamic_modules/test_data/go:http_integration_test",
         "//test/extensions/dynamic_modules/test_data/rust:http",
         "//test/extensions/dynamic_modules/test_data/rust:http_integration_test",
         "//test/extensions/dynamic_modules/test_data/rust:no_op",
-    ],
+    ] + select({
+        "//bazel:asan_build": [],
+        "//conditions:default": [
+            "//test/extensions/dynamic_modules/test_data/cpp:http",
+            "//test/extensions/dynamic_modules/test_data/cpp:http_integration_test",
+        ],
+    }),
     env = {
         "GODEBUG": "cgocheck=0",
     },
@@ -87,13 +91,17 @@ envoy_cc_test(
     name = "integration_test",
     srcs = ["integration_test.cc"],
     data = [
-        "//test/extensions/dynamic_modules/test_data/cpp:http",
-        "//test/extensions/dynamic_modules/test_data/cpp:http_integration_test",
         "//test/extensions/dynamic_modules/test_data/go:http",
         "//test/extensions/dynamic_modules/test_data/go:http_integration_test",
         "//test/extensions/dynamic_modules/test_data/rust:http",
         "//test/extensions/dynamic_modules/test_data/rust:http_integration_test",
-    ],
+    ] + select({
+        "//bazel:asan_build": [],
+        "//conditions:default": [
+            "//test/extensions/dynamic_modules/test_data/cpp:http",
+            "//test/extensions/dynamic_modules/test_data/cpp:http_integration_test",
+        ],
+    }),
     env = {
         "GODEBUG": "cgocheck=0",
     },

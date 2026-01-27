@@ -1,6 +1,8 @@
 package main
 
 import (
+	"runtime"
+
 	sdk "github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go"
 	_ "github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go/abi"
 	"github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go/shared"
@@ -635,6 +637,9 @@ func (p *HttpFilterSchedulerFilter) OnStreamComplete() {
 	for i, v := range p.eventIDs {
 		assertEq(int(v), i, "event id order")
 	}
+
+	// Force the GC to release the scheduler and related C resources.
+	runtime.GC()
 }
 
 // -----------------------------------------------------------------------------
@@ -691,6 +696,11 @@ func (p *FakeExternalCacheFilter) OnResponseHeaders(headers shared.HeaderMap, en
 		})
 	}()
 	return shared.HeadersStatusStop
+}
+
+func (p *FakeExternalCacheFilter) OnStreamComplete() {
+	// Force the GC to release the scheduler and related C resources.
+	runtime.GC()
 }
 
 // -----------------------------------------------------------------------------
@@ -890,6 +900,11 @@ func (p *StreamingTerminalFilter) OnBelowWriteBufferLowWatermark() {
 	if p.aboveW == p.belowW {
 		p.sendLargeResponseChunk()
 	}
+}
+
+func (p *StreamingTerminalFilter) OnStreamComplete() {
+	// Force the GC to release the scheduler and related C resources.
+	runtime.GC()
 }
 
 // -----------------------------------------------------------------------------

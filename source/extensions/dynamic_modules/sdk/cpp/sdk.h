@@ -2,7 +2,6 @@
 
 #include <cassert>
 #include <cstddef>
-#include <format>
 #include <memory>
 
 #include "absl/container/flat_hash_map.h"
@@ -94,7 +93,7 @@ private:
 /** BodyBuffer interface */
 class BodyBuffer {
 public:
-  virtual ~BodyBuffer() = default;
+  virtual ~BodyBuffer();
 
   /**
    * Returns all data chunks in the buffer.
@@ -124,7 +123,7 @@ public:
 /** HeaderMap interface */
 class HeaderMap {
 public:
-  virtual ~HeaderMap() = default;
+  virtual ~HeaderMap();
 
   /**
    * Returns all values for a given header key.
@@ -258,7 +257,7 @@ enum class HttpCalloutResult : uint32_t { Success, Reset, ExceedResponseBufferLi
 
 class HttpCalloutCallback {
 public:
-  virtual ~HttpCalloutCallback() = default;
+  virtual ~HttpCalloutCallback();
 
   /**
    * Invokes the callback with the HTTP callout result, headers, and body chunks.
@@ -283,7 +282,7 @@ enum class HttpStreamResetReason : uint32_t {
 
 class HttpStreamCallback {
 public:
-  virtual ~HttpStreamCallback() = default;
+  virtual ~HttpStreamCallback();
 
   /**
    * Called when response headers are received.
@@ -326,12 +325,12 @@ public:
 
 class RouteSpecificConfig {
 public:
-  virtual ~RouteSpecificConfig() = default;
+  virtual ~RouteSpecificConfig();
 };
 
 class Scheduler {
 public:
-  virtual ~Scheduler() = default;
+  virtual ~Scheduler();
 
   /**
    * Schedules a function for deferred execution.
@@ -342,7 +341,7 @@ public:
 
 class DownstreamWatermarkCallbacks {
 public:
-  virtual ~DownstreamWatermarkCallbacks() = default;
+  virtual ~DownstreamWatermarkCallbacks();
 
   /**
    * Called when the downstream write buffer exceeds the high watermark.
@@ -360,7 +359,7 @@ enum class MetricsResult : uint32_t { Success, NotFound, InvalidTags, Frozen };
 
 class HttpFilterHandle {
 public:
-  virtual ~HttpFilterHandle() = default;
+  virtual ~HttpFilterHandle();
 
   /**
    * Retrieves a string metadata value by namespace and key.
@@ -655,7 +654,7 @@ public:
 
 class HttpFilterConfigHandle {
 public:
-  virtual ~HttpFilterConfigHandle() = default;
+  virtual ~HttpFilterConfigHandle();
 
   /**
    * Defines a histogram metric with a name and optional tag keys.
@@ -723,7 +722,7 @@ enum class TrailersStatus : uint32_t {
 
 class HttpFilter {
 public:
-  virtual ~HttpFilter() = default;
+  virtual ~HttpFilter();
 
   /**
    * Processes request headers. Returns status indicating how to proceed.
@@ -779,7 +778,7 @@ public:
 
 class HttpFilterFactory {
 public:
-  virtual ~HttpFilterFactory() = default;
+  virtual ~HttpFilterFactory();
 
   /**
    * Creates a StreamPlugin instance for a given stream handle.
@@ -791,7 +790,7 @@ public:
 
 class HttpFilterConfigFactory {
 public:
-  virtual ~HttpFilterConfigFactory() = default;
+  virtual ~HttpFilterConfigFactory();
 
   /**
    * Creates a HttpFilterFactory from configuration data.
@@ -817,29 +816,18 @@ public:
 using HttpFilterConfigFactoryPtr = std::unique_ptr<HttpFilterConfigFactory>;
 
 class HttpFilterConfigFactoryRegistry {
-private:
-  static auto& getMutableRegistry() {
-    static auto registry = new absl::flat_hash_map<std::string, HttpFilterConfigFactoryPtr>();
-    return *registry;
-  }
-  friend class HttpFilterConfigFactoryRegister;
-
 public:
-  static const auto& getRegistry() { return getMutableRegistry(); };
+  static const absl::flat_hash_map<std::string, HttpFilterConfigFactoryPtr>& getRegistry();
+
+private:
+  static absl::flat_hash_map<std::string, HttpFilterConfigFactoryPtr>& getMutableRegistry();
+  friend class HttpFilterConfigFactoryRegister;
 };
 
 class HttpFilterConfigFactoryRegister {
 public:
-  HttpFilterConfigFactoryRegister(absl::string_view name, HttpFilterConfigFactoryPtr factory)
-      : name_(name) {
-    auto r =
-        HttpFilterConfigFactoryRegistry::getMutableRegistry().emplace(name_, std::move(factory));
-    assert(
-        (void(std::format("Factory with the same name {} already registered", name_)), r.second));
-  }
-  ~HttpFilterConfigFactoryRegister() {
-    HttpFilterConfigFactoryRegistry::getMutableRegistry().erase(name_);
-  }
+  HttpFilterConfigFactoryRegister(absl::string_view name, HttpFilterConfigFactoryPtr factory);
+  ~HttpFilterConfigFactoryRegister();
 
 private:
   const std::string name_;
@@ -849,7 +837,8 @@ private:
 #define REGISTER_HTTP_FILTER_CONFIG_FACTORY(FACTORY_CLASS, NAME)                                   \
   static Envoy::DynamicModules::HttpFilterConfigFactoryRegister                                    \
       HttpFilterConfigFactoryRegister_##FACTORY_CLASS##_register_NAME(                             \
-          NAME, std::make_unique<FACTORY_CLASS>());
+          NAME,                                                                                    \
+          std::unique_ptr<Envoy::DynamicModules::HttpFilterConfigFactory>(new FACTORY_CLASS()));
 
 // Macro to log messages
 #define DYM_LOG(HANDLE, LEVEL, FORMAT_STRING, ...)                                                 \

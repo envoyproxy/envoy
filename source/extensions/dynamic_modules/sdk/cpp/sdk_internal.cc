@@ -574,7 +574,11 @@ DummyLoggerHandle& dummyLoggerHandle() {
 }
 
 template <class T> T* unwrapPointer(const void* ptr) {
-  return const_cast<T*>(static_cast<const T*>(ptr));
+  return const_cast<T*>(reinterpret_cast<const T*>(ptr));
+}
+
+template <class T> void* wrapPointer(const T* ptr) {
+  return reinterpret_cast<void*>(const_cast<T*>(ptr));
 }
 
 struct HttpFilterFactoryWrapper {
@@ -615,7 +619,7 @@ envoy_dynamic_module_on_http_filter_config_new(
   factory->config_handle_ = std::move(config_handle);
   factory->factory_ = std::move(plugin_factory);
 
-  return factory.release();
+  return wrapPointer(factory.release());
 }
 
 void envoy_dynamic_module_on_http_filter_config_destroy(
@@ -644,7 +648,7 @@ envoy_dynamic_module_on_http_filter_per_route_config_new(
     return nullptr;
   }
 
-  return parsed_config.release();
+  return wrapPointer(parsed_config.release());
 }
 
 void envoy_dynamic_module_on_http_filter_per_route_config_destroy(
@@ -669,7 +673,7 @@ envoy_dynamic_module_type_http_filter_module_ptr envoy_dynamic_module_on_http_fi
   }
   plugin_handle->plugin_ = std::move(plugin);
 
-  return plugin_handle.release();
+  return wrapPointer(plugin_handle.release());
 }
 
 void envoy_dynamic_module_on_http_filter_destroy(
@@ -764,8 +768,7 @@ envoy_dynamic_module_on_http_filter_response_trailers(
 void envoy_dynamic_module_on_http_filter_stream_complete(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr) {
-  auto* plugin_handle = const_cast<HttpFilterHandleImpl*>(
-      static_cast<const HttpFilterHandleImpl*>(filter_module_ptr));
+  auto* plugin_handle = unwrapPointer<HttpFilterHandleImpl>(filter_module_ptr);
   if (plugin_handle == nullptr) {
     return;
   }
@@ -799,10 +802,11 @@ void envoy_dynamic_module_on_http_filter_http_callout_done(
 
   auto it = plugin_handle->callout_callbacks_.find(callout_id);
   if (it != plugin_handle->callout_callbacks_.end()) {
-    it->second->onHttpCalloutDone(static_cast<HttpCalloutResult>(result),
-                                  {typed_headers, headers_size},
-                                  {typed_body_chunks, body_chunks_size});
+    auto callback = it->second;
     plugin_handle->callout_callbacks_.erase(it);
+    callback->onHttpCalloutDone(static_cast<HttpCalloutResult>(result),
+                                {typed_headers, headers_size},
+                                {typed_body_chunks, body_chunks_size});
   }
 }
 

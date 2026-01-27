@@ -24,4 +24,8 @@ def test_program(name):
         visibility = ["//visibility:public"],
         shared_lib_name = "lib{}.so".format(name),
         deps = [_name],
+        user_link_flags = select({
+            "//bazel:darwin_any": ["-Wl,-undefined,dynamic_lookup"],
+            "//conditions:default": [],
+        }),
     )

@@ -127,8 +127,16 @@ filter_config:
   }
 };
 
+#ifndef __SANITIZE_ADDRESS__
+// TODO(wbpcode): address sanitizer cannot handle the cross shared libraries vptr casts.
+// and we need to figure out a way to fix it.
+auto DynamicModulesIntegrationTestValues = testing::Values("rust", "go", "cpp");
+#else
+auto DynamicModulesIntegrationTestValues = testing::Values("rust", "go");
+#endif
+
 INSTANTIATE_TEST_SUITE_P(
-    IpVersions, DynamicModulesIntegrationTest, testing::Values("rust", "cpp", "go"),
+    IpVersions, DynamicModulesIntegrationTest, DynamicModulesIntegrationTestValues,
     Extensions::DynamicModules::DynamicModuleTestLanguages::languageParamToTestName);
 
 TEST_P(DynamicModulesIntegrationTest, PassThrough) {
