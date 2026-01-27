@@ -1,5 +1,7 @@
 #include "source/extensions/filters/http/mcp_router/filter_config.h"
 
+#include "source/extensions/filters/common/mcp/filter_state.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -48,7 +50,8 @@ parseSessionIdentity(const envoy::extensions::filters::http::mcp_router::v3::Mcp
 McpRouterConfig::McpRouterConfig(
     const envoy::extensions::filters::http::mcp_router::v3::McpRouter& proto_config,
     Server::Configuration::FactoryContext& context)
-    : factory_context_(context), session_identity_(parseSessionIdentity(proto_config)) {
+    : factory_context_(context), session_identity_(parseSessionIdentity(proto_config)),
+      metadata_namespace_(Filters::Common::Mcp::metadataNamespace()) {
   for (const auto& server : proto_config.servers()) {
     McpBackendConfig backend;
     const auto& mcp_cluster = server.mcp_cluster();

@@ -536,6 +536,40 @@ actions:
   rate_limit_entry_->populateDescriptors(descriptors_, "", header_, stream_info_);
   EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"generic_key", "fake_key"}}}}),
               testing::ContainerEq(descriptors_));
+  EXPECT_EQ(descriptors_[0].x_ratelimit_option_, envoy::config::route::v3::RateLimit::UNSPECIFIED);
+}
+
+TEST_F(RateLimitPolicyEntryTest, RateLimitKeyWithXRateLimitOptionOff) {
+  const std::string yaml = R"EOF(
+actions:
+- generic_key:
+    descriptor_value: fake_key
+x_ratelimit_option: "OFF"
+  )EOF";
+
+  setupTest(yaml);
+
+  rate_limit_entry_->populateDescriptors(descriptors_, "", header_, stream_info_);
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"generic_key", "fake_key"}}}}),
+              testing::ContainerEq(descriptors_));
+  EXPECT_EQ(descriptors_[0].x_ratelimit_option_, envoy::config::route::v3::RateLimit::OFF);
+}
+
+TEST_F(RateLimitPolicyEntryTest, RateLimitKeyWithXRateLimitOption) {
+  const std::string yaml = R"EOF(
+actions:
+- generic_key:
+    descriptor_value: fake_key
+x_ratelimit_option: DRAFT_VERSION_03
+  )EOF";
+
+  setupTest(yaml);
+
+  rate_limit_entry_->populateDescriptors(descriptors_, "", header_, stream_info_);
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"generic_key", "fake_key"}}}}),
+              testing::ContainerEq(descriptors_));
+  EXPECT_EQ(descriptors_[0].x_ratelimit_option_,
+            envoy::config::route::v3::RateLimit::DRAFT_VERSION_03);
 }
 
 TEST_F(RateLimitPolicyEntryTest, GenericKeyWithSetDescriptorKey) {

@@ -191,7 +191,7 @@ TEST_F(McpFilterTest, DynamicMetadataSet) {
       R"({"jsonrpc": "2.0", "method": "tools/call", "params": {"name": "test"}, "id": 1})";
   Buffer::OwnedImpl buffer(json);
 
-  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("mcp_proxy", _))
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _))
       .WillOnce([&](const std::string&, const Protobuf::Struct& metadata) {
         const auto& fields = metadata.fields();
 
@@ -334,7 +334,7 @@ TEST_F(McpFilterTest, RequestBodyUnderLimitSucceeds) {
   std::string json = R"({"jsonrpc": "2.0", "method": "test", "params": {"key": "value"}, "id": 1})";
   Buffer::OwnedImpl buffer(json);
 
-  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("mcp_proxy", _));
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _));
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
 }
@@ -359,7 +359,7 @@ TEST_F(McpFilterTest, RequestBodyExceedingLimitContinues) {
   std::string json =
       R"({"jsonrpc": "2.0", "method": "test", "id": 1, "params": {"key": "value", "longkey": "this is a very long string to exceed the limit"}})";
   Buffer::OwnedImpl buffer(json);
-  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("mcp_proxy", _));
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
 }
 
@@ -413,7 +413,7 @@ TEST_F(McpFilterTest, RequestBodyWithDisabledLimitAllowsLargeBodies) {
   std::string json = R"({"jsonrpc": "2.0", "method": "test", "params": {"data": ")" + large_data +
                      R"("}, "id": 1})";
   Buffer::OwnedImpl buffer(json);
-  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("mcp_proxy", _));
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _));
 
   // Should succeed even with large body
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
@@ -530,7 +530,7 @@ TEST_F(McpFilterTest, RouteCacheNotClearedByDefault) {
   Buffer::OwnedImpl buffer(json);
 
   // Expect dynamic metadata to be set
-  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("mcp_proxy", _));
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _));
 
   // Expect route cache NOT to be cleared (default behavior)
   EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache()).Times(0);
@@ -553,7 +553,7 @@ TEST_F(McpFilterTest, RouteCacheNotClearedWhenDisabled) {
   Buffer::OwnedImpl buffer(json);
 
   // Expect dynamic metadata to be set
-  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("mcp_proxy", _));
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _));
 
   // Expect route cache NOT to be cleared
   EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache()).Times(0);
@@ -576,7 +576,7 @@ TEST_F(McpFilterTest, RouteCacheClearedWhenExplicitlyEnabled) {
   Buffer::OwnedImpl buffer(json);
 
   // Expect dynamic metadata to be set
-  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("mcp_proxy", _));
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _));
 
   // Expect route cache to be cleared
   EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
@@ -631,7 +631,7 @@ TEST_F(McpFilterTest, FilterWithCustomParserConfig) {
   Buffer::OwnedImpl buffer(json);
 
   // Expect dynamic metadata to be set with the custom field
-  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("mcp_proxy", _))
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _))
       .WillOnce([&](const std::string&, const Protobuf::Struct& metadata) {
         const auto& fields = metadata.fields();
         auto it = fields.find("params");
@@ -790,7 +790,7 @@ TEST_F(McpFilterTest, MethodGroupAddedToMetadata) {
       R"({"jsonrpc": "2.0", "method": "tools/call", "params": {"name": "test"}, "id": 1})";
   Buffer::OwnedImpl buffer(json);
 
-  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("mcp_proxy", _))
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _))
       .WillOnce([&](const std::string&, const Protobuf::Struct& metadata) {
         const auto& fields = metadata.fields();
 
@@ -832,7 +832,7 @@ TEST_F(McpFilterTest, MethodGroupWithCustomOverride) {
   std::string json = R"({"jsonrpc": "2.0", "method": "tools/list", "id": 1})";
   Buffer::OwnedImpl buffer(json);
 
-  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("mcp_proxy", _))
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _))
       .WillOnce([&](const std::string&, const Protobuf::Struct& metadata) {
         const auto& fields = metadata.fields();
         auto group_it = fields.find("group");
@@ -970,7 +970,7 @@ TEST_F(McpFilterTest, DefaultStorageModeDynamicMetadataOnly) {
   Buffer::OwnedImpl buffer(json);
 
   // Dynamic metadata should be set by default
-  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("mcp_proxy", _));
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _));
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
 
@@ -1002,7 +1002,7 @@ TEST_F(McpFilterTest, BothStorageModeSetsBothTargets) {
   Buffer::OwnedImpl buffer(json);
 
   // Both should be set
-  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("mcp_proxy", _));
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _));
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
 
