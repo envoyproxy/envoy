@@ -1,0 +1,46 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.network.tcp_bandwidth_limit.v3;
+
+import "envoy/config/core/v3/base.proto";
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/wrappers.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.network.tcp_bandwidth_limit.v3";
+option java_outer_classname = "TcpBandwidthLimitProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/tcp_bandwidth_limit/v3;tcp_bandwidth_limitv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: TCP Bandwidth Limit]
+// TCP Bandwidth Limit :ref:`configuration overview <config_network_filters_tcp_bandwidth_limit>`.
+// [#extension: envoy.filters.network.tcp_bandwidth_limit]
+
+// [#next-free-field: 6]
+message TcpBandwidthLimit {
+  // The human readable prefix to use when emitting stats.
+  string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
+
+  // The limit for download bandwidth in KiB/s.
+  // If not set, no limit is applied (unlimited bandwidth).
+  google.protobuf.UInt64Value download_limit_kbps = 2;
+
+  // The limit for upload bandwidth in KiB/s.
+  // If not set, no limit is applied (unlimited bandwidth).
+  google.protobuf.UInt64Value upload_limit_kbps = 3;
+
+  // Optional Fill interval in milliseconds for the token refills. Defaults to 50ms.
+  // It must be at least 20ms to avoid too aggressive refills.
+  google.protobuf.Duration fill_interval = 4 [(validate.rules).duration = {
+    lte {seconds: 1}
+    gte {nanos: 20000000}
+  }];
+
+  // Runtime flag that controls whether the filter is enabled or not. If not specified, defaults
+  // to enabled.
+  config.core.v3.RuntimeFeatureFlag runtime_enabled = 5;
+}
