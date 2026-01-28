@@ -257,10 +257,10 @@ DefaultCertValidator::verifyCertificate(X509* cert, const std::vector<std::strin
   Envoy::Ssl::ClientValidationStatus validated = Envoy::Ssl::ClientValidationStatus::NotValidated;
   if (!verify_san_list.empty()) {
     if (!verifySubjectAltName(cert, verify_san_list)) {
-      const std::string error_msg =
-          fmt::format("verify cert failed: verify SAN list, expected SANs: [{}], certificate SANs: [{}]",
-                      fmt::join(verify_san_list, ", "),
-                      fmt::join(Utility::getCertificateSansForLogging(cert), ", "));
+      const std::string error_msg = fmt::format(
+          "verify cert failed: verify SAN list, expected SANs: [{}], certificate SANs: [{}]",
+          fmt::join(verify_san_list, ", "),
+          fmt::join(Utility::getCertificateSansForLogging(cert), ", "));
 
       if (error_details != nullptr) {
         *error_details = error_msg;
