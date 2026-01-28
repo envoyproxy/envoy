@@ -33,3 +33,14 @@ envoy_cc_test(
         "@envoy_api//envoy/extensions/http/header_validators/envoy_default/v3:pkg_cc_proto",
     ],
 )
+
+envoy_cc_test(
+    name = "ep_specific_config_test",
+    srcs = ["ep_specific_config_test.cc"],
+    deps = [
+        "//source/extensions/upstreams/http:ep_specific_config",
+        "//test/mocks/server:instance_mocks",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/upstreams/http/v3:pkg_cc_proto",
+    ],
+)

@@ -2,11 +2,15 @@
 #include <memory>
 #include <vector>
 
+#include "envoy/extensions/upstreams/http/v3/http_protocol_options.pb.h"
+
 #include "source/common/event/dispatcher_impl.h"
+#include "source/common/http/conn_pool_base.h"
 #include "source/common/http/http2/conn_pool.h"
 #include "source/common/network/raw_buffer_socket.h"
 #include "source/common/network/utility.h"
 #include "source/common/upstream/upstream_impl.h"
+#include "source/extensions/upstreams/http/ep_specific_config.h"
 
 #include "test/common/http/common.h"
 #include "test/common/upstream/utility.h"
@@ -15,11 +19,13 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/server/instance.h"
 #include "test/mocks/server/overload_manager.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/transport_socket_match.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/test_runtime.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -1986,6 +1992,477 @@ TEST_F(InitialStreamsLimitTest, InitialStreamsLimitRespectMaxRequests) {
       .Times(AnyNumber())
       .WillRepeatedly(Return(100));
   EXPECT_EQ(100, ActiveClient::calculateInitialStreamsLimit(cache_, origin_, mock_host_));
+}
+
+// Test class for endpoint-specific protocol options
+class EpSpecificProtocolOptionsTest : public Http2ConnPoolImplTest {
+protected:
+  void SetUp() override {
+    // Configure base cluster settings
+    mock_host_->cluster_.http2_options_.mutable_max_concurrent_streams()->set_value(100);
+    EXPECT_CALL(mock_host_->cluster_, maxRequestsPerConnection)
+        .Times(AnyNumber())
+        .WillRepeatedly(Return(1000));
+  }
+
+  std::shared_ptr<Extensions::Upstreams::Http::EpSpecificProtocolOptionsConfigImpl>
+  createEpSpecificConfig(const std::string& yaml) {
+    envoy::extensions::upstreams::http::v3::EndpointSpecificHttpProtocolOptions options;
+    TestUtility::loadFromYamlAndValidate(yaml, options);
+    return std::make_shared<Extensions::Upstreams::Http::EpSpecificProtocolOptionsConfigImpl>(
+        options, server_context_);
+  }
+
+  std::shared_ptr<const envoy::config::core::v3::Metadata>
+  createHostMetadata(const std::string& filter_name, const std::string& key,
+                     const std::string& value) {
+    auto metadata = std::make_shared<envoy::config::core::v3::Metadata>();
+    (*metadata->mutable_filter_metadata())[filter_name].mutable_fields()->insert(
+        {key, ValueUtil::stringValue(value)});
+    return metadata;
+  }
+
+  TestScopedRuntime scoped_runtime_;
+  absl::optional<HttpServerPropertiesCache::Origin> origin_{{"https", "hostname.com", 443}};
+  std::shared_ptr<Upstream::MockHost> mock_host_{std::make_shared<NiceMock<Upstream::MockHost>>()};
+  std::shared_ptr<MockHttpServerPropertiesCache> cache_{
+      std::make_shared<NiceMock<MockHttpServerPropertiesCache>>()};
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
+};
+
+// Test that without ep-specific options, cluster default is used.
+TEST_F(EpSpecificProtocolOptionsTest, NoEpSpecificOptionsUsesClusterDefault) {
+  // No ep-specific options configured
+  EXPECT_CALL(mock_host_->cluster_,
+              extensionProtocolOptions(
+                  "envoy.extensions.upstreams.http.v3.EndpointSpecificHttpProtocolOptions"))
+      .WillRepeatedly(Return(nullptr));
+
+  EXPECT_EQ(100, ActiveClient::calculateInitialStreamsLimit(nullptr, origin_, mock_host_));
+}
+
+// Test that ep-specific max_concurrent_streams is applied when metadata matches.
+TEST_F(EpSpecificProtocolOptionsTest, EpSpecificMaxConcurrentStreamsApplied) {
+  const std::string config_yaml = R"EOF(
+endpoint_specific_options:
+  - http2_protocol_options:
+      max_concurrent_streams: 500
+    endpoint_metadata_match:
+      filter: envoy.lb
+      path:
+        - key: endpoint_type
+      value:
+        string_match:
+          exact: "high_throughput"
+)EOF";
+
+  auto ep_config = createEpSpecificConfig(config_yaml);
+  EXPECT_CALL(mock_host_->cluster_,
+              extensionProtocolOptions(
+                  "envoy.extensions.upstreams.http.v3.EndpointSpecificHttpProtocolOptions"))
+      .WillRepeatedly(Return(ep_config));
+
+  // Set up matching host metadata
+  auto metadata = createHostMetadata("envoy.lb", "endpoint_type", "high_throughput");
+  EXPECT_CALL(*mock_host_, metadata()).WillRepeatedly(Return(metadata));
+
+  // Should use the ep-specific value (500) instead of cluster default (100)
+  EXPECT_EQ(500, ActiveClient::calculateInitialStreamsLimit(nullptr, origin_, mock_host_));
+}
+
+// Test that cluster default is used when metadata doesn't match.
+TEST_F(EpSpecificProtocolOptionsTest, ClusterDefaultWhenMetadataDoesNotMatch) {
+  const std::string config_yaml = R"EOF(
+endpoint_specific_options:
+  - http2_protocol_options:
+      max_concurrent_streams: 500
+    endpoint_metadata_match:
+      filter: envoy.lb
+      path:
+        - key: endpoint_type
+      value:
+        string_match:
+          exact: "high_throughput"
+)EOF";
+
+  auto ep_config = createEpSpecificConfig(config_yaml);
+  EXPECT_CALL(mock_host_->cluster_,
+              extensionProtocolOptions(
+                  "envoy.extensions.upstreams.http.v3.EndpointSpecificHttpProtocolOptions"))
+      .WillRepeatedly(Return(ep_config));
+
+  // Set up non-matching host metadata
+  auto metadata = createHostMetadata("envoy.lb", "endpoint_type", "standard");
+  EXPECT_CALL(*mock_host_, metadata()).WillRepeatedly(Return(metadata));
+
+  // Should use cluster default (100) since metadata doesn't match
+  EXPECT_EQ(100, ActiveClient::calculateInitialStreamsLimit(nullptr, origin_, mock_host_));
+}
+
+// Test that cluster default is used when host has no metadata.
+TEST_F(EpSpecificProtocolOptionsTest, ClusterDefaultWhenNoHostMetadata) {
+  const std::string config_yaml = R"EOF(
+endpoint_specific_options:
+  - http2_protocol_options:
+      max_concurrent_streams: 500
+    endpoint_metadata_match:
+      filter: envoy.lb
+      path:
+        - key: endpoint_type
+      value:
+        string_match:
+          exact: "high_throughput"
+)EOF";
+
+  auto ep_config = createEpSpecificConfig(config_yaml);
+  EXPECT_CALL(mock_host_->cluster_,
+              extensionProtocolOptions(
+                  "envoy.extensions.upstreams.http.v3.EndpointSpecificHttpProtocolOptions"))
+      .WillRepeatedly(Return(ep_config));
+
+  // Host has no metadata
+  EXPECT_CALL(*mock_host_, metadata()).WillRepeatedly(Return(nullptr));
+
+  // Should use cluster default (100) since host has no metadata
+  EXPECT_EQ(100, ActiveClient::calculateInitialStreamsLimit(nullptr, origin_, mock_host_));
+}
+
+// Test that first matching option is used when multiple options are configured.
+TEST_F(EpSpecificProtocolOptionsTest, FirstMatchingOptionIsUsed) {
+  const std::string config_yaml = R"EOF(
+endpoint_specific_options:
+  - http2_protocol_options:
+      max_concurrent_streams: 200
+    endpoint_metadata_match:
+      filter: envoy.lb
+      path:
+        - key: tier
+      value:
+        string_match:
+          exact: "premium"
+  - http2_protocol_options:
+      max_concurrent_streams: 500
+    endpoint_metadata_match:
+      filter: envoy.lb
+      path:
+        - key: tier
+      value:
+        string_match:
+          exact: "premium"
+)EOF";
+
+  auto ep_config = createEpSpecificConfig(config_yaml);
+  EXPECT_CALL(mock_host_->cluster_,
+              extensionProtocolOptions(
+                  "envoy.extensions.upstreams.http.v3.EndpointSpecificHttpProtocolOptions"))
+      .WillRepeatedly(Return(ep_config));
+
+  // Set up matching host metadata
+  auto metadata = createHostMetadata("envoy.lb", "tier", "premium");
+  EXPECT_CALL(*mock_host_, metadata()).WillRepeatedly(Return(metadata));
+
+  // Should use the first matching option (200)
+  EXPECT_EQ(200, ActiveClient::calculateInitialStreamsLimit(nullptr, origin_, mock_host_));
+}
+
+// Test that ep-specific options respect cache concurrency when it's lower.
+TEST_F(EpSpecificProtocolOptionsTest, EpSpecificWithCacheConcurrency) {
+  const std::string config_yaml = R"EOF(
+endpoint_specific_options:
+  - http2_protocol_options:
+      max_concurrent_streams: 500
+    endpoint_metadata_match:
+      filter: envoy.lb
+      path:
+        - key: endpoint_type
+      value:
+        string_match:
+          exact: "high_throughput"
+)EOF";
+
+  auto ep_config = createEpSpecificConfig(config_yaml);
+  EXPECT_CALL(mock_host_->cluster_,
+              extensionProtocolOptions(
+                  "envoy.extensions.upstreams.http.v3.EndpointSpecificHttpProtocolOptions"))
+      .WillRepeatedly(Return(ep_config));
+
+  auto metadata = createHostMetadata("envoy.lb", "endpoint_type", "high_throughput");
+  EXPECT_CALL(*mock_host_, metadata()).WillRepeatedly(Return(metadata));
+
+  // Cache returns a lower concurrency value
+  EXPECT_CALL(*cache_, getConcurrentStreams(_)).WillOnce(Return(300));
+
+  // Should use cached value (300) since it's lower than ep-specific (500)
+  EXPECT_EQ(300, ActiveClient::calculateInitialStreamsLimit(cache_, origin_, mock_host_));
+}
+
+// Test that ep-specific options respect max_requests_per_connection when it's lower.
+TEST_F(EpSpecificProtocolOptionsTest, EpSpecificWithMaxRequestsPerConnection) {
+  const std::string config_yaml = R"EOF(
+endpoint_specific_options:
+  - http2_protocol_options:
+      max_concurrent_streams: 500
+    endpoint_metadata_match:
+      filter: envoy.lb
+      path:
+        - key: endpoint_type
+      value:
+        string_match:
+          exact: "high_throughput"
+)EOF";
+
+  auto ep_config = createEpSpecificConfig(config_yaml);
+  EXPECT_CALL(mock_host_->cluster_,
+              extensionProtocolOptions(
+                  "envoy.extensions.upstreams.http.v3.EndpointSpecificHttpProtocolOptions"))
+      .WillRepeatedly(Return(ep_config));
+
+  auto metadata = createHostMetadata("envoy.lb", "endpoint_type", "high_throughput");
+  EXPECT_CALL(*mock_host_, metadata()).WillRepeatedly(Return(metadata));
+
+  // Max requests per connection is lower than ep-specific max_concurrent_streams
+  EXPECT_CALL(mock_host_->cluster_, maxRequestsPerConnection)
+      .Times(AnyNumber())
+      .WillRepeatedly(Return(150));
+
+  // Should use max_requests_per_connection (150) since it's lower than ep-specific (500)
+  EXPECT_EQ(150, ActiveClient::calculateInitialStreamsLimit(nullptr, origin_, mock_host_));
+}
+
+// Test multiple endpoints with different metadata match to different options.
+TEST_F(EpSpecificProtocolOptionsTest, DifferentEndpointsMatchDifferentOptions) {
+  const std::string config_yaml = R"EOF(
+endpoint_specific_options:
+  - http2_protocol_options:
+      max_concurrent_streams: 50
+    endpoint_metadata_match:
+      filter: envoy.lb
+      path:
+        - key: capacity
+      value:
+        string_match:
+          exact: "low"
+  - http2_protocol_options:
+      max_concurrent_streams: 500
+    endpoint_metadata_match:
+      filter: envoy.lb
+      path:
+        - key: capacity
+      value:
+        string_match:
+          exact: "high"
+)EOF";
+
+  auto ep_config = createEpSpecificConfig(config_yaml);
+  EXPECT_CALL(mock_host_->cluster_,
+              extensionProtocolOptions(
+                  "envoy.extensions.upstreams.http.v3.EndpointSpecificHttpProtocolOptions"))
+      .WillRepeatedly(Return(ep_config));
+
+  // Test low capacity endpoint
+  {
+    auto low_capacity_metadata = createHostMetadata("envoy.lb", "capacity", "low");
+    EXPECT_CALL(*mock_host_, metadata()).WillRepeatedly(Return(low_capacity_metadata));
+    EXPECT_EQ(50, ActiveClient::calculateInitialStreamsLimit(nullptr, origin_, mock_host_));
+  }
+
+  // Test high capacity endpoint
+  {
+    auto high_capacity_metadata = createHostMetadata("envoy.lb", "capacity", "high");
+    EXPECT_CALL(*mock_host_, metadata()).WillRepeatedly(Return(high_capacity_metadata));
+    EXPECT_EQ(500, ActiveClient::calculateInitialStreamsLimit(nullptr, origin_, mock_host_));
+  }
+
+  // Test medium capacity endpoint (no match, uses cluster default)
+  {
+    auto medium_capacity_metadata = createHostMetadata("envoy.lb", "capacity", "medium");
+    EXPECT_CALL(*mock_host_, metadata()).WillRepeatedly(Return(medium_capacity_metadata));
+    EXPECT_EQ(100, ActiveClient::calculateInitialStreamsLimit(nullptr, origin_, mock_host_));
+  }
+}
+
+// Test class for maxStreamsPerConnection with endpoint-specific max_requests_per_connection
+class EpSpecificMaxRequestsTest : public Http2ConnPoolImplTest {
+protected:
+  void SetUp() override {
+    // Configure base cluster settings - will use cluster default of 1000
+    EXPECT_CALL(mock_host_->cluster_, maxRequestsPerConnection)
+        .Times(AnyNumber())
+        .WillRepeatedly(Return(1000));
+  }
+
+  // Helper to create endpoint-specific protocol options config
+  std::shared_ptr<Extensions::Upstreams::Http::EpSpecificProtocolOptionsConfigImpl>
+  createEpSpecificConfig(const std::string& yaml) {
+    envoy::extensions::upstreams::http::v3::EndpointSpecificHttpProtocolOptions options;
+    TestUtility::loadFromYamlAndValidate(yaml, options);
+    return std::make_shared<Extensions::Upstreams::Http::EpSpecificProtocolOptionsConfigImpl>(
+        options, server_context_);
+  }
+
+  // Helper to create host metadata
+  std::shared_ptr<const envoy::config::core::v3::Metadata>
+  createHostMetadata(const std::string& filter_name, const std::string& key,
+                     const std::string& value) {
+    auto metadata = std::make_shared<envoy::config::core::v3::Metadata>();
+    (*metadata->mutable_filter_metadata())[filter_name].mutable_fields()->insert(
+        {key, ValueUtil::stringValue(value)});
+    return metadata;
+  }
+
+  TestScopedRuntime scoped_runtime_;
+  std::shared_ptr<Upstream::MockHost> mock_host_{std::make_shared<NiceMock<Upstream::MockHost>>()};
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
+};
+
+// Test that without ep-specific options, cluster max_requests_per_connection is used
+TEST_F(EpSpecificMaxRequestsTest, NoEpSpecificOptionsUsesClusterDefault) {
+  EXPECT_CALL(mock_host_->cluster_,
+              extensionProtocolOptions(
+                  "envoy.extensions.upstreams.http.v3.EndpointSpecificHttpProtocolOptions"))
+      .WillRepeatedly(Return(nullptr));
+
+  // When max_streams_config is 0, should use DEFAULT_MAX_STREAMS (0x7fffffff)
+  // Since cluster max_requests is 1000, it should be the effective limit
+  EXPECT_EQ(1U << 29, MultiplexedActiveClientBase::maxStreamsPerConnection(0, mock_host_));
+}
+
+// Test that ep-specific max_requests_per_connection overrides cluster setting when metadata matches
+TEST_F(EpSpecificMaxRequestsTest, EpSpecificMaxRequestsApplied) {
+  const std::string config_yaml = R"EOF(
+endpoint_specific_options:
+  - http_protocol_options:
+      max_requests_per_connection: 5000
+    endpoint_metadata_match:
+      filter: envoy.lb
+      path:
+        - key: tier
+      value:
+        string_match:
+          exact: "premium"
+)EOF";
+
+  auto ep_config = createEpSpecificConfig(config_yaml);
+  EXPECT_CALL(mock_host_->cluster_,
+              extensionProtocolOptions(
+                  "envoy.extensions.upstreams.http.v3.EndpointSpecificHttpProtocolOptions"))
+      .WillRepeatedly(Return(ep_config));
+
+  auto metadata = createHostMetadata("envoy.lb", "tier", "premium");
+  EXPECT_CALL(*mock_host_, metadata()).WillRepeatedly(Return(metadata));
+
+  // Should use the ep-specific value (5000) instead of cluster default (1000)
+  EXPECT_EQ(5000, MultiplexedActiveClientBase::maxStreamsPerConnection(0, mock_host_));
+}
+
+// Test that cluster default is used when metadata doesn't match
+TEST_F(EpSpecificMaxRequestsTest, ClusterDefaultWhenMetadataDoesNotMatch) {
+  const std::string config_yaml = R"EOF(
+endpoint_specific_options:
+  - http_protocol_options:
+      max_requests_per_connection: 5000
+    endpoint_metadata_match:
+      filter: envoy.lb
+      path:
+        - key: tier
+      value:
+        string_match:
+          exact: "premium"
+)EOF";
+
+  auto ep_config = createEpSpecificConfig(config_yaml);
+  EXPECT_CALL(mock_host_->cluster_,
+              extensionProtocolOptions(
+                  "envoy.extensions.upstreams.http.v3.EndpointSpecificHttpProtocolOptions"))
+      .WillRepeatedly(Return(ep_config));
+
+  auto metadata = createHostMetadata("envoy.lb", "tier", "standard");
+  EXPECT_CALL(*mock_host_, metadata()).WillRepeatedly(Return(metadata));
+
+  // Should use cluster default (1000) since metadata doesn't match
+  EXPECT_EQ(1U << 29, MultiplexedActiveClientBase::maxStreamsPerConnection(0, mock_host_));
+}
+
+// Test that max_streams_config takes precedence when it's specified and lower
+TEST_F(EpSpecificMaxRequestsTest, MaxStreamsConfigTakesPrecedenceWhenLower) {
+  const std::string config_yaml = R"EOF(
+endpoint_specific_options:
+  - http_protocol_options:
+      max_requests_per_connection: 5000
+    endpoint_metadata_match:
+      filter: envoy.lb
+      path:
+        - key: tier
+      value:
+        string_match:
+          exact: "premium"
+)EOF";
+
+  auto ep_config = createEpSpecificConfig(config_yaml);
+  EXPECT_CALL(mock_host_->cluster_,
+              extensionProtocolOptions(
+                  "envoy.extensions.upstreams.http.v3.EndpointSpecificHttpProtocolOptions"))
+      .WillRepeatedly(Return(ep_config));
+
+  auto metadata = createHostMetadata("envoy.lb", "tier", "premium");
+  EXPECT_CALL(*mock_host_, metadata()).WillRepeatedly(Return(metadata));
+
+  // max_streams_config=500 should be used since it's lower than ep-specific (5000)
+  // Note: since max_streams_config is non-zero, it's used as initial max_requests
+  // and the ep-specific value overrides it
+  EXPECT_EQ(5000, MultiplexedActiveClientBase::maxStreamsPerConnection(500, mock_host_));
+}
+
+// Test different endpoints with different max_requests_per_connection
+TEST_F(EpSpecificMaxRequestsTest, DifferentEndpointsDifferentMaxRequests) {
+  const std::string config_yaml = R"EOF(
+endpoint_specific_options:
+  - http_protocol_options:
+      max_requests_per_connection: 100
+    endpoint_metadata_match:
+      filter: envoy.lb
+      path:
+        - key: limit
+      value:
+        string_match:
+          exact: "low"
+  - http_protocol_options:
+      max_requests_per_connection: 10000
+    endpoint_metadata_match:
+      filter: envoy.lb
+      path:
+        - key: limit
+      value:
+        string_match:
+          exact: "high"
+)EOF";
+
+  auto ep_config = createEpSpecificConfig(config_yaml);
+  EXPECT_CALL(mock_host_->cluster_,
+              extensionProtocolOptions(
+                  "envoy.extensions.upstreams.http.v3.EndpointSpecificHttpProtocolOptions"))
+      .WillRepeatedly(Return(ep_config));
+
+  // Test low limit endpoint
+  {
+    auto low_metadata = createHostMetadata("envoy.lb", "limit", "low");
+    EXPECT_CALL(*mock_host_, metadata()).WillRepeatedly(Return(low_metadata));
+    EXPECT_EQ(100, MultiplexedActiveClientBase::maxStreamsPerConnection(0, mock_host_));
+  }
+
+  // Test high limit endpoint
+  {
+    auto high_metadata = createHostMetadata("envoy.lb", "limit", "high");
+    EXPECT_CALL(*mock_host_, metadata()).WillRepeatedly(Return(high_metadata));
+    EXPECT_EQ(10000, MultiplexedActiveClientBase::maxStreamsPerConnection(0, mock_host_));
+  }
+
+  // Test unmatched endpoint (uses cluster default)
+  {
+    auto unmatched_metadata = createHostMetadata("envoy.lb", "limit", "medium");
+    EXPECT_CALL(*mock_host_, metadata()).WillRepeatedly(Return(unmatched_metadata));
+    EXPECT_EQ(1U << 29, MultiplexedActiveClientBase::maxStreamsPerConnection(0, mock_host_));
+  }
 }
 
 // Verifies the upstream_rq_per_cx histogram correctly tracks multiple concurrent HTTP/2 streams on

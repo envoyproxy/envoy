@@ -18,7 +18,7 @@ namespace Http {
  */
 struct CompiledEpSpecificOptions {
   CompiledEpSpecificOptions(
-      const envoy::extensions::upstreams::http::v3::EpSpecificHttpProtocolOptions::EpSpecificOptions&
+      const envoy::extensions::upstreams::http::v3::EndpointSpecificHttpProtocolOptions::EndpointSpecificOptions&
           options,
       Server::Configuration::CommonFactoryContext& context)
       : http2_protocol_options(options.has_http2_protocol_options()
@@ -29,9 +29,9 @@ struct CompiledEpSpecificOptions {
                                   ? absl::optional<envoy::config::core::v3::HttpProtocolOptions>(
                                         options.http_protocol_options())
                                   : absl::nullopt),
-        metadata_matcher(options.has_ep_metadata_match()
+        metadata_matcher(options.has_endpoint_metadata_match()
                              ? absl::optional<Matchers::MetadataMatcher>(
-                                   Matchers::MetadataMatcher(options.ep_metadata_match(), context))
+                                   Matchers::MetadataMatcher(options.endpoint_metadata_match(), context))
                              : absl::nullopt) {}
 
   absl::optional<envoy::config::core::v3::Http2ProtocolOptions> http2_protocol_options;
@@ -40,15 +40,15 @@ struct CompiledEpSpecificOptions {
 };
 
 /**
- * Config implementation for EpSpecificHttpProtocolOptions.
+ * Config implementation for EndpointSpecificHttpProtocolOptions.
  * This allows per-endpoint HTTP protocol options to be specified.
  */
 class EpSpecificProtocolOptionsConfigImpl : public Upstream::ProtocolOptionsConfig {
 public:
   EpSpecificProtocolOptionsConfigImpl(
-      const envoy::extensions::upstreams::http::v3::EpSpecificHttpProtocolOptions& config,
+      const envoy::extensions::upstreams::http::v3::EndpointSpecificHttpProtocolOptions& config,
       Server::Configuration::CommonFactoryContext& context) {
-    for (const auto& ep_option : config.ep_specific_options()) {
+    for (const auto& ep_option : config.endpoint_specific_options()) {
       compiled_options_.emplace_back(ep_option, context);
     }
   }
@@ -62,7 +62,7 @@ private:
 };
 
 /**
- * Factory for EpSpecificHttpProtocolOptions protocol options config.
+ * Factory for EndpointSpecificHttpProtocolOptions protocol options config.
  */
 class EpSpecificProtocolOptionsConfigFactory
     : public Server::Configuration::ProtocolOptionsFactory {
@@ -71,24 +71,24 @@ public:
       const Protobuf::Message& config,
       Server::Configuration::ProtocolOptionsFactoryContext& context) override {
     const auto& typed_config = MessageUtil::downcastAndValidate<
-        const envoy::extensions::upstreams::http::v3::EpSpecificHttpProtocolOptions&>(
+        const envoy::extensions::upstreams::http::v3::EndpointSpecificHttpProtocolOptions&>(
         config, context.messageValidationVisitor());
     return std::make_shared<EpSpecificProtocolOptionsConfigImpl>(typed_config,
                                                                   context.serverFactoryContext());
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<envoy::extensions::upstreams::http::v3::EpSpecificHttpProtocolOptions>();
+    return std::make_unique<envoy::extensions::upstreams::http::v3::EndpointSpecificHttpProtocolOptions>();
   }
 
   ProtobufTypes::MessagePtr createEmptyProtocolOptionsProto() override {
-    return std::make_unique<envoy::extensions::upstreams::http::v3::EpSpecificHttpProtocolOptions>();
+    return std::make_unique<envoy::extensions::upstreams::http::v3::EndpointSpecificHttpProtocolOptions>();
   }
 
   std::string category() const override { return "envoy.upstream_options"; }
   
   std::string name() const override {
-    return "envoy.extensions.upstreams.http.v3.EpSpecificHttpProtocolOptions";
+    return "envoy.extensions.upstreams.http.v3.EndpointSpecificHttpProtocolOptions";
   }
 };
 

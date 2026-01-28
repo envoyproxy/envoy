@@ -202,7 +202,7 @@ uint32_t MultiplexedActiveClientBase::maxStreamsPerConnection(uint32_t max_strea
   // Check for endpoint-specific max_requests_per_connection
   const auto ep_specific_protocol_options = host->cluster().extensionProtocolOptionsTyped<
       Extensions::Upstreams::Http::EpSpecificProtocolOptionsConfigImpl>(
-      "envoy.extensions.upstreams.http.v3.EpSpecificHttpProtocolOptions");
+      "envoy.extensions.upstreams.http.v3.EndpointSpecificHttpProtocolOptions");
 
   if (ep_specific_protocol_options != nullptr) {
     for (const auto& ep_option : ep_specific_protocol_options->compiledOptions()) {

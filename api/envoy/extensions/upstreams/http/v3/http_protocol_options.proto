@@ -227,12 +227,12 @@ message HttpProtocolOptions {
 // a "metadata match" field that allows for specific endpoints to
 // pick up a particular configuration.
 // [#next-free-field: 2]
-message EpSpecificHttpProtocolOptions {
+message EndpointSpecificHttpProtocolOptions {
   // Defines endpoint-specific HTTP protocol options. These options
   // are only applied to endpoints for each their metadata match the 
-  // `ep_metadata_match` string field. Otherwise the endpoint will
+  // `endpoint_metadata_match` field. Otherwise the endpoint will
   // pick the cluster's protocol options.
-  message EpSpecificOptions {
+  message EndpointSpecificOptions {
     // Endpoint-specific HTTP/2 protocol options.
     config.core.v3.Http2ProtocolOptions http2_protocol_options = 1;
     // Endpoint-specific HTTP protocol options.
@@ -243,16 +243,16 @@ message EpSpecificHttpProtocolOptions {
     //
     // Example:
     //
-    //      ep_metadata_match:
-    //        filter: ep_specific_protocol_options
+    //      endpoint_metadata_match:
+    //        filter: endpoint_specific_protocol_options
     //        path:
     //        - key: type
     //        value:
     //          string_match:
     //            exact: "high_throughput"
     //
-    type.matcher.v3.MetadataMatcher ep_metadata_match = 3 [(validate.rules).message = {required: true}];
+    type.matcher.v3.MetadataMatcher endpoint_metadata_match = 3 [(validate.rules).message = {required: true}];
   }
 
-  repeated EpSpecificOptions ep_specific_options = 1;
+  repeated EndpointSpecificOptions endpoint_specific_options = 1;
 }

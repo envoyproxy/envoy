@@ -24,7 +24,7 @@ uint32_t ActiveClient::calculateInitialStreamsLimit(
   
   const auto ep_specific_protocol_options = host->cluster().extensionProtocolOptionsTyped<
       Extensions::Upstreams::Http::EpSpecificProtocolOptionsConfigImpl>(
-      "envoy.extensions.upstreams.http.v3.EpSpecificHttpProtocolOptions");
+      "envoy.extensions.upstreams.http.v3.EndpointSpecificHttpProtocolOptions");
 
   if (ep_specific_protocol_options != nullptr && host->metadata() != nullptr) {
     for (const auto& ep_option : ep_specific_protocol_options->compiledOptions()) {
