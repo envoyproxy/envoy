@@ -142,6 +142,11 @@ new_features:
 - area: tcp_proxy
   change: |
     Added an option to emit a log entry when the connection is accepted.
+- area: sse_parser
+  change: |
+    Extended the SSE parser utility to support all standard SSE fields: ``id``, ``event`` (as ``event_type``),
+    and ``retry``, in addition to the existing ``data`` field. The ``retry`` field is parsed as a ``uint32_t``
+    and only accepts values consisting of ASCII digits per the SSE specification.
 - area: resource_monitors
   change: |
     Added cgroup v2 support to the CPU utilization resource monitor. The monitor now automatically
