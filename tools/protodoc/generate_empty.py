@@ -40,7 +40,7 @@ def main():
     for extension, details in empty_extensions.items():
         generate_empty_extension_docs(protodoc, extension, details, api_extensions_root)
 
-    with tarfile.open(output_filename, "w:gz") as tar:
+    with tarfile.open(output_filename, "w") as tar:
         tar.add(generated_rst_dir, arcname=".")
 
 

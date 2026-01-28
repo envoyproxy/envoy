@@ -186,7 +186,7 @@ class VersionHistories(runner.Runner):
         self.write_tarball()
 
     def write_tarball(self) -> None:
-        with tarfile.open(self.args.output_file, "w:gz") as tarball:
+        with tarfile.open(self.args.output_file, "w") as tarball:
             tarball.add(self.tpath, arcname="./")
 
     async def write_version_histories(self) -> None:
