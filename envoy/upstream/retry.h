@@ -2,6 +2,7 @@
 
 #include "envoy/config/typed_config.h"
 #include "envoy/singleton/manager.h"
+#include "envoy/stream_info/stream_info.h"
 #include "envoy/upstream/types.h"
 #include "envoy/upstream/upstream.h"
 
@@ -37,6 +38,7 @@ public:
   /**
    * Determines what PriorityLoad to use.
    *
+   * @param stream_info request stream information.
    * @param priority_set current priority set of cluster.
    * @param original_priority_load the unmodified HealthAndDegradedLoad.
    * @param priority_mapping_func a callback to get the priority of a host that has
@@ -47,7 +49,7 @@ public:
    * original_degraded_priority if no changes should be made.
    */
   virtual const HealthyAndDegradedLoad&
-  determinePriorityLoad(const PrioritySet& priority_set,
+  determinePriorityLoad(StreamInfo::StreamInfo* stream_info, const PrioritySet& priority_set,
                         const HealthyAndDegradedLoad& original_priority_load,
                         const PriorityMappingFunc& priority_mapping_func) PURE;
 

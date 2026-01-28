@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/stream_info/stream_info.h"
 #include "envoy/upstream/retry.h"
 
 #include "gmock/gmock.h"
@@ -15,7 +16,7 @@ public:
   MockRetryPriority(const MockRetryPriority& other) : priority_load_(other.priority_load_) {}
   ~MockRetryPriority() override;
 
-  const HealthyAndDegradedLoad& determinePriorityLoad(const PrioritySet&,
+  const HealthyAndDegradedLoad& determinePriorityLoad(StreamInfo::StreamInfo*, const PrioritySet&,
                                                       const HealthyAndDegradedLoad&,
                                                       const PriorityMappingFunc&) override {
     return priority_load_;

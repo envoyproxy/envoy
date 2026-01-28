@@ -10,6 +10,7 @@
 #include "envoy/router/context.h"
 #include "envoy/router/router.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/stream_info/stream_info.h"
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/common/backoff_strategy.h"
@@ -84,13 +85,13 @@ public:
   }
 
   const Upstream::HealthyAndDegradedLoad& priorityLoadForRetry(
-      const Upstream::PrioritySet& priority_set,
+      StreamInfo::StreamInfo* stream_info, const Upstream::PrioritySet& priority_set,
       const Upstream::HealthyAndDegradedLoad& original_priority_load,
       const Upstream::RetryPriority::PriorityMappingFunc& priority_mapping_func) override {
     if (!retry_priority_) {
       return original_priority_load;
     }
-    return retry_priority_->determinePriorityLoad(priority_set, original_priority_load,
+    return retry_priority_->determinePriorityLoad(stream_info, priority_set, original_priority_load,
                                                   priority_mapping_func);
   }
 
