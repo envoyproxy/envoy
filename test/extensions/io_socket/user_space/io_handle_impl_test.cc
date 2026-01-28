@@ -1209,11 +1209,13 @@ TEST_F(IoHandleImplTest, PassthroughState) {
   Protobuf::Value val;
   val.set_string_value("val");
   (*map.mutable_fields())["key"] = val;
-  StreamInfo::FilterState::Objects source_filter_state;
+  auto source_filter_state =
+      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
   auto object = std::make_shared<TestObject>(1000);
-  source_filter_state.push_back(
-      {object, StreamInfo::FilterState::StateType::ReadOnly,
-       StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection, "object_key"});
+  source_filter_state->setData(
+      "object_key", object, StreamInfo::FilterState::StateType::ReadOnly,
+      StreamInfo::FilterState::LifeSpan::Connection,
+      StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
   ASSERT_NE(nullptr, io_handle_->passthroughState());
   io_handle_->passthroughState()->initialize(std::move(source_metadata), source_filter_state);
 

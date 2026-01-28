@@ -57,25 +57,23 @@ void FilterStateImpl::setData(absl::string_view data_name, std::shared_ptr<Objec
     // We have another object with same data_name. Check for mutability
     // violations namely: readonly data cannot be overwritten, mutable data
     // cannot be overwritten by readonly data.
-    const FilterStateImpl::FilterObject* current = it->second.get();
-    if (current->state_type_ == FilterState::StateType::ReadOnly) {
+    const FilterStateImpl::FilterObject& current = it->second;
+    if (current.state_type_ == FilterState::StateType::ReadOnly) {
       IS_ENVOY_BUG("FilterStateAccessViolation: FilterState::setData<T> called twice on same "
                    "ReadOnly state.");
       return;
     }
 
-    if (current->state_type_ != state_type) {
+    if (current.state_type_ != state_type) {
       IS_ENVOY_BUG("FilterStateAccessViolation: FilterState::setData<T> called twice with "
                    "different state types.");
       return;
     }
   }
 
-  std::unique_ptr<FilterStateImpl::FilterObject> filter_object(new FilterStateImpl::FilterObject());
-  filter_object->data_ = data;
-  filter_object->state_type_ = state_type;
-  filter_object->stream_sharing_ = stream_sharing;
-  data_storage_[data_name] = std::move(filter_object);
+  data_storage_[data_name] =
+      FilterObject{.data_ = data, .state_type_ = state_type, .stream_sharing_ = stream_sharing};
+  ;
 }
 
 bool FilterStateImpl::hasDataWithName(absl::string_view data_name) const {
@@ -93,8 +91,8 @@ FilterStateImpl::getDataReadOnlyGeneric(absl::string_view data_name) const {
     return nullptr;
   }
 
-  const FilterStateImpl::FilterObject* current = it->second.get();
-  return current->data_.get();
+  const FilterStateImpl::FilterObject& current = it->second;
+  return current.data_.get();
 }
 
 FilterState::Object* FilterStateImpl::getDataMutableGeneric(absl::string_view data_name) {
@@ -112,14 +110,14 @@ FilterStateImpl::getDataSharedMutableGeneric(absl::string_view data_name) {
     return nullptr;
   }
 
-  FilterStateImpl::FilterObject* current = it->second.get();
-  if (current->state_type_ == FilterState::StateType::ReadOnly) {
+  const FilterStateImpl::FilterObject& current = it->second;
+  if (current.state_type_ == FilterState::StateType::ReadOnly) {
     IS_ENVOY_BUG("FilterStateAccessViolation: FilterState accessed immutable data as mutable.");
     // To reduce the chances of a crash, allow the mutation in this case instead of returning a
     // nullptr.
   }
 
-  return current->data_;
+  return current.data_;
 }
 
 bool FilterStateImpl::hasDataAtOrAboveLifeSpan(FilterState::LifeSpan life_span) const {
@@ -129,23 +127,44 @@ bool FilterStateImpl::hasDataAtOrAboveLifeSpan(FilterState::LifeSpan life_span) 
   return !data_storage_.empty() || (parent_ && parent_->hasDataAtOrAboveLifeSpan(life_span));
 }
 
-FilterState::ObjectsPtr FilterStateImpl::objectsSharedWithUpstreamConnection() const {
-  auto objects = parent_ ? parent_->objectsSharedWithUpstreamConnection()
-                         : std::make_unique<FilterState::Objects>();
+void FilterStateImpl::forEach(absl::AnyInvocable<void(absl::string_view, const FilterObject&)> cb) {
   for (const auto& [name, object] : data_storage_) {
-    switch (object->stream_sharing_) {
+    cb(name, object);
+  }
+  if (parent_) {
+    parent_->forEach(std::move(cb));
+  }
+}
+
+bool FilterStateImpl::empty() const {
+  return data_storage_.empty() && (parent_ == nullptr || parent_->empty());
+}
+
+FilterStateObjectsSharedPtr FilterStateImpl::objectsSharedWithUpstreamConnection() {
+  auto objects = std::make_shared<FilterStateImpl>(FilterState::LifeSpan::TopSpan);
+  forEach([objects](absl::string_view name, const FilterObject& object) {
+    switch (object.stream_sharing_) {
     case StreamSharingMayImpactPooling::SharedWithUpstreamConnection:
-      objects->push_back({object->data_, object->state_type_, object->stream_sharing_, name});
+      objects->setData(name, object.data_, object.state_type_, FilterState::LifeSpan::TopSpan,
+                       object.stream_sharing_);
       break;
     case StreamSharingMayImpactPooling::SharedWithUpstreamConnectionOnce:
-      objects->push_back(
-          {object->data_, object->state_type_, StreamSharingMayImpactPooling::None, name});
+      objects->setData(name, object.data_, object.state_type_, FilterState::LifeSpan::TopSpan,
+                       StreamSharingMayImpactPooling::None);
       break;
     default:
       break;
     }
-  }
+  });
   return objects;
+}
+
+void FilterStateImpl::mergeFrom(FilterStateObjects& input, FilterState::LifeSpan life_span) {
+  input.forEach(
+      [this, life_span](absl::string_view name,
+                        const StreamInfo::FilterStateObjects::FilterObject& object) mutable {
+        setData(name, object.data_, object.state_type_, life_span, object.stream_sharing_);
+      });
 }
 
 bool FilterStateImpl::hasDataWithNameInternally(absl::string_view data_name) const {

@@ -278,9 +278,11 @@ public:
 
   /**
    * @return filter state objects from the downstream request or connection
-   * that are marked as shared with the upstream connection.
+   * that are marked as shared with the upstream connection. Returns nullptr if there are no
+   * objects.
    */
-  virtual const StreamInfo::FilterState::Objects& downstreamSharedFilterStateObjects() const PURE;
+  virtual const StreamInfo::FilterStateObjectsSharedPtr&
+  downstreamSharedFilterStateObjects() const PURE;
 };
 
 using TransportSocketOptionsConstSharedPtr = std::shared_ptr<const TransportSocketOptions>;

@@ -44,7 +44,7 @@ class MockPassthroughState : public PassthroughState {
 public:
   MOCK_METHOD(void, initialize,
               (std::unique_ptr<envoy::config::core::v3::Metadata> metadata,
-               const StreamInfo::FilterState::Objects& filter_state_objects));
+               const StreamInfo::FilterStateObjectsSharedPtr& filter_state_objects));
   MOCK_METHOD(void, mergeInto,
               (envoy::config::core::v3::Metadata & metadata,
                StreamInfo::FilterState& filter_state));
@@ -52,7 +52,10 @@ public:
 
 class InternalSocketTest : public testing::Test {
 public:
-  InternalSocketTest() : metadata_(std::make_unique<envoy::config::core::v3::Metadata>()) {}
+  InternalSocketTest()
+      : metadata_(std::make_unique<envoy::config::core::v3::Metadata>()),
+        filter_state_objects_(std::make_shared<StreamInfo::FilterStateImpl>(
+            StreamInfo::FilterState::LifeSpan::Connection)) {}
 
   void initialize(Network::IoHandle& io_handle) {
     auto inner_socket = std::make_unique<NiceMock<Network::MockTransportSocket>>();
@@ -65,7 +68,7 @@ public:
   }
 
   std::unique_ptr<envoy::config::core::v3::Metadata> metadata_;
-  StreamInfo::FilterState::Objects filter_state_objects_;
+  StreamInfo::FilterStateObjectsSharedPtr filter_state_objects_;
   NiceMock<Network::MockTransportSocket>* inner_socket_;
   std::unique_ptr<InternalSocket> socket_;
   NiceMock<Network::MockTransportSocketCallbacks> transport_callbacks_;
@@ -80,9 +83,10 @@ TEST_F(InternalSocketTest, NativeSocket) {
 // Test that internal transport socket updates the passthrough state for the user space sockets.
 TEST_F(InternalSocketTest, PassthroughStateInjected) {
   auto filter_state_object = std::make_shared<TestObject>();
-  filter_state_objects_.push_back(
-      {filter_state_object, StreamInfo::FilterState::StateType::ReadOnly,
-       StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection, "test.object"});
+  filter_state_objects_->setData(
+      "test.object", filter_state_object, StreamInfo::FilterState::StateType::ReadOnly,
+      StreamInfo::FilterState::LifeSpan::Connection,
+      StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
   Protobuf::Struct& map = (*metadata_->mutable_filter_metadata())["envoy.test"];
   Protobuf::Value val;
   val.set_string_value("val");
@@ -92,29 +96,32 @@ TEST_F(InternalSocketTest, PassthroughStateInjected) {
   NiceMock<MockUserSpaceIoHandle> io_handle;
   EXPECT_CALL(io_handle, passthroughState()).WillRepeatedly(testing::Return(state));
   EXPECT_CALL(*state, initialize(_, _))
-      .WillOnce(Invoke([&](std::unique_ptr<envoy::config::core::v3::Metadata> metadata,
-                           const StreamInfo::FilterState::Objects& filter_state_objects) -> void {
-        ASSERT_EQ("val",
-                  metadata->filter_metadata().at("envoy.test").fields().at("key").string_value());
-        ASSERT_EQ(1, filter_state_objects.size());
-        const auto& object = filter_state_objects.at(0);
-        ASSERT_EQ("test.object", object.name_);
-        ASSERT_EQ(filter_state_object.get(), object.data_.get());
-      }));
+      .WillOnce(
+          Invoke([&](std::unique_ptr<envoy::config::core::v3::Metadata> metadata,
+                     const StreamInfo::FilterStateObjectsSharedPtr& filter_state_objects) -> void {
+            ASSERT_EQ(
+                "val",
+                metadata->filter_metadata().at("envoy.test").fields().at("key").string_value());
+            ASSERT_FALSE(filter_state_objects->empty());
+            const auto* object = filter_state_objects->getDataReadOnlyGeneric("test.object");
+            ASSERT_EQ(filter_state_object.get(), object);
+          }));
   initialize(io_handle);
 }
 
 TEST_F(InternalSocketTest, EmptyPassthroughState) {
   metadata_ = nullptr;
+  filter_state_objects_ = nullptr;
   auto state = std::make_shared<NiceMock<MockPassthroughState>>();
   NiceMock<MockUserSpaceIoHandle> io_handle;
   EXPECT_CALL(io_handle, passthroughState()).WillRepeatedly(testing::Return(state));
   EXPECT_CALL(*state, initialize(_, _))
-      .WillOnce(Invoke([&](std::unique_ptr<envoy::config::core::v3::Metadata> metadata,
-                           const StreamInfo::FilterState::Objects& filter_state_objects) -> void {
-        ASSERT_EQ(nullptr, metadata);
-        ASSERT_EQ(0, filter_state_objects.size());
-      }));
+      .WillOnce(
+          Invoke([&](std::unique_ptr<envoy::config::core::v3::Metadata> metadata,
+                     const StreamInfo::FilterStateObjectsSharedPtr& filter_state_objects) -> void {
+            ASSERT_EQ(nullptr, metadata);
+            ASSERT_EQ(nullptr, filter_state_objects);
+          }));
   initialize(io_handle);
 }
 

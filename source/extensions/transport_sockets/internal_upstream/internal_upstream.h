@@ -14,14 +14,14 @@ class InternalSocket : public TransportSockets::PassthroughSocket {
 public:
   InternalSocket(Network::TransportSocketPtr inner_socket,
                  std::unique_ptr<envoy::config::core::v3::Metadata> metadata,
-                 const StreamInfo::FilterState::Objects& filter_state_objects);
+                 const StreamInfo::FilterStateObjectsSharedPtr& filter_state_objects);
 
   // Network::TransportSocket
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override;
 
 private:
   std::unique_ptr<envoy::config::core::v3::Metadata> metadata_;
-  StreamInfo::FilterState::Objects filter_state_objects_;
+  StreamInfo::FilterStateObjectsSharedPtr filter_state_objects_;
 };
 
 } // namespace InternalUpstream

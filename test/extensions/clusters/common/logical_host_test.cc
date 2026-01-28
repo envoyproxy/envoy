@@ -96,7 +96,7 @@ public:
   // Helper to compute the per-connection resolution condition as used in LogicalHost.
   bool needsPerConnectionResolution(Network::TransportSocketOptionsConstSharedPtr options) {
     return cluster_info_->transportSocketMatcher().usesFilterState() && options &&
-           !options->downstreamSharedFilterStateObjects().empty();
+           options->downstreamSharedFilterStateObjects();
   }
 
   std::shared_ptr<NiceMock<Upstream::MockClusterInfo>> cluster_info_;

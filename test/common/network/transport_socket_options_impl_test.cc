@@ -50,8 +50,8 @@ TEST_F(TransportSocketOptionsImplTest, SharedFilterState) {
       StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
   auto transport_socket_options = TransportSocketOptionsUtility::fromFilterState(filter_state_);
   auto objects = transport_socket_options->downstreamSharedFilterStateObjects();
-  EXPECT_EQ(1, objects.size());
-  EXPECT_EQ("random_key_has_effect", objects.at(0).name_);
+  EXPECT_TRUE(objects && !objects->empty());
+  EXPECT_TRUE(objects->hasDataWithName("random_key_has_effect"));
 }
 
 TEST_F(TransportSocketOptionsImplTest, UpstreamServer) {
@@ -181,12 +181,12 @@ TEST_F(TransportSocketOptionsImplTest, NetworkNamespaceSharedWithUpstream) {
   ASSERT_NE(nullptr, transport_socket_options);
 
   auto objects = transport_socket_options->downstreamSharedFilterStateObjects();
-  EXPECT_EQ(1, objects.size());
-  EXPECT_EQ(DownstreamNetworkNamespace::key(), objects.at(0).name_);
+  EXPECT_NE(nullptr, objects);
+  EXPECT_TRUE(objects->hasDataWithName(DownstreamNetworkNamespace::key()));
 
   // Verify we can retrieve the network namespace from the filter state object.
   const auto* network_namespace_state =
-      dynamic_cast<const DownstreamNetworkNamespace*>(objects.at(0).data_.get());
+      objects->getDataReadOnly<DownstreamNetworkNamespace>(DownstreamNetworkNamespace::key());
   ASSERT_NE(nullptr, network_namespace_state);
   EXPECT_EQ(network_namespace_filepath, network_namespace_state->value());
 }

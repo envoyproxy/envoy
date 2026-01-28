@@ -371,7 +371,7 @@ Api::SysCallIntResult IoHandleImpl::shutdown(int how) {
 
 void PassthroughStateImpl::initialize(
     std::unique_ptr<envoy::config::core::v3::Metadata> metadata,
-    const StreamInfo::FilterState::Objects& filter_state_objects) {
+    const StreamInfo::FilterStateObjectsSharedPtr& filter_state_objects) {
   ASSERT(state_ == State::Created);
   metadata_ = std::move(metadata);
   filter_state_objects_ = filter_state_objects;
@@ -383,13 +383,11 @@ void PassthroughStateImpl::mergeInto(envoy::config::core::v3::Metadata& metadata
   if (metadata_) {
     metadata.MergeFrom(*metadata_);
   }
-  for (const auto& object : filter_state_objects_) {
-    // This should not throw as stream info is new and filter objects are uniquely named.
-    filter_state.setData(object.name_, object.data_, object.state_type_,
-                         StreamInfo::FilterState::LifeSpan::Connection, object.stream_sharing_);
+  if (filter_state_objects_) {
+    filter_state.mergeFrom(*filter_state_objects_, StreamInfo::FilterState::LifeSpan::Connection);
   }
   metadata_ = nullptr;
-  filter_state_objects_.clear();
+  filter_state_objects_ = nullptr;
   state_ = State::Done;
 }
 

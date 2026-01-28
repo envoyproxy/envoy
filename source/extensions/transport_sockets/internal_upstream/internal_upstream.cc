@@ -7,7 +7,7 @@ namespace InternalUpstream {
 
 InternalSocket::InternalSocket(Network::TransportSocketPtr inner_socket,
                                std::unique_ptr<envoy::config::core::v3::Metadata> metadata,
-                               const StreamInfo::FilterState::Objects& filter_state_objects)
+                               const StreamInfo::FilterStateObjectsSharedPtr& filter_state_objects)
     : PassthroughSocket(std::move(inner_socket)), metadata_(std::move(metadata)),
       filter_state_objects_(filter_state_objects) {}
 
@@ -18,7 +18,7 @@ void InternalSocket::setTransportSocketCallbacks(Network::TransportSocketCallbac
     io_handle->passthroughState()->initialize(std::move(metadata_), filter_state_objects_);
   }
   metadata_ = nullptr;
-  filter_state_objects_.clear();
+  filter_state_objects_ = nullptr;
 }
 
 } // namespace InternalUpstream

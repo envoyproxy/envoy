@@ -120,7 +120,7 @@ InternalSocketFactory::createTransportSocket(Network::TransportSocketOptionsCons
   }
   return std::make_unique<InternalSocket>(std::move(inner_socket), std::move(extracted_metadata),
                                           options ? options->downstreamSharedFilterStateObjects()
-                                                  : StreamInfo::FilterState::Objects());
+                                                  : nullptr);
 }
 
 REGISTER_FACTORY(InternalUpstreamConfigFactory,
