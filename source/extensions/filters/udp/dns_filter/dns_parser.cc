@@ -447,7 +447,11 @@ void DnsMessageParser::setResponseCode(DnsQueryContextPtr& context,
   }
 
   if (serialized_answers == 0) {
-    context->response_code_ = DNS_RESPONSE_CODE_NAME_ERROR;
+    if (context->known_domain_without_records_) {
+      context->response_code_ = DNS_RESPONSE_CODE_NO_ERROR;
+    } else {
+      context->response_code_ = DNS_RESPONSE_CODE_NAME_ERROR;
+    }
     return;
   }
   context->response_code_ = DNS_RESPONSE_CODE_NO_ERROR;
