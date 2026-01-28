@@ -72,8 +72,7 @@ SseParser::ParsedEvent SseParser::parseEvent(absl::string_view event) {
   return parsed_event;
 }
 
-std::tuple<size_t, size_t, size_t> SseParser::findEventEnd(absl::string_view buffer,
-                                                           bool end_stream) {
+SseParser::FindEventEndResult SseParser::findEventEnd(absl::string_view buffer, bool end_stream) {
   size_t consumed = 0;
   size_t event_start = 0;
   absl::string_view remaining = buffer;
