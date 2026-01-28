@@ -527,6 +527,7 @@ UTC
 UTF
 UUID
 UUIDs
+Valkey
 VC
 VCHAR
 VCL

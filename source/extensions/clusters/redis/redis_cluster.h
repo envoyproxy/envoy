@@ -129,6 +129,9 @@ public:
 
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
 
+  // Parse availability_zone from INFO response for zone discovery.
+  static std::string parseAvailabilityZone(const std::string& info_response);
+
   /// TimeSource& timeSource() const { return time_source_; }
 
 protected:
@@ -276,7 +279,6 @@ private:
                         NetworkFilters::Common::Redis::RespValuePtr&& value);
     void onZoneDiscoveryFailure(const std::string& address, bool is_primary);
     void finishZoneDiscovery();
-    static std::string parseAvailabilityZone(const std::string& info_response);
 
     // Extensions::NetworkFilters::Common::Redis::Client::Config
     bool disableOutlierEvents() const override { return true; }
