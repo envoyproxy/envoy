@@ -233,5 +233,7 @@ MockReceivedSettings::MockReceivedSettings() {
   ON_CALL(*this, maxConcurrentStreams()).WillByDefault(ReturnRef(max_concurrent_streams_));
 }
 
+MockRouteCache::MockRouteCache() = default;
+
 } // namespace Http
 } // namespace Envoy
