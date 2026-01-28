@@ -278,6 +278,8 @@ public:
   const std::string& token() const override { return access_token_; }
   const std::string& refreshToken() const override { return refresh_token_; }
 
+  std::string findTokenCookie(const absl::flat_hash_map<std::string, std::string>& cookies,
+                              const std::string& key_prefix) const;
   void setParams(const Http::RequestHeaderMap& headers, const std::string& secret) override;
   bool isValid() const override;
   bool hmacIsValid() const;
@@ -382,10 +384,23 @@ private:
                                        const std::chrono::seconds& expires_in) const;
   std::string buildCookieTail(const FilterConfig::CookieSettings& settings,
                               absl::string_view expires_time) const;
+  const char* mayAddSecureAttributeForCookie(absl::string_view cookie_name) const;
   void setOAuthResponseCookies(Http::ResponseHeaderMap& headers,
                                const std::string& encoded_token) const;
   void addFlowCookieDeletionHeaders(Http::ResponseHeaderMap& headers,
                                     absl::string_view flow_id) const;
+  void setCookie(Http::ResponseHeaderMap& headers, const std::string& key, const std::string& value,
+                 const std::string& cookie_tail) const;
+  size_t setChunkedCookies(Http::ResponseHeaderMap& headers, const std::string& key,
+                           const std::string& data, const std::string& cookie_tail,
+                           size_t chunk_size) const;
+  void setTokenCookie(Http::ResponseHeaderMap& headers, const std::string& key,
+                      const std::string& data, const std::string& cookie_tail,
+                      const size_t max_cookie_size = 4096) const;
+  void deleteTokenCookie(const Http::RequestHeaderMap& headers,
+                         Http::ResponseHeaderMap& response_headers, const std::string& cookie_name,
+                         absl::string_view cookie_path, absl::string_view cookie_domain,
+                         absl::string_view maybe_secure_attr) const;
   const std::string& bearerPrefix() const;
   CallbackValidationResult validateOAuthCallback(const Http::RequestHeaderMap& headers,
                                                  const absl::string_view path_str) const;

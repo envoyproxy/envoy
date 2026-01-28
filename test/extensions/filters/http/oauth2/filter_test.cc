@@ -61,6 +61,98 @@ static const std::string TEST_ENCRYPTED_ID_TOKEN =
 static const std::string TEST_ENCRYPTED_REFRESH_TOKEN =
     "Fc1bBwAAAAAVzVsHAAAAAERBBlyQ3ASXvDHzyIRDhLwvl1w07AKhjwBz1s4wJGX8"; //"some-refresh-token"
 static const std::string TEST_HMAC_SECRET = "asdf_token_secret_fdsa";
+static const std::string TEST_ENCRYPTED_ACCESS_TOKEN_CHUNK_1 =
+    "Fc1bBwAAAAAVzVsHAAAAAD_ypXMASeUN_fjH-g9bL24jvDxGz0pe5AjExfk4zlZlzFb4V0a3mRT4SAVliOpQ3g_"
+    "5r9tIyI96E-bK_XCz3xyGI5owpJzWvpE1sQKQqytXZrH_"
+    "xbczkOcZUI0GShSaPLT2BP6yb3wBiXCvprBdUalAvwi1oJYuehlM8zYLkxYTg5T8z5gEN_"
+    "y2GWpv8AbWMha0buEUvrFbEeiPtHK8-eIjjjIKT3it8nTkczTCb-wSVWiEqe8xd6-2y3BuX7p8O5_fJm9B6dw-G-SF_X_"
+    "iE3HZ42jxdVE6IIdoIXKnOvP9vULgdw0X-aEePiAqTR3TJncsPXN8dmvtLEfk1_wh6p-"
+    "ksK8LWuNHAU1zl3burFwxo07rdDV3-4ERbLwdi6TCAC2pwjkY_1zcb0comAVrH4VHTM7Xug_JaUL1F0tVZQbm8S4_"
+    "0NuoXcd7dJtXDaNdzsjl0vZdYY6UDkugn7nJoMKs_uLd8QrZ2TVZ48HPOP2PBJko4TRZxfRgC01M_"
+    "U6JmAlyp61TewWv4lq1ZCRVO6qurpGSusdVi38pzo5gXl4h9dfN_0CZFHFsnRfMDL7q1SXOpo4qQ48Eoak8bhrc6de_"
+    "sCXQbwAEfOCyYODFPkZkbGYWtB3mgrywK-DeytW0_-9_huwLxGaTaINycYs0MnQA-78zqdEp7_XimuP_"
+    "cC7iNbsuUFISiI7wF52mbAE5AgYU8Rv_9Kiac70EqjZXKdwzM_t5Ob_O9h6RVL0LLNHDmERYapuJoA-"
+    "CgvtEWl17CCfjzUaMpVG0AZAUB9b8n1W3cZ3tFmtGegrAzb-"
+    "ZAdjiGcjIjrNhEVCBbhS3pRjFoVlErIelTUMyDmKWAGeBv5rhVu912qImWALVlDxwHFUKTtoEfloqI57h2CDwwlX2rJtb0"
+    "7UeQHHxgHSRUH6ENsLdqOsbZRj4VgXm9sx53QFJDme-4HjQsm7hogfdS1zsyP9kojcwJjcbDw7Yv8jbd9PgxKkPXLO-"
+    "6ST-oCLRuoosIFJDIsPjDxNs_"
+    "ne1cvN2ySheVIEmmJB85moRiJ9hrGDqNjowqlaAshcV9vYcIp7qyaiQJtOJF0Nw8SQk4jV8Uq93Zud3DqjH4dOaLCGSMOO"
+    "dL1SUMpIP4ijXK90Hl_kuKiNOWJ_Wfn4zCSzc4k5DO09RtGmor05SlQYKQ38QEEo8GmT7I2_"
+    "7J54bYTVmJXoslcQ2Uo9bfvKFF1a0OWYX3raeEZWgcrjjTF-"
+    "amAbmEi5ozdYiP3xTaDmJfbTd8sfX1hl0xLYYMUbBhr6eEhSzhxiF82IuaZ_MlWXcFbx0ev0FDM6-Wg0UiytYs__"
+    "uRHYKmMY8NEwjQ-c4MbcX0Pk3GzUWwr7Et2rAc4pZmhNIS-NI-5RfYHBVvhJRoTPB6Dk-"
+    "8kZjpYt7D5XMgi8pZwOJ9Q5kJlzE3b0pEarqg1wHmBHZMv0JC3XUtAVAeGsuEkV0tvdYGFzCUmFhA8FsfOju-"
+    "WUtX1NB1tAoy8L_zEbnDQrxHSqlNyPCituwELxPefWE1WfR0FzKQWpuOF9t0JRnYGtTtOZ3tLdPHh9-"
+    "aDsXFbUC3eclz4jCcuTVtaZethJTcL-0h2iBH8t9B7_SlJ_xPMptNHmUG3SWTR35GAmA0X5p_IYNo-4nkhT-"
+    "6NU4q1ibys9Qp26s3AENUDaNOgoaHuypPauT0pQ21AbF1ixVTXZVi_cCJ1ZZe9_"
+    "JvuIVWjKxVlTiKVfHgieWo2SPIYVE5RWSpKhWRyt1se_sYW-4CBWnLEa_"
+    "CVxWSQysxzanez1qi56Inv0eToGTXBOyhr7d8LHUCYZ_N2k2Q1n4VDZ6gC4Yqiow5uTRSt5in_"
+    "IqoBl6356dZ8K9X1XkslBDa3xwskRFcb-"
+    "Qf0wR6zKI6HMlOiLeg0IgcqxibCq2c7ZXJdxUWRjNrMbMieUcUrfCAKqBA7eZfI5d3-"
+    "frrAbCCIY1x6xKEOqoUESzlLp9sMPVtiL2SsaHupPiTiQLsV1zevCvmmgLokTMLvp91PjdGy88g78QrH5oaj6NxH1JryK0"
+    "en0HCzwYsgKcXgXdPjsQq4w6BbhcPNHitxdjgQlXEqFVe2K7RMp-1dCCzOmYVafZC4J6QuI8NMje-USyfaeo_"
+    "LycufFJhdrnSv5O534UhPugHwh6aUPBaSbIZ9kJOTqghoPrVYRU0gQqCUcDo0_"
+    "CzptSdIvLwc5vKS56uEhGQxPt7gY8DVQmj9zlWJSK5lGBwwpglit5SOkQELKyg41flYGvcvIyM5Z20vgaXg_"
+    "Jsu5VAk4c2aQH-cuHPYqyoojcq-EaVMY5TMpJv5cCgsMM0MImQOtZyCsTNAS2-mn7In6vKpV-"
+    "Y6nWf89cSRlj2AQevisBziOgZo2Fs2fosRebHpDkhBXSGVfg5c3A5t0D1cOoCyfLMwR0A7re2kPfkBHurbp61zOr7UWELm"
+    "wqeEc3joYAcOysLuYqVid3CB7STAMQr9zTgaXajWMrfXE-Vp1KhjXWNM1ESH7K4Qqhc7Dk9Fqa3QDvLQ_"
+    "DlGkMwTHsL8i1TRejgcGQzWY3i-"
+    "G1hMKJa9oYip0EbJSuKLlHvOmP7DqXvp8kgkj2rPggEr8Ca5XezNRzn1pv255uxjbmjqdrr8hOA2-bBi2-xB4fUAFu_"
+    "dX7pfvBqES7cildhYXyeDKd-ck0KmMCU1Bx9wttgKZvHqqKh1S6n4cUeNZVBsib4S0S_IxWRCYK3czGi_"
+    "Dg61dOWAvK8VMOrWudWYQ6mY48m5nf2tpFetcQQmSbodfiSMVFsqK-R7O0eO62sYh-q1ycCaZ-"
+    "eqJliBZFqkUuQjpx2nRvfhk-HgZhZkx1IQVxFpSK28sKf7_8JFYJuHnABUGYNHK7A0Jg86eklOZa0m-HmFb4qaRIUkR_"
+    "SRN9-czOOh6zmqhAb9dnEznx6YauYajlfOHDxxNQ9Bisimc8jIHoklwvc10eCnJrL0rbOG2pvGlzTtMg48vD_lS0__"
+    "9GLoRDGdkEwEMJ2D3RKL-YblQ6ieA_ypyC2wWOx1woMM9ruvzIKUlcS9tfGvr3n0j_"
+    "sO7dpfuyw1B1ul09Vpf7CJvqhoY7Xd4iWz1efOvSAkeVN4Mi3hywKbUGjXxLdhszDMFeudtxbrWhtAOik8xNgDwHg8tXNA"
+    "bRQ9j6tSz-3uvW7UAU_Dnb6FVIvDxBfTnVwMhk09vbvY4WNfi5JsB_"
+    "etSDvnnaroR9TIFf8TbHmS9xPI4QjguUyZ2ybshQb7LpWn8LBea1M-"
+    "6sN7MkYf4W8WRSaB5AG5N4LNZQBlHFwHgI4LivtPVrcl3qM-jxTt_yWX5xSJmUJ-"
+    "yLsjcDKNaG9X6jaS7mCn0crQQXiBI8toRWFjMOHF0CMWze28CebCq0Yp4mPtbVPtDhba9SoACDXJPaJCET0mrUiPVAQEWD"
+    "qUNzlU23HKRzoMLCfIjKguF5_4cVRe4p1hsFxMuWeJtBWWAnO12D_L_"
+    "8BsBSMNxfgX9GtUaP7MVYZOJy31mPujZYgjuu6H3tSAXKTDWGgjQkNIEHqLrPPni87JBGtv6_s3qmUofRQKdP2FXB-"
+    "i5IRAp6um4FtIKYZJagFi3mR8T7B2WxwNITeXDVvLPSr-shFRVsaw328aoK8mcKfxzisroy7Qdf9Kk_"
+    "VJzTn1v2LnDTh7gFhtMs9lHojCJEdneZOxWBrm83sM5CfsxytH4PnEAH2ocAxyO_WoLGt8b-4eRJtad5s_hif-"
+    "FZch4DMRJ4YJZgJfayayuODe0NQ9mWPFD0Byzu9jbJb6cLPtgqDj6BAVgpqgQRVNKiTfrhnIecuQscpeSnjFkrtrhSjJfZ"
+    "OR_bi2uOuHfq8ed8R_ZoUgqQ_bLccO7Wno0WDVSLp_"
+    "v8su6tvrNJjkmhCrUyoZ5zYx9u8KNaEO6EB7vqTDAkAwOLHWD7ATw2kvuNAHu_"
+    "n5iViBfoukmrqBFJeVE4gDOGwWyXrApdpl2gwSYV_"
+    "BwLS00W5VXIrfAhgbOWpDU10LwQj4tyzrnRfJamyU9dFexH6tnyNtSodhYR_eMExXYMvwXOSEYyrOUL9DdFqGjWFqS_BD";
+static const std::string TEST_ENCRYPTED_ACCESS_TOKEN_CHUNK_2 =
+    "VXg6QjQ-XOdof0QYYCcZ6jAORvbXB_n9Rf4dQQ8sssMJX3i2_b2qxfiWIKJGyR-RzzmNsakzKXnafa4xUUpF87gSlM_"
+    "OAaj1dZgvh49QCdmZJWfi49S6b0jFJE7yNfAEUzsFvN78ivOvYzjsLoJO1It1tVcfiTlkSNJ3039tXNNyiKRDECOKpinTf"
+    "d1ZjWBjKF5FKxu5riPxwupgwjX9O-su3qW-puEl-oG04PwqrydYiQfR6cwUGN0jor0xJeW-L-"
+    "7OfMdGdKP8CWAQH8ZeqRGJFjUsRH3GNNcfh4qPG3vEvyGYoN-"
+    "yVRirjTKPjPNAARq5PoMaR742aEpKSYkomBFz4KsZhhjpLBSGgH0cQ22YPJ-loXlgI9_9wD4Y8csl6OYHQnpHi1bUSB0r-"
+    "JZKNxQJAcoqoMGxxW2IULvJdPRTK6ooKpqnCg6C4V0ZmeczNLQ2VgHIzZ9gZd76nXyqmm1QmnWf7DDqlSgMq2cGMiD6BzW"
+    "mBuxQC33uCI47QLZ036-tvyxCfxa_Cqd8GHvM5Vd8bb1ZKgkh9jvzcvi4bSyXGF6b0yu5_"
+    "vRKp5GQdpUqLklyUR2Le1gDB8cSwBdxGyTZhD5dYK7qvClow0yAQhT2AwFSIMr16-nnq-DcUaRjOr4RN4GsKQ5SP-"
+    "IebmtMhMWtJ7V5uCrIZLOPByXWr5q7CutXLKWejhomSZlrUwol1QnDuxDKBulcXtn9PLHGMJkSngizlc18a8zG3C_"
+    "YiV15xI8XNgvY2bijXxf2HbYG81rSMZ_jbUO_u9URPwkfMbRRtQ5Llp4K-5m_tFods1pV3fBFK3tUe-ZLrD7JsjPYSSLx-"
+    "2E82zdEhPagepsJz-xeTYItSeiMl1xff_zJ-NfrEBNec15Zr1kWfeL2Q-"
+    "8Fgu1ne4psafSPFqJOQ3PiRsxdrLoIU0mb0v6lzdwFULUBbcKiwrZ2Pnt0ZrEo1bXgPnCUVo1KajgSZxZaT-"
+    "uXE6qASF3VfC6BnMZOiSMvgYNYra_zVbWDhKz-lEovxbVrm19zKHVBR05dzq005GB_"
+    "qvkeiFFAiNyQKEDsxAKcFMDsDpR0zOd5y2kFoyRKzfOK1LZjnTbyKB1BZ7KceIzsA-"
+    "iZr9IsJysHrwnLZ4DGss34dJSRTzzq6MKz4W0fmDIyeNdijGeCkPnrU40cjxRqqsaYiGAXI-D101sqXB5D-"
+    "i9ucQgPqkckjS00Ygz05h6g4JgaPb0ORBmpWQDev2RwOe8tWnR3pNa06sd8epuBc_"
+    "jYhbF90z2SjwZartmhgfR2tjuA056YpASKtxp22hAi0kMvgmgKpXDdyoYRBbm6kjeUp8Qv57w6PGbhW9RkdK_"
+    "PzFq3CNZiyrZIJIrknKQCWZ_wPCnYnfNlVjIL-9Zgz1yCxDRFvn24B0cAwECL1QN2SaqaFSubq_vsOc6g1u8tMR3NO_"
+    "CdJcNAFTMzg3srQpBueScFasEwuDSaWXwQDQpLTVlb-I265nCGPrfEQb0jEMZqbJ7_"
+    "NBD9yUPFJNRFYetZRY9ccXRCD32ZoZ5qV21K5LPr2AwGBTduGbhUJ7RKJM4QB3Jh784cQgXuQ56QtQZCeqgxfh9Z-"
+    "o94sldBFNy4EDDetZMDH5wdrg5fzqV0XYvp7A1NNNGApumOjxPyoLPcdCtH4qR8qDV8qcPkj-"
+    "UjLPUaZU4fn2m4ZCGcYth5Fzww4AdE9kiQSPZcYgBM_8SOlMEN-"
+    "5Ca6AgYPUyaNXkeRKx8PTmghzRXkKIM8FuOYMIFEIygvcZTJcdcBwt0aozDMR4kKVygvHTH5leexCQ8gShI05o3POevPCp"
+    "h6dflfj-"
+    "oQTy16zGmAFLcjyEQUvSoE3ifqG1GqOIuuLPbb95PuwD0zs3VaETN1OQevROOkvIEeoXof1CGBvwwRrIh7Ym5eAig-"
+    "RpM30wmjZYeiZGE_QQBbUgBsTVqE-E_Ioh2Ssm5TcBVMRzFRbtgnAKtUMlvcZKblAJARVH8bSkq3XYvGI1n4zetyGamN_"
+    "uxRW7jSQqFQWFz_hQPLWlo9vaLR-YBAHl7ye9Pxqde5k4t_"
+    "I6RPoZBPZMG49hMqFBQ7ksbq2b3uNtJ9fjD8vZx8pfRdzKfuvdpBBn83w7rSDjQoJi5BcXCf3zLCCD3-"
+    "qxdaDRmcbe5sTN60HkoBAAy7-1na1AveKpaV9t0reBLXH78JyAowxLrcJKPWKnMy6SsI15z0YAEkIR_8TkRBAWOrQo1O_"
+    "7GtfJ5QvnLo7Ph2MFmtTKV-R4uxjj_OdCdpnQTtwQw_3lxshx2atrscyOU-K-whXs7PrvsJj2onWtCFlS0pje7eK5ntlV_"
+    "XaEOw_oMzwPG_"
+    "eYaAnjyBOg9bRCfPhAQVHRYFnxEUkKyAOfd2F82t9OHxb0pCCPOhKoP5jcUJ664o5NhodeTj6wP1zXDFp-"
+    "mIhycgKRAkS5Ss-kTCcuz-Kn2Kyr7b7XGhCUeb7RMBOUfAkxYmLzca584oupQ3CA56mBZNf0n-"
+    "W9DvVHcHAUPbYRR5FUbfUG1QTRThVwVj50glNpcGjIQB0zWuiMKC78dayTg2VmkFgfM5xIIIWM33uXVan2KI6ZGCJXzIur"
+    "OnbHHOiVzWEmLS86LvBggBmZGeKsnq9o9Su2eoOf_kJWLN9TbdVwnxFdCHs-OubdjBclBZpXxTZkIc";
 
 namespace {
 Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
@@ -306,6 +398,9 @@ public:
   void expectValidCookies(const CookieNames& cookie_names, const std::string& cookie_domain) {
     // Set SystemTime to a fixed point so we get consistent HMAC encodings between test runs.
     test_time_.setSystemTime(SystemTime(std::chrono::seconds(1000)));
+    // Generate a 5000-character long token for testing one of refresh_token, access_token or
+    // id_token.
+    std::string long_token(5000, 'x');
 
     const auto expires_at_s = DateUtil::nowToSeconds(test_time_.timeSystem()) + 10;
 
@@ -317,20 +412,26 @@ public:
          fmt::format("{}={}", cookie_names.oauth_expires_, expires_at_s)},
         {Http::Headers::get().Cookie.get(),
          absl::StrCat(cookie_names.bearer_token_, "=" + TEST_ENCRYPTED_ACCESS_TOKEN)},
+        // creating a refresh token longer than 4000 characters
         {Http::Headers::get().Cookie.get(),
-         absl::StrCat(cookie_names.oauth_hmac_, "=oMh0+qk68Y4ya4JGQqT+Ja1Y1X58Sc8iATRxPPPG5Yc=")},
+         absl::StrCat(cookie_names.refresh_token_, "_0=", long_token.substr(0, 3989))},
+        {Http::Headers::get().Cookie.get(),
+         absl::StrCat(cookie_names.refresh_token_, "_1=", long_token.substr(3989, 5000))},
+        {Http::Headers::get().Cookie.get(), absl::StrCat(cookie_names.refresh_token_, "_chunks=2")},
+        {Http::Headers::get().Cookie.get(),
+         absl::StrCat(cookie_names.oauth_hmac_, "=w+NyGgLaZqgSWSdXRnoBboGI00NSkVI4JhasWURioFI=")},
     };
 
     auto cookie_validator =
         std::make_shared<OAuth2CookieValidator>(test_time_, cookie_names, cookie_domain);
     EXPECT_EQ(cookie_validator->token(), "");
-    EXPECT_EQ(cookie_validator->refreshToken(), "");
     cookie_validator->setParams(request_headers, TEST_HMAC_SECRET);
 
     EXPECT_TRUE(cookie_validator->hmacIsValid());
     EXPECT_TRUE(cookie_validator->timestampIsValid());
     EXPECT_TRUE(cookie_validator->isValid());
-    EXPECT_FALSE(cookie_validator->canUpdateTokenByRefreshToken());
+    EXPECT_EQ(cookie_validator->refreshToken(), long_token);
+    EXPECT_TRUE(cookie_validator->canUpdateTokenByRefreshToken());
 
     // If we advance time beyond 10s the timestamp should no longer be valid.
     test_time_.advanceTimeWait(std::chrono::seconds(11));
@@ -809,6 +910,8 @@ TEST_F(OAuth2Test, PreservesQueryParametersInAuthorizationEndpointWithUrlEncodin
  * Expected behavior: the filter should redirect to the server name with cleared OAuth cookies.
  */
 TEST_F(OAuth2Test, RequestSignout) {
+  std::string long_token(5000, 'x');
+
   Http::TestRequestHeaderMapImpl request_headers{
       {Http::Headers::get().Path.get(), "/_signout"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
@@ -821,16 +924,23 @@ TEST_F(OAuth2Test, RequestSignout) {
       {Http::Headers::get().Cookie.get(), "CodeVerifier.1=code_verifier_1"},
       {Http::Headers::get().Cookie.get(), "OauthNonce.2=csrf_token_2"},
       {Http::Headers::get().Cookie.get(), "CodeVerifier.2=code_verifier_2"},
+      {Http::Headers::get().Cookie.get(),
+       absl::StrCat("BearerToken_0=", long_token.substr(0, 3955))},
+      {Http::Headers::get().Cookie.get(),
+       absl::StrCat("BearerToken_1=", long_token.substr(3955, 5000))},
+      {Http::Headers::get().Cookie.get(), "BearerToken_chunks=2"},
   };
 
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, true))
       .WillOnce(Invoke([&](Http::ResponseHeaderMap& headers, bool) {
         EXPECT_EQ(headers.Status()->value(), "302");
-        EXPECT_EQ(headers.get(Http::Headers::get().SetCookie).size(), 10);
+        EXPECT_EQ(headers.get(Http::Headers::get().SetCookie).size(), 12);
         EXPECT_EQ(headers.get(Http::Headers::get().Location)[0]->value().getStringView(),
                   "https://traffic.example.com/");
         EXPECT_EQ(Http::Utility::parseSetCookieValue(headers, "OauthHMAC"), "deleted");
-        EXPECT_EQ(Http::Utility::parseSetCookieValue(headers, "BearerToken"), "deleted");
+        EXPECT_EQ(Http::Utility::parseSetCookieValue(headers, "BearerToken_0"), "deleted");
+        EXPECT_EQ(Http::Utility::parseSetCookieValue(headers, "BearerToken_1"), "deleted");
+        EXPECT_EQ(Http::Utility::parseSetCookieValue(headers, "BearerToken_chunks"), "deleted");
         EXPECT_EQ(Http::Utility::parseSetCookieValue(headers, "IdToken"), "deleted");
         EXPECT_EQ(Http::Utility::parseSetCookieValue(headers, "RefreshToken"), "deleted");
         EXPECT_EQ(Http::Utility::parseSetCookieValue(headers, "OauthNonce"), "deleted");
@@ -2769,6 +2879,54 @@ TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokens) {
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), true));
 
   filter_->onGetAccessTokenSuccess("access_code", "some-id-token", "some-refresh-token",
+                                   std::chrono::seconds(600));
+}
+
+TEST_F(OAuth2Test, OAuthAccessTokenSucessWithChunkedToken) {
+  std::string long_token(5000, 'x');
+  oauthHMAC = "70RVEPVYna4P+pWr7p9ILsA9RobsKbFUiuMp5FGpAm4=;";
+  // Set SystemTime to a fixed point so we get consistent HMAC encodings between test runs.
+  test_time_.setSystemTime(SystemTime(std::chrono::seconds(1000)));
+
+  // host_ must be set, which is guaranteed (ASAN).
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Path.get(), "/_signout"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+  };
+  filter_->decodeHeaders(request_headers, false);
+
+  // Expected response after the callback is complete.
+  Http::TestRequestHeaderMapImpl expected_headers{
+      {Http::Headers::get().Status.get(), "302"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthHMAC=" + oauthHMAC + "path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthExpires=1600;path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(),
+       absl::StrCat("BearerToken_0=", TEST_ENCRYPTED_ACCESS_TOKEN_CHUNK_1,
+                    ";path=/;Max-Age=600;secure;HttpOnly")},
+      {Http::Headers::get().SetCookie.get(),
+       absl::StrCat("BearerToken_1=", TEST_ENCRYPTED_ACCESS_TOKEN_CHUNK_2,
+                    ";path=/;Max-Age=600;secure;HttpOnly")},
+      {Http::Headers::get().SetCookie.get(),
+       "BearerToken_chunks=2;path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(),
+       "IdToken=" + TEST_ENCRYPTED_ID_TOKEN + ";path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthNonce.00000000075bcd15=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthNonce=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
+      {Http::Headers::get().SetCookie.get(),
+       "CodeVerifier.00000000075bcd15=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
+      {Http::Headers::get().SetCookie.get(),
+       "CodeVerifier=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
+      {Http::Headers::get().Location.get(), ""},
+  };
+
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), true));
+
+  filter_->onGetAccessTokenSuccess(long_token, "some-id-token", "some-refresh-token",
                                    std::chrono::seconds(600));
 }
 
@@ -4801,6 +4959,86 @@ TEST_F(OAuth2Test, OAuthTestCustomCookiePaths) {
     EXPECT_TRUE(found_hmac_delete) << "OauthHMAC deletion cookie not found.";
     EXPECT_TRUE(found_nonce_delete) << "OauthNonce deletion cookie not found.";
     EXPECT_TRUE(found_code_verifier_delete) << "CodeVerifier deletion cookie not found.";
+  }
+}
+
+TEST_F(OAuth2Test, SetTokenCookie) {
+  init(getConfig(true /* forward_bearer_token */, true /* use_refresh_token */));
+
+  // Helper function to create tokens of specific sizes
+  auto createToken = [](size_t size, char fill_char) { return std::string(size, fill_char); };
+
+  // Test: Mixed token sizes - single cookie, chunked, and too large
+  {
+    // Access token: Small enough to fit in a single cookie
+    std::string access_token = createToken(100, 'a');
+
+    // ID token: Large enough to require chunking
+    std::string id_token = createToken(5000, 'i');
+
+    // Refresh token: Extremely large, should exceed max chunks limit of 15 per token
+    std::string refresh_token = createToken(4096 * 15, 'r');
+
+    Http::TestRequestHeaderMapImpl request_headers{
+        {Http::Headers::get().Path.get(), "/original_path?var1=1&var2=2"},
+        {Http::Headers::get().Host.get(), "traffic.example.com"},
+        {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+        {Http::Headers::get().Scheme.get(), "https"},
+    };
+
+    EXPECT_CALL(*validator_, setParams(_, _));
+    EXPECT_CALL(*validator_, isValid()).WillOnce(Return(true));
+    std::string legit_token{"legit_token"};
+    EXPECT_CALL(*validator_, token()).WillRepeatedly(ReturnRef(legit_token));
+    filter_->decodeHeaders(request_headers, false);
+
+    Http::TestResponseHeaderMapImpl response_headers;
+    EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, true))
+        .WillOnce(Invoke([&response_headers](Http::ResponseHeaderMap& headers, bool) {
+          response_headers = Http::TestResponseHeaderMapImpl(headers);
+        }));
+
+    filter_->onGetAccessTokenSuccess(access_token, id_token, refresh_token,
+                                     std::chrono::seconds(600));
+
+    auto extract_cookies = [](const Http::TestResponseHeaderMapImpl& headers) {
+      std::vector<std::string> cookies;
+      headers.iterate([&cookies](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+        if (header.key().getStringView() == Http::Headers::get().SetCookie.get()) {
+          cookies.push_back(std::string(header.value().getStringView()));
+        }
+        return Http::HeaderMap::Iterate::Continue;
+      });
+      return cookies;
+    };
+    auto cookies = extract_cookies(response_headers);
+
+    // Count cookies by type
+    int bearer_token_count = 0;
+    int id_token_chunk_count = 0;
+    int id_token_chunks_count = 0;
+    int refresh_token_count = 0;
+
+    for (const auto& cookie : cookies) {
+      if (cookie.find("BearerToken=") == 0) {
+        bearer_token_count++;
+      } else if (cookie.find("IdToken_0=") == 0) {
+        id_token_chunk_count++;
+      } else if (cookie.find("IdToken_1=") == 0) {
+        id_token_chunk_count++;
+      } else if (cookie.find("IdToken_chunks=2") == 0) {
+        id_token_chunks_count++;
+      } else if (cookie.find("RefreshToken") == 0) {
+        refresh_token_count++;
+      }
+    }
+
+    // Verify expected cookie counts
+    EXPECT_EQ(bearer_token_count, 1) << "Expected exactly 1 BearerToken cookie";
+    EXPECT_EQ(id_token_chunk_count, 2)
+        << "Expected exactly 2 IdToken chunk cookies (IdToken_0 and IdToken_1)";
+    EXPECT_EQ(id_token_chunks_count, 1) << "Expected exactly 1 IdToken_chunks cookie";
+    EXPECT_EQ(refresh_token_count, 0) << "Expected no RefreshToken cookies (token too large)";
   }
 }
 
