@@ -34,6 +34,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.transport_sockets.http_11_proxy"],
     rbe_pool = "2core",
     deps = [
+        "//source/common/network:utility_lib",
         "//source/extensions/clusters/dynamic_forward_proxy:cluster",
         "//source/extensions/filters/http/dynamic_forward_proxy:config",
         "//source/extensions/filters/network/tcp_proxy:config",
