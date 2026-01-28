@@ -1,6 +1,6 @@
 #include "source/extensions/bootstrap/dynamic_modules/extension.h"
 #include "source/extensions/bootstrap/dynamic_modules/extension_config.h"
-#include "source/extensions/dynamic_modules/abi.h"
+#include "source/extensions/dynamic_modules/abi/abi.h"
 
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"

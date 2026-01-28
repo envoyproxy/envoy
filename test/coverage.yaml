@@ -84,3 +84,4 @@ directories:
   source/extensions/health_checkers/grpc: 92.3
   source/extensions/config_subscription/rest: 94.9
   source/extensions/matching/input_matchers/cel_matcher: 100.0
+  source/extensions/dynamic_modules/sdk/cpp: 0.0  # SDK code self not directly tested
