@@ -70,14 +70,14 @@ message RedisProxy {
       // in its INFO response. Standard Redis does not support this field.
       //
       // The client zone is determined from Envoy's node.locality.zone.
-      AZ_AFFINITY = 5;
+      LOCAL_ZONE_AFFINITY = 5;
 
-      // Similar to AZ_AFFINITY, but also considers the primary node for same-zone routing.
+      // Similar to LOCAL_ZONE_AFFINITY, but also considers the primary node for same-zone routing.
       // Priority order: replicas in same zone -> primary in same zone -> any replica -> primary.
       // This is useful when reducing cross-zone traffic is more important than read distribution.
       //
       // Note: Zone discovery currently works with Valkey only.
-      AZ_AFFINITY_REPLICAS_AND_PRIMARY = 6;
+      LOCAL_ZONE_AFFINITY_REPLICAS_AND_PRIMARY = 6;
     }
 
     // Per-operation timeout in milliseconds. The timer starts when the first

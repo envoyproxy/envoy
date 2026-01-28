@@ -62,12 +62,12 @@ ConfigImpl::ConfigImpl(
     read_policy_ = ReadPolicy::Any;
     break;
   case envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::ConnPoolSettings::
-      AZ_AFFINITY:
-    read_policy_ = ReadPolicy::AzAffinity;
+      LOCAL_ZONE_AFFINITY:
+    read_policy_ = ReadPolicy::LocalZoneAffinity;
     break;
   case envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::ConnPoolSettings::
-      AZ_AFFINITY_REPLICAS_AND_PRIMARY:
-    read_policy_ = ReadPolicy::AzAffinityReplicasAndPrimary;
+      LOCAL_ZONE_AFFINITY_REPLICAS_AND_PRIMARY:
+    read_policy_ = ReadPolicy::LocalZoneAffinityReplicasAndPrimary;
     break;
   }
 

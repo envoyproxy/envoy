@@ -22,8 +22,8 @@ new_features:
 - area: redis
   change: |
     Added zone-aware routing support for Redis Cluster proxy. New read policies
-    :ref:`AZ_AFFINITY <envoy_v3_api_enum_value_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.ReadPolicy.AZ_AFFINITY>`
-    and :ref:`AZ_AFFINITY_REPLICAS_AND_PRIMARY <envoy_v3_api_enum_value_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.ReadPolicy.AZ_AFFINITY_REPLICAS_AND_PRIMARY>`
+    :ref:`LOCAL_ZONE_AFFINITY <envoy_v3_api_enum_value_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.ReadPolicy.LOCAL_ZONE_AFFINITY>`
+    and :ref:`LOCAL_ZONE_AFFINITY_REPLICAS_AND_PRIMARY <envoy_v3_api_enum_value_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.ReadPolicy.LOCAL_ZONE_AFFINITY_REPLICAS_AND_PRIMARY>`
     route read requests to replicas in the same availability zone. Zone discovery is enabled via
     :ref:`enable_zone_discovery <envoy_v3_api_field_extensions.clusters.redis.v3.RedisClusterConfig.enable_zone_discovery>`.
     Note: This feature currently works with Valkey only.

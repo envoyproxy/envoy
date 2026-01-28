@@ -165,22 +165,17 @@ private:
   // A redis node in the Redis cluster.
   class RedisHost : public Upstream::HostImpl {
   public:
-    // Factory method without zone (for backward compatibility)
-    static absl::StatusOr<std::unique_ptr<RedisHost>>
-    create(Upstream::ClusterInfoConstSharedPtr cluster, const std::string& hostname,
-           Network::Address::InstanceConstSharedPtr address, RedisCluster& parent, bool primary);
-
-    // Factory method with zone parameter - sets locality.zone on the host
+    // Factory method with optional zone parameter - sets locality.zone on the host if provided
     static absl::StatusOr<std::unique_ptr<RedisHost>>
     create(Upstream::ClusterInfoConstSharedPtr cluster, const std::string& hostname,
            Network::Address::InstanceConstSharedPtr address, RedisCluster& parent, bool primary,
-           const std::string& zone);
+           const std::string& zone = "");
 
   protected:
-    // Constructor without zone
+    // Constructor with optional zone - creates locality with zone set if non-empty
     RedisHost(Upstream::ClusterInfoConstSharedPtr cluster, const std::string& hostname,
               Network::Address::InstanceConstSharedPtr address, RedisCluster& parent, bool primary,
-              absl::Status& creation_status)
+              const std::string& zone, absl::Status& creation_status)
         : Upstream::HostImpl(
               creation_status, cluster, hostname, address,
               // TODO(zyfjeff): Created through metadata shared pool
@@ -189,22 +184,6 @@ private:
                   parent.localityLbEndpoint().metadata()),
               parent.lbEndpoint().load_balancing_weight().value(),
               // TODO(adisuissa): Convert to use a shared pool of localities.
-              std::make_shared<const envoy::config::core::v3::Locality>(
-                  parent.localityLbEndpoint().locality()),
-              parent.lbEndpoint().endpoint().health_check_config(),
-              parent.localityLbEndpoint().priority(), parent.lbEndpoint().health_status()),
-          primary_(primary) {}
-
-    // Constructor with zone - creates locality with zone set
-    RedisHost(Upstream::ClusterInfoConstSharedPtr cluster, const std::string& hostname,
-              Network::Address::InstanceConstSharedPtr address, RedisCluster& parent, bool primary,
-              const std::string& zone, absl::Status& creation_status)
-        : Upstream::HostImpl(
-              creation_status, cluster, hostname, address,
-              std::make_shared<envoy::config::core::v3::Metadata>(parent.lbEndpoint().metadata()),
-              std::make_shared<envoy::config::core::v3::Metadata>(
-                  parent.localityLbEndpoint().metadata()),
-              parent.lbEndpoint().load_balancing_weight().value(),
               makeLocalityWithZone(parent.localityLbEndpoint().locality(), zone),
               parent.lbEndpoint().endpoint().health_check_config(),
               parent.localityLbEndpoint().priority(), parent.lbEndpoint().health_status()),
@@ -213,7 +192,8 @@ private:
     bool isPrimary() const { return primary_; }
 
   private:
-    // Helper to create Locality proto with zone set
+    // Helper to create Locality proto with zone set if non-empty.
+    // Returns the base locality (as shared_ptr) if zone is empty.
     static std::shared_ptr<const envoy::config::core::v3::Locality>
     makeLocalityWithZone(const envoy::config::core::v3::Locality& base_locality,
                          const std::string& zone);

@@ -629,24 +629,25 @@ TEST_F(RedisLoadBalancerContextImplTest, ClientZone) {
 
   // Test with client zone specified
   RedisLoadBalancerContextImpl context1(
-      "foo", true, true, get_request, NetworkFilters::Common::Redis::Client::ReadPolicy::AzAffinity,
-      "us-east-1a");
+      "foo", true, true, get_request,
+      NetworkFilters::Common::Redis::Client::ReadPolicy::LocalZoneAffinity, "us-east-1a");
 
   EXPECT_EQ("us-east-1a", context1.clientZone());
-  EXPECT_EQ(NetworkFilters::Common::Redis::Client::ReadPolicy::AzAffinity, context1.readPolicy());
+  EXPECT_EQ(NetworkFilters::Common::Redis::Client::ReadPolicy::LocalZoneAffinity,
+            context1.readPolicy());
 
   // Test with empty client zone
   RedisLoadBalancerContextImpl context2(
       "foo", true, true, get_request,
-      NetworkFilters::Common::Redis::Client::ReadPolicy::AzAffinityReplicasAndPrimary);
+      NetworkFilters::Common::Redis::Client::ReadPolicy::LocalZoneAffinityReplicasAndPrimary);
 
   EXPECT_EQ("", context2.clientZone());
-  EXPECT_EQ(NetworkFilters::Common::Redis::Client::ReadPolicy::AzAffinityReplicasAndPrimary,
+  EXPECT_EQ(NetworkFilters::Common::Redis::Client::ReadPolicy::LocalZoneAffinityReplicasAndPrimary,
             context2.readPolicy());
 }
 
-// Tests for AZ_AFFINITY read policy with replicas in the same zone
-TEST_F(RedisClusterLoadBalancerTest, AzAffinityWithLocalReplica) {
+// Tests for LOCAL_ZONE_AFFINITY read policy with replicas in the same zone
+TEST_F(RedisClusterLoadBalancerTest, LocalZoneAffinityWithLocalReplica) {
   // Setup: primary in zone-a, replica in zone-a (same as client)
   // Hosts must have locality zones set - RedisShard reads zone from host->locality().zone()
   Upstream::HostVector hosts{
@@ -674,11 +675,11 @@ TEST_F(RedisClusterLoadBalancerTest, AzAffinityWithLocalReplica) {
       {8001, 3}, // slot 1: replica in zone-b (no local replica, fall back to any replica)
   };
   validateAssignment(hosts, expected_assignments, true,
-                     NetworkFilters::Common::Redis::Client::ReadPolicy::AzAffinity, "zone-a");
+                     NetworkFilters::Common::Redis::Client::ReadPolicy::LocalZoneAffinity, "zone-a");
 }
 
-// Tests for AZ_AFFINITY when no local replica exists - should fall back to any replica
-TEST_F(RedisClusterLoadBalancerTest, AzAffinityNoLocalReplica) {
+// Tests for LOCAL_ZONE_AFFINITY when no local replica exists - should fall back to any replica
+TEST_F(RedisClusterLoadBalancerTest, LocalZoneAffinityNoLocalReplica) {
   // Hosts must have locality zones set - RedisShard reads zone from host->locality().zone()
   Upstream::HostVector hosts{
       makeHostWithZone("tcp://127.0.0.1:90", "zone-a"), // primary, zone-a
@@ -700,11 +701,11 @@ TEST_F(RedisClusterLoadBalancerTest, AzAffinityNoLocalReplica) {
       {0, 1}, // falls back to replica in zone-b
   };
   validateAssignment(hosts, expected_assignments, true,
-                     NetworkFilters::Common::Redis::Client::ReadPolicy::AzAffinity, "zone-c");
+                     NetworkFilters::Common::Redis::Client::ReadPolicy::LocalZoneAffinity, "zone-c");
 }
 
-// Tests for AZ_AFFINITY when no replica exists - should fall back to primary
-TEST_F(RedisClusterLoadBalancerTest, AzAffinityNoReplica) {
+// Tests for LOCAL_ZONE_AFFINITY when no replica exists - should fall back to primary
+TEST_F(RedisClusterLoadBalancerTest, LocalZoneAffinityNoReplica) {
   // Hosts must have locality zones set - RedisShard reads zone from host->locality().zone()
   Upstream::HostVector hosts{
       makeHostWithZone("tcp://127.0.0.1:90", "zone-a"), // primary only
@@ -724,11 +725,11 @@ TEST_F(RedisClusterLoadBalancerTest, AzAffinityNoReplica) {
       {0, 0}, // falls back to primary
   };
   validateAssignment(hosts, expected_assignments, true,
-                     NetworkFilters::Common::Redis::Client::ReadPolicy::AzAffinity, "zone-a");
+                     NetworkFilters::Common::Redis::Client::ReadPolicy::LocalZoneAffinity, "zone-a");
 }
 
-// Tests for AZ_AFFINITY_REPLICAS_AND_PRIMARY with local replica
-TEST_F(RedisClusterLoadBalancerTest, AzAffinityReplicasAndPrimaryWithLocalReplica) {
+// Tests for LOCAL_ZONE_AFFINITY_REPLICAS_AND_PRIMARY with local replica
+TEST_F(RedisClusterLoadBalancerTest, LocalZoneAffinityReplicasAndPrimaryWithLocalReplica) {
   // Hosts must have locality zones set - RedisShard reads zone from host->locality().zone()
   Upstream::HostVector hosts{
       makeHostWithZone("tcp://127.0.0.1:90", "zone-a"), // primary, zone-a
@@ -751,11 +752,12 @@ TEST_F(RedisClusterLoadBalancerTest, AzAffinityReplicasAndPrimaryWithLocalReplic
   };
   validateAssignment(
       hosts, expected_assignments, true,
-      NetworkFilters::Common::Redis::Client::ReadPolicy::AzAffinityReplicasAndPrimary, "zone-a");
+      NetworkFilters::Common::Redis::Client::ReadPolicy::LocalZoneAffinityReplicasAndPrimary,
+      "zone-a");
 }
 
-// Tests for AZ_AFFINITY_REPLICAS_AND_PRIMARY - prefer local primary when no local replica
-TEST_F(RedisClusterLoadBalancerTest, AzAffinityReplicasAndPrimaryLocalPrimary) {
+// Tests for LOCAL_ZONE_AFFINITY_REPLICAS_AND_PRIMARY - prefer local primary when no local replica
+TEST_F(RedisClusterLoadBalancerTest, LocalZoneAffinityReplicasAndPrimaryLocalPrimary) {
   // Hosts must have locality zones set - RedisShard reads zone from host->locality().zone()
   Upstream::HostVector hosts{
       makeHostWithZone("tcp://127.0.0.1:90", "zone-a"), // primary, zone-a (same as client)
@@ -778,11 +780,12 @@ TEST_F(RedisClusterLoadBalancerTest, AzAffinityReplicasAndPrimaryLocalPrimary) {
   };
   validateAssignment(
       hosts, expected_assignments, true,
-      NetworkFilters::Common::Redis::Client::ReadPolicy::AzAffinityReplicasAndPrimary, "zone-a");
+      NetworkFilters::Common::Redis::Client::ReadPolicy::LocalZoneAffinityReplicasAndPrimary,
+      "zone-a");
 }
 
-// Tests for AZ_AFFINITY_REPLICAS_AND_PRIMARY - fall back to any replica when no local hosts
-TEST_F(RedisClusterLoadBalancerTest, AzAffinityReplicasAndPrimaryFallbackToReplica) {
+// Tests for LOCAL_ZONE_AFFINITY_REPLICAS_AND_PRIMARY - fall back to any replica when no local hosts
+TEST_F(RedisClusterLoadBalancerTest, LocalZoneAffinityReplicasAndPrimaryFallbackToReplica) {
   // Hosts must have locality zones set - RedisShard reads zone from host->locality().zone()
   Upstream::HostVector hosts{
       makeHostWithZone("tcp://127.0.0.1:90", "zone-a"), // primary, zone-a
@@ -805,11 +808,12 @@ TEST_F(RedisClusterLoadBalancerTest, AzAffinityReplicasAndPrimaryFallbackToRepli
   };
   validateAssignment(
       hosts, expected_assignments, true,
-      NetworkFilters::Common::Redis::Client::ReadPolicy::AzAffinityReplicasAndPrimary, "zone-c");
+      NetworkFilters::Common::Redis::Client::ReadPolicy::LocalZoneAffinityReplicasAndPrimary,
+      "zone-c");
 }
 
-// Tests for AZ_AFFINITY_REPLICAS_AND_PRIMARY - fall back to primary when no replicas
-TEST_F(RedisClusterLoadBalancerTest, AzAffinityReplicasAndPrimaryNoReplica) {
+// Tests for LOCAL_ZONE_AFFINITY_REPLICAS_AND_PRIMARY - fall back to primary when no replicas
+TEST_F(RedisClusterLoadBalancerTest, LocalZoneAffinityReplicasAndPrimaryNoReplica) {
   // Hosts must have locality zones set - RedisShard reads zone from host->locality().zone()
   Upstream::HostVector hosts{
       makeHostWithZone("tcp://127.0.0.1:90", "zone-a"), // primary only, zone-a
@@ -830,11 +834,12 @@ TEST_F(RedisClusterLoadBalancerTest, AzAffinityReplicasAndPrimaryNoReplica) {
   };
   validateAssignment(
       hosts, expected_assignments, true,
-      NetworkFilters::Common::Redis::Client::ReadPolicy::AzAffinityReplicasAndPrimary, "zone-c");
+      NetworkFilters::Common::Redis::Client::ReadPolicy::LocalZoneAffinityReplicasAndPrimary,
+      "zone-c");
 }
 
-// Tests for AZ_AFFINITY with empty client zone - should behave like PreferReplica
-TEST_F(RedisClusterLoadBalancerTest, AzAffinityEmptyClientZone) {
+// Tests for LOCAL_ZONE_AFFINITY with empty client zone - should behave like PreferReplica
+TEST_F(RedisClusterLoadBalancerTest, LocalZoneAffinityEmptyClientZone) {
   Upstream::HostVector hosts{
       Upstream::makeTestHost(info_, "tcp://127.0.0.1:90"), // primary
       Upstream::makeTestHost(info_, "tcp://127.0.0.2:90"), // replica
@@ -855,7 +860,7 @@ TEST_F(RedisClusterLoadBalancerTest, AzAffinityEmptyClientZone) {
       {0, 1}, // any replica
   };
   validateAssignment(hosts, expected_assignments, true,
-                     NetworkFilters::Common::Redis::Client::ReadPolicy::AzAffinity, "");
+                     NetworkFilters::Common::Redis::Client::ReadPolicy::LocalZoneAffinity, "");
 }
 
 } // namespace Redis
