@@ -167,6 +167,13 @@ absl::string_view getErrorDescription(int err);
  */
 std::string getX509VerificationErrorInfo(X509_STORE_CTX* ctx);
 
+/**
+ * Returns a list of all Subject Alternative Names from the certificate.
+ * @param cert the certificate
+ * @return std::vector returns the list of subject alternate names as strings.
+ */
+std::vector<std::string> getCertificateSansForLogging(X509* cert);
+
 } // namespace Utility
 } // namespace Tls
 } // namespace TransportSockets

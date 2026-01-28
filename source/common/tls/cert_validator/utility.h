@@ -1,5 +1,8 @@
 #pragma once
 
+#include <string>
+#include <vector>
+
 #include "openssl/x509v3.h"
 
 namespace Envoy {
