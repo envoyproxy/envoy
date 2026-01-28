@@ -127,8 +127,9 @@ message OAuth2Credentials {
   string client_id = 1 [(validate.rules).string = {min_len: 1}];
 
   // The secret used to retrieve the access token. This value will be URL encoded when sent to the OAuth server.
-  transport_sockets.tls.v3.SdsSecretConfig token_secret = 2
-      [(validate.rules).message = {required: true}];
+  // This field is required unless :ref:`auth_type <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.auth_type>`
+  // is set to ``TLS_CLIENT_AUTH``, in which case authentication is done via the client certificate.
+  transport_sockets.tls.v3.SdsSecretConfig token_secret = 2;
 
   // Configures how the secret token should be created.
   oneof token_formation {
@@ -159,6 +160,14 @@ message OAuth2Config {
 
     // The ``client_id`` and ``client_secret`` will be sent using HTTP Basic authentication scheme.
     BASIC_AUTH = 1;
+
+    // The client will be authenticated using mutual TLS (mTLS) with a client certificate.
+    // The ``client_secret`` is not required and will not be sent in the request to the
+    // authorization server.
+    // The client certificate must be configured in the cluster used by ``token_endpoint`` via
+    // transport socket configuration.
+    // This implements OAuth 2.0 Mutual-TLS Client Authentication as defined in RFC 8705.
+    TLS_CLIENT_AUTH = 2;
   }
 
   // Endpoint on the authorization server to retrieve the access token from.
