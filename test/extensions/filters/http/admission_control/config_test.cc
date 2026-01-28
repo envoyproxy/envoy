@@ -8,6 +8,7 @@
 #include "source/extensions/filters/http/admission_control/config.h"
 #include "source/extensions/filters/http/admission_control/evaluators/success_criteria_evaluator.h"
 
+#include "test/mocks/http/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/thread_local/mocks.h"
@@ -17,6 +18,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::NiceMock;
 using testing::Return;
 
@@ -217,6 +219,39 @@ success_criteria:
   EXPECT_CALL(runtime_.snapshot_, getDouble("foo.max_rejection_probability", 70.0))
       .WillOnce(Return(300.0));
   EXPECT_EQ(0.7, config->maxRejectionProbability());
+}
+
+TEST_F(AdmissionControlConfigTest, CreateFilterFactoryFromProtoWithServerContext) {
+  AdmissionControlFilterFactory admission_control_filter_factory;
+  const std::string yaml = R"EOF(
+enabled:
+  default_value: false
+  runtime_key: "foo.enabled"
+sampling_window: 1337s
+sr_threshold:
+  default_value:
+    value: 95
+  runtime_key: "foo.sr_threshold"
+aggression:
+  default_value: 4.2
+  runtime_key: "foo.aggression"
+success_criteria:
+  http_criteria:
+  grpc_criteria:
+)EOF";
+
+  AdmissionControlProto proto;
+  TestUtility::loadFromYamlAndValidate(yaml, proto);
+
+  // createFilterFactoryFromProtoWithServerContext returns FilterFactoryCb directly
+  auto cb = admission_control_filter_factory.createFilterFactoryFromProtoWithServerContext(
+      proto, "stats_prefix", context_.serverFactoryContext());
+
+  EXPECT_TRUE(cb != nullptr);
+
+  Http::MockFilterChainFactoryCallbacks callbacks;
+  EXPECT_CALL(callbacks, addStreamFilter(_));
+  cb(callbacks);
 }
 
 } // namespace
