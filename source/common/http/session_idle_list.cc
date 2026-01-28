@@ -1,13 +1,13 @@
 #include "source/common/http/session_idle_list.h"
 
 #include <algorithm>
+#include <cstddef>
 
-#include "source/common/common/assert.h"
-#include "source/common/common/logger.h"
-
-#include "absl/log/check.h"
 #include "absl/strings/str_format.h"
 #include "absl/time/time.h"
+#include "envoy/common/time.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/logger.h"
 
 namespace Envoy {
 namespace Http {
@@ -30,11 +30,12 @@ void SessionIdleList::MaybeTerminateIdleSessions() {
     IdleSessionInterface& next_session = idle_sessions_.next_session_to_terminate();
     absl::Duration time_since_enqueue = absl::FromChrono(
         dispatcher_.approximateMonotonicTime() - idle_sessions_.GetEnqueueTime(next_session));
-    if (time_since_enqueue < min_time_before_purge_allowed_) {
+    if (!ignore_min_time_before_termination_allowed_ &&
+        time_since_enqueue < min_time_before_termination_allowed_) {
       break;
     }
-    idle_sessions_.RemoveSessionFromList(next_session);
     next_session.TerminateIdleSession();
+    idle_sessions_.RemoveSessionFromList(next_session);
   }
   ENVOY_LOG(debug, "Terminated {} idle sessions.", num_terminated);
 };
@@ -53,7 +54,6 @@ void SessionIdleList::IdleSessions::AddSessionToList(MonotonicTime enqueue_time,
                                  static_cast<void*>(&session)));
   }
   map_[&session] = *iter;
-  ++size_;
 }
 
 void SessionIdleList::IdleSessions::RemoveSessionFromList(IdleSessionInterface& session) {
@@ -61,10 +61,6 @@ void SessionIdleList::IdleSessions::RemoveSessionFromList(IdleSessionInterface& 
   if (it != map_.end()) {
     set_.erase(it->second);
     map_.erase(it);
-    --size_;
-  } else {
-    IS_ENVOY_BUG(
-        absl::StrFormat("Session %p is not on the idle list.", static_cast<void*>(&session)));
   }
 }
 
@@ -78,8 +74,8 @@ MonotonicTime SessionIdleList::IdleSessions::GetEnqueueTime(IdleSessionInterface
 
 void SessionIdleList::IdleSessions::ResetSessionEnqueueTime(MonotonicTime enqueue_time,
                                                             IdleSessionInterface& session) {
-  RemoveSessionFromList(session);
-  AddSessionToList(enqueue_time, session);
+  this->RemoveSessionFromList(session);
+  this->AddSessionToList(enqueue_time, session);
 }
 
 } // namespace Http

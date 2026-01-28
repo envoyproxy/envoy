@@ -690,7 +690,6 @@ envoy_cc_library(
         "//source/common/access_log:access_log_lib",
         "//source/common/common:assert_lib",
         "//source/common/quic:envoy_quic_clock_lib",
-        "@com_google_absl//absl/base:dynamic_annotations",
         "@com_google_absl//absl/container:btree",
         "@com_google_absl//absl/container:node_hash_map",
         "@com_google_absl//absl/log:check",
