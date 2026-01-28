@@ -28,6 +28,7 @@ envoy_cc_library(
     hdrs = ["filter_config.h"],
     deps = [
         "//envoy/server:filter_config_interface",
+        "//source/extensions/filters/common/mcp:filter_state_lib",
         "@com_google_absl//absl/types:variant",
         "@envoy_api//envoy/extensions/filters/http/mcp_router/v3:pkg_cc_proto",
     ],

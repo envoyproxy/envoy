@@ -98,6 +98,11 @@ fn test_header_callbacks_filter_on_request_headers() {
     .returning(|_| Some(EnvoyBuffer::new("1.1.1.1:1234")))
     .once();
 
+  envoy_filter
+    .expect_get_worker_index()
+    .return_const(0u32)
+    .once();
+
   assert_eq!(
     f.on_request_headers(&mut envoy_filter, false),
     abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
@@ -230,4 +235,28 @@ fn test_body_callbacks_filter_on_bodies() {
     std::str::from_utf8(&f.get_final_read_response_body()).unwrap(),
     "coolcoolcoolcoolcoolcool"
   );
+}
+
+#[test]
+fn test_buffer_limit_callbacks() {
+  use envoy_proxy_dynamic_modules_rust_sdk::*;
+
+  let mut envoy_filter = MockEnvoyHttpFilter::default();
+
+  // Test get_buffer_limit.
+  envoy_filter
+    .expect_get_buffer_limit()
+    .return_const(1024u64)
+    .once();
+
+  assert_eq!(envoy_filter.get_buffer_limit(), 1024);
+
+  // Test set_buffer_limit.
+  envoy_filter
+    .expect_set_buffer_limit()
+    .withf(|limit| *limit == 2048)
+    .return_const(())
+    .once();
+
+  envoy_filter.set_buffer_limit(2048);
 }

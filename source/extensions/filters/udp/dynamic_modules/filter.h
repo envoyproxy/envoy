@@ -1,5 +1,7 @@
 #pragma once
 
+#include <sys/types.h>
+
 #include "envoy/network/filter.h"
 
 #include "source/common/common/logger.h"
@@ -14,7 +16,8 @@ class DynamicModuleUdpListenerFilter : public Network::UdpListenerReadFilter,
                                        public Logger::Loggable<Logger::Id::filter> {
 public:
   DynamicModuleUdpListenerFilter(Network::UdpReadFilterCallbacks& callbacks,
-                                 DynamicModuleUdpListenerFilterConfigSharedPtr config);
+                                 DynamicModuleUdpListenerFilterConfigSharedPtr config,
+                                 uint32_t worker_index);
   ~DynamicModuleUdpListenerFilter() override;
 
   // Network::UdpListenerReadFilter
@@ -36,10 +39,13 @@ public:
   void setCurrentDataForTest(Network::UdpRecvData* data) { current_data_ = data; }
 #endif
 
+  uint32_t workerIndex() const { return worker_index_; }
+
 private:
   const DynamicModuleUdpListenerFilterConfigSharedPtr config_;
   envoy_dynamic_module_type_udp_listener_filter_module_ptr in_module_filter_{nullptr};
   Network::UdpRecvData* current_data_{nullptr};
+  uint32_t worker_index_;
 };
 
 using DynamicModuleUdpListenerFilterSharedPtr = std::shared_ptr<DynamicModuleUdpListenerFilter>;

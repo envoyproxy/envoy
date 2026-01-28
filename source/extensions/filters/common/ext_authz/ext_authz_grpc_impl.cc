@@ -16,66 +16,85 @@ namespace Filters {
 namespace Common {
 namespace ExtAuthz {
 
-void copyHeaderFieldIntoResponse(
-    ResponsePtr& response,
-    const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption>& headers) {
-  for (const auto& header : headers) {
-    if (header.append().value()) {
-      response->headers_to_append.emplace_back(header.header().key(), header.header().value());
-    } else {
-      response->headers_to_set.emplace_back(header.header().key(), header.header().value());
-    }
+namespace {
+
+// Result of parsing a HeaderValueOption's append action.
+struct AppendActionResult {
+  HeaderAppendAction action;
+  bool from_deprecated_append;
+};
+
+// Converts proto HeaderValueOption to HeaderAppendAction.
+// Handles the deprecated append boolean for backward compatibility.
+// Returns the action and whether it came from the deprecated field.
+// Sets saw_invalid if the action is unknown.
+AppendActionResult getAppendAction(envoy::config::core::v3::HeaderValueOption& header,
+                                   bool& saw_invalid_append_actions) {
+  if (header.has_append()) {
+    // Handle deprecated append boolean for backward compatibility.
+    // When from_deprecated_append is true and action is APPEND_IF_EXISTS_OR_ADD,
+    // the filter will use appendCopy() instead of addCopy().
+    return {header.append().value() ? HeaderValueOption::APPEND_IF_EXISTS_OR_ADD
+                                    : HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD,
+            true};
+  }
+
+  if (!envoy::config::core::v3::HeaderValueOption::HeaderAppendAction_IsValid(
+          header.append_action())) {
+    saw_invalid_append_actions = true;
+    return {HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD, false};
+  }
+
+  return {header.append_action(), false};
+}
+
+// Moves header mutations from proto to the response vector, preserving order.
+// This is more efficient than copying strings since the proto data is not reused.
+void moveHeaderMutations(
+    Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption>& headers,
+    HeaderMutationVector& mutations, bool& saw_invalid_append_actions) {
+  mutations.reserve(mutations.size() + headers.size());
+  for (auto& header : headers) {
+    AppendActionResult result = getAppendAction(header, saw_invalid_append_actions);
+    mutations.push_back({std::move(*header.mutable_header()->mutable_key()),
+                         std::move(*header.mutable_header()->mutable_value()), result.action,
+                         result.from_deprecated_append});
   }
 }
 
-void copyOkResponseMutations(ResponsePtr& response,
-                             const envoy::service::auth::v3::OkHttpResponse& ok_response) {
-  copyHeaderFieldIntoResponse(response, ok_response.headers());
-
-  for (const auto& header : ok_response.response_headers_to_add()) {
-    if (header.has_append()) {
-      if (header.append().value()) {
-        response->response_headers_to_add.emplace_back(header.header().key(),
-                                                       header.header().value());
-      } else {
-        response->response_headers_to_set.emplace_back(header.header().key(),
-                                                       header.header().value());
-      }
-    } else {
-      switch (header.append_action()) {
-      case Router::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD:
-        response->response_headers_to_add.emplace_back(header.header().key(),
-                                                       header.header().value());
-        break;
-      case Router::HeaderValueOption::ADD_IF_ABSENT:
-        response->response_headers_to_add_if_absent.emplace_back(header.header().key(),
-                                                                 header.header().value());
-        break;
-      case Router::HeaderValueOption::OVERWRITE_IF_EXISTS:
-        response->response_headers_to_overwrite_if_exists.emplace_back(header.header().key(),
-                                                                       header.header().value());
-        break;
-      case Router::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD:
-        response->response_headers_to_set.emplace_back(header.header().key(),
-                                                       header.header().value());
-        break;
-      default:
-        response->saw_invalid_append_actions = true;
-        break;
-      }
-    }
+// Moves strings from proto repeated field to vector without copying.
+std::vector<std::string>
+moveStringsFromProto(Protobuf::RepeatedPtrField<std::string>& proto_strings) {
+  std::vector<std::string> result;
+  result.reserve(proto_strings.size());
+  for (auto& str : proto_strings) {
+    result.push_back(std::move(str));
   }
+  return result;
+}
 
-  response->headers_to_remove = std::vector<std::string>{ok_response.headers_to_remove().begin(),
-                                                         ok_response.headers_to_remove().end()};
+} // namespace
 
-  for (const auto& query_parameter : ok_response.query_parameters_to_set()) {
+void copyOkResponseMutations(ResponsePtr& response,
+                             envoy::service::auth::v3::OkHttpResponse* ok_response) {
+  // Move upstream request header mutations.
+  moveHeaderMutations(*ok_response->mutable_headers(), response->request_header_mutations,
+                      response->saw_invalid_append_actions);
+
+  // Move downstream response header mutations.
+  moveHeaderMutations(*ok_response->mutable_response_headers_to_add(),
+                      response->response_header_mutations, response->saw_invalid_append_actions);
+
+  // Move headers_to_remove to avoid copying strings.
+  response->headers_to_remove = moveStringsFromProto(*ok_response->mutable_headers_to_remove());
+
+  for (const auto& query_parameter : ok_response->query_parameters_to_set()) {
     response->query_parameters_to_set.emplace_back(query_parameter.key(), query_parameter.value());
   }
 
+  // Move query_parameters_to_remove to avoid copying strings.
   response->query_parameters_to_remove =
-      std::vector<std::string>{ok_response.query_parameters_to_remove().begin(),
-                               ok_response.query_parameters_to_remove().end()};
+      moveStringsFromProto(*ok_response->mutable_query_parameters_to_remove());
 }
 
 GrpcClientImpl::GrpcClientImpl(const Grpc::RawAsyncClientSharedPtr& async_client,
@@ -114,8 +133,7 @@ void GrpcClientImpl::onSuccess(std::unique_ptr<envoy::service::auth::v3::CheckRe
     span.setTag(TracingConstants::get().TraceStatus, TracingConstants::get().TraceOk);
     authz_response->status = CheckStatus::OK;
     if (response->has_ok_response()) {
-      const auto& ok_response = response->ok_response();
-      copyOkResponseMutations(authz_response, ok_response);
+      copyOkResponseMutations(authz_response, response->mutable_ok_response());
     }
   } else if (response->has_error_response()) {
     // If error_response is present, treat it as an error and not denial.
@@ -124,14 +142,17 @@ void GrpcClientImpl::onSuccess(std::unique_ptr<envoy::service::auth::v3::CheckRe
 
     // For error responses, don't set a default status_code.
     // Let the filter use status_on_error configuration.
-    const auto& error_response = response->error_response();
-    copyHeaderFieldIntoResponse(authz_response, error_response.headers());
+    auto* error_response = response->mutable_error_response();
+    // Move headers to local_response_header_mutations for local reply.
+    moveHeaderMutations(*error_response->mutable_headers(),
+                        authz_response->local_response_header_mutations,
+                        authz_response->saw_invalid_append_actions);
 
-    const uint32_t status_code = error_response.status().code();
+    const uint32_t status_code = error_response->status().code();
     if (status_code > 0) {
       authz_response->status_code = static_cast<Http::Code>(status_code);
     }
-    authz_response->body = error_response.body();
+    authz_response->body = error_response->body();
   } else {
     span.setTag(TracingConstants::get().TraceStatus, TracingConstants::get().TraceUnauthz);
     authz_response->status = CheckStatus::Denied;
@@ -139,13 +160,17 @@ void GrpcClientImpl::onSuccess(std::unique_ptr<envoy::service::auth::v3::CheckRe
     // The default HTTP status code for denied response is 403 Forbidden.
     authz_response->status_code = Http::Code::Forbidden;
     if (response->has_denied_response()) {
-      copyHeaderFieldIntoResponse(authz_response, response->denied_response().headers());
+      auto* denied_response = response->mutable_denied_response();
+      // Move headers to local_response_header_mutations for local reply.
+      moveHeaderMutations(*denied_response->mutable_headers(),
+                          authz_response->local_response_header_mutations,
+                          authz_response->saw_invalid_append_actions);
 
-      const uint32_t status_code = response->denied_response().status().code();
+      const uint32_t status_code = denied_response->status().code();
       if (status_code > 0) {
         authz_response->status_code = static_cast<Http::Code>(status_code);
       }
-      authz_response->body = response->denied_response().body();
+      authz_response->body = denied_response->body();
     }
   }
 
@@ -156,20 +181,17 @@ void GrpcClientImpl::onSuccess(std::unique_ptr<envoy::service::auth::v3::CheckRe
   } else {
     authz_response->dynamic_metadata = response->dynamic_metadata();
   }
-
   callbacks_->onComplete(std::move(authz_response));
   callbacks_ = nullptr;
 }
 
 void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::string&,
                                Tracing::Span&) {
-  ENVOY_LOG(trace, "CheckRequest call failed with status: {}",
-            Grpc::Utility::grpcStatusToString(status));
-  ASSERT(status != Grpc::Status::WellKnownGrpcStatus::Ok);
-  Response response{};
-  response.status = CheckStatus::Error;
-  response.grpc_status = status;
-  callbacks_->onComplete(std::make_unique<Response>(response));
+  ENVOY_LOG(trace, "ExtAuthz upstream failure: {}", status);
+  ResponsePtr authz_response = std::make_unique<Response>(Response{});
+  authz_response->status = CheckStatus::Error;
+  authz_response->grpc_status = status;
+  callbacks_->onComplete(std::move(authz_response));
   callbacks_ = nullptr;
 }
 

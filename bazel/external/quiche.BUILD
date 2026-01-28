@@ -2461,7 +2461,7 @@ envoy_quic_cc_library(
         ":quic_core_versions_lib",
         ":quic_platform",
         ":quiche_common_wire_serialization",
-        "@zlib",
+        "@envoy//bazel:zlib",
     ],
 )
 
@@ -2483,7 +2483,7 @@ envoy_quic_cc_library(
         ":quic_core_crypto_client_proof_source_lib",
         ":quic_core_crypto_crypto_handshake_lib",
         ":quiche_common_platform_client_stats",
-        "@zlib",
+        "@envoy//bazel:zlib",
     ],
 )
 
@@ -2504,7 +2504,7 @@ envoy_quic_cc_library(
         ":quic_core_proto_crypto_server_config_proto_header",
         ":quic_core_server_id_lib",
         ":quic_server_crypto_tls_handshake_lib",
-        "@zlib",
+        "@envoy//bazel:zlib",
     ],
 )
 
@@ -4357,6 +4357,16 @@ envoy_quic_cc_test_library(
 )
 
 envoy_quic_cc_test_library(
+    name = "quic_test_tools_crypto_stream_peer_lib",
+    srcs = ["quiche/quic/test_tools/quic_crypto_stream_peer.cc"],
+    hdrs = ["quiche/quic/test_tools/quic_crypto_stream_peer.h"],
+    deps = [
+        ":quic_core_session_lib",
+        ":quic_core_types_lib",
+    ],
+)
+
+envoy_quic_cc_test_library(
     name = "quic_test_tools_crypto_server_config_peer_lib",
     srcs = [
         "quiche/quic/test_tools/quic_crypto_server_config_peer.cc",
@@ -4583,6 +4593,7 @@ envoy_quic_cc_test_library(
         ":quic_server_session_lib",
         ":quic_test_tools_config_peer_lib",
         ":quic_test_tools_connection_id_manager_peer_lib",
+        ":quic_test_tools_crypto_stream_peer_lib",
         ":quic_test_tools_framer_peer_lib",
         ":quic_test_tools_mock_clock_lib",
         ":quic_test_tools_mock_random_lib",
@@ -5133,6 +5144,7 @@ envoy_cc_test(
         ":http2_test_tools_test_utils_lib",
         ":quiche_common_platform_test",
         ":quiche_http_header_block_lib",
+        "@com_google_absl//absl/functional:bind_front",
     ],
 )
 

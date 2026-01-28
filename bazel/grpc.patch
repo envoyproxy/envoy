@@ -229,7 +229,7 @@ diff --git a/third_party/BUILD b/third_party/BUILD
 index 13a4714d4b..8664e99ffc 100644
 --- a/third_party/BUILD
 +++ b/third_party/BUILD
-@@ -33,19 +33,13 @@ config_setting(
+@@ -33,25 +33,19 @@ config_setting(
  
  alias(
      name = "libssl",
@@ -248,6 +248,13 @@ index 13a4714d4b..8664e99ffc 100644
 -        "//conditions:default": "@boringssl//:crypto",
 -    }),
 +    actual = "@envoy//bazel:boringcrypto",
+     tags = ["manual"],
+ )
+
+ alias(
+     name = "madler_zlib",
+-    actual = "@zlib//:zlib",
++    actual = "@envoy//bazel:zlib",
      tags = ["manual"],
  )
  

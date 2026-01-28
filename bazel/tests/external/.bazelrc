@@ -1,0 +1,113 @@
+#############################################################################
+# startup
+#############################################################################
+
+startup --host_jvm_args=-Xmx3g
+
+
+#############################################################################
+# global
+#############################################################################
+
+build --color=yes
+fetch --color=yes
+run --color=yes
+
+common --enable_workspace
+common --noenable_bzlmod
+
+build --workspace_status_command="bash get_workspace_status"
+build --incompatible_strict_action_env
+build --action_env=SPHINX_RUNNER_ARGS
+build --cxxopt=-std=c++17 --host_cxxopt=-std=c++17
+build --action_env=BUILD_DOCS_SHA
+build --jobs=HOST_CPUS*.8
+build --verbose_failures
+
+common --@rules_python//python/config_settings:bootstrap_impl=script
+build --incompatible_default_to_explicit_init_py
+
+
+#############################################################################
+# ci
+#############################################################################
+
+common:ci --noshow_progress
+common:ci --noshow_loading_progress
+common:ci --test_output=errors
+
+build:remote-ci --config=ci
+build:remote-ci --remote_download_minimal
+
+
+#############################################################################
+# compiler
+#############################################################################
+
+# Common flags for Clang (shared between all clang variants)
+common:clang-common --linkopt=-fuse-ld=lld
+common:clang-common --@toolchains_llvm//toolchain/config:compiler-rt=false
+common:clang-common --@toolchains_llvm//toolchain/config:libunwind=false
+
+# Clang with libc++ (default)
+common:clang --config=clang-common
+common:clang --config=libc++
+common:clang --host_platform=@clang_platform
+common:clang --repo_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
+
+# Clang installed to non-standard location (ie not /opt/llvm/)
+common:clang-local --config=clang-common
+common:clang-local --config=libc++
+
+# libc++ - default for clang
+common:libc++ --action_env=CXXFLAGS=-stdlib=libc++
+common:libc++ --action_env=LDFLAGS="-stdlib=libc++ -fuse-ld=lld"
+common:libc++ --action_env=BAZEL_CXXOPTS=-stdlib=libc++
+common:libc++ --action_env=BAZEL_LINKLIBS=-l%:libc++.a:-l%:libc++abi.a
+common:libc++ --action_env=BAZEL_LINKOPTS=-lm:-pthread
+common:libc++ --define force_libcpp=enabled
+common:libc++ --@envoy//bazel:libc++=true
+
+
+#############################################################################
+# remote
+#############################################################################
+
+build:remote --spawn_strategy=remote,sandboxed,local
+build:remote --strategy=Javac=remote,sandboxed,local
+build:remote --strategy=Closure=remote,sandboxed,local
+build:remote --strategy=Genrule=remote,sandboxed,local
+build:remote --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
+# This flag may be more generally useful - it sets foreign_cc builds -jauto.
+# It is only set here because if it were the default it risks OOMing on local builds.
+build:remote --@envoy//bazel/foreign_cc:parallel_builds
+
+## RBE (Engflow Envoy)
+
+# this is not included in the `--config=rbe` target - set it to publish to engflow ui
+common:bes --bes_backend=grpcs://mordenite.cluster.engflow.com/
+common:bes --bes_results_url=https://mordenite.cluster.engflow.com/invocation/
+common:bes --bes_timeout=3600s
+common:bes --bes_upload_mode=fully_async
+common:bes --nolegacy_important_outputs
+
+common:engflow-common --google_default_credentials=false
+common:engflow-common --credential_helper=*.engflow.com=%workspace%/engflow-bazel-credential-helper.sh
+common:engflow-common --grpc_keepalive_time=60s
+common:engflow-common --grpc_keepalive_timeout=30s
+common:engflow-common --remote_cache_compression
+
+# this provides access to RBE+cache
+common:rbe --config=remote-cache
+common:rbe --config=remote-exec
+
+# this provides access to just cache
+common:remote-cache --config=engflow-common
+common:remote-cache --remote_cache=grpcs://mordenite.cluster.engflow.com
+common:remote-cache --remote_timeout=3600s
+
+common:remote-exec --remote_executor=grpcs://mordenite.cluster.engflow.com
+common:remote-exec --jobs=200
+common:remote-exec --define=engflow_rbe=true
+
+try-import %workspace%/repo.bazelrc

@@ -3,7 +3,7 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/stats/isolated_store_impl.h"
-#include "source/extensions/dynamic_modules/abi.h"
+#include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/filters/udp/dynamic_modules/filter.h"
 
 #include "test/extensions/dynamic_modules/util.h"
@@ -29,7 +29,7 @@ public:
     filter_config_ = std::make_shared<DynamicModuleUdpListenerFilterConfig>(
         proto_config, std::move(dynamic_module.value()), *stats_.rootScope());
 
-    filter_ = std::make_shared<DynamicModuleUdpListenerFilter>(callbacks_, filter_config_);
+    filter_ = std::make_shared<DynamicModuleUdpListenerFilter>(callbacks_, filter_config_, 1);
   }
 
   void TearDown() override { filter_.reset(); }
@@ -530,7 +530,7 @@ TEST_F(DynamicModuleUdpListenerFilterAbiCallbackTest, SendDatagramNoPeerAddress)
 TEST_F(DynamicModuleUdpListenerFilterAbiCallbackTest, SendDatagramNoCallbacks) {
   NiceMock<Network::MockUdpReadFilterCallbacks> local_callbacks;
   auto filter_without_listener =
-      std::make_shared<DynamicModuleUdpListenerFilter>(local_callbacks, filter_config_);
+      std::make_shared<DynamicModuleUdpListenerFilter>(local_callbacks, filter_config_, 1);
 
   Network::UdpRecvData data;
   data.buffer_ = std::make_unique<Buffer::OwnedImpl>("test");
@@ -576,6 +576,12 @@ TEST_F(DynamicModuleUdpListenerFilterAbiCallbackTest, SendDatagramIpv6) {
                                                                               peer_addr_buf, 9999));
 
   filter_->setCurrentDataForTest(nullptr);
+}
+
+TEST_F(DynamicModuleUdpListenerFilterAbiCallbackTest, GetWorkerIndex) {
+  uint32_t worker_index =
+      envoy_dynamic_module_callback_udp_listener_filter_get_worker_index(filterPtr());
+  EXPECT_EQ(1u, worker_index);
 }
 
 } // namespace DynamicModules
