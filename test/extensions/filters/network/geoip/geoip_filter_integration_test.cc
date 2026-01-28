@@ -242,6 +242,111 @@ typed_config:
   tcp_client->close();
 }
 
+// Tests that ASN DB takes precedence over ISP DB for asn_org lookups when both are configured.
+TEST_P(GeoipFilterIntegrationTest, AsnDbTakesPrecedenceOverIspDbForAsnOrg) {
+  const std::string set_filter_state_config = R"EOF(
+name: envoy.filters.network.set_filter_state
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.network.set_filter_state.v3.Config
+  on_new_connection:
+  - object_key: test.geoip.client_ip
+    format_string:
+      text_format_source:
+        inline_string: "89.160.20.112"
+)EOF";
+
+  // Configure with both ASN and ISP databases, requesting asn_org.
+  const std::string geoip_config = R"EOF(
+name: envoy.filters.network.geoip
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.network.geoip.v3.Geoip
+  stat_prefix: ""
+  client_ip: "%FILTER_STATE(test.geoip.client_ip:PLAIN)%"
+  provider:
+    name: envoy.geoip_providers.maxmind
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.geoip_providers.maxmind.v3.MaxMindConfig
+      common_provider_config:
+        geo_field_keys:
+          asn: "asn"
+          asn_org: "asn_org"
+      asn_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-ASN-Test.mmdb"
+      isp_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-ISP-Test.mmdb"
+)EOF";
+
+  useListenerAccessLog("%FILTER_STATE(envoy.geoip:PLAIN)%");
+  config_helper_.renameListener("tcp");
+  config_helper_.addNetworkFilter(TestEnvironment::substitute(geoip_config));
+  config_helper_.addNetworkFilter(set_filter_state_config);
+  initialize();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp"));
+  ASSERT_TRUE(tcp_client->connected());
+
+  test_server_->waitForCounterEq("geoip.total", 1);
+
+  tcp_client->close();
+  test_server_.reset();
+
+  // Verify filter state contains correct geolocation data from ASN DB (not ISP DB).
+  std::string access_log = waitForAccessLog(listener_access_log_name_);
+  EXPECT_THAT(access_log, testing::HasSubstr("\"asn\":\"29518\""));
+  EXPECT_THAT(access_log, testing::HasSubstr("\"asn_org\":\"Bredband2 AB\""));
+}
+
+// Tests that asn_org falls back to ISP DB when ASN DB is not configured.
+TEST_P(GeoipFilterIntegrationTest, AsnOrgFallsBackToIspDbWhenAsnDbNotConfigured) {
+  const std::string set_filter_state_config = R"EOF(
+name: envoy.filters.network.set_filter_state
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.network.set_filter_state.v3.Config
+  on_new_connection:
+  - object_key: test.geoip.client_ip
+    format_string:
+      text_format_source:
+        inline_string: "::1.128.0.1"
+)EOF";
+
+  // Configure with only ISP database (no ASN DB), requesting asn_org.
+  const std::string geoip_config = R"EOF(
+name: envoy.filters.network.geoip
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.network.geoip.v3.Geoip
+  stat_prefix: ""
+  client_ip: "%FILTER_STATE(test.geoip.client_ip:PLAIN)%"
+  provider:
+    name: envoy.geoip_providers.maxmind
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.geoip_providers.maxmind.v3.MaxMindConfig
+      common_provider_config:
+        geo_field_keys:
+          asn: "asn"
+          asn_org: "asn_org"
+          isp: "isp"
+      isp_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-ISP-Test.mmdb"
+)EOF";
+
+  useListenerAccessLog("%FILTER_STATE(envoy.geoip:PLAIN)%");
+  config_helper_.renameListener("tcp");
+  config_helper_.addNetworkFilter(TestEnvironment::substitute(geoip_config));
+  config_helper_.addNetworkFilter(set_filter_state_config);
+  initialize();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp"));
+  ASSERT_TRUE(tcp_client->connected());
+
+  test_server_->waitForCounterEq("geoip.total", 1);
+
+  tcp_client->close();
+  test_server_.reset();
+
+  // Verify filter state contains correct geolocation data from ISP DB (fallback).
+  std::string access_log = waitForAccessLog(listener_access_log_name_);
+  EXPECT_THAT(access_log, testing::HasSubstr("\"asn\":\"1221\""));
+  EXPECT_THAT(access_log, testing::HasSubstr("\"asn_org\":\"Telstra Internet\""));
+  EXPECT_THAT(access_log, testing::HasSubstr("\"isp\":\"Telstra Internet\""));
+}
+
 } // namespace
 } // namespace Geoip
 } // namespace NetworkFilters
