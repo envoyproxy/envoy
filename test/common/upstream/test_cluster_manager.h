@@ -184,7 +184,10 @@ public:
   }
 
   OdCdsApiHandlePtr createOdCdsApiHandle(OdCdsApiSharedPtr odcds) {
-    return ClusterManagerImpl::OdCdsApiHandleImpl::create(*this, std::move(odcds));
+    // For tests, generate a unique key based on the pointer address.
+    uint64_t config_source_key = reinterpret_cast<uint64_t>(odcds.get());
+    odcds_subscriptions_.emplace(config_source_key, std::move(odcds));
+    return ClusterManagerImpl::OdCdsApiHandleImpl::create(*this, config_source_key);
   }
 
   void notifyExpiredDiscovery(absl::string_view name) {
