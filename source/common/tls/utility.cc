@@ -565,7 +565,7 @@ std::vector<std::string> Utility::mapX509Stack(stack_st_X509& stack,
   return result;
 }
 
-std::vector<std::string> getCertificateSansForLogging(X509* cert) {
+std::vector<std::string> Utility::getCertificateSansForLogging(X509* cert) {
   std::vector<std::string> sans;
   // X509_get_ext_d2i should be available in all supported BoringSSL versions.
   bssl::UniquePtr<GENERAL_NAMES> san_names(
