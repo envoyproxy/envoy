@@ -41,6 +41,7 @@ paths:
   - bazel/external/http_parser/
   - bazel/rbe/toolchains/configs/
   - bazel-
+  - bssl-compat/
   - build
   - contrib/contrib_build_config.bzl
   - examples/wasm-cc

@@ -45,6 +45,7 @@ load(
     _envoy_select_hot_restart = "envoy_select_hot_restart",
     _envoy_select_nghttp2 = "envoy_select_nghttp2",
     _envoy_select_signal_trace = "envoy_select_signal_trace",
+    _envoy_select_ssl = "envoy_select_ssl",
     _envoy_select_static_extension_registration = "envoy_select_static_extension_registration",
     _envoy_select_wasm_cpp_tests = "envoy_select_wasm_cpp_tests",
     _envoy_select_wasm_rust_tests = "envoy_select_wasm_rust_tests",
@@ -93,11 +94,14 @@ def envoy_contrib_package():
 def _envoy_directory_genrule_impl(ctx):
     tree = ctx.actions.declare_directory(ctx.attr.name + ".outputs")
     ctx.actions.run_shell(
-        inputs = ctx.files.srcs,
+        inputs = ctx.files.srcs + ctx.files._openssl_libs,
         tools = ctx.files.tools,
         outputs = [tree],
         command = "mkdir -p " + tree.path + " && " + ctx.expand_location(ctx.attr.cmd),
-        env = {"GENRULE_OUTPUT_DIR": tree.path},
+        env = {
+            "GENRULE_OUTPUT_DIR": tree.path,
+            "LD_LIBRARY_PATH": ":".join([f.dirname for f in ctx.files._openssl_libs]),
+        },
         use_default_shell_env = True,
         toolchain = None,
     )
@@ -109,6 +113,10 @@ envoy_directory_genrule = rule(
         "srcs": attr.label_list(),
         "cmd": attr.string(),
         "tools": attr.label_list(),
+        "_openssl_libs": attr.label(
+            default = Label("@openssl//:libs"),
+            allow_files = True,
+        ),
     },
 )
 
@@ -255,6 +263,7 @@ envoy_select_hot_restart = _envoy_select_hot_restart
 envoy_select_nghttp2 = _envoy_select_nghttp2
 envoy_select_enable_http_datagrams = _envoy_select_enable_http_datagrams
 envoy_select_signal_trace = _envoy_select_signal_trace
+envoy_select_ssl = _envoy_select_ssl
 envoy_select_wasm_cpp_tests = _envoy_select_wasm_cpp_tests
 envoy_select_wasm_rust_tests = _envoy_select_wasm_rust_tests
 envoy_select_wasm_v8 = _envoy_select_wasm_v8
