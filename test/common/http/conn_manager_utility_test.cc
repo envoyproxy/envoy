@@ -2752,5 +2752,128 @@ TEST_F(ConnectionManagerUtilityTest, DiscardTEHeaderWithoutTrailers) {
   EXPECT_EQ("", headers.getTEValue());
 }
 
+// Verify that x-forwarded-proto is set to https when PROXY protocol destination port is 443.
+TEST_F(ConnectionManagerUtilityTest, ForwardedProtoFromProxyProtocolPort443) {
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(0));
+  // Configure port 443 as HTTPS destination port.
+  config_.https_destination_ports_ = {443, 8443};
+  config_.http_destination_ports_ = {80, 8080};
+
+  // Set local address as restored (simulating PROXY protocol) with port 443.
+  connection_.stream_info_.downstream_connection_info_provider_->restoreLocalAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1", 443));
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("12.12.12.12"));
+
+  TestRequestHeaderMapImpl headers;
+  callMutateRequestHeaders(headers, Protocol::Http2);
+
+  // Even though connection is not TLS, x-forwarded-proto should be https due to PROXY protocol
+  // destination port.
+  EXPECT_EQ("https", headers.getForwardedProtoValue());
+}
+
+// Verify that x-forwarded-proto is set to http when PROXY protocol destination port is 80.
+TEST_F(ConnectionManagerUtilityTest, ForwardedProtoFromProxyProtocolPort80) {
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(0));
+  // Configure port mappings.
+  config_.https_destination_ports_ = {443};
+  config_.http_destination_ports_ = {80};
+
+  // Set local address as restored (simulating PROXY protocol) with port 80.
+  connection_.stream_info_.downstream_connection_info_provider_->restoreLocalAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1", 80));
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("12.12.12.12"));
+
+  TestRequestHeaderMapImpl headers;
+  callMutateRequestHeaders(headers, Protocol::Http2);
+
+  EXPECT_EQ("http", headers.getForwardedProtoValue());
+}
+
+// Verify that x-forwarded-proto falls back to TLS status when port is not in the mapping.
+TEST_F(ConnectionManagerUtilityTest, ForwardedProtoFromProxyProtocolPortNotInMapping) {
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(0));
+  // Configure port mappings without 8443.
+  config_.https_destination_ports_ = {443};
+  config_.http_destination_ports_ = {80};
+
+  // Set local address as restored with a port not in the mapping (8443).
+  connection_.stream_info_.downstream_connection_info_provider_->restoreLocalAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1", 8443));
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("12.12.12.12"));
+
+  TestRequestHeaderMapImpl headers;
+  callMutateRequestHeaders(headers, Protocol::Http2);
+
+  // Should fall back to connection TLS status (http since not TLS).
+  EXPECT_EQ("http", headers.getForwardedProtoValue());
+}
+
+// Verify that the feature is disabled when the mapping is empty.
+TEST_F(ConnectionManagerUtilityTest, ForwardedProtoFromProxyProtocolDisabledWhenEmpty) {
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(0));
+  // Empty mappings (default) - feature disabled.
+
+  // Set local address as restored with port 443.
+  connection_.stream_info_.downstream_connection_info_provider_->restoreLocalAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1", 443));
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("12.12.12.12"));
+
+  TestRequestHeaderMapImpl headers;
+  callMutateRequestHeaders(headers, Protocol::Http2);
+
+  // Should use connection TLS status (http since not TLS).
+  EXPECT_EQ("http", headers.getForwardedProtoValue());
+}
+
+// Verify that the feature only applies when local address is restored (PROXY protocol).
+TEST_F(ConnectionManagerUtilityTest, ForwardedProtoFromProxyProtocolNotRestoredAddress) {
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(0));
+  // Configure port mappings.
+  config_.https_destination_ports_ = {443};
+  config_.http_destination_ports_ = {80};
+
+  // Set local address without restoring (not from PROXY protocol).
+  connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1", 443));
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("12.12.12.12"));
+
+  TestRequestHeaderMapImpl headers;
+  callMutateRequestHeaders(headers, Protocol::Http2);
+
+  // Should use connection TLS status since address was not restored.
+  EXPECT_EQ("http", headers.getForwardedProtoValue());
+}
+
+// Verify x-forwarded-proto from PROXY protocol with custom port (e.g., 8443 for https).
+TEST_F(ConnectionManagerUtilityTest, ForwardedProtoFromProxyProtocolCustomPort) {
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(0));
+  // Configure custom port mapping.
+  config_.https_destination_ports_ = {443, 8443};
+  config_.http_destination_ports_ = {80};
+
+  // Set local address as restored with custom HTTPS port.
+  connection_.stream_info_.downstream_connection_info_provider_->restoreLocalAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1", 8443));
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("12.12.12.12"));
+
+  TestRequestHeaderMapImpl headers;
+  callMutateRequestHeaders(headers, Protocol::Http2);
+
+  EXPECT_EQ("https", headers.getForwardedProtoValue());
+}
+
 } // namespace Http
 } // namespace Envoy
