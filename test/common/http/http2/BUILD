@@ -66,10 +66,12 @@ envoy_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/common/event:dispatcher_lib",
+        "//source/common/http:conn_pool_base_lib",
         "//source/common/http/http2:conn_pool_lib",
         "//source/common/network:utility_lib",
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
+        "//source/extensions/upstreams/http:ep_specific_config",
         "//test/common/http:common_lib",
         "//test/common/upstream:utility_lib",
         "//test/mocks/event:event_mocks",
@@ -77,10 +79,13 @@ envoy_cc_test(
         "//test/mocks/http:http_server_properties_cache_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:instance_mocks",
         "//test/mocks/server:overload_manager_mocks",
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/mocks/upstream:transport_socket_match_mocks",
         "//test/test_common:test_runtime_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/upstreams/http/v3:pkg_cc_proto",
     ],
 )
 

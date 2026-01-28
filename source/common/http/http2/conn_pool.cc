@@ -8,6 +8,7 @@
 
 #include "source/common/http/http2/codec_impl.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/extensions/upstreams/http/ep_specific_config.h"
 
 namespace Envoy {
 namespace Http {
@@ -20,6 +21,25 @@ uint32_t ActiveClient::calculateInitialStreamsLimit(
     Upstream::HostDescriptionConstSharedPtr host) {
   uint32_t initial_streams =
       host->cluster().httpProtocolOptions().http2Options().max_concurrent_streams().value();
+  
+  const auto ep_specific_protocol_options = host->cluster().extensionProtocolOptionsTyped<
+      Extensions::Upstreams::Http::EpSpecificProtocolOptionsConfigImpl>(
+      "envoy.extensions.upstreams.http.v3.EndpointSpecificHttpProtocolOptions");
+
+  if (ep_specific_protocol_options != nullptr && host->metadata() != nullptr) {
+    for (const auto& ep_option : ep_specific_protocol_options->compiledOptions()) {
+      // Use the MetadataMatcher to check if the endpoint metadata matches
+      if (ep_option.metadata_matcher.has_value() &&
+          ep_option.metadata_matcher->match(*host->metadata())) {
+        if (ep_option.http2_protocol_options.has_value() &&
+            ep_option.http2_protocol_options->has_max_concurrent_streams()) {
+          initial_streams = ep_option.http2_protocol_options->max_concurrent_streams().value();
+        }
+        break;
+      }
+    }
+  }
+
   if (http_server_properties_cache && origin.has_value()) {
     uint32_t cached_concurrency =
         http_server_properties_cache->getConcurrentStreams(origin.value());
@@ -31,7 +51,7 @@ uint32_t ActiveClient::calculateInitialStreamsLimit(
     }
   }
   uint32_t max_requests = MultiplexedActiveClientBase::maxStreamsPerConnection(
-      host->cluster().maxRequestsPerConnection());
+      host->cluster().maxRequestsPerConnection(), host);
   if (max_requests < initial_streams) {
     initial_streams = max_requests;
   }
