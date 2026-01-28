@@ -661,6 +661,9 @@ public:
   uint64_t requestBodyBufferLimit() const override { return request_body_buffer_limit_; }
   const std::vector<ShadowPolicyPtr>& shadowPolicies() const override { return shadow_policies_; }
   std::chrono::milliseconds timeout() const override { return timeout_; }
+  absl::optional<std::chrono::milliseconds> responseHeadersTimeout() const override {
+    return response_headers_timeout_;
+  }
   bool usingNewTimeouts() const override { return using_new_timeouts_; }
 
   // `OptionalTimeouts` manages various `optional` values. We pack them in a
@@ -882,6 +885,7 @@ private:
   RouteStatsContextPtr route_stats_context_;
   ClusterSpecifierPluginSharedPtr cluster_specifier_plugin_;
   const std::chrono::milliseconds timeout_;
+  const absl::optional<std::chrono::milliseconds> response_headers_timeout_;
   const OptionalTimeouts optional_timeouts_;
   Runtime::Loader& loader_;
   std::unique_ptr<const RuntimeData> runtime_;

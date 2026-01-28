@@ -497,6 +497,12 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
               : ""),
       vhost_(vhost), vhost_copy_(vhost), cluster_name_(route.route().cluster()),
       timeout_(PROTOBUF_GET_MS_OR_DEFAULT(route.route(), timeout, DEFAULT_ROUTE_TIMEOUT_MS)),
+      response_headers_timeout_(
+          route.route().has_response_headers_timeout()
+              ? absl::optional<std::chrono::milliseconds>(
+                    std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
+                        route.route().response_headers_timeout())))
+              : absl::nullopt),
       optional_timeouts_(buildOptionalTimeouts(route.route())), loader_(factory_context.runtime()),
       runtime_(loadRuntimeData(route.match())),
       redirect_config_(route.has_redirect()

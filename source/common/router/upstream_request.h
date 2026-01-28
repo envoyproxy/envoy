@@ -190,6 +190,7 @@ private:
   void resetPerTryIdleTimer();
   void onPerTryTimeout();
   void onPerTryIdleTimeout();
+  void onPerTryResponseHeadersTimeout();
   void upstreamLog(AccessLog::AccessLogType access_log_type);
   void resetUpstreamLogFlushTimer();
 
@@ -197,6 +198,7 @@ private:
   std::unique_ptr<GenericConnPool> conn_pool_;
   Event::TimerPtr per_try_timeout_;
   Event::TimerPtr per_try_idle_timeout_;
+  Event::TimerPtr per_try_response_headers_timeout_;
   std::unique_ptr<GenericUpstream> upstream_;
   absl::optional<Http::StreamResetReason> deferred_reset_reason_;
   Upstream::HostDescriptionConstSharedPtr upstream_host_;

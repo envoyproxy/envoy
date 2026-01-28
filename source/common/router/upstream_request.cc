@@ -190,6 +190,10 @@ void UpstreamRequest::cleanUp() {
     per_try_idle_timeout_->disableTimer();
   }
 
+  if (per_try_response_headers_timeout_ != nullptr) {
+    per_try_response_headers_timeout_->disableTimer();
+  }
+
   if (max_stream_duration_timer_ != nullptr) {
     max_stream_duration_timer_->disableTimer();
   }
@@ -261,6 +265,12 @@ void UpstreamRequest::decode1xxHeaders(Http::ResponseHeaderMapPtr&& headers) {
 
   ASSERT(Http::HeaderUtility::isSpecial1xx(*headers));
   addResponseHeadersStat(headers->byteSize(), headers->size());
+  
+  // Cancel response headers timeout - receiving 1xx means we got a response (TTFT)
+  if (per_try_response_headers_timeout_ != nullptr) {
+    per_try_response_headers_timeout_->disableTimer();
+  }
+  
   maybeHandleDeferredReadDisable();
   parent_.onUpstream1xxHeaders(std::move(headers), *this);
 }
@@ -295,6 +305,10 @@ void UpstreamRequest::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool e
   }
 
   awaiting_headers_ = false;
+  // Cancel response headers timeout now that final headers have arrived
+  if (per_try_response_headers_timeout_ != nullptr) {
+    per_try_response_headers_timeout_->disableTimer();
+  }
   if (span_ != nullptr) {
     Tracing::HttpTracerUtility::onUpstreamResponseHeaders(*span_, headers.get());
   }
@@ -530,6 +544,13 @@ void UpstreamRequest::setupPerTryTimeout() {
         parent_.callbacks()->dispatcher().createTimer([this]() -> void { onPerTryIdleTimeout(); });
     resetPerTryIdleTimer();
   }
+
+  ASSERT(!per_try_response_headers_timeout_);
+  if (parent_.timeout().response_headers_timeout_.count() > 0) {
+    per_try_response_headers_timeout_ =
+        parent_.callbacks()->dispatcher().createTimer([this]() -> void { onPerTryResponseHeadersTimeout(); });
+    per_try_response_headers_timeout_->enableTimer(parent_.timeout().response_headers_timeout_);
+  }
 }
 
 void UpstreamRequest::onPerTryIdleTimeout() {
@@ -540,6 +561,19 @@ void UpstreamRequest::onPerTryIdleTimeout() {
   }
   stream_info_.setResponseFlag(StreamInfo::CoreResponseFlag::StreamIdleTimeout);
   parent_.onPerTryIdleTimeout(*this);
+}
+
+void UpstreamRequest::onPerTryResponseHeadersTimeout() {
+  ENVOY_STREAM_LOG(debug, "upstream per try response headers timeout", *parent_.callbacks());
+  // Disable other per-try timers since we're timing out
+  if (per_try_timeout_) {
+    per_try_timeout_->disableTimer();
+  }
+  if (per_try_idle_timeout_) {
+    per_try_idle_timeout_->disableTimer();
+  }
+  stream_info_.setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamRequestTimeout);
+  parent_.onPerTryResponseHeadersTimeout(*this);
 }
 
 void UpstreamRequest::onPerTryTimeout() {

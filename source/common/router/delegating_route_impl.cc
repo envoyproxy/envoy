@@ -93,6 +93,10 @@ std::chrono::milliseconds DelegatingRouteEntry::timeout() const {
   return base_route_entry_->timeout();
 }
 
+absl::optional<std::chrono::milliseconds> DelegatingRouteEntry::responseHeadersTimeout() const {
+  return base_route_entry_->responseHeadersTimeout();
+}
+
 absl::optional<std::chrono::milliseconds> DelegatingRouteEntry::idleTimeout() const {
   return base_route_entry_->idleTimeout();
 }

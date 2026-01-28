@@ -1044,6 +1044,12 @@ public:
   virtual std::chrono::milliseconds timeout() const PURE;
 
   /**
+   * @return optional<std::chrono::milliseconds> the timeout for receiving response headers.
+   *         Zero indicates disabled, nullopt indicates not configured (use global timeout behavior).
+   */
+  virtual absl::optional<std::chrono::milliseconds> responseHeadersTimeout() const PURE;
+
+  /**
    * @return optional<std::chrono::milliseconds> the route's idle timeout. Zero indicates a
    *         disabled idle timeout, while nullopt indicates deference to the global timeout.
    */

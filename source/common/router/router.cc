@@ -213,6 +213,9 @@ TimeoutData FilterUtility::finalTimeout(const RouteEntry& route,
   }
   timeout.per_try_timeout_ = route.retryPolicy()->perTryTimeout();
   timeout.per_try_idle_timeout_ = route.retryPolicy()->perTryIdleTimeout();
+  if (route.responseHeadersTimeout().has_value()) {
+    timeout.response_headers_timeout_ = route.responseHeadersTimeout().value();
+  }
 
   uint64_t header_timeout;
 
@@ -1368,6 +1371,29 @@ void Filter::onPerTryTimeoutCommon(UpstreamRequest& upstream_request, Stats::Cou
                          response_code_details);
 }
 
+void Filter::onPerTryResponseHeadersTimeout(UpstreamRequest& upstream_request) {
+  cluster_->trafficStats()->upstream_rq_response_headers_timeout_.inc();
+  if (upstream_request.upstreamHost()) {
+    upstream_request.upstreamHost()->stats().rq_timeout_.inc();
+  }
+
+  upstream_request.resetStream();
+
+  updateOutlierDetection(Upstream::Outlier::Result::LocalOriginTimeout, upstream_request,
+                         absl::optional<uint64_t>(enumToInt(timeout_response_code_)));
+
+  if (maybeRetryReset(Http::StreamResetReason::LocalReset, upstream_request, TimeoutRetry::Yes)) {
+    return;
+  }
+
+  chargeUpstreamAbort(timeout_response_code_, false, upstream_request);
+
+  // Remove this upstream request from the list now that we're done with it.
+  upstream_request.removeFromList(upstream_requests_);
+  onUpstreamTimeoutAbort(StreamInfo::CoreResponseFlag::UpstreamRequestTimeout,
+                         StreamInfo::ResponseCodeDetails::get().UpstreamPerTryTimeout);
+}
+
 void Filter::onStreamMaxDurationReached(UpstreamRequest& upstream_request) {
   upstream_request.resetStream();
 
@@ -1702,6 +1728,8 @@ void Filter::resetOtherUpstreams(UpstreamRequest& upstream_request) {
 void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPtr&& headers,
                                UpstreamRequest& upstream_request, bool end_stream) {
   ENVOY_STREAM_LOG(debug, "upstream headers complete: end_stream={}", *callbacks_, end_stream);
+
+  // Note: response_headers_timeout is now handled per-try in UpstreamRequest::decodeHeaders
 
   ASSERT(!host_selection_cancelable_);
 

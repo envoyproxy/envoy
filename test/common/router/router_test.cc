@@ -1661,6 +1661,105 @@ TEST_F(RouterTest, UpstreamTimeout) {
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 }
 
+// Test that response headers timeout fires and returns 504.
+TEST_F(RouterTest, ResponseHeadersTimeout) {
+  ON_CALL(callbacks_.route_->route_entry_, responseHeadersTimeout())
+      .WillByDefault(Return(absl::optional<std::chrono::milliseconds>(std::chrono::milliseconds(100))));
+  ON_CALL(*callbacks_.route_, responseHeadersTimeout())
+      .WillByDefault(Return(absl::optional<std::chrono::milliseconds>(std::chrono::milliseconds(100))));
+
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  
+  expectResponseHeadersTimerCreate();
+  expectResponseTimerCreate();
+  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
+
+  Http::TestRequestHeaderMapImpl headers{{"x-envoy-internal", "true"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, false);
+  Buffer::OwnedImpl data;
+  router_->decodeData(data, true);
+
+  EXPECT_CALL(encoder.stream_, resetStream(Http::StreamResetReason::LocalReset));
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "504"}, {"content-length", "24"}, {"content-type", "text/plain"}};
+  EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
+  EXPECT_CALL(callbacks_, encodeData(_, true));
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+              putResult(Upstream::Outlier::Result::LocalOriginTimeout, _));
+  response_headers_timeout_->invokeCallback();
+
+  EXPECT_EQ(1U,
+            cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                .counter("upstream_rq_response_headers_timeout")
+                .value());
+  EXPECT_EQ(1UL, cm_.thread_local_cluster_.conn_pool_.host_->stats().rq_timeout_.value());
+}
+
+// Test that response headers timeout is properly cancelled when headers are received.
+TEST_F(RouterTest, ResponseHeadersTimeoutCancelledOnFinalHeaders) {
+  ON_CALL(callbacks_.route_->route_entry_, responseHeadersTimeout())
+      .WillByDefault(Return(absl::optional<std::chrono::milliseconds>(std::chrono::milliseconds(100))));
+  ON_CALL(*callbacks_.route_, responseHeadersTimeout())
+      .WillByDefault(Return(absl::optional<std::chrono::milliseconds>(std::chrono::milliseconds(100))));
+
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+
+  expectResponseHeadersTimerCreate();
+  expectResponseTimerCreate();
+  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
+
+  Http::TestRequestHeaderMapImpl headers{{"x-envoy-internal", "true"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, false);
+  Buffer::OwnedImpl data;
+  router_->decodeData(data, true);
+
+  Http::ResponseHeaderMapPtr response_headers_received(
+      new Http::TestResponseHeaderMapImpl{{":status", "200"}});
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+              putResult(_, absl::optional<uint64_t>(200)));
+  response_decoder->decodeHeaders(std::move(response_headers_received), true);
+  EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
+}
+
+// Test that 1xx informational headers DO cancel the response headers timeout.
+TEST_F(RouterTest, ResponseHeadersTimeoutCancelledOn1xxHeaders) {
+  ON_CALL(callbacks_.route_->route_entry_, responseHeadersTimeout())
+      .WillByDefault(Return(absl::optional<std::chrono::milliseconds>(std::chrono::milliseconds(100))));
+  ON_CALL(*callbacks_.route_, responseHeadersTimeout())
+      .WillByDefault(Return(absl::optional<std::chrono::milliseconds>(std::chrono::milliseconds(100))));
+
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+
+  expectResponseHeadersTimerCreate();
+  expectResponseTimerCreate();
+  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http11);
+
+  Http::TestRequestHeaderMapImpl headers{{"x-envoy-internal", "true"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, false);
+  Buffer::OwnedImpl data;
+  router_->decodeData(data, true);
+
+  // Receive 1xx informational headers - should cancel the per-try response headers timeout.
+  Http::ResponseHeaderMapPtr informational_headers(
+      new Http::TestResponseHeaderMapImpl{{":status", "100"}});
+  EXPECT_CALL(callbacks_, encode1xxHeaders_(_));
+  response_decoder->decode1xxHeaders(std::move(informational_headers));
+
+  // Complete the request with final headers to verify stats.
+  Http::ResponseHeaderMapPtr final_headers(
+      new Http::TestResponseHeaderMapImpl{{":status", "200"}});
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+              putResult(_, absl::optional<uint64_t>(200)));
+  response_decoder->decodeHeaders(std::move(final_headers), true);
+  EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
+}
+
 // Verify the timeout budget histograms are filled out correctly when using a
 // global and per-try timeout in a successful request.
 TEST_F(RouterTest, TimeoutBudgetHistogramStat) {
