@@ -40,7 +40,21 @@ TEST(OpenTelemetryConfigTest, OpenTelemetrySinkType) {
 
     Stats::SinkPtr sink = factory->createStatsSink(*message, server).value();
     EXPECT_NE(sink, nullptr);
-    EXPECT_NE(dynamic_cast<OpenTelemetry::OpenTelemetryGrpcSink*>(sink.get()), nullptr);
+    EXPECT_NE(dynamic_cast<OpenTelemetry::OpenTelemetrySink*>(sink.get()), nullptr);
+  }
+
+  {
+    envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig sink_config;
+    sink_config.mutable_http_service()->mutable_http_uri()->set_uri(
+        "https://some-o11y.com/v1/metrics");
+    sink_config.mutable_http_service()->mutable_http_uri()->set_cluster("otlp_http");
+    sink_config.mutable_http_service()->mutable_http_uri()->mutable_timeout()->set_seconds(10);
+    ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
+    TestUtility::jsonConvert(sink_config, *message);
+
+    Stats::SinkPtr sink = factory->createStatsSink(*message, server).value();
+    EXPECT_NE(sink, nullptr);
+    EXPECT_NE(dynamic_cast<OpenTelemetry::OpenTelemetrySink*>(sink.get()), nullptr);
   }
 }
 

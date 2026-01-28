@@ -41,6 +41,24 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "open_telemetry_http_lib",
+    srcs = ["open_telemetry_http_impl.cc"],
+    hdrs = ["open_telemetry_http_impl.h"],
+    deps = [
+        ":open_telemetry_lib",
+        "//envoy/upstream:cluster_manager_interface",
+        "//source/common/http:async_client_lib",
+        "//source/common/http:async_client_utility_lib",
+        "//source/common/http:header_map_lib",
+        "//source/common/http:message_lib",
+        "//source/common/http:utility_lib",
+        "//source/common/protobuf",
+        "//source/extensions/access_loggers/open_telemetry:otlp_log_utils_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "open_telemetry_proto_descriptors_lib",
     srcs = ["open_telemetry_proto_descriptors.cc"],
     hdrs = ["open_telemetry_proto_descriptors.h"],
@@ -55,6 +73,7 @@ envoy_cc_extension(
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     deps = [
+        ":open_telemetry_http_lib",
         ":open_telemetry_lib",
         ":open_telemetry_proto_descriptors_lib",
         "//envoy/registry",
