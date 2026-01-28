@@ -775,7 +775,7 @@ void RedisCluster::RedisDiscoverySession::onZoneResponse(
   zone_callbacks_.erase(address);
 
   if (value->type() == NetworkFilters::Common::Redis::RespType::BulkString) {
-    std::string zone = parseAvailabilityZone(value->asString());
+    std::string zone = RedisCluster::parseAvailabilityZone(value->asString());
     if (!zone.empty()) {
       discovered_zones_[address] = zone;
       ENVOY_LOG(debug, "discovered zone '{}' for node {}", zone, address);
@@ -827,8 +827,7 @@ void RedisCluster::RedisDiscoverySession::finishZoneDiscovery() {
 // availability_zone:us-east-1a
 // ...
 // Note: Standard Redis does not expose availability_zone.
-std::string
-RedisCluster::RedisDiscoverySession::parseAvailabilityZone(const std::string& info_response) {
+std::string RedisCluster::parseAvailabilityZone(const std::string& info_response) {
   static constexpr absl::string_view key = "availability_zone:";
   size_t pos = info_response.find(key);
   if (pos == std::string::npos) {

@@ -675,7 +675,8 @@ TEST_F(RedisClusterLoadBalancerTest, LocalZoneAffinityWithLocalReplica) {
       {8001, 3}, // slot 1: replica in zone-b (no local replica, fall back to any replica)
   };
   validateAssignment(hosts, expected_assignments, true,
-                     NetworkFilters::Common::Redis::Client::ReadPolicy::LocalZoneAffinity, "zone-a");
+                     NetworkFilters::Common::Redis::Client::ReadPolicy::LocalZoneAffinity,
+                     "zone-a");
 }
 
 // Tests for LOCAL_ZONE_AFFINITY when no local replica exists - should fall back to any replica
@@ -701,7 +702,8 @@ TEST_F(RedisClusterLoadBalancerTest, LocalZoneAffinityNoLocalReplica) {
       {0, 1}, // falls back to replica in zone-b
   };
   validateAssignment(hosts, expected_assignments, true,
-                     NetworkFilters::Common::Redis::Client::ReadPolicy::LocalZoneAffinity, "zone-c");
+                     NetworkFilters::Common::Redis::Client::ReadPolicy::LocalZoneAffinity,
+                     "zone-c");
 }
 
 // Tests for LOCAL_ZONE_AFFINITY when no replica exists - should fall back to primary
@@ -725,7 +727,8 @@ TEST_F(RedisClusterLoadBalancerTest, LocalZoneAffinityNoReplica) {
       {0, 0}, // falls back to primary
   };
   validateAssignment(hosts, expected_assignments, true,
-                     NetworkFilters::Common::Redis::Client::ReadPolicy::LocalZoneAffinity, "zone-a");
+                     NetworkFilters::Common::Redis::Client::ReadPolicy::LocalZoneAffinity,
+                     "zone-a");
 }
 
 // Tests for LOCAL_ZONE_AFFINITY_REPLICAS_AND_PRIMARY with local replica
