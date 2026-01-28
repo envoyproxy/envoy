@@ -59,6 +59,28 @@ Credential for ``Bearer`` token:
     :lineno-start: 61
     :caption: :download:`credential-injector-filter.yaml <_include/credential-injector-generic-filter.yaml>`
 
+Using header_value_prefix
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+When the credential is loaded dynamically (e.g., from a file or SDS), you may want to prepend a scheme
+like ``Bearer `` or ``Basic `` to the raw credential value. The ``header_value_prefix`` field allows you
+to do this without requiring an additional header mutation filter.
+
+For example, if your secret file contains just the token ``xyz123`` and you configure:
+
+.. code-block:: yaml
+
+    credential:
+      name: envoy.http.injected_credentials.generic
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.http.injected_credentials.generic.v3.Generic
+        header: Authorization
+        header_value_prefix: "Bearer "
+        credential:
+          name: my_token
+
+The resulting header will be: ``Authorization: Bearer xyz123``
+
 OAuth2 credential injector (client credential grant)
 ----------------------------------------------------
 * This extension should be configured with the type URL ``type.googleapis.com/envoy.extensions.http.injected_credentials.oauth2.v3.OAuth2``.

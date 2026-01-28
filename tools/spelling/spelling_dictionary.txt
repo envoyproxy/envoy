@@ -42,6 +42,7 @@ BACKTRACE
 BEL
 BBR
 BIDIRECTIONAL
+BOM
 CCL
 CGROUP
 CROSSSLOT
@@ -465,6 +466,7 @@ SIGSEGV
 SIGTERM
 SIMD
 SIO
+SSE
 SMTP
 SNI
 SOTW
@@ -644,6 +646,7 @@ buflen
 bugprone
 builtin
 builtins
+bulkstring
 bulkstrings
 bursty
 bytecode
@@ -1013,6 +1016,7 @@ lowp
 lstat
 ltrim
 lua
+luajit
 lyft
 maglev
 malloc
@@ -1059,6 +1063,7 @@ msgpack
 multi
 multicast
 multikill
+multiline
 multimap
 multiple
 multivalue
@@ -1202,6 +1207,7 @@ protobufs
 protoc
 protodoc
 protos
+protover
 protoxform
 proxied
 pseudocode
@@ -1342,6 +1348,7 @@ serializer
 serv
 servercert
 setenv
+SETNAME
 setsockopt
 sfixed
 sidestream
@@ -1618,3 +1625,27 @@ NXDOMAIN
 DNAT
 RSP
 EWMA
+hotplug
+cgroup
+cgroupv1
+cgroupv2
+cgroupsv1
+cgroupsv2
+usage_usec
+usec
+nsec
+millicores
+cpuacct
+cpuacct.usage
+effective_cpus
+cpus
+ja3
+ja4
+HBONE
+waypoint
+ztunnel
+UID
+UIDs
+configurability
+WDS
+OIDC

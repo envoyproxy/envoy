@@ -43,7 +43,7 @@ public:
   testing::NiceMock<StreamInfo::MockStreamInfo> stream_info_;
   std::string local_close_reason_{"unset_local_close_reason"};
   Connection::State state_{Connection::State::Open};
-  DetectedCloseType detected_close_type_{DetectedCloseType::Normal};
+  StreamInfo::DetectedCloseType detected_close_type_{StreamInfo::DetectedCloseType::Normal};
 };
 
 #define DEFINE_MOCK_CONNECTION_MOCK_METHODS                                                        \
@@ -59,7 +59,7 @@ public:
   MOCK_METHOD(bool, isHalfCloseEnabled, (), (const));                                              \
   MOCK_METHOD(void, close, (ConnectionCloseType type));                                            \
   MOCK_METHOD(void, close, (ConnectionCloseType type, absl::string_view details));                 \
-  MOCK_METHOD(DetectedCloseType, detectedCloseType, (), (const));                                  \
+  MOCK_METHOD(StreamInfo::DetectedCloseType, detectedCloseType, (), (const));                      \
   MOCK_METHOD(Event::Dispatcher&, dispatcher, (), (const));                                        \
   MOCK_METHOD(uint64_t, id, (), (const));                                                          \
   MOCK_METHOD(void, hashKey, (std::vector<uint8_t>&), (const));                                    \

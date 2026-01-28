@@ -18,6 +18,8 @@ public:
   MOCK_METHOD(void, cleanupAfterCertificateValidation, ());
   MOCK_METHOD(int64_t, getDefaultNetworkHandle, ());
   MOCK_METHOD((std::vector<std::pair<int64_t, ConnectionType>>), getAllConnectedNetworks, ());
+  MOCK_METHOD(void, bindSocketToNetwork,
+              (Network::ConnectionSocket & socket, int64_t network_handle), (override));
 };
 
 // SystemHelperPeer allows the replacement of the SystemHelper singleton

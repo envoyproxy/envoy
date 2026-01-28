@@ -25,6 +25,27 @@ The following Envoy filters emit dynamic metadata that other filters can leverag
 * :ref:`Role Based Access Control (RBAC) Filter <config_http_filters_rbac_dynamic_metadata>`
 * :ref:`Role Based Access Control (RBAC) Network Filter <config_network_filters_rbac_dynamic_metadata>`
 * :ref:`ZooKeeper Proxy Filter <config_network_filters_zookeeper_proxy_dynamic_metadata>`
+* :ref:`MCP Filter <config_http_filters_mcp>`
+
+.. _config_http_filters_mcp_dynamic_metadata:
+
+MCP Filter Dynamic Metadata
+---------------------------
+
+The :ref:`MCP filter <config_http_filters_mcp>` emits the following dynamic metadata under the
+``envoy.filters.http.mcp`` namespace when processing MCP (Model Context Protocol) JSON-RPC requests:
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 4
+
+  method, string, "The JSON-RPC method name (e.g., ``initialize``, ``tools/list``, ``tools/call``)."
+  id, number, "The JSON-RPC request ID."
+  params, struct, "The params object from the JSON-RPC request containing method-specific parameters."
+
+This metadata is consumed internally by the :ref:`MCP router filter <config_http_filters_mcp_router>` for
+request routing and aggregation. It can also be used by other filters such as RBAC for policy enforcement
+or access logging.
 
 The following Envoy filters can be configured to consume dynamic metadata emitted by other filters.
 

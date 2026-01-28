@@ -71,6 +71,20 @@ bool ConfigUtility::QueryParameterMatcher::matches(
   return matcher_.value().match(data.value());
 }
 
+ConfigUtility::CookieMatcher::CookieMatcher(const envoy::config::route::v3::CookieMatcher& config,
+                                            Server::Configuration::CommonFactoryContext& context)
+    : name_(config.name()), invert_match_(config.invert_match()),
+      string_match_(config.string_match(), context) {}
+
+bool ConfigUtility::CookieMatcher::matches(
+    const absl::optional<absl::string_view>& cookie_value) const {
+  bool matched = false;
+  if (cookie_value.has_value()) {
+    matched = string_match_.match(cookie_value.value());
+  }
+  return matched != invert_match_;
+}
+
 Upstream::ResourcePriority
 ConfigUtility::parsePriority(const envoy::config::core::v3::RoutingPriority& priority) {
   switch (priority) {
@@ -88,6 +102,22 @@ bool ConfigUtility::matchQueryParams(
     const std::vector<QueryParameterMatcherPtr>& config_query_params) {
   for (const auto& config_query_param : config_query_params) {
     if (!config_query_param->matches(query_params)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+bool ConfigUtility::matchCookies(const absl::flat_hash_map<std::string, std::string>& cookies,
+                                 const std::vector<CookieMatcherPtr>& matchers) {
+  for (const auto& matcher : matchers) {
+    absl::optional<absl::string_view> cookie_value;
+    const auto it = cookies.find(matcher->name());
+    if (it != cookies.end()) {
+      cookie_value = it->second;
+    }
+    if (!matcher->matches(cookie_value)) {
       return false;
     }
   }

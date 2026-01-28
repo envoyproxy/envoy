@@ -172,7 +172,7 @@ TEST_F(ActiveInternalListenerTest, AcceptSocketAndCreateNetworkFilter) {
       .WillOnce(testing::ReturnRef(*transport_socket_factory));
   EXPECT_CALL(*filter_chain_, networkFilterFactories).WillOnce(ReturnRef(*filter_factory_callback));
   auto* connection = new NiceMock<Network::MockServerConnection>();
-  EXPECT_CALL(dispatcher_, createServerConnection_()).WillOnce(Return(connection));
+  EXPECT_CALL(dispatcher_, createServerConnection_(_)).WillOnce(Return(connection));
   EXPECT_CALL(conn_handler_, incNumConnections());
   EXPECT_CALL(filter_chain_factory_, createNetworkFilterChain(_, _)).WillOnce(Return(true));
   EXPECT_CALL(listener_config_, perConnectionBufferLimitBytes());
@@ -220,7 +220,7 @@ TEST_F(ActiveInternalListenerTest, DestroyListenerCloseAllConnections) {
       .WillOnce(testing::ReturnRef(*transport_socket_factory));
   EXPECT_CALL(*filter_chain_, networkFilterFactories).WillOnce(ReturnRef(*filter_factory_callback));
   auto* connection = new NiceMock<Network::MockServerConnection>();
-  EXPECT_CALL(dispatcher_, createServerConnection_()).WillOnce(Return(connection));
+  EXPECT_CALL(dispatcher_, createServerConnection_(_)).WillOnce(Return(connection));
   EXPECT_CALL(conn_handler_, incNumConnections());
   EXPECT_CALL(filter_chain_factory_, createNetworkFilterChain(_, _)).WillOnce(Return(true));
   EXPECT_CALL(listener_config_, perConnectionBufferLimitBytes());

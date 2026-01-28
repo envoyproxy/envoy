@@ -7,3 +7,5 @@ Access Logs
   overview
   stats
   usage
+  dynamic_modules
+

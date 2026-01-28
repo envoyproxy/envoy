@@ -2,9 +2,15 @@
 
 #include <memory>
 
-namespace Envoy {
+#ifdef ENVOY_ENABLE_QUIC
+#include "quiche/quic/core/quic_path_validator.h"
 
+using NetworkHandle = quic::QuicNetworkHandle;
+#else
 using NetworkHandle = int64_t;
+#endif
+
+namespace Envoy {
 
 namespace Quic {
 

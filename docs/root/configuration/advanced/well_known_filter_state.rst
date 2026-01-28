@@ -90,6 +90,11 @@ The following lists the filter state object keys used by the Envoy extensions to
   * ``isp``: ISP name;
   * ``apple_private_relay``: iCloud Private Relay check result (``true`` or ``false``).
 
+``envoy.filters.http.mcp.request``
+  :ref:`MCP filter <config_http_filters_mcp>` stores parsed MCP (Model Context Protocol) JSON-RPC
+  request attributes when ``emit_filter_state`` is enabled. The object stores extracted fields
+  from the parsed request.
+
 ``envoy.network.network_namespace``
   Contains the value of the downstream connection's Linux network namespace if it differs from the default.
 
@@ -101,6 +106,10 @@ The following lists the filter state object keys used by the Envoy extensions to
   value clears the network namespace. This object is expected to be shared from the downstream
   filters with the upstream connections.
 
+``envoy.tls.certificate_mappers.on_demand_secret``
+  Allows overriding the certificate to use per-connection using the :ref:`filter state certificate mapper
+  <envoy_v3_api_msg_extensions.transport_sockets.tls.cert_mappers.filter_state_override.v3.Config>`.
+
 Filter state object factories
 -----------------------------
 
@@ -109,7 +118,23 @@ configuration with a :ref:`factory lookup key
 <envoy_v3_api_field_extensions.filters.common.set_filter_state.v3.FilterStateValue.factory_key>`.
 
 ``envoy.string``
-  A special generic string object factory. Accepts any string as its value.
+  A generic string object factory for creating filter state entries with custom key names.
+  Use this as the :ref:`factory_key
+  <envoy_v3_api_field_extensions.filters.common.set_filter_state.v3.FilterStateValue.factory_key>`
+  when your ``object_key`` is a custom name not listed in this document.
+
+  Example configuration:
+
+  .. code-block:: yaml
+
+    object_key: my.custom.key
+    factory_key: envoy.string
+    format_string:
+      text_format_source:
+        inline_string: "my-value"
+
+  This creates a filter state entry named ``my.custom.key`` containing the string ``my-value``.
+  The value can be accessed in access logs using ``%FILTER_STATE(my.custom.key)%``.
 
 ``envoy.network.ip``
   A factory to create IP addresses from ``IPv4`` and ``IPv6`` address strings.

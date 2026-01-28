@@ -497,6 +497,91 @@ TEST_P(TcpProxyIntegrationTest, AccessLogUpstreamConnectFailure) {
   EXPECT_THAT(log_result, testing::StartsWith("delayed_connect_error:"));
 }
 
+// Verifies that access log value for `DOWNSTREAM_LOCAL_CLOSE_REASON` matches
+// the failure message when there is a session idle timeout.
+TEST_P(TcpProxyIntegrationTest, AccessLogSessionIdleTimeout) {
+  std::string access_log_path = TestEnvironment::temporaryPath(
+      fmt::format("access_log{}{}.txt", version_ == Network::Address::IpVersion::v4 ? "v4" : "v6",
+                  TestUtility::uniqueFilename()));
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* filter_chain = listener->mutable_filter_chains(0);
+    auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
+    ASSERT_TRUE(config_blob->Is<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>());
+    auto tcp_proxy_config =
+        MessageUtil::anyConvert<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>(
+            *config_blob);
+    auto* access_log = tcp_proxy_config.add_access_log();
+    access_log->set_name("accesslog");
+    envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
+    access_log_config.set_path(access_log_path);
+    access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
+        "%DOWNSTREAM_LOCAL_CLOSE_REASON%");
+    access_log->mutable_typed_config()->PackFrom(access_log_config);
+    tcp_proxy_config.mutable_idle_timeout()->set_nanos(
+        std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::milliseconds(500))
+            .count());
+    config_blob->PackFrom(tcp_proxy_config);
+  });
+  enableHalfClose(false);
+  initialize();
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  // Session should idle timeout, causing disconnect.
+  tcp_client->waitForDisconnect();
+  // Guarantee client is done writing to the log.
+  auto log_result = waitForAccessLog(access_log_path);
+  EXPECT_EQ(log_result, "tcp_session_idle_timeout");
+}
+
+// Verifies that access log value for `UPSTREAM_DETECTED_CLOSE_TYPE` matches the
+// upstream close type.
+TEST_P(TcpProxyIntegrationTest, AccessLogUpstreamDetectedCloseType) {
+  std::string access_log_path = TestEnvironment::temporaryPath(
+      fmt::format("access_log{}{}.txt", version_ == Network::Address::IpVersion::v4 ? "v4" : "v6",
+                  TestUtility::uniqueFilename()));
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* filter_chain = listener->mutable_filter_chains(0);
+    auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
+    ASSERT_TRUE(config_blob->Is<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>());
+    auto tcp_proxy_config =
+        MessageUtil::anyConvert<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>(
+            *config_blob);
+    auto* access_log = tcp_proxy_config.add_access_log();
+    access_log->set_name("accesslog");
+    envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
+    access_log_config.set_path(access_log_path);
+    access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
+        "%UPSTREAM_DETECTED_CLOSE_TYPE%");
+    access_log->mutable_typed_config()->PackFrom(access_log_config);
+    config_blob->PackFrom(tcp_proxy_config);
+  });
+  initialize();
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+
+  ASSERT_TRUE(tcp_client->write("hello"));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(5));
+
+  // Close the upstream connection.
+  ASSERT_TRUE(fake_upstream_connection->close(Network::ConnectionCloseType::AbortReset));
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+
+  // Wait for the upstream to close to ensure we get the correct close type.
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_destroy_remote", 1,
+                                 TestUtility::DefaultTimeout * 100);
+
+  // Downstream should be closed by proxy.
+  tcp_client->close();
+
+  // Guarantee client is done writing to the log.
+  auto log_result = waitForAccessLog(access_log_path);
+  EXPECT_THAT(log_result, testing::Eq("RemoteReset"));
+}
+
 TEST_P(TcpProxyIntegrationTest, AccessLogOnUpstreamConnect) {
   std::string access_log_path = TestEnvironment::temporaryPath(
       fmt::format("access_log{}{}.txt", version_ == Network::Address::IpVersion::v4 ? "v4" : "v6",
@@ -551,6 +636,43 @@ TEST_P(TcpProxyIntegrationTest, AccessLogOnUpstreamConnect) {
   EXPECT_EQ(AccessLogType_Name(AccessLog::AccessLogType::TcpConnectionEnd), access_log_parts[0]);
   ASSERT_TRUE(absl::SimpleAtoi(access_log_parts[1], &upstream_connection_id));
   EXPECT_GT(upstream_connection_id, 0);
+}
+
+TEST_P(TcpProxyIntegrationTest, AccessLogOnStart) {
+  std::string access_log_path = TestEnvironment::temporaryPath(
+      fmt::format("access_log{}{}.txt", version_ == Network::Address::IpVersion::v4 ? "v4" : "v6",
+                  TestUtility::uniqueFilename()));
+
+  setupByteMeterAccessLog();
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* filter_chain = listener->mutable_filter_chains(0);
+    auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
+
+    ASSERT_TRUE(config_blob->Is<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>());
+    auto tcp_proxy_config =
+        MessageUtil::anyConvert<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>(
+            *config_blob);
+
+    tcp_proxy_config.mutable_access_log_options()->set_flush_access_log_on_start(true);
+    auto* access_log = tcp_proxy_config.add_access_log();
+    access_log->set_name("accesslog");
+    envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
+    access_log_config.set_path(access_log_path);
+    access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
+        "%ACCESS_LOG_TYPE%\n");
+    access_log->mutable_typed_config()->PackFrom(access_log_config);
+    config_blob->PackFrom(tcp_proxy_config);
+  });
+
+  initialize();
+  auto tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  auto log_result = waitForAccessLog(access_log_path);
+  EXPECT_EQ(AccessLogType_Name(AccessLog::AccessLogType::TcpConnectionStart), log_result);
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  tcp_client->close();
+  ASSERT_TRUE(fake_upstream_connection->close());
 }
 
 TEST_P(TcpProxyIntegrationTest, PeriodicAccessLog) {
@@ -2200,6 +2322,7 @@ TEST_P(TcpProxyIntegrationTest, UpstreamConnectModeTlsHandshakeNonTls) {
 
     tcp_proxy.set_upstream_connect_mode(
         envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_TLS_HANDSHAKE);
+    tcp_proxy.mutable_max_early_data_bytes()->set_value(0);
 
     filter->mutable_typed_config()->PackFrom(tcp_proxy);
   });
@@ -2240,6 +2363,7 @@ TEST_P(TcpProxyIntegrationTest, UpstreamConnectModeTlsHandshakeWithUpstreamTls) 
 
     tcp_proxy.set_upstream_connect_mode(
         envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_TLS_HANDSHAKE);
+    tcp_proxy.mutable_max_early_data_bytes()->set_value(0);
 
     filter->mutable_typed_config()->PackFrom(tcp_proxy);
   });
@@ -2261,6 +2385,126 @@ TEST_P(TcpProxyIntegrationTest, UpstreamConnectModeTlsHandshakeWithUpstreamTls) 
   tcp_client->waitForHalfClose();
 
   tcp_client->close();
+}
+
+// Test ON_DOWNSTREAM_TLS_HANDSHAKE mode with max_early_data_bytes set to zero.
+TEST_P(TcpProxySslIntegrationTest, OnDownstreamTlsHandshakeMode) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* filter_chain = listener->mutable_filter_chains(0);
+    auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
+
+    ASSERT_TRUE(config_blob->Is<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>());
+    auto tcp_proxy_config =
+        MessageUtil::anyConvert<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>(
+            *config_blob);
+
+    tcp_proxy_config.set_upstream_connect_mode(
+        envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_TLS_HANDSHAKE);
+    tcp_proxy_config.mutable_max_early_data_bytes()->set_value(0);
+
+    config_blob->PackFrom(tcp_proxy_config);
+  });
+
+  setupConnections();
+  sendAndReceiveTlsData("hello", "world");
+}
+
+// Test ON_DOWNSTREAM_TLS_HANDSHAKE mode with early data buffering.
+TEST_P(TcpProxySslIntegrationTest, OnDownstreamTlsHandshakeModeWithEarlyData) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* filter_chain = listener->mutable_filter_chains(0);
+    auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
+
+    ASSERT_TRUE(config_blob->Is<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>());
+    auto tcp_proxy_config =
+        MessageUtil::anyConvert<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>(
+            *config_blob);
+    // Set ON_DOWNSTREAM_TLS_HANDSHAKE mode with max_early_data_bytes.
+    tcp_proxy_config.set_upstream_connect_mode(
+        envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_TLS_HANDSHAKE);
+    tcp_proxy_config.mutable_max_early_data_bytes()->set_value(16384);
+
+    config_blob->PackFrom(tcp_proxy_config);
+  });
+
+  initialize();
+
+  MockWatermarkBuffer* client_write_buffer = nullptr;
+  ConnectionStatusCallbacks connect_callbacks;
+  std::shared_ptr<WaitForPayloadReader> payload_reader =
+      std::make_shared<WaitForPayloadReader>(*dispatcher_);
+  Network::ClientConnectionPtr ssl_client;
+  FakeRawConnectionPtr fake_upstream_connection;
+
+  // Set up the mock buffer factory so the newly created SSL client will have a mock write
+  // buffer. This allows us to track the bytes actually written to the socket.
+  EXPECT_CALL(*mock_buffer_factory_, createBuffer_(_, _, _))
+      .Times(AtLeast(1))
+      .WillOnce(Invoke([&](std::function<void()> below_low, std::function<void()> above_high,
+                           std::function<void()> above_overflow) -> Buffer::Instance* {
+        client_write_buffer =
+            new NiceMock<MockWatermarkBuffer>(below_low, above_high, above_overflow);
+        ON_CALL(*client_write_buffer, move(_))
+            .WillByDefault(Invoke(client_write_buffer, &MockWatermarkBuffer::baseMove));
+        ON_CALL(*client_write_buffer, drain(_))
+            .WillByDefault(Invoke(client_write_buffer, &MockWatermarkBuffer::trackDrains));
+        return client_write_buffer;
+      }));
+
+  // Set up the SSL client.
+  Network::Address::InstanceConstSharedPtr address =
+      Ssl::getSslAddress(version_, lookupPort("tcp_proxy"));
+  ssl_client = dispatcher_->createClientConnection(
+      address, Network::Address::InstanceConstSharedPtr(),
+      context_->createTransportSocket(nullptr, nullptr), nullptr, nullptr);
+
+  // Perform the SSL handshake. Loopback is allowlisted in tcp_proxy.json for the ssl_auth
+  // filter so there will be no pause waiting on auth data.
+  ssl_client->addConnectionCallbacks(connect_callbacks);
+  ssl_client->enableHalfClose(true);
+  ssl_client->addReadFilter(payload_reader);
+  ssl_client->connect();
+
+  // No upstream connection should be established yet (before TLS handshake completes).
+  ASSERT_FALSE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection,
+                                                        std::chrono::milliseconds(500)));
+
+  // Wait for TLS handshake to complete. The Connected event fires after TLS handshake.
+  while (!connect_callbacks.connected()) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+
+  // Now upstream connection should be established after TLS handshake completes.
+  AssertionResult result = fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection);
+  RELEASE_ASSERT(result, result.message());
+
+  // Send data after TLS handshake - this should be buffered if upstream isn't ready yet.
+  Buffer::OwnedImpl buffer("hello");
+  ssl_client->write(buffer, false);
+  while (client_write_buffer->bytesDrained() != 5) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+
+  // Verify data is forwarded (buffered and then sent once upstream is ready).
+  ASSERT_TRUE(fake_upstream_connection->waitForData(5));
+
+  // Send response back.
+  ASSERT_TRUE(fake_upstream_connection->write("world", true));
+  payload_reader->setDataToWaitFor("world");
+  ssl_client->dispatcher().run(Event::Dispatcher::RunType::Block);
+
+  // Clean up.
+  Buffer::OwnedImpl empty_buffer;
+  ssl_client->write(empty_buffer, true);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
+  ASSERT_TRUE(fake_upstream_connection->write("", true));
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+  ssl_client->dispatcher().run(Event::Dispatcher::RunType::Block);
+  EXPECT_TRUE(payload_reader->readLastByte());
+  EXPECT_TRUE(connect_callbacks.closed());
 }
 
 // Test connection close during wait for data trigger.

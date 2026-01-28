@@ -57,7 +57,7 @@ Network::TransportSocketPtr ServerSslSocketFactory::createDownstreamTransportSoc
   // use the same ssl_ctx to create SslSocket.
   Envoy::Ssl::ServerContextSharedPtr ssl_ctx;
   {
-    absl::ReaderMutexLock l(&ssl_ctx_mu_);
+    absl::ReaderMutexLock l(ssl_ctx_mu_);
     ssl_ctx = ssl_ctx_;
   }
   if (ssl_ctx) {
@@ -81,7 +81,7 @@ absl::Status ServerSslSocketFactory::onAddOrUpdateSecret() {
   auto ctx_or_error = manager_.createSslServerContext(stats_scope_, *config_, nullptr);
   RETURN_IF_NOT_OK(ctx_or_error.status());
   {
-    absl::WriterMutexLock l(&ssl_ctx_mu_);
+    absl::WriterMutexLock l(ssl_ctx_mu_);
     std::swap(*ctx_or_error, ssl_ctx_);
   }
   manager_.removeContext(*ctx_or_error);

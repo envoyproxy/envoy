@@ -6453,6 +6453,190 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, LiteralSockoptListenerEnabled) {
   EXPECT_EQ(1U, manager_->listeners().size());
 }
 
+TEST_P(ListenerManagerImplWithRealFiltersTest, ListenerKeepaliveEnabled) {
+  if (!ENVOY_SOCKET_SO_KEEPALIVE.hasValue()) {
+    GTEST_SKIP() << "Keepalive is not supported on this platform.";
+  }
+
+  const envoy::config::listener::v3::Listener listener = parseListenerFromV3Yaml(R"EOF(
+    name: SockoptsListener
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1111 }
+    additional_addresses:
+    - address:
+        socket_address: { address: 127.0.0.1, port_value: 2222 }
+    enable_reuse_port: false
+    filter_chains:
+    - filters: []
+      name: foo
+    tcp_keepalive: {}
+  )EOF");
+
+  // Second address.
+  expectCreateListenSocket(envoy::config::core::v3::SocketOption::STATE_PREBIND,
+                           /* expected_num_options */ 1,
+                           ListenerComponentFactory::BindType::NoReusePort);
+
+  // First address.
+  expectCreateListenSocket(envoy::config::core::v3::SocketOption::STATE_PREBIND,
+                           /* expected_num_options */ 1,
+                           ListenerComponentFactory::BindType::NoReusePort);
+
+  expectSetsockopt(/* expected_sockopt_level */ ENVOY_SOCKET_SO_KEEPALIVE.level(),
+                   /* expected_sockopt_name */ ENVOY_SOCKET_SO_KEEPALIVE.option(),
+                   /* expected_value */ 1,
+                   /* expected_num_calls */ 2);
+  addOrUpdateListener(listener);
+  EXPECT_EQ(1U, manager_->listeners().size());
+}
+
+TEST_P(ListenerManagerImplWithRealFiltersTest, ListenerKeepaliveEnabledWithOpts) {
+  if (!ENVOY_SOCKET_SO_KEEPALIVE.hasValue()) {
+    GTEST_SKIP() << "Keepalive is not supported on this platform.";
+  }
+
+  const envoy::config::listener::v3::Listener listener = parseListenerFromV3Yaml(R"EOF(
+    name: SockoptsListener
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1111 }
+    additional_addresses:
+    - address:
+        socket_address: { address: 127.0.0.1, port_value: 2222 }
+    enable_reuse_port: false
+    filter_chains:
+    - filters: []
+      name: foo
+    tcp_keepalive:
+      keepalive_probes: 3
+      keepalive_time: 4
+      keepalive_interval: 5
+  )EOF");
+
+  // Second address.
+  expectCreateListenSocket(envoy::config::core::v3::SocketOption::STATE_PREBIND,
+                           /* expected_num_options */ 4,
+                           ListenerComponentFactory::BindType::NoReusePort);
+
+  // First address.
+  expectCreateListenSocket(envoy::config::core::v3::SocketOption::STATE_PREBIND,
+                           /* expected_num_options */ 4,
+                           ListenerComponentFactory::BindType::NoReusePort);
+
+  expectSetsockopt(/* expected_sockopt_level */ ENVOY_SOCKET_SO_KEEPALIVE.level(),
+                   /* expected_sockopt_name */ ENVOY_SOCKET_SO_KEEPALIVE.option(),
+                   /* expected_value */ 1,
+                   /* expected_num_calls */ 2);
+
+  expectSetsockopt(/* expected_sockopt_level */ ENVOY_SOCKET_TCP_KEEPCNT.level(),
+                   /* expected_sockopt_name */ ENVOY_SOCKET_TCP_KEEPCNT.option(),
+                   /* expected_value */ 3,
+                   /* expected_num_calls */ 2);
+  expectSetsockopt(/* expected_sockopt_level */ ENVOY_SOCKET_TCP_KEEPIDLE.level(),
+                   /* expected_sockopt_name */ ENVOY_SOCKET_TCP_KEEPIDLE.option(),
+                   /* expected_value */ 4,
+                   /* expected_num_calls */ 2);
+  expectSetsockopt(/* expected_sockopt_level */ ENVOY_SOCKET_TCP_KEEPINTVL.level(),
+                   /* expected_sockopt_name */ ENVOY_SOCKET_TCP_KEEPINTVL.option(),
+                   /* expected_value */ 5,
+                   /* expected_num_calls */ 2);
+  addOrUpdateListener(listener);
+  EXPECT_EQ(1U, manager_->listeners().size());
+}
+
+TEST_P(ListenerManagerImplWithRealFiltersTest, ListenerKeepaliveOnAdditionalAddressEnabled) {
+  if (!ENVOY_SOCKET_SO_KEEPALIVE.hasValue()) {
+    GTEST_SKIP() << "Keepalive is not supported on this platform.";
+  }
+
+  const envoy::config::listener::v3::Listener listener = parseListenerFromV3Yaml(R"EOF(
+    name: SockoptsListener
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1111 }
+    additional_addresses:
+    - address:
+        socket_address: { address: 127.0.0.1, port_value: 2222 }
+      tcp_keepalive:
+        keepalive_probes: 3
+        keepalive_time: 4
+        keepalive_interval: 5
+    enable_reuse_port: false
+    filter_chains:
+    - filters: []
+      name: foo
+    tcp_keepalive: {}
+  )EOF");
+
+  // Second address.
+  expectCreateListenSocket(envoy::config::core::v3::SocketOption::STATE_PREBIND,
+                           /* expected_num_options */ 4,
+                           ListenerComponentFactory::BindType::NoReusePort);
+
+  // First address.
+  expectCreateListenSocket(envoy::config::core::v3::SocketOption::STATE_PREBIND,
+                           /* expected_num_options */ 1,
+                           ListenerComponentFactory::BindType::NoReusePort);
+
+  // First & Second address option.
+  expectSetsockopt(/* expected_sockopt_level */ ENVOY_SOCKET_SO_KEEPALIVE.level(),
+                   /* expected_sockopt_name */ ENVOY_SOCKET_SO_KEEPALIVE.option(),
+                   /* expected_value */ 1,
+                   /* expected_num_calls */ 2);
+
+  // Second address options.
+  expectSetsockopt(/* expected_sockopt_level */ ENVOY_SOCKET_TCP_KEEPCNT.level(),
+                   /* expected_sockopt_name */ ENVOY_SOCKET_TCP_KEEPCNT.option(),
+                   /* expected_value */ 3);
+  expectSetsockopt(/* expected_sockopt_level */ ENVOY_SOCKET_TCP_KEEPIDLE.level(),
+                   /* expected_sockopt_name */ ENVOY_SOCKET_TCP_KEEPIDLE.option(),
+                   /* expected_value */ 4);
+  expectSetsockopt(/* expected_sockopt_level */ ENVOY_SOCKET_TCP_KEEPINTVL.level(),
+                   /* expected_sockopt_name */ ENVOY_SOCKET_TCP_KEEPINTVL.option(),
+                   /* expected_value */ 5);
+  addOrUpdateListener(listener);
+  EXPECT_EQ(1U, manager_->listeners().size());
+}
+
+TEST_P(ListenerManagerImplWithRealFiltersTest, ListenerKeepaliveAdditionalAddressOverrideDisable) {
+  if (!ENVOY_SOCKET_SO_KEEPALIVE.hasValue()) {
+    GTEST_SKIP() << "Keepalive is not supported on this platform.";
+  }
+
+  const envoy::config::listener::v3::Listener listener = parseListenerFromV3Yaml(R"EOF(
+    name: SockoptsListener
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1111 }
+    additional_addresses:
+    - address:
+        socket_address: { address: 127.0.0.1, port_value: 2222 }
+      tcp_keepalive:
+        keepalive_probes: 0
+    enable_reuse_port: false
+    filter_chains:
+    - filters: []
+      name: foo
+    tcp_keepalive: {}
+  )EOF");
+
+  // Second address.
+  expectCreateListenSocket(envoy::config::core::v3::SocketOption::STATE_PREBIND,
+                           /* expected_num_options */ 0,
+                           ListenerComponentFactory::BindType::NoReusePort);
+
+  // First address.
+  expectCreateListenSocket(envoy::config::core::v3::SocketOption::STATE_PREBIND,
+                           /* expected_num_options */ 1,
+                           ListenerComponentFactory::BindType::NoReusePort);
+
+  // First address options.
+  expectSetsockopt(/* expected_sockopt_level */ ENVOY_SOCKET_SO_KEEPALIVE.level(),
+                   /* expected_sockopt_name */ ENVOY_SOCKET_SO_KEEPALIVE.option(),
+                   /* expected_value */ 1,
+                   /* expected_num_calls */ 1);
+
+  addOrUpdateListener(listener);
+  EXPECT_EQ(1U, manager_->listeners().size());
+}
+
 TEST_P(ListenerManagerImplWithRealFiltersTest,
        LiteralSockoptListenerEnabledWithMultiAddressesNoOverrideOpts) {
   const envoy::config::listener::v3::Listener listener = parseListenerFromV3Yaml(R"EOF(
@@ -8402,6 +8586,9 @@ public:
   Network::IoHandlePtr socket(Network::Socket::Type socket_type, Network::Address::Type addr_type,
                               Network::Address::IpVersion version, bool socket_v6only,
                               const Network::SocketCreationOptions& options) const override {
+    if (mock_io_handle_) {
+      return std::move(mock_io_handle_);
+    }
     UNREFERENCED_PARAMETER(socket_v6only);
     UNREFERENCED_PARAMETER(options);
     // Create a regular socket for testing
@@ -8420,6 +8607,9 @@ public:
   Network::IoHandlePtr socket(Network::Socket::Type socket_type,
                               const Network::Address::InstanceConstSharedPtr addr,
                               const Network::SocketCreationOptions& options) const override {
+    if (mock_io_handle_) {
+      return std::move(mock_io_handle_);
+    }
     // Delegate to the other socket method
     return socket(socket_type, addr->type(),
                   addr->ip() ? addr->ip()->version() : Network::Address::IpVersion::v4, false,
@@ -8447,8 +8637,13 @@ public:
   bool wasCalled() const { return was_called_; }
   void resetCalled() { was_called_ = false; }
 
+  void setMockIoHandle(Network::IoHandlePtr&& mock_io_handle) {
+    mock_io_handle_ = std::move(mock_io_handle);
+  }
+
 private:
   mutable bool was_called_{false};
+  mutable Network::IoHandlePtr mock_io_handle_;
 };
 
 // Test address that returns a custom socket interface
@@ -8621,6 +8816,57 @@ TEST_P(ListenerManagerImplTest, CustomSocketInterfaceFailureIsHandledGracefully)
   // The socket creation should fail with the expected error
   EXPECT_FALSE(socket_result.ok());
   EXPECT_EQ(socket_result.status().message(), "failed to create socket using custom interface");
+}
+
+TEST_P(ListenerManagerImplTest, CustomSocketInterfaceTcpListenSocketBindToPort) {
+  auto custom_interface = std::make_unique<TestCustomSocketInterface>();
+  TestCustomSocketInterface* custom_interface_ptr = custom_interface.get();
+  auto custom_address = std::make_shared<TestCustomAddress>(*custom_interface);
+  ProdListenerComponentFactory real_listener_factory(server_);
+
+  // Test with BindType::NoBind
+  {
+    Network::Socket::OptionsSharedPtr options = std::make_shared<Network::Socket::Options>();
+    Network::SocketCreationOptions creation_options;
+
+    auto mock_io_handle = std::make_unique<NiceMock<Network::MockIoHandle>>();
+    EXPECT_CALL(*mock_io_handle, bind(_)).Times(0);
+    EXPECT_CALL(*mock_io_handle, listen(_)).Times(0);
+    EXPECT_CALL(*mock_io_handle, isOpen()).WillRepeatedly(Return(true));
+    custom_interface_ptr->setMockIoHandle(std::move(mock_io_handle));
+
+    auto socket_result = real_listener_factory.createListenSocket(
+        custom_address, Network::Socket::Type::Stream, options,
+        ListenerComponentFactory::BindType::NoBind, creation_options, 0);
+    EXPECT_TRUE(socket_result.ok());
+  }
+
+  // Test with BindType::ReusePort
+  {
+    Network::Socket::OptionsSharedPtr options = std::make_shared<Network::Socket::Options>();
+    Network::SocketCreationOptions creation_options;
+    auto mock_io_handle = std::make_unique<NiceMock<Network::MockIoHandle>>();
+
+    // Set default actions for all potentially called methods on MockIoHandle
+    ON_CALL(*mock_io_handle, isOpen()).WillByDefault(Return(true));
+    ON_CALL(*mock_io_handle, bind(_)).WillByDefault(Return(Api::SysCallIntResult{0, 0}));
+    ON_CALL(*mock_io_handle, listen(_)).WillByDefault(Return(Api::SysCallIntResult{0, 0}));
+    ON_CALL(*mock_io_handle, localAddress()).WillByDefault(Return(custom_address));
+
+    // Explicit expectations for the test flow
+    EXPECT_CALL(*mock_io_handle, isOpen()).Times(testing::AtLeast(1));
+    EXPECT_CALL(*mock_io_handle, bind(_));
+
+    // *** Crucially, expect close() to NOT be called ***
+    EXPECT_CALL(*mock_io_handle, close()).Times(0);
+
+    custom_interface_ptr->setMockIoHandle(std::move(mock_io_handle));
+
+    auto socket_result = real_listener_factory.createListenSocket(
+        custom_address, Network::Socket::Type::Stream, options,
+        ListenerComponentFactory::BindType::ReusePort, creation_options, 0);
+    EXPECT_TRUE(socket_result.ok());
+  }
 }
 
 INSTANTIATE_TEST_SUITE_P(Matcher, ListenerManagerImplTest, ::testing::Values(false));
