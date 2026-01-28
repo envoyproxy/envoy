@@ -18,7 +18,7 @@ public:
           ssl_ctx, {Algorithm::Brotli, Algorithm::Zlib});
     } else {
       Extensions::TransportSockets::Tls::CertCompression::registerAlgorithms(ssl_ctx,
-                                                                              {Algorithm::Zlib});
+                                                                             {Algorithm::Zlib});
     }
   }
 

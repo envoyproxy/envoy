@@ -1,6 +1,7 @@
 #include "source/common/tls/cert_compression.h"
 
 #include "test/test_common/logging.h"
+#include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
@@ -69,6 +70,15 @@ TEST(CertCompressionBrotliTest, DecompressBadLength) {
       });
 }
 
+TEST(CertCompressionBrotliTest, CompressHugeInputSizeReturnsFailure) {
+  // BrotliEncoderMaxCompressedSize returns 0 for input sizes > ~2^30.
+  // This triggers the error path at lines 62-65 in cert_compression.cc.
+  bssl::ScopedCBB compressed;
+  ASSERT_EQ(1, CBB_init(compressed.get(), 0));
+  EXPECT_ENVOY_BUG(CertCompression::compressBrotli(nullptr, compressed.get(), nullptr, SIZE_MAX),
+                   "BrotliEncoderMaxCompressedSize returned 0");
+}
+
 //
 // Zlib Tests
 //
@@ -96,13 +106,13 @@ TEST(CertCompressionZlibTest, RoundTrip) {
 }
 
 TEST(CertCompressionZlibTest, DecompressBadData) {
+  constexpr uint8_t bad_compressed_data[2] = {1};
   EXPECT_LOG_CONTAINS(
       "error",
       "Cert zlib decompression failure, possibly caused by invalid compressed cert from peer", {
         CRYPTO_BUFFER* out = nullptr;
-        const uint8_t bad_compressed_data = 1;
         EXPECT_EQ(CertCompression::FAILURE,
-                  CertCompression::decompressZlib(nullptr, &out, 100, &bad_compressed_data,
+                  CertCompression::decompressZlib(nullptr, &out, 100, bad_compressed_data,
                                                   sizeof(bad_compressed_data)));
       });
 }
@@ -158,6 +168,13 @@ TEST_F(CertCompressionRegistrationTest, RegisterAllAlgorithms) {
   // Order matters: brotli > zlib (by priority)
   EXPECT_NO_THROW(CertCompression::registerBrotli(ssl_ctx_.get()));
   EXPECT_NO_THROW(CertCompression::registerZlib(ssl_ctx_.get()));
+}
+
+TEST_F(CertCompressionRegistrationTest, RegisterAlgorithmsVector) {
+  // This tests the registerAlgorithms() function which was previously untested.
+  // Covers lines 46-58 in cert_compression.cc: the for loop and switch cases.
+  CertCompression::registerAlgorithms(
+      ssl_ctx_.get(), {CertCompression::Algorithm::Brotli, CertCompression::Algorithm::Zlib});
 }
 
 } // namespace Tls

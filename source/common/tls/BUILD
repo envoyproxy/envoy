@@ -183,7 +183,6 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":cert_compression_lib",
-        ":ssl_ctx_stats_provider_lib",
         ":stats_lib",
         ":utility_lib",
         "//envoy/ssl:context_config_interface",
@@ -263,24 +262,16 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "ssl_ctx_stats_provider_lib",
-    hdrs = ["ssl_ctx_stats_provider.h"],
-    deps = [
-        ":stats_lib",
-    ],
-)
-
-envoy_cc_library(
     name = "cert_compression_lib",
     srcs = ["cert_compression.cc"],
     hdrs = ["cert_compression.h"],
     external_deps = ["ssl"],
     deps = [
+        "//bazel:zlib",
         "//envoy/ssl:context_config_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
         "@org_brotli//:brotlidec",
         "@org_brotli//:brotlienc",
-        "@zlib",
     ],
 )

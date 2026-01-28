@@ -9,10 +9,8 @@ class PendingProofSource : public EnvoyQuicProofSource {
 public:
   PendingProofSource(Network::Socket& listen_socket,
                      Network::FilterChainManager& filter_chain_manager,
-                     Server::ListenerStats& listener_stats, TimeSource& time_source,
-                     Stats::Scope& stats_scope)
-      : EnvoyQuicProofSource(listen_socket, filter_chain_manager, listener_stats, time_source,
-                             stats_scope) {}
+                     Server::ListenerStats& listener_stats, TimeSource& time_source)
+      : EnvoyQuicProofSource(listen_socket, filter_chain_manager, listener_stats, time_source) {}
 
 protected:
   void signPayload(const quic::QuicSocketAddress& /*server_address*/,
@@ -30,9 +28,9 @@ private:
 
 std::unique_ptr<quic::ProofSource> PendingProofSourceFactoryImpl::createQuicProofSource(
     Network::Socket& listen_socket, Network::FilterChainManager& filter_chain_manager,
-    Server::ListenerStats& listener_stats, TimeSource& time_source, Stats::Scope& stats_scope) {
+    Server::ListenerStats& listener_stats, TimeSource& time_source) {
   return std::make_unique<PendingProofSource>(listen_socket, filter_chain_manager, listener_stats,
-                                              time_source, stats_scope);
+                                              time_source);
 }
 
 REGISTER_FACTORY(PendingProofSourceFactoryImpl, EnvoyQuicProofSourceFactoryInterface);

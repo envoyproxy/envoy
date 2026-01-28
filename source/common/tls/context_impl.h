@@ -21,7 +21,6 @@
 #include "source/common/stats/symbol_table.h"
 #include "source/common/tls/cert_validator/cert_validator.h"
 #include "source/common/tls/context_manager_impl.h"
-#include "source/common/tls/ssl_ctx_stats_provider.h"
 #include "source/common/tls/stats.h"
 
 #include "absl/synchronization/mutex.h"
@@ -81,7 +80,6 @@ namespace TransportSockets {
 namespace Tls {
 
 class ContextImpl : public virtual Envoy::Ssl::Context,
-                    public SslCtxStatsProvider,
                     protected Logger::Loggable<Logger::Id::config> {
 public:
   virtual absl::StatusOr<bssl::UniquePtr<SSL>>
@@ -94,8 +92,7 @@ public:
    */
   void logHandshake(SSL* ssl) const;
 
-  SslStats& stats() override { return stats_; }
-  Stats::Scope& statsScope() override { return scope_; }
+  SslStats& stats() { return stats_; }
 
   /**
    * The global SSL-library index used for storing a pointer to the SslExtendedSocketInfo

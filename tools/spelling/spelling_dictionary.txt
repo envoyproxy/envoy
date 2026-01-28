@@ -849,6 +849,7 @@ filenames
 fileno
 filepath
 filesystem
+fingerprint
 firefox
 fixdate
 fixup

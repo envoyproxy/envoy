@@ -11,6 +11,7 @@
 #include "source/common/buffer/zero_copy_input_stream_impl.h"
 #include "source/common/grpc/codec.h"
 #include "source/common/grpc/common.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/tls/client_ssl_socket.h"
 #include "source/common/tls/context_manager_impl.h"
 #include "source/common/version/version.h"
@@ -570,6 +571,10 @@ tcp_logs:
 
 // Ssl Terminated by envoy, with `ja3` fingerprint.
 TEST_P(TcpGrpcAccessLogIntegrationTest, SslTerminatedWithJA3) {
+  // Disable cert compression for predictable fingerprints.
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.tls_support_certificate_compression",
+                                false);
+
   setupTlsInspectorFilter(/*ssl_terminate=*/true,
                           /*enable_`ja3`_fingerprinting=*/true);
   initialize();
@@ -635,6 +640,10 @@ tcp_logs:
 
 // Ssl NOT Terminated by envoy, no `ja3` fingerprint.
 TEST_P(TcpGrpcAccessLogIntegrationTest, SslNotTerminated) {
+  // Disable cert compression for predictable fingerprints.
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.tls_support_certificate_compression",
+                                false);
+
   setupTlsInspectorFilter(/*ssl_terminate=*/false,
                           /*enable_`ja3`_fingerprinting=*/false);
   initialize();
@@ -689,6 +698,10 @@ tcp_logs:
 
 // Ssl NOT Terminated by envoy, with `ja3` fingerprint.
 TEST_P(TcpGrpcAccessLogIntegrationTest, SslNotTerminatedWithJA3) {
+  // Disable cert compression for predictable fingerprints.
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.tls_support_certificate_compression",
+                                false);
+
   setupTlsInspectorFilter(/*ssl_terminate=*/false,
                           /*enable_`ja3`_fingerprinting=*/true);
   initialize();
@@ -744,6 +757,10 @@ tcp_logs:
 
 // Ssl NOT Terminated by envoy, with only `ja3` fingerprint. No sni.
 TEST_P(TcpGrpcAccessLogIntegrationTest, SslNotTerminatedWithJA3NoSNI) {
+  // Disable cert compression for predictable fingerprints.
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.tls_support_certificate_compression",
+                                false);
+
   setupTlsInspectorFilter(/*ssl_terminate=*/false,
                           /*enable_`ja3`_fingerprinting=*/true);
   initialize();

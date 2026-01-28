@@ -94,6 +94,7 @@ int CertCompression::decompressBrotli(SSL*, CRYPTO_BUFFER** out, size_t uncompre
     IS_ENVOY_BUG("Failed to allocate CRYPTO_BUFFER for brotli decompression");
     return FAILURE;
   }
+  memset(out_buf, 0, uncompressed_len);
 
   size_t decoded_size = uncompressed_len;
   BrotliDecoderResult result = BrotliDecoderDecompress(in_len, in, &decoded_size, out_buf);
@@ -184,12 +185,14 @@ int CertCompression::decompressZlib(SSL*, CRYPTO_BUFFER** out, size_t uncompress
 
   z.next_in = in;
   z.avail_in = in_len;
-  bssl::UniquePtr<CRYPTO_BUFFER> decompressed_data(
-      CRYPTO_BUFFER_alloc(&z.next_out, uncompressed_len));
+  uint8_t* out_buf = nullptr;
+  bssl::UniquePtr<CRYPTO_BUFFER> decompressed_data(CRYPTO_BUFFER_alloc(&out_buf, uncompressed_len));
   if (!decompressed_data) {
     IS_ENVOY_BUG("Failed to allocate CRYPTO_BUFFER for zlib decompression");
     return FAILURE;
   }
+  memset(out_buf, 0, uncompressed_len);
+  z.next_out = out_buf;
   z.avail_out = uncompressed_len;
 
   rv = inflate(&z, Z_FINISH);

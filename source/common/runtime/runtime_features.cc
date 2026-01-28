@@ -81,6 +81,7 @@ RUNTIME_GUARD(envoy_reloadable_features_safe_http2_options);
 RUNTIME_GUARD(envoy_reloadable_features_skip_dns_lookup_for_proxied_requests);
 RUNTIME_GUARD(envoy_reloadable_features_tcp_proxy_set_idle_timer_immediately_on_new_connection);
 RUNTIME_GUARD(envoy_reloadable_features_test_feature_true);
+RUNTIME_GUARD(envoy_reloadable_features_tls_support_certificate_compression);
 RUNTIME_GUARD(envoy_reloadable_features_trace_refresh_after_route_refresh);
 RUNTIME_GUARD(envoy_reloadable_features_udp_set_do_not_fragment);
 RUNTIME_GUARD(envoy_reloadable_features_uhv_allow_malformed_url_encoding);
@@ -123,7 +124,6 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_always_use_v6);
 FALSE_RUNTIME_GUARD(envoy_restart_features_upstream_http_filters_with_tcp_proxy);
 // TODO(danzh) false deprecate it once QUICHE has its own enable/disable flag.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_reject_all);
-RUNTIME_GUARD(envoy_reloadable_features_tls_support_certificate_compression);
 // TODO(#10646) change to true when UHV is sufficiently tested
 // For more information about Universal Header Validation, please see
 // https://github.com/envoyproxy/envoy/issues/10646
