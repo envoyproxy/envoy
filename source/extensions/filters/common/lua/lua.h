@@ -421,6 +421,13 @@ public:
     markDead();
     LuaRef<T>::reset();
   }
+
+  /**
+   * Resets the reference without calling markDead().
+   * Use this only when the referenced object is already being destroyed (e.g. inside its
+   * destructor) to avoid undefined behavior.
+   */
+  void resetWithoutMarkDead() { LuaRef<T>::reset(); }
 };
 
 /**
