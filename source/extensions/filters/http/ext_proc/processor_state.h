@@ -538,7 +538,7 @@ public:
 
   void injectDataToFilterChain(Buffer::Instance& data, bool end_stream) override {
     if (Runtime::runtimeFeatureEnabled(
-                                "envoy.reloadable_features.ext_proc_inject_data_with_state_update")) {
+            "envoy.reloadable_features.ext_proc_inject_data_with_state_update")) {
       decoder_callbacks_->injectDecodedDataToFilterChainWithStateUpdate(data, end_stream);
     } else {
       decoder_callbacks_->injectDecodedDataToFilterChain(data, end_stream);
