@@ -208,6 +208,12 @@ The ``envoy.filters.network.reverse_tunnel`` network filter implements the rever
 protocol. It validates incoming connection requests and accepts or rejects them based on the handshake
 parameters.
 
+When ``enable_tenant_isolation`` is set to ``true`` on the filter configuration, Envoy scopes cached
+reverse tunnel sockets by tenant. The filter concatenates the tenant identifier with the node and cluster
+identifiers using the ``@`` delimiter (for example ``tenant-a@node-1``). Because the delimiter is part of
+the composite key, handshake requests that include ``@`` in any of the reverse tunnel headers are rejected
+with ``400`` to prevent ambiguous lookups. The flag defaults to ``false`` to preserve existing behaviour.
+
 .. literalinclude:: /_configs/reverse_connection/responder-envoy.yaml
     :language: yaml
     :lines: 17-28
@@ -293,6 +299,15 @@ mapping, or custom filter implementations. The Lua filter checks request headers
 sets the ``x-computed-host-id`` header, which the reverse connection cluster uses to look up the appropriate
 tunnel connection.
 
+For deployments that enable :ref:`tenant isolation <config_network_filters_reverse_tunnel>`, the repository
+includes a companion configuration
+:download:`responder-envoy-tenant-isolation.yaml </_configs/reverse_connection/responder-envoy-tenant-isolation.yaml>`.
+That variant extends the Lua script to require an ``x-tenant-id`` header and automatically emit composite
+identifiers such as ``tenant-a@example-node`` before routing through the reverse connection cluster.
+Enabling or disabling tenant isolation therefore only changes the Envoy bootstrap configuration; the
+downstream contract remains consistent: supply ``x-tenant-id`` alongside ``x-node-id`` (or ``x-cluster-id``)
+when tenant-aware isolation is required.
+
 The header priority order is:
 
 #. **x-node-id header**: Highest priority—targets a specific downstream node.
@@ -318,6 +333,17 @@ The header priority order is:
       x-cluster-id: example-cluster
 
    The filter sets ``host_id = "example-cluster"`` and routes to any node in that cluster.
+
+#. **Request with tenant + node IDs** (tenant isolation enabled):
+
+   .. code-block:: http
+
+      GET /downstream_service HTTP/1.1
+      x-tenant-id: tenant-a
+      x-node-id: example-node
+
+   The tenant-aware configuration derives ``host_id = "tenant-a@example-node"`` so that the correct tunnel
+   socket is reused while keeping tenants isolated.
 
 .. _config_reverse_connection_security:
 

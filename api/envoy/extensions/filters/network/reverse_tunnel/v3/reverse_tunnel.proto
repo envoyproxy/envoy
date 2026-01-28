@@ -83,7 +83,7 @@ message Validation {
 // Configuration for the reverse tunnel network filter.
 // This filter handles reverse tunnel connection acceptance and rejection by processing
 // HTTP requests where required identification values are provided via HTTP headers.
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message ReverseTunnel {
   // Ping interval for health checks on established reverse tunnel connections.
   // If not specified, defaults to ``2 seconds``.
@@ -119,4 +119,11 @@ message ReverseTunnel {
   // via ``x-envoy-reverse-tunnel-upstream-cluster-name`` header. Connections with mismatched or missing
   // cluster names are rejected with HTTP ``400 Bad Request``. When empty, no cluster name validation is performed.
   string required_cluster_name = 6 [(validate.rules).string = {max_len: 255 ignore_empty: true}];
+
+  // Enables tenant-aware isolation for reverse connections. When set to ``true``, the filter
+  // requires tenant identifiers in addition to node and cluster identifiers and derives
+  // composite ``tenant@node`` and ``tenant@cluster`` keys for socket tracking. Identifiers
+  // containing the ``@`` delimiter are rejected to avoid ambiguity.
+  // Defaults to ``false`` for backwards compatibility.
+  bool enable_tenant_isolation = 7;
 }

@@ -212,6 +212,31 @@ validation:
   cb(filter_manager);
 }
 
+TEST(ReverseTunnelFilterConfigFactoryTest, ConfigurationWithTenantIsolation) {
+  ReverseTunnelFilterConfigFactory factory;
+
+  const std::string yaml_string = R"EOF(
+request_path: "/reverse_connections/request"
+request_method: GET
+enable_tenant_isolation: true
+)EOF";
+
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel proto_config;
+  TestUtility::loadFromYaml(yaml_string, proto_config);
+  EXPECT_TRUE(proto_config.enable_tenant_isolation());
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  auto result = factory.createFilterFactoryFromProto(proto_config, context);
+  ASSERT_TRUE(result.ok());
+  Network::FilterFactoryCb cb = result.value();
+
+  EXPECT_TRUE(cb != nullptr);
+
+  Network::MockFilterManager filter_manager;
+  EXPECT_CALL(filter_manager, addReadFilter(_));
+  cb(filter_manager);
+}
+
 TEST(ReverseTunnelFilterConfigFactoryTest, ConfigurationWithMetadataEmission) {
   ReverseTunnelFilterConfigFactory factory;
 
