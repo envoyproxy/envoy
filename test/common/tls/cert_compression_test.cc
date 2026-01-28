@@ -70,62 +70,6 @@ TEST(CertCompressionBrotliTest, DecompressBadLength) {
 }
 
 //
-// Zstd Tests
-//
-
-TEST(CertCompressionZstdTest, RoundTrip) {
-  // Compress
-  bssl::ScopedCBB compressed;
-  ASSERT_EQ(1, CBB_init(compressed.get(), 0));
-  EXPECT_EQ(CertCompression::SUCCESS,
-            CertCompression::compressZstd(nullptr, compressed.get(), kTestData, kTestDataLen));
-  const auto compressed_len = CBB_len(compressed.get());
-  EXPECT_GT(compressed_len, 0u);
-
-  // Decompress
-  CRYPTO_BUFFER* out = nullptr;
-  EXPECT_EQ(CertCompression::SUCCESS,
-            CertCompression::decompressZstd(nullptr, &out, kTestDataLen, CBB_data(compressed.get()),
-                                            compressed_len));
-  ASSERT_NE(nullptr, out);
-  bssl::UniquePtr<CRYPTO_BUFFER> out_ptr(out);
-
-  // Verify
-  EXPECT_EQ(kTestDataLen, CRYPTO_BUFFER_len(out));
-  EXPECT_EQ(0, memcmp(kTestData, CRYPTO_BUFFER_data(out), kTestDataLen));
-}
-
-TEST(CertCompressionZstdTest, DecompressBadData) {
-  EXPECT_LOG_CONTAINS(
-      "error",
-      "Cert zstd decompression failure, possibly caused by invalid compressed cert from peer", {
-        CRYPTO_BUFFER* out = nullptr;
-        const uint8_t bad_compressed_data = 1;
-        EXPECT_EQ(CertCompression::FAILURE,
-                  CertCompression::decompressZstd(nullptr, &out, 100, &bad_compressed_data,
-                                                  sizeof(bad_compressed_data)));
-      });
-}
-
-TEST(CertCompressionZstdTest, DecompressBadLength) {
-  bssl::ScopedCBB compressed;
-  ASSERT_EQ(1, CBB_init(compressed.get(), 0));
-  ASSERT_EQ(CertCompression::SUCCESS,
-            CertCompression::compressZstd(nullptr, compressed.get(), kTestData, kTestDataLen));
-  const auto compressed_len = CBB_len(compressed.get());
-  EXPECT_GT(compressed_len, 0u);
-
-  EXPECT_LOG_CONTAINS(
-      "error", "Zstd decompression length did not match peer provided uncompressed length", {
-        CRYPTO_BUFFER* out = nullptr;
-        EXPECT_EQ(CertCompression::FAILURE,
-                  CertCompression::decompressZstd(nullptr, &out,
-                                                  kTestDataLen + 1 /* intentionally incorrect */,
-                                                  CBB_data(compressed.get()), compressed_len));
-      });
-}
-
-//
 // Zlib Tests
 //
 
@@ -185,38 +129,6 @@ TEST(CertCompressionZlibTest, DecompressBadLength) {
 }
 
 //
-// Stats Recording Tests
-// These tests verify that compression succeeds even when SSL context is null
-// (stats recording is safely skipped in this case)
-//
-
-TEST(CertCompressionStatsTest, CompressBrotliWithNullSslRecordsNoStats) {
-  // Verify compression succeeds and doesn't crash when SSL is null
-  // (stats recording is safely skipped)
-  bssl::ScopedCBB compressed;
-  ASSERT_EQ(1, CBB_init(compressed.get(), 0));
-  EXPECT_EQ(CertCompression::SUCCESS,
-            CertCompression::compressBrotli(nullptr, compressed.get(), kTestData, kTestDataLen));
-  EXPECT_GT(CBB_len(compressed.get()), 0u);
-}
-
-TEST(CertCompressionStatsTest, CompressZstdWithNullSslRecordsNoStats) {
-  bssl::ScopedCBB compressed;
-  ASSERT_EQ(1, CBB_init(compressed.get(), 0));
-  EXPECT_EQ(CertCompression::SUCCESS,
-            CertCompression::compressZstd(nullptr, compressed.get(), kTestData, kTestDataLen));
-  EXPECT_GT(CBB_len(compressed.get()), 0u);
-}
-
-TEST(CertCompressionStatsTest, CompressZlibWithNullSslRecordsNoStats) {
-  bssl::ScopedCBB compressed;
-  ASSERT_EQ(1, CBB_init(compressed.get(), 0));
-  EXPECT_EQ(CertCompression::SUCCESS,
-            CertCompression::compressZlib(nullptr, compressed.get(), kTestData, kTestDataLen));
-  EXPECT_GT(CBB_len(compressed.get()), 0u);
-}
-
-//
 // Registration Tests
 // These tests verify that the compression algorithms can be registered with SSL_CTX
 //
@@ -236,11 +148,6 @@ TEST_F(CertCompressionRegistrationTest, RegisterBrotli) {
   EXPECT_NO_THROW(CertCompression::registerBrotli(ssl_ctx_.get()));
 }
 
-TEST_F(CertCompressionRegistrationTest, RegisterZstd) {
-  // Verify zstd registration succeeds without crashing
-  EXPECT_NO_THROW(CertCompression::registerZstd(ssl_ctx_.get()));
-}
-
 TEST_F(CertCompressionRegistrationTest, RegisterZlib) {
   // Verify zlib registration succeeds without crashing
   EXPECT_NO_THROW(CertCompression::registerZlib(ssl_ctx_.get()));
@@ -248,9 +155,8 @@ TEST_F(CertCompressionRegistrationTest, RegisterZlib) {
 
 TEST_F(CertCompressionRegistrationTest, RegisterAllAlgorithms) {
   // Verify all algorithms can be registered on the same context
-  // Order matters: brotli > zstd > zlib (by priority)
+  // Order matters: brotli > zlib (by priority)
   EXPECT_NO_THROW(CertCompression::registerBrotli(ssl_ctx_.get()));
-  EXPECT_NO_THROW(CertCompression::registerZstd(ssl_ctx_.get()));
   EXPECT_NO_THROW(CertCompression::registerZlib(ssl_ctx_.get()));
 }
 

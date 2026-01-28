@@ -11,14 +11,14 @@ class CertCompression : protected Logger::Loggable<Logger::Id::quic> {
 public:
   using Algorithm = Extensions::TransportSockets::Tls::CertCompression::Algorithm;
 
-  static void registerSslContext(SSL_CTX* ssl_ctx, Stats::Scope* scope = nullptr) {
+  static void registerSslContext(SSL_CTX* ssl_ctx) {
     if (Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.tls_support_certificate_compression")) {
       Extensions::TransportSockets::Tls::CertCompression::registerAlgorithms(
-          ssl_ctx, {Algorithm::Brotli, Algorithm::Zstd, Algorithm::Zlib}, scope);
+          ssl_ctx, {Algorithm::Brotli, Algorithm::Zlib});
     } else {
-      Extensions::TransportSockets::Tls::CertCompression::registerAlgorithms(
-          ssl_ctx, {Algorithm::Zlib}, scope);
+      Extensions::TransportSockets::Tls::CertCompression::registerAlgorithms(ssl_ctx,
+                                                                              {Algorithm::Zlib});
     }
   }
 

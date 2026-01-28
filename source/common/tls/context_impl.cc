@@ -165,15 +165,13 @@ ContextImpl::ContextImpl(
     }
 
     // Register certificate compression algorithms to reduce TLS handshake size (RFC 8879).
-    // Only register if the runtime feature flag is enabled (default: disabled).
+    // Only register if the runtime feature flag is enabled (default: enabled).
     if (Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.tls_support_certificate_compression")) {
-      // Priority: brotli > zstd > zlib (brotli generally provides best compression for certs)
-      CertCompression::registerAlgorithms(ctx.ssl_ctx_.get(),
-                                          {CertCompression::Algorithm::Brotli,
-                                           CertCompression::Algorithm::Zstd,
-                                           CertCompression::Algorithm::Zlib},
-                                          &scope);
+      // Priority: brotli > zlib (brotli generally provides best compression for certs)
+      CertCompression::registerAlgorithms(
+          ctx.ssl_ctx_.get(),
+          {CertCompression::Algorithm::Brotli, CertCompression::Algorithm::Zlib});
     }
   }
 

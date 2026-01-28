@@ -19,6 +19,3 @@
    sigalgs.<sigalg>, Counter, Total successful TLS connections that used signature algorithm <sigalg>
    versions.<version>, Counter, Total successful TLS connections that used protocol version <version>
    was_key_usage_invalid, Counter, Total successful TLS connections that used an `invalid keyUsage extension <https://github.com/google/boringssl/blob/6f13380d27835e70ec7caf807da7a1f239b10da6/ssl/internal.h#L3117>`_.
-   certificate_compression.<algo>.compressed, Counter, Total certificates compressed using algorithm <algo> (brotli/zstd/zlib). Requires runtime flag ``envoy.reloadable_features.tls_support_certificate_compression``.
-   certificate_compression.<algo>.total_uncompressed_bytes, Counter, Total bytes of certificates before compression using algorithm <algo>
-   certificate_compression.<algo>.total_compressed_bytes, Counter, Total bytes of certificates after compression using algorithm <algo>

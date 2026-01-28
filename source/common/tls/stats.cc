@@ -22,10 +22,6 @@ Stats::Gauge& createCertificateExpirationGauge(Stats::Scope& scope, const std::s
                                            Stats::Gauge::ImportMode::NeverImport);
 }
 
-CertCompressionStats generateCertCompressionStats(Stats::Scope& scope, const std::string& prefix) {
-  return CertCompressionStats{CERT_COMPRESSION_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
-}
-
 } // namespace Tls
 } // namespace TransportSockets
 } // namespace Extensions

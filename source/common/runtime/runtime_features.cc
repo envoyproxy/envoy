@@ -121,8 +121,7 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_always_use_v6);
 FALSE_RUNTIME_GUARD(envoy_restart_features_upstream_http_filters_with_tcp_proxy);
 // TODO(danzh) false deprecate it once QUICHE has its own enable/disable flag.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_reject_all);
-// TODO: flip to true after sufficient testing of TLS certificate compression.
-FALSE_RUNTIME_GUARD(envoy_reloadable_features_tls_support_certificate_compression);
+RUNTIME_GUARD(envoy_reloadable_features_tls_support_certificate_compression);
 // TODO(#10646) change to true when UHV is sufficiently tested
 // For more information about Universal Header Validation, please see
 // https://github.com/envoyproxy/envoy/issues/10646
