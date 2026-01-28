@@ -14,7 +14,9 @@ static constexpr const char* MMDB_CITY_LOOKUP_ARGS[] = {"city", "names", "en"};
 static constexpr const char* MMDB_REGION_LOOKUP_ARGS[] = {"subdivisions", "0", "iso_code"};
 static constexpr const char* MMDB_COUNTRY_LOOKUP_ARGS[] = {"country", "iso_code"};
 static constexpr const char* MMDB_ASN_LOOKUP_ARGS[] = {"autonomous_system_number"};
+static constexpr const char* MMDB_ASN_ORG_LOOKUP_ARGS[] = {"autonomous_system_organization"};
 static constexpr const char* MMDB_ISP_LOOKUP_ARGS[] = {"isp", "autonomous_system_number"};
+static constexpr const char* MMDB_ISP_ORG_LOOKUP_ARGS[] = {"organization"};
 static constexpr const char* MMDB_ANON_LOOKUP_ARGS[] = {"is_anonymous", "is_anonymous_vpn",
                                                         "is_hosting_provider", "is_tor_exit_node",
                                                         "is_public_proxy"};
@@ -50,6 +52,7 @@ GeoipProviderConfig::GeoipProviderConfig(
     city_header_ = getOptionalString(keys.city());
     region_header_ = getOptionalString(keys.region());
     asn_header_ = getOptionalString(keys.asn());
+    asn_org_header_ = getOptionalString(keys.asn_org());
     anon_header_ = getOptionalString(keys.anon());
     anon_vpn_header_ = getOptionalString(keys.anon_vpn());
     anon_hosting_header_ = getOptionalString(keys.anon_hosting());
@@ -64,6 +67,7 @@ GeoipProviderConfig::GeoipProviderConfig(
     city_header_ = getOptionalString(headers.city());
     region_header_ = getOptionalString(headers.region());
     asn_header_ = getOptionalString(headers.asn());
+    asn_org_header_ = getOptionalString(headers.asn_org());
     // TODO(barroca): When the is_anon field is fully deprecated, remove this fallback.
     anon_header_ = !headers.anon().empty() ? absl::make_optional(headers.anon())
                                            : getOptionalString(headers.is_anon());
@@ -256,7 +260,8 @@ void GeoipProvider::lookupInCityDb(
 void GeoipProvider::lookupInAsnDb(
     const Network::Address::InstanceConstSharedPtr& remote_address,
     absl::flat_hash_map<std::string, std::string>& lookup_result) const {
-  if (config_->isLookupEnabledForHeader(config_->asnHeader())) {
+  if (config_->isLookupEnabledForHeader(config_->asnHeader()) ||
+      config_->isLookupEnabledForHeader(config_->asnOrgHeader())) {
     int mmdb_error;
     auto asn_db_ptr = getAsnDb();
     // Used for testing.
@@ -281,6 +286,10 @@ void GeoipProvider::lookupInAsnDb(
         if (config_->isLookupEnabledForHeader(config_->asnHeader())) {
           populateGeoLookupResult(mmdb_lookup_result, lookup_result, config_->asnHeader().value(),
                                   MMDB_ASN_LOOKUP_ARGS[0]);
+        }
+        if (config_->isLookupEnabledForHeader(config_->asnOrgHeader())) {
+          populateGeoLookupResult(mmdb_lookup_result, lookup_result,
+                                  config_->asnOrgHeader().value(), MMDB_ASN_ORG_LOOKUP_ARGS[0]);
         }
 
         MMDB_free_entry_data_list(entry_data_list);
@@ -353,7 +362,9 @@ void GeoipProvider::lookupInIspDb(
     absl::flat_hash_map<std::string, std::string>& lookup_result) const {
   if (config_->isLookupEnabledForHeader(config_->ispHeader()) ||
       config_->isLookupEnabledForHeader(config_->applePrivateRelayHeader()) ||
-      (!config_->isAsnDbPathSet() && config_->isLookupEnabledForHeader(config_->asnHeader()))) {
+      (!config_->isAsnDbPathSet() &&
+       (config_->isLookupEnabledForHeader(config_->asnHeader()) ||
+        config_->isLookupEnabledForHeader(config_->asnOrgHeader())))) {
     int mmdb_error;
     auto isp_db_ptr = getIspDb();
     // Used for testing.
@@ -389,6 +400,11 @@ void GeoipProvider::lookupInIspDb(
         if (!config_->isAsnDbPathSet() && config_->isLookupEnabledForHeader(config_->asnHeader())) {
           populateGeoLookupResult(mmdb_lookup_result, lookup_result, config_->asnHeader().value(),
                                   MMDB_ISP_LOOKUP_ARGS[1]);
+        }
+        if (!config_->isAsnDbPathSet() &&
+            config_->isLookupEnabledForHeader(config_->asnOrgHeader())) {
+          populateGeoLookupResult(mmdb_lookup_result, lookup_result,
+                                  config_->asnOrgHeader().value(), MMDB_ISP_ORG_LOOKUP_ARGS[0]);
         }
         if (lookup_result.size() > n_prev_hits) {
           config_->incHit(ISP_DB_TYPE);
