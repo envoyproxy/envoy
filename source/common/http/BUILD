@@ -679,3 +679,21 @@ envoy_cc_library(
         "@com_google_absl//absl/types:span",
     ],
 )
+
+envoy_cc_library(
+    name = "session_idle_list_lib",
+    srcs = ["session_idle_list.cc"],
+    hdrs = ["session_idle_list.h"],
+    deps = [
+        "//envoy/access_log:access_log_interface",
+        "//envoy/event:dispatcher_interface",
+        "//source/common/access_log:access_log_lib",
+        "//source/common/common:assert_lib",
+        "//source/common/quic:envoy_quic_clock_lib",
+        "@com_google_absl//absl/container:btree",
+        "@com_google_absl//absl/container:node_hash_map",
+        "@com_google_absl//absl/log:check",
+        "@com_google_absl//absl/strings:str_format",
+        "@com_google_absl//absl/time",
+    ],
+)
