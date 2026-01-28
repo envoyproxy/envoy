@@ -74,8 +74,8 @@ MonotonicTime SessionIdleList::IdleSessions::GetEnqueueTime(IdleSessionInterface
 
 void SessionIdleList::IdleSessions::ResetSessionEnqueueTime(MonotonicTime enqueue_time,
                                                             IdleSessionInterface& session) {
-  this->RemoveSessionFromList(session);
-  this->AddSessionToList(enqueue_time, session);
+  RemoveSessionFromList(session);
+  AddSessionToList(enqueue_time, session);
 }
 
 } // namespace Http
