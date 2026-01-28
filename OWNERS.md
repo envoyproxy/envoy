@@ -90,7 +90,6 @@ without further review.
 * All senior maintainers
 * Tony Allen ([tonya11en](https://github.com/tonya11en)) (tony@allen.gg)
 * Tim Walsh ([twghu](https://github.com/twghu)) (twalsh@redhat.com)
-* Pradeep Rao ([pradeepcrao](https://github.com/pradeepcrao)) (pcrao@google.com)
 * Kateryna Nezdolii ([nezdolik](https://github.com/nezdolik)) (kateryna.nezdolii@gmail.com)
 * Boteng Yao ([botengyao](https://github.com/botengyao)) (boteng@google.com)
 * Kevin Baichoo ([KBaichoo](https://github.com/KBaichoo)) (envoy@kevinbaichoo.com)
@@ -100,6 +99,7 @@ without further review.
 * Raven Black ([ravenblackx](https://github.com/ravenblackx)) (ravenblack@dropbox.com)
 * Kuo-Chung Hsu ([juniorhsu](https://github.com/juniorhsu)) (kuochunghsu@pinterest.com)
 * Rohit Agrawal ([agrawroh](https://github.com/agrawroh)) (rohit.agrawal@databricks.com)
+* Antonio Leonti ([antoniovleonti](https://github.com/antoniovleonti)) (leonti@google.com)
 
 # Emeritus maintainers
 

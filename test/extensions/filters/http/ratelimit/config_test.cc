@@ -7,6 +7,7 @@
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/server/instance.h"
 
+#include "absl/strings/str_cat.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -28,33 +29,40 @@ TEST(RateLimitFilterConfigTest, ValidateFail) {
       ProtoValidationException);
 }
 
+// Test rate limit filter configuration with various timeout values.
+// Tests both non-zero timeout (2s) and zero timeout (0s -> infinite).
 TEST(RateLimitFilterConfigTest, RatelimitCorrectProto) {
-  const std::string yaml = R"EOF(
+  for (const char* timeout : {"2s", "0s"}) {
+    SCOPED_TRACE(absl::StrCat("timeout=", timeout));
+
+    const std::string yaml = absl::StrCat(R"EOF(
   domain: test
-  timeout: 2s
+  timeout: )EOF",
+                                          timeout, R"EOF(
   rate_limit_service:
     grpc_service:
       envoy_grpc:
         cluster_name: ratelimit_cluster
-  )EOF";
+  )EOF");
 
-  envoy::extensions::filters::http::ratelimit::v3::RateLimit proto_config{};
-  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+    envoy::extensions::filters::http::ratelimit::v3::RateLimit proto_config{};
+    TestUtility::loadFromYamlAndValidate(yaml, proto_config);
 
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+    NiceMock<Server::Configuration::MockFactoryContext> context;
 
-  EXPECT_CALL(context.server_factory_context_.cluster_manager_.async_client_manager_,
-              getOrCreateRawAsyncClientWithHashKey(_, _, _))
-      .WillOnce(Invoke([](const Grpc::GrpcServiceConfigWithHashKey&, Stats::Scope&, bool) {
-        return std::make_unique<NiceMock<Grpc::MockAsyncClient>>();
-      }));
+    EXPECT_CALL(context.server_factory_context_.cluster_manager_.async_client_manager_,
+                getOrCreateRawAsyncClientWithHashKey(_, _, _))
+        .WillOnce(Invoke([](const Grpc::GrpcServiceConfigWithHashKey&, Stats::Scope&, bool) {
+          return std::make_unique<NiceMock<Grpc::MockAsyncClient>>();
+        }));
 
-  RateLimitFilterConfig factory;
-  Http::FilterFactoryCb cb =
-      factory.createFilterFactoryFromProto(proto_config, "stats", context).value();
-  Http::MockFilterChainFactoryCallbacks filter_callback;
-  EXPECT_CALL(filter_callback, addStreamFilter(_));
-  cb(filter_callback);
+    RateLimitFilterConfig factory;
+    Http::FilterFactoryCb cb =
+        factory.createFilterFactoryFromProto(proto_config, "stats", context).value();
+    Http::MockFilterChainFactoryCallbacks filter_callback;
+    EXPECT_CALL(filter_callback, addStreamFilter(_));
+    cb(filter_callback);
+  }
 }
 
 TEST(RateLimitFilterConfigTest, RateLimitFilterEmptyProto) {

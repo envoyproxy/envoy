@@ -232,9 +232,6 @@ def envoy_dependencies(skip_targets = []):
 
     _com_github_fdio_vpp_vcl()
 
-    # Unconditional, since we use this only for compiler-agnostic fuzzing utils.
-    _org_llvm_releases_compiler_rt()
-
     _toolchains_llvm()
 
     _cc_deps()
@@ -736,12 +733,6 @@ def _googleurl():
         patch_args = ["-p1"],
     )
 
-def _org_llvm_releases_compiler_rt():
-    external_http_archive(
-        name = "org_llvm_releases_compiler_rt",
-        build_file = "@envoy//bazel/external:compiler_rt.BUILD",
-    )
-
 def _com_github_grpc_grpc():
     external_http_archive(
         name = "com_github_grpc_grpc",
@@ -762,7 +753,10 @@ def _rules_proto_grpc():
     external_http_archive("rules_proto_grpc")
 
 def _re2():
-    external_http_archive("com_googlesource_code_re2")
+    external_http_archive(
+        "com_googlesource_code_re2",
+        repo_mapping = {"@abseil-cpp": "@com_google_absl"},
+    )
 
 def _proxy_wasm_cpp_sdk():
     external_http_archive(

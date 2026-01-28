@@ -30,6 +30,7 @@ McpFilterConfig::McpFilterConfig(const envoy::extensions::filters::http::mcp::v3
                                  ? proto_config.max_request_body_size().value()
                                  : 8192), // Default: 8KB
       request_storage_mode_(proto_config.request_storage_mode()),
+      metadata_namespace_(Filters::Common::Mcp::metadataNamespace()),
       parser_config_(proto_config.has_parser_config()
                          ? McpParserConfig::fromProto(proto_config.parser_config())
                          : McpParserConfig::createDefault()),
@@ -133,7 +134,7 @@ Http::FilterHeadersStatus McpFilter::decodeHeaders(Http::RequestHeaderMap& heade
       // Need to buffer the body to check for JSON-RPC 2.0
       is_mcp_request_ = true;
 
-      // Set the buffer limit - Envoy will automatically send 413 if exceeded
+      // Set the buffer limit.
       const uint32_t max_size = getMaxRequestBodySize();
       if (max_size > 0) {
         decoder_callbacks_->setBufferLimit(max_size);
@@ -170,27 +171,21 @@ Http::FilterDataStatus McpFilter::decodeData(Buffer::Instance& data, bool end_st
     return Http::FilterDataStatus::Continue;
   }
 
-  size_t buffer_size = data.length();
+  const size_t chunk_size = data.length();
 
-  ENVOY_LOG(trace, "decodeData: buffer_size={}, already_parsed={}", buffer_size, bytes_parsed_);
+  ENVOY_LOG(trace, "decodeData: chunk_size={}, total_parsed={}, end_stream={}", chunk_size,
+            bytes_parsed_, end_stream);
 
   const uint32_t max_size = getMaxRequestBodySize();
-  size_t to_parse = buffer_size - bytes_parsed_;
+
+  size_t to_parse = chunk_size;
   if (max_size > 0) {
-    if (bytes_parsed_ >= max_size) {
-      config_->stats().body_too_large_.inc();
-      handleParseError("request body is too large.");
-      return Http::FilterDataStatus::StopIterationNoBuffer;
-    }
     size_t remaining_limit = max_size - bytes_parsed_;
-    to_parse = std::min(to_parse, remaining_limit);
+    to_parse = std::min(chunk_size, remaining_limit);
   }
 
-  // Linearize the buffer and create a string_view to avoid copying.
-  // Also ensure we don't linearize more than the buffer contains.
-  size_t linearize_size = std::min(bytes_parsed_ + to_parse, buffer_size);
-  const char* linearized = static_cast<const char*>(data.linearize(linearize_size));
-  absl::string_view parse_view(linearized + bytes_parsed_, to_parse);
+  const char* linearized = static_cast<const char*>(data.linearize(to_parse));
+  absl::string_view parse_view(linearized, to_parse);
 
   // The partial parser will return an OK status if the requirements are not satisfied.
   // It will potentially be a bad status due to the partial parse if all the requirements
@@ -222,7 +217,7 @@ Http::FilterDataStatus McpFilter::decodeData(Buffer::Instance& data, bool end_st
     return completeParsing();
   }
 
-  return Http::FilterDataStatus::StopIterationAndBuffer;
+  return Http::FilterDataStatus::StopIterationAndWatermark;
 }
 
 void McpFilter::handleParseError(absl::string_view error_msg) {
@@ -267,8 +262,7 @@ Http::FilterDataStatus McpFilter::completeParsing() {
     }
 
     if (config_->shouldStoreToDynamicMetadata()) {
-      decoder_callbacks_->streamInfo().setDynamicMetadata(std::string(MetadataKeys::FilterName),
-                                                          metadata);
+      decoder_callbacks_->streamInfo().setDynamicMetadata(config_->metadataNamespace(), metadata);
       ENVOY_LOG(debug, "MCP filter set dynamic metadata: {}", metadata.DebugString());
     }
 

@@ -42,6 +42,7 @@ BACKTRACE
 BEL
 BBR
 BIDIRECTIONAL
+BOM
 CCL
 CGROUP
 CROSSSLOT
@@ -465,6 +466,7 @@ SIGSEGV
 SIGTERM
 SIMD
 SIO
+SSE
 SMTP
 SNI
 SOTW
@@ -1061,6 +1063,7 @@ msgpack
 multi
 multicast
 multikill
+multiline
 multimap
 multiple
 multivalue
@@ -1622,6 +1625,20 @@ NXDOMAIN
 DNAT
 RSP
 EWMA
+hotplug
+cgroup
+cgroupv1
+cgroupv2
+cgroupsv1
+cgroupsv2
+usage_usec
+usec
+nsec
+millicores
+cpuacct
+cpuacct.usage
+effective_cpus
+cpus
 ja3
 ja4
 HBONE

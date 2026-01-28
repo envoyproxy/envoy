@@ -73,12 +73,14 @@ public:
   bool shouldEnforceValidation() const {
     return session_identity_.validation_mode == ValidationMode::Enforce;
   }
+  const std::string& metadataNamespace() const { return metadata_namespace_; }
 
 private:
   std::vector<McpBackendConfig> backends_;
   std::string default_backend_name_;
   Server::Configuration::FactoryContext& factory_context_;
   SessionIdentityConfig session_identity_;
+  std::string metadata_namespace_;
 };
 
 using McpRouterConfigSharedPtr = std::shared_ptr<McpRouterConfig>;
