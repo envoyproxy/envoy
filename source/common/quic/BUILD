@@ -734,5 +734,8 @@ envoy_cc_library(
     hdrs = envoy_select_enable_http3(["cert_compression.h"]),
     deps = envoy_select_enable_http3([
         "//source/common/tls:cert_compression_lib",
+        "//source/common/common:assert_lib",
+        "//source/common/common:logger_lib",
+        "//source/common/runtime:runtime_lib",
     ]),
 )

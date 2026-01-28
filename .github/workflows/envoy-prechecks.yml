@@ -93,6 +93,21 @@ jobs:
       request: ${{ needs.load.outputs.request }}
       trusted: ${{ needs.load.outputs.trusted && fromJSON(needs.load.outputs.trusted) || false }}
 
+  external:
+    permissions:
+      actions: read
+      contents: read
+      packages: read
+      pull-requests: read
+    name: Precheck (${{ needs.load.outputs.request && fromJSON(needs.load.outputs.request).summary.title || 'SKIPPED' }})
+    uses: ./.github/workflows/_precheck_external.yml
+    if: ${{ fromJSON(needs.load.outputs.request).run.precheck-external }}
+    needs:
+    - load
+    with:
+      request: ${{ needs.load.outputs.request }}
+      trusted: ${{ needs.load.outputs.trusted && fromJSON(needs.load.outputs.trusted) || false }}
+
   request:
     secrets:
       app-id: ${{ secrets.ENVOY_CI_APP_ID }}
@@ -108,12 +123,14 @@ jobs:
       && contains(fromJSON('["pull_request_target", "push", "schedule"]'), github.event.workflow_run.event)
       && (fromJSON(needs.load.outputs.request).run.precheck-format
           || fromJSON(needs.load.outputs.request).run.precheck-deps
-          || fromJSON(needs.load.outputs.request).run.precheck-publish)
+          || fromJSON(needs.load.outputs.request).run.precheck-publish
+          || fromJSON(needs.load.outputs.request).run.precheck-external)
     needs:
     - load
     - format
     - deps
     - publish
+    - external
     uses: ./.github/workflows/_finish.yml
     with:
       needs: ${{ toJSON(needs) }}

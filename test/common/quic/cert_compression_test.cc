@@ -11,13 +11,13 @@ namespace Quic {
 using TlsCertCompression = Extensions::TransportSockets::Tls::CertCompression;
 
 TEST(CertCompressionZlibTest, DecompressBadData) {
+  constexpr uint8_t bad_compressed_data[2] = {1};
   EXPECT_LOG_CONTAINS(
       "error",
       "Cert zlib decompression failure, possibly caused by invalid compressed cert from peer", {
         CRYPTO_BUFFER* out = nullptr;
-        const uint8_t bad_compressed_data = 1;
         EXPECT_EQ(TlsCertCompression::FAILURE,
-                  TlsCertCompression::decompressZlib(nullptr, &out, 100, &bad_compressed_data,
+                  TlsCertCompression::decompressZlib(nullptr, &out, 100, bad_compressed_data,
                                                      sizeof(bad_compressed_data)));
       });
 }

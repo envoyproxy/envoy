@@ -370,6 +370,12 @@ CAPIStatus envoyGoFilterHttpGetStringSecret(void* r, void* key_data, int key_len
       });
 }
 
+CAPIStatus envoyGoFilterHttpSetDrainConnectionUponCompletion(void* r) {
+  return envoyGoFilterHandlerWrapper(r, [](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+    return filter->setDrainConnectionUponCompletion();
+  });
+}
+
 CAPIStatus envoyGoFilterHttpDefineMetric(void* c, uint32_t metric_type, void* name_data,
                                          int name_len, uint32_t* metric_id) {
   return envoyGoConfigHandlerWrapper(

@@ -286,11 +286,44 @@ the secret name. This is useful for multi-tenant deployments, where a single lis
 cluster can present a variety of certificates to the peer. Envoy provides an :ref:`on-demand
 certificate selector <extension_envoy.tls.certificate_selectors.on_demand_secret>` that pauses the
 TLS handshake to issue an SDS request for a certificate if not present, and then continues the
-handshake after receiving the response. For example, the following downstream TLS context
-configuration uses the SNI field as the secret name in the SDS request:
+handshake after receiving the response.
+
+A certificate obtained via the on-demand SDS is configured the same way as a regular TLS certificate
+defined in the context, e.g. all parent settings are applied. If there is a dynamic update to the
+parent TLS context, e.g. a validation context SDS update, on-demand certificate contexts also
+receive it and get updated. As a consequence, the handshake uses the latest version of the CA secret
+when resuming the handshake.
+
+On-demand SDS should be used with DELTA_GRPC to manage the deletion of the secrets from the data
+plane. A resource removal sent via the xDS response will cancel the data plane subscription for the
+specific secret name. When using the regular GRPC xDS protocol, the subscription for each mapped
+secret remains active until the removal of the parent resource (listener or cluster).
+
+In addition to the standard SDS `subscription statistics <subscription_statistics>`, the following
+statistics are produced by the on-demand certificate extension. For downstream listeners, they are
+in the *listener.<stat_prefix>.on_demand_secret.* namespace. For upstream clusters, the stat prefix
+is *cluster.<stat_prefix>.on_demand_secret.*.
+
+.. csv-table::
+     :header: Name, Type, Description
+     :widths: 1, 1, 2
+
+     cert_requested, Counter, Total number of new SDS subscriptions created
+     cert_updated, Counter, Total number of certificate updates
+     cert_active, Gauge, Number of active certificate subscriptions and certificates
+
+.. note::
+
+    Session resumption is currently not supported for on-demand certificates.
+
+Examples
+^^^^^^^^
+
+The following *downstream* TLS context configuration uses the SNI field as the secret name in the
+SDS request:
 
 .. validated-code-block:: yaml
-  :type-name: envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext"
+  :type-name: envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
 
   common_tls_context:
     custom_tls_certificate_selector:
@@ -314,27 +347,72 @@ configuration uses the SNI field as the secret name in the SDS request:
   disable_stateless_session_resumption: true
   disable_stateful_session_resumption: true
 
-A certificate obtained via the on-demand SDS is configured the same way as a regular TLS certificate
-defined in the context, e.g. all parent settings are applied. If there is a dynamic update to the
-parent TLS context, e.g. a validation context SDS update, on-demand certificates also receive it and
-get updated.
+The following *downstream* TLS context configuration is analogous to the one with a regular SDS TLS
+certificate, but does not block the listener from listening until the SDS response arrives. Instead,
+connections are accepted and paused during the TLS handshake, and resumed once the certificate is
+received.
 
-On-demand SDS should be used with DELTA_GRPC to manage the deletion of the secrets from the data
-plane. A resource removal sent via the xDS response will cancel the data plane subscription for the
-specific secret name.
+.. validated-code-block:: yaml
+  :type-name: envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
 
-In addition to the standard SDS `subscription statistics <subscription_statistics>`, the following
-statistics are produced by the on-demand certificate extension. For downstream listeners, they are
-in the *listener.<stat_prefix>.on_demand_secret.* namespace.
+  common_tls_context:
+    custom_tls_certificate_selector:
+      name: on-demand
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_selectors.on_demand_secret.v3.Config
+        config_source:
+          api_config_source:
+            api_type: DELTA_GRPC
+            grpc_services:
+            - envoy_grpc:
+                cluster_name: some_xds_cluster
+        certificate_mapper:
+          name: sni
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.static_name.v3.StaticName
+            name: secret_0
+        prefetch_secret_names:
+        - secret_0
+  disable_stateless_session_resumption: true
+  disable_stateful_session_resumption: true
 
-.. csv-table::
-     :header: Name, Type, Description
-     :widths: 1, 1, 2
+The following *upstream* TLS context configuration uses a dynamic filter state value passed from the
+downstream listener:
 
-     cert_requested, Counter, Total number of new SDS subscriptions created
-     cert_updated, Counter, Total number of certificate updates
-     cert_active, Gauge, Number of active certificate subscriptions and certificates
+.. validated-code-block:: yaml
+  :type-name: envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
 
-.. note::
+  common_tls_context:
+    custom_tls_certificate_selector:
+      name: on-demand
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_selectors.on_demand_secret.v3.Config
+        config_source:
+          api_config_source:
+            api_type: DELTA_GRPC
+            grpc_services:
+            - envoy_grpc:
+                cluster_name: some_xds_cluster
+        certificate_mapper:
+          name: filter_state_override
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_mappers.filter_state_override.v3.Config
+            default_value: "default_secret"
 
-    Session resumption is currently not supported for on-demand certificates.
+For the *upstream* filter state override configuraton above to work, the value must be written in
+the downstream filter chain, e.g. using the following filter configuration:
+
+.. validated-code-block:: yaml
+  :type-name: envoy.config.listener.v3.Filter
+
+  name: envoy.filters.network.set_filter_state
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.network.set_filter_state.v3.Config
+    on_new_connection:
+    - object_key: envoy.tls.certificate_mappers.on_demand_secret
+      factory_key: envoy.string
+      format_string:
+        text_format_source:
+          inline_string: my_secret_name
+      shared_with_upstream: ONCE
+

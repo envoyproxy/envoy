@@ -2080,9 +2080,30 @@ message VirtualCluster {
 
 // Global rate limiting :ref:`architecture overview <arch_overview_global_rate_limit>`.
 // Also applies to Local rate limiting :ref:`using descriptors <config_http_filters_local_rate_limit_descriptors>`.
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message RateLimit {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RateLimit";
+
+  enum XRateLimitOption {
+    // X-RateLimit headers is not specified. When this enum is used at descriptor level,
+    // the behavior is to inherit the setting from the filter.
+    UNSPECIFIED = 0;
+
+    // X-RateLimit headers disabled.
+    OFF = 1;
+
+    // Use `draft RFC Version 03 <https://tools.ietf.org/id/draft-polli-ratelimit-headers-03.html>`_
+    // where 3 headers will be added:
+    //
+    // * ``X-RateLimit-Limit`` - indicates the request-quota associated to the
+    //   client in the current time-window followed by the description of the
+    //   quota policy. The value is returned by the maximum tokens of the token bucket.
+    // * ``X-RateLimit-Remaining`` - indicates the remaining requests in the
+    //   current time-window. The value is returned by the remaining tokens in the token bucket.
+    // * ``X-RateLimit-Reset`` - indicates the number of seconds until reset of
+    //   the current time-window. The value is returned by the remaining fill interval of the token bucket.
+    DRAFT_VERSION_03 = 2;
+  }
 
   // [#next-free-field: 13]
   message Action {
@@ -2631,6 +2652,9 @@ message RateLimit {
   //
   // Currently, this is only supported by the HTTP global rate filter.
   bool apply_on_stream_done = 6;
+
+  // Descriptor level X-RateLimit headers options which may override the filter level setting.
+  XRateLimitOption x_ratelimit_option = 7;
 }
 
 // .. attention::
