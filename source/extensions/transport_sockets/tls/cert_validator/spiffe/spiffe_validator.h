@@ -17,6 +17,7 @@
 #include "source/common/common/c_smart_ptr.h"
 #include "source/common/common/logger.h"
 #include "source/common/common/matchers.h"
+#include "source/common/config/datasource.h"
 #include "source/common/stats/symbol_table.h"
 #include "source/common/tls/cert_validator/cert_validator.h"
 #include "source/common/tls/cert_validator/san_matcher.h"
@@ -40,7 +41,7 @@ struct SpiffeData {
 class SPIFFEValidator : public CertValidator, Logger::Loggable<Logger::Id::secret> {
 public:
   SPIFFEValidator(SslStats& stats, Server::Configuration::CommonFactoryContext& context)
-      : spiffe_data_(std::make_shared<SpiffeData>()), api_(context.api()), stats_(stats),
+      : spiffe_data_(std::make_shared<SpiffeData>()), stats_(stats),
         time_source_(context.timeSource()) {};
   SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
                   Server::Configuration::CommonFactoryContext& context, Stats::Scope& scope,
@@ -73,8 +74,8 @@ public:
   static std::string extractTrustDomain(const std::string& san);
   static bool certificatePrecheck(X509* leaf_cert);
   OptRef<SpiffeData> getSpiffeData() const {
-    if (tls_) {
-      return tls_->get()->getSpiffeData();
+    if (bundle_provider_) {
+      return makeOptRefFromPtr(bundle_provider_->data().get());
     }
     return makeOptRefFromPtr(spiffe_data_.get());
   };
@@ -85,43 +86,18 @@ private:
                                             X509_VERIFY_PARAM* verify_param,
                                             std::string& error_details);
 
-  absl::Status initializeCertificateRefresh(Server::Configuration::CommonFactoryContext& context);
   void initializeCertExpirationStats(Stats::Scope& scope, const std::string& cert_name);
-  absl::StatusOr<std::shared_ptr<SpiffeData>>
-  parseTrustBundles(const std::string& trust_bundles_str);
-
-  class ThreadLocalSpiffeState : public Envoy::ThreadLocal::ThreadLocalObject {
-  public:
-    OptRef<SpiffeData> getSpiffeData() const { return makeOptRefFromPtr(spiffe_data_.get()); }
-    void updateSpiffeData(std::shared_ptr<SpiffeData> new_data) {
-      ENVOY_LOG(debug, "updating spiffe data");
-      spiffe_data_ = new_data;
-    }
-
-  private:
-    std::shared_ptr<SpiffeData> spiffe_data_;
-  };
-
-  void updateSpiffeData(std::shared_ptr<SpiffeData> new_spiffe_data) {
-    tls_->runOnAllThreads(
-        [new_spiffe_data](OptRef<ThreadLocalSpiffeState> obj) {
-          ENVOY_LOG(debug, "loading new spiffe data");
-          obj->updateSpiffeData(new_spiffe_data);
-        },
-        []() { ENVOY_LOG(debug, "SPIFFE data update completed on all threads"); });
-  }
 
   bool allow_expired_certificate_{false};
 
-  ThreadLocal::TypedSlotPtr<ThreadLocalSpiffeState> tls_;
   std::string ca_file_name_;
-  std::string trust_bundle_file_name_;
   std::shared_ptr<SpiffeData> spiffe_data_;
   std::vector<SanMatcherPtr> subject_alt_name_matchers_{};
-  std::unique_ptr<Filesystem::Watcher> file_watcher_;
-  Api::Api& api_;
   SslStats& stats_;
   TimeSource& time_source_;
+  using SpiffeTrustBundles = Config::DataSource::ProviderSingleton<SpiffeData>;
+  std::shared_ptr<SpiffeTrustBundles> bundle_map_;
+  Config::DataSource::DataSourceProviderSharedPtr<SpiffeData> bundle_provider_;
 };
 
 } // namespace Tls
