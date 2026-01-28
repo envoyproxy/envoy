@@ -22,6 +22,7 @@ class HeaderMapWrapper;
 class HeaderMapIterator : public Filters::Common::Lua::BaseLuaObject<HeaderMapIterator> {
 public:
   HeaderMapIterator(HeaderMapWrapper& parent);
+  ~HeaderMapIterator() override;
 
   static ExportedFunctions exportedFunctions() { return {}; }
 
@@ -114,6 +115,7 @@ private:
   DECLARE_LUA_FUNCTION(HeaderMapWrapper, luaSetHttp1ReasonPhrase);
 
   void checkModifiable(lua_State* state);
+  void onIteratorDestroyed(HeaderMapIterator* it);
 
   // Envoy::Lua::BaseLuaObject
   void onMarkDead() override {
