@@ -1,7 +1,7 @@
 package abi
 
 /*
-cgo darwin LDFLAGS: -Wl,-undefined,dynamic_lookup
+#cgo darwin LDFLAGS: -Wl,-undefined,dynamic_lookup
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
