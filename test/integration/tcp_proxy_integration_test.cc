@@ -9,6 +9,7 @@
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
 
 #include "source/common/config/api_version.h"
+#include "source/common/network/socket_option_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/stream_info/bool_accessor_impl.h"
 #include "source/common/tcp_proxy/tcp_proxy.h"
@@ -1986,6 +1987,116 @@ TEST_P(TcpProxyReceiveBeforeConnectIntegrationTest, UpstreamBufferHighWatermark)
   EXPECT_EQ(downstream_pauses, 0);
   EXPECT_EQ(downstream_resumes, 1);
 }
+
+// Socket send buffer is only supported on Linux for the buffer high watermark timeout test.
+#if defined(__linux__)
+TEST_P(TcpProxyIntegrationTest, BufferHighWatermarkTimeoutDisabledKeepsConnectionOpen) {
+  config_helper_.setBufferLimits(1024, 1024);
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    listener->mutable_per_connection_buffer_high_watermark_timeout()->set_seconds(0);
+    listener->mutable_per_connection_buffer_limit_bytes()->set_value(256);
+
+    // Reduce listener kernel send buffer so downstream writes back up quickly.
+    auto* sendbuf_opt = listener->add_socket_options();
+    sendbuf_opt->set_level(SOL_SOCKET);
+    sendbuf_opt->set_name(SO_SNDBUF);
+    sendbuf_opt->set_int_value(4096);
+    sendbuf_opt->set_state(envoy::config::core::v3::SocketOption::STATE_PREBIND);
+  });
+
+  initialize();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+
+  // Disable reads from the client to simulate a slow downstream.
+  tcp_client->readDisable(true);
+  std::string payload(512 * 1024, 'a');
+  ASSERT_TRUE(fake_upstream_connection->write(payload, false));
+
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(500));
+
+  EXPECT_TRUE(tcp_client->connected());
+
+  tcp_client->close();
+  ASSERT_TRUE(fake_upstream_connection->close());
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+}
+
+TEST_P(TcpProxyIntegrationTest, ListenerBufferHighWatermarkTimeoutClosesDownstream) {
+  config_helper_.setBufferLimits(1024, 1024);
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    listener->mutable_per_connection_buffer_high_watermark_timeout()->set_nanos(100 * 1000 * 1000);
+    // Reduce listener kernel send buffer so downstream writes back up quickly.
+    auto* sendbuf_opt = listener->add_socket_options();
+    sendbuf_opt->set_level(SOL_SOCKET);
+    sendbuf_opt->set_name(SO_SNDBUF);
+    sendbuf_opt->set_int_value(4096);
+    sendbuf_opt->set_state(envoy::config::core::v3::SocketOption::STATE_PREBIND);
+  });
+
+  initialize();
+
+  auto options = std::make_shared<Network::ConnectionSocket::Options>();
+  options->emplace_back(std::make_shared<Network::SocketOptionImpl>(
+      envoy::config::core::v3::SocketOption::STATE_PREBIND,
+      ENVOY_MAKE_SOCKET_OPTION_NAME(SOL_SOCKET, SO_RCVBUF), 128));
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"), options);
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  EXPECT_TRUE(tcp_client->connected());
+
+  // Disable reads from the client to simulate a slow downstream.
+  tcp_client->readDisable(true);
+  std::string payload(512 * 1024, 'a');
+  ASSERT_TRUE(fake_upstream_connection->write(payload, false));
+
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(500));
+
+  tcp_client->readDisable(false);
+  tcp_client->waitForHalfClose();
+  tcp_client->close();
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+  ASSERT_TRUE(fake_upstream_connection->close());
+}
+
+TEST_P(TcpProxyIntegrationTest, ClusterBufferHighWatermarkTimeoutClosesUpstream) {
+  config_helper_.setBufferLimits(1024, 1024);
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+    cluster->mutable_per_connection_buffer_high_watermark_timeout()->set_nanos(100 * 1000 * 1000);
+    cluster->mutable_per_connection_buffer_limit_bytes()->set_value(1024);
+
+    auto* bind_config = cluster->mutable_upstream_bind_config();
+    auto* sendbuf_opt = bind_config->add_socket_options();
+    sendbuf_opt->set_level(SOL_SOCKET);
+    sendbuf_opt->set_name(SO_SNDBUF);
+    sendbuf_opt->set_int_value(512);
+    sendbuf_opt->set_state(envoy::config::core::v3::SocketOption::STATE_PREBIND);
+  });
+
+  initialize();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  // Disable reads from the upstream to simulate a slow upstream.
+  ASSERT_TRUE(fake_upstream_connection->readDisable(true));
+
+  std::string payload(256 * 1024, 'a');
+  ASSERT_TRUE(tcp_client->write(payload, false));
+
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(500));
+
+  ASSERT_TRUE(fake_upstream_connection->readDisable(false));
+  tcp_client->waitForDisconnect();
+  tcp_client->close();
+  ASSERT_TRUE(fake_upstream_connection->close());
+}
+#endif
 
 // Test ON_DOWNSTREAM_DATA mode delays connection until data is received.
 TEST_P(TcpProxyIntegrationTest, UpstreamConnectModeOnDownstreamData) {

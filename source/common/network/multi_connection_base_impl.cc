@@ -249,6 +249,15 @@ void MultiConnectionBaseImpl::setBufferLimits(uint32_t limit) {
   }
 }
 
+void MultiConnectionBaseImpl::setBufferHighWatermarkTimeout(std::chrono::milliseconds timeout) {
+  if (!connect_finished_) {
+    per_connection_state_.buffer_high_watermark_timeout_ = timeout;
+  }
+  for (auto& connection : connections_) {
+    connection->setBufferHighWatermarkTimeout(timeout);
+  }
+}
+
 uint32_t MultiConnectionBaseImpl::bufferLimit() const { return connections_[0]->bufferLimit(); }
 
 bool MultiConnectionBaseImpl::aboveHighWatermark() const {
@@ -434,6 +443,10 @@ ClientConnectionPtr MultiConnectionBaseImpl::createNextConnection() {
   }
   if (per_connection_state_.buffer_limits_.has_value()) {
     connection->setBufferLimits(per_connection_state_.buffer_limits_.value());
+  }
+  if (per_connection_state_.buffer_high_watermark_timeout_.has_value()) {
+    connection->setBufferHighWatermarkTimeout(
+        per_connection_state_.buffer_high_watermark_timeout_.value());
   }
   if (per_connection_state_.enable_half_close_.has_value()) {
     connection->enableHalfClose(per_connection_state_.enable_half_close_.value());

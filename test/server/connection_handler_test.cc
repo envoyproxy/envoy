@@ -153,6 +153,9 @@ public:
       return hand_off_restored_destination_connections_;
     }
     uint32_t perConnectionBufferLimitBytes() const override { return 0; }
+    std::chrono::milliseconds perConnectionBufferHighWatermarkTimeout() const override {
+      return std::chrono::milliseconds::zero();
+    }
     std::chrono::milliseconds listenerFiltersTimeout() const override {
       return listener_filters_timeout_;
     }
