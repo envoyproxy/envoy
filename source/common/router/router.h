@@ -521,6 +521,7 @@ public:
                               bool pool_success) override;
   void onPerTryTimeout(UpstreamRequest& upstream_request) override;
   void onPerTryIdleTimeout(UpstreamRequest& upstream_request) override;
+  void onPerTryResponseHeadersTimeout(UpstreamRequest& upstream_request) override;
   void onStreamMaxDurationReached(UpstreamRequest& upstream_request) override;
   void setupRouteTimeoutForWebsocketUpgrade() override;
   void disableRouteTimeoutForWebsocketUpgrade() override;

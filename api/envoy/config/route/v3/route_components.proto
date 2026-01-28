@@ -811,7 +811,7 @@ message CorsPolicy {
   google.protobuf.BoolValue forward_not_matching_preflights = 13;
 }
 
-// [#next-free-field: 46]
+// [#next-free-field: 47]
 message RouteAction {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RouteAction";
 
@@ -1560,6 +1560,22 @@ message RouteAction {
 
   // Specifies the maximum stream duration for this route.
   MaxStreamDuration max_stream_duration = 36;
+
+  // Specifies the timeout for receiving response headers from the upstream.
+  // If not specified or zero, there is no separate timeout for response headers.
+  // This timeout starts when the downstream request has been fully received and
+  // forwarded to the upstream, and ends when the upstream response headers are
+  // received. If the upstream does not respond with headers within this timeout,
+  // the request will be aborted and a 504 Gateway Timeout response will be sent
+  // to the downstream client. It will be retried if retry is enabled.
+  //
+  // This is useful for LLM API scenarios where you want to enforce a strict
+  // Time to First Token (TTFT) timeout while allowing longer durations for
+  // the complete streaming response.
+  //
+  // Unlike per_try_timeout, this timeout applies once per upstream request attempt,
+  // starting after the full downstream request is forwarded to the upstream.
+  google.protobuf.Duration response_headers_timeout = 46;
 }
 
 // HTTP retry :ref:`architecture overview <arch_overview_http_routing_retry>`.

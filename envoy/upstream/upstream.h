@@ -750,6 +750,7 @@ public:
   COUNTER(upstream_rq_retry_success)                                                               \
   COUNTER(upstream_rq_rx_reset)                                                                    \
   COUNTER(upstream_rq_timeout)                                                                     \
+  COUNTER(upstream_rq_response_headers_timeout)                                                    \
   COUNTER(upstream_rq_total)                                                                       \
   COUNTER(upstream_rq_tx_reset)                                                                    \
   COUNTER(upstream_http3_broken)                                                                   \

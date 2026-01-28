@@ -60,6 +60,12 @@ void RouterTestBase::expectResponseTimerCreate() {
   EXPECT_CALL(*response_timeout_, disableTimer());
 }
 
+void RouterTestBase::expectResponseHeadersTimerCreate() {
+  response_headers_timeout_ = new Event::MockTimer(&callbacks_.dispatcher_);
+  EXPECT_CALL(*response_headers_timeout_, enableTimer(_, _));
+  EXPECT_CALL(*response_headers_timeout_, disableTimer()).Times(testing::AtLeast(1));
+}
+
 void RouterTestBase::expectPerTryTimerCreate() {
   per_try_timeout_ = new Event::MockTimer(&callbacks_.dispatcher_);
   EXPECT_CALL(*per_try_timeout_, enableTimer(_, _));

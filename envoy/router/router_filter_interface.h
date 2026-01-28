@@ -18,6 +18,7 @@ struct TimeoutData {
   std::chrono::milliseconds global_timeout_{0};
   std::chrono::milliseconds per_try_timeout_{0};
   std::chrono::milliseconds per_try_idle_timeout_{0};
+  std::chrono::milliseconds response_headers_timeout_{0};
 };
 
 // The interface the UpstreamRequest has to interact with the router filter.
@@ -97,6 +98,13 @@ public:
    * @param upstream_request inicates which UpstreamRequest which timed out
    */
   virtual void onPerTryIdleTimeout(UpstreamRequest& upstream_request) PURE;
+
+  /*
+   * This will be called if a per-try response headers timeout fails.
+   * This is the Time to First Token (TTFT) timeout on a per-try basis.
+   * @param upstream_request indicates which UpstreamRequest which timed out
+   */
+  virtual void onPerTryResponseHeadersTimeout(UpstreamRequest& upstream_request) PURE;
 
   /*
    * This will be called if the max stream duration was reached.
