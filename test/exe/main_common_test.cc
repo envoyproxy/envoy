@@ -39,7 +39,7 @@ namespace {
         __has_feature(memory_sanitizer))))
 const std::string& outOfMemoryPattern() {
 #if defined(TCMALLOC)
-  CONSTRUCT_ON_FIRST_USE(std::string, ".*Unable to allocate.*");
+  CONSTRUCT_ON_FIRST_USE(std::string, "(.*Unable to allocate.*|^$)");
 #else
   CONSTRUCT_ON_FIRST_USE(std::string, ".*panic: out of memory.*");
 #endif

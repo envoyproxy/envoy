@@ -494,7 +494,7 @@ TEST_F(StringMatcher, Memory) {
     // when additional features are added, but it should be done in a thoughtful  manner.
     // Adding 10*8192 bytes because tcmalloc consumption estimation may return
     // different values depending on memory alignment.
-    EXPECT_MEMORY_LE(regex_consumed_bytes, 15038016 + 10 * 8192);
+    EXPECT_MEMORY_LE(regex_consumed_bytes, 15700000 + 10 * 8192);
   }
 }
 

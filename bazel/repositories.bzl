@@ -801,8 +801,8 @@ def _com_github_luajit_luajit():
 def _com_github_google_tcmalloc():
     external_http_archive(
         name = "com_github_google_tcmalloc",
-        patches = ["@envoy//bazel:tcmalloc.patch"],
-        patch_args = ["-p1"],
+        # patches = ["@envoy//bazel:tcmalloc.patch"],
+        # patch_args = ["-p1"],
     )
 
 def _gperftools():
