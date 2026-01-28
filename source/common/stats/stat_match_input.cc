@@ -7,6 +7,8 @@ namespace Stats {
 namespace Matching {
 REGISTER_FACTORY(StatFullNameMatchInputFactory,
                  Matcher::DataInputFactory<Envoy::Stats::StatMatchingData>);
+REGISTER_FACTORY(StatTagValueInputFactory,
+                 Matcher::DataInputFactory<Envoy::Stats::StatMatchingData>);
 
 } // namespace Matching
 } // namespace Stats

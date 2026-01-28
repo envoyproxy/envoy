@@ -33,6 +33,7 @@ envoy_cc_library(
         ":stats_matcher_lib",
         "//envoy/registry",
         "//envoy/stats:stats_interface",
+        "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/extensions/matching/common_inputs/stats/v3:pkg_cc_proto",
     ],
 )

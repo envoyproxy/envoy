@@ -5,6 +5,7 @@ package envoy.extensions.access_loggers.stats.v3;
 import "google/protobuf/wrappers.proto";
 
 import "xds/annotations/v3/status.proto";
+import "xds/type/matcher/v3/matcher.proto";
 
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
@@ -16,16 +17,16 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/acc
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Stats logger]
-// Configuration for an access logger that emits custom Envoy stats according to its
-// configuration. The stats can have tags and values derived from
+// Configuration for an access logger that emits custom Envoy stats according to
+// its configuration. The stats can have tags and values derived from
 // :ref:`command operators <config_access_log_command_operators>`.
 // [#extension: envoy.access_loggers.stats]
 //
 // .. warning::
 //   It is easy to configure and use this extension in ways that create very
-//   large numbers of stats in Envoy, which can cause excessive memory or CPU use
-//   leading to a denial of service in Envoy, or can overwhelm any configured
-//   stat sinks by sending too many unique metrics.
+//   large numbers of stats in Envoy, which can cause excessive memory or CPU
+//   use leading to a denial of service in Envoy, or can overwhelm any
+//   configured stat sinks by sending too many unique metrics.
 
 message Config {
   option (xds.annotations.v3.message_status).work_in_progress = true;
@@ -35,7 +36,8 @@ message Config {
     // The name of the tag.
     string name = 1 [(validate.rules).string = {min_len: 1}];
 
-    // The value of the tag, using :ref:`command operators <config_access_log_command_operators>`.
+    // The value of the tag, using :ref:`command operators
+    // <config_access_log_command_operators>`.
     string value_format = 2 [(validate.rules).string = {min_len: 1}];
   }
 
@@ -46,6 +48,19 @@ message Config {
 
     // The tags for the stat.
     repeated Tag tags = 2;
+
+    // The customization for stats generation.
+    // The supported input is the ``TagName`` which allows matching the stats which has the expected tag.
+    //
+    // Currently, the only supported input is
+    // ``envoy.extensions.matching.common_inputs.stats.v3.StatTagValueInput``.
+    //
+    // The supported actions are:
+    //
+    // * :ref:`DropStatAction <envoy_v3_api_msg_extensions.access_loggers.stats.v3.DropStatAction>`
+    // * :ref:`InsertTagAction <envoy_v3_api_msg_extensions.access_loggers.stats.v3.InsertTagAction>`
+    // * :ref:`DropTagAction <envoy_v3_api_msg_extensions.access_loggers.stats.v3.DropTagAction>`
+    xds.type.matcher.v3.Matcher custom = 3;
   }
 
   // Configuration for a histogram stat.
@@ -60,8 +75,9 @@ message Config {
 
       Milliseconds = 3;
 
-      // Values are scaled to range 0-1.0, indicating 0%-100%. Values can be outside this range,
-      // but must be positive. Values extremely far out of this range may overflow.
+      // Values are scaled to range 0-1.0, indicating 0%-100%. Values can be
+      // outside this range, but must be positive. Values extremely far out of
+      // this range may overflow.
       Percent = 4;
     }
 
@@ -71,8 +87,9 @@ message Config {
     // The units for this histogram.
     Unit unit = 2 [(validate.rules).enum = {defined_only: true}];
 
-    // The format string for the value of this histogram, using :ref:`command operators <config_access_log_command_operators>`.
-    // This must evaluate to a positive number.
+    // The format string for the value of this histogram, using :ref:`command
+    // operators <config_access_log_command_operators>`. This must evaluate to a
+    // positive number.
     string value_format = 3 [(validate.rules).string = {min_len: 1 prefix: "%" suffix: "%"}];
   }
 
@@ -81,8 +98,9 @@ message Config {
     // The name and tags of this counter.
     Stat stat = 1 [(validate.rules).message = {required: true}];
 
-    // The format string for the value to add to this counter, using :ref:`command operators <config_access_log_command_operators>`.
-    // One of ``value_format`` or ``value_fixed`` must be configured.
+    // The format string for the value to add to this counter, using
+    // :ref:`command operators <config_access_log_command_operators>`. One of
+    // ``value_format`` or ``value_fixed`` must be configured.
     string value_format = 2
         [(validate.rules).string = {prefix: "%" suffix: "%" ignore_empty: true}];
 
@@ -99,4 +117,97 @@ message Config {
 
   // The counters this logger will emit.
   repeated Counter counters = 4;
+}
+
+// Action that drops the matched stat.
+//
+// For example, we only want track error tcp connection and we can drop stats
+// with ``%RESPONSE_FLAGS_LONG%`` is "-".
+//
+// .. code-block:: yaml
+//
+//   custom:
+//     matcher_tree:
+//       input:
+//         name: stat_tag_value_input
+//         typed_config:
+//           "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.stats.v3.StatTagValueInput
+//           tag_name: "error.type"
+//       exact_match_map:
+//         map:
+//           "-":
+//             action:
+//               name: drop_action
+//               typed_config:
+//                 "@type": type.googleapis.com/envoy.extensions.access_loggers.stats.v3.DropStatAction
+//
+message DropStatAction {
+}
+
+// Action that drops the tag.
+//
+// For example, we don't want to add http error label (we set error equal to
+// ``%RESPONSE_CODE_DETAILS%``) if it is "via_upstream".
+//
+// .. code-block:: yaml
+//
+//   custom:
+//     matcher_tree:
+//       input:
+//         name: stat_tag_value_input
+//         typed_config:
+//           "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.stats.v3.StatTagValueInput
+//           tag_name: "error.type"
+//       exact_match_map:
+//         map:
+//           "via_upstream":
+//             action:
+//               name: drop_tag_action
+//               typed_config:
+//                 "@type": type.googleapis.com/envoy.extensions.access_loggers.stats.v3.DropTagAction
+//                 target_tag_name: "error.type"
+//
+message DropTagAction {
+  // The name of the tag.
+  string target_tag_name = 1;
+}
+
+// Action that inserts a new tag, or replaces the tag value if the tag exists.
+//
+// For example, we wanna collect if the tcp connection reset is sent from local
+// or sent from remote, we want convert the ``%UPSTREAM_DETECTED_CLOSE_TYPE%`` the
+// value we are interested.
+//
+// .. code-block:: yaml
+//
+//   custom:
+//     matcher_tree:
+//       input:
+//         name: stat_tag_value_input
+//         typed_config:
+//           "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.stats.v3.StatTagValueInput
+//           tag_name: "network.io.direction"
+//       exact_match_map:
+//         map:
+//           "RemoteReset":
+//             action:
+//               name: replace_action
+//               typed_config:
+//                 "@type": type.googleapis.com/envoy.extensions.access_loggers.stats.v3.InsertTagAction
+//                 tag_name: "network.io.direction"
+//                 tag_value: "received"
+//           "LocalReset":
+//             action:
+//               name: replace_action
+//               typed_config:
+//                 "@type": type.googleapis.com/envoy.extensions.access_loggers.stats.v3.InsertTagAction
+//                 tag_name: "network.io.direction"
+//                 tag_value: "sent"
+//
+message InsertTagAction {
+  // The name of the tag.
+  string tag_name = 1;
+
+  // The value of the tag.
+  string tag_value = 2;
 }
