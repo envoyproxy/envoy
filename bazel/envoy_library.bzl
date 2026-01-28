@@ -101,7 +101,8 @@ def envoy_cc_library(
         alwayslink = None,
         defines = [],
         local_defines = [],
-        linkopts = []):
+        linkopts = [],
+        target_compatible_with = []):
     if tcmalloc_dep:
         deps += tcmalloc_external_deps(repository)
     exec_properties = exec_properties | select({
@@ -136,6 +137,7 @@ def envoy_cc_library(
         include_prefix = include_prefix,
         defines = envoy_mobile_defines(repository) + defines,
         local_defines = local_defines,
+        target_compatible_with = target_compatible_with,
     )
 
     # Intended for usage by external consumers. This allows them to disambiguate
@@ -149,6 +151,7 @@ def envoy_cc_library(
         deps = [":" + name],
         strip_include_prefix = strip_include_prefix,
         include_prefix = include_prefix,
+        target_compatible_with = target_compatible_with,
     )
 
 # Used to specify a library that only builds on POSIX

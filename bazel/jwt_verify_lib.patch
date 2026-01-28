@@ -170,7 +170,7 @@ index 28247dd..e35142b 100644
          ":jwt_verify_lib_fuzz_input_cc_proto",
          "//:jwt_verify_lib",
 -        "//external:libprotobuf_mutator",
-+        "@com_github_google_libprotobuf_mutator//:libprotobuf_mutator",
++        "@libprotobuf-mutator",
      ],
  )
  

@@ -8,6 +8,9 @@ try-import ../.bazelrc
 # global
 #############################################################################
 
+common --noenable_bzlmod
+common --enable_workspace
+
 # Common flags for all builds
 build --define=hot_restart=disabled
 build --define=tcmalloc=disabled

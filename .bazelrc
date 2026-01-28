@@ -19,12 +19,22 @@ startup --host_jvm_args="-DBAZEL_TRACK_SOURCE_DIRECTORIES=1"
 # global
 #############################################################################
 
-common --noenable_bzlmod
+common --enable_bzlmod
+common --noenable_workspace
+common --//bazel:enable_bzlmod=True
 
 fetch --color=yes
 run --color=yes
-
 build --color=yes
+
+common --registry=https://bcr.bazel.build/
+common --registry=https://raw.githubusercontent.com/envoyproxy/toolshed/7d2076a76b821de0a4949f17c8c81b93828bc7a9/bazel-registry
+common --registry=https://raw.githubusercontent.com/phlax/bazel-central-registry/b739c7fa56b971d695af9600b88099236dcfef76
+
+# common --registry=file:///toolshed/bazel-registry
+# common --registry=https://raw.githubusercontent.com/envoyproxy/toolshed/824ecbcaff66b9a353a3bc1da57c62834e5ab7bf/bazel-registry  # 0.0.2-dev
+# this can be useful for dev# common --lockfile_mode=off
+
 build --jobs=HOST_CPUS-1
 build --workspace_status_command="bash bazel/get_workspace_status"
 build --incompatible_strict_action_env
@@ -80,6 +90,17 @@ coverage --build_tests_only
 
 # Specifies the rustfmt.toml for all rustfmt_test targets.
 build --@rules_rust//rust/settings:rustfmt.toml=@envoy//:rustfmt.toml
+
+common --incompatible_enable_proto_toolchain_resolution=true
+
+# grpc
+build --@com_github_grpc_grpc//third_party:ssl_lib=@envoy//bazel:boringssl
+build --@com_github_grpc_grpc//third_party:crypto_lib=@envoy//bazel:boringcrypto
+
+# kafka
+build --@librdkafka//:with_ssl=false
+build --@librdkafka//:with_zlib=false
+build --per_file_copt=contrib/kafka/.*\.cc@-Wno-old-style-cast
 
 
 #############################################################################

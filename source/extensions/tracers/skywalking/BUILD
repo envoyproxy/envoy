@@ -20,7 +20,7 @@ envoy_cc_library(
         "//envoy/grpc:async_client_manager_interface",
         "//source/common/common:backoff_lib",
         "//source/common/grpc:async_client_lib",
-        "@com_github_skyapm_cpp2sky//source:cpp2sky_data_lib",
+        "@cpp2sky//source:cpp2sky_data_lib",
         "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
     ],
 )
@@ -44,7 +44,7 @@ envoy_cc_library(
         "//source/common/http:header_map_lib",
         "//source/common/runtime:runtime_lib",
         "//source/common/tracing:http_tracer_lib",
-        "@com_github_skyapm_cpp2sky//source:cpp2sky_data_lib",
+        "@cpp2sky//source:cpp2sky_data_lib",
         "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
     ],
 )

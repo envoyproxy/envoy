@@ -46,12 +46,8 @@ envoy_cc_benchmark_binary(
         "@com_github_google_benchmark//:benchmark",
         "@com_googlesource_code_re2//:re2",
     ] + select({
-        "//bazel:linux_x86_64": [
-            "//contrib/hyperscan/matching/input_matchers/source:hyperscan",
-        ],
-        "//bazel:linux_aarch64": [
-            "//contrib/hyperscan/matching/input_matchers/source:vectorscan",
-        ],
+        "//bazel:linux_x86_64": ["@hyperscan"],
+        "//bazel:linux_aarch64": ["@vectorscan"],
     }),
 )
 

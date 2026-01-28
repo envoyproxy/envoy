@@ -1,18 +1,21 @@
---- rust/private/rustc.bzl
-+++ rust/private/rustc.bzl
-@@ -1612,7 +1612,7 @@ def rustc_compile_action(
-             **crate_info_dict
-         )
+diff --git a/crate_universe/extensions.bzl b/crate_universe/extensions.bzl
+index 3d4e646da..5fcc98877 100644
+--- a/crate_universe/extensions.bzl
++++ b/crate_universe/extensions.bzl
+@@ -635,7 +635,7 @@ def _generate_hub_and_spokes(
+     )
  
--    if crate_info.type in ["staticlib", "cdylib"]:
-+    if crate_info.type in ["staticlib", "cdylib"] and not out_binary:
-         # These rules are not supposed to be depended on by other rust targets, and
-         # as such they shouldn't provide a CrateInfo. However, one may still want to
-         # write a rust_test for them, so we provide the CrateInfo wrapped in a provider
-
---- rust/private/rustc.bzl
-+++ rust/private/rustc.bzl
-@@ -1061,7 +1061,7 @@ def construct_arguments(
+     # The workspace root when one is explicitly provided.
+-    nonhermetic_root_bazel_workspace_dir = module_ctx.path(Label("@@//:MODULE.bazel")).dirname
++    nonhermetic_root_bazel_workspace_dir = module_ctx.path(Label("@@//:BUILD")).dirname
+ 
+     # If re-pinning is enabled, gather additional inputs for the generator
+     kwargs = dict()
+diff --git a/rust/private/rustc.bzl b/rust/private/rustc.bzl
+index a28ad50b7..7747a96ea 100644
+--- a/rust/private/rustc.bzl
++++ b/rust/private/rustc.bzl
+@@ -1164,7 +1164,7 @@ def construct_arguments(
  
      if toolchain.llvm_cov and ctx.configuration.coverage_enabled:
          # https://doc.rust-lang.org/rustc/instrument-coverage.html
@@ -21,3 +24,12 @@
  
      if toolchain._experimental_link_std_dylib:
          rustc_flags.add("--codegen=prefer-dynamic")
+@@ -1727,7 +1727,7 @@ def rustc_compile_action(
+             **crate_info_dict
+         )
+ 
+-    if crate_info.type in ["staticlib", "cdylib"]:
++    if crate_info.type in ["staticlib", "cdylib"] and not out_binary:
+         # These rules are not supposed to be depended on by other rust targets, and
+         # as such they shouldn't provide a CrateInfo. However, one may still want to
+         # write a rust_test for them, so we provide the CrateInfo wrapped in a provider

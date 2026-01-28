@@ -1,93 +1,3 @@
-diff --git a/BUILD.bazel b/BUILD.bazel
-index 8926b04e5..8994f79f2 100644
---- a/BUILD.bazel
-+++ b/BUILD.bazel
-@@ -354,13 +354,83 @@ alias(
- )
- 
- cc_binary(
--    name = "protoc",
-+    name = "compiled_protoc",
-     copts = COPTS,
-     linkopts = LINK_OPTS,
-     visibility = ["//visibility:public"],
-     deps = ["//src/google/protobuf/compiler:protoc_lib_stage1"],
- )
- 
-+# Lifted from `rules_proto`
-+config_setting(
-+    name = "linux-aarch_64",
-+    constraint_values = [
-+        "@platforms//os:linux",
-+        "@platforms//cpu:aarch64",
-+    ],
-+)
-+
-+config_setting(
-+    name = "linux-x86_64",
-+    constraint_values = [
-+        "@platforms//os:linux",
-+        "@platforms//cpu:x86_64",
-+    ],
-+)
-+
-+config_setting(
-+    name = "linux-ppcle_64",
-+    constraint_values = [
-+	"@platforms//os:linux",
-+	"@platforms//cpu:ppc64le",
-+    ],
-+)
-+
-+config_setting(
-+    name = "osx-aarch_64",
-+    constraint_values = [
-+        "@platforms//os:osx",
-+        "@platforms//cpu:aarch64",
-+    ],
-+)
-+
-+config_setting(
-+    name = "osx-x86_64",
-+    constraint_values = [
-+        "@platforms//os:osx",
-+        "@platforms//cpu:x86_64",
-+    ],
-+)
-+
-+config_setting(
-+    name = "win64",
-+    constraint_values = [
-+        "@platforms//os:windows",
-+        "@platforms//cpu:x86_64",
-+    ],
-+)
-+
-+# Use precompiled binaries where possible.
-+alias(
-+    name = "protoc",
-+    actual = select({
-+        ":linux-aarch_64": "@com_google_protobuf_protoc_linux_aarch_64//:protoc",
-+        ":linux-x86_64": "@com_google_protobuf_protoc_linux_x86_64//:protoc",
-+        ":linux-ppcle_64": "@com_google_protobuf_protoc_linux_ppcle_64//:protoc",
-+        ":osx-aarch_64": "@com_google_protobuf_protoc_osx_aarch_64//:protoc",
-+        ":osx-x86_64": "@com_google_protobuf_protoc_osx_x86_64//:protoc",
-+        ":win64": "@com_google_protobuf_protoc_win64//:protoc",
-+        "//conditions:default": ":compiled_protoc",
-+    }),
-+    visibility = ["//visibility:public"],
-+)
-+
-+alias(
-+    name = "protobuf_python_genproto",
-+    actual = "//python:well_known_types_py_pb2_genproto",
-+    visibility = ["//visibility:public"],
-+)
-+
- cc_binary(
-     name = "protoc_stage0",
-     copts = COPTS,
-
 diff --git a/build_defs/cpp_opts.bzl b/build_defs/cpp_opts.bzl
 --- a/build_defs/cpp_opts.bzl
 +++ b/build_defs/cpp_opts.bzl
@@ -99,15 +9,48 @@ diff --git a/build_defs/cpp_opts.bzl b/build_defs/cpp_opts.bzl
      ],
  })
 
-diff --git a/src/google/protobuf/io/BUILD.bazel b/src/google/protobuf/io/BUILD.bazel
---- a/src/google/protobuf/io/BUILD.bazel
-+++ b/src/google/protobuf/io/BUILD.bazel
-@@ -160,7 +160,7 @@ cc_library(
-         "@abseil-cpp//absl/log:absl_log",
-     ] + select({
-         "//build_defs:config_msvc": [],
--        "//conditions:default": ["@zlib"],
-+        "//conditions:default": ["@envoy//bazel:zlib"],
-     }),
+diff --git a/src/google/protobuf/BUILD.bazel b/src/google/protobuf/BUILD.bazel
+--- a/src/google/protobuf/BUILD.bazel
++++ b/src/google/protobuf/BUILD.bazel
+@@ -24,6 +24,25 @@ package(
+     ],
  )
-
+ 
++# Export Well Known Type proto files for use by genrules and other build rules.
++# This is needed for bzlmod compatibility where file targets need to be explicitly exported.
++exports_files(
++    [
++        "any.proto",
++        "api.proto",
++        "descriptor.proto",
++        "duration.proto",
++        "empty.proto",
++        "field_mask.proto",
++        "source_context.proto",
++        "struct.proto",
++        "timestamp.proto",
++        "type.proto",
++        "wrappers.proto",
++    ],
++    visibility = ["//visibility:public"],
++)
++
+ proto_library(
+     name = "any_proto",
+     srcs = ["any.proto"],
+diff --git a/src/google/protobuf/compiler/BUILD.bazel b/src/google/protobuf/compiler/BUILD.bazel
+--- a/src/google/protobuf/compiler/BUILD.bazel
++++ b/src/google/protobuf/compiler/BUILD.bazel
+@@ -344,11 +344,7 @@ filegroup(
+ 
+ exports_files(
+     srcs = ["plugin.proto"],
+-    visibility = [
+-        "//:__pkg__",
+-        "//python:__pkg__",
+-        "//ruby:__pkg__",
+-    ],
++    visibility = ["//visibility:public"],
+ )
+ 
+ cc_library(

@@ -17,6 +17,7 @@ py_binary(
         "//tools/clang-format",
         "//tools/type_whisperer:api_type_db.pb_text",
     ],
+    imports = ["external/googleapis~"],
     visibility = ["//visibility:public"],
     deps = [
         ":utils",

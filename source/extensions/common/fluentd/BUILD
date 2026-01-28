@@ -15,6 +15,6 @@ envoy_cc_library(
     deps = [
         "//source/common/config:utility_lib",
         "//source/common/tracing:http_tracer_lib",
-        "@com_github_msgpack_cpp//:msgpack",
+        "@msgpack-cxx//:msgpack",
     ],
 )

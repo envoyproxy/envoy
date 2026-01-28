@@ -1,7 +1,6 @@
 load("@aspect_bazel_lib//lib:repositories.bzl", "register_jq_toolchains", "register_yq_toolchains")
 load("@base_pip3//:requirements.bzl", pip_dependencies = "install_deps")
 load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies", "go_repository")
-load("@build_bazel_rules_apple//apple:repositories.bzl", "apple_rules_dependencies")
 load("@com_github_aignas_rules_shellcheck//:deps.bzl", "shellcheck_dependencies")
 load("@com_github_chrusty_protoc_gen_jsonschema//:deps.bzl", protoc_gen_jsonschema_go_dependencies = "go_dependencies")
 load("@com_google_cel_cpp//bazel:deps.bzl", "parser_deps")
@@ -13,6 +12,7 @@ load("@envoy_toolshed//coverage/grcov:grcov_repository.bzl", "grcov_repository")
 load("@fuzzing_pip3//:requirements.bzl", pip_fuzzing_dependencies = "install_deps")
 load("@io_bazel_rules_go//go:deps.bzl", "go_download_sdk", "go_register_toolchains", "go_rules_dependencies")
 load("@proxy_wasm_rust_sdk//bazel:dependencies.bzl", "proxy_wasm_rust_sdk_dependencies")
+load("@rules_apple//apple:repositories.bzl", "apple_rules_dependencies")
 load("@rules_buf//buf:repositories.bzl", "rules_buf_toolchains")
 load("@rules_cc//cc:extensions.bzl", "compatibility_proxy_repo")
 load("@rules_foreign_cc//foreign_cc:repositories.bzl", "rules_foreign_cc_dependencies")
@@ -221,7 +221,7 @@ def envoy_download_go_sdks(go_version):
 def crates_repositories():
     crates_repository(
         name = "dynamic_modules_rust_sdk_crate_index",
-        cargo_lockfile = "@envoy//source/extensions/dynamic_modules/sdk/rust:Cargo.lock",
-        lockfile = Label("@envoy//source/extensions/dynamic_modules/sdk/rust:Cargo.Bazel.lock"),
-        manifests = ["@envoy//source/extensions/dynamic_modules/sdk/rust:Cargo.toml"],
+        cargo_lockfile = "//source/extensions/dynamic_modules/sdk/rust:Cargo.lock",
+        lockfile = "//source/extensions/dynamic_modules/sdk/rust:Cargo.Bazel.lock",
+        manifests = ["//source/extensions/dynamic_modules/sdk/rust:Cargo.toml"],
     )

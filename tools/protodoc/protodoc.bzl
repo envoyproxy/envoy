@@ -20,7 +20,8 @@ def _protodoc_rule_impl(ctx):
         for path in dep[OutputGroupInfo].rst.to_list():
             envoy_api = (
                 path.short_path.startswith("../envoy_api") or
-                path.short_path.startswith("../com_github_cncf_xds")
+                path.short_path.startswith("../com_github_cncf_xds") or
+                path.short_path.startswith("../xds~")
             )
             if envoy_api:
                 deps.append(path)

@@ -82,3 +82,29 @@ genrule(
     target_compatible_with = ["@platforms//os:linux"],
     visibility = ["//visibility:public"],
 )
+
+filegroup(
+    name = "boost_headers",
+    srcs = [
+        "@boost.algorithm",
+        "@boost.concept_check",
+        "@boost.config",
+        "@boost.core",
+        "@boost.crc",
+        "@boost.dynamic_bitset",
+        "@boost.graph",
+        "@boost.icl",
+        "@boost.intrusive",
+        "@boost.iterator",
+        "@boost.lexical_cast",
+        "@boost.multi_array",
+        "@boost.property_map",
+        "@boost.ptr_container",
+        "@boost.random",
+        "@boost.range",
+        "@boost.smart_ptr",
+        "@boost.utility",
+        "@boost.variant",
+    ],
+    visibility = ["@envoy//contrib/hyperscan/matching/input_matchers/source:__pkg__"],
+)
