@@ -4008,13 +4008,16 @@ TEST_F(MockTransportConnectionImplTest, BufferHighWatermarkTimeoutClosesConnecti
   connection_->setBufferHighWatermarkTimeout(timeout);
 
   Buffer::OwnedImpl data("data");
+  EXPECT_CALL(*buffer_timer, enabled()).WillOnce(Return(false));
   EXPECT_CALL(*buffer_timer, enableTimer(timeout, _));
   EXPECT_CALL(*file_event_, activate(Event::FileReadyType::Write)).WillOnce(Invoke(file_ready_cb_));
   EXPECT_CALL(*transport_socket_, doWrite(BufferStringEqual("data"), _))
       .WillOnce(Return(IoResult{PostIoAction::KeepOpen, 0, false}));
   connection_->write(data, false);
 
+  // Timer callback fires - closeSocket is called first, then during buffer drain enabled() is checked
   EXPECT_CALL(*transport_socket_, closeSocket(ConnectionEvent::LocalClose));
+  EXPECT_CALL(*buffer_timer, enabled()).WillOnce(Return(false));
   buffer_timer->invokeCallback();
   EXPECT_EQ(static_cast<const Network::Connection&>(*connection_).localCloseReason(),
             StreamInfo::LocalCloseReasons::get().BufferHighWatermarkTimeout);
@@ -4047,6 +4050,7 @@ TEST_F(MockTransportConnectionImplTest, BufferHighWatermarkTimeoutCancelledOnDra
   connection_->setBufferHighWatermarkTimeout(timeout);
 
   Buffer::OwnedImpl data("bytes");
+  EXPECT_CALL(*buffer_timer, enabled()).WillOnce(Return(false));
   EXPECT_CALL(*buffer_timer, enableTimer(timeout, _));
   EXPECT_CALL(*file_event_, activate(Event::FileReadyType::Write)).WillOnce(Invoke(file_ready_cb_));
   EXPECT_CALL(*transport_socket_, doWrite(BufferStringEqual("bytes"), _))
@@ -4055,6 +4059,7 @@ TEST_F(MockTransportConnectionImplTest, BufferHighWatermarkTimeoutCancelledOnDra
 
   EXPECT_CALL(*transport_socket_, doWrite(BufferStringEqual("bytes"), _))
       .WillOnce(Invoke(&MockTransportConnectionImplTest::simulateSuccessfulWrite));
+  EXPECT_CALL(*buffer_timer, enabled()).WillOnce(Return(true));
   EXPECT_CALL(*buffer_timer, disableTimer());
   EXPECT_TRUE(file_ready_cb_(Event::FileReadyType::Write).ok());
 
@@ -4064,6 +4069,7 @@ TEST_F(MockTransportConnectionImplTest, BufferHighWatermarkTimeoutCancelledOnDra
 
 TEST_F(MockTransportConnectionImplTest, ReadBufferHighWatermarkSchedulesTimeout) {
   initializeConnection();
+  InSequence s;
 
   const std::chrono::milliseconds timeout(7);
   auto* buffer_timer = new Event::MockTimer(&dispatcher_);
@@ -4071,6 +4077,7 @@ TEST_F(MockTransportConnectionImplTest, ReadBufferHighWatermarkSchedulesTimeout)
   connection_->setBufferLimits(1);
   connection_->setBufferHighWatermarkTimeout(timeout);
 
+  EXPECT_CALL(*buffer_timer, enabled()).WillOnce(Return(false));
   EXPECT_CALL(*buffer_timer, enableTimer(timeout, _));
   StreamBuffer read_buffer = connection_->getReadBuffer();
   read_buffer.buffer.add("xy");
@@ -4078,6 +4085,7 @@ TEST_F(MockTransportConnectionImplTest, ReadBufferHighWatermarkSchedulesTimeout)
 
 TEST_F(MockTransportConnectionImplTest, ReadBufferHighWatermarkTimeoutCancelledOnDrain) {
   initializeConnection();
+  InSequence s;
 
   const std::chrono::milliseconds timeout(9);
   auto* buffer_timer = new Event::MockTimer(&dispatcher_);
@@ -4086,8 +4094,10 @@ TEST_F(MockTransportConnectionImplTest, ReadBufferHighWatermarkTimeoutCancelledO
   connection_->setBufferHighWatermarkTimeout(timeout);
 
   StreamBuffer read_buffer = connection_->getReadBuffer();
+  EXPECT_CALL(*buffer_timer, enabled()).WillOnce(Return(false));
   EXPECT_CALL(*buffer_timer, enableTimer(timeout, _));
   read_buffer.buffer.add("xy");
+  EXPECT_CALL(*buffer_timer, enabled()).WillOnce(Return(true));
   EXPECT_CALL(*buffer_timer, disableTimer());
   read_buffer.buffer.drain(read_buffer.buffer.length());
 }
@@ -4104,12 +4114,15 @@ TEST_F(MockTransportConnectionImplTest, UpdatingBufferHighWatermarkTimeoutResets
   connection_->setBufferHighWatermarkTimeout(timeout1);
 
   StreamBuffer read_buffer = connection_->getReadBuffer();
+  EXPECT_CALL(*buffer_timer1, enabled()).WillOnce(Return(false));
   EXPECT_CALL(*buffer_timer1, enableTimer(timeout1, _));
   read_buffer.buffer.add("xy");
 
+  // setBufferHighWatermarkTimeout checks enabled() then disables, then schedules which checks enabled() again
+  EXPECT_CALL(*buffer_timer1, enabled()).WillOnce(Return(true));
   EXPECT_CALL(*buffer_timer1, disableTimer());
-  auto* buffer_timer2 = new Event::MockTimer(&dispatcher_);
-  EXPECT_CALL(*buffer_timer2, enableTimer(timeout2, _));
+  EXPECT_CALL(*buffer_timer1, enabled()).WillOnce(Return(false));
+  EXPECT_CALL(*buffer_timer1, enableTimer(timeout2, _));
   connection_->setBufferHighWatermarkTimeout(timeout2);
 }
 
@@ -4124,9 +4137,12 @@ TEST_F(MockTransportConnectionImplTest, UpdatingBufferHighWatermarkTimeoutToZero
   connection_->setBufferHighWatermarkTimeout(timeout);
 
   StreamBuffer read_buffer = connection_->getReadBuffer();
+  EXPECT_CALL(*buffer_timer, enabled()).WillOnce(Return(false));
   EXPECT_CALL(*buffer_timer, enableTimer(timeout, _));
   read_buffer.buffer.add("xy");
 
+  // setBufferHighWatermarkTimeout(0) checks enabled() then disables, but doesn't reschedule
+  EXPECT_CALL(*buffer_timer, enabled()).WillOnce(Return(true));
   EXPECT_CALL(*buffer_timer, disableTimer());
   connection_->setBufferHighWatermarkTimeout(std::chrono::milliseconds(0));
 }
