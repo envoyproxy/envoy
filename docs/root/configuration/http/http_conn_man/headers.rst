@@ -488,8 +488,8 @@ When Envoy is deployed behind a Layer 4 load balancer (such as AWS NLB) that ter
 forwards traffic using PROXY protocol, Envoy receives unencrypted traffic but needs to know the
 original protocol for correct redirect behavior and routing decisions.
 
-The :ref:`forwarded_proto_config
-<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.forwarded_proto_config>`
+The :ref:`forward_proto_config
+<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.forward_proto_config>`
 configuration option allows specifying which destination ports should be treated as HTTPS or HTTP.
 When configured:
 
@@ -506,7 +506,7 @@ Example configuration:
 .. code-block:: yaml
 
   http_connection_manager:
-    forwarded_proto_config:
+    forward_proto_config:
       https_destination_ports: [443, 8443]
       http_destination_ports: [80, 8080]
 

@@ -3840,8 +3840,8 @@ TEST_F(HttpConnectionManagerMobileConfigTest, Mobile) {
   EXPECT_FALSE(hcm->clearHopByHopResponseHeaders());
 }
 
-// Test valid configuration for forwarded_proto_config.
-TEST_F(HttpConnectionManagerConfigTest, ForwardedProtoConfigValid) {
+// Test valid configuration for forward_proto_config.
+TEST_F(HttpConnectionManagerConfigTest, ForwardProtoConfigValid) {
   const std::string yaml_string = R"EOF(
 codec_type: http1
 stat_prefix: router
@@ -3855,7 +3855,7 @@ route_config:
         prefix: "/"
       route:
         cluster: cluster
-forwarded_proto_config:
+forward_proto_config:
   https_destination_ports: [443, 8443]
   http_destination_ports: [80, 8080]
 http_filters:
@@ -3881,8 +3881,8 @@ http_filters:
   EXPECT_TRUE(http_ports.contains(8080));
 }
 
-// Test empty forwarded_proto_config is valid (feature disabled).
-TEST_F(HttpConnectionManagerConfigTest, ForwardedProtoConfigEmpty) {
+// Test empty forward_proto_config is valid (feature disabled).
+TEST_F(HttpConnectionManagerConfigTest, ForwardProtoConfigEmpty) {
   const std::string yaml_string = R"EOF(
 codec_type: http1
 stat_prefix: router
@@ -3896,7 +3896,7 @@ route_config:
         prefix: "/"
       route:
         cluster: cluster
-forwarded_proto_config: {}
+forward_proto_config: {}
 http_filters:
 - name: envoy.filters.http.router
   typed_config:

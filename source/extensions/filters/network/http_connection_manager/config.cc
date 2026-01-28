@@ -443,16 +443,16 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       add_proxy_protocol_connection_state_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, add_proxy_protocol_connection_state, true)),
       https_destination_ports_(
-          config.has_forwarded_proto_config()
+          config.has_forward_proto_config()
               ? absl::flat_hash_set<uint32_t>(
-                    config.forwarded_proto_config().https_destination_ports().begin(),
-                    config.forwarded_proto_config().https_destination_ports().end())
+                    config.forward_proto_config().https_destination_ports().begin(),
+                    config.forward_proto_config().https_destination_ports().end())
               : absl::flat_hash_set<uint32_t>{}),
       http_destination_ports_(
-          config.has_forwarded_proto_config()
+          config.has_forward_proto_config()
               ? absl::flat_hash_set<uint32_t>(
-                    config.forwarded_proto_config().http_destination_ports().begin(),
-                    config.forwarded_proto_config().http_destination_ports().end())
+                    config.forward_proto_config().http_destination_ports().begin(),
+                    config.forward_proto_config().http_destination_ports().end())
               : absl::flat_hash_set<uint32_t>{}) {
   if (!creation_status.ok()) {
     return;

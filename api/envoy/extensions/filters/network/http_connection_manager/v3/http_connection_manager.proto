@@ -1069,18 +1069,18 @@ message HttpConnectionManager {
   // .. code-block:: yaml
   //
   //   http_connection_manager:
-  //     forwarded_proto_config:
+  //     forward_proto_config:
   //       https_destination_ports: [443, 8443]
   //       http_destination_ports: [80, 8080]
   //
   // If not configured, defaults to disabled and the standard behavior applies (using connection
   // TLS status or trusted downstream headers).
-  ForwardedProtoConfig forwarded_proto_config = 61;
+  ForwardProtoConfig forward_proto_config = 61;
 }
 
 // Configuration options for setting the ``x-forwarded-proto`` header.
 // This message provides flexibility for future enhancements to protocol inference.
-message ForwardedProtoConfig {
+message ForwardProtoConfig {
   // List of destination ports that should be treated as HTTPS.
   // When the PROXY protocol destination port matches one of these ports,
   // ``x-forwarded-proto`` will be set to ``https``.
