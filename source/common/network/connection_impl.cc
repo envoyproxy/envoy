@@ -250,7 +250,6 @@ void ConnectionImpl::closeInternal(ConnectionCloseType type) {
 
 void ConnectionImpl::onBufferHighWatermarkTimeout() {
   ENVOY_CONN_LOG(debug, "buffer high watermark timeout reached", *this);
-  buffer_high_watermark_timer_.reset();
   if (!socket_->isOpen()) {
     return;
   }
@@ -259,24 +258,29 @@ void ConnectionImpl::onBufferHighWatermarkTimeout() {
 }
 
 void ConnectionImpl::scheduleBufferHighWatermarkTimeout() {
-  if (buffer_high_watermark_timeout_.count() > 0 && !buffer_high_watermark_timer_) {
-    ENVOY_CONN_LOG(debug, "scheduling buffer high watermark timeout", *this);
+  if (buffer_high_watermark_timeout_.count() == 0) {
+    return;
+  }
+
+  if (buffer_high_watermark_timer_ == nullptr) {
     buffer_high_watermark_timer_ =
         dispatcher_.createTimer([this]() -> void { onBufferHighWatermarkTimeout(); });
+  }
+
+  if (!buffer_high_watermark_timer_->enabled()) {
+    ENVOY_CONN_LOG(debug, "scheduling buffer high watermark timeout", *this);
     buffer_high_watermark_timer_->enableTimer(buffer_high_watermark_timeout_);
   }
 }
 
 void ConnectionImpl::maybeCancelBufferHighWatermarkTimeout() {
-  if (buffer_high_watermark_timeout_.count() == 0 || !buffer_high_watermark_timer_) {
+  if (buffer_high_watermark_timer_ == nullptr || !buffer_high_watermark_timer_->enabled()) {
     return;
   }
 
-  // Don't cancel the timeout if either the write or read buffer is above the high watermark.
   if (!write_buffer_->highWatermarkTriggered() && !read_buffer_->highWatermarkTriggered()) {
     ENVOY_CONN_LOG(debug, "cancelling buffer high watermark timeout", *this);
     buffer_high_watermark_timer_->disableTimer();
-    buffer_high_watermark_timer_.reset();
   }
 }
 
@@ -651,13 +655,11 @@ void ConnectionImpl::setBufferHighWatermarkTimeout(std::chrono::milliseconds tim
   }
 
   buffer_high_watermark_timeout_ = timeout;
-  if (buffer_high_watermark_timer_) {
+
+  if (buffer_high_watermark_timer_ != nullptr && buffer_high_watermark_timer_->enabled()) {
     buffer_high_watermark_timer_->disableTimer();
-    buffer_high_watermark_timer_.reset();
   }
 
-  // If the connection is already above high watermark, ensure the timeout is (re)scheduled using
-  // the updated value.
   if (state() == State::Open &&
       (write_buffer_->highWatermarkTriggered() || read_buffer_->highWatermarkTriggered())) {
     scheduleBufferHighWatermarkTimeout();
