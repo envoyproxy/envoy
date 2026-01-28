@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package envoy.extensions.load_balancing_policies.rendezvous_hash.v3;
+
+import "envoy/extensions/load_balancing_policies/common/v3/common.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.load_balancing_policies.rendezvous_hash.v3";
+option java_outer_classname = "RendezvousHashProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/load_balancing_policies/rendezvous_hash/v3;rendezvous_hashv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Rendezvous Hash Load Balancing Policy]
+// [#extension: envoy.load_balancing_policies.rendezvous_hash]
+
+// This configuration allows the built-in RENDEZVOUS_HASH (also known as Highest Random Weight or HRW)
+// LB policy to be configured via the LB policy extension point.
+//
+// Rendezvous hashing works by computing a score for each host for a given key, and selecting the host
+// with the highest score. This provides consistent hashing with better distribution than ring hash
+// and uses less memory, though picking is O(n) instead of O(log n).
+//
+// See the :ref:`load balancing architecture overview
+// <arch_overview_load_balancing_types>` for more information.
+message RendezvousHash {
+  // Common configuration for hashing-based load balancing policies.
+  common.v3.ConsistentHashingLbConfig consistent_hashing_lb_config = 1;
+
+  // Enable locality weighted load balancing for rendezvous hash lb explicitly.
+  common.v3.LocalityLbConfig.LocalityWeightedLbConfig locality_weighted_lb_config = 2;
+}

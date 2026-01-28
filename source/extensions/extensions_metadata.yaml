@@ -1955,6 +1955,13 @@ envoy.load_balancing_policies.ring_hash:
   status: stable
   type_urls:
   - envoy.extensions.load_balancing_policies.ring_hash.v3.RingHash
+envoy.load_balancing_policies.rendezvous_hash:
+  categories:
+  - envoy.load_balancing_policies
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.load_balancing_policies.rendezvous_hash.v3.RendezvousHash
 envoy.load_balancing_policies.maglev:
   categories:
   - envoy.load_balancing_policies
