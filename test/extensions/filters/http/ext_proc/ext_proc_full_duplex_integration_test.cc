@@ -514,7 +514,8 @@ TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersInRequestProcessing) {
   serverSendHeaderResp();
   // The ext_proc_server_0 sends back a few chunks of the body responses.
   const std::string body_upstream(total_req_body_msg, 'r');
-  serverSendBodyRespDuplexStreamed(total_req_body_msg - 1, processor_stream_, /*end_stream*/ false, false, "");
+  serverSendBodyRespDuplexStreamed(total_req_body_msg - 1, processor_stream_, /*end_stream*/ false,
+                                   false, "");
 
   // The ext_proc_server_1 receives the headers.
   server1ReceiveHeaderReq(header_request);
@@ -565,8 +566,8 @@ TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersInResponseProcessing) {
   // The ext_proc_server_0 sends back a few chunks of the body responses.
   uint32_t total_resp_body_msg = 5;
   const std::string body_downstream(total_resp_body_msg, 'r');
-  serverSendBodyRespDuplexStreamed(total_resp_body_msg - 1, processor_stream_, /*end_stream*/ false, /*response*/ true,
-                                   "");
+  serverSendBodyRespDuplexStreamed(total_resp_body_msg - 1, processor_stream_, /*end_stream*/ false,
+                                   /*response*/ true, "");
 
   // The ext_proc_server_1 receives the headers.
   server1ReceiveHeaderReq(header_response, true, true);
@@ -575,7 +576,8 @@ TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersInResponseProcessing) {
 
   timeSystem().advanceTimeWaitImpl(20ms);
   // The ext_proc_server_0 now sends back the last chunk of the body responses.
-  serverSendBodyRespDuplexStreamed(1, processor_stream_, /*end_stream*/ true, /*response*/ true, "");
+  serverSendBodyRespDuplexStreamed(1, processor_stream_, /*end_stream*/ true, /*response*/ true,
+                                   "");
   verifyDownstreamResponse(*response, 200);
   EXPECT_EQ(body_downstream, response->body());
 }
@@ -618,15 +620,18 @@ TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersBothDuplexInBothDirection) {
   // The ext_proc_server_0 sends back the response.
   serverSendHeaderResp();
   const std::string body_upstream(total_req_body_msg, 'r');
-  serverSendBodyRespDuplexStreamed(total_req_body_msg, processor_stream_, /*end_stream*/ true, false, "");
+  serverSendBodyRespDuplexStreamed(total_req_body_msg, processor_stream_, /*end_stream*/ true,
+                                   false, "");
 
   // The ext_proc_server_1 receives the headers.
   server1ReceiveHeaderReq(header_request);
-  uint32_t total_req_body_msg_1 = serverReceiveBodyDuplexStreamed(body_upstream, processor_stream_1_, false, true);
+  uint32_t total_req_body_msg_1 =
+      serverReceiveBodyDuplexStreamed(body_upstream, processor_stream_1_, false, true);
   EXPECT_EQ(total_req_body_msg_1, total_req_body_msg);
   // The ext_proc_server_1 sends back the response.
   server1SendHeaderResp();
-  serverSendBodyRespDuplexStreamed(total_req_body_msg, processor_stream_1_,  /*end_stream*/ true, false, "");
+  serverSendBodyRespDuplexStreamed(total_req_body_msg, processor_stream_1_, /*end_stream*/ true,
+                                   false, "");
 
   handleUpstreamRequest();
   EXPECT_THAT(upstream_request_->headers(), ContainsHeader("x-new-header", "new"));
@@ -640,7 +645,8 @@ TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersBothDuplexInBothDirection) {
   server1SendHeaderResp(false, true);
   uint32_t total_resp_body_msg = 5;
   const std::string body_server_1(total_resp_body_msg, 'm');
-  serverSendBodyRespDuplexStreamed(total_resp_body_msg, processor_stream_1_, /*end_stream*/ true, /*response*/ true, "m");
+  serverSendBodyRespDuplexStreamed(total_resp_body_msg, processor_stream_1_, /*end_stream*/ true,
+                                   /*response*/ true, "m");
 
   // Now the ext_proc_server_0 receives the message.
   serverReceiveHeaderReq(header_response, false, true);
@@ -648,7 +654,8 @@ TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersBothDuplexInBothDirection) {
   serverSendHeaderResp(false, true);
   total_resp_body_msg = 7;
   const std::string body_downstream(total_resp_body_msg, 'n');
-  serverSendBodyRespDuplexStreamed(total_resp_body_msg , processor_stream_, /*end_stream*/true, /*response*/ true, "n");
+  serverSendBodyRespDuplexStreamed(total_resp_body_msg, processor_stream_, /*end_stream*/ true,
+                                   /*response*/ true, "n");
 
   verifyDownstreamResponse(*response, 200);
   EXPECT_EQ(body_downstream, response->body());
