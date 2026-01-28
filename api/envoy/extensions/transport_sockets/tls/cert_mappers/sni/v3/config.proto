@@ -18,4 +18,8 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 message SNI {
   // The value to use as the secret name when SNI is empty or absent.
   string default_value = 1 [(validate.rules).string = {min_len: 1}];
+
+  // Whether to include the signature algorithm in the SNI-based name. If true, the secret name will be in the format
+  // "<sni>/<signature_algorithm>". If false, the secret name will be just "<sni>".
+  bool include_signature_algorithm = 2;
 }
