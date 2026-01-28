@@ -1573,8 +1573,7 @@ message RouteAction {
   // Time to First Token (TTFT) timeout while allowing longer durations for
   // the complete streaming response.
   //
-  // Unlike per_try_timeout, this timeout applies once per upstream request attempt,
-  // starting after the full downstream request is forwarded to the upstream.
+  // This will apply to each upstream request attempt.
   google.protobuf.Duration response_headers_timeout = 46;
 }
 
