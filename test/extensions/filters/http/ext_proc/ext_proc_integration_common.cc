@@ -806,13 +806,14 @@ void ExtProcIntegrationTest::server1ReceiveHeaderReq(ProcessingRequest& header, 
 }
 
 uint32_t ExtProcIntegrationTest::serverReceiveBodyDuplexStreamed(absl::string_view body_sent,
+                                                                 FakeStreamPtr& processor_stream,
                                                                  bool response, bool compare_body) {
   std::string body_received;
   bool end_stream = false;
   uint32_t total_req_body_msg = 0;
   while (!end_stream) {
     ProcessingRequest body_request;
-    EXPECT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, body_request));
+    EXPECT_TRUE(processor_stream->waitForGrpcMessage(*dispatcher_, body_request));
     if (response) {
       EXPECT_TRUE(body_request.has_response_body());
       body_received = absl::StrCat(body_received, body_request.response_body().body());
@@ -872,6 +873,7 @@ void ExtProcIntegrationTest::server1SendHeaderResp(bool first_message, bool resp
 }
 
 void ExtProcIntegrationTest::serverSendBodyRespDuplexStreamed(uint32_t total_resp_body_msg,
+                                                              FakeStreamPtr& processor_stream,
                                                               bool end_of_stream, bool response,
                                                               absl::string_view body_sent) {
   for (uint32_t i = 0; i < total_resp_body_msg; i++) {
@@ -894,7 +896,7 @@ void ExtProcIntegrationTest::serverSendBodyRespDuplexStreamed(uint32_t total_res
       const bool end_of_stream = (i == total_resp_body_msg - 1) ? true : false;
       streamed_response->set_end_of_stream(end_of_stream);
     }
-    processor_stream_->sendGrpcMessage(response_body);
+    processor_stream->sendGrpcMessage(response_body);
   }
 }
 

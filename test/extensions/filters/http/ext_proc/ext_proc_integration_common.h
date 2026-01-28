@@ -185,11 +185,15 @@ protected:
                               bool response = false);
   void server1ReceiveHeaderReq(ProcessingRequest& header, bool first_message = true,
                                bool response = false);
-  uint32_t serverReceiveBodyDuplexStreamed(absl::string_view body_sent, bool response = false,
+  uint32_t serverReceiveBodyDuplexStreamed(absl::string_view body_sent,
+                                           FakeStreamPtr& processor_stream,
+                                           bool response = false,
                                            bool compare_body = true);
   void serverSendHeaderResp(bool first_message = true, bool response = false);
   void server1SendHeaderResp(bool first_message = true, bool response = false);
-  void serverSendBodyRespDuplexStreamed(uint32_t total_resp_body_msg, bool end_of_stream = true,
+  void serverSendBodyRespDuplexStreamed(uint32_t total_resp_body_msg,
+                                        FakeStreamPtr& processor_stream,
+                                        bool end_of_stream = true,
                                         bool response = false, absl::string_view body_sent = "");
   void serverSendTrailerRespDuplexStreamed();
   void initializeLogConfig(std::string& access_log_path);
