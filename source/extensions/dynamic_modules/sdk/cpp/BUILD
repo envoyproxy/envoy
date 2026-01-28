@@ -31,6 +31,7 @@ cc_library(
         ":sdk",
         "//source/extensions/dynamic_modules/abi",
         "@com_google_absl//absl/container:flat_hash_map",
+        "@com_google_absl//absl/synchronization",
     ],
     alwayslink = True,
 )

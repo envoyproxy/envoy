@@ -1,10 +1,10 @@
 #include <cstddef>
 #include <cstdint>
-#include <mutex> // NO_CHECK_FORMAT(mutex)
 
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/dynamic_modules/abi/abi_version.h"
 
+#include "absl/synchronization/mutex.h"
 #include "sdk.h"
 
 namespace Envoy {
@@ -182,9 +182,9 @@ public:
 private:
   void* scheduler_ptr_{};
 
-  std::mutex mutex_;
-  uint64_t next_task_id_{1}; // 0 is reserved.
-  absl::flat_hash_map<uint64_t, std::function<void()>> tasks_;
+  absl::Mutex mutex_;
+  uint64_t next_task_id_ ABSL_GUARDED_BY(mutex_){1}; // 0 is reserved.
+  absl::flat_hash_map<uint64_t, std::function<void()>> tasks_ ABSL_GUARDED_BY(mutex_);
 };
 
 // HttpFilterHandle implementation

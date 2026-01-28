@@ -608,8 +608,7 @@ class FormatChecker:
                 report_error(
                     "unexpected direct dependency on google.protobuf, use "
                     "the definitions in common/protobuf/protobuf.h instead.")
-        if (line.startswith("#include <mutex>") or line.startswith("#include <condition_variable")
-           ) and not "NO_CHECK_FORMAT(mutex)" in line:
+        if line.startswith("#include <mutex>") or line.startswith("#include <condition_variable"):
             # We don't check here for std::mutex because that may legitimately show up in
             # comments, for example this one.
             report_error(
