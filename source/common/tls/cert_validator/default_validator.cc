@@ -275,7 +275,7 @@ DefaultCertValidator::verifyCertificate(X509* cert, const std::vector<std::strin
   if (!subject_alt_name_matchers.empty()) {
     if (!matchSubjectAltName(cert, stream_info, subject_alt_name_matchers)) {
       const std::string error_msg =
-          fmt::format("verify cert failed: certificate SANs: [{}]",
+          fmt::format("verify cert failed: SAN matcher, certificate SANs are [{}]",
                       fmt::join(Utility::getCertificateSansForLogging(cert), ", "));
       if (error_details != nullptr) {
         *error_details = error_msg;
