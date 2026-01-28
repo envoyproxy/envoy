@@ -131,7 +131,7 @@ private:
 struct BoolMatcher : public InputMatcher {
   explicit BoolMatcher(bool value) : value_(value) {}
 
-  bool match(const MatchingDataType&) override { return value_; }
+  MatchResult match(const MatchingDataType&) override { return value_ ? MatchResult::matched() : MatchResult::noMatch(); }
   const bool value_;
 };
 
@@ -140,11 +140,14 @@ struct TestMatcher : public InputMatcher {
   explicit TestMatcher(std::function<bool(absl::optional<absl::string_view>)> predicate)
       : predicate_(predicate) {}
 
-  bool match(const MatchingDataType& input) override {
+  MatchResult match(const MatchingDataType& input) override {
     if (absl::holds_alternative<absl::monostate>(input)) {
-      return false;
+      return MatchResult::noMatch();
     }
-    return predicate_(absl::get<std::string>(input));
+    if (predicate_(absl::get<std::string>(input))) {
+      return MatchResult::matched();
+    }
+    return MatchResult::noMatch();
   }
 
   std::function<bool(absl::optional<absl::string_view>)> predicate_;
@@ -177,7 +180,7 @@ public:
 // An InputMatcher that always returns false.
 class NeverMatch : public InputMatcher {
 public:
-  bool match(const MatchingDataType&) override { return false; }
+  MatchResult match(const MatchingDataType&) override { return MatchResult::noMatch(); }
 };
 
 /**
@@ -206,12 +209,14 @@ public:
 class CustomStringMatcher : public InputMatcher {
 public:
   explicit CustomStringMatcher(const std::string& str) : str_value_(str) {}
-  bool match(const MatchingDataType& input) override {
+  MatchResult match(const MatchingDataType& input) override {
     if (absl::holds_alternative<absl::monostate>(input)) {
-      return false;
+      return MatchResult::noMatch();
     }
-
-    return str_value_ == absl::get<std::string>(input);
+    if (str_value_ == absl::get<std::string>(input)) {
+      return MatchResult::matched();
+    }
+    return MatchResult::noMatch();
   }
 
 private:
@@ -261,7 +266,7 @@ createSingleMatcher(absl::optional<absl::string_view> input,
       .value();
 }
 
-void PrintTo(const FieldMatchResult& result, std::ostream* os) {
+void PrintTo(const MatchResult& result, std::ostream* os) {
   if (result.isInsufficientData()) {
     *os << "InsufficientData";
   } else if (result.isNoMatch()) {
@@ -286,7 +291,7 @@ inline void PrintTo(const Action& action, std::ostream* os) {
   *os << "{type=" << action.typeUrl() << "}";
 }
 
-inline void PrintTo(const MatchResult& result, std::ostream* os) {
+inline void PrintTo(const ActionMatchResult& result, std::ostream* os) {
   if (result.isInsufficientData()) {
     *os << "InsufficientData";
   } else if (result.isNoMatch()) {
@@ -319,7 +324,7 @@ inline void PrintTo(const OnMatch<TestData>& on_match, std::ostream* os) {
 }
 
 MATCHER(HasInsufficientData, "") {
-  // Takes a MatchResult& and validates that it
+  // Takes a ActionMatchResult& and validates that it
   // is in the InsufficientData state.
   return arg.isInsufficientData();
 }
@@ -348,7 +353,7 @@ MATCHER_P(IsStringAction, matcher, "") {
 }
 
 MATCHER_P(HasStringAction, matcher, "") {
-  // Takes a MatchResult& and validates that it
+  // Takes a ActionMatchResult& and validates that it
   // has a StringAction with contents matching matcher.
   if (!arg.isMatch()) {
     return false;
@@ -357,7 +362,7 @@ MATCHER_P(HasStringAction, matcher, "") {
 }
 
 MATCHER_P(HasActionWithType, matcher, "") {
-  // Takes a MatchResult& and validates that it
+  // Takes a ActionMatchResult& and validates that it
   // has an action whose type matches matcher.
   if (!arg.isMatch()) {
     return false;
@@ -366,7 +371,7 @@ MATCHER_P(HasActionWithType, matcher, "") {
 }
 
 MATCHER(HasNoMatch, "") {
-  // Takes a MatchResult& and validates that it is NoMatch.
+  // Takes a ActionMatchResult& and validates that it is NoMatch.
   return arg.isNoMatch();
 }
 

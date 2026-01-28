@@ -578,7 +578,7 @@ const Network::FilterChain*
 FilterChainManagerImpl::findFilterChainUsingMatcher(const Network::ConnectionSocket& socket,
                                                     const StreamInfo::StreamInfo& info) const {
   Network::Matching::MatchingDataImpl data(socket, info.filterState(), info.dynamicMetadata());
-  const Matcher::MatchResult match_result =
+  const Matcher::ActionMatchResult match_result =
       Matcher::evaluateMatch<Network::MatchingData>(*matcher_, data);
   ASSERT(match_result.isComplete(), "Matching must complete for network streams.");
   if (match_result.isMatch()) {
