@@ -51,22 +51,24 @@ void copyRequestHeaders(const Http::RequestHeaderMap& source, Http::RequestHeade
 using McpMethodMap = absl::flat_hash_map<absl::string_view, McpMethod>;
 
 const McpMethodMap& mcpMethodMap() {
-  // TODO(botengyao): Add support for more MCP methods:
-  // - completion/complete
-  // - logging/setLevel
-  // - notifications/* (other notifications)
-  CONSTRUCT_ON_FIRST_USE(McpMethodMap,
-                         {{"initialize", McpMethod::Initialize},
-                          {"tools/list", McpMethod::ToolsList},
-                          {"tools/call", McpMethod::ToolsCall},
-                          {"resources/list", McpMethod::ResourcesList},
-                          {"resources/read", McpMethod::ResourcesRead},
-                          {"resources/subscribe", McpMethod::ResourcesSubscribe},
-                          {"resources/unsubscribe", McpMethod::ResourcesUnsubscribe},
-                          {"prompts/list", McpMethod::PromptsList},
-                          {"prompts/get", McpMethod::PromptsGet},
-                          {"ping", McpMethod::Ping},
-                          {"notifications/initialized", McpMethod::NotificationInitialized}});
+  CONSTRUCT_ON_FIRST_USE(
+      McpMethodMap,
+      {{"initialize", McpMethod::Initialize},
+       {"tools/list", McpMethod::ToolsList},
+       {"tools/call", McpMethod::ToolsCall},
+       {"resources/list", McpMethod::ResourcesList},
+       {"resources/read", McpMethod::ResourcesRead},
+       {"resources/subscribe", McpMethod::ResourcesSubscribe},
+       {"resources/unsubscribe", McpMethod::ResourcesUnsubscribe},
+       {"prompts/list", McpMethod::PromptsList},
+       {"prompts/get", McpMethod::PromptsGet},
+       {"completion/complete", McpMethod::CompletionComplete},
+       {"logging/setLevel", McpMethod::LoggingSetLevel},
+       {"ping", McpMethod::Ping},
+       // Notifications (client -> server).
+       {"notifications/initialized", McpMethod::NotificationInitialized},
+       {"notifications/cancelled", McpMethod::NotificationCancelled},
+       {"notifications/roots/list_changed", McpMethod::NotificationRootsListChanged}});
 }
 
 McpMethod parseMethodString(absl::string_view method_str) {
@@ -216,12 +218,28 @@ Http::FilterDataStatus McpRouterFilter::decodeData(Buffer::Instance& data, bool 
       handlePromptsGet();
       break;
 
+    case McpMethod::CompletionComplete:
+      handleCompletionComplete();
+      break;
+
+    case McpMethod::LoggingSetLevel:
+      handleLoggingSetLevel();
+      break;
+
     case McpMethod::Ping:
       handlePing();
       return Http::FilterDataStatus::StopIterationNoBuffer;
 
     case McpMethod::NotificationInitialized:
-      handleNotificationInitialized();
+      handleNotification("notifications/initialized");
+      break;
+
+    case McpMethod::NotificationCancelled:
+      handleNotification("notifications/cancelled");
+      break;
+
+    case McpMethod::NotificationRootsListChanged:
+      handleNotification("notifications/roots/list_changed");
       break;
 
     default:
@@ -241,6 +259,8 @@ Http::FilterDataStatus McpRouterFilter::decodeData(Buffer::Instance& data, bool 
         rewriteResourceUriBody(data);
       } else if (method_ == McpMethod::PromptsGet) {
         rewritePromptsGetBody(data);
+      } else if (method_ == McpMethod::CompletionComplete) {
+        rewriteCompletionCompleteBody(data);
       }
       needs_body_rewrite_ = false;
     }
@@ -261,8 +281,7 @@ Http::FilterTrailersStatus McpRouterFilter::decodeTrailers(Http::RequestTrailerM
 bool McpRouterFilter::readMetadataFromMcpFilter() {
   const auto& metadata = decoder_callbacks_->streamInfo().dynamicMetadata();
 
-  // TODO(botengyao): make this filter_metadata configurable.
-  auto filter_it = metadata.filter_metadata().find("mcp_proxy");
+  auto filter_it = metadata.filter_metadata().find(config_->metadataNamespace());
   if (filter_it == metadata.filter_metadata().end()) {
     return false;
   }
@@ -306,6 +325,29 @@ bool McpRouterFilter::readMetadataFromMcpFilter() {
       auto name_it = params_fields.find("name");
       if (name_it != params_fields.end() && name_it->second.has_string_value()) {
         prompt_name_ = name_it->second.string_value();
+      }
+    } else if (method_ == McpMethod::CompletionComplete) {
+      // Extract ref object with type, name (for prompts), and uri (for resources).
+      auto ref_it = params_fields.find("ref");
+      if (ref_it != params_fields.end() && ref_it->second.has_struct_value()) {
+        const auto& ref_fields = ref_it->second.struct_value().fields();
+
+        auto type_it = ref_fields.find("type");
+        if (type_it != ref_fields.end() && type_it->second.has_string_value()) {
+          completion_ref_type_ = type_it->second.string_value();
+        }
+
+        if (completion_ref_type_ == "ref/prompt") {
+          auto name_it = ref_fields.find("name");
+          if (name_it != ref_fields.end() && name_it->second.has_string_value()) {
+            prompt_name_ = name_it->second.string_value();
+          }
+        } else if (completion_ref_type_ == "ref/resource") {
+          auto uri_it = ref_fields.find("uri");
+          if (uri_it != ref_fields.end() && uri_it->second.has_string_value()) {
+            resource_uri_ = uri_it->second.string_value();
+          }
+        }
       }
     }
   }
@@ -529,6 +571,16 @@ ssize_t McpRouterFilter::rewritePromptsGetBody(Buffer::Instance& buffer) {
   }
 
   return rewriteAtPosition(buffer, pos, prompt_name_, unprefixed_prompt_name_);
+}
+
+ssize_t McpRouterFilter::rewriteCompletionCompleteBody(Buffer::Instance& buffer) {
+  // Rewrite based on ref type: prompt name for ref/prompt, resource URI for ref/resource.
+  if (completion_ref_type_ == "ref/prompt") {
+    return rewritePromptsGetBody(buffer);
+  } else if (completion_ref_type_ == "ref/resource") {
+    return rewriteResourceUriBody(buffer);
+  }
+  return 0;
 }
 
 ssize_t McpRouterFilter::rewriteAtPosition(Buffer::Instance& buffer, ssize_t pos,
@@ -783,11 +835,11 @@ void McpRouterFilter::handlePing() {
   sendJsonResponse(response_body, encoded_session_id_);
 }
 
-void McpRouterFilter::handleNotificationInitialized() {
-  ENVOY_LOG(debug, "notifications/initialized: forwarding to {} backends",
-            config_->backends().size());
+void McpRouterFilter::handleNotification(absl::string_view notification_name) {
+  ENVOY_LOG(debug, "{}: forwarding to {} backends", notification_name, config_->backends().size());
 
-  // Forward notifications/initialized to all backends and wait for responses.
+  // Forward notification to all backends and wait for responses.
+  // Notifications are fire-and-forget, so we respond with 202 Accepted once all backends respond.
   initializeFanout([this](std::vector<BackendResponse>) {
     // All backends have responded (or failed), send 202 to client.
     sendAccepted();
@@ -874,6 +926,82 @@ void McpRouterFilter::handlePromptsGet() {
 
   ENVOY_LOG(debug, "prompts/get: backend='{}', prompt='{}' -> '{}', needs_rewrite={}", backend_name,
             prompt_name_, actual_prompt, needs_body_rewrite_);
+
+  initializeSingleBackend(*backend, [this](BackendResponse resp) {
+    if (resp.success) {
+      sendJsonResponse(resp.body, encoded_session_id_);
+    } else {
+      sendHttpError(500, resp.error.empty() ? "Backend request failed" : resp.error);
+    }
+  });
+}
+
+void McpRouterFilter::handleLoggingSetLevel() {
+  // Fan out to all backends and return empty result.
+  // https://modelcontextprotocol.io/specification/2025-06-18/server/utilities/logging
+  ENVOY_LOG(debug, "logging/setLevel: fanout to {} backends", config_->backends().size());
+
+  initializeFanout([this](std::vector<BackendResponse> responses) {
+    // Check if at least one backend succeeded.
+    bool any_success = false;
+    for (const auto& resp : responses) {
+      if (resp.success) {
+        any_success = true;
+        break;
+      }
+    }
+
+    if (!any_success) {
+      sendHttpError(500, "All backends failed to set logging level");
+      return;
+    }
+
+    // Return empty JSON-RPC result.
+    std::string response = fmt::format(R"({{"jsonrpc":"2.0","id":{},"result":{{}}}})", request_id_);
+    sendJsonResponse(response, encoded_session_id_);
+  });
+}
+
+void McpRouterFilter::handleCompletionComplete() {
+  // Route based on ref type: ref/prompt uses prompt name, ref/resource uses resource URI.
+  // https://modelcontextprotocol.io/specification/2025-06-18/server/utilities/completion
+  std::string backend_name;
+
+  if (completion_ref_type_ == "ref/prompt") {
+    auto [name, actual_prompt] = parsePromptName(prompt_name_);
+    backend_name = name;
+    unprefixed_prompt_name_ = actual_prompt;
+    needs_body_rewrite_ = (prompt_name_ != unprefixed_prompt_name_);
+
+    ENVOY_LOG(debug,
+              "completion/complete (ref/prompt): backend='{}', name='{}' -> '{}', "
+              "needs_rewrite={}",
+              backend_name, prompt_name_, actual_prompt, needs_body_rewrite_);
+  } else if (completion_ref_type_ == "ref/resource") {
+    auto [name, actual_uri] = parseResourceUri(resource_uri_);
+    backend_name = name;
+    rewritten_uri_ = actual_uri;
+    needs_body_rewrite_ = (resource_uri_ != rewritten_uri_);
+
+    ENVOY_LOG(debug,
+              "completion/complete (ref/resource): backend='{}', uri='{}' -> '{}', "
+              "needs_rewrite={}",
+              backend_name, resource_uri_, actual_uri, needs_body_rewrite_);
+  } else {
+    sendHttpError(400, fmt::format("Invalid completion ref type '{}'", completion_ref_type_));
+    return;
+  }
+
+  if (backend_name.empty()) {
+    sendHttpError(400, "Cannot determine backend for completion request");
+    return;
+  }
+
+  const McpBackendConfig* backend = config_->findBackend(backend_name);
+  if (!backend) {
+    sendHttpError(400, fmt::format("Unknown backend '{}' in completion ref", backend_name));
+    return;
+  }
 
   initializeSingleBackend(*backend, [this](BackendResponse resp) {
     if (resp.success) {
@@ -1251,6 +1379,15 @@ McpRouterFilter::createUpstreamHeaders(const McpBackendConfig& backend,
           // Prompt name rewriting, delta = new_size - old_size.
           size_delta = static_cast<int64_t>(unprefixed_prompt_name_.size()) -
                        static_cast<int64_t>(prompt_name_.size());
+        } else if (method_ == McpMethod::CompletionComplete) {
+          // Completion ref rewriting: depends on ref type.
+          if (completion_ref_type_ == "ref/prompt") {
+            size_delta = static_cast<int64_t>(unprefixed_prompt_name_.size()) -
+                         static_cast<int64_t>(prompt_name_.size());
+          } else if (completion_ref_type_ == "ref/resource") {
+            size_delta = static_cast<int64_t>(rewritten_uri_.size()) -
+                         static_cast<int64_t>(resource_uri_.size());
+          }
         }
         int64_t new_length = static_cast<int64_t>(original_length) + size_delta;
         headers->setContentLength(new_length);

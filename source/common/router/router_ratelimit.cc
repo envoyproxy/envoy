@@ -347,7 +347,8 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
     Server::Configuration::CommonFactoryContext& context, absl::Status& creation_status)
     : disable_key_(config.disable_key()),
       stage_(static_cast<uint64_t>(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, stage, 0))),
-      apply_on_stream_done_(config.apply_on_stream_done()) {
+      apply_on_stream_done_(config.apply_on_stream_done()),
+      x_ratelimit_option_(config.x_ratelimit_option()) {
   actions_.reserve(config.actions().size());
   for (const auto& action : config.actions()) {
     switch (action.action_specifier_case()) {
@@ -481,6 +482,7 @@ void RateLimitPolicyEntryImpl::populateDescriptors(std::vector<RateLimit::Descri
   }
 
   if (result) {
+    descriptor.x_ratelimit_option_ = x_ratelimit_option_;
     descriptors.emplace_back(descriptor);
   }
 }

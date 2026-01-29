@@ -359,6 +359,8 @@ KaePrivateKeyMethodProvider::KaePrivateKeyMethodProvider(
   std::string private_key =
       THROW_OR_RETURN_VALUE(Config::DataSource::read(conf.private_key(), false, api_), std::string);
 
+  const uint32_t max_instances = PROTOBUF_GET_WRAPPED_OR_DEFAULT(conf, max_instances, 16);
+
   bssl::UniquePtr<BIO> bio(
       BIO_new_mem_buf(const_cast<char*>(private_key.data()), private_key.size()));
 
@@ -374,7 +376,7 @@ KaePrivateKeyMethodProvider::KaePrivateKeyMethodProvider(
   pkey_ = std::move(pkey);
 
   section_ = std::make_shared<KaeSection>(libuadk);
-  if (!section_->startSection(api_, poll_delay)) {
+  if (!section_->startSection(api_, poll_delay, max_instances)) {
     ENVOY_LOG(warn, "Failed to start KAE.");
     return;
   }
