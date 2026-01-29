@@ -11,7 +11,7 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/common/stats/utility.h"
-#include "source/extensions/dynamic_modules/abi.h"
+#include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/filters/network/dynamic_modules/filter.h"
 #include "source/extensions/filters/network/dynamic_modules/filter_config.h"
 

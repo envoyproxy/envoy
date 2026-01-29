@@ -39,7 +39,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 // [#extension: envoy.filters.network.http_connection_manager]
 
-// [#next-free-field: 61]
+// [#next-free-field: 62]
 message HttpConnectionManager {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager";
@@ -1051,6 +1051,49 @@ message HttpConnectionManager {
   // This should be set to ``false`` in cases where Envoy's view of the downstream address may not correspond to the
   // actual client address, for example, if there's another proxy in front of the Envoy.
   google.protobuf.BoolValue add_proxy_protocol_connection_state = 53;
+
+  // Configuration for controlling how the ``x-forwarded-proto`` header is set.
+  // This allows customization of protocol inference, including support for inferring the original
+  // protocol (HTTP or HTTPS) from the PROXY protocol destination port.
+  //
+  // This is useful when a Layer 4 load balancer (such as AWS NLB) terminates TLS and uses
+  // PROXY protocol to communicate with Envoy.
+  //
+  // When configured and the local address was restored from PROXY protocol (indicating the
+  // original destination address is available), the ``x-forwarded-proto`` header will be set
+  // based on whether the destination port is in ``https_destination_ports`` or
+  // ``http_destination_ports``.
+  //
+  // Example configuration:
+  //
+  // .. code-block:: yaml
+  //
+  //   http_connection_manager:
+  //     forward_proto_config:
+  //       https_destination_ports: [443, 8443]
+  //       http_destination_ports: [80, 8080]
+  //
+  // If not configured, defaults to disabled and the standard behavior applies (using connection
+  // TLS status or trusted downstream headers).
+  ForwardProtoConfig forward_proto_config = 61;
+}
+
+// Configuration options for setting the ``x-forwarded-proto`` header.
+// This message provides flexibility for future enhancements to protocol inference.
+message ForwardProtoConfig {
+  // List of destination ports that should be treated as HTTPS.
+  // When the PROXY protocol destination port matches one of these ports,
+  // ``x-forwarded-proto`` will be set to ``https``.
+  //
+  // Common values: 443, 8443
+  repeated uint32 https_destination_ports = 1;
+
+  // List of destination ports that should be treated as HTTP.
+  // When the PROXY protocol destination port matches one of these ports,
+  // ``x-forwarded-proto`` will be set to ``http``.
+  //
+  // Common values: 80, 8080
+  repeated uint32 http_destination_ports = 2;
 }
 
 // The configuration to customize local reply returned by Envoy.

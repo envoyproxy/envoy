@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/extensions/common/ratelimit/v3/ratelimit.pb.h"
 #include "envoy/http/codes.h"
 #include "envoy/stream_info/stream_info.h"
 
@@ -55,12 +56,13 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
     return;
   }
 
-  std::vector<Envoy::RateLimit::Descriptor> descriptors;
-  populateRateLimitDescriptors(descriptors, headers, false);
-  if (!descriptors.empty()) {
+  descriptors_.clear();
+  populateRateLimitDescriptors(descriptors_, headers, false);
+  ENVOY_LOG(debug, "rate limit descriptors size: {}", descriptors_.size());
+  if (!descriptors_.empty()) {
     state_ = State::Calling;
     initiating_call_ = true;
-    client_->limit(*this, getDomain(), descriptors, callbacks_->activeSpan(),
+    client_->limit(*this, getDomain(), descriptors_, callbacks_->activeSpan(),
                    callbacks_->streamInfo(), getHitAddend());
     initiating_call_ = false;
   }
@@ -231,8 +233,7 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
     cluster_->statsScope().counterFromStatName(stat_names.ok_).inc();
     break;
   case Filters::Common::RateLimit::LimitStatus::Error:
-    ENVOY_LOG_TO_LOGGER(Logger::Registry::getLog(Logger::Id::filter), debug,
-                        "rate limit status, status={}", static_cast<int>(status));
+    ENVOY_LOG(debug, "rate limit status, status={}", static_cast<int>(status));
     cluster_->statsScope().counterFromStatName(stat_names.error_).inc();
     break;
   case Filters::Common::RateLimit::LimitStatus::OverLimit:
@@ -259,15 +260,12 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
     break;
   }
 
-  if (config_->enableXRateLimitHeaders()) {
-    Http::ResponseHeaderMapPtr rate_limit_headers =
-        XRateLimitHeaderUtils::create(std::move(descriptor_statuses));
+  if (descriptor_statuses != nullptr && !descriptor_statuses->empty()) {
     if (response_headers_to_add_ == nullptr) {
       response_headers_to_add_ = Http::ResponseHeaderMapImpl::create();
     }
-    Http::HeaderMapImpl::copyFrom(*response_headers_to_add_, *rate_limit_headers);
-  } else {
-    descriptor_statuses = nullptr;
+    XRateLimitHeaderUtils::populateHeaders(descriptors_, config_->enableXRateLimitHeaders(),
+                                           *descriptor_statuses, *response_headers_to_add_);
   }
 
   if (status == Filters::Common::RateLimit::LimitStatus::OverLimit && config_->enforced()) {

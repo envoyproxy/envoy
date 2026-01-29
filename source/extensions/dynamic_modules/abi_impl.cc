@@ -8,7 +8,7 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
-#include "source/extensions/dynamic_modules/abi.h"
+#include "source/extensions/dynamic_modules/abi/abi.h"
 
 extern "C" {
 

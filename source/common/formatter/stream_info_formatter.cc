@@ -2097,6 +2097,20 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                                        return result;
                                      });
                                }}},
+                             {"UPSTREAM_DETECTED_CLOSE_TYPE",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](absl::string_view, absl::optional<size_t>) {
+                                 return std::make_unique<StreamInfoStringFormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info)
+                                         -> absl::optional<std::string> {
+                                       if (stream_info.upstreamInfo().has_value()) {
+                                         return detectedCloseTypeToString(
+                                             stream_info.upstreamInfo()
+                                                 ->upstreamDetectedCloseType());
+                                       }
+                                       return absl::nullopt;
+                                     });
+                               }}},
                              {"HOSTNAME",
                               {CommandSyntaxChecker::COMMAND_ONLY,
                                [](absl::string_view, absl::optional<size_t>) {

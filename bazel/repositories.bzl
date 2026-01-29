@@ -193,9 +193,8 @@ def envoy_dependencies(skip_targets = []):
     _io_opentelemetry_api_cpp()
     _net_colm_open_source_colm()
     _net_colm_open_source_ragel()
-    _zlib()
     _intel_dlb()
-    _com_github_zlib_ng_zlib_ng()
+    _zlib_ng()
     _org_boost()
     _org_brotli()
     _zstd()
@@ -232,9 +231,6 @@ def envoy_dependencies(skip_targets = []):
     external_http_archive("aspect_bazel_lib")
 
     _com_github_fdio_vpp_vcl()
-
-    # Unconditional, since we use this only for compiler-agnostic fuzzing utils.
-    _org_llvm_releases_compiler_rt()
 
     _toolchains_llvm()
 
@@ -467,15 +463,9 @@ def _net_colm_open_source_ragel():
         build_file_content = BUILD_ALL_CONTENT,
     )
 
-def _zlib():
+def _zlib_ng():
     external_http_archive(
-        name = "zlib",
-        build_file = "@envoy//bazel/external:zlib.BUILD",
-    )
-
-def _com_github_zlib_ng_zlib_ng():
-    external_http_archive(
-        name = "com_github_zlib_ng_zlib_ng",
+        name = "zlib_ng",
         build_file = "@envoy//bazel/external:zlib_ng.BUILD",
     )
 
@@ -743,12 +733,6 @@ def _googleurl():
         patch_args = ["-p1"],
     )
 
-def _org_llvm_releases_compiler_rt():
-    external_http_archive(
-        name = "org_llvm_releases_compiler_rt",
-        build_file = "@envoy//bazel/external:compiler_rt.BUILD",
-    )
-
 def _com_github_grpc_grpc():
     external_http_archive(
         name = "com_github_grpc_grpc",
@@ -769,7 +753,10 @@ def _rules_proto_grpc():
     external_http_archive("rules_proto_grpc")
 
 def _re2():
-    external_http_archive("com_googlesource_code_re2")
+    external_http_archive(
+        "com_googlesource_code_re2",
+        repo_mapping = {"@abseil-cpp": "@com_google_absl"},
+    )
 
 def _proxy_wasm_cpp_sdk():
     external_http_archive(
