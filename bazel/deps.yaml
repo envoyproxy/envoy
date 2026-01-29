@@ -372,6 +372,18 @@ com_github_luajit_luajit:
   cpe: "cpe:2.3:a:luajit:luajit:*"
   license: "MIT"
   license_url: "https://github.com/LuaJIT/LuaJIT/blob/{version}/COPYRIGHT"
+com_github_luajit2_luajit2:
+  project_name = "LuaJIT2",
+  project_desc = "Openresty/luajit2 - OpenResty's maintained branch of LuaJIT",
+  project_url = "https://github.com/openresty/luajit2",
+  release_date = "2025-08-26",
+  use_category:
+  - dataplane_ext
+  extensions:
+  - envoy.filters.http.lua
+  - envoy.router.cluster_specifier_plugin.lua
+  - envoy.string_matcher.lua
+  cpe: "cpe:2.3:a:luajit:luajit:*"
 com_github_lz4_lz4:
   project_name: "LZ4"
   project_desc: "Extremely Fast Compression algorithm"
