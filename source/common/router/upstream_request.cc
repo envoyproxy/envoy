@@ -644,7 +644,10 @@ void UpstreamRequest::onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
   onUpstreamHostSelected(host, true);
 
   if (info.downstreamAddressProvider().connectionID().has_value()) {
-    upstream_info.setUpstreamConnectionId(info.downstreamAddressProvider().connectionID().value());
+    uint64_t connection_id = info.downstreamAddressProvider().connectionID().value();
+    upstream_info.setUpstreamConnectionId(connection_id);
+    // Also track this connection ID as attempted for access logging purposes
+    upstream_info.addUpstreamConnectionIdAttempted(connection_id);
   }
 
   if (info.downstreamAddressProvider().interfaceName().has_value()) {

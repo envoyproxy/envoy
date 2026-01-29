@@ -322,10 +322,12 @@ void TcpConnPool::onPoolFailure(ConnectionPool::PoolFailureReason reason,
 void TcpConnPool::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data,
                               Upstream::HostDescriptionConstSharedPtr host) {
   if (downstream_info_.downstreamAddressProvider().connectionID()) {
-    downstream_info_.upstreamInfo()->setUpstreamConnectionId(conn_data->connection().id());
+    uint64_t connection_id = conn_data->connection().id();
+    downstream_info_.upstreamInfo()->setUpstreamConnectionId(connection_id);
+    // Also track this connection ID as attempted for access logging purposes
+    downstream_info_.upstreamInfo()->addUpstreamConnectionIdAttempted(connection_id);
     ENVOY_LOG(debug, "Attached upstream connection [C{}] to downstream connection [C{}]",
-              conn_data->connection().id(),
-              downstream_info_.downstreamAddressProvider().connectionID().value());
+              connection_id, downstream_info_.downstreamAddressProvider().connectionID().value());
   }
 
   upstream_handle_ = nullptr;
@@ -442,11 +444,12 @@ void HttpConnPool::onPoolReady(Http::RequestEncoder& request_encoder,
       downstream_info_.downstreamAddressProvider().connectionID()) {
     // info.downstreamAddressProvider() is being called to get the upstream connection ID,
     // because the StreamInfo object here is of the upstream connection.
-    downstream_info_.upstreamInfo()->setUpstreamConnectionId(
-        info.downstreamAddressProvider().connectionID().value());
+    uint64_t connection_id = info.downstreamAddressProvider().connectionID().value();
+    downstream_info_.upstreamInfo()->setUpstreamConnectionId(connection_id);
+    // Also track this connection ID as attempted for access logging purposes
+    downstream_info_.upstreamInfo()->addUpstreamConnectionIdAttempted(connection_id);
     ENVOY_LOG(debug, "Attached upstream connection [C{}] to downstream connection [C{}]",
-              info.downstreamAddressProvider().connectionID().value(),
-              downstream_info_.downstreamAddressProvider().connectionID().value());
+              connection_id, downstream_info_.downstreamAddressProvider().connectionID().value());
   }
 
   upstream_handle_ = nullptr;

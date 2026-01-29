@@ -153,5 +153,12 @@ new_features:
     detects and selects between cgroup v1 and v2 at runtime by checking available cgroup files on
     the system. This enables the resource monitor to work correctly in both cgroup v1 and v2
     environments without configuration changes.
+- area: formatter
+  change: |
+    Added new access log formatters for tracking upstream hosts and connection IDs attempted during
+    request processing: ``%UPSTREAM_HOSTS_ATTEMPTED%``, ``%UPSTREAM_HOSTS_ATTEMPTED_WITHOUT_PORT%``,
+    ``%UPSTREAM_HOST_NAMES_ATTEMPTED%``, ``%UPSTREAM_HOST_NAMES_ATTEMPTED_WITHOUT_PORT%``, and
+    ``%UPSTREAM_CONNECTION_IDS_ATTEMPTED%``. These are useful for debugging retry behavior and
+    understanding which hosts were tried before a successful connection or final failure.
 
 deprecated:

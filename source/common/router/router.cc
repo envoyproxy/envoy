@@ -1589,6 +1589,11 @@ void Filter::onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host
     return;
   }
 
+  // Track the attempted host in upstream info for access logging purposes.
+  if (host && callbacks_->streamInfo().upstreamInfo()) {
+    callbacks_->streamInfo().upstreamInfo()->addUpstreamHostAttempted(host);
+  }
+
   if (request_vcluster_) {
     // The cluster increases its upstream_rq_total_ counter right before firing this onPoolReady
     // callback. Hence, the upstream request increases the virtual cluster's upstream_rq_total_ stat

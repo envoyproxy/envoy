@@ -549,6 +549,36 @@ Current supported substitution commands include:
   Upstream host name (e.g., DNS name) without port component. If no DNS name is available,
   the main address of the upstream host (e.g., ip for TCP connections) will be used.
 
+.. _config_access_log_format_upstream_hosts_attempted:
+
+``%UPSTREAM_HOSTS_ATTEMPTED%``
+  Comma-separated list of upstream host addresses (e.g., ip:port) that were attempted during the request,
+  including retries. This is useful for debugging retry behavior and understanding which hosts were tried
+  before a successful connection or final failure.
+
+.. _config_access_log_format_upstream_hosts_attempted_without_port:
+
+``%UPSTREAM_HOSTS_ATTEMPTED_WITHOUT_PORT%``
+  Same as ``%UPSTREAM_HOSTS_ATTEMPTED%`` but without port components.
+
+.. _config_access_log_format_upstream_host_names_attempted:
+
+``%UPSTREAM_HOST_NAMES_ATTEMPTED%``
+  Comma-separated list of upstream host names (e.g., DNS names) that were attempted during the request,
+  including retries. If no DNS name is available for a host, its main address (e.g., ip:port) will be used.
+  This is useful for debugging retry behavior with human-readable host names.
+
+.. _config_access_log_format_upstream_host_names_attempted_without_port:
+
+``%UPSTREAM_HOST_NAMES_ATTEMPTED_WITHOUT_PORT%``
+  Same as ``%UPSTREAM_HOST_NAMES_ATTEMPTED%`` but without port components.
+
+.. _config_access_log_format_upstream_connection_ids_attempted:
+
+``%UPSTREAM_CONNECTION_IDS_ATTEMPTED%``
+  Comma-separated list of upstream connection IDs that were attempted during the request, including retries.
+  This is useful for cross-referencing with other logs to understand connection reuse and retry behavior.
+
 ``%UPSTREAM_CLUSTER%``
   Upstream cluster to which the upstream host belongs to. :ref:`alt_stat_name
   <envoy_v3_api_field_config.cluster.v3.Cluster.alt_stat_name>` will be used if provided.

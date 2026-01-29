@@ -626,6 +626,8 @@ bool UdpProxyFilter::UdpActiveSession::createUpstream() {
     }
   }
 
+  // Track attempted hosts for access logging
+  udp_session_info_.upstreamInfo()->addUpstreamHostAttempted(host_);
   udp_session_info_.upstreamInfo()->setUpstreamHost(host_);
   cluster_->addSession(host_.get(), this);
   createUdpSocket(host_);
@@ -984,6 +986,7 @@ void TunnelingConnectionPoolImpl::onPoolReady(Http::RequestEncoder& request_enco
   downstream_info_.upstreamInfo()->setUpstreamHost(upstream_host);
   downstream_info_.setUpstreamBytesMeter(request_encoder.getStream().bytesMeter());
   downstream_info_.upstreamInfo()->setUpstreamConnectionId(upstream_connection_id);
+  downstream_info_.upstreamInfo()->addUpstreamConnectionIdAttempted(upstream_connection_id);
   callbacks_->resetIdleTimer();
 }
 

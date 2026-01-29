@@ -676,6 +676,33 @@ public:
 
   virtual void setUpstreamProtocol(Http::Protocol protocol) PURE;
   virtual absl::optional<Http::Protocol> upstreamProtocol() const PURE;
+
+  /**
+   * Add a host to the list of upstream hosts that were attempted for this request.
+   * This is useful for tracking retry behavior in access logs.
+   * @param host the host description that was attempted.
+   */
+  virtual void addUpstreamHostAttempted(Upstream::HostDescriptionConstSharedPtr host) PURE;
+
+  /**
+   * @return the list of all upstream hosts that were attempted for this request,
+   * in the order they were attempted. This includes both successful and failed attempts.
+   */
+  virtual const std::vector<Upstream::HostDescriptionConstSharedPtr>&
+  upstreamHostsAttempted() const PURE;
+
+  /**
+   * Add a connection ID to the list of upstream connection IDs that were attempted for this
+   * request. This is useful for tracking connection reuse behavior in access logs.
+   * @param connection_id the connection ID that was attempted.
+   */
+  virtual void addUpstreamConnectionIdAttempted(uint64_t connection_id) PURE;
+
+  /**
+   * @return the list of all upstream connection IDs that were attempted for this request,
+   * in the order they were attempted. This helps identify connection reuse patterns.
+   */
+  virtual const std::vector<uint64_t>& upstreamConnectionIdsAttempted() const PURE;
 };
 
 /**

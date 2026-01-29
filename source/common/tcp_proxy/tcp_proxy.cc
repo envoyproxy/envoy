@@ -769,6 +769,8 @@ bool Filter::maybeTunnel(Upstream::ThreadLocalCluster& cluster) {
   Upstream::HostConstSharedPtr host =
       Upstream::LoadBalancer::onlyAllowSynchronousHostSelection(cluster.chooseHost(this));
   if (host) {
+    // Track attempted hosts for access logging
+    getStreamInfo().upstreamInfo()->addUpstreamHostAttempted(host);
     generic_conn_pool_ = factory->createGenericConnPool(
         host, cluster, config_->tunnelingConfigHelper(), this, *upstream_callbacks_,
         upstream_decoder_filter_callbacks_, getStreamInfo());
