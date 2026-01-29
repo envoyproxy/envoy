@@ -532,7 +532,7 @@ TEST_F(JsonContentParserTest, StopProcessingAfterMatchesDefault) {
 TEST_F(JsonContentParserTest, MultipleRulesWithDifferentStopBehavior) {
   // Create config with two rules:
   // Rule 1: stop after 1 match (extract model from first body)
-  // Rule 2: default (0) - process all json bodys (extract tokens from last body)
+  // Rule 2: default (0) - process all json bodies (extract tokens from last body)
   ProtoConfig proto_config;
 
   // Rule 1: Stop after first match
