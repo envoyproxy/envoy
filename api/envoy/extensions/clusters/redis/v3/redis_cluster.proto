@@ -54,7 +54,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //           redirect_refresh_threshold: 10
 // [#extension: envoy.clusters.redis]
 
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message RedisClusterConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.cluster.redis.RedisClusterConfig";
@@ -83,4 +83,14 @@ message RedisClusterConfig {
   // If not set, this defaults to 0, which disables the topology refresh due to degraded or
   // unhealthy host.
   uint32 host_degraded_refresh_threshold = 6;
+
+  // Enable zone discovery via INFO command. When enabled, the cluster will
+  // send INFO command to each node to discover its availability_zone field,
+  // which is then used for zone-aware routing.
+  //
+  // Note: This feature currently works with Valkey only. Valkey exposes
+  // availability_zone in its INFO response. Standard Redis does not support this field.
+  //
+  // If not set, this defaults to false.
+  google.protobuf.BoolValue enable_zone_discovery = 7;
 }
