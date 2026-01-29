@@ -3294,7 +3294,7 @@ impl EnvoyHttpFilterImpl {
     // At this point, we assume at least one value is present.
     results.push(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) });
     // So, we iterate from 1 to count - 1.
-    for i in 1 .. count {
+    for i in 1..count {
       let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
         ptr: std::ptr::null(),
         length: 0,
@@ -7853,28 +7853,11 @@ macro_rules! declare_bootstrap_init_functions {
 // Load Balancer Dynamic Module Support
 // =================================================================================================
 
-/// Represents the health status of an upstream host.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum HostHealth {
-  /// Host is unhealthy and should not be used for traffic.
-  Unhealthy,
-  /// Host is healthy but degraded. It can receive traffic but healthy hosts are preferred.
-  Degraded,
-  /// Host is healthy and can receive traffic.
-  Healthy,
-}
-
-impl From<abi::envoy_dynamic_module_type_host_health> for HostHealth {
-  fn from(health: abi::envoy_dynamic_module_type_host_health) -> Self {
-    match health {
-      abi::envoy_dynamic_module_type_host_health::Unhealthy => HostHealth::Unhealthy,
-      abi::envoy_dynamic_module_type_host_health::Degraded => HostHealth::Degraded,
-      abi::envoy_dynamic_module_type_host_health::Healthy => HostHealth::Healthy,
-    }
-  }
-}
-
-/// Trait for interacting with the Envoy load balancer.
+/// Trait for interacting with the Envoy load balancer and its context.
+///
+/// This trait provides access to both cluster/host information and request context.
+/// The cluster/host methods are always available, while the context methods are only
+/// valid during the [`LoadBalancer::choose_host`] callback.
 #[automock]
 pub trait EnvoyLoadBalancer {
   /// Returns the cluster name.
@@ -7899,17 +7882,53 @@ pub trait EnvoyLoadBalancer {
   fn get_host_weight(&self, priority: u32, index: usize) -> u32;
 
   /// Returns the health status of a host by index within all hosts at a given priority.
-  fn get_host_health(&self, priority: u32, index: usize) -> HostHealth;
+  fn get_host_health(
+    &self,
+    priority: u32,
+    index: usize,
+  ) -> abi::envoy_dynamic_module_type_host_health;
+
+  // -------------------------------------------------------------------------
+  // Context methods are only valid during choose_host callback.
+  // -------------------------------------------------------------------------
+
+  /// Returns whether the context is available.
+  /// Context methods will return default values if this returns false.
+  fn has_context(&self) -> bool;
+
+  /// Computes a hash key for consistent hashing from the request context.
+  /// Only valid during choose_host callback.
+  fn context_compute_hash_key(&self) -> Option<u64>;
+
+  /// Returns the number of downstream request headers.
+  /// Only valid during choose_host callback.
+  fn context_get_downstream_headers_count(&self) -> usize;
+
+  /// Returns a downstream request header by index.
+  /// Only valid during choose_host callback.
+  fn context_get_downstream_header(&self, index: usize) -> Option<(String, String)>;
+
+  /// Returns the value of a downstream request header by key.
+  /// Only valid during choose_host callback.
+  fn context_get_downstream_header_value(&self, key: &str) -> Option<String>;
 }
 
 /// Implementation of EnvoyLoadBalancer that calls into the Envoy ABI.
 pub struct EnvoyLoadBalancerImpl {
-  raw: abi::envoy_dynamic_module_type_lb_envoy_ptr,
+  lb_ptr: abi::envoy_dynamic_module_type_lb_envoy_ptr,
+  context_ptr: abi::envoy_dynamic_module_type_lb_context_envoy_ptr,
 }
 
 impl EnvoyLoadBalancerImpl {
-  pub fn new(raw: abi::envoy_dynamic_module_type_lb_envoy_ptr) -> Self {
-    Self { raw }
+  /// Creates a new EnvoyLoadBalancerImpl with both LB and context pointers.
+  pub fn new(
+    lb_ptr: abi::envoy_dynamic_module_type_lb_envoy_ptr,
+    context_ptr: abi::envoy_dynamic_module_type_lb_context_envoy_ptr,
+  ) -> Self {
+    Self {
+      lb_ptr,
+      context_ptr,
+    }
   }
 }
 
@@ -7920,7 +7939,7 @@ impl EnvoyLoadBalancer for EnvoyLoadBalancerImpl {
       length: 0,
     };
     unsafe {
-      abi::envoy_dynamic_module_callback_lb_get_cluster_name(self.raw, &mut result);
+      abi::envoy_dynamic_module_callback_lb_get_cluster_name(self.lb_ptr, &mut result);
       if !result.ptr.is_null() && result.length > 0 {
         std::str::from_utf8_unchecked(std::slice::from_raw_parts(
           result.ptr as *const _,
@@ -7934,19 +7953,19 @@ impl EnvoyLoadBalancer for EnvoyLoadBalancerImpl {
   }
 
   fn get_hosts_count(&self, priority: u32) -> usize {
-    unsafe { abi::envoy_dynamic_module_callback_lb_get_hosts_count(self.raw, priority) }
+    unsafe { abi::envoy_dynamic_module_callback_lb_get_hosts_count(self.lb_ptr, priority) }
   }
 
   fn get_healthy_hosts_count(&self, priority: u32) -> usize {
-    unsafe { abi::envoy_dynamic_module_callback_lb_get_healthy_hosts_count(self.raw, priority) }
+    unsafe { abi::envoy_dynamic_module_callback_lb_get_healthy_hosts_count(self.lb_ptr, priority) }
   }
 
   fn get_degraded_hosts_count(&self, priority: u32) -> usize {
-    unsafe { abi::envoy_dynamic_module_callback_lb_get_degraded_hosts_count(self.raw, priority) }
+    unsafe { abi::envoy_dynamic_module_callback_lb_get_degraded_hosts_count(self.lb_ptr, priority) }
   }
 
   fn get_priority_set_size(&self) -> usize {
-    unsafe { abi::envoy_dynamic_module_callback_lb_get_priority_set_size(self.raw) }
+    unsafe { abi::envoy_dynamic_module_callback_lb_get_priority_set_size(self.lb_ptr) }
   }
 
   fn get_host_address(&self, priority: u32, index: usize) -> Option<String> {
@@ -7955,7 +7974,12 @@ impl EnvoyLoadBalancer for EnvoyLoadBalancerImpl {
       length: 0,
     };
     let found = unsafe {
-      abi::envoy_dynamic_module_callback_lb_get_host_address(self.raw, priority, index, &mut result)
+      abi::envoy_dynamic_module_callback_lb_get_host_address(
+        self.lb_ptr,
+        priority,
+        index,
+        &mut result,
+      )
     };
     if found && !result.ptr.is_null() && result.length > 0 {
       unsafe {
@@ -7973,55 +7997,28 @@ impl EnvoyLoadBalancer for EnvoyLoadBalancerImpl {
   }
 
   fn get_host_weight(&self, priority: u32, index: usize) -> u32 {
-    unsafe { abi::envoy_dynamic_module_callback_lb_get_host_weight(self.raw, priority, index) }
+    unsafe { abi::envoy_dynamic_module_callback_lb_get_host_weight(self.lb_ptr, priority, index) }
   }
 
-  fn get_host_health(&self, priority: u32, index: usize) -> HostHealth {
-    unsafe {
-      abi::envoy_dynamic_module_callback_lb_get_host_health(self.raw, priority, index).into()
-    }
-  }
-}
-
-/// Trait for interacting with the load balancer context.
-#[automock]
-pub trait LoadBalancerContext {
-  /// Computes a hash key for consistent hashing.
-  fn compute_hash_key(&self) -> Option<u64>;
-
-  /// Returns the number of downstream request headers.
-  fn get_downstream_headers_count(&self) -> usize;
-
-  /// Returns a downstream request header by index.
-  fn get_downstream_header(&self, index: usize) -> Option<(String, String)>;
-
-  /// Returns the value of a downstream request header by key.
-  fn get_downstream_header_value(&self, key: &str) -> Option<String>;
-}
-
-/// Implementation of LoadBalancerContext that calls into the Envoy ABI.
-pub struct LoadBalancerContextImpl {
-  raw: abi::envoy_dynamic_module_type_lb_context_envoy_ptr,
-}
-
-impl LoadBalancerContextImpl {
-  pub fn new(raw: abi::envoy_dynamic_module_type_lb_context_envoy_ptr) -> Self {
-    Self { raw }
+  fn get_host_health(
+    &self,
+    priority: u32,
+    index: usize,
+  ) -> abi::envoy_dynamic_module_type_host_health {
+    unsafe { abi::envoy_dynamic_module_callback_lb_get_host_health(self.lb_ptr, priority, index) }
   }
 
-  pub fn is_null(&self) -> bool {
-    self.raw.is_null()
+  fn has_context(&self) -> bool {
+    !self.context_ptr.is_null()
   }
-}
 
-impl LoadBalancerContext for LoadBalancerContextImpl {
-  fn compute_hash_key(&self) -> Option<u64> {
-    if self.raw.is_null() {
+  fn context_compute_hash_key(&self) -> Option<u64> {
+    if self.context_ptr.is_null() {
       return None;
     }
     let mut hash: u64 = 0;
     let found = unsafe {
-      abi::envoy_dynamic_module_callback_lb_context_compute_hash_key(self.raw, &mut hash)
+      abi::envoy_dynamic_module_callback_lb_context_compute_hash_key(self.context_ptr, &mut hash)
     };
     if found {
       Some(hash)
@@ -8030,15 +8027,17 @@ impl LoadBalancerContext for LoadBalancerContextImpl {
     }
   }
 
-  fn get_downstream_headers_count(&self) -> usize {
-    if self.raw.is_null() {
+  fn context_get_downstream_headers_count(&self) -> usize {
+    if self.context_ptr.is_null() {
       return 0;
     }
-    unsafe { abi::envoy_dynamic_module_callback_lb_context_get_downstream_headers_count(self.raw) }
+    unsafe {
+      abi::envoy_dynamic_module_callback_lb_context_get_downstream_headers_count(self.context_ptr)
+    }
   }
 
-  fn get_downstream_header(&self, index: usize) -> Option<(String, String)> {
-    if self.raw.is_null() {
+  fn context_get_downstream_header(&self, index: usize) -> Option<(String, String)> {
+    if self.context_ptr.is_null() {
       return None;
     }
     let mut key = abi::envoy_dynamic_module_type_envoy_buffer {
@@ -8051,7 +8050,10 @@ impl LoadBalancerContext for LoadBalancerContextImpl {
     };
     let found = unsafe {
       abi::envoy_dynamic_module_callback_lb_context_get_downstream_header(
-        self.raw, index, &mut key, &mut value,
+        self.context_ptr,
+        index,
+        &mut key,
+        &mut value,
       )
     };
     if found {
@@ -8074,8 +8076,8 @@ impl LoadBalancerContext for LoadBalancerContextImpl {
     }
   }
 
-  fn get_downstream_header_value(&self, key: &str) -> Option<String> {
-    if self.raw.is_null() {
+  fn context_get_downstream_header_value(&self, key: &str) -> Option<String> {
+    if self.context_ptr.is_null() {
       return None;
     }
     let key_buffer = abi::envoy_dynamic_module_type_module_buffer {
@@ -8088,7 +8090,9 @@ impl LoadBalancerContext for LoadBalancerContextImpl {
     };
     let found = unsafe {
       abi::envoy_dynamic_module_callback_lb_context_get_downstream_header_value(
-        self.raw, key_buffer, &mut value,
+        self.context_ptr,
+        key_buffer,
+        &mut value,
       )
     };
     if found {
@@ -8108,21 +8112,31 @@ impl LoadBalancerContext for LoadBalancerContextImpl {
 }
 
 /// Trait for the load balancer configuration.
-pub trait LoadBalancerConfig: Sync + Send {
+///
+/// This is created once when the load balancer policy is configured and shared across all
+/// worker threads. Implementations must be `Sync` since they are accessed from worker threads.
+pub trait LoadBalancerConfig: Sync {
   /// Creates a new load balancer instance for each worker thread.
+  ///
+  /// This is called once per worker thread when the thread is initialized.
+  /// The `envoy_lb` provides access to cluster information (context methods are not available).
   fn new_load_balancer(&self, envoy_lb: &dyn EnvoyLoadBalancer) -> Box<dyn LoadBalancer>;
 }
 
 /// Trait for a load balancer instance.
-pub trait LoadBalancer: Send {
+///
+/// All the event hooks are called on the same thread as the one that the [`LoadBalancer`] is
+/// created via the [`LoadBalancerConfig::new_load_balancer`] method. In other words, the
+/// [`LoadBalancer`] object is thread-local.
+pub trait LoadBalancer {
   /// Chooses a host for an upstream request.
+  ///
+  /// The `envoy_lb` provides access to both cluster/host information and request context.
+  /// Context methods (those starting with `context_`) are only valid during this callback.
+  ///
   /// Returns the index of the selected host in the healthy hosts list at priority 0,
-  /// or None if no host should be selected.
-  fn choose_host(
-    &mut self,
-    envoy_lb: &dyn EnvoyLoadBalancer,
-    context: Option<&dyn LoadBalancerContext>,
-  ) -> Option<usize>;
+  /// or `None` if no host should be selected (which will result in no upstream connection).
+  fn choose_host(&mut self, envoy_lb: &dyn EnvoyLoadBalancer) -> Option<usize>;
 }
 
 /// The function signature for creating a new load balancer configuration.
@@ -8165,7 +8179,8 @@ unsafe extern "C" fn envoy_dynamic_module_on_lb_new(
   config_ptr: abi::envoy_dynamic_module_type_lb_config_module_ptr,
   lb_envoy_ptr: abi::envoy_dynamic_module_type_lb_envoy_ptr,
 ) -> abi::envoy_dynamic_module_type_lb_module_ptr {
-  let envoy_lb = EnvoyLoadBalancerImpl::new(lb_envoy_ptr);
+  // During new_load_balancer, context is not available.
+  let envoy_lb = EnvoyLoadBalancerImpl::new(lb_envoy_ptr, std::ptr::null_mut());
   let lb_config = {
     let raw = config_ptr as *const *const dyn LoadBalancerConfig;
     &**raw
@@ -8180,19 +8195,12 @@ unsafe extern "C" fn envoy_dynamic_module_on_lb_choose_host(
   lb_module_ptr: abi::envoy_dynamic_module_type_lb_module_ptr,
   context_envoy_ptr: abi::envoy_dynamic_module_type_lb_context_envoy_ptr,
 ) -> i64 {
-  let envoy_lb = EnvoyLoadBalancerImpl::new(lb_envoy_ptr);
-  let context_impl = LoadBalancerContextImpl::new(context_envoy_ptr);
-  let context: Option<&dyn LoadBalancerContext> = if context_impl.is_null() {
-    None
-  } else {
-    Some(&context_impl)
-  };
-
+  let envoy_lb = EnvoyLoadBalancerImpl::new(lb_envoy_ptr, context_envoy_ptr);
   let lb = {
     let raw = lb_module_ptr as *mut *mut dyn LoadBalancer;
     &mut **raw
   };
-  match lb.choose_host(&envoy_lb, context) {
+  match lb.choose_host(&envoy_lb) {
     Some(index) => index as i64,
     None => -1,
   }
@@ -8237,11 +8245,7 @@ unsafe extern "C" fn envoy_dynamic_module_on_lb_destroy(
 /// }
 ///
 /// impl LoadBalancer for MyLoadBalancer {
-///   fn choose_host(
-///     &mut self,
-///     envoy_lb: &dyn EnvoyLoadBalancer,
-///     _context: Option<&dyn LoadBalancerContext>,
-///   ) -> Option<usize> {
+///   fn choose_host(&mut self, envoy_lb: &dyn EnvoyLoadBalancer) -> Option<usize> {
 ///     let count = envoy_lb.get_healthy_hosts_count(0);
 ///     if count == 0 {
 ///       return None;

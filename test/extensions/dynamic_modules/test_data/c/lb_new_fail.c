@@ -1,8 +1,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "source/extensions/dynamic_modules/abi.h"
-#include "source/extensions/dynamic_modules/abi_version.h"
+#include "source/extensions/dynamic_modules/abi/abi.h"
+#include "source/extensions/dynamic_modules/abi/abi_version.h"
 
 // Load balancer module where on_lb_new fails but config succeeds.
 

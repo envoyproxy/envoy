@@ -3,8 +3,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "source/extensions/dynamic_modules/abi.h"
-#include "source/extensions/dynamic_modules/abi_version.h"
+#include "source/extensions/dynamic_modules/abi/abi.h"
+#include "source/extensions/dynamic_modules/abi/abi_version.h"
 
 // Test load balancer that exercises all callback functions for coverage.
 

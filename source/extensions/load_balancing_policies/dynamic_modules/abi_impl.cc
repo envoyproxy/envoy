@@ -1,4 +1,4 @@
-#include "source/extensions/dynamic_modules/abi.h"
+#include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/load_balancing_policies/dynamic_modules/load_balancer.h"
 
 namespace Envoy {
