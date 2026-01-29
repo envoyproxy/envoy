@@ -57,6 +57,15 @@ JsonRpcFieldExtractor* JsonRpcFieldExtractor::EndObject() {
     return this;
   }
   if (depth_ > 0) {
+    // Before updating path, mark object path as collected for early-stop optimization.
+    // This enables extraction rules targeting object paths (e.g., "params.ref") to work
+    // with early termination, since objects themselves are not rendered as primitives.
+    if (!current_path_cache_.empty()) {
+      if (collected_fields_.insert(current_path_cache_).second) {
+        fields_collected_count_++;
+      }
+    }
+
     depth_--;
     if (!path_stack_.empty()) {
       // Update cached path before removing from stack

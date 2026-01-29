@@ -8,14 +8,10 @@ void JsonRpcParserConfig::addMethodConfig(absl::string_view method,
   method_fields_[std::string(method)] = std::move(fields);
 }
 
-const std::vector<AttributeExtractionRule>&
+const std::vector<AttributeExtractionRule>
 JsonRpcParserConfig::getFieldsForMethod(const std::string& method) const {
-  static const std::vector<AttributeExtractionRule> empty;
   auto it = method_fields_.find(method);
-  if (it != method_fields_.end()) {
-    return it->second;
-  }
-  return empty;
+  return (it != method_fields_.end()) ? it->second : std::vector<AttributeExtractionRule>{};
 }
 
 } // namespace Json

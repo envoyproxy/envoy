@@ -32,7 +32,7 @@ public:
    * @param method the method name.
    * @return vector of extraction rules.
    */
-  const std::vector<AttributeExtractionRule>& getFieldsForMethod(const std::string& method) const;
+  const std::vector<AttributeExtractionRule> getFieldsForMethod(const std::string& method) const;
 
   /**
    * Adds a configuration for a specific method.
