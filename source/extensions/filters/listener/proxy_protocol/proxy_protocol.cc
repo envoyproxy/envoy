@@ -612,25 +612,38 @@ bool Filter::parseTlvs(const uint8_t* buf, size_t len) {
 
       if (config_->tlvLocation() ==
           envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol::FILTER_STATE) {
-        // Store TLV values in a single filter state object.
-        constexpr absl::string_view kFilterStateKey = "envoy.network.proxy_protocol.tlv";
-        TlvFilterStateObject* tlv_filter_state_obj = nullptr;
-        const auto* existing_obj = cb_->filterState().getDataReadOnlyGeneric(kFilterStateKey);
-        if (existing_obj != nullptr) {
-          tlv_filter_state_obj = const_cast<TlvFilterStateObject*>(
-              dynamic_cast<const TlvFilterStateObject*>(existing_obj));
-        }
-        if (tlv_filter_state_obj == nullptr) {
-          auto new_obj = std::make_unique<TlvFilterStateObject>();
-          tlv_filter_state_obj = new_obj.get();
-          cb_->filterState().setData(kFilterStateKey, std::move(new_obj),
+        // Check if a direct filter state key is specified for this TLV.
+        if (!key_value_pair->filter_state_key().empty()) {
+          // Store as a separate filter state object with the specified key.
+          // This allows direct access via FilterStateInput in RBAC without needing CEL.
+          cb_->filterState().setData(key_value_pair->filter_state_key(),
+                                     std::make_unique<Router::StringAccessorImpl>(sanitised_value),
                                      StreamInfo::FilterState::StateType::ReadOnly,
                                      StreamInfo::FilterState::LifeSpan::Connection);
-          ENVOY_LOG(trace, "proxy_protocol: Created TLV FilterState object");
+          ENVOY_LOG(trace,
+                    "proxy_protocol: Stored TLV type {} as separate FilterState with key '{}'",
+                    tlv_type, key_value_pair->filter_state_key());
+        } else {
+          // Store TLV values in a single filter state object (default behavior).
+          constexpr absl::string_view kFilterStateKey = "envoy.network.proxy_protocol.tlv";
+          TlvFilterStateObject* tlv_filter_state_obj = nullptr;
+          const auto* existing_obj = cb_->filterState().getDataReadOnlyGeneric(kFilterStateKey);
+          if (existing_obj != nullptr) {
+            tlv_filter_state_obj = const_cast<TlvFilterStateObject*>(
+                dynamic_cast<const TlvFilterStateObject*>(existing_obj));
+          }
+          if (tlv_filter_state_obj == nullptr) {
+            auto new_obj = std::make_unique<TlvFilterStateObject>();
+            tlv_filter_state_obj = new_obj.get();
+            cb_->filterState().setData(kFilterStateKey, std::move(new_obj),
+                                       StreamInfo::FilterState::StateType::ReadOnly,
+                                       StreamInfo::FilterState::LifeSpan::Connection);
+            ENVOY_LOG(trace, "proxy_protocol: Created TLV FilterState object");
+          }
+          tlv_filter_state_obj->addTlvValue(key_value_pair->key(), sanitised_value);
+          ENVOY_LOG(trace, "proxy_protocol: Stored TLV type {} value in FilterState with key {}",
+                    tlv_type, key_value_pair->key());
         }
-        tlv_filter_state_obj->addTlvValue(key_value_pair->key(), sanitised_value);
-        ENVOY_LOG(trace, "proxy_protocol: Stored TLV type {} value in FilterState with key {}",
-                  tlv_type, key_value_pair->key());
       } else {
         // Store in dynamic metadata (default, backwards compatible behavior).
         std::string metadata_key = key_value_pair->metadata_namespace().empty()

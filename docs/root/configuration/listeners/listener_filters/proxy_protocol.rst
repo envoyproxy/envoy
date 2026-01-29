@@ -12,7 +12,59 @@ Envoy then extracts these and uses them as the remote address.
 
 In Proxy Protocol v2 there exists the concept of extensions (TLV)
 tags that are optional. If the type of the TLV is added to the filter's configuration,
-the TLV will be emitted as dynamic metadata with user-specified key.
+the TLV will be emitted as dynamic metadata or filter state with user-specified key.
+
+TLV Storage Options
+-------------------
+
+The filter supports two storage locations for TLV values, controlled by the
+:ref:`tlv_location <envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.tlv_location>` setting:
+
+**DYNAMIC_METADATA** (default)
+  TLV values are stored in dynamic metadata under the ``envoy.filters.listener.proxy_protocol`` namespace.
+  This allows access via :ref:`DynamicMetadataInput <envoy_v3_api_msg_extensions.matching.common_inputs.network.v3.DynamicMetadataInput>`
+  in RBAC and other matchers.
+
+**FILTER_STATE**
+  TLV values are stored in filter state. By default, all TLV values are stored in a single
+  object under the key ``envoy.network.proxy_protocol.tlv``, accessible via CEL expressions
+  like ``filter_state["envoy.network.proxy_protocol.tlv"]["my_key"]``.
+
+  Alternatively, you can use the
+  :ref:`filter_state_key <envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.KeyValuePair.filter_state_key>`
+  field to store each TLV value as a separate filter state object. This enables direct access
+  via :ref:`FilterStateInput <envoy_v3_api_msg_extensions.matching.common_inputs.network.v3.FilterStateInput>`
+  in RBAC without needing CEL expressions:
+
+  .. code-block:: yaml
+
+    listener_filters:
+      - name: envoy.filters.listener.proxy_protocol
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.listener.proxy_protocol.v3.ProxyProtocol
+          tlv_location: FILTER_STATE
+          rules:
+            - tlv_type: 0xEA
+              on_tlv_present:
+                key: "aws_vpce_id"
+                filter_state_key: "aws_vpce_id"  # Store as separate filter state
+
+  With this configuration, you can match on the TLV value directly in RBAC:
+
+  .. code-block:: yaml
+
+    matcher:
+      matcher_tree:
+        input:
+          name: filter_state
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.FilterStateInput
+            key: "aws_vpce_id"
+        exact_match_map:
+          map:
+            "vpce-12345678":
+              action:
+                name: allow
 
 This implementation supports both version 1 and version 2, it
 automatically determines on a per-connection basis which of the two

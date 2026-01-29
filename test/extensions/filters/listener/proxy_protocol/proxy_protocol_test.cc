@@ -2238,6 +2238,141 @@ TEST_P(ProxyProtocolTest, V2ExtractTLVToFilterStateSerializeMethods) {
   EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);
 }
 
+TEST_P(ProxyProtocolTest, V2ExtractTLVToFilterStateWithDirectKey) {
+  // Test storing TLV values as separate filter state objects using filter_state_key.
+  // This allows direct access via FilterStateInput in RBAC without needing CEL.
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                0x54, 0x0a, 0x21, 0x11, 0x00, 0x27, 0x01, 0x02, 0x03, 0x04,
+                                0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02};
+  constexpr uint8_t tlv1[] = {0x0, 0x0, 0x1, 0xff};
+  constexpr uint8_t tlv_type_authority[] = {0x02, 0x00, 0x07, 0x66, 0x6f,
+                                            0x6f, 0x2e, 0x63, 0x6f, 0x6d};
+  constexpr uint8_t tlv_vpce[] = {0xea, 0x00, 0x0a, 0x21, 0x76, 0x70, 0x63,
+                                  0x65, 0x2d, 0x30, 0x78, 0x78, 0x78};
+  constexpr uint8_t data[] = {'D', 'A', 'T', 'A'};
+
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
+  proto_config.set_tlv_location(
+      envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol::FILTER_STATE);
+
+  // Rule 1: Use filter_state_key for direct access
+  auto rule1 = proto_config.add_rules();
+  rule1->set_tlv_type(0x02);
+  rule1->mutable_on_tlv_present()->set_key("PP2 type authority");
+  rule1->mutable_on_tlv_present()->set_filter_state_key("my_authority_key");
+
+  // Rule 2: Use filter_state_key for direct access with a different key
+  auto rule2 = proto_config.add_rules();
+  rule2->set_tlv_type(0xea);
+  rule2->mutable_on_tlv_present()->set_key("aws_vpce_id");
+  rule2->mutable_on_tlv_present()->set_filter_state_key("aws_vpce_id");
+
+  connect(true, &proto_config);
+  write(buffer, sizeof(buffer));
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  write(tlv1, sizeof(tlv1));
+  write(tlv_type_authority, sizeof(tlv_type_authority));
+  write(tlv_vpce, sizeof(tlv_vpce));
+  write(data, sizeof(data));
+  expectData("DATA");
+
+  auto& filter_state = server_connection_->streamInfo().filterState();
+
+  // Verify that TLV values are stored as separate filter state objects.
+  EXPECT_TRUE(filter_state->hasDataWithName("my_authority_key"));
+  EXPECT_TRUE(filter_state->hasDataWithName("aws_vpce_id"));
+
+  // Access the values directly via serializeAsString (like FilterStateInput does).
+  const auto* authority_obj = filter_state->getDataReadOnlyGeneric("my_authority_key");
+  ASSERT_NE(nullptr, authority_obj);
+  auto authority_str = authority_obj->serializeAsString();
+  ASSERT_TRUE(authority_str.has_value());
+  EXPECT_EQ("foo.com", authority_str.value());
+
+  const auto* vpce_obj = filter_state->getDataReadOnlyGeneric("aws_vpce_id");
+  ASSERT_NE(nullptr, vpce_obj);
+  auto vpce_str = vpce_obj->serializeAsString();
+  ASSERT_TRUE(vpce_str.has_value());
+  EXPECT_EQ("!vpce-0xxx", vpce_str.value());
+
+  // Verify the shared TLV filter state object is NOT created when filter_state_key is used.
+  constexpr absl::string_view kFilterStateKey = "envoy.network.proxy_protocol.tlv";
+  EXPECT_FALSE(filter_state->hasDataWithName(kFilterStateKey));
+
+  // Verify dynamic metadata is NOT populated when FILTER_STATE is used.
+  EXPECT_EQ(0, server_connection_->streamInfo().dynamicMetadata().filter_metadata_size());
+
+  disconnect();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);
+}
+
+TEST_P(ProxyProtocolTest, V2ExtractTLVToFilterStateMixedKeys) {
+  // Test mixing filter_state_key (direct) and default behavior (shared object).
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                0x54, 0x0a, 0x21, 0x11, 0x00, 0x27, 0x01, 0x02, 0x03, 0x04,
+                                0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02};
+  constexpr uint8_t tlv1[] = {0x0, 0x0, 0x1, 0xff};
+  constexpr uint8_t tlv_type_authority[] = {0x02, 0x00, 0x07, 0x66, 0x6f,
+                                            0x6f, 0x2e, 0x63, 0x6f, 0x6d};
+  constexpr uint8_t tlv_vpce[] = {0xea, 0x00, 0x0a, 0x21, 0x76, 0x70, 0x63,
+                                  0x65, 0x2d, 0x30, 0x78, 0x78, 0x78};
+  constexpr uint8_t data[] = {'D', 'A', 'T', 'A'};
+
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
+  proto_config.set_tlv_location(
+      envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol::FILTER_STATE);
+
+  // Rule 1: Use direct filter_state_key
+  auto rule1 = proto_config.add_rules();
+  rule1->set_tlv_type(0x02);
+  rule1->mutable_on_tlv_present()->set_key("PP2 type authority");
+  rule1->mutable_on_tlv_present()->set_filter_state_key("direct_authority");
+
+  // Rule 2: Use default shared object behavior (no filter_state_key)
+  auto rule2 = proto_config.add_rules();
+  rule2->set_tlv_type(0xea);
+  rule2->mutable_on_tlv_present()->set_key("aws_vpce_id");
+  // No filter_state_key set - will use shared object.
+
+  connect(true, &proto_config);
+  write(buffer, sizeof(buffer));
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  write(tlv1, sizeof(tlv1));
+  write(tlv_type_authority, sizeof(tlv_type_authority));
+  write(tlv_vpce, sizeof(tlv_vpce));
+  write(data, sizeof(data));
+  expectData("DATA");
+
+  auto& filter_state = server_connection_->streamInfo().filterState();
+
+  // Verify rule1 is stored as separate filter state.
+  EXPECT_TRUE(filter_state->hasDataWithName("direct_authority"));
+  const auto* authority_obj = filter_state->getDataReadOnlyGeneric("direct_authority");
+  ASSERT_NE(nullptr, authority_obj);
+  auto authority_str = authority_obj->serializeAsString();
+  ASSERT_TRUE(authority_str.has_value());
+  EXPECT_EQ("foo.com", authority_str.value());
+
+  // Verify rule2 is stored in the shared TLV filter state object.
+  constexpr absl::string_view kFilterStateKey = "envoy.network.proxy_protocol.tlv";
+  EXPECT_TRUE(filter_state->hasDataWithName(kFilterStateKey));
+  const auto* tlv_obj = filter_state->getDataReadOnlyGeneric(kFilterStateKey);
+  ASSERT_NE(nullptr, tlv_obj);
+  EXPECT_TRUE(tlv_obj->hasFieldSupport());
+  auto vpce_field = tlv_obj->getField("aws_vpce_id");
+  ASSERT_TRUE(absl::holds_alternative<absl::string_view>(vpce_field));
+  EXPECT_EQ("!vpce-0xxx", absl::get<absl::string_view>(vpce_field));
+
+  // Verify rule1's key is NOT in the shared object.
+  auto authority_field = tlv_obj->getField("PP2 type authority");
+  EXPECT_TRUE(absl::holds_alternative<absl::monostate>(authority_field));
+
+  disconnect();
+  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);
+}
+
 TEST_P(ProxyProtocolTest, MalformedProxyLine) {
   connect(false);
 
