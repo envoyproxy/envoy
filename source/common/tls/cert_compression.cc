@@ -15,22 +15,6 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
 
-namespace {
-
-class ScopedZStream {
-public:
-  using CleanupFunc = int (*)(z_stream*);
-
-  ScopedZStream(z_stream& z, CleanupFunc cleanup) : z_(z), cleanup_(cleanup) {}
-  ~ScopedZStream() { cleanup_(&z_); }
-
-private:
-  z_stream& z_;
-  CleanupFunc cleanup_;
-};
-
-} // namespace
-
 void CertCompression::registerBrotli(SSL_CTX* ssl_ctx) {
   auto ret = SSL_CTX_add_cert_compression_alg(ssl_ctx, TLSEXT_cert_compression_brotli,
                                               compressBrotli, decompressBrotli);
@@ -41,20 +25,6 @@ void CertCompression::registerZlib(SSL_CTX* ssl_ctx) {
   auto ret = SSL_CTX_add_cert_compression_alg(ssl_ctx, TLSEXT_cert_compression_zlib, compressZlib,
                                               decompressZlib);
   ASSERT(ret == 1);
-}
-
-void CertCompression::registerAlgorithms(SSL_CTX* ssl_ctx,
-                                         const std::vector<Algorithm>& algorithms) {
-  for (const auto& algo : algorithms) {
-    switch (algo) {
-    case Algorithm::Brotli:
-      registerBrotli(ssl_ctx);
-      break;
-    case Algorithm::Zlib:
-      registerZlib(ssl_ctx);
-      break;
-    }
-  }
 }
 
 int CertCompression::compressBrotli(SSL*, CBB* out, const uint8_t* in, size_t in_len) {
@@ -94,7 +64,6 @@ int CertCompression::decompressBrotli(SSL*, CRYPTO_BUFFER** out, size_t uncompre
     IS_ENVOY_BUG("Failed to allocate CRYPTO_BUFFER for brotli decompression");
     return FAILURE;
   }
-  memset(out_buf, 0, uncompressed_len);
 
   size_t decoded_size = uncompressed_len;
   BrotliDecoderResult result = BrotliDecoderDecompress(in_len, in, &decoded_size, out_buf);
@@ -120,6 +89,22 @@ int CertCompression::decompressBrotli(SSL*, CRYPTO_BUFFER** out, size_t uncompre
   *out = decompressed_data.release();
   return SUCCESS;
 }
+
+namespace {
+
+class ScopedZStream {
+public:
+  using CleanupFunc = int (*)(z_stream*);
+
+  ScopedZStream(z_stream& z, CleanupFunc cleanup) : z_(z), cleanup_(cleanup) {}
+  ~ScopedZStream() { cleanup_(&z_); }
+
+private:
+  z_stream& z_;
+  CleanupFunc cleanup_;
+};
+
+} // namespace
 
 int CertCompression::compressZlib(SSL*, CBB* out, const uint8_t* in, size_t in_len) {
   z_stream z = {};
@@ -191,7 +176,6 @@ int CertCompression::decompressZlib(SSL*, CRYPTO_BUFFER** out, size_t uncompress
     IS_ENVOY_BUG("Failed to allocate CRYPTO_BUFFER for zlib decompression");
     return FAILURE;
   }
-  memset(out_buf, 0, uncompressed_len);
   z.next_out = out_buf;
   z.avail_out = uncompressed_len;
 

@@ -89,10 +89,10 @@ removed_config_or_runtime:
 new_features:
 - area: tls
   change: |
-    Added TLS certificate compression support (RFC 8879) with brotli and zlib algorithms.
-    Compression reduces TLS handshake size, especially beneficial for QUIC where the ServerHello
-    needs to fit in the initial response. Controlled by runtime flag
-    ``envoy.reloadable_features.tls_support_certificate_compression`` (defaults to ``true``).
+    Extended TLS certificate compression (RFC 8879): added brotli to QUIC (which already supported zlib),
+    and added brotli and zlib to TCP TLS. Controlled by runtime flag
+    ``envoy.reloadable_features.tls_certificate_compression_brotli`` (defaults to ``true``).
+    When disabled, QUIC retains zlib-only compression, while TCP TLS has no compression.
 - area: stats
   change: |
     Added support to limit the number of stats stored in each stats scope in the stats library.

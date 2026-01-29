@@ -3,6 +3,7 @@
 #include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
+#include "absl/types/span.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -36,8 +37,8 @@ TEST(CertCompressionBrotliTest, RoundTrip) {
   bssl::UniquePtr<CRYPTO_BUFFER> out_ptr(out);
 
   // Verify
-  EXPECT_EQ(kTestDataLen, CRYPTO_BUFFER_len(out));
-  EXPECT_EQ(0, memcmp(kTestData, CRYPTO_BUFFER_data(out), kTestDataLen));
+  EXPECT_EQ(absl::Span<const uint8_t>(kTestData, kTestDataLen),
+            absl::Span<const uint8_t>(CRYPTO_BUFFER_data(out), CRYPTO_BUFFER_len(out)));
 }
 
 TEST(CertCompressionBrotliTest, DecompressBadData) {
@@ -75,7 +76,7 @@ TEST(CertCompressionBrotliTest, CompressHugeInputSizeReturnsFailure) {
   // This triggers the error path at lines 62-65 in cert_compression.cc.
   bssl::ScopedCBB compressed;
   ASSERT_EQ(1, CBB_init(compressed.get(), 0));
-  EXPECT_ENVOY_BUG(CertCompression::compressBrotli(nullptr, compressed.get(), nullptr, SIZE_MAX),
+  EXPECT_ENVOY_BUG(CertCompression::compressBrotli(nullptr, compressed.get(), nullptr, 1 << 31),
                    "BrotliEncoderMaxCompressedSize returned 0");
 }
 
@@ -101,8 +102,8 @@ TEST(CertCompressionZlibTest, RoundTrip) {
   bssl::UniquePtr<CRYPTO_BUFFER> out_ptr(out);
 
   // Verify
-  EXPECT_EQ(kTestDataLen, CRYPTO_BUFFER_len(out));
-  EXPECT_EQ(0, memcmp(kTestData, CRYPTO_BUFFER_data(out), kTestDataLen));
+  EXPECT_EQ(absl::Span<const uint8_t>(kTestData, kTestDataLen),
+            absl::Span<const uint8_t>(CRYPTO_BUFFER_data(out), CRYPTO_BUFFER_len(out)));
 }
 
 TEST(CertCompressionZlibTest, DecompressBadData) {
@@ -168,13 +169,6 @@ TEST_F(CertCompressionRegistrationTest, RegisterAllAlgorithms) {
   // Order matters: brotli > zlib (by priority)
   EXPECT_NO_THROW(CertCompression::registerBrotli(ssl_ctx_.get()));
   EXPECT_NO_THROW(CertCompression::registerZlib(ssl_ctx_.get()));
-}
-
-TEST_F(CertCompressionRegistrationTest, RegisterAlgorithmsVector) {
-  // This tests the registerAlgorithms() function which was previously untested.
-  // Covers lines 46-58 in cert_compression.cc: the for loop and switch cases.
-  CertCompression::registerAlgorithms(
-      ssl_ctx_.get(), {CertCompression::Algorithm::Brotli, CertCompression::Algorithm::Zlib});
 }
 
 } // namespace Tls

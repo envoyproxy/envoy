@@ -7923,7 +7923,7 @@ TEST_P(SslSocketTest, RsaKeyUsageVerificationEnforcementOn) {
 TEST_P(SslSocketTest, CertificateCompressionEnabled) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.tls_support_certificate_compression", "true"}});
+      {{"envoy.reloadable_features.tls_certificate_compression_brotli", "true"}});
 
   envoy::config::listener::v3::Listener listener;
   envoy::config::listener::v3::FilterChain* filter_chain = listener.add_filter_chains();
@@ -7949,7 +7949,7 @@ TEST_P(SslSocketTest, CertificateCompressionEnabled) {
 TEST_P(SslSocketTest, CertificateCompressionDisabled) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.tls_support_certificate_compression", "false"}});
+      {{"envoy.reloadable_features.tls_certificate_compression_brotli", "false"}});
 
   envoy::config::listener::v3::Listener listener;
   envoy::config::listener::v3::FilterChain* filter_chain = listener.add_filter_chains();

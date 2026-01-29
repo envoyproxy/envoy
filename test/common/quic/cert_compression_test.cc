@@ -1,4 +1,3 @@
-#include "source/common/quic/cert_compression.h"
 #include "source/common/tls/cert_compression.h"
 
 #include "test/test_common/logging.h"

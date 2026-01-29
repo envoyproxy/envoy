@@ -221,5 +221,8 @@ void configQuicInitialFlowControlWindow(const envoy::config::core::v3::QuicProto
 // Extract the two ECN bits from the TOS byte in the IP header.
 quic::QuicEcnCodepoint getQuicEcnCodepointFromTosByte(uint8_t tos_byte);
 
+// Register TLS certificate compression algorithms (RFC 8879) for QUIC.
+void registerCertCompression(SSL_CTX* ssl_ctx);
+
 } // namespace Quic
 } // namespace Envoy

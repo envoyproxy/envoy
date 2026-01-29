@@ -406,7 +406,7 @@ envoy_cc_test(
     name = "cert_compression_test",
     srcs = envoy_select_enable_http3(["cert_compression_test.cc"]),
     deps = envoy_select_enable_http3([
-        "//source/common/quic:cert_compression_lib",
+        "//source/common/tls:cert_compression_lib",
         "//test/test_common:logging_lib",
     ]),
 )
