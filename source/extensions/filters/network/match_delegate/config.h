@@ -137,6 +137,7 @@ public:
   void addFilter(Envoy::Network::FilterSharedPtr filter) override;
   void removeReadFilter(Envoy::Network::ReadFilterSharedPtr filter) override;
   bool initializeReadFilters() override;
+  void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) override;
 
 private:
   Envoy::Network::FilterManager& filter_manager_;

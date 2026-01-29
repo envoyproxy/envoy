@@ -55,6 +55,7 @@ public:
   MOCK_METHOD(void, addReadFilter, (ReadFilterSharedPtr filter));
   MOCK_METHOD(void, removeReadFilter, (ReadFilterSharedPtr filter));
   MOCK_METHOD(bool, initializeReadFilters, ());
+  MOCK_METHOD(void, addAccessLogHandler, (AccessLog::InstanceSharedPtr handler));
 };
 
 class MockDnsResolver : public DnsResolver {

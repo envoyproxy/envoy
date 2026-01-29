@@ -125,6 +125,7 @@ envoy_cc_library(
         ":listen_socket_interface",
         ":listener_filter_buffer_interface",
         ":transport_socket_interface",
+        "//envoy/access_log:access_log_interface",
         "//envoy/buffer:buffer_interface",
         "//envoy/config:extension_config_provider_interface",
         "//envoy/config:typed_metadata_interface",

@@ -85,6 +85,10 @@ void DelegatingNetworkFilterManager::removeReadFilter(Envoy::Network::ReadFilter
 
 bool DelegatingNetworkFilterManager::initializeReadFilters() { return false; }
 
+void DelegatingNetworkFilterManager::addAccessLogHandler(AccessLog::InstanceSharedPtr handler) {
+  filter_manager_.addAccessLogHandler(std::move(handler));
+}
+
 } // namespace Factory
 
 void DelegatingNetworkFilter::FilterMatchState::evaluateMatchTree() {

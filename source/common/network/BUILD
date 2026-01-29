@@ -182,6 +182,7 @@ envoy_cc_library(
     srcs = ["filter_manager_impl.cc"],
     hdrs = ["filter_manager_impl.h"],
     deps = [
+        "//envoy/access_log:access_log_interface",
         "//envoy/network:connection_interface",
         "//envoy/network:filter_interface",
         "//source/common/common:assert_lib",

@@ -52,6 +52,10 @@ bool QuicFilterManagerConnectionImpl::initializeReadFilters() {
   return filter_manager_->initializeReadFilters();
 }
 
+void QuicFilterManagerConnectionImpl::addAccessLogHandler(AccessLog::InstanceSharedPtr handler) {
+  filter_manager_->addAccessLogHandler(handler);
+}
+
 void QuicFilterManagerConnectionImpl::enableHalfClose(bool enabled) {
   RELEASE_ASSERT(!enabled, "Quic connection doesn't support half close.");
 }
