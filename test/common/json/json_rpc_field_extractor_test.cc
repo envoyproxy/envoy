@@ -20,10 +20,11 @@ protected:
     addMethodConfig("method1", {AttributeExtractionRule("params.param1"),
                                 AttributeExtractionRule("params.param2")});
     addMethodConfig("method2", {AttributeExtractionRule("params.nested.param3")});
-       addMethodConfig("method_types",
-                    {AttributeExtractionRule("params.bool"), AttributeExtractionRule("params.uint32"),
-                     AttributeExtractionRule("params.double"), AttributeExtractionRule("params.float"),
-                     AttributeExtractionRule("params.null"), AttributeExtractionRule("params.byte")});
+    addMethodConfig(
+        "method_types",
+        {AttributeExtractionRule("params.bool"), AttributeExtractionRule("params.uint32"),
+         AttributeExtractionRule("params.double"), AttributeExtractionRule("params.float"),
+         AttributeExtractionRule("params.null"), AttributeExtractionRule("params.byte")});
   }
 };
 
