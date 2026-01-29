@@ -235,6 +235,7 @@ message EndpointSpecificHttpProtocolOptions {
   message EndpointSpecificOptions {
     // Endpoint-specific HTTP/2 protocol options.
     config.core.v3.Http2ProtocolOptions http2_protocol_options = 1;
+
     // Endpoint-specific HTTP protocol options.
     config.core.v3.HttpProtocolOptions http_protocol_options = 2;
 
@@ -251,7 +252,8 @@ message EndpointSpecificHttpProtocolOptions {
     //          string_match:
     //            exact: "high_throughput"
     //
-    type.matcher.v3.MetadataMatcher endpoint_metadata_match = 3 [(validate.rules).message = {required: true}];
+    type.matcher.v3.MetadataMatcher endpoint_metadata_match = 3
+        [(validate.rules).message = {required: true}];
   }
 
   repeated EndpointSpecificOptions endpoint_specific_options = 1;
