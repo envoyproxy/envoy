@@ -423,7 +423,6 @@ TEST_F(StatsAccessLoggerTest, GaugeNoValueConfig) {
           name: gauge
         operation_type: Add
 )EOF";
-
   EXPECT_THROW_WITH_MESSAGE(initialize(yaml), EnvoyException,
                             "Stats logger gauge must have either `value_format` or `value_fixed`.");
 }
