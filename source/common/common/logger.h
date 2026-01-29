@@ -68,6 +68,7 @@ const static bool should_log = true;
   FUNCTION(init)                                                                                   \
   FUNCTION(io)                                                                                     \
   FUNCTION(jwt)                                                                                    \
+  FUNCTION(json_rpc)                                                                               \
   FUNCTION(kafka)                                                                                  \
   FUNCTION(key_value_store)                                                                        \
   FUNCTION(lua)                                                                                    \
