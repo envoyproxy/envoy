@@ -101,14 +101,6 @@ def load_repository_locations(repository_locations_spec):
         if "version" not in location:
             _fail_missing_attribute("version", key)
 
-        if "use_category" not in location:
-            _fail_missing_attribute("use_category", key)
-        use_category = location["use_category"]
-
-        if "dataplane_ext" in use_category or "observability_ext" in use_category:
-            if "extensions" not in location:
-                _fail_missing_attribute("extensions", key)
-
         if "release_date" not in location:
             _fail_missing_attribute("release_date", key)
         release_date = location["release_date"]
@@ -117,27 +109,8 @@ def load_repository_locations(repository_locations_spec):
         if len(release_date) != 10 or release_date[4] != "-" or release_date[7] != "-":
             fail("release_date must match YYYY-DD-MM: " + release_date)
 
-        if "cpe" in location:
-            cpe = location["cpe"]
-
-            # Starlark doesn't have regexes.
-            cpe_components = len(cpe.split(":"))
-
-            # We allow cpe:2.3:a:foo:*:* and cpe:2.3.:a:foo:bar:* only.
-            cpe_components_valid = (cpe_components == 6)
-            cpe_matches = (cpe == "N/A" or (cpe.startswith("cpe:2.3:a:") and cpe.endswith(":*") and cpe_components_valid))
-            if not cpe_matches:
-                fail("CPE must match cpe:2.3:a:<facet>:<facet>:*: " + cpe)
-        elif not [category for category in USE_CATEGORIES_WITH_CPE_OPTIONAL if category in location["use_category"]]:
-            _fail_missing_attribute("cpe", key)
-
-        for category in location["use_category"]:
-            if category not in USE_CATEGORIES:
-                fail("Unknown use_category value '" + category + "' for dependecy " + key)
-
-        # Remove any extra annotations that we add, so that we don't confuse http_archive etc.
-        for annotation in DEPENDENCY_ANNOTATIONS:
-            if annotation in mutable_location:
-                mutable_location.pop(annotation)
+        # Note: use_category, extensions, cpe, and other metadata fields are now in
+        # separate YAML files (bazel/deps.yaml and api/bazel/deps.yaml) and are
+        # validated in the merged JSON by downstream tools.
 
     return locations

@@ -41,9 +41,16 @@ absl::StatusOr<Http::FilterFactoryCb> DynamicModuleConfigFactory::createFilterFa
       Extensions::DynamicModules::HttpFilters::CustomStatNamespace);
 
   return [config = filter_config.value()](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    const std::string& worker_name = callbacks.dispatcher().name();
+    auto pos = worker_name.find_first_of('_');
+    ENVOY_BUG(pos != std::string::npos, "worker name is not in expected format worker_{index}");
+    uint32_t worker_index;
+    if (!absl::SimpleAtoi(worker_name.substr(pos + 1), &worker_index)) {
+      IS_ENVOY_BUG("failed to parse worker index from name");
+    }
     auto filter =
         std::make_shared<Envoy::Extensions::DynamicModules::HttpFilters::DynamicModuleHttpFilter>(
-            config, config->stats_scope_->symbolTable());
+            config, config->stats_scope_->symbolTable(), worker_index);
     filter->initializeInModuleFilter();
     callbacks.addStreamFilter(filter);
   };

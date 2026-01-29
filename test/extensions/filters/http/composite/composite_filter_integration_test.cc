@@ -10,6 +10,7 @@
 #include "envoy/type/matcher/v3/http_inputs.pb.validate.h"
 
 #include "source/common/http/matching/inputs.h"
+#include "source/common/protobuf/protobuf.h"
 #include "source/extensions/filters/http/match_delegate/config.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
@@ -997,6 +998,253 @@ TEST_P(CompositeFilterChainIntegrationTest, TestNoMatchBypassesFilterChain) {
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_THAT(response->headers(), Http::HttpStatusIs("200"));
+}
+
+// Tests that a named filter chain defined in Composite config can be referenced by
+// filter_chain_name.
+class NamedFilterChainIntegrationTest : public testing::TestWithParam<CompositeFilterTestParams>,
+                                        public HttpIntegrationTest {
+public:
+  NamedFilterChainIntegrationTest()
+      : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam().version),
+        downstream_filter_(GetParam().is_downstream), is_dual_factory_(GetParam().is_dual_factory),
+        proto_type_(is_dual_factory_ ? proto_type_dual_ : proto_type_downstream_) {}
+
+  void addNamedFilterChainAndCompositeFilter(const std::string& chain_name,
+                                             const std::string& composite_name = "composite") {
+    // Use YAML format with named_filter_chains in the Composite typed_config.
+    std::string filter_config =
+        absl::StrFormat(R"EOF(
+      name: %s
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.common.matching.v3.ExtensionWithMatcher
+        extension_config:
+          name: composite
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.Composite
+            named_filter_chains:
+              %s:
+                typed_config:
+                  - name: add-header-filter
+                    typed_config:
+                      "@type": type.googleapis.com/google.protobuf.Struct
+                  - name: set-response-code
+                    typed_config:
+                      "@type": type.googleapis.com/test.integration.filters.%s
+                      code: 418
+                      prefix: "/respond-directly"
+        xds_matcher:
+          matcher_tree:
+            input:
+              name: request-headers
+              typed_config:
+                "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+                header_name: match-header
+            exact_match_map:
+              map:
+                match:
+                  action:
+                    name: composite-action
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.ExecuteFilterAction
+                      filter_chain_name: "%s"
+    )EOF",
+                        composite_name, chain_name, proto_type_, chain_name);
+    config_helper_.prependFilter(filter_config, downstream_filter_);
+  }
+
+  void addMultipleNamedFilterChains(const std::string& composite_name = "composite") {
+    // Named filter chains are now defined in the Composite filter config itself.
+    std::string filter_config = absl::StrFormat(R"EOF(
+      name: %s
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.common.matching.v3.ExtensionWithMatcher
+        extension_config:
+          name: composite
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.Composite
+            named_filter_chains:
+              chain-418:
+                typed_config:
+                  - name: add-header-filter
+                    typed_config:
+                      "@type": type.googleapis.com/google.protobuf.Struct
+                  - name: set-response-code
+                    typed_config:
+                      "@type": type.googleapis.com/test.integration.filters.%s
+                      code: 418
+                      prefix: "/respond-directly"
+              chain-503:
+                typed_config:
+                  - name: set-response-code
+                    typed_config:
+                      "@type": type.googleapis.com/test.integration.filters.%s
+                      code: 503
+        xds_matcher:
+          matcher_tree:
+            input:
+              name: request-headers
+              typed_config:
+                "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+                header_name: match-header
+            exact_match_map:
+              map:
+                use-418:
+                  action:
+                    name: composite-action-418
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.ExecuteFilterAction
+                      filter_chain_name: "chain-418"
+                use-503:
+                  action:
+                    name: composite-action-503
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.ExecuteFilterAction
+                      filter_chain_name: "chain-503"
+    )EOF",
+                                                composite_name, proto_type_, proto_type_);
+    config_helper_.prependFilter(filter_config, downstream_filter_);
+  }
+
+  const Http::TestRequestHeaderMapImpl match_request_headers_ = {{":method", "GET"},
+                                                                 {":path", "/somepath"},
+                                                                 {":scheme", "http"},
+                                                                 {"match-header", "match"},
+                                                                 {":authority", "blah"}};
+
+  const Http::TestRequestHeaderMapImpl match_request_headers_418_ = {{":method", "GET"},
+                                                                     {":path", "/somepath"},
+                                                                     {":scheme", "http"},
+                                                                     {"match-header", "use-418"},
+                                                                     {":authority", "blah"}};
+
+  const Http::TestRequestHeaderMapImpl match_request_headers_503_ = {{":method", "GET"},
+                                                                     {":path", "/somepath"},
+                                                                     {":scheme", "http"},
+                                                                     {"match-header", "use-503"},
+                                                                     {":authority", "blah"}};
+
+  const Http::TestRequestHeaderMapImpl match_request_headers_respond_directly_ = {
+      {":method", "GET"},
+      {":path", "/respond-directly"},
+      {":scheme", "http"},
+      {"match-header", "match"},
+      {":authority", "blah"}};
+
+  void initialize() override {
+    if (!downstream_filter_) {
+      setUpstreamProtocol(Http::CodecType::HTTP2);
+    }
+    HttpIntegrationTest::initialize();
+  }
+
+  static std::vector<CompositeFilterTestParams> getValuesForNamedFilterChainTest() {
+    std::vector<CompositeFilterTestParams> ret;
+    for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
+      for (bool is_dual_factory : {true, false}) {
+        CompositeFilterTestParams params;
+        params.version = ip_version;
+        params.is_downstream = true; // Named filter chains only supported for downstream.
+        params.is_dual_factory = is_dual_factory;
+        ret.push_back(params);
+      }
+    }
+    return ret;
+  }
+
+  static std::string NamedFilterChainTestParamsToString(
+      const ::testing::TestParamInfo<CompositeFilterTestParams>& params) {
+    return absl::StrCat(
+        (params.param.version == Network::Address::IpVersion::v4 ? "IPv4_" : "IPv6_"),
+        (params.param.is_dual_factory ? "DualFactory" : "DownstreamFactory"));
+  }
+
+  const std::string proto_type_dual_ = "SetResponseCodeFilterConfigDual";
+  const std::string proto_type_downstream_ = "SetResponseCodeFilterConfig";
+  bool downstream_filter_{true};
+  bool is_dual_factory_{false};
+  std::string proto_type_;
+};
+
+INSTANTIATE_TEST_SUITE_P(
+    IpVersions, NamedFilterChainIntegrationTest,
+    testing::ValuesIn(NamedFilterChainIntegrationTest::getValuesForNamedFilterChainTest()),
+    NamedFilterChainIntegrationTest::NamedFilterChainTestParamsToString);
+
+// Verifies that a named filter chain is executed correctly when referenced via filter_chain_name.
+TEST_P(NamedFilterChainIntegrationTest, TestNamedFilterChainRef) {
+  addNamedFilterChainAndCompositeFilter("test-chain");
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  {
+    // Request that matches but doesn't trigger the second filter's prefix.
+    // Should reach upstream. First filter should add x-header-to-add header.
+    auto response = codec_client_->makeRequestWithBody(match_request_headers_, 1024);
+    waitForNextUpstreamRequest();
+    // Verify the first filter (add-header-filter) ran by checking for the header it adds.
+    EXPECT_FALSE(
+        upstream_request_->headers().get(Http::LowerCaseString("x-header-to-add")).empty());
+    EXPECT_EQ("value", upstream_request_->headers()
+                           .get(Http::LowerCaseString("x-header-to-add"))[0]
+                           ->value()
+                           .getStringView());
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_THAT(response->headers(), Http::HttpStatusIs("200"));
+  }
+
+  {
+    // Request that triggers the second filter to respond with 418.
+    auto response =
+        codec_client_->makeRequestWithBody(match_request_headers_respond_directly_, 1024);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_THAT(response->headers(), Http::HttpStatusIs("418"));
+  }
+}
+
+// Verifies that a request without the match header doesn't trigger the named filter chain.
+TEST_P(NamedFilterChainIntegrationTest, TestNoMatchBypassesNamedFilterChain) {
+  addNamedFilterChainAndCompositeFilter("test-chain");
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Request without match header should reach upstream even with matching path.
+  // The filter chain should not be triggered, so x-header-to-add won't be present.
+  auto response = codec_client_->makeRequestWithBody(default_request_headers_, 1024);
+  waitForNextUpstreamRequest();
+
+  // Verify the filter chain was not triggered by checking that the header is absent.
+  EXPECT_TRUE(upstream_request_->headers().get(Http::LowerCaseString("x-header-to-add")).empty());
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_THAT(response->headers(), Http::HttpStatusIs("200"));
+}
+
+// Verifies that multiple named filter chains can be defined and different ones
+// can be used based on matching criteria.
+TEST_P(NamedFilterChainIntegrationTest, TestMultipleNamedFilterChains) {
+  addMultipleNamedFilterChains();
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  {
+    // Request matching chain-418 should add header and reach upstream.
+    auto response = codec_client_->makeRequestWithBody(match_request_headers_418_, 1024);
+    waitForNextUpstreamRequest();
+    EXPECT_FALSE(
+        upstream_request_->headers().get(Http::LowerCaseString("x-header-to-add")).empty());
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_THAT(response->headers(), Http::HttpStatusIs("200"));
+  }
+
+  {
+    // Request matching chain-503 should get 503 from the set-response-code filter.
+    auto response = codec_client_->makeRequestWithBody(match_request_headers_503_, 1024);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_THAT(response->headers(), Http::HttpStatusIs("503"));
+  }
 }
 
 } // namespace

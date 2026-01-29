@@ -44,10 +44,6 @@ std::ostream& operator<<(std::ostream& os, Connection::State connection_state) {
   return os;
 }
 
-absl::string_view ipVersionAsString(Network::Address::IpVersion ip_version) {
-  return ip_version == Network::Address::IpVersion::v4 ? "v4" : "v6";
-}
-
 } // namespace
 
 void ConnectionImplUtility::updateBufferStats(uint64_t delta, uint64_t new_total,
@@ -158,7 +154,7 @@ void ConnectionImpl::close(ConnectionCloseType type) {
     ENVOY_CONN_LOG(
         trace, "connection closing type=AbortReset, setting LocalReset to the detected close type.",
         *this);
-    setDetectedCloseType(DetectedCloseType::LocalReset);
+    setDetectedCloseType(StreamInfo::DetectedCloseType::LocalReset);
     closeSocket(ConnectionEvent::LocalClose);
     return;
   }
@@ -283,7 +279,7 @@ bool ConnectionImpl::filterChainWantsData() {
          (read_disable_count_ == 1 && read_buffer_->highWatermarkTriggered());
 }
 
-void ConnectionImpl::setDetectedCloseType(DetectedCloseType close_type) {
+void ConnectionImpl::setDetectedCloseType(StreamInfo::DetectedCloseType close_type) {
   detected_close_type_ = close_type;
 }
 
@@ -329,8 +325,8 @@ void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
 
   connection_stats_.reset();
 
-  if (detected_close_type_ == DetectedCloseType::RemoteReset ||
-      detected_close_type_ == DetectedCloseType::LocalReset) {
+  if (detected_close_type_ == StreamInfo::DetectedCloseType::RemoteReset ||
+      detected_close_type_ == StreamInfo::DetectedCloseType::LocalReset) {
 #if ENVOY_PLATFORM_ENABLE_SEND_RST
     const bool ok = Network::Socket::applyOptions(
         Network::SocketOptionFactory::buildZeroSoLingerOptions(), *socket_,
@@ -750,7 +746,7 @@ void ConnectionImpl::onReadReady() {
   if (result.err_code_.has_value() &&
       result.err_code_ == Api::IoError::IoErrorCode::ConnectionReset) {
     ENVOY_CONN_LOG(trace, "read: rst close from peer", *this);
-    setDetectedCloseType(DetectedCloseType::RemoteReset);
+    setDetectedCloseType(StreamInfo::DetectedCloseType::RemoteReset);
     if (result.bytes_processed_ != 0) {
       onRead(new_buffer_size);
       // In some cases, the transport socket could read data along with an RST (Reset) flag.
@@ -845,7 +841,7 @@ void ConnectionImpl::onWriteReady() {
       result.err_code_ == Api::IoError::IoErrorCode::ConnectionReset) {
     // Discard anything in the buffer.
     ENVOY_CONN_LOG(debug, "write: rst close from peer.", *this);
-    setDetectedCloseType(DetectedCloseType::RemoteReset);
+    setDetectedCloseType(StreamInfo::DetectedCloseType::RemoteReset);
     closeSocket(ConnectionEvent::RemoteClose);
     return;
   }
@@ -1138,27 +1134,9 @@ void ClientConnectionImpl::connect() {
   } else {
     immediate_error_event_ = ConnectionEvent::RemoteClose;
     connecting_ = false;
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.log_ip_families_on_network_error")) {
-      absl::string_view remote_address_family =
-          socket_->connectionInfoProvider().remoteAddress()->type() == Address::Type::Ip
-              ? ipVersionAsString(
-                    socket_->connectionInfoProvider().remoteAddress()->ip()->version())
-              : "";
-      absl::string_view local_address_family =
-          socket_->connectionInfoProvider().remoteAddress()->type() == Address::Type::Ip
-              ? ipVersionAsString(socket_->connectionInfoProvider().localAddress()->ip()->version())
-              : "";
-      setFailureReason(absl::StrCat(
-          "immediate connect error: ", errorDetails(result.errno_),
-          "|remote address:", socket_->connectionInfoProvider().remoteAddress()->asString(),
-          "|remote address family:", remote_address_family,
-          "|local address family:", local_address_family));
-    } else {
-      setFailureReason(absl::StrCat(
-          "immediate connect error: ", errorDetails(result.errno_),
-          "|remote address:", socket_->connectionInfoProvider().remoteAddress()->asString()));
-    }
+    setFailureReason(absl::StrCat(
+        "immediate connect error: ", errorDetails(result.errno_),
+        "|remote address:", socket_->connectionInfoProvider().remoteAddress()->asString()));
     ENVOY_CONN_LOG_EVENT(debug, "connection_immediate_error", "{}", *this, failureReason());
 
     // Trigger a write event. This is needed on macOS and seems harmless on Linux.

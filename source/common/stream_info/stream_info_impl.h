@@ -392,9 +392,11 @@ struct StreamInfoImpl : public StreamInfo {
     start_time_ = info.startTime();
     start_time_monotonic_ = info.startTimeMonotonic();
     downstream_transport_failure_reason_ = std::string(info.downstreamTransportFailureReason());
+    downstream_local_close_reason_ = std::string(info.downstreamLocalCloseReason());
     bytes_retransmitted_ = info.bytesRetransmitted();
     packets_retransmitted_ = info.packetsRetransmitted();
     should_drain_connection_ = info.shouldDrainConnectionUponCompletion();
+    codec_stream_id_ = info.codecStreamId();
   }
 
   // This function is used to copy over every field exposed in the StreamInfo interface, with a
@@ -435,6 +437,7 @@ struct StreamInfoImpl : public StreamInfo {
     upstream_bytes_meter_ = info.getUpstreamBytesMeter();
     bytes_sent_ = info.bytesSent();
     is_shadow_ = info.isShadow();
+    codec_stream_id_ = info.codecStreamId();
     parent_stream_info_ = info.parentStreamInfo();
   }
 
@@ -447,6 +450,22 @@ struct StreamInfoImpl : public StreamInfo {
 
   absl::string_view downstreamTransportFailureReason() const override {
     return downstream_transport_failure_reason_;
+  }
+
+  void setDownstreamLocalCloseReason(absl::string_view failure_reason) override {
+    downstream_local_close_reason_ = std::string(failure_reason);
+  }
+
+  absl::string_view downstreamLocalCloseReason() const override {
+    return downstream_local_close_reason_;
+  }
+
+  void setDownstreamDetectedCloseType(DetectedCloseType close_type) override {
+    downstream_detected_close_type_ = close_type;
+  }
+
+  DetectedCloseType downstreamDetectedCloseType() const override {
+    return downstream_detected_close_type_;
   }
 
   bool shouldSchemeMatchUpstream() const override { return should_scheme_match_upstream_; }
@@ -468,6 +487,10 @@ struct StreamInfoImpl : public StreamInfo {
   OptRef<const StreamInfo> parentStreamInfo() const override { return parent_stream_info_; }
 
   void clearParentStreamInfo() override { parent_stream_info_.reset(); }
+
+  absl::optional<uint32_t> codecStreamId() const override { return codec_stream_id_; }
+
+  void setCodecStreamId(absl::optional<uint32_t> id) override { codec_stream_id_ = id; }
 
   TimeSource& time_source_;
   SystemTime start_time_;
@@ -510,6 +533,8 @@ private:
   BytesMeterSharedPtr upstream_bytes_meter_{std::make_shared<BytesMeter>()};
   BytesMeterSharedPtr downstream_bytes_meter_;
   std::string downstream_transport_failure_reason_;
+  std::string downstream_local_close_reason_;
+  DetectedCloseType downstream_detected_close_type_{DetectedCloseType::Normal};
   OptRef<const StreamInfo> parent_stream_info_;
   uint64_t bytes_received_{};
   uint64_t bytes_retransmitted_{};
@@ -520,6 +545,7 @@ private:
   bool should_scheme_match_upstream_{false};
   bool should_drain_connection_{false};
   bool is_shadow_{false};
+  absl::optional<uint32_t> codec_stream_id_{};
 };
 
 } // namespace StreamInfo

@@ -92,6 +92,19 @@ TEST_F(McpJsonParserTest, ToolsCallExtraction) {
   EXPECT_EQ(value->string_value(), "calculator");
 }
 
+TEST_F(McpJsonParserTest, ResourcesListExtraction) {
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "resources/list",
+    "id": 100
+  })";
+
+  EXPECT_OK(parser_->parse(json));
+
+  EXPECT_TRUE(parser_->isValidMcpRequest());
+  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::RESOURCES_LIST);
+}
+
 TEST_F(McpJsonParserTest, ResourcesReadExtraction) {
   std::string json = R"({
     "jsonrpc": "2.0",
@@ -110,6 +123,59 @@ TEST_F(McpJsonParserTest, ResourcesReadExtraction) {
   const auto* value = parser_->getNestedValue("params.uri");
   ASSERT_NE(value, nullptr);
   EXPECT_EQ(value->string_value(), "file:///path/to/resource.txt");
+}
+
+TEST_F(McpJsonParserTest, ResourcesSubscribeExtraction) {
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "resources/subscribe",
+    "params": {
+      "uri": "file:///config/settings.json"
+    },
+    "id": 102
+  })";
+
+  EXPECT_OK(parser_->parse(json));
+
+  EXPECT_TRUE(parser_->isValidMcpRequest());
+  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::RESOURCES_SUBSCRIBE);
+
+  const auto* value = parser_->getNestedValue("params.uri");
+  ASSERT_NE(value, nullptr);
+  EXPECT_EQ(value->string_value(), "file:///config/settings.json");
+}
+
+TEST_F(McpJsonParserTest, ResourcesUnsubscribeExtraction) {
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "resources/unsubscribe",
+    "params": {
+      "uri": "file:///config/settings.json"
+    },
+    "id": 103
+  })";
+
+  EXPECT_OK(parser_->parse(json));
+
+  EXPECT_TRUE(parser_->isValidMcpRequest());
+  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::RESOURCES_UNSUBSCRIBE);
+
+  const auto* value = parser_->getNestedValue("params.uri");
+  ASSERT_NE(value, nullptr);
+  EXPECT_EQ(value->string_value(), "file:///config/settings.json");
+}
+
+TEST_F(McpJsonParserTest, PromptsListExtraction) {
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "prompts/list",
+    "id": 200
+  })";
+
+  EXPECT_OK(parser_->parse(json));
+
+  EXPECT_TRUE(parser_->isValidMcpRequest());
+  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::PROMPTS_LIST);
 }
 
 TEST_F(McpJsonParserTest, PromptsGetExtraction) {
@@ -1193,6 +1259,86 @@ TEST_F(McpJsonParserTest, CheckIdForRegularRequest) {
   const auto* id = parser_->getNestedValue("id");
   ASSERT_NE(id, nullptr);
   EXPECT_EQ(id->number_value(), 2);
+}
+
+// Method Group Tests
+TEST(McpParserConfigTest, BuiltInMethodGroups) {
+  McpParserConfig config = McpParserConfig::createDefault();
+
+  // Lifecycle
+  EXPECT_EQ(config.getMethodGroup("initialize"), "lifecycle");
+  EXPECT_EQ(config.getMethodGroup("notifications/initialized"), "lifecycle");
+  EXPECT_EQ(config.getMethodGroup("ping"), "lifecycle");
+
+  // Tool
+  EXPECT_EQ(config.getMethodGroup("tools/call"), "tool");
+  EXPECT_EQ(config.getMethodGroup("tools/list"), "tool");
+
+  // Resource
+  EXPECT_EQ(config.getMethodGroup("resources/read"), "resource");
+  EXPECT_EQ(config.getMethodGroup("resources/list"), "resource");
+  EXPECT_EQ(config.getMethodGroup("resources/subscribe"), "resource");
+  EXPECT_EQ(config.getMethodGroup("resources/unsubscribe"), "resource");
+  EXPECT_EQ(config.getMethodGroup("resources/templates/list"), "resource");
+
+  // Prompt
+  EXPECT_EQ(config.getMethodGroup("prompts/get"), "prompt");
+  EXPECT_EQ(config.getMethodGroup("prompts/list"), "prompt");
+
+  // Other built-ins
+  EXPECT_EQ(config.getMethodGroup("logging/setLevel"), "logging");
+  EXPECT_EQ(config.getMethodGroup("sampling/createMessage"), "sampling");
+  EXPECT_EQ(config.getMethodGroup("completion/complete"), "completion");
+
+  // Notifications (prefix match)
+  EXPECT_EQ(config.getMethodGroup("notifications/progress"), "notification");
+  EXPECT_EQ(config.getMethodGroup("notifications/cancelled"), "notification");
+  EXPECT_EQ(config.getMethodGroup("notifications/custom"), "notification");
+
+  // Unknown
+  EXPECT_EQ(config.getMethodGroup("unknown/method"), "unknown");
+  EXPECT_EQ(config.getMethodGroup("custom/extension"), "unknown");
+}
+
+TEST(McpParserConfigTest, MethodGroupFromProtoWithOverrides) {
+  envoy::extensions::filters::http::mcp::v3::ParserConfig proto_config;
+  proto_config.set_group_metadata_key("method_group");
+
+  // Override initialize to be in "admin" group
+  auto* method1 = proto_config.add_methods();
+  method1->set_method("initialize");
+  method1->set_group("admin");
+
+  // Override tools/call to be in "operations" group
+  auto* method2 = proto_config.add_methods();
+  method2->set_method("tools/call");
+  method2->set_group("operations");
+
+  McpParserConfig config = McpParserConfig::fromProto(proto_config);
+
+  EXPECT_EQ(config.groupMetadataKey(), "method_group");
+  EXPECT_EQ(config.getMethodGroup("initialize"), "admin");
+  EXPECT_EQ(config.getMethodGroup("tools/call"), "operations");
+
+  // Non-overridden methods use built-in
+  EXPECT_EQ(config.getMethodGroup("tools/list"), "tool");
+  EXPECT_EQ(config.getMethodGroup("resources/read"), "resource");
+  EXPECT_EQ(config.getMethodGroup("ping"), "lifecycle");
+}
+
+TEST(McpParserConfigTest, MethodGroupEmptyGroupFallsBackToBuiltIn) {
+  envoy::extensions::filters::http::mcp::v3::ParserConfig proto_config;
+  proto_config.set_group_metadata_key("group");
+
+  // Empty group means use built-in
+  auto* method = proto_config.add_methods();
+  method->set_method("tools/call");
+  method->set_group(""); // Empty group
+
+  McpParserConfig config = McpParserConfig::fromProto(proto_config);
+
+  // Should fall back to built-in group
+  EXPECT_EQ(config.getMethodGroup("tools/call"), "tool");
 }
 
 } // namespace

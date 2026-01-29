@@ -169,6 +169,10 @@ public:
   MOCK_METHOD(bool, isShadow, (), (const, override));
   MOCK_METHOD(void, setDownstreamTransportFailureReason, (absl::string_view failure_reason));
   MOCK_METHOD(absl::string_view, downstreamTransportFailureReason, (), (const));
+  MOCK_METHOD(void, setDownstreamLocalCloseReason, (absl::string_view failure_reason));
+  MOCK_METHOD(absl::string_view, downstreamLocalCloseReason, (), (const));
+  MOCK_METHOD(void, setDownstreamDetectedCloseType, (DetectedCloseType close_type));
+  MOCK_METHOD(DetectedCloseType, downstreamDetectedCloseType, (), (const));
   MOCK_METHOD(bool, shouldSchemeMatchUpstream, (), (const));
   MOCK_METHOD(void, setShouldSchemeMatchUpstream, (bool));
   MOCK_METHOD(bool, shouldDrainConnectionUponCompletion, (), (const));
@@ -178,6 +182,8 @@ public:
   MOCK_METHOD(OptRef<const StreamInfo>, parentStreamInfo, (), (const));
   MOCK_METHOD(void, addCustomFlag, (absl::string_view));
   MOCK_METHOD(absl::string_view, customFlags, (), (const));
+  MOCK_METHOD(absl::optional<uint32_t>, codecStreamId, (), (const, override));
+  MOCK_METHOD(void, setCodecStreamId, (absl::optional<uint32_t> id), (override));
 
   Envoy::Event::SimulatedTimeSystem ts_;
   SystemTime start_time_;
@@ -203,6 +209,8 @@ public:
   absl::optional<std::string> virtual_cluster_name_;
   DownstreamTiming downstream_timing_;
   std::string downstream_transport_failure_reason_;
+  std::string downstream_local_close_reason_;
+  DetectedCloseType downstream_detected_close_type_{DetectedCloseType::Normal};
   std::string stream_flags_;
   Router::VirtualHostConstSharedPtr virtual_host_;
 };

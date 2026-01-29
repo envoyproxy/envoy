@@ -1546,6 +1546,16 @@ CAPIStatus Filter::getSecret(const absl::string_view name, uint64_t* value_data,
   }
 }
 
+CAPIStatus Filter::setDrainConnectionUponCompletion() {
+  Thread::LockGuard lock(mutex_);
+  if (has_destroyed_) {
+    ENVOY_LOG(debug, "golang filter has been destroyed");
+    return CAPIStatus::CAPIFilterIsDestroy;
+  }
+  streamInfo().setShouldDrainConnectionUponCompletion(true);
+  return CAPIStatus::CAPIOK;
+}
+
 /* ConfigId */
 
 uint64_t Filter::getMergedConfigId() {

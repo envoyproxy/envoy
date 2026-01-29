@@ -639,6 +639,624 @@ TEST_P(McpRouterIntegrationTest, ToolCallWithUnknownBackendReturns400) {
   EXPECT_EQ("400", response->headers().getStatusValue());
 }
 
+// Test resources/list request fans out to both backends and aggregates resources.
+TEST_P(McpRouterIntegrationTest, ResourcesListFanoutAggregation) {
+  initializeFilter();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  const std::string request_body = R"({
+    "jsonrpc": "2.0",
+    "method": "resources/list",
+    "id": 20
+  })";
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/mcp"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"accept", "application/json"},
+                                     {"accept", "text/event-stream"},
+                                     {"content-type", "application/json"}},
+      request_body);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, time_backend_connection_));
+  ASSERT_TRUE(time_backend_connection_->waitForNewStream(*dispatcher_, time_backend_request_));
+  ASSERT_TRUE(time_backend_request_->waitForEndStream(*dispatcher_));
+
+  ASSERT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, tools_backend_connection_));
+  ASSERT_TRUE(tools_backend_connection_->waitForNewStream(*dispatcher_, tools_backend_request_));
+  ASSERT_TRUE(tools_backend_request_->waitForEndStream(*dispatcher_));
+
+  // Time backend returns a resource.
+  const std::string time_response = R"({
+    "jsonrpc": "2.0",
+    "id": 20,
+    "result": {
+      "resources": [
+        {"uri": "file://current_time", "name": "Current Time", "mimeType": "text/plain"}
+      ]
+    }
+  })";
+  time_backend_request_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
+      false);
+  Buffer::OwnedImpl time_body(time_response);
+  time_backend_request_->encodeData(time_body, true);
+
+  // Tools backend returns resources.
+  const std::string tools_response = R"({
+    "jsonrpc": "2.0",
+    "id": 20,
+    "result": {
+      "resources": [
+        {"uri": "file://config", "name": "Config File", "description": "Configuration settings"},
+        {"uri": "file://data", "name": "Data File"}
+      ]
+    }
+  })";
+  tools_backend_request_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
+      false);
+  Buffer::OwnedImpl tools_body(tools_response);
+  tools_backend_request_->encodeData(tools_body, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  // Verify the aggregated response contains resources from both backends with backend+scheme
+  // prefixes.
+  EXPECT_THAT(response->body(), testing::HasSubstr("time+file://current_time"));
+  EXPECT_THAT(response->body(), testing::HasSubstr("tools+file://config"));
+  EXPECT_THAT(response->body(), testing::HasSubstr("tools+file://data"));
+}
+
+// Test resources/read routes to correct backend based on URI scheme.
+TEST_P(McpRouterIntegrationTest, ResourcesReadRoutesToCorrectBackend) {
+  initializeFilter();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  const std::string request_body = R"({
+    "jsonrpc": "2.0",
+    "method": "resources/read",
+    "id": 21,
+    "params": {
+      "uri": "time+file://current_time"
+    }
+  })";
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/mcp"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"accept", "application/json"},
+                                     {"accept", "text/event-stream"},
+                                     {"content-type", "application/json"}},
+      request_body);
+
+  // Request should be routed to time backend based on "time+" prefix in URI.
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, time_backend_connection_));
+  ASSERT_TRUE(time_backend_connection_->waitForNewStream(*dispatcher_, time_backend_request_));
+  ASSERT_TRUE(time_backend_request_->waitForEndStream(*dispatcher_));
+
+  // Verify upstream request body has URI rewritten (backend prefix stripped).
+  EXPECT_THAT(time_backend_request_->body().toString(), testing::HasSubstr("file://current_time"));
+  EXPECT_THAT(time_backend_request_->body().toString(), testing::Not(testing::HasSubstr("time+")));
+
+  const std::string backend_response = R"({
+    "jsonrpc": "2.0",
+    "id": 21,
+    "result": {
+      "contents": [{"uri": "file://current_time", "mimeType": "text/plain", "text": "2024-01-15T10:30:00Z"}]
+    }
+  })";
+  time_backend_request_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
+      false);
+  Buffer::OwnedImpl response_body(backend_response);
+  time_backend_request_->encodeData(response_body, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_THAT(response->body(), testing::HasSubstr("2024-01-15T10:30:00Z"));
+}
+
+// Test resources/subscribe routes to correct backend.
+TEST_P(McpRouterIntegrationTest, ResourcesSubscribeRoutesToBackend) {
+  initializeFilter();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  const std::string request_body = R"({
+    "jsonrpc": "2.0",
+    "method": "resources/subscribe",
+    "id": 22,
+    "params": {
+      "uri": "tools+file://config"
+    }
+  })";
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/mcp"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"accept", "application/json"},
+                                     {"accept", "text/event-stream"},
+                                     {"content-type", "application/json"}},
+      request_body);
+
+  // Request should be routed to tools backend based on "tools+" prefix in URI.
+  ASSERT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, tools_backend_connection_));
+  ASSERT_TRUE(tools_backend_connection_->waitForNewStream(*dispatcher_, tools_backend_request_));
+  ASSERT_TRUE(tools_backend_request_->waitForEndStream(*dispatcher_));
+
+  // Verify upstream request body has URI rewritten (backend prefix stripped).
+  EXPECT_THAT(tools_backend_request_->body().toString(), testing::HasSubstr("file://config"));
+
+  // Subscribe returns empty result per MCP spec.
+  const std::string backend_response = R"({
+    "jsonrpc": "2.0",
+    "id": 22,
+    "result": {}
+  })";
+  tools_backend_request_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
+      false);
+  Buffer::OwnedImpl response_body(backend_response);
+  tools_backend_request_->encodeData(response_body, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_THAT(response->body(), testing::HasSubstr("\"result\""));
+  EXPECT_THAT(response->body(), testing::HasSubstr("\"id\": 22"));
+}
+
+// Test resources/unsubscribe routes to correct backend.
+TEST_P(McpRouterIntegrationTest, ResourcesUnsubscribeRoutesToBackend) {
+  initializeFilter();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  const std::string request_body = R"({
+    "jsonrpc": "2.0",
+    "method": "resources/unsubscribe",
+    "id": 23,
+    "params": {
+      "uri": "time+file://current_time"
+    }
+  })";
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/mcp"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"accept", "application/json"},
+                                     {"accept", "text/event-stream"},
+                                     {"content-type", "application/json"}},
+      request_body);
+
+  // Request should be routed to time backend based on "time+" prefix in URI.
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, time_backend_connection_));
+  ASSERT_TRUE(time_backend_connection_->waitForNewStream(*dispatcher_, time_backend_request_));
+  ASSERT_TRUE(time_backend_request_->waitForEndStream(*dispatcher_));
+
+  // Verify upstream request body has URI rewritten.
+  EXPECT_THAT(time_backend_request_->body().toString(), testing::HasSubstr("file://current_time"));
+
+  // Unsubscribe returns empty result per MCP spec.
+  const std::string backend_response = R"({
+    "jsonrpc": "2.0",
+    "id": 23,
+    "result": {}
+  })";
+  time_backend_request_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
+      false);
+  Buffer::OwnedImpl response_body(backend_response);
+  time_backend_request_->encodeData(response_body, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_THAT(response->body(), testing::HasSubstr("\"result\""));
+  EXPECT_THAT(response->body(), testing::HasSubstr("\"id\": 23"));
+}
+
+// Test resources/read with unknown backend URI returns 400.
+TEST_P(McpRouterIntegrationTest, ResourcesReadWithUnknownBackendReturns400) {
+  initializeFilter();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  const std::string request_body = R"({
+    "jsonrpc": "2.0",
+    "method": "resources/read",
+    "id": 24,
+    "params": {
+      "uri": "unknown+file://some_resource"
+    }
+  })";
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/mcp"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"accept", "application/json"},
+                                     {"accept", "text/event-stream"},
+                                     {"content-type", "application/json"}},
+      request_body);
+
+  // Unknown backend prefix should return 400 Bad Request.
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("400", response->headers().getStatusValue());
+}
+
+// Test prompts/list request fans out to both backends and aggregates prompts.
+TEST_P(McpRouterIntegrationTest, PromptsListFanoutAggregation) {
+  initializeFilter();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  const std::string request_body = R"({
+    "jsonrpc": "2.0",
+    "method": "prompts/list",
+    "id": 30
+  })";
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/mcp"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"accept", "application/json"},
+                                     {"accept", "text/event-stream"},
+                                     {"content-type", "application/json"}},
+      request_body);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, time_backend_connection_));
+  ASSERT_TRUE(time_backend_connection_->waitForNewStream(*dispatcher_, time_backend_request_));
+  ASSERT_TRUE(time_backend_request_->waitForEndStream(*dispatcher_));
+
+  ASSERT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, tools_backend_connection_));
+  ASSERT_TRUE(tools_backend_connection_->waitForNewStream(*dispatcher_, tools_backend_request_));
+  ASSERT_TRUE(tools_backend_request_->waitForEndStream(*dispatcher_));
+
+  // Time backend returns a prompt.
+  const std::string time_response = R"({
+    "jsonrpc": "2.0",
+    "id": 30,
+    "result": {
+      "prompts": [
+        {"name": "greeting", "description": "A friendly greeting prompt"}
+      ]
+    }
+  })";
+  time_backend_request_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
+      false);
+  Buffer::OwnedImpl time_body(time_response);
+  time_backend_request_->encodeData(time_body, true);
+
+  // Tools backend returns prompts.
+  const std::string tools_response = R"({
+    "jsonrpc": "2.0",
+    "id": 30,
+    "result": {
+      "prompts": [
+        {"name": "code_review", "description": "Review code for issues"},
+        {"name": "summarize", "description": "Summarize text", "arguments": [{"name": "text", "required": true}]}
+      ]
+    }
+  })";
+  tools_backend_request_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
+      false);
+  Buffer::OwnedImpl tools_body(tools_response);
+  tools_backend_request_->encodeData(tools_body, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  // Verify the aggregated response contains prompts from both backends with name prefixes.
+  EXPECT_THAT(response->body(), testing::HasSubstr("time__greeting"));
+  EXPECT_THAT(response->body(), testing::HasSubstr("tools__code_review"));
+  EXPECT_THAT(response->body(), testing::HasSubstr("tools__summarize"));
+}
+
+// Test prompts/get routes to correct backend based on name prefix.
+TEST_P(McpRouterIntegrationTest, PromptsGetRoutesToCorrectBackend) {
+  initializeFilter();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  const std::string request_body = R"({
+    "jsonrpc": "2.0",
+    "method": "prompts/get",
+    "id": 31,
+    "params": {
+      "name": "time__greeting"
+    }
+  })";
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/mcp"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"accept", "application/json"},
+                                     {"accept", "text/event-stream"},
+                                     {"content-type", "application/json"}},
+      request_body);
+
+  // Request should be routed to time backend based on "time__" prefix.
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, time_backend_connection_));
+  ASSERT_TRUE(time_backend_connection_->waitForNewStream(*dispatcher_, time_backend_request_));
+  ASSERT_TRUE(time_backend_request_->waitForEndStream(*dispatcher_));
+
+  // Verify upstream request body has prompt name rewritten (prefix stripped).
+  EXPECT_THAT(time_backend_request_->body().toString(), testing::HasSubstr("\"greeting\""));
+  EXPECT_THAT(time_backend_request_->body().toString(), testing::Not(testing::HasSubstr("time__")));
+
+  const std::string backend_response = R"({
+    "jsonrpc": "2.0",
+    "id": 31,
+    "result": {
+      "description": "A friendly greeting prompt",
+      "messages": [{"role": "user", "content": {"type": "text", "text": "Hello!"}}]
+    }
+  })";
+  time_backend_request_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
+      false);
+  Buffer::OwnedImpl response_body(backend_response);
+  time_backend_request_->encodeData(response_body, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_THAT(response->body(), testing::HasSubstr("A friendly greeting prompt"));
+}
+
+// Test prompts/get with unknown backend prefix returns 400.
+TEST_P(McpRouterIntegrationTest, PromptsGetWithUnknownBackendReturns400) {
+  initializeFilter();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  const std::string request_body = R"({
+    "jsonrpc": "2.0",
+    "method": "prompts/get",
+    "id": 32,
+    "params": {
+      "name": "unknown__some_prompt"
+    }
+  })";
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/mcp"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"accept", "application/json"},
+                                     {"accept", "text/event-stream"},
+                                     {"content-type", "application/json"}},
+      request_body);
+
+  // Unknown backend prefix should return 400 Bad Request.
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("400", response->headers().getStatusValue());
+}
+
+// Test notifications/cancelled is forwarded to all backends.
+TEST_P(McpRouterIntegrationTest, NotificationCancelledFanout) {
+  initializeFilter();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Notifications don't have an 'id' field per JSON-RPC spec.
+  const std::string request_body = R"({
+    "jsonrpc": "2.0",
+    "method": "notifications/cancelled",
+    "params": {
+      "requestId": "req-123",
+      "reason": "User cancelled"
+    }
+  })";
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/mcp"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"accept", "application/json"},
+                                     {"accept", "text/event-stream"},
+                                     {"content-type", "application/json"}},
+      request_body);
+
+  // Both backends should receive the notification.
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, time_backend_connection_));
+  ASSERT_TRUE(time_backend_connection_->waitForNewStream(*dispatcher_, time_backend_request_));
+  ASSERT_TRUE(time_backend_request_->waitForEndStream(*dispatcher_));
+
+  ASSERT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, tools_backend_connection_));
+  ASSERT_TRUE(tools_backend_connection_->waitForNewStream(*dispatcher_, tools_backend_request_));
+  ASSERT_TRUE(tools_backend_request_->waitForEndStream(*dispatcher_));
+
+  // Backends respond with 202 Accepted (notifications don't return content).
+  time_backend_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "202"}}, true);
+  tools_backend_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "202"}}, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("202", response->headers().getStatusValue());
+}
+
+// Test notifications/roots/list_changed is forwarded to all backends.
+TEST_P(McpRouterIntegrationTest, NotificationRootsListChangedFanout) {
+  initializeFilter();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  const std::string request_body = R"({
+    "jsonrpc": "2.0",
+    "method": "notifications/roots/list_changed"
+  })";
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/mcp"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"accept", "application/json"},
+                                     {"accept", "text/event-stream"},
+                                     {"content-type", "application/json"}},
+      request_body);
+
+  // Both backends should receive the notification.
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, time_backend_connection_));
+  ASSERT_TRUE(time_backend_connection_->waitForNewStream(*dispatcher_, time_backend_request_));
+  ASSERT_TRUE(time_backend_request_->waitForEndStream(*dispatcher_));
+
+  ASSERT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, tools_backend_connection_));
+  ASSERT_TRUE(tools_backend_connection_->waitForNewStream(*dispatcher_, tools_backend_request_));
+  ASSERT_TRUE(tools_backend_request_->waitForEndStream(*dispatcher_));
+
+  time_backend_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "202"}}, true);
+  tools_backend_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "202"}}, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("202", response->headers().getStatusValue());
+}
+
+class McpRouterSubjectValidationIntegrationTest : public McpRouterIntegrationTest {
+public:
+  void initializeFilterWithSubjectValidation() {
+    config_helper_.skipPortUsageValidation();
+
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* time_cluster = bootstrap.mutable_static_resources()->add_clusters();
+      time_cluster->set_name("mcp_time_backend");
+      time_cluster->mutable_connect_timeout()->set_seconds(5);
+      time_cluster->set_type(envoy::config::cluster::v3::Cluster::STATIC);
+      time_cluster->set_lb_policy(envoy::config::cluster::v3::Cluster::ROUND_ROBIN);
+
+      auto* time_endpoint = time_cluster->mutable_load_assignment();
+      time_endpoint->set_cluster_name("mcp_time_backend");
+      auto* time_locality = time_endpoint->add_endpoints();
+      auto* time_lb = time_locality->add_lb_endpoints();
+      time_lb->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_address(
+          Network::Test::getLoopbackAddressString(GetParam()));
+      time_lb->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_port_value(
+          fake_upstreams_[0]->localAddress()->ip()->port());
+    });
+
+    // MCP router with session identity and ENFORCE validation
+    config_helper_.prependFilter(R"EOF(
+      name: envoy.filters.http.mcp_router
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.mcp_router.v3.McpRouter
+        servers:
+          - name: time
+            mcp_cluster:
+              cluster: mcp_time_backend
+              path: /mcp
+              timeout: 5s
+        session_identity:
+          identity:
+            header:
+              name: x-user-id
+          validation:
+            mode: ENFORCE
+    )EOF");
+
+    config_helper_.prependFilter(R"EOF(
+      name: envoy.filters.http.mcp
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.mcp.v3.Mcp
+        traffic_mode: PASS_THROUGH
+    )EOF");
+
+    config_helper_.addConfigModifier(
+        [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+               hcm) {
+          auto* filters = hcm.mutable_http_filters();
+          for (auto it = filters->begin(); it != filters->end();) {
+            if (it->name() == "envoy.filters.http.router") {
+              it = filters->erase(it);
+            } else {
+              ++it;
+            }
+          }
+        });
+
+    HttpIntegrationTest::initialize();
+  }
+
+  std::string encodeSessionId(const std::string& route, const std::string& subject,
+                              const std::string& backend_session) {
+    std::string backend_encoded = Base64::encode(backend_session.data(), backend_session.size());
+    std::string composite = route + "@" + subject + "@time:" + backend_encoded;
+    return Base64::encode(composite.data(), composite.size());
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, McpRouterSubjectValidationIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+// Subject mismatch returns 403
+TEST_P(McpRouterSubjectValidationIntegrationTest, SubjectMismatchReturns403) {
+  initializeFilterWithSubjectValidation();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Session ID has subject "alice", but header says "bob"
+  std::string session_id = encodeSessionId("test_route", "alice", "backend-session-123");
+
+  const std::string request_body = R"({"jsonrpc":"2.0","method":"tools/list","id":1})";
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/mcp"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"accept", "application/json"},
+                                     {"accept", "text/event-stream"},
+                                     {"content-type", "application/json"},
+                                     {"mcp-session-id", session_id},
+                                     {"x-user-id", "bob"}},
+      request_body);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("403", response->headers().getStatusValue());
+}
+
+// Missing auth header returns 403
+TEST_P(McpRouterSubjectValidationIntegrationTest, MissingAuthHeaderReturns403) {
+  initializeFilterWithSubjectValidation();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  std::string session_id = encodeSessionId("test_route", "alice", "backend-session-123");
+
+  const std::string request_body = R"({"jsonrpc":"2.0","method":"tools/list","id":1})";
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/mcp"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"accept", "application/json"},
+                                     {"accept", "text/event-stream"},
+                                     {"content-type", "application/json"},
+                                     {"mcp-session-id", session_id}},
+      request_body);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("403", response->headers().getStatusValue());
+}
+
 } // namespace
 } // namespace McpRouter
 } // namespace HttpFilters

@@ -500,6 +500,79 @@ TEST_F(StatsThreadLocalStoreTest, HistogramScopeOverlap) {
   tls_.shutdownThread();
 }
 
+TEST_F(StatsThreadLocalStoreTest, StatsNumLimitsWithEviction) {
+  InSequence s;
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+
+  ScopeSharedPtr scope = store_->createScope("scope.", true, {1, 1, 1});
+  EXPECT_EQ(0, TestUtility::findCounter(*store_, "server.stats_overflow.counter")->value());
+  EXPECT_EQ(0, TestUtility::findCounter(*store_, "server.stats_overflow.gauge")->value());
+  EXPECT_EQ(0, TestUtility::findCounter(*store_, "server.stats_overflow.histogram")->value());
+
+  {
+    Counter& c1 = scope->counterFromString("c1");
+    EXPECT_EQ("scope.c1", c1.name());
+    Counter& c2 = scope->counterFromString("c2");
+    EXPECT_EQ(&c2, &store_->nullCounter());
+    EXPECT_EQ(1, TestUtility::findCounter(*store_, "server.stats_overflow.counter")->value());
+
+    Gauge& g1 = scope->gaugeFromString("g1", Gauge::ImportMode::Accumulate);
+    EXPECT_EQ("scope.g1", g1.name());
+    Gauge& g2 = scope->gaugeFromString("g2", Gauge::ImportMode::Accumulate);
+    EXPECT_EQ(&g2, &store_->nullGauge());
+    EXPECT_EQ(1, TestUtility::findCounter(*store_, "server.stats_overflow.gauge")->value());
+
+    Histogram& h1 = scope->histogramFromString("h1", Histogram::Unit::Unspecified);
+    EXPECT_EQ("scope.h1", h1.name());
+    Histogram& h2 = scope->histogramFromString("h2", Histogram::Unit::Unspecified);
+    EXPECT_EQ("", h2.name());
+    EXPECT_EQ(1, TestUtility::findCounter(*store_, "server.stats_overflow.histogram")->value());
+
+    // c1, g1, h1 are used.
+    c1.inc();
+    g1.set(1);
+    EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 1));
+    h1.recordValue(1);
+    store_->mergeHistograms([]() -> void {});
+
+    // First eviction marks stats as unused.
+    store_->evictUnused();
+    EXPECT_FALSE(c1.used());
+    EXPECT_FALSE(g1.used());
+    EXPECT_FALSE(h1.used());
+  }
+
+  // Second eviction removes stats.
+  EXPECT_CALL(tls_, runOnAllThreads(_, _)).Times(testing::AtLeast(1));
+  store_->evictUnused();
+
+  // After eviction, we should be able to create new stats.
+  Counter& c3 = scope->counterFromString("c3");
+  EXPECT_EQ("scope.c3", c3.name());
+  EXPECT_EQ(1, TestUtility::findCounter(*store_, "server.stats_overflow.counter")->value());
+  Counter& c4 = scope->counterFromString("c4");
+  EXPECT_EQ(&c4, &store_->nullCounter());
+  EXPECT_EQ(2, TestUtility::findCounter(*store_, "server.stats_overflow.counter")->value());
+
+  Gauge& g3 = scope->gaugeFromString("g3", Gauge::ImportMode::Accumulate);
+  EXPECT_EQ("scope.g3", g3.name());
+  EXPECT_EQ(1, TestUtility::findCounter(*store_, "server.stats_overflow.gauge")->value());
+  Gauge& g4 = scope->gaugeFromString("g4", Gauge::ImportMode::Accumulate);
+  EXPECT_EQ(&g4, &store_->nullGauge());
+  EXPECT_EQ(2, TestUtility::findCounter(*store_, "server.stats_overflow.gauge")->value());
+
+  Histogram& h3 = scope->histogramFromString("h3", Histogram::Unit::Unspecified);
+  EXPECT_EQ("scope.h3", h3.name());
+  EXPECT_EQ(1, TestUtility::findCounter(*store_, "server.stats_overflow.histogram")->value());
+  Histogram& h4 = scope->histogramFromString("h4", Histogram::Unit::Unspecified);
+  EXPECT_EQ("", h4.name());
+  EXPECT_EQ(2, TestUtility::findCounter(*store_, "server.stats_overflow.histogram")->value());
+
+  tls_.shutdownGlobalThreading();
+  store_->shutdownThreading();
+  tls_.shutdownThread();
+}
+
 TEST_F(StatsThreadLocalStoreTest, ForEach) {
   auto collect_scopes = [this]() -> std::vector<std::string> {
     std::vector<std::string> names;
@@ -1791,18 +1864,18 @@ TEST_F(HistogramTest, BasicHistogramSummaryValidate) {
   EXPECT_EQ(2, validateMerge());
 
   const std::string h1_expected_summary =
-      "P0: 1, P25: 1.025, P50: 1.05, P75: 1.075, P90: 1.09, P95: 1.095, "
-      "P99: 1.099, P99.5: 1.0995, P99.9: 1.0999, P100: 1.1";
+      "P0: 1.05, P25: 1.05, P50: 1.05, P75: 1.05, P90: 1.05, P95: 1.05, "
+      "P99: 1.05, P99.5: 1.05, P99.9: 1.05, P100: 1.05";
   const std::string h2_expected_summary =
-      "P0: 0, P25: 25, P50: 50, P75: 75, P90: 90, P95: 95, P99: 99, "
-      "P99.5: 99.5, P99.9: 99.9, P100: 100";
+      "P0: 0, P25: 24.5, P50: 49.5, P75: 74.5, P90: 89.5, P95: 94.5, P99: 98.5, "
+      "P99.5: 99.5, P99.9: 99.5, P100: 99.5";
 
   const std::string h1_expected_buckets =
-      "B0.5: 0, B1: 0, B5: 1, B10: 1, B25: 1, B50: 1, B100: 1, B250: 1, "
+      "B0.5: 0, B1: 1, B5: 1, B10: 1, B25: 1, B50: 1, B100: 1, B250: 1, "
       "B500: 1, B1000: 1, B2500: 1, B5000: 1, B10000: 1, B30000: 1, B60000: 1, "
       "B300000: 1, B600000: 1, B1.8e+06: 1, B3.6e+06: 1";
   const std::string h2_expected_buckets =
-      "B0.5: 1, B1: 1, B5: 5, B10: 10, B25: 25, B50: 50, B100: 100, B250: 100, "
+      "B0.5: 1, B1: 2, B5: 6, B10: 11, B25: 26, B50: 51, B100: 100, B250: 100, "
       "B500: 100, B1000: 100, B2500: 100, B5000: 100, B10000: 100, B30000: 100, "
       "B60000: 100, B300000: 100, B600000: 100, B1.8e+06: 100, B3.6e+06: 100";
 
@@ -1835,10 +1908,11 @@ TEST_F(HistogramTest, BasicHistogramMergeSummary) {
   }
   EXPECT_EQ(1, validateMerge());
 
-  const std::string expected_summary = "P0: 0, P25: 25, P50: 50, P75: 75, P90: 90, P95: 95, P99: "
-                                       "99, P99.5: 99.5, P99.9: 99.9, P100: 100";
+  const std::string expected_summary =
+      "P0: 0, P25: 24.5, P50: 49.5, P75: 74.5, P90: 89.5, P95: 94.5, P99: 98.5, "
+      "P99.5: 99.5, P99.9: 99.5, P100: 99.5";
   const std::string expected_bucket_summary =
-      "B0.5: 1, B1: 1, B5: 5, B10: 10, B25: 25, B50: 50, B100: 100, B250: 100, "
+      "B0.5: 1, B1: 2, B5: 6, B10: 11, B25: 26, B50: 51, B100: 100, B250: 100, "
       "B500: 100, B1000: 100, B2500: 100, B5000: 100, B10000: 100, B30000: 100, "
       "B60000: 100, B300000: 100, B600000: 100, B1.8e+06: 100, B3.6e+06: 100";
 
@@ -1890,7 +1964,7 @@ TEST_F(HistogramTest, ParentHistogramBucketSummaryAndDetail) {
   EXPECT_CALL(sink_, onHistogramComplete(Ref(histogram), 10));
   histogram.recordValue(10);
   store_->mergeHistograms([]() -> void {});
-  EXPECT_EQ("B0.5(0,0) B1(0,0) B5(0,0) B10(0,0) B25(1,1) B50(1,1) B100(1,1) "
+  EXPECT_EQ("B0.5(0,0) B1(0,0) B5(0,0) B10(1,1) B25(1,1) B50(1,1) B100(1,1) "
             "B250(1,1) B500(1,1) B1000(1,1) B2500(1,1) B5000(1,1) B10000(1,1) "
             "B30000(1,1) B60000(1,1) B300000(1,1) B600000(1,1) B1.8e+06(1,1) "
             "B3.6e+06(1,1)",
@@ -2260,7 +2334,7 @@ TEST_F(HistogramThreadTest, ScopeOverlap) {
   // a string. This expectation captures the bucket transition to indicate
   // 0 samples at less than 100, and 10 between 100 and 249 inclusive.
   EXPECT_THAT(histograms[0]->bucketSummary(),
-              HasSubstr(absl::StrCat(" B100(0,0) B250(", NumThreads, ",", NumThreads, ") ")));
+              HasSubstr(absl::StrCat(" B100(10,10) B250(", NumThreads, ",", NumThreads, ") ")));
 
   // The histogram was created in scope1, which can now be destroyed. But the
   // histogram is kept alive by scope2.
@@ -2281,7 +2355,7 @@ TEST_F(HistogramThreadTest, ScopeOverlap) {
 
   // Shows the bucket summary with 10 samples at >=100, and 20 at >=250.
   EXPECT_THAT(histograms[0]->bucketSummary(),
-              HasSubstr(absl::StrCat(" B100(0,0) B250(0,", NumThreads, ") B500(", NumThreads, ",",
+              HasSubstr(absl::StrCat(" B100(0,10) B250(0,", NumThreads, ") B500(", NumThreads, ",",
                                      2 * NumThreads, ") ")));
 
   // Now clear everything, and synchronize the system by calling mergeHistograms().
