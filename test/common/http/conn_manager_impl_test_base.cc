@@ -148,6 +148,12 @@ public:
   bool addProxyProtocolConnectionState() const override {
     return parent_.addProxyProtocolConnectionState();
   }
+  const absl::flat_hash_set<uint32_t>& httpsDestinationPorts() const override {
+    return parent_.httpsDestinationPorts();
+  }
+  const absl::flat_hash_set<uint32_t>& httpDestinationPorts() const override {
+    return parent_.httpDestinationPorts();
+  }
 
 private:
   ConnectionManagerConfig& parent_;
