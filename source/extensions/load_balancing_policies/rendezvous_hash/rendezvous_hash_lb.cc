@@ -7,6 +7,7 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/common/safe_memcpy.h"
 
 #include "absl/numeric/bits.h"
 
@@ -140,7 +141,7 @@ double RendezvousHashLoadBalancer::RendezvousHashTable::fastLog(double x) {
 
 double RendezvousHashLoadBalancer::RendezvousHashTable::fastLog2(double x) {
   uint64_t bits;
-  std::memcpy(&bits, &x, sizeof(double));
+  safeMemcpy(&bits, &x);
 
   // Extract exponent (biased by +1023 in IEEE 754) and mantissa
   const uint64_t exponent = (bits & EXPONENT_MASK) >> 52;
@@ -153,7 +154,7 @@ double RendezvousHashLoadBalancer::RendezvousHashTable::fastLog2(double x) {
   // Reconstruct double with new exponent
   const uint64_t new_bits = (new_exponent << 52) | mantissa;
   double new_double;
-  std::memcpy(&new_double, &new_bits, sizeof(double));
+  safeMemcpy(&new_double, &new_bits);
 
   // Extract the true exponent
   const double base_exponent = static_cast<double>(exponent) - static_cast<double>(new_exponent);
