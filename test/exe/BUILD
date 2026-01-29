@@ -4,7 +4,6 @@ load(
     "envoy_cc_test_library",
     "envoy_package",
     "envoy_select_admin_functionality",
-    "envoy_select_boringssl",
     "envoy_sh_test",
 )
 
@@ -155,7 +154,6 @@ envoy_cc_test(
     name = "all_extensions_build_test",
     size = "large",
     srcs = ["all_extensions_build_test.cc"],
-    copts = envoy_select_boringssl(["-DENVOY_SSL_FIPS"]),
     data = [
         "fips_check.sh",
         "//source/extensions:extensions_metadata.yaml",
