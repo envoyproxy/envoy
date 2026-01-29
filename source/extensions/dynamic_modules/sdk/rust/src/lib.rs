@@ -3294,7 +3294,7 @@ impl EnvoyHttpFilterImpl {
     // At this point, we assume at least one value is present.
     results.push(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) });
     // So, we iterate from 1 to count - 1.
-    for i in 1..count {
+    for i in 1 .. count {
       let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
         ptr: std::ptr::null(),
         length: 0,

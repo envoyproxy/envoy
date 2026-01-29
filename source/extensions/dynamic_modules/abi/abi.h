@@ -6036,14 +6036,6 @@ typedef const void* envoy_dynamic_module_type_lb_module_ptr;
 typedef void* envoy_dynamic_module_type_lb_context_envoy_ptr;
 
 /**
- * envoy_dynamic_module_type_lb_cluster_info_envoy_ptr is a raw pointer to
- * ClusterInfo in Envoy. This is passed to the module for cluster information.
- *
- * OWNERSHIP: Envoy owns the pointer. The pointer is valid during the load balancer lifetime.
- */
-typedef void* envoy_dynamic_module_type_lb_cluster_info_envoy_ptr;
-
-/**
  * envoy_dynamic_module_type_host_health represents the health status of an upstream host.
  */
 typedef enum {
