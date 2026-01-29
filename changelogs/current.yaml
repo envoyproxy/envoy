@@ -87,51 +87,6 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
-- area: formatter
-  change: |
-    Extended ``*_WITHOUT_PORT`` address formatters to accept an optional ``MASK_PREFIX_LEN`` parameter
-    that masks IP addresses and returns them in CIDR notation (e.g., ``%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT(16)%``
-    returns ``10.1.0.0/16`` for client IP ``10.1.10.23``).
-- area: mcp_router
-  change: |
-    Added support for MCP client-to-server notification methods ``notifications/cancelled``
-    and ``notifications/roots/list_changed``.
-- area: mcp_router
-  change: |
-    Added support for MCP completion method ``completion/complete`` with routing based on
-    ``ref/prompt`` or ``ref/resource``.
-- area: mcp_router
-  change: |
-    Added support for MCP logging method ``logging/setLevel``.
-- area: mcp_router
-  change: |
-    Added support for MCP prompt methods ``prompts/list`` and ``prompts/get``.
-- area: mcp_router
-  change: |
-    Added support for MCP resource methods ``resources/list``, ``resources/read``,
-    ``resources/subscribe``, and ``resources/unsubscribe``.
-- area: oauth2
-  change: |
-    Added :ref:`allow_failed_matcher <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.allow_failed_matcher>`
-    to allow requests to proceed to upstream as unauthenticated when OAuth validation fails (missing, invalid, or expired
-    credentials) and the request matches the configured matchers. This enables graceful degradation patterns where services
-    can handle both authenticated and unauthenticated requests. When triggered, all OAuth cookies are stripped and context
-    headers ``x-envoy-oauth-status: failed`` and ``x-envoy-oauth-failure-reason`` are added. The matcher evaluation follows
-    priority order: ``pass_through_matcher`` > ``allow_failed_matcher`` > ``deny_redirect_matcher`` > default OAuth behavior.
-- area: ratelimit
-  change: |
-    Added per-descriptor ``x-ratelimit-*`` headers support. See the
-    :ref:`x_ratelimit_option <envoy_v3_api_field_config.route.v3.RateLimit.x_ratelimit_option>`
-    field documentation for more details.
-- area: ratelimit
-  change: |
-    Added support for shadow mode in the local rate limit filter.
-- area: resource_monitors
-  change: |
-    Added cgroup v2 support to the CPU utilization resource monitor. The monitor now automatically
-    detects and selects between cgroup v1 and v2 at runtime by checking available cgroup files on
-    the system. This enables the resource monitor to work correctly in both cgroup v1 and v2
-    environments without configuration changes.
 - area: stats
   change: |
     Added support to limit the number of stats stored in each stats scope in the stats library.
@@ -198,10 +153,13 @@ new_features:
     detects and selects between cgroup v1 and v2 at runtime by checking available cgroup files on
     the system. This enables the resource monitor to work correctly in both cgroup v1 and v2
     environments without configuration changes.
-- area: tls
+- area: oauth2
   change: |
-    Added support for fetching certificates on-demand via SDS in the upstream TLS transport socket
-    using the extension :ref:`on-demand certificate selector
-    <extension_envoy.tls.certificate_selectors.on_demand_secret>`.
+    Added :ref:`allow_failed_matcher <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.allow_failed_matcher>`
+    to allow requests to proceed to upstream as unauthenticated when OAuth validation fails (missing, invalid, or expired
+    credentials) and the request matches the configured matchers. This enables graceful degradation patterns where services
+    can handle both authenticated and unauthenticated requests. When triggered, all OAuth cookies are stripped and context
+    headers ``x-envoy-oauth-status: failed`` and ``x-envoy-oauth-failure-reason`` are added. The matcher evaluation follows
+    priority order: ``pass_through_matcher`` > ``allow_failed_matcher`` > ``deny_redirect_matcher`` > default OAuth behavior.
 
 deprecated:
