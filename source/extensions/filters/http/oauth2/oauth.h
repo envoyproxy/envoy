@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "envoy/common/pure.h"
+#include "envoy/http/filter.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -30,7 +31,9 @@ public:
 
   virtual void onRefreshAccessTokenFailure() PURE;
 
-  virtual void sendUnauthorizedResponse(const std::string& details) PURE;
+  virtual void asyncOnUnauthorized(const std::string& details) PURE;
+
+  virtual Http::FilterHeadersStatus onUnauthorized(const std::string& details) PURE;
 };
 
 /**

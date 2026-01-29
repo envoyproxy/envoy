@@ -33,6 +33,19 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Oauth2 {
 
+/**
+ * Constant OAuth2 related HTTP headers with x-envoy prefix.
+ */
+class OAuth2HeaderValues {
+public:
+  const char* prefix() const { return ThreadSafeSingleton<Http::PrefixValue>::get().prefix(); }
+
+  const Http::LowerCaseString OAuthStatus{absl::StrCat(prefix(), "-oauth-status")};
+  const Http::LowerCaseString OAuthFailureReason{absl::StrCat(prefix(), "-oauth-failure-reason")};
+};
+
+using OAuth2Headers = ConstSingleton<OAuth2HeaderValues>;
+
 class OAuth2Client;
 
 // Helper class used to fetch secrets (usually from SDS).
@@ -73,7 +86,8 @@ private:
   COUNTER(oauth_passthrough)                                                                       \
   COUNTER(oauth_success)                                                                           \
   COUNTER(oauth_refreshtoken_success)                                                              \
-  COUNTER(oauth_refreshtoken_failure)
+  COUNTER(oauth_refreshtoken_failure)                                                              \
+  COUNTER(oauth_allow_failed_passthrough)
 
 /**
  * Wrapper struct filter stats. @see stats_macros.h
@@ -141,6 +155,9 @@ public:
   }
   const std::vector<Http::HeaderUtility::HeaderDataPtr>& denyRedirectMatchers() const {
     return deny_redirect_header_matchers_;
+  }
+  const std::vector<Http::HeaderUtility::HeaderDataPtr>& allowFailedMatchers() const {
+    return allow_failed_header_matchers_;
   }
   const HttpUri& oauthTokenEndpoint() const { return oauth_token_endpoint_; }
   const Http::Utility::Url& authorizationEndpointUrl() const { return authorization_endpoint_url_; }
@@ -222,6 +239,7 @@ private:
   const std::string encoded_resource_query_params_;
   const std::vector<Http::HeaderUtility::HeaderDataPtr> pass_through_header_matchers_;
   const std::vector<Http::HeaderUtility::HeaderDataPtr> deny_redirect_header_matchers_;
+  const std::vector<Http::HeaderUtility::HeaderDataPtr> allow_failed_header_matchers_;
   const CookieNames cookie_names_;
   const std::string cookie_domain_;
   const AuthType auth_type_;
@@ -332,9 +350,15 @@ public:
 
   void onRefreshAccessTokenFailure() override;
 
-  // a catch-all function used for request failures. we don't retry, as a user can simply refresh
-  // the page in the case of a network blip.
-  void sendUnauthorizedResponse(const std::string& details) override;
+  // Handles unauthorized requests from async contexts (OAuth client callbacks).
+  // Calls onUnauthorized() and then continueDecoding() if needed.
+  void asyncOnUnauthorized(const std::string& details) override;
+
+  // Handles unauthorized requests by checking allow_failed_matcher and either continuing
+  // the request as unauthorized (if matcher matches) or sending an unauthorized response.
+  // This is a catch-all function for request failures. We don't retry, as a user can simply
+  // refresh the page in the case of a network blip.
+  Http::FilterHeadersStatus onUnauthorized(const std::string& details) override;
 
   void finishGetAccessTokenFlow();
   void finishRefreshAccessTokenFlow();
@@ -397,6 +421,10 @@ private:
   std::string encryptToken(const std::string& token) const;
   std::string decryptToken(const std::string& encrypted_token) const;
   void removeOAuthFlowCookies(Http::RequestHeaderMap& headers) const;
+  void removeOAuthTokenCookies(Http::RequestHeaderMap& headers) const;
+  bool shouldAllowFailed(const Http::RequestHeaderMap& headers) const;
+  void continueAsUnauthorized(const std::string& failure_reason);
+  void sendUnauthorizedResponse(const std::string& details);
 };
 
 } // namespace Oauth2

@@ -97,11 +97,11 @@ public:
   void onBeforeFinalizeUpstreamSpan(Envoy::Tracing::Span&,
                                     const Http::ResponseHeaderMap*) override {}
 
-  MOCK_METHOD(void, asyncGetAccessToken,
+  MOCK_METHOD(absl::Status, asyncGetAccessToken,
               (const std::string&, const std::string&, const std::string&, const std::string&,
                const std::string&, Envoy::Extensions::HttpFilters::Oauth2::AuthType));
 
-  MOCK_METHOD(void, asyncRefreshAccessToken,
+  MOCK_METHOD(absl::Status, asyncRefreshAccessToken,
               (const std::string&, const std::string&, const std::string&,
                Envoy::Extensions::HttpFilters::Oauth2::AuthType));
 };
@@ -221,6 +221,9 @@ public:
     auto* deny_redirect_matcher = p.add_deny_redirect_matcher();
     deny_redirect_matcher->set_name("X-Requested-With");
     deny_redirect_matcher->mutable_string_match()->set_exact("XMLHttpRequest");
+    auto* allow_failed_matcher = p.add_allow_failed_matcher();
+    allow_failed_matcher->set_name(":path");
+    allow_failed_matcher->mutable_string_match()->set_prefix("/allowfailed");
     auto credentials = p.mutable_credentials();
     credentials->set_client_id(TEST_CLIENT_ID);
     credentials->mutable_token_secret()->set_name("secret");
@@ -1067,7 +1070,8 @@ TEST_F(OAuth2Test, SetBearerToken) {
 
   EXPECT_CALL(*oauth_client_, asyncGetAccessToken("123", TEST_CLIENT_ID, "asdf_client_secret_fdsa",
                                                   "https://traffic.example.com" + TEST_CALLBACK,
-                                                  TEST_CODE_VERIFIER, AuthType::UrlEncodedBody));
+                                                  TEST_CODE_VERIFIER, AuthType::UrlEncodedBody))
+      .WillOnce(Return(absl::OkStatus()));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
             filter_->decodeHeaders(request_headers, false));
@@ -1132,7 +1136,8 @@ TEST_F(OAuth2Test, SetBearerTokenWithEncryptionDisabled) {
 
   EXPECT_CALL(*oauth_client_, asyncGetAccessToken("123", TEST_CLIENT_ID, "asdf_client_secret_fdsa",
                                                   "https://traffic.example.com" + TEST_CALLBACK,
-                                                  TEST_CODE_VERIFIER, AuthType::UrlEncodedBody));
+                                                  TEST_CODE_VERIFIER, AuthType::UrlEncodedBody))
+      .WillOnce(Return(absl::OkStatus()));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
             filter_->decodeHeaders(request_headers, false));
@@ -1204,7 +1209,8 @@ TEST_F(OAuth2Test, SetBearerTokenWithDisableTokenEncryptionConfig) {
 
   EXPECT_CALL(*oauth_client_, asyncGetAccessToken("123", TEST_CLIENT_ID, "asdf_client_secret_fdsa",
                                                   "https://traffic.example.com" + TEST_CALLBACK,
-                                                  TEST_CODE_VERIFIER, AuthType::UrlEncodedBody));
+                                                  TEST_CODE_VERIFIER, AuthType::UrlEncodedBody))
+      .WillOnce(Return(absl::OkStatus()));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
             filter_->decodeHeaders(request_headers, false));
@@ -1316,7 +1322,8 @@ TEST_F(OAuth2Test, OAuthErrorNonOAuthHttpCallback) {
 
   EXPECT_CALL(*oauth_client_, asyncGetAccessToken("123", TEST_CLIENT_ID, "asdf_client_secret_fdsa",
                                                   "https://traffic.example.com" + TEST_CALLBACK,
-                                                  TEST_CODE_VERIFIER, AuthType::UrlEncodedBody));
+                                                  TEST_CODE_VERIFIER, AuthType::UrlEncodedBody))
+      .WillOnce(Return(absl::OkStatus()));
 
   // Invoke the callback logic. As a side effect, state_ will be populated.
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
@@ -1356,7 +1363,8 @@ TEST_F(OAuth2Test, OAuthErrorNonOAuthHttpCallback) {
 
   EXPECT_CALL(*oauth_client_, asyncGetAccessToken("123", TEST_CLIENT_ID, "asdf_client_secret_fdsa",
                                                   "https://traffic.example.com" + TEST_CALLBACK,
-                                                  TEST_CODE_VERIFIER, AuthType::UrlEncodedBody));
+                                                  TEST_CODE_VERIFIER, AuthType::UrlEncodedBody))
+      .WillOnce(Return(absl::OkStatus()));
 
   // Invoke the callback logic. As a side effect, state_ will be populated.
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
@@ -1429,7 +1437,8 @@ TEST_F(OAuth2Test, OAuthCallbackStartsAuthentication) {
 
   EXPECT_CALL(*oauth_client_, asyncGetAccessToken("123", TEST_CLIENT_ID, "asdf_client_secret_fdsa",
                                                   "https://traffic.example.com" + TEST_CALLBACK,
-                                                  TEST_CODE_VERIFIER, AuthType::UrlEncodedBody));
+                                                  TEST_CODE_VERIFIER, AuthType::UrlEncodedBody))
+      .WillOnce(Return(absl::OkStatus()));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
             filter_->decodeHeaders(request_headers, false));
@@ -1461,7 +1470,8 @@ TEST_F(OAuth2Test, OAuthCallbackStartsAuthenticationWithoutFlowIdInState) {
 
   EXPECT_CALL(*oauth_client_, asyncGetAccessToken("123", TEST_CLIENT_ID, "asdf_client_secret_fdsa",
                                                   "https://traffic.example.com" + TEST_CALLBACK,
-                                                  TEST_CODE_VERIFIER, AuthType::UrlEncodedBody));
+                                                  TEST_CODE_VERIFIER, AuthType::UrlEncodedBody))
+      .WillOnce(Return(absl::OkStatus()));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
             filter_->decodeHeaders(request_headers, false));
@@ -2252,7 +2262,8 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithCookieDomain) {
 
   EXPECT_CALL(*oauth_client_, asyncGetAccessToken("123", TEST_CLIENT_ID, "asdf_client_secret_fdsa",
                                                   "https://traffic.example.com" + TEST_CALLBACK,
-                                                  TEST_CODE_VERIFIER, AuthType::UrlEncodedBody));
+                                                  TEST_CODE_VERIFIER, AuthType::UrlEncodedBody))
+      .WillOnce(Return(absl::OkStatus()));
 
   // Invoke the callback logic. As a side effect, state_ will be populated.
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
@@ -2387,7 +2398,8 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithSpecialCharactersForJson) {
 
   EXPECT_CALL(*oauth_client_, asyncGetAccessToken("123", TEST_CLIENT_ID, "asdf_client_secret_fdsa",
                                                   "https://traffic.example.com" + TEST_CALLBACK,
-                                                  TEST_CODE_VERIFIER, AuthType::UrlEncodedBody));
+                                                  TEST_CODE_VERIFIER, AuthType::UrlEncodedBody))
+      .WillOnce(Return(absl::OkStatus()));
 
   // Invoke the callback logic. As a side effect, state_ will be populated.
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
@@ -2462,7 +2474,8 @@ TEST_F(OAuth2Test, SetCookieIgnoresIdTokenWhenDisabledAccessToken) {
 
   EXPECT_CALL(*oauth_client_, asyncGetAccessToken("123", TEST_CLIENT_ID, "asdf_client_secret_fdsa",
                                                   "https://traffic.example.com" + TEST_CALLBACK,
-                                                  TEST_CODE_VERIFIER, AuthType::UrlEncodedBody));
+                                                  TEST_CODE_VERIFIER, AuthType::UrlEncodedBody))
+      .WillOnce(Return(absl::OkStatus()));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
             filter_->decodeHeaders(request_headers, false));
@@ -2537,7 +2550,8 @@ TEST_F(OAuth2Test, SetCookieIgnoresIdTokenWhenDisabledRefreshToken) {
 
   EXPECT_CALL(*oauth_client_,
               asyncRefreshAccessToken(legit_refresh_token, TEST_CLIENT_ID,
-                                      "asdf_client_secret_fdsa", AuthType::UrlEncodedBody));
+                                      "asdf_client_secret_fdsa", AuthType::UrlEncodedBody))
+      .WillOnce(Return(absl::OkStatus()));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers, false));
@@ -2611,7 +2625,8 @@ TEST_F(OAuth2Test, SetCookieIgnoresTokensWhenAllTokensAreDisabled1) {
 
   EXPECT_CALL(*oauth_client_, asyncGetAccessToken("123", TEST_CLIENT_ID, "asdf_client_secret_fdsa",
                                                   "https://traffic.example.com" + TEST_CALLBACK,
-                                                  TEST_CODE_VERIFIER, AuthType::UrlEncodedBody));
+                                                  TEST_CODE_VERIFIER, AuthType::UrlEncodedBody))
+      .WillOnce(Return(absl::OkStatus()));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
             filter_->decodeHeaders(request_headers, false));
@@ -2683,7 +2698,8 @@ TEST_F(OAuth2Test, SetCookieIgnoresTokensWhenAllTokensAreDisabled2) {
 
   EXPECT_CALL(*oauth_client_,
               asyncRefreshAccessToken(legit_refresh_token, TEST_CLIENT_ID,
-                                      "asdf_client_secret_fdsa", AuthType::UrlEncodedBody));
+                                      "asdf_client_secret_fdsa", AuthType::UrlEncodedBody))
+      .WillOnce(Return(absl::OkStatus()));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers, false));
@@ -3403,7 +3419,8 @@ TEST_F(OAuth2Test, OAuthTestFullFlowWithUseRefreshToken) {
 
   EXPECT_CALL(*oauth_client_, asyncGetAccessToken("123", TEST_CLIENT_ID, "asdf_client_secret_fdsa",
                                                   "https://traffic.example.com" + TEST_CALLBACK,
-                                                  TEST_CODE_VERIFIER, AuthType::UrlEncodedBody));
+                                                  TEST_CODE_VERIFIER, AuthType::UrlEncodedBody))
+      .WillOnce(Return(absl::OkStatus()));
 
   // Invoke the callback logic. As a side effect, state_ will be populated.
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
@@ -3454,7 +3471,8 @@ TEST_F(OAuth2Test, OAuthTestFullFlowWithUseRefreshToken) {
 
   EXPECT_CALL(*oauth_client_,
               asyncRefreshAccessToken(legit_refresh_token, TEST_CLIENT_ID,
-                                      "asdf_client_secret_fdsa", AuthType::UrlEncodedBody));
+                                      "asdf_client_secret_fdsa", AuthType::UrlEncodedBody))
+      .WillOnce(Return(absl::OkStatus()));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(third_request_headers, false));
@@ -3490,7 +3508,8 @@ TEST_F(OAuth2Test, OAuthTestRefreshAccessTokenSuccess) {
 
   EXPECT_CALL(*oauth_client_,
               asyncRefreshAccessToken(legit_refresh_token, TEST_CLIENT_ID,
-                                      "asdf_client_secret_fdsa", AuthType::UrlEncodedBody));
+                                      "asdf_client_secret_fdsa", AuthType::UrlEncodedBody))
+      .WillOnce(Return(absl::OkStatus()));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(first_request_headers, false));
@@ -3542,7 +3561,8 @@ TEST_F(OAuth2Test, OAuthTestRefreshAccessTokenFail) {
 
   EXPECT_CALL(*oauth_client_,
               asyncRefreshAccessToken(legit_refresh_token, TEST_CLIENT_ID,
-                                      "asdf_client_secret_fdsa", AuthType::UrlEncodedBody));
+                                      "asdf_client_secret_fdsa", AuthType::UrlEncodedBody))
+      .WillOnce(Return(absl::OkStatus()));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(first_request_headers, false));
@@ -3613,7 +3633,8 @@ TEST_F(OAuth2Test, AjaxRefreshDoesNotRedirect) {
 
   EXPECT_CALL(*oauth_client_,
               asyncRefreshAccessToken(legit_refresh_token, TEST_CLIENT_ID,
-                                      "asdf_client_secret_fdsa", AuthType::UrlEncodedBody));
+                                      "asdf_client_secret_fdsa", AuthType::UrlEncodedBody))
+      .WillOnce(Return(absl::OkStatus()));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(first_request_headers, false));
@@ -3653,7 +3674,8 @@ TEST_F(OAuth2Test, OAuthTestSetCookiesAfterRefreshAccessToken) {
 
   EXPECT_CALL(*oauth_client_,
               asyncRefreshAccessToken(legit_refresh_token, TEST_CLIENT_ID,
-                                      "asdf_client_secret_fdsa", AuthType::UrlEncodedBody));
+                                      "asdf_client_secret_fdsa", AuthType::UrlEncodedBody))
+      .WillOnce(Return(absl::OkStatus()));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers, false));
@@ -3728,7 +3750,8 @@ TEST_F(OAuth2Test, OAuthTestSetCookiesAfterRefreshAccessTokenNoNewRefreshToken) 
 
   EXPECT_CALL(*oauth_client_,
               asyncRefreshAccessToken(legit_refresh_token, TEST_CLIENT_ID,
-                                      "asdf_client_secret_fdsa", AuthType::UrlEncodedBody));
+                                      "asdf_client_secret_fdsa", AuthType::UrlEncodedBody))
+      .WillOnce(Return(absl::OkStatus()));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers, false));
@@ -4700,7 +4723,8 @@ TEST_F(OAuth2Test, OAuthTestCustomCookiePaths) {
 
     EXPECT_CALL(*validator_, setParams(_, _));
     EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
-    EXPECT_CALL(*oauth_client_, asyncGetAccessToken(_, _, _, _, _, _));
+    EXPECT_CALL(*oauth_client_, asyncGetAccessToken(_, _, _, _, _, _))
+        .WillOnce(Return(absl::OkStatus()));
 
     EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
               filter_->decodeHeaders(callback_headers, false));
@@ -4802,6 +4826,313 @@ TEST_F(OAuth2Test, OAuthTestCustomCookiePaths) {
     EXPECT_TRUE(found_nonce_delete) << "OauthNonce deletion cookie not found.";
     EXPECT_TRUE(found_code_verifier_delete) << "CodeVerifier deletion cookie not found.";
   }
+}
+
+/**
+ * Scenario: Request to /allowfailed path with no OAuth cookies at all.
+ *
+ * Expected behavior: Since there are no cookies and the path matches allow_failed_matcher,
+ * the filter should not redirect to OAuth server and should continue to upstream as
+ * unauthenticated.
+ */
+TEST_F(OAuth2Test, AllowFailedWithNoCookies) {
+  init(getConfig());
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Path.get(), "/allowfailed/api"},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Scheme.get(), "https"},
+  };
+
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
+
+  // Should NOT redirect or send local reply
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _)).Times(0);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+
+  // Verify the headers were added
+  EXPECT_EQ(request_headers.get(OAuth2Headers::get().OAuthStatus)[0]->value().getStringView(),
+            "failed");
+  EXPECT_FALSE(request_headers.get(OAuth2Headers::get().OAuthFailureReason).empty());
+
+  EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_allow_failed_passthrough").value(), 1);
+  EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_failure").value(), 0);
+}
+
+/**
+ * Scenario: Request to /allowfailed path with invalid refresh token. Token endpoint is available
+ * and async refresh is attempted, but the token endpoint rejects the refresh token.
+ *
+ * Expected behavior: After the async refresh failure callback, since the path matches
+ * allow_failed_matcher, the filter should continue to upstream as unauthenticated.
+ */
+TEST_F(OAuth2Test, AllowFailedWithInvalidRefreshTokenAsyncFailure) {
+  init(getConfig(false /* forward_bearer_token */, true /* use_refresh_token */));
+
+  test_time_.setSystemTime(SystemTime(std::chrono::seconds(1000)));
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Path.get(), "/allowfailed/api"},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Cookie.get(), "OauthExpires=123"},
+      {Http::Headers::get().Cookie.get(), "BearerToken=" + TEST_ENCRYPTED_ACCESS_TOKEN},
+      {Http::Headers::get().Cookie.get(),
+       "OauthHMAC="
+       "ZTRlMzU5N2Q4ZDIwZWE5ZTU5NTg3YTU3YTcxZTU0NDFkMzY1ZTc1NjMyODYyMj"
+       "RlNjMxZTJmNTZkYzRmZTM0ZQ===="},
+      {Http::Headers::get().Cookie.get(), "RefreshToken=" + TEST_ENCRYPTED_REFRESH_TOKEN},
+  };
+
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
+  EXPECT_CALL(*validator_, canUpdateTokenByRefreshToken()).WillOnce(Return(true));
+
+  std::string legit_refresh_token{"legit_refresh_token"};
+  EXPECT_CALL(*validator_, refreshToken()).WillRepeatedly(ReturnRef(legit_refresh_token));
+
+  // Mock asyncRefreshAccessToken to succeed (async work starts)
+  EXPECT_CALL(*oauth_client_,
+              asyncRefreshAccessToken("legit_refresh_token", TEST_CLIENT_ID,
+                                      "asdf_client_secret_fdsa", AuthType::UrlEncodedBody))
+      .WillOnce(Return(absl::OkStatus()));
+
+  // Filter should stop and wait for async response
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers, false));
+
+  // Now simulate the async failure callback from token endpoint
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  filter_->onRefreshAccessTokenFailure();
+
+  // Verify the headers were added
+  EXPECT_EQ(request_headers.get(OAuth2Headers::get().OAuthStatus)[0]->value().getStringView(),
+            "failed");
+  EXPECT_FALSE(request_headers.get(OAuth2Headers::get().OAuthFailureReason).empty());
+
+  // Verify OAuth cookies were removed
+  auto cookies = Http::Utility::parseCookies(request_headers);
+  EXPECT_TRUE(cookies.find("BearerToken") == cookies.end());
+  EXPECT_TRUE(cookies.find("OauthHMAC") == cookies.end());
+  EXPECT_TRUE(cookies.find("OauthExpires") == cookies.end());
+  EXPECT_TRUE(cookies.find("RefreshToken") == cookies.end());
+
+  EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_allow_failed_passthrough").value(), 1);
+  EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_refreshtoken_failure").value(), 1);
+}
+
+/**
+ * Scenario: Request to /allowfailed path with refresh token cookie, but the token cluster
+ * is not found (synchronous failure).
+ *
+ * Expected behavior: Since asyncRefreshAccessToken fails synchronously and the path matches
+ * allow_failed_matcher, the request should continue to upstream as unauthenticated immediately.
+ */
+TEST_F(OAuth2Test, AllowFailedWithRefreshTokenClusterNotFound) {
+  init(getConfig(false /* forward_bearer_token */, true /* use_refresh_token */));
+
+  test_time_.setSystemTime(SystemTime(std::chrono::seconds(1000)));
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Path.get(), "/allowfailed/api"},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Cookie.get(), "OauthExpires=123"},
+      {Http::Headers::get().Cookie.get(), "BearerToken=" + TEST_ENCRYPTED_ACCESS_TOKEN},
+      {Http::Headers::get().Cookie.get(),
+       "OauthHMAC="
+       "ZTRlMzU5N2Q4ZDIwZWE5ZTU5NTg3YTU3YTcxZTU0NDFkMzY1ZTc1NjMyODYyMj"
+       "RlNjMxZTJmNTZkYzRmZTM0ZQ===="},
+      {Http::Headers::get().Cookie.get(), "RefreshToken=" + TEST_ENCRYPTED_REFRESH_TOKEN},
+  };
+
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
+  EXPECT_CALL(*validator_, canUpdateTokenByRefreshToken()).WillOnce(Return(true));
+
+  std::string legit_refresh_token{"legit_refresh_token"};
+  EXPECT_CALL(*validator_, refreshToken()).WillRepeatedly(ReturnRef(legit_refresh_token));
+
+  // Mock asyncRefreshAccessToken to return an error status (cluster not found)
+  EXPECT_CALL(*oauth_client_,
+              asyncRefreshAccessToken("legit_refresh_token", TEST_CLIENT_ID,
+                                      "asdf_client_secret_fdsa", AuthType::UrlEncodedBody))
+      .WillOnce(Return(absl::UnavailableError("Token endpoint cluster not found")));
+
+  // Should NOT call sendLocalReply or redirect
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _)).Times(0);
+
+  // Filter should continue immediately (not wait for async)
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+
+  // Verify the headers were added
+  EXPECT_EQ(request_headers.get(OAuth2Headers::get().OAuthStatus)[0]->value().getStringView(),
+            "failed");
+  EXPECT_FALSE(request_headers.get(OAuth2Headers::get().OAuthFailureReason).empty());
+
+  // Verify OAuth cookies were removed
+  auto cookies = Http::Utility::parseCookies(request_headers);
+  EXPECT_TRUE(cookies.find("BearerToken") == cookies.end());
+  EXPECT_TRUE(cookies.find("OauthHMAC") == cookies.end());
+  EXPECT_TRUE(cookies.find("OauthExpires") == cookies.end());
+  EXPECT_TRUE(cookies.find("RefreshToken") == cookies.end());
+
+  EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_allow_failed_passthrough").value(), 1);
+  EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_failure").value(), 0);
+}
+
+/**
+ * Scenario: OAuth callback where asyncGetAccessToken fails synchronously (cluster not found).
+ *
+ * Expected behavior: Since we're on the callback path (/_oauth), shouldAllowFailed returns false
+ * and the filter should return 401 Unauthorized. Callback requests should never be forwarded to
+ * upstream, even if cluster is not found.
+ */
+TEST_F(OAuth2Test, OAuthCallbackGetAccessTokenClusterNotFound) {
+  init(getConfig(false /* forward_bearer_token */, true /* use_refresh_token */));
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Path.get(), "/_oauth?code=123&state=" + TEST_ENCODED_STATE},
+      {Http::Headers::get().Cookie.get(), "OauthNonce.00000000075bcd15=" + TEST_CSRF_TOKEN},
+      {Http::Headers::get().Cookie.get(),
+       "CodeVerifier.00000000075bcd15=" + TEST_ENCRYPTED_CODE_VERIFIER},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Scheme.get(), "https"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+  };
+
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
+
+  // Mock asyncGetAccessToken to return an error status (cluster not found)
+  EXPECT_CALL(*oauth_client_, asyncGetAccessToken("123", TEST_CLIENT_ID, "asdf_client_secret_fdsa",
+                                                  "https://traffic.example.com" + TEST_CALLBACK,
+                                                  TEST_CODE_VERIFIER, AuthType::UrlEncodedBody))
+      .WillOnce(Return(absl::UnavailableError("Token endpoint cluster not found")));
+
+  // Expect 401 Unauthorized response (not Continue)
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::Unauthorized, _, _, _, _));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, false));
+
+  EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_failure").value(), 1);
+  EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_allow_failed_passthrough").value(), 0);
+}
+
+/**
+ * Scenario: AJAX request (matching deny_redirect_matcher) to /allowfailed path without valid OAuth.
+ *
+ * Expected behavior: allow_failed_matcher takes precedence - request should continue as
+ * unauthenticated rather than returning 401 (deny_redirect would normally return 401).
+ */
+TEST_F(OAuth2Test, AllowFailedMatcherTakesPrecedenceOverDenyRedirect) {
+  init(getConfig());
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Path.get(), "/allowfailed/api"},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Post},
+      {Http::Headers::get().Scheme.get(), "https"},
+      {"X-Requested-With", "XMLHttpRequest"}, // Matches deny_redirect_matcher
+  };
+
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
+
+  // Should NOT return 401, should continue
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+
+  EXPECT_EQ(request_headers.get(OAuth2Headers::get().OAuthStatus)[0]->value().getStringView(),
+            "failed");
+
+  EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_allow_failed_passthrough").value(), 1);
+}
+
+/**
+ * Scenario: Request with injected OAuth status headers to test sanitization.
+ * A malicious client sends x-envoy-oauth-status and x-envoy-oauth-failure-reason headers
+ * in their request.
+ *
+ * Expected behavior: The filter should sanitize these headers to prevent header injection
+ * attacks, similar to how it sanitizes the Authorization header.
+ */
+TEST_F(OAuth2Test, SanitizeInjectedOAuthStatusHeaders) {
+  init(getConfig());
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Path.get(), "/anypath"},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Scheme.get(), "https"},
+      // Malicious client trying to inject OAuth status headers
+      {"x-envoy-oauth-status", "injected-success"},
+      {"x-envoy-oauth-failure-reason", "injected-reason"},
+  };
+
+  // cookie-validation mocking - user is authenticated
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(true));
+
+  std::string legit_token{"legit_token"};
+  EXPECT_CALL(*validator_, token()).WillRepeatedly(ReturnRef(legit_token));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+
+  // Verify the injected headers were sanitized (removed)
+  EXPECT_TRUE(request_headers.get(OAuth2Headers::get().OAuthStatus).empty());
+  EXPECT_TRUE(request_headers.get(OAuth2Headers::get().OAuthFailureReason).empty());
+
+  EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_failure").value(), 0);
+  EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_success").value(), 1);
+}
+
+/**
+ * Scenario: Request with injected OAuth status headers on allow_failed path.
+ * Tests that sanitization occurs before the filter sets its own legitimate headers.
+ *
+ * Expected behavior: The injected headers should be removed, and only the filter's
+ * legitimate headers should be present in the final request.
+ */
+TEST_F(OAuth2Test, SanitizeInjectedOAuthStatusHeadersOnAllowFailedPath) {
+  init(getConfig());
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Path.get(), "/allowfailed/api"},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Scheme.get(), "https"},
+      // Malicious client trying to inject fake success status
+      {"x-envoy-oauth-status", "injected-success"},
+      {"x-envoy-oauth-failure-reason", "injected-fake-reason"},
+  };
+
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _)).Times(0);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+
+  // Verify only the legitimate "failed" status is present (not the injected "success")
+  auto status_headers = request_headers.get(OAuth2Headers::get().OAuthStatus);
+  EXPECT_EQ(status_headers.size(), 1);
+  EXPECT_EQ(status_headers[0]->value().getStringView(), "failed");
+
+  auto reason_headers = request_headers.get(OAuth2Headers::get().OAuthFailureReason);
+  EXPECT_EQ(reason_headers.size(), 1);
+  // Verify it's not the injected value
+  EXPECT_NE(reason_headers[0]->value().getStringView(), "injected-fake-reason");
+
+  EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_allow_failed_passthrough").value(), 1);
 }
 
 } // namespace Oauth2

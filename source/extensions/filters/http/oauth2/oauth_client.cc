@@ -39,10 +39,10 @@ constexpr const char* UrlBodyTemplateWithoutCredentialsForRefreshToken =
 
 } // namespace
 
-void OAuth2ClientImpl::asyncGetAccessToken(const std::string& auth_code,
-                                           const std::string& client_id, const std::string& secret,
-                                           const std::string& cb_url,
-                                           const std::string& code_verifier, AuthType auth_type) {
+absl::Status
+OAuth2ClientImpl::asyncGetAccessToken(const std::string& auth_code, const std::string& client_id,
+                                      const std::string& secret, const std::string& cb_url,
+                                      const std::string& code_verifier, AuthType auth_type) {
   ASSERT(state_ == OAuthState::Idle);
   state_ = OAuthState::PendingAccessToken;
 
@@ -71,12 +71,13 @@ void OAuth2ClientImpl::asyncGetAccessToken(const std::string& auth_code,
   request->body().add(body);
   request->headers().setContentLength(body.length());
   ENVOY_STREAM_LOG(debug, "Dispatching OAuth request for access token.", *decoder_callbacks_);
-  dispatchRequest(std::move(request));
+  return dispatchRequest(std::move(request));
 }
 
-void OAuth2ClientImpl::asyncRefreshAccessToken(const std::string& refresh_token,
-                                               const std::string& client_id,
-                                               const std::string& secret, AuthType auth_type) {
+absl::Status OAuth2ClientImpl::asyncRefreshAccessToken(const std::string& refresh_token,
+                                                       const std::string& client_id,
+                                                       const std::string& secret,
+                                                       AuthType auth_type) {
   ASSERT(state_ == OAuthState::Idle);
   state_ = OAuthState::PendingAccessTokenByRefreshToken;
 
@@ -105,10 +106,10 @@ void OAuth2ClientImpl::asyncRefreshAccessToken(const std::string& refresh_token,
   request->headers().setContentLength(body.length());
   ENVOY_STREAM_LOG(debug, "Dispatching OAuth request for update access token by refresh token.",
                    *decoder_callbacks_);
-  dispatchRequest(std::move(request));
+  return dispatchRequest(std::move(request));
 }
 
-void OAuth2ClientImpl::dispatchRequest(Http::RequestMessagePtr&& msg) {
+absl::Status OAuth2ClientImpl::dispatchRequest(Http::RequestMessagePtr&& msg) {
   const auto thread_local_cluster = cm_.getThreadLocalCluster(uri_.cluster());
   if (thread_local_cluster != nullptr) {
     auto options = Http::AsyncClient::RequestOptions().setTimeout(
@@ -121,8 +122,9 @@ void OAuth2ClientImpl::dispatchRequest(Http::RequestMessagePtr&& msg) {
 
     in_flight_request_ =
         thread_local_cluster->httpAsyncClient().send(std::move(msg), *this, options);
+    return absl::OkStatus();
   } else {
-    parent_->sendUnauthorizedResponse("Token endpoint cluster not found");
+    return absl::UnavailableError("Token endpoint cluster not found");
   }
 }
 
@@ -144,7 +146,7 @@ void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
                      message->bodyAsString());
     switch (oldState) {
     case OAuthState::PendingAccessToken:
-      parent_->sendUnauthorizedResponse(
+      parent_->asyncOnUnauthorized(
           fmt::format("Failed to get access token, response code: {}, response body: {}",
                       response_code, message->bodyAsString()));
       break;
@@ -164,7 +166,7 @@ void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
     MessageUtil::loadFromJson(response_body, response, ProtobufMessage::getNullValidationVisitor());
   }
   END_TRY catch (EnvoyException& e) {
-    parent_->sendUnauthorizedResponse(fmt::format(
+    parent_->asyncOnUnauthorized(fmt::format(
         "Failed to parse oauth response body: {}, exception: {}", response_body, e.what()));
     return;
   }
@@ -172,7 +174,7 @@ void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
   // TODO(snowp): Should this be a pgv validation instead? A more readable log
   // message might be good enough reason to do this manually?
   if (!response.has_access_token()) {
-    parent_->sendUnauthorizedResponse(
+    parent_->asyncOnUnauthorized(
         fmt::format("No access token found in the token exchange response: {}", response_body));
     return;
   }
@@ -186,7 +188,7 @@ void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
     expires_in = std::chrono::seconds{response.expires_in().value()};
   }
   if (expires_in <= 0s) {
-    parent_->sendUnauthorizedResponse(fmt::format(
+    parent_->asyncOnUnauthorized(fmt::format(
         "No default or explicit access token expiration found in the token exchange response: {}",
         response_body));
     return;
@@ -213,7 +215,7 @@ void OAuth2ClientImpl::onFailure(const Http::AsyncClient::Request&,
 
   switch (oldState) {
   case OAuthState::PendingAccessToken:
-    parent_->sendUnauthorizedResponse("Failed to get access token due to HTTP request failure");
+    parent_->asyncOnUnauthorized("Failed to get access token due to HTTP request failure");
     break;
   case OAuthState::PendingAccessTokenByRefreshToken:
     parent_->onRefreshAccessTokenFailure();
