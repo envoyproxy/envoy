@@ -1608,16 +1608,7 @@ ClusterManagerImpl::requestOnDemandClusterDiscovery(uint64_t config_source_key, 
   Event::Dispatcher& worker_dispatcher = cluster_manager.thread_local_dispatcher_;
   dispatcher_.post([this, config_source_key, timeout, name = std::move(name),
                     invoker = std::move(invoker), &worker_dispatcher] {
-    auto it = odcds_subscriptions_.find(config_source_key);
-    if (it == odcds_subscriptions_.end()) {
-      ENVOY_LOG(warn, "cm odcds: config source with key {} not found, discovery request ignored",
-                config_source_key);
-      worker_dispatcher.post([invoker = std::move(invoker)] {
-        invoker.invokeCallback(ClusterDiscoveryStatus::Missing);
-      });
-      return;
-    }
-    OdCdsApiSharedPtr odcds = it->second;
+    OdCdsApiSharedPtr odcds = odcds_subscriptions_.at(config_source_key);
 
     // Check for the cluster here too. It might have been added between the time when this closure
     // was posted and when it is being executed.
@@ -1632,8 +1623,7 @@ ClusterManagerImpl::requestOnDemandClusterDiscovery(uint64_t config_source_key, 
       return;
     }
 
-    if (auto pending_it = pending_cluster_creations_.find(name);
-        pending_it != pending_cluster_creations_.end()) {
+    if (pending_cluster_creations_.contains(name)) {
       ENVOY_LOG(debug, "cm odcds: on-demand discovery for cluster {} is already in progress", name);
       // We already began the discovery process for this cluster, nothing to do. If we got here,
       // it means that it was other worker thread that requested the discovery.
