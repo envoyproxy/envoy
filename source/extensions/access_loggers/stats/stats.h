@@ -66,12 +66,21 @@ private:
     uint64_t value_fixed_;
   };
 
+  struct AddSubtract {
+    envoy::data::accesslog::v3::AccessLogType add_at_;
+    envoy::data::accesslog::v3::AccessLogType subtract_at_;
+  };
+
   struct Gauge {
     NameAndTags stat_;
     Formatter::FormatterProviderPtr value_formatter_;
     uint64_t value_fixed_;
-    envoy::extensions::access_loggers::stats::v3::Config::Gauge::OperationType operation_type_;
+    bool is_set_operation_;
+    absl::optional<AddSubtract> add_subtract_;
   };
+
+  void emitLogForGauge(const Gauge& gauge, const Formatter::Context& context,
+                       const StreamInfo::StreamInfo& stream_info) const;
 
   const Stats::ScopeSharedPtr scope_;
   Stats::StatNamePool stat_name_pool_;

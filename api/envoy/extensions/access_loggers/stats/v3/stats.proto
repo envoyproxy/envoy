@@ -4,6 +4,8 @@ package envoy.extensions.access_loggers.stats.v3;
 
 import "google/protobuf/wrappers.proto";
 
+import "envoy/data/accesslog/v3/accesslog.proto";
+
 import "xds/annotations/v3/status.proto";
 
 import "udpa/annotations/status.proto";
@@ -96,37 +98,26 @@ message Config {
   // values, and are useful for tracking concurrency or other mutable values
   // over time.
   //
-  // Using the SET operation is straightforward and self-explanatory.
-  // The following example demonstrates how to use an ADD/SUBTRACT pair to track a gauge
-  // by configuring two separate stats access loggers with different filters.
+  // The `operation` field determines how the gauge is modified.
+  // Using the `set` operation is straightforward and self-explanatory.
+  // The following example demonstrates how to use an `add_subtract` pair to
+  // track a gauge by configuring a single stats access logger:
   //
   // .. code-block:: yaml
   //
   //   http_connection_manager:
   //     access_log:
   //     - name: envoy.access_loggers.stats
-  //       filter:
-  //         log_type_filter:
-  //           types: [DownstreamStart]
   //       typed_config:
   //         "@type": type.googleapis.com/envoy.extensions.access_loggers.stats.v3.Config
   //         stat_prefix: "my_prefix"
   //         gauges:
   //         - stat:
   //             name: "http_active_requests"
-  //           operation_type: ADD
-  //           value_fixed: 1
-  //     - name: envoy.access_loggers.stats
-  //       filter:
-  //         log_type_filter:
-  //           types: [DownstreamEnd]
-  //       typed_config:
-  //         "@type": type.googleapis.com/envoy.extensions.access_loggers.stats.v3.Config
-  //         stat_prefix: "my_prefix"
-  //         gauges:
-  //         - stat:
-  //             name: "http_active_requests"
-  //           operation_type: SUBTRACT
+  //           operation:
+  //             add_subtract:
+  //               add_at: DownstreamStart
+  //               subtract_at: DownstreamEnd
   //           value_fixed: 1
   //
   // .. warning::
@@ -136,12 +127,31 @@ message Config {
   //   on the memory overhead.
   message Gauge {
     // The operation to perform on the gauge.
-    // A non-``Unspecified`` operation type should be set.
-    enum OperationType {
-      Unspecified = 0;
-      Add = 1;
-      Subtract = 2;
-      Set = 3;
+    // One of ``is_set_operation`` or ``increment_decrement`` must be
+    // configured.
+    message Operation {
+      // The ADD/SUBTRACT pair operation.
+      // Both ``add_at`` and ``subtract_at`` must be configured with a
+      // corresponding ``AccessLogType`` pair. Subtraction is only performed if
+      // the addition was successful to prevent leaking.
+      message AddSubtract {
+        // The access log type to trigger the addition.
+        envoy.data.accesslog.v3.AccessLogType add_at = 1
+            [(validate.rules).enum = { defined_only: true }];
+
+        // The access log type to trigger the subtraction.
+        envoy.data.accesslog.v3.AccessLogType subtract_at = 2
+            [(validate.rules).enum = { defined_only: true }];
+      }
+
+      // The SET operation.
+      message Set {}
+
+      // The SET operation to perform on the gauge.
+      Set set = 1;
+
+      // The increment/decrement to perform on the gauge.
+      AddSubtract add_subtract = 2;
     }
 
     // The name and tags of this gauge.
@@ -158,7 +168,7 @@ message Config {
     google.protobuf.UInt64Value value_fixed = 3 [(validate.rules).uint64 = {gt: 0}];
 
     // The operation to perform on the gauge.
-    OperationType operation_type = 4 [(validate.rules).enum = {defined_only: true not_in: 0}];
+    Operation operation = 4 [(validate.rules).message = {required: true}];
   }
 
   // The stat prefix for the generated stats.

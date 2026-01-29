@@ -178,11 +178,8 @@ TEST_P(StatsAccessLogIntegrationTest, PercentHistogram) {
 }
 
 TEST_P(StatsAccessLogIntegrationTest, ActiveRequestsGauge) {
-  const std::string config_yaml_start = R"EOF(
+  const std::string config_yaml = R"EOF(
               name: envoy.access_loggers.stats
-              filter:
-                log_type_filter:
-                  types: [DownstreamStart]
               typed_config:
                 "@type": type.googleapis.com/envoy.extensions.access_loggers.stats.v3.Config
                 stat_prefix: test_stat_prefix
@@ -193,28 +190,13 @@ TEST_P(StatsAccessLogIntegrationTest, ActiveRequestsGauge) {
                         - name: request_header_tag
                           value_format: '%REQUEST_HEADER(tag-value)%'
                     value_fixed: 1
-                    operation_type: Add
+                    operation:
+                      add_subtract:
+                        add_at: DownstreamStart
+                        subtract_at: DownstreamEnd
 )EOF";
 
-  const std::string config_yaml_end = R"EOF(
-              name: envoy.access_loggers.stats
-              filter:
-                log_type_filter:
-                  types: [DownstreamEnd]
-              typed_config:
-                "@type": type.googleapis.com/envoy.extensions.access_loggers.stats.v3.Config
-                stat_prefix: test_stat_prefix
-                gauges:
-                  - stat:
-                      name: active_requests
-                      tags:
-                        - name: request_header_tag
-                          value_format: '%REQUEST_HEADER(tag-value)%'
-                    value_fixed: 1
-                    operation_type: Subtract
-)EOF";
-
-  init({config_yaml_start, config_yaml_end}, /*autonomous_upstream=*/false,
+  init(config_yaml, /*autonomous_upstream=*/false,
        /*flush_access_log_on_new_request=*/true);
 
   Http::TestRequestHeaderMapImpl request_headers{

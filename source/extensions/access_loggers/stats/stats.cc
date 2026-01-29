@@ -1,6 +1,7 @@
 #include "source/extensions/access_loggers/stats/stats.h"
 
 #include "envoy/data/accesslog/v3/accesslog.pb.h"
+#include "envoy/stream_info/filter_state.h"
 
 #include "source/common/formatter/substitution_formatter.h"
 
@@ -10,6 +11,23 @@ namespace AccessLoggers {
 namespace StatsAccessLog {
 
 namespace {
+
+class AccessLogState : public StreamInfo::FilterState::Object {
+public:
+  // The Stats::Gauge pointer is used as a key in the set. The memory address of the Gauge object is
+  // unique for the lifetime of that specific gauge and serves as a unique identifier.
+  void addInflightGauge(Stats::Gauge* gauge) { inflight_gauges_.insert(gauge); }
+  bool removeInflightGauge(Stats::Gauge* gauge) { return inflight_gauges_.erase(gauge) > 0; }
+
+  static const std::string& key() {
+    static const std::string* kKey = new std::string("envoy.access_loggers.stats.access_log_state");
+    return *kKey;
+  }
+
+private:
+  absl::flat_hash_set<Stats::Gauge*> inflight_gauges_;
+};
+
 Formatter::FormatterProviderPtr
 parseValueFormat(absl::string_view format,
                  const std::vector<Formatter::CommandParserPtr>& commands) {
@@ -82,13 +100,28 @@ StatsAccessLog::StatsAccessLog(const envoy::extensions::access_loggers::stats::v
       gauges_([&]() {
         std::vector<Gauge> gauges;
         for (const auto& gauge_cfg : config.gauges()) {
-          Gauge& inserted =
-              gauges.emplace_back(NameAndTags(gauge_cfg.stat(), stat_name_pool_, commands), nullptr,
-                                  0, gauge_cfg.operation_type());
-          if (gauge_cfg.operation_type() ==
-              envoy::extensions::access_loggers::stats::v3::Config::Gauge::Unspecified) {
-            throw EnvoyException("Stats logger gauge must have `operation_type` configured.");
+          bool is_set = false;
+          absl::optional<AddSubtract> add_subtract;
+
+          // Proto validation ensures that operation is present. However, since the oneof is not
+          // enforced in the proto (for legacy reasons), we need to check manually that exactly one
+          // operation is configured.
+          if (gauge_cfg.operation().has_add_subtract() == gauge_cfg.operation().has_set()) {
+            throw EnvoyException(
+                "Stats logger gauge must have either `set` or `add_subtract` operation configured.");
           }
+
+          if (gauge_cfg.operation().has_add_subtract()) {
+            add_subtract = {gauge_cfg.operation().add_subtract().add_at(),
+                            gauge_cfg.operation().add_subtract().subtract_at()};
+          } else {
+            is_set = true;
+          }
+
+          Gauge& inserted = gauges.emplace_back(
+              NameAndTags(gauge_cfg.stat(), stat_name_pool_, commands), nullptr, 0, is_set,
+              add_subtract);
+
           if (!gauge_cfg.value_format().empty() && gauge_cfg.has_value_fixed()) {
             throw EnvoyException(
                 "Stats logger cannot have both `value_format` and `value_fixed` configured.");
@@ -211,38 +244,77 @@ void StatsAccessLog::emitLogConst(const Formatter::Context& context,
   }
 
   for (const auto& gauge : gauges_) {
-    uint64_t value;
-    if (gauge.value_formatter_ != nullptr) {
-      absl::optional<uint64_t> computed_value_opt =
-          getFormatValue(*gauge.value_formatter_, context, stream_info, false);
-      if (!computed_value_opt.has_value()) {
-        continue;
-      }
+    emitLogForGauge(gauge, context, stream_info);
+  }
+}
 
-      value = *computed_value_opt;
+void StatsAccessLog::emitLogForGauge(const Gauge& gauge, const Formatter::Context& context,
+                                     const StreamInfo::StreamInfo& stream_info) const {
+  uint64_t value;
+  if (gauge.value_formatter_ != nullptr) {
+    absl::optional<uint64_t> computed_value_opt =
+        getFormatValue(*gauge.value_formatter_, context, stream_info, false);
+    if (!computed_value_opt.has_value()) {
+      return;
+    }
+
+    value = *computed_value_opt;
+  } else {
+    value = gauge.value_fixed_;
+  }
+
+  enum class OpType { Unspecified, Add, Subtract, Set };
+  OpType op = OpType::Unspecified;
+
+  if (gauge.add_subtract_) {
+    if (context.accessLogType() == gauge.add_subtract_->add_at_) {
+      op = OpType::Add;
+    } else if (context.accessLogType() == gauge.add_subtract_->subtract_at_) {
+      op = OpType::Subtract;
     } else {
-      value = gauge.value_fixed_;
+      return;
     }
+  } else if (gauge.is_set_operation_) {
+    op = OpType::Set;
+  }
 
-    auto [tags, storage] = gauge.stat_.tags(context, stream_info, *scope_);
-    Stats::Gauge::ImportMode import_mode =
-        gauge.operation_type_ == envoy::extensions::access_loggers::stats::v3::Config::Gauge::Set
-            ? Stats::Gauge::ImportMode::NeverImport
-            : Stats::Gauge::ImportMode::Accumulate;
-    auto& gauge_stat = scope_->gaugeFromStatNameWithTags(gauge.stat_.name_, tags, import_mode);
-    switch (gauge.operation_type_) {
-    case envoy::extensions::access_loggers::stats::v3::Config::Gauge::Add:
-      gauge_stat.add(value);
-      break;
-    case envoy::extensions::access_loggers::stats::v3::Config::Gauge::Subtract:
-      gauge_stat.sub(value);
-      break;
-    case envoy::extensions::access_loggers::stats::v3::Config::Gauge::Set:
-      gauge_stat.set(value);
-      break;
-    default:
-      break;
+  auto [tags, storage] = gauge.stat_.tags(context, stream_info, *scope_);
+  Stats::Gauge::ImportMode import_mode = op == OpType::Set ? Stats::Gauge::ImportMode::NeverImport
+                                                           : Stats::Gauge::ImportMode::Accumulate;
+  auto& gauge_stat = scope_->gaugeFromStatNameWithTags(gauge.stat_.name_, tags, import_mode);
+
+  if (gauge.add_subtract_) {
+    auto& filter_state = const_cast<StreamInfo::FilterState&>(stream_info.filterState());
+    if (!filter_state.hasData<AccessLogState>(AccessLogState::key())) {
+      filter_state.setData(AccessLogState::key(), std::make_shared<AccessLogState>(),
+                           StreamInfo::FilterState::StateType::Mutable,
+                           StreamInfo::FilterState::LifeSpan::Request);
     }
+    auto* state = filter_state.getDataMutable<AccessLogState>(AccessLogState::key());
+
+    if (op == OpType::Add) {
+      state->addInflightGauge(&gauge_stat);
+      gauge_stat.add(value);
+    } else if (op == OpType::Subtract) {
+      if (state->removeInflightGauge(&gauge_stat)) {
+        gauge_stat.sub(value);
+      }
+    }
+    return;
+  }
+
+  switch (op) {
+  case OpType::Add:
+    gauge_stat.add(value);
+    break;
+  case OpType::Subtract:
+    gauge_stat.sub(value);
+    break;
+  case OpType::Set:
+    gauge_stat.set(value);
+    break;
+  default:
+    break;
   }
 }
 
