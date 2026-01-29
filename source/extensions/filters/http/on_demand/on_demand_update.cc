@@ -272,6 +272,9 @@ void OnDemandRouteUpdate::onClusterDiscoveryCompletion(
 
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.on_demand_cluster_no_recreate_stream")) {
+    // Whether or not the cluster exists, we continue decoding. Filters further down the
+    // chain may want to weigh in on cluster selection, so we don't send a local reply
+    // here.
     callbacks_->continueDecoding();
     return;
   }
