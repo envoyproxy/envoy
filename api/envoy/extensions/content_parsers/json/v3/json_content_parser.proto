@@ -4,6 +4,8 @@ package envoy.extensions.content_parsers.json.v3;
 
 import "envoy/extensions/filters/http/json_to_metadata/v3/json_to_metadata.proto";
 
+import "xds/annotations/v3/status.proto";
+
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
