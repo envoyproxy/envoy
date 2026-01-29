@@ -708,8 +708,9 @@ TEST_F(ExtAuthzHttpClientTest, ErrorResponseStatusCodeUnsetForStatusOnError) {
   // Capture the actual response to verify status_code is Http::Code(0).
   ResponsePtr captured_response;
   EXPECT_CALL(request_callbacks_, onComplete_(_))
-      .WillOnce(Invoke(
-          [&captured_response](ResponsePtr& response) { captured_response = std::move(response); }));
+      .WillOnce(Invoke([&captured_response](ResponsePtr& response) {
+        captured_response = std::move(response);
+      }));
   client_->onFailure(async_request_, Http::AsyncClient::FailureReason::Reset);
 
   ASSERT_NE(captured_response, nullptr);
@@ -731,8 +732,9 @@ TEST_F(ExtAuthzHttpClientTest, Error5xxResponseStatusCodeUnsetForStatusOnError) 
   // Capture the actual response to verify status_code is Http::Code(0).
   ResponsePtr captured_response;
   EXPECT_CALL(request_callbacks_, onComplete_(_))
-      .WillOnce(Invoke(
-          [&captured_response](ResponsePtr& response) { captured_response = std::move(response); }));
+      .WillOnce(Invoke([&captured_response](ResponsePtr& response) {
+        captured_response = std::move(response);
+      }));
   client_->onSuccess(async_request_, std::move(check_response));
 
   ASSERT_NE(captured_response, nullptr);
@@ -751,8 +753,9 @@ TEST_F(ExtAuthzHttpClientTest, NoClusterErrorResponseStatusCodeUnsetForStatusOnE
   // Capture the actual response to verify status_code is Http::Code(0).
   ResponsePtr captured_response;
   EXPECT_CALL(request_callbacks_, onComplete_(_))
-      .WillOnce(Invoke(
-          [&captured_response](ResponsePtr& response) { captured_response = std::move(response); }));
+      .WillOnce(Invoke([&captured_response](ResponsePtr& response) {
+        captured_response = std::move(response);
+      }));
   client_->check(request_callbacks_, envoy::service::auth::v3::CheckRequest{}, parent_span_,
                  stream_info_);
 

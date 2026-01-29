@@ -34,6 +34,9 @@ const Http::HeaderMap& lengthZeroHeader() {
 }
 
 // Static response used for creating authorization ERROR responses.
+// Note: status_code is intentionally left as default (0) so that the filter
+// uses the configured status_on_error value. See PR #42764 for the equivalent
+// gRPC fix.
 const Response& errorResponse() {
   CONSTRUCT_ON_FIRST_USE(Response, Response{CheckStatus::Error,
                                             HeaderMutationVector{},
@@ -44,7 +47,7 @@ const Response& errorResponse() {
                                             Http::Utility::QueryParamsVector{},
                                             {},
                                             EMPTY_STRING,
-                                            Http::Code::Forbidden,
+                                            Http::Code{},
                                             Protobuf::Struct{}});
 }
 

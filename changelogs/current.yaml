@@ -78,6 +78,11 @@ bug_fixes:
   change: |
     Fixed a bug where headers from a denied authorization response (non-200) were not properly propagated
     to the client.
+- area: ext_authz
+  change: |
+    Fixed the HTTP ext_authz client to respect ``status_on_error`` configuration when the HTTP call fails.
+    Previously, HTTP client failures (timeout, 5xx responses, connection errors) always returned 403 Forbidden
+    regardless of the configured ``status_on_error`` setting.
 - area: formatter
   change: |
     Fixed the log formatter in HTTP router upstream logs by correctly setting the downstream connection's
