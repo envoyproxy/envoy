@@ -882,13 +882,6 @@ filegroup(
         patch_args = ["-p1"],
     )
 
-    # This archive provides Kafka (and Zookeeper) binaries, that are used during Kafka integration
-    # tests.
-    external_http_archive(
-        name = "kafka_server_binary",
-        build_file_content = BUILD_ALL_CONTENT,
-    )
-
 def _com_github_fdio_vpp_vcl():
     external_http_archive(
         name = "com_github_fdio_vpp_vcl",
