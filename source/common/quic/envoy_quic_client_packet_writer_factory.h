@@ -51,7 +51,8 @@ public:
    * Returns a packet writer factory based on the given config.
    */
   virtual QuicClientPacketWriterFactoryPtr
-  createQuicClientPacketWriterFactory(const Protobuf::Message& config,
+  createQuicClientPacketWriterFactory(Event::Dispatcher& dispatcher,
+                                      const Protobuf::Message& config,
                                       ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
 };
 

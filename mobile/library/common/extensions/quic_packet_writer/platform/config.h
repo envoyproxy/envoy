@@ -20,7 +20,7 @@ public:
   }
 
   Envoy::Quic::QuicClientPacketWriterFactoryPtr createQuicClientPacketWriterFactory(
-      const Protobuf::Message& config,
+      Event::Dispatcher& dispatcher, const Protobuf::Message& config,
       Envoy::ProtobufMessage::ValidationVisitor& validation_visitor) override;
 };
 
