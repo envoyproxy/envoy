@@ -199,12 +199,21 @@ private:
   Filters::Common::LocalRateLimit::LocalRateLimiterImpl& getPerConnectionRateLimiter();
   Filters::Common::LocalRateLimit::LocalRateLimiter::Result
   requestAllowed(absl::Span<const RateLimit::Descriptor> request_descriptors);
+  bool enableXRateLimitHeaders() const {
+    if (x_ratelimit_option_ ==
+        RateLimit::XRateLimitOption::RateLimit_XRateLimitOption_UNSPECIFIED) {
+      return used_config_->enableXRateLimitHeaders();
+    }
+    return x_ratelimit_option_ ==
+           RateLimit::XRateLimitOption::RateLimit_XRateLimitOption_DRAFT_VERSION_03;
+  }
 
   FilterConfigSharedPtr config_;
   // Actual config used for the current request. Is config_ by default, but can be overridden by
   // per-route config.
   const FilterConfig* used_config_{};
   std::shared_ptr<const Filters::Common::LocalRateLimit::TokenBucketContext> token_bucket_context_;
+  RateLimit::XRateLimitOption x_ratelimit_option_{};
 
   VhRateLimitOptions vh_rate_limits_;
 };

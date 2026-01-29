@@ -34,6 +34,8 @@ enum class McpMethod {
   ResourcesUnsubscribe,
   PromptsList,
   PromptsGet,
+  CompletionComplete,
+  LoggingSetLevel,
   Ping,
   // Notifications (client -> server, fire-and-forget).
   NotificationInitialized,
@@ -118,6 +120,8 @@ private:
   ssize_t rewriteResourceUriBody(Buffer::Instance& buffer);
   // Rewrites the prompt name in the buffer. Returns the size delta (new_size - old_size).
   ssize_t rewritePromptsGetBody(Buffer::Instance& buffer);
+  // Rewrites the completion ref (prompt name or resource URI) in the buffer.
+  ssize_t rewriteCompletionCompleteBody(Buffer::Instance& buffer);
   // Helper to replace content at a position in the buffer, and return the delta.
   ssize_t rewriteAtPosition(Buffer::Instance& buffer, ssize_t pos, const std::string& search_str,
                             const std::string& replacement);
@@ -134,6 +138,8 @@ private:
   void handleResourcesUnsubscribe();
   void handlePromptsList();
   void handlePromptsGet();
+  void handleCompletionComplete();
+  void handleLoggingSetLevel();
   void handlePing();
   // Generic handler for client→server notifications (fanout to all backends).
   void handleNotification(absl::string_view notification_name);
@@ -175,6 +181,7 @@ private:
   std::string rewritten_uri_;        // Rewritten URI for backend (e.g., "file://path/to/resource")
   std::string prompt_name_;          // Original prefixed prompt name (e.g., "time__greeting")
   std::string unprefixed_prompt_name_; // Unprefixed prompt name for backend (e.g., "greeting")
+  std::string completion_ref_type_;    // Completion reference type: "ref/prompt" or "ref/resource"
   bool needs_body_rewrite_{false};     // Whether tool/prompt name or URI rewriting is needed
 
   std::string route_name_{"default"};

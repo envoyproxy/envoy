@@ -46,8 +46,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/bazelbuild/buildtools/archive/v{version}.tar.gz"],
     ),
     envoy_examples = dict(
-        version = "0.1.5",
-        sha256 = "bae2525bdd5838e94249470e5c3ee212c9a9533624a45be73782e9b45f70348a",
+        version = "0.1.7",
+        sha256 = "f015df55ca56d627b9d3e3b828273defc541656debf9268872cde9ddaed45202",
         strip_prefix = "examples-{version}",
         urls = ["https://github.com/envoyproxy/examples/archive/v{version}.tar.gz"],
     ),
@@ -554,14 +554,10 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/simdutf/simdutf/releases/download/v{version}/singleheader.zip"],
     ),
     com_github_google_quiche = dict(
-        project_name = "QUICHE",
-        project_desc = "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols",
-        project_url = "https://github.com/google/quiche",
-        version = "f9b729501753d7d4dd61f8e868a1f4a38e5ece26",
-        sha256 = "0ed32ce64d6d3a9acd542c60301977fbbbb36a9bc0dc6b46d2f97cabbbcae3eb",
+        version = "b7b4c0cfe393a57b8706b0f1be81518595daaa44",
+        sha256 = "9d8344faf932165b6013f8fdd2cbfe2be7c2e7a5129c5e572036d13718a3f1bf",
         urls = ["https://github.com/google/quiche/archive/{version}.tar.gz"],
         strip_prefix = "quiche-{version}",
-        release_date = "2026-01-22",
     ),
     googleurl = dict(
         version = "dd4080fec0b443296c0ed0036e1e776df8813aa7",
@@ -588,24 +584,10 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/google/flatbuffers/archive/v{version}.tar.gz"],
     ),
     com_googlesource_code_re2 = dict(
-        version = "2023-11-01",
-        sha256 = "4e6593ac3c71de1c0f322735bc8b0492a72f66ffccfad76e259fa21c41d27d8a",
+        version = "2024-07-02",
+        sha256 = "a835fe55fbdcd8e80f38584ab22d0840662c67f2feb36bd679402da9641dc71e",
         strip_prefix = "re2-{version}",
-        urls = ["https://github.com/google/re2/archive/{version}.tar.gz"],
-    ),
-    # Included to access FuzzedDataProvider.h. This is compiler agnostic but
-    # provided as part of the compiler-rt source distribution. We can't use the
-    # Clang variant as we are not a Clang-LLVM only shop today.
-    org_llvm_releases_compiler_rt = dict(
-        # Note: the llvm/clang version should match the version specified in:
-        #  - .github/workflows/codeql-daily.yml
-        #  - .github/workflows/codeql-push.yml
-        #  - https://github.com/envoyproxy/envoy-build-tools/blob/main/build_container/build_container_ubuntu.sh#L84
-        version = "18.1.8",
-        sha256 = "e054e99a9c9240720616e927cb52363abbc8b4f1ef0286bad3df79ec8fdf892f",
-        # Only allow peeking at fuzzer related files for now.
-        strip_prefix = "compiler-rt-{version}.src",
-        urls = ["https://github.com/llvm/llvm-project/releases/download/llvmorg-{version}/compiler-rt-{version}.src.tar.xz"],
+        urls = ["https://github.com/google/re2/releases/download/{version}/re2-{version}.zip"],
     ),
     kafka_source = dict(
         version = "3.9.1",
