@@ -10,7 +10,6 @@
 #include "envoy/stats/scope.h"
 #include "envoy/upstream/load_balancer.h"
 
-#include "source/common/common/logger.h"
 #include "source/extensions/load_balancing_policies/common/thread_aware_lb_impl.h"
 
 namespace Envoy {
@@ -48,8 +47,6 @@ public:
  * - Lower memory usage than ring hash
  * - O(n) picking time instead of O(log n) for ring hash
  *
- * Based on:
- * https://www.snia.org/sites/default/files/SDC15_presentations/dist_sys/Jason_Resch_New_Consistent_Hashings_Rev.pdf
  */
 class RendezvousHashLoadBalancer : public ThreadAwareLoadBalancerBase {
   // Allow test access to private nested class.

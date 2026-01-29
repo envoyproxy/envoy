@@ -16,8 +16,8 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: Rendezvous Hash Load Balancing Policy]
 // [#extension: envoy.load_balancing_policies.rendezvous_hash]
 
-// This configuration allows the built-in RENDEZVOUS_HASH (also known as Highest Random Weight or HRW)
-// LB policy to be configured via the LB policy extension point.
+// Configuration for Rendezvous Hash (also known as Highest Random Weight or HRW)
+// load balancing policy to be configured via the LB policy extension point.
 //
 // Rendezvous hashing works by computing a score for each host for a given key, and selecting the host
 // with the highest score. This provides consistent hashing with better distribution than ring hash
