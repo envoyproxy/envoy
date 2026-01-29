@@ -696,6 +696,72 @@ TEST_F(ExtAuthzHttpClientTest, NoCluster) {
                  stream_info_);
 }
 
+// Test that error response has status_code = Http::Code(0) so that the filter
+// can use the configured status_on_error instead of a hardcoded 403.
+// Regression test for HTTP ext_authz status_on_error being ignored on timeout/failure.
+// See: https://github.com/envoyproxy/envoy/pull/42764 (fixed gRPC, HTTP still broken)
+TEST_F(ExtAuthzHttpClientTest, ErrorResponseStatusCodeUnsetForStatusOnError) {
+  envoy::service::auth::v3::CheckRequest request;
+
+  client_->check(request_callbacks_, request, parent_span_, stream_info_);
+
+  // Capture the actual response to verify status_code is Http::Code(0).
+  ResponsePtr captured_response;
+  EXPECT_CALL(request_callbacks_, onComplete_(_))
+      .WillOnce(Invoke(
+          [&captured_response](ResponsePtr& response) { captured_response = std::move(response); }));
+  client_->onFailure(async_request_, Http::AsyncClient::FailureReason::Reset);
+
+  ASSERT_NE(captured_response, nullptr);
+  EXPECT_EQ(captured_response->status, CheckStatus::Error);
+  // The status_code must be Http::Code(0) to allow the filter to use status_on_error config.
+  // If this is Http::Code::Forbidden (403), it will override the configured status_on_error.
+  EXPECT_EQ(captured_response->status_code, static_cast<Http::Code>(0));
+}
+
+// Test that 5xx error response has status_code = Http::Code(0) so that the filter
+// can use the configured status_on_error instead of a hardcoded 403.
+TEST_F(ExtAuthzHttpClientTest, Error5xxResponseStatusCodeUnsetForStatusOnError) {
+  Http::ResponseMessagePtr check_response(new Http::ResponseMessageImpl(
+      Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "503"}}}));
+  envoy::service::auth::v3::CheckRequest request;
+
+  client_->check(request_callbacks_, request, parent_span_, stream_info_);
+
+  // Capture the actual response to verify status_code is Http::Code(0).
+  ResponsePtr captured_response;
+  EXPECT_CALL(request_callbacks_, onComplete_(_))
+      .WillOnce(Invoke(
+          [&captured_response](ResponsePtr& response) { captured_response = std::move(response); }));
+  client_->onSuccess(async_request_, std::move(check_response));
+
+  ASSERT_NE(captured_response, nullptr);
+  EXPECT_EQ(captured_response->status, CheckStatus::Error);
+  // The status_code must be Http::Code(0) to allow the filter to use status_on_error config.
+  EXPECT_EQ(captured_response->status_code, static_cast<Http::Code>(0));
+}
+
+// Test that cluster not found error response has status_code = Http::Code(0).
+TEST_F(ExtAuthzHttpClientTest, NoClusterErrorResponseStatusCodeUnsetForStatusOnError) {
+  InSequence s;
+
+  EXPECT_CALL(cm_, getThreadLocalCluster(Eq("ext_authz"))).WillOnce(Return(nullptr));
+  EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient()).Times(0);
+
+  // Capture the actual response to verify status_code is Http::Code(0).
+  ResponsePtr captured_response;
+  EXPECT_CALL(request_callbacks_, onComplete_(_))
+      .WillOnce(Invoke(
+          [&captured_response](ResponsePtr& response) { captured_response = std::move(response); }));
+  client_->check(request_callbacks_, envoy::service::auth::v3::CheckRequest{}, parent_span_,
+                 stream_info_);
+
+  ASSERT_NE(captured_response, nullptr);
+  EXPECT_EQ(captured_response->status, CheckStatus::Error);
+  // The status_code must be Http::Code(0) to allow the filter to use status_on_error config.
+  EXPECT_EQ(captured_response->status_code, static_cast<Http::Code>(0));
+}
+
 // Test that retry policy is properly configured when set in HttpService.
 TEST_F(ExtAuthzHttpClientTest, RetryPolicyConfiguration) {
   const std::string yaml = R"EOF(
