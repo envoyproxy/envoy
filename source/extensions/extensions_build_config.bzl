@@ -590,6 +590,11 @@ EXTENSIONS = {
     "envoy.config_mux.sotw_grpc_mux_factory": "//source/extensions/config_subscription/grpc/xds_mux:grpc_mux_lib",
 
     #
+    # Content Parsers
+    #
+    "envoy.content_parsers.json":                            "//source/extensions/content_parsers/json:config",
+
+    #
     # Geolocation Provider
     #
     "envoy.geoip_providers.maxmind":                         "//source/extensions/geoip_providers/maxmind:config",
