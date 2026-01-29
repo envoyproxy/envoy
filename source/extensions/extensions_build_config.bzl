@@ -592,7 +592,7 @@ EXTENSIONS = {
     #
     # Content Parsers
     #
-    "envoy.sse_content_parsers.json":                        "//source/extensions/content_parsers/json:config",
+    "envoy.content_parsers.json":                            "//source/extensions/content_parsers/json:config",
 
     #
     # Geolocation Provider
