@@ -32,6 +32,11 @@ TEST(JsonContentParserConfigTest, ValidConfig) {
   JsonContentParserConfigFactory factory;
   auto parser_factory = factory.createParserFactory(proto_config, context);
   EXPECT_NE(parser_factory, nullptr);
+
+  // Test factory methods
+  auto parser = parser_factory->createParser();
+  EXPECT_NE(parser, nullptr);
+  EXPECT_EQ(parser_factory->statsPrefix(), "json.");
 }
 
 TEST(JsonContentParserConfigTest, OnMissingWithEmptyValue) {

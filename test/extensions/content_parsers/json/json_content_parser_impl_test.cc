@@ -622,6 +622,98 @@ TEST_F(JsonContentParserTest, AllRulesStopAfterMatchCausesStreamStop) {
   EXPECT_TRUE(result3.stop_processing);
 }
 
+TEST_F(JsonContentParserTest, OnErrorDeferredAction) {
+  // Create config programmatically to properly set protobuf Value
+  ProtoConfig proto_config;
+  auto* rule = proto_config.add_rules()->mutable_rule();
+  rule->add_selectors()->set_key("usage");
+
+  auto* on_present = rule->mutable_on_present();
+  on_present->set_metadata_namespace("envoy.lb");
+  on_present->set_key("usage");
+
+  auto* on_error = rule->mutable_on_error();
+  on_error->set_metadata_namespace("envoy.errors");
+  on_error->set_key("parse_error");
+  on_error->mutable_value()->set_string_value("failed");
+
+  parser_ = std::make_unique<JsonContentParserImpl>(proto_config);
+
+  // Test getDeferredActions when has_error is true
+  auto deferred = parser_->getDeferredActions(0, true, false);
+  EXPECT_EQ(deferred.size(), 1);
+  EXPECT_EQ(deferred[0].namespace_, "envoy.errors");
+  EXPECT_EQ(deferred[0].key, "parse_error");
+  ASSERT_TRUE(deferred[0].value.has_value());
+  EXPECT_EQ(deferred[0].value->string_value(), "failed");
+}
+
+TEST_F(JsonContentParserTest, DoubleValueExtraction) {
+  const std::string config = R"EOF(
+rules:
+  - rule:
+      selectors:
+        - key: "price"
+      on_present:
+        metadata_namespace: "envoy.lb"
+        key: "price"
+        type: NUMBER
+  - rule:
+      selectors:
+        - key: "score"
+      on_present:
+        metadata_namespace: "envoy.lb"
+        key: "score"
+        type: PROTOBUF_VALUE
+  )EOF";
+  setupParser(config);
+
+  const std::string data = R"({"price":19.99,"score":3.14})";
+  auto result = parser_->parse(data);
+
+  EXPECT_FALSE(result.has_error);
+  EXPECT_EQ(result.immediate_actions.size(), 2);
+
+  // First action: NUMBER type with double
+  EXPECT_EQ(result.immediate_actions[0].namespace_, "envoy.lb");
+  EXPECT_EQ(result.immediate_actions[0].key, "price");
+  ASSERT_TRUE(result.immediate_actions[0].value.has_value());
+  EXPECT_DOUBLE_EQ(result.immediate_actions[0].value->number_value(), 19.99);
+
+  // Second action: PROTOBUF_VALUE type with double
+  EXPECT_EQ(result.immediate_actions[1].namespace_, "envoy.lb");
+  EXPECT_EQ(result.immediate_actions[1].key, "score");
+  ASSERT_TRUE(result.immediate_actions[1].value.has_value());
+  EXPECT_DOUBLE_EQ(result.immediate_actions[1].value->number_value(), 3.14);
+}
+
+TEST_F(JsonContentParserTest, NumRulesMethod) {
+  const std::string config = R"EOF(
+rules:
+  - rule:
+      selectors:
+        - key: "field1"
+      on_present:
+        metadata_namespace: "envoy.lb"
+        key: "key1"
+  - rule:
+      selectors:
+        - key: "field2"
+      on_present:
+        metadata_namespace: "envoy.lb"
+        key: "key2"
+  - rule:
+      selectors:
+        - key: "field3"
+      on_present:
+        metadata_namespace: "envoy.lb"
+        key: "key3"
+  )EOF";
+  setupParser(config);
+
+  EXPECT_EQ(parser_->numRules(), 3);
+}
+
 } // namespace
 } // namespace Json
 } // namespace ContentParsers
