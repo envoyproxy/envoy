@@ -1,7 +1,5 @@
 #include "source/common/tls/cert_validator/utility.h"
 
-#include "source/common/tls/utility.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
