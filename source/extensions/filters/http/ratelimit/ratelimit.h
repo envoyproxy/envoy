@@ -223,7 +223,9 @@ using FilterConfigPerRouteSharedPtr = std::shared_ptr<FilterConfigPerRoute>;
  * HTTP rate limit filter. Depending on the route configuration, this filter calls the global
  * rate limiting service before allowing further filter iteration.
  */
-class Filter : public Http::StreamFilter, public Filters::Common::RateLimit::RequestCallbacks {
+class Filter : public Http::StreamFilter,
+               public Filters::Common::RateLimit::RequestCallbacks,
+               public Logger::Loggable<Logger::Id::filter> {
 public:
   Filter(FilterConfigSharedPtr config, Filters::Common::RateLimit::ClientPtr&& client)
       : config_(config), client_(std::move(client)) {}
@@ -284,6 +286,7 @@ private:
   bool initiating_call_{};
   Http::ResponseHeaderMapPtr response_headers_to_add_;
   Http::RequestHeaderMap* request_headers_{};
+  std::vector<Envoy::RateLimit::Descriptor> descriptors_;
 };
 
 /**

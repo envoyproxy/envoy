@@ -1,7 +1,9 @@
 #include "source/common/http/sse/sse_parser.h"
 
+#include <algorithm>
 #include <cstdint>
 
+#include "absl/strings/ascii.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -31,6 +33,39 @@ SseParser::ParsedEvent SseParser::parseEvent(absl::string_view event) {
         parsed_event.data->append("\n");
       }
       parsed_event.data->append(field_value.data(), field_value.size());
+    } else if (field_name == "id") {
+      // Per SSE spec, if the field value contains U+0000 NULL, the field is ignored.
+      // Otherwise, set the last event ID to the field value. If multiple id fields exist,
+      // the last one wins.
+      if (field_value.find('\0') == absl::string_view::npos) {
+        parsed_event.id = std::string(field_value);
+      }
+    } else if (field_name == "event") {
+      // Per SSE spec, the event field sets the event type. If multiple event fields exist,
+      // the last one wins.
+      parsed_event.event_type = std::string(field_value);
+    } else if (field_name == "retry") {
+      // Per SSE spec, the retry field must consist of only ASCII digits.
+      // If it contains any other character, the field is ignored.
+      if (!field_value.empty()) {
+        uint64_t value = 0;
+        bool valid = true;
+        for (char c : field_value) {
+          if (!absl::ascii_isdigit(c)) {
+            valid = false;
+            break;
+          }
+          uint64_t new_value = value * 10 + static_cast<uint64_t>(c - '0');
+          if (new_value < value) {
+            valid = false;
+            break;
+          }
+          value = new_value;
+        }
+        if (valid) {
+          parsed_event.retry = value;
+        }
+      }
     }
   }
 

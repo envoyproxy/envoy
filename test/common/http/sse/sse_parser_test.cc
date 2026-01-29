@@ -1,3 +1,5 @@
+#include <limits>
+
 #include "source/common/http/sse/sse_parser.h"
 
 #include "gtest/gtest.h"
@@ -449,6 +451,129 @@ TEST_F(SseParserTest, FindEventEndWithBOM) {
   auto event = SseParser::parseEvent(event_str);
   ASSERT_TRUE(event.data.has_value());
   EXPECT_EQ(event.data.value(), "hello");
+}
+
+// Test parseEvent with id field
+TEST_F(SseParserTest, ParseEventWithId) {
+  const std::string event = "id: 123\ndata: test\n";
+  auto parsed = SseParser::parseEvent(event);
+  ASSERT_TRUE(parsed.id.has_value());
+  EXPECT_EQ(parsed.id.value(), "123");
+  ASSERT_TRUE(parsed.data.has_value());
+  EXPECT_EQ(parsed.data.value(), "test");
+}
+
+// Test parseEvent with event type field
+TEST_F(SseParserTest, ParseEventWithEventType) {
+  const std::string event = "event: message\ndata: hello\n";
+  auto parsed = SseParser::parseEvent(event);
+  ASSERT_TRUE(parsed.event_type.has_value());
+  EXPECT_EQ(parsed.event_type.value(), "message");
+  ASSERT_TRUE(parsed.data.has_value());
+  EXPECT_EQ(parsed.data.value(), "hello");
+}
+
+// Test parseEvent with retry field
+TEST_F(SseParserTest, ParseEventWithRetry) {
+  const std::string event = "retry: 5000\ndata: test\n";
+  auto parsed = SseParser::parseEvent(event);
+  ASSERT_TRUE(parsed.retry.has_value());
+  EXPECT_EQ(parsed.retry.value(), 5000);
+}
+
+// Test parseEvent with all fields
+TEST_F(SseParserTest, ParseEventWithAllFields) {
+  const std::string event = "id: evt123\nevent: custom\nretry: 3000\ndata: payload\n";
+  auto parsed = SseParser::parseEvent(event);
+  ASSERT_TRUE(parsed.id.has_value());
+  EXPECT_EQ(parsed.id.value(), "evt123");
+  ASSERT_TRUE(parsed.event_type.has_value());
+  EXPECT_EQ(parsed.event_type.value(), "custom");
+  ASSERT_TRUE(parsed.retry.has_value());
+  EXPECT_EQ(parsed.retry.value(), 3000);
+  ASSERT_TRUE(parsed.data.has_value());
+  EXPECT_EQ(parsed.data.value(), "payload");
+}
+
+// Test parseEvent with empty id field
+TEST_F(SseParserTest, ParseEventWithEmptyId) {
+  const std::string event = "id:\ndata: test\n";
+  auto parsed = SseParser::parseEvent(event);
+  ASSERT_TRUE(parsed.id.has_value());
+  EXPECT_EQ(parsed.id.value(), "");
+}
+
+// Test parseEvent with id containing NULL (should be ignored per SSE spec)
+TEST_F(SseParserTest, ParseEventWithNullInId) {
+  const std::string event = std::string("id: abc\0def\ndata: test\n", 23);
+  auto parsed = SseParser::parseEvent(event);
+  // Per SSE spec, id containing NULL should be ignored
+  EXPECT_FALSE(parsed.id.has_value());
+}
+
+// Test parseEvent with invalid retry (non-digits)
+TEST_F(SseParserTest, ParseEventWithInvalidRetry) {
+  const std::string event = "retry: abc\ndata: test\n";
+  auto parsed = SseParser::parseEvent(event);
+  EXPECT_FALSE(parsed.retry.has_value());
+}
+
+// Test parseEvent with invalid retry (mixed digits and letters)
+TEST_F(SseParserTest, ParseEventWithMixedRetry) {
+  const std::string event = "retry: 123abc\ndata: test\n";
+  auto parsed = SseParser::parseEvent(event);
+  EXPECT_FALSE(parsed.retry.has_value());
+}
+
+// Test parseEvent with empty retry
+TEST_F(SseParserTest, ParseEventWithEmptyRetry) {
+  const std::string event = "retry:\ndata: test\n";
+  auto parsed = SseParser::parseEvent(event);
+  EXPECT_FALSE(parsed.retry.has_value());
+}
+
+// Test parseEvent with multiple id fields (last one wins)
+TEST_F(SseParserTest, ParseEventMultipleIds) {
+  const std::string event = "id: first\nid: second\ndata: test\n";
+  auto parsed = SseParser::parseEvent(event);
+  ASSERT_TRUE(parsed.id.has_value());
+  EXPECT_EQ(parsed.id.value(), "second");
+}
+
+// Test parseEvent with multiple event fields (last one wins)
+TEST_F(SseParserTest, ParseEventMultipleEventTypes) {
+  const std::string event = "event: type1\nevent: type2\ndata: test\n";
+  auto parsed = SseParser::parseEvent(event);
+  ASSERT_TRUE(parsed.event_type.has_value());
+  EXPECT_EQ(parsed.event_type.value(), "type2");
+}
+
+// Test parseEvent with retry overflow.
+TEST_F(SseParserTest, ParseEventRetryOverflow) {
+  const std::string event = "retry: 99999999999999999999\ndata: test\n";
+  auto parsed = SseParser::parseEvent(event);
+  EXPECT_FALSE(parsed.retry.has_value());
+}
+
+// Test parseEvent with no data field but other fields present
+TEST_F(SseParserTest, ParseEventNoDataWithOtherFields) {
+  const std::string event = "id: 123\nevent: ping\nretry: 1000\n";
+  auto parsed = SseParser::parseEvent(event);
+  EXPECT_FALSE(parsed.data.has_value());
+  ASSERT_TRUE(parsed.id.has_value());
+  EXPECT_EQ(parsed.id.value(), "123");
+  ASSERT_TRUE(parsed.event_type.has_value());
+  EXPECT_EQ(parsed.event_type.value(), "ping");
+  ASSERT_TRUE(parsed.retry.has_value());
+  EXPECT_EQ(parsed.retry.value(), 1000);
+}
+
+// Test parseEvent with retry value of 0
+TEST_F(SseParserTest, ParseEventRetryZero) {
+  const std::string event = "retry: 0\ndata: test\n";
+  auto parsed = SseParser::parseEvent(event);
+  ASSERT_TRUE(parsed.retry.has_value());
+  EXPECT_EQ(parsed.retry.value(), 0);
 }
 
 } // namespace

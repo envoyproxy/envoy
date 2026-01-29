@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <string>
 #include <tuple>
 #include <utility>
@@ -42,13 +43,19 @@ class SseParser {
 public:
   /**
    * Represents a parsed SSE event.
-   * Currently only supports the 'data' field. Future versions may add 'id', 'event', and 'retry'.
+   * Supports 'data', 'id', 'event', and 'retry' fields per the SSE specification.
    */
   struct ParsedEvent {
     // The concatenated data field values. Per SSE spec, multiple data fields are joined with
     // newlines. absl::nullopt if no data fields present, empty string if data field exists but
     // empty.
     absl::optional<std::string> data;
+    // The event ID. absl::nullopt if no id field is present.
+    absl::optional<std::string> id;
+    // The event type. absl::nullopt if no event field is present.
+    absl::optional<std::string> event_type;
+    // The reconnection time in milliseconds. absl::nullopt if no retry field is present.
+    absl::optional<uint64_t> retry;
   };
 
   /**
