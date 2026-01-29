@@ -226,7 +226,6 @@ message HttpProtocolOptions {
 // Aggregates endpoint-specific protocol options. Each item has
 // a "metadata match" field that allows for specific endpoints to
 // pick up a particular configuration.
-// [#next-free-field: 2]
 message EndpointSpecificHttpProtocolOptions {
   // Defines endpoint-specific HTTP protocol options. These options
   // are only applied to endpoints for each their metadata match the
