@@ -42,8 +42,7 @@ RendezvousHashLoadBalancer::RendezvousHashLoadBalancer(
     : ThreadAwareLoadBalancerBase(priority_set, stats, runtime, random, healthy_panic_threshold,
                                   config.has_locality_weighted_lb_config(), std::move(hash_policy)),
       scope_(scope.createScope("rendezvous_hash_lb.")),
-      use_hostname_for_hashing_(
-          config.consistent_hashing_lb_config().use_hostname_for_hashing()),
+      use_hostname_for_hashing_(config.consistent_hashing_lb_config().use_hostname_for_hashing()),
       hash_balance_factor_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.consistent_hashing_lb_config(),
                                                            hash_balance_factor, 0)) {}
 
@@ -51,8 +50,8 @@ ThreadAwareLoadBalancerBase::HashingLoadBalancerSharedPtr
 RendezvousHashLoadBalancer::createLoadBalancer(
     const NormalizedHostWeightVector& normalized_host_weights, double /* min_normalized_weight */,
     double /* max_normalized_weight */) {
-  HashingLoadBalancerSharedPtr rendezvous_lb = std::make_shared<RendezvousHashTable>(
-      normalized_host_weights, use_hostname_for_hashing_);
+  HashingLoadBalancerSharedPtr rendezvous_lb =
+      std::make_shared<RendezvousHashTable>(normalized_host_weights, use_hostname_for_hashing_);
 
   if (hash_balance_factor_ == 0) {
     return rendezvous_lb;
@@ -64,8 +63,7 @@ RendezvousHashLoadBalancer::createLoadBalancer(
 
 RendezvousHashLoadBalancer::RendezvousHashTable::RendezvousHashTable(
     const NormalizedHostWeightVector& normalized_host_weights, bool use_hostname_for_hashing) {
-  ENVOY_LOG(trace, "rendezvous hash: building table with {} hosts",
-            normalized_host_weights.size());
+  ENVOY_LOG(trace, "rendezvous hash: building table with {} hosts", normalized_host_weights.size());
 
   // We can't do anything sensible with no hosts.
   if (normalized_host_weights.empty()) {
@@ -89,8 +87,7 @@ RendezvousHashLoadBalancer::RendezvousHashTable::RendezvousHashTable(
 }
 
 HostSelectionResponse
-RendezvousHashLoadBalancer::RendezvousHashTable::chooseHost(uint64_t hash,
-                                                            uint32_t attempt) const {
+RendezvousHashLoadBalancer::RendezvousHashTable::chooseHost(uint64_t hash, uint32_t attempt) const {
   if (hosts_.empty()) {
     return {nullptr};
   }
@@ -116,8 +113,8 @@ RendezvousHashLoadBalancer::RendezvousHashTable::chooseHost(uint64_t hash,
 }
 
 double RendezvousHashLoadBalancer::RendezvousHashTable::computeScore(uint64_t key,
-                                                                      uint64_t host_hash,
-                                                                      double weight) {
+                                                                     uint64_t host_hash,
+                                                                     double weight) {
   // Combine the key and host hash using xorshift*
   const uint64_t combined_hash = xorshiftMult64(key ^ host_hash);
   // Normalize to [0.0, 1.0)

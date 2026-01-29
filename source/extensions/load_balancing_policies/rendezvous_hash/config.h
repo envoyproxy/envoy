@@ -33,8 +33,7 @@ public:
   loadConfig(Server::Configuration::ServerFactoryContext& context,
              const Protobuf::Message& config) override {
     ASSERT(dynamic_cast<const RendezvousHashLbProto*>(&config) != nullptr);
-    const RendezvousHashLbProto& typed_proto =
-        dynamic_cast<const RendezvousHashLbProto&>(config);
+    const RendezvousHashLbProto& typed_proto = dynamic_cast<const RendezvousHashLbProto&>(config);
     absl::Status creation_status = absl::OkStatus();
     auto typed_config = std::make_unique<Upstream::TypedRendezvousHashLbConfig>(
         typed_proto, context.regexEngine(), creation_status);

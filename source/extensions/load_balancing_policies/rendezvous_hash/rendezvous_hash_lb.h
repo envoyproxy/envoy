@@ -16,6 +16,9 @@
 namespace Envoy {
 namespace Upstream {
 
+// Forward declaration for test access.
+class RendezvousHashMathTest;
+
 using RendezvousHashLbProto =
     envoy::extensions::load_balancing_policies::rendezvous_hash::v3::RendezvousHash;
 using ClusterProto = envoy::config::cluster::v3::Cluster;
@@ -45,15 +48,18 @@ public:
  * - Lower memory usage than ring hash
  * - O(n) picking time instead of O(log n) for ring hash
  *
- * Based on: https://www.snia.org/sites/default/files/SDC15_presentations/dist_sys/Jason_Resch_New_Consistent_Hashings_Rev.pdf
+ * Based on:
+ * https://www.snia.org/sites/default/files/SDC15_presentations/dist_sys/Jason_Resch_New_Consistent_Hashings_Rev.pdf
  */
 class RendezvousHashLoadBalancer : public ThreadAwareLoadBalancerBase {
+  // Allow test access to private nested class.
+  friend class RendezvousHashMathTest;
+
 public:
   RendezvousHashLoadBalancer(const PrioritySet& priority_set, ClusterLbStats& stats,
                              Stats::Scope& scope, Runtime::Loader& runtime,
                              Random::RandomGenerator& random, uint32_t healthy_panic_threshold,
-                             const RendezvousHashLbProto& config,
-                             HashPolicySharedPtr hash_policy);
+                             const RendezvousHashLbProto& config, HashPolicySharedPtr hash_policy);
 
 private:
   /**
@@ -73,6 +79,9 @@ private:
    */
   class RendezvousHashTable : public HashingLoadBalancer,
                               protected Logger::Loggable<Logger::Id::upstream> {
+    // Allow test access to private methods.
+    friend class RendezvousHashMathTest;
+
   public:
     RendezvousHashTable(const NormalizedHostWeightVector& normalized_host_weights,
                         bool use_hostname_for_hashing);
@@ -106,7 +115,8 @@ private:
 
     /**
      * Fast log2 approximation using bit manipulation.
-     * Based on: https://innovation.ebayinc.com/stories/fast-approximate-logarithms-part-iii-the-formulas/
+     * Based on:
+     * https://innovation.ebayinc.com/stories/fast-approximate-logarithms-part-iii-the-formulas/
      */
     static double fastLog2(double x);
 
