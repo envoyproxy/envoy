@@ -117,7 +117,8 @@ private:
   mutable absl::flat_hash_map<std::vector<std::string>, NormalizationResult> path_cache_;
 
   // Cache to store match results.
-  mutable absl::flat_hash_map<const Matcher::MatchTree<HttpMatchingData>*, Matcher::ActionMatchResult>
+  mutable absl::flat_hash_map<const Matcher::MatchTree<HttpMatchingData>*,
+                              Matcher::ActionMatchResult>
       match_result_cache_;
 };
 

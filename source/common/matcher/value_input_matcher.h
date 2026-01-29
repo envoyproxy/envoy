@@ -15,8 +15,9 @@ public:
       : matcher_(matcher, context) {}
 
   MatchResult match(const MatchingDataType& input) override {
-    if (absl::holds_alternative<std::string>(input) && matcher_.match(absl::get<std::string>(input))) {
-        return MatchResult::matched();
+    if (absl::holds_alternative<std::string>(input) &&
+        matcher_.match(absl::get<std::string>(input))) {
+      return MatchResult::matched();
     }
     // Return false when input is empty.(i.e., input is absl::monostate).
     return MatchResult::noMatch();

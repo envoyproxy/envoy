@@ -230,7 +230,8 @@ inline constexpr char RequestHeaderAndPathCelString[] = R"pb(
     }
 )pb";
 
-// Compiled CEL expression string: request.path == '/foo' && response.headers['content-type'] == 'text/plain'
+// Compiled CEL expression string: request.path == '/foo' && response.headers['content-type'] ==
+// 'text/plain'
 inline constexpr char ResponseHeaderAndPathCelExprString[] = R"pb(
     expr {
       id: 11

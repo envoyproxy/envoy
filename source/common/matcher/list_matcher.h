@@ -16,7 +16,7 @@ public:
   explicit ListMatcher(absl::optional<OnMatch<DataType>> on_no_match) : on_no_match_(on_no_match) {}
 
   ActionMatchResult match(const DataType& matching_data,
-                    SkippedMatchCb skipped_match_cb = nullptr) override {
+                          SkippedMatchCb skipped_match_cb = nullptr) override {
     for (const auto& matcher : matchers_) {
       MatchResult result = matcher.first->match(matching_data);
 

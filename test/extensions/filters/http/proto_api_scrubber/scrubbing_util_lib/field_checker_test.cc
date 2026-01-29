@@ -1191,7 +1191,8 @@ TEST_F(FieldCheckerTest, ConstructorPropagatesHeadersAndTrailersToMatchTree) {
       match(testing::AllOf(HasRequestHeader("x-req-header"), HasResponseHeader("x-res-header"),
                            HasRequestTrailer("x-req-trailer"), HasResponseTrailer("x-res-trailer")),
             testing::_))
-      .WillOnce(testing::Return(Matcher::ActionMatchResult(Matcher::ActionConstSharedPtr{nullptr})));
+      .WillOnce(
+          testing::Return(Matcher::ActionMatchResult(Matcher::ActionConstSharedPtr{nullptr})));
 
   // Wire up the config to return our spying match tree.
   ON_CALL(mock_config, getRequestFieldMatcher(method, field_name))

@@ -131,7 +131,9 @@ private:
 struct BoolMatcher : public InputMatcher {
   explicit BoolMatcher(bool value) : value_(value) {}
 
-  MatchResult match(const MatchingDataType&) override { return value_ ? MatchResult::matched() : MatchResult::noMatch(); }
+  MatchResult match(const MatchingDataType&) override {
+    return value_ ? MatchResult::matched() : MatchResult::noMatch();
+  }
   const bool value_;
 };
 

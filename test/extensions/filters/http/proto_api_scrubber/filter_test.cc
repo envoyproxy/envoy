@@ -1317,7 +1317,8 @@ TEST_F(MethodLevelRestrictionTest, MethodBlockedByMatcher) {
 
   EXPECT_CALL(*mock_filter_config_, getMethodMatcher(method_name))
       .WillOnce(Return(mock_match_tree));
-  EXPECT_CALL(*mock_match_tree, match(_, _)).WillOnce(Return(Matcher::ActionMatchResult(mock_action)));
+  EXPECT_CALL(*mock_match_tree, match(_, _))
+      .WillOnce(Return(Matcher::ActionMatchResult(mock_action)));
 
   auto req_headers = TestRequestHeaderMapImpl{
       {":method", "POST"}, {":path", method_name}, {"content-type", "application/grpc"}};
@@ -1346,7 +1347,8 @@ TEST_F(MethodLevelRestrictionTest, MethodAllowedByMatcher) {
       .WillOnce(Return(mock_match_tree));
 
   // Explicitly return NoMatch state from the matcher.
-  EXPECT_CALL(*mock_match_tree, match(_, _)).WillOnce(Return(Matcher::ActionMatchResult::noMatch()));
+  EXPECT_CALL(*mock_match_tree, match(_, _))
+      .WillOnce(Return(Matcher::ActionMatchResult::noMatch()));
 
   auto req_headers = TestRequestHeaderMapImpl{
       {":method", "POST"}, {":path", method_name}, {"content-type", "application/grpc"}};
@@ -1408,7 +1410,8 @@ TEST_F(MethodLevelRestrictionTest, MethodAllowedWithFieldRestrictions) {
   EXPECT_CALL(*mock_filter_config_, getMethodMatcher(method_name))
       .WillOnce(Return(mock_match_tree));
 
-  EXPECT_CALL(*mock_match_tree, match(_, _)).WillOnce(Return(Matcher::ActionMatchResult::noMatch()));
+  EXPECT_CALL(*mock_match_tree, match(_, _))
+      .WillOnce(Return(Matcher::ActionMatchResult::noMatch()));
 
   // Setup field restriction on the real config
   ProtoApiScrubberConfig field_config_proto;
@@ -1549,7 +1552,8 @@ TEST_F(ObservabilityTest, MethodLevelBlockingUpdatesStatsAndTrace) {
       .WillOnce(Return(mock_match_tree));
 
   // Return Match to simulate block.
-  EXPECT_CALL(*mock_match_tree, match(_, _)).WillOnce(Return(Matcher::ActionMatchResult(mock_action)));
+  EXPECT_CALL(*mock_match_tree, match(_, _))
+      .WillOnce(Return(Matcher::ActionMatchResult(mock_action)));
 
   TestRequestHeaderMapImpl headers{
       {":method", "POST"}, {":path", method_name}, {"content-type", "application/grpc"}};

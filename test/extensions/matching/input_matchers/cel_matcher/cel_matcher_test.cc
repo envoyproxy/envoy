@@ -312,8 +312,7 @@ TEST_F(CelMatcherTest, CelMatcherRequestHeaderPathNotMatched) {
 }
 
 TEST_F(CelMatcherTest, CelMatcherRequestInsufficientDataResponseHeaderMatched) {
-  auto matcher_tree =
-      buildMatcherTree(ResponseHeaderAndPathCelExprString);
+  auto matcher_tree = buildMatcherTree(ResponseHeaderAndPathCelExprString);
 
   TestRequestHeaderMapImpl request_headers;
   buildCustomHeader({{":path", "/foo"}}, request_headers);
@@ -330,10 +329,8 @@ TEST_F(CelMatcherTest, CelMatcherRequestInsufficientDataResponseHeaderMatched) {
   EXPECT_THAT(matcher_tree->match(data_), HasStringAction("match!!"));
 }
 
-TEST_F(CelMatcherTest,
-       CelMatcherRequestInsufficientDataResponseHeaderNotMatched) {
-  auto matcher_tree =
-      buildMatcherTree(ResponseHeaderAndPathCelExprString);
+TEST_F(CelMatcherTest, CelMatcherRequestInsufficientDataResponseHeaderNotMatched) {
+  auto matcher_tree = buildMatcherTree(ResponseHeaderAndPathCelExprString);
 
   TestRequestHeaderMapImpl request_headers;
   buildCustomHeader({{":path", "/foo"}}, request_headers);
@@ -351,8 +348,7 @@ TEST_F(CelMatcherTest,
 }
 
 TEST_F(CelMatcherTest, CelMatcherRequestInsufficientDataPathNotMatched) {
-  auto matcher_tree =
-      buildMatcherTree(ResponseHeaderAndPathCelExprString);
+  auto matcher_tree = buildMatcherTree(ResponseHeaderAndPathCelExprString);
 
   TestRequestHeaderMapImpl request_headers;
   buildCustomHeader({{":path", "/bar"}}, request_headers);

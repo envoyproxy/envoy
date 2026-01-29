@@ -33,7 +33,7 @@ protected:
       : MapMatcher<DataType>(std::move(data_input), std::move(on_no_match), creation_status) {}
 
   ActionMatchResult doMatch(const DataType& data, absl::string_view key,
-                      SkippedMatchCb skipped_match_cb) override {
+                            SkippedMatchCb skipped_match_cb) override {
     const auto itr = children_.find(key);
     if (itr != children_.end()) {
       ActionMatchResult result =

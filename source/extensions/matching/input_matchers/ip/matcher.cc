@@ -1,7 +1,8 @@
 #include "source/extensions/matching/input_matchers/ip/matcher.h"
 
-#include "source/common/network/utility.h"
 #include "envoy/matcher/matcher.h"
+
+#include "source/common/network/utility.h"
 
 namespace Envoy {
 namespace Extensions {

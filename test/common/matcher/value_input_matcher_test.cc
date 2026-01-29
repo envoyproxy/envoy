@@ -1,6 +1,7 @@
+#include "envoy/matcher/matcher.h"
+
 #include "source/common/matcher/value_input_matcher.h"
 
-#include "envoy/matcher/matcher.h"
 #include "test/mocks/server/server_factory_context.h"
 
 #include "gtest/gtest.h"

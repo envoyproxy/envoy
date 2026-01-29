@@ -29,13 +29,13 @@ namespace {
 
 using ::Envoy::Matcher::ActionConstSharedPtr;
 using ::Envoy::Matcher::ActionFactory;
+using ::Envoy::Matcher::ActionMatchResult;
 using ::Envoy::Matcher::CustomMatcherFactory;
 using ::Envoy::Matcher::DataInputGetResult;
 using ::Envoy::Matcher::HasInsufficientData;
 using ::Envoy::Matcher::HasNoMatch;
 using ::Envoy::Matcher::HasStringAction;
 using ::Envoy::Matcher::IsStringAction;
-using ::Envoy::Matcher::ActionMatchResult;
 using ::Envoy::Matcher::MatchTreeFactory;
 using ::Envoy::Matcher::MatchTreePtr;
 using ::Envoy::Matcher::MatchTreeSharedPtr;

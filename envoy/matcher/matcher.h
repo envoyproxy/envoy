@@ -89,8 +89,12 @@ public:
     return result_.index() == other.result_.index();
   }
   std::string toString() const {
-    if (isInsufficientData()) return "insufficient data";
-    if (isMatched()) return "match";
+    if (isInsufficientData()) {
+      return "insufficient data";
+    }
+    if (isMatched()) {
+      return "match";
+    }
     return "no match";
   }
   static MatchResult insufficientData() { return MatchResult{InsufficientData{}}; }
@@ -211,7 +215,7 @@ public:
   // into ActionMatchResult values, and handle noMatch and insufficientData results as appropriate
   // for the specific matcher type.
   virtual ActionMatchResult match(const DataType& matching_data,
-                            SkippedMatchCb skipped_match_cb = nullptr) PURE;
+                                  SkippedMatchCb skipped_match_cb = nullptr) PURE;
 
 protected:
   // Internally handle recursion & keep_matching logic in matcher implementations.

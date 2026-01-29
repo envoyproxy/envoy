@@ -32,7 +32,7 @@ protected:
       : MapMatcher<DataType>(std::move(data_input), std::move(on_no_match), creation_status) {}
 
   ActionMatchResult doMatch(const DataType& data, absl::string_view key,
-                      SkippedMatchCb skipped_match_cb) override {
+                            SkippedMatchCb skipped_match_cb) override {
     const absl::InlinedVector<std::shared_ptr<OnMatch<DataType>>, 4> results =
         children_.findMatchingPrefixes(key);
     bool retry_shorter = Runtime::runtimeFeatureEnabled(

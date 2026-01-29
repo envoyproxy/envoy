@@ -147,8 +147,9 @@ public:
     }
 
     MatchResult current_match = input_matcher_->match(input.data_);
-    if (!current_match.isMatched() && input.data_availability_ ==
-                              DataInputGetResult::DataAvailability::MoreDataMightBeAvailable) {
+    if (!current_match.isMatched() &&
+        input.data_availability_ ==
+            DataInputGetResult::DataAvailability::MoreDataMightBeAvailable) {
       ENVOY_LOG(trace, "No match yet; delaying result as more data might be available.");
       return MatchResult::insufficientData();
     }

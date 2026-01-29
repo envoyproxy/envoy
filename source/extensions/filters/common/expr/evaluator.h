@@ -59,12 +59,9 @@ public:
   FindFunctionOverloads(absl::string_view) const override {
     return {};
   }
-  bool needs_response_path_data() const {
-    return needs_response_path_data_;
-  }
+  bool needs_response_path_data() const { return needs_response_path_data_; }
   bool has_response_data() const {
-    return activation_response_headers_ != nullptr ||
-           activation_response_trailers_ != nullptr;
+    return activation_response_headers_ != nullptr || activation_response_trailers_ != nullptr;
   }
 
 protected:

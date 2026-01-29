@@ -24,7 +24,8 @@ public:
     return MatchTree<DataType>::handleRecursionAndSkips(on_no_match_, data, skipped_match_cb);
   }
 
-  ActionMatchResult match(const DataType& data, SkippedMatchCb skipped_match_cb = nullptr) override {
+  ActionMatchResult match(const DataType& data,
+                          SkippedMatchCb skipped_match_cb = nullptr) override {
     const auto input = data_input_->get(data);
     ENVOY_LOG(trace, "Attempting to match {}", input);
     if (input.data_availability_ == DataInputGetResult::DataAvailability::NotAvailable) {
@@ -56,9 +57,10 @@ public:
 
   // The inner match method. Attempts to match against the resulting data string.
   // If a match is found, handleRecursionAndSkips must be called on it.
-  // Otherwise ActionMatchResult::noMatch() or ActionMatchResult::insufficientData() should be returned.
+  // Otherwise ActionMatchResult::noMatch() or ActionMatchResult::insufficientData() should be
+  // returned.
   virtual ActionMatchResult doMatch(const DataType& data, absl::string_view key,
-                              SkippedMatchCb skipped_match_cb) PURE;
+                                    SkippedMatchCb skipped_match_cb) PURE;
 };
 
 } // namespace Matcher
