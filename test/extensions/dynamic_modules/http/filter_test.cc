@@ -2,7 +2,7 @@
 
 #include "source/common/http/message_impl.h"
 #include "source/common/router/string_accessor_impl.h"
-#include "source/extensions/dynamic_modules/abi.h"
+#include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/filters/http/dynamic_modules/filter.h"
 
 #include "test/extensions/dynamic_modules/util.h"
@@ -68,8 +68,22 @@ TEST_P(DynamicModuleTestLanguages, Nop) {
   filter->onDestroy();
 }
 
-TEST(DynamicModulesTest, ConfigInitializationFailure) {
-  auto dynamic_module = newDynamicModule(testSharedObjectPath("http", "rust"), false);
+#ifndef __SANITIZE_ADDRESS__
+// TODO(wbpcode): address sanitizer cannot handle the cross shared libraries vptr casts.
+// and we need to figure out a way to fix it.
+auto DynamicModuleHttpLanguageTestsValues = testing::Values("rust", "go", "cpp");
+#else
+auto DynamicModuleHttpLanguageTestsValues = testing::Values("rust", "go");
+#endif
+
+class DynamicModuleHttpLanguageTests : public DynamicModuleTestLanguages {};
+
+INSTANTIATE_TEST_SUITE_P(HttpLanguageTests, DynamicModuleHttpLanguageTests,
+                         DynamicModuleHttpLanguageTestsValues,
+                         DynamicModuleTestLanguages::languageParamToTestName);
+
+TEST_P(DynamicModuleHttpLanguageTests, ConfigInitializationFailure) {
+  auto dynamic_module = newDynamicModule(testSharedObjectPath("http", GetParam()), false);
   EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   Stats::IsolatedStoreImpl stats_store;
@@ -81,11 +95,11 @@ TEST(DynamicModulesTest, ConfigInitializationFailure) {
               testing::HasSubstr("Failed to initialize dynamic module"));
 }
 
-TEST(DynamicModulesTest, StatsCallbacks) {
+TEST_P(DynamicModuleHttpLanguageTests, StatsCallbacks) {
   const std::string filter_name = "stats_callbacks";
   const std::string filter_config = "";
   // TODO: Add non-Rust test program once we have non-Rust SDK.
-  auto dynamic_module = newDynamicModule(testSharedObjectPath("http", "rust"), false);
+  auto dynamic_module = newDynamicModule(testSharedObjectPath("http", GetParam()), false);
   if (!dynamic_module.ok()) {
     ENVOY_LOG_MISC(debug, "Failed to load dynamic module: {}", dynamic_module.status().message());
   }
@@ -202,11 +216,11 @@ TEST(DynamicModulesTest, StatsCallbacks) {
   filter->onDestroy();
 }
 
-TEST(DynamicModulesTest, HeaderCallbacks) {
+TEST_P(DynamicModuleHttpLanguageTests, HeaderCallbacks) {
   const std::string filter_name = "header_callbacks";
   const std::string filter_config = "";
   // TODO: Add non-Rust test program once we have non-Rust SDK.
-  auto dynamic_module = newDynamicModule(testSharedObjectPath("http", "rust"), false);
+  auto dynamic_module = newDynamicModule(testSharedObjectPath("http", GetParam()), false);
   if (!dynamic_module.ok()) {
     ENVOY_LOG_MISC(debug, "Failed to load dynamic module: {}", dynamic_module.status().message());
   }
@@ -264,11 +278,11 @@ TEST(DynamicModulesTest, HeaderCallbacks) {
   filter->onDestroy();
 }
 
-TEST(DynamicModulesTest, DynamicMetadataCallbacks) {
+TEST_P(DynamicModuleHttpLanguageTests, DynamicMetadataCallbacks) {
   const std::string filter_name = "dynamic_metadata_callbacks";
   const std::string filter_config = "";
   // TODO: Add non-Rust test program once we have non-Rust SDK.
-  auto dynamic_module = newDynamicModule(testSharedObjectPath("http", "rust"), false);
+  auto dynamic_module = newDynamicModule(testSharedObjectPath("http", GetParam()), false);
   if (!dynamic_module.ok()) {
     ENVOY_LOG_MISC(debug, "Failed to load dynamic module: {}", dynamic_module.status().message());
   }
@@ -348,11 +362,11 @@ TEST(DynamicModulesTest, DynamicMetadataCallbacks) {
   filter->onDestroy();
 }
 
-TEST(DynamicModulesTest, FilterStateCallbacks) {
+TEST_P(DynamicModuleHttpLanguageTests, FilterStateCallbacks) {
   const std::string filter_name = "filter_state_callbacks";
   const std::string filter_config = "";
   // TODO: Add non-Rust test program once we have non-Rust SDK.
-  auto dynamic_module = newDynamicModule(testSharedObjectPath("http", "rust"), false);
+  auto dynamic_module = newDynamicModule(testSharedObjectPath("http", GetParam()), false);
   if (!dynamic_module.ok()) {
     ENVOY_LOG_MISC(debug, "Failed to load dynamic module: {}", dynamic_module.status().message());
   }
@@ -426,11 +440,11 @@ TEST(DynamicModulesTest, FilterStateCallbacks) {
   EXPECT_EQ(stream_complete_value->serializeAsString(), "stream_complete_value");
 }
 
-TEST(DynamicModulesTest, BodyCallbacks) {
+TEST_P(DynamicModuleHttpLanguageTests, BodyCallbacks) {
   const std::string filter_name = "body_callbacks";
   const std::string filter_config = "";
   // TODO: Add non-Rust test program once we have non-Rust SDK.
-  auto dynamic_module = newDynamicModule(testSharedObjectPath("http", "rust"), false);
+  auto dynamic_module = newDynamicModule(testSharedObjectPath("http", GetParam()), false);
   if (!dynamic_module.ok()) {
     ENVOY_LOG_MISC(debug, "Failed to load dynamic module: {}", dynamic_module.status().message());
   }
@@ -495,11 +509,11 @@ TEST(DynamicModulesTest, BodyCallbacks) {
   EXPECT_EQ(response_body.toString(), "barend");
 }
 
-TEST(DynamicModulesTest, HttpFilterHttpCallout_non_existing_cluster) {
+TEST_P(DynamicModuleHttpLanguageTests, HttpFilterHttpCallout_non_existing_cluster) {
   const std::string filter_name = "http_callouts";
   // TODO: Add non-Rust test program once we have non-Rust SDK.
   auto dynamic_module =
-      newDynamicModule(testSharedObjectPath("http_integration_test", "rust"), false);
+      newDynamicModule(testSharedObjectPath("http_integration_test", GetParam()), false);
   if (!dynamic_module.ok()) {
     ENVOY_LOG_MISC(debug, "Failed to load dynamic module: {}", dynamic_module.status().message());
   }
@@ -535,11 +549,11 @@ TEST(DynamicModulesTest, HttpFilterHttpCallout_non_existing_cluster) {
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter->decodeHeaders(headers, false));
 }
 
-TEST(DynamicModulesTest, HttpFilterHttpCallout_immediate_failing_cluster) {
+TEST_P(DynamicModuleHttpLanguageTests, HttpFilterHttpCallout_immediate_failing_cluster) {
   const std::string filter_name = "http_callouts";
   // TODO: Add non-Rust test program once we have non-Rust SDK.
   auto dynamic_module =
-      newDynamicModule(testSharedObjectPath("http_integration_test", "rust"), false);
+      newDynamicModule(testSharedObjectPath("http_integration_test", GetParam()), false);
   if (!dynamic_module.ok()) {
     ENVOY_LOG_MISC(debug, "Failed to load dynamic module: {}", dynamic_module.status().message());
   }
@@ -589,11 +603,11 @@ TEST(DynamicModulesTest, HttpFilterHttpCallout_immediate_failing_cluster) {
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter->decodeHeaders(headers, false));
 }
 
-TEST(DynamicModulesTest, HttpFilterHttpCallout_success) {
+TEST_P(DynamicModuleHttpLanguageTests, HttpFilterHttpCallout_success) {
   const std::string filter_name = "http_callouts";
   // TODO: Add non-Rust test program once we have non-Rust SDK.
   auto dynamic_module =
-      newDynamicModule(testSharedObjectPath("http_integration_test", "rust"), false);
+      newDynamicModule(testSharedObjectPath("http_integration_test", GetParam()), false);
   if (!dynamic_module.ok()) {
     ENVOY_LOG_MISC(debug, "Failed to load dynamic module: {}", dynamic_module.status().message());
   }
@@ -659,11 +673,11 @@ TEST(DynamicModulesTest, HttpFilterHttpCallout_success) {
   callbacks_captured->onSuccess(req, std::move(response));
 }
 
-TEST(DynamicModulesTest, HttpFilterHttpCallout_resetting) {
+TEST_P(DynamicModuleHttpLanguageTests, HttpFilterHttpCallout_resetting) {
   const std::string filter_name = "http_callouts";
   // TODO: Add non-Rust test program once we have non-Rust SDK.
   auto dynamic_module =
-      newDynamicModule(testSharedObjectPath("http_integration_test", "rust"), false);
+      newDynamicModule(testSharedObjectPath("http_integration_test", GetParam()), false);
   if (!dynamic_module.ok()) {
     ENVOY_LOG_MISC(debug, "Failed to load dynamic module: {}", dynamic_module.status().message());
   }
@@ -714,10 +728,10 @@ TEST(DynamicModulesTest, HttpFilterHttpCallout_resetting) {
 }
 
 // This test verifies that handling of per-route config is correct in terms of lifetimes.
-TEST(DynamicModulesTest, HttpFilterPerFilterConfigLifetimes) {
+TEST_P(DynamicModuleHttpLanguageTests, HttpFilterPerRouteConfigLifetimes) {
   const std::string filter_name = "per_route_config";
   auto dynamic_module =
-      newDynamicModule(testSharedObjectPath("http_integration_test", "rust"), false);
+      newDynamicModule(testSharedObjectPath("http_integration_test", GetParam()), false);
   if (!dynamic_module.ok()) {
     ENVOY_LOG_MISC(debug, "Failed to load dynamic module: {}", dynamic_module.status().message());
   }
@@ -740,7 +754,7 @@ TEST(DynamicModulesTest, HttpFilterPerFilterConfigLifetimes) {
   EXPECT_TRUE(filter_config_or_status.ok());
 
   auto dynamic_module_for_route =
-      newDynamicModule(testSharedObjectPath("http_integration_test", "rust"), false);
+      newDynamicModule(testSharedObjectPath("http_integration_test", GetParam()), false);
   if (!dynamic_module.ok()) {
     ENVOY_LOG_MISC(debug, "Failed to load dynamic module: {}", dynamic_module.status().message());
   }
@@ -832,6 +846,8 @@ TEST(HttpFilter, HeaderMapGetter) {
   EXPECT_EQ(response_trailers, filter.responseTrailers().value());
 }
 
+// TODO(wbpcode): use actual test programs for following tests.
+
 // Test sendStreamData on invalid stream handle returns false.
 TEST(HttpFilter, SendStreamDataOnInvalidStream) {
   Stats::SymbolTableImpl symbol_table;
@@ -871,7 +887,7 @@ TEST(HttpFilter, SendStreamTrailersOnInvalidStream) {
   EXPECT_FALSE(filter.sendStreamTrailers(0, std::move(trailers)));
 }
 
-TEST(DynamicModulesTest, HttpFilterHttpStreamCalloutOnComplete) {
+TEST(DynamicModuleHttpStreamTest, HttpFilterHttpStreamCalloutOnComplete) {
   auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", "c"), false);
   EXPECT_TRUE(dynamic_module.ok());
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
@@ -923,7 +939,7 @@ TEST(DynamicModulesTest, HttpFilterHttpStreamCalloutOnComplete) {
   }
 }
 
-TEST(DynamicModulesTest, StartHttpStreamDoesNotSetContentLength) {
+TEST(DynamicModuleHttpStreamTest, StartHttpStreamDoesNotSetContentLength) {
   auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", "c"), false);
   EXPECT_TRUE(dynamic_module.ok());
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
@@ -990,7 +1006,7 @@ TEST(DynamicModulesTest, StartHttpStreamDoesNotSetContentLength) {
   }
 }
 
-TEST(DynamicModulesTest, StartHttpStreamAndNoCluster) {
+TEST(DynamicModuleHttpStreamTest, StartHttpStreamAndNoCluster) {
   auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", "c"), false);
   EXPECT_TRUE(dynamic_module.ok());
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
@@ -1025,7 +1041,7 @@ TEST(DynamicModulesTest, StartHttpStreamAndNoCluster) {
   EXPECT_EQ(result, envoy_dynamic_module_type_http_callout_init_result_ClusterNotFound);
 }
 
-TEST(DynamicModulesTest, StartHttpStreamMissingRequiredHeaders) {
+TEST(DynamicModuleHttpStreamTest, StartHttpStreamMissingRequiredHeaders) {
   auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", "c"), false);
   EXPECT_TRUE(dynamic_module.ok());
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
@@ -1063,7 +1079,7 @@ TEST(DynamicModulesTest, StartHttpStreamMissingRequiredHeaders) {
   EXPECT_EQ(result, envoy_dynamic_module_type_http_callout_init_result_MissingRequiredHeaders);
 }
 
-TEST(DynamicModulesTest, StartHttpStreamHandlesInlineResetDuringHeaders) {
+TEST(DynamicModuleHttpStreamTest, StartHttpStreamHandlesInlineResetDuringHeaders) {
   auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", "c"), false);
   EXPECT_TRUE(dynamic_module.ok());
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
@@ -1118,7 +1134,7 @@ TEST(DynamicModulesTest, StartHttpStreamHandlesInlineResetDuringHeaders) {
   EXPECT_NE(captured_callbacks, nullptr);
 }
 
-TEST(DynamicModulesTest, HttpStreamCalloutDeferredDeleteOnDestroy) {
+TEST(DynamicModuleHttpStreamTest, HttpStreamCalloutDeferredDeleteOnDestroy) {
   auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", "c"), false);
   EXPECT_TRUE(dynamic_module.ok());
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
@@ -1175,7 +1191,7 @@ TEST(DynamicModulesTest, HttpStreamCalloutDeferredDeleteOnDestroy) {
   dispatcher.clearDeferredDeleteList();
 }
 
-TEST(DynamicModulesTest, HttpFilterHttpStreamCalloutOnReset) {
+TEST(DynamicModuleHttpStreamTest, HttpFilterHttpStreamCalloutOnReset) {
   auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", "c"), false);
   EXPECT_TRUE(dynamic_module.ok());
   NiceMock<Server::Configuration::MockServerFactoryContext> context;

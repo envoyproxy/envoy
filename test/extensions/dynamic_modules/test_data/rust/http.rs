@@ -518,7 +518,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for DynamicMetadataCallbacksFilter {
     // No namespace.
     let no_namespace = envoy_filter.get_metadata_string(
       abi::envoy_dynamic_module_type_metadata_source::Dynamic,
-      "no_namespace",
+      "ns_req_body",
       "key",
     );
     assert!(no_namespace.is_none());
@@ -549,7 +549,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for DynamicMetadataCallbacksFilter {
     // No namespace.
     let no_namespace = envoy_filter.get_metadata_string(
       abi::envoy_dynamic_module_type_metadata_source::Dynamic,
-      "no_namespace",
+      "ns_res_header",
       "key",
     );
     assert!(no_namespace.is_none());
@@ -579,7 +579,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for DynamicMetadataCallbacksFilter {
     // No namespace.
     let no_namespace = envoy_filter.get_metadata_string(
       abi::envoy_dynamic_module_type_metadata_source::Dynamic,
-      "no_namespace",
+      "ns_res_body",
       "key",
     );
     assert!(no_namespace.is_none());
