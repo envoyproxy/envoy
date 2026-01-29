@@ -21,10 +21,12 @@ uint32_t ActiveClient::calculateInitialStreamsLimit(
     Upstream::HostDescriptionConstSharedPtr host) {
   uint32_t initial_streams =
       host->cluster().httpProtocolOptions().http2Options().max_concurrent_streams().value();
-  
-  const auto ep_specific_protocol_options = host->cluster().extensionProtocolOptionsTyped<
-      Extensions::Upstreams::Http::EpSpecificProtocolOptionsConfigImpl>(
-      "envoy.extensions.upstreams.http.v3.EndpointSpecificHttpProtocolOptions");
+
+  const auto ep_specific_protocol_options =
+      host->cluster()
+          .extensionProtocolOptionsTyped<
+              Extensions::Upstreams::Http::EpSpecificProtocolOptionsConfigImpl>(
+              "envoy.extensions.upstreams.http.v3.EndpointSpecificHttpProtocolOptions");
 
   if (ep_specific_protocol_options != nullptr && host->metadata() != nullptr) {
     for (const auto& ep_option : ep_specific_protocol_options->compiledOptions()) {

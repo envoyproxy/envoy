@@ -195,14 +195,17 @@ void MultiplexedActiveClientBase::onStreamReset(Http::StreamResetReason reason) 
   }
 }
 
-uint32_t MultiplexedActiveClientBase::maxStreamsPerConnection(uint32_t max_streams_config,
-                                                              Upstream::HostDescriptionConstSharedPtr host) {
+uint32_t
+MultiplexedActiveClientBase::maxStreamsPerConnection(uint32_t max_streams_config,
+                                                     Upstream::HostDescriptionConstSharedPtr host) {
   uint32_t max_requests = (max_streams_config != 0) ? max_streams_config : DEFAULT_MAX_STREAMS;
-  
+
   // Check for endpoint-specific max_requests_per_connection
-  const auto ep_specific_protocol_options = host->cluster().extensionProtocolOptionsTyped<
-      Extensions::Upstreams::Http::EpSpecificProtocolOptionsConfigImpl>(
-      "envoy.extensions.upstreams.http.v3.EndpointSpecificHttpProtocolOptions");
+  const auto ep_specific_protocol_options =
+      host->cluster()
+          .extensionProtocolOptionsTyped<
+              Extensions::Upstreams::Http::EpSpecificProtocolOptionsConfigImpl>(
+              "envoy.extensions.upstreams.http.v3.EndpointSpecificHttpProtocolOptions");
 
   if (ep_specific_protocol_options != nullptr) {
     for (const auto& ep_option : ep_specific_protocol_options->compiledOptions()) {
@@ -217,7 +220,7 @@ uint32_t MultiplexedActiveClientBase::maxStreamsPerConnection(uint32_t max_strea
       }
     }
   }
-  
+
   return max_requests;
 }
 
@@ -226,7 +229,9 @@ MultiplexedActiveClientBase::MultiplexedActiveClientBase(
     uint32_t max_configured_concurrent_streams, Stats::Counter& cx_total,
     OptRef<Upstream::Host::CreateConnectionData> data)
     : Envoy::Http::ActiveClient(
-          parent, maxStreamsPerConnection(parent.host()->cluster().maxRequestsPerConnection(), parent.host()),
+          parent,
+          maxStreamsPerConnection(parent.host()->cluster().maxRequestsPerConnection(),
+                                  parent.host()),
           effective_concurrent_streams, max_configured_concurrent_streams, data) {
   codec_client_->setCodecClientCallbacks(*this);
   codec_client_->setCodecConnectionCallbacks(*this);

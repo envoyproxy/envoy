@@ -320,9 +320,7 @@ public:
     uint32_t max_requests_per_connection{0};
   };
 
-  const EndpointLimitOptions& endpointLimits() {
-    return endpoint_limits_;
-  }
+  const EndpointLimitOptions& endpointLimits() { return endpoint_limits_; }
 
 protected:
   virtual void onConnected(Envoy::ConnectionPool::ActiveClient&) {}

@@ -18,8 +18,8 @@ namespace Http {
  */
 struct CompiledEpSpecificOptions {
   CompiledEpSpecificOptions(
-      const envoy::extensions::upstreams::http::v3::EndpointSpecificHttpProtocolOptions::EndpointSpecificOptions&
-          options,
+      const envoy::extensions::upstreams::http::v3::EndpointSpecificHttpProtocolOptions::
+          EndpointSpecificOptions& options,
       Server::Configuration::CommonFactoryContext& context)
       : http2_protocol_options(options.has_http2_protocol_options()
                                    ? absl::optional<envoy::config::core::v3::Http2ProtocolOptions>(
@@ -30,8 +30,8 @@ struct CompiledEpSpecificOptions {
                                         options.http_protocol_options())
                                   : absl::nullopt),
         metadata_matcher(options.has_endpoint_metadata_match()
-                             ? absl::optional<Matchers::MetadataMatcher>(
-                                   Matchers::MetadataMatcher(options.endpoint_metadata_match(), context))
+                             ? absl::optional<Matchers::MetadataMatcher>(Matchers::MetadataMatcher(
+                                   options.endpoint_metadata_match(), context))
                              : absl::nullopt) {}
 
   absl::optional<envoy::config::core::v3::Http2ProtocolOptions> http2_protocol_options;
@@ -74,19 +74,21 @@ public:
         const envoy::extensions::upstreams::http::v3::EndpointSpecificHttpProtocolOptions&>(
         config, context.messageValidationVisitor());
     return std::make_shared<EpSpecificProtocolOptionsConfigImpl>(typed_config,
-                                                                  context.serverFactoryContext());
+                                                                 context.serverFactoryContext());
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<envoy::extensions::upstreams::http::v3::EndpointSpecificHttpProtocolOptions>();
+    return std::make_unique<
+        envoy::extensions::upstreams::http::v3::EndpointSpecificHttpProtocolOptions>();
   }
 
   ProtobufTypes::MessagePtr createEmptyProtocolOptionsProto() override {
-    return std::make_unique<envoy::extensions::upstreams::http::v3::EndpointSpecificHttpProtocolOptions>();
+    return std::make_unique<
+        envoy::extensions::upstreams::http::v3::EndpointSpecificHttpProtocolOptions>();
   }
 
   std::string category() const override { return "envoy.upstream_options"; }
-  
+
   std::string name() const override {
     return "envoy.extensions.upstreams.http.v3.EndpointSpecificHttpProtocolOptions";
   }
