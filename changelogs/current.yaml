@@ -82,6 +82,13 @@ bug_fixes:
   change: |
     Fixed the log formatter in HTTP router upstream logs by correctly setting the downstream connection's
     ``ConnectionInfoProvider`` in the ``StreamInfo``.
+- area: spiffe
+  change: |
+    Reduce the number of the file watches needed by :ref:`trust_bundles
+    <envoy_v3_api_field_extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig.trust_bundles>` when the validator
+    is used in multiple places. Add support for :ref:`watched_directory
+    <envoy_v3_api_field_config.core.v3.datasource.watched_directory>` to support Kubernetes environments that rely on
+    atomic symbolic file updates.  Add content hashing during file watching to handle excessive watch notifications.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`

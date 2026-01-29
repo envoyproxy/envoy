@@ -54,6 +54,7 @@ envoy_cc_library(
         ":watched_directory_lib",
         "//envoy/api:api_interface",
         "//envoy/init:manager_interface",
+        "//envoy/singleton:instance_interface",
         "//envoy/thread_local:thread_local_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:backoff_lib",
