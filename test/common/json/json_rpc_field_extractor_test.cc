@@ -140,6 +140,51 @@ TEST_F(JsonRpcFieldExtractorTest, ListFieldSupported) {
   EXPECT_EQ("value1", list.values(1).string_value());
 }
 
+TEST_F(JsonRpcFieldExtractorTest, NestedListField) {
+  ExtractorTestJsonRpcParserConfig config;
+  config.addMethodConfig("method_list", {AttributeExtractionRule("params.list")});
+  Protobuf::Struct metadata;
+  TestJsonRpcFieldExtractor extractor(metadata, config);
+  extractor.list_supported = true;
+
+  extractor.StartObject("");
+  extractor.RenderString("jsonrpc", "2.0");
+  extractor.RenderString("method", "method_list");
+  extractor.StartObject("params");
+  extractor.StartList("list");
+  extractor.RenderString("", "value0");
+  // nested list
+  extractor.StartList("");
+  extractor.RenderString("", "nested_value0");
+  extractor.RenderString("", "nested_value1");
+  extractor.EndList();
+  extractor.RenderString("", "value1");
+  extractor.EndList();
+  extractor.EndObject();
+  extractor.RenderInt32("id", 5);
+  extractor.EndObject();
+  extractor.finalizeExtraction();
+
+  EXPECT_TRUE(extractor.isValidJsonRpc());
+  EXPECT_EQ("method_list", extractor.getMethod());
+
+  const auto& fields = metadata.fields();
+  EXPECT_EQ(4, fields.size());
+  EXPECT_EQ("2.0", fields.at("jsonrpc").string_value());
+  EXPECT_EQ("method_list", fields.at("method").string_value());
+  EXPECT_EQ(5, fields.at("id").number_value());
+  const auto& params = fields.at("params").struct_value().fields();
+  const auto& list = params.at("list").list_value();
+  ASSERT_EQ(3, list.values_size());
+  EXPECT_EQ("value0", list.values(0).string_value());
+  EXPECT_EQ("value1", list.values(2).string_value());
+
+  const auto& nested_list = list.values(1).list_value();
+  ASSERT_EQ(2, nested_list.values_size());
+  EXPECT_EQ("nested_value0", nested_list.values(0).string_value());
+  EXPECT_EQ("nested_value1", nested_list.values(1).string_value());
+}
+
 TEST_F(JsonRpcFieldExtractorTest, AllTypes) {
   ExtractorTestJsonRpcParserConfig config;
   Protobuf::Struct metadata;
@@ -207,6 +252,67 @@ TEST_F(JsonRpcFieldExtractorTest, NoListSupport) {
   EXPECT_EQ("method_list", fields.at("method").string_value());
   EXPECT_EQ(3, fields.at("id").number_value());
   EXPECT_FALSE(fields.contains("params"));
+}
+
+TEST_F(JsonRpcFieldExtractorTest, EarlyStop) {
+  ExtractorTestJsonRpcParserConfig config;
+  config.addMethodConfig("early_stop_method", {AttributeExtractionRule("params.foo")});
+  Protobuf::Struct metadata;
+  TestJsonRpcFieldExtractor extractor(metadata, config);
+
+  extractor.StartObject("");
+  extractor.RenderString("jsonrpc", "2.0");
+  extractor.RenderString("method", "early_stop_method");
+  extractor.StartObject("params");
+  extractor.RenderString("foo", "bar");
+  extractor.EndObject();
+  extractor.RenderInt32("id", 6);
+  // can_stop_parsing_ should be true now.
+  EXPECT_TRUE(extractor.shouldStopParsing());
+  // This should be ignored.
+  extractor.RenderString("ignored_param", "ignored_value");
+  extractor.EndObject();
+  extractor.finalizeExtraction();
+
+  EXPECT_TRUE(extractor.isValidJsonRpc());
+  EXPECT_EQ("early_stop_method", extractor.getMethod());
+
+  const auto& fields = metadata.fields();
+  EXPECT_EQ(4, fields.size());
+  EXPECT_EQ("2.0", fields.at("jsonrpc").string_value());
+  EXPECT_EQ("early_stop_method", fields.at("method").string_value());
+  EXPECT_EQ(6, fields.at("id").number_value());
+  const auto& params = fields.at("params").struct_value().fields();
+  EXPECT_TRUE(params.contains("foo"));
+  EXPECT_EQ("bar", params.at("foo").string_value());
+  EXPECT_FALSE(fields.contains("ignored_param"));
+}
+
+TEST_F(JsonRpcFieldExtractorTest, EarlyStopNotification) {
+  ExtractorTestJsonRpcParserConfig config;
+  config.addMethodConfig("notification", {});
+  Protobuf::Struct metadata;
+  TestJsonRpcFieldExtractor extractor(metadata, config);
+
+  extractor.StartObject("");
+  extractor.RenderString("jsonrpc", "2.0");
+  extractor.RenderString("method", "notification");
+  // can_stop_parsing_ should be true now.
+  EXPECT_TRUE(extractor.shouldStopParsing());
+  // This should be ignored.
+  extractor.RenderString("ignored_param", "ignored_value");
+  extractor.EndObject();
+  extractor.finalizeExtraction();
+
+  EXPECT_TRUE(extractor.isValidJsonRpc());
+  EXPECT_EQ("notification", extractor.getMethod());
+
+  const auto& fields = metadata.fields();
+  EXPECT_EQ(2, fields.size());
+  EXPECT_EQ("2.0", fields.at("jsonrpc").string_value());
+  EXPECT_EQ("notification", fields.at("method").string_value());
+  EXPECT_FALSE(fields.contains("id"));
+  EXPECT_FALSE(fields.contains("ignored_param"));
 }
 
 TEST_F(JsonRpcFieldExtractorTest, InvalidJsonRpcMissingVersion) {
