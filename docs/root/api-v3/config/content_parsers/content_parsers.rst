@@ -1,3 +1,5 @@
+.. _extension_category_envoy.content_parsers:
+
 Content parsers
 ===============
 
