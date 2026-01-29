@@ -20,6 +20,10 @@ protected:
     addMethodConfig("method1", {AttributeExtractionRule("params.param1"),
                                 AttributeExtractionRule("params.param2")});
     addMethodConfig("method2", {AttributeExtractionRule("params.nested.param3")});
+       addMethodConfig("method_types",
+                    {AttributeExtractionRule("params.bool"), AttributeExtractionRule("params.uint32"),
+                     AttributeExtractionRule("params.double"), AttributeExtractionRule("params.float"),
+                     AttributeExtractionRule("params.null"), AttributeExtractionRule("params.byte")});
   }
 };
 
@@ -100,7 +104,7 @@ TEST_F(JsonRpcFieldExtractorTest, NestedField) {
   EXPECT_EQ("value3", nested.at("param3").string_value());
 }
 
-TEST_F(JsonRpcFieldExtractorTest, ListField) {
+TEST_F(JsonRpcFieldExtractorTest, ListFieldSupported) {
   ExtractorTestJsonRpcParserConfig config;
   config.addMethodConfig("method_list", {AttributeExtractionRule("params.list")});
   Protobuf::Struct metadata;
@@ -133,6 +137,75 @@ TEST_F(JsonRpcFieldExtractorTest, ListField) {
   ASSERT_EQ(2, list.values_size());
   EXPECT_EQ("value0", list.values(0).string_value());
   EXPECT_EQ("value1", list.values(1).string_value());
+}
+
+TEST_F(JsonRpcFieldExtractorTest, AllTypes) {
+  ExtractorTestJsonRpcParserConfig config;
+  Protobuf::Struct metadata;
+  TestJsonRpcFieldExtractor extractor(metadata, config);
+
+  extractor.StartObject("");
+  extractor.RenderString("jsonrpc", "2.0");
+  extractor.RenderString("method", "method_types");
+  extractor.StartObject("params");
+  extractor.RenderBool("bool", true);
+  extractor.RenderUint32("uint32", 4294967295);
+  extractor.RenderDouble("double", 123.456);
+  extractor.RenderFloat("float", 789.101f);
+  extractor.RenderNull("null");
+  extractor.RenderBytes("byte", "byte_value");
+  extractor.EndObject();
+  extractor.RenderInt32("id", 4);
+  extractor.EndObject();
+  extractor.finalizeExtraction();
+
+  EXPECT_TRUE(extractor.isValidJsonRpc());
+  EXPECT_EQ("method_types", extractor.getMethod());
+
+  const auto& fields = metadata.fields();
+  EXPECT_EQ(4, fields.size());
+  EXPECT_EQ("2.0", fields.at("jsonrpc").string_value());
+  EXPECT_EQ("method_types", fields.at("method").string_value());
+  EXPECT_EQ(4, fields.at("id").number_value());
+  const auto& params = fields.at("params").struct_value().fields();
+  EXPECT_TRUE(params.at("bool").bool_value());
+  EXPECT_EQ(4294967295, params.at("uint32").number_value());
+  EXPECT_EQ(123.456, params.at("double").number_value());
+  EXPECT_NEAR(789.101, params.at("float").number_value(), 0.001);
+  EXPECT_EQ(Protobuf::NULL_VALUE, params.at("null").null_value());
+  EXPECT_EQ("byte_value", params.at("byte").string_value());
+}
+
+TEST_F(JsonRpcFieldExtractorTest, NoListSupport) {
+  ExtractorTestJsonRpcParserConfig config;
+  Protobuf::Struct metadata;
+  TestJsonRpcFieldExtractor extractor(metadata, config);
+
+  extractor.StartObject("");
+  extractor.RenderString("jsonrpc", "2.0");
+  extractor.RenderString("method", "method_list");
+  extractor.StartObject("params");
+  extractor.StartList("list");
+  extractor.RenderString("", "value0");
+  extractor.StartObject(""); // This object should be ignored
+  extractor.RenderString("a", "b");
+  extractor.EndObject();
+  extractor.RenderString("", "value1");
+  extractor.EndList();
+  extractor.EndObject();
+  extractor.RenderInt32("id", 3);
+  extractor.EndObject();
+  extractor.finalizeExtraction();
+
+  EXPECT_TRUE(extractor.isValidJsonRpc());
+  EXPECT_EQ("method_list", extractor.getMethod());
+
+  const auto& fields = metadata.fields();
+  EXPECT_EQ(3, fields.size());
+  EXPECT_EQ("2.0", fields.at("jsonrpc").string_value());
+  EXPECT_EQ("method_list", fields.at("method").string_value());
+  EXPECT_EQ(3, fields.at("id").number_value());
+  EXPECT_FALSE(fields.contains("params"));
 }
 
 TEST_F(JsonRpcFieldExtractorTest, InvalidJsonRpcMissingVersion) {
