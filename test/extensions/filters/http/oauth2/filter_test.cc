@@ -5056,6 +5056,85 @@ TEST_F(OAuth2Test, AllowFailedMatcherTakesPrecedenceOverDenyRedirect) {
   EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_allow_failed_passthrough").value(), 1);
 }
 
+/**
+ * Scenario: Request with injected OAuth status headers to test sanitization.
+ * A malicious client sends x-envoy-oauth-status and x-envoy-oauth-failure-reason headers
+ * in their request.
+ *
+ * Expected behavior: The filter should sanitize these headers to prevent header injection
+ * attacks, similar to how it sanitizes the Authorization header.
+ */
+TEST_F(OAuth2Test, SanitizeInjectedOAuthStatusHeaders) {
+  init(getConfig());
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Path.get(), "/anypath"},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Scheme.get(), "https"},
+      // Malicious client trying to inject OAuth status headers
+      {"x-envoy-oauth-status", "injected-success"},
+      {"x-envoy-oauth-failure-reason", "injected-reason"},
+  };
+
+  // cookie-validation mocking - user is authenticated
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(true));
+
+  std::string legit_token{"legit_token"};
+  EXPECT_CALL(*validator_, token()).WillRepeatedly(ReturnRef(legit_token));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+
+  // Verify the injected headers were sanitized (removed)
+  EXPECT_TRUE(request_headers.get(OAuth2Headers::get().OAuthStatus).empty());
+  EXPECT_TRUE(request_headers.get(OAuth2Headers::get().OAuthFailureReason).empty());
+
+  EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_failure").value(), 0);
+  EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_success").value(), 1);
+}
+
+/**
+ * Scenario: Request with injected OAuth status headers on allow_failed path.
+ * Tests that sanitization occurs before the filter sets its own legitimate headers.
+ *
+ * Expected behavior: The injected headers should be removed, and only the filter's
+ * legitimate headers should be present in the final request.
+ */
+TEST_F(OAuth2Test, SanitizeInjectedOAuthStatusHeadersOnAllowFailedPath) {
+  init(getConfig());
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Path.get(), "/allowfailed/api"},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Scheme.get(), "https"},
+      // Malicious client trying to inject fake success status
+      {"x-envoy-oauth-status", "injected-success"},
+      {"x-envoy-oauth-failure-reason", "injected-fake-reason"},
+  };
+
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _)).Times(0);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+
+  // Verify only the legitimate "failed" status is present (not the injected "success")
+  auto status_headers = request_headers.get(OAuth2Headers::get().OAuthStatus);
+  EXPECT_EQ(status_headers.size(), 1);
+  EXPECT_EQ(status_headers[0]->value().getStringView(), "failed");
+
+  auto reason_headers = request_headers.get(OAuth2Headers::get().OAuthFailureReason);
+  EXPECT_EQ(reason_headers.size(), 1);
+  // Verify it's not the injected value
+  EXPECT_NE(reason_headers[0]->value().getStringView(), "injected-fake-reason");
+
+  EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_allow_failed_passthrough").value(), 1);
+}
+
 } // namespace Oauth2
 } // namespace HttpFilters
 } // namespace Extensions

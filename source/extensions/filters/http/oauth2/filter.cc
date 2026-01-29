@@ -654,6 +654,11 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
     headers.removeInline(authorization_handle.handle());
   }
 
+  // Sanitize OAuth status headers to prevent header injection attacks.
+  // These headers are only set by the filter itself when allow_failed_matcher is used.
+  headers.remove(OAuth2Headers::get().OAuthStatus);
+  headers.remove(OAuth2Headers::get().OAuthFailureReason);
+
   // The following 2 headers are guaranteed for regular requests. The asserts are helpful when
   // writing test code to not forget these important variables in mock requests
   const Http::HeaderEntry* host_header = headers.Host();
@@ -1443,8 +1448,8 @@ bool OAuth2Filter::shouldAllowFailed(const Http::RequestHeaderMap& headers) cons
 
 void OAuth2Filter::continueAsUnauthorized(const std::string& failure_reason) {
   removeOAuthTokenCookies(*request_headers_);
-  request_headers_->addCopy(OAuth2Headers::get().OAuthStatus, "failed");
-  request_headers_->addCopy(OAuth2Headers::get().OAuthFailureReason, failure_reason);
+  request_headers_->setCopy(OAuth2Headers::get().OAuthStatus, "failed");
+  request_headers_->setCopy(OAuth2Headers::get().OAuthFailureReason, failure_reason);
   config_->stats().oauth_allow_failed_passthrough_.inc();
   ENVOY_LOG(debug, "allow_failed_matcher matched, continuing as unauthorized: {}", failure_reason);
 }
