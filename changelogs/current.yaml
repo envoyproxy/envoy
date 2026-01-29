@@ -87,6 +87,12 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
+- area: tls
+  change: |
+    Added TLS certificate compression support (RFC 8879) with brotli and zlib algorithms.
+    Compression reduces TLS handshake size, especially beneficial for QUIC where the ServerHello
+    needs to fit in the initial response. Controlled by runtime flag
+    ``envoy.reloadable_features.tls_support_certificate_compression`` (defaults to ``true``).
 - area: stats
   change: |
     Added support to limit the number of stats stored in each stats scope in the stats library.

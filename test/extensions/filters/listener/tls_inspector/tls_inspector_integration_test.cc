@@ -8,6 +8,7 @@
 #include "source/common/config/api_version.h"
 #include "source/common/network/raw_buffer_socket.h"
 #include "source/common/network/utility.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/tls/client_ssl_socket.h"
 #include "source/common/tls/context_manager_impl.h"
 #include "source/extensions/filters/listener/tls_inspector/tls_inspector.h"
@@ -292,6 +293,10 @@ TEST_P(TlsInspectorIntegrationTest, TlsInspectorMetadataPopulatedInAccessLog) {
 
 // The `JA3` fingerprint is correct in the access log.
 TEST_P(TlsInspectorIntegrationTest, JA3FingerprintIsSet) {
+  // Disable cert compression for predictable fingerprints.
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.tls_support_certificate_compression",
+                                false);
+
   // These TLS options will create a client hello message with
   // `JA3` fingerprint:
   //   `771,49199,23-65281-10-11-35-16-13,23,0`
@@ -321,6 +326,10 @@ TEST_P(TlsInspectorIntegrationTest, JA3FingerprintIsSet) {
 
 // The `JA4` fingerprint is correct in the access log.
 TEST_P(TlsInspectorIntegrationTest, JA4FingerprintIsSet) {
+  // Disable cert compression for predictable fingerprints.
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.tls_support_certificate_compression",
+                                false);
+
   // These TLS options will create a client hello message with
   // `JA4` fingerprint:
   //   `t12i0107en_f06271c2b022_0f3b2bcde21d`

@@ -26,6 +26,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stats/utility.h"
+#include "source/common/tls/cert_compression.h"
 #include "source/common/tls/cert_validator/factory.h"
 #include "source/common/tls/stats.h"
 #include "source/common/tls/utility.h"
@@ -161,6 +162,15 @@ ContextImpl::ContextImpl(
             "Failed to initialize TLS signature algorithms ", config.signatureAlgorithms()));
         return;
       }
+    }
+
+    // Register certificate compression algorithms to reduce TLS handshake size (RFC 8879).
+    // Only register if the runtime feature flag is enabled (default: enabled).
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.tls_support_certificate_compression")) {
+      // Priority: brotli > zlib (brotli generally provides best compression for certs)
+      CertCompression::registerAlgorithms(ctx.ssl_ctx_.get(), {CertCompression::Algorithm::Brotli,
+                                                               CertCompression::Algorithm::Zlib});
     }
   }
 

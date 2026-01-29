@@ -731,11 +731,9 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "cert_compression_lib",
-    srcs = envoy_select_enable_http3(["cert_compression.cc"]),
     hdrs = envoy_select_enable_http3(["cert_compression.h"]),
-    external_deps = ["ssl"],
     deps = envoy_select_enable_http3([
-        "//bazel:zlib",
+        "//source/common/tls:cert_compression_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
         "//source/common/runtime:runtime_lib",
