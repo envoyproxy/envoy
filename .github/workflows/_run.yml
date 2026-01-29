@@ -236,23 +236,26 @@ jobs:
 
     - run: |
         mkdir ${{ runner.temp }}/container
+        MNT_AVAILABLE=false
         if mountpoint -q /mnt; then
+            MNT_AVAILABLE=true
             USAGE="$(df --output=pcent /mnt | tail -n 1 | tr -d ' %')"
             if [[ "$USAGE" -ge 100 ]]; then
                 echo "should-remnt=true" >> "$GITHUB_OUTPUT"
                 echo "::warning::Disk usage for /mnt is at 100% ... remounting"
             fi
         fi
+        echo "mnt-available=$MNT_AVAILABLE" >> "$GITHUB_OUTPUT"
       id: disk
     - uses: envoyproxy/toolshed/actions/github/remnt@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
       if: steps.disk.outputs.should-remnt == 'true'
     - uses: envoyproxy/toolshed/actions/bind-mounts@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
-      if: inputs.bind-mount && ! github.event.repository.private
+      if: inputs.bind-mount && steps.disk.outputs.mnt-available == 'true'
       with:
         mounts: ${{ inputs.bind-mounts }}
     - name: Free diskspace
       uses: envoyproxy/toolshed/actions/diskspace@35f9bcf37d0ceaedea0250da014348ce4bdf8d35  # v0.4.1
-      if: inputs.diskspace-hack || github.event.repository.private
+      if: inputs.diskspace-hack || steps.disk.outputs.mnt-available != 'true'
       with:
         to_remove: ${{ inputs.diskspace-hack-paths }}
     - run: |
@@ -295,7 +298,7 @@ jobs:
     # HACK/WORKAROUND for cache scope issue (https://github.com/envoyproxy/envoy/issues/37603)
     - if: ${{ inputs.cache-build-image }}
       id: cache-lookup
-      uses: actions/cache/restore@9255dc7a253b0ccc959486e2bca901246202afeb  # v5.0.1
+      uses: actions/cache/restore@8b402f58fbc84540c8b491a91e594a4576fec3d7  # v5.0.2
       with:
         lookup-only: true
         path: /tmp/cache

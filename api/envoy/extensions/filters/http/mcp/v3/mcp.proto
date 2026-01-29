@@ -21,6 +21,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // [#extension: envoy.filters.http.mcp]
 
 // This filter will inspect and get attributes from MCP traffic.
+// [#next-free-field: 6]
 message Mcp {
   // Traffic handling mode for non-MCP traffic.
   enum TrafficMode {
@@ -33,6 +34,22 @@ message Mcp {
     // - POST requests with JSON-RPC 2.0 messages
     // - GET requests for SSE streams (with Accept: text/event-stream)
     REJECT_NO_MCP = 1;
+  }
+
+  // Where to store parsed MCP request attributes.
+  enum RequestStorageMode {
+    // Unspecified. Uses default behavior (same as DYNAMIC_METADATA).
+    MODE_UNSPECIFIED = 0;
+
+    // Store request attributes in dynamic metadata only.
+    // This is the default behavior.
+    DYNAMIC_METADATA = 1;
+
+    // Store request attributes in filter state only.
+    FILTER_STATE = 2;
+
+    // Store request attributes in both dynamic metadata and filter state.
+    DYNAMIC_METADATA_AND_FILTER_STATE = 3;
   }
 
   // Configures how the filter handles non-MCP traffic.
@@ -54,6 +71,11 @@ message Mcp {
 
   // Parser configuration, this provide the attribute extraction override.
   ParserConfig parser_config = 4;
+
+  // Where to store parsed MCP request attributes.
+  // Controls whether attributes are written to dynamic metadata, filter state, or both.
+  // Default is DYNAMIC_METADATA when unspecified.
+  RequestStorageMode request_storage_mode = 5 [(validate.rules).enum = {defined_only: true}];
 }
 
 // Parser configuration with method-specific rules.

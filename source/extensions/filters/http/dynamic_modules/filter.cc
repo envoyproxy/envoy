@@ -22,6 +22,10 @@ void DynamicModuleHttpFilter::onStreamComplete() {
 
 void DynamicModuleHttpFilter::onDestroy() {
   destroyed_ = true;
+  // Remove watermark callbacks before destroying.
+  if (decoder_callbacks_ != nullptr) {
+    decoder_callbacks_->removeDownstreamWatermarkCallbacks(*this);
+  }
   destroy();
 };
 
@@ -539,6 +543,19 @@ void DynamicModuleHttpFilter::HttpStreamCalloutCallback::onReset() {
     dispatcher.deferredDelete(std::move(deletable));
     filter->http_stream_callouts_.erase(it);
   }
+}
+
+Http::LocalErrorStatus
+DynamicModuleHttpFilter::onLocalReply(const Http::StreamFilterBase::LocalReplyData& data) {
+  if (!in_module_filter_) {
+    return Http::LocalErrorStatus::Continue;
+  }
+  envoy_dynamic_module_type_envoy_buffer details_buffer{data.details_.data(), data.details_.size()};
+  const envoy_dynamic_module_type_on_http_filter_local_reply_status status =
+      config_->on_http_filter_local_reply_(thisAsVoidPtr(), in_module_filter_,
+                                           static_cast<uint32_t>(data.code_), details_buffer,
+                                           data.reset_imminent_);
+  return static_cast<Http::LocalErrorStatus>(status);
 }
 
 void DynamicModuleHttpFilter::storeSocketOptionInt(
