@@ -33,17 +33,6 @@ envoy_cc_library(
 )
 
 go_library(
-    name = "go_sdk_abi_version",
-    srcs = [
-        "//source/extensions/dynamic_modules/abi:version.go",
-    ],
-    cgo = True,
-    embedsrcs = ["//source/extensions/dynamic_modules/abi:abi.h"],
-    importpath = "github.com/envoyproxy/envoy/source/extensions/dynamic_modules/abi",
-    visibility = ["//visibility:public"],
-)
-
-go_library(
     name = "go_sdk_shared",
     srcs = [
         "sdk/go/shared/api.go",
@@ -82,7 +71,6 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//source/extensions/dynamic_modules:go_sdk",
-        "//source/extensions/dynamic_modules:go_sdk_abi_version",
         "//source/extensions/dynamic_modules:go_sdk_shared",
     ],
 )

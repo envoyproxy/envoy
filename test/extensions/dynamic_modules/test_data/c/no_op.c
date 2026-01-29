@@ -1,7 +1,7 @@
 #include <assert.h>
 
 #include "source/extensions/dynamic_modules/abi/abi.h"
-#include "source/extensions/dynamic_modules/abi/abi_version.h"
+
 
 static int some_variable = 0;
 static int current_load_id = 0;
@@ -9,7 +9,7 @@ static int seen_load_id = -1;
 
 envoy_dynamic_module_type_abi_version_module_ptr envoy_dynamic_module_on_program_init(void) {
   current_load_id++;
-  return kAbiVersion;
+  return envoy_dynamic_modules_abi_version;
 }
 
 int getSomeVariable(void) {
