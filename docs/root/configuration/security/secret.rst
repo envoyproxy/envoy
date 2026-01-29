@@ -410,7 +410,7 @@ the downstream filter chain, e.g. using the following filter configuration:
     "@type": type.googleapis.com/envoy.extensions.filters.network.set_filter_state.v3.Config
     on_new_connection:
     - object_key: envoy.tls.certificate_mappers.on_demand_secret
-      factory_key: envoy.string
+      factory_key: envoy.hashable_string
       format_string:
         text_format_source:
           inline_string: my_secret_name
