@@ -5,4 +5,4 @@ Content parsers
   :glob:
   :maxdepth: 2
 
-  ../../extensions/content_parsers/*/v3/*
+  ../../extensions/content_parsers/json/*/v3/*
