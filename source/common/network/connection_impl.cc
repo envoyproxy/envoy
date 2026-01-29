@@ -124,6 +124,8 @@ ConnectionImpl::~ConnectionImpl() {
   // deletion). Hence the assert above. However, call close() here just to be completely sure that
   // the fd is closed and make it more likely that we crash from a bad close callback.
   close(ConnectionCloseType::NoFlush);
+  // Ensure that the access log is written.
+  ensureAccessLogWritten();
 }
 
 void ConnectionImpl::addWriteFilter(WriteFilterSharedPtr filter) {
@@ -157,7 +159,6 @@ void ConnectionImpl::close(ConnectionCloseType type) {
   if (!socket_->isOpen()) {
     ENVOY_CONN_LOG_EVENT(debug, "connection_closing", "Not closing conn, socket is not open",
                          *this);
-    ensureAccessLogWritten();
     return;
   }
 
@@ -168,13 +169,11 @@ void ConnectionImpl::close(ConnectionCloseType type) {
         *this);
     setDetectedCloseType(StreamInfo::DetectedCloseType::LocalReset);
     closeSocket(ConnectionEvent::LocalClose);
-    ensureAccessLogWritten();
     return;
   }
 
   if (type == ConnectionCloseType::Abort || type == ConnectionCloseType::NoFlush) {
     closeInternal(type);
-    ensureAccessLogWritten();
     return;
   }
 
@@ -183,7 +182,6 @@ void ConnectionImpl::close(ConnectionCloseType type) {
   ASSERT(type == ConnectionCloseType::FlushWrite ||
          type == ConnectionCloseType::FlushWriteAndDelay);
   closeThroughFilterManager(ConnectionCloseAction{ConnectionEvent::LocalClose, false, type});
-  ensureAccessLogWritten();
 }
 
 void ConnectionImpl::closeInternal(ConnectionCloseType type) {
@@ -1125,9 +1123,13 @@ ClientConnectionImpl::ClientConnectionImpl(
 }
 
 ClientConnectionImpl::~ClientConnectionImpl() {
-  // Ensure that the connection is closed and the access log is written before the
-  // StreamInfo is destroyed.
+  // Ensure that the connection is closed.
   close(ConnectionCloseType::NoFlush);
+
+  // Ensure that the access log is written before the StreamInfo is destroyed.
+  // We need to write the access log here because the StreamInfo is owned by this class,
+  // and will be destroyed before the base class destructor runs.
+  ensureAccessLogWritten();
 }
 
 void ClientConnectionImpl::connect() {

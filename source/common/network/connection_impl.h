@@ -172,6 +172,9 @@ protected:
   // written exactly once, even if close() is called multiple times.
   bool access_log_written_{false};
 
+  // Write access log if it hasn't been written yet.
+  void ensureAccessLogWritten();
+
   // A convenience function which returns true if
   // 1) The read disable count is zero or
   // 2) The read disable count is one due to the read buffer being overrun.
@@ -240,9 +243,6 @@ private:
   bool bothSidesHalfClosed();
 
   void closeInternal(ConnectionCloseType type);
-
-  // Write access log if it hasn't been written yet.
-  void ensureAccessLogWritten();
 
   static std::atomic<uint64_t> next_global_id_;
 
