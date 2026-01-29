@@ -233,7 +233,13 @@ TEST_F(JsonRpcFieldExtractorTest, NoListSupport) {
   extractor.StartObject("params");
   extractor.StartList("list");
   extractor.RenderString("", "value0");
-  extractor.StartObject(""); // This object should be ignored
+  extractor.RenderBool("ignored_bool", true);
+  extractor.RenderInt64("ignored_int64", 123);
+  extractor.RenderUint64("ignored_uint64", 456);
+  extractor.RenderDouble("ignored_double", 1.23);
+  extractor.RenderNull("ignored_null");
+  // This object should be ignored
+  extractor.StartObject("");
   extractor.RenderString("a", "b");
   extractor.EndObject();
   extractor.RenderString("", "value1");
@@ -271,6 +277,11 @@ TEST_F(JsonRpcFieldExtractorTest, EarlyStop) {
   EXPECT_TRUE(extractor.shouldStopParsing());
   // This should be ignored.
   extractor.RenderString("ignored_param", "ignored_value");
+  extractor.RenderBool("ignored_bool", true);
+  extractor.RenderInt64("ignored_int64", 123);
+  extractor.RenderUint64("ignored_uint64", 456);
+  extractor.RenderDouble("ignored_double", 1.23);
+  extractor.RenderNull("ignored_null");
   extractor.EndObject();
   extractor.finalizeExtraction();
 

@@ -19,10 +19,7 @@ JsonRpcFieldExtractor::JsonRpcFieldExtractor(Protobuf::Struct& metadata,
 }
 
 JsonRpcFieldExtractor* JsonRpcFieldExtractor::StartObject(absl::string_view name) {
-  if (array_depth_ > 0) {
-    return this;
-  }
-  if (can_stop_parsing_) {
+  if (array_depth_ > 0 || can_stop_parsing_) {
     return this;
   }
 
@@ -160,13 +157,9 @@ std::string JsonRpcFieldExtractor::buildFullPath(absl::string_view name) const {
 
 JsonRpcFieldExtractor* JsonRpcFieldExtractor::RenderString(absl::string_view name,
                                                            absl::string_view value) {
-  if (array_depth_ > 0) {
+  if (array_depth_ > 0 || can_stop_parsing_) {
     return this;
   }
-  if (can_stop_parsing_) {
-    return this;
-  }
-
   std::string full_path = buildFullPath(name);
   ENVOY_LOG_MISC(debug, "render string name {} path {}, value {}", name, full_path, value);
 
@@ -414,6 +407,7 @@ void JsonRpcFieldExtractor::copyFieldByPath(const std::string& path) {
     } else {
       if (it->second.has_list_value()) {
         // if path segment is list but we have more segments, not supported for copy.
+        // TODO(tyxia): support list indexing in path.
         return;
       } else if (!it->second.has_struct_value()) {
         return;

@@ -87,7 +87,6 @@ envoy_cc_library(
         "json_rpc_field_extractor.h",
         "json_rpc_parser_config.h",
     ],
-    # external_deps = ["grpc_transcoding"],
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
