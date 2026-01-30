@@ -296,7 +296,7 @@ TEST_F(OnDemandFilterTest,
 // tests onClusterDiscoveryCompletion when a cluster is available, but recreating a stream failed
 TEST_F(OnDemandFilterTest, OnClusterDiscoveryCompletionClusterFoundRecreateStreamFailed) {
   TestScopedRuntime scoped_runtime;
-  // This test is irrlelvant for the case when there is no recreateStream call.
+  // This test is irrelevant for the case when there is no recreateStream call.
   scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.on_demand_cluster_no_recreate_stream", "false"}});
   Http::TestRequestHeaderMapImpl headers;
