@@ -124,6 +124,12 @@ TEST_P(DynamicModuleTestLanguages, ABIVersionMismatch) {
               testing::HasSubstr("ABI version mismatch: got invalid-version-hash, but expected"));
 }
 
+TEST(DynamicModuleTestLanguages, ABIVersionPrevious) {
+  absl::StatusOr<DynamicModulePtr> result =
+      newDynamicModule(testSharedObjectPath("abi_version_previous", "c"), false);
+  EXPECT_TRUE(result.ok());
+}
+
 TEST(CreateDynamicModulesByName, EnvoyDynamicModulesSearchPathSet) {
   TestEnvironment::setEnvVar(
       "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",

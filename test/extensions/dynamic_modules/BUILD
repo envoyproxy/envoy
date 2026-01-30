@@ -21,6 +21,7 @@ envoy_cc_test(
     srcs = ["dynamic_modules_test.cc"],
     data = [
         "//test/extensions/dynamic_modules/test_data/c:abi_version_mismatch",
+        "//test/extensions/dynamic_modules/test_data/c:abi_version_previous",
         "//test/extensions/dynamic_modules/test_data/c:no_op",
         "//test/extensions/dynamic_modules/test_data/c:no_program_init",
         "//test/extensions/dynamic_modules/test_data/c:program_child",
