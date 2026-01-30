@@ -64,5 +64,5 @@ message FilterChain {
   //
   // [#extension-category: envoy.filters.http]
   repeated config.core.v3.TypedExtensionConfig filters = 1
-  [(validate.rules).repeated = {min_items: 1}];
+      [(validate.rules).repeated = {min_items: 1}];
 }
