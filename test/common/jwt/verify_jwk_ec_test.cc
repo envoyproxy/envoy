@@ -234,6 +234,46 @@ TEST_F(VerifyJwkECTest, NonExistKidFail) {
   EXPECT_EQ(verifyJwt(jwt, *jwks_, 1), Status::JwksKidAlgMismatch);
 }
 
+// Test EC signature verification with empty signature.
+// This exercises the `BN_bin2bn` and `ECDSA_SIG_set0` code paths with zero-length data.
+TEST_F(VerifyJwkECTest, EmptySignatureFail) {
+  Jwt jwt;
+  EXPECT_EQ(jwt.parseFromString(JwtTextEC), Status::Ok);
+  // Clear the signature to make it empty.
+  jwt.signature_.clear();
+  EXPECT_EQ(verifyJwt(jwt, *jwks_, 1), Status::JwtVerificationFail);
+}
+
+// Test EC signature verification with a very short signature (1 byte).
+// This tests edge cases in signature parsing where signature_len / 2 = 0.
+TEST_F(VerifyJwkECTest, VeryShortSignatureFail) {
+  Jwt jwt;
+  EXPECT_EQ(jwt.parseFromString(JwtTextEC), Status::Ok);
+  // Set signature to a single byte.
+  jwt.signature_ = "x";
+  EXPECT_EQ(verifyJwt(jwt, *jwks_, 1), Status::JwtVerificationFail);
+}
+
+// Test EC signature verification with a 2-byte signature.
+// This tests the minimum case where both r and s get 1 byte each.
+TEST_F(VerifyJwkECTest, TwoByteSignatureFail) {
+  Jwt jwt;
+  EXPECT_EQ(jwt.parseFromString(JwtTextEC), Status::Ok);
+  // Set signature to two bytes.
+  jwt.signature_ = "xy";
+  EXPECT_EQ(verifyJwt(jwt, *jwks_, 1), Status::JwtVerificationFail);
+}
+
+// Test EC signature verification with odd-length signature.
+// This ensures proper handling when signature_len is not evenly divisible by 2.
+TEST_F(VerifyJwkECTest, OddLengthSignatureFail) {
+  Jwt jwt;
+  EXPECT_EQ(jwt.parseFromString(JwtTextEC), Status::Ok);
+  // Set signature to 3 bytes (odd length).
+  jwt.signature_ = "xyz";
+  EXPECT_EQ(verifyJwt(jwt, *jwks_, 1), Status::JwtVerificationFail);
+}
+
 TEST_F(VerifyJwkECTest, PubkeyNoAlgOK) {
   // Remove "alg" claim from public key.
   std::string alg_claim = R"("alg": "ES256",)";
@@ -268,6 +308,51 @@ TEST_F(VerifyJwkECTest, PubkeyNoKidOK) {
   Jwt jwt;
   EXPECT_EQ(jwt.parseFromString(JwtES256Text), Status::Ok);
   EXPECT_EQ(verifyJwt(jwt, *jwks_, 1), Status::Ok);
+}
+
+// Test ES384 signature verification with empty signature.
+TEST_F(VerifyJwkECTest, ES384EmptySignatureFail) {
+  Jwt jwt;
+  EXPECT_EQ(jwt.parseFromString(JwtES384Text), Status::Ok);
+  jwt.signature_.clear();
+  EXPECT_EQ(verifyJwt(jwt, *jwks_, 1), Status::JwtVerificationFail);
+}
+
+// Test ES384 signature verification with very short signature.
+TEST_F(VerifyJwkECTest, ES384VeryShortSignatureFail) {
+  Jwt jwt;
+  EXPECT_EQ(jwt.parseFromString(JwtES384Text), Status::Ok);
+  jwt.signature_ = "x";
+  EXPECT_EQ(verifyJwt(jwt, *jwks_, 1), Status::JwtVerificationFail);
+}
+
+// Test ES512 signature verification with empty signature.
+TEST_F(VerifyJwkECTest, ES512EmptySignatureFail) {
+  Jwt jwt;
+  EXPECT_EQ(jwt.parseFromString(JwtES512Text), Status::Ok);
+  jwt.signature_.clear();
+  EXPECT_EQ(verifyJwt(jwt, *jwks_, 1), Status::JwtVerificationFail);
+}
+
+// Test ES512 signature verification with very short signature.
+TEST_F(VerifyJwkECTest, ES512VeryShortSignatureFail) {
+  Jwt jwt;
+  EXPECT_EQ(jwt.parseFromString(JwtES512Text), Status::Ok);
+  jwt.signature_ = "x";
+  EXPECT_EQ(verifyJwt(jwt, *jwks_, 1), Status::JwtVerificationFail);
+}
+
+// Test EC signature verification with signature half the expected length.
+// For ES256, the signature should be 64 bytes (32 for r, 32 for s).
+// This tests with 32 bytes to ensure proper handling of undersized signatures.
+TEST_F(VerifyJwkECTest, HalfLengthSignatureFail) {
+  Jwt jwt;
+  EXPECT_EQ(jwt.parseFromString(JwtTextEC), Status::Ok);
+  // Truncate to half the expected signature length.
+  if (jwt.signature_.size() > 32) {
+    jwt.signature_ = jwt.signature_.substr(0, 32);
+  }
+  EXPECT_EQ(verifyJwt(jwt, *jwks_, 1), Status::JwtVerificationFail);
 }
 
 } // namespace
