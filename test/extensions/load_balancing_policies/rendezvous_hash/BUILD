@@ -17,22 +17,14 @@ envoy_extension_cc_test(
     extension_names = ["envoy.load_balancing_policies.rendezvous_hash"],
     rbe_pool = "6gig",
     deps = [
-        "//envoy/router:router_interface",
-        "//source/common/network:utility_lib",
-        "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
         "//source/extensions/load_balancing_policies/rendezvous_hash:rendezvous_hash_lb_lib",
         "//test/common/upstream:utility_lib",
-        "//test/mocks:common_lib",
-        "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/mocks/upstream:host_mocks",
         "//test/mocks/upstream:host_set_mocks",
-        "//test/mocks/upstream:load_balancer_context_mock",
         "//test/mocks/upstream:priority_set_mocks",
-        "//test/test_common:simulated_time_system_lib",
-        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
     ],
 )
 

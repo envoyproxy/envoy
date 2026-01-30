@@ -4,25 +4,16 @@
 #include <memory>
 #include <string>
 
-#include "envoy/config/cluster/v3/cluster.pb.h"
-#include "envoy/router/router.h"
-
-#include "source/common/network/utility.h"
 #include "source/common/upstream/upstream_impl.h"
 #include "source/extensions/load_balancing_policies/rendezvous_hash/rendezvous_hash_lb.h"
 
 #include "test/common/upstream/utility.h"
-#include "test/mocks/common.h"
-#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/host_set.h"
-#include "test/mocks/upstream/load_balancer_context.h"
 #include "test/mocks/upstream/priority_set.h"
-#include "test/test_common/simulated_time_system.h"
 
-#include "absl/container/node_hash_map.h"
 #include "absl/types/optional.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -234,8 +225,7 @@ public:
   HostPredicate should_select_another_host_;
 };
 
-class RendezvousHashLoadBalancerTest : public Event::TestUsingSimulatedTime,
-                                       public testing::TestWithParam<bool> {
+class RendezvousHashLoadBalancerTest : public testing::TestWithParam<bool> {
 public:
   RendezvousHashLoadBalancerTest()
       : stat_names_(stats_store_.symbolTable()), stats_(stat_names_, *stats_store_.rootScope()) {}
