@@ -254,8 +254,8 @@ envoy_cmake(
     lib_source = "@com_github_google_libsxg//:all",
     out_static_libs = ["libsxg.a"],
     tags = ["skip_on_windows"],
-    # Use boringssl alias to select fips vs non-fips version.
-    deps = ["//bazel:boringssl"],
+    # Use ssl label_flag to select the SSL library.
+    deps = ["//bazel:ssl"],
 )
 
 envoy_cmake(
