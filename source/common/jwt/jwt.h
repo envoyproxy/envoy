@@ -99,9 +99,8 @@ struct Jwt {
    * @param clock_skew: the the clock skew in second.
    * @return the verification status.
    */
-  Status verifyTimeConstraint(uint64_t now,
-                              uint64_t clock_skew = kClockSkewInSecond) const;
+  Status verifyTimeConstraint(uint64_t now, uint64_t clock_skew = kClockSkewInSecond) const;
 };
 
-}  // namespace JwtVerify
-}  // namespace Envoy
+} // namespace JwtVerify
+} // namespace Envoy

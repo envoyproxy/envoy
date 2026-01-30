@@ -19,11 +19,9 @@
 namespace Envoy {
 namespace JwtVerify {
 
-StructUtils::StructUtils(const ::google::protobuf::Struct& struct_pb)
-    : struct_pb_(struct_pb) {}
+StructUtils::StructUtils(const ::google::protobuf::Struct& struct_pb) : struct_pb_(struct_pb) {}
 
-StructUtils::FindResult StructUtils::GetString(const std::string& name,
-                                               std::string* str_value) {
+StructUtils::FindResult StructUtils::GetString(const std::string& name, std::string* str_value) {
   const ::google::protobuf::Value* found;
   FindResult result = GetValue(name, found);
   if (result != OK) {
@@ -36,8 +34,7 @@ StructUtils::FindResult StructUtils::GetString(const std::string& name,
   return OK;
 }
 
-StructUtils::FindResult StructUtils::GetDouble(const std::string& name,
-                                               double* double_value) {
+StructUtils::FindResult StructUtils::GetDouble(const std::string& name, double* double_value) {
   const ::google::protobuf::Value* found;
   FindResult result = GetValue(name, found);
   if (result != OK) {
@@ -50,24 +47,21 @@ StructUtils::FindResult StructUtils::GetDouble(const std::string& name,
   return OK;
 }
 
-StructUtils::FindResult StructUtils::GetUInt64(const std::string& name,
-                                               uint64_t* int_value) {
+StructUtils::FindResult StructUtils::GetUInt64(const std::string& name, uint64_t* int_value) {
   double double_value;
   FindResult result = GetDouble(name, &double_value);
   if (result != OK) {
     return result;
   }
   if (double_value < 0 ||
-      double_value >=
-          static_cast<double>(std::numeric_limits<uint64_t>::max())) {
+      double_value >= static_cast<double>(std::numeric_limits<uint64_t>::max())) {
     return OUT_OF_RANGE;
   }
   *int_value = static_cast<uint64_t>(double_value);
   return OK;
 }
 
-StructUtils::FindResult StructUtils::GetBoolean(const std::string& name,
-                                                bool* bool_value) {
+StructUtils::FindResult StructUtils::GetBoolean(const std::string& name, bool* bool_value) {
   const ::google::protobuf::Value* found;
   FindResult result = GetValue(name, found);
   if (result != OK) {
@@ -80,8 +74,8 @@ StructUtils::FindResult StructUtils::GetBoolean(const std::string& name,
   return OK;
 }
 
-StructUtils::FindResult StructUtils::GetStringList(
-    const std::string& name, std::vector<std::string>* list) {
+StructUtils::FindResult StructUtils::GetStringList(const std::string& name,
+                                                   std::vector<std::string>* list) {
   const ::google::protobuf::Value* found;
   FindResult result = GetValue(name, found);
   if (result != OK) {
@@ -103,10 +97,9 @@ StructUtils::FindResult StructUtils::GetStringList(
   return WRONG_TYPE;
 }
 
-StructUtils::FindResult StructUtils::GetValue(
-    const std::string& nested_names, const google::protobuf::Value*& found) {
-  const std::vector<absl::string_view> name_vector =
-      absl::StrSplit(nested_names, '.');
+StructUtils::FindResult StructUtils::GetValue(const std::string& nested_names,
+                                              const google::protobuf::Value*& found) {
+  const std::vector<absl::string_view> name_vector = absl::StrSplit(nested_names, '.');
 
   const google::protobuf::Struct* current_struct = &struct_pb_;
   for (int i = 0; i < name_vector.size(); ++i) {
@@ -127,5 +120,5 @@ StructUtils::FindResult StructUtils::GetValue(
   return MISSING;
 }
 
-}  // namespace JwtVerify
-}  // namespace Envoy
+} // namespace JwtVerify
+} // namespace Envoy

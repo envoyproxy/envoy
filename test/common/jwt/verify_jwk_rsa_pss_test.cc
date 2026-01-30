@@ -206,7 +206,7 @@ const std::string Ps512JwtTextWithCorrectKid =
     "Sl9FNeK5UPE9vYBi7QJ-Wt3Ikg7kEgPiuADlIao_ZxKdzoA51isGBg";
 
 class VerifyJwkRsaPssTest : public testing::Test {
- protected:
+protected:
   void SetUp() {
     jwks_ = Jwks::createFrom(PublicKeyRSAPSS, Jwks::Type::JWKS);
     EXPECT_EQ(jwks_->getStatus(), Status::Ok);
@@ -325,7 +325,7 @@ const std::string JwtTextWithNonExistentKid =
 // If kid is specified in the jwt, use only the requested key in the jwks for
 //   verification.
 class VerifyKidMatchingTest : public testing::Test {
- protected:
+protected:
   void SetUp() {
     correct_jwks_ = Jwks::createFrom(JwtIoPublicKeyRSAPSS, Jwks::Type::JWKS);
     EXPECT_EQ(correct_jwks_->getStatus(), Status::Ok);
@@ -363,6 +363,6 @@ TEST_F(VerifyKidMatchingTest, JwtTextWithNonExistentKid) {
   EXPECT_EQ(verifyJwt(jwt, *correct_jwks_, 1), Status::JwksKidAlgMismatch);
 }
 
-}  // namespace
-}  // namespace JwtVerify
-}  // namespace Envoy
+} // namespace
+} // namespace JwtVerify
+} // namespace Envoy

@@ -58,14 +58,14 @@ void tickClock() {
   assert(num_attempts < kMaxAttempts);
 }
 
-}  // namespace
+} // namespace
 
 // Value type
 struct TestValue {
-  int label;  // Index into "in_cache"
+  int label; // Index into "in_cache"
   explicit TestValue(int l) : label(l) {}
 
- protected:
+protected:
   // Make sure that TestCache can delete TestValue when declared as friend.
   friend class SimpleLRUCache<int, TestValue>;
   friend class TestCache;
@@ -73,12 +73,12 @@ struct TestValue {
 };
 
 class TestCache : public SimpleLRUCache<int, TestValue> {
- public:
+public:
   explicit TestCache(int64_t size, bool check_in_cache = true)
       : SimpleLRUCache<int, TestValue>(size), check_in_cache_(check_in_cache) {}
 
- protected:
-  virtual void removeElement(TestValue *v) {
+protected:
+  virtual void removeElement(TestValue* v) {
     if (v && check_in_cache_) {
       assert(in_cache[v->label]);
       std::cout << " Evict:" << v->label;
@@ -91,16 +91,18 @@ class TestCache : public SimpleLRUCache<int, TestValue> {
 };
 
 class SimpleLRUCacheTest : public ::testing::Test {
- protected:
+protected:
   SimpleLRUCacheTest() {}
   virtual ~SimpleLRUCacheTest() {}
 
   virtual void SetUp() {
-    for (int i = 0; i < kElems; ++i) in_cache[i] = false;
+    for (int i = 0; i < kElems; ++i)
+      in_cache[i] = false;
   }
 
   virtual void TearDown() {
-    if (cache_) cache_->clear();
+    if (cache_)
+      cache_->clear();
     for (int i = 0; i < kElems; i++) {
       assert(!in_cache[i]);
     }
@@ -116,9 +118,7 @@ class SimpleLRUCacheTest : public ::testing::Test {
   std::unique_ptr<TestCache> cache_;
 };
 
-TEST_F(SimpleLRUCacheTest, IteratorDefaultConstruct) {
-  TestCache::const_iterator default_unused;
-}
+TEST_F(SimpleLRUCacheTest, IteratorDefaultConstruct) { TestCache::const_iterator default_unused; }
 
 TEST_F(SimpleLRUCacheTest, Iteration) {
   int count = 0;
@@ -127,12 +127,11 @@ TEST_F(SimpleLRUCacheTest, Iteration) {
   // fill the cache, evict some items, ensure i can iterate over all remaining
   for (int i = 0; i < kElems; ++i) {
     ASSERT_TRUE(!cache_->lookup(i));
-    TestValue *v = new TestValue(i);
+    TestValue* v = new TestValue(i);
     in_cache[i] = true;
     cache_->insert(i, v, 1);
   }
-  for (TestCache::const_iterator pos = cache_->begin(); pos != cache_->end();
-       ++pos) {
+  for (TestCache::const_iterator pos = cache_->begin(); pos != cache_->end(); ++pos) {
     ++count;
     ASSERT_EQ(pos->first, pos->second->label);
     ASSERT_TRUE(in_cache[pos->second->label]);
@@ -144,13 +143,12 @@ TEST_F(SimpleLRUCacheTest, Iteration) {
   // iterate over the cache w/o filling the cache to capacity first
   for (int i = 0; i < kCacheSize / 2; ++i) {
     ASSERT_TRUE(!cache_->lookup(i));
-    TestValue *v = new TestValue(i);
+    TestValue* v = new TestValue(i);
     in_cache[i] = true;
     cache_->insert(i, v, 1);
   }
   count = 0;
-  for (TestCache::const_iterator pos = cache_->begin(); pos != cache_->end();
-       ++pos) {
+  for (TestCache::const_iterator pos = cache_->begin(); pos != cache_->end(); ++pos) {
     ++count;
     ASSERT_EQ(pos->first, pos->second->label);
     ASSERT_TRUE(in_cache[pos->second->label]);
@@ -171,9 +169,9 @@ TEST_F(SimpleLRUCacheTest, StdCopy) {
   // Non have been removed, so Defer size is 0
   ASSERT_EQ(cache_->deferredEntries(), 0);
 
-  std::vector<std::pair<int, TestValue *>> to_release;
+  std::vector<std::pair<int, TestValue*>> to_release;
   std::copy(cache_->begin(), cache_->end(), std::back_inserter(to_release));
-  for (const auto &entry : to_release) {
+  for (const auto& entry : to_release) {
     cache_->release(entry.first, entry.second);
   }
 
@@ -186,7 +184,7 @@ TEST_F(SimpleLRUCacheTest, StdCopy) {
 void SimpleLRUCacheTest::testInOrderEvictions(int cache_size) {
   for (int i = 0; i < kElems; i++) {
     ASSERT_TRUE(!cache_->lookup(i));
-    TestValue *v = new TestValue(i);
+    TestValue* v = new TestValue(i);
     in_cache[i] = true;
     cache_->insert(i, v, 1);
 
@@ -219,7 +217,7 @@ void SimpleLRUCacheTest::testSetMaxSize() {
   // Fill the cache exactly and verify all values are present.
   for (int i = 0; i < cache_size; i++) {
     ASSERT_TRUE(!cache_->lookup(i));
-    TestValue *v = new TestValue(i);
+    TestValue* v = new TestValue(i);
     in_cache[i] = true;
     cache_->insert(i, v, 1);
   }
@@ -241,7 +239,7 @@ void SimpleLRUCacheTest::testSetMaxSize() {
   // Fill the cache to the new size and ensure all values are present.
   for (int i = elems; i < cache_size; i++) {
     ASSERT_TRUE(!cache_->lookup(i)) << i;
-    TestValue *v = new TestValue(i);
+    TestValue* v = new TestValue(i);
     in_cache[i] = true;
     cache_->insert(i, v, 1);
   }
@@ -332,7 +330,7 @@ void SimpleLRUCacheTest::testOverfullEvictionPolicy() {
   // Fill with elements that should stick around if used over and over
   for (int i = 0; i < kCacheSize; i++) {
     ASSERT_TRUE(!cache_->lookup(i));
-    TestValue *v = new TestValue(i);
+    TestValue* v = new TestValue(i);
     in_cache[i] = true;
     cache_->insert(i, v, 1);
   }
@@ -340,14 +338,14 @@ void SimpleLRUCacheTest::testOverfullEvictionPolicy() {
   for (int i = kCacheSize; i < kElems; i++) {
     // Access all of the elements that should stick around
     for (int j = 0; j < kCacheSize; j++) {
-      TestValue *v = cache_->lookup(j);
+      TestValue* v = cache_->lookup(j);
       ASSERT_TRUE(v != nullptr);
       cache_->release(j, v);
     }
 
     // Insert new value
     ASSERT_TRUE(!cache_->lookup(i));
-    TestValue *v = new TestValue(i);
+    TestValue* v = new TestValue(i);
     in_cache[i] = true;
     cache_->insert(i, v, 1);
     ASSERT_TRUE(in_cache[i]);
@@ -378,7 +376,7 @@ TEST_F(SimpleLRUCacheTest, OverfullEvictionPolicyWithAgeBasedEvictionEnabled) {
 
   for (int i = 0; i < kCacheSize; i++) {
     ASSERT_TRUE(!cache_->lookup(i));
-    TestValue *v = new TestValue(i);
+    TestValue* v = new TestValue(i);
     in_cache[i] = true;
     cache_->insert(i, v, 1);
   }
@@ -392,7 +390,7 @@ TEST_F(SimpleLRUCacheTest, OverfullEvictionPolicyWithAgeBasedEvictionEnabled) {
   // Key 0 was accessed most recently, yet new value evicts it because it is
   // the oldest one.
   ASSERT_TRUE(!cache_->lookup(kCacheSize));
-  TestValue *v = new TestValue(kCacheSize);
+  TestValue* v = new TestValue(kCacheSize);
   in_cache[kCacheSize] = true;
   cache_->insert(kCacheSize, v, 1);
   ASSERT_TRUE(in_cache[kCacheSize]);
@@ -400,11 +398,11 @@ TEST_F(SimpleLRUCacheTest, OverfullEvictionPolicyWithAgeBasedEvictionEnabled) {
 }
 
 TEST_F(SimpleLRUCacheTest, Update) {
-  cache_.reset(new TestCache(kCacheSize, false));  // Don't check in_cache.
+  cache_.reset(new TestCache(kCacheSize, false)); // Don't check in_cache.
   // Insert some values.
   for (int i = 0; i < kCacheSize; i++) {
     ASSERT_TRUE(!cache_->lookup(i));
-    TestValue *v = new TestValue(i);
+    TestValue* v = new TestValue(i);
     cache_->insert(i, v, 1);
   }
   // Update them.
@@ -422,7 +420,7 @@ TEST_F(SimpleLRUCacheTest, Update) {
   }
   // Flush them out.
   for (int i = 0; i < kCacheSize; i++) {
-    TestValue *v = new TestValue(i);
+    TestValue* v = new TestValue(i);
     cache_->insert(i + kCacheSize, v, 1);
   }
   // Original values are gone.
@@ -439,7 +437,7 @@ TEST_F(SimpleLRUCacheTest, Pinning) {
   cache_.reset(new TestCache(kCacheSize));
   for (int i = 0; i < kElems; i++) {
     ASSERT_TRUE(!cache_->lookup(i));
-    TestValue *v = new TestValue(i);
+    TestValue* v = new TestValue(i);
     in_cache[i] = true;
     if (i < kPinned) {
       cache_->insertPinned(i, v, 1);
@@ -449,10 +447,10 @@ TEST_F(SimpleLRUCacheTest, Pinning) {
   }
   for (int i = 0; i < kPinned; i++) {
     ASSERT_TRUE(in_cache[i]);
-    TestValue *v = cache_->lookup(i);
+    TestValue* v = cache_->lookup(i);
     ASSERT_TRUE(v != nullptr);
-    cache_->release(i, v);  // For initial insertPinned
-    cache_->release(i, v);  // For the previous lookup
+    cache_->release(i, v); // For initial insertPinned
+    cache_->release(i, v); // For the previous lookup
   }
 }
 
@@ -460,7 +458,7 @@ TEST_F(SimpleLRUCacheTest, Remove) {
   cache_.reset(new TestCache(kCacheSize));
   for (int i = 0; i < kElems; i++) {
     ASSERT_TRUE(!cache_->lookup(i));
-    TestValue *v = new TestValue(i);
+    TestValue* v = new TestValue(i);
     in_cache[i] = true;
     cache_->insert(i, v, 1);
 
@@ -468,10 +466,10 @@ TEST_F(SimpleLRUCacheTest, Remove) {
     if (i > 1) {
       const int key = i - 1;
       int prev_entries = cache_->entries();
-      if ((key % 2) == 0) {  // test normal removal
+      if ((key % 2) == 0) { // test normal removal
         cache_->remove(key);
-      } else {  // test different removal status
-        TestValue *const v2 = cache_->lookup(key);
+      } else { // test different removal status
+        TestValue* const v2 = cache_->lookup(key);
         ASSERT_TRUE(v2) << ": key=" << key;
         cache_->remove(key);
         ASSERT_TRUE(cache_->stillInUse(key)) << ": " << key;
@@ -492,12 +490,12 @@ TEST_F(SimpleLRUCacheTest, Remove) {
 void SimpleLRUCacheTest::testRemoveUnpinned() {
   for (int i = 0; i < kCacheSize; i++) {
     ASSERT_TRUE(!cache_->lookup(i));
-    TestValue *v = new TestValue(i);
+    TestValue* v = new TestValue(i);
     in_cache[i] = true;
     cache_->insert(i, v, 1);
   }
 
-  TestValue *const val = cache_->lookup(1);
+  TestValue* const val = cache_->lookup(1);
   ASSERT_TRUE(val);
   cache_->removeUnpinned();
   ASSERT_EQ(cache_->entries(), 1);
@@ -538,20 +536,20 @@ TEST_F(SimpleLRUCacheTest, RemoveUnpinnedWithAgeBasedEvictionEnabled) {
 TEST_F(SimpleLRUCacheTest, MultiInsert) {
   cache_.reset(new TestCache(kCacheSize));
   for (int i = 0; i < kElems; i++) {
-    TestValue *v = new TestValue(i);
+    TestValue* v = new TestValue(i);
     in_cache[i] = true;
     cache_->insert(0, v, 1);
     if (i > 0) {
-      ASSERT_TRUE(!in_cache[i - 1]);  // Older entry must have been evicted
+      ASSERT_TRUE(!in_cache[i - 1]); // Older entry must have been evicted
     }
   }
 }
 
 TEST_F(SimpleLRUCacheTest, MultiInsertPinned) {
   cache_.reset(new TestCache(kCacheSize));
-  TestValue *list[kElems];
+  TestValue* list[kElems];
   for (int i = 0; i < kElems; i++) {
-    TestValue *v = new TestValue(i);
+    TestValue* v = new TestValue(i);
     in_cache[i] = true;
     cache_->insertPinned(0, v, 1);
     list[i] = v;
@@ -568,33 +566,36 @@ TEST_F(SimpleLRUCacheTest, MultiInsertPinned) {
 void SimpleLRUCacheTest::testExpiration(bool lru, bool release_quickly) {
   cache_.reset(new TestCache(kCacheSize));
   if (lru) {
-    cache_->setMaxIdleSeconds(0.2);  // 200 milliseconds
+    cache_->setMaxIdleSeconds(0.2); // 200 milliseconds
   } else {
-    cache_->setAgeBasedEviction(0.2);  // 200 milliseconds
+    cache_->setAgeBasedEviction(0.2); // 200 milliseconds
   }
   for (int i = 0; i < kCacheSize; i++) {
-    TestValue *v = new TestValue(i);
+    TestValue* v = new TestValue(i);
     in_cache[i] = true;
     cache_->insert(i, v, 1);
   }
-  for (int i = 0; i < kCacheSize; i++) ASSERT_TRUE(in_cache[i]);
+  for (int i = 0; i < kCacheSize; i++)
+    ASSERT_TRUE(in_cache[i]);
 
   usleep(110 * 1000);
 
-  TestValue *v1 = cache_->lookup(0);
+  TestValue* v1 = cache_->lookup(0);
   ASSERT_TRUE(v1 != nullptr);
   if (release_quickly) {
     cache_->release(0, v1);
     v1 = nullptr;
   }
-  for (int i = 0; i < kCacheSize; i++) ASSERT_TRUE(in_cache[i]);
+  for (int i = 0; i < kCacheSize; i++)
+    ASSERT_TRUE(in_cache[i]);
 
   // Sleep more: should cause expiration of everything we
   // haven't touched, and the one we touched if age-based.
   usleep(110 * 1000);
 
   // Nothing gets expired until we call one of the cache methods.
-  for (int i = 0; i < kCacheSize; i++) ASSERT_TRUE(in_cache[i]);
+  for (int i = 0; i < kCacheSize; i++)
+    ASSERT_TRUE(in_cache[i]);
 
   // It's now 220 ms since element 0 was created, and
   // 110 ms since we last looked at it.  If we configured
@@ -605,11 +606,12 @@ void SimpleLRUCacheTest::testExpiration(bool lru, bool release_quickly) {
   // Whether or not the element was pinned shouldn't matter:
   // it should be expired either way in AgeBased mode,
   // and not expired either way in lru mode.
-  TestValue *v2 = cache_->lookup(0);
+  TestValue* v2 = cache_->lookup(0);
   ASSERT_EQ(v2 == nullptr, !lru);
 
   // In either case all the other elements should now be gone.
-  for (int i = 1; i < kCacheSize; i++) ASSERT_TRUE(!in_cache[i]);
+  for (int i = 1; i < kCacheSize; i++)
+    ASSERT_TRUE(!in_cache[i]);
 
   // Clean up
   bool cleaned_up = false;
@@ -649,7 +651,7 @@ void SimpleLRUCacheTest::testLargeExpiration(bool lru, double timeout) {
     cache_->setAgeBasedEviction(timeout);
   }
   for (int i = 0; i < kCacheSize; i++) {
-    TestValue *v = new TestValue(i);
+    TestValue* v = new TestValue(i);
     in_cache[i] = true;
     cache_->insert(i, v, 1);
   }
@@ -671,8 +673,7 @@ static double getBoundaryTimeout() {
   // Search for the smallest timeout value that will result in overflow when
   // converted to an integral number of cycles.
   const double seconds_to_cycles = SimpleCycleTimer::frequency();
-  double seconds = static_cast<double>(std::numeric_limits<int64_t>::max()) /
-                   seconds_to_cycles;
+  double seconds = static_cast<double>(std::numeric_limits<int64_t>::max()) / seconds_to_cycles;
   // Because of floating point rounding, we are not certain that the previous
   // computation will result in precisely the right value. So, jitter the value
   // until we know we found the correct value. First, look for a value that we
@@ -701,7 +702,7 @@ TEST_F(SimpleLRUCacheTest, UpdateSize) {
   // to force a GC and throw off our ASSERT_TRUE()s down below.
   cache_.reset(new TestCache(kCacheSize * 2));
   for (int i = 0; i < kCacheSize; i++) {
-    TestValue *v = new TestValue(i);
+    TestValue* v = new TestValue(i);
     in_cache[i] = true;
     cache_->insert(i, v, 1);
   }
@@ -717,7 +718,7 @@ TEST_F(SimpleLRUCacheTest, UpdateSize) {
   ASSERT_EQ(cache_->pinnedSize(), 0);
 
   // Now lock a value -- total should be the same, but one should be pinned.
-  TestValue *found = cache_->lookup(0);
+  TestValue* found = cache_->lookup(0);
 
   ASSERT_EQ(cache_->size(), kCacheSize);
   ASSERT_EQ(cache_->maxSize(), kCacheSize * 2);
@@ -805,7 +806,7 @@ TEST_F(SimpleLRUCacheTest, UpdateSize) {
 
   // Now blow the cache up from the inside: resize an entry to an enormous size.
   // This will push everything out except the entry itself because it's pinned.
-  TestValue *v = new TestValue(0);
+  TestValue* v = new TestValue(0);
   in_cache[0] = true;
   cache_->insertPinned(0, v, 1);
   ASSERT_EQ(cache_->entries(), kCacheSize - 1);
@@ -854,7 +855,7 @@ TEST_F(SimpleLRUCacheTest, DontUpdateEvictionOrder) {
         ASSERT_GT(cache_->getLastUseTime(this_elem), original_end);
       }
 
-      TestValue *value = cache_->lookupWithOptions(this_elem, options);
+      TestValue* value = cache_->lookupWithOptions(this_elem, options);
       TestCache::ScopedLookup scoped_lookup(cache_.get(), this_elem, options);
       if (in_cache[this_elem]) {
         ASSERT_TRUE(value != nullptr);
@@ -880,7 +881,7 @@ TEST_F(SimpleLRUCacheTest, ScopedLookup) {
   cache_.reset(new TestCache(kElems));
   for (int i = 0; i < kElems; i++) {
     ASSERT_TRUE(!cache_->lookup(i));
-    TestValue *v = new TestValue(i);
+    TestValue* v = new TestValue(i);
     in_cache[i] = true;
     cache_->insert(i, v, 1);
   }
@@ -911,10 +912,10 @@ TEST_F(SimpleLRUCacheTest, AgeOfLRUItemInMicroseconds) {
   ASSERT_EQ(cache_->ageOfLRUItemInMicroseconds(), 0);
 
   // Make sure non-empty cache doesn't return zero.
-  TestValue *v = new TestValue(1);
+  TestValue* v = new TestValue(1);
   in_cache[1] = true;
   cache_->insert(1, v, 1);
-  tickClock();  // must let at least 1us go by
+  tickClock(); // must let at least 1us go by
   ASSERT_NE(cache_->ageOfLRUItemInMicroseconds(), 0);
 
   // Make sure "oldest" ages as time goes by.
@@ -952,7 +953,7 @@ TEST_F(SimpleLRUCacheTest, GetLastUseTime) {
   last = SimpleCycleTimer::now();
   tickClock();
   in_cache[1] = true;
-  TestValue *v = new TestValue(1);
+  TestValue* v = new TestValue(1);
   cache_->insert(1, v, 1);
   tickClock();
   now = SimpleCycleTimer::now();
@@ -991,8 +992,7 @@ TEST_F(SimpleLRUCacheTest, GetLastUseTime) {
   ASSERT_LT(cache_->getLastUseTime(2), now);
 
   // Make sure iterator returns the same value as getLastUseTime
-  for (TestCache::const_iterator it = cache_->begin(); it != cache_->end();
-       ++it) {
+  for (TestCache::const_iterator it = cache_->begin(); it != cache_->end(); ++it) {
     ASSERT_EQ(it.last_use_time(), cache_->getLastUseTime(it->first));
   }
 
@@ -1014,7 +1014,7 @@ TEST_F(SimpleLRUCacheTest, GetInsertionTime) {
   last = SimpleCycleTimer::now();
   tickClock();
   in_cache[1] = true;
-  TestValue *v = new TestValue(1);
+  TestValue* v = new TestValue(1);
   cache_->insert(1, v, 1);
   tickClock();
   now = SimpleCycleTimer::now();
@@ -1050,8 +1050,7 @@ TEST_F(SimpleLRUCacheTest, GetInsertionTime) {
   ASSERT_LT(cache_->getInsertionTime(1), now);
 
   // Make sure iterator returns the same value as getInsertionTime
-  for (TestCache::const_iterator it = cache_->begin(); it != cache_->end();
-       ++it) {
+  for (TestCache::const_iterator it = cache_->begin(); it != cache_->end(); ++it) {
     ASSERT_EQ(it.insertion_time(), cache_->getInsertionTime(it->first));
   }
 
@@ -1060,7 +1059,7 @@ TEST_F(SimpleLRUCacheTest, GetInsertionTime) {
   ASSERT_EQ(cache_->getInsertionTime(2), -1);
 }
 
-std::string StringPrintf(void *p, int pin, int defer) {
+std::string StringPrintf(void* p, int pin, int defer) {
   std::stringstream ss;
   ss << std::hex << p << std::dec << ": pin: " << pin;
   ss << ", is_deferred: " << defer;
@@ -1069,11 +1068,11 @@ std::string StringPrintf(void *p, int pin, int defer) {
 
 TEST_F(SimpleLRUCacheTest, DebugOutput) {
   cache_.reset(new TestCache(kCacheSize, false /* check_in_cache */));
-  TestValue *v1 = new TestValue(0);
+  TestValue* v1 = new TestValue(0);
   cache_->insertPinned(0, v1, 1);
-  TestValue *v2 = new TestValue(0);
+  TestValue* v2 = new TestValue(0);
   cache_->insertPinned(0, v2, 1);
-  TestValue *v3 = new TestValue(0);
+  TestValue* v3 = new TestValue(0);
   cache_->insert(0, v3, 1);
 
   std::string s;
@@ -1095,7 +1094,7 @@ TEST_F(SimpleLRUCacheTest, LookupWithoutEvictionOrderUpdateAndRemove) {
 
   SimpleLRUCacheOptions no_update_options;
   no_update_options.set_update_eviction_order(false);
-  TestValue *value = cache_->lookupWithOptions(1, no_update_options);
+  TestValue* value = cache_->lookupWithOptions(1, no_update_options);
   // Remove the second element before calling releaseWithOptions. Since we used
   // update_eviction_order = false for the LookupWithOptions call the value was
   // not removed from the LRU. remove() is responsible for taking the value out
@@ -1109,5 +1108,5 @@ TEST_F(SimpleLRUCacheTest, LookupWithoutEvictionOrderUpdateAndRemove) {
   EXPECT_THAT(TestCache::ScopedLookup(cache_.get(), 2).value(), NotNull());
 }
 
-}  // namespace SimpleLruCache
-}  // namespace Envoy
+} // namespace SimpleLruCache
+} // namespace Envoy

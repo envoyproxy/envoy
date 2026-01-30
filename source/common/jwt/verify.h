@@ -68,8 +68,7 @@ Status verifyJwt(const Jwt& jwt, const Jwks& jwks, uint64_t now,
  * @param audiences a list of audience by which to check against
  * @return the verification status
  */
-Status verifyJwt(const Jwt& jwt, const Jwks& jwks,
-                 const std::vector<std::string>& audiences);
+Status verifyJwt(const Jwt& jwt, const Jwks& jwks, const std::vector<std::string>& audiences);
 
 /**
  * This function verifies JWT signature is valid, that it has not expired
@@ -85,8 +84,8 @@ Status verifyJwt(const Jwt& jwt, const Jwks& jwks,
  * @param audiences a list of audience by which to check against.
  * @return the verification status
  */
-Status verifyJwt(const Jwt& jwt, const Jwks& jwks,
-                 const std::vector<std::string>& audiences, uint64_t now);
+Status verifyJwt(const Jwt& jwt, const Jwks& jwks, const std::vector<std::string>& audiences,
+                 uint64_t now);
 
-}  // namespace JwtVerify
-}  // namespace Envoy
+} // namespace JwtVerify
+} // namespace Envoy

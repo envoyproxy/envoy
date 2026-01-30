@@ -33,7 +33,7 @@ namespace JwtVerify {
  *    if (keys->getStatus() == Status::Ok) { ... }
  */
 class Jwks : public WithStatus {
- public:
+public:
   // Format of public key.
   enum Type { JWKS, PEM };
 
@@ -41,13 +41,11 @@ class Jwks : public WithStatus {
   static std::unique_ptr<Jwks> createFrom(const std::string& pkey, Type type);
   // Executes to createFrom with type=PEM and sets additional JWKS paramaters
   // not specified within the PEM.
-  static std::unique_ptr<Jwks> createFromPem(const std::string& pkey,
-                                             const std::string& kid,
+  static std::unique_ptr<Jwks> createFromPem(const std::string& pkey, const std::string& kid,
                                              const std::string& alg);
 
   // Adds a key to this keyset.
-  Status addKeyFromPem(const std::string& pkey, const std::string& kid,
-                       const std::string& alg);
+  Status addKeyFromPem(const std::string& pkey, const std::string& kid, const std::string& alg);
 
   // Struct for JSON Web Key
   struct Pubkey {
@@ -67,7 +65,7 @@ class Jwks : public WithStatus {
   // Access to list of Jwks
   const std::vector<PubkeyPtr>& keys() const { return keys_; }
 
- private:
+private:
   // Create Jwks
   void createFromJwksCore(const std::string& pkey_jwks);
   // Create PEM
@@ -79,5 +77,5 @@ class Jwks : public WithStatus {
 
 typedef std::unique_ptr<Jwks> JwksPtr;
 
-}  // namespace JwtVerify
-}  // namespace Envoy
+} // namespace JwtVerify
+} // namespace Envoy

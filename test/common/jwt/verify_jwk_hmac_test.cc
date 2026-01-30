@@ -136,7 +136,7 @@ const std::string JwtTextWithNonExistKid =
     "WFHsFo29tA5_gT_rzm6WheQhCwwBPrRZWFEAWRF9Ym4";
 
 class VerifyJwkHmacTest : public testing::Test {
- protected:
+protected:
   void SetUp() {
     jwks_ = Jwks::createFrom(SymmetricKeyHMAC, Jwks::Type::JWKS);
     EXPECT_EQ(jwks_->getStatus(), Status::Ok);
@@ -220,10 +220,8 @@ TEST_F(VerifyJwkHmacTest, OkSymmetricKeyNotAlg) {
 
 TEST_F(VerifyJwkHmacTest, OkSymmetricKeyNotKid) {
   // Remove "kid" claim from symmetric key.
-  std::string kid_claim1 =
-      R"("kid": "62a93512c9ee4c7f8067b5a216dade2763d32a47",)";
-  std::string kid_claim2 =
-      R"("kid": "b3319a147514df7ee5e4bcdee51350cc890cc89e",)";
+  std::string kid_claim1 = R"("kid": "62a93512c9ee4c7f8067b5a216dade2763d32a47",)";
+  std::string kid_claim2 = R"("kid": "b3319a147514df7ee5e4bcdee51350cc890cc89e",)";
   std::string symmkey_no_kid = SymmetricKeyHMAC;
   std::size_t kid_pos = symmkey_no_kid.find(kid_claim1);
   symmkey_no_kid.erase(kid_pos, kid_claim1.length());
@@ -237,6 +235,6 @@ TEST_F(VerifyJwkHmacTest, OkSymmetricKeyNotKid) {
   EXPECT_EQ(verifyJwt(jwt, *jwks_, 1), Status::Ok);
 }
 
-}  // namespace
-}  // namespace JwtVerify
-}  // namespace Envoy
+} // namespace
+} // namespace JwtVerify
+} // namespace Envoy

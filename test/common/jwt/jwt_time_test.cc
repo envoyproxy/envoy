@@ -44,18 +44,14 @@ TEST(VerifyExpTest, BothNbfExp) {
   EXPECT_EQ(jwt.parseFromString(JwtText), Status::Ok);
 
   // 10s before exp
-  EXPECT_EQ(jwt.verifyTimeConstraint(ExpTime + kClockSkewInSecond - 10),
-            Status::Ok);
+  EXPECT_EQ(jwt.verifyTimeConstraint(ExpTime + kClockSkewInSecond - 10), Status::Ok);
   // 10s after exp
-  EXPECT_EQ(jwt.verifyTimeConstraint(ExpTime + kClockSkewInSecond + 10),
-            Status::JwtExpired);
+  EXPECT_EQ(jwt.verifyTimeConstraint(ExpTime + kClockSkewInSecond + 10), Status::JwtExpired);
 
   // 10s after nbf
-  EXPECT_EQ(jwt.verifyTimeConstraint(NbfTime - kClockSkewInSecond + 10),
-            Status::Ok);
+  EXPECT_EQ(jwt.verifyTimeConstraint(NbfTime - kClockSkewInSecond + 10), Status::Ok);
   // 10s befoe nbf
-  EXPECT_EQ(jwt.verifyTimeConstraint(NbfTime - kClockSkewInSecond - 10),
-            Status::JwtNotYetValid);
+  EXPECT_EQ(jwt.verifyTimeConstraint(NbfTime - kClockSkewInSecond - 10), Status::JwtNotYetValid);
 }
 
 TEST(VerifyExpTest, BothNbfExpWithCustomClockSkew) {
@@ -64,21 +60,15 @@ TEST(VerifyExpTest, BothNbfExpWithCustomClockSkew) {
 
   constexpr uint64_t kCustomClockSkew = 10;
   // 10s before exp
-  EXPECT_EQ(jwt.verifyTimeConstraint(ExpTime + kCustomClockSkew - 1,
-                                     kCustomClockSkew),
-            Status::Ok);
+  EXPECT_EQ(jwt.verifyTimeConstraint(ExpTime + kCustomClockSkew - 1, kCustomClockSkew), Status::Ok);
   // 10s after exp
-  EXPECT_EQ(jwt.verifyTimeConstraint(ExpTime + kCustomClockSkew + 1,
-                                     kCustomClockSkew),
+  EXPECT_EQ(jwt.verifyTimeConstraint(ExpTime + kCustomClockSkew + 1, kCustomClockSkew),
             Status::JwtExpired);
 
   // 10s after nbf
-  EXPECT_EQ(jwt.verifyTimeConstraint(NbfTime - kCustomClockSkew + 1,
-                                     kCustomClockSkew),
-            Status::Ok);
+  EXPECT_EQ(jwt.verifyTimeConstraint(NbfTime - kCustomClockSkew + 1, kCustomClockSkew), Status::Ok);
   // 10s befoe nbf
-  EXPECT_EQ(jwt.verifyTimeConstraint(NbfTime - kCustomClockSkew - 1,
-                                     kCustomClockSkew),
+  EXPECT_EQ(jwt.verifyTimeConstraint(NbfTime - kCustomClockSkew - 1, kCustomClockSkew),
             Status::JwtNotYetValid);
 }
 
@@ -89,11 +79,9 @@ TEST(VerifyExpTest, OnlyExp) {
   jwt.nbf_ = 0;
 
   // 10s before exp
-  EXPECT_EQ(jwt.verifyTimeConstraint(ExpTime + kClockSkewInSecond - 10),
-            Status::Ok);
+  EXPECT_EQ(jwt.verifyTimeConstraint(ExpTime + kClockSkewInSecond - 10), Status::Ok);
   // 10s after exp
-  EXPECT_EQ(jwt.verifyTimeConstraint(ExpTime + kClockSkewInSecond + 10),
-            Status::JwtExpired);
+  EXPECT_EQ(jwt.verifyTimeConstraint(ExpTime + kClockSkewInSecond + 10), Status::JwtExpired);
 
   // `Now` can be 0,
   EXPECT_EQ(jwt.verifyTimeConstraint(0), Status::Ok);
@@ -109,11 +97,9 @@ TEST(VerifyExpTest, OnlyNbf) {
   EXPECT_EQ(jwt.verifyTimeConstraint(9223372036854775810U), Status::Ok);
 
   // 10s after nbf
-  EXPECT_EQ(jwt.verifyTimeConstraint(NbfTime - kClockSkewInSecond + 10),
-            Status::Ok);
+  EXPECT_EQ(jwt.verifyTimeConstraint(NbfTime - kClockSkewInSecond + 10), Status::Ok);
   // 10s befoe nbf
-  EXPECT_EQ(jwt.verifyTimeConstraint(NbfTime - kClockSkewInSecond - 10),
-            Status::JwtNotYetValid);
+  EXPECT_EQ(jwt.verifyTimeConstraint(NbfTime - kClockSkewInSecond - 10), Status::JwtNotYetValid);
 }
 
 TEST(VerifyExpTest, NotTimeConstraint) {
@@ -130,6 +116,6 @@ TEST(VerifyExpTest, NotTimeConstraint) {
   EXPECT_EQ(jwt.verifyTimeConstraint(0), Status::Ok);
 }
 
-}  // namespace
-}  // namespace JwtVerify
-}  // namespace Envoy
+} // namespace
+} // namespace JwtVerify
+} // namespace Envoy

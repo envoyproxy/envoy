@@ -1345,6 +1345,6 @@ bad-pub-key
   EXPECT_EQ(jwks->keys().size(), 1);
 }
 
-}  // namespace
-}  // namespace JwtVerify
-}  // namespace Envoy
+} // namespace
+} // namespace JwtVerify
+} // namespace Envoy

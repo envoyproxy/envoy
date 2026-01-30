@@ -177,6 +177,6 @@ TEST(VerifyPKCSTestRs256, jwksIncorrectAlgSpecifiedFail) {
   });
 }
 
-}  // namespace
-}  // namespace JwtVerify
-}  // namespace Envoy
+} // namespace
+} // namespace JwtVerify
+} // namespace Envoy

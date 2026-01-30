@@ -110,6 +110,6 @@ TEST(VerifyPKCSTestRs512, OKPem) {
   });
 }
 
-}  // namespace
-}  // namespace JwtVerify
-}  // namespace Envoy
+} // namespace
+} // namespace JwtVerify
+} // namespace Envoy

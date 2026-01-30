@@ -54,7 +54,7 @@ std::string sanitizeAudience(const std::string& aud) {
   return aud;
 }
 
-}  // namespace
+} // namespace
 
 CheckAudience::CheckAudience(const std::vector<std::string>& config_audiences) {
   for (const auto& aud : config_audiences) {
@@ -62,19 +62,17 @@ CheckAudience::CheckAudience(const std::vector<std::string>& config_audiences) {
   }
 }
 
-bool CheckAudience::areAudiencesAllowed(
-    const std::vector<std::string>& jwt_audiences) const {
+bool CheckAudience::areAudiencesAllowed(const std::vector<std::string>& jwt_audiences) const {
   if (config_audiences_.empty()) {
     return true;
   }
   for (const auto& aud : jwt_audiences) {
-    if (config_audiences_.find(sanitizeAudience(aud)) !=
-        config_audiences_.end()) {
+    if (config_audiences_.find(sanitizeAudience(aud)) != config_audiences_.end()) {
       return true;
     }
   }
   return false;
 }
 
-}  // namespace JwtVerify
-}  // namespace Envoy
+} // namespace JwtVerify
+} // namespace Envoy

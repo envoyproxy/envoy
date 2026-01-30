@@ -32,7 +32,7 @@ namespace JwtVerify {
  * before comparison.
  */
 class CheckAudience {
- public:
+public:
   // Construct the object with a list audiences from config.
   CheckAudience(const std::vector<std::string>& config_audiences);
 
@@ -42,12 +42,12 @@ class CheckAudience {
   // check if config audiences is empty
   bool empty() const { return config_audiences_.empty(); }
 
- private:
+private:
   // configured audiences;
   std::set<std::string> config_audiences_;
 };
 
 typedef std::unique_ptr<CheckAudience> CheckAudiencePtr;
 
-}  // namespace JwtVerify
-}  // namespace Envoy
+} // namespace JwtVerify
+} // namespace Envoy

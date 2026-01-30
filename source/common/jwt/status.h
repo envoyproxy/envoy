@@ -232,7 +232,7 @@ std::string getStatusString(Status status);
  * Base class to keep the status that represents "OK" or the first failure.
  */
 class WithStatus {
- public:
+public:
   WithStatus() : status_(Status::Ok) {}
 
   /**
@@ -241,7 +241,7 @@ class WithStatus {
    */
   Status getStatus() const { return status_; }
 
- protected:
+protected:
   void updateStatus(Status status) {
     // Only keep the first failure
     if (status_ == Status::Ok) {
@@ -251,10 +251,10 @@ class WithStatus {
 
   void resetStatus(Status status) { status_ = status; }
 
- private:
+private:
   // The internal status.
   Status status_;
 };
 
-}  // namespace JwtVerify
-}  // namespace Envoy
+} // namespace JwtVerify
+} // namespace Envoy

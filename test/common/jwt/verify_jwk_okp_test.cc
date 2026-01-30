@@ -92,7 +92,7 @@ const std::string JwtJWKEd25519WrongSignature =
     "tT7aebOM2GHb2q6qex1O6BFkp5n8-2wrwKKE1BQ";
 
 class VerifyJwkOKPTest : public testing::Test {
- protected:
+protected:
   void SetUp() {
     jwks_ = Jwks::createFrom(PublicKeyJwkOKP, Jwks::Type::JWKS);
     EXPECT_EQ(jwks_->getStatus(), Status::Ok);
@@ -110,8 +110,7 @@ TEST_F(VerifyJwkOKPTest, KidOK) {
     EXPECT_EQ(verifyJwt(jwt, *jwks_, 1), Status::JwtVerificationFail);
   });
   fuzzJwtSignatureLength(jwt, [this](const Jwt& jwt) {
-    EXPECT_EQ(verifyJwt(jwt, *jwks_, 1),
-              Status::JwtEd25519SignatureWrongLength);
+    EXPECT_EQ(verifyJwt(jwt, *jwks_, 1), Status::JwtEd25519SignatureWrongLength);
   });
 }
 
@@ -124,8 +123,7 @@ TEST_F(VerifyJwkOKPTest, NoKidOK) {
     EXPECT_EQ(verifyJwt(jwt, *jwks_, 1), Status::JwtVerificationFail);
   });
   fuzzJwtSignatureLength(jwt, [this](const Jwt& jwt) {
-    EXPECT_EQ(verifyJwt(jwt, *jwks_, 1),
-              Status::JwtEd25519SignatureWrongLength);
+    EXPECT_EQ(verifyJwt(jwt, *jwks_, 1), Status::JwtEd25519SignatureWrongLength);
   });
 }
 
@@ -177,6 +175,6 @@ TEST_F(VerifyJwkOKPTest, WrongSignatureFail) {
   EXPECT_EQ(verifyJwt(jwt, *jwks_), Status::JwtVerificationFail);
 }
 
-}  // namespace
-}  // namespace JwtVerify
-}  // namespace Envoy
+} // namespace
+} // namespace JwtVerify
+} // namespace Envoy

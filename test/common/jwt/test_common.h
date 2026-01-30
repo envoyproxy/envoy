@@ -22,8 +22,7 @@
 namespace Envoy {
 namespace JwtVerify {
 
-void fuzzJwtSignatureBits(const Jwt& jwt,
-                          std::function<void(const Jwt& jwt)> test_fn) {
+void fuzzJwtSignatureBits(const Jwt& jwt, std::function<void(const Jwt& jwt)> test_fn) {
   // alter 1 bit
   for (size_t b = 0; b < jwt.signature_.size(); ++b) {
     for (int bit = 0; bit < 8; ++bit) {
@@ -36,8 +35,7 @@ void fuzzJwtSignatureBits(const Jwt& jwt,
   }
 }
 
-void fuzzJwtSignatureLength(const Jwt& jwt,
-                            std::function<void(const Jwt& jwt)> test_fn) {
+void fuzzJwtSignatureLength(const Jwt& jwt, std::function<void(const Jwt& jwt)> test_fn) {
   // truncate bytes
   for (size_t count = 1; count < jwt.signature_.size(); ++count) {
     Jwt fuzz_jwt(jwt);
@@ -46,8 +44,7 @@ void fuzzJwtSignatureLength(const Jwt& jwt,
   }
 }
 
-void fuzzJwtSignature(const Jwt& jwt,
-                      std::function<void(const Jwt& jwt)> test_fn) {
+void fuzzJwtSignature(const Jwt& jwt, std::function<void(const Jwt& jwt)> test_fn) {
   fuzzJwtSignatureBits(jwt, test_fn);
   fuzzJwtSignatureLength(jwt, test_fn);
 }
@@ -122,9 +119,8 @@ const std::string kRealX509Jwks = R"(
  * @return the std::ostream os
  */
 std::ostream& operator<<(std::ostream& os, const Status& status) {
-  return os << "Status(" << static_cast<int>(status) << ", "
-            << getStatusString(status) << ")";
+  return os << "Status(" << static_cast<int>(status) << ", " << getStatusString(status) << ")";
 }
 
-}  // namespace JwtVerify
-}  // namespace Envoy
+} // namespace JwtVerify
+} // namespace Envoy

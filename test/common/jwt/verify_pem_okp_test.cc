@@ -87,8 +87,8 @@ TEST(VerifyPEMTestOKP, WrongSignatureFail) {
   EXPECT_EQ(verifyJwt(jwt, *jwks, 1), Status::JwtVerificationFail);
 }
 
-}  // namespace
-}  // namespace JwtVerify
-}  // namespace Envoy
+} // namespace
+} // namespace JwtVerify
+} // namespace Envoy
 
 #endif

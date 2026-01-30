@@ -20,7 +20,7 @@ namespace Envoy {
 namespace JwtVerify {
 
 class StructUtils {
- public:
+public:
   StructUtils(const ::google::protobuf::Struct& struct_pb);
 
   enum FindResult {
@@ -43,16 +43,14 @@ class StructUtils {
   // Get string or list of string, designed to get "aud" field
   // "aud" can be either string array or string.
   // Try as string array, read it as empty array if doesn't exist.
-  FindResult GetStringList(const std::string& name,
-                           std::vector<std::string>* list);
+  FindResult GetStringList(const std::string& name, std::vector<std::string>* list);
 
   // Find the value with nested names.
-  FindResult GetValue(const std::string& nested_names,
-                      const google::protobuf::Value*& found);
+  FindResult GetValue(const std::string& nested_names, const google::protobuf::Value*& found);
 
- private:
+private:
   const ::google::protobuf::Struct& struct_pb_;
 };
 
-}  // namespace JwtVerify
-}  // namespace Envoy
+} // namespace JwtVerify
+} // namespace Envoy

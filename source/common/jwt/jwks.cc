@@ -55,15 +55,14 @@ inline const uint8_t* castToUChar(const std::string& str) {
  * bssl::UniquePtr<EVP_PKEY> pkey = e.createEcKeyFromJwkEC(...);
  */
 class KeyGetter : public WithStatus {
- public:
+public:
   bssl::UniquePtr<EVP_PKEY> createEvpPkeyFromPem(const std::string& pkey_pem) {
     bssl::UniquePtr<BIO> buf(BIO_new_mem_buf(pkey_pem.data(), pkey_pem.size()));
     if (buf == nullptr) {
       updateStatus(Status::JwksBioAllocError);
       return nullptr;
     }
-    bssl::UniquePtr<EVP_PKEY> key(
-        PEM_read_bio_PUBKEY(buf.get(), nullptr, nullptr, nullptr));
+    bssl::UniquePtr<EVP_PKEY> key(PEM_read_bio_PUBKEY(buf.get(), nullptr, nullptr, nullptr));
     if (key == nullptr) {
       updateStatus(Status::JwksPemBadBase64);
       return nullptr;
@@ -86,16 +85,14 @@ class KeyGetter : public WithStatus {
       return nullptr;
     }
 
-    if (EC_KEY_set_public_key_affine_coordinates(ec_key.get(), bn_x.get(),
-                                                 bn_y.get()) == 0) {
+    if (EC_KEY_set_public_key_affine_coordinates(ec_key.get(), bn_x.get(), bn_y.get()) == 0) {
       updateStatus(Status::JwksEcParseError);
       return nullptr;
     }
     return ec_key;
   }
 
-  bssl::UniquePtr<RSA> createRsaFromJwk(const std::string& n,
-                                        const std::string& e) {
+  bssl::UniquePtr<RSA> createRsaFromJwk(const std::string& n, const std::string& e) {
     bssl::UniquePtr<BIGNUM> n_bn = createBigNumFromBase64UrlString(n);
     bssl::UniquePtr<BIGNUM> e_bn = createBigNumFromBase64UrlString(e);
     if (n_bn == nullptr || e_bn == nullptr) {
@@ -103,8 +100,7 @@ class KeyGetter : public WithStatus {
       updateStatus(Status::JwksRsaParseError);
       return nullptr;
     }
-    if (BN_cmp_word(e_bn.get(), 3) != 0 &&
-        BN_cmp_word(e_bn.get(), 65537) != 0) {
+    if (BN_cmp_word(e_bn.get(), 3) != 0 && BN_cmp_word(e_bn.get(), 65537) != 0) {
       // non-standard key; reject it early.
       updateStatus(Status::JwksRsaParseError);
       return nullptr;
@@ -113,8 +109,7 @@ class KeyGetter : public WithStatus {
     // https://boringssl-review.googlesource.com/c/boringssl/+/59386 (May 2023),
     // replace all this with `RSA_new_public_key` instead.
     bssl::UniquePtr<RSA> rsa(RSA_new());
-    if (rsa == nullptr ||
-        !RSA_set0_key(rsa.get(), n_bn.get(), e_bn.get(), /*d=*/nullptr)) {
+    if (rsa == nullptr || !RSA_set0_key(rsa.get(), n_bn.get(), e_bn.get(), /*d=*/nullptr)) {
       // Allocation or programmer error.
       updateStatus(Status::JwksRsaParseError);
       return nullptr;
@@ -130,8 +125,7 @@ class KeyGetter : public WithStatus {
     return rsa;
   }
 
-  std::string createRawKeyFromJwkOKP(int nid, size_t keylen,
-                                     const std::string& x) {
+  std::string createRawKeyFromJwkOKP(int nid, size_t keylen, const std::string& x) {
     std::string x_decoded;
     if (!absl::WebSafeBase64Unescape(x, &x_decoded)) {
       updateStatus(Status::JwksOKPXBadBase64);
@@ -142,23 +136,19 @@ class KeyGetter : public WithStatus {
     return x_decoded;
   }
 
- private:
-  bssl::UniquePtr<BIGNUM> createBigNumFromBase64UrlString(
-      const std::string& s) {
+private:
+  bssl::UniquePtr<BIGNUM> createBigNumFromBase64UrlString(const std::string& s) {
     std::string s_decoded;
     if (!absl::WebSafeBase64Unescape(s, &s_decoded)) {
       return nullptr;
     }
-    return bssl::UniquePtr<BIGNUM>(
-        BN_bin2bn(castToUChar(s_decoded), s_decoded.length(), NULL));
+    return bssl::UniquePtr<BIGNUM>(BN_bin2bn(castToUChar(s_decoded), s_decoded.length(), NULL));
   };
 };
 
-Status extractJwkFromJwkRSA(const ::google::protobuf::Struct& jwk_pb,
-                            Jwks::Pubkey* jwk) {
-  if (!jwk->alg_.empty() &&
-      (jwk->alg_.size() < 2 || (jwk->alg_.compare(0, 2, "RS") != 0 &&
-                                jwk->alg_.compare(0, 2, "PS") != 0))) {
+Status extractJwkFromJwkRSA(const ::google::protobuf::Struct& jwk_pb, Jwks::Pubkey* jwk) {
+  if (!jwk->alg_.empty() && (jwk->alg_.size() < 2 || (jwk->alg_.compare(0, 2, "RS") != 0 &&
+                                                      jwk->alg_.compare(0, 2, "PS") != 0))) {
     return Status::JwksRSAKeyBadAlg;
   }
 
@@ -186,10 +176,8 @@ Status extractJwkFromJwkRSA(const ::google::protobuf::Struct& jwk_pb,
   return e.getStatus();
 }
 
-Status extractJwkFromJwkEC(const ::google::protobuf::Struct& jwk_pb,
-                           Jwks::Pubkey* jwk) {
-  if (!jwk->alg_.empty() &&
-      (jwk->alg_.size() < 2 || jwk->alg_.compare(0, 2, "ES") != 0)) {
+Status extractJwkFromJwkEC(const ::google::protobuf::Struct& jwk_pb, Jwks::Pubkey* jwk) {
+  if (!jwk->alg_.empty() && (jwk->alg_.size() < 2 || jwk->alg_.compare(0, 2, "ES") != 0)) {
     return Status::JwksECKeyBadAlg;
   }
 
@@ -255,10 +243,8 @@ Status extractJwkFromJwkEC(const ::google::protobuf::Struct& jwk_pb,
   return e.getStatus();
 }
 
-Status extractJwkFromJwkOct(const ::google::protobuf::Struct& jwk_pb,
-                            Jwks::Pubkey* jwk) {
-  if (!jwk->alg_.empty() && jwk->alg_ != "HS256" && jwk->alg_ != "HS384" &&
-      jwk->alg_ != "HS512") {
+Status extractJwkFromJwkOct(const ::google::protobuf::Struct& jwk_pb, Jwks::Pubkey* jwk) {
+  if (!jwk->alg_.empty() && jwk->alg_ != "HS256" && jwk->alg_ != "HS384" && jwk->alg_ != "HS512") {
     return Status::JwksHMACKeyBadAlg;
   }
 
@@ -282,8 +268,7 @@ Status extractJwkFromJwkOct(const ::google::protobuf::Struct& jwk_pb,
 }
 
 // The "OKP" key type is defined in https://tools.ietf.org/html/rfc8037
-Status extractJwkFromJwkOKP(const ::google::protobuf::Struct& jwk_pb,
-                            Jwks::Pubkey* jwk) {
+Status extractJwkFromJwkOKP(const ::google::protobuf::Struct& jwk_pb, Jwks::Pubkey* jwk) {
   // alg is not required, but if present it must be EdDSA
   if (!jwk->alg_.empty() && jwk->alg_ != "EdDSA") {
     return Status::JwksOKPKeyBadAlg;
@@ -368,8 +353,7 @@ Status extractX509(const std::string& key, Jwks::Pubkey* jwk) {
   if (BIO_write(jwk->bio_.get(), key.c_str(), key.length()) <= 0) {
     return Status::JwksX509BioWriteError;
   }
-  jwk->x509_.reset(
-      PEM_read_bio_X509(jwk->bio_.get(), nullptr, nullptr, nullptr));
+  jwk->x509_.reset(PEM_read_bio_X509(jwk->bio_.get(), nullptr, nullptr, nullptr));
   if (jwk->x509_ == nullptr) {
     return Status::JwksX509ParseError;
   }
@@ -390,13 +374,11 @@ bool shouldCheckX509(const ::google::protobuf::Struct& jwks_pb) {
   }
 
   for (const auto& kid : jwks_pb.fields()) {
-    if (kid.first.empty() ||
-        kid.second.kind_case() != google::protobuf::Value::kStringValue) {
+    if (kid.first.empty() || kid.second.kind_case() != google::protobuf::Value::kStringValue) {
       return false;
     }
     const std::string& cert = kid.second.string_value();
-    if (!absl::StartsWith(cert, kX509CertPrefix) ||
-        !absl::EndsWith(cert, kX509CertSuffix)) {
+    if (!absl::StartsWith(cert, kX509CertPrefix) || !absl::EndsWith(cert, kX509CertSuffix)) {
       return false;
     }
   }
@@ -419,7 +401,7 @@ Status createFromX509(const ::google::protobuf::Struct& jwks_pb,
   return Status::Ok;
 }
 
-}  // namespace
+} // namespace
 
 Status Jwks::addKeyFromPem(const std::string& pkey, const std::string& kid,
                            const std::string& alg) {
@@ -435,12 +417,12 @@ Status Jwks::addKeyFromPem(const std::string& pkey, const std::string& kid,
 JwksPtr Jwks::createFrom(const std::string& pkey, Type type) {
   JwksPtr keys(new Jwks());
   switch (type) {
-    case Type::JWKS:
-      keys->createFromJwksCore(pkey);
-      break;
-    case Type::PEM:
-      keys->createFromPemCore(pkey);
-      break;
+  case Type::JWKS:
+    keys->createFromJwksCore(pkey);
+    break;
+  case Type::PEM:
+    keys->createFromPemCore(pkey);
+    break;
   }
   return keys;
 }
@@ -488,33 +470,32 @@ void Jwks::createFromPemCore(const std::string& pkey_pem) {
   assert(e.getStatus() == Status::Ok);
 
   switch (EVP_PKEY_id(evp_pkey.get())) {
-    case EVP_PKEY_RSA:
-      key_ptr->rsa_.reset(EVP_PKEY_get1_RSA(evp_pkey.get()));
-      key_ptr->kty_ = "RSA";
-      break;
-    case EVP_PKEY_EC:
-      key_ptr->ec_key_.reset(EVP_PKEY_get1_EC_KEY(evp_pkey.get()));
-      key_ptr->kty_ = "EC";
-      break;
+  case EVP_PKEY_RSA:
+    key_ptr->rsa_.reset(EVP_PKEY_get1_RSA(evp_pkey.get()));
+    key_ptr->kty_ = "RSA";
+    break;
+  case EVP_PKEY_EC:
+    key_ptr->ec_key_.reset(EVP_PKEY_get1_EC_KEY(evp_pkey.get()));
+    key_ptr->kty_ = "EC";
+    break;
 #ifndef BORINGSSL_FIPS
-    case EVP_PKEY_ED25519: {
-      uint8_t raw_key[ED25519_PUBLIC_KEY_LEN];
-      size_t out_len = ED25519_PUBLIC_KEY_LEN;
-      if (EVP_PKEY_get_raw_public_key(evp_pkey.get(), raw_key, &out_len) != 1 ||
-          out_len != ED25519_PUBLIC_KEY_LEN) {
-        updateStatus(Status::JwksPemGetRawEd25519Error);
-        return;
-      }
-      key_ptr->okp_key_raw_ =
-          std::string(reinterpret_cast<const char*>(raw_key), out_len);
-      key_ptr->kty_ = "OKP";
-      key_ptr->crv_ = "Ed25519";
-      break;
-    }
-#endif
-    default:
-      updateStatus(Status::JwksPemNotImplementedKty);
+  case EVP_PKEY_ED25519: {
+    uint8_t raw_key[ED25519_PUBLIC_KEY_LEN];
+    size_t out_len = ED25519_PUBLIC_KEY_LEN;
+    if (EVP_PKEY_get_raw_public_key(evp_pkey.get(), raw_key, &out_len) != 1 ||
+        out_len != ED25519_PUBLIC_KEY_LEN) {
+      updateStatus(Status::JwksPemGetRawEd25519Error);
       return;
+    }
+    key_ptr->okp_key_raw_ = std::string(reinterpret_cast<const char*>(raw_key), out_len);
+    key_ptr->kty_ = "OKP";
+    key_ptr->crv_ = "Ed25519";
+    break;
+  }
+#endif
+  default:
+    updateStatus(Status::JwksPemNotImplementedKty);
+    return;
   }
 
   keys_.push_back(std::move(key_ptr));
@@ -525,8 +506,7 @@ void Jwks::createFromJwksCore(const std::string& jwks_json) {
 
   ::google::protobuf::util::JsonParseOptions options;
   ::google::protobuf::Struct jwks_pb;
-  const auto status = ::google::protobuf::util::JsonStringToMessage(
-      jwks_json, &jwks_pb, options);
+  const auto status = ::google::protobuf::util::JsonStringToMessage(jwks_json, &jwks_pb, options);
   if (!status.ok()) {
     updateStatus(Status::JwksParseError);
     return;
@@ -569,5 +549,5 @@ void Jwks::createFromJwksCore(const std::string& jwks_json) {
   }
 }
 
-}  // namespace JwtVerify
-}  // namespace Envoy
+} // namespace JwtVerify
+} // namespace Envoy

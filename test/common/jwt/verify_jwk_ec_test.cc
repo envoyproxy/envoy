@@ -127,14 +127,13 @@ const std::string JwtES256Text =
     "o2ZSXyLh3IcMBQNSeRZRe5Z-MUDl-s-F99XGoyutqA6lq8bKZ6vmjZAlpVG8AGRZW9J"
     "Gp9lq3cbEw";
 
-const std::string JwtTextEC =
-    "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImFiYyJ9.eyJpc3MiOiI2Mj"
-    "g2NDU3NDE4ODEtbm9hYml1MjNmNWE4bThvdmQ4dWN2Njk4bGo3OHZ2MGxAZGV2ZWxvc"
-    "GVyLmdzZXJ2aWNlYWNjb3VudC5jb20iLCJzdWIiOiI2Mjg2NDU3NDE4ODEtbm9hYml1"
-    "MjNmNWE4bThvdmQ4dWN2Njk4bGo3OHZ2MGxAZGV2ZWxvcGVyLmdzZXJ2aWNlYWNjb3V"
-    "udC5jb20iLCJhdWQiOiJodHRwOi8vbXlzZXJ2aWNlLmNvbS9teWFwaSJ9.T2KAwChqg"
-    "o2ZSXyLh3IcMBQNSeRZRe5Z-MUDl-s-F99XGoyutqA6lq8bKZ6vmjZAlpVG8AGRZW9J"
-    "Gp9lq3cbEw";
+const std::string JwtTextEC = "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImFiYyJ9.eyJpc3MiOiI2Mj"
+                              "g2NDU3NDE4ODEtbm9hYml1MjNmNWE4bThvdmQ4dWN2Njk4bGo3OHZ2MGxAZGV2ZWxvc"
+                              "GVyLmdzZXJ2aWNlYWNjb3VudC5jb20iLCJzdWIiOiI2Mjg2NDU3NDE4ODEtbm9hYml1"
+                              "MjNmNWE4bThvdmQ4dWN2Njk4bGo3OHZ2MGxAZGV2ZWxvcGVyLmdzZXJ2aWNlYWNjb3V"
+                              "udC5jb20iLCJhdWQiOiJodHRwOi8vbXlzZXJ2aWNlLmNvbS9teWFwaSJ9.T2KAwChqg"
+                              "o2ZSXyLh3IcMBQNSeRZRe5Z-MUDl-s-F99XGoyutqA6lq8bKZ6vmjZAlpVG8AGRZW9J"
+                              "Gp9lq3cbEw";
 
 // "{"kid":"es384"}"
 const std::string JwtES384Text =
@@ -178,7 +177,7 @@ const std::string JwtTextECNoKid =
     "qWJT_V5IVrKrdQ";
 
 class VerifyJwkECTest : public testing::Test {
- protected:
+protected:
   void SetUp() {
     jwks_ = Jwks::createFrom(PublicKeyJwkEC, Jwks::Type::JWKS);
     EXPECT_EQ(jwks_->getStatus(), Status::Ok);
@@ -269,6 +268,6 @@ TEST_F(VerifyJwkECTest, PubkeyNoKidOK) {
   EXPECT_EQ(verifyJwt(jwt, *jwks_, 1), Status::Ok);
 }
 
-}  // namespace
-}  // namespace JwtVerify
-}  // namespace Envoy
+} // namespace
+} // namespace JwtVerify
+} // namespace Envoy

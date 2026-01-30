@@ -91,6 +91,6 @@ TEST(CheckAudienceTest, TestEmptyAudienceMatch) {
   EXPECT_TRUE(checker.areAudiencesAllowed({""}));
 }
 
-}  // namespace
-}  // namespace JwtVerify
-}  // namespace Envoy
+} // namespace
+} // namespace JwtVerify
+} // namespace Envoy

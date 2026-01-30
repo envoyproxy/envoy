@@ -88,6 +88,6 @@ TEST(VerifyX509Test, RealToken) {
   });
 }
 
-}  // namespace
-}  // namespace JwtVerify
-}  // namespace Envoy
+} // namespace
+} // namespace JwtVerify
+} // namespace Envoy

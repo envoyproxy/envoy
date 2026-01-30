@@ -96,6 +96,6 @@ TEST(VerifyAudTest, Success) {
   EXPECT_EQ(verifyJwt(jwt, *jwks, std::vector<std::string>{}), Status::Ok);
 }
 
-}  // namespace
-}  // namespace JwtVerify
-}  // namespace Envoy
+} // namespace
+} // namespace JwtVerify
+} // namespace Envoy
