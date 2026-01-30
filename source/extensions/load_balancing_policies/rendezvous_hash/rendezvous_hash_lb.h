@@ -89,7 +89,8 @@ private:
   private:
     /**
      * Computes the rendezvous hash score for the given key and host.
-     * Uses the formula from https://www.snia.org/sites/default/files/SDC15_presentations/dist_sys/Jason_Resch_New_Consistent_Hashings_Rev.pdf
+     * Uses the formula from
+     * https://www.snia.org/sites/default/files/SDC15_presentations/dist_sys/Jason_Resch_New_Consistent_Hashings_Rev.pdf
      * to maintain minimal disruption guarantee of rendezvous hashing.
      */
     static double computeScore(uint64_t key, uint64_t host_hash, double weight);
