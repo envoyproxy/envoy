@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.extensions.transport_sockets.tls.cert_mappers.sni.v3;
 
+import "google/protobuf/wrappers.proto";
+
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -21,5 +23,5 @@ message SNI {
 
   // Whether to include the signature algorithm in the SNI-based name. If true, the secret name will be in the format
   // "<sni>/<signature_algorithm>". If false, the secret name will be just "<sni>".
-  bool include_signature_algorithm = 2;
+  google.protobuf.BoolValue include_signature_algorithm = 2;
 }

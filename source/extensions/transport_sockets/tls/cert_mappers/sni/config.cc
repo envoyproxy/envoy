@@ -55,7 +55,8 @@ SNIMapperFactory::createTlsCertificateMapperFactory(
   const SNIConfigProto& config = MessageUtil::downcastAndValidate<const SNIConfigProto&>(
       proto_config, factory_context.messageValidationVisitor());
   return [default_value = config.default_value(),
-          include_signature_algorithm = config.include_signature_algorithm()]() {
+          include_signature_algorithm =
+              PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, include_signature_algorithm, false)]() {
     return std::make_unique<SNIMapper>(default_value, include_signature_algorithm);
   };
 }
