@@ -161,7 +161,12 @@ public:
   createOnMatch(const envoy::config::common::matcher::v3::Matcher::OnMatch&) PURE;
 };
 
-// The result of a match. There are three possible results:
+// The result of a match. Use of ActionMatchResult over MatchResult indicates there is a configured
+// action associated with the match. This is used to inject configuration into the matcher. In cases
+// where there is no associated configuration (such as sub-matchers configured as part of a match
+// tree), use MatchResult to convey the result without an associated action.
+//
+// There are three possible results:
 // - The match could not be completed due to lack of data (isInsufficientData() will return true.)
 // - The match was completed, no match found (isNoMatch() will return true.)
 // - The match was completed, match found (isMatch() will return true, action() will return the
