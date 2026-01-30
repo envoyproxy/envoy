@@ -26,15 +26,12 @@
 // by nature. For example, we assume that modules will not try to pass invalid pointers to Envoy
 // intentionally.
 
-// This is the ABI version that we bump when we make deprecating changes to the ABI.
-// Until we reach v1.0, we only guarantee backward compatibility in the next minor version.
-// For example, v0.1 is guaranteed to work with v0.2, but not with v0.3.
+// This is the ABI version that we bump the minor version when we make deprecating changes to the
+// ABI. Until we reach v1.0, we only guarantee backward compatibility in the next minor version. For
+// example, v0.1.y is guaranteed to be compatible with v0.2.x, but not with v0.3.x.
 //
-// This is used only for compatibility checks between Envoy and dynamic modules and should not be
-// surfaced to users directly.
-//
-// When bumping the version, make sure move the previous version to
-// ENVOY_DYNAMIC_MODULES_PREVIOUS_ABI_VERSION.
+// This is used only for tracking the ABI version of dynamic modules and emitting warnings when
+// there's a mismatch.
 //
 // Note(internal): We could use the Envoy's version such as "v1.38.0" here, there are several
 // reasons as to why we use a static version string instead:
@@ -42,9 +39,7 @@
 // SDK downstream users.
 // 2. In the future, after the stable ABI is established, we may want to decouple the ABI version
 // from Envoy's versioning scheme.
-#define ENVOY_DYNAMIC_MODULES_ABI_VERSION "v0.1"
-// No previous version until v1.38 release.
-#define ENVOY_DYNAMIC_MODULES_PREVIOUS_ABI_VERSION "v0.0"
+#define ENVOY_DYNAMIC_MODULES_ABI_VERSION "v0.1.0"
 
 #ifdef __cplusplus
 #include <cstdbool>

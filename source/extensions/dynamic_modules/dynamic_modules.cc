@@ -63,19 +63,16 @@ newDynamicModule(const std::filesystem::path& object_file_absolute_path, const b
     return absl::InvalidArgumentError(
         absl::StrCat("Failed to initialize dynamic module: ", object_file_absolute_path.c_str()));
   }
-  // We only guard against backward compatibility for two versions: the current and previous ones.
+  // We log a warning if the ABI version does not match exactly.
   if (absl::string_view(abi_version) != absl::string_view(ENVOY_DYNAMIC_MODULES_ABI_VERSION)) {
-    if (absl::string_view(abi_version) !=
-        absl::string_view(ENVOY_DYNAMIC_MODULES_PREVIOUS_ABI_VERSION)) {
-      return absl::InvalidArgumentError(absl::StrCat(
-          "ABI version mismatch: got ", abi_version, ", but expected ",
-          ENVOY_DYNAMIC_MODULES_ABI_VERSION, " or ", ENVOY_DYNAMIC_MODULES_PREVIOUS_ABI_VERSION));
-    }
     ENVOY_LOG_TO_LOGGER(
         Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), warn,
         "Dynamic module ABI version {} is deprecated. Please recompile the module against the "
         "SDK with the exact Envoy version used by the main program.",
         abi_version);
+  } else {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), info,
+                        "Dynamic module ABI version {} matched.", abi_version);
   }
   return dynamic_module;
 }
