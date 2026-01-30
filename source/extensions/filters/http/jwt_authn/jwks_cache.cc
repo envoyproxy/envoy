@@ -158,7 +158,7 @@ public:
 
   bool isExpired() const override { return time_source_.monotonicTime() >= tls_->expire_; }
 
-  const ::google::jwt_verify::Jwks* setRemoteJwks(JwksConstPtr&& jwks) override {
+  const ::Envoy::JwtVerify::Jwks* setRemoteJwks(JwksConstPtr&& jwks) override {
     // convert unique_ptr to shared_ptr
     JwksConstSharedPtr shared_jwks = std::move(jwks);
     tls_->jwks_ = shared_jwks;

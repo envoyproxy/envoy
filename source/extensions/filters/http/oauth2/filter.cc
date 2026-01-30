@@ -1118,8 +1118,8 @@ std::string
 OAuth2Filter::getExpiresTimeForRefreshToken(const std::string& refresh_token,
                                             const std::chrono::seconds& expires_in) const {
   if (config_->useRefreshToken()) {
-    ::google::jwt_verify::Jwt jwt;
-    if (jwt.parseFromString(refresh_token) == ::google::jwt_verify::Status::Ok && jwt.exp_ != 0) {
+    ::Envoy::JwtVerify::Jwt jwt;
+    if (jwt.parseFromString(refresh_token) == ::Envoy::JwtVerify::Status::Ok && jwt.exp_ != 0) {
       const std::chrono::seconds expiration_from_jwt = std::chrono::seconds{jwt.exp_};
       const std::chrono::seconds now =
           std::chrono::time_point_cast<std::chrono::seconds>(time_source_.systemTime())
@@ -1149,8 +1149,8 @@ OAuth2Filter::getExpiresTimeForRefreshToken(const std::string& refresh_token,
 std::string OAuth2Filter::getExpiresTimeForIdToken(const std::string& id_token,
                                                    const std::chrono::seconds& expires_in) const {
   if (!id_token.empty()) {
-    ::google::jwt_verify::Jwt jwt;
-    if (jwt.parseFromString(id_token) == ::google::jwt_verify::Status::Ok && jwt.exp_ != 0) {
+    ::Envoy::JwtVerify::Jwt jwt;
+    if (jwt.parseFromString(id_token) == ::Envoy::JwtVerify::Status::Ok && jwt.exp_ != 0) {
       const std::chrono::seconds expiration_from_jwt = std::chrono::seconds{jwt.exp_};
       const std::chrono::seconds now =
           std::chrono::time_point_cast<std::chrono::seconds>(time_source_.systemTime())
