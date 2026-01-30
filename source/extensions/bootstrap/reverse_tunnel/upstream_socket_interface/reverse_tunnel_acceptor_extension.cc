@@ -31,9 +31,9 @@ UpstreamSocketThreadLocal::UpstreamSocketThreadLocal(Event::Dispatcher& dispatch
     std::string total_nodes_stat_name =
         fmt::format("{}.{}.total_nodes", stat_prefix, dispatcher_name);
     Stats::StatNameManagedStorage total_nodes_stat_name_storage(total_nodes_stat_name,
-                                                               stats_store.symbolTable());
-    total_nodes_gauge_ = &stats_store.gaugeFromStatName(
-        total_nodes_stat_name_storage.statName(), Stats::Gauge::ImportMode::NeverImport);
+                                                                stats_store.symbolTable());
+    total_nodes_gauge_ = &stats_store.gaugeFromStatName(total_nodes_stat_name_storage.statName(),
+                                                        Stats::Gauge::ImportMode::NeverImport);
   }
 }
 
@@ -221,8 +221,9 @@ void ReverseTunnelAcceptorExtension::updateConnectionStats(const std::string& no
   updatePerWorkerConnectionStats(node_id, cluster_id, increment);
 }
 
-void ReverseTunnelAcceptorExtension::updatePerWorkerAggregateMetrics(
-    const std::string& node_id, const std::string& cluster_id, bool increment) {
+void ReverseTunnelAcceptorExtension::updatePerWorkerAggregateMetrics(const std::string& node_id,
+                                                                     const std::string& cluster_id,
+                                                                     bool increment) {
   // Get TLS for current worker
   auto* local_registry = getLocalRegistry();
   if (local_registry == nullptr) {

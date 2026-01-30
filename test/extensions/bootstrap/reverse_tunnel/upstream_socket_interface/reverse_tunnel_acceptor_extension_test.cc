@@ -2,8 +2,6 @@
 
 #include "envoy/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/v3/upstream_reverse_connection_socket_interface.pb.h"
 
-#include "fmt/format.h"
-
 #include "source/common/network/utility.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor_extension.h"
@@ -18,6 +16,7 @@
 #include "test/test_common/logging.h"
 #include "test/test_common/registry.h"
 
+#include "fmt/format.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -199,14 +198,17 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, UpdateConnectionStatsWithDetailedStat
   auto no_stats_extension = std::make_unique<ReverseTunnelAcceptorExtension>(
       *socket_interface_, context_, no_stats_config);
 
+  // Call onServerInitialized to set up the extension reference properly.
+  no_stats_extension->onServerInitialized();
+
   // Set up thread local slot so aggregate metrics can be initialized.
-  thread_local_registry_ =
+  auto no_stats_registry =
       std::make_shared<UpstreamSocketThreadLocal>(dispatcher_, no_stats_extension.get());
-  tls_slot_ = ThreadLocal::TypedSlot<UpstreamSocketThreadLocal>::makeUnique(thread_local_);
+  auto no_stats_tls_slot =
+      ThreadLocal::TypedSlot<UpstreamSocketThreadLocal>::makeUnique(thread_local_);
   thread_local_.setDispatcher(&dispatcher_);
-  tls_slot_->set([registry = thread_local_registry_](Event::Dispatcher&) { return registry; });
-  no_stats_extension->tls_slot_ = std::move(tls_slot_);
-  no_stats_extension->socket_interface_->extension_ = no_stats_extension.get();
+  no_stats_tls_slot->set([registry = no_stats_registry](Event::Dispatcher&) { return registry; });
+  no_stats_extension->setTestOnlyTLSRegistry(std::move(no_stats_tls_slot));
 
   // Update connection stats - should not create detailed stats, but aggregate metrics should work.
   no_stats_extension->updateConnectionStats("node1", "cluster1", true);
@@ -226,7 +228,8 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, UpdateConnectionStatsWithDetailedStat
   uint64_t total_clusters_value = 0;
   uint64_t total_nodes_value = 0;
   Stats::IterateFn<Stats::Gauge> gauge_callback =
-      [&total_clusters_value, &total_nodes_value](const Stats::RefcountPtr<Stats::Gauge>& gauge) -> bool {
+      [&total_clusters_value,
+       &total_nodes_value](const Stats::RefcountPtr<Stats::Gauge>& gauge) -> bool {
     const std::string& gauge_name = gauge->name();
     if (gauge_name.find(".total_clusters") != std::string::npos && gauge->used()) {
       total_clusters_value = gauge->value();
@@ -245,7 +248,8 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, UpdateConnectionStatsWithDetailedStat
   Stats::IterateFn<Stats::Gauge> detailed_stats_callback =
       [&found_detailed_stats](const Stats::RefcountPtr<Stats::Gauge>& gauge) -> bool {
     const std::string& gauge_name = gauge->name();
-    // Check if any detailed stats were created (nodes. or clusters. or worker_.node. or worker_.cluster.).
+    // Check if any detailed stats were created (nodes. or clusters. or worker_.node. or
+    // worker_.cluster.).
     if ((gauge_name.find(".nodes.") != std::string::npos ||
          gauge_name.find(".clusters.") != std::string::npos ||
          (gauge_name.find(".worker_") != std::string::npos &&
@@ -614,11 +618,12 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, ValidateDisconnectionReporting) {
 
 // Helper function to get aggregate metric values from stats store.
 std::pair<uint64_t, uint64_t> getAggregateMetrics(Stats::Scope& stats_store,
-                                                   const std::string& stat_prefix,
-                                                   const std::string& dispatcher_name) {
+                                                  const std::string& stat_prefix,
+                                                  const std::string& dispatcher_name) {
   uint64_t total_clusters_value = 0;
   uint64_t total_nodes_value = 0;
-  std::string expected_clusters_stat = fmt::format("{}.{}.total_clusters", stat_prefix, dispatcher_name);
+  std::string expected_clusters_stat =
+      fmt::format("{}.{}.total_clusters", stat_prefix, dispatcher_name);
   std::string expected_nodes_stat = fmt::format("{}.{}.total_nodes", stat_prefix, dispatcher_name);
 
   Stats::IterateFn<Stats::Gauge> gauge_callback =
@@ -680,7 +685,7 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, AggregateMetricsUniqueCounting) {
   auto [total_clusters, total_nodes] =
       getAggregateMetrics(stats_store, "test_scope.reverse_connections", "worker_0");
   EXPECT_EQ(total_clusters, 1); // Only 1 unique cluster
-  EXPECT_EQ(total_nodes, 1);     // Only 1 unique node
+  EXPECT_EQ(total_nodes, 1);    // Only 1 unique node
 
   // Add connections to different clusters/nodes.
   extension_->updateConnectionStats("node2", "cluster2", true);
@@ -689,7 +694,7 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, AggregateMetricsUniqueCounting) {
   std::tie(total_clusters, total_nodes) =
       getAggregateMetrics(stats_store, "test_scope.reverse_connections", "worker_0");
   EXPECT_EQ(total_clusters, 2); // cluster1 and cluster2
-  EXPECT_EQ(total_nodes, 3);     // node1, node2, node3
+  EXPECT_EQ(total_nodes, 3);    // node1, node2, node3
 }
 
 TEST_F(ReverseTunnelAcceptorExtensionTest, AggregateMetricsDecrement) {
@@ -699,7 +704,8 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, AggregateMetricsDecrement) {
 
   // Add connections.
   extension_->updateConnectionStats("node1", "cluster1", true);
-  extension_->updateConnectionStats("node1", "cluster1", true); // 2 connections to same cluster/node
+  extension_->updateConnectionStats("node1", "cluster1",
+                                    true); // 2 connections to same cluster/node
   extension_->updateConnectionStats("node2", "cluster2", true);
   extension_->updateConnectionStats("node3", "cluster3", true);
 
