@@ -153,7 +153,6 @@ def envoy_dependencies(skip_targets = []):
     _com_github_fmtlib_fmt()
     _com_github_gabime_spdlog()
     _com_github_google_benchmark()
-    _com_github_google_jwt_verify()
     _com_github_google_libprotobuf_mutator()
     _com_github_google_libsxg()
     _com_github_google_tcmalloc()
@@ -781,13 +780,6 @@ def _emsdk():
         name = "emsdk",
         patch_args = ["-p2"],
         patches = ["@envoy//bazel:emsdk.patch"],
-    )
-
-def _com_github_google_jwt_verify():
-    external_http_archive(
-        "com_github_google_jwt_verify",
-        patches = ["@envoy//bazel:jwt_verify_lib.patch"],
-        patch_args = ["-p1"],
     )
 
 def _com_github_luajit_luajit():
