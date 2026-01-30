@@ -273,7 +273,7 @@ com_github_google_quiche:
   project_name: "QUICHE"
   project_desc: "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols"
   project_url: "https://github.com/google/quiche"
-  release_date: "2026-01-22"
+  release_date: "2026-01-26"
   use_category:
   - controlplane
   - dataplane_core
@@ -736,7 +736,7 @@ envoy_examples:
   project_name: "envoy_examples"
   project_desc: "Envoy proxy examples"
   project_url: "https://github.com/envoyproxy/examples"
-  release_date: "2026-01-03"
+  release_date: "2026-01-29"
   use_category:
   - test_only
   license: "Apache-2.0"
@@ -953,13 +953,7 @@ io_vectorscan:
   - envoy.regex_engines.hyperscan
   license: "BSD-3-Clause"
   license_url: "https://github.com/VectorCamp/vectorscan/blob/vectorscan/{version}/LICENSE"
-kafka_server_binary:
-  project_name: "Kafka (server binary)"
-  project_desc: "Open-source distributed event streaming platform"
-  project_url: "https://kafka.apache.org"
-  release_date: "2025-05-19"
-  use_category:
-  - test_only
+
 kafka_source:
   project_name: "Kafka (source)"
   project_desc: "Open-source distributed event streaming platform"

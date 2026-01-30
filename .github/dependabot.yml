@@ -101,3 +101,15 @@ updates:
   schedule:
     interval: daily
     time: "06:00"
+
+- package-ecosystem: "gomod"
+  directory: "/source/extensions/dynamic_modules"
+  schedule:
+    interval: daily
+    time: "06:00"
+
+- package-ecosystem: "gomod"
+  directory: "/test/extensions/dynamic_modules/test_data/go"
+  schedule:
+    interval: daily
+    time: "06:00"

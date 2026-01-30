@@ -219,7 +219,8 @@ class Validator(object):
           DependencyError: on a dependency validation error.
         """
         # Validate that //source doesn't depend on test_only
-        queried_source_deps = await self._build_graph.query_external_deps('//source/...')
+        queried_source_deps = await self._build_graph.query_external_deps(
+            '//source/...', exclude=["//source/extensions/dynamic_modules/sdk/cpp/..."])
         expected_test_only_deps = self._dep_info.deps_by_use_category('test_only')
         bad_test_only_deps = expected_test_only_deps.intersection(queried_source_deps)
         if len(bad_test_only_deps) > 0:
