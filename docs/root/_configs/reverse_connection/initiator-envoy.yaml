@@ -41,10 +41,13 @@ static_resources:
               routes:
               - match:
                   prefix: '/downstream_service'
-                direct_response:
-                  status: 200
-                  body:
-                    inline_string: "Hello, World!"
+                route:
+                  cluster: downstream-service
+          http_filters:
+          - name: envoy.filters.http.router
+            typed_config:
+              "@type": >-
+                type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
 
   # Cluster designating upstream-envoy
   clusters:
@@ -58,20 +61,20 @@ static_resources:
         - endpoint:
             address:
               socket_address:
-                address: 127.0.0.1  # Address of upstream-envoy
+                address: upstream-envoy  # Address of upstream-envoy
                 port_value: 9000  # Port for rev_conn_api_listener
 
   # Backend HTTP service behind downstream which
   # we will access via reverse connections
-  # - name: downstream-service
-  #   type: STRICT_DNS
-  #   connect_timeout: 30s
-  #   load_assignment:
-  #     cluster_name: downstream-service
-  #     endpoints:
-  #     - lb_endpoints:
-  #       - endpoint:
-  #           address:
-  #             socket_address:
-  #               address: downstream-service
-  #               port_value: 80
+  - name: downstream-service
+    type: STRICT_DNS
+    connect_timeout: 30s
+    load_assignment:
+      cluster_name: downstream-service
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: downstream-service
+                port_value: 80
