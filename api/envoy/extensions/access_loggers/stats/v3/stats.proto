@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package envoy.extensions.access_loggers.stats.v3;
 
-import "google/protobuf/wrappers.proto";
-
 import "envoy/data/accesslog/v3/accesslog.proto";
+
+import "google/protobuf/wrappers.proto";
 
 import "xds/annotations/v3/status.proto";
 
@@ -98,9 +98,9 @@ message Config {
   // values, and are useful for tracking concurrency or other mutable values
   // over time.
   //
-  // The `operation` field determines how the gauge is modified.
-  // Using the `set` operation is straightforward and self-explanatory.
-  // The following example demonstrates how to use an `add_subtract` pair to
+  // The ``operation`` field determines how the gauge is modified.
+  // Using the ``set`` operation is straightforward and self-explanatory.
+  // The following example demonstrates how to use an ``add_subtract`` pair to
   // track a gauge by configuring a single stats access logger:
   //
   // .. code-block:: yaml
@@ -136,16 +136,16 @@ message Config {
       // the addition was successful to prevent leaking.
       message AddSubtract {
         // The access log type to trigger the addition.
-        envoy.data.accesslog.v3.AccessLogType add_at = 1
-            [(validate.rules).enum = { defined_only: true }];
+        data.accesslog.v3.AccessLogType add_at = 1 [(validate.rules).enum = {defined_only: true}];
 
         // The access log type to trigger the subtraction.
-        envoy.data.accesslog.v3.AccessLogType subtract_at = 2
-            [(validate.rules).enum = { defined_only: true }];
+        data.accesslog.v3.AccessLogType subtract_at = 2
+            [(validate.rules).enum = {defined_only: true}];
       }
 
       // The SET operation.
-      message Set {}
+      message Set {
+      }
 
       // The SET operation to perform on the gauge.
       Set set = 1;

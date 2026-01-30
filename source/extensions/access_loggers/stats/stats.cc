@@ -107,8 +107,8 @@ StatsAccessLog::StatsAccessLog(const envoy::extensions::access_loggers::stats::v
           // enforced in the proto (for legacy reasons), we need to check manually that exactly one
           // operation is configured.
           if (gauge_cfg.operation().has_add_subtract() == gauge_cfg.operation().has_set()) {
-            throw EnvoyException(
-                "Stats logger gauge must have either `set` or `add_subtract` operation configured.");
+            throw EnvoyException("Stats logger gauge must have either `set` or `add_subtract` "
+                                 "operation configured.");
           }
 
           if (gauge_cfg.operation().has_add_subtract()) {
@@ -118,9 +118,9 @@ StatsAccessLog::StatsAccessLog(const envoy::extensions::access_loggers::stats::v
             is_set = true;
           }
 
-          Gauge& inserted = gauges.emplace_back(
-              NameAndTags(gauge_cfg.stat(), stat_name_pool_, commands), nullptr, 0, is_set,
-              add_subtract);
+          Gauge& inserted =
+              gauges.emplace_back(NameAndTags(gauge_cfg.stat(), stat_name_pool_, commands), nullptr,
+                                  0, is_set, add_subtract);
 
           if (!gauge_cfg.value_format().empty() && gauge_cfg.has_value_fixed()) {
             throw EnvoyException(
