@@ -115,6 +115,19 @@ TEST(BufferFilterFactoryTest, BufferFilterRouteSpecificConfig) {
   EXPECT_TRUE(inflated);
 }
 
+TEST(BufferFilterFactoryTest, BufferFilterCorrectProtoWithServerContext) {
+  envoy::extensions::filters::http::buffer::v3::Buffer config;
+  config.mutable_max_request_bytes()->set_value(1028);
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  BufferFilterFactory factory;
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProtoWithServerContext(config, "stats", context);
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
+  cb(filter_callback);
+}
+
 } // namespace
 } // namespace BufferFilter
 } // namespace HttpFilters
