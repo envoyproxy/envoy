@@ -197,6 +197,23 @@ build:test-coverage --test_arg="-l trace"
 build:test-coverage --test_arg="--log-path /dev/null"
 build:test-coverage --test_tag_filters=-nocoverage,-fuzz_target
 
+
+#############################################################################
+# SSL Library Selection
+#############################################################################
+
+# BoringSSL FIPS
+build:boringssl-fips --//bazel:ssl=@boringssl_fips//:ssl
+build:boringssl-fips --//bazel:crypto=@boringssl_fips//:crypto
+build:boringssl-fips --//bazel:fips=True
+
+# AWS-LC FIPS
+build:aws-lc-fips --//bazel:ssl=@aws_lc//:ssl
+build:aws-lc-fips --//bazel:crypto=@aws_lc//:crypto
+build:aws-lc-fips --//bazel:fips=True
+build:aws-lc-fips --//bazel:http3=False
+
+
 ## Compile-time-options testing
 # Right now, none of the available compile-time options conflict with each other. If this
 # changes, this build type may need to be broken up.
@@ -204,7 +221,7 @@ build:compile-time-options --define=admin_html=disabled
 build:compile-time-options --define=signal_trace=disabled
 build:compile-time-options --define=hot_restart=disabled
 build:compile-time-options --define=google_grpc=disabled
-build:compile-time-options --define=boringssl=fips
+build:compile-time-options --config=boringssl-fips
 build:compile-time-options --define=log_debug_assert_in_release=enabled
 build:compile-time-options --define=path_normalization_by_default=true
 build:compile-time-options --define=deprecated_features=disabled

@@ -237,7 +237,7 @@ index 13a4714d4b..8664e99ffc 100644
 -        ":grpc_use_openssl_setting": "@openssl//:ssl",
 -        "//conditions:default": "@boringssl//:ssl",
 -    }),
-+    actual = "@envoy//bazel:boringssl",
++    actual = "@envoy//bazel:ssl",
      tags = ["manual"],
  )
  
@@ -247,7 +247,7 @@ index 13a4714d4b..8664e99ffc 100644
 -        ":grpc_use_openssl_setting": "@openssl//:crypto",
 -        "//conditions:default": "@boringssl//:crypto",
 -    }),
-+    actual = "@envoy//bazel:boringcrypto",
++    actual = "@envoy//bazel:crypto",
      tags = ["manual"],
  )
 
