@@ -27,7 +27,7 @@ envoy_cc_library(
         "verify.h",
     ],
     deps = [
-        "//bazel:boringssl",
+        "//bazel:ssl",
         "//source/common/protobuf",
         "@com_google_absl//absl/container:flat_hash_set",
         "@com_google_absl//absl/strings",
