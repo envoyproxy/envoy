@@ -14,7 +14,7 @@ limitations under the License.
 ==============================================================================*/
 
 //
-// Tests fo SimpleLRUCache
+// Tests for SimpleLRUCache
 
 #include "source/common/jwt/simple_lru_cache.h"
 

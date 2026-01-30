@@ -50,7 +50,7 @@ TEST(VerifyExpTest, BothNbfExp) {
 
   // 10s after nbf
   EXPECT_EQ(jwt.verifyTimeConstraint(NbfTime - kClockSkewInSecond + 10), Status::Ok);
-  // 10s befoe nbf
+  // 10s before nbf
   EXPECT_EQ(jwt.verifyTimeConstraint(NbfTime - kClockSkewInSecond - 10), Status::JwtNotYetValid);
 }
 
@@ -67,7 +67,7 @@ TEST(VerifyExpTest, BothNbfExpWithCustomClockSkew) {
 
   // 10s after nbf
   EXPECT_EQ(jwt.verifyTimeConstraint(NbfTime - kCustomClockSkew + 1, kCustomClockSkew), Status::Ok);
-  // 10s befoe nbf
+  // 10s before nbf
   EXPECT_EQ(jwt.verifyTimeConstraint(NbfTime - kCustomClockSkew - 1, kCustomClockSkew),
             Status::JwtNotYetValid);
 }
@@ -98,7 +98,7 @@ TEST(VerifyExpTest, OnlyNbf) {
 
   // 10s after nbf
   EXPECT_EQ(jwt.verifyTimeConstraint(NbfTime - kClockSkewInSecond + 10), Status::Ok);
-  // 10s befoe nbf
+  // 10s before nbf
   EXPECT_EQ(jwt.verifyTimeConstraint(NbfTime - kClockSkewInSecond - 10), Status::JwtNotYetValid);
 }
 
