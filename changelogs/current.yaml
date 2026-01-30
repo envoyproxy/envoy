@@ -95,6 +95,11 @@ new_features:
     Added support for fetching certificates on-demand via SDS in the upstream TLS transport socket
     using the extension :ref:`on-demand certificate selector
     <extension_envoy.tls.certificate_selectors.on_demand_secret>`.
+- area: dynamic modules
+  change: |
+    Relaxed the version check for dynamic modules to allow loading modules built with one minor
+    version lower than the running Envoy binary in the next Envoy minor release. For example,
+    Envoy 1.38.x can now load modules built with Envoy 1.39.y.
 - area: mcp_router
   change: |
     Added support for MCP resource methods ``resources/list``, ``resources/read``,
