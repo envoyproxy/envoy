@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/api/api.h"
 #include "envoy/common/random_generator.h"
 #include "envoy/config/core/v3/base.pb.h"
@@ -88,9 +90,10 @@ public:
   DynamicData(const ProtoDataSource& source, Event::Dispatcher& main_dispatcher,
               ThreadLocal::SlotAllocator& tls, Api::Api& api,
               DataTransform<DataType> data_transform_cb, const ProviderOptions& options,
-              std::shared_ptr<DataType> initial_data, uint64_t hash, absl::Status& creation_status)
+              std::shared_ptr<DataType> initial_data, uint64_t initial_hash,
+              absl::AnyInvocable<void()> cleanup, absl::Status& creation_status)
       : dispatcher_(main_dispatcher), api_(api), options_(options), filename_(source.filename()),
-        data_transform_(data_transform_cb), hash_(hash) {
+        data_transform_(data_transform_cb), hash_(initial_hash), cleanup_(std::move(cleanup)) {
     slot_ =
         ThreadLocal::TypedSlot<typename DynamicData<DataType>::ThreadLocalData>::makeUnique(tls);
     slot_->set([initial_data = std::move(initial_data)](Event::Dispatcher&) {
@@ -113,13 +116,22 @@ public:
           creation_status);
     }
   }
+
   ~DynamicData() {
     if (!dispatcher_.isThreadSafe()) {
-      dispatcher_.post([to_delete = std::move(slot_)] {});
+      dispatcher_.post([to_delete = std::move(slot_), cleanup = std::move(cleanup_)]() mutable {
+        if (cleanup) {
+          cleanup();
+        }
+      });
+    } else {
+      if (cleanup_) {
+        cleanup_();
+      }
     }
   }
 
-  const std::shared_ptr<DataType> data() const {
+  std::shared_ptr<DataType> data() const {
     const auto thread_local_data = slot_->get();
     return thread_local_data.has_value() ? thread_local_data->data_ : nullptr;
   }
@@ -167,6 +179,7 @@ private:
   const std::string filename_;
   DataTransform<DataType> data_transform_;
   uint64_t hash_;
+  absl::AnyInvocable<void()> cleanup_;
   ThreadLocal::TypedSlotPtr<ThreadLocalData> slot_;
   WatchedDirectoryPtr watcher_;
   Filesystem::WatcherPtr modify_watcher_;
@@ -211,7 +224,7 @@ public:
   static absl::StatusOr<DataSourceProviderPtr<DataType>>
   create(const ProtoDataSource& source, Event::Dispatcher& main_dispatcher,
          ThreadLocal::SlotAllocator& tls, Api::Api& api, DataTransform<DataType> data_transform_cb,
-         const ProviderOptions& options) {
+         const ProviderOptions& options, absl::AnyInvocable<void()> cleanup = {}) {
     uint64_t max_size = options.max_size;
     auto initial_data_or_error = read(source, options.allow_empty, api, max_size);
     RETURN_IF_NOT_OK_REF(initial_data_or_error.status());
@@ -235,26 +248,27 @@ public:
     absl::Status creation_status = absl::OkStatus();
     const uint64_t hash = options.hash_content ? HashUtil::xxHash64(*initial_data_or_error) : 0;
     auto ret = std::unique_ptr<DataSourceProvider>(new DataSourceProvider<DataType>(
-        source, main_dispatcher, tls, api, data_transform_cb, options,
-        std::move(transformed_data_or_error).value(), hash, creation_status));
+        std::make_unique<DynamicData<DataType>>(source, main_dispatcher, tls, api,
+                                                data_transform_cb, options,
+                                                std::move(transformed_data_or_error).value(), hash,
+                                                std::move(cleanup), creation_status)));
     RETURN_IF_NOT_OK(creation_status);
     return std::move(ret);
   }
 
-  const std::shared_ptr<DataType> data() const {
+  std::shared_ptr<DataType> data() const {
     if (absl::holds_alternative<std::shared_ptr<DataType>>(data_)) {
       return absl::get<std::shared_ptr<DataType>>(data_);
     }
-    return absl::get<DynamicData<DataType>>(data_).data();
+    return absl::get<std::unique_ptr<DynamicData<DataType>>>(data_)->data();
   }
 
   DataSourceProvider(DataType&& data) : data_(std::make_shared<DataType>(std::move(data))) {}
   template <class... Args>
-  DataSourceProvider(Args&&... args)
-      : data_(absl::in_place_index<1>, std::forward<Args>(args)...) {}
+  DataSourceProvider(std::unique_ptr<DynamicData<DataType>> data) : data_(std::move(data)) {}
 
 private:
-  absl::variant<std::shared_ptr<DataType>, DynamicData<DataType>> data_;
+  absl::variant<std::shared_ptr<DataType>, std::unique_ptr<DynamicData<DataType>>> data_;
 };
 
 /**
@@ -263,7 +277,9 @@ private:
  * are created on-demand. This singleton reduces the resource pressure on the file watchers
  * and storage needed by the data type.
  */
-template <class DataType> class ProviderSingleton : public Singleton::Instance {
+template <class DataType>
+class ProviderSingleton : public Singleton::Instance,
+                          public std::enable_shared_from_this<ProviderSingleton<DataType>> {
 public:
   ProviderSingleton(Event::Dispatcher& main_dispatcher, ThreadLocal::SlotAllocator& tls,
                     Api::Api& api, DataTransform<DataType> data_transform_cb,
@@ -285,8 +301,16 @@ public:
         return locked_provider;
       }
     }
-    auto provider_or_error = DataSourceProvider<DataType>::create(source, dispatcher_, tls_, api_,
-                                                                  data_transform_, options_);
+
+    // Cleanup is guaranteed to execute on the main dispatcher during destruction but may happen
+    // after the singleton is released.
+    auto provider_or_error = DataSourceProvider<DataType>::create(
+        source, dispatcher_, tls_, api_, data_transform_, options_,
+        [weak_this = this->weak_from_this(), config_hash] {
+          if (auto locked_this = weak_this.lock(); locked_this) {
+            locked_this->cleanup(config_hash);
+          }
+        });
     RETURN_IF_NOT_OK(provider_or_error.status());
     DataSourceProviderSharedPtr<DataType> new_provider = *std::move(provider_or_error);
     dynamic_providers_[config_hash] = new_provider;
@@ -294,6 +318,12 @@ public:
   }
 
 private:
+  void cleanup(size_t key) {
+    auto it = dynamic_providers_.find(key);
+    if (it != dynamic_providers_.end() && it->second.expired()) {
+      dynamic_providers_.erase(it);
+    }
+  }
   Event::Dispatcher& dispatcher_;
   ThreadLocal::SlotAllocator& tls_;
   Api::Api& api_;

@@ -853,60 +853,63 @@ TEST(DataSourceProviderTest, Singleton) {
   Api::ApiPtr api = Api::createApiForTest();
   Event::DispatcherPtr dispatcher = api->allocateDispatcher("test_thread");
   NiceMock<ThreadLocal::MockInstance> tls;
-  DataSource::ProviderSingleton<std::string> singleton(
+  auto singleton = std::make_shared<DataSource::ProviderSingleton<std::string>>(
       *dispatcher, tls, *api,
-      [&](absl::string_view data) { return std::make_shared<std::string>(data); }, {});
+      [&](absl::string_view data) { return std::make_shared<std::string>(data); },
+      DataSource::ProviderOptions{});
 
   TestEnvironment::createPath(TestEnvironment::temporaryPath("envoy_test"));
+  const std::string filename = "envoy_test/watched_file";
+  unlink(TestEnvironment::temporaryPath(filename).c_str());
+  {
+    std::ofstream file(TestEnvironment::temporaryPath(filename));
+    file << "Hello, world!";
+    file.close();
+  }
 
   {
     // Static sources should not share providers (even when using files).
     // This is needed to ensure that the file is reloaded when a data source is requested.
-    const std::string filename = "envoy_test/static_file";
-    unlink(TestEnvironment::temporaryPath(filename).c_str());
     envoy::config::core::v3::DataSource config;
     const std::string yaml = fmt::format(R"EOF(
       filename: "{}"
     )EOF",
                                          TestEnvironment::temporaryPath(filename));
     TestUtility::loadFromYamlAndValidate(yaml, config);
-    {
-      std::ofstream file(TestEnvironment::temporaryPath(filename));
-      file << "Hello, world!";
-      file.close();
-    }
-    auto provider1 = singleton.getOrCreate(config);
+    auto provider1 = singleton->getOrCreate(config);
     EXPECT_TRUE(provider1.ok());
-    auto provider2 = singleton.getOrCreate(config);
+    auto provider2 = singleton->getOrCreate(config);
     EXPECT_TRUE(provider2.ok());
     EXPECT_NE(provider1->get(), provider2->get());
   }
 
+  envoy::config::core::v3::DataSource config;
+  const std::string yaml = fmt::format(R"EOF(
+    filename: "{}"
+    watched_directory:
+      path: "{}"
+  )EOF",
+                                       TestEnvironment::temporaryPath(filename),
+                                       TestEnvironment::temporaryPath("envoy_test"));
+  TestUtility::loadFromYamlAndValidate(yaml, config);
+
   {
     // Dynamic sources should share providers.
-    const std::string filename = "envoy_test/watched_file";
-    unlink(TestEnvironment::temporaryPath(filename).c_str());
-    envoy::config::core::v3::DataSource config;
-    const std::string yaml = fmt::format(R"EOF(
-      filename: "{}"
-      watched_directory:
-        path: "{}"
-    )EOF",
-                                         TestEnvironment::temporaryPath(filename),
-                                         TestEnvironment::temporaryPath("envoy_test"));
-    TestUtility::loadFromYamlAndValidate(yaml, config);
-    {
-      std::ofstream file(TestEnvironment::temporaryPath(filename));
-      file << "Hello, world!";
-      file.close();
-    }
-
-    auto provider1 = singleton.getOrCreate(config);
+    auto provider1 = singleton->getOrCreate(config);
     EXPECT_TRUE(provider1.ok());
-    auto provider2 = singleton.getOrCreate(config);
+    auto provider2 = singleton->getOrCreate(config);
     EXPECT_TRUE(provider2.ok());
     EXPECT_EQ(provider1->get(), provider2->get());
+    provider1->reset();
+    provider2->reset();
   }
+
+  // Destruction of the singleton is handled correctly.
+  auto provider = singleton->getOrCreate(config);
+  EXPECT_TRUE(provider.ok());
+  singleton.reset();
+  unlink(TestEnvironment::temporaryPath(filename).c_str());
+  provider->reset();
 }
 
 } // namespace
