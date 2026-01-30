@@ -46,7 +46,7 @@ message JsonContentParser {
     //   to avoid unnecessary processing of subsequent content.
     //
     // - If set to N > 1: Reserved for future use (e.g., aggregating multiple values).
-    //   Currently behaves the same as N=1 (extract-and-overwrite N times, then stop).
+    //   Values > 1 are currently rejected to prevent behavioral changes when this feature is implemented.
     //
     // Example use cases:
     //
@@ -55,7 +55,7 @@ message JsonContentParser {
     //
     // - Extract token usage from final content: ``stop_processing_after_matches: 0``
     //   (Processes all content items, extracts value from the last one that contains it)
-    uint32 stop_processing_after_matches = 2;
+    uint32 stop_processing_after_matches = 2 [(validate.rules).uint32 = {lte: 1}];
   }
 
   // The rules to apply for extracting values from JSON content.
