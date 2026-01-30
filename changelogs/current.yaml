@@ -11,6 +11,12 @@ behavior_changes:
     other than ``IMMEDIATE`` (i.e., ``ON_DOWNSTREAM_DATA`` or ``ON_DOWNSTREAM_TLS_HANDSHAKE``). The field
     can be set to ``0`` to disable early data buffering while still using delayed connection modes.
     Configurations using these modes without ``max_early_data_bytes`` will now fail validation at startup.
+- area: on_demand
+  change: |
+    The on_demand filter, when doing On Demand CDS, will no longer do internal redirects after CDS is
+    successful. Filters appearing in the filter chain before the On Demand Filter will no longer be
+    invoked twice. This behavior can be temporarily reverted by setting the runtime guard
+    ``envoy.reloadable_features.on_demand_cluster_no_recreate_stream`` to ``false``.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -46,6 +52,9 @@ bug_fixes:
     request header mutations. Previously, only the deprecated ``append`` boolean was checked. Now
     ``APPEND_IF_EXISTS_OR_ADD``, ``ADD_IF_ABSENT``, ``OVERWRITE_IF_EXISTS``, and ``OVERWRITE_IF_EXISTS_OR_ADD``
     actions are fully supported, providing parity with ``response_headers_to_add`` handling.
+- area: load_report
+  change: |
+    Fixed an issue upon load-report shutdown race with ADS stream. Introduced proper cleanup of the gRPC stream.
 - area: http
   change: |
     Fixed a potential file descriptor leak where HTTP/1.1 connections with zombie streams (waiting for codec

@@ -953,13 +953,7 @@ io_vectorscan:
   - envoy.regex_engines.hyperscan
   license: "BSD-3-Clause"
   license_url: "https://github.com/VectorCamp/vectorscan/blob/vectorscan/{version}/LICENSE"
-kafka_server_binary:
-  project_name: "Kafka (server binary)"
-  project_desc: "Open-source distributed event streaming platform"
-  project_url: "https://kafka.apache.org"
-  release_date: "2025-05-19"
-  use_category:
-  - test_only
+
 kafka_source:
   project_name: "Kafka (source)"
   project_desc: "Open-source distributed event streaming platform"

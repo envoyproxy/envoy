@@ -44,7 +44,7 @@ public:
   ~FileSharedImpl() override = default;
 
   bool isOpen() const override;
-  std::string path() const override;
+  absl::string_view path() const override;
   DestinationType destinationType() const override;
 
 protected:
