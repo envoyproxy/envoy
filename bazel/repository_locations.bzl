@@ -248,7 +248,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "LuaJIT-{version}",
         urls = ["https://github.com/LuaJIT/LuaJIT/archive/{version}.tar.gz"],
     ),
-    com_github_luajit2_luajit2 = dict(
+    com_github_openresty_luajit2 = dict(
         version = "dcc9c9ee67e1a5d3d636bd7745e95ddb4a1c70bc",
         sha256 = "1e2374ac75618862d8c81bd5fc496fa7428c278164ad375a3e6b746e8833c0d2",
         strip_prefix = "luajit2-{version}",

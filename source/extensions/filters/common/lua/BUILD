@@ -12,14 +12,14 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 bool_flag(
-    name = "luajit2",
+    name = "openresty-luajit2",
     build_setting_default = False,
 )
 
 config_setting(
-    name = "with_luajit2",
+    name = "with_openresty_luajit2",
     flag_values = {
-        ":luajit2": "True",
+        ":openresty-luajit2": "True",
     },
 )
 
@@ -35,7 +35,7 @@ envoy_cc_library(
         "//source/common/common:thread_lib",
         "//source/common/protobuf",
     ] + select({
-        ":with_luajit2": ["//bazel/foreign_cc:luajit2"],
+        ":with_openresty_luajit2": ["//bazel/foreign_cc:openresty-luajit2"],
         "//conditions:default": ["//bazel/foreign_cc:luajit"],
     }),
 )
@@ -63,7 +63,7 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "@com_google_absl//absl/strings",
     ] + select({
-        ":with_luajit2": ["//bazel/foreign_cc:luajit2"],
+        ":with_openresty_luajit2": ["//bazel/foreign_cc:openresty-luajit2"],
         "//conditions:default": ["//bazel/foreign_cc:luajit"],
     }),
 )

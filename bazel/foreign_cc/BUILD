@@ -123,7 +123,7 @@ configure_make(
 )
 
 configure_make(
-    name = "luajit2",
+    name = "openresty-luajit2",
     configure_command = "build.py",
     env = select({
         # This shouldn't be needed! See
@@ -133,7 +133,7 @@ configure_make(
         "//bazel:msan_build": {"ENVOY_CONFIG_MSAN": "1"},
         "//conditions:default": {},
     }),
-    lib_source = "@com_github_luajit2_luajit2//:all",
+    lib_source = "@com_github_openresty_luajit2//:all",
     out_include_dir = "include/luajit-2.1",
     out_static_libs = ["libluajit-5.1.a"],
     tags = ["skip_on_windows"],
