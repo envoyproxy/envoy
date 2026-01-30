@@ -253,6 +253,7 @@ HDS
 HMAC
 HOL
 HPACK
+HRW
 HTAB
 HTML
 HTTP
@@ -1585,6 +1586,7 @@ xform
 xhtml
 xid
 xmodem
+xorshift
 xxhash
 xxs
 xyz

@@ -35,7 +35,7 @@ public:
 };
 
 /**
- * Implementation of Rendezvous Hashing (also known as Highest Random Weight or HRW).
+ * Implement Rendezvous Hashing (also known as Highest Random Weight or HRW).
  *
  * Rendezvous hashing works by computing a score for each host for a given key, and selecting
  * the host with the highest score. The score is computed using the weighted rendezvous hashing
@@ -89,7 +89,8 @@ private:
   private:
     /**
      * Computes the rendezvous hash score for the given key and host.
-     * Uses the formula: -weight / ln(normalizedHash(xorshiftMult64(key ^ host_hash)))
+     * Uses the formula from https://www.snia.org/sites/default/files/SDC15_presentations/dist_sys/Jason_Resch_New_Consistent_Hashings_Rev.pdf
+     * to maintain minimal disruption guarantee of rendezvous hashing.
      */
     static double computeScore(uint64_t key, uint64_t host_hash, double weight);
 
