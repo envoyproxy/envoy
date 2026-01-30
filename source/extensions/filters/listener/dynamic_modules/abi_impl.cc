@@ -8,7 +8,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/common/stats/utility.h"
-#include "source/extensions/dynamic_modules/abi.h"
+#include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/filters/listener/dynamic_modules/filter.h"
 #include "source/extensions/filters/listener/dynamic_modules/filter_config.h"
 
@@ -791,6 +791,16 @@ void envoy_dynamic_module_callback_listener_filter_config_scheduler_commit(
     uint64_t event_id) {
   auto* scheduler = static_cast<DynamicModuleListenerFilterConfigScheduler*>(scheduler_module_ptr);
   scheduler->commit(event_id);
+}
+
+// -----------------------------------------------------------------------------
+// Misc ABI Callbacks
+// -----------------------------------------------------------------------------
+
+uint32_t envoy_dynamic_module_callback_listener_filter_get_worker_index(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr) {
+  auto filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  return filter->workerIndex();
 }
 
 } // extern "C"

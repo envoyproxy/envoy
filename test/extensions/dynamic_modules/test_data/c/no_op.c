@@ -1,7 +1,7 @@
 #include <assert.h>
 
-#include "source/extensions/dynamic_modules/abi.h"
-#include "source/extensions/dynamic_modules/abi_version.h"
+#include "source/extensions/dynamic_modules/abi/abi.h"
+#include "source/extensions/dynamic_modules/abi/abi_version.h"
 
 static int some_variable = 0;
 static int current_load_id = 0;
@@ -110,6 +110,14 @@ void envoy_dynamic_module_on_http_filter_downstream_above_write_buffer_high_wate
 void envoy_dynamic_module_on_http_filter_downstream_below_write_buffer_low_watermark(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr) {}
+
+envoy_dynamic_module_type_on_http_filter_local_reply_status
+envoy_dynamic_module_on_http_filter_local_reply(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr, uint32_t response_code,
+    envoy_dynamic_module_type_envoy_buffer details, bool reset_imminent) {
+  return envoy_dynamic_module_type_on_http_filter_local_reply_status_Continue;
+}
 
 void envoy_dynamic_module_on_http_filter_http_stream_headers(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,

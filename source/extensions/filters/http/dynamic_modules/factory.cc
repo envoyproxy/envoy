@@ -7,9 +7,9 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-absl::StatusOr<Http::FilterFactoryCb> DynamicModuleConfigFactory::createFilterFactoryFromProtoTyped(
-    const FilterConfig& proto_config, const std::string&, DualInfo dual_info,
-    Server::Configuration::ServerFactoryContext& context) {
+absl::StatusOr<Http::FilterFactoryCb> DynamicModuleConfigFactory::createFilterFactory(
+    const FilterConfig& proto_config, const std::string&,
+    Server::Configuration::ServerFactoryContext& context, Stats::Scope& scope) {
 
   const auto& module_config = proto_config.dynamic_module_config();
   auto dynamic_module = Extensions::DynamicModules::newDynamicModuleByName(
@@ -30,7 +30,7 @@ absl::StatusOr<Http::FilterFactoryCb> DynamicModuleConfigFactory::createFilterFa
       filter_config =
           Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
               proto_config.filter_name(), config, proto_config.terminal_filter(),
-              std::move(dynamic_module.value()), dual_info.scope, context);
+              std::move(dynamic_module.value()), scope, context);
 
   if (!filter_config.ok()) {
     return absl::InvalidArgumentError("Failed to create filter config: " +
@@ -41,12 +41,28 @@ absl::StatusOr<Http::FilterFactoryCb> DynamicModuleConfigFactory::createFilterFa
       Extensions::DynamicModules::HttpFilters::CustomStatNamespace);
 
   return [config = filter_config.value()](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    const std::string& worker_name = callbacks.dispatcher().name();
+    auto pos = worker_name.find_first_of('_');
+    ENVOY_BUG(pos != std::string::npos, "worker name is not in expected format worker_{index}");
+    uint32_t worker_index;
+    if (!absl::SimpleAtoi(worker_name.substr(pos + 1), &worker_index)) {
+      IS_ENVOY_BUG("failed to parse worker index from name");
+    }
     auto filter =
         std::make_shared<Envoy::Extensions::DynamicModules::HttpFilters::DynamicModuleHttpFilter>(
-            config, config->stats_scope_->symbolTable());
+            config, config->stats_scope_->symbolTable(), worker_index);
     filter->initializeInModuleFilter();
     callbacks.addStreamFilter(filter);
   };
+}
+
+Envoy::Http::FilterFactoryCb
+DynamicModuleConfigFactory::createFilterFactoryFromProtoWithServerContextTyped(
+    const FilterConfig& proto_config, const std::string& stat_prefix,
+    Server::Configuration::ServerFactoryContext& context) {
+  auto cb_or_error = createFilterFactory(proto_config, stat_prefix, context, context.scope());
+  THROW_IF_NOT_OK_REF(cb_or_error.status());
+  return cb_or_error.value();
 }
 
 absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>

@@ -16,6 +16,8 @@ static LOG_COUNT: AtomicU32 = AtomicU32::new(0);
 static FLUSH_COUNT: AtomicU32 = AtomicU32::new(0);
 
 fn init() -> bool {
+  let concurrency = unsafe { get_server_concurrency() };
+  assert_eq!(concurrency, 1);
   true
 }
 
@@ -46,7 +48,14 @@ impl AccessLoggerConfig for TestAccessLoggerConfig {
     })
   }
 
-  fn create_logger(&self, metrics: MetricsContext) -> Box<dyn AccessLogger> {
+  fn create_logger(
+    &self,
+    metrics: MetricsContext,
+    logger_envoy_ptr: *mut ::std::ffi::c_void,
+  ) -> Box<dyn AccessLogger> {
+    // Test worker id.
+    unsafe { abi::envoy_dynamic_module_callback_access_logger_get_worker_index(logger_envoy_ptr) };
+
     Box::new(TestAccessLogger {
       pending_logs: 0,
       log_counter: self.log_counter,
@@ -78,6 +87,10 @@ impl AccessLogger for TestAccessLogger {
     let _is_health_check = ctx.is_health_check();
     let _timing = ctx.timing_info();
     let _bytes = ctx.bytes_info();
+
+    // Test worker id.
+    let worker_id = ctx.get_worker_index();
+    assert_eq!(worker_id, 0);
   }
 
   fn flush(&mut self) {

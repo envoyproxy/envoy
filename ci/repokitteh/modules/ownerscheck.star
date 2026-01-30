@@ -233,8 +233,8 @@ def _reconcile_and_comment(config, assignees, sender):
 def _force_reconcile_and_comment(config, assignees, sender):
     _comment(config, _reconcile(config), assignees, sender, force = True)
 
-def _pr(action, config, assignees, sender):
-    if action in ["synchronize", "opened"]:
+def _pr(action, config, assignees, sender, draft):
+    if action in ["synchronize", "opened", "ready_for_review"] and not draft:
         _reconcile_and_comment(config, assignees, sender)
 
 def _pr_review(action, review_state, config):

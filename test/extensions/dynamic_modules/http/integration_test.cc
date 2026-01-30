@@ -2,13 +2,19 @@
 
 #include "source/common/common/base64.h"
 
+#include "test/extensions/dynamic_modules/util.h"
 #include "test/integration/http_integration.h"
 
 namespace Envoy {
-class DynamicModulesIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+
+class DynamicModulesIntegrationTest : public testing::TestWithParam<std::string>,
                                       public HttpIntegrationTest {
 public:
-  DynamicModulesIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, GetParam()) {
+  // To reduce tests, we use v4 for Rust tests and v6 for C++ and Golang tests.
+  DynamicModulesIntegrationTest()
+      : HttpIntegrationTest(Http::CodecType::HTTP2, GetParam() == "Rust"
+                                                        ? Envoy::Network::Address::IpVersion::v4
+                                                        : Envoy::Network::Address::IpVersion::v6) {
     setUpstreamProtocol(Http::CodecType::HTTP2);
   };
 
@@ -19,9 +25,10 @@ public:
                    bool upstream_filter = false) {
     TestEnvironment::setEnvVar(
         "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
-        TestEnvironment::substitute(
-            "{{ test_rundir }}/test/extensions/dynamic_modules/test_data/rust"),
+        TestEnvironment::substitute("{{ test_rundir }}/test/extensions/dynamic_modules/test_data/" +
+                                    GetParam()),
         1);
+    TestEnvironment::setEnvVar("GODEBUG", "cgocheck=0", 1);
 
     constexpr auto filter_config = R"EOF(
 name: envoy.extensions.filters.http.dynamic_modules
@@ -120,9 +127,17 @@ filter_config:
   }
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, DynamicModulesIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
+#ifndef __SANITIZE_ADDRESS__
+// TODO(wbpcode): address sanitizer cannot handle the cross shared libraries vptr casts.
+// and we need to figure out a way to fix it.
+auto DynamicModulesIntegrationTestValues = testing::Values("rust", "go", "cpp");
+#else
+auto DynamicModulesIntegrationTestValues = testing::Values("rust", "go");
+#endif
+
+INSTANTIATE_TEST_SUITE_P(
+    IpVersions, DynamicModulesIntegrationTest, DynamicModulesIntegrationTestValues,
+    Extensions::DynamicModules::DynamicModuleTestLanguages::languageParamToTestName);
 
 TEST_P(DynamicModulesIntegrationTest, PassThrough) {
   initializeFilter("passthrough");
@@ -827,6 +842,47 @@ TEST_P(DynamicModulesIntegrationTest, ConfigScheduler) {
     absl::SleepFor(absl::Milliseconds(100));
   }
   FAIL() << "Config was not updated in time";
+}
+
+// Test buffer limit callbacks for non-terminal filters.
+TEST_P(DynamicModulesIntegrationTest, BufferLimitFilter) {
+  // TODO(wbpcode): Enable this test for other SDKs when supported.
+  if (GetParam() != "rust") {
+    // Buffer limit callbacks are only supported in the Rust SDK currently.
+    return;
+  }
+
+  initializeFilter("buffer_limit_filter");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+
+  // Verify the buffer limit headers were set by the filter.
+  auto initial_limit_header =
+      response->headers().get(Http::LowerCaseString("x-initial-buffer-limit"));
+  ASSERT_FALSE(initial_limit_header.empty());
+  uint64_t initial_limit;
+  EXPECT_TRUE(absl::SimpleAtoi(initial_limit_header[0]->value().getStringView(), &initial_limit));
+
+  auto current_limit_header =
+      response->headers().get(Http::LowerCaseString("x-current-buffer-limit"));
+  ASSERT_FALSE(current_limit_header.empty());
+  uint64_t current_limit;
+  EXPECT_TRUE(absl::SimpleAtoi(current_limit_header[0]->value().getStringView(), &current_limit));
+
+  // The filter should have either kept the existing limit (if already >= 65536) or increased it.
+  // The default buffer limit in Envoy is 16MB (16777216), so the filter should have kept it.
+  EXPECT_GE(current_limit, 65536);
+  // The initial and current limits should be the same if initial was already >= 65536.
+  if (initial_limit >= 65536) {
+    EXPECT_EQ(current_limit, initial_limit);
+  } else {
+    EXPECT_EQ(current_limit, 65536);
+  }
 }
 
 } // namespace Envoy
