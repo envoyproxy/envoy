@@ -36,6 +36,7 @@ public:
   LoadStatsReporter(const LocalInfo::LocalInfo& local_info, ClusterManager& cluster_manager,
                     Stats::Scope& scope, Grpc::RawAsyncClientSharedPtr&& async_client,
                     Event::Dispatcher& dispatcher);
+  virtual ~LoadStatsReporter();
 
   // Grpc::AsyncStreamCallbacks
   void onCreateInitialMetadata(Http::RequestHeaderMap& metadata) override;
