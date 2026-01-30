@@ -36,7 +36,7 @@
 // When bumping the version, make sure move the previous version to
 // ENVOY_DYNAMIC_MODULES_PREVIOUS_ABI_VERSION.
 //
-// Note(internal): We could use the Envoy's version such as "v1.38.0" here, there are serveral
+// Note(internal): We could use the Envoy's version such as "v1.38.0" here, there are several
 // reasons as to why we use a static version string instead:
 // 1. Envoy's version is generated at the build time of Envoy while we need to make it available for
 // SDK downstream users.
