@@ -24,9 +24,7 @@ using FilterChainConfigProtoPerRoute =
 #define COMMON_FILTER_CHAIN_STATS(COUNTER)                                                         \
   COUNTER(no_route)                                                                                \
   COUNTER(no_route_filter_config)                                                                  \
-  COUNTER(no_matched_filter_chain)                                                                 \
   COUNTER(use_route_filter_chain)                                                                  \
-  COUNTER(use_named_filter_chain)                                                                  \
   COUNTER(use_default_filter_chain)                                                                \
   COUNTER(pass_through)
 
@@ -83,13 +81,6 @@ public:
                     Server::Configuration::FactoryContext& context,
                     const std::string& stats_prefix);
 
-  OptRef<const FilterChain> filterChain(absl::string_view name) const {
-    if (auto it = named_filter_chains_.find(name); it != named_filter_chains_.end()) {
-      return makeOptRefFromPtr(it->second.get());
-    }
-    return {};
-  }
-
   OptRef<const FilterChain> filterChain() const {
     return makeOptRefFromPtr(default_filter_chain_.get());
   }
@@ -103,7 +94,6 @@ private:
   }
 
   FilterChainConstSharedPtr default_filter_chain_;
-  absl::flat_hash_map<std::string, FilterChainConstSharedPtr> named_filter_chains_;
   FilterChainStats stats_;
 };
 

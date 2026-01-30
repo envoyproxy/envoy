@@ -28,12 +28,6 @@ OptRef<const FilterChain> routeLevelFilterChain(FilterChainConfig& filter_chain_
     filter_chain_config.stats().use_route_filter_chain_.inc();
     return chain;
   }
-  if (auto chain = filter_chain_config.filterChain(per_route_config->filterChainName());
-      chain.has_value()) {
-    filter_chain_config.stats().use_named_filter_chain_.inc();
-    return chain;
-  }
-  filter_chain_config.stats().no_matched_filter_chain_.inc();
   return {};
 }
 

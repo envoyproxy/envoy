@@ -20,24 +20,11 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Filter-level configuration for the filter chain filter. This filter acts as a wrapper
 // that applies a configurable chain of HTTP filters to incoming requests.
 message FilterChainConfig {
-  // Default filter chain applied when no route level filter chain is specified
-  // or when the route level filter chain name does not match any named filter chains in the
-  // :ref:`filter chains map
-  // <envoy_v3_api_field_extensions.filters.http.filter_chain.v3.FilterChainConfig.filter_chains>`.
+  // Default filter chain applied when no route level filter chain is specified.
   //
   // This field is optional. If not specified and no route-level configuration matches,
   // the filter will pass through without applying any additional filters.
   FilterChain filter_chain = 1;
-
-  // Map of named filter chains. The key is an arbitrary name assigned to the filter chain.
-  // These named filter chains can be referenced by the per-route configuration using
-  // the :ref:`filter_chain_name
-  // <envoy_v3_api_field_extensions.filters.http.filter_chain.v3.FilterChainConfigPerRoute.filter_chain_name>`.
-  //
-  // When Envoy initializing the filter chain for incoming requests, this special wrapper filter
-  // will look up the appropriate filter chain from this map based on the route configuration and
-  // apply the corresponding filters.
-  map<string, FilterChain> filter_chains = 2;
 }
 
 // Per-route configuration for the filter chain filter. This allows different filter chains
@@ -52,26 +39,10 @@ message FilterChainConfigPerRoute {
   // Filter chain to be applied on current route.
   //
   // .. note::
-  //   Not all HTTP filters are compatible to be used within this route level filter chain.
-  //   If one filter is not compatible and you attempt to use it, please configure the filter
-  //   at the :ref:`filter chains map
-  //   <envoy_v3_api_field_extensions.filters.http.filter_chain.v3.FilterChainConfig.filter_chains>`
-  //   and reference it by using ``filter_chain_name`` instead.
+  //   Not all HTTP filters are compatible to be used within this route level filter chain
+  //   for now.
   //
-  // One and only one of ``filter_chain`` or ``filter_chain_name`` SHOULD be specified.
-  FilterChain filter_chain = 1;
-
-  // Name of the filter chain to be applied on this route. This name should match
-  // one of the names defined in the
-  // :ref:`filter chains map
-  // <envoy_v3_api_field_extensions.filters.http.filter_chain.v3.FilterChainConfig.filter_chains>`. If no name
-  // matches, the :ref:`default filter chain
-  // <envoy_v3_api_field_extensions.filters.http.filter_chain.v3.FilterChainConfig.filter_chain>` will be used.
-  // If even the default filter chain is not defined, the filter will pass through without applying
-  // any additional filters.
-  //
-  // One and only one of ``filter_chain`` or ``filter_chain_name`` SHOULD be specified.
-  string filter_chain_name = 2;
+  FilterChain filter_chain = 1 [(validate.rules).message = {required: true}];
 }
 
 // A filter chain is a list of HTTP filters that are applied in order.
@@ -93,5 +64,5 @@ message FilterChain {
   //
   // [#extension-category: envoy.filters.http]
   repeated config.core.v3.TypedExtensionConfig filters = 1
-      [(validate.rules).repeated = {min_items: 1}];
+  [(validate.rules).repeated = {min_items: 1}];
 }
