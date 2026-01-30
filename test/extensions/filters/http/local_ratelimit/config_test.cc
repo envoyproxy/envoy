@@ -425,7 +425,8 @@ stat_prefix: test
 
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
-  auto callback = factory.createFilterFactoryFromProtoWithServerContext(*proto_config, "stats", context);
+  auto callback =
+      factory.createFilterFactoryFromProtoWithServerContext(*proto_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   callback(filter_callback);

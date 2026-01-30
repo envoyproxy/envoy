@@ -23,7 +23,8 @@ Http::FilterFactoryCb LocalRateLimitFilterConfig::createFilterFactoryFromProtoTy
   };
 }
 
-Http::FilterFactoryCb LocalRateLimitFilterConfig::createFilterFactoryFromProtoWithServerContextTyped(
+Http::FilterFactoryCb
+LocalRateLimitFilterConfig::createFilterFactoryFromProtoWithServerContextTyped(
     const envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit& proto_config,
     const std::string&, Server::Configuration::ServerFactoryContext& context) {
 
