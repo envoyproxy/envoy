@@ -207,7 +207,7 @@ MultiplexedActiveClientBase::maxStreamsPerConnection(uint32_t max_streams_config
               Extensions::Upstreams::Http::EpSpecificProtocolOptionsConfigImpl>(
               "envoy.extensions.upstreams.http.v3.EndpointSpecificHttpProtocolOptions");
 
-  if (ep_specific_protocol_options != nullptr) {
+  if (ep_specific_protocol_options != nullptr && host->metadata() != nullptr) {
     for (const auto& ep_option : ep_specific_protocol_options->compiledOptions()) {
       // Check if the metadata matcher matches this endpoint's metadata
       if (ep_option.metadata_matcher.has_value() &&
