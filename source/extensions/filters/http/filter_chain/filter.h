@@ -63,11 +63,9 @@ public:
                             const std::string& stats_prefix, absl::Status& creation_status);
 
   OptRef<const FilterChain> filterChain() const { return makeOptRefFromPtr(filter_chain_.get()); }
-  absl::string_view filterChainName() const { return filter_chain_name_; }
 
 private:
   FilterChainConstSharedPtr filter_chain_;
-  std::string filter_chain_name_;
 };
 
 using FilterChainPerRouteConfigConstSharedPtr = std::shared_ptr<const FilterChainPerRouteConfig>;
