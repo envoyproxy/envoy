@@ -98,9 +98,10 @@ message Config {
   // values, and are useful for tracking concurrency or other mutable values
   // over time.
   //
-  // The ``operation`` field determines how the gauge is modified.
-  // Using the ``set`` operation is straightforward and self-explanatory.
-  // The following example demonstrates how to use an ``add_subtract`` pair to
+  // The `operations` field determines how the gauge is modified based on the
+  // access log type.
+  // Using the `SET` operation is straightforward and self-explanatory.
+  // The following example demonstrates how to use an `ADD/SUBTRACT` pair to
   // track a gauge by configuring a single stats access logger:
   //
   // .. code-block:: yaml
@@ -114,10 +115,11 @@ message Config {
   //         gauges:
   //         - stat:
   //             name: "http_active_requests"
-  //           operation:
-  //             add_subtract:
-  //               add_at: DownstreamStart
-  //               subtract_at: DownstreamEnd
+  //           operations:
+  //           - log_type: DownstreamStart
+  //             operation_type: ADD
+  //           - log_type: DownstreamEnd
+  //             operation_type: SUBTRACT
   //           value_fixed: 1
   //
   // .. warning::
@@ -125,33 +127,30 @@ message Config {
   //   ADD/SUBTRACT/SET operations depend on the previous status. Please have an
   //   estimate on the cardinality of dynamic gauges introduced and keep in mind
   //   on the memory overhead.
+  //
+  // Usage restrictions:
+  // i). Only one ADD/SUBTRACT pair at most can be defined in the
+  // ``operations``. Add/Subtract not matched with the other isn't
+  // allowed.
+  // ii). During runtime, SUBTRACT will execute if and only ADD operation has
+  // been done, tracked by inflight counter in filter state.
   message Gauge {
-    // The operation to perform on the gauge.
-    // One of ``is_set_operation`` or ``increment_decrement`` must be
-    // configured.
+    // An operation to perform on the gauge.
     message Operation {
-      // The ADD/SUBTRACT pair operation.
-      // Both ``add_at`` and ``subtract_at`` must be configured with a
-      // corresponding ``AccessLogType`` pair. Subtraction is only performed if
-      // the addition was successful to prevent leaking.
-      message AddSubtract {
-        // The access log type to trigger the addition.
-        data.accesslog.v3.AccessLogType add_at = 1 [(validate.rules).enum = {defined_only: true}];
-
-        // The access log type to trigger the subtraction.
-        data.accesslog.v3.AccessLogType subtract_at = 2
-            [(validate.rules).enum = {defined_only: true}];
+      // The operation to perform on the gauge.
+      enum OperationType {
+        UNSPECIFIED = 0;
+        SET = 1;
+        ADD = 2;
+        SUBTRACT = 3;
       }
 
-      // The SET operation.
-      message Set {
-      }
+      // The access log type to trigger the operation.
+      envoy.data.accesslog.v3.AccessLogType log_type = 1
+          [(validate.rules).enum = {defined_only: true}];
 
-      // The SET operation to perform on the gauge.
-      Set set = 1;
-
-      // The increment/decrement to perform on the gauge.
-      AddSubtract add_subtract = 2;
+      // The operation to perform.
+      OperationType operation_type = 2 [(validate.rules).enum = {defined_only: true}];
     }
 
     // The name and tags of this gauge.
@@ -167,8 +166,8 @@ message Config {
     // One of ``value_format`` or ``value_fixed`` must be configured.
     google.protobuf.UInt64Value value_fixed = 3 [(validate.rules).uint64 = {gt: 0}];
 
-    // The operation to perform on the gauge.
-    Operation operation = 4 [(validate.rules).message = {required: true}];
+    // The collection of operations that define how the gauge is modified.
+    repeated Operation operations = 4;
   }
 
   // The stat prefix for the generated stats.

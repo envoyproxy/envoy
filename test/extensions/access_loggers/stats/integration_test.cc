@@ -190,10 +190,11 @@ TEST_P(StatsAccessLogIntegrationTest, ActiveRequestsGauge) {
                         - name: request_header_tag
                           value_format: '%REQUEST_HEADER(tag-value)%'
                     value_fixed: 1
-                    operation:
-                      add_subtract:
-                        add_at: DownstreamStart
-                        subtract_at: DownstreamEnd
+                    operations:
+                    - log_type: DownstreamStart
+                      operation_type: ADD
+                    - log_type: DownstreamEnd
+                      operation_type: SUBTRACT
 )EOF";
 
   init(config_yaml, /*autonomous_upstream=*/false,
@@ -222,6 +223,69 @@ TEST_P(StatsAccessLogIntegrationTest, ActiveRequestsGauge) {
   EXPECT_EQ(response->headers().getStatusValue(), "200");
 
   // After DownstreamEnd is logged, gauge should be 0.
+  test_server_->waitForGaugeEq("test_stat_prefix.active_requests.request_header_tag.my-tag", 0);
+}
+
+TEST_P(StatsAccessLogIntegrationTest, SubtractWithoutAdd) {
+  const std::string config_yaml = R"EOF(
+              name: envoy.access_loggers.stats
+              filter:
+                log_type_filter:
+                  types: [DownstreamEnd]
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.access_loggers.stats.v3.Config
+                stat_prefix: test_stat_prefix
+                gauges:
+                  - stat:
+                      name: active_requests
+                      tags:
+                        - name: request_header_tag
+                          value_format: '%REQUEST_HEADER(tag-value)%'
+                    value_fixed: 1
+                    operations:
+                    - log_type: DownstreamStart
+                      operation_type: ADD
+                    - log_type: DownstreamEnd
+                      operation_type: SUBTRACT
+)EOF";
+
+  init(config_yaml, /*autonomous_upstream=*/false,
+       /*flush_access_log_on_new_request=*/true);
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"},  {":authority", "envoyproxy.io"}, {":path", "/"},
+      {":scheme", "http"}, {"tag-value", "my-tag"},
+  };
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+
+  // Wait for upstream to receive request.
+  waitForNextUpstreamRequest();
+
+  // Since DownstreamStart is filtered out, gauge should be 0.
+  // Note: waitForGaugeEq waits for the gauge to exist and equal the value.
+  // If no stats are emitted yet, it might timeout or fail depending on implementation.
+  // However, in this case, we expect NO stats to be emitted at start.
+  // We can't verify "stat doesn't exist" easily with waitForGaugeEq.
+  // But we proceed.
+
+  // Send response from upstream.
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  upstream_request_->encodeHeaders(response_headers, true);
+
+  // Wait for client to receive response.
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ(response->headers().getStatusValue(), "200");
+
+  // After DownstreamEnd is logged, subtract should be skipped because Add didn't happen.
+  // Gauge should still be 0.
+  // If the logic was wrong and it subtracted 1 from 0, it would be non-zero (underflow).
+  // We rely on the fact that if it underflowed, it wouldn't be 0.
+  // We also assume the stat is created or we can check it.
+  // Since the access logger runs at DownstreamEnd, it *will* try to look up the stat.
+  // If it skips subtract, the gauge might be created with default 0 value or looked up.
+  // `waitForGaugeEq` ensures the gauge exists and has value 0.
   test_server_->waitForGaugeEq("test_stat_prefix.active_requests.request_header_tag.my-tag", 0);
 }
 

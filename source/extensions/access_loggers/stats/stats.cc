@@ -100,27 +100,43 @@ StatsAccessLog::StatsAccessLog(const envoy::extensions::access_loggers::stats::v
       gauges_([&]() {
         std::vector<Gauge> gauges;
         for (const auto& gauge_cfg : config.gauges()) {
-          bool is_set = false;
-          absl::optional<AddSubtract> add_subtract;
+          absl::flat_hash_map<
+              envoy::data::accesslog::v3::AccessLogType,
+              envoy::extensions::access_loggers::stats::v3::Config::Gauge::Operation::OperationType>
+              operations;
 
-          // Proto validation ensures that operation is present. However, since the oneof is not
-          // enforced in the proto (for legacy reasons), we need to check manually that exactly one
-          // operation is configured.
-          if (gauge_cfg.operation().has_add_subtract() == gauge_cfg.operation().has_set()) {
-            throw EnvoyException("Stats logger gauge must have either `set` or `add_subtract` "
-                                 "operation configured.");
+          int add_count = 0;
+          int subtract_count = 0;
+
+          for (const auto& trigger : gauge_cfg.operations()) {
+            if (operations.contains(trigger.log_type())) {
+              throw EnvoyException(fmt::format("Duplicate access log type '{}' in gauge operations.",
+                                               static_cast<int>(trigger.log_type())));
+            }
+            operations[trigger.log_type()] = trigger.operation_type();
+
+            if (trigger.operation_type() ==
+                envoy::extensions::access_loggers::stats::v3::Config::Gauge::Operation::ADD) {
+              add_count++;
+            } else if (trigger.operation_type() == envoy::extensions::access_loggers::stats::v3::
+                                                       Config::Gauge::Operation::SUBTRACT) {
+              subtract_count++;
+            }
           }
 
-          if (gauge_cfg.operation().has_add_subtract()) {
-            add_subtract = {gauge_cfg.operation().add_subtract().add_at(),
-                            gauge_cfg.operation().add_subtract().subtract_at()};
-          } else {
-            is_set = true;
+          if ((add_count > 0 || subtract_count > 0) && (add_count != 1 || subtract_count != 1)) {
+            throw EnvoyException(
+                "Stats logger gauge must have exactly one ADD and one SUBTRACT operation defined if "
+                "either is present.");
+          }
+
+          if (operations.empty()) {
+            throw EnvoyException("Stats logger gauge must have at least one operation configured.");
           }
 
           Gauge& inserted =
               gauges.emplace_back(NameAndTags(gauge_cfg.stat(), stat_name_pool_, commands), nullptr,
-                                  0, is_set, add_subtract);
+                                  0, std::move(operations));
 
           if (!gauge_cfg.value_format().empty() && gauge_cfg.has_value_fixed()) {
             throw EnvoyException(
@@ -250,6 +266,11 @@ void StatsAccessLog::emitLogConst(const Formatter::Context& context,
 
 void StatsAccessLog::emitLogForGauge(const Gauge& gauge, const Formatter::Context& context,
                                      const StreamInfo::StreamInfo& stream_info) const {
+  auto it = gauge.operations_.find(context.accessLogType());
+  if (it == gauge.operations_.end()) {
+    return;
+  }
+
   uint64_t value;
   if (gauge.value_formatter_ != nullptr) {
     absl::optional<uint64_t> computed_value_opt =
@@ -263,27 +284,19 @@ void StatsAccessLog::emitLogForGauge(const Gauge& gauge, const Formatter::Contex
     value = gauge.value_fixed_;
   }
 
-  enum class OpType { Unspecified, Add, Subtract, Set };
-  OpType op = OpType::Unspecified;
-
-  if (gauge.add_subtract_) {
-    if (context.accessLogType() == gauge.add_subtract_->add_at_) {
-      op = OpType::Add;
-    } else if (context.accessLogType() == gauge.add_subtract_->subtract_at_) {
-      op = OpType::Subtract;
-    } else {
-      return;
-    }
-  } else if (gauge.is_set_operation_) {
-    op = OpType::Set;
-  }
+  using OperationType =
+      envoy::extensions::access_loggers::stats::v3::Config::Gauge::Operation::OperationType;
+  OperationType op = it->second;
 
   auto [tags, storage] = gauge.stat_.tags(context, stream_info, *scope_);
-  Stats::Gauge::ImportMode import_mode = op == OpType::Set ? Stats::Gauge::ImportMode::NeverImport
-                                                           : Stats::Gauge::ImportMode::Accumulate;
+  Stats::Gauge::ImportMode import_mode =
+      op == OperationType::Config_Gauge_Operation_OperationType_SET
+          ? Stats::Gauge::ImportMode::NeverImport
+          : Stats::Gauge::ImportMode::Accumulate;
   auto& gauge_stat = scope_->gaugeFromStatNameWithTags(gauge.stat_.name_, tags, import_mode);
 
-  if (gauge.add_subtract_) {
+  if (op == OperationType::Config_Gauge_Operation_OperationType_ADD ||
+      op == OperationType::Config_Gauge_Operation_OperationType_SUBTRACT) {
     auto& filter_state = const_cast<StreamInfo::FilterState&>(stream_info.filterState());
     if (!filter_state.hasData<AccessLogState>(AccessLogState::key())) {
       filter_state.setData(AccessLogState::key(), std::make_shared<AccessLogState>(),
@@ -292,10 +305,10 @@ void StatsAccessLog::emitLogForGauge(const Gauge& gauge, const Formatter::Contex
     }
     auto* state = filter_state.getDataMutable<AccessLogState>(AccessLogState::key());
 
-    if (op == OpType::Add) {
+    if (op == OperationType::Config_Gauge_Operation_OperationType_ADD) {
       state->addInflightGauge(&gauge_stat);
       gauge_stat.add(value);
-    } else if (op == OpType::Subtract) {
+    } else {
       if (state->removeInflightGauge(&gauge_stat)) {
         gauge_stat.sub(value);
       }
@@ -304,13 +317,7 @@ void StatsAccessLog::emitLogForGauge(const Gauge& gauge, const Formatter::Contex
   }
 
   switch (op) {
-  case OpType::Add:
-    gauge_stat.add(value);
-    break;
-  case OpType::Subtract:
-    gauge_stat.sub(value);
-    break;
-  case OpType::Set:
+  case OperationType::Config_Gauge_Operation_OperationType_SET:
     gauge_stat.set(value);
     break;
   default:
