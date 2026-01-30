@@ -12,9 +12,11 @@
 namespace Envoy {
 namespace Quic {
 
-constexpr size_t MaxRetries =
-    12; // Max retries for ENOBUFS error. Same as Chromium value
-        // (https://source.chromium.org/chromium/chromium/src/+/main:net/quic/quic_chromium_packet_writer.cc;l=34;bpv=1;bpt=0).
+namespace {
+
+// Max retries for ENOBUFS error. Same as Chromium value
+// (https://source.chromium.org/chromium/chromium/src/+/main:net/quic/quic_chromium_packet_writer.cc;l=34;bpv=1;bpt=0).
+constexpr size_t MaxRetries = 12;
 
 class RetriablePacketWriter : public Network::UdpDefaultWriter {
 public:
@@ -53,6 +55,8 @@ private:
   Event::TimerPtr retry_timer_;
   size_t retry_count_{0};
 };
+
+} // namespace
 
 QuicClientPacketWriterFactory::CreationResult
 QuicPlatformPacketWriterFactory::createSocketAndQuicPacketWriter(
