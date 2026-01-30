@@ -595,12 +595,6 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "librdkafka-{version}",
         urls = ["https://github.com/confluentinc/librdkafka/archive/v{version}.tar.gz"],
     ),
-    kafka_server_binary = dict(
-        version = "3.9.1",
-        sha256 = "dd4399816e678946cab76e3bd1686103555e69bc8f2ab8686cda71aa15bc31a3",
-        strip_prefix = "kafka_2.13-{version}",
-        urls = ["https://downloads.apache.org/kafka/{version}/kafka_2.13-{version}.tgz"],
-    ),
     proxy_wasm_cpp_sdk = dict(
         version = "e5256b0c5463ea9961965ad5de3e379e00486640",
         sha256 = "b560a1da27a0d3ab374527e9c7dfa4fe6493887299945be2762a0518ce35570e",
