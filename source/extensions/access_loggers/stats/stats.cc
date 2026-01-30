@@ -137,12 +137,12 @@ StatsAccessLog::NameAndTags::NameAndTags(
     dynamic_tags_.emplace_back(tag_cfg, pool, commands, context);
   }
 
-  if (cfg.has_custom()) {
+  if (cfg.has_rules()) {
     ActionValidationVisitor validation_visitor;
     ActionContext action_context;
     Matcher::MatchTreeFactory<Envoy::Stats::StatMatchingData, ActionContext> factory(
         action_context, context.serverFactoryContext(), validation_visitor);
-    custom_ = factory.create(cfg.custom())();
+    rules_ = factory.create(cfg.rules())();
   }
 }
 
@@ -168,10 +168,10 @@ StatsAccessLog::NameAndTags::tags(const Formatter::Context& context,
     str_tags.emplace_back(dynamic_tag.str_name_, tag_value);
   }
 
-  if (custom_) {
+  if (rules_) {
     StatsAccessLogMetric metric(str_tags);
     Envoy::Stats::StatMatchingDataImpl<StatsAccessLogMetric> data(metric);
-    const auto result = custom_->match(data);
+    const auto result = rules_->match(data);
     if (result.isMatch()) {
       if (const auto* action = dynamic_cast<const StatsAction*>(result.action().get())) {
         switch (action->type()) {

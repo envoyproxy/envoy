@@ -49,18 +49,15 @@ message Config {
     // The tags for the stat.
     repeated Tag tags = 2;
 
-    // The customization for stats generation.
-    // The supported input is the ``TagName`` which allows matching the stats which has the expected tag.
-    //
-    // Currently, the only supported input is
+    // The custom rules to generate the stats. Currently, the only
+    // supported input is
     // ``envoy.extensions.matching.common_inputs.stats.v3.StatTagValueInput``.
-    //
     // The supported actions are:
     //
     // * :ref:`DropStatAction <envoy_v3_api_msg_extensions.access_loggers.stats.v3.DropStatAction>`
     // * :ref:`InsertTagAction <envoy_v3_api_msg_extensions.access_loggers.stats.v3.InsertTagAction>`
     // * :ref:`DropTagAction <envoy_v3_api_msg_extensions.access_loggers.stats.v3.DropTagAction>`
-    xds.type.matcher.v3.Matcher custom = 3;
+    xds.type.matcher.v3.Matcher rules = 3;
   }
 
   // Configuration for a histogram stat.
@@ -126,7 +123,7 @@ message Config {
 //
 // .. code-block:: yaml
 //
-//   custom:
+//   rules:
 //     matcher_tree:
 //       input:
 //         name: stat_tag_value_input
@@ -151,7 +148,7 @@ message DropStatAction {
 //
 // .. code-block:: yaml
 //
-//   custom:
+//   rules:
 //     matcher_tree:
 //       input:
 //         name: stat_tag_value_input
@@ -180,7 +177,7 @@ message DropTagAction {
 //
 // .. code-block:: yaml
 //
-//   custom:
+//   rules:
 //     matcher_tree:
 //       input:
 //         name: stat_tag_value_input

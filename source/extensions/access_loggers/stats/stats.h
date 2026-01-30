@@ -65,7 +65,7 @@ private:
     std::string str_name_;
     Envoy::Stats::StatName name_;
     std::vector<DynamicTag> dynamic_tags_;
-    Matcher::MatchTreeSharedPtr<Envoy::Stats::StatMatchingData> custom_;
+    Matcher::MatchTreeSharedPtr<Envoy::Stats::StatMatchingData> rules_;
   };
 
   struct Histogram {

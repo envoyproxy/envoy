@@ -306,7 +306,7 @@ TEST_F(StatsAccessLoggerTest, DropStatAction) {
           tags:
             - name: foo
               value_format: bar
-          custom:
+          rules:
             matcher_tree:
               input:
                 name: stat_tag_value_input
@@ -337,7 +337,7 @@ TEST_F(StatsAccessLoggerTest, DropStatAction) {
           tags:
             - name: foo
               value_format: baz
-          custom:
+          rules:
             matcher_tree:
               input:
                 name: stat_tag_value_input
@@ -370,7 +370,7 @@ TEST_F(StatsAccessLoggerTest, DropStatActionOnHistogram) {
           tags:
             - name: foo
               value_format: bar
-          custom:
+          rules:
             matcher_tree:
               input:
                 name: stat_tag_value_input
@@ -402,7 +402,7 @@ TEST_F(StatsAccessLoggerTest, DropStatActionOnHistogram) {
           tags:
             - name: foo
               value_format: baz
-          custom:
+          rules:
             matcher_tree:
               input:
                 name: stat_tag_value_input
@@ -438,7 +438,7 @@ TEST_F(StatsAccessLoggerTest, StatTagFilterErrorType) {
           tags:
             - name: error.type
               value_format: "-"
-          custom:
+          rules:
             matcher_tree:
               input:
                 name: stat_tag_value_input
@@ -469,7 +469,7 @@ TEST_F(StatsAccessLoggerTest, StatTagFilterErrorType) {
           tags:
             - name: error.type
               value_format: "UH"
-          custom:
+          rules:
             matcher_tree:
               input:
                 name: stat_tag_value_input
@@ -502,7 +502,7 @@ TEST_F(StatsAccessLoggerTest, StatTagFilterInsertTag) {
           tags:
             - name: foo
               value_format: bar
-          custom:
+          rules:
             matcher_tree:
               input:
                 name: stat_tag_value_input
@@ -546,7 +546,7 @@ TEST_F(StatsAccessLoggerTest, StatTagFilterDropTag) {
           tags:
             - name: foo
               value_format: bar
-          custom:
+          rules:
             matcher_tree:
               input:
                 name: stat_tag_value_input
