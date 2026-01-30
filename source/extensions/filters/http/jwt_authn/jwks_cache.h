@@ -13,7 +13,7 @@
 #include "source/extensions/filters/http/jwt_authn/stats.h"
 
 #include "absl/strings/string_view.h"
-#include "jwt_verify_lib/jwks.h"
+#include "source/common/jwt/jwks.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -23,8 +23,8 @@ namespace JwtAuthn {
 class JwksCache;
 using JwksCachePtr = std::unique_ptr<JwksCache>;
 
-using JwksConstPtr = std::unique_ptr<const ::google::jwt_verify::Jwks>;
-using JwksConstSharedPtr = std::shared_ptr<const ::google::jwt_verify::Jwks>;
+using JwksConstPtr = std::unique_ptr<const ::Envoy::JwtVerify::Jwks>;
+using JwksConstSharedPtr = std::shared_ptr<const ::Envoy::JwtVerify::Jwks>;
 
 /**
  * Interface to access all configured Jwt rules and their cached Jwks objects.
@@ -70,13 +70,13 @@ public:
     virtual const Router::RetryPolicyConstSharedPtr& retryPolicy() const PURE;
 
     // Get the Jwks object.
-    virtual const ::google::jwt_verify::Jwks* getJwksObj() const PURE;
+    virtual const ::Envoy::JwtVerify::Jwks* getJwksObj() const PURE;
 
     // Return true if jwks object is expired.
     virtual bool isExpired() const PURE;
 
     // Set a remote Jwks.
-    virtual const ::google::jwt_verify::Jwks* setRemoteJwks(JwksConstPtr&& jwks) PURE;
+    virtual const ::Envoy::JwtVerify::Jwks* setRemoteJwks(JwksConstPtr&& jwks) PURE;
 
     // Get Token Cache.
     virtual JwtCache& getJwtCache() PURE;

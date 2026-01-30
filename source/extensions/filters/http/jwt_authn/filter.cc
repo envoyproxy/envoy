@@ -4,9 +4,9 @@
 #include "source/common/http/utility.h"
 
 #include "absl/strings/str_split.h"
-#include "jwt_verify_lib/status.h"
+#include "source/common/jwt/status.h"
 
-using ::google::jwt_verify::Status;
+using ::Envoy::JwtVerify::Status;
 
 namespace Envoy {
 namespace Extensions {
@@ -112,7 +112,7 @@ void Filter::clearRouteCache() { decoder_callbacks_->downstreamCallbacks()->clea
 
 void Filter::onComplete(const Status& status) {
   ENVOY_STREAM_LOG(debug, "Jwt authentication completed with: {}", *decoder_callbacks_,
-                   ::google::jwt_verify::getStatusString(status));
+                   ::Envoy::JwtVerify::getStatusString(status));
   // This stream has been reset, abort the callback.
   if (state_ == Responded) {
     return;
@@ -127,11 +127,11 @@ void Filter::onComplete(const Status& status) {
     if (config_.get()->stripFailureResponse()) {
       decoder_callbacks_->sendLocalReply(
           code, "", nullptr, absl::nullopt,
-          generateRcDetails(::google::jwt_verify::getStatusString(status)));
+          generateRcDetails(::Envoy::JwtVerify::getStatusString(status)));
       return;
     }
     decoder_callbacks_->sendLocalReply(
-        code, ::google::jwt_verify::getStatusString(status),
+        code, ::Envoy::JwtVerify::getStatusString(status),
         [uri = this->original_uri_, status](Http::ResponseHeaderMap& headers) {
           std::string value = absl::StrCat("Bearer realm=\"", uri, "\"");
           if (status != Status::JwtMissed) {
@@ -139,7 +139,7 @@ void Filter::onComplete(const Status& status) {
           }
           headers.setCopy(Http::Headers::get().WWWAuthenticate, value);
         },
-        absl::nullopt, generateRcDetails(::google::jwt_verify::getStatusString(status)));
+        absl::nullopt, generateRcDetails(::Envoy::JwtVerify::getStatusString(status)));
     return;
   }
   stats_.allowed_.inc();

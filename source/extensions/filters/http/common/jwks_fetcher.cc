@@ -8,7 +8,7 @@
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
 
-#include "jwt_verify_lib/status.h"
+#include "source/common/jwt/status.h"
 
 using envoy::extensions::filters::http::jwt_authn::v3::RemoteJwks;
 
@@ -86,8 +86,8 @@ public:
       if (response->body().length() != 0) {
         const auto body = response->bodyAsString();
         auto jwks =
-            google::jwt_verify::Jwks::createFrom(body, google::jwt_verify::Jwks::Type::JWKS);
-        if (jwks->getStatus() == google::jwt_verify::Status::Ok) {
+            Envoy::JwtVerify::Jwks::createFrom(body, Envoy::JwtVerify::Jwks::Type::JWKS);
+        if (jwks->getStatus() == Envoy::JwtVerify::Status::Ok) {
           ENVOY_LOG(debug, "{}: fetch pubkey [uri = {}]: succeeded", __func__, uri);
           receiver_->onJwksSuccess(std::move(jwks));
         } else {

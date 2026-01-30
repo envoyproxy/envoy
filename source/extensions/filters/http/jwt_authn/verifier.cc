@@ -2,14 +2,14 @@
 
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
 
-#include "jwt_verify_lib/check_audience.h"
+#include "source/common/jwt/check_audience.h"
 
 using envoy::extensions::filters::http::jwt_authn::v3::JwtProvider;
 using envoy::extensions::filters::http::jwt_authn::v3::JwtRequirement;
 using envoy::extensions::filters::http::jwt_authn::v3::JwtRequirementAndList;
 using envoy::extensions::filters::http::jwt_authn::v3::JwtRequirementOrList;
-using ::google::jwt_verify::CheckAudience;
-using ::google::jwt_verify::Status;
+using ::Envoy::JwtVerify::CheckAudience;
+using ::Envoy::JwtVerify::Status;
 
 namespace Envoy {
 namespace Extensions {
@@ -153,7 +153,7 @@ private:
   const CheckAudience* getAudienceChecker() const override { return check_audience_.get(); }
 
   // Check audience object
-  ::google::jwt_verify::CheckAudiencePtr check_audience_;
+  ::Envoy::JwtVerify::CheckAudiencePtr check_audience_;
 };
 
 // Allow missing or failed verifier

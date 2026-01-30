@@ -27,8 +27,8 @@
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
-#include "jwt_verify_lib/jwt.h"
-#include "jwt_verify_lib/status.h"
+#include "source/common/jwt/jwt.h"
+#include "source/common/jwt/status.h"
 #include "openssl/rand.h"
 
 using namespace std::chrono_literals;

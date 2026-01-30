@@ -7,9 +7,9 @@
 
 #include "source/extensions/filters/http/common/factory_base.h"
 
-#include "jwt_verify_lib/jwt.h"
-#include "jwt_verify_lib/verify.h"
-#include "simple_lru_cache/simple_lru_cache_inl.h"
+#include "source/common/jwt/jwt.h"
+#include "source/common/jwt/verify.h"
+#include "source/common/jwt/simple_lru_cache_inl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -17,8 +17,8 @@ namespace HttpFilters {
 namespace GcpAuthn {
 
 template <typename TokenType>
-using LRUCache = ::google::simple_lru_cache::SimpleLRUCache<std::string, TokenType>;
-using JwtToken = ::google::jwt_verify::Jwt;
+using LRUCache = ::Envoy::SimpleLruCache::SimpleLRUCache<std::string, TokenType>;
+using JwtToken = ::Envoy::JwtVerify::Jwt;
 
 template <typename TokenType> class TokenCacheImpl : public Logger::Loggable<Logger::Id::init> {
 public:
@@ -94,8 +94,8 @@ TokenType* TokenCacheImpl<TokenType>::validateTokenAndReturn(const std::string& 
     // token producer here, we should instead include the clock skew as the part of the `now` time
     // up front to account for the clock skew on the consumer side where the token will be consumed.
     if (found_token->verifyTimeConstraint(
-            DateUtil::nowToSeconds(time_source_) + ::google::jwt_verify::kClockSkewInSecond,
-            /*clock_skew=*/0) == ::google::jwt_verify::Status::JwtExpired) {
+            DateUtil::nowToSeconds(time_source_) + ::Envoy::JwtVerify::kClockSkewInSecond,
+            /*clock_skew=*/0) == ::Envoy::JwtVerify::Status::JwtExpired) {
       // Remove the expired entry.
       lru_cache_.remove(key);
     } else {

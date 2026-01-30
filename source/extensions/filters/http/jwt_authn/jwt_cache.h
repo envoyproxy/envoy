@@ -7,8 +7,8 @@
 
 #include "source/common/common/utility.h"
 
-#include "jwt_verify_lib/jwt.h"
-#include "jwt_verify_lib/verify.h"
+#include "source/common/jwt/jwt.h"
+#include "source/common/jwt/verify.h"
 
 using envoy::extensions::filters::http::jwt_authn::v3::JwtCacheConfig;
 
@@ -28,12 +28,12 @@ public:
 
   // Lookup a JWT in the cache, if found return the pointer to its parsed jwt struct.
   // If no found, return nullptr.
-  virtual ::google::jwt_verify::Jwt* lookup(const std::string& token) PURE;
+  virtual ::Envoy::JwtVerify::Jwt* lookup(const std::string& token) PURE;
 
   // Insert a JWT and its parsed JWT struct to the cache.
   // The function will take over the ownership of jwt object.
   virtual void insert(const std::string& token,
-                      std::unique_ptr<::google::jwt_verify::Jwt>&& jwt) PURE;
+                      std::unique_ptr<::Envoy::JwtVerify::Jwt>&& jwt) PURE;
 
   // JwtCache factory function.
   static JwtCachePtr create(bool enable_cache, const JwtCacheConfig& config,
