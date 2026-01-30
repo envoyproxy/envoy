@@ -4,9 +4,11 @@
 // all dynamic modules. These are the "Common Callbacks" declared in abi.h and are available
 // regardless of which extension point is being used (HTTP/Network/Listener/UDP/Bootstrap/etc).
 
+#include "envoy/server/factory_context.h"
+
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
-#include "source/extensions/dynamic_modules/abi.h"
+#include "source/extensions/dynamic_modules/abi/abi.h"
 
 extern "C" {
 
@@ -42,6 +44,13 @@ void envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level level
   default:
     break;
   }
+}
+
+uint32_t envoy_dynamic_module_callback_get_concurrency() {
+  using namespace Envoy;
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+  auto context = Server::Configuration::ServerFactoryContextInstance::getExisting();
+  return context->options().concurrency();
 }
 
 // ---------------------- Bootstrap extension scheduler callbacks ------------------------

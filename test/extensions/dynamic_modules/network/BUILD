@@ -13,6 +13,7 @@ envoy_cc_test(
     srcs = ["filter_test.cc"],
     data = [
         "//test/extensions/dynamic_modules/test_data/c:network_config_new_fail",
+        "//test/extensions/dynamic_modules/test_data/c:network_filter_new_fail",
         "//test/extensions/dynamic_modules/test_data/c:network_no_op",
         "//test/extensions/dynamic_modules/test_data/c:network_stop_iteration",
         "//test/extensions/dynamic_modules/test_data/c:no_op",
@@ -24,6 +25,7 @@ envoy_cc_test(
         "//source/extensions/filters/network/dynamic_modules:filter_lib",
         "//test/extensions/dynamic_modules:util",
         "//test/mocks/network:network_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
     ],
 )

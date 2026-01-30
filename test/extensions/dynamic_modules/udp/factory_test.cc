@@ -4,6 +4,8 @@
 #include "test/mocks/server/listener_factory_context.h"
 #include "test/test_common/utility.h"
 
+#include "gmock/gmock.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace UdpFilters {
@@ -41,6 +43,9 @@ filter_config:
 
   NiceMock<Network::MockUdpListenerFilterManager> filter_manager;
   NiceMock<Network::MockUdpReadFilterCallbacks> read_callbacks;
+  NiceMock<Event::MockDispatcher> worker_thread_dispatcher{"worker_0"};
+  ON_CALL(read_callbacks.udp_listener_, dispatcher())
+      .WillByDefault(testing::ReturnRef(worker_thread_dispatcher));
 
   EXPECT_CALL(filter_manager, addReadFilter_(testing::_));
   callback(filter_manager, read_callbacks);
@@ -107,11 +112,16 @@ filter_name: test_filter
 
   NiceMock<Network::MockUdpListenerFilterManager> filter_manager1;
   NiceMock<Network::MockUdpReadFilterCallbacks> read_callbacks1;
+  NiceMock<Event::MockDispatcher> worker_thread_dispatcher{"worker_0"};
+  ON_CALL(read_callbacks1.udp_listener_, dispatcher())
+      .WillByDefault(testing::ReturnRef(worker_thread_dispatcher));
   EXPECT_CALL(filter_manager1, addReadFilter_(testing::_));
   callback1(filter_manager1, read_callbacks1);
 
   NiceMock<Network::MockUdpListenerFilterManager> filter_manager2;
   NiceMock<Network::MockUdpReadFilterCallbacks> read_callbacks2;
+  ON_CALL(read_callbacks2.udp_listener_, dispatcher())
+      .WillByDefault(testing::ReturnRef(worker_thread_dispatcher));
   EXPECT_CALL(filter_manager2, addReadFilter_(testing::_));
   callback2(filter_manager2, read_callbacks2);
 }
@@ -136,6 +146,9 @@ filter_config:
 
   NiceMock<Network::MockUdpListenerFilterManager> filter_manager;
   NiceMock<Network::MockUdpReadFilterCallbacks> read_callbacks;
+  NiceMock<Event::MockDispatcher> worker_thread_dispatcher{"worker_0"};
+  ON_CALL(read_callbacks.udp_listener_, dispatcher())
+      .WillByDefault(testing::ReturnRef(worker_thread_dispatcher));
 
   EXPECT_CALL(filter_manager, addReadFilter_(testing::_));
   callback(filter_manager, read_callbacks);
@@ -163,6 +176,9 @@ filter_config:
 
   NiceMock<Network::MockUdpListenerFilterManager> filter_manager;
   NiceMock<Network::MockUdpReadFilterCallbacks> read_callbacks;
+  NiceMock<Event::MockDispatcher> worker_thread_dispatcher{"worker_0"};
+  ON_CALL(read_callbacks.udp_listener_, dispatcher())
+      .WillByDefault(testing::ReturnRef(worker_thread_dispatcher));
 
   EXPECT_CALL(filter_manager, addReadFilter_(testing::_));
   callback(filter_manager, read_callbacks);

@@ -4,7 +4,7 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/common/stats/isolated_store_impl.h"
-#include "source/extensions/dynamic_modules/abi.h"
+#include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/filters/network/dynamic_modules/filter.h"
 
 #include "test/extensions/dynamic_modules/util.h"
@@ -16,6 +16,8 @@
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/host.h"
+
+#include "gmock/gmock.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -35,9 +37,9 @@ public:
     filter_config_ = filter_config_or_status.value();
 
     filter_ = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
-    filter_->initializeInModuleFilter();
 
     ON_CALL(read_callbacks_, connection()).WillByDefault(testing::ReturnRef(connection_));
+    ON_CALL(connection_, dispatcher()).WillByDefault(testing::ReturnRef(worker_thread_dispatcher_));
     filter_->initializeReadFilterCallbacks(read_callbacks_);
     filter_->initializeWriteFilterCallbacks(write_callbacks_);
   }
@@ -60,6 +62,7 @@ public:
   NiceMock<Network::MockReadFilterCallbacks> read_callbacks_;
   NiceMock<Network::MockWriteFilterCallbacks> write_callbacks_;
   NiceMock<Network::MockConnection> connection_;
+  NiceMock<Event::MockDispatcher> worker_thread_dispatcher_{"worker_0"};
 };
 
 // =============================================================================
@@ -426,7 +429,7 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, InjectReadDataEmptyEndStream) 
 
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, InjectReadDataNullCallbacks) {
   auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
-  filter->initializeInModuleFilter();
+  filter_->initializeReadFilterCallbacks(read_callbacks_);
 
   char data[] = "test";
   envoy_dynamic_module_type_module_buffer buf = {data, 4};
@@ -453,7 +456,7 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, InjectWriteDataEmptyEndStream)
 
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, InjectWriteDataNullCallbacks) {
   auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
-  filter->initializeInModuleFilter();
+  filter_->initializeReadFilterCallbacks(read_callbacks_);
 
   char data[] = "test";
   envoy_dynamic_module_type_module_buffer buf = {data, 4};
@@ -631,7 +634,7 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, DisableCloseFalse) {
 
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, DisableCloseNullCallbacks) {
   auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
-  filter->initializeInModuleFilter();
+  filter_->initializeReadFilterCallbacks(read_callbacks_);
 
   envoy_dynamic_module_callback_network_filter_disable_close(static_cast<void*>(filter.get()),
                                                              true);
@@ -1247,9 +1250,10 @@ public:
     filter_config_ = filter_config_or_status.value();
 
     filter_ = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
-    filter_->initializeInModuleFilter();
 
+    ON_CALL(connection_, dispatcher()).WillByDefault(testing::ReturnRef(worker_thread_dispatcher_));
     ON_CALL(read_callbacks_, connection()).WillByDefault(testing::ReturnRef(connection_));
+
     filter_->initializeReadFilterCallbacks(read_callbacks_);
     filter_->initializeWriteFilterCallbacks(write_callbacks_);
   }
@@ -1271,6 +1275,7 @@ public:
   NiceMock<Network::MockReadFilterCallbacks> read_callbacks_;
   NiceMock<Network::MockWriteFilterCallbacks> write_callbacks_;
   NiceMock<Network::MockConnection> connection_;
+  NiceMock<Event::MockDispatcher> worker_thread_dispatcher_{"worker_0"};
 };
 
 TEST_F(DynamicModuleNetworkFilterHttpCalloutTest, SendHttpCalloutClusterNotFound) {
@@ -1615,7 +1620,7 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetUpstreamHostAddressNoHost) 
 
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetUpstreamHostAddressNullCallbacks) {
   auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
-  filter->initializeInModuleFilter();
+  filter_->initializeReadFilterCallbacks(read_callbacks_);
 
   envoy_dynamic_module_type_envoy_buffer address_out = {nullptr, 0};
   uint32_t port_out = 0;
@@ -1685,7 +1690,7 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetUpstreamHostHostnameEmpty) 
 
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetUpstreamHostHostnameNullCallbacks) {
   auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
-  filter->initializeInModuleFilter();
+  filter_->initializeReadFilterCallbacks(read_callbacks_);
 
   envoy_dynamic_module_type_envoy_buffer hostname_out = {nullptr, 0};
   bool result = envoy_dynamic_module_callback_network_filter_get_upstream_host_hostname(
@@ -1724,7 +1729,7 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetUpstreamHostClusterNoHost) 
 
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetUpstreamHostClusterNullCallbacks) {
   auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
-  filter->initializeInModuleFilter();
+  filter_->initializeReadFilterCallbacks(read_callbacks_);
 
   envoy_dynamic_module_type_envoy_buffer cluster_name_out = {nullptr, 0};
   bool result = envoy_dynamic_module_callback_network_filter_get_upstream_host_cluster(
@@ -1751,7 +1756,7 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, HasUpstreamHostFalse) {
 
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, HasUpstreamHostNullCallbacks) {
   auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
-  filter->initializeInModuleFilter();
+  filter_->initializeReadFilterCallbacks(read_callbacks_);
 
   bool result = envoy_dynamic_module_callback_network_filter_has_upstream_host(
       static_cast<void*>(filter.get()));
@@ -1780,7 +1785,7 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, StartUpstreamSecureTransportFa
 
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, StartUpstreamSecureTransportNullCallbacks) {
   auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config_);
-  filter->initializeInModuleFilter();
+  filter_->initializeReadFilterCallbacks(read_callbacks_);
 
   bool result = envoy_dynamic_module_callback_network_filter_start_upstream_secure_transport(
       static_cast<void*>(filter.get()));
@@ -1940,6 +1945,106 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest,
 
   // Clean up.
   envoy_dynamic_module_callback_network_filter_config_scheduler_delete(scheduler);
+}
+
+// =============================================================================
+// Misc ABI Callback Tests
+// =============================================================================
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetWorkerIndex) {
+  uint32_t worker_index =
+      envoy_dynamic_module_callback_network_filter_get_worker_index(filterPtr());
+  EXPECT_EQ(0u, worker_index);
+}
+
+// =============================================================================
+// Connection State and Flow Control Callback Tests
+// =============================================================================
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetConnectionState) {
+  EXPECT_CALL(connection_, state())
+      .WillOnce(testing::Return(Network::Connection::State::Open))
+      .WillOnce(testing::Return(Network::Connection::State::Closing))
+      .WillOnce(testing::Return(Network::Connection::State::Closed));
+
+  EXPECT_EQ(envoy_dynamic_module_type_network_connection_state_Open,
+            envoy_dynamic_module_callback_network_filter_get_connection_state(filterPtr()));
+  EXPECT_EQ(envoy_dynamic_module_type_network_connection_state_Closing,
+            envoy_dynamic_module_callback_network_filter_get_connection_state(filterPtr()));
+  EXPECT_EQ(envoy_dynamic_module_type_network_connection_state_Closed,
+            envoy_dynamic_module_callback_network_filter_get_connection_state(filterPtr()));
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, ReadDisable) {
+  EXPECT_CALL(connection_, readDisable(true))
+      .WillOnce(
+          testing::Return(Network::Connection::ReadDisableStatus::TransitionedToReadDisabled));
+  EXPECT_CALL(connection_, readDisable(false))
+      .WillOnce(testing::Return(Network::Connection::ReadDisableStatus::TransitionedToReadEnabled));
+
+  auto status = envoy_dynamic_module_callback_network_filter_read_disable(filterPtr(), true);
+  EXPECT_EQ(envoy_dynamic_module_type_network_read_disable_status_TransitionedToReadDisabled,
+            status);
+
+  status = envoy_dynamic_module_callback_network_filter_read_disable(filterPtr(), false);
+  EXPECT_EQ(envoy_dynamic_module_type_network_read_disable_status_TransitionedToReadEnabled,
+            status);
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, ReadDisableStillDisabled) {
+  EXPECT_CALL(connection_, readDisable(true))
+      .WillOnce(testing::Return(Network::Connection::ReadDisableStatus::StillReadDisabled));
+
+  auto status = envoy_dynamic_module_callback_network_filter_read_disable(filterPtr(), true);
+  EXPECT_EQ(envoy_dynamic_module_type_network_read_disable_status_StillReadDisabled, status);
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, ReadEnabled) {
+  EXPECT_CALL(connection_, readEnabled())
+      .WillOnce(testing::Return(true))
+      .WillOnce(testing::Return(false));
+
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_filter_read_enabled(filterPtr()));
+  EXPECT_FALSE(envoy_dynamic_module_callback_network_filter_read_enabled(filterPtr()));
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, IsHalfCloseEnabled) {
+  EXPECT_CALL(connection_, isHalfCloseEnabled())
+      .WillOnce(testing::Return(true))
+      .WillOnce(testing::Return(false));
+
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_filter_is_half_close_enabled(filterPtr()));
+  EXPECT_FALSE(envoy_dynamic_module_callback_network_filter_is_half_close_enabled(filterPtr()));
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, EnableHalfClose) {
+  EXPECT_CALL(connection_, enableHalfClose(true));
+  EXPECT_CALL(connection_, enableHalfClose(false));
+
+  envoy_dynamic_module_callback_network_filter_enable_half_close(filterPtr(), true);
+  envoy_dynamic_module_callback_network_filter_enable_half_close(filterPtr(), false);
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, GetBufferLimit) {
+  EXPECT_CALL(connection_, bufferLimit()).WillOnce(testing::Return(65536));
+
+  uint32_t limit = envoy_dynamic_module_callback_network_filter_get_buffer_limit(filterPtr());
+  EXPECT_EQ(65536u, limit);
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, SetBufferLimits) {
+  EXPECT_CALL(connection_, setBufferLimits(32768));
+
+  envoy_dynamic_module_callback_network_filter_set_buffer_limits(filterPtr(), 32768);
+}
+
+TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, AboveHighWatermark) {
+  EXPECT_CALL(connection_, aboveHighWatermark())
+      .WillOnce(testing::Return(true))
+      .WillOnce(testing::Return(false));
+
+  EXPECT_TRUE(envoy_dynamic_module_callback_network_filter_above_high_watermark(filterPtr()));
+  EXPECT_FALSE(envoy_dynamic_module_callback_network_filter_above_high_watermark(filterPtr()));
 }
 
 } // namespace NetworkFilters

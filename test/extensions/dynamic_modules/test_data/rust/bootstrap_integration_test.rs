@@ -3,6 +3,8 @@ use envoy_proxy_dynamic_modules_rust_sdk::*;
 declare_bootstrap_init_functions!(my_program_init, my_new_bootstrap_extension_config_fn);
 
 fn my_program_init() -> bool {
+  let concurrency = unsafe { get_server_concurrency() };
+  assert_eq!(concurrency, 1);
   true
 }
 

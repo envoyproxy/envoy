@@ -186,7 +186,6 @@ def envoy_dependencies(skip_targets = []):
     _dragonbox()
     _fp16()
     _simdutf()
-    _intel_ittapi()
     _com_github_google_quiche()
     _googleurl()
     _io_hyperscan()
@@ -194,9 +193,8 @@ def envoy_dependencies(skip_targets = []):
     _io_opentelemetry_api_cpp()
     _net_colm_open_source_colm()
     _net_colm_open_source_ragel()
-    _zlib()
     _intel_dlb()
-    _com_github_zlib_ng_zlib_ng()
+    _zlib_ng()
     _org_boost()
     _org_brotli()
     _zstd()
@@ -223,16 +221,16 @@ def envoy_dependencies(skip_targets = []):
     external_http_archive("rules_license")
     external_http_archive("rules_pkg")
     external_http_archive("com_github_aignas_rules_shellcheck")
+
     external_http_archive(
-        "aspect_bazel_lib",
+        name = "yq.bzl",
+        location_name = "yq_bzl",
         patch_args = ["-p1"],
-        patches = ["@envoy//bazel:aspect.patch"],
+        patches = ["@envoy//bazel:yq.patch"],
     )
+    external_http_archive("aspect_bazel_lib")
 
     _com_github_fdio_vpp_vcl()
-
-    # Unconditional, since we use this only for compiler-agnostic fuzzing utils.
-    _org_llvm_releases_compiler_rt()
 
     _toolchains_llvm()
 
@@ -465,16 +463,10 @@ def _net_colm_open_source_ragel():
         build_file_content = BUILD_ALL_CONTENT,
     )
 
-def _zlib():
+def _zlib_ng():
     external_http_archive(
-        name = "zlib",
-        build_file = "@envoy//bazel/external:zlib.BUILD",
-    )
-
-def _com_github_zlib_ng_zlib_ng():
-    external_http_archive(
-        name = "com_github_zlib_ng_zlib_ng",
-        build_file_content = BUILD_ALL_CONTENT,
+        name = "zlib_ng",
+        build_file = "@envoy//bazel/external:zlib_ng.BUILD",
     )
 
 # Boost in general is not approved for Envoy use, and the header-only
@@ -677,6 +669,7 @@ def _v8():
         name = "v8",
         patches = [
             "@envoy//bazel:v8.patch",
+            "@envoy//bazel:v8_novtune.patch",
             "@envoy//bazel:v8_ppc64le.patch",
             # https://issues.chromium.org/issues/423403090
             "@envoy//bazel:v8_python.patch",
@@ -726,12 +719,6 @@ def _simdutf():
         build_file = "@envoy//bazel/external:simdutf.BUILD",
     )
 
-def _intel_ittapi():
-    external_http_archive(
-        name = "intel_ittapi",
-        build_file = "@envoy//bazel/external:intel_ittapi.BUILD",
-    )
-
 def _com_github_google_quiche():
     external_http_archive(
         name = "com_github_google_quiche",
@@ -744,12 +731,6 @@ def _googleurl():
         name = "googleurl",
         patches = ["@envoy//bazel/external:googleurl.patch"],
         patch_args = ["-p1"],
-    )
-
-def _org_llvm_releases_compiler_rt():
-    external_http_archive(
-        name = "org_llvm_releases_compiler_rt",
-        build_file = "@envoy//bazel/external:compiler_rt.BUILD",
     )
 
 def _com_github_grpc_grpc():
@@ -772,7 +753,10 @@ def _rules_proto_grpc():
     external_http_archive("rules_proto_grpc")
 
 def _re2():
-    external_http_archive("com_googlesource_code_re2")
+    external_http_archive(
+        "com_googlesource_code_re2",
+        repo_mapping = {"@abseil-cpp": "@com_google_absl"},
+    )
 
 def _proxy_wasm_cpp_sdk():
     external_http_archive(

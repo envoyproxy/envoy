@@ -235,6 +235,8 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeaderCallbacksFilter {
       std::str::from_utf8(downstream_addr.unwrap().as_slice()).unwrap(),
       "1.1.1.1:1234"
     );
+    let worker_index = envoy_filter.get_worker_index();
+    assert_eq!(worker_index, 0);
 
     abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
   }
@@ -518,7 +520,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for DynamicMetadataCallbacksFilter {
     // No namespace.
     let no_namespace = envoy_filter.get_metadata_string(
       abi::envoy_dynamic_module_type_metadata_source::Dynamic,
-      "no_namespace",
+      "ns_req_body",
       "key",
     );
     assert!(no_namespace.is_none());
@@ -549,7 +551,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for DynamicMetadataCallbacksFilter {
     // No namespace.
     let no_namespace = envoy_filter.get_metadata_string(
       abi::envoy_dynamic_module_type_metadata_source::Dynamic,
-      "no_namespace",
+      "ns_res_header",
       "key",
     );
     assert!(no_namespace.is_none());
@@ -579,7 +581,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for DynamicMetadataCallbacksFilter {
     // No namespace.
     let no_namespace = envoy_filter.get_metadata_string(
       abi::envoy_dynamic_module_type_metadata_source::Dynamic,
-      "no_namespace",
+      "ns_res_body",
       "key",
     );
     assert!(no_namespace.is_none());

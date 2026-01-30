@@ -22,12 +22,10 @@ directories:
   source/common/tls: 94.5  # FIPS code paths impossible to trigger on non-FIPS builds and vice versa
   source/common/tls/cert_validator: 95.0
   source/common/tls/private_key: 88.9
-  source/common/tracing: 95.9
   source/common/watchdog: 60.0  # Death tests don't report LCOV
   source/exe: 94.4  # increased by #32346, need coverage for terminate_handler and hot restart failures
   source/extensions/api_listeners: 55.0  # Many IS_ENVOY_BUG are not covered.
   source/extensions/api_listeners/default_api_listener: 67.8  # Many IS_ENVOY_BUG are not covered.
-  source/extensions/access_loggers/open_telemetry: 96.4  # Serialization failure path is untestable
   source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface: 96.3
   source/extensions/common/aws: 98.5
   source/extensions/common/aws/credential_providers: 100.0
@@ -72,6 +70,7 @@ directories:
   source/extensions/stat_sinks/statsd: 85.2  # Death tests don't report LCOV
   source/extensions/tracers/zipkin: 95.6
   source/extensions/transport_sockets/proxy_protocol: 96.2
+  source/extensions/transport_sockets/tls/cert_mappers/filter_state_override: 96.2
   source/extensions/wasm_runtime/wamr: 0.0  # Not enabled in coverage build
   source/extensions/wasm_runtime/wasmtime: 0.0  # Not enabled in coverage build
   source/extensions/watchdog: 83.3  # Death tests within extensions
@@ -85,3 +84,4 @@ directories:
   source/extensions/health_checkers/grpc: 92.3
   source/extensions/config_subscription/rest: 94.9
   source/extensions/matching/input_matchers/cel_matcher: 100.0
+  source/extensions/dynamic_modules/sdk/cpp: 0.0  # SDK code self not directly tested
