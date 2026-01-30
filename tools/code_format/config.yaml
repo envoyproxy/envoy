@@ -244,6 +244,8 @@ paths:
   # Files in these paths can use Protobuf::util::JsonStringToMessage
   json_string_to_message:
     include:
+    - source/common/jwt/jwt.cc
+    - source/common/jwt/jwks.cc
     - source/common/protobuf/utility.cc
     - source/common/protobuf/protobuf.h
     - source/common/protobuf/yaml_utility.cc
@@ -286,11 +288,13 @@ paths:
     - source/common/common/utility.h
     - source/common/event/real_time_system.cc
     - source/common/event/real_time_system.h
+    - source/common/jwt/simple_lru_cache_inl.h
     - source/exe/main_common.cc
     - source/exe/main_common.h
     - source/extensions/common/aws/utility.cc
     - source/server/config_validation/server.cc
     - test/common/common/log_macros_test.cc
+    - test/common/jwt/simple_lru_cache_test.cc
     - test/common/protobuf/utility_test.cc
     - test/integration/integration.h
     - test/test_common/simulated_time_system.cc

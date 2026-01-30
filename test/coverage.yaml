@@ -12,6 +12,7 @@ directories:
   source/common/http/http1: 93.4  # To be removed when http_inspector_use_balsa_parser is retired.
   source/common/http/http2: 96.6
   source/common/json: 95.2
+  source/common/jwt: 86.2
   source/common/matcher: 95.0
   source/common/memory: 98.1  # tcmalloc code path is not enabled in coverage build, only gperf tcmalloc, see PR#32589
   source/common/network: 94.3  # Flaky, `activateFileEvents`, `startSecureTransport` and `ioctl`, listener_socket do not always report LCOV
