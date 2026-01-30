@@ -55,7 +55,8 @@ constexpr const char* envoy_dynamic_modules_abi_version = ENVOY_DYNAMIC_MODULES_
 
 extern "C" {
 #else
-const char* __attribute__((weak)) envoy_dynamic_modules_abi_version = ENVOY_DYNAMIC_MODULES_ABI_VERSION;
+const char* __attribute__((weak)) envoy_dynamic_modules_abi_version =
+    ENVOY_DYNAMIC_MODULES_ABI_VERSION;
 
 #include <stdbool.h>
 #include <stddef.h>
