@@ -153,7 +153,6 @@ def envoy_dependencies(skip_targets = []):
     _com_github_fmtlib_fmt()
     _com_github_gabime_spdlog()
     _com_github_google_benchmark()
-    _com_github_google_jwt_verify()
     _com_github_google_libprotobuf_mutator()
     _com_github_google_libsxg()
     _com_github_google_tcmalloc()
@@ -783,13 +782,6 @@ def _emsdk():
         patches = ["@envoy//bazel:emsdk.patch"],
     )
 
-def _com_github_google_jwt_verify():
-    external_http_archive(
-        "com_github_google_jwt_verify",
-        patches = ["@envoy//bazel:jwt_verify_lib.patch"],
-        patch_args = ["-p1"],
-    )
-
 def _com_github_luajit_luajit():
     external_http_archive(
         name = "com_github_luajit_luajit",
@@ -880,13 +872,6 @@ filegroup(
         # For now, let's just drop this dependency from Kafka, as it's used only for monitoring.
         patches = ["@envoy//bazel/foreign_cc:librdkafka.patch"],
         patch_args = ["-p1"],
-    )
-
-    # This archive provides Kafka (and Zookeeper) binaries, that are used during Kafka integration
-    # tests.
-    external_http_archive(
-        name = "kafka_server_binary",
-        build_file_content = BUILD_ALL_CONTENT,
     )
 
 def _com_github_fdio_vpp_vcl():

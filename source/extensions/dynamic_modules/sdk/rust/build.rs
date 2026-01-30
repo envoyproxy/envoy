@@ -11,20 +11,20 @@ fn main() {
   // will try to use the system clang from PATH. So, this doesn't affect the local builds.
   // In any case, clang must be found to build the bindings.
 
-  println!("cargo:rerun-if-changed=../../abi.h");
+  println!("cargo:rerun-if-changed=../../abi/abi.h");
 
   let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
   let abi_version_path = out_path.join("generated_abi_version.h");
 
   // Calculate SHA256 of abi.h to generate abi_version.h
   let output = Command::new("sha256sum")
-    .arg("../../abi.h")
+    .arg("../../abi/abi.h")
     .output()
     .or_else(|_| {
       Command::new("shasum")
         .arg("-a")
         .arg("256")
-        .arg("../../abi.h")
+        .arg("../../abi/abi.h")
         .output()
     })
     .expect("Failed to execute sha256sum or shasum. Make sure one of them is available in PATH.");
@@ -64,7 +64,7 @@ const char* kAbiVersion = "{}";
   std::fs::write(&abi_version_path, version_content).expect("Failed to write generated header");
 
   let bindings = bindgen::Builder::default()
-    .header("../../abi.h")
+    .header("../../abi/abi.h")
     .header(abi_version_path.to_str().unwrap())
     .clang_arg("-v")
     .default_enum_style(bindgen::EnumVariation::Rust {

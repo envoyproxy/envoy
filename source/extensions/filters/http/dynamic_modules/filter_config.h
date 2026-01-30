@@ -3,7 +3,7 @@
 #include "envoy/server/factory_context.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "source/extensions/dynamic_modules/abi.h"
+#include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 
 namespace Envoy {

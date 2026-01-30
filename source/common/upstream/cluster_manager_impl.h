@@ -312,6 +312,7 @@ public:
     // Make sure we destroy all potential outgoing connections before this returns.
     cds_api_.reset();
     xds_manager_.shutdown();
+    load_stats_reporter_.reset();
     active_clusters_.clear();
     warming_clusters_.clear();
     updateClusterCounts();
