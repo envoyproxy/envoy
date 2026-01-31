@@ -114,6 +114,10 @@ StatsAccessLog::StatsAccessLog(const envoy::extensions::access_loggers::stats::v
                   fmt::format("Duplicate access log type '{}' in gauge operations.",
                               static_cast<int>(trigger.log_type())));
             }
+            if (trigger.operation_type() == envoy::extensions::access_loggers::stats::v3::Config::
+                                                Gauge::Operation::UNSPECIFIED) {
+              throw EnvoyException("Stats logger gauge operation cannot be UNSPECIFIED.");
+            }
             operations[trigger.log_type()] = trigger.operation_type();
 
             if (trigger.operation_type() ==

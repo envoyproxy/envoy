@@ -139,13 +139,13 @@ message Config {
     message Operation {
       // The operation to perform on the gauge.
       enum OperationType {
-        // If it is ``UNSPECIFIED``, it will be no-op.
+        // Not a valid operation. It will fail validation if used.
         UNSPECIFIED = 0;
-        // Set a value to the gauge.
+        // Set the gauge value to the configured value.
         SET = 1;
-        // Add a value to the gauge.
+        // Add the configured value to the gauge.
         ADD = 2;
-        // Subtract a value from the gauge.
+        // Subtract the configured value from the gauge.
         SUBTRACT = 3;
       }
 

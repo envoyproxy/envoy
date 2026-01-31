@@ -482,6 +482,21 @@ TEST_F(StatsAccessLoggerTest, GaugeMissingSubtract) {
       "is present.");
 }
 
+TEST_F(StatsAccessLoggerTest, GaugeUnspecifiedOperation) {
+  const std::string yaml = R"EOF(
+    stat_prefix: test_stat_prefix
+    gauges:
+      - stat:
+          name: gauge
+        value_fixed: 42
+        operations:
+        - log_type: DownstreamStart
+          operation_type: UNSPECIFIED
+)EOF";
+  EXPECT_THROW_WITH_MESSAGE(initialize(yaml), EnvoyException,
+                            "Stats logger gauge operation cannot be UNSPECIFIED.");
+}
+
 TEST_F(StatsAccessLoggerTest, GaugeNeitherSetNorAddSubtract) {
   const std::string yaml = R"EOF(
     stat_prefix: test_stat_prefix
