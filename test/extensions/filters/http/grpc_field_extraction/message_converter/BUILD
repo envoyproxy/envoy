@@ -31,7 +31,7 @@ envoy_cc_test(
         "//test/proto:apikeys_proto_cc_proto",
         "//test/test_common:status_utility_lib",
         "@com_google_protofieldextraction//:all_libs",
-        "@ocp//ocpdiag/core/testing:status_matchers",
+        "@ocp-diag-core//ocpdiag/core/testing:status_matchers",
     ],
 )
 
@@ -46,7 +46,7 @@ envoy_cc_test(
         "//test/proto:apikeys_proto_cc_proto",
         "//test/test_common:status_utility_lib",
         "@com_google_protofieldextraction//:all_libs",
-        "@ocp//ocpdiag/core/testing:status_matchers",
+        "@ocp-diag-core//ocpdiag/core/testing:status_matchers",
     ],
 )
 

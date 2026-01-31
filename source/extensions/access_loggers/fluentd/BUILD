@@ -29,7 +29,7 @@ envoy_cc_library(
         "//source/common/access_log:access_log_lib",
         "//source/extensions/access_loggers/common:access_log_base",
         "//source/extensions/common/fluentd:fluentd_base_lib",
-        "@com_github_msgpack_cpp//:msgpack",
+        "@msgpack-cxx//:msgpack",
         "@envoy_api//envoy/extensions/access_loggers/fluentd/v3:pkg_cc_proto",
     ],
 )

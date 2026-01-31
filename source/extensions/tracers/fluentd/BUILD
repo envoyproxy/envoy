@@ -34,7 +34,7 @@ envoy_cc_library(
         "//source/common/tracing:trace_context_lib",
         "//source/extensions/common/fluentd:fluentd_base_lib",
         "//source/extensions/tracers/common:factory_base_lib",
-        "@com_github_msgpack_cpp//:msgpack",
+        "@msgpack-cxx//:msgpack",
         "@envoy_api//envoy/extensions/tracers/fluentd/v3:pkg_cc_proto",
     ],
 )

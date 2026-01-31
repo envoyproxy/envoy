@@ -29,7 +29,7 @@ envoy_cc_test(
         "@com_google_protofieldextraction//:all_libs",
         "@com_google_protofieldextraction//proto_field_extraction/test_utils:utils",
         "@com_google_protoprocessinglib//proto_processing_lib/proto_scrubber:field_mask_path_checker",
-        "@ocp//ocpdiag/core/testing:parse_text_proto",
-        "@ocp//ocpdiag/core/testing:status_matchers",
+        "@ocp-diag-core//ocpdiag/core/testing:parse_text_proto",
+        "@ocp-diag-core//ocpdiag/core/testing:status_matchers",
     ],
 )
