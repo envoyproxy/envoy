@@ -280,12 +280,6 @@ TEST_P(StatsAccessLogIntegrationTest, SubtractWithoutAdd) {
 
   // After DownstreamEnd is logged, subtract should be skipped because Add didn't happen.
   // Gauge should still be 0.
-  // If the logic was wrong and it subtracted 1 from 0, it would be non-zero (underflow).
-  // We rely on the fact that if it underflowed, it wouldn't be 0.
-  // We also assume the stat is created or we can check it.
-  // Since the access logger runs at DownstreamEnd, it *will* try to look up the stat.
-  // If it skips subtract, the gauge might be created with default 0 value or looked up.
-  // `waitForGaugeEq` ensures the gauge exists and has value 0.
   test_server_->waitForGaugeEq("test_stat_prefix.active_requests.request_header_tag.my-tag", 0);
 }
 
