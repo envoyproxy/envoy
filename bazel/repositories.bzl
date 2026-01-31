@@ -170,6 +170,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_jbeder_yaml_cpp()
     _com_github_libevent_libevent()
     _com_github_luajit_luajit()
+    _com_github_openresty_luajit2()
     _com_github_nghttp2_nghttp2()
     _com_github_msgpack_cpp()
     _com_github_skyapm_cpp2sky()
@@ -788,6 +789,20 @@ def _com_github_luajit_luajit():
         build_file_content = BUILD_ALL_CONTENT,
         patches = ["@envoy//bazel/foreign_cc:luajit.patch"],
         patch_args = ["-p1"],
+    )
+
+def _com_github_openresty_luajit2():
+    external_http_archive(
+        name = "com_github_openresty_luajit2",
+        build_file_content = BUILD_ALL_CONTENT,
+        patches = ["@envoy//bazel/foreign_cc:openresty-luajit2.patch"],
+        patch_args = ["-p1"],
+        patch_cmds = ["chmod u+x build.py"],
+    )
+
+    native.bind(
+        name = "openresty-luajit2",
+        actual = "@envoy//bazel/foreign_cc:openresty-luajit2",
     )
 
 def _com_github_google_tcmalloc():
