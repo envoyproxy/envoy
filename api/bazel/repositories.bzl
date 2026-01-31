@@ -55,6 +55,7 @@ def api_dependencies(bzlmod = False):
         repo_mapping = {
             "@com_google_googleapis": "@googleapis",
             "@com_github_grpc_grpc": "@grpc",
+            "@com_googlesource_code_re2": "@re2",
         },
     )
     external_http_archive(
