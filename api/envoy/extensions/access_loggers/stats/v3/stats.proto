@@ -100,7 +100,7 @@ message Config {
   //
   // The ``operations`` field determines how the gauge is modified based on the
   // access log type.
-  // Using the `SET` operation is straightforward and self-explanatory.
+  // Using the ``SET`` operation is straightforward and self-explanatory.
   // The following example demonstrates how to use an ``ADD/SUBTRACT`` pair to
   // track a gauge by configuring a single stats access logger:
   //
