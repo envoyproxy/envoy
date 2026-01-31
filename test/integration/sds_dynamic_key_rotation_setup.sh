@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -e
+set -eu
 
 TEST_CERTS="${TEST_SRCDIR}/${TEST_WORKSPACE}/test/config/integration/certs"
 

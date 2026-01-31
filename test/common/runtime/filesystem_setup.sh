@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -e
+set -eu
 
 ENVOY_SRCDIR="${TEST_SRCDIR}/${TEST_WORKSPACE}"
 TEST_DATA=test/common/runtime/test_data
@@ -21,7 +21,7 @@ mkdir -p "${LOOP_PATH}"
 
 # the ln in MSYS2 doesn't handle recursive symlinks correctly,
 # so use the cmd built in mklink instead on Windows
-if [[ -z "${WINDIR}" ]]; then
+if [[ -z "${WINDIR:-}" ]]; then
   ln -sf "${TEST_TMPDIR}/${TEST_DATA}/root" "${TEST_TMPDIR}/${TEST_DATA}/current"
   ln -sf "${TEST_TMPDIR}/${TEST_DATA}/root/envoy/subdir" "${TEST_TMPDIR}/${TEST_DATA}/root/envoy/badlink"
   ln -sf "${LOOP_PATH}" "${LOOP_PATH}"/loop

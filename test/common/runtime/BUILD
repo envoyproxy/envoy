@@ -32,7 +32,9 @@ envoy_cc_test(
 envoy_cc_test(
     name = "runtime_impl_test",
     srcs = ["runtime_impl_test.cc"],
-    data = glob(["test_data/**"]) + ["filesystem_setup.sh"],
+    data = glob(["test_data/**"]) + [
+        "filesystem_setup.sh",
+    ],
     rbe_pool = "6gig",
     deps = [
         "//source/common/config:runtime_utility_lib",

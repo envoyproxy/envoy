@@ -35,6 +35,20 @@ exports_files([
     "exported_symbols_apple.txt",
 ])
 
+# TODO(phlax): Cleanup once bzlmod migration is complete
+bool_flag(
+    name = "enable_bzlmod",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "bzlmod_mode",
+    flag_values = {
+        ":enable_bzlmod": "True",
+    },
+    visibility = ["//visibility:public"],
+)
+
 sh_library(
     name = "volatile_env",
     srcs = ["volatile_env.sh"],
@@ -584,6 +598,52 @@ check_removed_fips_define(
 label_flag(
     name = "zlib",
     build_setting_default = "@zlib-ng",
+)
+
+# TODO(phlax): Cleanup once bzlmod migration is complete.
+# Compatibility aliases: select between the foreign_cc build and the module-provided library.
+# Once bzlmod is the only supported mode these become plain aliases to the module (or can
+# be removed entirely along with //bazel/foreign_cc).
+alias(
+    name = "libevent",
+    actual = select({
+        ":bzlmod_mode": "@libevent",
+        "//conditions:default": "//bazel/foreign_cc:_event_foreign_cc",
+    }),
+    visibility = ["//visibility:public"],
+)
+
+alias(
+    name = "luajit",
+    actual = select({
+        ":bzlmod_mode": "@luajit",
+        "//conditions:default": "//bazel/foreign_cc:_luajit_foreign_cc",
+    }),
+    visibility = ["//visibility:public"],
+)
+
+alias(
+    name = "libmaxminddb",
+    actual = select({
+        ":bzlmod_mode": "@libmaxminddb",
+        "//conditions:default": "//bazel/foreign_cc:maxmind",
+    }),
+    visibility = ["//visibility:public"],
+)
+
+# TODO(phlax): Cleanup once bzlmod migration is complete.
+# Platform-gated wrapper for libmaxminddb; only links on Linux and macOS.
+# cc_library is equivalent to envoy_cc_library for this deps-only wrapper: copts,
+# linkstatic, and Windows handling from envoy_cc_library only apply to compiled srcs.
+cc_library(
+    name = "maxmind_linux_darwin",
+    srcs = [],
+    visibility = ["//visibility:public"],
+    deps = select({
+        "//bazel:linux": [":libmaxminddb"],
+        "//bazel:darwin_any": [":libmaxminddb"],
+        "//conditions:default": [],
+    }),
 )
 
 config_setting(

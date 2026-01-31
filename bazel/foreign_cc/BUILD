@@ -176,7 +176,7 @@ cc_library(
 )
 
 configure_make(
-    name = "luajit",
+    name = "_luajit_foreign_cc",
     configure_command = "luajit_build.sh",
     env = select({
         # This shouldn't be needed! See
@@ -333,7 +333,7 @@ envoy_cmake(
 )
 
 envoy_cmake(
-    name = "event",
+    name = "_event_foreign_cc",
     build_args = select({
         "//bazel/foreign_cc:parallel_builds_enabled": ["-j"],
         "//conditions:default": ["-j1"],
@@ -509,16 +509,6 @@ envoy_cmake(
     lib_source = "@libmaxminddb//:all",
     out_static_libs = ["libmaxminddb.a"],
     tags = ["skip_on_windows"],
-)
-
-envoy_cc_library(
-    name = "maxmind_linux_darwin",
-    srcs = [],
-    deps = select({
-        "//bazel:linux": [":maxmind"],
-        "//bazel:darwin_any": [":maxmind"],
-        "//conditions:default": [],
-    }),
 )
 
 configure_make(

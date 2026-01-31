@@ -233,6 +233,7 @@ FIPS
 FIRSTHDR
 FQDN
 FREEBIND
+bzlmod
 curr
 doo
 eslint
@@ -964,6 +965,7 @@ hackery
 hacky
 handoff
 handshaker
+hardcode
 hardcoded
 hardcodes
 hardcoding
@@ -1680,6 +1682,7 @@ wildcard
 wildcards
 winsock
 workspace
+workspaces
 writev
 wrsq
 www
