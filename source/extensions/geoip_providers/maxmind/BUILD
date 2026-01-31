@@ -41,9 +41,11 @@ envoy_cc_library(
     hdrs = ["geoip_provider.h"],
     tags = ["skip_on_windows"],
     deps = [
-        "//bazel/foreign_cc:maxmind_linux_darwin",
         "//envoy/geoip:geoip_provider_driver_interface",
         "//source/common/common:thread_synchronizer_lib",
         "@envoy_api//envoy/extensions/geoip_providers/maxmind/v3:pkg_cc_proto",
-    ],
+    ] + select({
+        "//bazel:bzlmod_mode": ["@libmaxminddb"],
+        "//conditions:default": ["//bazel/foreign_cc:maxmind_linux_darwin"],
+    }),
 )

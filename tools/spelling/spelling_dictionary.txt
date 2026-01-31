@@ -231,6 +231,7 @@ FIPS
 FIRSTHDR
 FQDN
 FREEBIND
+bzlmod
 curr
 doo
 eslint
@@ -1675,6 +1676,7 @@ wildcard
 wildcards
 winsock
 workspace
+workspaces
 writev
 wrsq
 www
