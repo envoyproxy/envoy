@@ -38,7 +38,8 @@ file_descriptor_set_text = rule(
             doc = "List of all proto_library deps to be included.",
         ),
         "proto_repositories": attr.string_list(
-            default = ["envoy_api"],
+            # TODO(phlax): Cleanup once bzlmod migration is complete
+            default = ["envoy_api", "envoy_api~"],
             allow_empty = False,
         ),
         "with_external_deps": attr.bool(

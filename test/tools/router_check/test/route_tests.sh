@@ -2,11 +2,22 @@
 
 set -e
 
+# TODO(phlax): Cleanup once bzlmod migration is complete
+# Detect workspace name - in WORKSPACE it's 'envoy', in bzlmod it could be '_main' or 'envoy~'
+for workspace_name in envoy envoy~ _main; do
+    if [[ -d "${TEST_SRCDIR}/${workspace_name}" ]]; then
+        ENVOY_WORKSPACE="${workspace_name}"
+        break
+    fi
+done
+# Fallback to 'envoy' if detection fails
+ENVOY_WORKSPACE="${ENVOY_WORKSPACE:-envoy}"
+
 # Router_check_tool binary path
-PATH_BIN="${TEST_SRCDIR}/envoy"/test/tools/router_check/router_check_tool
+PATH_BIN="${TEST_SRCDIR}/${ENVOY_WORKSPACE}"/test/tools/router_check/router_check_tool
 
 # Config json path
-PATH_CONFIG="${TEST_SRCDIR}/envoy"/test/tools/router_check/test/config
+PATH_CONFIG="${TEST_SRCDIR}/${ENVOY_WORKSPACE}"/test/tools/router_check/test/config
 
 TESTS=("ContentType" "ClusterHeader" "DirectResponse" "HeaderMatchedRouting" "Redirect" "Redirect2" "Redirect3" "Redirect4" "Runtime" "TestRoutes" "Weighted")
 

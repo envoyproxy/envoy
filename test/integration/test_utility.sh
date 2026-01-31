@@ -142,4 +142,18 @@ wait_for_stat() {
     echo "$ret"
 }
 
-[[ -z "${ENVOY_BIN}" ]] && ENVOY_BIN="${TEST_SRCDIR}/envoy/source/exe/envoy-static"
+# TODO(phlax): Cleanup once bzlmod migration is complete
+# Detect workspace name - in WORKSPACE it's 'envoy', in bzlmod it could be '_main' or 'envoy~'
+detect_workspace_name() {
+    for workspace_name in envoy envoy~ _main; do
+        if [[ -d "${TEST_SRCDIR}/${workspace_name}" ]]; then
+            echo "${workspace_name}"
+            return
+        fi
+    done
+    # Fallback to 'envoy' if detection fails
+    echo "envoy"
+}
+
+ENVOY_WORKSPACE=$(detect_workspace_name)
+[[ -z "${ENVOY_BIN}" ]] && ENVOY_BIN="${TEST_SRCDIR}/${ENVOY_WORKSPACE}/source/exe/envoy-static"

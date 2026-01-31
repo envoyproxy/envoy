@@ -1,16 +1,21 @@
 #!/usr/bin/env bash
 
 tmp="${TEST_TMPDIR}/test/integration/admin_html/tempfiles"
-export ENVOY_BIN="${TEST_SRCDIR}/envoy/test/integration/admin_html/test_server"
+
+# TODO(phlax): Cleanup once bzlmod migration is complete
 # shellcheck source=test/integration/test_utility.sh
-source "${TEST_SRCDIR}/envoy/test/integration/test_utility.sh"
+source "${TEST_SRCDIR}/envoy/test/integration/test_utility.sh" 2>/dev/null || \
+  source "${TEST_SRCDIR}/envoy~/test/integration/test_utility.sh" 2>/dev/null || \
+  source "${TEST_SRCDIR}/_main/test/integration/test_utility.sh"
+
+export ENVOY_BIN="${TEST_SRCDIR}/${ENVOY_WORKSPACE}/test/integration/admin_html/test_server"
 
 # Verifies that a file can be fetched from the admin address, and it matches
 # the source file from the repo.
 check_file() {
   file="$1"
   check curl "$admin_address/test?file=$file" --output "$tmp/$file.out"
-  check check diff "$tmp/$file.out" "${TEST_SRCDIR}/envoy/test/integration/admin_html/$file"
+  check check diff "$tmp/$file.out" "${TEST_SRCDIR}/${ENVOY_WORKSPACE}/test/integration/admin_html/$file"
 }
 
 # We also want to verify nothing terrible can happen with this server if we

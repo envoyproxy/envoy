@@ -2,7 +2,18 @@
 
 set -e
 
-TEST_CERTS="${TEST_SRCDIR}"/envoy/test/config/integration/certs
+# TODO(phlax): Cleanup once bzlmod migration is complete
+# Detect workspace name - in WORKSPACE it's 'envoy', in bzlmod it could be '_main' or 'envoy~'
+for workspace_name in envoy envoy~ _main; do
+    if [[ -d "${TEST_SRCDIR}/${workspace_name}" ]]; then
+        ENVOY_WORKSPACE="${workspace_name}"
+        break
+    fi
+done
+# Fallback to 'envoy' if detection fails
+ENVOY_WORKSPACE="${ENVOY_WORKSPACE:-envoy}"
+
+TEST_CERTS="${TEST_SRCDIR}/${ENVOY_WORKSPACE}"/test/config/integration/certs
 
 ROOT="${TEST_TMPDIR}"/root
 SERVER_KEYCERT="${ROOT}"/server

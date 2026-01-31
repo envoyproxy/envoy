@@ -4,8 +4,19 @@ set -e
 
 TEST_DATA=test/common/runtime/test_data
 
+# TODO(phlax): Cleanup once bzlmod migration is complete
+# Detect workspace name - in WORKSPACE it's 'envoy', in bzlmod it could be '_main' or 'envoy~'
+for workspace_name in envoy envoy~ _main; do
+    if [[ -d "${TEST_SRCDIR}/${workspace_name}" ]]; then
+        ENVOY_WORKSPACE="${workspace_name}"
+        break
+    fi
+done
+# Fallback to 'envoy' if detection fails
+ENVOY_WORKSPACE="${ENVOY_WORKSPACE:-envoy}"
+
 # Regular runtime tests.
-cd "${TEST_SRCDIR}/envoy"
+cd "${TEST_SRCDIR}/${ENVOY_WORKSPACE}"
 rm -rf "${TEST_TMPDIR:?}/${TEST_DATA}"
 mkdir -p "${TEST_TMPDIR}/${TEST_DATA}"
 cp -RfL "${TEST_DATA}"/* "${TEST_TMPDIR}/${TEST_DATA}"

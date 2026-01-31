@@ -298,9 +298,30 @@ const std::string& TestEnvironment::temporaryDirectory() {
   CONSTRUCT_ON_FIRST_USE(std::string, getTemporaryDirectory());
 }
 
+// TODO(phlax): Cleanup once bzlmod migration is complete
+// Helper to detect workspace name - in WORKSPACE it's 'envoy', in bzlmod it could be '_main' or 'envoy~'
+std::string detectWorkspaceName() {
+  static const std::vector<std::string> workspace_names = {"envoy", "envoy~", "_main"};
+  for (const auto& workspace : workspace_names) {
+    auto path = Runfiles::CreateForTest()->Rlocation(workspace);
+    if (!path.empty() && Filesystem::directoryExists(path)) {
+      return workspace;
+    }
+  }
+  // Fallback to 'envoy' if detection fails
+  return "envoy";
+}
+
 std::string TestEnvironment::runfilesDirectory(const std::string& workspace) {
   RELEASE_ASSERT(runfiles_ != nullptr, "");
-  auto path = runfiles_->Rlocation(workspace);
+  // TODO(phlax): Cleanup once bzlmod migration is complete
+  // If using default workspace, try to detect the actual workspace name
+  std::string actual_workspace = workspace;
+  if (workspace == "envoy") {
+    static const std::string detected_workspace = detectWorkspaceName();
+    actual_workspace = detected_workspace;
+  }
+  auto path = runfiles_->Rlocation(actual_workspace);
 #ifdef WIN32
   path = std::regex_replace(path, std::regex("\\\\"), "/");
 #endif
@@ -309,7 +330,14 @@ std::string TestEnvironment::runfilesDirectory(const std::string& workspace) {
 
 std::string TestEnvironment::runfilesPath(const std::string& path, const std::string& workspace) {
   RELEASE_ASSERT(runfiles_ != nullptr, "");
-  return runfiles_->Rlocation(absl::StrCat(workspace, "/", path));
+  // TODO(phlax): Cleanup once bzlmod migration is complete
+  // If using default workspace, try to detect the actual workspace name
+  std::string actual_workspace = workspace;
+  if (workspace == "envoy") {
+    static const std::string detected_workspace = detectWorkspaceName();
+    actual_workspace = detected_workspace;
+  }
+  return runfiles_->Rlocation(absl::StrCat(actual_workspace, "/", path));
 }
 
 const std::string TestEnvironment::unixDomainSocketDirectory() {

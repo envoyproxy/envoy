@@ -9,9 +9,13 @@
 # source/exe/envoy-static. If this starts failing to run or build, ensure that
 # source/exe/main.cc and ./hotrestart_main.cc have not diverged except for
 # adding the new gauge.
-export ENVOY_BIN="${TEST_SRCDIR}"/envoy/test/integration/hotrestart_main
+# TODO(phlax): Cleanup once bzlmod migration is complete
 # shellcheck source=test/integration/test_utility.sh
-source "$TEST_SRCDIR/envoy/test/integration/test_utility.sh"
+source "$TEST_SRCDIR/envoy/test/integration/test_utility.sh" 2>/dev/null || \
+  source "$TEST_SRCDIR/envoy~/test/integration/test_utility.sh" 2>/dev/null || \
+  source "$TEST_SRCDIR/_main/test/integration/test_utility.sh"
+
+export ENVOY_BIN="${TEST_SRCDIR}/${ENVOY_WORKSPACE}/test/integration/hotrestart_main"
 
 # TODO(htuch): In this test script, we are duplicating work done in test_environment.cc via sed.
 # Instead, we can add a simple C++ binary that links against test_environment.cc and uses the
@@ -27,8 +31,8 @@ if [[ -z "${ENVOY_IP_TEST_VERSIONS}" ]] || [[ "${ENVOY_IP_TEST_VERSIONS}" == "al
   || [[ "${ENVOY_IP_TEST_VERSIONS}" == "v4only" ]]; then
   HOT_RESTART_JSON_V4="${TEST_TMPDIR}"/hot_restart_v4.yaml
   echo "building ${HOT_RESTART_JSON_V4} ..."
-  sed -e "s#{{ upstream_. }}#0#g" "${TEST_SRCDIR}/envoy"/test/config/integration/server.yaml | \
-    sed -e "s#{{ test_rundir }}#$TEST_SRCDIR/envoy#" | \
+  sed -e "s#{{ upstream_. }}#0#g" "${TEST_SRCDIR}/${ENVOY_WORKSPACE}"/test/config/integration/server.yaml | \
+    sed -e "s#{{ test_rundir }}#$TEST_SRCDIR/${ENVOY_WORKSPACE}#" | \
     sed -e "s#{{ test_tmpdir }}#$TEST_TMPDIR#" | \
     sed -e "s#{{ ip_loopback_address }}#127.0.0.1#" | \
     sed -e "s#{{ enable_reuse_port }}#false#" | \
@@ -41,8 +45,8 @@ fi
 if [[ -z "${ENVOY_IP_TEST_VERSIONS}" ]] || [[ "${ENVOY_IP_TEST_VERSIONS}" == "all" ]] \
   || [[ "${ENVOY_IP_TEST_VERSIONS}" == "v6only" ]]; then
   HOT_RESTART_JSON_V6="${TEST_TMPDIR}"/hot_restart_v6.yaml
-  sed -e "s#{{ upstream_. }}#0#g" "${TEST_SRCDIR}/envoy"/test/config/integration/server.yaml | \
-    sed -e "s#{{ test_rundir }}#$TEST_SRCDIR/envoy#" | \
+  sed -e "s#{{ upstream_. }}#0#g" "${TEST_SRCDIR}/${ENVOY_WORKSPACE}"/test/config/integration/server.yaml | \
+    sed -e "s#{{ test_rundir }}#$TEST_SRCDIR/${ENVOY_WORKSPACE}#" | \
     sed -e "s#{{ test_tmpdir }}#$TEST_TMPDIR#" | \
     sed -e "s#{{ ip_loopback_address }}#::1#" | \
     sed -e "s#{{ enable_reuse_port }}#false#" | \
@@ -56,7 +60,7 @@ fi
 # upstreams to avoid too much wild sedding.
 HOT_RESTART_JSON_UDS="${TEST_TMPDIR}"/hot_restart_uds.yaml
 SOCKET_DIR="$(mktemp -d /tmp/envoy_test_hotrestart.XXXXXX)"
-sed -e "s#{{ socket_dir }}#${SOCKET_DIR}#" "${TEST_SRCDIR}/envoy"/test/config/integration/server_unix_listener.yaml | \
+sed -e "s#{{ socket_dir }}#${SOCKET_DIR}#" "${TEST_SRCDIR}/${ENVOY_WORKSPACE}"/test/config/integration/server_unix_listener.yaml | \
   sed -e "s#{{ ip_loopback_address }}#127.0.0.1#" | \
   sed -e "s#{{ null_device_path }}#/dev/null#" | \
   cat > "${HOT_RESTART_JSON_UDS}"
@@ -65,8 +69,8 @@ JSON_TEST_ARRAY+=("${HOT_RESTART_JSON_UDS}")
 # Test reuse_port listener.
 HOT_RESTART_JSON_REUSE_PORT="${TEST_TMPDIR}"/hot_restart_v4.yaml
 echo "building ${HOT_RESTART_JSON_V4} ..."
-sed -e "s#{{ upstream_. }}#0#g" "${TEST_SRCDIR}/envoy"/test/config/integration/server.yaml | \
-  sed -e "s#{{ test_rundir }}#$TEST_SRCDIR/envoy#" | \
+sed -e "s#{{ upstream_. }}#0#g" "${TEST_SRCDIR}/${ENVOY_WORKSPACE}"/test/config/integration/server.yaml | \
+  sed -e "s#{{ test_rundir }}#$TEST_SRCDIR/${ENVOY_WORKSPACE}#" | \
   sed -e "s#{{ test_tmpdir }}#$TEST_TMPDIR#" | \
   sed -e "s#{{ ip_loopback_address }}#127.0.0.1#" | \
   sed -e "s#{{ enable_reuse_port }}#true#" | \
@@ -78,8 +82,8 @@ JSON_TEST_ARRAY+=("${HOT_RESTART_JSON_REUSE_PORT}")
 # Test reuse_port listener with multiple addresses.
 HOT_RESTART_JSON_REUSE_PORT_MULTI_ADDRESSES="${TEST_TMPDIR}"/hot_restart_v4_multiple_addresses.yaml
 echo "building ${HOT_RESTART_JSON_V4} ..."
-sed -e "s#{{ upstream_. }}#0#g" "${TEST_SRCDIR}/envoy"/test/config/integration/server_multiple_addresses.yaml | \
-  sed -e "s#{{ test_rundir }}#$TEST_SRCDIR/envoy#" | \
+sed -e "s#{{ upstream_. }}#0#g" "${TEST_SRCDIR}/${ENVOY_WORKSPACE}"/test/config/integration/server_multiple_addresses.yaml | \
+  sed -e "s#{{ test_rundir }}#$TEST_SRCDIR/${ENVOY_WORKSPACE}#" | \
   sed -e "s#{{ test_tmpdir }}#$TEST_TMPDIR#" | \
   sed -e "s#{{ ip_loopback_address }}#127.0.0.1#" | \
   sed -e "s#{{ enable_reuse_port }}#true#" | \
@@ -137,7 +141,7 @@ function run_testsuite() {
   sleep 3
 
   UPDATED_HOT_RESTART_JSON="${TEST_TMPDIR}"/hot_restart_updated."${TEST_INDEX}".yaml
-  "${TEST_SRCDIR}/envoy"/tools/socket_passing/socket_passing "-o" "${HOT_RESTART_JSON}" "-a" "${ADMIN_ADDRESS_PATH_0}" \
+  "${TEST_SRCDIR}/${ENVOY_WORKSPACE}"/tools/socket_passing/socket_passing "-o" "${HOT_RESTART_JSON}" "-a" "${ADMIN_ADDRESS_PATH_0}" \
     "-u" "${UPDATED_HOT_RESTART_JSON}"
 
   # Send SIGUSR1 signal to the first server, this should not kill it. Also send SIGHUP which should
@@ -205,7 +209,7 @@ function run_testsuite() {
 
   start_test "Checking that listener addresses have not changed"
   HOT_RESTART_JSON_1="${TEST_TMPDIR}"/hot_restart.1."${TEST_INDEX}".yaml
-  "${TEST_SRCDIR}/envoy"/tools/socket_passing/socket_passing "-o" "${UPDATED_HOT_RESTART_JSON}" "-a" "${ADMIN_ADDRESS_PATH_1}" \
+  "${TEST_SRCDIR}/${ENVOY_WORKSPACE}"/tools/socket_passing/socket_passing "-o" "${UPDATED_HOT_RESTART_JSON}" "-a" "${ADMIN_ADDRESS_PATH_1}" \
     "-u" "${HOT_RESTART_JSON_1}"
   CONFIG_DIFF=$(diff "${UPDATED_HOT_RESTART_JSON}" "${HOT_RESTART_JSON_1}")
   [[ -z "${CONFIG_DIFF}" ]]
@@ -264,7 +268,7 @@ function run_testsuite() {
 
   start_test "Checking that listener addresses have not changed"
   HOT_RESTART_JSON_2="${TEST_TMPDIR}"/hot_restart.2."${TEST_INDEX}".yaml
-  "${TEST_SRCDIR}/envoy"/tools/socket_passing/socket_passing "-o" "${UPDATED_HOT_RESTART_JSON}" "-a" "${ADMIN_ADDRESS_PATH_2}" \
+  "${TEST_SRCDIR}/${ENVOY_WORKSPACE}"/tools/socket_passing/socket_passing "-o" "${UPDATED_HOT_RESTART_JSON}" "-a" "${ADMIN_ADDRESS_PATH_2}" \
     "-u" "${HOT_RESTART_JSON_2}"
   CONFIG_DIFF=$(diff "${UPDATED_HOT_RESTART_JSON}" "${HOT_RESTART_JSON_2}")
   [[ -z "${CONFIG_DIFF}" ]]

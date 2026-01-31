@@ -45,7 +45,11 @@ envoy_cc_test(
         "//test/config_test:example_configs_test_setup.sh",
     ],
     env = {
-        "EXAMPLE_CONFIGS_TAR_PATH": "envoy/configs/example_contrib_configs.tar",
+        # TODO(phlax): Cleanup once bzlmod migration is complete
+        "EXAMPLE_CONFIGS_TAR_PATH": select({
+            "//bazel:bzlmod_mode": "_main/configs/example_contrib_configs.tar",
+            "//conditions:default": "envoy/configs/example_contrib_configs.tar",
+        }),
         "DISABLE_TEST_MERGE": "true",
         "GODEBUG": "cgocheck=0",
     },
