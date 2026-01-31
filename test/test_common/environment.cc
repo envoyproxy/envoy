@@ -300,27 +300,28 @@ const std::string& TestEnvironment::temporaryDirectory() {
 
 // TODO(phlax): Cleanup once bzlmod migration is complete
 // Helper to detect workspace name - in WORKSPACE it's 'envoy', in bzlmod it could be '_main' or 'envoy~'
-std::string detectWorkspaceName() {
-  static const std::vector<std::string> workspace_names = {"envoy", "envoy~", "_main"};
-  for (const auto& workspace : workspace_names) {
-    auto path = Runfiles::CreateForTest()->Rlocation(workspace);
-    if (!path.empty() && Filesystem::directoryExists(path)) {
-      return workspace;
+const std::string& detectWorkspaceName() {
+  // Cache the result in a static variable so we only detect once
+  static const std::string detected_workspace = []() {
+    static const std::vector<std::string> workspace_names = {"envoy", "envoy~", "_main"};
+    auto* runfiles = Runfiles::CreateForTest();
+    for (const auto& workspace : workspace_names) {
+      auto path = runfiles->Rlocation(workspace);
+      if (!path.empty() && Filesystem::directoryExists(path)) {
+        return workspace;
+      }
     }
-  }
-  // Fallback to 'envoy' if detection fails
-  return "envoy";
+    // Fallback to 'envoy' if detection fails
+    return std::string("envoy");
+  }();
+  return detected_workspace;
 }
 
 std::string TestEnvironment::runfilesDirectory(const std::string& workspace) {
   RELEASE_ASSERT(runfiles_ != nullptr, "");
   // TODO(phlax): Cleanup once bzlmod migration is complete
   // If using default workspace, try to detect the actual workspace name
-  std::string actual_workspace = workspace;
-  if (workspace == "envoy") {
-    static const std::string detected_workspace = detectWorkspaceName();
-    actual_workspace = detected_workspace;
-  }
+  const std::string& actual_workspace = (workspace == "envoy") ? detectWorkspaceName() : workspace;
   auto path = runfiles_->Rlocation(actual_workspace);
 #ifdef WIN32
   path = std::regex_replace(path, std::regex("\\\\"), "/");
@@ -332,11 +333,7 @@ std::string TestEnvironment::runfilesPath(const std::string& path, const std::st
   RELEASE_ASSERT(runfiles_ != nullptr, "");
   // TODO(phlax): Cleanup once bzlmod migration is complete
   // If using default workspace, try to detect the actual workspace name
-  std::string actual_workspace = workspace;
-  if (workspace == "envoy") {
-    static const std::string detected_workspace = detectWorkspaceName();
-    actual_workspace = detected_workspace;
-  }
+  const std::string& actual_workspace = (workspace == "envoy") ? detectWorkspaceName() : workspace;
   return runfiles_->Rlocation(absl::StrCat(actual_workspace, "/", path));
 }
 
