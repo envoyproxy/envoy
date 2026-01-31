@@ -141,10 +141,13 @@ message Config {
       enum OperationType {
         // Not a valid operation. It will fail validation if used.
         UNSPECIFIED = 0;
+
         // Set the gauge value to the configured value.
         SET = 1;
+
         // Add the configured value to the gauge.
         ADD = 2;
+
         // Subtract the configured value from the gauge.
         SUBTRACT = 3;
       }
