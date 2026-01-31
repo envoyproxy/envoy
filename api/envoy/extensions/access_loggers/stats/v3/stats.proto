@@ -98,10 +98,10 @@ message Config {
   // values, and are useful for tracking concurrency or other mutable values
   // over time.
   //
-  // The `operations` field determines how the gauge is modified based on the
+  // The ``operations`` field determines how the gauge is modified based on the
   // access log type.
   // Using the `SET` operation is straightforward and self-explanatory.
-  // The following example demonstrates how to use an `ADD/SUBTRACT` pair to
+  // The following example demonstrates how to use an ``ADD/SUBTRACT`` pair to
   // track a gauge by configuring a single stats access logger:
   //
   // .. code-block:: yaml
@@ -146,8 +146,7 @@ message Config {
       }
 
       // The access log type to trigger the operation.
-      envoy.data.accesslog.v3.AccessLogType log_type = 1
-          [(validate.rules).enum = {defined_only: true}];
+      data.accesslog.v3.AccessLogType log_type = 1 [(validate.rules).enum = {defined_only: true}];
 
       // The operation to perform.
       OperationType operation_type = 2 [(validate.rules).enum = {defined_only: true}];

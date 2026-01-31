@@ -110,8 +110,9 @@ StatsAccessLog::StatsAccessLog(const envoy::extensions::access_loggers::stats::v
 
           for (const auto& trigger : gauge_cfg.operations()) {
             if (operations.contains(trigger.log_type())) {
-              throw EnvoyException(fmt::format("Duplicate access log type '{}' in gauge operations.",
-                                               static_cast<int>(trigger.log_type())));
+              throw EnvoyException(
+                  fmt::format("Duplicate access log type '{}' in gauge operations.",
+                              static_cast<int>(trigger.log_type())));
             }
             operations[trigger.log_type()] = trigger.operation_type();
 
@@ -125,9 +126,9 @@ StatsAccessLog::StatsAccessLog(const envoy::extensions::access_loggers::stats::v
           }
 
           if ((add_count > 0 || subtract_count > 0) && (add_count != 1 || subtract_count != 1)) {
-            throw EnvoyException(
-                "Stats logger gauge must have exactly one ADD and one SUBTRACT operation defined if "
-                "either is present.");
+            throw EnvoyException("Stats logger gauge must have exactly one ADD and one SUBTRACT "
+                                 "operation defined if "
+                                 "either is present.");
           }
 
           if (operations.empty()) {
