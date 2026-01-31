@@ -100,7 +100,10 @@ Wasm::Wasm(WasmHandleSharedPtr base_wasm_handle, Event::Dispatcher& dispatcher)
             lifecycle_stats_handler_.getActiveVmCount());
 }
 
-void Wasm::error(std::string_view message) { ENVOY_LOG(error, "Wasm VM failed {}", message); }
+void Wasm::error(std::string_view message) {
+  ENVOY_LOG(error, "Wasm VM failed {}", message);
+  lifecycle_stats_handler_.onEvent(WasmEvent::RuntimeError);
+}
 
 void Wasm::setTimerPeriod(uint32_t context_id, std::chrono::milliseconds new_period) {
   auto& period = timer_period_[context_id];
@@ -497,10 +500,6 @@ Wasm* PluginConfig::maybeReloadHandleIfNeeded(SinglePluginHandle& handle_wrapper
   if (wasm == nullptr || wasm->fail_state() != proxy_wasm::FailState::RuntimeError) {
     return wasm;
   }
-
-  // Publish RuntimeError event when detected. On failure, only the state is updated by sdk, no
-  // event was published.
-  stats_handler_->onEvent(WasmEvent::RuntimeError);
 
   // If the handle is not allowed to reload, return it directly.
   if (failure_policy_ != FailurePolicy::FAIL_RELOAD) {

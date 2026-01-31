@@ -1,3 +1,7 @@
+#include "envoy/http/filter.h"
+#include "envoy/http/filter_factory.h"
+#include "envoy/server/lifecycle_notifier.h"
+
 #include "source/common/common/base64.h"
 #include "source/common/common/hex.h"
 #include "source/common/event/dispatcher_impl.h"
@@ -19,9 +23,14 @@
 #include "absl/types/optional.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "openssl/bytestring.h"
+#include "openssl/hmac.h"
 #include "openssl/sha.h"
 #include "wasm_runtime.h"
+#include "zlib.h"
 
+using StageCallbackWithCompletion =
+    Envoy::Server::ServerLifecycleNotifier::StageCallbackWithCompletion;
 using testing::AtMost;
 using testing::Eq;
 using testing::HasSubstr;
@@ -1540,6 +1549,9 @@ vm_config:
     // The wasm should be in runtime error state now.
     EXPECT_EQ(initial_wasm->fail_state(), proxy_wasm::FailState::RuntimeError);
 
+    // Verify the crashed counter was incremented.
+    EXPECT_EQ(server_.store_.counterFromString(absl::StrCat("wasm.", runtime_name, ".crashed")).value(), 1);
+
     // Wait 2 seconds to avoid possible backoff.
     server_.dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::seconds(2));
 
@@ -1554,7 +1566,6 @@ vm_config:
 
     EXPECT_EQ(plugin_config_->wasmStats().vm_reload_success_.value(), 1);
     EXPECT_EQ(plugin_config_->wasmStats().vm_reload_backoff_.value(), 0);
-    EXPECT_EQ(plugin_config_->wasmStats().vm_failed_.value(), 1);
 
     EXPECT_CALL(decoder_callbacks_,
                 sendLocalReply(Envoy::Http::Code::ServiceUnavailable, testing::Eq(""), _,
@@ -1566,13 +1577,15 @@ vm_config:
     // The wasm should be in runtime error state again.
     EXPECT_EQ(context_wasm->fail_state(), proxy_wasm::FailState::RuntimeError);
 
+    // Verify the crashed counter was incremented again (now 2).
+    EXPECT_EQ(server_.store_.counterFromString(absl::StrCat("wasm.", runtime_name, ".crashed")).value(), 2);
+
     // The wasm failed again and the PluginConfig::wasm() will try to reload again but will backoff.
     // The previous wasm will be returned.
     EXPECT_EQ(plugin_config_->wasm(), context_wasm);
 
     EXPECT_EQ(plugin_config_->wasmStats().vm_reload_success_.value(), 1);
     EXPECT_EQ(plugin_config_->wasmStats().vm_reload_backoff_.value(), 1);
-    EXPECT_EQ(plugin_config_->wasmStats().vm_failed_.value(), 2);
 
     // Wait 2 seconds.
     server_.dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::seconds(2));
@@ -1682,7 +1695,6 @@ vm_config:
                                testing::Eq("wasm_fail_stream")));
     EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer,
               context_->decodeData(request_body, true));
-    EXPECT_EQ(plugin_config_->wasmStats().vm_failed_.value(), 1);
   };
 
   test_func(false);
@@ -1761,7 +1773,6 @@ vm_config:
                                testing::Eq("wasm_fail_stream")));
     EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer,
               context_->decodeData(request_body, true));
-    EXPECT_EQ(plugin_config_->wasmStats().vm_failed_.value(), 1);
   };
 
   test_func(false);
@@ -1831,7 +1842,6 @@ vm_config:
     EXPECT_NE(nullptr, latest_wasm);
     EXPECT_EQ(latest_wasm, initial_wasm);
     EXPECT_EQ(latest_wasm->fail_state(), proxy_wasm::FailState::RuntimeError);
-    EXPECT_EQ(plugin_config_->wasmStats().vm_failed_.value(), 1);
   };
 
   test_func(false);

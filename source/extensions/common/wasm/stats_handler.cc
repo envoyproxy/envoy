@@ -75,6 +75,9 @@ void LifecycleStatsHandler::onEvent(WasmEvent event) {
     lifecycle_stats_.active_.set(++active_wasms);
     lifecycle_stats_.created_.inc();
     break;
+  case WasmEvent::RuntimeError:
+    lifecycle_stats_.crashed_.inc();
+    break;
   default:
     break;
   }
@@ -95,16 +98,6 @@ void StatsHandler::onEvent(WasmEvent event) const {
     break;
   case WasmEvent::VmReloadFailure:
     wasm_stats_.vm_reload_failure_.inc();
-    break;
-  // VM failure events - increment the universal vm_failed counter
-  case WasmEvent::UnableToCreateVm:
-  case WasmEvent::UnableToCloneVm:
-  case WasmEvent::MissingFunction:
-  case WasmEvent::UnableToInitializeCode:
-  case WasmEvent::StartFailed:
-  case WasmEvent::ConfigureFailed:
-  case WasmEvent::RuntimeError:
-    wasm_stats_.vm_failed_.inc();
     break;
   default:
     break;

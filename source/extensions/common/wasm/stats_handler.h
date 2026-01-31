@@ -33,6 +33,7 @@ struct CreateWasmStats {
 
 #define LIFECYCLE_STATS(COUNTER, GAUGE)                                                            \
   COUNTER(created)                                                                                 \
+  COUNTER(crashed)                                                                                 \
   GAUGE(active, NeverImport)
 
 struct LifecycleStats {
@@ -110,8 +111,7 @@ protected:
   COUNTER(vm_reload)                                                                               \
   COUNTER(vm_reload_backoff)                                                                       \
   COUNTER(vm_reload_success)                                                                       \
-  COUNTER(vm_reload_failure)                                                                       \
-  COUNTER(vm_failed)
+  COUNTER(vm_reload_failure)
 
 struct WasmStats {
   WASM_STATS(GENERATE_COUNTER_STRUCT)
