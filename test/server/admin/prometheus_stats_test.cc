@@ -198,7 +198,7 @@ TEST_F(PrometheusStatsFormatterTest, MetricNameCollison) {
 
   // Create two counters and two gauges with each pair having the same name,
   // but having different tag names and values.
-  //`statsAsPrometheus()` should return two implying it found two unique stat names
+  //`statsAsPrometheusText()` should return two implying it found two unique stat names
 
   addCounter("cluster.test_cluster_1.upstream_cx_total",
              {{makeStat("a.tag-name"), makeStat("a.tag-value")}});
@@ -210,7 +210,7 @@ TEST_F(PrometheusStatsFormatterTest, MetricNameCollison) {
            {{makeStat("another_tag_name_4"), makeStat("another_tag_4-value")}});
 
   Buffer::OwnedImpl response;
-  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
+  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
       counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response,
       StatsParams(), custom_namespaces);
   EXPECT_EQ(2UL, size);
@@ -220,7 +220,7 @@ TEST_F(PrometheusStatsFormatterTest, UniqueMetricName) {
   Stats::CustomStatNamespacesImpl custom_namespaces;
 
   // Create two counters and two gauges, all with unique names.
-  // statsAsPrometheus() should return four implying it found
+  // statsAsPrometheusText() should return four implying it found
   // four unique stat names.
 
   addCounter("cluster.test_cluster_1.upstream_cx_total",
@@ -233,7 +233,7 @@ TEST_F(PrometheusStatsFormatterTest, UniqueMetricName) {
            {{makeStat("another_tag_name_4"), makeStat("another_tag_4-value")}});
 
   Buffer::OwnedImpl response;
-  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
+  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
       counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response,
       StatsParams(), custom_namespaces);
   EXPECT_EQ(4UL, size);
@@ -251,7 +251,7 @@ TEST_F(PrometheusStatsFormatterTest, HistogramWithNoValuesAndNoTags) {
   addHistogram(histogram);
 
   Buffer::OwnedImpl response;
-  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
+  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
       counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response,
       StatsParams(), custom_namespaces);
   EXPECT_EQ(1UL, size);
@@ -296,7 +296,7 @@ TEST_F(PrometheusStatsFormatterTest, SummaryWithNoValuesAndNoTags) {
   StatsParams params = StatsParams();
   params.histogram_buckets_mode_ = Utility::HistogramBucketsMode::Summary;
   Buffer::OwnedImpl response;
-  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
+  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
       counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response, params,
       custom_namespaces);
   EXPECT_EQ(1UL, size);
@@ -359,7 +359,7 @@ envoy_cluster_default_total_match_count{envoy_cluster_name="x"} 0
   // re-try the streaming Prometheus implementation.
 
   Buffer::OwnedImpl response;
-  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
+  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
       counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response,
       StatsParams(), custom_namespaces);
   EXPECT_EQ(1, size);
@@ -380,7 +380,7 @@ TEST_F(PrometheusStatsFormatterTest, HistogramWithNonDefaultBuckets) {
   addHistogram(histogram);
 
   Buffer::OwnedImpl response;
-  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
+  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
       counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response,
       StatsParams(), custom_namespaces);
   EXPECT_EQ(1UL, size);
@@ -420,7 +420,7 @@ TEST_F(PrometheusStatsFormatterTest, HistogramWithScaledPercent) {
   addHistogram(histogram);
 
   Buffer::OwnedImpl response;
-  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
+  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
       counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response,
       StatsParams(), custom_namespaces);
   EXPECT_EQ(1UL, size);
@@ -455,7 +455,7 @@ TEST_F(PrometheusStatsFormatterTest, HistogramWithHighCounts) {
   addHistogram(histogram);
 
   Buffer::OwnedImpl response;
-  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
+  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
       counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response,
       StatsParams(), custom_namespaces);
   EXPECT_EQ(1UL, size);
@@ -520,7 +520,7 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithAllMetricTypes) {
   EXPECT_CALL(*histogram1, cumulativeStatistics()).WillOnce(ReturnRef(h1_cumulative_statistics));
 
   Buffer::OwnedImpl response;
-  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
+  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
       counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response,
       StatsParams(), custom_namespaces);
   EXPECT_EQ(12UL, size);
@@ -598,7 +598,7 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithTextReadoutsInGaugeFormat) {
                   {makeStat("tag3"), makeStat(R"(")")}});
 
   Buffer::OwnedImpl response;
-  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
+  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
       counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response,
       StatsParams(), custom_namespaces);
   EXPECT_EQ(4UL, size);
@@ -647,7 +647,7 @@ TEST_F(PrometheusStatsFormatterTest, OutputSortedByMetricName) {
   }
 
   Buffer::OwnedImpl response;
-  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
+  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
       counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response,
       StatsParams(), custom_namespaces);
   EXPECT_EQ(6UL, size);
@@ -833,7 +833,7 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithUsedOnly) {
   Buffer::OwnedImpl response;
   StatsParams params;
   params.used_only_ = true;
-  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
+  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
       counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response, params,
       custom_namespaces);
   EXPECT_EQ(1UL, size);
@@ -880,7 +880,7 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithHiddenGauge) {
   {
     Buffer::OwnedImpl response;
     params.hidden_ = HiddenFlag::Exclude;
-    const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
+    const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
         counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response, params,
         custom_namespaces);
     const std::string expected_output =
@@ -893,7 +893,7 @@ envoy_cluster_test_cluster_2_upstream_cx_total{another_tag_name_3="another_tag_3
   {
     Buffer::OwnedImpl response;
     params.hidden_ = HiddenFlag::ShowOnly;
-    const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
+    const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
         counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response, params,
         custom_namespaces);
     const std::string expected_output =
@@ -906,7 +906,7 @@ envoy_cluster_test_cluster_2_upstream_cx_total{another_tag_name_4="another_tag_4
   {
     Buffer::OwnedImpl response;
     params.hidden_ = HiddenFlag::Include;
-    const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
+    const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
         counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response, params,
         custom_namespaces);
     const std::string expected_output =
@@ -939,7 +939,7 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithUsedOnlyHistogram) {
     EXPECT_CALL(*histogram1, cumulativeStatistics()).Times(0);
 
     Buffer::OwnedImpl response;
-    const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
+    const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
         counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response, params,
         custom_namespaces);
     EXPECT_EQ(0UL, size);
@@ -950,7 +950,7 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithUsedOnlyHistogram) {
     EXPECT_CALL(*histogram1, cumulativeStatistics()).WillOnce(ReturnRef(h1_cumulative_statistics));
 
     Buffer::OwnedImpl response;
-    const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
+    const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
         counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response, params,
         custom_namespaces);
     EXPECT_EQ(1UL, size);
@@ -989,7 +989,7 @@ envoy_cluster_test_1_upstream_cx_total{a_tag_name="a.tag-value"} 0
     StatsParams params;
     ASSERT_EQ(Http::Code::OK,
               params.parse("/stats?filter=cluster.test_1.upstream_cx_total", response));
-    const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
+    const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
         counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response, params,
         custom_namespaces);
     EXPECT_EQ(1UL, size);
@@ -1001,7 +1001,7 @@ envoy_cluster_test_1_upstream_cx_total{a_tag_name="a.tag-value"} 0
     StatsParams params;
     ASSERT_EQ(Http::Code::OK,
               params.parse("/stats?filter=cluster.test_1.upstream_cx_total&safe", response));
-    const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
+    const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
         counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response, params,
         custom_namespaces);
     EXPECT_EQ(1UL, size);
@@ -1013,7 +1013,7 @@ envoy_cluster_test_1_upstream_cx_total{a_tag_name="a.tag-value"} 0
     Buffer::OwnedImpl response;
     StatsParams params;
     ASSERT_EQ(Http::Code::OK, params.parse("/stats?filter=cluster.test_1.endpoint.*c1", response));
-    const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
+    const uint64_t size = PrometheusStatsFormatter::statsAsPrometheusText(
         counters_, gauges_, histograms_, textReadouts_, endpoints_helper_->cm_, response, params,
         custom_namespaces);
     const std::string expected =
