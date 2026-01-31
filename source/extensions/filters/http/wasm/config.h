@@ -46,12 +46,37 @@ public:
         stats_prefix, context);
   }
 
+  Http::FilterFactoryCb createFilterFactoryFromProtoWithServerContext(
+      const Protobuf::Message& proto_config, const std::string& stats_prefix,
+      Server::Configuration::ServerFactoryContext& context) override {
+    return createFilterFactoryFromProtoTyped(
+        MessageUtil::downcastAndValidate<const envoy::extensions::filters::http::wasm::v3::Wasm&>(
+            proto_config, context.messageValidationVisitor()),
+        stats_prefix, context);
+  }
+
 private:
   template <class FactoryContext>
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::wasm::v3::Wasm& proto_config, const std::string&,
       FactoryContext& context) {
     context.serverFactoryContext().api().customStatNamespaces().registerStatNamespace(
+        Extensions::Common::Wasm::CustomStatNamespace);
+    auto filter_config = std::make_shared<FilterConfig>(proto_config, context);
+    return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+      auto filter = filter_config->createContext();
+      if (!filter) { // Fail open
+        return;
+      }
+      callbacks.addStreamFilter(filter);
+      callbacks.addAccessLogHandler(filter);
+    };
+  }
+
+  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+      const envoy::extensions::filters::http::wasm::v3::Wasm& proto_config, const std::string&,
+      Server::Configuration::ServerFactoryContext& context) {
+    context.api().customStatNamespaces().registerStatNamespace(
         Extensions::Common::Wasm::CustomStatNamespace);
     auto filter_config = std::make_shared<FilterConfig>(proto_config, context);
     return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
