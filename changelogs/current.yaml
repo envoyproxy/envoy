@@ -91,6 +91,11 @@ bug_fixes:
   change: |
     Fixed the log formatter in HTTP router upstream logs by correctly setting the downstream connection's
     ``ConnectionInfoProvider`` in the ``StreamInfo``.
+- area: ext_authz
+  change: |
+    Fixed the HTTP ext_authz client to respect ``status_on_error`` configuration when the authorization
+    server returns a 5xx error or when HTTP call failures occur. Previously, these error scenarios always
+    returned 403 Forbidden regardless of the configured error status.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
