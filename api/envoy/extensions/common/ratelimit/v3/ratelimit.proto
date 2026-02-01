@@ -144,6 +144,9 @@ message LocalRateLimitDescriptor {
 
   // Token Bucket algorithm for local ratelimiting.
   type.v3.TokenBucket token_bucket = 2 [(validate.rules).message = {required: true}];
+
+  // Mark the descriptor as shadow. When the values is true, envoy allow requests to the backend.
+  bool shadow_mode = 3;
 }
 
 // Configuration used to enable local cluster level rate limiting where the token buckets

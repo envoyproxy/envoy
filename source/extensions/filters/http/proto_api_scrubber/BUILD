@@ -43,8 +43,8 @@ envoy_cc_library(
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "//source/extensions/filters/http/grpc_field_extraction/message_converter:message_converter_lib",
         "//source/extensions/filters/http/proto_api_scrubber/scrubbing_util_lib",
-        "@com_google_protoprocessinglib//proto_processing_lib/proto_scrubber",
         "@envoy_api//envoy/extensions/filters/http/proto_api_scrubber/v3:pkg_cc_proto",
+        "@proto-processing//proto_processing_lib/proto_scrubber",
     ],
 )
 

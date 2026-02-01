@@ -387,7 +387,7 @@ void NetworkExtProcFilter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&
     stats_.read_data_injected_.inc();
   } else if (response->has_write_data()) {
     if (timeout_manager_ && write_pending_) {
-      timeout_manager_->stopTimer(true);
+      timeout_manager_->stopTimer(false);
     }
     write_pending_ = false;
 

@@ -79,7 +79,7 @@ createPersistentQuicInfoForCluster(Event::Dispatcher& dispatcher,
   ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
       client_writer_config, server_context.messageValidationVisitor(), factory);
   quic_info->writer_factory_ = factory.createQuicClientPacketWriterFactory(
-      *message, server_context.messageValidationVisitor());
+      *message, dispatcher, server_context.messageValidationVisitor());
   return quic_info;
 }
 

@@ -4,7 +4,7 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/common/stats/isolated_store_impl.h"
-#include "source/extensions/dynamic_modules/abi.h"
+#include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/filters/listener/dynamic_modules/filter.h"
 
 #include "test/extensions/dynamic_modules/util.h"
