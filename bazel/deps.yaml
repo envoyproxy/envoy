@@ -892,7 +892,7 @@ fips_ninja:
   project_name: "Ninja"
   project_desc: "Small build system with a focus on speed"
   project_url: "https://ninja-build.org/"
-  release_date: "2025-07-10"
+  release_date: "2025-11-20"
   use_category:
   - build
   - dataplane_core
