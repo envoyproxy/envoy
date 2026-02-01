@@ -328,7 +328,8 @@ public:
   virtual bool initializeReadFilters() PURE;
 
   /**
-   * Add a network access log handler to the connection.
+   * Add a network access log handler to the connection. The added log handlers will be called on
+   * during connections' destruction.
    * @param handler supplies the access log handler to add.
    */
   virtual void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) PURE;
