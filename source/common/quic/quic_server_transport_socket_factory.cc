@@ -175,6 +175,27 @@ QuicServerTransportSocketFactory::getTlsCertificateAndKey(absl::string_view sni,
   return {tls_context.quic_cert_, tls_context.quic_private_key_};
 }
 
+int QuicServerTransportSocketFactory::sessionTicketProcess(SSL* ssl, uint8_t* key_name, uint8_t* iv,
+                                                           EVP_CIPHER_CTX* ctx, HMAC_CTX* hmac_ctx,
+                                                           int encrypt) const {
+  Envoy::Ssl::ServerContextSharedPtr ssl_ctx;
+  {
+    absl::ReaderMutexLock l(ssl_ctx_mu_);
+    ssl_ctx = ssl_ctx_;
+  }
+  if (!ssl_ctx) {
+    return 0;
+  }
+
+  auto server_ctx =
+      std::dynamic_pointer_cast<Extensions::TransportSockets::Tls::ServerContextImpl>(ssl_ctx);
+  if (!server_ctx) {
+    return 0;
+  }
+
+  return server_ctx->sessionTicketProcess(ssl, key_name, iv, ctx, hmac_ctx, encrypt);
+}
+
 absl::Status QuicServerTransportSocketFactory::onSecretUpdated() {
   ENVOY_LOG(debug, "Secret is updated.");
 
