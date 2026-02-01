@@ -122,7 +122,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "c-ares-{version}",
         urls = ["https://github.com/c-ares/c-ares/releases/download/v{version}/c-ares-{version}.tar.gz"],
     ),
-    com_github_openhistogram_libcircllhist = dict(
+    libcircllhist = dict(
         version = "0.3.2",
         sha256 = "6dfbd649fde380f7a2256def43b9c6374c6d6fe768178b09e39eedf874b139f4",
         strip_prefix = "libcircllhist-py-{version}",

@@ -488,7 +488,7 @@ com_github_nlohmann_json:
   license: "MIT"
   license_url: "https://github.com/nlohmann/json/blob/v{version}/LICENSE.MIT"
 
-com_github_openhistogram_libcircllhist:
+libcircllhist:
   project_name: "libcircllhist"
   project_desc: "An implementation of OpenHistogram log-linear histograms"
   project_url: "https://github.com/openhistogram/libcircllhist"
@@ -738,7 +738,7 @@ com_google_protofieldextraction:
   license_url: "https://github.com/grpc-ecosystem/proto-field-extraction/blob/{version}/LICENSE"
 
 com_google_protoprocessinglib:
-  project_name: "proto_processing_lib"
+  project_name: "proto-processing"
   project_desc: "Library that provides utility functionality for proto field scrubbing"
   project_url: "https://github.com/grpc-ecosystem/proto_processing_lib"
   release_date: "2025-01-10"
