@@ -315,8 +315,9 @@ TEST_F(EnvoyQuicServerStreamTest, EncodeHeaderOnClosedStream) {
               onResetStream(Http::StreamResetReason::LocalRefusedStreamReset, _));
   quic_stream_->resetStream(Http::StreamResetReason::LocalRefusedStreamReset);
 
-  EXPECT_ENVOY_BUG(quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/false),
-                   "encodeHeaders is called on write-closed stream.");
+  // No data should be sent on the closed stream.
+  EXPECT_CALL(quic_session_, WritevData(_, _, _, _, _, _)).Times(0);
+  quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/false);
 }
 
 TEST_F(EnvoyQuicServerStreamTest, EncodeDataOnClosedStream) {
