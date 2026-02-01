@@ -112,7 +112,7 @@ envoy_cc_benchmark_binary(
         ":deterministic_hash_test_proto_cc_proto",
         "//source/common/protobuf:utility_lib",
         "//test/test_common:test_runtime_lib",
-        "@com_github_google_benchmark//:benchmark",
+        "@benchmark",
     ],
 )
 

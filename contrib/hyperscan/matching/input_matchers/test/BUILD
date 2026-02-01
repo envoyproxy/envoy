@@ -43,8 +43,8 @@ envoy_cc_benchmark_binary(
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
-        "@com_github_google_benchmark//:benchmark",
-        "@com_googlesource_code_re2//:re2",
+        "@benchmark",
+        "@re2",
     ] + select({
         "//bazel:linux_x86_64": [
             "//contrib/hyperscan/matching/input_matchers/source:hyperscan",
@@ -64,7 +64,7 @@ envoy_cc_benchmark_binary(
         "//source/common/common:utility_lib",
         "//source/common/thread_local:thread_local_lib",
         "//test/mocks/event:event_mocks",
-        "@com_github_google_benchmark//:benchmark",
+        "@benchmark",
     ] + select({
         "//bazel:linux_x86_64": [
             "//contrib/hyperscan/matching/input_matchers/source:hyperscan_matcher_lib",

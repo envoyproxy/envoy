@@ -203,8 +203,8 @@ envoy_cc_benchmark_binary(
         "//test/mocks/stream_info:stream_info_mocks",
         # tranport socket config registration
         "//source/extensions/transport_sockets/tls:config",
-        "@com_github_google_benchmark//:benchmark",
-        "@com_google_googletest//:gtest",
+        "@benchmark",
+        "@googletest//:gtest",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
 )

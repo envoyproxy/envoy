@@ -994,9 +994,9 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = selects.with_or({
         ("//bazel:linux_x86_64", "//bazel:linux_aarch64"): [
-            "@com_github_google_tcmalloc//tcmalloc",
-            "@com_github_google_tcmalloc//tcmalloc:profile_marshaler",
-            "@com_github_google_tcmalloc//tcmalloc:malloc_extension",
+            "@tcmalloc//tcmalloc",
+            "@tcmalloc//tcmalloc:profile_marshaler",
+            "@tcmalloc//tcmalloc:malloc_extension",
         ],
         "//conditions:default": ["//bazel/external:gperftools"],
     }),
@@ -1009,7 +1009,7 @@ cc_library(
         (
             "//bazel:linux_x86_64",
             "//bazel:linux_aarch64",
-        ): ["@com_github_google_tcmalloc//tcmalloc"],
+        ): ["@tcmalloc//tcmalloc"],
         "//conditions:default": ["//bazel/external:gperftools"],
     }),
 )

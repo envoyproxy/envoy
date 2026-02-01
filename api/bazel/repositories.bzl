@@ -37,6 +37,9 @@ def api_dependencies(bzlmod = False):
     )
     external_http_archive(
         name = "com_envoyproxy_protoc_gen_validate",
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel:pgv.patch"],
+        repo_mapping = {"@com_google_absl": "@abseil-cpp"},
     )
     external_http_archive(
         name = "com_google_googleapis",
@@ -55,11 +58,14 @@ def api_dependencies(bzlmod = False):
         build_file_content = ZIPKINAPI_BUILD_CONTENT,
     )
     external_http_archive(
-        name = "opentelemetry_proto",
+        name = "opentelemetry-proto",
+        location_name = "opentelemetry_proto",
         build_file_content = OPENTELEMETRY_BUILD_CONTENT,
+        repo_mapping = {"@com_google_absl": "@abseil-cpp"},
     )
     external_http_archive(
         name = "dev_cel",
+        repo_mapping = {"@com_google_absl": "@abseil-cpp"},
     )
 
 PROMETHEUSMETRICS_BUILD_CONTENT = """
