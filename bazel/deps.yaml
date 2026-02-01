@@ -784,7 +784,7 @@ fips_cmake_linux_x86_64:
   project_name: "CMake (Linux x86_64)"
   project_desc: "Cross-platform family of tools designed to build, test and package software"
   project_url: "https://cmake.org/"
-  release_date: "2025-12-08"
+  release_date: "2026-01-27"
   use_category:
   - build
   - dataplane_core
