@@ -1123,8 +1123,8 @@ ClientConnectionImpl::ClientConnectionImpl(
 }
 
 ClientConnectionImpl::~ClientConnectionImpl() {
-  // Ensure that connection is closed and the access log is written before the StreamInfo is destroyed.
-  // We need to write the access log here because the StreamInfo is owned by this class,
+  // Ensure that connection is closed and the access log is written before the StreamInfo is
+  // destroyed. We need to write the access log here because the StreamInfo is owned by this class,
   // and will be destroyed before the base class destructor runs.
   close(ConnectionCloseType::NoFlush);
   ensureAccessLogWritten();
