@@ -167,5 +167,13 @@ new_features:
     detects and selects between cgroup v1 and v2 at runtime by checking available cgroup files on
     the system. This enables the resource monitor to work correctly in both cgroup v1 and v2
     environments without configuration changes.
+- area: oauth2
+  change: |
+    Added :ref:`allow_failed_matcher <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.allow_failed_matcher>`
+    to allow requests to proceed to upstream as unauthenticated when OAuth validation fails (missing, invalid, or expired
+    credentials) and the request matches the configured matchers. This enables graceful degradation patterns where services
+    can handle both authenticated and unauthenticated requests. When triggered, all OAuth cookies are stripped and context
+    headers ``x-envoy-oauth-status: failed`` and ``x-envoy-oauth-failure-reason`` are added. The matcher evaluation follows
+    priority order: ``pass_through_matcher`` > ``allow_failed_matcher`` > ``deny_redirect_matcher`` > default OAuth behavior.
 
 deprecated:
