@@ -14,14 +14,28 @@ namespace Extensions {
 namespace Clusters {
 namespace Redis {
 
-absl::StatusOr<std::unique_ptr<RedisCluster::RedisHost>> RedisCluster::RedisHost::create(
-    Upstream::ClusterInfoConstSharedPtr cluster, const std::string& hostname,
-    Network::Address::InstanceConstSharedPtr address, RedisCluster& parent, bool primary) {
+absl::StatusOr<std::unique_ptr<RedisCluster::RedisHost>>
+RedisCluster::RedisHost::create(Upstream::ClusterInfoConstSharedPtr cluster,
+                                const std::string& hostname,
+                                Network::Address::InstanceConstSharedPtr address,
+                                RedisCluster& parent, bool primary, const std::string& zone) {
   absl::Status creation_status = absl::OkStatus();
-  auto ret = std::unique_ptr<RedisCluster::RedisHost>(
-      new RedisCluster::RedisHost(cluster, hostname, address, parent, primary, creation_status));
+  auto ret = std::unique_ptr<RedisCluster::RedisHost>(new RedisCluster::RedisHost(
+      cluster, hostname, address, parent, primary, zone, creation_status));
   RETURN_IF_NOT_OK(creation_status);
   return ret;
+}
+
+std::shared_ptr<const envoy::config::core::v3::Locality>
+RedisCluster::RedisHost::makeLocalityWithZone(
+    const envoy::config::core::v3::Locality& base_locality, const std::string& zone) {
+  // Always create a new locality from base. If zone is empty, the host uses
+  // the parent's locality zone (if any). If zone is non-empty, override it.
+  auto locality = std::make_shared<envoy::config::core::v3::Locality>(base_locality);
+  if (!zone.empty()) {
+    locality->set_zone(zone);
+  }
+  return locality;
 }
 
 absl::StatusOr<std::unique_ptr<RedisCluster>> RedisCluster::create(
@@ -74,7 +88,8 @@ RedisCluster::RedisCluster(
                                          context.serverFactoryContext().mainThreadDispatcher(),
                                          context.serverFactoryContext().clusterManager(),
                                          context.serverFactoryContext().api().timeSource())),
-      registration_handle_(nullptr) {
+      registration_handle_(nullptr), enable_zone_discovery_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+                                         redis_cluster, enable_zone_discovery, false)) {
   const auto& locality_lb_endpoints = load_assignment_.endpoints();
   for (const auto& locality_lb_endpoint : locality_lb_endpoints) {
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
@@ -138,21 +153,32 @@ void RedisCluster::updateAllHosts(const Upstream::HostVector& hosts_added,
       hosts_added, hosts_removed, absl::nullopt, absl::nullopt, absl::nullopt);
 }
 
-void RedisCluster::onClusterSlotUpdate(ClusterSlotsSharedPtr&& slots) {
+void RedisCluster::onClusterSlotUpdate(ClusterSlotsSharedPtr&& slots,
+                                       const HostZoneMap& host_zone_map) {
   Upstream::HostVector new_hosts;
   absl::flat_hash_set<std::string> all_new_hosts;
 
+  // Helper to look up zone from map
+  auto get_zone = [&host_zone_map](const std::string& address) -> std::string {
+    auto it = host_zone_map.find(address);
+    return (it != host_zone_map.end()) ? it->second : "";
+  };
+
   for (const ClusterSlot& slot : *slots) {
-    if (all_new_hosts.count(slot.primary()->asString()) == 0) {
+    const std::string primary_address = slot.primary()->asString();
+    if (all_new_hosts.count(primary_address) == 0) {
+      // Pass zone from map to set host's locality.zone
       new_hosts.emplace_back(THROW_OR_RETURN_VALUE(
-          RedisHost::create(info(), "", slot.primary(), *this, true), std::unique_ptr<RedisHost>));
-      all_new_hosts.emplace(slot.primary()->asString());
+          RedisHost::create(info(), "", slot.primary(), *this, true, get_zone(primary_address)),
+          std::unique_ptr<RedisHost>));
+      all_new_hosts.emplace(primary_address);
     }
     for (auto const& replica : slot.replicas()) {
       if (all_new_hosts.count(replica.first) == 0) {
-        new_hosts.emplace_back(
-            THROW_OR_RETURN_VALUE(RedisHost::create(info(), "", replica.second, *this, false),
-                                  std::unique_ptr<RedisHost>));
+        // Pass zone from map to set host's locality.zone
+        new_hosts.emplace_back(THROW_OR_RETURN_VALUE(
+            RedisHost::create(info(), "", replica.second, *this, false, get_zone(replica.first)),
+            std::unique_ptr<RedisHost>));
         all_new_hosts.emplace(replica.first);
       }
     }
@@ -495,8 +521,12 @@ void RedisCluster::RedisDiscoverySession::resolveReplicas(
 
 void RedisCluster::RedisDiscoverySession::finishClusterHostnameResolution(
     ClusterSlotsSharedPtr slots) {
-  parent_.onClusterSlotUpdate(std::move(slots));
-  resolve_timer_->enableTimer(parent_.cluster_refresh_rate_);
+  if (parent_.enable_zone_discovery_) {
+    startZoneDiscovery(std::move(slots));
+  } else {
+    parent_.onClusterSlotUpdate(std::move(slots));
+    resolve_timer_->enableTimer(parent_.cluster_refresh_rate_);
+  }
 }
 
 void RedisCluster::RedisDiscoverySession::onResponse(
@@ -596,8 +626,12 @@ void RedisCluster::RedisDiscoverySession::onResponse(
     resolveClusterHostnames(std::move(cluster_slots), hostname_resolution_required_cnt);
   } else {
     // All slots addresses were represented by IP/Port pairs.
-    parent_.onClusterSlotUpdate(std::move(cluster_slots));
-    resolve_timer_->enableTimer(parent_.cluster_refresh_rate_);
+    if (parent_.enable_zone_discovery_) {
+      startZoneDiscovery(std::move(cluster_slots));
+    } else {
+      parent_.onClusterSlotUpdate(std::move(cluster_slots));
+      resolve_timer_->enableTimer(parent_.cluster_refresh_rate_);
+    }
   }
 }
 
@@ -643,7 +677,174 @@ void RedisCluster::RedisDiscoverySession::onFailure() {
   resolve_timer_->enableTimer(parent_.cluster_refresh_rate_);
 }
 
+// ZoneDiscoveryCallback implementation
+void RedisCluster::ZoneDiscoveryCallback::onResponse(
+    NetworkFilters::Common::Redis::RespValuePtr&& value) {
+  parent_.onZoneResponse(address_, is_primary_, std::move(value));
+}
+
+void RedisCluster::ZoneDiscoveryCallback::onFailure() {
+  parent_.onZoneDiscoveryFailure(address_, is_primary_);
+}
+
+// Zone discovery methods
+void RedisCluster::RedisDiscoverySession::startZoneDiscovery(ClusterSlotsSharedPtr slots) {
+  ENVOY_LOG(debug, "starting zone discovery for '{}' with {} slots", parent_.info_->name(),
+            slots->size());
+
+  // Collect unique node addresses. Map value indicates if node is primary.
+  // Using only the map (keys are unique) - no separate set needed.
+  absl::flat_hash_map<std::string, bool> address_is_primary;
+
+  for (const ClusterSlot& slot : *slots) {
+    if (slot.primary()) {
+      const std::string& addr = slot.primary()->asString();
+      // Only insert if not already present (first occurrence determines role)
+      address_is_primary.try_emplace(addr, true);
+    }
+    for (const auto& replica : slot.replicas()) {
+      // Only insert if not already present
+      address_is_primary.try_emplace(replica.first, false);
+    }
+  }
+
+  if (address_is_primary.empty()) {
+    ENVOY_LOG(debug, "no nodes to discover zones for");
+    parent_.onClusterSlotUpdate(std::move(slots));
+    resolve_timer_->enableTimer(parent_.cluster_refresh_rate_);
+    return;
+  }
+
+  pending_zone_discovery_slots_ = std::move(slots);
+  pending_zone_requests_.store(address_is_primary.size());
+
+  // Send INFO command to each unique node
+  for (const auto& [addr, is_primary] : address_is_primary) {
+
+    // Find existing client or create new one
+    RedisDiscoveryClientPtr& client = client_map_[addr];
+    if (!client) {
+      // Need to create a new host and client for this address
+      auto address = Network::Utility::parseInternetAddressAndPortNoThrow(addr, false);
+      if (!address) {
+        ENVOY_LOG(warn, "failed to parse address {} for zone discovery", addr);
+        onZoneDiscoveryFailure(addr, is_primary);
+        continue;
+      }
+
+      auto host_or_error = RedisHost::create(parent_.info(), "", address, parent_, is_primary);
+      if (!host_or_error.ok()) {
+        ENVOY_LOG(warn, "failed to create host for zone discovery: {}", addr);
+        onZoneDiscoveryFailure(addr, is_primary);
+        continue;
+      }
+
+      // Convert unique_ptr to shared_ptr for the client factory
+      Upstream::HostSharedPtr host = std::move(*host_or_error);
+
+      client = std::make_unique<RedisDiscoveryClient>(*this);
+      client->host_ = addr;
+      client->client_ = client_factory_.create(
+          host, dispatcher_, shared_from_this(), redis_command_stats_, parent_.info()->statsScope(),
+          parent_.auth_username_, parent_.auth_password_, false, absl::nullopt, absl::nullopt);
+      client->client_->addConnectionCallbacks(*client);
+    }
+
+    // Create callback for this zone request
+    auto callback = std::make_unique<ZoneDiscoveryCallback>(*this, addr, is_primary);
+    zone_callbacks_[addr] = std::move(callback);
+
+    ENVOY_LOG(debug, "sending INFO command to {} for zone discovery", addr);
+    auto* request = client->client_->makeRequest(InfoRequest::instance_, *zone_callbacks_[addr]);
+    if (request) {
+      zone_requests_[addr] = request;
+    } else {
+      ENVOY_LOG(warn, "failed to send INFO command to {}", addr);
+      onZoneDiscoveryFailure(addr, is_primary);
+    }
+  }
+}
+
+void RedisCluster::RedisDiscoverySession::onZoneResponse(
+    const std::string& address, bool /*is_primary*/,
+    NetworkFilters::Common::Redis::RespValuePtr&& value) {
+  ENVOY_LOG(debug, "received zone discovery response from {}", address);
+
+  // Remove from tracking
+  zone_requests_.erase(address);
+  zone_callbacks_.erase(address);
+
+  if (value->type() == NetworkFilters::Common::Redis::RespType::BulkString) {
+    std::string zone = RedisCluster::parseAvailabilityZone(value->asString());
+    if (!zone.empty()) {
+      discovered_zones_[address] = zone;
+      ENVOY_LOG(debug, "discovered zone '{}' for node {}", zone, address);
+    }
+  } else {
+    ENVOY_LOG(warn, "unexpected INFO response type from {}: {}", address,
+              static_cast<int>(value->type()));
+  }
+
+  // fetch_sub returns the value before decrement, so subtract 1 for actual remaining count
+  uint32_t remaining = pending_zone_requests_.fetch_sub(1) - 1;
+  if (remaining == 0) {
+    finishZoneDiscovery();
+  }
+}
+
+void RedisCluster::RedisDiscoverySession::onZoneDiscoveryFailure(const std::string& address,
+                                                                 bool /*is_primary*/) {
+  ENVOY_LOG(warn, "zone discovery failed for node {}", address);
+
+  // Remove from tracking
+  zone_requests_.erase(address);
+  zone_callbacks_.erase(address);
+
+  // Continue even on failure - just won't have zone info for this node
+  // fetch_sub returns the value before decrement, so subtract 1 for actual remaining count
+  uint32_t remaining = pending_zone_requests_.fetch_sub(1) - 1;
+  if (remaining == 0) {
+    finishZoneDiscovery();
+  }
+}
+
+void RedisCluster::RedisDiscoverySession::finishZoneDiscovery() {
+  ENVOY_LOG(debug, "zone discovery complete for '{}'", parent_.info_->name());
+
+  if (pending_zone_discovery_slots_) {
+    parent_.onClusterSlotUpdate(std::move(pending_zone_discovery_slots_), discovered_zones_);
+    pending_zone_discovery_slots_ = nullptr;
+    discovered_zones_.clear(); // Clear after use
+  }
+  resolve_timer_->enableTimer(parent_.cluster_refresh_rate_);
+}
+
+// Parse availability_zone from Valkey INFO response.
+// Valkey INFO response format:
+// # Server
+// valkey_version:8.0.0
+// ...
+// availability_zone:us-east-1a
+// ...
+// Note: Standard Redis does not expose availability_zone.
+std::string RedisCluster::parseAvailabilityZone(const std::string& info_response) {
+  static constexpr absl::string_view key = "availability_zone:";
+  size_t pos = info_response.find(key);
+  if (pos == std::string::npos) {
+    return "";
+  }
+
+  pos += key.size();
+  size_t end = info_response.find_first_of("\r\n", pos);
+  if (end == std::string::npos) {
+    end = info_response.size();
+  }
+
+  return info_response.substr(pos, end - pos);
+}
+
 RedisCluster::ClusterSlotsRequest RedisCluster::ClusterSlotsRequest::instance_;
+RedisCluster::InfoRequest RedisCluster::InfoRequest::instance_;
 
 absl::StatusOr<std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>>
 RedisClusterFactory::createClusterWithConfig(

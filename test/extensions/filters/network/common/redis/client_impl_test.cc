@@ -570,6 +570,16 @@ TEST_F(RedisClientImplTest, InitializedWithAnyReadPolicy) {
       envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::ConnPoolSettings::ANY);
 }
 
+TEST_F(RedisClientImplTest, InitializedWithLocalZoneAffinityReadPolicy) {
+  testInitializeReadPolicy(envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::
+                               ConnPoolSettings::LOCAL_ZONE_AFFINITY);
+}
+
+TEST_F(RedisClientImplTest, InitializedWithLocalZoneAffinityReplicasAndPrimaryReadPolicy) {
+  testInitializeReadPolicy(envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::
+                               ConnPoolSettings::LOCAL_ZONE_AFFINITY_REPLICAS_AND_PRIMARY);
+}
+
 TEST_F(RedisClientImplTest, Cancel) {
   InSequence s;
 

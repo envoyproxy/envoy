@@ -32,6 +32,9 @@
 
 using testing::_;
 using testing::ContainerEq;
+using testing::DoAll;
+using testing::Invoke;
+using testing::InvokeWithoutArgs;
 using testing::NiceMock;
 using testing::Ref;
 using testing::Return;
@@ -84,6 +87,28 @@ const std::string NoWarmupConfig = R"EOF(
       value:
         cluster_refresh_rate: 4s
         cluster_refresh_timeout: 0.25s
+  )EOF";
+
+const std::string ZoneDiscoveryConfig = R"EOF(
+  name: name
+  connect_timeout: 0.25s
+  dns_lookup_family: V4_ONLY
+  load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 22120
+  cluster_type:
+    name: envoy.clusters.redis
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.Struct
+      value:
+        cluster_refresh_rate: 4s
+        cluster_refresh_timeout: 0.25s
+        enable_zone_discovery: true
   )EOF";
 } // namespace
 
@@ -1524,6 +1549,36 @@ TEST_F(RedisClusterTest, NoSegfaultOnClusterDestructionWithPendingCallback) {
   // 1. The destructor sets is_destroying_ = true
   // 2. The destructor resets redis_discovery_session_
   // 3. Timer callbacks check is_destroying_ before accessing cluster members
+}
+
+// Tests for parseAvailabilityZone static method
+TEST_F(RedisClusterTest, ParseAvailabilityZoneValidResponse) {
+  EXPECT_EQ("us-east-1a",
+            RedisCluster::parseAvailabilityZone(
+                "# Server\nvalkey_version:8.0.0\navailability_zone:us-east-1a\nother:data\n"));
+}
+
+TEST_F(RedisClusterTest, ParseAvailabilityZoneNoZoneField) {
+  EXPECT_EQ("", RedisCluster::parseAvailabilityZone("redis_version:7.0.0\nother:field\n"));
+}
+
+TEST_F(RedisClusterTest, ParseAvailabilityZoneAtEndOfResponse) {
+  EXPECT_EQ("eu-west-1b", RedisCluster::parseAvailabilityZone(
+                              "redis_version:7.0.0\navailability_zone:eu-west-1b"));
+}
+
+TEST_F(RedisClusterTest, ParseAvailabilityZoneEmptyValue) {
+  EXPECT_EQ("", RedisCluster::parseAvailabilityZone(
+                    "redis_version:7.0.0\navailability_zone:\nother:data\n"));
+}
+
+TEST_F(RedisClusterTest, ParseAvailabilityZoneWithCarriageReturn) {
+  EXPECT_EQ("ap-northeast-1c", RedisCluster::parseAvailabilityZone(
+                                   "# Server\r\navailability_zone:ap-northeast-1c\r\nother:data"));
+}
+
+TEST_F(RedisClusterTest, ParseAvailabilityZoneEmptyResponse) {
+  EXPECT_EQ("", RedisCluster::parseAvailabilityZone(""));
 }
 
 } // namespace Redis
