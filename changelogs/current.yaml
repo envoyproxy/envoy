@@ -167,5 +167,11 @@ new_features:
     detects and selects between cgroup v1 and v2 at runtime by checking available cgroup files on
     the system. This enables the resource monitor to work correctly in both cgroup v1 and v2
     environments without configuration changes.
+- area: dynamic_modules
+  change: |
+    Added configurable :ref:`metrics_namespace
+    <envoy_v3_api_field_extensions.dynamic_modules.v3.DynamicModuleConfig.metrics_namespace>` field
+    to ``DynamicModuleConfig``. This allows users to customize the prefix used for all metrics
+    created by dynamic modules.
 
 deprecated:
