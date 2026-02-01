@@ -256,8 +256,6 @@ def _boringssl_fips():
         name = "boringssl_fips",
         location_name = "boringssl",
         build_file = "@envoy//bazel/external:boringssl_fips.BUILD",
-        patches = ["@envoy//bazel:boringssl_fips.patch"],
-        patch_args = ["-p1"],
     )
 
     NINJA_BUILD_CONTENT = "%s\nexports_files([\"configure.py\"])" % BUILD_ALL_CONTENT

@@ -53,7 +53,7 @@ boringssl:
   project_name: "BoringSSL"
   project_desc: "Minimal OpenSSL fork"
   project_url: "https://github.com/google/boringssl"
-  release_date: "2025-05-14"
+  release_date: "2025-11-25"
   use_category:
   - controlplane
   - dataplane_core
