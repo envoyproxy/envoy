@@ -140,24 +140,19 @@ TEST_F(StatActionTest, CombinedAction) {
   ASSERT_NE(stat_action, nullptr);
 
   // Input: [foo=1, other=2]
-  // Expected Output: [other=2, bar=baz]
+  // Expected Output: [other=2] (insert_tag is ignored due to precedence)
   Envoy::Stats::TagVector tags;
   tags.emplace_back(Envoy::Stats::Tag{"foo", "1"});
   tags.emplace_back(Envoy::Stats::Tag{"other", "2"});
 
   EXPECT_EQ(StatsAction::Result::Keep, stat_action->apply(tags));
-  ASSERT_EQ(2, tags.size());
+  ASSERT_EQ(1, tags.size());
   // drop_tag removed "foo".
-  // insert_tag added "bar".
+  // insert_tag is skipped.
   // "other" remains.
-  // The implementation uses vector, so order might depend on implementation details.
-  // DropTagAction uses erase which preserves order.
-  // InsertTagAction uses emplace_back which appends.
 
   EXPECT_EQ("other", tags[0].name_);
   EXPECT_EQ("2", tags[0].value_);
-  EXPECT_EQ("bar", tags[1].name_);
-  EXPECT_EQ("baz", tags[1].value_);
 }
 
 TEST_F(StatActionTest, CombinedDropStat) {

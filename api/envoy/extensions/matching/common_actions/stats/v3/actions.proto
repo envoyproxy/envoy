@@ -31,8 +31,8 @@ message StatAction {
     string tag_value = 2;
   }
 
-  // If multiple actions are configured, they are applied in the following
-  // order:
+  // If multiple actions are configured, only the first non-empty action will be
+  // applied based on the following order:
   // 1. drop_stat
   // 2. drop_tag
   // 3. insert_tag

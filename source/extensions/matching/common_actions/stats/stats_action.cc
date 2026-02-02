@@ -106,14 +106,10 @@ public:
     if (action_config.has_drop_stat()) {
       actions.push_back(
           std::make_unique<DropStatAction>(action_config.drop_stat()));
-    }
-
-    if (action_config.has_drop_tag()) {
+    } else if (action_config.has_drop_tag()) {
       actions.push_back(
           std::make_unique<DropTagAction>(action_config.drop_tag()));
-    }
-
-    if (action_config.has_insert_tag()) {
+    } else if (action_config.has_insert_tag()) {
       actions.push_back(
           std::make_unique<InsertTagAction>(action_config.insert_tag()));
     }
