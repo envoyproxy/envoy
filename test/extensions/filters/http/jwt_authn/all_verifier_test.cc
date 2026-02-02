@@ -12,7 +12,6 @@
 #include "gmock/gmock.h"
 
 using envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication;
-using ::google::jwt_verify::Status;
 using ::testing::NiceMock;
 
 namespace Envoy {
@@ -20,6 +19,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace JwtAuthn {
 namespace {
+
+using JwtVerify::Status;
 
 constexpr char kConfigTemplate[] = R"(
 providers:
