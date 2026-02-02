@@ -5,7 +5,7 @@
 #include "source/common/stats/symbol_table.h"
 #include "source/extensions/bootstrap/dynamic_modules/extension.h"
 #include "source/extensions/bootstrap/dynamic_modules/extension_config.h"
-#include "source/extensions/dynamic_modules/abi.h"
+#include "source/extensions/dynamic_modules/abi/abi.h"
 
 using Envoy::Extensions::Bootstrap::DynamicModules::DynamicModuleBootstrapExtension;
 using Envoy::Extensions::Bootstrap::DynamicModules::DynamicModuleBootstrapExtensionConfig;

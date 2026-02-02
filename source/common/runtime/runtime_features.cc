@@ -61,6 +61,7 @@ RUNTIME_GUARD(envoy_reloadable_features_no_extension_lookup_by_name);
 RUNTIME_GUARD(envoy_reloadable_features_oauth2_cleanup_cookies);
 RUNTIME_GUARD(envoy_reloadable_features_oauth2_encrypt_tokens);
 RUNTIME_GUARD(envoy_reloadable_features_odcds_over_ads_fix);
+RUNTIME_GUARD(envoy_reloadable_features_on_demand_cluster_no_recreate_stream);
 RUNTIME_GUARD(envoy_reloadable_features_on_demand_track_end_stream);
 RUNTIME_GUARD(envoy_reloadable_features_original_dst_rely_on_idle_timeout);
 RUNTIME_GUARD(envoy_reloadable_features_prefix_map_matcher_resume_after_subtree_miss);
@@ -215,27 +216,6 @@ std::string swapPrefix(std::string name) {
 
 } // namespace
 
-// This is a singleton class to map Envoy style flag names to absl flags
-class RuntimeFeatures {
-public:
-  RuntimeFeatures();
-
-  // Get the command line flag corresponding to the Envoy style feature name, or
-  // nullptr if it is not a registered flag.
-  absl::CommandLineFlag* getFlag(absl::string_view feature) const {
-    auto it = all_features_.find(feature);
-    if (it == all_features_.end()) {
-      return nullptr;
-    }
-    return it->second;
-  }
-
-private:
-  absl::flat_hash_map<std::string, absl::CommandLineFlag*> all_features_;
-};
-
-using RuntimeFeaturesDefaults = ConstSingleton<RuntimeFeatures>;
-
 RuntimeFeatures::RuntimeFeatures() {
   absl::flat_hash_map<absl::string_view, absl::CommandLineFlag*> flags = absl::GetAllFlags();
   for (auto& it : flags) {
@@ -248,6 +228,14 @@ RuntimeFeatures::RuntimeFeatures() {
     std::string envoy_name = swapPrefix(std::string(name));
     all_features_.emplace(envoy_name, it.second);
   }
+}
+
+absl::CommandLineFlag* RuntimeFeatures::getFlag(absl::string_view feature) const {
+  auto it = all_features_.find(feature);
+  if (it == all_features_.end()) {
+    return nullptr;
+  }
+  return it->second;
 }
 
 bool hasRuntimePrefix(absl::string_view feature) {

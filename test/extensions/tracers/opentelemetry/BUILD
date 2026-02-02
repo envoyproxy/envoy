@@ -47,7 +47,7 @@ envoy_extension_cc_test(
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
         "@com_google_absl//absl/types:optional",
-        "@io_opentelemetry_cpp//api",
+        "@opentelemetry-cpp//api",
     ],
 )
 

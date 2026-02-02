@@ -37,10 +37,17 @@ DynamicModuleListenerFilterConfigFactory::createListenerFilterFactoryFromProto(
     filter_config_str = std::move(config_or_error.value());
   }
 
+  // Use configured metrics namespace or fall back to the default.
+  const std::string metrics_namespace =
+      module_config.metrics_namespace().empty()
+          ? std::string(Extensions::DynamicModules::ListenerFilters::DefaultMetricsNamespace)
+          : module_config.metrics_namespace();
+
   auto filter_config =
       Extensions::DynamicModules::ListenerFilters::newDynamicModuleListenerFilterConfig(
-          proto_config.filter_name(), filter_config_str, std::move(dynamic_module.value()),
-          context.listenerScope(), context.serverFactoryContext().mainThreadDispatcher());
+          proto_config.filter_name(), filter_config_str, metrics_namespace,
+          std::move(dynamic_module.value()), context.listenerScope(),
+          context.serverFactoryContext().mainThreadDispatcher());
 
   if (!filter_config.ok()) {
     throw EnvoyException("Failed to create filter config: " +

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <string>
 #include <tuple>
 #include <utility>
@@ -26,15 +27,14 @@ namespace Sse {
  *   std::string buffer_;
  *   absl::string_view buffer_view(buffer_);
  *   while (!buffer_view.empty()) {
- *     auto [event_start, event_end, next_start] = findEventEnd(buffer_view, end_stream);
- *     if (event_start == absl::string_view::npos) break;
+ *     auto result = findEventEnd(buffer_view, end_stream);
+ *     if (result.event_start == absl::string_view::npos) break;
  *
- *     auto event_str = buffer_view.substr(event_start, event_end - event_start);
- *     auto event = parseEvent(event_str);
- *     if (event.data.has_value()) {
+ *     auto event_str = buffer_view.substr(result.event_start, result.event_end -
+ * result.event_start); auto event = parseEvent(event_str); if (event.data.has_value()) {
  *       // Process event.data.value()
  *     }
- *     buffer_view = buffer_view.substr(next_start);
+ *     buffer_view = buffer_view.substr(result.next_start);
  *   }
  *   buffer_.erase(0, buffer_.size() - buffer_view.size());
  */
@@ -42,13 +42,31 @@ class SseParser {
 public:
   /**
    * Represents a parsed SSE event.
-   * Currently only supports the 'data' field. Future versions may add 'id', 'event', and 'retry'.
+   * Supports 'data', 'id', 'event', and 'retry' fields per the SSE specification.
    */
   struct ParsedEvent {
     // The concatenated data field values. Per SSE spec, multiple data fields are joined with
     // newlines. absl::nullopt if no data fields present, empty string if data field exists but
     // empty.
     absl::optional<std::string> data;
+    // The event ID. absl::nullopt if no id field is present.
+    absl::optional<std::string> id;
+    // The event type. absl::nullopt if no event field is present.
+    absl::optional<std::string> event_type;
+    // The reconnection time in milliseconds. absl::nullopt if no retry field is present.
+    absl::optional<uint64_t> retry;
+  };
+
+  /**
+   * Result of finding the end of an SSE event in a buffer.
+   */
+  struct FindEventEndResult {
+    // Where the event content begins (after BOM if present).
+    size_t event_start;
+    // Where the event content ends (excluding trailing blank line).
+    size_t event_end;
+    // Where to continue parsing for the next event.
+    size_t next_start;
   };
 
   /**
@@ -68,13 +86,10 @@ public:
    *
    * @param buffer the buffer to search for an event.
    * @param end_stream whether this is the end of the stream (affects partial line handling).
-   * @return a tuple of {event_start, event_end, next_event_start} positions.
-   *         event_start: where the event content begins (after BOM if present)
-   *         event_end: where the event content ends (excluding trailing blank line)
-   *         next_event_start: where to continue parsing for the next event
-   *         Returns {npos, npos, npos} if no complete event is found.
+   * @return FindEventEndResult with event_start, event_end, and next_start positions.
+   *         All fields are set to npos if no complete event is found.
    */
-  static std::tuple<size_t, size_t, size_t> findEventEnd(absl::string_view buffer, bool end_stream);
+  static FindEventEndResult findEventEnd(absl::string_view buffer, bool end_stream);
 
 private:
   /**
