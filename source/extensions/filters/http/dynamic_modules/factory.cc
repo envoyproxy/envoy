@@ -44,7 +44,12 @@ absl::StatusOr<Http::FilterFactoryCb> DynamicModuleConfigFactory::createFilterFa
                                       std::string(filter_config.status().message()));
   }
 
-  context.api().customStatNamespaces().registerStatNamespace(metrics_namespace);
+  // Register the metrics namespace as a custom stat namespace unless the user wants to include
+  // the namespace in the stats output. When registered, the namespace prefix is stripped from
+  // /stats endpoints and no envoy_ prefix is added in prometheus output.
+  if (!module_config.include_metrics_namespace_in_stats_output()) {
+    context.api().customStatNamespaces().registerStatNamespace(metrics_namespace);
+  }
 
   return [config = filter_config.value()](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     const std::string& worker_name = callbacks.dispatcher().name();

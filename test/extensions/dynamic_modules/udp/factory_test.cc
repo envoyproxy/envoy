@@ -1,3 +1,4 @@
+#include "source/common/stats/custom_stat_namespaces_impl.h"
 #include "source/extensions/filters/udp/dynamic_modules/factory.h"
 
 #include "test/extensions/dynamic_modules/util.h"
@@ -21,11 +22,18 @@ public:
     TestEnvironment::setEnvVar("ENVOY_DYNAMIC_MODULES_SEARCH_PATH", shared_object_dir, 1);
   }
 
+  void setupMockContext(NiceMock<Server::Configuration::MockListenerFactoryContext>& context) {
+    ON_CALL(context.server_factory_context_.api_, customStatNamespaces())
+        .WillByDefault(testing::ReturnRef(custom_stat_namespaces_));
+  }
+
   DynamicModuleUdpListenerFilterConfigFactory factory_;
+  Stats::CustomStatNamespacesImpl custom_stat_namespaces_;
 };
 
 TEST_F(DynamicModuleUdpListenerFilterFactoryTest, ValidConfig) {
   NiceMock<Server::Configuration::MockListenerFactoryContext> context;
+  setupMockContext(context);
   const std::string yaml = R"EOF(
 dynamic_module_config:
   name: udp_no_op
@@ -96,6 +104,7 @@ filter_name: test_filter
 
 TEST_F(DynamicModuleUdpListenerFilterFactoryTest, MultipleFactoryCallsSameModule) {
   NiceMock<Server::Configuration::MockListenerFactoryContext> context;
+  setupMockContext(context);
 
   const std::string yaml = R"EOF(
 dynamic_module_config:
@@ -128,6 +137,7 @@ filter_name: test_filter
 
 TEST_F(DynamicModuleUdpListenerFilterFactoryTest, ConfigWithBytesValue) {
   NiceMock<Server::Configuration::MockListenerFactoryContext> context;
+  setupMockContext(context);
 
   const std::string yaml = R"EOF(
 dynamic_module_config:
@@ -156,6 +166,7 @@ filter_config:
 
 TEST_F(DynamicModuleUdpListenerFilterFactoryTest, ConfigWithStruct) {
   NiceMock<Server::Configuration::MockListenerFactoryContext> context;
+  setupMockContext(context);
 
   const std::string yaml = R"EOF(
 dynamic_module_config:

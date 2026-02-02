@@ -49,6 +49,14 @@ DynamicModuleNetworkFilterConfigFactory::createFilterFactoryFromProtoTyped(
                                       std::string(filter_config.status().message()));
   }
 
+  // Register the metrics namespace as a custom stat namespace unless the user wants to include
+  // the namespace in the stats output. When registered, the namespace prefix is stripped from
+  // /stats endpoints and no envoy_ prefix is added in prometheus output.
+  if (!module_config.include_metrics_namespace_in_stats_output()) {
+    context.serverFactoryContext().api().customStatNamespaces().registerStatNamespace(
+        metrics_namespace);
+  }
+
   return [config = filter_config.value()](Network::FilterManager& filter_manager) -> void {
     auto filter = std::make_shared<
         Envoy::Extensions::DynamicModules::NetworkFilters::DynamicModuleNetworkFilter>(config);

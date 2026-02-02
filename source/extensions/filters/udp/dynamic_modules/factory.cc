@@ -28,6 +28,20 @@ DynamicModuleUdpListenerFilterConfigFactory::createFilterFactoryFromProto(
   auto filter_config = std::make_shared<DynamicModuleUdpListenerFilterConfig>(
       proto_config, std::move(dynamic_module), context.scope());
 
+  // Determine the metrics namespace for registration.
+  const auto& module_config = proto_config.dynamic_module_config();
+  const std::string metrics_namespace = module_config.metrics_namespace().empty()
+                                            ? std::string(DefaultMetricsNamespace)
+                                            : module_config.metrics_namespace();
+
+  // Register the metrics namespace as a custom stat namespace unless the user wants to include
+  // the namespace in the stats output. When registered, the namespace prefix is stripped from
+  // /stats endpoints and no envoy_ prefix is added in prometheus output.
+  if (!module_config.include_metrics_namespace_in_stats_output()) {
+    context.serverFactoryContext().api().customStatNamespaces().registerStatNamespace(
+        metrics_namespace);
+  }
+
   return [filter_config](Network::UdpListenerFilterManager& filter_manager,
                          Network::UdpReadFilterCallbacks& callbacks) -> void {
     const std::string& worker_name = callbacks.udpListener().dispatcher().name();

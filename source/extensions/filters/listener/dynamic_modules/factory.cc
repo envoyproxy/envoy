@@ -54,6 +54,14 @@ DynamicModuleListenerFilterConfigFactory::createListenerFilterFactoryFromProto(
                          std::string(filter_config.status().message()));
   }
 
+  // Register the metrics namespace as a custom stat namespace unless the user wants to include
+  // the namespace in the stats output. When registered, the namespace prefix is stripped from
+  // /stats endpoints and no envoy_ prefix is added in prometheus output.
+  if (!module_config.include_metrics_namespace_in_stats_output()) {
+    context.serverFactoryContext().api().customStatNamespaces().registerStatNamespace(
+        metrics_namespace);
+  }
+
   return [filter_cfg = filter_config.value(),
           listener_filter_matcher](Network::ListenerFilterManager& filter_manager) -> void {
     auto filter =
