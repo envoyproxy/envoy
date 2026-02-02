@@ -97,6 +97,12 @@ TEST_F(FileServerFilterTest, PassThroughIfNoPath) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter->decodeHeaders(request_headers, true));
 }
 
+TEST_F(FileServerFilterTest, DestroyBeforeHeadersIsOkay) {
+  auto filter = testFilter();
+  filter->onDestroy();
+  // Should not crash due to uninitialized abort functions or anything!
+}
+
 TEST_F(FileServerFilterTest, PassThroughIfNotMatchingPathMapping) {
   auto filter = testFilter();
   Http::TestRequestHeaderMapImpl request_headers{
