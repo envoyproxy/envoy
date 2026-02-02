@@ -12,7 +12,10 @@ envoy_cc_library(
     name = "stats_action_lib",
     srcs = ["stats_action.cc"],
     hdrs = ["stats_action.h"],
-    visibility = ["//source/extensions/access_loggers/stats:__subpackages__"],
+    visibility = [
+        "//source/extensions/access_loggers/stats:__subpackages__",
+        "//test/common/stats:__subpackages__",
+    ],
     deps = [
         "//envoy/registry",
         "//envoy/stats:stats_interface",
