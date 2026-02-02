@@ -49,7 +49,5 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/http/file_server:config",
         "//test/integration:http_protocol_integration_lib",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/strings:string_view",
     ],
 )
