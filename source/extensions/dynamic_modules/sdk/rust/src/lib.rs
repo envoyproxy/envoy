@@ -1535,12 +1535,35 @@ pub trait EnvoyHttpFilter {
     details: &str,
   );
 
-  /// Send a GOAWAY frame to the downstream and close the connection.
+  /// Attempt to send a GOAWAY frame to the downstream and close the connection.
   ///
-  /// This is useful for implementing graceful connection shutdown scenarios.
+  /// This is a connection-level operation that affects all streams on the connection. When called,
+  /// the current filter chain iteration is aborted immediately and no subsequent filters will be
+  /// invoked for the current callback. This effectively pauses all streams on the connection.
   ///
-  /// * `graceful` - If true, initiates a graceful drain sequence before closing. If false, sends
-  ///   GOAWAY and closes immediately.
+  /// # Protocol-specific behavior
+  ///
+  /// - **HTTP/2**: Sends an actual GOAWAY frame to notify the client that the connection is being
+  ///   closed and no new streams should be initiated.
+  /// - **HTTP/1**: Since HTTP/1 does not have a GOAWAY frame, the connection is closed directly.
+  ///   The `graceful` parameter still controls whether in-flight requests are allowed to complete.
+  ///
+  /// # Arguments
+  ///
+  /// * `graceful` - If true, initiates a graceful drain sequence that allows in-flight streams to
+  ///   complete before closing the connection. If false, sends GOAWAY (for HTTP/2) and closes the
+  ///   connection immediately.
+  ///
+  /// # Filter chain behavior
+  ///
+  /// Once called, the filter chain iteration is stopped and no further filters will process
+  /// the current request/response. The stream may still receive the `on_destroy` callback for
+  /// cleanup purposes.
+  ///
+  /// # Multiple calls
+  ///
+  /// Multiple calls to this method are safe and the operation is idempotent. Subsequent calls are
+  /// no-ops once the first call has been made.
   fn send_go_away_and_close(&mut self, graceful: bool);
 
   /// Recreate the HTTP stream, optionally with new headers.

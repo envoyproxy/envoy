@@ -480,13 +480,25 @@ TEST_F(LocalRateLimiterImplTest, AtomicTokenBucketStatus) {
 }
 
 TEST_F(LocalRateLimiterDescriptorImplTest, AtomicTokenBucketDescriptorBase) {
+
   TestUtility::loadFromYaml(fmt::format(single_descriptor_config_yaml, 1, 1, "0.1s"),
                             *descriptors_.Add());
   initializeWithAtomicTokenBucketDescriptor(std::chrono::milliseconds(50), 1, 1);
 
-  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor_).allowed);
-  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor_).allowed);
-  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor_).allowed);
+  descriptor_[0].x_ratelimit_option_ = envoy::config::route::v3::RateLimit::DRAFT_VERSION_03;
+  auto result = rate_limiter_->requestAllowed(descriptor_);
+  EXPECT_TRUE(result.allowed);
+  EXPECT_EQ(result.x_ratelimit_option, envoy::config::route::v3::RateLimit::DRAFT_VERSION_03);
+
+  descriptor_[0].x_ratelimit_option_ = envoy::config::route::v3::RateLimit::OFF;
+  result = rate_limiter_->requestAllowed(descriptor_);
+  EXPECT_FALSE(result.allowed);
+  EXPECT_EQ(result.x_ratelimit_option, envoy::config::route::v3::RateLimit::OFF);
+
+  descriptor_[0].x_ratelimit_option_ = envoy::config::route::v3::RateLimit::UNSPECIFIED;
+  result = rate_limiter_->requestAllowed(descriptor_);
+  EXPECT_FALSE(result.allowed);
+  EXPECT_EQ(result.x_ratelimit_option, envoy::config::route::v3::RateLimit::UNSPECIFIED);
 }
 
 TEST_F(LocalRateLimiterDescriptorImplTest, AtomicTokenBucketDescriptor) {

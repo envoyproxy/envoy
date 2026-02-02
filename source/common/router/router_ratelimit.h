@@ -290,6 +290,7 @@ private:
   std::vector<RateLimit::DescriptorProducerPtr> actions_;
   absl::optional<RateLimitOverrideActionPtr> limit_override_ = absl::nullopt;
   const bool apply_on_stream_done_ = false;
+  const RateLimit::XRateLimitOption x_ratelimit_option_{};
 };
 
 /**

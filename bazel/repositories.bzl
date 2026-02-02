@@ -78,9 +78,13 @@ def _cc_deps():
         name = "grpc_httpjson_transcoding",
         patch_args = ["-p1"],
         patches = ["@envoy//bazel:grpc_httpjson_transcoding.patch"],
+        repo_mapping = {
+            "@com_google_protoconverter": "@proto-converter",
+        },
     )
     external_http_archive(
-        name = "com_google_protoconverter",
+        "proto-converter",
+        location_name = "com_google_protoconverter",
         patch_args = ["-p1"],
         patches = ["@envoy//bazel:com_google_protoconverter.patch"],
         patch_cmds = [
@@ -91,13 +95,28 @@ def _cc_deps():
             "rm src/google/protobuf/util/converter/port_undef.inc",
         ],
     )
-    external_http_archive("com_google_protofieldextraction")
     external_http_archive(
-        "com_google_protoprocessinglib",
+        "proto-field-extraction",
+        location_name = "com_google_protofieldextraction",
+        repo_mapping = {
+            "@ocp": "@ocp-diag-core",
+        },
+    )
+    external_http_archive(
+        "proto-processing",
+        location_name = "com_google_protoprocessinglib",
         patch_args = ["-p1"],
         patches = ["@envoy//bazel:proto_processing_lib.patch"],
+        repo_mapping = {
+            "@ocp": "@ocp-diag-core",
+            "@com_google_protoconverter": "@proto-converter",
+            "@com_google_protofieldextraction": "@proto-field-extraction",
+        },
     )
-    external_http_archive("ocp")
+    external_http_archive(
+        name = "ocp-diag-core",
+        location_name = "ocp",
+    )
 
 def _go_deps(skip_targets):
     # Keep the skip_targets check around until Istio Proxy has stopped using
@@ -153,7 +172,6 @@ def envoy_dependencies(skip_targets = []):
     _com_github_fmtlib_fmt()
     _com_github_gabime_spdlog()
     _com_github_google_benchmark()
-    _com_github_google_jwt_verify()
     _com_github_google_libprotobuf_mutator()
     _com_github_google_libsxg()
     _com_github_google_tcmalloc()
@@ -193,9 +211,8 @@ def envoy_dependencies(skip_targets = []):
     _io_opentelemetry_api_cpp()
     _net_colm_open_source_colm()
     _net_colm_open_source_ragel()
-    _zlib()
     _intel_dlb()
-    _com_github_zlib_ng_zlib_ng()
+    _zlib_ng()
     _org_boost()
     _org_brotli()
     _zstd()
@@ -233,9 +250,6 @@ def envoy_dependencies(skip_targets = []):
 
     _com_github_fdio_vpp_vcl()
 
-    # Unconditional, since we use this only for compiler-agnostic fuzzing utils.
-    _org_llvm_releases_compiler_rt()
-
     _toolchains_llvm()
 
     _cc_deps()
@@ -261,8 +275,6 @@ def _boringssl_fips():
         name = "boringssl_fips",
         location_name = "boringssl",
         build_file = "@envoy//bazel/external:boringssl_fips.BUILD",
-        patches = ["@envoy//bazel:boringssl_fips.patch"],
-        patch_args = ["-p1"],
     )
 
     NINJA_BUILD_CONTENT = "%s\nexports_files([\"configure.py\"])" % BUILD_ALL_CONTENT
@@ -297,7 +309,7 @@ def _aws_lc():
 
 def _com_github_openhistogram_libcircllhist():
     external_http_archive(
-        name = "com_github_openhistogram_libcircllhist",
+        name = "libcircllhist",
         build_file = "@envoy//bazel/external:libcircllhist.BUILD",
     )
 
@@ -338,7 +350,8 @@ def _com_github_cyan4973_xxhash():
 
 def _com_github_envoyproxy_sqlparser():
     external_http_archive(
-        name = "com_github_envoyproxy_sqlparser",
+        name = "sql-parser",
+        location_name = "com_github_envoyproxy_sqlparser",
         build_file = "@envoy//bazel/external:sqlparser.BUILD",
     )
 
@@ -467,15 +480,10 @@ def _net_colm_open_source_ragel():
         build_file_content = BUILD_ALL_CONTENT,
     )
 
-def _zlib():
+def _zlib_ng():
     external_http_archive(
-        name = "zlib",
-        build_file = "@envoy//bazel/external:zlib.BUILD",
-    )
-
-def _com_github_zlib_ng_zlib_ng():
-    external_http_archive(
-        name = "com_github_zlib_ng_zlib_ng",
+        name = "zlib-ng",
+        location_name = "zlib_ng",
         build_file = "@envoy//bazel/external:zlib_ng.BUILD",
     )
 
@@ -567,13 +575,15 @@ def _com_github_nghttp2_nghttp2():
 
 def _com_github_msgpack_cpp():
     external_http_archive(
-        name = "com_github_msgpack_cpp",
+        name = "msgpack-cxx",
+        location_name = "com_github_msgpack_cpp",
         build_file = "@envoy//bazel/external:msgpack.BUILD",
     )
 
 def _io_hyperscan():
     external_http_archive(
-        name = "io_hyperscan",
+        name = "hyperscan",
+        location_name = "io_hyperscan",
         build_file_content = BUILD_ALL_CONTENT,
         patch_args = ["-p1"],
         patches = ["@envoy//bazel/foreign_cc:hyperscan.patch"],
@@ -581,7 +591,8 @@ def _io_hyperscan():
 
 def _io_vectorscan():
     external_http_archive(
-        name = "io_vectorscan",
+        name = "vectorscan",
+        location_name = "io_vectorscan",
         build_file_content = BUILD_ALL_CONTENT,
         type = "tar.gz",
         patch_args = ["-p1"],
@@ -590,7 +601,8 @@ def _io_vectorscan():
 
 def _io_opentelemetry_api_cpp():
     external_http_archive(
-        name = "io_opentelemetry_cpp",
+        name = "opentelemetry-cpp",
+        location_name = "io_opentelemetry_cpp",
     )
 
 def _com_github_datadog_dd_trace_cpp():
@@ -598,7 +610,8 @@ def _com_github_datadog_dd_trace_cpp():
 
 def _com_github_skyapm_cpp2sky():
     external_http_archive(
-        name = "com_github_skyapm_cpp2sky",
+        name = "cpp2sky",
+        location_name = "com_github_skyapm_cpp2sky",
         patches = ["@envoy//bazel:com_github_skyapm_cpp2sky.patch"],
         patch_args = ["-p1"],
     )
@@ -612,7 +625,10 @@ def _com_github_nlohmann_json():
     )
 
 def _com_github_alibaba_hessian2_codec():
-    external_http_archive("com_github_alibaba_hessian2_codec")
+    external_http_archive(
+        name = "hessian2-codec",
+        location_name = "com_github_alibaba_hessian2_codec",
+    )
 
 def _com_github_ncopa_suexec():
     external_http_archive(
@@ -743,18 +759,15 @@ def _googleurl():
         patch_args = ["-p1"],
     )
 
-def _org_llvm_releases_compiler_rt():
-    external_http_archive(
-        name = "org_llvm_releases_compiler_rt",
-        build_file = "@envoy//bazel/external:compiler_rt.BUILD",
-    )
-
 def _com_github_grpc_grpc():
     external_http_archive(
         name = "com_github_grpc_grpc",
         patch_args = ["-p1"],
         patches = ["@envoy//bazel:grpc.patch"],
-        repo_mapping = {"@openssl": "@boringssl"},
+        repo_mapping = {
+            "@com_github_cncf_xds": "@xds",
+            "@openssl": "@boringssl",
+        },
     )
     external_http_archive(
         "build_bazel_rules_apple",
@@ -769,7 +782,10 @@ def _rules_proto_grpc():
     external_http_archive("rules_proto_grpc")
 
 def _re2():
-    external_http_archive("com_googlesource_code_re2")
+    external_http_archive(
+        "com_googlesource_code_re2",
+        repo_mapping = {"@abseil-cpp": "@com_google_absl"},
+    )
 
 def _proxy_wasm_cpp_sdk():
     external_http_archive(
@@ -794,13 +810,6 @@ def _emsdk():
         name = "emsdk",
         patch_args = ["-p2"],
         patches = ["@envoy//bazel:emsdk.patch"],
-    )
-
-def _com_github_google_jwt_verify():
-    external_http_archive(
-        "com_github_google_jwt_verify",
-        patches = ["@envoy//bazel:jwt_verify_lib.patch"],
-        patch_args = ["-p1"],
     )
 
 def _com_github_luajit_luajit():
@@ -893,13 +902,6 @@ filegroup(
         # For now, let's just drop this dependency from Kafka, as it's used only for monitoring.
         patches = ["@envoy//bazel/foreign_cc:librdkafka.patch"],
         patch_args = ["-p1"],
-    )
-
-    # This archive provides Kafka (and Zookeeper) binaries, that are used during Kafka integration
-    # tests.
-    external_http_archive(
-        name = "kafka_server_binary",
-        build_file_content = BUILD_ALL_CONTENT,
     )
 
 def _com_github_fdio_vpp_vcl():
