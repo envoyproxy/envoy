@@ -26,6 +26,17 @@ absl::StatusOr<Http::FilterFactoryCb> BufferFilterFactory::createFilterFactoryFr
   };
 }
 
+Envoy::Http::FilterFactoryCb
+BufferFilterFactory::createFilterFactoryFromProtoWithServerContextTyped(
+    const envoy::extensions::filters::http::buffer::v3::Buffer& proto_config,
+    const std::string& stats_prefix, Server::Configuration::ServerFactoryContext&) {
+  ASSERT(proto_config.has_max_request_bytes());
+  BufferFilterConfigSharedPtr filter_config(new BufferFilterConfig(proto_config));
+  return [filter_config, stats_prefix](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addStreamDecoderFilter(std::make_shared<BufferFilter>(filter_config));
+  };
+}
+
 absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
 BufferFilterFactory::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::buffer::v3::BufferPerRoute& proto_config,

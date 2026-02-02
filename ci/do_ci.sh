@@ -102,7 +102,11 @@ function cp_binary_for_image_build() {
     -o "${BASE_TARGET_DIR}"/"${TARGET_DIR}"/config_load_check_tool
 
   # Copy the su-exec utility binary into the image
-  cp -f bazel-bin/external/com_github_ncopa_suexec/su-exec "${BASE_TARGET_DIR}"/"${TARGET_DIR}"
+  if [[ -n "$ENVOY_CI_BZLMOD" ]]; then
+      cp -f bazel-bin/external/su-exec~/su-exec "${BASE_TARGET_DIR}"/"${TARGET_DIR}"
+  else
+      cp -f bazel-bin/external/com_github_ncopa_suexec/su-exec "${BASE_TARGET_DIR}"/"${TARGET_DIR}"
+  fi
 
   # Stripped binaries for the debug image.
   mkdir -p "${BASE_TARGET_DIR}"/"${TARGET_DIR}"_stripped
@@ -168,7 +172,11 @@ function bazel_binary_build() {
     //test/tools/config_load_check:config_load_check_tool "${CONFIG_ARGS[@]}"
 
   # Build su-exec utility
-  bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c "${COMPILE_TYPE}" @com_github_ncopa_suexec//:su-exec
+  if [[ -n "$ENVOY_CI_BZLMOD" ]]; then
+      bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c "${COMPILE_TYPE}" @su-exec
+  else
+      bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c "${COMPILE_TYPE}" @com_github_ncopa_suexec//:su-exec
+  fi
   cp_binary_for_image_build "${BINARY_TYPE}" "${COMPILE_TYPE}" "${EXE_NAME}"
 }
 
@@ -221,7 +229,11 @@ function bazel_envoy_api_go_build() {
             # strip @envoy_api//
         RULE_DIR="$(echo "${GO_PROTO:12}" | cut -d: -f1)"
         PROTO="$(echo "${GO_PROTO:12}" | cut -d: -f2)"
-        INPUT_DIR="${BAZEL_BIN}/external/envoy_api/${RULE_DIR}/${PROTO}_/${GO_IMPORT_BASE}/${RULE_DIR}"
+        if [[ -n "$ENVOY_CI_BZLMOD" ]]; then
+            INPUT_DIR="${BAZEL_BIN}/external/envoy_api~/${RULE_DIR}/${PROTO}_/${GO_IMPORT_BASE}/${RULE_DIR}"
+        else
+            INPUT_DIR="${BAZEL_BIN}/external/envoy_api/${RULE_DIR}/${PROTO}_/${GO_IMPORT_BASE}/${RULE_DIR}"
+        fi
         OUTPUT_DIR="build_go/${RULE_DIR}"
         mkdir -p "$OUTPUT_DIR"
         if [[ ! -e "$INPUT_DIR" ]]; then
@@ -377,15 +389,18 @@ case $CI_TARGET in
         # This doesn't go into CI but is available for developer convenience.
         echo "bazel with different compiletime options build with tests..."
         TEST_TARGETS=("${TEST_TARGETS[@]/#\/\//@envoy\/\/}")
-        echo "Building and testing with wasm=wamr: ${TEST_TARGETS[*]}"
-        bazel_with_collection \
-            test "${BAZEL_BUILD_OPTIONS[@]}" \
-            --config=compile-time-options \
-            --define wasm=wamr \
-            -c fastbuild \
-            "${TEST_TARGETS[@]}" \
-            --test_tag_filters=-nofips \
-            --build_tag_filters=-nofips
+        if [[ -z "$ENVOY_SKIP_CTO_WAMR" ]]; then
+            echo "Building and testing with wasm=wamr: ${TEST_TARGETS[*]}"
+            bazel_with_collection \
+                test "${BAZEL_BUILD_OPTIONS[@]}" \
+                --config=compile-time-options \
+                --define wasm=wamr \
+                -c fastbuild \
+                "${TEST_TARGETS[@]}"
+        fi
+        if [[ -z "$ENVOY_SKIP_CTO_WASMTIME" ]]; then
+            exit 0
+        fi
         echo "Building and testing with wasm=wasmtime: and admin_functionality and admin_html disabled ${TEST_TARGETS[*]}"
         bazel_with_collection \
             test "${BAZEL_BUILD_OPTIONS[@]}" \
@@ -393,9 +408,7 @@ case $CI_TARGET in
             --define wasm=wasmtime \
             --define admin_functionality=disabled \
             -c fastbuild \
-            "${TEST_TARGETS[@]}" \
-            --test_tag_filters=-nofips \
-            --build_tag_filters=-nofips
+            "${TEST_TARGETS[@]}"
         # "--define log_debug_assert_in_release=enabled" must be tested with a release build, so run only
         # these tests under "-c opt" to save time in CI.
         bazel_with_collection \
@@ -420,8 +433,7 @@ case $CI_TARGET in
             --define wasm=wasmtime \
             --define enable_logging=disabled \
             -c fastbuild \
-            @envoy//source/exe:envoy-static \
-            --build_tag_filters=-nofips
+            @envoy//source/exe:envoy-static
         collect_build_profile build
         ;;
 
@@ -634,6 +646,7 @@ case $CI_TARGET in
         if [[ -n "${DOCS_BUILD_RST}" ]]; then
             bazel "${BAZEL_STARTUP_OPTIONS[@]}" build "${BAZEL_BUILD_OPTIONS[@]}" //docs:rst
             cp bazel-bin/docs/rst.tar.gz "$DOCS_OUTPUT_DIR"/envoy-docs-rst.tar.gz
+            exit 0
         fi
         DOCS_OUTPUT_DIR="$(realpath "$DOCS_OUTPUT_DIR")"
         bazel "${BAZEL_STARTUP_OPTIONS[@]}" run \
