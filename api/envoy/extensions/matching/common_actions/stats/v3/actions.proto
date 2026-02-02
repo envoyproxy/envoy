@@ -31,9 +31,18 @@ message StatAction {
     string tag_value = 2;
   }
 
-  oneof rule {
-    DropStatAction drop_stat = 1;
-    DropTagAction drop_tag = 2;
-    InsertTagAction insert_tag = 3;
-  }
+  // If multiple actions are configured, they are applied in the following
+  // order:
+  // 1. drop_stat
+  // 2. drop_tag
+  // 3. insert_tag
+
+  // If set, the stat will be dropped.
+  DropStatAction drop_stat = 1;
+
+  // If set, the tag with the given name will be dropped.
+  DropTagAction drop_tag = 2;
+
+  // If set, the tag with the given name will be inserted or updated.
+  InsertTagAction insert_tag = 3;
 }

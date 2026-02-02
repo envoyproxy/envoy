@@ -11,25 +11,16 @@ namespace Stats {
 
 namespace {
 
-class DropStatAction
-    : public Matcher::ActionBase<
-          envoy::extensions::matching::common_actions::stats::v3::StatAction::DropStatAction>,
-      public StatsAction {
+class DropStatAction : public StatsAction {
 public:
   explicit DropStatAction(
       const envoy::extensions::matching::common_actions::stats::v3::StatAction::
           DropStatAction&) {}
 
-  Result apply(Envoy::Stats::TagVector&) const override {
-    return Result::Drop;
-  }
+  Result apply(Envoy::Stats::TagVector&) const override { return Result::Drop; }
 };
 
-class InsertTagAction
-    : public Matcher::ActionBase<
-          envoy::extensions::matching::common_actions::stats::v3::StatAction::
-              InsertTagAction>,
-      public StatsAction {
+class InsertTagAction : public StatsAction {
 public:
   explicit InsertTagAction(
       const envoy::extensions::matching::common_actions::stats::v3::StatAction::
@@ -56,10 +47,7 @@ private:
   const std::string tag_value_;
 };
 
-class DropTagAction
-    : public Matcher::ActionBase<
-          envoy::extensions::matching::common_actions::stats::v3::StatAction::DropTagAction>,
-      public StatsAction {
+class DropTagAction : public StatsAction {
 public:
   explicit DropTagAction(
       const envoy::extensions::matching::common_actions::stats::v3::StatAction::
@@ -81,6 +69,27 @@ private:
   const std::string target_tag_name_;
 };
 
+class CompositeStatsAction
+    : public Matcher::ActionBase<
+          envoy::extensions::matching::common_actions::stats::v3::StatAction>,
+      public StatsAction {
+public:
+  CompositeStatsAction(std::vector<std::unique_ptr<StatsAction>> actions)
+      : actions_(std::move(actions)) {}
+
+  Result apply(Envoy::Stats::TagVector& tags) const override {
+    for (const auto& action : actions_) {
+      if (action->apply(tags) == Result::Drop) {
+        return Result::Drop;
+      }
+    }
+    return Result::Keep;
+  }
+
+private:
+  const std::vector<std::unique_ptr<StatsAction>> actions_;
+};
+
 } // namespace
 
 class StatActionFactory : public Matcher::ActionFactory<ActionContext> {
@@ -92,23 +101,24 @@ public:
         const envoy::extensions::matching::common_actions::stats::v3::StatAction&>(
         config, validation_visitor);
 
-    switch (action_config.rule_case()) {
-    case envoy::extensions::matching::common_actions::stats::v3::StatAction::RuleCase::
-        kDropStat:
-      return std::make_shared<DropStatAction>(action_config.drop_stat());
-    case envoy::extensions::matching::common_actions::stats::v3::StatAction::RuleCase::
-        kDropTag:
-      return std::make_shared<DropTagAction>(action_config.drop_tag());
-    case envoy::extensions::matching::common_actions::stats::v3::StatAction::RuleCase::
-        kInsertTag:
-      return std::make_shared<InsertTagAction>(action_config.insert_tag());
-    case envoy::extensions::matching::common_actions::stats::v3::StatAction::RuleCase::
-        RULE_NOT_SET:
-      break;
+    std::vector<std::unique_ptr<StatsAction>> actions;
+
+    if (action_config.has_drop_stat()) {
+      actions.push_back(
+          std::make_unique<DropStatAction>(action_config.drop_stat()));
     }
 
-    throw EnvoyException(fmt::format("Unknown state action: {}",
-                                     action_config.DebugString()));
+    if (action_config.has_drop_tag()) {
+      actions.push_back(
+          std::make_unique<DropTagAction>(action_config.drop_tag()));
+    }
+
+    if (action_config.has_insert_tag()) {
+      actions.push_back(
+          std::make_unique<InsertTagAction>(action_config.insert_tag()));
+    }
+
+    return std::make_shared<CompositeStatsAction>(std::move(actions));
   }
 
   std::string name() const override {

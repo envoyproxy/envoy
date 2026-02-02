@@ -115,16 +115,65 @@ TEST_F(StatActionTest, DropTagAction) {
   EXPECT_EQ("other", tags[0].name_);
 }
 
-TEST_F(StatActionTest, UnknownAction) {
+TEST_F(StatActionTest, EmptyAction) {
   StatAction config;
-  // No action set
+  createAction(config);
 
-  auto& factory = Config::Utility::getAndCheckFactoryByName<
-      Matcher::ActionFactory<ActionContext>>(
-      "envoy.extensions.matching.common_actions.stats.v3.StatAction");
-  EXPECT_THROW_WITH_REGEX(
-      factory.createAction(config, action_context_, validation_visitor_),
-      EnvoyException, "Unknown state action: .*");
+  const auto* stat_action = dynamic_cast<const StatsAction*>(action_.get());
+  ASSERT_NE(stat_action, nullptr);
+
+  Envoy::Stats::TagVector tags;
+  EXPECT_EQ(StatsAction::Result::Keep, stat_action->apply(tags));
+}
+
+TEST_F(StatActionTest, CombinedAction) {
+  StatAction config;
+  auto* drop_tag = config.mutable_drop_tag();
+  drop_tag->set_target_tag_name("foo");
+  auto* insert_tag = config.mutable_insert_tag();
+  insert_tag->set_tag_name("bar");
+  insert_tag->set_tag_value("baz");
+
+  createAction(config);
+
+  const auto* stat_action = dynamic_cast<const StatsAction*>(action_.get());
+  ASSERT_NE(stat_action, nullptr);
+
+  // Input: [foo=1, other=2]
+  // Expected Output: [other=2, bar=baz]
+  Envoy::Stats::TagVector tags;
+  tags.emplace_back(Envoy::Stats::Tag{"foo", "1"});
+  tags.emplace_back(Envoy::Stats::Tag{"other", "2"});
+
+  EXPECT_EQ(StatsAction::Result::Keep, stat_action->apply(tags));
+  ASSERT_EQ(2, tags.size());
+  // drop_tag removed "foo".
+  // insert_tag added "bar".
+  // "other" remains.
+  // The implementation uses vector, so order might depend on implementation details.
+  // DropTagAction uses erase which preserves order.
+  // InsertTagAction uses emplace_back which appends.
+
+  EXPECT_EQ("other", tags[0].name_);
+  EXPECT_EQ("2", tags[0].value_);
+  EXPECT_EQ("bar", tags[1].name_);
+  EXPECT_EQ("baz", tags[1].value_);
+}
+
+TEST_F(StatActionTest, CombinedDropStat) {
+  StatAction config;
+  config.mutable_drop_stat();
+  auto* insert_tag =
+      config.mutable_insert_tag(); // Should be ignored or executed before drop?
+  insert_tag->set_tag_name("bar");
+  insert_tag->set_tag_value("baz");
+
+  createAction(config);
+  const auto* stat_action = dynamic_cast<const StatsAction*>(action_.get());
+  ASSERT_NE(stat_action, nullptr);
+
+  Envoy::Stats::TagVector tags;
+  EXPECT_EQ(StatsAction::Result::Drop, stat_action->apply(tags));
 }
 
 } // namespace
