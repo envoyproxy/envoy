@@ -19,6 +19,7 @@
 #include "test/mocks/matcher/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -327,6 +328,19 @@ TEST_F(CelMatcherTest, CelMatcherRequestInsufficientDataResponseHeaderMatched) {
   data_.onResponseHeaders(response_headers);
 
   EXPECT_THAT(matcher_tree->match(data_), HasStringAction("match!!"));
+}
+
+TEST_F(CelMatcherTest, CelMatcherRequestNoInsufficientDataIfRuntimeGuardFalse) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_cel_response_path_matching", "false"}});
+  auto matcher_tree = buildMatcherTree(ResponseHeaderAndPathCelExprString);
+
+  TestRequestHeaderMapImpl request_headers;
+  buildCustomHeader({{":path", "/foo"}}, request_headers);
+  data_.onRequestHeaders(request_headers);
+
+  EXPECT_THAT(matcher_tree->match(data_), HasNoMatch());
 }
 
 TEST_F(CelMatcherTest, CelMatcherRequestInsufficientDataResponseHeaderNotMatched) {

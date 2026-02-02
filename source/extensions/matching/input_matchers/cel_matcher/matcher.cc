@@ -38,7 +38,9 @@ Matcher::MatchResult CelInputMatcher::match(const MatchingDataType& input) {
         return Matcher::MatchResult::matched();
       }
     }
-    if (cel_data->needs_response() && !cel_data->has_response_data()) {
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.enable_cel_response_path_matching") &&
+        cel_data->needs_response() && !cel_data->has_response_data()) {
       return Matcher::MatchResult::insufficientData();
     }
   }
