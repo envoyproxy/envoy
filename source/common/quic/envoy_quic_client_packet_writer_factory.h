@@ -52,6 +52,7 @@ public:
    */
   virtual QuicClientPacketWriterFactoryPtr
   createQuicClientPacketWriterFactory(const Protobuf::Message& config,
+                                      Event::Dispatcher& dispatcher,
                                       ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
 };
 

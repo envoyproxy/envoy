@@ -30,6 +30,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // the ABI is stabilized, this restriction will be revisited. Until then, Envoy checks the hash of
 // the ABI header files to ensure that the dynamic modules are built against the same version of the
 // ABI.
+// [#next-free-field: 6]
 message DynamicModuleConfig {
   // The name of the dynamic module.
   //
@@ -69,4 +70,12 @@ message DynamicModuleConfig {
   //
   // Defaults to ``false``.
   bool load_globally = 4;
+
+  // The namespace prefix for metrics emitted by this dynamic module.
+  //
+  // This allows users to customize the prefix used for all metrics created by the dynamic module.
+  // The prefix is prepended to all metric names.
+  //
+  // Defaults to ``dynamicmodulescustom``.
+  string metrics_namespace = 5;
 }

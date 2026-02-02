@@ -52,8 +52,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/envoyproxy/examples/archive/v{version}.tar.gz"],
     ),
     envoy_toolshed = dict(
-        version = "0.3.26",
-        sha256 = "96e27e0f9f9c259f3f623b7c79f30e4adbfc817a2513cbb14b13d57f90689481",
+        version = "0.3.28",
+        sha256 = "8f4c01104e41eefaf08cbe7a678f50a2aff00e45ba873a2c0d3514e9b2debdb8",
         strip_prefix = "toolshed-bazel-v{version}/bazel",
         urls = ["https://github.com/envoyproxy/toolshed/archive/bazel-v{version}.tar.gz"],
     ),
@@ -67,8 +67,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
     boringssl = dict(
         # To update BoringSSL, which tracks BCR tags, open https://registry.bazel.build/modules/boringssl
         # and select an appropriate tag for the new version.
-        version = "0.20250514.0",
-        sha256 = "71ef1eb84a035a033ad55867f89a141ddb2e5c5829dd4035ea7803bfff0257ed",
+        version = "0.20251124.0",
+        sha256 = "d47f89b894bf534c82071d7426c5abf1e5bd044fee242def53cd5d3d0f656c09",
         strip_prefix = "boringssl-{version}",
         urls = ["https://github.com/google/boringssl/archive/{version}.tar.gz"],
     ),
@@ -122,7 +122,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "c-ares-{version}",
         urls = ["https://github.com/c-ares/c-ares/releases/download/v{version}/c-ares-{version}.tar.gz"],
     ),
-    com_github_openhistogram_libcircllhist = dict(
+    libcircllhist = dict(
         version = "0.3.2",
         sha256 = "6dfbd649fde380f7a2256def43b9c6374c6d6fe768178b09e39eedf874b139f4",
         strip_prefix = "libcircllhist-py-{version}",
@@ -697,20 +697,20 @@ REPOSITORY_LOCATIONS_SPEC = dict(
     ),
     # Dependencies for fips - VERSIONS SHOULD NOT BE CHANGED
     fips_ninja = dict(
-        version = "1.13.1",
-        sha256 = "f0055ad0369bf2e372955ba55128d000cfcc21777057806015b45e4accbebf23",
+        version = "1.13.2",
+        sha256 = "974d6b2f4eeefa25625d34da3cb36bdcebe7fbce40f4c16ac0835fd1c0cbae17",
         strip_prefix = "ninja-{version}",
         urls = ["https://github.com/ninja-build/ninja/archive/refs/tags/v{version}.tar.gz"],
     ),
     fips_cmake_linux_x86_64 = dict(
-        version = "4.2.1",
-        sha256 = "c059bff1e97a2b6b5b0c0872263627486345ad0ed083298cb21cff2eda883980",
+        version = "4.2.3",
+        sha256 = "5bb505d5e0cca0480a330f7f27ccf52c2b8b5214c5bba97df08899f5ef650c23",
         strip_prefix = "cmake-{version}-linux-x86_64",
         urls = ["https://github.com/Kitware/CMake/releases/download/v{version}/cmake-{version}-linux-x86_64.tar.gz"],
     ),
     fips_cmake_linux_aarch64 = dict(
-        version = "4.2.1",
-        sha256 = "3e178207a2c42af4cd4883127f8800b6faf99f3f5187dccc68bfb2cc7808f5f7",
+        version = "4.2.3",
+        sha256 = "e529c75f18f27ba27c52b329efe7b1f98dc32ccc0c6d193c7ab343f888962672",
         strip_prefix = "cmake-{version}-linux-aarch64",
         urls = ["https://github.com/Kitware/CMake/releases/download/v{version}/cmake-{version}-linux-aarch64.tar.gz"],
     ),

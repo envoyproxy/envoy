@@ -73,8 +73,8 @@ envoy_cc_library(
         "//envoy/network:transport_socket_interface",
         "//envoy/stats:primitive_stats_macros",
         "//envoy/stats:stats_macros",
-        "@com_github_cncf_xds//xds/data/orca/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@xds//xds/data/orca/v3:pkg_cc_proto",
     ],
 )
 
