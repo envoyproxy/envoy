@@ -406,7 +406,7 @@ TEST_F(ReverseTunnelFilterUnitTest, ConfigurationCustomPingInterval) {
   proto_config.set_auto_close_connections(true);
   proto_config.set_request_path("/custom/path");
   proto_config.set_request_method(envoy::config::core::v3::PUT);
-  proto_config.set_enable_tenant_isolation(true);
+  proto_config.mutable_enable_tenant_isolation()->set_value(true);
 
   auto config_or_error = ReverseTunnelFilterConfig::create(proto_config, factory_context_);
   ASSERT_TRUE(config_or_error.ok());
@@ -445,7 +445,7 @@ TEST_F(ReverseTunnelFilterUnitTest, ConfigurationDefaults) {
 
 TEST_F(ReverseTunnelFilterUnitTest, TenantIsolationRejectsDelimiterInIdentifiers) {
   envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
-  cfg.set_enable_tenant_isolation(true);
+  cfg.mutable_enable_tenant_isolation()->set_value(true);
 
   auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
   ASSERT_TRUE(config_or_error.ok());
