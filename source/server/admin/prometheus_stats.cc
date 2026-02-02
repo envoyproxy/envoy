@@ -385,19 +385,20 @@ private:
   // Write a varint-length-delimited protobuf message to the buffer.
   void writeDelimitedMessage(const google::protobuf::MessageLite& message,
                              Buffer::Instance& output) const {
+    constexpr size_t kMaxVarintLength = 10; // This is documented, but exported as a constant.
+
     const size_t length = message.ByteSizeLong();
+    auto reservation = output.reserveSingleSlice(length + kMaxVarintLength);
+    uint8_t* const reservation_start = reinterpret_cast<uint8_t*>(reservation.slice().mem_);
 
-    // Write varint length prefix.
-    uint8_t varint_buf[10]; // 10 is the maximum size of a varint64.
-    Protobuf::io::ArrayOutputStream array_stream(varint_buf, sizeof(varint_buf));
-    Protobuf::io::CodedOutputStream coded_stream(&array_stream);
-    coded_stream.WriteVarint64(length);
-    output.add(varint_buf, coded_stream.ByteCount());
+    uint8_t* const end_of_varint =
+        Protobuf::io::CodedOutputStream::WriteVarint64ToArray(length, reservation_start);
+    message.SerializeWithCachedSizesToArray(end_of_varint);
 
-    // Write the serialized message.
-    auto reservation = output.reserveSingleSlice(length);
-    message.SerializeWithCachedSizesToArray(reinterpret_cast<uint8_t*>(reservation.slice().mem_));
-    reservation.commit(length);
+    ASSERT(end_of_varint >= reservation_start);
+    const size_t varint_size = end_of_varint - reservation_start;
+    ASSERT(varint_size <= kMaxVarintLength);
+    reservation.commit(varint_size + length);
   }
 };
 
