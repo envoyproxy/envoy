@@ -14,7 +14,8 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 message TransformStat {
   // Action that drops the stat.
-  message DropStat {}
+  message DropStat {
+  }
 
   // Action that drops the tag.
   message DropTag {

@@ -1,13 +1,11 @@
-#include "source/extensions/matching/actions/transform_stat/transform_stat.h"
-
 #include "envoy/extensions/matching/actions/transform_stat/v3/transform_stat.pb.h"
 #include "envoy/registry/registry.h"
-#include "source/common/config/utility.h"
-#include "test/mocks/protobuf/mocks.h"
-#include "test/test_common/utility.h"
-
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "source/common/config/utility.h"
+#include "source/extensions/matching/actions/transform_stat/transform_stat.h"
+#include "test/mocks/protobuf/mocks.h"
+#include "test/test_common/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -23,9 +21,9 @@ public:
   TransformStatTest() = default;
 
   void createAction(const TransformStat& config) {
-    auto& factory = Config::Utility::getAndCheckFactoryByName<
-        Matcher::ActionFactory<ActionContext>>(
-        "envoy.extensions.matching.actions.transform_stat.v3.TransformStat");
+    auto& factory =
+        Config::Utility::getAndCheckFactoryByName<Matcher::ActionFactory<ActionContext>>(
+            "envoy.extensions.matching.actions.transform_stat.v3.TransformStat");
     action_ = factory.createAction(config, action_context_, validation_visitor_);
   }
 

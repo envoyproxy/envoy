@@ -4,8 +4,6 @@ package envoy.extensions.access_loggers.stats.v3;
 
 import "google/protobuf/wrappers.proto";
 
-import "envoy/extensions/matching/actions/transform_stat/v3/transform_stat.proto";
-
 import "xds/annotations/v3/status.proto";
 import "xds/type/matcher/v3/matcher.proto";
 

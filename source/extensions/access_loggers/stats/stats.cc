@@ -80,9 +80,8 @@ struct StatsAccessLogMetric {
 class ActionValidationVisitor
     : public Matcher::MatchTreeValidationVisitor<Stats::StatMatchingData> {
 public:
-  absl::Status
-  performDataInputValidation(const Matcher::DataInputFactory<Stats::StatMatchingData>&,
-                             absl::string_view) override {
+  absl::Status performDataInputValidation(const Matcher::DataInputFactory<Stats::StatMatchingData>&,
+                                          absl::string_view) override {
     return absl::OkStatus();
   }
 };
@@ -171,15 +170,16 @@ StatsAccessLog::NameAndTags::tags(const Formatter::Context& context,
     Stats::StatMatchingDataImpl<StatsAccessLogMetric> data(metric);
     const auto result = rules_->match(data);
     if (result.isMatch()) {
-                  if (const auto* action =
-                          dynamic_cast<const Extensions::Matching::Actions::TransformStat::TransformStatAction*>(
-                              result.action().get())) {
-                    const auto action_result = action->apply(str_tags);
-                    if (action_result ==
-                        Extensions::Matching::Actions::TransformStat::TransformStatAction::Result::Drop) {
-                      return {std::move(tags), {}, std::move(str_tags), true};
-                    }
-                  }    }
+      if (const auto* action = dynamic_cast<
+              const Extensions::Matching::Actions::TransformStat::TransformStatAction*>(
+              result.action().get())) {
+        const auto action_result = action->apply(str_tags);
+        if (action_result ==
+            Extensions::Matching::Actions::TransformStat::TransformStatAction::Result::Drop) {
+          return {std::move(tags), {}, std::move(str_tags), true};
+        }
+      }
+    }
   }
 
   std::vector<Stats::StatNameDynamicStorage> dynamic_storage;

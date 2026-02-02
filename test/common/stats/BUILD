@@ -144,20 +144,6 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "stat_action_test",
-    srcs = ["stat_action_test.cc"],
-    rbe_pool = "6gig",
-    deps = [
-        "//envoy/registry",
-        "//source/common/config:utility_lib",
-        "//source/extensions/matching/common_actions/stats:stats_action_lib",
-        "//test/mocks/protobuf:protobuf_mocks",
-        "//test/test_common:utility_lib",
-        "@envoy_api//envoy/extensions/matching/common_actions/stats/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_test(
     name = "stats_matcher_impl_test",
     srcs = ["stats_matcher_impl_test.cc"],
     rbe_pool = "6gig",

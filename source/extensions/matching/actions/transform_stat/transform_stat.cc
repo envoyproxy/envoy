@@ -74,11 +74,11 @@ public:
 
 class TransformStatActionFactory : public Matcher::ActionFactory<ActionContext> {
 public:
-  Matcher::ActionConstSharedPtr createAction(
-      const Protobuf::Message& config, ActionContext&,
-      ProtobufMessage::ValidationVisitor& validation_visitor) override {
-    const auto& action_config = MessageUtil::downcastAndValidate<const ProtoTransformStat&>(
-        config, validation_visitor);
+  Matcher::ActionConstSharedPtr
+  createAction(const Protobuf::Message& config, ActionContext&,
+               ProtobufMessage::ValidationVisitor& validation_visitor) override {
+    const auto& action_config =
+        MessageUtil::downcastAndValidate<const ProtoTransformStat&>(config, validation_visitor);
 
     if (action_config.has_drop_stat()) {
       return std::make_shared<DropStat>(action_config.drop_stat());
