@@ -15,7 +15,7 @@ licenses(["notice"])  # Apache 2
 envoy_contrib_package()
 
 COMMON_ENV = {
-    "LDFLAGS": "-L$$EXT_BUILD_ROOT/$(BINDIR)/external/numactl/lib",
+    "LDFLAGS": "-L$$EXT_BUILD_ROOT/$(BINDIR)/bazel/external/lib",
 }
 
 configure_make(
@@ -27,13 +27,15 @@ configure_make(
         "--disable-shared",
     ],
     # Include the numa_archive genrule output so that libnuma.a is available
-    # for the linker to find with -lnuma.
+    # for the linker to find with -lnuma. Include zlib_ng_archive when building
+    # with zlib-ng so that libz.a is available for the configure script.
     data = [
-        "@numactl//:numa_archive",
+        "//bazel/external:numa_archive",
+        "//bazel/external:zlib_archive",
     ],
-    # Point to the directory containing the libnuma.a archive created by the
-    # numa_archive genrule. The cc_library doesn't produce a file that can be
-    # found with -lnuma, so we need to use the genrule output.
+    # Point to the directory containing the libnuma.a and libz.a archives.
+    # The cc_library targets don't produce files that can be found with -lnuma
+    # or -lz, so we need to use the genrule outputs.
     env = select({
         "//bazel:clang_build": COMMON_ENV | {
             "CFLAGS": "-Wno-error=newline-eof -Wno-error=strict-prototypes -Wno-error=unused-but-set-variable",
@@ -49,7 +51,7 @@ configure_make(
     visibility = ["//visibility:public"],
     deps = [
         "//bazel/foreign_cc:lz4",
-        "@zlib",
+        "//bazel:zlib",
         "//contrib/qat:qatlib",
         # Use boringssl alias to select fips vs non-fips version.
         "//bazel:boringcrypto",

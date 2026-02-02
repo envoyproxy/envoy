@@ -156,6 +156,18 @@ public:
     return headers;
   }
 
+  // Helper to build reverse tunnel headers block with upstream cluster name.
+  std::string makeRtHeadersWithUpstreamCluster(const std::string& node, const std::string& cluster,
+                                               const std::string& tenant,
+                                               const std::string& upstream_cluster_name) {
+    std::string headers;
+    headers += "x-envoy-reverse-tunnel-node-id: " + node + "\r\n";
+    headers += "x-envoy-reverse-tunnel-cluster-id: " + cluster + "\r\n";
+    headers += "x-envoy-reverse-tunnel-tenant-id: " + tenant + "\r\n";
+    headers += "x-envoy-reverse-tunnel-upstream-cluster-name: " + upstream_cluster_name + "\r\n";
+    return headers;
+  }
+
   // Helper to craft HTTP request with reverse tunnel headers and optional body.
   std::string makeHttpRequestWithRtHeaders(const std::string& method, const std::string& path,
                                            const std::string& node, const std::string& cluster,
@@ -164,6 +176,20 @@ public:
     std::string req = fmt::format("{} {} HTTP/1.1\r\n", method, path);
     req += "Host: localhost\r\n";
     req += makeRtHeaders(node, cluster, tenant);
+    req += fmt::format("Content-Length: {}\r\n\r\n", body.size());
+    req += body;
+    return req;
+  }
+
+  // Helper to craft HTTP request with reverse tunnel headers including upstream cluster name.
+  std::string makeHttpRequestWithAllHeaders(const std::string& method, const std::string& path,
+                                            const std::string& node, const std::string& cluster,
+                                            const std::string& tenant,
+                                            const std::string& upstream_cluster_name,
+                                            const std::string& body = "") {
+    std::string req = fmt::format("{} {} HTTP/1.1\r\n", method, path);
+    req += "Host: localhost\r\n";
+    req += makeRtHeadersWithUpstreamCluster(node, cluster, tenant, upstream_cluster_name);
     req += fmt::format("Content-Length: {}\r\n\r\n", body.size());
     req += body;
     return req;
@@ -202,6 +228,25 @@ public:
     upstream_thread_local_registry_.reset();
     upstream_extension_.reset();
     upstream_socket_interface_.reset();
+  }
+};
+
+// Separate test fixture for tests that need upstream socket interface
+// This isolates tests that set up global socket interfaces from regular tests
+class ReverseTunnelFilterWithUpstreamTest : public ReverseTunnelFilterUnitTest {
+public:
+  void SetUp() override {
+    ReverseTunnelFilterUnitTest::SetUp();
+    setupUpstreamExtension();
+    setupUpstreamThreadLocalSlot();
+  }
+
+  void TearDown() override {
+    upstream_tls_slot_.reset();
+    upstream_thread_local_registry_.reset();
+    upstream_extension_.reset();
+    upstream_socket_interface_.reset();
+    ReverseTunnelFilterUnitTest::TearDown();
   }
 };
 
@@ -1328,12 +1373,7 @@ TEST_F(ReverseTunnelFilterUnitTest, ProcessAcceptedConnectionNullTlsRegistry) {
 }
 
 // Test processAcceptedConnection when duplicate() returns null.
-TEST_F(ReverseTunnelFilterUnitTest, ProcessAcceptedConnectionDuplicateFails) {
-  // Set up thread local slot for downstream socket interface. This is necessary
-  // for the socket manager to be initialized.
-  setupUpstreamExtension();
-  setupUpstreamThreadLocalSlot();
-
+TEST_F(ReverseTunnelFilterWithUpstreamTest, ProcessAcceptedConnectionDuplicateFails) {
   // Create a mock socket that returns a null/closed handle on duplicate.
   auto mock_socket = std::make_unique<Network::MockConnectionSocket>();
   auto mock_io_handle = std::make_unique<Network::MockIoHandle>();
@@ -1366,13 +1406,7 @@ TEST_F(ReverseTunnelFilterUnitTest, ProcessAcceptedConnectionDuplicateFails) {
 }
 
 // Test processAcceptedConnection when duplicated handle is not open.
-TEST_F(ReverseTunnelFilterUnitTest, ProcessAcceptedConnectionDuplicatedHandleNotOpen) {
-
-  // Set up thread local slot for downstream socket interface. This is necessary
-  // for the socket manager to be initialized.
-  setupUpstreamExtension();
-  setupUpstreamThreadLocalSlot();
-
+TEST_F(ReverseTunnelFilterWithUpstreamTest, ProcessAcceptedConnectionDuplicatedHandleNotOpen) {
   auto mock_socket = std::make_unique<Network::MockConnectionSocket>();
   auto mock_io_handle = std::make_unique<Network::MockIoHandle>();
   auto dup_io_handle = std::make_unique<Network::MockIoHandle>();
@@ -1406,7 +1440,7 @@ TEST_F(ReverseTunnelFilterUnitTest, ProcessAcceptedConnectionDuplicatedHandleNot
   EXPECT_THAT(written, testing::HasSubstr("200 OK"));
 }
 
-TEST_F(ReverseTunnelFilterUnitTest, ProcessAcceptedConnectionReportsConnectionEvent) {
+TEST_F(ReverseTunnelFilterWithUpstreamTest, ProcessAcceptedConnectionReportsConnectionEvent) {
   auto* reporter_cfg = upstream_config_.mutable_reporter_config();
   reporter_cfg->set_name(Bootstrap::ReverseConnection::MOCK_REPORTER);
   Protobuf::StringValue reporter_payload;
@@ -1513,12 +1547,7 @@ TEST_F(ReverseTunnelFilterUnitTest, EdgeCaseHttpProtobufProcessing) {
 }
 
 // Test to trigger specific interface methods for coverage.
-TEST_F(ReverseTunnelFilterUnitTest, InterfaceMethodsCompleteCoverage) {
-  // Set up thread local slot for downstream socket interface. This is necessary
-  // for the socket manager to be initialized.
-  setupUpstreamExtension();
-  setupUpstreamThreadLocalSlot();
-
+TEST_F(ReverseTunnelFilterWithUpstreamTest, InterfaceMethodsCompleteCoverage) {
   // Set up mock socket with proper duplication mocking
   auto mock_socket = std::make_unique<Network::MockConnectionSocket>();
   auto mock_io_handle = std::make_unique<Network::MockIoHandle>();
@@ -1570,11 +1599,13 @@ TEST_F(ReverseTunnelFilterUnitTest, InterfaceMethodsCompleteCoverage) {
 
 // Test processIfComplete when already complete.
 TEST_F(ReverseTunnelFilterUnitTest, ProcessIfCompleteAlreadyComplete) {
-  // Set up thread local slot for downstream socket interface. This is necessary
-  // for the socket manager to be initialized.
-  setupUpstreamExtension();
-  // We don't need to setup thread local slot for this test since
-  // we are not testing socket duplication.
+  // Mock socket to skip duplication
+  auto mock_socket = std::make_unique<Network::MockConnectionSocket>();
+  EXPECT_CALL(*mock_socket, isOpen()).WillRepeatedly(testing::Return(false));
+  static Network::ConnectionSocketPtr stored_socket_complete;
+  stored_socket_complete = std::move(mock_socket);
+  EXPECT_CALL(callbacks_.connection_, getSocket())
+      .WillRepeatedly(testing::ReturnRef(stored_socket_complete));
 
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
@@ -1597,12 +1628,7 @@ TEST_F(ReverseTunnelFilterUnitTest, ProcessIfCompleteAlreadyComplete) {
 }
 
 // Test successful socket duplication with all operations succeeding.
-TEST_F(ReverseTunnelFilterUnitTest, SuccessfulSocketDuplication) {
-  // Set up thread local slot for downstream socket interface. This is necessary
-  // for the socket manager to be initialized.
-  setupUpstreamExtension();
-  setupUpstreamThreadLocalSlot();
-
+TEST_F(ReverseTunnelFilterWithUpstreamTest, SuccessfulSocketDuplication) {
   auto socket_with_dup = std::make_unique<Network::MockConnectionSocket>();
 
   // Mock successful duplication where everything succeeds.
@@ -1702,6 +1728,164 @@ TEST_F(ReverseTunnelFilterUnitTest, CodecInitializationCoverage) {
   // Second call uses existing codec.
   Buffer::OwnedImpl data2("Host: test\r\n\r\n");
   EXPECT_EQ(Network::FilterStatus::StopIteration, test_filter->onData(data2, false));
+}
+
+// Test cluster name validation accepts matching name.
+TEST_F(ReverseTunnelFilterUnitTest, ClusterNameValidationAcceptsMatchingName) {
+  // Configure filter with required_cluster_name.
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  cfg.set_required_cluster_name("my-upstream-cluster");
+
+  auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
+  ASSERT_TRUE(config_or_error.ok());
+  auto local_config = config_or_error.value();
+
+  ReverseTunnelFilter filter(local_config, *stats_store_.rootScope(), overload_manager_);
+  filter.initializeReadFilterCallbacks(callbacks_);
+
+  auto socket = std::make_unique<Network::MockConnectionSocket>();
+  EXPECT_CALL(*socket, isOpen()).WillRepeatedly(testing::Return(false));
+
+  static Network::ConnectionSocketPtr stored_socket_accepts_match;
+  stored_socket_accepts_match = std::move(socket);
+  EXPECT_CALL(callbacks_.connection_, getSocket())
+      .WillRepeatedly(testing::ReturnRef(stored_socket_accepts_match));
+
+  // Capture writes to connection.
+  std::string written;
+  EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
+      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
+        written.append(data.toString());
+        data.drain(data.length());
+      }));
+
+  // Send request with matching cluster name.
+  Buffer::OwnedImpl request(makeHttpRequestWithAllHeaders("GET", "/reverse_connections/request",
+                                                          "node1", "cluster1", "tenant1",
+                                                          "my-upstream-cluster"));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter.onData(request, false));
+
+  // Should accept with 200 OK.
+  EXPECT_THAT(written, testing::HasSubstr("200 OK"));
+  auto accepted = TestUtility::findCounter(stats_store_, "reverse_tunnel.handshake.accepted");
+  ASSERT_NE(nullptr, accepted);
+  EXPECT_EQ(1, accepted->value());
+}
+
+// Test cluster name validation rejects mismatched cluster name.
+TEST_F(ReverseTunnelFilterUnitTest, ClusterNameValidationRejectsMismatchedName) {
+  // Configure filter with required_cluster_name.
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  cfg.set_required_cluster_name("my-upstream-cluster");
+
+  auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
+  ASSERT_TRUE(config_or_error.ok());
+  auto local_config = config_or_error.value();
+
+  ReverseTunnelFilter filter(local_config, *stats_store_.rootScope(), overload_manager_);
+  EXPECT_CALL(callbacks_, connection()).WillRepeatedly(ReturnRef(callbacks_.connection_));
+  filter.initializeReadFilterCallbacks(callbacks_);
+
+  // Capture writes to connection.
+  std::string written;
+  EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
+      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
+        written.append(data.toString());
+        data.drain(data.length());
+      }));
+
+  // Expect connection to be closed.
+  EXPECT_CALL(callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
+
+  // Send request with mismatched cluster name.
+  Buffer::OwnedImpl request(makeHttpRequestWithAllHeaders(
+      "GET", "/reverse_connections/request", "node1", "cluster1", "tenant1", "wrong-cluster"));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter.onData(request, false));
+
+  // Should reject with 400 Bad Request.
+  EXPECT_THAT(written, testing::HasSubstr("400 Bad Request"));
+  EXPECT_THAT(written, testing::HasSubstr("Cluster name mismatch"));
+  auto validation_failed =
+      TestUtility::findCounter(stats_store_, "reverse_tunnel.handshake.validation_failed");
+  ASSERT_NE(nullptr, validation_failed);
+  EXPECT_EQ(1, validation_failed->value());
+}
+
+// Test cluster name validation rejects missing cluster name header.
+TEST_F(ReverseTunnelFilterUnitTest, ClusterNameValidationRejectsMissingHeader) {
+  // Configure filter with required_cluster_name.
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  cfg.set_required_cluster_name("my-upstream-cluster");
+
+  auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
+  ASSERT_TRUE(config_or_error.ok());
+  auto local_config = config_or_error.value();
+
+  ReverseTunnelFilter filter(local_config, *stats_store_.rootScope(), overload_manager_);
+  EXPECT_CALL(callbacks_, connection()).WillRepeatedly(ReturnRef(callbacks_.connection_));
+  filter.initializeReadFilterCallbacks(callbacks_);
+
+  // Capture writes to connection.
+  std::string written;
+  EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
+      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
+        written.append(data.toString());
+        data.drain(data.length());
+      }));
+
+  // Expect connection to be closed.
+  EXPECT_CALL(callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
+
+  // Send request without upstream cluster name header.
+  Buffer::OwnedImpl request(makeHttpRequestWithRtHeaders("GET", "/reverse_connections/request",
+                                                         "node1", "cluster1", "tenant1"));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter.onData(request, false));
+
+  // Should reject with 400 Bad Request.
+  EXPECT_THAT(written, testing::HasSubstr("400 Bad Request"));
+  EXPECT_THAT(written, testing::HasSubstr("Missing upstream cluster name header"));
+  auto parse_error = TestUtility::findCounter(stats_store_, "reverse_tunnel.handshake.parse_error");
+  ASSERT_NE(nullptr, parse_error);
+  EXPECT_EQ(1, parse_error->value());
+}
+
+// Test cluster name validation is disabled when required_cluster_name is not set.
+TEST_F(ReverseTunnelFilterUnitTest, ClusterNameValidationDisabledWhenNotSet) {
+  // Configure filter without required_cluster_name.
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+
+  auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
+  ASSERT_TRUE(config_or_error.ok());
+  auto local_config = config_or_error.value();
+
+  ReverseTunnelFilter filter(local_config, *stats_store_.rootScope(), overload_manager_);
+  filter.initializeReadFilterCallbacks(callbacks_);
+
+  auto socket = std::make_unique<Network::MockConnectionSocket>();
+  EXPECT_CALL(*socket, isOpen()).WillRepeatedly(testing::Return(false));
+
+  static Network::ConnectionSocketPtr stored_socket_not_enforced;
+  stored_socket_not_enforced = std::move(socket);
+  EXPECT_CALL(callbacks_.connection_, getSocket())
+      .WillRepeatedly(testing::ReturnRef(stored_socket_not_enforced));
+
+  // Capture writes to connection.
+  std::string written;
+  EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
+      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
+        written.append(data.toString());
+        data.drain(data.length());
+      }));
+
+  // Send request without upstream cluster name header.
+  Buffer::OwnedImpl request(makeHttpRequestWithRtHeaders("GET", "/reverse_connections/request",
+                                                         "node1", "cluster1", "tenant1"));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter.onData(request, false));
+
+  // Should accept with 200 OK.
+  EXPECT_THAT(written, testing::HasSubstr("200 OK"));
+  auto accepted = TestUtility::findCounter(stats_store_, "reverse_tunnel.handshake.accepted");
+  EXPECT_EQ(1, accepted->value());
 }
 
 } // namespace

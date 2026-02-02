@@ -35,6 +35,7 @@
 // ASAP by filing a bug on github. Overriding non-buggy code is strongly discouraged to avoid the
 // problem of the bugs being found after the old code path has been removed.
 RUNTIME_GUARD(envoy_reloadable_features_async_host_selection);
+RUNTIME_GUARD(envoy_reloadable_features_codec_client_enable_idle_timer_only_when_connected);
 RUNTIME_GUARD(envoy_reloadable_features_decouple_explicit_drain_pools_and_dns_refresh);
 RUNTIME_GUARD(envoy_reloadable_features_dfp_cluster_resolves_hosts);
 RUNTIME_GUARD(envoy_reloadable_features_disallow_quic_client_udp_mmsg);
@@ -49,18 +50,22 @@ RUNTIME_GUARD(envoy_reloadable_features_ext_proc_stream_close_optimization);
 RUNTIME_GUARD(envoy_reloadable_features_generic_proxy_codec_buffer_limit);
 RUNTIME_GUARD(envoy_reloadable_features_get_header_tag_from_header_map);
 RUNTIME_GUARD(envoy_reloadable_features_grpc_side_stream_flow_control);
+RUNTIME_GUARD(envoy_reloadable_features_http1_close_connection_on_zombie_stream_complete);
 RUNTIME_GUARD(envoy_reloadable_features_http2_discard_host_header);
 RUNTIME_GUARD(envoy_reloadable_features_http_async_client_retry_respect_buffer_limits);
 // Delay deprecation and decommission until UHV is enabled.
 RUNTIME_GUARD(envoy_reloadable_features_http_reject_path_with_fragment);
+RUNTIME_GUARD(envoy_reloadable_features_mcp_filter_use_new_metadata_namespace);
 RUNTIME_GUARD(envoy_reloadable_features_mobile_use_network_observer_registry);
 RUNTIME_GUARD(envoy_reloadable_features_no_extension_lookup_by_name);
 RUNTIME_GUARD(envoy_reloadable_features_oauth2_cleanup_cookies);
 RUNTIME_GUARD(envoy_reloadable_features_oauth2_encrypt_tokens);
 RUNTIME_GUARD(envoy_reloadable_features_odcds_over_ads_fix);
+RUNTIME_GUARD(envoy_reloadable_features_on_demand_cluster_no_recreate_stream);
 RUNTIME_GUARD(envoy_reloadable_features_on_demand_track_end_stream);
 RUNTIME_GUARD(envoy_reloadable_features_original_dst_rely_on_idle_timeout);
 RUNTIME_GUARD(envoy_reloadable_features_prefix_map_matcher_resume_after_subtree_miss);
+RUNTIME_GUARD(envoy_reloadable_features_proxy_protocol_allow_duplicate_tlvs);
 RUNTIME_GUARD(envoy_reloadable_features_quic_defer_logging_to_ack_listener);
 RUNTIME_GUARD(envoy_reloadable_features_quic_fix_defer_logging_miss_for_half_closed_stream);
 // Ignore the automated "remove this flag" issue: we should keep this for 1 year. Confirm with
@@ -89,6 +94,7 @@ RUNTIME_GUARD(envoy_reloadable_features_wasm_use_effective_ctx_for_foreign_funct
 RUNTIME_GUARD(envoy_reloadable_features_websocket_allow_4xx_5xx_through_filter_chain);
 RUNTIME_GUARD(envoy_reloadable_features_websocket_enable_timeout_on_upgrade_response);
 RUNTIME_GUARD(envoy_reloadable_features_xds_failover_to_primary_enabled);
+RUNTIME_GUARD(envoy_reloadable_features_xds_legacy_delta_skip_subsequent_node);
 
 RUNTIME_GUARD(envoy_restart_features_move_locality_schedulers_to_lb);
 RUNTIME_GUARD(envoy_restart_features_raise_file_limits);
@@ -210,27 +216,6 @@ std::string swapPrefix(std::string name) {
 
 } // namespace
 
-// This is a singleton class to map Envoy style flag names to absl flags
-class RuntimeFeatures {
-public:
-  RuntimeFeatures();
-
-  // Get the command line flag corresponding to the Envoy style feature name, or
-  // nullptr if it is not a registered flag.
-  absl::CommandLineFlag* getFlag(absl::string_view feature) const {
-    auto it = all_features_.find(feature);
-    if (it == all_features_.end()) {
-      return nullptr;
-    }
-    return it->second;
-  }
-
-private:
-  absl::flat_hash_map<std::string, absl::CommandLineFlag*> all_features_;
-};
-
-using RuntimeFeaturesDefaults = ConstSingleton<RuntimeFeatures>;
-
 RuntimeFeatures::RuntimeFeatures() {
   absl::flat_hash_map<absl::string_view, absl::CommandLineFlag*> flags = absl::GetAllFlags();
   for (auto& it : flags) {
@@ -243,6 +228,14 @@ RuntimeFeatures::RuntimeFeatures() {
     std::string envoy_name = swapPrefix(std::string(name));
     all_features_.emplace(envoy_name, it.second);
   }
+}
+
+absl::CommandLineFlag* RuntimeFeatures::getFlag(absl::string_view feature) const {
+  auto it = all_features_.find(feature);
+  if (it == all_features_.end()) {
+    return nullptr;
+  }
+  return it->second;
 }
 
 bool hasRuntimePrefix(absl::string_view feature) {

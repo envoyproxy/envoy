@@ -13,12 +13,14 @@ envoy_cc_test(
     srcs = ["filter_test.cc"],
     data = [
         "//test/extensions/dynamic_modules/test_data/c:listener_config_new_fail",
+        "//test/extensions/dynamic_modules/test_data/c:listener_filter_new_fail",
         "//test/extensions/dynamic_modules/test_data/c:listener_no_op",
         "//test/extensions/dynamic_modules/test_data/c:listener_stop_iteration",
         "//test/extensions/dynamic_modules/test_data/c:no_op",
     ],
     rbe_pool = "6gig",
     deps = [
+        "//source/common/stats:isolated_store_lib",
         "//source/extensions/filters/listener/dynamic_modules:config",
         "//source/extensions/filters/listener/dynamic_modules:filter_lib",
         "//test/extensions/dynamic_modules:util",
@@ -54,6 +56,7 @@ envoy_cc_test(
     deps = [
         "//source/common/network:address_lib",
         "//source/common/router:string_accessor_lib",
+        "//source/common/stats:isolated_store_lib",
         "//source/extensions/filters/listener/dynamic_modules:config",
         "//source/extensions/filters/listener/dynamic_modules:filter_lib",
         "//test/extensions/dynamic_modules:util",

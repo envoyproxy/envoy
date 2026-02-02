@@ -50,7 +50,7 @@ jobs:
     with:
       args: ${{ matrix.args }}
       bind-mount: false
-      command: ./bazelw
+      command: bazel
       container-command:
       docker-ipv6: false
       request: ${{ needs.load.outputs.request }}

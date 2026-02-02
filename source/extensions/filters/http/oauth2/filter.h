@@ -175,16 +175,18 @@ public:
       const envoy::extensions::filters::http::oauth2::v3::OAuth2Config& proto_config) const;
   struct CookieSettings {
     CookieSettings(const envoy::extensions::filters::http::oauth2::v3::CookieConfig& config)
-        : same_site_(config.same_site()), path_(config.path().empty() ? "/" : config.path()) {}
+        : same_site_(config.same_site()), path_(config.path().empty() ? "/" : config.path()),
+          partitioned_(config.partitioned()) {}
 
     // Default constructor.
     CookieSettings()
         : same_site_(envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
                          CookieConfig_SameSite_DISABLED),
-          path_("/") {}
+          path_("/"), partitioned_(false) {}
 
     const envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite same_site_;
     const std::string path_;
+    const bool partitioned_;
   };
 
   const CookieSettings& bearerTokenCookieSettings() const { return bearer_token_cookie_settings_; }
@@ -289,7 +291,7 @@ private:
   std::string expires_;
   std::string hmac_;
   std::vector<uint8_t> secret_;
-  absl::string_view host_;
+  std::string host_;
   TimeSource& time_source_;
   const CookieNames cookie_names_;
   const std::string cookie_domain_;
@@ -354,7 +356,7 @@ private:
   std::string expires_refresh_token_in_;
   std::string expires_id_token_in_;
   std::string new_expires_;
-  absl::string_view host_;
+  std::string host_;
   std::string original_request_url_;
   std::string flow_id_;
   Http::RequestHeaderMap* request_headers_{nullptr};

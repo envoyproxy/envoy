@@ -2,16 +2,16 @@
 
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
+#include "source/common/jwt/status.h"
 
 #include "absl/strings/str_split.h"
-#include "jwt_verify_lib/status.h"
-
-using ::google::jwt_verify::Status;
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace JwtAuthn {
+
+using JwtVerify::Status;
 
 namespace {
 constexpr absl::string_view InvalidTokenErrorString = ", error=\"invalid_token\"";
@@ -43,14 +43,14 @@ Filter::Filter(FilterConfigSharedPtr config)
     : stats_(config->stats()), config_(std::move(config)) {}
 
 void Filter::onDestroy() {
-  ENVOY_LOG(debug, "Called Filter : {}", __func__);
+  ENVOY_STREAM_LOG(debug, "Called Filter : {}", *decoder_callbacks_, __func__);
   if (context_) {
     context_->cancel();
   }
 }
 
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
-  ENVOY_LOG(debug, "Called Filter : {}", __func__);
+  ENVOY_STREAM_LOG(debug, "Called Filter : {}", *decoder_callbacks_, __func__);
 
   state_ = Calling;
   stopped_ = false;
@@ -58,7 +58,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   if (config_->bypassCorsPreflightRequest() && isCorsPreflightRequest(headers)) {
     // The CORS preflight doesn't include user credentials, bypass regardless of JWT requirements.
     // See http://www.w3.org/TR/cors/#cross-origin-request-with-preflight.
-    ENVOY_LOG(debug, "CORS preflight request bypassed regardless of JWT requirements");
+    ENVOY_STREAM_LOG(debug, "CORS preflight request bypassed regardless of JWT requirements",
+                     *decoder_callbacks_);
     stats_.cors_preflight_bypassed_.inc();
     onComplete(Status::Ok);
     return Http::FilterHeadersStatus::Continue;
@@ -97,7 +98,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   if (state_ == Complete) {
     return Http::FilterHeadersStatus::Continue;
   }
-  ENVOY_LOG(debug, "Called Filter : {} Stop", __func__);
+  ENVOY_STREAM_LOG(debug, "Called Filter : {} Stop", *decoder_callbacks_, __func__);
   stopped_ = true;
   return Http::FilterHeadersStatus::StopIteration;
 }
@@ -110,8 +111,8 @@ void Filter::setExtractedData(const Protobuf::Struct& extracted_data) {
 void Filter::clearRouteCache() { decoder_callbacks_->downstreamCallbacks()->clearRouteCache(); }
 
 void Filter::onComplete(const Status& status) {
-  ENVOY_LOG(debug, "Jwt authentication completed with: {}",
-            ::google::jwt_verify::getStatusString(status));
+  ENVOY_STREAM_LOG(debug, "Jwt authentication completed with: {}", *decoder_callbacks_,
+                   JwtVerify::getStatusString(status));
   // This stream has been reset, abort the callback.
   if (state_ == Responded) {
     return;
@@ -124,13 +125,12 @@ void Filter::onComplete(const Status& status) {
         status == Status::JwtAudienceNotAllowed ? Http::Code::Forbidden : Http::Code::Unauthorized;
     // return failure reason as message body
     if (config_.get()->stripFailureResponse()) {
-      decoder_callbacks_->sendLocalReply(
-          code, "", nullptr, absl::nullopt,
-          generateRcDetails(::google::jwt_verify::getStatusString(status)));
+      decoder_callbacks_->sendLocalReply(code, "", nullptr, absl::nullopt,
+                                         generateRcDetails(JwtVerify::getStatusString(status)));
       return;
     }
     decoder_callbacks_->sendLocalReply(
-        code, ::google::jwt_verify::getStatusString(status),
+        code, JwtVerify::getStatusString(status),
         [uri = this->original_uri_, status](Http::ResponseHeaderMap& headers) {
           std::string value = absl::StrCat("Bearer realm=\"", uri, "\"");
           if (status != Status::JwtMissed) {
@@ -138,7 +138,7 @@ void Filter::onComplete(const Status& status) {
           }
           headers.setCopy(Http::Headers::get().WWWAuthenticate, value);
         },
-        absl::nullopt, generateRcDetails(::google::jwt_verify::getStatusString(status)));
+        absl::nullopt, generateRcDetails(JwtVerify::getStatusString(status)));
     return;
   }
   stats_.allowed_.inc();
@@ -149,7 +149,7 @@ void Filter::onComplete(const Status& status) {
 }
 
 Http::FilterDataStatus Filter::decodeData(Buffer::Instance&, bool) {
-  ENVOY_LOG(debug, "Called Filter : {}", __func__);
+  ENVOY_STREAM_LOG(debug, "Called Filter : {}", *decoder_callbacks_, __func__);
   if (state_ == Calling) {
     return Http::FilterDataStatus::StopIterationAndWatermark;
   }
@@ -157,7 +157,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance&, bool) {
 }
 
 Http::FilterTrailersStatus Filter::decodeTrailers(Http::RequestTrailerMap&) {
-  ENVOY_LOG(debug, "Called Filter : {}", __func__);
+  ENVOY_STREAM_LOG(debug, "Called Filter : {}", *decoder_callbacks_, __func__);
   if (state_ == Calling) {
     return Http::FilterTrailersStatus::StopIteration;
   }
@@ -165,8 +165,8 @@ Http::FilterTrailersStatus Filter::decodeTrailers(Http::RequestTrailerMap&) {
 }
 
 void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
-  ENVOY_LOG(debug, "Called Filter : {}", __func__);
   decoder_callbacks_ = &callbacks;
+  ENVOY_STREAM_LOG(debug, "Called Filter : {}", *decoder_callbacks_, __func__);
 }
 
 } // namespace JwtAuthn

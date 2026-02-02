@@ -176,7 +176,7 @@ jobs:
             architectures:
             - amd64
             - arm64
-            artifact-pattern: contrib-distroless.{arch}.tar
+            artifact-pattern: envoy-contrib-distroless.{arch}.tar
             additional-tags:
             - contrib-distroless-v${{ inputs.version-major }}.${{ inputs.version-minor }}-latest
           - name: ${{ inputs.dockerhub-repo }}

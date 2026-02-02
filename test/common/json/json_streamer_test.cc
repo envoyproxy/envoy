@@ -151,6 +151,29 @@ TYPED_TEST(JsonStreamerTest, SubMap) {
   EXPECT_EQ(R"EOF({"a":{"one":1,"three.5":3.5}})EOF", this->buffer_.toString());
 }
 
+TYPED_TEST(JsonStreamerTest, MapRawJson) {
+  {
+    auto map = this->streamer_.makeRootMap();
+    map->addKey("nested");
+    map->addRawJson(R"({"inner":"value","num":42})");
+    map->addKey("after");
+    map->addString("test");
+  }
+  EXPECT_EQ(R"EOF({"nested":{"inner":"value","num":42},"after":"test"})EOF",
+            this->buffer_.toString());
+}
+
+TYPED_TEST(JsonStreamerTest, ArrayRawJson) {
+  {
+    auto array = this->streamer_.makeRootArray();
+    array->addString("first");
+    array->addRawJson(R"({"embedded":"object"})");
+    array->addRawJson(R"([1,2,3])");
+    array->addNumber(static_cast<int64_t>(99));
+  }
+  EXPECT_EQ(R"EOF(["first",{"embedded":"object"},[1,2,3],99])EOF", this->buffer_.toString());
+}
+
 TYPED_TEST(JsonStreamerTest, SimpleDirectCall) {
   {
     this->streamer_.addBool(true);

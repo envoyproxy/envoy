@@ -436,6 +436,57 @@ TEST_P(McpFilterIntegrationTest, PerRouteVirtualHostLevel) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
+// Test chunk-by-chunk request body parsing
+TEST_P(McpFilterIntegrationTest, ChunkByChunkBodyParsing) {
+  initializeFilter();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  const std::string full_body =
+      R"({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{}}})";
+
+  auto encoder_decoder = codec_client_->startRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/mcp"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"content-type", "application/json"},
+                                     {"accept", "application/json, text/event-stream"}});
+
+  auto& encoder = encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  // Send body in multiple chunks
+  // Chunk 1: partial JSON - just the opening and jsonrpc field
+  std::string chunk1 = R"({"jsonrpc":"2.0",)";
+  Buffer::OwnedImpl buffer1(chunk1);
+  encoder.encodeData(buffer1, false);
+
+  // Chunk 2: id field
+  std::string chunk2 = R"("id":1,)";
+  Buffer::OwnedImpl buffer2(chunk2);
+  encoder.encodeData(buffer2, false);
+
+  // Chunk 3: method field
+  std::string chunk3 = R"("method":"initialize",)";
+  Buffer::OwnedImpl buffer3(chunk3);
+  encoder.encodeData(buffer3, false);
+
+  // Chunk 4: params and closing (with end_stream)
+  std::string chunk4 = R"("params":{"protocolVersion":"2025-06-18","capabilities":{}}})";
+  Buffer::OwnedImpl buffer4(chunk4);
+  encoder.encodeData(buffer4, true);
+
+  waitForNextUpstreamRequest();
+
+  EXPECT_EQ(full_body, upstream_request_->body().toString());
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
 } // namespace
 } // namespace Mcp
 } // namespace HttpFilters

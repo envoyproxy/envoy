@@ -159,13 +159,12 @@ public:
   MOCK_METHOD(std::vector<Http::Protocol>, upstreamHttpProtocol, (absl::optional<Http::Protocol>),
               (const));
 
-  MOCK_METHOD(bool, createFilterChain,
-              (Http::FilterChainManager & manager, const Http::FilterChainOptions& options),
+  MOCK_METHOD(bool, createFilterChain, (Http::FilterChainFactoryCallbacks & callbacks),
               (const, override));
   MOCK_METHOD(bool, createUpgradeFilterChain,
               (absl::string_view upgrade_type,
                const Http::FilterChainFactory::UpgradeMap* upgrade_map,
-               Http::FilterChainManager& manager, const Http::FilterChainOptions&),
+               Http::FilterChainFactoryCallbacks& callbacks),
               (const));
   MOCK_METHOD(Http::ClientHeaderValidatorPtr, makeHeaderValidator, (Http::Protocol), (const));
   MOCK_METHOD(

@@ -3,7 +3,7 @@ aio.api.bazel
 aio.api.github>=0.2.5
 aio.core>=0.10.2
 aiodocker>=0.22.2
-aiohttp>=3.11.6
+aiohttp>=3.13.3
 aioquic>=0.9.21
 cffi>=1.15.0
 colorama
@@ -28,7 +28,7 @@ frozendict>=2.3.7
 gitpython
 icalendar>=6.1.1
 jinja2
-kafka-python-ng
+
 multidict>=6.0.2
 orjson>=3.10.15
 pep8-naming
