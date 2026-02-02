@@ -42,7 +42,7 @@ def api_dependencies(bzlmod = False):
         name = "com_google_googleapis",
     )
     external_http_archive(
-        name = "com_github_cncf_xds",
+        name = "xds",
     )
     external_http_archive(
         name = "rules_buf",

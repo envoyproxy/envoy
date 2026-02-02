@@ -730,6 +730,6 @@ envoy_cc_test(
         "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
         "@com_google_absl//absl/status",
-        "@ocp//ocpdiag/core/testing:status_matchers",
+        "@ocp-diag-core//ocpdiag/core/testing:status_matchers",
     ],
 )
