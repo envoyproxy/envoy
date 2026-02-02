@@ -12,6 +12,8 @@
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/upstream_socket_manager.h"
 #include "source/extensions/filters/network/reverse_tunnel/reverse_tunnel_filter.h"
 
+#include "absl/strings/str_cat.h"
+
 namespace ReverseConnection = Envoy::Extensions::Bootstrap::ReverseConnection;
 
 #include "test/mocks/event/mocks.h"
@@ -454,8 +456,10 @@ TEST_F(ReverseTunnelFilterUnitTest, TenantIsolationRejectsDelimiterInIdentifiers
 
   EXPECT_CALL(callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
 
-  Buffer::OwnedImpl request(makeHttpRequestWithRtHeaders("GET", "/reverse_connections/request",
-                                                         "node@foo", "cluster", "tenant"));
+  const std::string node_id_with_delimiter =
+      absl::StrCat("node", ReverseTunnelFilterConfig::tenantDelimiter(), "foo");
+  Buffer::OwnedImpl request(makeHttpRequestWithRtHeaders(
+      "GET", "/reverse_connections/request", node_id_with_delimiter, "cluster", "tenant"));
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter.onData(request, false));
 
   auto parse_error = TestUtility::findCounter(stats_store_, "reverse_tunnel.handshake.parse_error");

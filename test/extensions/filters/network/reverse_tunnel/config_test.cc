@@ -223,7 +223,8 @@ enable_tenant_isolation: true
 
   envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel proto_config;
   TestUtility::loadFromYaml(yaml_string, proto_config);
-  EXPECT_TRUE(proto_config.enable_tenant_isolation());
+  EXPECT_TRUE(proto_config.has_enable_tenant_isolation());
+  EXPECT_TRUE(proto_config.enable_tenant_isolation().value());
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   auto result = factory.createFilterFactoryFromProto(proto_config, context);

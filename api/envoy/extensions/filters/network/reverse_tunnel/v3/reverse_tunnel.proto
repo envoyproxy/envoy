@@ -123,8 +123,8 @@ message ReverseTunnel {
 
   // Enables tenant-aware isolation for reverse connections. When set to ``true``, the filter
   // requires tenant identifiers in addition to node and cluster identifiers and derives
-  // composite ``tenant@node`` and ``tenant@cluster`` keys for socket tracking. Identifiers
-  // containing the ``@`` delimiter are rejected to avoid ambiguity.
+  // composite ``tenant:node`` and ``tenant:cluster`` keys for socket tracking. Identifiers
+  // containing the ``:`` delimiter are rejected to avoid ambiguity.
   // Defaults to ``false`` for backwards compatibility.
   google.protobuf.BoolValue enable_tenant_isolation = 7;
 }

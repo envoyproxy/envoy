@@ -5,6 +5,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/test_runtime.h"
 
+#include "absl/strings/str_cat.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -231,7 +232,8 @@ TEST_F(ReverseConnectionUtilityTest, PingMessageHandlerGetPingCount) {
 }
 
 TEST_F(ReverseConnectionUtilityTest, SplitTenantScopedIdentifierWithDelimiter) {
-  const absl::string_view composite = "tenant-alpha@node-1";
+  const std::string composite =
+      ReverseConnectionUtility::buildTenantScopedIdentifier("tenant-alpha", "node-1");
   const auto result = ReverseConnectionUtility::splitTenantScopedIdentifier(composite);
   EXPECT_TRUE(result.hasTenant());
   EXPECT_EQ(result.tenant, "tenant-alpha");
@@ -256,7 +258,8 @@ TEST_F(ReverseConnectionUtilityTest, SplitTenantScopedIdentifierEmptyValue) {
 TEST_F(ReverseConnectionUtilityTest, BuildTenantScopedIdentifierWithTenant) {
   const std::string composite =
       ReverseConnectionUtility::buildTenantScopedIdentifier("tenant-alpha", "node-1");
-  EXPECT_EQ(composite, "tenant-alpha@node-1");
+  EXPECT_EQ(composite, absl::StrCat("tenant-alpha",
+                                    ReverseConnectionUtility::TENANT_SCOPE_DELIMITER, "node-1"));
 }
 
 TEST_F(ReverseConnectionUtilityTest, BuildTenantScopedIdentifierWithoutTenant) {

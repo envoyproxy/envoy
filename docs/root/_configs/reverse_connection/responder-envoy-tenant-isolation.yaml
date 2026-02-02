@@ -65,26 +65,25 @@ static_resources:
                   local cluster_id = headers:get("x-cluster-id")
                   local tenant_id = headers:get("x-tenant-id")
 
-                  if not tenant_id then
-                    request_handle:logError("No tenant ID found")
-                    -- Don't set x-computed-host-id, which will cause cluster matching to fail
-                    return
-                  end
-
                   local host_id = ""
 
                   -- Priority 1: x-node-id header
                   if node_id then
-                    host_id = tenant_id .. "@" .. node_id
+                    host_id = node_id
                     request_handle:logInfo("Using x-node-id as host_id: " .. host_id)
                   -- Priority 2: x-cluster-id header
                   elseif cluster_id then
-                    host_id = tenant_id .. "@" .. cluster_id
+                    host_id = cluster_id
                     request_handle:logInfo("Using x-cluster-id as host_id: " .. host_id)
                   else
                     request_handle:logError("No valid headers found: x-node-id or x-cluster-id")
                     -- Don't set x-computed-host-id, which will cause cluster matching to fail
                     return
+                  end
+
+                  -- Log the tenant ID
+                  if tenant_id then
+                    request_handle:logInfo("Using x-tenant-id as tenant_id: " .. tenant_id)
                   end
 
                   -- Set the computed host ID for the reverse connection cluster
@@ -111,6 +110,9 @@ static_resources:
         # use the socket. Otherwise, it assumes this is a downstream node and looks for cached sockets with
         # this as the node instead.
         host_id_format: "%REQ(x-computed-host-id)%"
+        # Tenant identifier format. When tenant isolation is enabled in the reverse tunnel filter,
+        # this is the tenant ID that will be used to scope the cached sockets.
+        tenant_id_format: "%REQ(x-tenant-id)%"
     typed_extension_protocol_options:
       envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
         "@type": >-
@@ -118,3 +120,9 @@ static_resources:
         explicit_http_config:
           # Right the moment, reverse connections are supported over HTTP/2 only.
           http2_protocol_options: {}
+
+admin:
+  address:
+    socket_address:
+      address: 127.0.0.1
+      port_value: 9901

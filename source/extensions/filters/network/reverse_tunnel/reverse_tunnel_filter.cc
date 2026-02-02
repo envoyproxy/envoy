@@ -334,10 +334,12 @@ void ReverseTunnelFilter::RequestDecoderImpl::processIfComplete(bool end_stream)
                      "reverse_tunnel: identifier contains reserved delimiter '{}' while tenant "
                      "isolation is enabled",
                      parent_.read_callbacks_->connection(), delimiter);
-      sendLocalReply(Http::Code::BadRequest,
-                     "Reverse tunnel identifiers must not contain '@' when tenant isolation is "
-                     "enabled",
-                     nullptr, absl::nullopt, "reverse_tunnel_invalid_identifier");
+      sendLocalReply(
+          Http::Code::BadRequest,
+          fmt::format("Reverse tunnel identifiers must not contain '{}' when tenant isolation is "
+                      "enabled",
+                      delimiter),
+          nullptr, absl::nullopt, "reverse_tunnel_invalid_identifier");
       parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
       return;
     }

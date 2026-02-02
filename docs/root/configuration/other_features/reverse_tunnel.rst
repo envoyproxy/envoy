@@ -210,8 +210,8 @@ parameters.
 
 When ``enable_tenant_isolation`` is set to ``true`` on the filter configuration, Envoy scopes cached
 reverse tunnel sockets by tenant. The filter concatenates the tenant identifier with the node and cluster
-identifiers using the ``@`` delimiter (for example ``tenant-a@node-1``). Because the delimiter is part of
-the composite key, handshake requests that include ``@`` in any of the reverse tunnel headers are rejected
+identifiers using the ``:`` delimiter (for example ``tenant-a:node-1``). Because the delimiter is part of
+the composite key, handshake requests that include ``:`` in any of the reverse tunnel headers are rejected
 with ``400`` to prevent ambiguous lookups. The flag defaults to ``false`` to preserve existing behaviour.
 
 .. literalinclude:: /_configs/reverse_connection/responder-envoy.yaml
@@ -233,6 +233,12 @@ for a downstream node, the cluster looks up a cached reverse tunnel connection t
 Each data request must include a ``host_id`` that identifies the target downstream node. This ID can be
 specified directly in request headers or computed from them. The cluster extracts the ``host_id`` using
 the configured ``host_id_format`` field and uses it to look up the appropriate reverse tunnel connection.
+
+When tenant isolation is enabled (via ``enable_tenant_isolation: true`` in the reverse tunnel filter),
+the cluster can be configured with an optional ``tenant_id_format`` field. If both ``host_id_format``
+and ``tenant_id_format`` are configured, the cluster automatically constructs tenant-scoped identifiers
+by concatenating the formatted tenant ID with the formatted host ID using an internal delimiter. This
+ensures proper tenant isolation without exposing delimiter or concatenation details to users.
 
 .. literalinclude:: /_configs/reverse_connection/responder-envoy.yaml
     :language: yaml
@@ -302,11 +308,9 @@ tunnel connection.
 For deployments that enable :ref:`tenant isolation <config_network_filters_reverse_tunnel>`, the repository
 includes a companion configuration
 :download:`responder-envoy-tenant-isolation.yaml </_configs/reverse_connection/responder-envoy-tenant-isolation.yaml>`.
-That variant extends the Lua script to require an ``x-tenant-id`` header and automatically emit composite
-identifiers such as ``tenant-a@example-node`` before routing through the reverse connection cluster.
-Enabling or disabling tenant isolation therefore only changes the Envoy bootstrap configuration; the
-downstream contract remains consistent: supply ``x-tenant-id`` alongside ``x-node-id`` (or ``x-cluster-id``)
-when tenant-aware isolation is required.
+That variant configures the reverse connection cluster with both ``host_id_format`` and ``tenant_id_format``.
+When tenant isolation is enabled, the cluster automatically constructs tenant-scoped identifiers (e.g.,
+``tenant-a:example-node``) internally by concatenating the formatted tenant ID with the formatted host ID.
 
 The header priority order is:
 
@@ -342,8 +346,9 @@ The header priority order is:
       x-tenant-id: tenant-a
       x-node-id: example-node
 
-   The tenant-aware configuration derives ``host_id = "tenant-a@example-node"`` so that the correct tunnel
-   socket is reused while keeping tenants isolated.
+   The cluster uses ``tenant_id_format: "%REQ(x-tenant-id)%"`` and ``host_id_format: "%REQ(x-node-id)%"``
+   to automatically construct ``host_id = "tenant-a:example-node"`` internally, ensuring the correct
+   tunnel socket is reused while keeping tenants isolated.
 
 .. _config_reverse_connection_security:
 

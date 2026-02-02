@@ -24,7 +24,7 @@ public:
   static constexpr absl::string_view PROXY_MESSAGE = "PROXY";
   static constexpr absl::string_view DEFAULT_REVERSE_TUNNEL_REQUEST_PATH =
       "/reverse_connections/request";
-  static constexpr absl::string_view TENANT_SCOPE_DELIMITER = "@";
+  static constexpr absl::string_view TENANT_SCOPE_DELIMITER = ":";
 
   struct TenantScopedIdentifierView {
     absl::string_view tenant;
