@@ -1143,5 +1143,11 @@ TEST_P(MatcherAmbiguousTest, KeepMatchingWithFailingNestedMatcher) {
   EXPECT_THAT(skipped_results, ElementsAre(IsStringAction("match")));
 }
 
+TEST(MatchResultTest, toString) {
+  EXPECT_EQ(Matcher::MatchResult::noMatch().toString(), "no match");
+  EXPECT_EQ(Matcher::MatchResult::insufficientData().toString(), "insufficient data");
+  EXPECT_EQ(Matcher::MatchResult::matched().toString(), "match");
+}
+
 } // namespace Matcher
 } // namespace Envoy
