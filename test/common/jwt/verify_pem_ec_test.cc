@@ -181,6 +181,70 @@ TEST(VerifyPKCSTestRs256, jwksIncorrectAlgSpecifiedFail) {
   });
 }
 
+// Test EC signature verification with empty signature.
+// This exercises the `BN_bin2bn` and `ECDSA_SIG_set0` code paths with zero-length data.
+TEST(VerifyPemECTest, EmptySignatureFail) {
+  Jwt jwt;
+  EXPECT_EQ(jwt.parseFromString(JwtPemEs256), Status::Ok);
+  auto jwks = Jwks::createFrom(es256pubkey, Jwks::Type::PEM);
+  EXPECT_EQ(jwks->getStatus(), Status::Ok);
+  jwks->keys()[0]->alg_ = "ES256";
+  jwks->keys()[0]->crv_ = "P-256";
+  // Clear the signature to make it empty.
+  jwt.signature_.clear();
+  EXPECT_EQ(verifyJwt(jwt, *jwks, 1), Status::JwtVerificationFail);
+}
+
+// Test EC signature verification with a very short signature (1 byte).
+TEST(VerifyPemECTest, VeryShortSignatureFail) {
+  Jwt jwt;
+  EXPECT_EQ(jwt.parseFromString(JwtPemEs256), Status::Ok);
+  auto jwks = Jwks::createFrom(es256pubkey, Jwks::Type::PEM);
+  EXPECT_EQ(jwks->getStatus(), Status::Ok);
+  jwks->keys()[0]->alg_ = "ES256";
+  jwks->keys()[0]->crv_ = "P-256";
+  // Set signature to a single byte.
+  jwt.signature_ = "x";
+  EXPECT_EQ(verifyJwt(jwt, *jwks, 1), Status::JwtVerificationFail);
+}
+
+// Test EC signature verification with a 2-byte signature.
+TEST(VerifyPemECTest, TwoByteSignatureFail) {
+  Jwt jwt;
+  EXPECT_EQ(jwt.parseFromString(JwtPemEs256), Status::Ok);
+  auto jwks = Jwks::createFrom(es256pubkey, Jwks::Type::PEM);
+  EXPECT_EQ(jwks->getStatus(), Status::Ok);
+  jwks->keys()[0]->alg_ = "ES256";
+  jwks->keys()[0]->crv_ = "P-256";
+  // Set signature to two bytes.
+  jwt.signature_ = "xy";
+  EXPECT_EQ(verifyJwt(jwt, *jwks, 1), Status::JwtVerificationFail);
+}
+
+// Test ES384 signature verification with empty signature using PEM key.
+TEST(VerifyPemECTest, ES384EmptySignatureFail) {
+  Jwt jwt;
+  EXPECT_EQ(jwt.parseFromString(JwtPemEs384), Status::Ok);
+  auto jwks = Jwks::createFrom(es384pubkey, Jwks::Type::PEM);
+  EXPECT_EQ(jwks->getStatus(), Status::Ok);
+  jwks->keys()[0]->alg_ = "ES384";
+  jwks->keys()[0]->crv_ = "P-384";
+  jwt.signature_.clear();
+  EXPECT_EQ(verifyJwt(jwt, *jwks, 1), Status::JwtVerificationFail);
+}
+
+// Test ES512 signature verification with empty signature using PEM key.
+TEST(VerifyPemECTest, ES512EmptySignatureFail) {
+  Jwt jwt;
+  EXPECT_EQ(jwt.parseFromString(JwtPemEs512), Status::Ok);
+  auto jwks = Jwks::createFrom(es512pubkey, Jwks::Type::PEM);
+  EXPECT_EQ(jwks->getStatus(), Status::Ok);
+  jwks->keys()[0]->alg_ = "ES512";
+  jwks->keys()[0]->crv_ = "P-512";
+  jwt.signature_.clear();
+  EXPECT_EQ(verifyJwt(jwt, *jwks, 1), Status::JwtVerificationFail);
+}
+
 } // namespace
 } // namespace JwtVerify
 } // namespace Envoy

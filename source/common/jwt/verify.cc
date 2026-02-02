@@ -112,10 +112,19 @@ bool verifySignatureEC(EC_KEY* key, const EVP_MD* md, const uint8_t* signature,
     return false;
   }
 
-  if (BN_bin2bn(signature, signature_len / 2, ecdsa_sig->r) == nullptr ||
-      BN_bin2bn(signature + (signature_len / 2), signature_len / 2, ecdsa_sig->s) == nullptr) {
+  bssl::UniquePtr<BIGNUM> ecdsa_sig_r{BN_bin2bn(signature, signature_len / 2, nullptr)};
+  bssl::UniquePtr<BIGNUM> ecdsa_sig_s{
+      BN_bin2bn(signature + (signature_len / 2), signature_len / 2, nullptr)};
+
+  // Short-circuit evaluation ensures `ECDSA_SIG_set0` is only called if both `BIGNUMs` are valid.
+  // On `ECDSA_SIG_set0` success, ownership transfers to `ecdsa_sig`; on failure, `unique_ptrs`
+  // clean up.
+  if (ecdsa_sig_r == nullptr || ecdsa_sig_s == nullptr ||
+      ECDSA_SIG_set0(ecdsa_sig.get(), ecdsa_sig_r.get(), ecdsa_sig_s.get()) == 0) {
     return false;
   }
+  ecdsa_sig_r.release();
+  ecdsa_sig_s.release();
 
   if (ECDSA_do_verify(digest.data(), digest_len, ecdsa_sig.get(), key) == 1) {
     return true;
