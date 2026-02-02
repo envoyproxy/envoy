@@ -9,15 +9,15 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_test(
-    name = "stat_action_test",
-    srcs = ["stat_action_test.cc"],
+    name = "transform_stat_test",
+    srcs = ["transform_stat_test.cc"],
     rbe_pool = "6gig",
     deps = [
         "//envoy/registry",
         "//source/common/config:utility_lib",
-        "//source/extensions/matching/actions/stat:stats_action_lib",
+        "//source/extensions/matching/actions/transform_stat:transform_stat_lib",
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/extensions/matching/actions/stats/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/matching/actions/transform_stat/v3:pkg_cc_proto",
     ],
 )

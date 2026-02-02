@@ -6,7 +6,9 @@ licenses(["notice"])  # Apache 2
 
 api_proto_package(
     deps = [
+        "//envoy/extensions/matching/actions/transform_stat/v3:pkg",
         "@xds//udpa/annotations:pkg",
-        "@xds//xds/annotations/v3:pkg",ain
+        "@xds//xds/annotations/v3:pkg",
+        "@xds//xds/type/matcher/v3:pkg",
     ],
 )

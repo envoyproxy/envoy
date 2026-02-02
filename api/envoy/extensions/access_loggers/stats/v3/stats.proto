@@ -4,7 +4,7 @@ package envoy.extensions.access_loggers.stats.v3;
 
 import "google/protobuf/wrappers.proto";
 
-import "envoy/extensions/matching/actions/stats/v3/stats.proto";
+import "envoy/extensions/matching/actions/transform_stat/v3/transform_stat.proto";
 
 import "xds/annotations/v3/status.proto";
 import "xds/type/matcher/v3/matcher.proto";
@@ -55,7 +55,7 @@ message Config {
     // supported input is
     // ``envoy.extensions.matching.common_inputs.stats.v3.StatTagValueInput``.
     // The supported actions are
-    // - ``envoy.extensions.matching.actions.stats.v3.StatAction``.
+    // - ``envoy.extensions.matching.actions.transform_stat.v3.TransformStat``.
     xds.type.matcher.v3.Matcher rules = 3;
   }
 

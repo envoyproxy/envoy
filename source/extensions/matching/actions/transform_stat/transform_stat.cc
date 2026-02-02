@@ -1,30 +1,30 @@
-#include "source/extensions/matching/actions/stat/stats_action.h"
+#include "source/extensions/matching/actions/transform_stat/transform_stat.h"
 
-#include "envoy/extensions/matching/actions/stats/v3/stats.pb.validate.h"
+#include "envoy/extensions/matching/actions/transform_stat/v3/transform_stat.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Matching {
 namespace Actions {
-namespace Stat {
+namespace TransformStat {
 
 namespace {
 
-class DropStatAction : public StatsAction {
+class DropStat : public TransformStatAction {
 public:
-  explicit DropStatAction(
-      const envoy::extensions::matching::actions::stats::v3::StatAction::
-          DropStatAction&) {}
+  explicit DropStat(
+      const envoy::extensions::matching::actions::transform_stat::v3::TransformStat::
+          DropStat&) {}
 
   Result apply(Envoy::Stats::TagVector&) const override { return Result::Drop; }
 };
 
-class InsertTagAction : public StatsAction {
+class InsertTag : public TransformStatAction {
 public:
-  explicit InsertTagAction(
-      const envoy::extensions::matching::actions::stats::v3::StatAction::
-          InsertTagAction& config)
+  explicit InsertTag(
+      const envoy::extensions::matching::actions::transform_stat::v3::TransformStat::
+          InsertTag& config)
       : tag_name_(config.tag_name()), tag_value_(config.tag_value()) {}
 
   Result apply(Envoy::Stats::TagVector& tags) const override {
@@ -47,11 +47,11 @@ private:
   const std::string tag_value_;
 };
 
-class DropTagAction : public StatsAction {
+class DropTag : public TransformStatAction {
 public:
-  explicit DropTagAction(
-      const envoy::extensions::matching::actions::stats::v3::StatAction::
-          DropTagAction& config)
+  explicit DropTag(
+      const envoy::extensions::matching::actions::transform_stat::v3::TransformStat::
+          DropTag& config)
       : target_tag_name_(config.target_tag_name()) {}
 
   Result apply(Envoy::Stats::TagVector& tags) const override {
@@ -69,12 +69,12 @@ private:
   const std::string target_tag_name_;
 };
 
-class CompositeStatsAction
+class CompositeTransformStatAction
     : public Matcher::ActionBase<
-          envoy::extensions::matching::actions::stats::v3::StatAction>,
-      public StatsAction {
+          envoy::extensions::matching::actions::transform_stat::v3::TransformStat>,
+      public TransformStatAction {
 public:
-  CompositeStatsAction(std::vector<std::unique_ptr<StatsAction>> actions)
+  CompositeTransformStatAction(std::vector<std::unique_ptr<TransformStatAction>> actions)
       : actions_(std::move(actions)) {}
 
   Result apply(Envoy::Stats::TagVector& tags) const override {
@@ -87,49 +87,49 @@ public:
   }
 
 private:
-  const std::vector<std::unique_ptr<StatsAction>> actions_;
+  const std::vector<std::unique_ptr<TransformStatAction>> actions_;
 };
 
 } // namespace
 
-class StatActionFactory : public Matcher::ActionFactory<ActionContext> {
+class TransformStatActionFactory : public Matcher::ActionFactory<ActionContext> {
 public:
   Matcher::ActionConstSharedPtr createAction(
       const Protobuf::Message& config, ActionContext&,
       ProtobufMessage::ValidationVisitor& validation_visitor) override {
     const auto& action_config = MessageUtil::downcastAndValidate<
-        const envoy::extensions::matching::actions::stats::v3::StatAction&>(
+        const envoy::extensions::matching::actions::transform_stat::v3::TransformStat&>(
         config, validation_visitor);
 
-    std::vector<std::unique_ptr<StatsAction>> actions;
+    std::vector<std::unique_ptr<TransformStatAction>> actions;
 
     if (action_config.has_drop_stat()) {
       actions.push_back(
-          std::make_unique<DropStatAction>(action_config.drop_stat()));
+          std::make_unique<DropStat>(action_config.drop_stat()));
     } else if (action_config.has_drop_tag()) {
       actions.push_back(
-          std::make_unique<DropTagAction>(action_config.drop_tag()));
+          std::make_unique<DropTag>(action_config.drop_tag()));
     } else if (action_config.has_insert_tag()) {
       actions.push_back(
-          std::make_unique<InsertTagAction>(action_config.insert_tag()));
+          std::make_unique<InsertTag>(action_config.insert_tag()));
     }
 
-    return std::make_shared<CompositeStatsAction>(std::move(actions));
+    return std::make_shared<CompositeTransformStatAction>(std::move(actions));
   }
 
   std::string name() const override {
-    return "envoy.extensions.matching.actions.stats.v3.StatAction";
+    return "envoy.extensions.matching.actions.transform_stat.v3.TransformStat";
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<
-        envoy::extensions::matching::actions::stats::v3::StatAction>();
+        envoy::extensions::matching::actions::transform_stat::v3::TransformStat>();
   }
 };
 
-REGISTER_FACTORY(StatActionFactory, Matcher::ActionFactory<ActionContext>);
+REGISTER_FACTORY(TransformStatActionFactory, Matcher::ActionFactory<ActionContext>);
 
-} // namespace Stat
+} // namespace TransformStat
 } // namespace Actions
 } // namespace Matching
 } // namespace Extensions

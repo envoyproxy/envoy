@@ -172,16 +172,15 @@ StatsAccessLog::NameAndTags::tags(const Formatter::Context& context,
     Envoy::Stats::StatMatchingDataImpl<StatsAccessLogMetric> data(metric);
     const auto result = rules_->match(data);
     if (result.isMatch()) {
-            if (const auto* action =
-                    dynamic_cast<const Extensions::Matching::Actions::Stat::StatsAction*>(
-                        result.action().get())) {
-              const auto action_result = action->apply(str_tags);
-              if (action_result ==
-                  Extensions::Matching::Actions::Stat::StatsAction::Result::Drop) {
-                return {std::move(tags), {}, std::move(str_tags), true};
-              }
-            }
-    }
+                  if (const auto* action =
+                          dynamic_cast<const Extensions::Matching::Actions::TransformStat::TransformStatAction*>(
+                              result.action().get())) {
+                    const auto action_result = action->apply(str_tags);
+                    if (action_result ==
+                        Extensions::Matching::Actions::TransformStat::TransformStatAction::Result::Drop) {
+                      return {std::move(tags), {}, std::move(str_tags), true};
+                    }
+                  }    }
   }
 
   std::vector<Envoy::Stats::StatNameDynamicStorage> dynamic_storage;

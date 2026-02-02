@@ -350,6 +350,7 @@ proto_library(
         "//envoy/extensions/matching/input_matchers/ip/v3:pkg",
         "//envoy/extensions/matching/input_matchers/metadata/v3:pkg",
         "//envoy/extensions/matching/input_matchers/runtime_fraction/v3:pkg",
+        "//envoy/extensions/matching/actions/transform_stat/v3:pkg",
         "//envoy/extensions/network/dns_resolver/apple/v3:pkg",
         "//envoy/extensions/network/dns_resolver/cares/v3:pkg",
         "//envoy/extensions/network/dns_resolver/getaddrinfo/v3:pkg",

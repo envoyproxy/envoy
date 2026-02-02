@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/extensions/matching/actions/stats/v3/stats.pb.h"
+#include "envoy/extensions/matching/actions/transform_stat/v3/transform_stat.pb.h"
 
 #include "source/common/matcher/matcher.h"
 #include "source/common/protobuf/utility.h"
@@ -9,11 +9,11 @@ namespace Envoy {
 namespace Extensions {
 namespace Matching {
 namespace Actions {
-namespace Stat {
+namespace TransformStat {
 
 struct ActionContext {};
 
-class StatsAction {
+class TransformStatAction {
 public:
   /**
    * The result of the action application.
@@ -25,7 +25,7 @@ public:
     Drop,
   };
 
-  virtual ~StatsAction() = default;
+  virtual ~TransformStatAction() = default;
 
   /**
    * Applies the action to the given tags.
@@ -35,7 +35,7 @@ public:
   virtual Result apply(Envoy::Stats::TagVector& tags) const PURE;
 };
 
-} // namespace Stat
+} // namespace TransformStat
 } // namespace Actions
 } // namespace Matching
 } // namespace Extensions

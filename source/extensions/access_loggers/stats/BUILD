@@ -20,7 +20,7 @@ envoy_cc_library(
         "//source/common/formatter:substitution_format_string_lib",
         "//source/common/matcher:matcher_lib",
         "//source/extensions/access_loggers/common:access_log_base",
-        "//source/extensions/matching/actions/stat:stats_action_lib",
+        "//source/extensions/matching/actions/transform_stat:transform_stat_lib",
         "@envoy_api//envoy/extensions/access_loggers/stats/v3:pkg_cc_proto",
     ],
 )
