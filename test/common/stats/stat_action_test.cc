@@ -159,7 +159,7 @@ TEST_F(StatActionTest, CombinedDropStat) {
   StatAction config;
   config.mutable_drop_stat();
   auto* insert_tag =
-      config.mutable_insert_tag(); // Should be ignored or executed before drop?
+      config.mutable_insert_tag();
   insert_tag->set_tag_name("bar");
   insert_tag->set_tag_value("baz");
 
