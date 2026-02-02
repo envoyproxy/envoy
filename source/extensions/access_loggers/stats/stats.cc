@@ -23,19 +23,19 @@ parseValueFormat(absl::string_view format,
   return std::move(formatters[0]);
 }
 
-Envoy::Stats::Histogram::Unit
+Stats::Histogram::Unit
 convertUnitEnum(envoy::extensions::access_loggers::stats::v3::Config::Histogram::Unit unit) {
   switch (unit) {
   case envoy::extensions::access_loggers::stats::v3::Config::Histogram::Unspecified:
-    return Envoy::Stats::Histogram::Unit::Unspecified;
+    return Stats::Histogram::Unit::Unspecified;
   case envoy::extensions::access_loggers::stats::v3::Config::Histogram::Bytes:
-    return Envoy::Stats::Histogram::Unit::Bytes;
+    return Stats::Histogram::Unit::Bytes;
   case envoy::extensions::access_loggers::stats::v3::Config::Histogram::Microseconds:
-    return Envoy::Stats::Histogram::Unit::Microseconds;
+    return Stats::Histogram::Unit::Microseconds;
   case envoy::extensions::access_loggers::stats::v3::Config::Histogram::Milliseconds:
-    return Envoy::Stats::Histogram::Unit::Milliseconds;
+    return Stats::Histogram::Unit::Milliseconds;
   case envoy::extensions::access_loggers::stats::v3::Config::Histogram::Percent:
-    return Envoy::Stats::Histogram::Unit::Percent;
+    return Stats::Histogram::Unit::Percent;
   default:
     throw EnvoyException(fmt::format("Unknown histogram unit value in stats logger: {}",
                                      static_cast<int64_t>(unit)));
@@ -63,25 +63,25 @@ absl::optional<uint64_t> getFormatValue(const Formatter::FormatterProvider& form
   }
 
   if (is_percent) {
-    value *= Envoy::Stats::Histogram::PercentScale;
+    value *= Stats::Histogram::PercentScale;
   }
   return value;
 }
 
 struct StatsAccessLogMetric {
-  StatsAccessLogMetric(const Envoy::Stats::TagVector& tags) : tags_(tags) {}
+  StatsAccessLogMetric(const Stats::TagVector& tags) : tags_(tags) {}
 
   std::string name() const { return ""; }
-  const Envoy::Stats::TagVector& tags() const { return tags_; }
+  const Stats::TagVector& tags() const { return tags_; }
 
-  const Envoy::Stats::TagVector& tags_;
+  const Stats::TagVector& tags_;
 };
 
 class ActionValidationVisitor
-    : public Matcher::MatchTreeValidationVisitor<Envoy::Stats::StatMatchingData> {
+    : public Matcher::MatchTreeValidationVisitor<Stats::StatMatchingData> {
 public:
   absl::Status
-  performDataInputValidation(const Matcher::DataInputFactory<Envoy::Stats::StatMatchingData>&,
+  performDataInputValidation(const Matcher::DataInputFactory<Stats::StatMatchingData>&,
                              absl::string_view) override {
     return absl::OkStatus();
   }
@@ -128,7 +128,7 @@ StatsAccessLog::StatsAccessLog(const envoy::extensions::access_loggers::stats::v
 
 StatsAccessLog::NameAndTags::NameAndTags(
     const envoy::extensions::access_loggers::stats::v3::Config::Stat& cfg,
-    Envoy::Stats::StatNamePool& pool, const std::vector<Formatter::CommandParserPtr>& commands,
+    Stats::StatNamePool& pool, const std::vector<Formatter::CommandParserPtr>& commands,
     Server::Configuration::GenericFactoryContext& context)
     : str_name_(cfg.name()) {
   name_ = pool.add(str_name_);
@@ -139,7 +139,7 @@ StatsAccessLog::NameAndTags::NameAndTags(
   if (cfg.has_rules()) {
     ActionValidationVisitor validation_visitor;
     ActionContext action_context;
-    Matcher::MatchTreeFactory<Envoy::Stats::StatMatchingData, ActionContext> factory(
+    Matcher::MatchTreeFactory<Stats::StatMatchingData, ActionContext> factory(
         action_context, context.serverFactoryContext(), validation_visitor);
     rules_ = factory.create(cfg.rules())();
   }
@@ -147,7 +147,7 @@ StatsAccessLog::NameAndTags::NameAndTags(
 
 StatsAccessLog::DynamicTag::DynamicTag(
     const envoy::extensions::access_loggers::stats::v3::Config::Tag& tag_cfg,
-    Envoy::Stats::StatNamePool& pool, const std::vector<Formatter::CommandParserPtr>& commands,
+    Stats::StatNamePool& pool, const std::vector<Formatter::CommandParserPtr>& commands,
     Server::Configuration::GenericFactoryContext&)
     : str_name_(tag_cfg.name()), name_(pool.add(str_name_)),
       value_formatter_(THROW_OR_RETURN_VALUE(
@@ -157,19 +157,18 @@ StatsAccessLog::DynamicTag::DynamicTag(
 StatsAccessLog::NameAndTags::TagsResult
 StatsAccessLog::NameAndTags::tags(const Formatter::Context& context,
                                   const StreamInfo::StreamInfo& stream_info,
-                                  Envoy::Stats::Scope& scope) const {
-  Envoy::Stats::StatNameTagVector tags;
-  Envoy::Stats::TagVector str_tags;
+                                  Stats::Scope& scope) const {
+  Stats::StatNameTagVector tags;
+  Stats::TagVector str_tags;
 
   for (const auto& dynamic_tag : dynamic_tags_) {
-    // TODO(wbpcode): optimize this to avoid re-format.
     std::string tag_value = dynamic_tag.value_formatter_->format(context, stream_info);
     str_tags.emplace_back(dynamic_tag.str_name_, tag_value);
   }
 
   if (rules_) {
     StatsAccessLogMetric metric(str_tags);
-    Envoy::Stats::StatMatchingDataImpl<StatsAccessLogMetric> data(metric);
+    Stats::StatMatchingDataImpl<StatsAccessLogMetric> data(metric);
     const auto result = rules_->match(data);
     if (result.isMatch()) {
                   if (const auto* action =
@@ -183,7 +182,7 @@ StatsAccessLog::NameAndTags::tags(const Formatter::Context& context,
                   }    }
   }
 
-  std::vector<Envoy::Stats::StatNameDynamicStorage> dynamic_storage;
+  std::vector<Stats::StatNameDynamicStorage> dynamic_storage;
   dynamic_storage.reserve(str_tags.size() * 2);
   for (const auto& tag : str_tags) {
     auto& storage_name = dynamic_storage.emplace_back(tag.name_, scope.symbolTable());
@@ -204,7 +203,7 @@ void StatsAccessLog::emitLogConst(const Formatter::Context& context,
   for (const auto& histogram : histograms_) {
     absl::optional<uint64_t> computed_value_opt =
         getFormatValue(*histogram.value_formatter_, context, stream_info,
-                       histogram.unit_ == Envoy::Stats::Histogram::Unit::Percent);
+                       histogram.unit_ == Stats::Histogram::Unit::Percent);
     if (!computed_value_opt.has_value()) {
       continue;
     }
