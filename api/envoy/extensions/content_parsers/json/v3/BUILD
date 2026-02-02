@@ -7,7 +7,7 @@ licenses(["notice"])  # Apache 2
 api_proto_package(
     deps = [
         "//envoy/extensions/filters/http/json_to_metadata/v3:pkg",
-        "xds//udpa/annotations:pkg",
-        "xds//xds/annotations/v3:pkg",
+        "@xds//udpa/annotations:pkg",
+        "@xds//xds/annotations/v3:pkg",
     ],
 )
