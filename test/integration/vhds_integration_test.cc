@@ -163,6 +163,11 @@ TEST_P(VhdsIntegrationTest, VirtualHostMatchingIsCaseInsensitive) {
   // Note: Case-sensitive VHDS queries are enabled by default via the runtime flag
   // "envoy.reloadable_features.vhds_case_sensitive_query"
 
+  // First, verify the default virtual host (sni.lyft.com) works as configured during initialization
+  testRouterHeaderOnlyRequestAndResponse(nullptr, 1, "/", "sni.lyft.com");
+  cleanupUpstreamAndDownstream();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+
   // Send a VHDS response with a virtual host that has domain "Example.Com" (mixed case)
   sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
       Config::TestTypeUrl::get().VirtualHost,
