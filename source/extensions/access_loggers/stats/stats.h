@@ -6,12 +6,14 @@
 
 #include "source/common/matcher/matcher.h"
 #include "source/extensions/access_loggers/common/access_log_base.h"
-#include "source/extensions/access_loggers/stats/stats_action.h"
+#include "source/extensions/matching/common_actions/stats/stats_action.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace AccessLoggers {
 namespace StatsAccessLog {
+
+using Extensions::Matching::CommonActions::Stats::ActionContext;
 
 class StatsAccessLog : public AccessLoggers::Common::ImplBase {
 public:

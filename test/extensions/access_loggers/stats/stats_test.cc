@@ -317,9 +317,10 @@ TEST_F(StatsAccessLoggerTest, DropStatAction) {
                 map:
                   "bar":
                     action:
-                      name: drop_stat_action
+                      name: generic_stat_action
                       typed_config:
-                        "@type": type.googleapis.com/envoy.extensions.access_loggers.stats.v3.DropStatAction
+                        "@type": type.googleapis.com/envoy.extensions.matching.common_actions.stats.v3.StatAction
+                        drop_stat: {}
         value_fixed: 1
 )EOF";
 
@@ -348,9 +349,10 @@ TEST_F(StatsAccessLoggerTest, DropStatAction) {
                 map:
                   "bar":
                     action:
-                      name: drop_stat_action
+                      name: generic_stat_action
                       typed_config:
-                        "@type": type.googleapis.com/envoy.extensions.access_loggers.stats.v3.DropStatAction
+                        "@type": type.googleapis.com/envoy.extensions.matching.common_actions.stats.v3.StatAction
+                        drop_stat: {}
         value_fixed: 1
 )EOF";
   initialize(yaml2);
@@ -381,9 +383,10 @@ TEST_F(StatsAccessLoggerTest, DropStatActionOnHistogram) {
                 map:
                   "bar":
                     action:
-                      name: drop_stat_action
+                      name: generic_stat_action
                       typed_config:
-                        "@type": type.googleapis.com/envoy.extensions.access_loggers.stats.v3.DropStatAction
+                        "@type": type.googleapis.com/envoy.extensions.matching.common_actions.stats.v3.StatAction
+                        drop_stat: {}
         unit: Bytes
         value_format: '%BYTES_RECEIVED%'
 )EOF";
@@ -413,9 +416,10 @@ TEST_F(StatsAccessLoggerTest, DropStatActionOnHistogram) {
                 map:
                   "bar":
                     action:
-                      name: drop_stat_action
+                      name: generic_stat_action
                       typed_config:
-                        "@type": type.googleapis.com/envoy.extensions.access_loggers.stats.v3.DropStatAction
+                        "@type": type.googleapis.com/envoy.extensions.matching.common_actions.stats.v3.StatAction
+                        drop_stat: {}
         unit: Bytes
         value_format: '%BYTES_RECEIVED%'
 )EOF";
@@ -449,9 +453,10 @@ TEST_F(StatsAccessLoggerTest, StatTagFilterErrorType) {
                 map:
                   "-":
                     action:
-                      name: drop_stat_action
+                      name: generic_stat_action
                       typed_config:
-                        "@type": type.googleapis.com/envoy.extensions.access_loggers.stats.v3.DropStatAction
+                        "@type": type.googleapis.com/envoy.extensions.matching.common_actions.stats.v3.StatAction
+                        drop_stat: {}
         value_fixed: 1
 )EOF";
 
@@ -480,9 +485,10 @@ TEST_F(StatsAccessLoggerTest, StatTagFilterErrorType) {
                 map:
                   "-":
                     action:
-                      name: drop_stat_action
+                      name: generic_stat_action
                       typed_config:
-                        "@type": type.googleapis.com/envoy.extensions.access_loggers.stats.v3.DropStatAction
+                        "@type": type.googleapis.com/envoy.extensions.matching.common_actions.stats.v3.StatAction
+                        drop_stat: {}
         value_fixed: 1
 )EOF";
   initialize(yaml2);
@@ -513,11 +519,12 @@ TEST_F(StatsAccessLoggerTest, StatTagFilterInsertTag) {
                 map:
                   "bar":
                     action:
-                      name: insert_tag_action
+                      name: generic_stat_action
                       typed_config:
-                        "@type": type.googleapis.com/envoy.extensions.access_loggers.stats.v3.InsertTagAction
-                        tag_name: foo
-                        tag_value: baz
+                        "@type": type.googleapis.com/envoy.extensions.matching.common_actions.stats.v3.StatAction
+                        insert_tag:
+                          tag_name: foo
+                          tag_value: baz
         value_fixed: 1
 )EOF";
 
@@ -557,10 +564,11 @@ TEST_F(StatsAccessLoggerTest, StatTagFilterDropTag) {
                 map:
                   "bar":
                     action:
-                      name: drop_tag_action
+                      name: generic_stat_action
                       typed_config:
-                        "@type": type.googleapis.com/envoy.extensions.access_loggers.stats.v3.DropTagAction
-                        target_tag_name: foo
+                        "@type": type.googleapis.com/envoy.extensions.matching.common_actions.stats.v3.StatAction
+                        drop_tag:
+                          target_tag_name: foo
         value_fixed: 1
 )EOF";
 

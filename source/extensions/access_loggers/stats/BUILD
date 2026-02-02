@@ -10,29 +10,17 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 envoy_cc_library(
-    name = "stats_action_lib",
-    srcs = ["stats_action.cc"],
-    hdrs = ["stats_action.h"],
-    deps = [
-        "//envoy/registry",
-        "//source/common/matcher:matcher_lib",
-        "//source/common/protobuf",
-        "@envoy_api//envoy/extensions/access_loggers/stats/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_library(
     name = "stats_lib",
     srcs = ["stats.cc"],
     hdrs = ["stats.h"],
     deps = [
-        ":stats_action_lib",
         "//envoy/access_log:access_log_interface",
         "//envoy/stats:tag_interface",
         "//source/common/access_log:access_log_lib",
         "//source/common/formatter:substitution_format_string_lib",
         "//source/common/matcher:matcher_lib",
         "//source/extensions/access_loggers/common:access_log_base",
+        "//source/extensions/matching/common_actions/stats:stats_action_lib",
         "@envoy_api//envoy/extensions/access_loggers/stats/v3:pkg_cc_proto",
     ],
 )

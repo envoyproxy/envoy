@@ -3,7 +3,6 @@
 #include "envoy/registry/registry.h"
 
 #include "source/common/formatter/substitution_formatter.h"
-#include "source/extensions/access_loggers/stats/stats_action.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -173,36 +172,12 @@ StatsAccessLog::NameAndTags::tags(const Formatter::Context& context,
     Envoy::Stats::StatMatchingDataImpl<StatsAccessLogMetric> data(metric);
     const auto result = rules_->match(data);
     if (result.isMatch()) {
-      if (const auto* action = dynamic_cast<const StatsAction*>(result.action().get())) {
-        switch (action->type()) {
-        case StatsAction::ActionType::DropStat:
+      if (const auto* action =
+              dynamic_cast<const Extensions::Matching::CommonActions::Stats::StatsAction*>(
+                  result.action().get())) {
+        const auto action_result = action->apply(str_tags);
+        if (action_result == Extensions::Matching::CommonActions::Stats::StatsAction::Result::Drop) {
           return {std::move(tags), {}, std::move(str_tags), true};
-        case StatsAction::ActionType::DropTag: {
-          const auto* drop_tag_action = static_cast<const DropTagAction*>(action);
-          for (auto it = str_tags.begin(); it != str_tags.end();) {
-            if (it->name_ == drop_tag_action->targetTagName()) {
-              it = str_tags.erase(it);
-            } else {
-              ++it;
-            }
-          }
-          break;
-        }
-        case StatsAction::ActionType::InsertTag: {
-          const auto* insert_action = static_cast<const InsertTagAction*>(action);
-          bool replaced = false;
-          for (auto& tag : str_tags) {
-            if (tag.name_ == insert_action->tagName()) {
-              tag.value_ = insert_action->tagValue();
-              replaced = true;
-              break;
-            }
-          }
-          if (!replaced) {
-            str_tags.emplace_back(insert_action->tagName(), insert_action->tagValue());
-          }
-          break;
-        }
         }
       }
     }
