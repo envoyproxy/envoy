@@ -132,6 +132,10 @@ new_features:
 - area: mcp_router
   change: |
     Added support for MCP logging method ``logging/setLevel``.
+- area: network
+  change: |
+    Added support access logging in network filters like http filters, by allowing network filters to register as access logger
+    instances.
 - area: formatter
   change: |
     Extended ``*_WITHOUT_PORT`` address formatters to accept an optional ``MASK_PREFIX_LEN`` parameter
