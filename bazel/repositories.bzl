@@ -764,7 +764,10 @@ def _com_github_grpc_grpc():
         name = "com_github_grpc_grpc",
         patch_args = ["-p1"],
         patches = ["@envoy//bazel:grpc.patch"],
-        repo_mapping = {"@openssl": "@boringssl"},
+        repo_mapping = {
+            "@com_github_cncf_xds": "@xds",
+            "@openssl": "@boringssl",
+        },
     )
     external_http_archive(
         "build_bazel_rules_apple",
