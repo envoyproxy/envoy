@@ -80,6 +80,8 @@ struct ProviderOptions {
   bool hash_content{false};
 };
 
+// DynamicData registers the file watches and a thread local slot. This class
+// must be created and deleted on the dispatcher thread.
 template <class DataType> class DynamicData {
 public:
   struct ThreadLocalData : public ThreadLocal::ThreadLocalObject {
@@ -118,16 +120,8 @@ public:
   }
 
   ~DynamicData() {
-    if (!dispatcher_.isThreadSafe()) {
-      dispatcher_.post([to_delete = std::move(slot_), cleanup = std::move(cleanup_)]() mutable {
-        if (cleanup) {
-          cleanup();
-        }
-      });
-    } else {
-      if (cleanup_) {
-        cleanup_();
-      }
+    if (cleanup_) {
+      cleanup_();
     }
   }
 
@@ -135,6 +129,8 @@ public:
     const auto thread_local_data = slot_->get();
     return thread_local_data.has_value() ? thread_local_data->data_ : nullptr;
   }
+
+  Event::Dispatcher& dispatcher() { return dispatcher_; }
 
 private:
   absl::Status onWatchUpdate() {
@@ -263,11 +259,24 @@ public:
     return absl::get<std::unique_ptr<DynamicData<DataType>>>(data_)->data();
   }
 
+  ~DataSourceProvider() {
+    if (absl::holds_alternative<std::unique_ptr<DynamicData<DataType>>>(data_)) {
+      // Schedule destruction on the dispatcher thread. This ensures that close()
+      // stops any inotify events on the same thread.
+      std::unique_ptr<DynamicData<DataType>> data =
+          std::move(absl::get<std::unique_ptr<DynamicData<DataType>>>(data_));
+      Event::Dispatcher& dispatcher = data->dispatcher();
+      if (!dispatcher.isThreadSafe()) {
+        dispatcher.post([to_delete = std::move(data)] {});
+      }
+    }
+  }
+
+private:
   DataSourceProvider(DataType&& data) : data_(std::make_shared<DataType>(std::move(data))) {}
   template <class... Args>
   DataSourceProvider(std::unique_ptr<DynamicData<DataType>> data) : data_(std::move(data)) {}
 
-private:
   absl::variant<std::shared_ptr<DataType>, std::unique_ptr<DynamicData<DataType>>> data_;
 };
 

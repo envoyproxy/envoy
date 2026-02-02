@@ -881,6 +881,7 @@ TEST(DataSourceProviderTest, Singleton) {
     auto provider2 = singleton->getOrCreate(config);
     EXPECT_TRUE(provider2.ok());
     EXPECT_NE(provider1->get(), provider2->get());
+    dispatcher->run(Event::Dispatcher::RunType::Block);
   }
 
   envoy::config::core::v3::DataSource config;
@@ -902,6 +903,7 @@ TEST(DataSourceProviderTest, Singleton) {
     EXPECT_EQ(provider1->get(), provider2->get());
     provider1->reset();
     provider2->reset();
+    dispatcher->run(Event::Dispatcher::RunType::Block);
   }
 
   // Destruction of the singleton is handled correctly.
@@ -910,6 +912,54 @@ TEST(DataSourceProviderTest, Singleton) {
   singleton.reset();
   unlink(TestEnvironment::temporaryPath(filename).c_str());
   provider->reset();
+  dispatcher->run(Event::Dispatcher::RunType::Block);
+}
+
+TEST(DataSourceProviderTest, WorkerDestruction) {
+  const std::string filename = "envoy_test/watched_file";
+  unlink(TestEnvironment::temporaryPath(filename).c_str());
+
+  envoy::config::core::v3::DataSource config;
+  TestEnvironment::createPath(TestEnvironment::temporaryPath("envoy_test"));
+
+  const std::string yaml = fmt::format(R"EOF(
+    filename: "{}"
+  )EOF",
+                                       TestEnvironment::temporaryPath(filename));
+  TestUtility::loadFromYamlAndValidate(yaml, config);
+
+  {
+    std::ofstream file(TestEnvironment::temporaryPath(filename));
+    file << "Hello, world!";
+    file.close();
+  }
+
+  EXPECT_EQ(envoy::config::core::v3::DataSource::SpecifierCase::kFilename, config.specifier_case());
+  Api::ApiPtr api = Api::createApiForTest();
+  Event::DispatcherPtr dispatcher = api->allocateDispatcher("test_thread");
+  NiceMock<ThreadLocal::MockInstance> tls;
+
+  auto provider_or_error = DataSource::DataSourceProvider<std::string>::create(
+      config, *dispatcher, tls, *api,
+      [&](absl::string_view data) { return std::make_shared<std::string>(data); },
+      {.modify_watch = true});
+  EXPECT_NE(provider_or_error.value()->data(), nullptr);
+  EXPECT_EQ(*provider_or_error.value()->data(), "Hello, world!");
+
+  {
+    std::ofstream file(TestEnvironment::temporaryPath(filename));
+    file << "Updated";
+    file.close();
+  }
+
+  // Run dispatcher and destroy provider to simulate a race condition.
+  auto worker_thread =
+      api->threadFactory().createThread([&]() { provider_or_error.value().reset(); });
+  worker_thread->join();
+  dispatcher->run(Event::Dispatcher::RunType::NonBlock);
+
+  // Remove the file.
+  unlink(TestEnvironment::temporaryPath(filename).c_str());
 }
 
 } // namespace
