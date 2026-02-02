@@ -33,7 +33,7 @@ com_github_chrusty_protoc_gen_jsonschema:
   - build
   license: "Apache-2.0"
   license_url: "https://github.com/norbjd/protoc-gen-jsonschema/blob/{version}/LICENSE"
-com_github_cncf_xds:
+xds:
   project_name: "xDS API"
   project_desc: "xDS API Working Group (xDS-WG)"
   project_url: "https://github.com/cncf/xds"
