@@ -10,6 +10,15 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 envoy_cc_library(
+    name = "absl_status_to_http_status",
+    srcs = ["absl_status_to_http_status.cc"],
+    hdrs = ["absl_status_to_http_status.h"],
+    deps = [
+        "//envoy/http:codes_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "file_server_lib",
     srcs = [
         "file_streamer.cc",
@@ -22,6 +31,7 @@ envoy_cc_library(
         "filter_config.h",
     ],
     deps = [
+        ":absl_status_to_http_status",
         "//envoy/buffer:buffer_interface",
         "//envoy/server:instance_interface",
         "//source/common/common:enum_to_int",

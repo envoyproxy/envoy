@@ -1,5 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_test",
     "envoy_package",
 )
 load(
@@ -10,6 +11,14 @@ load(
 licenses(["notice"])  # Apache 2
 
 envoy_package()
+
+envoy_cc_test(
+    name = "absl_status_to_http_status_test",
+    srcs = ["absl_status_to_http_status_test.cc"],
+    deps = [
+        "//source/extensions/filters/http/file_server:absl_status_to_http_status",
+    ],
+)
 
 envoy_extension_cc_test(
     name = "file_server_test",

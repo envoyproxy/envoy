@@ -5,6 +5,7 @@
 #include "source/common/common/enum_to_int.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/extensions/common/async_files/async_file_manager.h"
+#include "source/extensions/filters/http/file_server/absl_status_to_http_status.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -12,42 +13,6 @@ namespace HttpFilters {
 namespace FileServer {
 
 namespace {
-Http::Code abslStatusToHttpStatus(absl::StatusCode code) {
-  switch (code) {
-  case absl::StatusCode::kOk:
-    return Http::Code::OK;
-  case absl::StatusCode::kCancelled:
-    return static_cast<Http::Code>(499);
-  case absl::StatusCode::kUnknown:
-    return Http::Code::InternalServerError;
-  case absl::StatusCode::kInvalidArgument:
-    return Http::Code::BadRequest;
-  case absl::StatusCode::kDeadlineExceeded:
-    return Http::Code::GatewayTimeout;
-  case absl::StatusCode::kNotFound:
-    return Http::Code::NotFound;
-  case absl::StatusCode::kAlreadyExists:
-    return Http::Code::Conflict;
-  case absl::StatusCode::kPermissionDenied:
-    return Http::Code::Forbidden;
-  case absl::StatusCode::kResourceExhausted:
-    return Http::Code::TooManyRequests;
-  case absl::StatusCode::kFailedPrecondition:
-    return Http::Code::BadRequest;
-  case absl::StatusCode::kAborted:
-    return Http::Code::Conflict;
-  case absl::StatusCode::kOutOfRange:
-    return Http::Code::RangeNotSatisfiable;
-  case absl::StatusCode::kUnimplemented:
-    return Http::Code::ServiceUnavailable;
-  case absl::StatusCode::kDataLoss:
-    return Http::Code::InternalServerError;
-  case absl::StatusCode::kUnauthenticated:
-    return Http::Code::Unauthorized;
-  default:
-    return Http::Code::InternalServerError;
-  }
-}
 
 const Http::LowerCaseString& acceptRangesHeaderKey() {
   CONSTRUCT_ON_FIRST_USE(Http::LowerCaseString, "accept-ranges");
