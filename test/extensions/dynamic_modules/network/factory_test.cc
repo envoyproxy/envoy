@@ -1,6 +1,5 @@
 #include "envoy/extensions/filters/network/dynamic_modules/v3/dynamic_modules.pb.h"
 
-#include "source/common/stats/custom_stat_namespaces_impl.h"
 #include "source/extensions/filters/network/dynamic_modules/factory.h"
 
 #include "test/extensions/dynamic_modules/util.h"
@@ -19,13 +18,10 @@ public:
                                TestEnvironment::substitute(
                                    "{{ test_rundir }}/test/extensions/dynamic_modules/test_data/c"),
                                1);
-    ON_CALL(context_.server_factory_context_.api_, customStatNamespaces())
-        .WillByDefault(testing::ReturnRef(custom_stat_namespaces_));
   }
 
   NiceMock<MockFactoryContext> context_;
   DynamicModuleNetworkFilterConfigFactory factory_;
-  Stats::CustomStatNamespacesImpl custom_stat_namespaces_;
 };
 
 TEST_F(DynamicModuleNetworkFilterFactoryTest, ValidConfig) {

@@ -3,6 +3,7 @@
 #include "envoy/registry/registry.h"
 
 #include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/filters/listener/dynamic_modules/filter.h"
 #include "source/extensions/filters/listener/dynamic_modules/filter_config.h"
 
@@ -54,10 +55,11 @@ DynamicModuleListenerFilterConfigFactory::createListenerFilterFactoryFromProto(
                          std::string(filter_config.status().message()));
   }
 
-  // Register the metrics namespace as a custom stat namespace unless the user wants to include
-  // the namespace in the stats output. When registered, the namespace prefix is stripped from
-  // /stats endpoints and no envoy_ prefix is added in prometheus output.
-  if (!module_config.include_metrics_namespace_in_stats_output()) {
+  // When the runtime guard is enabled, register the metrics namespace as a custom stat namespace.
+  // This causes the namespace prefix to be stripped from prometheus output and no envoy_ prefix
+  // is added. This is the legacy behavior for backward compatibility.
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.dynamic_modules_strip_custom_stat_prefix")) {
     context.serverFactoryContext().api().customStatNamespaces().registerStatNamespace(
         metrics_namespace);
   }

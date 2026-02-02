@@ -170,11 +170,11 @@ new_features:
 - area: dynamic_modules
   change: |
     Added configurable :ref:`metrics_namespace
-    <envoy_v3_api_field_extensions.dynamic_modules.v3.DynamicModuleConfig.metrics_namespace>` and
-    :ref:`include_metrics_namespace_in_stats_output
-    <envoy_v3_api_field_extensions.dynamic_modules.v3.DynamicModuleConfig.include_metrics_namespace_in_stats_output>`
-    fields to ``DynamicModuleConfig``. This allows users to customize the prefix used for all metrics
-    created by dynamic modules and control whether metrics appear with the ``envoy_`` prefix in
-    prometheus output.
+    <envoy_v3_api_field_extensions.dynamic_modules.v3.DynamicModuleConfig.metrics_namespace>` field
+    to ``DynamicModuleConfig``. This allows users to customize the prefix used for all metrics
+    created by dynamic modules. Metrics now appear with the standard ``envoy_`` prefix followed by
+    the namespace in prometheus output (e.g. ``envoy_myapp_requests_total``). The legacy behavior
+    (stripping the namespace prefix from prometheus output) can be restored by setting the runtime
+    guard ``envoy.reloadable_features.dynamic_modules_strip_custom_stat_prefix`` to ``true``.
 
 deprecated:

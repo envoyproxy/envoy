@@ -676,63 +676,6 @@ typed_config:
   EXPECT_TRUE(response->complete());
 }
 
-TEST_P(DynamicModulesIntegrationTest, IncludeMetricsNamespaceInStatsOutput) {
-  // Skip for non-Rust languages to avoid duplication.
-  if (GetParam() != "rust") {
-    GTEST_SKIP() << "Metrics namespace inclusion test only runs for Rust";
-  }
-
-  TestEnvironment::setEnvVar(
-      "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
-      TestEnvironment::substitute("{{ test_rundir }}/test/extensions/dynamic_modules/test_data/" +
-                                  GetParam()),
-      1);
-  TestEnvironment::setEnvVar("GODEBUG", "cgocheck=0", 1);
-
-  // Configure filter with include_metrics_namespace_in_stats_output set to true.
-  // This means the namespace will NOT be registered as a custom stat namespace,
-  // so metrics will appear with the namespace prefix in /stats output.
-  constexpr auto filter_config_yaml = R"EOF(
-name: envoy.extensions.filters.http.dynamic_modules
-typed_config:
-  "@type": type.googleapis.com/envoy.extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter
-  dynamic_module_config:
-    name: http_integration_test
-    metrics_namespace: myapp
-    include_metrics_namespace_in_stats_output: true
-  filter_name: stats_callbacks
-  filter_config:
-    "@type": type.googleapis.com/google.protobuf.StringValue
-    value: header_to_count,header_to_set
-)EOF";
-
-  config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
-  config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
-  config_helper_.prependFilter(filter_config_yaml);
-  initialize();
-
-  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
-
-  Http::TestRequestHeaderMapImpl request_headers = default_request_headers_;
-  request_headers.addCopy(Http::LowerCaseString("header_to_count"), "5");
-  request_headers.addCopy(Http::LowerCaseString("header_to_set"), "42");
-  auto encoder_decoder = codec_client_->startRequest(request_headers, true);
-  auto response = std::move(encoder_decoder.second);
-  waitForNextUpstreamRequest();
-
-  // With include_metrics_namespace_in_stats_output=true, the namespace is NOT stripped.
-  // Stats should still be accessible with the full namespace prefix.
-  test_server_->waitUntilHistogramHasSamples("myapp.requests_header_values");
-  EXPECT_EQ(test_server_->counter("myapp.requests_total")->value(), 1);
-  EXPECT_EQ(test_server_->gauge("myapp.requests_pending")->value(), 1);
-  EXPECT_EQ(test_server_->gauge("myapp.requests_set_value")->value(), 42);
-
-  Http::TestResponseHeaderMapImpl response_headers = default_response_headers_;
-  upstream_request_->encodeHeaders(response_headers, true);
-  ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_TRUE(response->complete());
-}
-
 std::string terminal_filter_config;
 
 class DynamicModulesTerminalIntegrationTest
