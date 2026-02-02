@@ -115,7 +115,9 @@ ReverseTunnelFilterConfig::ReverseTunnelFilterConfig(
               ? proto_config.validation().dynamic_metadata_namespace()
               : "envoy.filters.network.reverse_tunnel"),
       required_cluster_name_(proto_config.required_cluster_name()),
-      enable_tenant_isolation_(proto_config.enable_tenant_isolation()) {}
+      enable_tenant_isolation_(proto_config.has_enable_tenant_isolation()
+                                   ? proto_config.enable_tenant_isolation().value()
+                                   : false) {}
 
 bool ReverseTunnelFilterConfig::validateIdentifiers(
     absl::string_view node_id, absl::string_view cluster_id,
