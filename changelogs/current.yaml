@@ -8,12 +8,18 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
-- area: ext_authz
-  change: |
-    Fixed a bug where headers from a denied authorization response (non-200s) were not properly propagated to the client.
 - area: oauth2
   change: |
-    Fixed OAuth2 refresh requests so host rewriting no longer overrides the original Host value.
+    Fixed OAuth2 refresh requests so host rewriting no longer overrides the original ``Host`` header value.
+- area: ext_authz
+  change: |
+    Fixed a bug where headers from a denied authorization response (non-200) were not properly propagated
+    to the client.
+- area: ext_authz
+  change: |
+    Fixed the HTTP ext_authz client to respect ``status_on_error`` configuration when the authorization
+    server returns a 5xx error or when HTTP call failures occur. Previously, these error scenarios always
+    returned 403 Forbidden regardless of the configured error status.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
