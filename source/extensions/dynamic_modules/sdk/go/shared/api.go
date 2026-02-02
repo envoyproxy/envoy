@@ -142,7 +142,13 @@ func (p *EmptyHttpFilter) OnStreamComplete() {
 // This is used to create instances of the stream plugin at runtime when a new request is received.
 // The implementation of this interface should be thread-safe and hold the parsed configuration.
 type HttpFilterFactory interface {
+	// Create creates a HttpFilter instance.
 	Create(handle HttpFilterHandle) HttpFilter
+
+	// OnDestory is called when the factory is being destroyed. This is a good place to clean up any
+	// resources. This usually happens when the configuration is updated and all existing streams
+	// using this factory are closed.
+	OnDestory()
 }
 
 // HttpFilterConfigFactory is the factory interface for creating stream plugin configurations.
