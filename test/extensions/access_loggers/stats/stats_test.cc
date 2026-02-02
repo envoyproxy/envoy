@@ -319,7 +319,7 @@ TEST_F(StatsAccessLoggerTest, DropStatAction) {
                     action:
                       name: generic_stat_action
                       typed_config:
-                        "@type": type.googleapis.com/envoy.extensions.matching.common_actions.stats.v3.StatAction
+                        "@type": type.googleapis.com/envoy.extensions.matching.actions.stats.v3.StatAction
                         drop_stat: {}
         value_fixed: 1
 )EOF";
@@ -351,7 +351,7 @@ TEST_F(StatsAccessLoggerTest, DropStatAction) {
                     action:
                       name: generic_stat_action
                       typed_config:
-                        "@type": type.googleapis.com/envoy.extensions.matching.common_actions.stats.v3.StatAction
+                        "@type": type.googleapis.com/envoy.extensions.matching.actions.stats.v3.StatAction
                         drop_stat: {}
         value_fixed: 1
 )EOF";
@@ -385,7 +385,7 @@ TEST_F(StatsAccessLoggerTest, DropStatActionOnHistogram) {
                     action:
                       name: generic_stat_action
                       typed_config:
-                        "@type": type.googleapis.com/envoy.extensions.matching.common_actions.stats.v3.StatAction
+                        "@type": type.googleapis.com/envoy.extensions.matching.actions.stats.v3.StatAction
                         drop_stat: {}
         unit: Bytes
         value_format: '%BYTES_RECEIVED%'
@@ -418,7 +418,7 @@ TEST_F(StatsAccessLoggerTest, DropStatActionOnHistogram) {
                     action:
                       name: generic_stat_action
                       typed_config:
-                        "@type": type.googleapis.com/envoy.extensions.matching.common_actions.stats.v3.StatAction
+                        "@type": type.googleapis.com/envoy.extensions.matching.actions.stats.v3.StatAction
                         drop_stat: {}
         unit: Bytes
         value_format: '%BYTES_RECEIVED%'
@@ -455,7 +455,7 @@ TEST_F(StatsAccessLoggerTest, StatTagFilterErrorType) {
                     action:
                       name: generic_stat_action
                       typed_config:
-                        "@type": type.googleapis.com/envoy.extensions.matching.common_actions.stats.v3.StatAction
+                        "@type": type.googleapis.com/envoy.extensions.matching.actions.stats.v3.StatAction
                         drop_stat: {}
         value_fixed: 1
 )EOF";
@@ -487,7 +487,7 @@ TEST_F(StatsAccessLoggerTest, StatTagFilterErrorType) {
                     action:
                       name: generic_stat_action
                       typed_config:
-                        "@type": type.googleapis.com/envoy.extensions.matching.common_actions.stats.v3.StatAction
+                        "@type": type.googleapis.com/envoy.extensions.matching.actions.stats.v3.StatAction
                         drop_stat: {}
         value_fixed: 1
 )EOF";
@@ -521,7 +521,7 @@ TEST_F(StatsAccessLoggerTest, StatTagFilterInsertTag) {
                     action:
                       name: generic_stat_action
                       typed_config:
-                        "@type": type.googleapis.com/envoy.extensions.matching.common_actions.stats.v3.StatAction
+                        "@type": type.googleapis.com/envoy.extensions.matching.actions.stats.v3.StatAction
                         insert_tag:
                           tag_name: foo
                           tag_value: baz
@@ -566,7 +566,7 @@ TEST_F(StatsAccessLoggerTest, StatTagFilterDropTag) {
                     action:
                       name: generic_stat_action
                       typed_config:
-                        "@type": type.googleapis.com/envoy.extensions.matching.common_actions.stats.v3.StatAction
+                        "@type": type.googleapis.com/envoy.extensions.matching.actions.stats.v3.StatAction
                         drop_tag:
                           target_tag_name: foo
         value_fixed: 1
