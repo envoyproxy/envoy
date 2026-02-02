@@ -29,12 +29,18 @@ DynamicModuleNetworkFilterConfigFactory::createFilterFactoryFromProtoTyped(
     config = std::move(config_or_error.value());
   }
 
+  // Use configured metrics namespace or fall back to the default.
+  const std::string metrics_namespace =
+      module_config.metrics_namespace().empty()
+          ? std::string(Extensions::DynamicModules::NetworkFilters::DefaultMetricsNamespace)
+          : module_config.metrics_namespace();
+
   absl::StatusOr<
       Envoy::Extensions::DynamicModules::NetworkFilters::DynamicModuleNetworkFilterConfigSharedPtr>
       filter_config =
           Envoy::Extensions::DynamicModules::NetworkFilters::newDynamicModuleNetworkFilterConfig(
-              proto_config.filter_name(), config, std::move(dynamic_module.value()),
-              context.serverFactoryContext().clusterManager(),
+              proto_config.filter_name(), config, metrics_namespace,
+              std::move(dynamic_module.value()), context.serverFactoryContext().clusterManager(),
               context.serverFactoryContext().scope(),
               context.serverFactoryContext().mainThreadDispatcher());
 

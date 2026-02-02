@@ -5,6 +5,7 @@
 *.svg binary
 /test/common/tls/test_data/aes_128_key binary
 /test/common/tls/test_data/ticket_key_* binary
+/test/common/http/sse/sse_parser_corpus/* binary
 /test/**/*_corpus/* linguist-generated=true
 package.lock binary
 yarn.lock binary

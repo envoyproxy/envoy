@@ -415,13 +415,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSize) {
   // If you encounter a failure here, please see
   // https://github.com/envoyproxy/envoy/blob/main/source/docs/stats.md#stats-memory-tests
   // for details on how to fix.
-  //
-  // We only run the exact test for ipv6 because ipv4 in some cases may allocate a
-  // different number of bytes. We still run the approximate test.
-  if (ip_version_ != Network::Address::IpVersion::v6) {
-    // https://github.com/envoyproxy/envoy/issues/12209
-    // EXPECT_MEMORY_EQ(m_per_cluster, 37061);
-  }
+
   EXPECT_MEMORY_LE(m_per_cluster, 45000); // Round up to allow platform variations.
 }
 

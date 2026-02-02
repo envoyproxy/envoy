@@ -359,32 +359,18 @@ protected:
       }
     };
 
-    if (false) {
-      EXPECT_CALL(client_connection_callbacks, onEvent)
-          .WillRepeatedly(Invoke([&](Network::ConnectionEvent e) -> void {
-            ENVOY_LOG_MISC(info, "client onEvent {}", static_cast<int>(e));
-            connect_second_time();
-          }));
-
-      EXPECT_CALL(server_connection_callbacks, onEvent)
-          .WillRepeatedly(Invoke([&](Network::ConnectionEvent e) -> void {
-            ENVOY_LOG_MISC(info, "server onEvent {}", static_cast<int>(e));
-            connect_second_time();
-          }));
+    if (mod == Ssl::SelectionResult::SelectionStatus::Failed) {
+      EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
+          .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { close_second_time(); }));
+      EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
+          .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { close_second_time(); }));
     } else {
-      if (mod == Ssl::SelectionResult::SelectionStatus::Failed) {
-        EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
-            .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { close_second_time(); }));
-        EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
-            .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { close_second_time(); }));
-      } else {
-        EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-            .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
-        EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-            .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
-        EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
-        EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
-      }
+      EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
+          .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
+      EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
+          .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
+      EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
+      EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
     }
 
     dispatcher->run(Event::Dispatcher::RunType::Block);

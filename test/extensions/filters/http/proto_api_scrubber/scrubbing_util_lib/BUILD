@@ -30,6 +30,6 @@ envoy_cc_test(
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
         "@com_github_cncf_xds//xds/type/matcher/v3:pkg_cc_proto",
-        "@com_google_protoprocessinglib//proto_processing_lib/proto_scrubber",
+        "@proto-processing//proto_processing_lib/proto_scrubber",
     ],
 )

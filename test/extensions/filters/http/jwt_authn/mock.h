@@ -11,18 +11,17 @@
 #include "absl/strings/string_view.h"
 #include "gmock/gmock.h"
 
-using ::google::jwt_verify::Status;
-
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace JwtAuthn {
 
+using JwtVerify::Status;
+
 class MockAuthFactory : public AuthFactory {
 public:
   MOCK_METHOD(AuthenticatorPtr, create,
-              (const ::google::jwt_verify::CheckAudience*, const absl::optional<std::string>&, bool,
-               bool),
+              (const JwtVerify::CheckAudience*, const absl::optional<std::string>&, bool, bool),
               (const));
 };
 
@@ -66,8 +65,8 @@ public:
 
 class MockJwtCache : public JwtCache {
 public:
-  MOCK_METHOD(::google::jwt_verify::Jwt*, lookup, (const std::string&), ());
-  MOCK_METHOD(void, insert, (const std::string&, std::unique_ptr<::google::jwt_verify::Jwt>&&), ());
+  MOCK_METHOD(JwtVerify::Jwt*, lookup, (const std::string&), ());
+  MOCK_METHOD(void, insert, (const std::string&, std::unique_ptr<JwtVerify::Jwt>&&), ());
 };
 
 class MockJwksData : public JwksCache::JwksData {
@@ -88,9 +87,9 @@ public:
   MOCK_METHOD(const envoy::extensions::filters::http::jwt_authn::v3::JwtProvider&, getJwtProvider,
               (), (const));
   MOCK_METHOD(const Router::RetryPolicyConstSharedPtr&, retryPolicy, (), (const));
-  MOCK_METHOD(const ::google::jwt_verify::Jwks*, getJwksObj, (), (const));
+  MOCK_METHOD(const JwtVerify::Jwks*, getJwksObj, (), (const));
   MOCK_METHOD(bool, isExpired, (), (const));
-  MOCK_METHOD(const ::google::jwt_verify::Jwks*, setRemoteJwks, (JwksConstPtr&&), ());
+  MOCK_METHOD(const JwtVerify::Jwks*, setRemoteJwks, (JwksConstPtr&&), ());
   MOCK_METHOD(JwtCache&, getJwtCache, (), ());
 
   envoy::extensions::filters::http::jwt_authn::v3::JwtProvider jwt_provider_;

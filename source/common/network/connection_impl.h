@@ -318,6 +318,14 @@ public:
   // Network::ClientConnection
   void connect() override;
 
+protected:
+  void setDetectedCloseType(StreamInfo::DetectedCloseType close_type) override {
+    ConnectionImpl::setDetectedCloseType(close_type);
+    if (stream_info_.upstreamInfo() != nullptr) {
+      stream_info_.upstreamInfo()->setUpstreamDetectedCloseType(close_type);
+    }
+  }
+
 private:
   void onConnected() override;
 

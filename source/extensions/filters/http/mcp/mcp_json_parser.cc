@@ -36,7 +36,7 @@ void McpParserConfig::initializeDefaults() {
   addMethodConfig(Methods::PROMPTS_LIST, {});
   addMethodConfig(Methods::PROMPTS_GET, {AttributeExtractionRule("params.name")});
 
-  // Completion
+  // Completion.
   addMethodConfig(Methods::COMPLETION_COMPLETE, {AttributeExtractionRule("params.ref")});
 
   // Logging

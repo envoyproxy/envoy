@@ -106,6 +106,17 @@ Ssl::ConnectionInfoConstSharedPtr TcpUpstream::getUpstreamConnectionSslInfo() {
   return nullptr;
 }
 
+StreamInfo::DetectedCloseType TcpUpstream::detectedCloseType() const {
+  if (upstream_conn_data_ != nullptr &&
+      upstream_conn_data_->connection().streamInfo().upstreamInfo()) {
+    return upstream_conn_data_->connection()
+        .streamInfo()
+        .upstreamInfo()
+        ->upstreamDetectedCloseType();
+  }
+  return StreamInfo::DetectedCloseType::Normal;
+}
+
 Tcp::ConnectionPool::ConnectionData*
 TcpUpstream::onDownstreamEvent(Network::ConnectionEvent event) {
   // TODO(botengyao): propagate RST back to upstream connection if RST is received from downstream.
@@ -132,6 +143,10 @@ HttpUpstream::HttpUpstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
       upstream_callbacks_(callbacks), type_(type) {}
 
 HttpUpstream::~HttpUpstream() { resetEncoder(Network::ConnectionEvent::LocalClose); }
+
+StreamInfo::DetectedCloseType HttpUpstream::detectedCloseType() const {
+  return StreamInfo::DetectedCloseType::Normal;
+}
 
 bool HttpUpstream::isValidResponse(const Http::ResponseHeaderMap& headers) {
   if (type_ == Http::CodecType::HTTP1) {
@@ -453,6 +468,10 @@ void HttpConnPool::onGenericPoolReady(Upstream::HostDescriptionConstSharedPtr& h
     return;
   }
   callbacks_->onGenericPoolReady(nullptr, std::move(upstream_), host, address_provider, ssl_info);
+}
+
+StreamInfo::DetectedCloseType CombinedUpstream::detectedCloseType() const {
+  return StreamInfo::DetectedCloseType::Normal;
 }
 
 CombinedUpstream::CombinedUpstream(HttpConnPool& http_conn_pool,
