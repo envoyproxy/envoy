@@ -17,7 +17,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "704a0197e4e966f96993260418f2542568198490456c21814f647ae7091f56f2",
         urls = ["https://github.com/bazelbuild/rules_jvm_external/releases/download/{version}/rules_jvm_external-{version}.tar.gz"],
     ),
-    com_github_cncf_xds = dict(
+    xds = dict(
         # During the UDPA -> xDS migration, we aren't working with releases.
         version = "8bfbf64dc13ee1a570be4fbdcfccbdd8532463f0",
         sha256 = "82363065ca2c978398d2307fe960c301a0b6655d55981fac017783bba22771d9",

@@ -121,8 +121,8 @@ py_binary(
         ":jinja",
         ":validate_py_pb2",
         "//tools/api_proto_plugin",
-        "@com_github_cncf_xds//udpa/annotations:pkg_py_proto",
-        "@com_github_cncf_xds//xds/annotations/v3:pkg_py_proto",
+        "@xds//udpa/annotations:pkg_py_proto",
+        "@xds//xds/annotations/v3:pkg_py_proto",
         requirement("envoy.code.check"),
     ],
 )
