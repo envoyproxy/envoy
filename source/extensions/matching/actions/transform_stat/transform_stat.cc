@@ -11,20 +11,18 @@ namespace TransformStat {
 
 namespace {
 
-class DropStat : public TransformStatAction {
+using ProtoTransformStat = envoy::extensions::matching::actions::transform_stat::v3::TransformStat;
+
+class DropStat : public Matcher::ActionBase<ProtoTransformStat>, public TransformStatAction {
 public:
-  explicit DropStat(
-      const envoy::extensions::matching::actions::transform_stat::v3::TransformStat::
-          DropStat&) {}
+  explicit DropStat(const ProtoTransformStat::DropStat&) {}
 
   Result apply(Envoy::Stats::TagVector&) const override { return Result::Drop; }
 };
 
-class InsertTag : public TransformStatAction {
+class InsertTag : public Matcher::ActionBase<ProtoTransformStat>, public TransformStatAction {
 public:
-  explicit InsertTag(
-      const envoy::extensions::matching::actions::transform_stat::v3::TransformStat::
-          InsertTag& config)
+  explicit InsertTag(const ProtoTransformStat::InsertTag& config)
       : tag_name_(config.tag_name()), tag_value_(config.tag_value()) {}
 
   Result apply(Envoy::Stats::TagVector& tags) const override {
@@ -47,11 +45,9 @@ private:
   const std::string tag_value_;
 };
 
-class DropTag : public TransformStatAction {
+class DropTag : public Matcher::ActionBase<ProtoTransformStat>, public TransformStatAction {
 public:
-  explicit DropTag(
-      const envoy::extensions::matching::actions::transform_stat::v3::TransformStat::
-          DropTag& config)
+  explicit DropTag(const ProtoTransformStat::DropTag& config)
       : target_tag_name_(config.target_tag_name()) {}
 
   Result apply(Envoy::Stats::TagVector& tags) const override {
@@ -69,25 +65,9 @@ private:
   const std::string target_tag_name_;
 };
 
-class CompositeTransformStatAction
-    : public Matcher::ActionBase<
-          envoy::extensions::matching::actions::transform_stat::v3::TransformStat>,
-      public TransformStatAction {
+class NoOpAction : public Matcher::ActionBase<ProtoTransformStat>, public TransformStatAction {
 public:
-  CompositeTransformStatAction(std::vector<std::unique_ptr<TransformStatAction>> actions)
-      : actions_(std::move(actions)) {}
-
-  Result apply(Envoy::Stats::TagVector& tags) const override {
-    for (const auto& action : actions_) {
-      if (action->apply(tags) == Result::Drop) {
-        return Result::Drop;
-      }
-    }
-    return Result::Keep;
-  }
-
-private:
-  const std::vector<std::unique_ptr<TransformStatAction>> actions_;
+  Result apply(Envoy::Stats::TagVector&) const override { return Result::Keep; }
 };
 
 } // namespace
@@ -97,24 +77,18 @@ public:
   Matcher::ActionConstSharedPtr createAction(
       const Protobuf::Message& config, ActionContext&,
       ProtobufMessage::ValidationVisitor& validation_visitor) override {
-    const auto& action_config = MessageUtil::downcastAndValidate<
-        const envoy::extensions::matching::actions::transform_stat::v3::TransformStat&>(
+    const auto& action_config = MessageUtil::downcastAndValidate<const ProtoTransformStat&>(
         config, validation_visitor);
 
-    std::vector<std::unique_ptr<TransformStatAction>> actions;
-
     if (action_config.has_drop_stat()) {
-      actions.push_back(
-          std::make_unique<DropStat>(action_config.drop_stat()));
+      return std::make_shared<DropStat>(action_config.drop_stat());
     } else if (action_config.has_drop_tag()) {
-      actions.push_back(
-          std::make_unique<DropTag>(action_config.drop_tag()));
+      return std::make_shared<DropTag>(action_config.drop_tag());
     } else if (action_config.has_insert_tag()) {
-      actions.push_back(
-          std::make_unique<InsertTag>(action_config.insert_tag()));
+      return std::make_shared<InsertTag>(action_config.insert_tag());
     }
 
-    return std::make_shared<CompositeTransformStatAction>(std::move(actions));
+    return std::make_shared<NoOpAction>();
   }
 
   std::string name() const override {
@@ -122,8 +96,7 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<
-        envoy::extensions::matching::actions::transform_stat::v3::TransformStat>();
+    return std::make_unique<ProtoTransformStat>();
   }
 };
 
