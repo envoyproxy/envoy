@@ -17,11 +17,9 @@ namespace FileServer {
 using Extensions::Common::AsyncFiles::MockAsyncFileContext;
 using Extensions::Common::AsyncFiles::MockAsyncFileHandle;
 using Extensions::Common::AsyncFiles::MockAsyncFileManager;
-using StatusHelpers::HasStatus;
 using ::testing::AnyNumber;
 using ::testing::InSequence;
 using ::testing::NiceMock;
-using ::testing::NotNull;
 using ::testing::ReturnRef;
 using ::testing::StrictMock;
 
