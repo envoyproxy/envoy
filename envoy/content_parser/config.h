@@ -25,7 +25,7 @@ public:
   createParserFactory(const Protobuf::Message& config,
                       Server::Configuration::ServerFactoryContext& context) PURE;
 
-  std::string category() const override { return "envoy.content_parser"; }
+  std::string category() const override { return "envoy.content_parsers"; }
 };
 
 } // namespace ContentParser
