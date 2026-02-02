@@ -1,8 +1,9 @@
-#include "source/extensions/matching/common_actions/stats/stats_action.h"
-
-#include "envoy/extensions/matching/common_actions/stats/v3/actions.pb.h"
+#include "envoy/extensions/matching/actions/stats/v3/stats.pb.h"
 #include "envoy/registry/registry.h"
+
 #include "source/common/config/utility.h"
+#include "source/extensions/matching/actions/stat/stats_action.h"
+
 #include "test/mocks/protobuf/mocks.h"
 #include "test/test_common/utility.h"
 
@@ -12,20 +13,20 @@
 namespace Envoy {
 namespace Extensions {
 namespace Matching {
-namespace CommonActions {
-namespace Stats {
+namespace Actions {
+namespace Stat {
 namespace {
 
-using ::envoy::extensions::matching::common_actions::stats::v3::StatAction;
+using ::envoy::extensions::matching::actions::stats::v3::StatAction;
 
 class StatActionTest : public testing::Test {
 public:
   StatActionTest() = default;
 
   void createAction(const StatAction& config) {
-    auto& factory = Config::Utility::getAndCheckFactoryByName<
-        Matcher::ActionFactory<ActionContext>>(
-        "envoy.extensions.matching.common_actions.stats.v3.StatAction");
+    auto& factory =
+        Config::Utility::getAndCheckFactoryByName<Matcher::ActionFactory<ActionContext>>(
+            "envoy.extensions.matching.actions.stats.v3.StatAction");
     action_ = factory.createAction(config, action_context_, validation_visitor_);
   }
 
@@ -158,8 +159,7 @@ TEST_F(StatActionTest, CombinedAction) {
 TEST_F(StatActionTest, CombinedDropStat) {
   StatAction config;
   config.mutable_drop_stat();
-  auto* insert_tag =
-      config.mutable_insert_tag();
+  auto* insert_tag = config.mutable_insert_tag();
   insert_tag->set_tag_name("bar");
   insert_tag->set_tag_value("baz");
 
@@ -172,8 +172,8 @@ TEST_F(StatActionTest, CombinedDropStat) {
 }
 
 } // namespace
-} // namespace Stats
-} // namespace CommonActions
+} // namespace Stat
+} // namespace Actions
 } // namespace Matching
 } // namespace Extensions
 } // namespace Envoy

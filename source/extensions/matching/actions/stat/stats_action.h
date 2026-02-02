@@ -1,14 +1,15 @@
 #pragma once
 
-#include "envoy/extensions/matching/common_actions/stats/v3/actions.pb.h"
+#include "envoy/extensions/matching/actions/stats/v3/stats.pb.h"
+
 #include "source/common/matcher/matcher.h"
 #include "source/common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Matching {
-namespace CommonActions {
-namespace Stats {
+namespace Actions {
+namespace Stat {
 
 struct ActionContext {};
 
@@ -34,8 +35,8 @@ public:
   virtual Result apply(Envoy::Stats::TagVector& tags) const PURE;
 };
 
-} // namespace Stats
-} // namespace CommonActions
+} // namespace Stat
+} // namespace Actions
 } // namespace Matching
 } // namespace Extensions
 } // namespace Envoy

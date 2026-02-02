@@ -1,20 +1,20 @@
-#include "source/extensions/matching/common_actions/stats/stats_action.h"
+#include "source/extensions/matching/actions/stat/stats_action.h"
 
-#include "envoy/extensions/matching/common_actions/stats/v3/actions.pb.validate.h"
+#include "envoy/extensions/matching/actions/stats/v3/stats.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Matching {
-namespace CommonActions {
-namespace Stats {
+namespace Actions {
+namespace Stat {
 
 namespace {
 
 class DropStatAction : public StatsAction {
 public:
   explicit DropStatAction(
-      const envoy::extensions::matching::common_actions::stats::v3::StatAction::
+      const envoy::extensions::matching::actions::stats::v3::StatAction::
           DropStatAction&) {}
 
   Result apply(Envoy::Stats::TagVector&) const override { return Result::Drop; }
@@ -23,7 +23,7 @@ public:
 class InsertTagAction : public StatsAction {
 public:
   explicit InsertTagAction(
-      const envoy::extensions::matching::common_actions::stats::v3::StatAction::
+      const envoy::extensions::matching::actions::stats::v3::StatAction::
           InsertTagAction& config)
       : tag_name_(config.tag_name()), tag_value_(config.tag_value()) {}
 
@@ -50,7 +50,7 @@ private:
 class DropTagAction : public StatsAction {
 public:
   explicit DropTagAction(
-      const envoy::extensions::matching::common_actions::stats::v3::StatAction::
+      const envoy::extensions::matching::actions::stats::v3::StatAction::
           DropTagAction& config)
       : target_tag_name_(config.target_tag_name()) {}
 
@@ -71,7 +71,7 @@ private:
 
 class CompositeStatsAction
     : public Matcher::ActionBase<
-          envoy::extensions::matching::common_actions::stats::v3::StatAction>,
+          envoy::extensions::matching::actions::stats::v3::StatAction>,
       public StatsAction {
 public:
   CompositeStatsAction(std::vector<std::unique_ptr<StatsAction>> actions)
@@ -98,7 +98,7 @@ public:
       const Protobuf::Message& config, ActionContext&,
       ProtobufMessage::ValidationVisitor& validation_visitor) override {
     const auto& action_config = MessageUtil::downcastAndValidate<
-        const envoy::extensions::matching::common_actions::stats::v3::StatAction&>(
+        const envoy::extensions::matching::actions::stats::v3::StatAction&>(
         config, validation_visitor);
 
     std::vector<std::unique_ptr<StatsAction>> actions;
@@ -118,19 +118,19 @@ public:
   }
 
   std::string name() const override {
-    return "envoy.extensions.matching.common_actions.stats.v3.StatAction";
+    return "envoy.extensions.matching.actions.stats.v3.StatAction";
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<
-        envoy::extensions::matching::common_actions::stats::v3::StatAction>();
+        envoy::extensions::matching::actions::stats::v3::StatAction>();
   }
 };
 
 REGISTER_FACTORY(StatActionFactory, Matcher::ActionFactory<ActionContext>);
 
-} // namespace Stats
-} // namespace CommonActions
+} // namespace Stat
+} // namespace Actions
 } // namespace Matching
 } // namespace Extensions
 } // namespace Envoy

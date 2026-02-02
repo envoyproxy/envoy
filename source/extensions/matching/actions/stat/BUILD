@@ -15,12 +15,13 @@ envoy_cc_library(
     visibility = [
         "//source/extensions/access_loggers/stats:__subpackages__",
         "//test/common/stats:__subpackages__",
+        "//test/extensions/matching/actions/stats:__subpackages__",
     ],
     deps = [
         "//envoy/registry",
         "//envoy/stats:stats_interface",
         "//source/common/matcher:matcher_lib",
         "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/extensions/matching/common_actions/stats/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/matching/actions/stats/v3:pkg_cc_proto",
     ],
 )
