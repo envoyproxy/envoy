@@ -39,7 +39,15 @@ public:
     std::string s(yaml);
     ProtoFileServerConfig proto_config;
     TestUtility::loadFromYaml(s, proto_config);
-    return std::make_shared<FileServerConfig>(proto_config, mock_async_file_manager_);
+    return std::make_shared<FileServerConfig>(proto_config, nullptr, mock_async_file_manager_);
+  }
+  void initFilter(FileServerFilter& filter) {
+    filter.setDecoderFilterCallbacks(decoder_callbacks_);
+    // It's a NiceMock but we do want to be notified of unexpected sendLocalReply.
+    EXPECT_CALL(decoder_callbacks_, sendLocalReply).Times(0);
+    EXPECT_CALL(decoder_callbacks_, dispatcher)
+        .Times(AnyNumber())
+        .WillRepeatedly(ReturnRef(*dispatcher_));
   }
   std::shared_ptr<FileServerFilter> testFilter() {
     auto filter = FileServerFilter::createShared(configFromYaml(R"(
@@ -55,12 +63,7 @@ directory_behaviors:
   - try_file: "index.txt"
   - directory_list: {}
 )"));
-    filter->setDecoderFilterCallbacks(decoder_callbacks_);
-    // It's a NiceMock but we do want to be notified of unexpected sendLocalReply.
-    EXPECT_CALL(decoder_callbacks_, sendLocalReply).Times(0);
-    EXPECT_CALL(decoder_callbacks_, dispatcher)
-        .Times(AnyNumber())
-        .WillRepeatedly(ReturnRef(*dispatcher_));
+    initFilter(*filter);
     return filter;
   }
 
@@ -190,6 +193,60 @@ TEST_F(FileServerFilterTest, FilterOnDestroyWhileFileActionInFlightAbortsRespons
   filter->onDestroy();
   pumpDispatcher();
   // Should have been no call to sendLocalReply due to abort.
+}
+
+TEST_F(FileServerFilterTest, ErrorsOnDirectoryWithNoConfiguredBehavior) {
+  auto filter = FileServerFilter::createShared(configFromYaml(R"(
+path_mappings:
+  - path_prefix: /path1
+    filesystem_prefix: fs1
+)"));
+  initFilter(*filter);
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":path", "/path1/foo"},
+      {":method", "GET"},
+      {":host", "test.host"},
+      {":scheme", "https"},
+  };
+  {
+    InSequence seq;
+    EXPECT_CALL(*mock_async_file_manager_, stat);
+    EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::Forbidden, _, _, _,
+                                                   "file_server_no_valid_directory_behavior"));
+  }
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter->decodeHeaders(request_headers, true));
+  struct stat stat_result = {};
+  stat_result.st_mode = S_IFDIR;
+  mock_async_file_manager_->nextActionCompletes(absl::StatusOr<struct stat>{stat_result});
+  pumpDispatcher();
+}
+
+TEST_F(FileServerFilterTest, ErrorsOnDirectoryWithImpossiblyConfiguredBehaviorForCoverage) {
+  auto filter = FileServerFilter::createShared(configFromYaml(R"(
+path_mappings:
+  - path_prefix: /path1
+    filesystem_prefix: fs1
+directory_behaviors:
+  - {}
+)"));
+  initFilter(*filter);
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":path", "/path1/foo"},
+      {":method", "GET"},
+      {":host", "test.host"},
+      {":scheme", "https"},
+  };
+  {
+    InSequence seq;
+    EXPECT_CALL(*mock_async_file_manager_, stat);
+    EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _,
+                                                   "file_server_empty_behavior_type"));
+  }
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter->decodeHeaders(request_headers, true));
+  struct stat stat_result = {};
+  stat_result.st_mode = S_IFDIR;
+  mock_async_file_manager_->nextActionCompletes(absl::StatusOr<struct stat>{stat_result});
+  pumpDispatcher();
 }
 
 TEST_F(FileServerFilterTest, TriesAllDirectoryBehaviorsInOrder) {

@@ -49,7 +49,6 @@ private:
   FileStreamer file_streamer_;
   bool is_head_;
   bool headers_sent_ = false;
-  CancelFunction cancel_callback_ = []() {};
 };
 
 } // namespace FileServer

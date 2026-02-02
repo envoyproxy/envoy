@@ -67,7 +67,6 @@ void FileServerFilter::onBelowWriteBufferLowWatermark() { file_streamer_.unpause
 
 Http::FilterHeadersStatus FileServerFilter::decodeHeaders(RequestHeaderMap& headers,
                                                           bool end_stream ABSL_ATTRIBUTE_UNUSED) {
-  std::cerr << "XXXXX decodeHeaders" << std::endl;
   if (!decoder_callbacks_->route() || !headers.Path()) {
     return Http::FilterHeadersStatus::Continue;
   }
@@ -79,11 +78,9 @@ Http::FilterHeadersStatus FileServerFilter::decodeHeaders(RequestHeaderMap& head
   std::string path = PercentEncoding::decode(headers.Path()->value().getStringView());
   std::shared_ptr<const ProtoFileServerConfig::PathMapping> mapping = config->pathMapping(path);
   if (!mapping) {
-    std::cerr << "XXXXX !mapping" << std::endl;
     // If the request didn't match a mapping, skip this filter.
     return Http::FilterHeadersStatus::Continue;
   }
-  std::cerr << "XXXXX matched a mapping" << std::endl;
   absl::optional<std::filesystem::path> file_path = config->applyPathMapping(path, *mapping);
   if (!file_path) {
     decoder_callbacks_->sendLocalReply(Http::Code::BadRequest,

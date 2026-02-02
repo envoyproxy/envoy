@@ -206,6 +206,46 @@ TEST_F(FileServerConfigTest, EmptyConfigIsOkInRouteConfig) {
   EXPECT_THAT(config->directoryBehavior(0), Eq(absl::nullopt));
 }
 
+TEST_F(FileServerConfigTest, InvalidFileManagerConfigFailsInRouteConfig) {
+  auto mismatched_config = factory()->createRouteSpecificFilterConfig(
+      configFromYaml(R"(
+manager_config:
+  id: "mismatched"
+  thread_pool:
+    thread_count: 2
+)"),
+      mock_server_factory_context_, ProtobufMessage::getNullValidationVisitor());
+  auto status_or = factory()->createRouteSpecificFilterConfig(
+      configFromYaml(R"(
+manager_config:
+  id: "mismatched"
+  thread_pool:
+    thread_count: 1
+)"),
+      mock_server_factory_context_, ProtobufMessage::getNullValidationVisitor());
+  EXPECT_THAT(status_or, HasStatus(absl::StatusCode::kInvalidArgument,
+                                   HasSubstr("AsyncFileManager mismatched config")));
+}
+
+TEST_F(FileServerConfigTest, InvalidFileManagerConfigFailsInMainConfig) {
+  auto mismatched_config = factory()->createFilterFactoryFromProto(configFromYaml(R"(
+manager_config:
+  id: "mismatched"
+  thread_pool:
+    thread_count: 2
+)"),
+                                                                   "stats", mock_factory_context_);
+  auto status_or = factory()->createFilterFactoryFromProto(configFromYaml(R"(
+manager_config:
+  id: "mismatched"
+  thread_pool:
+    thread_count: 1
+)"),
+                                                           "stats", mock_factory_context_);
+  EXPECT_THAT(status_or, HasStatus(absl::StatusCode::kInvalidArgument,
+                                   HasSubstr("AsyncFileManager mismatched config")));
+}
+
 } // namespace FileServer
 } // namespace HttpFilters
 } // namespace Extensions

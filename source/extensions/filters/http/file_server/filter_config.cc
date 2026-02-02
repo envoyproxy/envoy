@@ -5,14 +5,11 @@
 #include "envoy/common/exception.h"
 
 #include "source/common/common/thread.h"
-#include "source/extensions/common/async_files/async_file_manager_factory.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace FileServer {
-
-using ::Envoy::Extensions::Common::AsyncFiles::AsyncFileManagerFactory;
 
 namespace {
 
@@ -31,21 +28,27 @@ absl::StatusOr<std::shared_ptr<const FileServerConfig>>
 FileServerConfig::create(const ProtoFileServerConfig& config,
                          Envoy::Server::Configuration::ServerFactoryContext& context) {
   auto factory = AsyncFileManagerFactory::singleton(&context.singletonManager());
-  TRY_ASSERT_MAIN_THREAD {
-    // TODO(ravenblack): make getAsyncFileManager use StatusOr instead of throw.
-    auto async_file_manager = factory->getAsyncFileManager(config.manager_config());
-    return std::make_shared<const FileServerConfig>(config, std::move(async_file_manager));
+  if (config.manager_config().manager_type_case() !=
+      envoy::extensions::common::async_files::v3::AsyncFileManagerConfig::MANAGER_TYPE_NOT_SET) {
+    TRY_ASSERT_MAIN_THREAD {
+      // TODO(ravenblack): make getAsyncFileManager use StatusOr instead of throw.
+      auto async_file_manager = factory->getAsyncFileManager(config.manager_config());
+      return std::make_shared<const FileServerConfig>(config, std::move(factory),
+                                                      std::move(async_file_manager));
+    }
+    END_TRY
+    catch (const EnvoyException& e) {
+      return absl::InvalidArgumentError(e.what());
+    }
   }
-  END_TRY
-  catch (const EnvoyException& e) {
-    ENVOY_LOG_MISC(warn, "invalid AsyncFileManagerConfig");
-  }
-  return std::make_shared<const FileServerConfig>(config, nullptr);
+  return std::make_shared<const FileServerConfig>(config, nullptr, nullptr);
 }
 
 FileServerConfig::FileServerConfig(const ProtoFileServerConfig& config,
+                                   std::shared_ptr<AsyncFileManagerFactory> factory,
                                    std::shared_ptr<AsyncFileManager> manager)
-    : async_file_manager_(std::move(manager)), path_mappings_(makePathMappings(config)),
+    : async_file_manager_factory_(std::move(factory)), async_file_manager_(std::move(manager)),
+      path_mappings_(makePathMappings(config)),
       content_types_(config.content_types().begin(), config.content_types().end()),
       default_content_type_(config.default_content_type()),
       directory_behaviors_(config.directory_behaviors().begin(),

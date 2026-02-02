@@ -134,6 +134,42 @@ TEST_P(FileServerIntegrationTest, IgnoresInvalidlyFormattedRangeHeader) {
   EXPECT_THAT(response->body(), banana_html_contents_);
 }
 
+TEST_P(FileServerIntegrationTest, IgnoresMultipleRangeHeader) {
+  initializeFilter(testConfig());
+  Http::TestRequestHeaderMapImpl request_headers = requestPath("/path1/banana.html");
+  request_headers.addCopy("range", "bytes=3-5,6-9");
+  auto response = sendHeaderOnlyRequestAwaitResponse(request_headers);
+  EXPECT_THAT(
+      response->headers(),
+      AllOf(ContainsHeader(":status", "200"), ContainsHeader("content-type", "text/html"),
+            ContainsHeader("content-length", absl::StrCat(banana_html_contents_.length()))));
+  EXPECT_THAT(response->body(), banana_html_contents_);
+}
+
+TEST_P(FileServerIntegrationTest, IgnoresSuffixRangeHeader) {
+  initializeFilter(testConfig());
+  Http::TestRequestHeaderMapImpl request_headers = requestPath("/path1/banana.html");
+  request_headers.addCopy("range", "bytes=-6");
+  auto response = sendHeaderOnlyRequestAwaitResponse(request_headers);
+  EXPECT_THAT(
+      response->headers(),
+      AllOf(ContainsHeader(":status", "200"), ContainsHeader("content-type", "text/html"),
+            ContainsHeader("content-length", absl::StrCat(banana_html_contents_.length()))));
+  EXPECT_THAT(response->body(), banana_html_contents_);
+}
+
+TEST_P(FileServerIntegrationTest, IgnoresNonNumericRangeHeader) {
+  initializeFilter(testConfig());
+  Http::TestRequestHeaderMapImpl request_headers = requestPath("/path1/banana.html");
+  request_headers.addCopy("range", "bytes=banana-");
+  auto response = sendHeaderOnlyRequestAwaitResponse(request_headers);
+  EXPECT_THAT(
+      response->headers(),
+      AllOf(ContainsHeader(":status", "200"), ContainsHeader("content-type", "text/html"),
+            ContainsHeader("content-length", absl::StrCat(banana_html_contents_.length()))));
+  EXPECT_THAT(response->body(), banana_html_contents_);
+}
+
 TEST_P(FileServerIntegrationTest, ReadsSpecifiedFileWithRange) {
   initializeFilter(testConfig());
   Http::TestRequestHeaderMapImpl request_headers = requestPath("/path1/banana.html");

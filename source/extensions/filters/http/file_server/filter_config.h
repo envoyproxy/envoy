@@ -1,5 +1,6 @@
 #pragma once
 
+#include <filesystem>
 #include <memory>
 #include <string>
 
@@ -8,6 +9,7 @@
 
 #include "source/common/common/radix_tree.h"
 #include "source/extensions/common/async_files/async_file_manager.h"
+#include "source/extensions/common/async_files/async_file_manager_factory.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/strings/string_view.h"
@@ -19,13 +21,16 @@ namespace FileServer {
 
 using ProtoFileServerConfig = envoy::extensions::filters::http::file_server::v3::FileServerConfig;
 using ::Envoy::Extensions::Common::AsyncFiles::AsyncFileManager;
+using ::Envoy::Extensions::Common::AsyncFiles::AsyncFileManagerFactory;
 
 class FileServerConfig : public Router::RouteSpecificFilterConfig {
 public:
   static absl::StatusOr<std::shared_ptr<const FileServerConfig>>
   create(const ProtoFileServerConfig& config,
          Envoy::Server::Configuration::ServerFactoryContext& context);
-  FileServerConfig(const ProtoFileServerConfig& config, std::shared_ptr<AsyncFileManager> manager);
+  FileServerConfig(const ProtoFileServerConfig& config,
+                   std::shared_ptr<AsyncFileManagerFactory> factory,
+                   std::shared_ptr<AsyncFileManager> manager);
 
   const std::shared_ptr<AsyncFileManager>& asyncFileManager() const { return async_file_manager_; }
   // Returns nullptr if there is no corresponding path mapping (filter should be bypassed).
@@ -41,11 +46,13 @@ public:
   OptRef<const ProtoFileServerConfig::DirectoryBehavior> directoryBehavior(size_t index) const;
 
 private:
+  // The factory is held to keep the singleton alive.
+  const std::shared_ptr<AsyncFileManagerFactory> async_file_manager_factory_;
   const std::shared_ptr<AsyncFileManager> async_file_manager_;
   const RadixTree<std::shared_ptr<const ProtoFileServerConfig::PathMapping>> path_mappings_;
   const absl::flat_hash_map<std::string, std::string> content_types_;
   const std::string default_content_type_;
-  const std::vector<const ProtoFileServerConfig::DirectoryBehavior> directory_behaviors_;
+  const std::vector<ProtoFileServerConfig::DirectoryBehavior> directory_behaviors_;
 };
 
 } // namespace FileServer

@@ -44,7 +44,6 @@ public:
   void abort();
 
 private:
-  Event::Dispatcher& dispatcher() { return *dispatcher_; }
   const FileServerConfig* file_server_config_;
   void startFile();
   void startDir(int behavior_index);
