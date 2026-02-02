@@ -22,7 +22,7 @@ public:
     return std::make_unique<envoy::extensions::content_parsers::json::v3::JsonContentParser>();
   }
 
-  std::string name() const override { return "envoy.content_parser.json"; }
+  std::string name() const override { return "envoy.content_parsers.json"; }
 };
 
 } // namespace Json

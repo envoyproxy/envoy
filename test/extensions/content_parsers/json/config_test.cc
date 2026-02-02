@@ -39,6 +39,27 @@ TEST(JsonContentParserConfigTest, ValidConfig) {
   EXPECT_EQ(parser_factory->statsPrefix(), "json.");
 }
 
+TEST(JsonContentParserConfigTest, OnPresentWithEmptyValue) {
+  envoy::extensions::content_parsers::json::v3::JsonContentParser proto_config;
+
+  auto* rule_config = proto_config.add_rules();
+  auto* rule = rule_config->mutable_rule();
+  auto* selector = rule->add_selectors();
+  selector->set_key("usage");
+
+  // Set on_present with explicit value field but leave the Value empty (kind_case == 0)
+  auto* on_present = rule->mutable_on_present();
+  on_present->set_metadata_namespace("envoy.lb");
+  on_present->set_key("tokens");
+  on_present->mutable_value(); // This sets the value oneof but leaves Value empty
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  JsonContentParserConfigFactory factory;
+  EXPECT_THROW_WITH_MESSAGE(factory.createParserFactory(proto_config, context), EnvoyException,
+                            "on_present KeyValuePair with explicit value must have value set");
+}
+
 TEST(JsonContentParserConfigTest, OnMissingWithEmptyValue) {
   envoy::extensions::content_parsers::json::v3::JsonContentParser proto_config;
 

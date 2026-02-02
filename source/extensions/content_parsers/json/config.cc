@@ -17,6 +17,15 @@ ContentParser::ParserFactoryPtr JsonContentParserConfigFactory::createParserFact
 
   for (const auto& rule_config : json_config.rules()) {
     const auto& rule = rule_config.rule();
+    if (rule.has_on_present()) {
+      const auto& kv_pair = rule.on_present();
+      if (kv_pair.value_type_case() == envoy::extensions::filters::http::json_to_metadata::v3::
+                                           JsonToMetadata::KeyValuePair::kValue) {
+        if (kv_pair.value().kind_case() == 0) {
+          throw EnvoyException("on_present KeyValuePair with explicit value must have value set");
+        }
+      }
+    }
     if (rule.has_on_missing()) {
       const auto& kv_pair = rule.on_missing();
       if (kv_pair.value_type_case() == envoy::extensions::filters::http::json_to_metadata::v3::

@@ -47,6 +47,14 @@ struct ParseResult {
   bool has_error = false;
 };
 
+/**
+ * Content parser interface for extracting metadata from content strings.
+ *
+ * Lifecycle and Thread Safety:
+ * - Parser instances may maintain internal state (e.g., match counts for rules)
+ * - Callers should create a new parser instance per request/stream
+ * - Parser instances should not be reused across different requests
+ */
 class Parser {
 public:
   virtual ~Parser() = default;
