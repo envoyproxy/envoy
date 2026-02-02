@@ -1958,11 +1958,12 @@ envoy_cc_test(
         "//test/config/integration/certs",
     ],
     rbe_pool = "6gig",
+    shard_count = 4,
     # TODO(envoyproxy/windows-dev): The key rotation in SdsDynamicKeyRotationIntegrationTest via
     # TestEnvironment::renameFile() fails on Windows. The renameFile() implementation does not
     # correctly handle symlinks.
     tags = [
-        "cpu:3",
+        "cpu:2",
         "fails_on_clang_cl",
         "fails_on_windows",
     ],
@@ -2509,25 +2510,6 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test(
-    name = "scoped_rds_lib",
-    size = "large",
-    rbe_pool = "6gig",
-    deps = [
-        ":http_integration_lib",
-        ":scoped_rds_test_lib",
-        "//source/common/config:api_version_lib",
-        "//source/common/event:dispatcher_includes",
-        "//source/common/event:dispatcher_lib",
-        "//source/common/network:connection_lib",
-        "//source/common/network:utility_lib",
-        "//test/common/grpc:grpc_client_integration_lib",
-        "//test/config:v2_link_hacks",
-        "//test/test_common:resources_lib",
-        "//test/test_common:utility_lib",
-    ],
-)
-
-envoy_cc_test(
     name = "scoped_rds_integration_test",
     size = "large",
     srcs = [
@@ -2539,7 +2521,7 @@ envoy_cc_test(
     ],
     deps = [
         ":http_integration_lib",
-        ":scoped_rds_lib",
+        ":scoped_rds_test_lib",
         "//source/common/config:api_version_lib",
         "//source/common/event:dispatcher_includes",
         "//source/common/event:dispatcher_lib",
