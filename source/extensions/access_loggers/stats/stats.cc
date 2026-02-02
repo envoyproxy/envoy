@@ -10,6 +10,9 @@ namespace AccessLoggers {
 namespace StatsAccessLog {
 
 namespace {
+
+using Extensions::Matching::Actions::TransformStat::ActionContext;
+
 Formatter::FormatterProviderPtr
 parseValueFormat(absl::string_view format,
                  const std::vector<Formatter::CommandParserPtr>& commands) {

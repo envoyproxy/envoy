@@ -1,11 +1,14 @@
 #include "envoy/extensions/matching/actions/transform_stat/v3/transform_stat.pb.h"
 #include "envoy/registry/registry.h"
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
+
 #include "source/common/config/utility.h"
 #include "source/extensions/matching/actions/transform_stat/transform_stat.h"
+
 #include "test/mocks/protobuf/mocks.h"
 #include "test/test_common/utility.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Extensions {

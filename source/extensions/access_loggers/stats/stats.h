@@ -13,8 +13,6 @@ namespace Extensions {
 namespace AccessLoggers {
 namespace StatsAccessLog {
 
-using Extensions::Matching::Actions::TransformStat::ActionContext;
-
 class StatsAccessLog : public AccessLoggers::Common::ImplBase {
 public:
   StatsAccessLog(const envoy::extensions::access_loggers::stats::v3::Config& config,
