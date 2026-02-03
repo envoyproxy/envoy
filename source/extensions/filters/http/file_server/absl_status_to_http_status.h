@@ -1,4 +1,7 @@
+#pragma once
+
 #include "envoy/http/codes.h"
+
 #include "absl/status/status.h"
 
 namespace Envoy {
