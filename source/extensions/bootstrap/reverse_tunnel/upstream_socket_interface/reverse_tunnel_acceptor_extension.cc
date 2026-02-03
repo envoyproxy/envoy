@@ -15,7 +15,7 @@ UpstreamSocketThreadLocal::UpstreamSocketThreadLocal(Event::Dispatcher& dispatch
                                                      ReverseTunnelAcceptorExtension* extension)
     : dispatcher_(dispatcher),
       socket_manager_(std::make_unique<UpstreamSocketManager>(dispatcher, extension)) {
-  // Initialize per-worker aggregate metrics
+  // Initialize per-worker aggregate metrics.
   if (extension != nullptr) {
     auto& stats_store = extension->getStatsScope();
     std::string dispatcher_name = dispatcher.name();
@@ -157,7 +157,7 @@ absl::flat_hash_map<std::string, uint64_t> ReverseTunnelAcceptorExtension::getCr
 void ReverseTunnelAcceptorExtension::updateConnectionStats(const std::string& node_id,
                                                            const std::string& cluster_id,
                                                            bool increment) {
-  // update per-worker aggregate metrics
+  // Update per-worker aggregate metrics.
   updatePerWorkerAggregateMetrics(node_id, cluster_id, increment);
 
   // Check if reverse tunnel detailed stats are enabled via configuration flag.
@@ -224,7 +224,7 @@ void ReverseTunnelAcceptorExtension::updateConnectionStats(const std::string& no
 void ReverseTunnelAcceptorExtension::updatePerWorkerAggregateMetrics(const std::string& node_id,
                                                                      const std::string& cluster_id,
                                                                      bool increment) {
-  // Get TLS for current worker
+  // Get TLS for current worker.
   auto* local_registry = getLocalRegistry();
   if (local_registry == nullptr) {
     return;
@@ -233,7 +233,7 @@ void ReverseTunnelAcceptorExtension::updatePerWorkerAggregateMetrics(const std::
   auto& cluster_counts = local_registry->cluster_connection_counts_;
   auto& node_counts = local_registry->node_connection_counts_;
 
-  // Update counts
+  // Update counts.
   if (increment) {
     if (!cluster_id.empty()) {
       cluster_counts[cluster_id]++;
@@ -262,7 +262,7 @@ void ReverseTunnelAcceptorExtension::updatePerWorkerAggregateMetrics(const std::
     }
   }
 
-  // Update gauges with current map sizes
+  // Update gauges with current map sizes.
   if (local_registry->total_clusters_gauge_ != nullptr) {
     local_registry->total_clusters_gauge_->set(cluster_counts.size());
   }

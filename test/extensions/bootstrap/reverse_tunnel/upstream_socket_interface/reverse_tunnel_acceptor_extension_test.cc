@@ -223,7 +223,7 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, UpdateConnectionStatsWithDetailedStat
   auto per_worker_stat_map = no_stats_extension->getPerWorkerStatMap();
   EXPECT_TRUE(per_worker_stat_map.empty());
 
-  // Verify that aggregate metrics ARE present even when detailed stats are disabled.
+  // Verify that aggregate metrics are present even when detailed stats are disabled.
   auto& stats_store = no_stats_extension->getStatsScope();
   uint64_t total_clusters_value = 0;
   uint64_t total_nodes_value = 0;

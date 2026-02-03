@@ -63,8 +63,7 @@ public:
   // Maps track connection counts per cluster/node. Size of map = number of unique clusters/nodes.
   absl::flat_hash_map<std::string, uint64_t> cluster_connection_counts_;
   absl::flat_hash_map<std::string, uint64_t> node_connection_counts_;
-  // Per-worker aggregate metrics gauges - always available regardless of enable_detailed_stats
-  // flag.
+  // Per-worker aggregate metrics gauges.
   Stats::Gauge* total_clusters_gauge_{nullptr};
   Stats::Gauge* total_nodes_gauge_{nullptr};
 
@@ -233,7 +232,7 @@ private:
 
   /**
    * Update per-worker aggregate metrics (total_clusters and total_nodes).
-   * Called only from updateConnectionStats
+   * This is an internal function called only from updateConnectionStats.
    * @param node_id the node identifier for the connection.
    * @param cluster_id the cluster identifier for the connection.
    * @param increment whether to increment (true) or decrement (false) the connection count.
