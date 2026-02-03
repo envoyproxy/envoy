@@ -19,6 +19,11 @@ private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::cache_v2::v3::CacheV2Config& config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
+
+  Http::FilterFactoryCb createFilterFactoryFromProtoWithServerContextTyped(
+      const envoy::extensions::filters::http::cache_v2::v3::CacheV2Config& config,
+      const std::string& stats_prefix,
+      Server::Configuration::ServerFactoryContext& context) override;
 };
 
 } // namespace CacheV2

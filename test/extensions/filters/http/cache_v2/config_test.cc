@@ -83,6 +83,19 @@ TEST_F(CacheFilterFactoryTest, FactoryFailsToCreateCache) {
       EnvoyException);
 }
 
+TEST_F(CacheFilterFactoryTest, BasicWithServerContext) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
+  config_.mutable_typed_config()->PackFrom(
+      envoy::extensions::http::cache_v2::simple_http_cache::v3::SimpleHttpCacheV2Config());
+  Http::FilterFactoryCb cb =
+      factory_.createFilterFactoryFromProtoWithServerContext(config_, "stats", server_context);
+  Http::StreamFilterSharedPtr filter;
+  EXPECT_CALL(filter_callback_, addStreamFilter(_)).WillOnce(::testing::SaveArg<0>(&filter));
+  cb(filter_callback_);
+  ASSERT(filter);
+  ASSERT(dynamic_cast<CacheFilter*>(filter.get()));
+}
+
 } // namespace
 } // namespace CacheV2
 } // namespace HttpFilters

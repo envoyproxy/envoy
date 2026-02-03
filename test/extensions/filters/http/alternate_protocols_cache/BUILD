@@ -12,6 +12,17 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_extension_cc_test(
+    name = "config_test",
+    srcs = ["config_test.cc"],
+    extension_names = ["envoy.filters.http.alternate_protocols_cache"],
+    deps = [
+        "//source/extensions/filters/http/alternate_protocols_cache:config",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/server:factory_context_mocks",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "filter_test",
     srcs = ["filter_test.cc"],
     extension_names = ["envoy.filters.http.alternate_protocols_cache"],
