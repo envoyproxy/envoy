@@ -12,10 +12,12 @@ Common messages
   ../config/core/v3/base.proto
   ../config/core/v3/cel.proto
   ../extensions/filters/common/matcher/action/v3/skip_action.proto
+  ../extensions/matching/actions/transform_stat/v3/transform_stat.proto
   ../extensions/matching/common_inputs/network/v3/network_inputs.proto
   ../extensions/common/ratelimit/v3/ratelimit.proto
   ../extensions/matching/common_inputs/stats/v3/stats.proto
   ../extensions/matching/common_inputs/ssl/v3/ssl_inputs.proto
+  ../extensions/matching/common_inputs/transport_socket/v3/transport_socket_inputs.proto
   ../config/core/v3/config_source.proto
   ../extensions/matching/input_matchers/consistent_hashing/v3/consistent_hashing.proto
   ../extensions/network/socket_interface/v3/default_socket_interface.proto
