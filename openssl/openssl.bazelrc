@@ -19,6 +19,6 @@ test:openssl --test_env=ENVOY_IP_TEST_VERSIONS=v4only
 # we say that we are using the FIPS version of BoringSSL, then all the QUIC support is
 # excluded from the build.
 common:openssl --//bazel:http3=False
-common:openssl --define=boringssl=fips
+#common:openssl --define=boringssl=fips
 build:openssl --build_tag_filters=-nofips
 test:openssl --test_tag_filters=-nofips
