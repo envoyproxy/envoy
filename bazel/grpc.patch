@@ -40,6 +40,19 @@ index a3b8923b6e..f4a2ed3f13 100644
              "//conditions:default": [name + "_native"],
          }),
          outs = [name + "_binary"],
+diff --git a/include/grpc/event_engine/memory_request.h b/include/grpc/event_engine/memory_request.h
+index 76bcbb2036..ad8cab842e 100644
+--- a/include/grpc/event_engine/memory_request.h
++++ b/include/grpc/event_engine/memory_request.h
+@@ -17,6 +17,8 @@
+ #include <grpc/support/port_platform.h>
+ #include <stddef.h>
+ 
++#include <string>
++
+ #include "absl/strings/string_view.h"
+ 
+ namespace grpc_event_engine {
 diff --git a/src/core/BUILD b/src/core/BUILD
 index 0a8eebafb9..6d4f158719 100644
 --- a/src/core/BUILD
