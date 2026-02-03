@@ -205,6 +205,8 @@ build:compile-time-options --define=signal_trace=disabled
 build:compile-time-options --define=hot_restart=disabled
 build:compile-time-options --define=google_grpc=disabled
 build:compile-time-options --define=boringssl=fips
+build:compile-time-options --test_tag_filters=-nofips
+build:compile-time-options --build_tag_filters=-nofips
 build:compile-time-options --define=log_debug_assert_in_release=enabled
 build:compile-time-options --define=path_normalization_by_default=true
 build:compile-time-options --define=deprecated_features=disabled

@@ -20,7 +20,7 @@ public:
   }
 
   QuicClientPacketWriterFactoryPtr createQuicClientPacketWriterFactory(
-      const Protobuf::Message& /*config*/,
+      const Protobuf::Message& /*config*/, Event::Dispatcher& /*dispatcher*/,
       ProtobufMessage::ValidationVisitor& /*validation_visitor*/) override {
     return std::make_unique<QuicClientPacketWriterFactoryImpl>();
   }

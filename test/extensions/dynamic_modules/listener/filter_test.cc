@@ -45,9 +45,9 @@ public:
     auto dynamic_module = newDynamicModule(testSharedObjectPath("listener_no_op", "c"), false);
     EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
-    auto filter_config_or_status =
-        newDynamicModuleListenerFilterConfig("test_filter", "", std::move(dynamic_module.value()),
-                                             *stats_.rootScope(), main_thread_dispatcher_);
+    auto filter_config_or_status = newDynamicModuleListenerFilterConfig(
+        "test_filter", "", DefaultMetricsNamespace, std::move(dynamic_module.value()),
+        *stats_.rootScope(), main_thread_dispatcher_);
     EXPECT_TRUE(filter_config_or_status.ok()) << filter_config_or_status.status().message();
     filter_config_ = filter_config_or_status.value();
 
@@ -117,9 +117,9 @@ TEST_F(DynamicModuleListenerFilterTest, OnAcceptWithNullInModuleFilterClosesSock
       newDynamicModule(testSharedObjectPath("listener_filter_new_fail", "c"), false);
   EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
-  auto filter_config_or_status =
-      newDynamicModuleListenerFilterConfig("test_filter", "", std::move(dynamic_module.value()),
-                                           *stats_.rootScope(), main_thread_dispatcher_);
+  auto filter_config_or_status = newDynamicModuleListenerFilterConfig(
+      "test_filter", "", DefaultMetricsNamespace, std::move(dynamic_module.value()),
+      *stats_.rootScope(), main_thread_dispatcher_);
   EXPECT_TRUE(filter_config_or_status.ok()) << filter_config_or_status.status().message();
   auto filter_config = filter_config_or_status.value();
 
@@ -205,8 +205,8 @@ TEST(DynamicModuleListenerFilterConfigTest, ConfigInitialization) {
   EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
   auto filter_config_or_status = newDynamicModuleListenerFilterConfig(
-      "test_filter", "some_config", std::move(dynamic_module.value()), *stats.rootScope(),
-      main_thread_dispatcher);
+      "test_filter", "some_config", DefaultMetricsNamespace, std::move(dynamic_module.value()),
+      *stats.rootScope(), main_thread_dispatcher);
   EXPECT_TRUE(filter_config_or_status.ok());
 
   auto config = filter_config_or_status.value();
@@ -227,9 +227,9 @@ TEST(DynamicModuleListenerFilterConfigTest, MissingSymbols) {
   auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", "c"), false);
   EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
-  auto filter_config_or_status =
-      newDynamicModuleListenerFilterConfig("test_filter", "", std::move(dynamic_module.value()),
-                                           *stats.rootScope(), main_thread_dispatcher);
+  auto filter_config_or_status = newDynamicModuleListenerFilterConfig(
+      "test_filter", "", DefaultMetricsNamespace, std::move(dynamic_module.value()),
+      *stats.rootScope(), main_thread_dispatcher);
   EXPECT_FALSE(filter_config_or_status.ok());
 }
 
@@ -241,9 +241,9 @@ TEST(DynamicModuleListenerFilterConfigTest, ConfigInitializationFailure) {
       newDynamicModule(testSharedObjectPath("listener_config_new_fail", "c"), false);
   EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
-  auto filter_config_or_status =
-      newDynamicModuleListenerFilterConfig("test_filter", "", std::move(dynamic_module.value()),
-                                           *stats.rootScope(), main_thread_dispatcher);
+  auto filter_config_or_status = newDynamicModuleListenerFilterConfig(
+      "test_filter", "", DefaultMetricsNamespace, std::move(dynamic_module.value()),
+      *stats.rootScope(), main_thread_dispatcher);
   EXPECT_FALSE(filter_config_or_status.ok());
   EXPECT_THAT(filter_config_or_status.status().message(),
               testing::HasSubstr("Failed to initialize"));
@@ -256,9 +256,9 @@ TEST(DynamicModuleListenerFilterConfigTest, StopIterationStatus) {
       newDynamicModule(testSharedObjectPath("listener_stop_iteration", "c"), false);
   EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
-  auto filter_config_or_status =
-      newDynamicModuleListenerFilterConfig("test_filter", "", std::move(dynamic_module.value()),
-                                           *stats.rootScope(), main_thread_dispatcher);
+  auto filter_config_or_status = newDynamicModuleListenerFilterConfig(
+      "test_filter", "", DefaultMetricsNamespace, std::move(dynamic_module.value()),
+      *stats.rootScope(), main_thread_dispatcher);
   EXPECT_TRUE(filter_config_or_status.ok());
   auto config = filter_config_or_status.value();
 
@@ -282,9 +282,9 @@ TEST(DynamicModuleListenerFilterConfigTest, OnDataStopIterationStatus) {
       newDynamicModule(testSharedObjectPath("listener_stop_iteration", "c"), false);
   EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
-  auto filter_config_or_status =
-      newDynamicModuleListenerFilterConfig("test_filter", "", std::move(dynamic_module.value()),
-                                           *stats.rootScope(), main_thread_dispatcher);
+  auto filter_config_or_status = newDynamicModuleListenerFilterConfig(
+      "test_filter", "", DefaultMetricsNamespace, std::move(dynamic_module.value()),
+      *stats.rootScope(), main_thread_dispatcher);
   EXPECT_TRUE(filter_config_or_status.ok());
   auto config = filter_config_or_status.value();
 
@@ -320,7 +320,7 @@ TEST_F(DynamicModuleListenerFilterTest, MetricsCounterDefineAndIncrement) {
                 static_cast<void*>(filter.get()), counter_id, 5));
 
   // Verify the counter value.
-  auto counter = TestUtility::findCounter(stats_, "dynamic_module_listener_filter.test_counter");
+  auto counter = TestUtility::findCounter(stats_, "dynamicmodulescustom.test_counter");
   ASSERT_NE(nullptr, counter);
   EXPECT_EQ(5, counter->value());
 }
@@ -351,7 +351,7 @@ TEST_F(DynamicModuleListenerFilterTest, MetricsGaugeDefineAndManipulate) {
                 static_cast<void*>(filter.get()), gauge_id, 5));
 
   // Verify the gauge value: 100 + 10 - 5 = 105.
-  auto gauge = TestUtility::findGauge(stats_, "dynamic_module_listener_filter.test_gauge");
+  auto gauge = TestUtility::findGauge(stats_, "dynamicmodulescustom.test_gauge");
   ASSERT_NE(nullptr, gauge);
   EXPECT_EQ(105, gauge->value());
 }

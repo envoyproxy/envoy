@@ -26,7 +26,7 @@ bazel_dep(name = "rules_java", version = "9.0.3")
 bazel_dep(name = "rules_jvm_external", version = "6.8")
 bazel_dep(name = "rules_proto", version = "7.1.0")
 bazel_dep(name = "rules_python", version = "1.6.0")
-bazel_dep(name = "xds", version = "0.0.0-20240423-555b57e", repo_name = "com_github_cncf_xds")
+bazel_dep(name = "xds", version = "0.0.0-20240423-555b57e")
 bazel_dep(name = "zipkin-api", version = "1.0.0", repo_name = "com_github_openzipkin_zipkinapi")
 
 # Bump google_benchmark to avoid rules_foreign_cc
