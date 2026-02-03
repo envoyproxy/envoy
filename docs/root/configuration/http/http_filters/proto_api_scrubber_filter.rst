@@ -39,7 +39,8 @@ How it Works
 
 1. **Descriptor Loading**: The filter loads a ``FileDescriptorSet`` provided in the configuration. This allows the filter to decode binary gRPC payloads into structured data.
 2. **Transcoding**: The filter buffers the gRPC stream, decodes the Protobuf payload, and traverses the message structure.
-3. **Matching & Scrubbing**:
+3. **Unknown Field Filtering**: The filter scrubs the field if it is unknown to the FileDescriptorSet (i.e. sending a request with a modified request message schema)
+4. **Matching & Scrubbing**:
 
    * The filter evaluates restrictions in a top-down hierarchy: **Method-level** (early rejection), **Message-level** (global scrubbing), and finally **Field-level** (fine-grained control).
    * For every target field or message, it evaluates the associated **Matcher**.
@@ -48,7 +49,7 @@ How it Works
    * For **Enums**: The filter can scrub based on the numeric value or the string name of the enum.
    * For **Any**: The filter unpacks ``google.protobuf.Any`` fields and applies **Message-Level** restrictions to the unpacked content.
 
-4. **Re-encoding**: The modified message is re-serialized and sent downstream or upstream.
+5. **Re-encoding**: The modified message is re-serialized and sent downstream or upstream.
 
 Restrictions Hierarchy
 ----------------------
