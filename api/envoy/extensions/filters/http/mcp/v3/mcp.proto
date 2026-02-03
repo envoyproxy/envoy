@@ -87,6 +87,10 @@ message ParserConfig {
     // The path is a dot-separated string representing the location of the field in the JSON payload.
     // For example, "params.name" extracts the "name" field from the "params" object.
     string path = 1 [(validate.rules).string = {min_len: 1}];
+
+    // When true, this field is best-effort: parsing will continue to try to extract it,
+    // but missing it (e.g., due to hitting max_request_body_size) will not cause rejection.
+    bool is_optional = 2;
   }
 
   // Configuration for a specific MCP method.
@@ -114,6 +118,10 @@ message ParserConfig {
   // The dynamic metadata key where the group name will be stored.
   // If empty, group classification is disabled.
   string group_metadata_key = 2;
+
+  // Attributes to extract for all methods.
+  // These rules apply in addition to any method-specific rules.
+  repeated AttributeExtractionRule extraction_rules = 3;
 }
 
 // Per-route override configuration for MCP filter

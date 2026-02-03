@@ -391,6 +391,61 @@ TEST_F(McpFilterTest, RequestBodyExceedingLimitRejectWhenNotEnoughData) {
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
 }
 
+// Test optional extraction rules allow partial parsing when size limit is hit.
+TEST_F(McpFilterTest, OptionalFieldsAllowPartialParsingOnSizeLimit) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+
+  auto* parser_config = proto_config.mutable_parser_config();
+  auto* method_rule = parser_config->add_methods();
+  method_rule->set_method("tools/call");
+
+  // Required field.
+  method_rule->add_extraction_rules()->set_path("params.name");
+
+  // Optional field that may not appear within the size limit.
+  auto* optional_rule = method_rule->add_extraction_rules();
+  optional_rule->set_path("params._meta");
+  optional_rule->set_is_optional(true);
+
+  const std::string prefix =
+      R"({"jsonrpc": "2.0", "method": "tools/call", "id": 1, "params": {"name": "tool", "padding": ")";
+  const uint32_t limit = static_cast<uint32_t>(prefix.size() + 5);
+  proto_config.mutable_max_request_body_size()->set_value(limit);
+
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+
+  EXPECT_CALL(decoder_callbacks_, setBufferLimit(limit));
+  filter_->decodeHeaders(headers, false);
+
+  std::string padding(200, 'a');
+  std::string json = prefix + padding + R"("}})";
+  Buffer::OwnedImpl buffer(json);
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _))
+      .WillOnce([&](const std::string&, const Protobuf::Struct& metadata) {
+        const auto& fields = metadata.fields();
+        auto params_it = fields.find("params");
+        ASSERT_NE(params_it, fields.end());
+        const auto& params = params_it->second.struct_value().fields();
+
+        auto name_it = params.find("name");
+        ASSERT_NE(name_it, params.end());
+        EXPECT_EQ(name_it->second.string_value(), "tool");
+
+        EXPECT_EQ(params.find("_meta"), params.end());
+      });
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+}
+
 // Test request body with limit disabled (0 = no limit) allows large bodies
 TEST_F(McpFilterTest, RequestBodyWithDisabledLimitAllowsLargeBodies) {
   envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
