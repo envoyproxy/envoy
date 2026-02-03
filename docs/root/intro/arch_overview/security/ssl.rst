@@ -44,8 +44,9 @@ BoringSSL can be built in a
 `FIPS-compliant mode <https://boringssl.googlesource.com/boringssl/+/main/crypto/fipsmodule/FIPS.md>`_,
 following the build instructions from the `Security Policy for BoringCrypto module
 <https://csrc.nist.gov/CSRC/media/projects/cryptographic-module-validation-program/documents/security-policies/140sp3678.pdf>`_,
-using ``--config=boringssl-fips`` Bazel option. AWS-LC FIPS can also be used with ``--config=aws-lc-fips``.
-Currently, these options are only available on Linux-x86_64.
+using ``--config=boringssl-fips`` Bazel option. Currently, the BoringSSL/FIPS build will only work Linux-x86_64.
+
+AWS-LC FIPS can also be used with ``--config=aws-lc-fips``, and has wider architecture support.
 
 The correctness of the FIPS build can be verified by checking the presence of ``BoringSSL-FIPS`` or ``AWS-LC-FIPS``
 in the :option:`--version` output.

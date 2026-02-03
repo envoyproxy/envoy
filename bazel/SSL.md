@@ -36,7 +36,7 @@ bazel build --config=aws-lc-fips //source/exe:envoy-static
 
 ## Migration from `--define boringssl=fips`
 
-The legacy `--define boringssl=fips` flag is deprecated. Migrate as follows:
+The legacy `--define boringssl=fips` flag no longer works. Migrate as follows:
 
 | Legacy | New |
 |--------|-----|
@@ -47,7 +47,7 @@ The legacy flag automatically selected AWS-LC on ppc64le. With the new approach,
 
 ## SSL flag integrity
 
-The SSL configuration uses three interdependent Bazel flags: `//bazel:ssl`, `//bazel:crypto`, and `//bazel:fips`.
+The Bazel SSL configuration uses three interdependent flags: `//bazel:ssl`, `//bazel:crypto`, and `//bazel:fips`.
 
 **Do not set these flags directly.** Use the `--config` options above, which ensure the flags are set consistently.
 
