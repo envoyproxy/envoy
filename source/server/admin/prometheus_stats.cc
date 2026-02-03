@@ -385,7 +385,7 @@ private:
   // Write a varint-length-delimited protobuf message to the buffer.
   void writeDelimitedMessage(const google::protobuf::MessageLite& message,
                              Buffer::Instance& output) const {
-    constexpr size_t kMaxVarintLength = 10; // This is documented, but exported as a constant.
+    constexpr size_t kMaxVarintLength = 10; // This is documented, but not exported as a constant.
 
     const size_t length = message.ByteSizeLong();
     auto reservation = output.reserveSingleSlice(length + kMaxVarintLength);
