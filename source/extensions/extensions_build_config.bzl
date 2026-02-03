@@ -141,7 +141,7 @@ EXTENSIONS = {
     #
 
     "envoy.matching.actions.format_string":             "//source/extensions/matching/actions/format_string:config",
-    "envoy.matching.actions.transform_stat":            "//source/extensions/matching/actions/transform_stat:transform_stat_lib",
+    "envoy.matching.actions.transform_stat":            "//source/extensions/matching/actions/transform_stat:config",
     "envoy.matching.action.transport_socket.name":      "//source/extensions/matching/common_inputs/transport_socket:config",
 
     #

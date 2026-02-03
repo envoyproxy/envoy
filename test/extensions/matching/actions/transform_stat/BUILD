@@ -15,6 +15,7 @@ envoy_cc_test(
     deps = [
         "//envoy/registry",
         "//source/common/config:utility_lib",
+        "//source/extensions/matching/actions/transform_stat:config",
         "//source/extensions/matching/actions/transform_stat:transform_stat_lib",
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/test_common:utility_lib",
