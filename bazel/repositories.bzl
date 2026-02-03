@@ -476,9 +476,10 @@ def _yaml_cpp():
     )
 
 def _libevent():
+    LIBEVENT_BUILD_CONTENT = """%s\nalias(name = "libevent", actual = ":all")""" % BUILD_ALL_CONTENT
     external_http_archive(
         name = "libevent",
-        build_file_content = BUILD_ALL_CONTENT,
+        build_file_content = LIBEVENT_BUILD_CONTENT,
     )
 
 def _colm():
@@ -841,9 +842,10 @@ def _emsdk():
     )
 
 def _luajit():
+    LUAJIT_BUILD_CONTENT = """%s\nalias(name = "luajit", actual = ":all")""" % BUILD_ALL_CONTENT
     external_http_archive(
         name = "luajit",
-        build_file_content = BUILD_ALL_CONTENT,
+        build_file_content = LUAJIT_BUILD_CONTENT,
         patches = ["@envoy//bazel/foreign_cc:luajit.patch"],
         patch_args = ["-p1"],
     )
@@ -964,7 +966,8 @@ def _thrift():
     )
 
 def _libmaxminddb():
+    LIBMAXMINDDB_BUILD_CONTENT = """%s\nalias(name = "libmaxminddb", actual = ":all")""" % BUILD_ALL_CONTENT
     external_http_archive(
         name = "libmaxminddb",
-        build_file_content = BUILD_ALL_CONTENT,
+        build_file_content = LIBMAXMINDDB_BUILD_CONTENT,
     )

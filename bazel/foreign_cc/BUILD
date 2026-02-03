@@ -113,7 +113,7 @@ configure_make(
         "//bazel:windows_dbg_build": {"WINDOWS_DBG_BUILD": "debug"},
         "//conditions:default": {},
     }),
-    lib_source = "@luajit//:all",
+    lib_source = "@luajit",
     out_include_dir = "include/luajit-2.1",
     out_static_libs = select({
         "//bazel:windows_x86_64": ["lua51.lib"],
@@ -291,7 +291,7 @@ envoy_cmake(
         "-G",
         "Ninja",
     ],
-    lib_source = "@libevent//:all",
+    lib_source = "@libevent",
     out_static_libs = select({
         # macOS organization of libevent is different from Windows/Linux.
         # Including libevent_core is a requirement on those platforms, but
