@@ -11,7 +11,9 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/mat
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Transform Stat actions]
+// [#extension: envoy.matching.actions.transform_stat]
 
+// Transform action for the matched stat.
 message TransformStat {
   // Action that drops the stat.
   message DropStat {
