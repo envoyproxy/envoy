@@ -13,6 +13,7 @@ EXTERNAL_PROTO_IMPORT_BAZEL_DEP_MAP = {
     "google/api/expr/v1alpha1/syntax.proto": "@com_google_googleapis//google/api/expr/v1alpha1:syntax_proto",
     "io/prometheus/client/metrics.proto": "@prometheus_metrics_model//:client_model",
     "opentelemetry/proto/common/v1/common.proto": "@opentelemetry-proto//:common_proto",
+    "src/proto/grpc/health/v1/health.proto": "@com_github_grpc_grpc//src/proto/grpc/health/v1:health_proto",
 }
 
 # This maps from the Bazel proto_library target to the Go language binding target for external dependencies.
@@ -35,6 +36,7 @@ EXTERNAL_PROTO_GO_BAZEL_DEP_MAP = {
     "@opentelemetry-proto//:metrics_proto": "@opentelemetry-proto//:metrics_proto_go",
     "@opentelemetry-proto//:metrics_service_proto": "@opentelemetry-proto//:metrics_service_grpc_go",
     "@opentelemetry-proto//:common_proto": "@opentelemetry-proto//:common_proto_go",
+    "@com_github_grpc_grpc//src/proto/grpc/health/v1:health_proto": "@org_golang_google_grpc//health/grpc_health_v1:go_default_library",
 }
 
 # This maps from the Bazel proto_library target to the C++ language binding target for external dependencies.
@@ -48,4 +50,5 @@ EXTERNAL_PROTO_CC_BAZEL_DEP_MAP = {
     "@opentelemetry-proto//:metrics_proto": "@opentelemetry-proto//:metrics_proto_cc",
     "@opentelemetry-proto//:metrics_service_proto": "@opentelemetry-proto//:metrics_service_grpc_cc",
     "@opentelemetry-proto//:common_proto": "@opentelemetry-proto//:common_proto_cc",
+    "@com_github_grpc_grpc//src/proto/grpc/health/v1:health_proto": "@com_github_grpc_grpc//src/proto/grpc/health/v1:health_cc_proto",
 }

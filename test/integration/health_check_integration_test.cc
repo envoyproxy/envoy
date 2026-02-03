@@ -710,10 +710,17 @@ public:
 
   // Adds a gRPC active health check specifier to the given cluster, and waits for the first health
   // check probe to be received.
-  void initGrpcHealthCheck(uint32_t cluster_idx) {
+  void initGrpcHealthCheck(uint32_t cluster_idx,
+                           const std::vector<grpc::health::v1::HealthCheckResponse::ServingStatus>&
+                               retriable_statuses = {},
+                           uint32_t unhealthy_threshold = 1) {
     auto& cluster_data = clusters_[cluster_idx];
     auto health_check = addHealthCheck(cluster_data.cluster_);
-    health_check->mutable_grpc_health_check();
+    auto* grpc_health_check = health_check->mutable_grpc_health_check();
+    for (const auto status : retriable_statuses) {
+      grpc_health_check->add_retriable_serving_statuses(status);
+    }
+    health_check->mutable_unhealthy_threshold()->set_value(unhealthy_threshold);
 
     // Introduce the cluster using compareDiscoveryRequest / sendDiscoveryResponse.
     EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "", {}, {}, {}, true));
@@ -793,6 +800,68 @@ TEST_P(GrpcHealthCheckIntegrationTest, SingleEndpointNotServingGrpc) {
   test_server_->waitForCounterGe("cluster.cluster_1.health_check.failure", 1);
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
+}
+
+TEST_P(GrpcHealthCheckIntegrationTest, NotServingGrpcRetriesWhenConfigured) {
+  initialize();
+
+  const uint32_t cluster_idx = 0;
+  initGrpcHealthCheck(cluster_idx, {grpc::health::v1::HealthCheckResponse::NOT_SERVING},
+                      /*unhealthy_threshold=*/2);
+
+  grpc::health::v1::HealthCheckResponse response;
+  response.set_status(grpc::health::v1::HealthCheckResponse::SERVING);
+  sendGrpcResponse(
+      cluster_idx,
+      Http::TestResponseHeaderMapImpl{
+          {":status", "200"}, {"content-type", Http::Headers::get().ContentTypeValues.Grpc}},
+      response);
+
+  test_server_->waitForCounterGe("cluster.cluster_1.health_check.success", 1);
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.success")->value());
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_1.membership_healthy")->value());
+
+  // Wait until the next attempt is made.
+  test_server_->waitForCounterEq("cluster.cluster_1.health_check.attempt", 2);
+
+  grpc::health::v1::HealthCheckRequest request;
+  auto& cluster_data = clusters_[cluster_idx];
+  ASSERT_TRUE(cluster_data.host_fake_connection_->waitForNewStream(*dispatcher_,
+                                                                   cluster_data.host_stream_));
+  ASSERT_TRUE(cluster_data.host_stream_->waitForGrpcMessage(*dispatcher_, request));
+  ASSERT_TRUE(cluster_data.host_stream_->waitForEndStream(*dispatcher_));
+
+  response.set_status(grpc::health::v1::HealthCheckResponse::NOT_SERVING);
+  sendGrpcResponse(
+      cluster_idx,
+      Http::TestResponseHeaderMapImpl{
+          {":status", "200"}, {"content-type", Http::Headers::get().ContentTypeValues.Grpc}},
+      response);
+
+  test_server_->waitForCounterGe("cluster.cluster_1.health_check.failure", 1);
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.success")->value());
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_1.membership_healthy")->value());
+
+  // Wait until the next attempt is made.
+  test_server_->waitForCounterEq("cluster.cluster_1.health_check.attempt", 3);
+
+  ASSERT_TRUE(cluster_data.host_fake_connection_->waitForNewStream(*dispatcher_,
+                                                                   cluster_data.host_stream_));
+  ASSERT_TRUE(cluster_data.host_stream_->waitForGrpcMessage(*dispatcher_, request));
+  ASSERT_TRUE(cluster_data.host_stream_->waitForEndStream(*dispatcher_));
+
+  sendGrpcResponse(
+      cluster_idx,
+      Http::TestResponseHeaderMapImpl{
+          {":status", "200"}, {"content-type", Http::Headers::get().ContentTypeValues.Grpc}},
+      response);
+
+  test_server_->waitForCounterGe("cluster.cluster_1.health_check.failure", 2);
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.success")->value());
+  EXPECT_EQ(2, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
+  EXPECT_EQ(0, test_server_->gauge("cluster.cluster_1.membership_healthy")->value());
 }
 
 // Tests that no gRPC health check response results in timeout and unhealthy endpoint.

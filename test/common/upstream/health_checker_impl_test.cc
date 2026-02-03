@@ -4985,6 +4985,19 @@ public:
     addCompletionCallback();
   }
 
+  void setupHCWithRetriableStatuses(
+      const std::vector<grpc::health::v1::HealthCheckResponse::ServingStatus>& statuses,
+      int unhealthy_threshold) {
+    auto config = createGrpcHealthCheckConfig();
+    config.mutable_unhealthy_threshold()->set_value(unhealthy_threshold);
+    auto* grpc_config = config.mutable_grpc_health_check();
+    for (const auto status : statuses) {
+      grpc_config->add_retriable_serving_statuses(status);
+    }
+    allocHealthChecker(config);
+    addCompletionCallback();
+  }
+
   void setupServiceNameHC(const absl::optional<std::string>& authority) {
     auto config = createGrpcHealthCheckConfig();
     config.mutable_grpc_health_check()->set_service_name("service");
@@ -5698,6 +5711,32 @@ TEST_F(GrpcHealthCheckerImplTest, GrpcHealthFail) {
   EXPECT_CALL(event_logger_, logAddHealthy(_, _, false));
   respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::SERVING);
   expectHostHealthy(true);
+}
+
+TEST_F(GrpcHealthCheckerImplTest, GrpcHealthFailRetriableNotServing) {
+  setupHCWithRetriableStatuses({grpc::health::v1::HealthCheckResponse::NOT_SERVING},
+                               /*unhealthy_threshold=*/2);
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+
+  expectSessionCreate();
+  expectHealthcheckStart(0);
+  EXPECT_CALL(event_logger_, logUnhealthy(_, _, _, true));
+  health_checker_->start();
+
+  expectHealthcheckStop(0);
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::ChangePending));
+  respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::NOT_SERVING);
+  expectHostHealthy(true);
+
+  expectHealthcheckStart(0);
+  test_sessions_[0]->interval_timer_->invokeCallback();
+
+  expectHealthcheckStop(0);
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed));
+  EXPECT_CALL(event_logger_, logEjectUnhealthy(_, _, _));
+  respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::NOT_SERVING);
+  expectHostHealthy(false);
 }
 
 // Test disconnects produce network-type failures which does not lead to immediate unhealthy state.

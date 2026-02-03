@@ -2,6 +2,7 @@
 
 #include <cstdint>
 
+#include "absl/container/flat_hash_set.h"
 #include "envoy/access_log/access_log.h"
 #include "envoy/api/api.h"
 #include "envoy/common/random_generator.h"
@@ -60,7 +61,6 @@ private:
 
     void onRpcComplete(Grpc::Status::GrpcStatus grpc_status, const std::string& grpc_message,
                        bool end_stream);
-    bool isHealthCheckSucceeded(Grpc::Status::GrpcStatus grpc_status) const;
     void resetState();
     void logHealthCheckStatus(Grpc::Status::GrpcStatus grpc_status,
                               const std::string& grpc_message);
@@ -148,6 +148,8 @@ private:
   absl::optional<std::string> service_name_;
   absl::optional<std::string> authority_value_;
   Router::HeaderParserPtr request_headers_parser_;
+  const absl::flat_hash_set<grpc::health::v1::HealthCheckResponse::ServingStatus>
+      retriable_statuses_;
 };
 
 /**
