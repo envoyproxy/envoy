@@ -1,7 +1,9 @@
+#include "source/common/stats/custom_stat_namespaces_impl.h"
 #include "source/extensions/filters/udp/dynamic_modules/factory.h"
 
 #include "test/extensions/dynamic_modules/util.h"
 #include "test/mocks/server/listener_factory_context.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -182,6 +184,37 @@ filter_config:
 
   EXPECT_CALL(filter_manager, addReadFilter_(testing::_));
   callback(filter_manager, read_callbacks);
+}
+
+// Test that the legacy behavior registers the custom stat namespace when the runtime guard is
+// enabled.
+TEST_F(DynamicModuleUdpListenerFilterFactoryTest, LegacyBehaviorWithRuntimeGuard) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.dynamic_modules_strip_custom_stat_prefix", "true"}});
+
+  NiceMock<Server::Configuration::MockListenerFactoryContext> context;
+
+  // Set up mock to expect the registerStatNamespace call.
+  Stats::CustomStatNamespacesImpl custom_stat_namespaces;
+  ON_CALL(context.server_factory_context_.api_, customStatNamespaces())
+      .WillByDefault(testing::ReturnRef(custom_stat_namespaces));
+
+  const std::string yaml = R"EOF(
+dynamic_module_config:
+  name: udp_no_op
+  do_not_close: true
+  metrics_namespace: custom_namespace
+filter_name: test_filter
+)EOF";
+
+  envoy::extensions::filters::udp::dynamic_modules::v3::DynamicModuleUdpListenerFilter proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
+
+  auto callback = factory_.createFilterFactoryFromProto(proto_config, context);
+
+  // Verify the custom namespace was registered.
+  EXPECT_TRUE(custom_stat_namespaces.registered("custom_namespace"));
 }
 
 } // namespace DynamicModules

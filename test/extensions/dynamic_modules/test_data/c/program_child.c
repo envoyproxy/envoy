@@ -1,7 +1,7 @@
 #include <assert.h>
 
-#include "source/extensions/dynamic_modules/abi.h"
-#include "source/extensions/dynamic_modules/abi_version.h"
+#include "source/extensions/dynamic_modules/abi/abi.h"
+#include "source/extensions/dynamic_modules/abi/abi_version.h"
 
 // This function is also defined in program_global.c. When program_global is loaded with
 // RTLD_GLOBAL before this module, calling this function from getSomeVariable() exercises
