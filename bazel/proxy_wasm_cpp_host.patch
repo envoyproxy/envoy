@@ -7,7 +7,7 @@ index 91792a8..872131c 100644
      ] + select({
          "//bazel:crypto_system": [],
 -        "//conditions:default": ["@boringssl//:crypto"],
-+        "//conditions:default": ["@envoy//bazel:boringcrypto"],
++        "//conditions:default": ["@envoy//bazel:crypto"],
      }),
      alwayslink = 1,
  )
