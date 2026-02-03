@@ -953,11 +953,10 @@ TEST(DataSourceProviderTest, WorkerDestruction) {
   }
 
   // Run dispatcher and destroy provider to simulate a race condition.
-  auto worker_thread =
-      api->threadFactory().createThread([&]() { provider_or_error.value().reset(); });
-  dispatcher->run(Event::Dispatcher::RunType::NonBlock);
-  worker_thread->join();
-  dispatcher->run(Event::Dispatcher::RunType::NonBlock);
+  Event::DispatcherPtr worker = api->allocateDispatcher("worker_thread");
+  worker->post([&]() { provider_or_error.value().reset(); });
+  worker->run(Event::Dispatcher::RunType::Block);
+  dispatcher->run(Event::Dispatcher::RunType::Block);
 
   // Remove the file.
   unlink(TestEnvironment::temporaryPath(filename).c_str());
