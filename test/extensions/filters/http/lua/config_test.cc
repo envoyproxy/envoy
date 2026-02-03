@@ -48,6 +48,26 @@ TEST(LuaFilterConfigTest, LuaFilterWithDefaultSourceCode) {
   cb(filter_callback);
 }
 
+TEST(LuaFilterConfigTest, LuaFilterWithDefaultSourceCodeWithServerContext) {
+  const std::string yaml_string = R"EOF(
+  default_source_code:
+    inline_string: |
+      function envoy_on_request(request_handle)
+        request_handle:headers():add("code", "code_from_hello")
+      end
+  )EOF";
+
+  envoy::extensions::filters::http::lua::v3::Lua proto_config;
+  TestUtility::loadFromYaml(yaml_string, proto_config);
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  LuaFilterConfig factory;
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProtoWithServerContext(proto_config, "stats", context);
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamFilter(_));
+  cb(filter_callback);
+}
+
 #ifndef ENVOY_DISABLE_DEPRECATED_FEATURES
 TEST(LuaFilterConfigTest, LuaFilterInJson) {
   const std::string yaml_string = R"EOF(

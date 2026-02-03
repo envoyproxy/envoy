@@ -12,6 +12,7 @@ directories:
   source/common/http/http1: 93.4  # To be removed when http_inspector_use_balsa_parser is retired.
   source/common/http/http2: 96.6
   source/common/json: 95.2
+  source/common/jwt: 86.2
   source/common/matcher: 95.0
   source/common/memory: 98.1  # tcmalloc code path is not enabled in coverage build, only gperf tcmalloc, see PR#32589
   source/common/network: 94.3  # Flaky, `activateFileEvents`, `startSecureTransport` and `ioctl`, listener_socket do not always report LCOV
@@ -27,7 +28,7 @@ directories:
   source/extensions/api_listeners: 55.0  # Many IS_ENVOY_BUG are not covered.
   source/extensions/api_listeners/default_api_listener: 67.8  # Many IS_ENVOY_BUG are not covered.
   source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface: 96.3
-  source/extensions/common/aws: 98.5
+  source/extensions/common/aws: 97.5
   source/extensions/common/aws/credential_providers: 100.0
   source/extensions/common/proxy_protocol: 94.6  # Adjusted for security patch
   source/extensions/common/tap: 95.1

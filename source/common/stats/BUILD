@@ -73,8 +73,8 @@ envoy_cc_library(
         "//source/common/common:matchers_lib",
         "//source/common/common:utility_lib",
         "//source/common/protobuf:utility_lib",
-        "@com_github_openhistogram_libcircllhist//:libcircllhist",
         "@envoy_api//envoy/config/metrics/v3:pkg_cc_proto",
+        "@libcircllhist",
     ],
 )
 
