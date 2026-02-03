@@ -33,9 +33,9 @@ envoy_extension_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/extensions/access_loggers/stats:config",
+        "//source/extensions/matching/actions/transform_stat:config",
         "//test/integration:http_integration_lib",
         "//test/test_common:utility_lib",
-        "//source/extensions/matching/actions/transform_stat:config",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )

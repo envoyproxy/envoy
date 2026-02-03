@@ -37,7 +37,9 @@ TransformStatAction::Result DropTag::apply(Envoy::Stats::TagVector& tags) const 
   return Result::Keep;
 }
 
-TransformStatAction::Result NoOpAction::apply(Envoy::Stats::TagVector&) const { return Result::Keep; }
+TransformStatAction::Result NoOpAction::apply(Envoy::Stats::TagVector&) const {
+  return Result::Keep;
+}
 
 } // namespace TransformStat
 } // namespace Actions
