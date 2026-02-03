@@ -42,16 +42,14 @@ message FileServerConfig {
     message DirectoryList {
     }
 
-    oneof behavior_type {
-      option (validate.required) = true;
+    // Attempts to serve the given file within the directory, e.g. ``index.html``.
+    // Precisely one of `default_file` and `list` must be set per `DirectoryBehavior`.
+    string default_file = 1 [(validate.rules).string = {pattern: "^[^/]*$"}];
 
-      // Attempts to serve the given file within the directory, e.g. ``index.html``.
-      string try_file = 1 [(validate.rules).string = {pattern: "^[^/]+$"}];
-
-      // Responds with an html formatted list of the files in the directory.
-      // [#not-implemented-hide:] Directory operations currently have no async implementation.
-      DirectoryList directory_list = 2;
-    }
+    // Responds with an html formatted list of the files and subdirectories in the directory.
+    // Precisely one of `default_file` and `list` must be set per `DirectoryBehavior`.
+    // [#not-implemented-hide:] Directory operations currently have no async implementation.
+    DirectoryList list = 2;
   }
 
   // A configuration for an AsyncFileManager.

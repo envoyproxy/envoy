@@ -64,9 +64,9 @@ typed_config:
     "html": "text/html"
   default_content_type: "application/octet-stream"
   directory_behaviors:
-    - try_file: "index.html"
-    - try_file: "index.txt"
-    - directory_list: {}
+    - default_file: "index.html"
+    - default_file: "index.txt"
+    - list: {}
 )");
   }
 

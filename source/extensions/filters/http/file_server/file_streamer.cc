@@ -60,10 +60,9 @@ void FileStreamer::startDir(int behavior_index) {
     client_.errorFromFile(Http::Code::Forbidden, "file_server_no_valid_directory_behavior");
     return;
   }
-  switch (behavior->behavior_type_case()) {
-  case ProtoFileServerConfig::DirectoryBehavior::kTryFile:
+  if (!behavior->default_file().empty()) {
     cancel_callback_ = file_server_config_->asyncFileManager()->openExistingFile(
-        dispatcher_, (file_path_ / std::filesystem::path{behavior->try_file()}).string(),
+        dispatcher_, (file_path_ / std::filesystem::path{behavior->default_file()}).string(),
         Common::AsyncFiles::AsyncFileManager::Mode::ReadOnly,
         [this, behavior_index](absl::StatusOr<AsyncFileHandle> result) {
           if (!result.ok()) {
@@ -71,18 +70,18 @@ void FileStreamer::startDir(int behavior_index) {
             // Since the action is dispatched, this isn't recursion.
             return startDir(behavior_index + 1);
           }
-          file_path_ =
-              file_path_ / std::filesystem::path{
-                               file_server_config_->directoryBehavior(behavior_index)->try_file()};
+          file_path_ = file_path_ /
+                       std::filesystem::path{
+                           file_server_config_->directoryBehavior(behavior_index)->default_file()};
           async_file_ = std::move(result.value());
           startFile();
         });
     return;
-  case ProtoFileServerConfig::DirectoryBehavior::kDirectoryList:
-    client_.errorFromFile(Http::Code::Forbidden, "file_server_directory_list_not_implemented");
+  } else if (behavior->has_list()) {
+    client_.errorFromFile(Http::Code::Forbidden, "file_server_list_not_implemented");
     return;
-  case ProtoFileServerConfig::DirectoryBehavior::BEHAVIOR_TYPE_NOT_SET:
-    // Unreachable due to proto validations.
+  } else {
+    // Normally unreachable due to proto validations.
     client_.errorFromFile(Http::Code::InternalServerError, "file_server_empty_behavior_type");
     return;
   }

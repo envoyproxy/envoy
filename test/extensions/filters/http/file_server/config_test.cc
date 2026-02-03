@@ -81,11 +81,32 @@ public:
   NiceMock<Server::Configuration::MockServerFactoryContext> mock_server_factory_context_;
 };
 
+TEST_F(FileServerConfigTest, EmptyDirectoryBehaviorIsConfigError) {
+  auto status_or = factory()->createFilterFactoryFromProto(configFromYaml(R"(
+directory_behaviors:
+  - {}
+)"),
+                                                           "stats", mock_factory_context_);
+  EXPECT_THAT(status_or,
+              HasStatus(absl::StatusCode::kInvalidArgument, HasSubstr("must set one of")));
+}
+
+TEST_F(FileServerConfigTest, OverpopulatedDirectoryBehaviorIsConfigError) {
+  auto status_or = factory()->createFilterFactoryFromProto(configFromYaml(R"(
+directory_behaviors:
+  - default_file: "index.html"
+    list: {}
+)"),
+                                                           "stats", mock_factory_context_);
+  EXPECT_THAT(status_or,
+              HasStatus(absl::StatusCode::kInvalidArgument, HasSubstr("must have only one of")));
+}
+
 TEST_F(FileServerConfigTest, DuplicateDirectoryFilesIsConfigError) {
   auto status_or = factory()->createFilterFactoryFromProto(configFromYaml(R"(
 directory_behaviors:
-  - try_file: "index.html"
-  - try_file: "index.html"
+  - default_file: "index.html"
+  - default_file: "index.html"
 )"),
                                                            "stats", mock_factory_context_);
   EXPECT_THAT(status_or, HasStatus(absl::StatusCode::kInvalidArgument, HasSubstr("index.html")));
@@ -94,12 +115,12 @@ directory_behaviors:
 TEST_F(FileServerConfigTest, DuplicateDirectoryListIsConfigError) {
   auto status_or = factory()->createFilterFactoryFromProto(configFromYaml(R"(
 directory_behaviors:
-  - directory_list: {}
-  - directory_list: {}
+  - list: {}
+  - list: {}
 )"),
                                                            "stats", mock_factory_context_);
-  EXPECT_THAT(status_or, HasStatus(absl::StatusCode::kInvalidArgument,
-                                   HasSubstr("multiple directory_list directives")));
+  EXPECT_THAT(status_or,
+              HasStatus(absl::StatusCode::kInvalidArgument, HasSubstr("multiple list directives")));
 }
 
 TEST_F(FileServerConfigTest, DuplicatePathPrefixIsConfigError) {
@@ -148,9 +169,9 @@ content_types:
   "README": "text/markdown"
 default_content_type: "application/octet-stream"
 directory_behaviors:
-  - try_file: "index.html"
-  - try_file: "index.txt"
-  - directory_list: {}
+  - default_file: "index.html"
+  - default_file: "index.txt"
+  - list: {}
 )"));
   EXPECT_THAT(config->pathMapping("/"), IsNull());
   EXPECT_THAT(config->pathMapping("/path1"), IsNull());
@@ -175,15 +196,16 @@ directory_behaviors:
   EXPECT_THAT(config->contentTypeForPath("/fs2/README."), Eq("text/x-no-suffix"));
   EXPECT_THAT(config->contentTypeForPath("/fs1/other"), Eq("application/octet-stream"));
   EXPECT_THAT(config->asyncFileManager(), NotNull());
-  EXPECT_THAT(config->directoryBehavior(0),
-              OptRefWith(Property("try_file", &ProtoFileServerConfig::DirectoryBehavior::try_file,
-                                  Eq("index.html"))));
-  EXPECT_THAT(config->directoryBehavior(1),
-              OptRefWith(Property("try_file", &ProtoFileServerConfig::DirectoryBehavior::try_file,
-                                  Eq("index.txt"))));
+  EXPECT_THAT(
+      config->directoryBehavior(0),
+      OptRefWith(Property("default_file", &ProtoFileServerConfig::DirectoryBehavior::default_file,
+                          Eq("index.html"))));
+  EXPECT_THAT(
+      config->directoryBehavior(1),
+      OptRefWith(Property("default_file", &ProtoFileServerConfig::DirectoryBehavior::default_file,
+                          Eq("index.txt"))));
   EXPECT_THAT(config->directoryBehavior(2),
-              OptRefWith(Property("has_directory_list",
-                                  &ProtoFileServerConfig::DirectoryBehavior::has_directory_list,
+              OptRefWith(Property("has_list", &ProtoFileServerConfig::DirectoryBehavior::has_list,
                                   Eq(true))));
   EXPECT_THAT(config->directoryBehavior(3), Eq(absl::nullopt));
 }
@@ -192,8 +214,8 @@ TEST_F(FileServerConfigTest, DuplicateDirectoryFilesIsConfigErrorInRouteConfig) 
   auto status_or = factory()->createRouteSpecificFilterConfig(
       configFromYaml(R"(
 directory_behaviors:
-  - try_file: "index.html"
-  - try_file: "index.html"
+  - default_file: "index.html"
+  - default_file: "index.html"
 )"),
       mock_server_factory_context_, ProtobufMessage::getNullValidationVisitor());
   EXPECT_THAT(status_or, HasStatus(absl::StatusCode::kInvalidArgument, HasSubstr("index.html")));

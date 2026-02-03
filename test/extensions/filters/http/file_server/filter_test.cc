@@ -57,9 +57,9 @@ content_types:
   "html": "text/html"
 default_content_type: "application/octet-stream"
 directory_behaviors:
-  - try_file: "index.html"
-  - try_file: "index.txt"
-  - directory_list: {}
+  - default_file: "index.html"
+  - default_file: "index.txt"
+  - list: {}
 )"));
     initFilter(*filter);
     return filter;
@@ -266,8 +266,8 @@ TEST_F(FileServerFilterTest, TriesAllDirectoryBehaviorsInOrder) {
     EXPECT_CALL(*mock_async_file_manager_, stat);
     EXPECT_CALL(*mock_async_file_manager_, openExistingFile(_, "fs1/foo/index.html", _, _));
     EXPECT_CALL(*mock_async_file_manager_, openExistingFile(_, "fs1/foo/index.txt", _, _));
-    EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::Forbidden, _, _, _,
-                                                   "file_server_directory_list_not_implemented"));
+    EXPECT_CALL(decoder_callbacks_,
+                sendLocalReply(Http::Code::Forbidden, _, _, _, "file_server_list_not_implemented"));
   }
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter->decodeHeaders(request_headers, true));
   struct stat stat_result = {};

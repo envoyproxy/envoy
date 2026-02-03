@@ -29,16 +29,25 @@ absl::Status validateProto(const ProtoFileServerConfig& config) {
   }
   seen.erase(seen.begin(), seen.end());
   bool directory_tried = false;
+  static const absl::string_view directory_options = "default_file or list";
   for (const auto& directory_behavior : config.directory_behaviors()) {
-    if (!directory_behavior.try_file().empty()) {
-      std::tie(std::ignore, inserted) = seen.emplace(directory_behavior.try_file());
+    if (directory_behavior.default_file().empty() && !directory_behavior.has_list()) {
+      return absl::InvalidArgumentError(
+          absl::StrCat("directory_behavior must set one of ", directory_options));
+    }
+    if (!directory_behavior.default_file().empty() && directory_behavior.has_list()) {
+      return absl::InvalidArgumentError(
+          absl::StrCat("directory_behavior must have only one of ", directory_options));
+    }
+    if (!directory_behavior.default_file().empty()) {
+      std::tie(std::ignore, inserted) = seen.emplace(directory_behavior.default_file());
       if (!inserted) {
         return absl::InvalidArgumentError(absl::StrCat(
-            "duplicate try_file in directory_behaviors: ", directory_behavior.try_file()));
+            "duplicate default_file in directory_behaviors: ", directory_behavior.default_file()));
       }
     } else {
       if (directory_tried) {
-        return absl::InvalidArgumentError("multiple directory_list directives");
+        return absl::InvalidArgumentError("multiple list directives");
       }
       directory_tried = true;
     }
