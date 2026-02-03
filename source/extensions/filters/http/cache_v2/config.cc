@@ -39,6 +39,20 @@ Http::FilterFactoryCb CacheFilterFactory::createFilterFactoryFromProtoTyped(
       };
 }
 
+Http::FilterFactoryCb CacheFilterFactory::createFilterFactoryFromProtoWithServerContextTyped(
+    const envoy::extensions::filters::http::cache_v2::v3::CacheV2Config& config,
+    const std::string& /*stats_prefix*/, Server::Configuration::ServerFactoryContext& context) {
+  // Note: Cache initialization requires full FactoryContext for async client initialization.
+  // For now, ServerContext version will create filter with disabled cache.
+  // This is safe since routes can still have per-route cache configs.
+  std::shared_ptr<CacheSessions> cache; // null cache means disabled
+
+  return [config = std::make_shared<CacheFilterConfig>(config, cache, context)](
+             Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addStreamFilter(std::make_shared<CacheFilter>(config));
+  };
+}
+
 REGISTER_FACTORY(CacheFilterFactory, Server::Configuration::NamedHttpFilterConfigFactory);
 
 } // namespace CacheV2
