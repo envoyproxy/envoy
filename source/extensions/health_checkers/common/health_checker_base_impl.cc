@@ -160,7 +160,7 @@ HealthCheckerImplBase::intervalWithJitter(uint64_t base_time_ms,
 
 void HealthCheckerImplBase::addHosts(const HostVector& hosts) {
   for (const HostSharedPtr& host : hosts) {
-    if (host->disableActiveHealthCheck()) {
+    if (host->disableActiveHealthCheck() || active_sessions_.contains(host)) {
       continue;
     }
     active_sessions_[host] = makeSession(host);
@@ -172,7 +172,11 @@ void HealthCheckerImplBase::addHosts(const HostVector& hosts) {
 
 void HealthCheckerImplBase::onClusterMemberUpdate(const HostVector& hosts_added,
                                                   const HostVector& hosts_removed) {
-  addHosts(hosts_added);
+  // Skip adding hosts while cluster is still warming (e.g., waiting for SDS secrets).
+  // start() will add all existing hosts after warming completes.
+  if (cluster_.info()->configUpdateStats().warming_state_.value() == 0) {
+    addHosts(hosts_added);
+  }
   for (const HostSharedPtr& host : hosts_removed) {
     if (host->disableActiveHealthCheck()) {
       continue;
