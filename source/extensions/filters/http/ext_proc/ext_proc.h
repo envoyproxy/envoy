@@ -103,6 +103,7 @@ public:
   void recordGrpcCall(std::chrono::microseconds latency, Grpc::Status::GrpcStatus call_status,
                       ProcessorState::CallbackState callback_state,
                       envoy::config::core::v3::TrafficDirection traffic_direction);
+  void setFailedOpen() { failed_open_ = true; }
   void recordGrpcStatusBeforeFirstCall(Grpc::Status::GrpcStatus call_status) {
     grpc_status_before_first_call_ = call_status;
   }
@@ -169,7 +170,6 @@ private:
   std::string http_response_code_details_;
   // True if the stream failed open.
   bool failed_open_{false};
-  void setFailedOpen() { failed_open_ = true; }
   // The gRPC status when the openStream() operation fails.
   Grpc::Status::GrpcStatus grpc_status_before_first_call_ = Grpc::Status::Ok;
 };
