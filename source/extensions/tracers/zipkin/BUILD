@@ -56,8 +56,8 @@ envoy_cc_library(
         "//source/common/upstream:cluster_update_tracker_lib",
         "//source/extensions/tracers/opentelemetry:opentelemetry_tracer_lib",
         "@abseil-cpp//absl/types:optional",
-        "@com_github_openzipkin_zipkinapi//:zipkin_cc_proto",
         "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
+        "@zipkin-api",
     ],
 )
 

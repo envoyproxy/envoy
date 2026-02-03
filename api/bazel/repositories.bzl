@@ -54,7 +54,8 @@ def api_dependencies(bzlmod = False):
         name = "rules_proto",
     )
     external_http_archive(
-        name = "com_github_openzipkin_zipkinapi",
+        name = "zipkin-api",
+        location_name = "zipkin_api",
         build_file_content = ZIPKINAPI_BUILD_CONTENT,
     )
     external_http_archive(
@@ -99,12 +100,17 @@ api_cc_py_proto_library(
         "zipkin-jsonv2.proto",
         "zipkin.proto",
     ],
-    visibility = ["//visibility:public"],
 )
 
 go_proto_library(
     name = "zipkin_go_proto",
     proto = ":zipkin",
+    visibility = ["//visibility:public"],
+)
+
+alias(
+    name = "zipkin-api",
+    actual = ":zipkin_cc_proto",
     visibility = ["//visibility:public"],
 )
 """

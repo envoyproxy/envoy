@@ -42,7 +42,7 @@ xds:
   - api
   license: "Apache-2.0"
   license_url: "https://github.com/cncf/xds/blob/{version}/LICENSE"
-com_github_openzipkin_zipkinapi:
+zipkin_api:
   project_name: "Zipkin API"
   project_desc: "Zipkin's language independent model and HTTP Api Definitions"
   project_url: "https://github.com/openzipkin/zipkin-api"
