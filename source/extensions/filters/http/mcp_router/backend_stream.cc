@@ -13,12 +13,16 @@ namespace Extensions {
 namespace HttpFilters {
 namespace McpRouter {
 
+namespace {
+
 // Extract media type from Content-Type header (before any semicolon).
 absl::string_view extractMediaType(absl::string_view content_type) {
   const std::vector<absl::string_view> parts =
       absl::StrSplit(content_type, absl::MaxSplits(';', 1));
   return absl::StripAsciiWhitespace(parts.front());
 }
+
+} // namespace
 
 ResponseContentType detectContentType(absl::string_view content_type_header) {
   if (content_type_header.empty()) {
@@ -47,7 +51,7 @@ SseMessageType classifyMessage(absl::string_view json_data, int64_t request_id) 
 
   // Has result or error with matching ID -> Response
   if ((result_or.ok() && *result_or) || (error_or.ok() && *error_or)) {
-    if (id_or.ok() && (request_id == 0 || *id_or == request_id)) {
+    if (id_or.ok() && *id_or == request_id) {
       return SseMessageType::Response;
     }
   }
@@ -64,6 +68,7 @@ SseMessageType classifyMessage(absl::string_view json_data, int64_t request_id) 
 
   return SseMessageType::Unknown;
 }
+
 
 BackendStreamCallbacks::BackendStreamCallbacks(const std::string& backend_name,
                                                std::function<void(BackendResponse)> on_complete,

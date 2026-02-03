@@ -78,8 +78,8 @@ class ClassifyMessageTest : public testing::Test {};
 TEST_F(ClassifyMessageTest, ClassifiesResponseWithResult) {
   std::string data = R"({"jsonrpc":"2.0","id":1,"result":{"tools":[]}})";
   EXPECT_EQ(classifyMessage(data, 1), SseMessageType::Response);
-  // Also matches with request_id=0 (match any).
-  EXPECT_EQ(classifyMessage(data, 0), SseMessageType::Response);
+  // request_id=0 does NOT match id=1 - they must match exactly.
+  EXPECT_EQ(classifyMessage(data, 0), SseMessageType::Unknown);
 }
 
 // Verifies Response type detection (has error with matching id).

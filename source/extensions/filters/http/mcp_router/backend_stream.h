@@ -38,7 +38,7 @@ enum class SseMessageType {
 /**
  * Classifies a JSON-RPC message from SSE event data.
  * @param json_data The raw JSON-RPC message from SSE data field.
- * @param request_id The client request ID to match (0 = match any).
+ * @param request_id The client request ID to match for Response classification.
  * @return The classified message type.
  */
 SseMessageType classifyMessage(absl::string_view json_data, int64_t request_id);
