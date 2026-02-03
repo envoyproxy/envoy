@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.extensions.dynamic_modules.v3;
 
+import "envoy/config/core/v3/base.proto";
+
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -30,7 +32,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // the ABI is stabilized, this restriction will be revisited. Until then, Envoy checks the hash of
 // the ABI header files to ensure that the dynamic modules are built against the same version of the
 // ABI.
-// [#next-free-field: 6]
+// [#next-free-field: 8]
 message DynamicModuleConfig {
   // The name of the dynamic module.
   //
@@ -42,9 +44,12 @@ message DynamicModuleConfig {
   // try to find the module from a standard system library path (e.g., ``/usr/lib``) following the
   // platform's default behavior for ``dlopen``.
   //
+  // This field is optional if the ``module`` field is set. When both ``name`` and ``module`` are
+  // specified, the ``module`` field takes precedence.
+  //
   // .. note::
   //   There is some remaining work to make the search path configurable via command line options.
-  string name = 1 [(validate.rules).string = {min_len: 1}];
+  string name = 1;
 
   // If true, prevents the module from being unloaded with ``dlclose``.
   //
@@ -78,4 +83,47 @@ message DynamicModuleConfig {
   //
   // Defaults to ``dynamicmodulescustom``.
   string metrics_namespace = 5;
+
+  // The dynamic module binary to load.
+  //
+  // This field supports loading modules from:
+  //
+  // * Local file path (via ``local.filename``)
+  // * Inline bytes (via ``local.inline_bytes`` or ``local.inline_string``)
+  // * Remote HTTP URL (via ``remote``)
+  //
+  // When both ``name`` and ``module`` are set, ``module`` takes precedence.
+  //
+  // Example configurations:
+  //
+  // Local file:
+  //
+  // .. code-block:: yaml
+  //
+  //    module:
+  //      local:
+  //        filename: "/path/to/libmy_module.so"
+  //
+  // Remote HTTP:
+  //
+  // .. code-block:: yaml
+  //
+  //    module:
+  //      remote:
+  //        http_uri:
+  //          uri: "https://modules.example.com/libmy_module.so"
+  //          cluster: module_server
+  //          timeout: 10s
+  //        sha256: "abc123..."
+  //
+  config.core.v3.AsyncDataSource module = 6;
+
+  // If true and the module needs to be remotely fetched and it is not in the cache,
+  // then NACK the configuration update and do a background fetch to fill the cache.
+  // If false, fetch the module asynchronously and enter warming state.
+  //
+  // This only applies when using remote data sources via the ``module`` field.
+  //
+  // Defaults to ``false``.
+  bool nack_on_module_cache_miss = 7;
 }

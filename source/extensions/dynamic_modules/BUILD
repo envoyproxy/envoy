@@ -17,7 +17,29 @@ envoy_cc_library(
     ],
     deps = [
         "//envoy/common:exception_lib",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/common:hex_lib",
+        "//source/common/crypto:utility_lib",
         "//source/extensions/dynamic_modules/abi",
+    ],
+)
+
+envoy_cc_library(
+    name = "code_cache_lib",
+    srcs = ["code_cache.cc"],
+    hdrs = [
+        "code_cache.h",
+    ],
+    deps = [
+        "//envoy/event:deferred_deletable",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/init:manager_interface",
+        "//envoy/stats:stats_interface",
+        "//envoy/upstream:cluster_manager_interface",
+        "//source/common/common:logger_lib",
+        "//source/common/config:remote_data_fetcher_lib",
+        "//source/common/init:target_lib",
+        "@com_google_absl//absl/container:flat_hash_map",
     ],
 )
 
