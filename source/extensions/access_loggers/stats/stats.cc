@@ -64,7 +64,6 @@ absl::optional<uint64_t> getFormatValue(const Formatter::FormatterProvider& form
                    computed_value.DebugString());
     return absl::nullopt;
   }
-
   if (is_percent) {
     value *= Stats::Histogram::PercentScale;
   }
