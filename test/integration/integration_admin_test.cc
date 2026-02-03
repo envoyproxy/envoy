@@ -476,10 +476,10 @@ TEST_P(IntegrationAdminTest, AdminPrometheusProtobufFormat) {
       {":path", "/stats/prometheus"},
       {":authority", "admin"},
       {":scheme", "http"},
-      {"accept", "application/"
-                 "vnd.google.protobuf;proto=io.prometheus.client.MetricFamily;encoding=delimited;q="
-                 "0.6,application/openmetrics-text;version=1.0.0;escaping=allow-utf-8;q=0.5,text/"
-                 "plain;version=0.0.4;q=0.4,*/*;q=0.3"}};
+      {"accept",
+       "application/"
+       "vnd.google.protobuf;proto=io.prometheus.client.MetricFamily;encoding=delimited;q=0.6"},
+  };
 
   IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
   ASSERT_TRUE(response->waitForEndStream());
