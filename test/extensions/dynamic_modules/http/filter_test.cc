@@ -34,8 +34,9 @@ TEST_P(DynamicModuleTestLanguages, Nop) {
   Stats::IsolatedStoreImpl stats_store;
   auto filter_config_or_status =
       Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
-          filter_name, filter_config, false, std::move(dynamic_module.value()),
-          *stats_store.createScope(""), context);
+          filter_name, filter_config,
+          Envoy::Extensions::DynamicModules::HttpFilters::DefaultMetricsNamespace, false,
+          std::move(dynamic_module.value()), *stats_store.createScope(""), context);
   EXPECT_TRUE(filter_config_or_status.ok());
 
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
@@ -88,7 +89,7 @@ TEST_P(DynamicModuleHttpLanguageTests, ConfigInitializationFailure) {
   Stats::IsolatedStoreImpl stats_store;
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   auto filter_config_or_status = newDynamicModuleHttpFilterConfig(
-      "config_init_failure", "", false, std::move(dynamic_module.value()),
+      "config_init_failure", "", DefaultMetricsNamespace, false, std::move(dynamic_module.value()),
       *stats_store.createScope(""), context);
   EXPECT_FALSE(filter_config_or_status.ok());
   EXPECT_THAT(filter_config_or_status.status().message(),
@@ -110,8 +111,8 @@ TEST_P(DynamicModuleHttpLanguageTests, StatsCallbacks) {
   Stats::TestUtil::TestScope stats_scope{"", stats_store};
   auto filter_config_or_status =
       Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
-          filter_name, filter_config, false, std::move(dynamic_module.value()), stats_scope,
-          context);
+          filter_name, filter_config, DefaultMetricsNamespace, false,
+          std::move(dynamic_module.value()), stats_scope, context);
   EXPECT_TRUE(filter_config_or_status.ok());
 
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
@@ -230,8 +231,8 @@ TEST_P(DynamicModuleHttpLanguageTests, HeaderCallbacks) {
   Stats::IsolatedStoreImpl stats_store;
   auto filter_config_or_status =
       Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
-          filter_name, filter_config, false, std::move(dynamic_module.value()),
-          *stats_store.createScope(""), context);
+          filter_name, filter_config, DefaultMetricsNamespace, false,
+          std::move(dynamic_module.value()), *stats_store.createScope(""), context);
   EXPECT_TRUE(filter_config_or_status.ok());
 
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
@@ -293,8 +294,8 @@ TEST_P(DynamicModuleHttpLanguageTests, DynamicMetadataCallbacks) {
   auto stats_scope = stats_store.createScope("");
   auto filter_config_or_status =
       Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
-          filter_name, filter_config, false, std::move(dynamic_module.value()), *stats_scope,
-          context);
+          filter_name, filter_config, DefaultMetricsNamespace, false,
+          std::move(dynamic_module.value()), *stats_scope, context);
   EXPECT_TRUE(filter_config_or_status.ok());
 
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
@@ -377,8 +378,8 @@ TEST_P(DynamicModuleHttpLanguageTests, FilterStateCallbacks) {
   auto stats_scope = stats_store.createScope("");
   auto filter_config_or_status =
       Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
-          filter_name, filter_config, false, std::move(dynamic_module.value()), *stats_scope,
-          context);
+          filter_name, filter_config, DefaultMetricsNamespace, false,
+          std::move(dynamic_module.value()), *stats_scope, context);
   EXPECT_TRUE(filter_config_or_status.ok());
 
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
@@ -455,8 +456,8 @@ TEST_P(DynamicModuleHttpLanguageTests, BodyCallbacks) {
   auto stats_scope = stats_store.createScope("");
   auto filter_config_or_status =
       Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
-          filter_name, filter_config, false, std::move(dynamic_module.value()), *stats_scope,
-          context);
+          filter_name, filter_config, DefaultMetricsNamespace, false,
+          std::move(dynamic_module.value()), *stats_scope, context);
   EXPECT_TRUE(filter_config_or_status.ok());
 
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
@@ -537,8 +538,8 @@ TEST_P(DynamicModuleHttpLanguageTests, HttpFilterHttpCallout_non_existing_cluste
       .WillOnce(testing::Return(nullptr));
   auto filter_config_or_status =
       Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
-          filter_name, filter_config, false, std::move(dynamic_module.value()), *stats_scope,
-          context);
+          filter_name, filter_config, DefaultMetricsNamespace, false,
+          std::move(dynamic_module.value()), *stats_scope, context);
   EXPECT_TRUE(filter_config_or_status.ok());
 
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
@@ -580,8 +581,8 @@ TEST_P(DynamicModuleHttpLanguageTests, HttpFilterHttpCallout_immediate_failing_c
   const std::string filter_config = "immediate_failing_cluster";
   auto filter_config_or_status =
       Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
-          filter_name, filter_config, false, std::move(dynamic_module.value()), *stats_scope,
-          context);
+          filter_name, filter_config, DefaultMetricsNamespace, false,
+          std::move(dynamic_module.value()), *stats_scope, context);
   EXPECT_TRUE(filter_config_or_status.ok());
 
   std::shared_ptr<Upstream::MockThreadLocalCluster> cluster =
@@ -639,8 +640,8 @@ TEST_P(DynamicModuleHttpLanguageTests, HttpFilterHttpCallout_success) {
   const std::string filter_config = "success_cluster";
   auto filter_config_or_status =
       Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
-          filter_name, filter_config, false, std::move(dynamic_module.value()), *stats_scope,
-          context);
+          filter_name, filter_config, DefaultMetricsNamespace, false,
+          std::move(dynamic_module.value()), *stats_scope, context);
   EXPECT_TRUE(filter_config_or_status.ok());
 
   std::shared_ptr<Upstream::MockThreadLocalCluster> cluster =
@@ -714,8 +715,8 @@ TEST_P(DynamicModuleHttpLanguageTests, HttpFilterHttpCallout_resetting) {
   const std::string filter_config = "resetting_cluster";
   auto filter_config_or_status =
       Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
-          filter_name, filter_config, false, std::move(dynamic_module.value()), *stats_scope,
-          context);
+          filter_name, filter_config, DefaultMetricsNamespace, false,
+          std::move(dynamic_module.value()), *stats_scope, context);
   EXPECT_TRUE(filter_config_or_status.ok());
 
   std::shared_ptr<Upstream::MockThreadLocalCluster> cluster =
@@ -773,8 +774,8 @@ TEST_P(DynamicModuleHttpLanguageTests, HttpFilterPerRouteConfigLifetimes) {
   const std::string filter_config = "listener config";
   auto filter_config_or_status =
       Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
-          filter_name, filter_config, false, std::move(dynamic_module.value()), *stats_scope,
-          context);
+          filter_name, filter_config, DefaultMetricsNamespace, false,
+          std::move(dynamic_module.value()), *stats_scope, context);
   EXPECT_TRUE(filter_config_or_status.ok());
 
   auto dynamic_module_for_route =
@@ -928,7 +929,8 @@ TEST(DynamicModuleHttpStreamTest, HttpFilterHttpStreamCalloutOnComplete) {
 
   auto filter_config_or_status =
       Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
-          "filter", "", false, std::move(dynamic_module.value()), *stats_scope, context);
+          "filter", "", DefaultMetricsNamespace, false, std::move(dynamic_module.value()),
+          *stats_scope, context);
   EXPECT_TRUE(filter_config_or_status.ok());
 
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
@@ -980,7 +982,8 @@ TEST(DynamicModuleHttpStreamTest, StartHttpStreamDoesNotSetContentLength) {
 
   auto filter_config_or_status =
       Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
-          "filter", "", false, std::move(dynamic_module.value()), *stats_scope, context);
+          "filter", "", DefaultMetricsNamespace, false, std::move(dynamic_module.value()),
+          *stats_scope, context);
   EXPECT_TRUE(filter_config_or_status.ok());
 
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
@@ -1044,7 +1047,8 @@ TEST(DynamicModuleHttpStreamTest, StartHttpStreamAndNoCluster) {
 
   auto filter_config_or_status =
       Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
-          "filter", "", false, std::move(dynamic_module.value()), *stats_scope, context);
+          "filter", "", DefaultMetricsNamespace, false, std::move(dynamic_module.value()),
+          *stats_scope, context);
   EXPECT_TRUE(filter_config_or_status.ok());
 
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
@@ -1082,7 +1086,8 @@ TEST(DynamicModuleHttpStreamTest, StartHttpStreamMissingRequiredHeaders) {
 
   auto filter_config_or_status =
       Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
-          "filter", "", false, std::move(dynamic_module.value()), *stats_scope, context);
+          "filter", "", DefaultMetricsNamespace, false, std::move(dynamic_module.value()),
+          *stats_scope, context);
   EXPECT_TRUE(filter_config_or_status.ok());
 
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
@@ -1120,7 +1125,8 @@ TEST(DynamicModuleHttpStreamTest, StartHttpStreamHandlesInlineResetDuringHeaders
 
   auto filter_config_or_status =
       Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
-          "filter", "", false, std::move(dynamic_module.value()), *stats_scope, context);
+          "filter", "", DefaultMetricsNamespace, false, std::move(dynamic_module.value()),
+          *stats_scope, context);
   EXPECT_TRUE(filter_config_or_status.ok());
 
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
@@ -1175,7 +1181,8 @@ TEST(DynamicModuleHttpStreamTest, HttpStreamCalloutDeferredDeleteOnDestroy) {
 
   auto filter_config_or_status =
       Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
-          "filter", "", false, std::move(dynamic_module.value()), *stats_scope, context);
+          "filter", "", DefaultMetricsNamespace, false, std::move(dynamic_module.value()),
+          *stats_scope, context);
   EXPECT_TRUE(filter_config_or_status.ok());
 
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
@@ -1232,7 +1239,8 @@ TEST(DynamicModuleHttpStreamTest, HttpFilterHttpStreamCalloutOnReset) {
 
   auto filter_config_or_status =
       Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
-          "filter", "", false, std::move(dynamic_module.value()), *stats_scope, context);
+          "filter", "", DefaultMetricsNamespace, false, std::move(dynamic_module.value()),
+          *stats_scope, context);
   EXPECT_TRUE(filter_config_or_status.ok());
 
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
@@ -1284,7 +1292,8 @@ TEST(DynamicModulesTest, HttpFilterResetHttpStream) {
 
   auto filter_config_or_status =
       Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
-          "filter", "", false, std::move(dynamic_module.value()), *stats_scope, context);
+          "filter", "", DefaultMetricsNamespace, false, std::move(dynamic_module.value()),
+          *stats_scope, context);
   EXPECT_TRUE(filter_config_or_status.ok());
 
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
@@ -1343,7 +1352,8 @@ TEST(DynamicModulesTest, HttpFilterStartHttpStreamNoBodyEndStream) {
 
   auto filter_config_or_status =
       Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
-          "filter", "", false, std::move(dynamic_module.value()), *stats_scope, context);
+          "filter", "", DefaultMetricsNamespace, false, std::move(dynamic_module.value()),
+          *stats_scope, context);
   EXPECT_TRUE(filter_config_or_status.ok());
 
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
@@ -1398,7 +1408,8 @@ TEST(DynamicModulesTest, HttpFilterStartHttpStreamInlineResetOnHeaders) {
 
   auto filter_config_or_status =
       Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
-          "filter", "", false, std::move(dynamic_module.value()), *stats_scope, context);
+          "filter", "", DefaultMetricsNamespace, false, std::move(dynamic_module.value()),
+          *stats_scope, context);
   EXPECT_TRUE(filter_config_or_status.ok());
 
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
@@ -1458,7 +1469,8 @@ TEST(DynamicModulesTest, HttpFilterStartHttpStreamInlineResetOnData) {
 
   auto filter_config_or_status =
       Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
-          "filter", "", false, std::move(dynamic_module.value()), *stats_scope, context);
+          "filter", "", DefaultMetricsNamespace, false, std::move(dynamic_module.value()),
+          *stats_scope, context);
   EXPECT_TRUE(filter_config_or_status.ok());
 
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
@@ -1522,7 +1534,8 @@ TEST(DynamicModulesTest, StartHttpStreamCannotCreateRequest) {
 
   auto filter_config_or_status =
       Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
-          "filter", "", false, std::move(dynamic_module.value()), *stats_scope, context);
+          "filter", "", DefaultMetricsNamespace, false, std::move(dynamic_module.value()),
+          *stats_scope, context);
   EXPECT_TRUE(filter_config_or_status.ok());
 
   NiceMock<Event::MockDispatcher> dispatcher;

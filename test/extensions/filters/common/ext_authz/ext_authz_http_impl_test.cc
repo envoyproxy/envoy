@@ -670,6 +670,60 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationRequest5xxError) {
   client_->onSuccess(async_request_, std::move(check_response));
 }
 
+// Test that HTTP call failure leaves status_code unset. This allows the filter to use
+// status_on_error configuration instead of a hardcoded value.
+TEST_F(ExtAuthzHttpClientTest, HttpCallFailureDoesNotSetStatusCode) {
+  envoy::service::auth::v3::CheckRequest request;
+
+  // Expected: status_code should be unset (0), not Forbidden.
+  auto expected_response = Response{};
+  expected_response.status = CheckStatus::Error;
+  expected_response.status_code = static_cast<Http::Code>(0);
+
+  client_->check(request_callbacks_, request, parent_span_, stream_info_);
+
+  EXPECT_CALL(request_callbacks_, onComplete_(WhenDynamicCastTo<ResponsePtr&>(
+                                      AuthzErrorResponseWithAttributes(expected_response))));
+  client_->onFailure(async_request_, Http::AsyncClient::FailureReason::Reset);
+}
+
+// Test that HTTP 5xx response leaves status_code unset. This allows the filter to use
+// status_on_error configuration instead of a hardcoded value.
+TEST_F(ExtAuthzHttpClientTest, Http5xxResponseDoesNotSetStatusCode) {
+  Http::ResponseMessagePtr check_response(new Http::ResponseMessageImpl(
+      Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "503"}}}));
+  envoy::service::auth::v3::CheckRequest request;
+
+  // Expected: status_code should be unset (0), not Forbidden.
+  auto expected_response = Response{};
+  expected_response.status = CheckStatus::Error;
+  expected_response.status_code = static_cast<Http::Code>(0);
+
+  client_->check(request_callbacks_, request, parent_span_, stream_info_);
+
+  EXPECT_CALL(request_callbacks_, onComplete_(WhenDynamicCastTo<ResponsePtr&>(
+                                      AuthzErrorResponseWithAttributes(expected_response))));
+  client_->onSuccess(async_request_, std::move(check_response));
+}
+
+// Test that missing cluster leaves status_code unset. This allows the filter to use
+// status_on_error configuration instead of a hardcoded value.
+TEST_F(ExtAuthzHttpClientTest, MissingClusterDoesNotSetStatusCode) {
+  InSequence s;
+
+  // Expected: status_code should be unset (0), not Forbidden.
+  auto expected_response = Response{};
+  expected_response.status = CheckStatus::Error;
+  expected_response.status_code = static_cast<Http::Code>(0);
+
+  EXPECT_CALL(cm_, getThreadLocalCluster(Eq("ext_authz"))).WillOnce(Return(nullptr));
+  EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient()).Times(0);
+  EXPECT_CALL(request_callbacks_, onComplete_(WhenDynamicCastTo<ResponsePtr&>(
+                                      AuthzErrorResponseWithAttributes(expected_response))));
+  client_->check(request_callbacks_, envoy::service::auth::v3::CheckRequest{}, parent_span_,
+                 stream_info_);
+}
+
 // Test the client when the request is canceled.
 TEST_F(ExtAuthzHttpClientTest, CancelledAuthorizationRequest) {
   envoy::service::auth::v3::CheckRequest request;

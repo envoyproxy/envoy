@@ -136,6 +136,11 @@ configuration with a :ref:`factory lookup key
   This creates a filter state entry named ``my.custom.key`` containing the string ``my-value``.
   The value can be accessed in access logs using ``%FILTER_STATE(my.custom.key)%``.
 
+``envoy.hashable_string``
+  Same as ``envoy.string`` but supports connection pool hashing when :ref:`shared with the upstream
+  <arch_overview_advanced_filter_state_sharing>`. Please use with care as it can lead to significant
+  increase in the number of upstream connections when used with HTTP upstreams.
+
 ``envoy.network.ip``
   A factory to create IP addresses from ``IPv4`` and ``IPv6`` address strings.
 

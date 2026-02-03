@@ -24,7 +24,7 @@ using CreateJwksFetcherCb = std::function<Common::JwksFetcherPtr(
 /**
  *  JwksDoneFetched is a callback interface to set a Jwks when fetch is done.
  */
-using JwksDoneFetched = std::function<void(google::jwt_verify::JwksPtr&& jwks)>;
+using JwksDoneFetched = std::function<void(Envoy::JwtVerify::JwksPtr&& jwks)>;
 
 // This class handles fetching Jwks asynchronously.
 // It will be no-op if async_fetch is not enabled.
@@ -50,7 +50,7 @@ private:
   void handleFetchDone();
 
   // Override the functions from Common::JwksFetcher::JwksReceiver
-  void onJwksSuccess(google::jwt_verify::JwksPtr&& jwks) override;
+  void onJwksSuccess(Envoy::JwtVerify::JwksPtr&& jwks) override;
   void onJwksError(Failure reason) override;
 
   // the remote Jwks config

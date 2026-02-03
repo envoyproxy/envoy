@@ -13,6 +13,7 @@ envoy_cc_test(
     srcs = ["filter_config_test.cc"],
     rbe_pool = "6gig",
     deps = [
+        "//envoy/common:hashable_interface",
         "//source/common/formatter:formatter_extension_lib",
         "//source/common/router:string_accessor_lib",
         "//source/extensions/filters/common/set_filter_state:filter_config_lib",
