@@ -56,7 +56,6 @@ private:
     struct TagsResult {
       Envoy::Stats::StatNameTagVector tags_;
       std::vector<Envoy::Stats::StatNameDynamicStorage> dynamic_storage_;
-      Envoy::Stats::TagVector str_tags_;
       bool dropped_;
     };
     TagsResult tags(const Formatter::Context& context, const StreamInfo::StreamInfo& stream_info,

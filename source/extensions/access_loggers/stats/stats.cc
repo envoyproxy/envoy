@@ -178,7 +178,7 @@ StatsAccessLog::NameAndTags::tags(const Formatter::Context& context,
         const auto action_result = action->apply(str_tags);
         if (action_result ==
             Extensions::Matching::Actions::TransformStat::TransformStatAction::Result::Drop) {
-          return {std::move(tags), {}, std::move(str_tags), true};
+          return {std::move(tags), {}, true};
         }
       }
     }
@@ -192,7 +192,7 @@ StatsAccessLog::NameAndTags::tags(const Formatter::Context& context,
     tags.emplace_back(storage_name.statName(), storage_value.statName());
   }
 
-  return {std::move(tags), std::move(dynamic_storage), std::move(str_tags), false};
+  return {std::move(tags), std::move(dynamic_storage), false};
 }
 
 void StatsAccessLog::emitLog(const Formatter::Context& context,
@@ -212,7 +212,7 @@ void StatsAccessLog::emitLogConst(const Formatter::Context& context,
 
     uint64_t value = *computed_value_opt;
 
-    auto [tags, storage, str_tags, dropped] = histogram.stat_.tags(context, stream_info, *scope_);
+    auto [tags, storage, dropped] = histogram.stat_.tags(context, stream_info, *scope_);
 
     if (dropped) {
       continue;
@@ -237,7 +237,7 @@ void StatsAccessLog::emitLogConst(const Formatter::Context& context,
       value = counter.value_fixed_;
     }
 
-    auto [tags, storage, str_tags, dropped] = counter.stat_.tags(context, stream_info, *scope_);
+    auto [tags, storage, dropped] = counter.stat_.tags(context, stream_info, *scope_);
 
     if (dropped) {
       continue;
