@@ -24,6 +24,7 @@ public:
   // Return true to keep going - false is for HEAD requests.
   virtual bool headersFromFile(Http::ResponseHeaderMapPtr response_headers) PURE;
   virtual void bodyChunkFromFile(Buffer::InstancePtr buf, bool end_stream) PURE;
+  virtual ~FileStreamerClient() = default;
 };
 
 class FileStreamer {
