@@ -31,8 +31,8 @@ public:
     EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
     auto filter_config_or_status = newDynamicModuleNetworkFilterConfig(
-        "test_filter", "", std::move(dynamic_module.value()), cluster_manager_, *stats_.rootScope(),
-        main_thread_dispatcher_);
+        "test_filter", "", DefaultMetricsNamespace, std::move(dynamic_module.value()),
+        cluster_manager_, *stats_.rootScope(), main_thread_dispatcher_);
     EXPECT_TRUE(filter_config_or_status.ok()) << filter_config_or_status.status().message();
     filter_config_ = filter_config_or_status.value();
 
@@ -1244,8 +1244,8 @@ public:
     EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
 
     auto filter_config_or_status = newDynamicModuleNetworkFilterConfig(
-        "test_filter", "", std::move(dynamic_module.value()), cluster_manager_, *stats_.rootScope(),
-        main_thread_dispatcher_);
+        "test_filter", "", DefaultMetricsNamespace, std::move(dynamic_module.value()),
+        cluster_manager_, *stats_.rootScope(), main_thread_dispatcher_);
     EXPECT_TRUE(filter_config_or_status.ok()) << filter_config_or_status.status().message();
     filter_config_ = filter_config_or_status.value();
 

@@ -949,8 +949,9 @@ public:
   }
 
   void initializeConfig(bool legacy_allowed_headers = true, bool failure_mode_allow = true,
-                        uint64_t timeout_ms = 300) {
-    config_helper_.addConfigModifier([this, legacy_allowed_headers, failure_mode_allow, timeout_ms](
+                        uint64_t timeout_ms = 300, uint32_t status_on_error_code = 0) {
+    config_helper_.addConfigModifier([this, legacy_allowed_headers, failure_mode_allow, timeout_ms,
+                                      status_on_error_code](
                                          envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* ext_authz_cluster = bootstrap.mutable_static_resources()->add_clusters();
       ext_authz_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
@@ -966,6 +967,11 @@ public:
       proto_config_.mutable_http_service()->mutable_server_uri()->mutable_timeout()->CopyFrom(
           Protobuf::util::TimeUtil::MillisecondsToDuration(timeout_ms));
       proto_config_.set_encode_raw_headers(encodeRawHeaders());
+
+      if (status_on_error_code > 0) {
+        proto_config_.mutable_status_on_error()->set_code(
+            static_cast<envoy::type::v3::StatusCode>(status_on_error_code));
+      }
 
       envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter ext_authz_filter;
       ext_authz_filter.set_name("envoy.filters.http.ext_authz");
@@ -1833,6 +1839,40 @@ TEST_P(ExtAuthzHttpIntegrationTest, TimeoutFailOpen) {
   ASSERT_TRUE(response_->waitForEndStream());
   EXPECT_TRUE(response_->complete());
   EXPECT_EQ("200", response_->headers().getStatusValue());
+
+  cleanup();
+}
+
+// Test that HTTP ext_authz call failure respects status_on_error configuration.
+TEST_P(ExtAuthzHttpIntegrationTest, HttpCallFailureUsesStatusOnError) {
+  initializeConfig(false, /*failure_mode_allow=*/false, /*timeout_ms=*/1,
+                   /*status_on_error_code=*/503);
+  HttpIntegrationTest::initialize();
+  initiateClientConnection();
+
+  // Do not sendExtAuthzResponse(). Envoy should reject with configured status_on_error.
+  ASSERT_TRUE(response_->waitForEndStream(Envoy::Seconds(10)));
+  EXPECT_TRUE(response_->complete());
+  EXPECT_EQ("503", response_->headers().getStatusValue());
+
+  cleanup();
+}
+
+// Test that HTTP ext_authz 5xx response respects status_on_error configuration.
+TEST_P(ExtAuthzHttpIntegrationTest, Http5xxResponseUsesStatusOnError) {
+  initializeConfig(false, /*failure_mode_allow=*/false, /*timeout_ms=*/300000,
+                   /*status_on_error_code=*/503);
+  HttpIntegrationTest::initialize();
+  initiateClientConnection();
+  waitForExtAuthzRequest();
+
+  // Send a 5xx response from ext_authz server.
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "500"}};
+  ext_authz_request_->encodeHeaders(response_headers, true);
+
+  ASSERT_TRUE(response_->waitForEndStream());
+  EXPECT_TRUE(response_->complete());
+  EXPECT_EQ("503", response_->headers().getStatusValue());
 
   cleanup();
 }
