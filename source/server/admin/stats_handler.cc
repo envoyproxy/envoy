@@ -153,10 +153,6 @@ Http::Code StatsHandler::prometheusStats(const Http::RequestHeaderMap& request_h
     return code;
   }
 
-  if (server_.statsConfig().flushOnAdmin()) {
-    server_.flushStats();
-  }
-
   return prometheusFlushAndRender(params, request_headers, response_headers, response);
 }
 
