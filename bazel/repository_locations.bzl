@@ -46,14 +46,14 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/bazelbuild/buildtools/archive/v{version}.tar.gz"],
     ),
     envoy_examples = dict(
-        version = "0.1.5",
-        sha256 = "bae2525bdd5838e94249470e5c3ee212c9a9533624a45be73782e9b45f70348a",
+        version = "0.1.8",
+        sha256 = "7a350305da51972f2acb13ccf8fd2c8d165f9e161cb41d85f49495e425898dc8",
         strip_prefix = "examples-{version}",
         urls = ["https://github.com/envoyproxy/examples/archive/v{version}.tar.gz"],
     ),
     envoy_toolshed = dict(
-        version = "0.3.26",
-        sha256 = "96e27e0f9f9c259f3f623b7c79f30e4adbfc817a2513cbb14b13d57f90689481",
+        version = "0.3.28",
+        sha256 = "8f4c01104e41eefaf08cbe7a678f50a2aff00e45ba873a2c0d3514e9b2debdb8",
         strip_prefix = "toolshed-bazel-v{version}/bazel",
         urls = ["https://github.com/envoyproxy/toolshed/archive/bazel-v{version}.tar.gz"],
     ),
@@ -67,8 +67,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
     boringssl = dict(
         # To update BoringSSL, which tracks BCR tags, open https://registry.bazel.build/modules/boringssl
         # and select an appropriate tag for the new version.
-        version = "0.20250514.0",
-        sha256 = "71ef1eb84a035a033ad55867f89a141ddb2e5c5829dd4035ea7803bfff0257ed",
+        version = "0.20251124.0",
+        sha256 = "d47f89b894bf534c82071d7426c5abf1e5bd044fee242def53cd5d3d0f656c09",
         strip_prefix = "boringssl-{version}",
         urls = ["https://github.com/google/boringssl/archive/{version}.tar.gz"],
     ),
@@ -122,7 +122,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "c-ares-{version}",
         urls = ["https://github.com/c-ares/c-ares/releases/download/v{version}/c-ares-{version}.tar.gz"],
     ),
-    com_github_openhistogram_libcircllhist = dict(
+    libcircllhist = dict(
         version = "0.3.2",
         sha256 = "6dfbd649fde380f7a2256def43b9c6374c6d6fe768178b09e39eedf874b139f4",
         strip_prefix = "libcircllhist-py-{version}",
@@ -373,12 +373,6 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "msgpack-cxx-{version}",
         urls = ["https://github.com/msgpack/msgpack-c/releases/download/cpp-{version}/msgpack-cxx-{version}.tar.gz"],
     ),
-    com_github_google_jwt_verify = dict(
-        version = "b59e8075d4a4f975ba6f109e1916d6e60aeb5613",
-        sha256 = "637e4983506c4f26bbe2808ae4e1944e46cbb2277d34ff0b8a3b72bdac3c4b91",
-        strip_prefix = "jwt_verify_lib-{version}",
-        urls = ["https://github.com/google/jwt_verify_lib/archive/{version}.tar.gz"],
-    ),
     com_github_alibaba_hessian2_codec = dict(
         version = "6f5a64770f0374a761eece13c8863b80dc5adcd8",
         sha256 = "bb4c4af6a7e3031160bf38dfa957b0ee950e2d8de47d4ba14c7a658c3a2c74d1",
@@ -554,14 +548,10 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/simdutf/simdutf/releases/download/v{version}/singleheader.zip"],
     ),
     com_github_google_quiche = dict(
-        project_name = "QUICHE",
-        project_desc = "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols",
-        project_url = "https://github.com/google/quiche",
-        version = "f9b729501753d7d4dd61f8e868a1f4a38e5ece26",
-        sha256 = "0ed32ce64d6d3a9acd542c60301977fbbbb36a9bc0dc6b46d2f97cabbbcae3eb",
+        version = "b7b4c0cfe393a57b8706b0f1be81518595daaa44",
+        sha256 = "9d8344faf932165b6013f8fdd2cbfe2be7c2e7a5129c5e572036d13718a3f1bf",
         urls = ["https://github.com/google/quiche/archive/{version}.tar.gz"],
         strip_prefix = "quiche-{version}",
-        release_date = "2026-01-22",
     ),
     googleurl = dict(
         version = "dd4080fec0b443296c0ed0036e1e776df8813aa7",
@@ -588,10 +578,10 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/google/flatbuffers/archive/v{version}.tar.gz"],
     ),
     com_googlesource_code_re2 = dict(
-        version = "2023-11-01",
-        sha256 = "4e6593ac3c71de1c0f322735bc8b0492a72f66ffccfad76e259fa21c41d27d8a",
+        version = "2024-07-02",
+        sha256 = "a835fe55fbdcd8e80f38584ab22d0840662c67f2feb36bd679402da9641dc71e",
         strip_prefix = "re2-{version}",
-        urls = ["https://github.com/google/re2/archive/{version}.tar.gz"],
+        urls = ["https://github.com/google/re2/releases/download/{version}/re2-{version}.zip"],
     ),
     kafka_source = dict(
         version = "3.9.1",
@@ -604,12 +594,6 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "abe0212ecd3e7ed3c4818a4f2baf7bf916e845e902bb15ae48834ca2d36ac745",
         strip_prefix = "librdkafka-{version}",
         urls = ["https://github.com/confluentinc/librdkafka/archive/v{version}.tar.gz"],
-    ),
-    kafka_server_binary = dict(
-        version = "3.9.1",
-        sha256 = "dd4399816e678946cab76e3bd1686103555e69bc8f2ab8686cda71aa15bc31a3",
-        strip_prefix = "kafka_2.13-{version}",
-        urls = ["https://downloads.apache.org/kafka/{version}/kafka_2.13-{version}.tgz"],
     ),
     proxy_wasm_cpp_sdk = dict(
         version = "e5256b0c5463ea9961965ad5de3e379e00486640",
@@ -713,20 +697,20 @@ REPOSITORY_LOCATIONS_SPEC = dict(
     ),
     # Dependencies for fips - VERSIONS SHOULD NOT BE CHANGED
     fips_ninja = dict(
-        version = "1.13.1",
-        sha256 = "f0055ad0369bf2e372955ba55128d000cfcc21777057806015b45e4accbebf23",
+        version = "1.13.2",
+        sha256 = "974d6b2f4eeefa25625d34da3cb36bdcebe7fbce40f4c16ac0835fd1c0cbae17",
         strip_prefix = "ninja-{version}",
         urls = ["https://github.com/ninja-build/ninja/archive/refs/tags/v{version}.tar.gz"],
     ),
     fips_cmake_linux_x86_64 = dict(
-        version = "4.2.1",
-        sha256 = "c059bff1e97a2b6b5b0c0872263627486345ad0ed083298cb21cff2eda883980",
+        version = "4.2.3",
+        sha256 = "5bb505d5e0cca0480a330f7f27ccf52c2b8b5214c5bba97df08899f5ef650c23",
         strip_prefix = "cmake-{version}-linux-x86_64",
         urls = ["https://github.com/Kitware/CMake/releases/download/v{version}/cmake-{version}-linux-x86_64.tar.gz"],
     ),
     fips_cmake_linux_aarch64 = dict(
-        version = "4.2.1",
-        sha256 = "3e178207a2c42af4cd4883127f8800b6faf99f3f5187dccc68bfb2cc7808f5f7",
+        version = "4.2.3",
+        sha256 = "e529c75f18f27ba27c52b329efe7b1f98dc32ccc0c6d193c7ab343f888962672",
         strip_prefix = "cmake-{version}-linux-aarch64",
         urls = ["https://github.com/Kitware/CMake/releases/download/v{version}/cmake-{version}-linux-aarch64.tar.gz"],
     ),

@@ -39,10 +39,10 @@ envoy_cc_library(
         "//envoy/server:factory_context_interface",
         "//source/common/common:minimal_logger_lib",
         "//source/common/init:target_lib",
+        "//source/common/jwt:jwt_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/tracing:http_tracer_lib",
         "//source/extensions/filters/http/common:jwks_fetcher_lib",
-        "@com_github_google_jwt_verify//:jwt_verify_lib",
         "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3:pkg_cc_proto",
     ],
 )
@@ -55,8 +55,8 @@ envoy_cc_library(
         "jwks_async_fetcher_lib",
         ":jwt_cache_lib",
         "//source/common/config:datasource_lib",
+        "//source/common/jwt:jwt_lib",
         "//source/common/router:retry_policy_lib",
-        "@com_github_google_jwt_verify//:jwt_verify_lib",
         "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3:pkg_cc_proto",
     ],
 )
@@ -85,7 +85,7 @@ envoy_cc_library(
         ":matchers_lib",
         "//envoy/http:filter_interface",
         "//source/common/http:headers_lib",
-        "@com_github_google_jwt_verify//:jwt_verify_lib",
+        "//source/common/jwt:jwt_lib",
     ],
 )
 
@@ -147,9 +147,9 @@ envoy_cc_library(
     srcs = ["jwt_cache.cc"],
     hdrs = ["jwt_cache.h"],
     deps = [
+        "//source/common/jwt:jwt_lib",
+        "//source/common/jwt:simple_lru_cache_lib",
         "//source/common/protobuf:utility_lib",
-        "@com_github_google_jwt_verify//:jwt_verify_lib",
-        "@com_github_google_jwt_verify//:simple_lru_cache_lib",
         "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3:pkg_cc_proto",
     ],
 )

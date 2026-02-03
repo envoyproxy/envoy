@@ -43,7 +43,7 @@ envoy_cc_library(
     hdrs = ["context_provider.h"],
     deps = [
         "//envoy/common:callback",
-        "@com_github_cncf_xds//xds/core/v3:pkg_cc_proto",
+        "@xds//xds/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -89,8 +89,8 @@ envoy_cc_library(
         ":custom_config_validators_interface",
         ":subscription_interface",
         "//envoy/common:backoff_strategy_interface",
-        "@com_github_cncf_xds//xds/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@xds//xds/core/v3:pkg_cc_proto",
     ],
 )
 
