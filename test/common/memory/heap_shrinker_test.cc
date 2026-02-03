@@ -1,3 +1,5 @@
+#include "envoy/config/overload/v3/overload.pb.h"
+
 #include "source/common/event/dispatcher_impl.h"
 #include "source/common/memory/heap_shrinker.h"
 #include "source/common/memory/stats.h"
@@ -81,6 +83,76 @@ TEST_F(HeapShrinkerTest, ShrinkWhenTriggered) {
   step();
   step();
   EXPECT_EQ(2, shrink_count.value());
+}
+
+TEST_F(HeapShrinkerTest, CustomTimerInterval) {
+  Server::OverloadActionCb action_cb;
+  envoy::config::overload::v3::ShrinkHeapConfig config;
+  config.mutable_timer_interval()->set_seconds(5);
+  EXPECT_CALL(overload_manager_, getShrinkHeapConfig())
+      .WillRepeatedly(Return(absl::make_optional(config)));
+  EXPECT_CALL(overload_manager_, registerForAction(_, _, _))
+      .WillOnce(Invoke([&](const std::string&, Event::Dispatcher&, Server::OverloadActionCb cb) {
+        action_cb = cb;
+        return true;
+      }));
+
+  HeapShrinker h(dispatcher_, overload_manager_, *stats_.rootScope());
+
+  Envoy::Stats::Counter& shrink_count =
+      stats_.counter("overload.envoy.overload_actions.shrink_heap.shrink_count");
+  action_cb(Server::OverloadActionState::saturated());
+
+  // With 5 second interval, advancing 5 seconds should trigger one shrink
+  time_system_.advanceTimeAndRun(std::chrono::milliseconds(5000), dispatcher_,
+                                 Event::Dispatcher::RunType::NonBlock);
+  EXPECT_EQ(1, shrink_count.value());
+
+  // Advance another 5 seconds should trigger another shrink
+  time_system_.advanceTimeAndRun(std::chrono::milliseconds(5000), dispatcher_,
+                                 Event::Dispatcher::RunType::NonBlock);
+  EXPECT_EQ(2, shrink_count.value());
+}
+
+TEST_F(HeapShrinkerTest, CustomMaxUnfreedMemoryBytes) {
+  Server::OverloadActionCb action_cb;
+  envoy::config::overload::v3::ShrinkHeapConfig config;
+  config.set_max_unfreed_memory_bytes(50 * 1024 * 1024); // 50MB
+  EXPECT_CALL(overload_manager_, getShrinkHeapConfig())
+      .WillRepeatedly(Return(absl::make_optional(config)));
+  EXPECT_CALL(overload_manager_, registerForAction(_, _, _))
+      .WillOnce(Invoke([&](const std::string&, Event::Dispatcher&, Server::OverloadActionCb cb) {
+        action_cb = cb;
+        return true;
+      }));
+
+  HeapShrinker h(dispatcher_, overload_manager_, *stats_.rootScope());
+
+  Envoy::Stats::Counter& shrink_count =
+      stats_.counter("overload.envoy.overload_actions.shrink_heap.shrink_count");
+  action_cb(Server::OverloadActionState::saturated());
+  step();
+  EXPECT_EQ(1, shrink_count.value());
+}
+
+TEST_F(HeapShrinkerTest, NoConfigUsesDefaults) {
+  Server::OverloadActionCb action_cb;
+  EXPECT_CALL(overload_manager_, getShrinkHeapConfig()).WillRepeatedly(Return(absl::nullopt));
+  EXPECT_CALL(overload_manager_, registerForAction(_, _, _))
+      .WillOnce(Invoke([&](const std::string&, Event::Dispatcher&, Server::OverloadActionCb cb) {
+        action_cb = cb;
+        return true;
+      }));
+
+  HeapShrinker h(dispatcher_, overload_manager_, *stats_.rootScope());
+
+  Envoy::Stats::Counter& shrink_count =
+      stats_.counter("overload.envoy.overload_actions.shrink_heap.shrink_count");
+  action_cb(Server::OverloadActionState::saturated());
+
+  // Default is 10 seconds, so 10 second advance should trigger shrink
+  step();
+  EXPECT_EQ(1, shrink_count.value());
 }
 
 } // namespace

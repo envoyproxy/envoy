@@ -137,6 +137,21 @@ message ScaleTimersOverloadActionConfig {
   repeated ScaleTimer timer_scale_factors = 1 [(validate.rules).repeated = {min_items: 1}];
 }
 
+// Typed configuration for the "envoy.overload_actions.shrink_heap" action.
+// See :ref:`the docs <config_overload_manager_shrink_heap>` for an example of how to configure
+// this action.
+message ShrinkHeapConfig {
+  // The interval at which shrink heap action checks if memory should be released.
+  // If not specified, defaults to 10 seconds.
+  google.protobuf.Duration timer_interval = 1;
+
+  // Maximum amount of unfreed memory in bytes to keep before releasing memory
+  // back to the system. This is used as the threshold passed to
+  // tcmalloc::MallocExtension::ReleaseMemoryToSystem().
+  // If not specified, defaults to 104857600 (100MB).
+  uint64 max_unfreed_memory_bytes = 2;
+}
+
 message OverloadAction {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.overload.v2alpha.OverloadAction";

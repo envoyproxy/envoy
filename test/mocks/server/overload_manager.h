@@ -38,6 +38,8 @@ public:
   MOCK_METHOD(ThreadLocalOverloadState&, getThreadLocalOverloadState, ());
   MOCK_METHOD(LoadShedPoint*, getLoadShedPoint, (absl::string_view));
   MOCK_METHOD(void, stop, ());
+  MOCK_METHOD(absl::optional<envoy::config::overload::v3::ShrinkHeapConfig>, getShrinkHeapConfig,
+              (), (const, override));
 
   testing::NiceMock<MockThreadLocalOverloadState> overload_state_;
 };
