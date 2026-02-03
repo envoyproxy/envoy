@@ -1,10 +1,11 @@
 #pragma once
 
-#include "google/protobuf/io/coded_stream.h"
-#include "io/prometheus/client/metrics.pb.h"
+#include "source/common/protobuf/protobuf.h"
 
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/cluster_manager.h"
+
+#include "io/prometheus/client/metrics.pb.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -146,8 +147,8 @@ public:
 std::vector<io::prometheus::client::MetricFamily> parsePrometheusProtobuf(absl::string_view data) {
   std::vector<io::prometheus::client::MetricFamily> families;
 
-  google::protobuf::io::ArrayInputStream array_stream(data.data(), data.size());
-  google::protobuf::io::CodedInputStream coded_stream(&array_stream);
+  Protobuf::io::ArrayInputStream array_stream(data.data(), data.size());
+  Protobuf::io::CodedInputStream coded_stream(&array_stream);
 
   while (true) {
     // Read the varint length prefix.

@@ -17,8 +17,8 @@
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/integration/utility.h"
-#include "test/test_common/utility.h"
 #include "test/test_common/stats_utility.h"
+#include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
@@ -490,7 +490,7 @@ TEST_P(IntegrationAdminTest, AdminPrometheusProtobufFormat) {
             "proto=io.prometheus.client.MetricFamily; encoding=delimited",
             response->headers().getContentTypeValue());
 
-  // Validate that it is well-formed protobuf outout.
+  // Validate that it is well-formed protobuf output.
   auto families = parsePrometheusProtobuf(response->body());
   EXPECT_GT(families.size(), 0);
 

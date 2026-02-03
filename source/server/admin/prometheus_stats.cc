@@ -9,10 +9,9 @@
 #include "source/common/stats/histogram_impl.h"
 #include "source/common/upstream/host_utility.h"
 
-#include "io/prometheus/client/metrics.pb.h"
-
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_replace.h"
+#include "io/prometheus/client/metrics.pb.h"
 
 namespace Envoy {
 namespace Server {
@@ -383,8 +382,7 @@ private:
   }
 
   // Write a varint-length-delimited protobuf message to the buffer.
-  void writeDelimitedMessage(const google::protobuf::MessageLite& message,
-                             Buffer::Instance& output) const {
+  void writeDelimitedMessage(const Protobuf::MessageLite& message, Buffer::Instance& output) const {
     constexpr size_t kMaxVarintLength = 10; // This is documented, but not exported as a constant.
 
     const size_t length = message.ByteSizeLong();
