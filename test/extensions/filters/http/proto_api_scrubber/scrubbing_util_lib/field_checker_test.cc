@@ -1312,7 +1312,8 @@ TEST_F(FieldCheckerTest, NoMatchFoundForMessageField) {
   EXPECT_EQ(field_checker.CheckField({"some_message_field"}, &field), FieldCheckResults::kPartial);
 }
 
-// Tests that when `field` is nullptr (indicating an unknown field), CheckField returns kInclude.
+// Tests that when `field` is nullptr (indicating an unknown field), CheckField returns kExclude
+// during request scrubbing.
 TEST_F(FieldCheckerTest, UnknownFieldIsNull) {
   ProtoApiScrubberConfig config;
   initializeFilterConfig(config);
@@ -1323,7 +1324,22 @@ TEST_F(FieldCheckerTest, UnknownFieldIsNull) {
 
   // Pass nullptr to simulate an unknown field.
   EXPECT_EQ(field_checker.CheckField({"some", "unknown", "field"}, nullptr),
-            FieldCheckResults::kInclude);
+            FieldCheckResults::kExclude);
+}
+
+// Tests that when `field` is nullptr (indicating an unknown field), CheckField returns kExclude
+// during response scrubbing.
+TEST_F(FieldCheckerTest, UnknownFieldIsNullResponseScrubbing) {
+  ProtoApiScrubberConfig config;
+  initializeFilterConfig(config);
+
+  NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
+  FieldChecker field_checker(ScrubberContext::kResponseScrubbing, &mock_stream_info, {}, {}, {}, {},
+                             "/apikeys.ApiKeys/CreateApiKey", filter_config_.get());
+
+  // Pass nullptr to simulate an unknown field.
+  EXPECT_EQ(field_checker.CheckField({"some", "unknown", "field"}, nullptr),
+            FieldCheckResults::kExclude);
 }
 
 } // namespace

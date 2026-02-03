@@ -40,6 +40,9 @@ minor_behavior_changes:
     Updated libcircllhist to 0.3.2, which changes how bucket bounds are interpreted. This should not impact
     production monitoring if the number of samples in the histograms is high. Affected tests were adjusted
     to account for histogram changes.
+- area: proto_api_scrubber
+  change: |
+    Unknown fields will now be scrubbed.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
