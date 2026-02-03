@@ -947,8 +947,8 @@ TEST_F(McpJsonParserTest, FromProtoConfig) {
   ASSERT_EQ(fields.size(), 2);
   EXPECT_EQ(fields[0].path, "params.field1");
   EXPECT_EQ(fields[1].path, "params.field2");
-  EXPECT_FALSE(fields[0].optional);
-  EXPECT_TRUE(fields[1].optional);
+  EXPECT_FALSE(fields[0].is_optional);
+  EXPECT_TRUE(fields[1].is_optional);
 
   // Default fields should still be there (implicit in implementation)
   EXPECT_TRUE(config.getAlwaysExtract().contains("jsonrpc"));

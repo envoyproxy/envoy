@@ -212,7 +212,7 @@ void McpParserConfig::buildMethodRequirements(
   optional_set.reserve(total_rules);
 
   auto add_rule = [&](const AttributeExtractionRule& rule) {
-    if (rule.optional) {
+    if (rule.is_optional) {
       if (required_set.contains(rule.path)) {
         return;
       }

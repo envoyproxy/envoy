@@ -101,12 +101,16 @@ public:
     std::vector<std::string> optional;
   };
 
+  // Rule for extracting a specific attribute from the JSON payload.
   struct AttributeExtractionRule {
-    std::string path; // JSON path (e.g., "params.name")
-    bool optional{false};
+    // JSON path to extract (e.g., "params.name", "params.uri").
+    std::string path;
+    // When true, this field is best-effort: parsing will continue without it,
+    // but missing it (e.g., due to hitting max_request_body_size) won't cause rejection.
+    bool is_optional{false};
 
-    AttributeExtractionRule(const std::string& p, bool is_optional = false)
-        : path(p), optional(is_optional) {}
+    AttributeExtractionRule(const std::string& p, bool optional = false)
+        : path(p), is_optional(optional) {}
   };
 
   // Method config entry for user-configured rules
