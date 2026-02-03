@@ -6,6 +6,7 @@ uncomment.sh "$1" --comment -h \
   --sed '/base\.h/a#include <ossl/openssl/err.h>' \
   --sed '/OPENSSL_INLINE int ERR_GET_LIB/i#define ERR_GET_LIB(packed_error) ossl_ERR_GET_LIB(packed_error)' \
   --sed '/OPENSSL_INLINE int ERR_GET_REASON/i#define ERR_GET_REASON(packed_error) ossl_ERR_GET_REASON(packed_error)' \
+  --uncomment-regex-range 'OPENSSL_INLINE int ERR_equals' '}' \
   --uncomment-func-decl ERR_get_error \
   --uncomment-func-decl ERR_peek_error \
   --uncomment-func-decl ERR_peek_error_line_data \

@@ -29,6 +29,8 @@ patched_bssl_filegroup(
         "crypto/test/test_data.h",
         "crypto/test/test_util.cc",
         "crypto/test/test_util.h",
+        "crypto/test/der_trailing_data.h",
+        "crypto/test/der_trailing_data.cc",
         "crypto/x509/x509_test.cc",
         "ssl/ssl_c_test.c",
         "ssl/ssl_test.cc",

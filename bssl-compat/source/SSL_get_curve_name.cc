@@ -31,7 +31,6 @@ static const struct KnownCurveCandidate kCurveCandidates[] = {
     {ossl_NID_secp192k1, 18, ""},
     {ossl_NID_X9_62_prime192v1, 19, "P-192"},
     {ossl_NID_secp224k1, 20, ""},
-    {ossl_NID_secp224r1, SSL_GROUP_SECP224R1, "P-224"},
     {ossl_NID_secp256k1, 22, ""},
     {ossl_NID_X9_62_prime256v1, SSL_GROUP_SECP256R1, "P-256"},
     {ossl_NID_secp384r1, SSL_GROUP_SECP384R1, "P-384"},

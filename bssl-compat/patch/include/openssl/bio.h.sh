@@ -4,7 +4,6 @@ set -euo pipefail
 
 uncomment.sh "$1" --comment -h \
   --uncomment-macro-redef 'BIO_R_[[:alnum:]_]*' \
-  --uncomment-struct bio_method_st \
   --uncomment-macro BIO_C_SET_FD \
   --uncomment-macro BIO_C_GET_FD \
   --uncomment-typedef bio_info_cb \

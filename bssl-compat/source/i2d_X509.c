@@ -17,7 +17,7 @@
  * which must have enough space available, and advances *outp just past the
  * output.
  */
-int i2d_X509(X509 *x509, uint8_t **outp) {
+int i2d_X509(const X509 *x509, uint8_t **outp) {
   ossl_BIO *bio = ossl.ossl_BIO_new(ossl.ossl_BIO_s_mem());
   int length = -1;
 

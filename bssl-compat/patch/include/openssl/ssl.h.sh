@@ -203,7 +203,6 @@ uncomment.sh "$1" --comment -h \
   --uncomment-func-decl SSL_get_all_signature_algorithm_names \
   --uncomment-func-decl SSL_get_all_version_names \
   --uncomment-func-decl SSL_get_all_curve_names \
-  --uncomment-macro SSL_GROUP_SECP224R1 \
   --uncomment-macro SSL_GROUP_SECP256R1 \
   --uncomment-macro SSL_GROUP_SECP384R1 \
   --uncomment-macro SSL_GROUP_SECP521R1 \

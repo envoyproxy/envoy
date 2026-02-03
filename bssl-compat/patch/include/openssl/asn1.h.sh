@@ -20,6 +20,7 @@ uncomment.sh "$1" --comment -h \
   --uncomment-func-decl ASN1_IA5STRING_free \
   --uncomment-func-decl ASN1_INTEGER_new \
   --uncomment-func-decl ASN1_INTEGER_free \
+  --uncomment-func-decl ASN1_INTEGER_set_uint64 \
   --uncomment-func-decl c2i_ASN1_INTEGER \
   --uncomment-func-decl ASN1_INTEGER_to_BN \
   --uncomment-func-decl ASN1_TIME_new \

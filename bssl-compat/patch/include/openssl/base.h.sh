@@ -97,6 +97,7 @@ uncomment.sh "$1" --comment -h \
   --uncomment-macro BORINGSSL_MAKE_DELETER \
   --uncomment-macro BORINGSSL_MAKE_UP_REF \
   --uncomment-macro OPENSSL_PRINTF_FORMAT_FUNC \
+  --uncomment-macro BSSL_CHECK \
   --uncomment-macro BSSL_NAMESPACE_BEGIN \
   --uncomment-macro BSSL_NAMESPACE_END \
   --uncomment-regex-range 'template\s*<typename\s*T,\s*typename\s*Enable\s*=\s*void>' 'struct\s*DeleterImpl\s*{};' \
