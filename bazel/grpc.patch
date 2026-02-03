@@ -66,6 +66,18 @@ index 0a8eebafb9..6d4f158719 100644
      ],
  )
  
+diff --git a/src/core/channelz/v2tov1/property_list.cc b/src/core/channelz/v2tov1/property_list.cc
+index 64bbb6307c..03367cce7c 100644
+--- a/src/core/channelz/v2tov1/property_list.cc
++++ b/src/core/channelz/v2tov1/property_list.cc
+@@ -15,6 +15,7 @@
+ #include "src/core/channelz/v2tov1/property_list.h"
+ 
+ #include <cstdint>
++#include <limits>
+ #include <optional>
+ #include <string>
+ 
 diff --git a/src/core/lib/promise/detail/promise_factory.h b/src/core/lib/promise/detail/promise_factory.h
 index 3fb5d68146..583a2f9553 100644
 --- a/src/core/lib/promise/detail/promise_factory.h
