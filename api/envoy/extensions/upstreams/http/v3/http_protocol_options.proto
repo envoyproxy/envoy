@@ -229,7 +229,7 @@ message HttpProtocolOptions {
 message EndpointSpecificHttpProtocolOptions {
   // Defines endpoint-specific HTTP protocol options. These options
   // are only applied to endpoints for each their metadata match the
-  // `endpoint_metadata_match` field. Otherwise the endpoint will
+  // ``endpoint_metadata_match`` field. Otherwise the endpoint will
   // pick the cluster's protocol options.
   message EndpointSpecificOptions {
     // Endpoint-specific HTTP/2 protocol options.
