@@ -141,6 +141,12 @@ new_features:
     Extended ``*_WITHOUT_PORT`` address formatters to accept an optional ``MASK_PREFIX_LEN`` parameter
     that masks IP addresses and returns them in CIDR notation (e.g., ``%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT(16)%``
     returns ``10.1.0.0/16`` for client IP ``10.1.10.23``).
+- area: stat_sinks
+  change: |
+    Added support for exporting OpenTelemetry metrics via HTTP. The new ``http_service`` field
+    in :ref:`SinkConfig <envoy_v3_api_msg_extensions.stat_sinks.open_telemetry.v3.SinkConfig>`
+    enables direct OTLP metrics export to backends that only accept HTTP (Dynatrace, Datadog, Elastic),
+    without requiring an intermediate collector sidecar.
 - area: ratelimit
   change: |
     Added support for shadow mode in the local rate limit filter.
