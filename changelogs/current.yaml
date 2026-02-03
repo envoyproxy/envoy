@@ -116,6 +116,9 @@ minor_behavior_changes:
   change: |
     Added ``server_half_closed`` counter to the ext_proc filter stats in the
     ``http.<stat_prefix>.ext_proc.`` namespace.
+- area: proto_api_scrubber
+  change: |
+    Unknown fields will now be scrubbed.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
