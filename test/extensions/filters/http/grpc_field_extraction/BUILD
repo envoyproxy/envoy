@@ -12,6 +12,18 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
+envoy_extension_cc_test(
+    name = "config_test",
+    srcs = ["config_test.cc"],
+    data = ["//test/proto:apikeys_proto_descriptor"],
+    extension_names = ["envoy.filters.http.grpc_field_extraction"],
+    deps = [
+        "//source/extensions/filters/http/grpc_field_extraction:config",
+        "//test/mocks/server:factory_context_mocks",
+        "//test/test_common:environment_lib",
+    ],
+)
+
 envoy_cc_test(
     name = "filter_test",
     srcs = ["filter_test.cc"],
