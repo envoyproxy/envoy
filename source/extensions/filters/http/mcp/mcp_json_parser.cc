@@ -623,7 +623,7 @@ bool McpFieldExtractor::hasAllRequiredFields() {
 }
 
 void McpFieldExtractor::copySelectedFields() {
-  std::unordered_set<std::string> copied_fields;
+  absl::flat_hash_set<std::string> copied_fields;
 
   for (const auto& field : config_.getAlwaysExtract()) {
     if (copied_fields.insert(field).second) {
