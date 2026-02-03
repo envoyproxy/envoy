@@ -43,11 +43,11 @@ message FileServerConfig {
     }
 
     // Attempts to serve the given file within the directory, e.g. ``index.html``.
-    // Precisely one of `default_file` and `list` must be set per `DirectoryBehavior`.
+    // Precisely one of ``default_file`` and ``list`` must be set per ``DirectoryBehavior``.
     string default_file = 1 [(validate.rules).string = {pattern: "^[^/]*$"}];
 
     // Responds with an html formatted list of the files and subdirectories in the directory.
-    // Precisely one of `default_file` and `list` must be set per `DirectoryBehavior`.
+    // Precisely one of ``default_file`` and ``list`` must be set per ``DirectoryBehavior``.
     // [#not-implemented-hide:] Directory operations currently have no async implementation.
     List list = 2;
   }
