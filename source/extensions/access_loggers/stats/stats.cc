@@ -15,21 +15,24 @@ namespace {
 class AccessLogState : public StreamInfo::FilterState::Object {
 public:
   ~AccessLogState() override {
-    for (const auto& [gauge, value] : inflight_gauges_) {
-      gauge->sub(value);
+    for (const auto& [gauge, value_pair] : inflight_gauges_) {
+      // Use the shared pointer to ensure the gauge is still valid.
+      value_pair.first->sub(value_pair.second);
     }
   }
 
   // The Stats::Gauge pointer is used as a key in the set. The memory address of the Gauge object is
   // unique for the lifetime of that specific gauge and serves as a unique identifier.
-  void addInflightGauge(Stats::Gauge* gauge, uint64_t value) { inflight_gauges_[gauge] = value; }
+  void addInflightGauge(Stats::Gauge* gauge, uint64_t value) {
+    inflight_gauges_[gauge] = std::make_pair(Stats::GaugeSharedPtr(gauge), value);
+  }
 
   absl::optional<uint64_t> removeInflightGauge(Stats::Gauge* gauge) {
     auto it = inflight_gauges_.find(gauge);
     if (it == inflight_gauges_.end()) {
       return absl::nullopt;
     }
-    uint64_t value = it->second;
+    uint64_t value = it->second.second;
     inflight_gauges_.erase(it);
     return value;
   }
@@ -40,7 +43,9 @@ public:
   }
 
 private:
-  absl::flat_hash_map<Stats::Gauge*, uint64_t> inflight_gauges_;
+  // The map value holds a shared pointer to the gauge (GaugeSharedPtr) to prevent the gauge from
+  // being destroyed if it gets evicted from the stats scope while still in-flight.
+  absl::flat_hash_map<Stats::Gauge*, std::pair<Stats::GaugeSharedPtr, uint64_t>> inflight_gauges_;
 };
 
 Formatter::FormatterProviderPtr
@@ -150,8 +155,7 @@ StatsAccessLog::StatsAccessLog(const envoy::extensions::access_loggers::stats::v
           if ((add_count > 0 || subtract_count > 0) && (add_count != 1 || subtract_count != 1)) {
             throw EnvoyException(
                 "Stats logger gauge must have exactly one PAIRED_ADD and one PAIRED_SUBTRACT "
-                "operation defined if "
-                "either is present.");
+                "operation defined if either is present.");
           }
 
           if (operations.empty()) {
