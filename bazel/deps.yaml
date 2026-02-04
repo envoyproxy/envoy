@@ -563,7 +563,7 @@ com_google_absl:
   project_name: "Abseil"
   project_desc: "Open source collection of C++ libraries drawn from the most fundamental pieces of Google’s internal codebase"
   project_url: "https://abseil.io/"
-  release_date: "2025-09-22"
+  release_date: "2026-01-07"
   use_category:
   - dataplane_core
   - controlplane
