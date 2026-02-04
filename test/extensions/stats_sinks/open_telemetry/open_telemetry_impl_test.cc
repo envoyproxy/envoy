@@ -1216,9 +1216,9 @@ public:
               (const, override));
 };
 
-class OpenTelemetryGrpcSinkTests : public OpenTelemetryStatsSinkTests {
+class OpenTelemetrySinkTests : public OpenTelemetryStatsSinkTests {
 public:
-  OpenTelemetryGrpcSinkTests()
+  OpenTelemetrySinkTests()
       : flusher_(std::make_shared<MockOtlpMetricsFlusher>()),
         exporter_(std::make_shared<MockOpenTelemetryGrpcMetricsExporter>()) {}
 
@@ -1226,9 +1226,9 @@ public:
   std::shared_ptr<MockOpenTelemetryGrpcMetricsExporter> exporter_;
 };
 
-TEST_F(OpenTelemetryGrpcSinkTests, BasicFlow) {
+TEST_F(OpenTelemetrySinkTests, BasicFlow) {
   // Initialize the sink with a created_at time of 1000.
-  OpenTelemetryGrpcSink sink(flusher_, exporter_, /*create_time_ns=*/1000);
+  OpenTelemetrySink sink(flusher_, exporter_, /*create_time_ns=*/1000);
 
   // First flush: last_flush_time_ns should be the created_at value (1000).
   MetricsExportRequestPtr request1 = std::make_unique<MetricsExportRequest>();
