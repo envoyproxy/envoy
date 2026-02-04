@@ -152,7 +152,7 @@ private:
     if (!transformed_new_data_or_error.ok()) {
       // Log an error but don't fail the watch to avoid throwing EnvoyException at runtime.
       ENVOY_LOG_TO_LOGGER(Logger::Registry::getLog(Logger::Id::config), error,
-                          "Failed to transform data from file: {}",
+                          "Failed to transform data from file '{}': {}", filename_,
                           transformed_new_data_or_error.status().message());
       return absl::OkStatus();
     }
