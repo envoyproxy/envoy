@@ -4,6 +4,7 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/network/application_protocol.h"
 #include "source/common/network/downstream_network_namespace.h"
+#include "source/common/network/filter_state_proxy_info.h"
 #include "source/common/network/proxy_protocol_filter_state.h"
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/network/upstream_server_name.h"
@@ -198,6 +199,17 @@ TEST_F(TransportSocketOptionsImplTest, NetworkNamespaceDynamicObject) {
   // options.
   auto transport_socket_options = TransportSocketOptionsUtility::fromFilterState(filter_state_);
   EXPECT_EQ(nullptr, transport_socket_options);
+}
+
+TEST_F(TransportSocketOptionsImplTest, Http11ProxyInfoFromWellKnownKey) {
+  setFilterStateObject(Http11ProxyInfoFilterState::key(), "www.example.com:443,127.0.0.1:15002");
+
+  auto transport_socket_options = TransportSocketOptionsUtility::fromFilterState(filter_state_);
+  ASSERT_NE(nullptr, transport_socket_options);
+  ASSERT_TRUE(transport_socket_options->http11ProxyInfo().has_value());
+  EXPECT_EQ("www.example.com:443", transport_socket_options->http11ProxyInfo()->hostname);
+  EXPECT_EQ("127.0.0.1:15002",
+            transport_socket_options->http11ProxyInfo()->proxy_address->asStringView());
 }
 
 } // namespace
