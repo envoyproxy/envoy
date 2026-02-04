@@ -677,7 +677,7 @@ TEST_F(McpJsonParserTest, OptionalFieldConfigDetection) {
       R"({"jsonrpc": "2.0", "method": "tools/call", "id": 1, "params": {"name": "tool"}})";
 
   EXPECT_OK(parser->parse(json));
-  EXPECT_TRUE(parser->hasOptionalFields()); // params._meta is always o tional
+  EXPECT_TRUE(parser->hasOptionalFields());
   EXPECT_TRUE(parser->hasAllRequiredFields());
 
   const auto* meta = parser->getNestedValue("params._meta");
