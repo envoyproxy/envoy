@@ -85,6 +85,11 @@ bug_fixes:
   change: |
     Fixed the log formatter in HTTP router upstream logs by correctly setting the downstream connection's
     ``ConnectionInfoProvider`` in the ``StreamInfo``.
+- area: odcds
+  change: |
+    Fixed a crash (SIGABRT) when destroying OdCDS handles on worker threads. The handle no longer holds
+    a direct reference to the subscription, preventing thread-safety issues during destruction. The
+    subscription now persists in ClusterManagerImpl and is looked up by a config source key.
 - area: ext_authz
   change: |
     Fixed the HTTP ext_authz client to respect ``status_on_error`` configuration when the authorization
