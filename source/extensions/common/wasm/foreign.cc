@@ -135,7 +135,7 @@ RegisterForeignFunction registerSignForeignFunction(
     [](WasmBase&, std::string_view arguments,
        const std::function<void*(size_t size)>& alloc_result) -> WasmResult {
       envoy::source::extensions::common::wasm::SignArguments args;
-      if (args.ParseFromArray(arguments.data(), arguments.size())) {
+      if (args.ParseFromString(arguments)) {
         const auto& hash = args.hash_function();
         auto text_str = args.text();
 
