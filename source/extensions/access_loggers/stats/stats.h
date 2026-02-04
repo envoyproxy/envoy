@@ -70,9 +70,11 @@ private:
     NameAndTags stat_;
     Formatter::FormatterProviderPtr value_formatter_;
     uint64_t value_fixed_;
-    absl::flat_hash_map<
-        envoy::data::accesslog::v3::AccessLogType,
-        envoy::extensions::access_loggers::stats::v3::Config::Gauge::Operation::OperationType>
+    absl::InlinedVector<
+        std::pair<
+            envoy::data::accesslog::v3::AccessLogType,
+            envoy::extensions::access_loggers::stats::v3::Config::Gauge::Operation::OperationType>,
+        2>
         operations_;
   };
 

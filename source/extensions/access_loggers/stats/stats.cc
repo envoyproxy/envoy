@@ -100,25 +100,28 @@ StatsAccessLog::StatsAccessLog(const envoy::extensions::access_loggers::stats::v
       gauges_([&]() {
         std::vector<Gauge> gauges;
         for (const auto& gauge_cfg : config.gauges()) {
-          absl::flat_hash_map<
-              envoy::data::accesslog::v3::AccessLogType,
-              envoy::extensions::access_loggers::stats::v3::Config::Gauge::Operation::OperationType>
+          absl::InlinedVector<std::pair<envoy::data::accesslog::v3::AccessLogType,
+                                        envoy::extensions::access_loggers::stats::v3::Config::
+                                            Gauge::Operation::OperationType>,
+                              2>
               operations;
 
           int add_count = 0;
           int subtract_count = 0;
 
           for (const auto& trigger : gauge_cfg.operations()) {
-            if (operations.contains(trigger.log_type())) {
-              throw EnvoyException(
-                  fmt::format("Duplicate access log type '{}' in gauge operations.",
-                              static_cast<int>(trigger.log_type())));
+            for (const auto& op : operations) {
+              if (op.first == trigger.log_type()) {
+                throw EnvoyException(
+                    fmt::format("Duplicate access log type '{}' in gauge operations.",
+                                static_cast<int>(trigger.log_type())));
+              }
             }
             if (trigger.operation_type() == envoy::extensions::access_loggers::stats::v3::Config::
                                                 Gauge::Operation::UNSPECIFIED) {
               throw EnvoyException("Stats logger gauge operation cannot be UNSPECIFIED.");
             }
-            operations[trigger.log_type()] = trigger.operation_type();
+            operations.emplace_back(trigger.log_type(), trigger.operation_type());
 
             if (trigger.operation_type() ==
                 envoy::extensions::access_loggers::stats::v3::Config::Gauge::Operation::ADD) {
@@ -271,7 +274,8 @@ void StatsAccessLog::emitLogConst(const Formatter::Context& context,
 
 void StatsAccessLog::emitLogForGauge(const Gauge& gauge, const Formatter::Context& context,
                                      const StreamInfo::StreamInfo& stream_info) const {
-  auto it = gauge.operations_.find(context.accessLogType());
+  auto it = std::find_if(gauge.operations_.begin(), gauge.operations_.end(),
+                         [&](const auto& op) { return op.first == context.accessLogType(); });
   if (it == gauge.operations_.end()) {
     return;
   }

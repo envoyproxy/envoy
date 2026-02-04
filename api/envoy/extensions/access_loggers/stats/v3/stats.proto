@@ -132,7 +132,10 @@ message Config {
   // i). Only one ADD/SUBTRACT pair at most can be defined in the
   // ``operations``. Add/Subtract not matched with the other isn't
   // allowed.
-  // ii). During runtime, SUBTRACT will execute if and only ADD operation has
+  // ii). We only support add first then subtract logic and we rely on the
+  // symmetrical log types (e.g., DownstreamStart/DownstreamEnd) to increment
+  // and decrement the gauge.
+  // iii). During runtime, SUBTRACT will execute if and only ADD operation has
   // been done, tracked by inflight counter in filter state.
   message Gauge {
     // An operation to perform on the gauge.
