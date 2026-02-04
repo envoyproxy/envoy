@@ -95,7 +95,7 @@ envoy_cc_test(
     repository = "@envoy",
     deps = [
         ":quiche_common_platform_test",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/strings",
     ],
 )
 
@@ -177,8 +177,8 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform_export",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:variant",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/types:variant",
     ],
 )
 
@@ -444,8 +444,8 @@ envoy_cc_library(
         ":http2_header_byte_listener_interface_lib",
         ":http2_no_op_headers_handler_lib",
         ":quiche_common_callbacks",
-        "@com_google_absl//absl/algorithm",
-        "@com_google_absl//absl/cleanup",
+        "@abseil-cpp//absl/algorithm",
+        "@abseil-cpp//absl/cleanup",
     ],
 )
 
@@ -608,7 +608,7 @@ envoy_cc_test(
         ":quiche_common_platform_expect_bug",
         ":quiche_common_platform_export",
         ":quiche_common_platform_test",
-        "@com_google_absl//absl/functional:bind_front",
+        "@abseil-cpp//absl/functional:bind_front",
     ],
 )
 
@@ -2265,7 +2265,7 @@ envoy_quic_cc_library(
         ":quic_platform_export",
         ":quiche_common_platform",
         ":quiche_common_text_utils_lib",
-        "@com_google_absl//absl/strings:str_format",
+        "@abseil-cpp//absl/strings:str_format",
     ],
 )
 
@@ -2397,8 +2397,8 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform_logging",
-        "@com_google_absl//absl/status",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/strings",
     ],
 )
 
@@ -2636,8 +2636,8 @@ envoy_quic_cc_library(
         ":quic_core_data_lib",
         ":quic_platform_base",
         ":quiche_common_endian_lib",
-        "@com_google_absl//absl/base:core_headers",
-        "@com_google_absl//absl/container:node_hash_map",
+        "@abseil-cpp//absl/base:core_headers",
+        "@abseil-cpp//absl/container:node_hash_map",
     ],
 )
 
@@ -2759,9 +2759,9 @@ envoy_cc_library(
     copts = quiche_copts,
     repository = "@envoy",
     deps = [
-        "@com_google_absl//absl/base:core_headers",
-        "@com_google_absl//absl/status",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/base:core_headers",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/strings",
     ],
 )
 
@@ -2775,7 +2775,7 @@ envoy_cc_library(
         ":quiche_common_lib",
         ":quiche_common_platform_logging",
         ":quiche_common_status_utils",
-        "@com_google_absl//absl/status:statusor",
+        "@abseil-cpp//absl/status:statusor",
     ],
 )
 
@@ -2787,8 +2787,8 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform_export",
-        "@com_google_absl//absl/functional:any_invocable",
-        "@com_google_absl//absl/functional:function_ref",
+        "@abseil-cpp//absl/functional:any_invocable",
+        "@abseil-cpp//absl/functional:function_ref",
     ],
 )
 
@@ -2861,7 +2861,7 @@ envoy_quic_cc_library(
         ":quic_platform_base",
         ":quiche_common_text_utils_lib",
         ":quiche_common_wire_serialization",
-        "@com_google_absl//absl/cleanup",
+        "@abseil-cpp//absl/cleanup",
     ],
 )
 
@@ -2980,7 +2980,7 @@ envoy_cc_library(
         ":quiche_common_lib",
         ":quiche_common_platform_bug_tracker",
         ":quiche_common_platform_logging",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/strings",
     ],
 )
 
@@ -2993,8 +2993,8 @@ envoy_cc_library(
     deps = [
         ":quiche_common_mem_slice",
         ":quiche_common_platform_export",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:span",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/types:span",
     ],
 )
 
@@ -3006,9 +3006,9 @@ envoy_cc_library(
     repository = "@envoy",
     deps = [
         ":quiche_common_platform_export",
-        "@com_google_absl//absl/base:prefetch",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:span",
+        "@abseil-cpp//absl/base:prefetch",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/types:span",
     ],
 )
 
@@ -3074,7 +3074,7 @@ envoy_quic_cc_library(
         ":quic_core_http_spdy_utils_lib",
         ":quic_core_types_lib",
         ":quic_platform_base",
-        "@com_google_absl//absl/base:nullability",
+        "@abseil-cpp//absl/base:nullability",
     ],
 )
 
@@ -3292,7 +3292,7 @@ envoy_cc_library(
             ":quic_core_alarm_factory_lib",
             ":quic_core_clock_lib",
             ":quic_core_udp_socket_lib",
-            "@com_google_absl//absl/base:core_headers",
+            "@abseil-cpp//absl/base:core_headers",
         ],
     }),
 )
@@ -3317,12 +3317,12 @@ envoy_cc_library(
         ":quic_platform_socket_address",
         ":quiche_common_platform_export",
         ":quiche_common_platform_logging",
-        "@com_google_absl//absl/base:core_headers",
-        "@com_google_absl//absl/container:flat_hash_set",
-        "@com_google_absl//absl/status",
-        "@com_google_absl//absl/status:statusor",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:span",
+        "@abseil-cpp//absl/base:core_headers",
+        "@abseil-cpp//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/types:span",
     ],
 )
 
@@ -3356,11 +3356,11 @@ envoy_cc_library(
             ":quic_platform_socket_address",
             ":quiche_common_buffer_allocator_lib",
             ":quiche_common_platform",
-            "@com_google_absl//absl/status:statusor",
-            "@com_google_absl//absl/strings",
-            "@com_google_absl//absl/types:optional",
-            "@com_google_absl//absl/types:span",
-            "@com_google_absl//absl/types:variant",
+            "@abseil-cpp//absl/status:statusor",
+            "@abseil-cpp//absl/strings",
+            "@abseil-cpp//absl/types:optional",
+            "@abseil-cpp//absl/types:span",
+            "@abseil-cpp//absl/types:variant",
         ],
     }),
 )
@@ -4076,8 +4076,8 @@ envoy_quic_cc_library(
         ":quic_platform_base",
         ":quic_platform_bug_tracker",
         ":quiche_common_mem_slice",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:span",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/types:span",
     ],
 )
 
@@ -4086,8 +4086,8 @@ envoy_quic_cc_library(
     hdrs = ["quiche/quic/core/quic_inlined_string_view.h"],
     deps = [
         ":quic_platform_base",
-        "@com_google_absl//absl/numeric:bits",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/numeric:bits",
+        "@abseil-cpp//absl/strings",
     ],
 )
 
@@ -4106,8 +4106,8 @@ envoy_quic_cc_library(
         ":quic_platform_base",
         ":quic_platform_bug_tracker",
         ":quiche_common_mem_slice",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:span",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/types:span",
     ],
 )
 
@@ -4692,7 +4692,7 @@ envoy_cc_library(
         ":quiche_common_buffer_allocator_lib",
         ":quiche_common_callbacks",
         ":quiche_common_platform_export",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/strings",
     ],
 )
 
@@ -4769,10 +4769,10 @@ envoy_quiche_platform_impl_cc_library(
         "quiche/common/platform/default/quiche_platform_impl/quiche_logging_impl.h",
     ],
     deps = [
-        "@com_google_absl//absl/flags:flag",
-        "@com_google_absl//absl/log:absl_check",
-        "@com_google_absl//absl/log:absl_log",
-        "@com_google_absl//absl/log:flags",
+        "@abseil-cpp//absl/flags:flag",
+        "@abseil-cpp//absl/log:absl_check",
+        "@abseil-cpp//absl/log:absl_log",
+        "@abseil-cpp//absl/log:flags",
     ],
 )
 
@@ -5046,7 +5046,7 @@ envoy_cc_library(
     repository = "@envoy",
     deps = [
         ":quiche_common_platform_export",
-        "@com_google_absl//absl/container:inlined_vector",
+        "@abseil-cpp//absl/container:inlined_vector",
     ],
 )
 
@@ -5062,7 +5062,7 @@ envoy_cc_test_library(
         ":quiche_common_platform_googleurl",
         ":quiche_common_platform_iovec",
         ":quiche_common_platform_test",
-        "@com_google_absl//absl/status:status_matchers",
+        "@abseil-cpp//absl/status:status_matchers",
         "@envoy//test/common/quic/platform:quiche_test_helpers_impl_lib",
         "@envoy//test/common/quic/platform:quiche_test_impl_lib",
     ],
@@ -5075,8 +5075,8 @@ envoy_cc_library(
     repository = "@envoy",
     deps = [
         ":quiche_common_platform_export",
-        "@com_google_absl//absl/hash",
-        "@com_google_absl//absl/strings:str_format",
+        "@abseil-cpp//absl/hash",
+        "@abseil-cpp//absl/strings:str_format",
     ],
 )
 
@@ -5144,7 +5144,7 @@ envoy_cc_test(
         ":http2_test_tools_test_utils_lib",
         ":quiche_common_platform_test",
         ":quiche_http_header_block_lib",
-        "@com_google_absl//absl/functional:bind_front",
+        "@abseil-cpp//absl/functional:bind_front",
     ],
 )
 
@@ -5158,13 +5158,13 @@ envoy_cc_library(
         ":quiche_common_platform",
         ":quiche_common_platform_export",
         ":quiche_common_platform_logging",
-        "@com_google_absl//absl/algorithm:container",
-        "@com_google_absl//absl/container:flat_hash_set",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/strings:str_format",
-        "@com_google_absl//absl/types:optional",
-        "@com_google_absl//absl/types:span",
-        "@com_google_absl//absl/types:variant",
+        "@abseil-cpp//absl/algorithm:container",
+        "@abseil-cpp//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/strings:str_format",
+        "@abseil-cpp//absl/types:optional",
+        "@abseil-cpp//absl/types:span",
+        "@abseil-cpp//absl/types:variant",
     ],
 )
 
@@ -5327,8 +5327,8 @@ envoy_cc_library(
     repository = "@envoy",
     deps = [
         ":quiche_common_text_utils_lib",
-        "@com_google_absl//absl/container:flat_hash_set",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/strings",
     ],
 )
 
@@ -5360,7 +5360,7 @@ envoy_cc_library(
         ":quiche_common_callbacks",
         ":quiche_common_platform_export",
         ":quiche_common_platform_lower_case_string",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/strings",
     ],
 )
 
@@ -5375,7 +5375,7 @@ envoy_cc_library(
         ":quiche_common_platform_bug_tracker",
         ":quiche_common_platform_export",
         ":quiche_common_platform_logging",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/strings",
     ],
 )
 
@@ -5388,7 +5388,7 @@ envoy_cc_test(
         ":quiche_balsa_simple_buffer_lib",
         ":quiche_common_platform_expect_bug",
         ":quiche_common_platform_test",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/strings",
     ],
 )
 
@@ -5402,8 +5402,8 @@ envoy_cc_library(
         ":quiche_common_platform",
         ":quiche_common_platform_export",
         ":quiche_common_text_utils_lib",
-        "@com_google_absl//absl/container:flat_hash_set",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/strings",
     ],
 )
 
@@ -5436,9 +5436,9 @@ envoy_cc_library(
         ":quiche_common_platform_export",
         ":quiche_common_platform_header_policy",
         ":quiche_common_platform_logging",
-        "@com_google_absl//absl/container:flat_hash_set",
-        "@com_google_absl//absl/memory",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/memory",
+        "@abseil-cpp//absl/strings",
     ],
 )
 
@@ -5456,10 +5456,10 @@ envoy_cc_test(
         ":quiche_common_platform_logging",
         ":quiche_common_platform_test",
         ":quiche_common_test_tools_test_utils_lib",
-        "@com_google_absl//absl/base:core_headers",
-        "@com_google_absl//absl/memory",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/strings:str_format",
+        "@abseil-cpp//absl/base:core_headers",
+        "@abseil-cpp//absl/memory",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/strings:str_format",
     ],
 )
 
@@ -5482,7 +5482,7 @@ envoy_cc_library(
         ":quiche_common_platform_bug_tracker",
         ":quiche_common_platform_export",
         ":quiche_common_platform_logging",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/strings",
     ],
 )
 
@@ -5502,9 +5502,9 @@ envoy_cc_test(
         ":quiche_common_platform_expect_bug",
         ":quiche_common_platform_logging",
         ":quiche_common_platform_test",
-        "@com_google_absl//absl/flags:flag",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/strings:str_format",
+        "@abseil-cpp//absl/flags:flag",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/strings:str_format",
     ],
 )
 
@@ -5525,8 +5525,8 @@ envoy_cc_library(
         ":quiche_common_quiche_vectorized_io_utils_lib",
         ":quiche_common_status_utils",
         ":quiche_common_structured_headers_lib",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/time",
-        "@com_google_absl//absl/types:span",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/time",
+        "@abseil-cpp//absl/types:span",
     ],
 )

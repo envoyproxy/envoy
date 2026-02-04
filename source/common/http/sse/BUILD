@@ -13,7 +13,7 @@ envoy_cc_library(
     srcs = ["sse_parser.cc"],
     hdrs = ["sse_parser.h"],
     deps = [
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/types:optional",
     ],
 )
