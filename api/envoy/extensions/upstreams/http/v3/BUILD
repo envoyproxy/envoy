@@ -11,7 +11,6 @@ api_proto_package(
         "//envoy/config/route/v3:pkg",
         "//envoy/extensions/filters/network/http_connection_manager/v3:pkg",
         "//envoy/type/matcher/v3:pkg",
-        "@com_github_cncf_xds//udpa/annotations:pkg",
         "@xds//udpa/annotations:pkg",
     ],
 )
