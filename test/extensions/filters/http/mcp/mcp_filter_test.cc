@@ -392,6 +392,7 @@ TEST_F(McpFilterTest, RequestBodyExceedingLimitRejectWhenNotEnoughData) {
 }
 
 // Test optional extraction rules allow partial parsing when size limit is hit.
+// params._meta is hardcoded as a global optional field.
 TEST_F(McpFilterTest, OptionalFieldsAllowPartialParsingOnSizeLimit) {
   envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
 
@@ -401,12 +402,6 @@ TEST_F(McpFilterTest, OptionalFieldsAllowPartialParsingOnSizeLimit) {
 
   // Required field.
   method_rule->add_extraction_rules()->set_path("params.name");
-
-  // Optional field that may not appear within the size limit.
-  auto* optional_rule = method_rule->add_extraction_rules();
-  optional_rule->set_path("params._meta");
-  optional_rule->set_is_optional(true);
-
   const std::string prefix =
       R"({"jsonrpc": "2.0", "method": "tools/call", "id": 1, "params": {"name": "tool", "padding": ")";
   const uint32_t limit = static_cast<uint32_t>(prefix.size() + 5);

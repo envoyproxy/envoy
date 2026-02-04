@@ -71,12 +71,6 @@ McpParserConfig::fromProto(const envoy::extensions::filters::http::mcp::v3::Pars
 
   config.group_metadata_key_ = proto.group_metadata_key();
 
-  // Global extraction rules applied to all methods.
-  for (const auto& extraction_rule_proto : proto.extraction_rules()) {
-    config.global_fields_.emplace_back(extraction_rule_proto.path(),
-                                       extraction_rule_proto.is_optional());
-  }
-
   // Process method-specific configs (for both extraction rules and group overrides)
   for (const auto& method_proto : proto.methods()) {
     MethodConfigEntry entry;
@@ -84,8 +78,7 @@ McpParserConfig::fromProto(const envoy::extensions::filters::http::mcp::v3::Pars
     entry.group = method_proto.group();
 
     for (const auto& extraction_rule_proto : method_proto.extraction_rules()) {
-      entry.extraction_rules.emplace_back(extraction_rule_proto.path(),
-                                          extraction_rule_proto.is_optional());
+      entry.extraction_rules.emplace_back(extraction_rule_proto.path());
     }
 
     config.method_configs_.push_back(std::move(entry));
@@ -94,7 +87,7 @@ McpParserConfig::fromProto(const envoy::extensions::filters::http::mcp::v3::Pars
     if (!method_proto.extraction_rules().empty()) {
       std::vector<AttributeExtractionRule> extraction_rules;
       for (const auto& rule_proto : method_proto.extraction_rules()) {
-        extraction_rules.emplace_back(rule_proto.path(), rule_proto.is_optional());
+        extraction_rules.emplace_back(rule_proto.path());
       }
       config.addMethodConfig(method_proto.method(), std::move(extraction_rules));
     }
@@ -205,48 +198,17 @@ void McpParserConfig::buildMethodRequirements(
   requirements.required.clear();
   requirements.optional.clear();
 
-  const size_t total_rules = global_fields_.size() + method_fields.size();
   absl::flat_hash_set<std::string> required_set;
-  absl::flat_hash_set<std::string> optional_set;
-  required_set.reserve(total_rules);
-  optional_set.reserve(total_rules);
 
-  auto add_rule = [&](const AttributeExtractionRule& rule) {
-    if (rule.is_optional) {
-      if (required_set.contains(rule.path)) {
-        return;
-      }
-      if (optional_set.insert(rule.path).second) {
-        requirements.optional.push_back(rule.path);
-      }
-      return;
-    }
-
-    if (required_set.insert(rule.path).second) {
-      requirements.required.push_back(rule.path);
-    }
-  };
-
-  for (const auto& field : global_fields_) {
-    add_rule(field);
-  }
-
+  // All method-specific extraction rules are required.
   for (const auto& field : method_fields) {
-    add_rule(field);
+    if (required_set.insert(field.path).second) {
+      requirements.required.push_back(field.path);
+    }
   }
 
-  if (!requirements.optional.empty() && !required_set.empty()) {
-    size_t out = 0;
-    for (size_t i = 0; i < requirements.optional.size(); ++i) {
-      if (required_set.contains(requirements.optional[i])) {
-        continue;
-      }
-      if (out != i) {
-        requirements.optional[out] = std::move(requirements.optional[i]);
-      }
-      ++out;
-    }
-    requirements.optional.resize(out);
+  if (!required_set.contains(McpConstants::kOptionalMetaField)) {
+    requirements.optional.push_back(std::string(McpConstants::kOptionalMetaField));
   }
 }
 
@@ -280,6 +242,11 @@ McpFieldExtractor* McpFieldExtractor::StartObject(absl::string_view name) {
       current_path_cache_ += ".";
     }
     current_path_cache_ += name;
+
+    // Track when we enter the "params" object (direct child of root)
+    if (depth_ == 2 && name == "params") {
+      params_depth_ = depth_;
+    }
   }
 
   auto* parent = context_stack_.top().struct_ptr;
@@ -311,6 +278,13 @@ McpFieldExtractor* McpFieldExtractor::EndObject() {
     }
 
     depth_--;
+
+    // Check if we just exited the "params" object using depth tracking
+    if (params_depth_ > 0 && depth_ < params_depth_) {
+      params_depth_ = 0; // Reset - we've exited params
+      checkEarlyStop();
+    }
+
     if (!path_stack_.empty()) {
       // Update cached path before removing from stack
       size_t last_dot = current_path_cache_.rfind('.');
@@ -518,31 +492,46 @@ void McpFieldExtractor::checkEarlyStop() {
 
   // Fast path: check if we have collected enough fields
   if (fields_collected_count_ < required_fields_needed_) {
-    return; // Still missing fields
+    return; // Still missing required fields
   }
 
   if (!requiredFieldsCollected()) {
     return;
   }
 
+  // No optional fields configured - can stop now.
   if (!has_optional_fields_) {
     can_stop_parsing_ = true;
     ENVOY_LOG(debug, "early stop: Have all required fields for method {}", method_);
     return;
   }
 
-  if (fields_collected_count_ < fields_needed_) {
-    return;
-  }
-
+  // Check if we've collected all optional fields
+  bool all_optional_collected = true;
   for (const auto& field : optional_fields_) {
     if (collected_fields_.count(field) == 0) {
-      return;
+      all_optional_collected = false;
+      break;
     }
   }
 
-  can_stop_parsing_ = true;
-  ENVOY_LOG(debug, "early stop: Have all required + optional fields for method {}", method_);
+  if (all_optional_collected) {
+    can_stop_parsing_ = true;
+    ENVOY_LOG(debug, "early stop: Have all required + optional fields for method {}", method_);
+    return;
+  }
+
+  // If params object has been exited or was never entered, we know params.* optional fields
+  // can't appear anymore. params_depth_ == 0 means: either we never entered params, or we
+  // already exited it. collected_fields_ contains "params" only if we entered the params object.
+  bool params_seen = collected_fields_.count("params") > 0;
+  bool params_exited = params_seen && params_depth_ == 0;
+  if (params_exited || !params_seen) {
+    can_stop_parsing_ = true;
+    ENVOY_LOG(debug, "early stop: params object {} - optional fields cannot appear",
+              params_exited ? "closed" : "not present");
+    return;
+  }
 }
 
 void McpFieldExtractor::updateFieldRequirements() {
@@ -631,19 +620,17 @@ void McpFieldExtractor::copySelectedFields() {
     }
   }
 
-  // Copy global fields
-  for (const auto& field : config_.getGlobalFields()) {
-    if (copied_fields.insert(field.path).second) {
-      copyFieldByPath(field.path);
-    }
-  }
-
   // Copy method-specific fields
   const auto& fields = config_.getFieldsForMethod(method_);
   for (const auto& field : fields) {
     if (copied_fields.insert(field.path).second) {
       copyFieldByPath(field.path);
     }
+  }
+
+  const std::string meta_field(McpConstants::kOptionalMetaField);
+  if (copied_fields.insert(meta_field).second) {
+    copyFieldByPath(meta_field);
   }
 }
 

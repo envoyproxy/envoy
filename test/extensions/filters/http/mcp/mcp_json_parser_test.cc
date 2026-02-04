@@ -379,14 +379,15 @@ TEST_F(McpJsonParserTest, PartialParsingMidString) {
 }
 
 TEST_F(McpJsonParserTest, PartialParsingEscapeSequence) {
-  // Split in the middle of an escape sequence
+  // Split in the middle of an escape sequence inside params object.
+  // The JSON parsing will fail due to incomplete escape sequence,
+  // but the MCP request is still valid if we have jsonrpc and method.
   std::string json1 = R"({"jsonrpc": "2.0", "method": "test", "id": 1, "params": {"text": "line1\)";
 
   auto status = parser_->parse(json1);
 
-  // Early termination.
+  // Parse fails due to incomplete escape sequence (invalid JSON)
   EXPECT_FALSE(status.ok());
-
   EXPECT_TRUE(parser_->isValidMcpRequest());
 }
 
@@ -663,10 +664,10 @@ TEST_F(McpJsonParserTest, CustomFieldExtraction) {
 }
 
 TEST_F(McpJsonParserTest, OptionalFieldConfigDetection) {
+  // params._meta is hardcoded as a global optional field, so any method should have optional fields
   McpParserConfig custom_config;
   std::vector<McpParserConfig::AttributeExtractionRule> rules = {
-      McpParserConfig::AttributeExtractionRule("params.name"),
-      McpParserConfig::AttributeExtractionRule("params._meta", true)};
+      McpParserConfig::AttributeExtractionRule("params.name")};
 
   custom_config.addMethodConfig(McpConstants::Methods::TOOLS_CALL, rules);
 
@@ -676,20 +677,17 @@ TEST_F(McpJsonParserTest, OptionalFieldConfigDetection) {
       R"({"jsonrpc": "2.0", "method": "tools/call", "id": 1, "params": {"name": "tool"}})";
 
   EXPECT_OK(parser->parse(json));
-  EXPECT_TRUE(parser->hasOptionalFields());
+  EXPECT_TRUE(parser->hasOptionalFields()); // params._meta is always optional
   EXPECT_TRUE(parser->hasAllRequiredFields());
 
   const auto* meta = parser->getNestedValue("params._meta");
-  EXPECT_EQ(meta, nullptr);
+  EXPECT_EQ(meta, nullptr); // Not present in the JSON, but that's fine for optionals
 }
 
-TEST_F(McpJsonParserTest, GlobalExtractionRulesApplyToAllMethods) {
-  envoy::extensions::filters::http::mcp::v3::ParserConfig proto_config;
-  auto* rule = proto_config.add_extraction_rules();
-  rule->set_path("params._meta");
-  rule->set_is_optional(true);
-
-  McpParserConfig config = McpParserConfig::fromProto(proto_config);
+TEST_F(McpJsonParserTest, GlobalOptionalMetaFieldExtraction) {
+  // params._meta is a global optional field and should be extracted
+  // for all methods when present
+  McpParserConfig config = McpParserConfig::createDefault();
   auto parser = std::make_unique<McpJsonParser>(config);
 
   std::string json1 = R"({
@@ -937,9 +935,7 @@ TEST_F(McpJsonParserTest, FromProtoConfig) {
   auto* method_rule = proto_config.add_methods();
   method_rule->set_method("custom/method");
   method_rule->add_extraction_rules()->set_path("params.field1");
-  auto* optional_rule = method_rule->add_extraction_rules();
-  optional_rule->set_path("params.field2");
-  optional_rule->set_is_optional(true);
+  method_rule->add_extraction_rules()->set_path("params.field2");
 
   McpParserConfig config = McpParserConfig::fromProto(proto_config);
 
@@ -947,8 +943,6 @@ TEST_F(McpJsonParserTest, FromProtoConfig) {
   ASSERT_EQ(fields.size(), 2);
   EXPECT_EQ(fields[0].path, "params.field1");
   EXPECT_EQ(fields[1].path, "params.field2");
-  EXPECT_FALSE(fields[0].is_optional);
-  EXPECT_TRUE(fields[1].is_optional);
 
   // Default fields should still be there (implicit in implementation)
   EXPECT_TRUE(config.getAlwaysExtract().contains("jsonrpc"));
