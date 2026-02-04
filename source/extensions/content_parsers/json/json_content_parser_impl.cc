@@ -22,6 +22,7 @@ JsonContentParserImpl::Rule::Rule(const ProtoRule& rule, uint32_t stop_processin
 
 JsonContentParserImpl::JsonContentParserImpl(
     const envoy::extensions::content_parsers::json::v3::JsonContentParser& config) {
+  rules_.reserve(config.rules().size());
   for (const auto& rule_config : config.rules()) {
     rules_.emplace_back(rule_config.rule(), rule_config.stop_processing_after_matches());
   }
@@ -34,14 +35,25 @@ ContentParser::ParseResult JsonContentParserImpl::parse(absl::string_view data) 
   auto json_or = Envoy::Json::Factory::loadFromString(std::string(data));
   if (!json_or.ok()) {
     ENVOY_LOG(trace, "Failed to parse JSON: {}", json_or.status().message());
-    result.has_error = true;
+    result.error_message = std::string(json_or.status().message());
+    any_parse_error_ = true;
     return result;
   }
   Envoy::Json::ObjectSharedPtr json_obj = json_or.value();
 
-  // Apply each rule
+  // Apply each rule and track stop processing condition.
+  // We stop processing when all rules have limits and all those limits have been reached.
+  // If any rule has no limit (stop_processing_after_matches == 0), we never stop.
+  bool all_rules_have_limits = true;
+  bool all_limited_rules_satisfied = true;
+
   for (size_t i = 0; i < rules_.size(); ++i) {
     auto& rule = rules_[i];
+
+    // Track if any rule has no limit
+    if (rule.stop_processing_after_matches_ == 0) {
+      all_rules_have_limits = false;
+    }
 
     // Skip rules that have already reached their match limit
     if (rule.stop_processing_after_matches_ > 0 &&
@@ -60,31 +72,20 @@ ContentParser::ParseResult JsonContentParserImpl::parse(absl::string_view data) 
       }
 
       // Track that this rule matched
-      result.matched_rules.push_back(i);
+      rule.ever_matched_ = true;
 
       // Increment match count for this rule
       rule.match_count_++;
     } else {
-      // Selector not found. Mark for on_missing (will execute at end if on_present never
-      // executes).
+      // Selector not found
       ENVOY_LOG(trace, "Selector not found: {}", value_or.status().message());
-      result.selector_not_found_rules.push_back(i);
+      rule.selector_not_found_ = true;
     }
-  }
 
-  // Check if we should stop processing.
-  // We stop processing when ALL rules have limits AND all those limits have been reached
-  // If ANY rule has no limit (stop_processing_after_matches == 0), we never stop
-  bool all_rules_have_limits = true;
-  bool all_limited_rules_satisfied = true;
-  for (const auto& rule : rules_) {
-    if (rule.stop_processing_after_matches_ == 0) {
-      all_rules_have_limits = false;
-      break;
-    }
-    if (rule.match_count_ < rule.stop_processing_after_matches_) {
+    // After processing, check if this rule with a limit is still not satisfied
+    if (rule.stop_processing_after_matches_ > 0 &&
+        rule.match_count_ < rule.stop_processing_after_matches_) {
       all_limited_rules_satisfied = false;
-      break;
     }
   }
 
@@ -92,20 +93,24 @@ ContentParser::ParseResult JsonContentParserImpl::parse(absl::string_view data) 
   return result;
 }
 
-std::vector<ContentParser::MetadataAction>
-JsonContentParserImpl::getDeferredActions(size_t rule_index, bool has_error,
-                                          bool selector_not_found) {
+std::vector<ContentParser::MetadataAction> JsonContentParserImpl::getAllDeferredActions() {
   std::vector<ContentParser::MetadataAction> actions;
 
-  // Note: rule_index is always valid
-  ASSERT(rule_index < rules_.size());
-  const auto& rule = rules_[rule_index];
+  for (const auto& rule : rules_) {
+    // Only process rules that never matched (on_present never fired)
+    if (rule.ever_matched_) {
+      continue;
+    }
 
-  // Priority: on_error over on_missing
-  if (has_error && rule.rule_.has_on_error()) {
-    actions.push_back(keyValuePairToAction(rule.rule_.on_error(), absl::nullopt));
-  } else if (selector_not_found && rule.rule_.has_on_missing()) {
-    actions.push_back(keyValuePairToAction(rule.rule_.on_missing(), absl::nullopt));
+    // Priority: on_error over on_missing.
+    // If any_parse_error_ is true but on_error is not configured, fall through to on_missing.
+    // This allows users to handle missing values even when parse errors occur,
+    // if they choose not to configure on_error handling.
+    if (any_parse_error_ && rule.rule_.has_on_error()) {
+      actions.push_back(keyValuePairToAction(rule.rule_.on_error(), absl::nullopt));
+    } else if (rule.selector_not_found_ && rule.rule_.has_on_missing()) {
+      actions.push_back(keyValuePairToAction(rule.rule_.on_missing(), absl::nullopt));
+    }
   }
 
   return actions;
@@ -114,8 +119,9 @@ JsonContentParserImpl::getDeferredActions(size_t rule_index, bool has_error,
 absl::StatusOr<Envoy::Json::ValueType>
 JsonContentParserImpl::extractValueFromJson(const Envoy::Json::ObjectSharedPtr& json_obj,
                                             const std::vector<std::string>& path) const {
-  // Note: path cannot be empty
-  ASSERT(!path.empty());
+  if (path.empty()) {
+    return absl::InvalidArgumentError("Path is empty");
+  }
 
   Envoy::Json::ObjectSharedPtr current = json_obj;
 
@@ -173,11 +179,15 @@ ContentParser::MetadataAction JsonContentParserImpl::keyValuePairToAction(
   action.key = kv_pair.key();
   action.preserve_existing = kv_pair.preserve_existing_metadata_value();
 
+  // Populate the metadata value:
+  // 1. If kv_pair has an explicit 'value' field (kValue), use that constant value.
+  //    This allows hardcoded values for on_error/on_missing fallbacks, or for
+  //    on_present when only presence detection is needed (ignoring extracted value).
+  // 2. Otherwise, if we extracted a value from JSON, convert it using the specified type.
+  // 3. If neither, action.value remains default-constructed (empty).
   if (kv_pair.value_type_case() == KeyValuePair::kValue) {
-    // Use hardcoded value from kv_pair (already a Protobuf::Value)
     action.value = kv_pair.value();
   } else if (extracted_value.has_value()) {
-    // Convert extracted JSON value to Protobuf::Value
     action.value = jsonValueToProtobufValue(extracted_value.value(), kv_pair.type());
   }
 
@@ -191,50 +201,64 @@ Protobuf::Value JsonContentParserImpl::jsonValueToProtobufValue(const Envoy::Jso
   switch (type) {
   case ValueType::JsonToMetadata_ValueType_STRING:
     // Always convert to string
-    if (absl::holds_alternative<std::string>(value)) {
-      pb_value.set_string_value(absl::get<std::string>(value));
-    } else if (absl::holds_alternative<int64_t>(value)) {
-      pb_value.set_string_value(absl::StrCat(absl::get<int64_t>(value)));
-    } else if (absl::holds_alternative<double>(value)) {
-      pb_value.set_string_value(absl::StrCat(absl::get<double>(value)));
-    } else if (absl::holds_alternative<bool>(value)) {
-      pb_value.set_string_value(absl::get<bool>(value) ? "true" : "false");
-    }
+    absl::visit(
+        [&pb_value](const auto& v) {
+          using T = std::decay_t<decltype(v)>;
+          if constexpr (std::is_same_v<T, std::string>) {
+            pb_value.set_string_value(v);
+          } else if constexpr (std::is_same_v<T, int64_t>) {
+            pb_value.set_string_value(absl::StrCat(v));
+          } else if constexpr (std::is_same_v<T, double>) {
+            pb_value.set_string_value(absl::StrCat(v));
+          } else if constexpr (std::is_same_v<T, bool>) {
+            pb_value.set_string_value(v ? "true" : "false");
+          }
+        },
+        value);
     break;
 
   case ValueType::JsonToMetadata_ValueType_NUMBER:
     // Convert to number
-    if (absl::holds_alternative<int64_t>(value)) {
-      pb_value.set_number_value(static_cast<double>(absl::get<int64_t>(value)));
-    } else if (absl::holds_alternative<double>(value)) {
-      pb_value.set_number_value(absl::get<double>(value));
-    } else if (absl::holds_alternative<bool>(value)) {
-      pb_value.set_number_value(absl::get<bool>(value) ? 1.0 : 0.0);
-    } else if (absl::holds_alternative<std::string>(value)) {
-      // Try to parse string as number
-      double num;
-      if (absl::SimpleAtod(absl::get<std::string>(value), &num)) {
-        pb_value.set_number_value(num);
-      } else {
-        // If conversion fails, leave pb_value unset (kind_case == 0)
-        ENVOY_LOG(debug, "Failed to convert string '{}' to NUMBER type",
-                  absl::get<std::string>(value));
-      }
-    }
+    absl::visit(
+        [&pb_value](const auto& v) {
+          using T = std::decay_t<decltype(v)>;
+          if constexpr (std::is_same_v<T, int64_t>) {
+            pb_value.set_number_value(static_cast<double>(v));
+          } else if constexpr (std::is_same_v<T, double>) {
+            pb_value.set_number_value(v);
+          } else if constexpr (std::is_same_v<T, bool>) {
+            pb_value.set_number_value(v ? 1.0 : 0.0);
+          } else if constexpr (std::is_same_v<T, std::string>) {
+            // Try to parse string as number
+            double num;
+            if (absl::SimpleAtod(v, &num)) {
+              pb_value.set_number_value(num);
+            } else {
+              // If conversion fails, leave pb_value unset (kind_case == 0)
+              ENVOY_LOG_MISC(debug, "Failed to convert string '{}' to NUMBER type", v);
+            }
+          }
+        },
+        value);
     break;
 
   case ValueType::JsonToMetadata_ValueType_PROTOBUF_VALUE:
   default:
     // Preserve original type
-    if (absl::holds_alternative<std::string>(value)) {
-      pb_value.set_string_value(absl::get<std::string>(value));
-    } else if (absl::holds_alternative<int64_t>(value)) {
-      pb_value.set_number_value(static_cast<double>(absl::get<int64_t>(value)));
-    } else if (absl::holds_alternative<double>(value)) {
-      pb_value.set_number_value(absl::get<double>(value));
-    } else if (absl::holds_alternative<bool>(value)) {
-      pb_value.set_bool_value(absl::get<bool>(value));
-    }
+    absl::visit(
+        [&pb_value](const auto& v) {
+          using T = std::decay_t<decltype(v)>;
+          if constexpr (std::is_same_v<T, std::string>) {
+            pb_value.set_string_value(v);
+          } else if constexpr (std::is_same_v<T, int64_t>) {
+            pb_value.set_number_value(static_cast<double>(v));
+          } else if constexpr (std::is_same_v<T, double>) {
+            pb_value.set_number_value(v);
+          } else if constexpr (std::is_same_v<T, bool>) {
+            pb_value.set_bool_value(v);
+          }
+        },
+        value);
     break;
   }
 

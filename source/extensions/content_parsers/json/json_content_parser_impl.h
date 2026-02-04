@@ -32,18 +32,22 @@ public:
       const envoy::extensions::content_parsers::json::v3::JsonContentParser& config);
 
   ContentParser::ParseResult parse(absl::string_view data) override;
-  std::vector<ContentParser::MetadataAction> getDeferredActions(size_t rule_index, bool has_error,
-                                                                bool selector_not_found) override;
-  size_t numRules() const override { return rules_.size(); }
+  std::vector<ContentParser::MetadataAction> getAllDeferredActions() override;
 
 private:
-  struct Rule {
+  class Rule {
+  public:
     Rule(const ProtoRule& rule, uint32_t stop_processing_after_matches);
-    const ProtoRule rule_;
+    const ProtoRule& rule_;
     std::vector<std::string> selector_path_;
     uint32_t stop_processing_after_matches_;
     size_t match_count_ = 0;
+    bool ever_matched_ = false;       // Track if on_present ever fired
+    bool selector_not_found_ = false; // Track if selector was ever not found
   };
+
+  // Session-level state (accumulated across parse() calls)
+  bool any_parse_error_ = false;
 
   /**
    * Extract value from JSON object using path.

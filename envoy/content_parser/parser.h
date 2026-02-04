@@ -31,59 +31,69 @@ struct MetadataAction {
  * Result of parsing.
  */
 struct ParseResult {
-  // Metadata actions to execute immediately (returned when rule matches)
+  // Metadata actions to execute immediately (on_present matched)
   std::vector<MetadataAction> immediate_actions;
 
-  // Indices of rules that matched and returned immediate actions
-  std::vector<size_t> matched_rules;
-
-  // Indices of rules where parser's selector/pattern was not found
-  std::vector<size_t> selector_not_found_rules;
-
-  // Whether processing should stop after.
+  // Whether all rules have reached their match limits (can stop processing)
   bool stop_processing = false;
 
-  // Whether an error occurred during parsing (applies to all rules)
-  bool has_error = false;
+  // Error message if parsing failed (e.g., invalid JSON). Empty if no error.
+  absl::optional<std::string> error_message;
 };
 
 /**
  * Content parser interface for extracting metadata from content strings.
  *
  * Lifecycle and Thread Safety:
- * - Parser instances may maintain internal state (e.g., match counts for rules)
+ * - Parser instances maintain internal state (match counts, error tracking)
  * - Callers should create a new parser instance per request/stream
  * - Parser instances should not be reused across different requests
+ *
+ * Example usage (caller is responsible for applying metadata actions):
+ *
+ *   auto parser = factory->createParser();
+ *   for (chunk : data_chunks) {
+ *     auto result = parser->parse(chunk);
+ *     if (result.error_message) {
+ *       // Optional: log the error
+ *       LOG_DEBUG("Parse error: {}", *result.error_message);
+ *     }
+ *     for (const auto& action : result.immediate_actions) {
+ *       applyAction(action);  // Caller implements this
+ *     }
+ *     if (result.stop_processing) break;
+ *   }
+ *   // At end-of-stream, apply deferred actions (on_error/on_missing)
+ *   for (const auto& action : parser->getAllDeferredActions()) {
+ *     applyAction(action);
+ *   }
  */
 class Parser {
 public:
   virtual ~Parser() = default;
 
   /**
-   * Parse a data string.
+   * Parse a data string. Call this for each chunk of data.
+   *
+   * The parser tracks state internally across multiple parse() calls:
+   * - Which rules have matched (for on_present)
+   * - Which rules had selector not found
+   * - Whether any parse error occurred
    *
    * @param data a data string to be processed
-   * @return ParseResult indicating what actions to take immediately and state to track
+   * @return ParseResult with immediate actions and processing state
    */
   virtual ParseResult parse(absl::string_view data) PURE;
 
   /**
-   * Get deferred actions to execute.
+   * Get all deferred actions for rules that never matched.
    *
-   * @param rule_index the index of the rule (0-based)
-   * @param has_error whether any parsing error occurred
-   * @param selector_not_found whether the parser's selector/pattern was not found
-   * @return vector of metadata actions to execute (typically fallback values)
+   * Call this once at end-of-stream. The parser uses internally tracked state
+   * to determine which rules need fallback actions.
+   *
+   * @return vector of metadata actions for all rules needing deferred handling
    */
-  virtual std::vector<MetadataAction> getDeferredActions(size_t rule_index, bool has_error,
-                                                         bool selector_not_found) PURE;
-
-  /**
-   * Get the number of rules configured in this parser.
-   * Used by the filter to allocate per-rule state tracking.
-   * @return number of rules
-   */
-  virtual size_t numRules() const PURE;
+  virtual std::vector<MetadataAction> getAllDeferredActions() PURE;
 };
 
 using ParserPtr = std::unique_ptr<Parser>;
