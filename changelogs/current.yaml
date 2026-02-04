@@ -100,6 +100,10 @@ minor_behavior_changes:
 - area: proto_api_scrubber
   change: |
     Unknown fields will now be scrubbed.
+- area: stat_sinks
+  change: |
+    OpenTelemetry :ref:`SinkConfig <envoy_v3_api_msg_extensions.stat_sinks.open_telemetry.v3.SinkConfig>`
+    stopped reporting empty delta counters and histograms.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
