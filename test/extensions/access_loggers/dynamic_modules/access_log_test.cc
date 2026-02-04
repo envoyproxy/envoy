@@ -4,9 +4,12 @@
 
 #include "test/extensions/dynamic_modules/util.h"
 #include "test/mocks/access_log/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/utility.h"
+
+#include "gmock/gmock.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -58,7 +61,7 @@ TEST_F(DynamicModuleAccessLogTest, ConfigHasFunctionPointers) {
 
 TEST_F(DynamicModuleAccessLogTest, ThreadLocalLoggerCreation) {
   // Test that ThreadLocalLogger can be created with the config.
-  auto tl_logger = std::make_shared<ThreadLocalLogger>(nullptr, config_);
+  auto tl_logger = std::make_shared<ThreadLocalLogger>(nullptr, config_, 1);
   auto module_logger = config_->on_logger_new_(config_->in_module_config_, tl_logger.get());
   EXPECT_NE(nullptr, module_logger);
 
@@ -69,7 +72,7 @@ TEST_F(DynamicModuleAccessLogTest, ThreadLocalLoggerCreation) {
 
 TEST_F(DynamicModuleAccessLogTest, ThreadLocalLoggerDestruction) {
   // Test that ThreadLocalLogger properly destroys the module logger.
-  auto tl_logger = std::make_shared<ThreadLocalLogger>(nullptr, config_);
+  auto tl_logger = std::make_shared<ThreadLocalLogger>(nullptr, config_, 1);
   auto module_logger = config_->on_logger_new_(config_->in_module_config_, tl_logger.get());
   EXPECT_NE(nullptr, module_logger);
 
@@ -81,7 +84,7 @@ TEST_F(DynamicModuleAccessLogTest, ThreadLocalLoggerDestruction) {
 
 TEST_F(DynamicModuleAccessLogTest, FlushCalledOnDestruction) {
   // Test that flush is called before destroy when logger is destroyed.
-  auto tl_logger = std::make_shared<ThreadLocalLogger>(nullptr, config_);
+  auto tl_logger = std::make_shared<ThreadLocalLogger>(nullptr, config_, 1);
   auto module_logger = config_->on_logger_new_(config_->in_module_config_, tl_logger.get());
   EXPECT_NE(nullptr, module_logger);
 
@@ -116,7 +119,7 @@ TEST_F(DynamicModuleAccessLogTest, FlushCalledOnDestruction) {
 
 TEST_F(DynamicModuleAccessLogTest, FlushNotCalledWhenNull) {
   // Test that flush is skipped when on_logger_flush_ is nullptr.
-  auto tl_logger = std::make_shared<ThreadLocalLogger>(nullptr, config_);
+  auto tl_logger = std::make_shared<ThreadLocalLogger>(nullptr, config_, 1);
   auto module_logger = config_->on_logger_new_(config_->in_module_config_, tl_logger.get());
   EXPECT_NE(nullptr, module_logger);
 
@@ -140,28 +143,24 @@ TEST_F(DynamicModuleAccessLogTest, FlushNotCalledWhenNull) {
 
 TEST_F(DynamicModuleAccessLogTest, DynamicModuleAccessLogCreation) {
   NiceMock<ThreadLocal::MockInstance> tls;
+  NiceMock<Event::MockDispatcher> dispatcher{"worker_0"};
+  tls.setDispatcher(&dispatcher);
 
   // Use allocateSlotMock to get a properly functioning slot.
   EXPECT_CALL(tls, allocateSlot()).WillOnce(testing::Invoke([&tls]() {
     return tls.allocateSlotMock();
   }));
 
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  NiceMock<Server::MockOptions> options;
+  ON_CALL(options, concurrency()).WillByDefault(testing::Return(1));
+  ON_CALL(context, options()).WillByDefault(testing::ReturnRef(options));
+  ScopedThreadLocalServerContextSetter setter(context);
+
   // Test that the access log can be created.
   auto access_log = std::make_unique<DynamicModuleAccessLog>(
       nullptr, config_, static_cast<ThreadLocal::SlotAllocator&>(tls));
   EXPECT_NE(nullptr, access_log);
-}
-
-TEST_F(DynamicModuleAccessLogTest, DynamicModuleAccessLogContext) {
-  NiceMock<StreamInfo::MockStreamInfo> stream_info;
-  Http::TestRequestHeaderMapImpl request_headers;
-  Formatter::Context log_context(&request_headers, nullptr, nullptr);
-
-  DynamicModuleAccessLogContext ctx(log_context, stream_info);
-
-  // Verify the context holds references correctly.
-  EXPECT_EQ(&request_headers, ctx.log_context_.requestHeaders().ptr());
-  EXPECT_EQ(&stream_info, &ctx.stream_info_);
 }
 
 TEST_F(DynamicModuleAccessLogTest, EmitLog) {
@@ -174,7 +173,7 @@ TEST_F(DynamicModuleAccessLogTest, EmitLog) {
       nullptr, config_, static_cast<ThreadLocal::SlotAllocator&>(tls));
 
   // Set up the mock slot to return a ThreadLocalLogger.
-  auto tl_logger = std::make_shared<ThreadLocalLogger>(nullptr, config_);
+  auto tl_logger = std::make_shared<ThreadLocalLogger>(nullptr, config_, 1);
   auto module_logger = config_->on_logger_new_(config_->in_module_config_, tl_logger.get());
   tl_logger->logger_ = module_logger;
 
@@ -209,7 +208,7 @@ TEST_F(DynamicModuleAccessLogTest, EmitLogNullLogger) {
       nullptr, config_, static_cast<ThreadLocal::SlotAllocator&>(tls));
 
   // Return null logger to simulate not initialized or error.
-  auto tl_logger = std::make_shared<ThreadLocalLogger>(nullptr, config_);
+  auto tl_logger = std::make_shared<ThreadLocalLogger>(nullptr, config_, 1);
   ON_CALL(*slot, get()).WillByDefault(testing::Return(tl_logger));
 
   NiceMock<StreamInfo::MockStreamInfo> stream_info;

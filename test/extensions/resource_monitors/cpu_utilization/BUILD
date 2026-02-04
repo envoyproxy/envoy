@@ -54,3 +54,15 @@ envoy_extension_cc_test(
         "@envoy_api//envoy/extensions/resource_monitors/cpu_utilization/v3:pkg_cc_proto",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "cpu_paths_test",
+    srcs = ["cpu_paths_test.cc"],
+    extension_names = ["envoy.resource_monitors.cpu_utilization"],
+    tags = ["skip_on_windows"],
+    deps = [
+        "//source/extensions/resource_monitors/cpu_utilization:cpu_paths",
+        "//test/mocks/filesystem:filesystem_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)

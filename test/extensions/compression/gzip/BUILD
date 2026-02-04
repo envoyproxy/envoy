@@ -25,5 +25,6 @@ envoy_cc_fuzz_test(
         "//source/common/common:assert_lib",
         "//source/extensions/compression/gzip/compressor:compressor_lib",
         "//source/extensions/compression/gzip/decompressor:zlib_decompressor_impl_lib",
+        "//test/fuzz:utility_lib",
     ],
 )

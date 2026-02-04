@@ -413,6 +413,8 @@ bool EdsClusterImpl::updateHostsPerLocality(
 
   HostVector hosts_added;
   HostVector hosts_removed;
+  hosts_added.reserve(new_hosts.size());
+  hosts_removed.reserve(host_set.hosts().size());
   // We need to trigger updateHosts with the new host vectors if they have changed. We also do this
   // when the locality weight map or the overprovisioning factor. Note calling updateDynamicHostList
   // is responsible for both determining whether there was a change and to perform the actual update

@@ -3,6 +3,7 @@
 #include "envoy/registry/registry.h"
 
 #include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/filters/network/dynamic_modules/filter.h"
 #include "source/extensions/filters/network/dynamic_modules/filter_config.h"
 
@@ -29,12 +30,18 @@ DynamicModuleNetworkFilterConfigFactory::createFilterFactoryFromProtoTyped(
     config = std::move(config_or_error.value());
   }
 
+  // Use configured metrics namespace or fall back to the default.
+  const std::string metrics_namespace =
+      module_config.metrics_namespace().empty()
+          ? std::string(Extensions::DynamicModules::NetworkFilters::DefaultMetricsNamespace)
+          : module_config.metrics_namespace();
+
   absl::StatusOr<
       Envoy::Extensions::DynamicModules::NetworkFilters::DynamicModuleNetworkFilterConfigSharedPtr>
       filter_config =
           Envoy::Extensions::DynamicModules::NetworkFilters::newDynamicModuleNetworkFilterConfig(
-              proto_config.filter_name(), config, std::move(dynamic_module.value()),
-              context.serverFactoryContext().clusterManager(),
+              proto_config.filter_name(), config, metrics_namespace,
+              std::move(dynamic_module.value()), context.serverFactoryContext().clusterManager(),
               context.serverFactoryContext().scope(),
               context.serverFactoryContext().mainThreadDispatcher());
 
@@ -43,10 +50,18 @@ DynamicModuleNetworkFilterConfigFactory::createFilterFactoryFromProtoTyped(
                                       std::string(filter_config.status().message()));
   }
 
+  // When the runtime guard is enabled, register the metrics namespace as a custom stat namespace.
+  // This causes the namespace prefix to be stripped from prometheus output and no envoy_ prefix
+  // is added. This is the legacy behavior for backward compatibility.
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.dynamic_modules_strip_custom_stat_prefix")) {
+    context.serverFactoryContext().api().customStatNamespaces().registerStatNamespace(
+        metrics_namespace);
+  }
+
   return [config = filter_config.value()](Network::FilterManager& filter_manager) -> void {
     auto filter = std::make_shared<
         Envoy::Extensions::DynamicModules::NetworkFilters::DynamicModuleNetworkFilter>(config);
-    filter->initializeInModuleFilter();
     filter_manager.addFilter(filter);
   };
 }

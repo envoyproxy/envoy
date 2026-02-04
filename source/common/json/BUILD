@@ -76,3 +76,25 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib_header",
     ],
 )
+
+envoy_cc_library(
+    name = "json_rpc_parser_lib",
+    srcs = [
+        "json_rpc_field_extractor.cc",
+        "json_rpc_parser_config.cc",
+    ],
+    hdrs = [
+        "json_rpc_field_extractor.h",
+        "json_rpc_parser_config.h",
+    ],
+    deps = [
+        "//source/common/common:assert_lib",
+        "//source/common/common:logger_lib",
+        "//source/common/protobuf",
+        "//source/common/protobuf:utility_lib",
+        "@com_google_absl//absl/container:flat_hash_map",
+        "@com_google_absl//absl/container:flat_hash_set",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/strings",
+    ],
+)
