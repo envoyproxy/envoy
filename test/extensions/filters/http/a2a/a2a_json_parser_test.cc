@@ -627,6 +627,187 @@ TEST_F(A2aJsonParserTest, ResubscribeTaskRequest) {
             2);
 }
 
+TEST_F(A2aJsonParserTest, ParseTasksPushNotificationConfigGet) {
+  const std::string json = R"({
+    "jsonrpc": "2.0",
+    "id": 130,
+    "method": "tasks/pushNotificationConfig/get",
+    "params": {
+      "id": "task-uuid-12345",
+      "metadata": {"foo": "bar"},
+      "pushNotificationConfigId": "config-abc"
+    }
+  })";
+
+  ASSERT_TRUE(parser_.parse(json).ok());
+  ASSERT_TRUE(parser_.finishParse().ok());
+  EXPECT_TRUE(parser_.isValidA2aRequest());
+  EXPECT_EQ(parser_.getMethod(), "tasks/pushNotificationConfig/get");
+  EXPECT_EQ(parser_.metadata().fields().at("id").number_value(), 130);
+  EXPECT_EQ(
+      parser_.metadata().fields().at("params").struct_value().fields().at("id").string_value(),
+      "task-uuid-12345");
+  EXPECT_EQ(parser_.metadata()
+                .fields()
+                .at("params")
+                .struct_value()
+                .fields()
+                .at("metadata")
+                .struct_value()
+                .fields()
+                .at("foo")
+                .string_value(),
+            "bar");
+  EXPECT_EQ(parser_.metadata()
+                .fields()
+                .at("params")
+                .struct_value()
+                .fields()
+                .at("pushNotificationConfigId")
+                .string_value(),
+            "config-abc");
+}
+
+TEST_F(A2aJsonParserTest, ParseTasksPushNotificationConfigList) {
+  const std::string json = R"({
+    "jsonrpc": "2.0",
+    "id": 131,
+    "method": "tasks/pushNotificationConfig/list",
+    "params": {
+      "id": "task-uuid-12345",
+      "metadata": {"foo": "bar"},
+      "pushNotificationConfigId": "config-abc"
+    }
+  })";
+
+  ASSERT_TRUE(parser_.parse(json).ok());
+  ASSERT_TRUE(parser_.finishParse().ok());
+  EXPECT_TRUE(parser_.isValidA2aRequest());
+  EXPECT_EQ(parser_.getMethod(), "tasks/pushNotificationConfig/list");
+  EXPECT_EQ(parser_.metadata().fields().at("id").number_value(), 131);
+  EXPECT_EQ(
+      parser_.metadata().fields().at("params").struct_value().fields().at("id").string_value(),
+      "task-uuid-12345");
+  EXPECT_EQ(parser_.metadata()
+                .fields()
+                .at("params")
+                .struct_value()
+                .fields()
+                .at("metadata")
+                .struct_value()
+                .fields()
+                .at("foo")
+                .string_value(),
+            "bar");
+  EXPECT_EQ(parser_.metadata()
+                .fields()
+                .at("params")
+                .struct_value()
+                .fields()
+                .at("pushNotificationConfigId")
+                .string_value(),
+            "config-abc");
+}
+
+TEST_F(A2aJsonParserTest, ParseTasksPushNotificationConfigDelete) {
+  const std::string json = R"({
+    "jsonrpc": "2.0",
+    "id": 132,
+    "method": "tasks/pushNotificationConfig/delete",
+    "params": {
+      "id": "task-uuid-12345",
+      "pushNotificationConfigId": "config-abc"
+    }
+  })";
+
+  ASSERT_TRUE(parser_.parse(json).ok());
+  ASSERT_TRUE(parser_.finishParse().ok());
+  EXPECT_TRUE(parser_.isValidA2aRequest());
+  EXPECT_EQ(parser_.getMethod(), "tasks/pushNotificationConfig/delete");
+  EXPECT_EQ(parser_.metadata().fields().at("id").number_value(), 132);
+  EXPECT_EQ(
+      parser_.metadata().fields().at("params").struct_value().fields().at("id").string_value(),
+      "task-uuid-12345");
+  EXPECT_EQ(parser_.metadata()
+                .fields()
+                .at("params")
+                .struct_value()
+                .fields()
+                .at("pushNotificationConfigId")
+                .string_value(),
+            "config-abc");
+}
+
+TEST_F(A2aJsonParserTest, ParseAgentGetAuthenticatedExtendedCard) {
+  const std::string json = R"({
+    "jsonrpc": "2.0",
+    "id": 133,
+    "method": "agent/getAuthenticatedExtendedCard",
+    "params": {}
+  })";
+
+  ASSERT_TRUE(parser_.parse(json).ok());
+  ASSERT_TRUE(parser_.finishParse().ok());
+  EXPECT_TRUE(parser_.isValidA2aRequest());
+  EXPECT_EQ(parser_.getMethod(), "agent/getAuthenticatedExtendedCard");
+  EXPECT_EQ(parser_.metadata().fields().at("id").number_value(), 133);
+}
+
+TEST_F(A2aJsonParserTest, GetNestedValue) {
+  const std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "message/send",
+    "id": "123",
+    "params": {
+      "taskId": "task-abc-987",
+      "message": {
+        "role": "user",
+        "kind": "message"
+      },
+      "configuration": {
+        "blocking": true
+      }
+    }
+  })";
+  ASSERT_TRUE(parser_.parse(json).ok());
+  ASSERT_TRUE(parser_.finishParse().ok());
+  EXPECT_TRUE(parser_.isValidA2aRequest());
+
+  // Valid paths
+  EXPECT_EQ(parser_.getNestedValue("params.taskId")->string_value(), "task-abc-987");
+  EXPECT_EQ(parser_.getNestedValue("params.message.role")->string_value(), "user");
+  EXPECT_TRUE(parser_.getNestedValue("params.configuration.blocking")->bool_value());
+
+  // Invalid paths
+  EXPECT_EQ(parser_.getNestedValue(""), nullptr);
+  EXPECT_EQ(parser_.getNestedValue("params.message.foo"), nullptr);
+  EXPECT_EQ(parser_.getNestedValue("params.taskId.foo"), nullptr);
+  EXPECT_EQ(parser_.getNestedValue("invalid.path"), nullptr);
+}
+
+TEST_F(A2aJsonParserTest, Reset) {
+  const std::string json1 =
+      R"({"jsonrpc": "2.0", "method": "tasks/get", "id": "1", "params": {"id": "task1"}})";
+  const std::string json2 =
+      R"({"jsonrpc": "2.0", "method": "tasks/cancel", "id": "2", "params": {"id": "task2"}})";
+
+  ASSERT_TRUE(parser_.parse(json1).ok());
+  ASSERT_TRUE(parser_.finishParse().ok());
+  EXPECT_TRUE(parser_.isValidA2aRequest());
+  EXPECT_EQ(parser_.getMethod(), "tasks/get");
+  EXPECT_EQ(parser_.metadata().fields().at("id").string_value(), "1");
+
+  parser_.reset();
+  EXPECT_FALSE(parser_.isValidA2aRequest());
+  EXPECT_TRUE(parser_.metadata().fields().empty());
+
+  ASSERT_TRUE(parser_.parse(json2).ok());
+  ASSERT_TRUE(parser_.finishParse().ok());
+  EXPECT_TRUE(parser_.isValidA2aRequest());
+  EXPECT_EQ(parser_.getMethod(), "tasks/cancel");
+  EXPECT_EQ(parser_.metadata().fields().at("id").string_value(), "2");
+}
+
 // TODO(tyxia): Add support for parsing responses.
 TEST_F(A2aJsonParserTest, ParseResponseWithResult) {
   const std::string json = R"({
