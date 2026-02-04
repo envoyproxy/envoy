@@ -1,5 +1,6 @@
 #include "source/extensions/filters/udp/dynamic_modules/factory.h"
 
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/filters/udp/dynamic_modules/filter.h"
 
 namespace Envoy {
@@ -27,6 +28,19 @@ DynamicModuleUdpListenerFilterConfigFactory::createFilterFactoryFromProto(
 
   auto filter_config = std::make_shared<DynamicModuleUdpListenerFilterConfig>(
       proto_config, std::move(dynamic_module), context.scope());
+
+  // When the runtime guard is enabled, register the metrics namespace as a custom stat namespace.
+  // This causes the namespace prefix to be stripped from prometheus output and no envoy_ prefix
+  // is added. This is the legacy behavior for backward compatibility.
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.dynamic_modules_strip_custom_stat_prefix")) {
+    const auto& module_config = proto_config.dynamic_module_config();
+    const std::string metrics_namespace = module_config.metrics_namespace().empty()
+                                              ? std::string(DefaultMetricsNamespace)
+                                              : module_config.metrics_namespace();
+    context.serverFactoryContext().api().customStatNamespaces().registerStatNamespace(
+        metrics_namespace);
+  }
 
   return [filter_config](Network::UdpListenerFilterManager& filter_manager,
                          Network::UdpReadFilterCallbacks& callbacks) -> void {

@@ -255,7 +255,7 @@ envoy_cmake(
     out_static_libs = ["libsxg.a"],
     tags = ["skip_on_windows"],
     # Use boringssl alias to select fips vs non-fips version.
-    deps = ["//bazel:boringssl"],
+    deps = ["//bazel:ssl"],
 )
 
 envoy_cmake(

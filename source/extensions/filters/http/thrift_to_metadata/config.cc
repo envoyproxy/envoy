@@ -25,6 +25,17 @@ Http::FilterFactoryCb ThriftToMetadataConfig::createFilterFactoryFromProtoTyped(
   };
 }
 
+Http::FilterFactoryCb ThriftToMetadataConfig::createFilterFactoryFromProtoWithServerContextTyped(
+    const envoy::extensions::filters::http::thrift_to_metadata::v3::ThriftToMetadata& proto_config,
+    const std::string&, Server::Configuration::ServerFactoryContext& context) {
+  std::shared_ptr<FilterConfig> config =
+      std::make_shared<FilterConfig>(proto_config, context.scope());
+
+  return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addStreamFilter(std::make_shared<Filter>(config));
+  };
+}
+
 /**
  * Static registration for this filter. @see RegisterFactory.
  */

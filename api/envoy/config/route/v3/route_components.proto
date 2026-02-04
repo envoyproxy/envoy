@@ -7,6 +7,7 @@ import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/extension.proto";
 import "envoy/config/core/v3/proxy_protocol.proto";
 import "envoy/config/core/v3/substitution_format_string.proto";
+import "envoy/type/matcher/v3/address.proto";
 import "envoy/type/matcher/v3/filter_state.proto";
 import "envoy/type/matcher/v3/metadata.proto";
 import "envoy/type/matcher/v3/regex.proto";
@@ -2105,7 +2106,7 @@ message RateLimit {
     DRAFT_VERSION_03 = 2;
   }
 
-  // [#next-free-field: 13]
+  // [#next-free-field: 14]
   message Action {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.route.RateLimit.Action";
@@ -2486,6 +2487,54 @@ message RateLimit {
           [(validate.rules).repeated = {min_items: 1}];
     }
 
+    // The following descriptor entry is appended to the descriptor:
+    //
+    // .. code-block:: cpp
+    //
+    //   ("remote_address_match", "<descriptor_value>")
+    // [#not-implemented-hide:]
+    message RemoteAddressMatch {
+      // Descriptor value of entry.
+      //
+      // The same :ref:`format specifier <config_access_log_format>` as used for
+      // :ref:`HTTP access logging <config_access_log>` applies here, however
+      // unknown specifier values are replaced with the empty string instead of ``-``.
+      //
+      // .. note::
+      //
+      //   The format string can contain multiple valid substitution fields. If multiple substitution
+      //   fields are present, their results will be concatenated to form the final descriptor value.
+      //   If it contains no substitution fields, the value will be used as is.
+      //   All substitution fields will be evaluated and their results concatenated.
+      //   If the final concatenated result is empty and ``default_value`` is set, the ``default_value`` will be used.
+      //   If ``default_value`` is not set and the result is empty, this descriptor will be skipped
+      //   and not included in the rate limit call.
+      //
+      // For example, ``static_value`` will be used as is since there are no substitution fields.
+      // ``%REQ(:method)%`` will be replaced with the HTTP method, and
+      // ``%REQ(:method)%%REQ(:path)%`` will be replaced with the concatenation of the HTTP method and path.
+      // ``%CEL(request.headers['user-id'])%`` will use CEL to extract the user ID from request headers.
+      //
+      string descriptor_value = 1 [(validate.rules).string = {min_len: 1}];
+
+      // The key to use in the descriptor entry.
+      //
+      // Defaults to ``remote_address_match``.
+      string descriptor_key = 2;
+
+      // An optional value to use if the final concatenated ``descriptor_value`` result is empty.
+      string default_value = 3;
+
+      // Specifies an address matcher that controls whether the rate limit action is applied.
+      // The matcher checks the remote address (trusted address from
+      // :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`)
+      // against the specified CIDR ranges. The rate limit action will be applied if
+      // the remote address matches any of the CIDR ranges (or does not match any if
+      // ``invert_match`` is set to true in the address matcher).
+      type.matcher.v3.AddressMatcher address_matcher = 4
+          [(validate.rules).message = {required: true}];
+    }
+
     oneof action_specifier {
       option (validate.required) = true;
 
@@ -2538,6 +2587,10 @@ message RateLimit {
 
       // Rate limit on the existence of query parameters.
       QueryParameterValueMatch query_parameter_value_match = 11;
+
+      // [#not-implemented-hide:]
+      // Rate limit on remote address match.
+      RemoteAddressMatch remote_address_match = 13;
     }
   }
 
