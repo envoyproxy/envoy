@@ -192,9 +192,9 @@ TEST_P(StatsAccessLogIntegrationTest, ActiveRequestsGauge) {
                     value_fixed: 1
                     operations:
                     - log_type: DownstreamStart
-                      operation_type: ADD
+                      operation_type: PAIRED_ADD
                     - log_type: DownstreamEnd
-                      operation_type: SUBTRACT
+                      operation_type: PAIRED_SUBTRACT
 )EOF";
 
   init(config_yaml, /*autonomous_upstream=*/false,
@@ -244,9 +244,9 @@ TEST_P(StatsAccessLogIntegrationTest, SubtractWithoutAdd) {
                     value_fixed: 1
                     operations:
                     - log_type: DownstreamStart
-                      operation_type: ADD
+                      operation_type: PAIRED_ADD
                     - log_type: DownstreamEnd
-                      operation_type: SUBTRACT
+                      operation_type: PAIRED_SUBTRACT
 )EOF";
 
   init(config_yaml, /*autonomous_upstream=*/false,

@@ -436,14 +436,14 @@ TEST_F(StatsAccessLoggerTest, GaugeBothSetAndAddSubtract) {
         value_fixed: 42
         operations:
         - log_type: DownstreamStart
-          operation_type: ADD
+          operation_type: PAIRED_ADD
         - log_type: DownstreamEnd
           operation_type: SET
 )EOF";
   EXPECT_THROW_WITH_MESSAGE(
       initialize(yaml), EnvoyException,
-      "Stats logger gauge must have exactly one ADD and one SUBTRACT operation defined if either "
-      "is present.");
+      "Stats logger gauge must have exactly one PAIRED_ADD and one PAIRED_SUBTRACT operation "
+      "defined if either is present.");
 }
 
 TEST_F(StatsAccessLoggerTest, GaugeMultipleAdd) {
@@ -455,14 +455,14 @@ TEST_F(StatsAccessLoggerTest, GaugeMultipleAdd) {
         value_fixed: 42
         operations:
         - log_type: DownstreamStart
-          operation_type: ADD
+          operation_type: PAIRED_ADD
         - log_type: DownstreamEnd
-          operation_type: ADD
+          operation_type: PAIRED_ADD
 )EOF";
   EXPECT_THROW_WITH_MESSAGE(
       initialize(yaml), EnvoyException,
-      "Stats logger gauge must have exactly one ADD and one SUBTRACT operation defined if either "
-      "is present.");
+      "Stats logger gauge must have exactly one PAIRED_ADD and one PAIRED_SUBTRACT operation "
+      "defined if either is present.");
 }
 
 TEST_F(StatsAccessLoggerTest, GaugeMissingSubtract) {
@@ -474,12 +474,12 @@ TEST_F(StatsAccessLoggerTest, GaugeMissingSubtract) {
         value_fixed: 42
         operations:
         - log_type: DownstreamStart
-          operation_type: ADD
+          operation_type: PAIRED_ADD
 )EOF";
   EXPECT_THROW_WITH_MESSAGE(
       initialize(yaml), EnvoyException,
-      "Stats logger gauge must have exactly one ADD and one SUBTRACT operation defined if either "
-      "is present.");
+      "Stats logger gauge must have exactly one PAIRED_ADD and one PAIRED_SUBTRACT operation "
+      "defined if either is present.");
 }
 
 TEST_F(StatsAccessLoggerTest, GaugeUnspecifiedOperation) {
@@ -518,9 +518,9 @@ TEST_F(StatsAccessLoggerTest, GaugeAddSubtractBehavior) {
         value_fixed: 1
         operations:
         - log_type: DownstreamStart
-          operation_type: ADD
+          operation_type: PAIRED_ADD
         - log_type: DownstreamEnd
-          operation_type: SUBTRACT
+          operation_type: PAIRED_SUBTRACT
 )EOF";
   initialize(yaml);
 
@@ -561,6 +561,64 @@ TEST_F(StatsAccessLoggerTest, GaugeAddSubtractBehavior) {
   EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate));
   EXPECT_CALL(store_.gauge_, sub(1)).Times(0);
   logger_->log(formatter_context_, stream_info_);
+}
+
+TEST_F(StatsAccessLoggerTest, PairedSubtractIgnoresConfiguredValue) {
+  const std::string yaml = R"EOF(
+    stat_prefix: test_stat_prefix
+    gauges:
+      - stat:
+          name: gauge
+        value_fixed: 10
+        operations:
+        - log_type: DownstreamStart
+          operation_type: PAIRED_ADD
+        - log_type: DownstreamEnd
+          operation_type: PAIRED_SUBTRACT
+)EOF";
+  initialize(yaml);
+
+  // Trigger ADD with value 10
+  formatter_context_.setAccessLogType(envoy::data::accesslog::v3::AccessLogType::DownstreamStart);
+  EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate));
+  EXPECT_CALL(store_.gauge_, add(10));
+  logger_->log(formatter_context_, stream_info_);
+
+  // Trigger SUBTRACT. Should still subtract 10.
+  formatter_context_.setAccessLogType(envoy::data::accesslog::v3::AccessLogType::DownstreamEnd);
+  EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate));
+  EXPECT_CALL(store_.gauge_, sub(10));
+  logger_->log(formatter_context_, stream_info_);
+}
+
+TEST_F(StatsAccessLoggerTest, DestructionSubtractsRemainingValue) {
+  const std::string yaml = R"EOF(
+    stat_prefix: test_stat_prefix
+    gauges:
+      - stat:
+          name: gauge
+        value_fixed: 10
+        operations:
+        - log_type: DownstreamStart
+          operation_type: PAIRED_ADD
+        - log_type: DownstreamEnd
+          operation_type: PAIRED_SUBTRACT
+)EOF";
+  initialize(yaml);
+
+  // Trigger ADD using a local StreamInfo so we can control its lifetime.
+  formatter_context_.setAccessLogType(envoy::data::accesslog::v3::AccessLogType::DownstreamStart);
+
+  NiceMock<StreamInfo::MockStreamInfo> local_stream_info;
+
+  EXPECT_CALL(store_, gauge(_, Stats::Gauge::ImportMode::Accumulate));
+  EXPECT_CALL(store_.gauge_, add(10));
+  logger_->log(formatter_context_, local_stream_info);
+
+  // Expect subtraction on destruction
+  EXPECT_CALL(store_.gauge_, sub(10));
+
+  // local_stream_info goes out of scope here.
 }
 
 } // namespace StatsAccessLog

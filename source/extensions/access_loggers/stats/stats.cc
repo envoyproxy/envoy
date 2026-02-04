@@ -14,10 +14,25 @@ namespace {
 
 class AccessLogState : public StreamInfo::FilterState::Object {
 public:
+  ~AccessLogState() override {
+    for (const auto& [gauge, value] : inflight_gauges_) {
+      gauge->sub(value);
+    }
+  }
+
   // The Stats::Gauge pointer is used as a key in the set. The memory address of the Gauge object is
   // unique for the lifetime of that specific gauge and serves as a unique identifier.
-  void addInflightGauge(Stats::Gauge* gauge) { inflight_gauges_.insert(gauge); }
-  bool removeInflightGauge(Stats::Gauge* gauge) { return inflight_gauges_.erase(gauge) > 0; }
+  void addInflightGauge(Stats::Gauge* gauge, uint64_t value) { inflight_gauges_[gauge] = value; }
+
+  absl::optional<uint64_t> removeInflightGauge(Stats::Gauge* gauge) {
+    auto it = inflight_gauges_.find(gauge);
+    if (it == inflight_gauges_.end()) {
+      return absl::nullopt;
+    }
+    uint64_t value = it->second;
+    inflight_gauges_.erase(it);
+    return value;
+  }
 
   static const std::string& key() {
     static const std::string* kKey = new std::string("envoy.access_loggers.stats.access_log_state");
@@ -25,7 +40,7 @@ public:
   }
 
 private:
-  absl::flat_hash_set<Stats::Gauge*> inflight_gauges_;
+  absl::flat_hash_map<Stats::Gauge*, uint64_t> inflight_gauges_;
 };
 
 Formatter::FormatterProviderPtr
@@ -124,16 +139,16 @@ StatsAccessLog::StatsAccessLog(const envoy::extensions::access_loggers::stats::v
             operations.emplace_back(trigger.log_type(), trigger.operation_type());
 
             if (trigger.operation_type() ==
-                envoy::extensions::access_loggers::stats::v3::Config::Gauge::Operation::ADD) {
+                envoy::extensions::access_loggers::stats::v3::Config::Gauge::Operation::PAIRED_ADD) {
               add_count++;
             } else if (trigger.operation_type() == envoy::extensions::access_loggers::stats::v3::
-                                                       Config::Gauge::Operation::SUBTRACT) {
+                                                       Config::Gauge::Operation::PAIRED_SUBTRACT) {
               subtract_count++;
             }
           }
 
           if ((add_count > 0 || subtract_count > 0) && (add_count != 1 || subtract_count != 1)) {
-            throw EnvoyException("Stats logger gauge must have exactly one ADD and one SUBTRACT "
+            throw EnvoyException("Stats logger gauge must have exactly one PAIRED_ADD and one PAIRED_SUBTRACT "
                                  "operation defined if "
                                  "either is present.");
           }
@@ -304,8 +319,8 @@ void StatsAccessLog::emitLogForGauge(const Gauge& gauge, const Formatter::Contex
           : Stats::Gauge::ImportMode::Accumulate;
   auto& gauge_stat = scope_->gaugeFromStatNameWithTags(gauge.stat_.name_, tags, import_mode);
 
-  if (op == OperationType::Config_Gauge_Operation_OperationType_ADD ||
-      op == OperationType::Config_Gauge_Operation_OperationType_SUBTRACT) {
+  if (op == OperationType::Config_Gauge_Operation_OperationType_PAIRED_ADD ||
+      op == OperationType::Config_Gauge_Operation_OperationType_PAIRED_SUBTRACT) {
     auto& filter_state = const_cast<StreamInfo::FilterState&>(stream_info.filterState());
     if (!filter_state.hasData<AccessLogState>(AccessLogState::key())) {
       filter_state.setData(AccessLogState::key(), std::make_shared<AccessLogState>(),
@@ -314,12 +329,13 @@ void StatsAccessLog::emitLogForGauge(const Gauge& gauge, const Formatter::Contex
     }
     auto* state = filter_state.getDataMutable<AccessLogState>(AccessLogState::key());
 
-    if (op == OperationType::Config_Gauge_Operation_OperationType_ADD) {
-      state->addInflightGauge(&gauge_stat);
+    if (op == OperationType::Config_Gauge_Operation_OperationType_PAIRED_ADD) {
+      state->addInflightGauge(&gauge_stat, value);
       gauge_stat.add(value);
     } else {
-      if (state->removeInflightGauge(&gauge_stat)) {
-        gauge_stat.sub(value);
+      absl::optional<uint64_t> added_value = state->removeInflightGauge(&gauge_stat);
+      if (added_value.has_value()) {
+        gauge_stat.sub(added_value.value());
       }
     }
     return;

@@ -129,14 +129,15 @@ message Config {
   //   on the memory overhead.
   //
   // Usage restrictions:
-  // i). Only one ADD/SUBTRACT pair at most can be defined in the
-  // ``operations``. Add/Subtract not matched with the other isn't
+  // i). Only one PAIRED_ADD/PAIRED_SUBTRACT pair at most can be defined in the
+  // ``operations``. PAIRED_ADD/PAIRED_SUBTRACT not matched with the other isn't
   // allowed.
   // ii). We only support add first then subtract logic and we rely on the
   // symmetrical log types (e.g., DownstreamStart/DownstreamEnd) to increment
   // and decrement the gauge.
-  // iii). During runtime, SUBTRACT will execute if and only ADD operation has
-  // been done, tracked by inflight counter in filter state.
+  // iii). During runtime, PAIRED_SUBTRACT will execute if and only if
+  // PAIRED_ADD operation has been done, tracked by inflight counter in filter
+  // state.
   message Gauge {
     // An operation to perform on the gauge.
     message Operation {
@@ -149,10 +150,13 @@ message Config {
         SET = 1;
 
         // Add the configured value to the gauge.
-        ADD = 2;
+        PAIRED_ADD = 2;
 
-        // Subtract the configured value from the gauge.
-        SUBTRACT = 3;
+        // Subtract the value from the gauge.
+        // The value subtracted will be the same as the value added by the
+        // paired PAIRED_ADD operation, regardless of the value configured
+        // for this operation.
+        PAIRED_SUBTRACT = 3;
       }
 
       // The access log type to trigger the operation.
