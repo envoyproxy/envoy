@@ -20,7 +20,7 @@ envoy_cc_test(
         "//source/common/watchdog:abort_action_lib",
         "//test/common/stats:stat_test_utility_lib",
         "//test/test_common:utility_lib",
-        "@com_google_absl//absl/synchronization",
+        "@abseil-cpp//absl/synchronization",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/watchdog/v3:pkg_cc_proto",
     ],

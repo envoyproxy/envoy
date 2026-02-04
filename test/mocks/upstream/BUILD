@@ -152,6 +152,7 @@ envoy_cc_mock(
     srcs = ["retry_priority.cc"],
     hdrs = ["retry_priority.h"],
     deps = [
+        "//envoy/stream_info:stream_info_interface",
         "//envoy/upstream:retry_interface",
     ],
 )
