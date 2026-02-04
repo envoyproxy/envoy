@@ -24,7 +24,7 @@ envoy_cc_library(
         "-Wno-unused-parameter",
     ],
     deps = [
-        "@proxy_wasm_cpp_host//:base_lib",
-        "@proxy_wasm_cpp_host//:v8_lib",
+        "@proxy-wasm-cpp-host//:base_lib",
+        "@proxy-wasm-cpp-host//:v8_lib",
     ],
 )

@@ -1204,8 +1204,8 @@ pub static NEW_FORMATTER_CONFIG_FUNCTION: OnceLock<NewFormatterConfigFunction> =
 /// # Example
 ///
 /// ```
-/// use envoy_proxy_dynamic_modules_rust_sdk::*;
 /// use envoy_proxy_dynamic_modules_rust_sdk::formatter::*;
+/// use envoy_proxy_dynamic_modules_rust_sdk::*;
 ///
 /// fn program_init() -> bool {
 ///   true

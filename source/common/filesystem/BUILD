@@ -129,6 +129,6 @@ envoy_cc_library(
         "//conditions:default": [],
     }) + select({
         "//bazel:bzlmod_mode": ["@libevent"],
-        "//conditions:default": ["//bazel/foreign_cc:event"],
+        "//conditions:default": ["@libevent"],
     }),
 )

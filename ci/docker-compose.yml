@@ -100,6 +100,7 @@ services:
     volumes:
     - ${ENVOY_DOCKER_BUILD_DIR:-/tmp/envoy-docker-build}:/build${MOUNT_ACCESS_MODE:-}
     - ${SOURCE_DIR:-..}:/source${MOUNT_ACCESS_MODE:-}
+    - ../../toolshed:/toolshed
     - ${SHARED_TMP_DIR:-/tmp/bazel-shared}:${SHARED_TMP_DIR:-/tmp/bazel-shared}${MOUNT_ACCESS_MODE:-}
 
   envoy-build-gpg:

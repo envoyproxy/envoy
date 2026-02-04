@@ -15,7 +15,7 @@ envoy_cc_extension(
     deps = envoy_select_wasm_wasmtime([
         "//envoy/registry",
         "//source/extensions/common/wasm:wasm_runtime_factory_interface",
-        "@proxy_wasm_cpp_host//:base_lib",
-        "@proxy_wasm_cpp_host//:wasmtime_lib",
+        "@proxy-wasm-cpp-host//:base_lib",
+        "@proxy-wasm-cpp-host//:wasmtime_lib",
     ]),
 )

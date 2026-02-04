@@ -1,0 +1,151 @@
+diff --git a/bazel/BUILD b/bazel/BUILD
+index 387dc66..3e399ba 100644
+--- a/bazel/BUILD
++++ b/bazel/BUILD
+@@ -2,6 +2,18 @@ package(default_visibility = ["//visibility:public"])
+ 
+ filegroup(name = "empty")
+ 
++alias(
++    name = "dwp_files",
++    actual = select({
++        ":linux": "@emscripten_bin_linux//:dwp_files",
++        ":linux_arm64": "@emscripten_bin_linux_arm64//:dwp_files",
++        ":macos": "@emscripten_bin_mac//:dwp_files",
++        ":macos_arm64": "@emscripten_bin_mac_arm64//:dwp_files",
++        ":windows": "@emscripten_bin_win//:dwp_files",
++        "//conditions:default": ":empty",
++    }),
++)
++
+ platform(
+     name = "platform_wasm",
+     constraint_values = [
+diff --git a/bazel/MODULE.bazel b/bazel/MODULE.bazel
+index e5ea27d..5bdf64b 100644
+--- a/bazel/MODULE.bazel
++++ b/bazel/MODULE.bazel
+@@ -14,6 +14,7 @@ python = use_extension("@rules_python//python/extensions:python.bzl", "python")
+ python.toolchain(
+     python_version = "3.13",
+ )
++use_repo(python, "python_3_13")
+ 
+ node = use_extension("@rules_nodejs//nodejs:extensions.bzl", "node")
+ node.toolchain(node_version = "20.18.0")
+@@ -29,44 +30,6 @@ use_repo(emscripten_deps, "emscripten_bin_mac")
+ use_repo(emscripten_deps, "emscripten_bin_mac_arm64")
+ use_repo(emscripten_deps, "emscripten_bin_win")
+ 
+-npm = use_extension(
+-    "@aspect_rules_js//npm:extensions.bzl",
+-    "npm",
+-)
+-npm.npm_translate_lock(
+-    name = "emscripten_npm_linux",
+-    data = ["@emscripten_bin_linux//:emscripten/package.json"],
+-    npm_package_lock = "@emscripten_bin_linux//:emscripten/package-lock.json",
+-)
+-npm.npm_translate_lock(
+-    name = "emscripten_npm_linux_arm64",
+-    data = ["@emscripten_bin_linux_arm64//:emscripten/package.json"],
+-    npm_package_lock = "@emscripten_bin_linux_arm64//:emscripten/package-lock.json",
+-)
+-npm.npm_translate_lock(
+-    name = "emscripten_npm_mac",
+-    data = ["@emscripten_bin_mac//:emscripten/package.json"],
+-    npm_package_lock = "@emscripten_bin_mac//:emscripten/package-lock.json",
+-)
+-npm.npm_translate_lock(
+-    name = "emscripten_npm_mac_arm64",
+-    data = ["@emscripten_bin_mac_arm64//:emscripten/package.json"],
+-    npm_package_lock = "@emscripten_bin_mac_arm64//:emscripten/package-lock.json",
+-)
+-npm.npm_translate_lock(
+-    name = "emscripten_npm_win",
+-    data = ["@emscripten_bin_win//:emscripten/package.json"],
+-    npm_package_lock = "@emscripten_bin_win//:emscripten/package-lock.json",
+-)
+-use_repo(
+-    npm,
+-    "emscripten_npm_linux",
+-    "emscripten_npm_linux_arm64",
+-    "emscripten_npm_mac",
+-    "emscripten_npm_mac_arm64",
+-    "emscripten_npm_win",
+-)
+-
+ emscripten_cache = use_extension("//:emscripten_cache.bzl", "emscripten_cache")
+ use_repo(emscripten_cache, "emscripten_cache")
+ 
+diff --git a/bazel/emscripten_build_file.bzl b/bazel/emscripten_build_file.bzl
+index 0d7aff2..eefbe79 100644
+--- a/bazel/emscripten_build_file.bzl
++++ b/bazel/emscripten_build_file.bzl
+@@ -90,4 +90,12 @@ filegroup(
+         ],
+     ),
+ )
++
++filegroup(
++    name = "dwp_files",
++    srcs = [
++        "bin/llvm-dwp{bin_extension}",
++    ],
++)
++
+ """
+diff --git a/bazel/emscripten_toolchain/emar.sh b/bazel/emscripten_toolchain/emar.sh
+index b4ead6e..45ad876 100755
+--- a/bazel/emscripten_toolchain/emar.sh
++++ b/bazel/emscripten_toolchain/emar.sh
+@@ -2,4 +2,4 @@
+ 
+ source $(dirname $0)/env.sh
+ 
+-exec python3 $EMSCRIPTEN/emar.py "$@"
++exec external/rules_python~~python~python_3_13_x86_64-unknown-linux-gnu/bin/python3 $EMSCRIPTEN/emar.py "$@"
+diff --git a/bazel/emscripten_toolchain/emcc.sh b/bazel/emscripten_toolchain/emcc.sh
+index 5fdaf9c..015f74e 100755
+--- a/bazel/emscripten_toolchain/emcc.sh
++++ b/bazel/emscripten_toolchain/emcc.sh
+@@ -2,4 +2,4 @@
+ 
+ source $(dirname $0)/env.sh
+ 
+-exec python3 $EMSCRIPTEN/emcc.py "$@"
++exec external/rules_python~~python~python_3_13_x86_64-unknown-linux-gnu/bin/python3 $EMSCRIPTEN/emcc.py "$@"
+diff --git a/bazel/emscripten_toolchain/emcc_link.sh b/bazel/emscripten_toolchain/emcc_link.sh
+index 44f3235..3d0f9a0 100755
+--- a/bazel/emscripten_toolchain/emcc_link.sh
++++ b/bazel/emscripten_toolchain/emcc_link.sh
+@@ -2,4 +2,4 @@
+ 
+ source $(dirname $0)/env.sh
+ 
+-exec python3 $(dirname $0)/link_wrapper.py "$@"
++exec external/rules_python~~python~python_3_13_x86_64-unknown-linux-gnu/bin/python3 $(dirname $0)/link_wrapper.py "$@"
+diff --git a/bazel/emscripten_toolchain/wasm_cc_binary.bzl b/bazel/emscripten_toolchain/wasm_cc_binary.bzl
+index e7bd8ef..fbe86a4 100644
+--- a/bazel/emscripten_toolchain/wasm_cc_binary.bzl
++++ b/bazel/emscripten_toolchain/wasm_cc_binary.bzl
+@@ -151,7 +151,6 @@ def _wasm_cc_binary_legacy_impl(ctx):
+     args.add("--allow_empty_outputs")
+     args.add_all("--archive", ctx.files.cc_target)
+     args.add_joined("--outputs", outputs, join_with = ",")
+-
+     ctx.actions.run(
+         inputs = ctx.files.cc_target,
+         outputs = outputs,
+diff --git a/bazel/remote_emscripten_repository.bzl b/bazel/remote_emscripten_repository.bzl
+index 819a048..787c08c 100644
+--- a/bazel/remote_emscripten_repository.bzl
++++ b/bazel/remote_emscripten_repository.bzl
+@@ -62,6 +62,7 @@ def create_toolchains(name, repo_name, exec_compatible_with):
+             "@emsdk//emscripten_toolchain:env.sh",
+             "@emsdk//emscripten_toolchain:env.bat",
+             "@nodejs//:node_files",
++            "@python_3_13//:files",
+         ],
+     )
+ 

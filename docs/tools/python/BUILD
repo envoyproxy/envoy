@@ -4,6 +4,7 @@ licenses(["notice"])  # Apache 2
 
 exports_files([
     "entry_point.py",
+    "requirements.txt",
 ])
 
 compile_pip_requirements(

@@ -7,9 +7,13 @@ def _type_database_impl(ctx):
     type_db_deps = depset(transitive = type_db_deps)
     proto_repositories = ctx.attr.proto_repositories
 
+    def _normalize_workspace_name(ws_name):
+        if not ws_name:
+            return ""
+        return ws_name.split("+", 1)[0].split("~", 1)[0]
+
     def _descriptor_set(dep):
-        ws_name = dep.owner.workspace_name
-        ws_name = ws_name.rstrip("~").split("~")[0] if ws_name else ""
+        ws_name = _normalize_workspace_name(dep.owner.workspace_name)
         if (not ws_name) or ws_name in proto_repositories:
             return dep.path
 

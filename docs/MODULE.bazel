@@ -3,11 +3,135 @@ module(
     version = "1.38.0-dev",
 )
 
+bazel_dep(name = "com_envoyproxy_protoc_gen_validate", version = "1.3.0.envoy")
 bazel_dep(name = "envoy")
+bazel_dep(name = "envoy_api", version = "1.40.0-dev")
+bazel_dep(name = "envoy-examples", version = "0.2.4.envoy")
+bazel_dep(name = "envoy_toolshed", version = "0.4.4.envoy")
+bazel_dep(name = "googleurl", version = "0.0.0-221103-dd4080f.envoy")
+bazel_dep(name = "grpc", version = "1.83.0.envoy")
+bazel_dep(name = "librdkafka", version = "2.6.0.envoy")
+bazel_dep(name = "protobuf", version = "35.1.bcr.envoy", repo_name = "com_google_protobuf")
+bazel_dep(name = "proxy-wasm-cpp-host", version = "0.0.0-260704-f2db56a.envoy")
+bazel_dep(name = "rules_cc", version = "0.2.22")
+bazel_dep(name = "rules_pkg", version = "1.1.0")
+bazel_dep(name = "rules_python", version = "2.2.0")
+bazel_dep(name = "rules_rust", version = "0.69.0.envoy")
+bazel_dep(name = "toolchains_llvm", version = "1.8.0.envoy")
+bazel_dep(name = "xds", version = "0.0.1-20251110-8bfbf64.envoy")
+bazel_dep(name = "zlib-ng", version = "2.3.2.envoy")
 
 local_path_override(
     module_name = "envoy",
     path = "../",
 )
+local_path_override(
+    module_name = "envoy_api",
+    path = "../api",
+)
+local_path_override(
+    module_name = "envoy-examples",
+    path = "../../examples",
+)
 
-bazel_dep(name = "envoy-examples", version = "0.2.4")
+envoy_examples_ext = use_extension("@envoy-examples//bazel:extensions.bzl", "envoy_build_examples")
+use_repo(envoy_examples_ext, "envoy-example-wasm-cc")
+
+python = use_extension("@rules_python//python/extensions:python.bzl", "python")
+python.toolchain(
+    is_default = True,
+    python_version = "3.12",
+)
+use_repo(
+    python,
+    "python_3_12",
+    python = "python_versions",
+)
+
+pip = use_extension("@rules_python//python/extensions:pip.bzl", "pip")
+pip.parse(
+    hub_name = "docs_pip3",
+    python_version = "3.12",
+    requirements_lock = "//tools/python:requirements.txt",
+)
+use_repo(pip, "base_pip3", "docs_pip3")
+
+envoy_toolchains_ext = use_extension("@envoy//bazel:extensions.bzl", "envoy_toolchains_extension")
+use_repo(envoy_toolchains_ext, "clang_platform")
+
+
+sysroot_ext = use_extension("@envoy_toolshed//sysroot:extensions.bzl", "sysroot_extension")
+# sysroot_ext.setup()
+use_repo(sysroot_ext, "sysroot_linux_amd64", "sysroot_linux_arm64")
+
+llvm = use_extension("@toolchains_llvm//toolchain/extensions:llvm.bzl", "llvm", dev_dependency=True)
+llvm.cxx_cross_lib(
+    name = "llvm_toolchain",
+    label = "@libcxx_libs_aarch64",
+    targets = ["linux-aarch64"],
+)
+llvm.cxx_cross_lib(
+    name = "llvm_toolchain",
+    label = "@libcxx_libs_x86_64",
+    targets = ["linux-x86_64"],
+)
+llvm.toolchain(
+    name = "llvm_toolchain",
+    extra_llvm_distributions = {
+        "LLVM-22.1.8-Linux-ARM64.tar.xz": "805efad2bb91cb4967fa569e0881d10c0f69c04461cf671cccbae19f547acc34",
+        "LLVM-22.1.8-Linux-X64.tar.xz": "df0e1ecf16caf3489a272a5eea4eec9b0d82878f6477fa309504f918a0006384",
+        "LLVM-22.1.8-macOS-ARM64.tar.xz": "f260f4f7c0d430828a81ae8a3826a1d63fc0963ec2459489308cc23b1f7eab4f",
+    },
+    llvm_version = "22.1.8",
+)
+llvm.toolchain_root(
+    name = "llvm_toolchain",
+    label = "@llvm_minimal_linux_x64",
+    targets = ["linux-x86_64"],
+)
+llvm.toolchain_root(
+    name = "llvm_toolchain",
+    label = "@llvm_minimal_linux_arm64",
+    targets = ["linux-aarch64"],
+)
+llvm.toolchain_root(
+    name = "llvm_toolchain",
+    label = "@llvm_minimal_macos_arm64",
+    targets = ["darwin-aarch64"],
+)
+llvm.sysroot(
+    name = "llvm_toolchain",
+    label = "@sysroot_linux_amd64//:sysroot",
+    targets = ["linux-x86_64"],
+)
+llvm.sysroot(
+    name = "llvm_toolchain",
+    label = "@sysroot_linux_arm64//:sysroot",
+    targets = ["linux-aarch64"],
+)
+use_repo(llvm, "llvm_toolchain")
+
+register_toolchains("@llvm_toolchain//:all", dev_dependency = True)
+
+libcxx_ext = use_extension("@envoy_toolshed//compile:extensions.bzl", "libcxx_extension", dev_dependency = True)
+use_repo(libcxx_ext, "llvm_libcxx_aarch64", "llvm_libcxx_x86_64")
+
+libcxx_libs_ext = use_extension("@envoy_toolshed//compile:extensions.bzl", "libcxx_libs_extension", dev_dependency = True)
+libcxx_libs_ext.setup()
+use_repo(libcxx_libs_ext, "libcxx_libs_aarch64", "libcxx_libs_x86_64")
+
+llvm_minimal_build_ext = use_extension("@envoy_toolshed//compile:extensions.bzl", "llvm_minimal_build_extension", dev_dependency = True)
+use_repo(llvm_minimal_build_ext, "llvm_tarball_linux_x86_64", "llvm_tarball_linux_arm64", "llvm_tarball_macos_arm64")
+
+llvm_minimal_ext = use_extension("@envoy_toolshed//compile:extensions.bzl", "llvm_minimal_extension", dev_dependency = True)
+llvm_minimal_ext.setup()
+use_repo(llvm_minimal_ext, "llvm_minimal_linux_x64", "llvm_minimal_linux_arm64", "llvm_minimal_macos_arm64")
+
+llvm_toolchain_alias_ext = use_extension("@envoy_toolshed//compile:extensions.bzl", "llvm_toolchain_alias_extension", dev_dependency = True)
+use_repo(llvm_toolchain_alias_ext, "llvm_toolchain_llvm")
+
+cc_configure = use_extension("@rules_cc//cc:extensions.bzl", "cc_configure_extension")
+use_repo(cc_configure, "local_config_cc", "local_config_cc_toolchains")
+
+compat = use_extension("@rules_cc//cc:extensions.bzl", "compatibility_proxy")
+use_repo(compat, "cc_compatibility_proxy")

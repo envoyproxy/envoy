@@ -1,7 +1,5 @@
 load("@aspect_bazel_lib//lib:repositories.bzl", "register_jq_toolchains", "register_yq_toolchains")
 load("@base_pip3//:requirements.bzl", pip_dependencies = "install_deps")
-load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies", "go_repository")
-load("@build_bazel_rules_apple//apple:repositories.bzl", "apple_rules_dependencies")
 load("@cel-cpp//bazel:deps.bzl", "parser_deps")
 load("@com_github_chrusty_protoc_gen_jsonschema//:deps.bzl", protoc_gen_jsonschema_go_dependencies = "go_dependencies")
 load("@dev_pip3//:requirements.bzl", pip_dev_dependencies = "install_deps")
@@ -10,15 +8,16 @@ load("@emsdk//:toolchains.bzl", "register_emscripten_toolchains")
 load("@envoy_toolshed//compile:sanitizer_libs.bzl", "setup_sanitizer_libs")
 load("@envoy_toolshed//coverage/grcov:grcov_repository.bzl", "grcov_repository")
 load("@fuzzing_pip3//:requirements.bzl", pip_fuzzing_dependencies = "install_deps")
+load("@gazelle//:deps.bzl", "gazelle_dependencies", "go_repository")
 load("@io_bazel_rules_go//go:deps.bzl", "go_download_sdk", "go_register_toolchains", "go_rules_dependencies")
-load("@proxy_wasm_rust_sdk//bazel:dependencies.bzl", "proxy_wasm_rust_sdk_dependencies")
+load("@rules_apple//apple:repositories.bzl", "apple_rules_dependencies")
 load("@rules_buf//buf:repositories.bzl", "rules_buf_toolchains")
 load("@rules_cc//cc:extensions.bzl", "compatibility_proxy_repo")
 load("@rules_foreign_cc//foreign_cc:repositories.bzl", "rules_foreign_cc_dependencies")
 load("@rules_fuzzing//fuzzing:repositories.bzl", "rules_fuzzing_dependencies")
 load("@rules_pkg//:deps.bzl", "rules_pkg_dependencies")
 load("@rules_proto_grpc//:repositories.bzl", "rules_proto_grpc_toolchains")
-load("@rules_rust//crate_universe:defs.bzl", "crate", "crates_repository")
+load("@rules_rust//crate_universe:defs.bzl", "crates_repository")
 load("@rules_rust//crate_universe:repositories.bzl", "crate_universe_dependencies")
 load("@rules_rust//rust:defs.bzl", "rust_common")
 load("@rules_rust//rust:repositories.bzl", "rules_rust_dependencies", "rust_register_toolchains", "rust_repository_set")
@@ -223,7 +222,7 @@ def envoy_dependency_imports(
     )
 
     go_repository(
-        name = "com_github_envoyproxy_protoc_gen_validate",
+        name = "com_envoyproxy_protoc_gen_validate",
         importpath = "github.com/envoyproxy/protoc-gen-validate",
         sum = "h1:TvGH1wof4H33rezVKWSpqKz5NXWg5VPuZ0uONDT6eb4=",
         version = "v1.3.0",

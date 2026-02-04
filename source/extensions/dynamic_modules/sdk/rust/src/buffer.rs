@@ -147,7 +147,8 @@ impl Default for EnvoyMutBuffer<'_> {
 }
 
 // Envoy fills caller-allocated `Vec`s of these types in place by reinterpreting them as the ABI
-// buffer and HTTP header structs, so assert the layouts match to keep those reinterpretations sound.
+// buffer and HTTP header structs, so assert the layouts match to keep those reinterpretations
+// sound.
 const _: () = {
   type EnvoyBufferPair = (EnvoyBuffer<'static>, EnvoyBuffer<'static>);
 
@@ -220,8 +221,8 @@ mod tests {
 
   #[test]
   fn test_envoy_buffer_as_slice_treats_null_and_empty_alike() {
-    // A null buffer and a non-null zero-length buffer both yield an empty slice, so the list getters
-    // can return Envoy-filled entries directly without normalizing empty ones.
+    // A null buffer and a non-null zero-length buffer both yield an empty slice, so the list
+    // getters can return Envoy-filled entries directly without normalizing empty ones.
     assert_eq!(EnvoyBuffer::default().as_slice(), b"");
     assert_eq!(EnvoyBuffer::new(b"").as_slice(), b"");
   }
