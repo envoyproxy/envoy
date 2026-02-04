@@ -3248,8 +3248,8 @@ TEST_P(TcpProxyTest, MergeWithDownstreamTlvsWithDownstreamState) {
   auto* tlv = config.add_proxy_protocol_tlvs();
   tlv->set_type(0xF1);
   tlv->set_value("tcp_proxy_value");
-  config.set_downstream_tlv_merge_policy(
-      envoy::extensions::filters::network::tcp_proxy::v3::OVERRIDE_DOWNSTREAM_TLVS_BY_TYPE);
+  config.set_proxy_protocol_tlv_merge_policy(
+      envoy::extensions::filters::network::tcp_proxy::v3::OVERWRITE_BY_TYPE_IF_EXISTS_OR_ADD);
 
   // Set up existing downstream proxy protocol state (simulating proxy_protocol listener filter).
   Network::ProxyProtocolTLVVector downstream_tlvs;
@@ -3303,8 +3303,8 @@ TEST_P(TcpProxyTest, MergeWithDownstreamTlvsPrecedence) {
   auto* tlv = config.add_proxy_protocol_tlvs();
   tlv->set_type(0xE1); // Same type as downstream TLV
   tlv->set_value("overridden");
-  config.set_downstream_tlv_merge_policy(
-      envoy::extensions::filters::network::tcp_proxy::v3::OVERRIDE_DOWNSTREAM_TLVS_BY_TYPE);
+  config.set_proxy_protocol_tlv_merge_policy(
+      envoy::extensions::filters::network::tcp_proxy::v3::OVERWRITE_BY_TYPE_IF_EXISTS_OR_ADD);
 
   // Set up existing downstream proxy protocol state with a conflicting TLV type.
   Network::ProxyProtocolTLVVector downstream_tlvs;
@@ -3392,8 +3392,8 @@ TEST_P(TcpProxyTest, MergeWithDownstreamTlvsWithDynamicTlv) {
   tlv->set_type(0xF2);
   tlv->mutable_format_string()->mutable_text_format_source()->set_inline_string(
       "%DYNAMIC_METADATA(envoy.test:key)%");
-  config.set_downstream_tlv_merge_policy(
-      envoy::extensions::filters::network::tcp_proxy::v3::OVERRIDE_DOWNSTREAM_TLVS_BY_TYPE);
+  config.set_proxy_protocol_tlv_merge_policy(
+      envoy::extensions::filters::network::tcp_proxy::v3::OVERWRITE_BY_TYPE_IF_EXISTS_OR_ADD);
 
   // Set dynamic metadata.
   filter_callbacks_.connection_.stream_info_.metadata_.mutable_filter_metadata()->insert(
@@ -3449,8 +3449,8 @@ TEST_P(TcpProxyTest, AppendToDownstreamTlvsPreservesDuplicates) {
   auto* tlv2 = config.add_proxy_protocol_tlvs();
   tlv2->set_type(0xF0); // Different type
   tlv2->set_value("tcp_proxy_f0");
-  config.set_downstream_tlv_merge_policy(
-      envoy::extensions::filters::network::tcp_proxy::v3::APPEND_TO_DOWNSTREAM_TLVS);
+  config.set_proxy_protocol_tlv_merge_policy(
+      envoy::extensions::filters::network::tcp_proxy::v3::APPEND_IF_EXISTS_OR_ADD);
 
   // Set up existing downstream proxy protocol state with duplicate types.
   Network::ProxyProtocolTLVVector downstream_tlvs;

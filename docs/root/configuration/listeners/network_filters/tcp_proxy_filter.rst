@@ -159,22 +159,21 @@ Example configuration with static and dynamic TLVs:
           text_format_source:
             inline_string: "%DYNAMIC_METADATA(envoy.some_filter:some_key)%"
 
-Merging TLVs with Downstream PROXY Protocol State
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Merging TLVs with Existing PROXY Protocol State
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-When the downstream connection already contains ``PROXY`` protocol state (parsed by a
+When PROXY protocol state already exists (e.g., parsed by a
 :ref:`proxy protocol listener filter <config_listener_filters_proxy_protocol>`), the
 ``proxy_protocol_tlvs`` configured in the TCP proxy filter are ignored by default.
 
-To control how TCP proxy TLVs interact with downstream TLVs, use
-:ref:`downstream_tlv_merge_policy
-<envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.downstream_tlv_merge_policy>`:
+To control how configured TLVs interact with existing state, use
+:ref:`proxy_protocol_tlv_merge_policy
+<envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.proxy_protocol_tlv_merge_policy>`:
 
-* ``KEEP_DOWNSTREAM_ONLY`` (default): TCP proxy TLVs are ignored if downstream state exists.
-  Only downstream TLVs are forwarded.
-* ``OVERRIDE_DOWNSTREAM_TLVS_BY_TYPE``: TCP proxy TLVs override downstream TLVs with the same type.
+* ``ADD_IF_ABSENT`` (default): Add configured TLVs only if no state exists.
+* ``OVERWRITE_BY_TYPE_IF_EXISTS_OR_ADD``: Overwrite existing TLVs by type with configured TLVs.
   Non-conflicting TLVs from both sources are preserved.
-* ``APPEND_TO_DOWNSTREAM_TLVS``: TCP proxy TLVs are appended to downstream TLVs, preserving all
+* ``APPEND_IF_EXISTS_OR_ADD``: Append configured TLVs to existing TLVs, preserving all
   TLVs from both sources (allows duplicate types per PROXY protocol v2 spec).
 
 .. note::
