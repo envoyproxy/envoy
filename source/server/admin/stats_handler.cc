@@ -127,10 +127,6 @@ Http::Code StatsHandler::prometheusStats(absl::string_view path_and_query,
     return code;
   }
 
-  if (server_.statsConfig().flushOnAdmin()) {
-    server_.flushStats();
-  }
-
   return prometheusFlushAndRender(params, response);
 }
 
