@@ -16,13 +16,10 @@ class AccessLogState : public StreamInfo::FilterState::Object {
 public:
   ~AccessLogState() override {
     for (const auto& [gauge, value_pair] : inflight_gauges_) {
-      // Use the shared pointer to ensure the gauge is still valid.
       value_pair.first->sub(value_pair.second);
     }
   }
 
-  // The Stats::Gauge pointer is used as a key in the set. The memory address of the Gauge object is
-  // unique for the lifetime of that specific gauge and serves as a unique identifier.
   void addInflightGauge(Stats::Gauge* gauge, uint64_t value) {
     inflight_gauges_[gauge] = std::make_pair(Stats::GaugeSharedPtr(gauge), value);
   }
