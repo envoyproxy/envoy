@@ -114,6 +114,7 @@ public:
   void reset();
 
 private:
+  // TODO(tyxia): This config_ could be storeed as a reference to if needed.
   A2aParserConfig config_;
   Protobuf::Struct metadata_;
   std::unique_ptr<A2aFieldExtractor> extractor_;
