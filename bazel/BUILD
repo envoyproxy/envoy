@@ -8,6 +8,7 @@ load("@envoy_toolshed//dependency:macros.bzl", "updater")
 load("@rules_cc//cc:defs.bzl", "cc_library")
 load("@rules_shell//shell:sh_library.bzl", "sh_library")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
+load(":deprecated_features.bzl", "check_removed_fips_define")
 load(":repository_locations.bzl", "REPOSITORY_LOCATIONS_SPEC")
 
 licenses(["notice"])  # Apache 2
@@ -532,6 +533,12 @@ selects.config_setting_group(
         ":using_boringssl_fips",
         ":using_aws_lc",
     ],
+)
+
+check_removed_fips_define(
+    name = "check_removed_fips_define",
+    build_setting_default = "",
+    visibility = ["//visibility:public"],
 )
 
 label_flag(
