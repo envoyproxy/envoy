@@ -664,7 +664,7 @@ TEST_F(McpJsonParserTest, CustomFieldExtraction) {
 }
 
 TEST_F(McpJsonParserTest, OptionalFieldConfigDetection) {
-  // params._meta is hardcoded as a global optional field, so any method should have optional fields
+  // params._meta is a global optional field, so any method could have optional fields
   McpParserConfig custom_config;
   std::vector<McpParserConfig::AttributeExtractionRule> rules = {
       McpParserConfig::AttributeExtractionRule("params.name")};
@@ -677,11 +677,11 @@ TEST_F(McpJsonParserTest, OptionalFieldConfigDetection) {
       R"({"jsonrpc": "2.0", "method": "tools/call", "id": 1, "params": {"name": "tool"}})";
 
   EXPECT_OK(parser->parse(json));
-  EXPECT_TRUE(parser->hasOptionalFields()); // params._meta is always optional
+  EXPECT_TRUE(parser->hasOptionalFields()); // params._meta is always o tional
   EXPECT_TRUE(parser->hasAllRequiredFields());
 
   const auto* meta = parser->getNestedValue("params._meta");
-  EXPECT_EQ(meta, nullptr); // Not present in the JSON, but that's fine for optionals
+  EXPECT_EQ(meta, nullptr);
 }
 
 TEST_F(McpJsonParserTest, GlobalOptionalMetaFieldExtraction) {
