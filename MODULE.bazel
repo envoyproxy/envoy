@@ -131,6 +131,7 @@ bazel_dep(name = "rules_shellcheck", version = "0.4.0", dev_dependency = True, r
 local_path_override(
     module_name = "envoy-api",
     path = "api",
+    repo_name = "envoy_api",
 )
 
 single_version_override(
