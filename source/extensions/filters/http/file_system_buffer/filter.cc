@@ -180,7 +180,7 @@ Http::FilterTrailersStatus FileSystemBufferFilter::receiveTrailers(const BufferB
     return Http::FilterTrailersStatus::Continue;
   }
   state.seen_end_stream_ = true;
-  state.seen_trailers = true;
+  state.seen_trailers_ = true;
   dispatchStateChanged();
   return Http::FilterTrailersStatus::StopIteration;
 }
@@ -247,7 +247,7 @@ void FileSystemBufferFilter::maybeOutputRequest() {
       auto out = request_state_.buffer_.front()->extract();
       request_state_.buffer_.pop_front();
       bool end_stream = (request_state_.buffer_.empty() && request_state_.seen_end_stream_ &&
-                         !request_state_.seen_trailers);
+                         !request_state_.seen_trailers_);
       request_callbacks_->injectDecodedDataToFilterChain(*out, end_stream);
     }
   }
@@ -274,7 +274,7 @@ bool FileSystemBufferFilter::maybeOutputResponse() {
       auto out = response_state_.buffer_.front()->extract();
       response_state_.buffer_.pop_front();
       bool end_stream = (response_state_.buffer_.empty() && response_state_.seen_end_stream_ &&
-                         !response_state_.seen_trailers);
+                         !response_state_.seen_trailers_);
       response_callbacks_->injectEncodedDataToFilterChain(*out, end_stream);
     }
   }

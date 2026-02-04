@@ -236,11 +236,9 @@ TEST_F(FileSystemBufferFilterTest, BuffersEntireRequestAndReplacesContentLength)
   EXPECT_EQ(request_sent_on_, "");
   testing::InSequence s;
   EXPECT_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, false))
-      .WillOnce(
-          Invoke([this](Buffer::Instance& out, bool) { request_sent_on_ += out.toString(); }));
+      .WillOnce([this](Buffer::Instance& out, bool) { request_sent_on_ += out.toString(); });
   EXPECT_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, true))
-      .WillOnce(
-          Invoke([this](Buffer::Instance& out, bool) { request_sent_on_ += out.toString(); }));
+      .WillOnce([this](Buffer::Instance& out, bool) { request_sent_on_ += out.toString(); });
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(data2, true));
   EXPECT_EQ(request_headers_.getContentLengthValue(), "12");
   EXPECT_EQ(request_sent_on_, "hello banana");
@@ -264,11 +262,9 @@ TEST_F(FileSystemBufferFilterTest, BuffersEntireResponseAndReplacesContentLength
   EXPECT_EQ(response_sent_on_, "");
   testing::InSequence s;
   EXPECT_CALL(encoder_callbacks_, injectEncodedDataToFilterChain(_, false))
-      .WillOnce(
-          Invoke([this](Buffer::Instance& out, bool) { response_sent_on_ += out.toString(); }));
+      .WillOnce([this](Buffer::Instance& out, bool) { response_sent_on_ += out.toString(); });
   EXPECT_CALL(encoder_callbacks_, injectEncodedDataToFilterChain(_, true))
-      .WillOnce(
-          Invoke([this](Buffer::Instance& out, bool) { response_sent_on_ += out.toString(); }));
+      .WillOnce([this](Buffer::Instance& out, bool) { response_sent_on_ += out.toString(); });
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(data2, true));
   EXPECT_EQ(response_headers_.getContentLengthValue(), "12");
   EXPECT_EQ(response_sent_on_, "hello banana");
@@ -588,8 +584,7 @@ TEST_F(FileSystemBufferFilterTest, RequestTrailersArePostponedUntilStreamComplet
   EXPECT_EQ("", request_sent_on_);
   EXPECT_FALSE(continued_decoding_);
   EXPECT_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, false))
-      .WillOnce(
-          Invoke([this](Buffer::Instance& out, bool) { request_sent_on_ += out.toString(); }));
+      .WillOnce([this](Buffer::Instance& out, bool) { request_sent_on_ += out.toString(); });
   EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers_));
   EXPECT_EQ("hello", request_sent_on_);
   EXPECT_TRUE(continued_decoding_);
@@ -613,8 +608,7 @@ TEST_F(FileSystemBufferFilterTest, ResponseTrailersArePostponedUntilStreamComple
   EXPECT_EQ("", response_sent_on_);
   EXPECT_FALSE(continued_encoding_);
   EXPECT_CALL(encoder_callbacks_, injectEncodedDataToFilterChain(_, false))
-      .WillOnce(
-          Invoke([this](Buffer::Instance& out, bool) { response_sent_on_ += out.toString(); }));
+      .WillOnce([this](Buffer::Instance& out, bool) { response_sent_on_ += out.toString(); });
   EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->encodeTrailers(response_trailers_));
   EXPECT_EQ("hello", response_sent_on_);
   EXPECT_TRUE(continued_encoding_);
