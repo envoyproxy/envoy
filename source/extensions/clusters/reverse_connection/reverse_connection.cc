@@ -62,8 +62,14 @@ RevConCluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) 
   // Check if tenant isolation is enabled and tenant_id_formatter is configured.
   std::string final_host_id = host_id;
   auto* socket_manager = parent_->getUpstreamSocketManager();
-  if (socket_manager != nullptr && socket_manager->tenantIsolationEnabled() &&
-      parent_->tenant_id_formatter_ != nullptr) {
+  if (socket_manager != nullptr && socket_manager->tenantIsolationEnabled()) {
+    // When tenant isolation is enabled, tenant_id_formatter must be configured.
+    if (parent_->tenant_id_formatter_ == nullptr) {
+      ENVOY_LOG(error,
+                "reverse_connection: tenant isolation is enabled but tenant_id_format is not "
+                "configured. tenant_id_format is required when tenant isolation is enabled.");
+      return {nullptr};
+    }
     // Format tenant identifier.
     const std::string tenant_id =
         parent_->tenant_id_formatter_->format(formatter_context, stream_info);
@@ -78,10 +84,11 @@ RevConCluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) 
                 "reverse_connection: tenant isolation enabled, using tenant-scoped identifier: {}",
                 final_host_id);
     } else {
-      ENVOY_LOG(debug,
-                "reverse_connection: tenant isolation enabled but tenant_id formatter returned "
-                "empty value, using host_id only: {}",
-                host_id);
+      // When tenant isolation is enabled, tenant_id must be inferrable.
+      ENVOY_LOG(error,
+                "reverse_connection: tenant isolation enabled but tenant_id cannot be inferred "
+                "(formatter returned empty value)");
+      return {nullptr};
     }
   }
 

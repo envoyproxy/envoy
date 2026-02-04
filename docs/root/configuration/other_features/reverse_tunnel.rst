@@ -235,10 +235,16 @@ specified directly in request headers or computed from them. The cluster extract
 the configured ``host_id_format`` field and uses it to look up the appropriate reverse tunnel connection.
 
 When tenant isolation is enabled (via ``enable_tenant_isolation: true`` in the reverse tunnel filter),
-the cluster can be configured with an optional ``tenant_id_format`` field. If both ``host_id_format``
-and ``tenant_id_format`` are configured, the cluster automatically constructs tenant-scoped identifiers
-by concatenating the formatted tenant ID with the formatted host ID using an internal delimiter. This
-ensures proper tenant isolation without exposing delimiter or concatenation details to users.
+the cluster **must** be configured with the ``tenant_id_format`` field. The cluster automatically
+constructs tenant-scoped identifiers using the formatted tenant ID and the formatted host ID.
+
+.. important::
+
+   When tenant isolation is enabled, ``tenant_id_format`` is **required**. The tenant identifier must
+   be inferrable from the request context (i.e., the formatter must evaluate to a non-empty value).
+   If ``tenant_id_format`` is not configured or the tenant identifier cannot be inferred, host selection
+   will fail and the request will not be routed. This ensures strict tenant isolation and prevents
+   requests from being routed without proper tenant scoping.
 
 .. literalinclude:: /_configs/reverse_connection/responder-envoy.yaml
     :language: yaml
@@ -308,9 +314,7 @@ tunnel connection.
 For deployments that enable :ref:`tenant isolation <config_network_filters_reverse_tunnel>`, the repository
 includes a companion configuration
 :download:`responder-envoy-tenant-isolation.yaml </_configs/reverse_connection/responder-envoy-tenant-isolation.yaml>`.
-That variant configures the reverse connection cluster with both ``host_id_format`` and ``tenant_id_format``.
-When tenant isolation is enabled, the cluster automatically constructs tenant-scoped identifiers (e.g.,
-``tenant-a:example-node``) internally by concatenating the formatted tenant ID with the formatted host ID.
+That variant configures the reverse connection cluster with both ``host_id_format`` and ``tenant_id_format``. 
 
 The header priority order is:
 
@@ -349,6 +353,12 @@ The header priority order is:
    The cluster uses ``tenant_id_format: "%REQ(x-tenant-id)%"`` and ``host_id_format: "%REQ(x-node-id)%"``
    to automatically construct ``host_id = "tenant-a:example-node"`` internally, ensuring the correct
    tunnel socket is reused while keeping tenants isolated.
+
+   .. note::
+
+      If tenant isolation is enabled and ``tenant_id_format`` is configured, but the tenant ID cannot
+      be inferred from the request (e.g., the ``x-tenant-id`` header is missing or the formatter
+      evaluates to empty), host selection will fail and the request will not be routed.
 
 .. _config_reverse_connection_security:
 

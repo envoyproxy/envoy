@@ -53,14 +53,13 @@ message ReverseConnectionClusterConfig {
   // the tenant identifier when tenant isolation is enabled. The format string supports
   // the same Envoy formatter syntax as ``host_id_format``.
   //
-  // When tenant isolation is enabled (via ``enable_tenant_isolation`` in the reverse tunnel
-  // filter configuration) and this field is set, the cluster automatically concatenates
-  // the formatted tenant identifier with the formatted host identifier using an internal
-  // delimiter to create a tenant-scoped identifier. This ensures that reverse connections
-  // are properly isolated by tenant without exposing delimiter details to users.
+  // **REQUIRED** when tenant isolation is enabled (via ``enable_tenant_isolation`` in the
+  // reverse tunnel filter configuration).
   //
-  // If tenant isolation is enabled but this field is not set, tenant scoping is skipped
-  // and only ``host_id_format`` is used. This allows gradual migration and backward compatibility.
+  // When tenant isolation is enabled and this field is set, the tenant identifier must be
+  // inferrable from the request context (i.e., the formatter must evaluate to a non-empty
+  // value). If the tenant identifier cannot be inferred, host selection will fail and the
+  // request will not be routed.
   //
   // Examples:
   //
