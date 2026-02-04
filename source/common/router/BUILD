@@ -336,6 +336,7 @@ envoy_cc_library(
         "//envoy/http:header_map_interface",
         "//envoy/router:router_interface",
         "//envoy/runtime:runtime_interface",
+        "//envoy/stream_info:stream_info_interface",
         "//envoy/upstream:upstream_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:backoff_lib",
