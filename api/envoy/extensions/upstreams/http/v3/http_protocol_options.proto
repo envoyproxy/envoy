@@ -243,6 +243,8 @@ message EndpointSpecificHttpProtocolOptions {
     //
     // Example:
     //
+    // .. code::
+    //
     //      endpoint_metadata_match:
     //        filter: endpoint_specific_protocol_options
     //        path:
