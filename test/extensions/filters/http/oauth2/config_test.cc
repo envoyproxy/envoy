@@ -262,7 +262,7 @@ config:
   EXPECT_CALL(context.server_factory_context_, clusterManager()).Times(2);
   EXPECT_CALL(context, scope());
   EXPECT_CALL(context.server_factory_context_, timeSource());
-  EXPECT_CALL(context, initManager()).Times(2);
+  EXPECT_CALL(context, initManager());
   EXPECT_LOG_CONTAINS(
       "debug", "OAuth2 filter: token_secret is ignored when auth_type is TLS_CLIENT_AUTH", {
         Http::FilterFactoryCb cb =
