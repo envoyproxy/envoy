@@ -44,14 +44,15 @@ const std::vector<AttributeExtractionRule>& getTasksListRules() {
 }
 
 const std::vector<AttributeExtractionRule>& getTaskPushNotificationRules() {
-  CONSTRUCT_ON_FIRST_USE(std::vector<AttributeExtractionRule>,
-                         {
-                             AttributeExtractionRule("params.taskId"),
-                             AttributeExtractionRule("params.pushNotificationConfig.id"),
-                             AttributeExtractionRule("params.pushNotificationConfig.url"),
-                             AttributeExtractionRule("params.pushNotificationConfig.token"),
-                             AttributeExtractionRule("params.pushNotificationConfig.authentication"),
-                         });
+  CONSTRUCT_ON_FIRST_USE(
+      std::vector<AttributeExtractionRule>,
+      {
+          AttributeExtractionRule("params.taskId"),
+          AttributeExtractionRule("params.pushNotificationConfig.id"),
+          AttributeExtractionRule("params.pushNotificationConfig.url"),
+          AttributeExtractionRule("params.pushNotificationConfig.token"),
+          AttributeExtractionRule("params.pushNotificationConfig.authentication"),
+      });
 }
 
 const std::vector<AttributeExtractionRule>& getTaskIdParamsRules() {
@@ -162,9 +163,7 @@ absl::Status A2aJsonParser::finishParse() {
   return status;
 }
 
-std::string A2aJsonParser::getMethod() const {
-  return extractor_ ? extractor_->getMethod() : "";
-}
+std::string A2aJsonParser::getMethod() const { return extractor_ ? extractor_->getMethod() : ""; }
 
 const Protobuf::Value* A2aJsonParser::getNestedValue(const std::string& dotted_path) const {
   if (dotted_path.empty()) {
