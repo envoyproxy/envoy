@@ -122,6 +122,7 @@ Config::SharedConfig::SharedConfig(
     Server::Configuration::FactoryContext& context)
     : stats_scope_(context.scope().createScope(fmt::format("tcp.{}", config.stat_prefix()))),
       stats_(generateStats(*stats_scope_)),
+      flush_access_log_on_start_(config.access_log_options().flush_access_log_on_start(),
       proxy_protocol_tlv_merge_policy_(config.proxy_protocol_tlv_merge_policy()) {
   if (config.has_idle_timeout()) {
     const uint64_t timeout = DurationUtil::durationToMilliseconds(config.idle_timeout());
@@ -254,12 +255,12 @@ Config::Config(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProx
     max_early_data_bytes_ = config.max_early_data_bytes().value();
   }
 
-  // Validate: ON_DOWNSTREAM_DATA requires max_early_data_bytes to be set.
-  if (upstream_connect_mode_ ==
-          envoy::extensions::filters::network::tcp_proxy::v3::ON_DOWNSTREAM_DATA &&
+  // Validate: Non-IMMEDIATE modes require max_early_data_bytes to be set.
+  // Setting it to zero is allowed and will disable early data buffering.
+  if (upstream_connect_mode_ != UpstreamConnectMode::IMMEDIATE &&
       !max_early_data_bytes_.has_value()) {
     throw EnvoyException(
-        "max_early_data_bytes must be set when upstream_connect_mode is ON_DOWNSTREAM_DATA");
+        "max_early_data_bytes must be set when upstream_connect_mode is not IMMEDIATE");
   }
 }
 
@@ -1124,6 +1125,9 @@ Network::FilterStatus Filter::onNewConnection() {
   // Set UUID for the connection. This is used for logging and tracing.
   getStreamInfo().setStreamIdProvider(
       std::make_shared<StreamInfo::StreamIdProviderImpl>(config_->randomGenerator().uuid()));
+  if (config_->flushAccessLogOnStart()) {
+    flushAccessLog(AccessLog::AccessLogType::TcpConnectionStart);
+  }
 
   ASSERT(upstream_ == nullptr);
 
@@ -1230,7 +1234,8 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
     if (Runtime::runtimeFeatureEnabled(
             "envoy.restart_features.upstream_http_filters_with_tcp_proxy")) {
       read_callbacks_->connection().dispatcher().deferredDelete(std::move(upstream_));
-    } else {
+    } else if (upstream_) {
+      getStreamInfo().upstreamInfo()->setUpstreamDetectedCloseType(upstream_->detectedCloseType());
       upstream_.reset();
     }
     disableIdleTimer();

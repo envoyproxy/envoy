@@ -400,6 +400,7 @@ proto_library(
         "//envoy/extensions/transport_sockets/starttls/v3:pkg",
         "//envoy/extensions/transport_sockets/tap/v3:pkg",
         "//envoy/extensions/transport_sockets/tcp_stats/v3:pkg",
+        "//envoy/extensions/transport_sockets/tls/cert_mappers/filter_state_override/v3:pkg",
         "//envoy/extensions/transport_sockets/tls/cert_mappers/sni/v3:pkg",
         "//envoy/extensions/transport_sockets/tls/cert_mappers/static_name/v3:pkg",
         "//envoy/extensions/transport_sockets/tls/cert_selectors/on_demand_secret/v3:pkg",
@@ -448,10 +449,10 @@ proto_library(
     name = "xds_protos",
     visibility = ["//visibility:public"],
     deps = [
-        "@com_github_cncf_xds//xds/core/v3:pkg",
-        "@com_github_cncf_xds//xds/data/orca/v3:pkg",
-        "@com_github_cncf_xds//xds/type/matcher/v3:pkg",
-        "@com_github_cncf_xds//xds/type/v3:pkg",
+        "@xds//xds/core/v3:pkg",
+        "@xds//xds/data/orca/v3:pkg",
+        "@xds//xds/type/matcher/v3:pkg",
+        "@xds//xds/type/v3:pkg",
     ],
 )
 

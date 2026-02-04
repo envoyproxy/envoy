@@ -97,6 +97,23 @@ TEST(StatefulSessionFactoryConfigTest, SimpleConfigTest) {
                   .ok());
 }
 
+TEST(StatefulSessionFactoryConfigTest, SimpleConfigTestWithServerContext) {
+  testing::NiceMock<Http::MockSessionStateFactoryConfig> config_factory;
+  Registry::InjectFactory<Http::SessionStateFactoryConfig> registration(config_factory);
+
+  ProtoConfig proto_config;
+  TestUtility::loadFromYamlAndValidate(std::string(ConfigYaml), proto_config);
+
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  StatefulSessionFactoryConfig factory;
+
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProtoWithServerContext(proto_config, "stats", context);
+  Http::MockFilterChainFactoryCallbacks filter_callbacks;
+  EXPECT_CALL(filter_callbacks, addStreamFilter(_));
+  cb(filter_callbacks);
+}
+
 } // namespace
 } // namespace StatefulSession
 } // namespace HttpFilters

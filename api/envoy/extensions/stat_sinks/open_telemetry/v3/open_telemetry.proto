@@ -4,6 +4,7 @@ package envoy.extensions.stat_sinks.open_telemetry.v3;
 
 import "envoy/config/core/v3/extension.proto";
 import "envoy/config/core/v3/grpc_service.proto";
+import "envoy/config/core/v3/http_service.proto";
 
 import "google/protobuf/wrappers.proto";
 
@@ -23,7 +24,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Stats configuration proto schema for ``envoy.stat_sinks.open_telemetry`` sink.
 // [#extension: envoy.stat_sinks.open_telemetry]
 
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message SinkConfig {
   // ConversionAction is used to convert a stat to a metric. If a stat matches,
   // the metric_name and static_metric_labels will be
@@ -46,6 +47,17 @@ message SinkConfig {
 
     // The upstream gRPC cluster that implements the OTLP/gRPC collector.
     config.core.v3.GrpcService grpc_service = 1 [(validate.rules).message = {required: true}];
+
+    // The upstream HTTP cluster that implements the OTLP/HTTP collector.
+    // See `OTLP/HTTP <https://opentelemetry.io/docs/specs/otlp/#otlphttp>`_.
+    //
+    // .. note::
+    //
+    //   The ``request_headers_to_add`` property in the OTLP HTTP exporter service
+    //   does not support the :ref:`format specifier <config_access_log_format>`.
+    //   The values configured are added as HTTP headers on the OTLP export request
+    //   without any formatting applied.
+    config.core.v3.HttpService http_service = 9;
   }
 
   // Attributes to be associated with the resource in the OTLP message.

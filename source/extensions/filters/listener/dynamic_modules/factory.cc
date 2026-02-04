@@ -3,6 +3,7 @@
 #include "envoy/registry/registry.h"
 
 #include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/filters/listener/dynamic_modules/filter.h"
 #include "source/extensions/filters/listener/dynamic_modules/filter_config.h"
 
@@ -37,14 +38,30 @@ DynamicModuleListenerFilterConfigFactory::createListenerFilterFactoryFromProto(
     filter_config_str = std::move(config_or_error.value());
   }
 
+  // Use configured metrics namespace or fall back to the default.
+  const std::string metrics_namespace =
+      module_config.metrics_namespace().empty()
+          ? std::string(Extensions::DynamicModules::ListenerFilters::DefaultMetricsNamespace)
+          : module_config.metrics_namespace();
+
   auto filter_config =
       Extensions::DynamicModules::ListenerFilters::newDynamicModuleListenerFilterConfig(
-          proto_config.filter_name(), filter_config_str, std::move(dynamic_module.value()),
-          context.listenerScope(), context.serverFactoryContext().mainThreadDispatcher());
+          proto_config.filter_name(), filter_config_str, metrics_namespace,
+          std::move(dynamic_module.value()), context.listenerScope(),
+          context.serverFactoryContext().mainThreadDispatcher());
 
   if (!filter_config.ok()) {
     throw EnvoyException("Failed to create filter config: " +
                          std::string(filter_config.status().message()));
+  }
+
+  // When the runtime guard is enabled, register the metrics namespace as a custom stat namespace.
+  // This causes the namespace prefix to be stripped from prometheus output and no envoy_ prefix
+  // is added. This is the legacy behavior for backward compatibility.
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.dynamic_modules_strip_custom_stat_prefix")) {
+    context.serverFactoryContext().api().customStatNamespaces().registerStatNamespace(
+        metrics_namespace);
   }
 
   return [filter_cfg = filter_config.value(),
@@ -52,7 +69,6 @@ DynamicModuleListenerFilterConfigFactory::createListenerFilterFactoryFromProto(
     auto filter =
         std::make_unique<Extensions::DynamicModules::ListenerFilters::DynamicModuleListenerFilter>(
             filter_cfg);
-    filter->initializeInModuleFilter();
     filter_manager.addAcceptFilter(listener_filter_matcher, std::move(filter));
   };
 }

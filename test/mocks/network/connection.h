@@ -43,7 +43,7 @@ public:
   testing::NiceMock<StreamInfo::MockStreamInfo> stream_info_;
   std::string local_close_reason_{"unset_local_close_reason"};
   Connection::State state_{Connection::State::Open};
-  DetectedCloseType detected_close_type_{DetectedCloseType::Normal};
+  StreamInfo::DetectedCloseType detected_close_type_{StreamInfo::DetectedCloseType::Normal};
 };
 
 #define DEFINE_MOCK_CONNECTION_MOCK_METHODS                                                        \
@@ -54,12 +54,13 @@ public:
   MOCK_METHOD(void, addWriteFilter, (WriteFilterSharedPtr filter));                                \
   MOCK_METHOD(void, addFilter, (FilterSharedPtr filter));                                          \
   MOCK_METHOD(void, addReadFilter, (ReadFilterSharedPtr filter));                                  \
+  MOCK_METHOD(void, addAccessLogHandler, (AccessLog::InstanceSharedPtr handler));                  \
   MOCK_METHOD(void, removeReadFilter, (ReadFilterSharedPtr filter));                               \
   MOCK_METHOD(void, enableHalfClose, (bool enabled));                                              \
   MOCK_METHOD(bool, isHalfCloseEnabled, (), (const));                                              \
   MOCK_METHOD(void, close, (ConnectionCloseType type));                                            \
   MOCK_METHOD(void, close, (ConnectionCloseType type, absl::string_view details));                 \
-  MOCK_METHOD(DetectedCloseType, detectedCloseType, (), (const));                                  \
+  MOCK_METHOD(StreamInfo::DetectedCloseType, detectedCloseType, (), (const));                      \
   MOCK_METHOD(Event::Dispatcher&, dispatcher, (), (const));                                        \
   MOCK_METHOD(uint64_t, id, (), (const));                                                          \
   MOCK_METHOD(void, hashKey, (std::vector<uint8_t>&), (const));                                    \
