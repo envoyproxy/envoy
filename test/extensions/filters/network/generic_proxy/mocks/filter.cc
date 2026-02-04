@@ -27,14 +27,6 @@ MockStreamFilterConfig::MockStreamFilterConfig() {
   }));
 }
 
-MockFilterChainManager::MockFilterChainManager() {
-  ON_CALL(*this, applyFilterFactoryCb(_, _))
-      .WillByDefault(Invoke([this](FilterContext context, FilterFactoryCb& factory) {
-        contexts_.push_back(context);
-        factory(callbacks_);
-      }));
-}
-
 MockDecoderFilter::MockDecoderFilter() {
   ON_CALL(*this, setDecoderFilterCallbacks(_))
       .WillByDefault(Invoke([this](DecoderFilterCallback& cb) { decoder_callbacks_ = &cb; }));

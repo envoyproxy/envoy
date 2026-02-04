@@ -20,13 +20,16 @@ void ValidateResultCallbackImpl::onSslHandshakeCancelled() { extended_socket_inf
 
 void ValidateResultCallbackImpl::onCertValidationResult(bool succeeded,
                                                         Ssl::ClientValidationStatus detailed_status,
-                                                        const std::string& /*error_details*/,
+                                                        const std::string& error_details,
                                                         uint8_t tls_alert) {
   if (!extended_socket_info_.has_value()) {
     return;
   }
   extended_socket_info_->setCertificateValidationStatus(detailed_status);
   extended_socket_info_->setCertificateValidationAlert(tls_alert);
+  if (!error_details.empty()) {
+    extended_socket_info_->setCertificateValidationError(error_details);
+  }
   extended_socket_info_->onCertificateValidationCompleted(succeeded, true);
 }
 
@@ -154,6 +157,7 @@ Network::PostIoAction SslHandshakerImpl::doHandshake() {
     case SSL_ERROR_PENDING_CERTIFICATE:
     case SSL_ERROR_WANT_PRIVATE_KEY_OPERATION:
     case SSL_ERROR_WANT_CERTIFICATE_VERIFY:
+    case SSL_ERROR_WANT_X509_LOOKUP:
       state_ = Ssl::SocketState::HandshakeInProgress;
       return PostIoAction::KeepOpen;
     default:

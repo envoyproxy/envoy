@@ -159,6 +159,7 @@ envoy_cc_test(
         "//source/extensions/load_balancing_policies/subset:config",
         "//source/extensions/transport_sockets/tls:config",
         "//source/extensions/upstreams/http/generic:config",
+        "//test/common/quic:test_utils_lib",
         "//test/config:v2_link_hacks",
         "//test/integration/load_balancers:custom_lb_policy",
         "//test/mocks/matcher:matcher_mocks",
@@ -553,9 +554,9 @@ envoy_cc_test(
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
-        "@com_github_cncf_xds//xds/type/matcher/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@xds//xds/type/matcher/v3:pkg_cc_proto",
     ],
 )
 

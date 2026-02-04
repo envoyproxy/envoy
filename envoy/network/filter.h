@@ -2,6 +2,7 @@
 
 #include <memory>
 
+#include "envoy/access_log/access_log.h"
 #include "envoy/buffer/buffer.h"
 #include "envoy/config/extension_config_provider.h"
 #include "envoy/config/typed_metadata.h"
@@ -325,6 +326,13 @@ public:
    * @return true if read filters were initialized successfully, otherwise false.
    */
   virtual bool initializeReadFilters() PURE;
+
+  /**
+   * Add a network access log handler to the connection. The added log handlers will be called on
+   * during connections' destruction.
+   * @param handler supplies the access log handler to add.
+   */
+  virtual void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) PURE;
 };
 
 /**

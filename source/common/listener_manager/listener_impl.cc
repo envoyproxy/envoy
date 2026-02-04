@@ -339,13 +339,12 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
       quic_stat_names_(parent_.quicStatNames()),
       missing_listener_config_stats_({ALL_MISSING_LISTENER_CONFIG_STATS(
           POOL_COUNTER(listener_factory_context_->listenerScope()))}) {
-  std::vector<std::reference_wrapper<
-      const Protobuf::RepeatedPtrField<envoy::config::core::v3::SocketOption>>>
-      address_opts_list;
+  std::vector<Network::Socket::OptionsSharedPtr> address_opts_list;
   if (config.has_internal_listener()) {
     addresses_.emplace_back(
         std::make_shared<Network::Address::EnvoyInternalInstance>(config.name()));
-    address_opts_list.emplace_back(std::ref(config.socket_options()));
+    address_opts_list.emplace_back(
+        Network::SocketOptionFactory::buildLiteralOptions(config.socket_options()));
   } else {
     // All the addresses should be same socket type, so get the first address's socket type is
     // enough.
@@ -354,7 +353,18 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
     auto address = std::move(address_or_error.value());
     SET_AND_RETURN_IF_NOT_OK(checkIpv4CompatAddress(address, config.address()), creation_status);
     addresses_.emplace_back(address);
-    address_opts_list.emplace_back(std::ref(config.socket_options()));
+    auto opts = std::make_shared<Network::Socket::Options>();
+    Network::Socket::OptionsSharedPtr keepalive_opts;
+    if (config.has_tcp_keepalive()) {
+      keepalive_opts = Network::SocketOptionFactory::buildTcpKeepaliveOptions(
+          Network::parseTcpKeepaliveConfig(config.tcp_keepalive()));
+    }
+    if (keepalive_opts != nullptr && !keepalive_opts->empty()) {
+      addListenSocketOptions(opts, keepalive_opts);
+    }
+    addListenSocketOptions(
+        opts, Network::SocketOptionFactory::buildLiteralOptions(config.socket_options()));
+    address_opts_list.emplace_back(opts);
 
     for (auto i = 0; i < config.additional_addresses_size(); i++) {
       if (socket_type_ !=
@@ -373,12 +383,28 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
           checkIpv4CompatAddress(address, config.additional_addresses(i).address()),
           creation_status);
       addresses_.emplace_back(additional_address);
-      if (config.additional_addresses(i).has_socket_options()) {
-        address_opts_list.emplace_back(
-            std::ref(config.additional_addresses(i).socket_options().socket_options()));
+      auto opts = std::make_shared<Network::Socket::Options>();
+
+      Network::Socket::OptionsSharedPtr additional_keepalive_opts;
+      if (config.additional_addresses(i).has_tcp_keepalive()) {
+        additional_keepalive_opts = Network::SocketOptionFactory::buildTcpKeepaliveOptions(
+            Network::parseTcpKeepaliveConfig(config.additional_addresses(i).tcp_keepalive()));
       } else {
-        address_opts_list.emplace_back(std::ref(config.socket_options()));
+        additional_keepalive_opts = keepalive_opts;
       }
+      if (additional_keepalive_opts != nullptr && !additional_keepalive_opts->empty()) {
+        addListenSocketOptions(opts, additional_keepalive_opts);
+      }
+
+      if (config.additional_addresses(i).has_socket_options()) {
+        addListenSocketOptions(
+            opts, Network::SocketOptionFactory::buildLiteralOptions(
+                      config.additional_addresses(i).socket_options().socket_options()));
+      } else {
+        addListenSocketOptions(
+            opts, Network::SocketOptionFactory::buildLiteralOptions(config.socket_options()));
+      }
+      address_opts_list.emplace_back(opts);
     }
   }
 
@@ -662,9 +688,7 @@ ListenerImpl::buildUdpListenerFactory(const envoy::config::listener::v3::Listene
 
 void ListenerImpl::buildListenSocketOptions(
     const envoy::config::listener::v3::Listener& config,
-    std::vector<std::reference_wrapper<
-        const Protobuf::RepeatedPtrField<envoy::config::core::v3::SocketOption>>>&
-        address_opts_list) {
+    std::vector<Network::Socket::OptionsSharedPtr>& address_opts_list) {
   listen_socket_options_list_.insert(listen_socket_options_list_.begin(), addresses_.size(),
                                      nullptr);
   for (std::vector<std::reference_wrapper<
@@ -689,10 +713,8 @@ void ListenerImpl::buildListenSocketOptions(
       addListenSocketOptions(listen_socket_options_list_[i],
                              Network::SocketOptionFactory::buildReusePortOptions());
     }
-    if (!address_opts_list[i].get().empty()) {
-      addListenSocketOptions(
-          listen_socket_options_list_[i],
-          Network::SocketOptionFactory::buildLiteralOptions(address_opts_list[i]));
+    if (!address_opts_list[i]->empty()) {
+      addListenSocketOptions(listen_socket_options_list_[i], address_opts_list[i]);
     }
     if (socket_type_ == Network::Socket::Type::Datagram) {
       // Needed for recvmsg to return destination address in IP header.
@@ -1216,21 +1238,35 @@ bool ListenerMessageUtil::socketOptionsEqual(const envoy::config::listener::v3::
     return false;
   }
 
+  if (lhs.has_tcp_keepalive() != rhs.has_tcp_keepalive()) {
+    return false;
+  }
+
+  if (lhs.has_tcp_keepalive() &&
+      !Protobuf::util::MessageDifferencer::Equals(lhs.tcp_keepalive(), rhs.tcp_keepalive())) {
+    return false;
+  }
+
   if (lhs.additional_addresses_size() != rhs.additional_addresses_size()) {
     return false;
   }
   // Assume people won't change the order of additional addresses.
   for (auto i = 0; i < lhs.additional_addresses_size(); i++) {
-    if (lhs.additional_addresses(i).has_socket_options() !=
-        rhs.additional_addresses(i).has_socket_options()) {
+    auto& lhs_addr = lhs.additional_addresses(i);
+    auto& rhs_addr = rhs.additional_addresses(i);
+    if (lhs_addr.has_socket_options() != rhs_addr.has_socket_options()) {
       return false;
     }
-    if (lhs.additional_addresses(i).has_socket_options()) {
+    if (lhs_addr.has_tcp_keepalive() != rhs_addr.has_tcp_keepalive()) {
+      return false;
+    }
+
+    if (lhs_addr.has_socket_options()) {
       is_equal =
-          std::equal(lhs.additional_addresses(i).socket_options().socket_options().begin(),
-                     lhs.additional_addresses(i).socket_options().socket_options().end(),
-                     rhs.additional_addresses(i).socket_options().socket_options().begin(),
-                     rhs.additional_addresses(i).socket_options().socket_options().end(),
+          std::equal(lhs_addr.socket_options().socket_options().begin(),
+                     lhs_addr.socket_options().socket_options().end(),
+                     rhs_addr.socket_options().socket_options().begin(),
+                     rhs_addr.socket_options().socket_options().end(),
                      [](const ::envoy::config::core::v3::SocketOption& option,
                         const ::envoy::config::core::v3::SocketOption& other_option) {
                        return Protobuf::util::MessageDifferencer::Equals(option, other_option);
@@ -1238,6 +1274,11 @@ bool ListenerMessageUtil::socketOptionsEqual(const envoy::config::listener::v3::
       if (!is_equal) {
         return false;
       }
+    }
+
+    if (lhs_addr.has_tcp_keepalive() && !Protobuf::util::MessageDifferencer::Equals(
+                                            lhs_addr.tcp_keepalive(), rhs_addr.tcp_keepalive())) {
+      return false;
     }
   }
 

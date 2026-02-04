@@ -90,6 +90,9 @@ public:
 
   const StreamInfo::BytesMeterSharedPtr& bytesMeter() override { return bytes_meter_; }
 
+  // http1 doesn't have a codec level stream id.
+  absl::optional<uint32_t> codecStreamId() const override { return absl::nullopt; }
+
 protected:
   StreamEncoderImpl(ConnectionImpl& connection, StreamInfo::BytesMeterSharedPtr&& bytes_meter);
   void encodeHeadersBase(const RequestOrResponseHeaderMap& headers, absl::optional<uint64_t> status,

@@ -51,6 +51,8 @@ void GrpcClientImpl::createRequest(envoy::service::ratelimit::v3::RateLimitReque
   request.set_domain(domain);
   request.set_hits_addend(hits_addend);
   for (const Envoy::RateLimit::Descriptor& descriptor : descriptors) {
+    ENVOY_LOG_TO_LOGGER(Logger::Registry::getLog(Logger::Id::filter), trace,
+                        "adding ratelimit descriptor: {}", descriptor.toString());
     envoy::extensions::common::ratelimit::v3::RateLimitDescriptor* new_descriptor =
         request.add_descriptors();
     for (const Envoy::RateLimit::DescriptorEntry& entry : descriptor.entries_) {
@@ -147,7 +149,7 @@ void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::strin
 
 ClientPtr rateLimitClient(Server::Configuration::FactoryContext& context,
                           const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
-                          const std::chrono::milliseconds timeout) {
+                          const absl::optional<std::chrono::milliseconds>& timeout) {
   // TODO(ramaraochavali): register client to singleton when GrpcClientImpl supports concurrent
   // requests.
   auto client_or_error =

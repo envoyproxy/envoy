@@ -80,6 +80,8 @@ public:
 
   Configuration::FactoryContext& factoryContext() { return factory_context_; }
 
+  const Matcher::MatchTreePtr<Http::HttpMatchingData>& forwardClientCertMatcher() const override;
+
   // Server::Admin
   // TODO(jsedgwick) These can be managed with a generic version of ConfigTracker.
   // Wins would be no manual removeHandler() and code reuse.
@@ -115,11 +117,9 @@ public:
   bool createQuicListenerFilterChain(Network::QuicListenerFilterManager&) override { return true; }
 
   // Http::FilterChainFactory
-  bool createFilterChain(Http::FilterChainManager& manager,
-                         const Http::FilterChainOptions&) const override;
+  bool createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) const override;
   bool createUpgradeFilterChain(absl::string_view, const Http::FilterChainFactory::UpgradeMap*,
-                                Http::FilterChainManager&,
-                                const Http::FilterChainOptions&) const override {
+                                Http::FilterChainFactoryCallbacks&) const override {
     return false;
   }
 
@@ -249,6 +249,12 @@ public:
   bool appendLocalOverload() const override { return false; }
   bool appendXForwardedPort() const override { return false; }
   bool addProxyProtocolConnectionState() const override { return true; }
+  const absl::flat_hash_set<uint32_t>& httpsDestinationPorts() const override {
+    return https_destination_ports_;
+  }
+  const absl::flat_hash_set<uint32_t>& httpDestinationPorts() const override {
+    return http_destination_ports_;
+  }
 
 private:
   friend class AdminTestingPeer;
@@ -469,6 +475,7 @@ private:
   Http::RequestIDExtensionSharedPtr request_id_extension_;
   AccessLog::InstanceSharedPtrVector access_logs_;
   std::vector<Matchers::StringMatcherPtr> allowlisted_paths_;
+  Matcher::MatchTreePtr<Http::HttpMatchingData> forward_client_cert_matcher_;
   const bool flush_access_log_on_new_request_ = false;
   const absl::optional<std::chrono::milliseconds> null_access_log_flush_interval_;
   const std::string profile_path_;
@@ -511,13 +518,15 @@ private:
   AdminListenerPtr listener_;
   const AdminInternalAddressConfig internal_address_config_;
   const LocalReply::LocalReplyPtr local_reply_;
-  const std::vector<Http::OriginalIPDetectionSharedPtr> detection_extensions_{};
-  const std::vector<Http::EarlyHeaderMutationPtr> early_header_mutations_{};
-  const absl::optional<std::string> scheme_{};
+  const std::vector<Http::OriginalIPDetectionSharedPtr> detection_extensions_;
+  const std::vector<Http::EarlyHeaderMutationPtr> early_header_mutations_;
+  const absl::optional<std::string> scheme_;
   const bool scheme_match_upstream_ = false;
   const bool ignore_global_conn_limit_;
   std::unique_ptr<HttpConnectionManagerProto::ProxyStatusConfig> proxy_status_config_;
   const Http::HeaderValidatorFactoryPtr header_validator_factory_;
+  const absl::flat_hash_set<uint32_t> https_destination_ports_;
+  const absl::flat_hash_set<uint32_t> http_destination_ports_;
 };
 
 } // namespace Server

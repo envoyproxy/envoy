@@ -1,5 +1,6 @@
 #include "source/extensions/filters/http/dynamic_modules/factory.h"
 
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/filters/http/dynamic_modules/filter.h"
 #include "source/extensions/filters/http/dynamic_modules/filter_config.h"
 
@@ -7,9 +8,9 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-absl::StatusOr<Http::FilterFactoryCb> DynamicModuleConfigFactory::createFilterFactoryFromProtoTyped(
-    const FilterConfig& proto_config, const std::string&, DualInfo dual_info,
-    Server::Configuration::ServerFactoryContext& context) {
+absl::StatusOr<Http::FilterFactoryCb> DynamicModuleConfigFactory::createFilterFactory(
+    const FilterConfig& proto_config, const std::string&,
+    Server::Configuration::ServerFactoryContext& context, Stats::Scope& scope) {
 
   const auto& module_config = proto_config.dynamic_module_config();
   auto dynamic_module = Extensions::DynamicModules::newDynamicModuleByName(
@@ -25,28 +26,56 @@ absl::StatusOr<Http::FilterFactoryCb> DynamicModuleConfigFactory::createFilterFa
     RETURN_IF_NOT_OK_REF(config_or_error.status());
     config = std::move(config_or_error.value());
   }
+
+  // Use configured metrics namespace or fall back to the default.
+  const std::string metrics_namespace =
+      module_config.metrics_namespace().empty()
+          ? std::string(Extensions::DynamicModules::HttpFilters::DefaultMetricsNamespace)
+          : module_config.metrics_namespace();
+
   absl::StatusOr<
       Envoy::Extensions::DynamicModules::HttpFilters::DynamicModuleHttpFilterConfigSharedPtr>
       filter_config =
           Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
-              proto_config.filter_name(), config, proto_config.terminal_filter(),
-              std::move(dynamic_module.value()), dual_info.scope, context);
+              proto_config.filter_name(), config, metrics_namespace, proto_config.terminal_filter(),
+              std::move(dynamic_module.value()), scope, context);
 
   if (!filter_config.ok()) {
     return absl::InvalidArgumentError("Failed to create filter config: " +
                                       std::string(filter_config.status().message()));
   }
 
-  context.api().customStatNamespaces().registerStatNamespace(
-      Extensions::DynamicModules::HttpFilters::CustomStatNamespace);
+  // When the runtime guard is enabled, register the metrics namespace as a custom stat namespace.
+  // This causes the namespace prefix to be stripped from prometheus output and no envoy_ prefix
+  // is added. This is the legacy behavior for backward compatibility.
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.dynamic_modules_strip_custom_stat_prefix")) {
+    context.api().customStatNamespaces().registerStatNamespace(metrics_namespace);
+  }
 
   return [config = filter_config.value()](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    const std::string& worker_name = callbacks.dispatcher().name();
+    auto pos = worker_name.find_first_of('_');
+    ENVOY_BUG(pos != std::string::npos, "worker name is not in expected format worker_{index}");
+    uint32_t worker_index;
+    if (!absl::SimpleAtoi(worker_name.substr(pos + 1), &worker_index)) {
+      IS_ENVOY_BUG("failed to parse worker index from name");
+    }
     auto filter =
         std::make_shared<Envoy::Extensions::DynamicModules::HttpFilters::DynamicModuleHttpFilter>(
-            config, config->stats_scope_->symbolTable());
+            config, config->stats_scope_->symbolTable(), worker_index);
     filter->initializeInModuleFilter();
     callbacks.addStreamFilter(filter);
   };
+}
+
+Envoy::Http::FilterFactoryCb
+DynamicModuleConfigFactory::createFilterFactoryFromProtoWithServerContextTyped(
+    const FilterConfig& proto_config, const std::string& stat_prefix,
+    Server::Configuration::ServerFactoryContext& context) {
+  auto cb_or_error = createFilterFactory(proto_config, stat_prefix, context, context.scope());
+  THROW_IF_NOT_OK_REF(cb_or_error.status());
+  return cb_or_error.value();
 }
 
 absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>

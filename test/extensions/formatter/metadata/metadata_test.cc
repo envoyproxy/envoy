@@ -196,6 +196,21 @@ TEST_F(MetadataFormatterTest, VirtualHostMetadataNoVirtualHost) {
             getTestMetadataFormatter("VIRTUAL_HOST")->format(formatter_context_, stream_info_));
 }
 
+TEST_F(MetadataFormatterTest, ListenerFilterChainMetadata) {
+  auto filter_chain_info = std::make_shared<NiceMock<Network::MockFilterChainInfo>>();
+  EXPECT_CALL(*filter_chain_info, metadata()).WillRepeatedly(testing::ReturnRef(*metadata_));
+  stream_info_.downstream_connection_info_provider_->setFilterChainInfo(filter_chain_info);
+  EXPECT_EQ(
+      "test_value",
+      getTestMetadataFormatter("LISTENER_FILTER_CHAIN")->format(formatter_context_, stream_info_));
+}
+
+TEST_F(MetadataFormatterTest, NoListenerFilterChainMetadata) {
+  EXPECT_EQ(
+      "-",
+      getTestMetadataFormatter("LISTENER_FILTER_CHAIN")->format(formatter_context_, stream_info_));
+}
+
 } // namespace Formatter
 } // namespace Extensions
 } // namespace Envoy

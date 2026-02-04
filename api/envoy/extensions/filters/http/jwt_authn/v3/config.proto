@@ -561,7 +561,7 @@ message ProviderWithAudiences {
 //        - allow_missing: {}
 //    - provider_name: provider-B
 //
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message JwtRequirement {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.jwt_authn.v2alpha.JwtRequirement";
@@ -592,7 +592,39 @@ message JwtRequirement {
     // to only verify JWTs and pass the verified payload to another filter. The
     // different is this mode will reject requests with invalid tokens.
     google.protobuf.Empty allow_missing = 6;
+
+    // Extract JWT claims without performing signature validation.
+    // This mode will decode the JWT, extract claims, and forward them as
+    // configured (via claim_to_headers, forward_payload_header, etc.) but
+    // will NOT verify the JWT signature against JWKS.
+    //
+    // .. warning::
+    //
+    //    This mode does not verify JWT authenticity. Use only in scenarios where:
+    //
+    //    - JWTs come from a trusted source (e.g., internal service mesh)
+    //    - Signature verification is performed elsewhere in the request path
+    //    - You are in a testing period and the token issuer doesn't support JWKS yet
+    //
+    // This mode will:
+    //
+    // * Decode the JWT header and payload
+    // * Extract claims and forward them as headers
+    // * Always return success (Status::Ok) regardless of JWT validity
+    // * Log when extraction occurs
+    //
+    // This mode will NOT:
+    //
+    // * Verify the JWT signature
+    // * Validate the (issuer) claim
+    // * Validate the (audience) claim
+    // * Check not-before time (nbf claim)
+    ExtractOnlyWithoutValidation extract_only_without_validation = 7;
   }
+}
+
+message ExtractOnlyWithoutValidation {
+  // Reserved for future extensions (e.g., claim filtering, logging options)
 }
 
 // This message specifies a list of RequiredProvider.

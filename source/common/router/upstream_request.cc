@@ -82,7 +82,10 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
                                  bool can_send_early_data, bool can_use_http3,
                                  bool enable_half_close)
     : parent_(parent), conn_pool_(std::move(conn_pool)),
-      stream_info_(parent_.callbacks()->dispatcher().timeSource(), nullptr,
+      stream_info_(parent_.callbacks()->dispatcher().timeSource(),
+                   parent_.callbacks()->connection().has_value()
+                       ? parent_.callbacks()->connection()->connectionInfoProviderSharedPtr()
+                       : nullptr,
                    StreamInfo::FilterState::LifeSpan::FilterChain),
       start_time_(parent_.callbacks()->dispatcher().timeSource().monotonicTime()),
       upstream_canary_(false), router_sent_end_stream_(false), encode_trailers_(false),
@@ -142,7 +145,7 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
   filter_manager_ = std::make_unique<UpstreamFilterManager>(
       *filter_manager_callbacks_, parent_.callbacks()->dispatcher(), UpstreamRequest::connection(),
       parent_.callbacks()->streamId(), parent_.callbacks()->account(), true,
-      parent_.callbacks()->decoderBufferLimit(), *this);
+      parent_.callbacks()->bufferLimit(), *this);
   // Attempt to create custom cluster-specified filter chain
   bool created = filter_manager_->createFilterChain(*parent_.cluster()).created();
 

@@ -53,7 +53,7 @@ envoy_cc_library(
         ":cc_wkt_protos",
         "//envoy/common:base_includes",
         "@com_google_protobuf//:protobuf",
-        "@com_google_protoconverter//:all",
+        "@proto-converter//:all",
     ],
 )
 
@@ -84,7 +84,6 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
         "//source/common/protobuf:visitor_lib",
         "//source/common/runtime:runtime_features_lib",
-        "@com_github_cncf_xds//udpa/annotations:pkg_cc_proto",
         "@com_github_jbeder_yaml_cpp//:yaml-cpp",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/strings:str_format",
@@ -92,6 +91,7 @@ envoy_cc_library(
         "@com_google_protobuf//third_party/utf8_range:utf8_validity",
         "@envoy_api//envoy/annotations:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
+        "@xds//udpa/annotations:pkg_cc_proto",
     ],
 )
 
@@ -167,6 +167,7 @@ envoy_cc_library(
         "@envoy_api//envoy/extensions/quic/connection_id_generator/v3:pkg_cc_proto_descriptor",
         "@envoy_api//envoy/extensions/quic/crypto_stream/v3:pkg_cc_proto_descriptor",
         "@envoy_api//envoy/extensions/quic/proof_source/v3:pkg_cc_proto_descriptor",
+        "@envoy_api//envoy/extensions/quic/client_writer_factory/v3:pkg_cc_proto_descriptor",
         "@envoy_api//envoy/extensions/regex_engines/v3:pkg_cc_proto_descriptor",
         "@envoy_api//envoy/extensions/request_id/uuid/v3:pkg_cc_proto_descriptor",
         "@envoy_api//envoy/extensions/transport_sockets/http_11_proxy/v3:pkg_cc_proto_descriptor",
@@ -224,10 +225,10 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
         "//source/common/protobuf:visitor_lib",
         "//source/common/runtime:runtime_features_lib",
-        "@com_github_cncf_xds//udpa/annotations:pkg_cc_proto",
         "@com_google_protobuf//:protobuf",
         "@envoy_api//envoy/annotations:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
+        "@xds//udpa/annotations:pkg_cc_proto",
     ] + envoy_select_enable_yaml(["yaml_utility_lib"]),
 )
 
@@ -246,7 +247,7 @@ envoy_cc_library(
         ":message_validator_lib",
         ":protobuf",
         ":utility_lib_header",
-        "@com_github_cncf_xds//udpa/type/v1:pkg_cc_proto",
-        "@com_github_cncf_xds//xds/type/v3:pkg_cc_proto",
+        "@xds//udpa/type/v1:pkg_cc_proto",
+        "@xds//xds/type/v3:pkg_cc_proto",
     ],
 )
