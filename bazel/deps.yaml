@@ -71,7 +71,7 @@ build_bazel_rules_apple:
   license: "Apache-2.0"
   license_url: "https://github.com/bazelbuild/rules_apple/blob/{version}/LICENSE"
 
-com_github_aignas_rules_shellcheck:
+shellcheck:
   project_name: "Shellcheck rules for bazel"
   project_desc: "Now you do not need to depend on the system shellcheck version in your bazel-managed (mono)repos."
   project_url: "https://github.com/aignas/rules_shellcheck"
@@ -81,7 +81,7 @@ com_github_aignas_rules_shellcheck:
   license: "MIT"
   license_url: "https://github.com/aignas/rules_shellcheck/blob/{version}/LICENSE"
 
-com_github_alibaba_hessian2_codec:
+hessian2_codec:
   project_name: "hessian2-codec"
   project_desc: "hessian2-codec is a C++ library for hessian2 codec"
   project_url: "https://github.com/alibaba/hessian2-codec.git"
@@ -95,7 +95,7 @@ com_github_alibaba_hessian2_codec:
   license: "Apache-2.0"
   license_url: "https://github.com/alibaba/hessian2-codec/blob/{version}/LICENSE"
 
-com_github_awslabs_aws_c_auth:
+aws_c_auth_testdata:
   project_name: "aws-c-auth"
   project_desc: "C99 library implementation of AWS client-side authentication: standard credentials providers and signing"
   project_url: "https://github.com/awslabs/aws-c-auth"
@@ -107,7 +107,7 @@ com_github_awslabs_aws_c_auth:
   license: "Apache-2.0"
   license_url: "https://github.com/awslabs/aws-c-auth/blob/v{version}/LICENSE"
 
-com_github_axboe_liburing:
+liburing:
   project_name: "liburing"
   project_desc: "C helpers to set up and tear down io_uring instances"
   project_url: "https://github.com/axboe/liburing"
@@ -116,7 +116,7 @@ com_github_axboe_liburing:
   - dataplane_core
   - controlplane
 
-com_github_bazelbuild_buildtools:
+buildtools:
   project_name: "Bazel build tools"
   project_desc: "Developer tools for working with Google's bazel buildtool."
   project_url: "https://github.com/bazelbuild/buildtools"
@@ -124,7 +124,7 @@ com_github_bazelbuild_buildtools:
   use_category:
   - test_only
 
-com_github_cares_cares:
+c_ares:
   project_name: "c-ares"
   project_desc: "C library for asynchronous DNS requests"
   project_url: "https://c-ares.haxx.se/"
@@ -136,7 +136,7 @@ com_github_cares_cares:
   license: "c-ares"
   license_url: "https://github.com/c-ares/c-ares/blob/cares-{underscore_version}/LICENSE.md"
 
-com_github_cyan4973_xxhash:
+xxhash:
   project_name: "xxHash"
   project_desc: "Extremely fast hash algorithm"
   project_url: "https://github.com/Cyan4973/xxHash"
@@ -147,7 +147,7 @@ com_github_cyan4973_xxhash:
   license: "BSD-2-Clause"
   license_url: "https://github.com/Cyan4973/xxHash/blob/v{version}/LICENSE"
 
-com_github_datadog_dd_trace_cpp:
+dd_trace_cpp:
   project_name: "Datadog C++ Tracing Library"
   project_desc: "Datadog distributed tracing for C++"
   project_url: "https://github.com/DataDog/dd-trace-cpp"
@@ -159,7 +159,7 @@ com_github_datadog_dd_trace_cpp:
   license: "Apache-2.0"
   license_url: "https://github.com/DataDog/dd-trace-cpp/blob/v{version}/LICENSE.md"
 
-com_github_envoyproxy_sqlparser:
+sql_parser:
   project_name: "C++ SQL Parser Library"
   project_desc: "Forked from Hyrise SQL Parser"
   project_url: "https://github.com/envoyproxy/sql-parser"
@@ -172,7 +172,7 @@ com_github_envoyproxy_sqlparser:
   license: "MIT"
   license_url: "https://github.com/envoyproxy/sql-parser/blob/{version}/LICENSE"
 
-com_github_fdio_vpp_vcl:
+vpp_vcl:
   project_name: "VPP Comms Library"
   project_desc: "FD.io Vector Packet Processor (VPP) Comms Library"
   project_url: "https://fd.io/"
@@ -184,7 +184,7 @@ com_github_fdio_vpp_vcl:
   license: "Apache-2.0"
   license_url: "https://github.com/FDio/vpp/blob/{version}/LICENSE"
 
-com_github_fmtlib_fmt:
+fmt:
   project_name: "fmt"
   project_desc: "{fmt} is an open-source formatting library providing a fast and safe alternative to C stdio and C++ iostreams"
   project_url: "https://fmt.dev"
@@ -196,7 +196,7 @@ com_github_fmtlib_fmt:
   license: "fmt"
   license_url: "https://github.com/fmtlib/fmt/blob/{version}/LICENSE"
 
-com_github_gabime_spdlog:
+spdlog:
   project_name: "spdlog"
   project_desc: "Very fast, header-only/compiled, C++ logging library"
   project_url: "https://github.com/gabime/spdlog"
@@ -207,7 +207,7 @@ com_github_gabime_spdlog:
   license: "MIT"
   license_url: "https://github.com/gabime/spdlog/blob/v{version}/LICENSE"
 
-com_github_google_benchmark:
+benchmark:
   project_name: "Benchmark"
   project_desc: "Library to benchmark code snippets"
   project_url: "https://github.com/google/benchmark"
@@ -217,7 +217,7 @@ com_github_google_benchmark:
   license: "Apache-2.0"
   license_url: "https://github.com/google/benchmark/blob/v{version}/LICENSE"
 
-com_github_google_flatbuffers:
+flatbuffers:
   project_name: "FlatBuffers"
   project_desc: "FlatBuffers is a cross platform serialization library architected for maximum memory efficiency"
   project_url: "https://github.com/google/flatbuffers"
@@ -247,21 +247,7 @@ com_github_google_flatbuffers:
   license: "Apache-2.0"
   license_url: "https://github.com/google/flatbuffers/blob/v{version}/LICENSE"
 
-com_github_google_jwt_verify:
-  project_name: "jwt_verify_lib"
-  project_desc: "JWT verification library for C++"
-  project_url: "https://github.com/google/jwt_verify_lib"
-  release_date: "2023-05-17"
-  use_category:
-  - dataplane_ext
-  extensions:
-  - envoy.filters.http.jwt_authn
-  - envoy.filters.http.gcp_authn
-  - envoy.filters.http.oauth2
-  license: "Apache-2.0"
-  license_url: "https://github.com/google/jwt_verify_lib/blob/{version}/LICENSE"
-
-com_github_google_libprotobuf_mutator:
+libprotobuf_mutator:
   project_name: "libprotobuf-mutator"
   project_desc: "Library to randomly mutate protobuffers"
   project_url: "https://github.com/google/libprotobuf-mutator"
@@ -271,7 +257,7 @@ com_github_google_libprotobuf_mutator:
   license: "Apache-2.0"
   license_url: "https://github.com/google/libprotobuf-mutator/blob/v{version}/LICENSE"
 
-com_github_google_libsxg:
+libsxg:
   project_name: "libsxg"
   project_desc: "Signed HTTP Exchange library"
   project_url: "https://github.com/google/libsxg"
@@ -283,7 +269,7 @@ com_github_google_libsxg:
   license: "Apache-2.0"
   license_url: "https://github.com/google/libsxg/blob/{version}/LICENSE"
 
-com_github_google_perfetto:
+perfetto:
   project_name: "Perfetto"
   project_desc: "Perfetto Tracing SDK"
   project_url: "https://perfetto.dev/"
@@ -294,7 +280,7 @@ com_github_google_perfetto:
   license: "Apache-2.0"
   license_url: "https://github.com/google/perfetto/blob/v{version}/LICENSE"
 
-com_github_google_quiche:
+quiche:
   project_name: "QUICHE"
   project_desc: "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols"
   project_url: "https://github.com/google/quiche"
@@ -305,7 +291,7 @@ com_github_google_quiche:
   license: "BSD-3-Clause"
   license_url: "https://github.com/google/quiche/blob/{version}/LICENSE"
 
-com_github_google_tcmalloc:
+tcmalloc:
   project_name: "tcmalloc"
   project_desc: "Fast, multi-threaded malloc implementation"
   project_url: "https://github.com/google/tcmalloc"
@@ -328,7 +314,7 @@ com_github_grpc_grpc:
   license: "Apache-2.0"
   license_url: "https://github.com/grpc/grpc/blob/v{version}/LICENSE"
 
-com_github_intel_ipp_crypto_crypto_mb:
+ipp_crypto:
   project_name: "libipp-crypto"
   project_desc: "Intel® Integrated Performance Primitives Cryptography"
   project_url: "https://github.com/intel/cryptography-primitives"
@@ -341,7 +327,7 @@ com_github_intel_ipp_crypto_crypto_mb:
   license: "Apache-2.0"
   license_url: "https://github.com/intel/cryptography-primitives/blob/ippcp_{version}/LICENSE"
 
-com_github_intel_qatlib:
+qatlib:
   project_name: "qatlib"
   project_desc: "Intel QuickAssist Technology Library"
   project_url: "https://github.com/intel/qatlib"
@@ -355,7 +341,7 @@ com_github_intel_qatlib:
   license: "BSD-3-Clause"
   license_url: "https://github.com/intel/qatlib/blob/{version}/LICENSE"
 
-com_github_intel_qatzip:
+qatzip:
   project_name: "qatzip"
   project_desc: "Intel QuickAssist Technology QATzip Library"
   project_url: "https://github.com/intel/qatzip"
@@ -367,7 +353,7 @@ com_github_intel_qatzip:
   license: "BSD-3-Clause"
   license_url: "https://github.com/intel/QATzip/blob/v{version}/LICENSE"
 
-com_github_jbeder_yaml_cpp:
+yaml_cpp:
   project_name: "yaml-cpp"
   project_desc: "YAML parser and emitter in C++ matching the YAML 1.2 spec"
   project_url: "https://github.com/jbeder/yaml-cpp"
@@ -379,7 +365,7 @@ com_github_jbeder_yaml_cpp:
   license: "MIT"
   license_url: "https://github.com/jbeder/yaml-cpp/blob/{version}/LICENSE"
 
-com_github_libevent_libevent:
+libevent:
   project_name: "libevent"
   project_desc: "Event notification library"
   project_url: "https://libevent.org"
@@ -391,7 +377,7 @@ com_github_libevent_libevent:
   license: "BSD-3-Clause"
   license_url: "https://github.com/libevent/libevent/blob/{version}/LICENSE"
 
-com_github_luajit_luajit:
+luajit:
   project_name: "LuaJIT"
   project_desc: "Just-In-Time compiler for Lua"
   project_url: "https://luajit.org"
@@ -406,7 +392,7 @@ com_github_luajit_luajit:
   license: "MIT"
   license_url: "https://github.com/LuaJIT/LuaJIT/blob/{version}/COPYRIGHT"
 
-com_github_lz4_lz4:
+lz4:
   project_name: "LZ4"
   project_desc: "Extremely Fast Compression algorithm"
   project_url: "http://www.lz4.org/"
@@ -416,7 +402,7 @@ com_github_lz4_lz4:
   extensions:
   - envoy.compression.qatzip.compressor
 
-com_github_maxmind_libmaxminddb:
+libmaxminddb:
   project_name: "maxmind_libmaxminddb"
   project_desc: "C library for reading MaxMind DB files"
   project_url: "https://github.com/maxmind/libmaxminddb"
@@ -429,7 +415,7 @@ com_github_maxmind_libmaxminddb:
   license: "Apache-2.0"
   license_url: "https://github.com/maxmind/libmaxminddb/blob/{version}/LICENSE"
 
-com_github_mirror_tclap:
+tclap:
   project_name: "tclap"
   project_desc: "Small, flexible library that provides a simple interface for defining and accessing command line arguments"
   project_url: "http://tclap.sourceforge.net"
@@ -440,7 +426,7 @@ com_github_mirror_tclap:
   license: "MIT"
   license_url: "https://github.com/mirror/tclap/blob/v{version}/COPYING"
 
-com_github_msgpack_cpp:
+msgpack_cxx:
   project_name: "msgpack for C/C++"
   project_desc: "MessagePack is an efficient binary serialization format"
   project_url: "https://github.com/msgpack/msgpack-c"
@@ -454,7 +440,7 @@ com_github_msgpack_cpp:
   license: "Boost"
   license_url: "https://github.com/msgpack/msgpack-c/blob/cpp-{version}/LICENSE_1_0.txt"
 
-com_github_ncopa_suexec:
+su_exec:
   project_name: "su-exec"
   project_desc: "Utility to switch user and group id, setgroups and exec"
   project_url: "https://github.com/ncopa/su-exec"
@@ -464,7 +450,7 @@ com_github_ncopa_suexec:
   license: "MIT"
   license_url: "https://github.com/ncopa/su-exec/blob/v{version}/LICENSE"
 
-com_github_nghttp2_nghttp2:
+nghttp2:
   project_name: "Nghttp2"
   project_desc: "Implementation of HTTP/2 and its header compression algorithm HPACK in C"
   project_url: "https://nghttp2.org"
@@ -476,7 +462,7 @@ com_github_nghttp2_nghttp2:
   license: "MIT"
   license_url: "https://github.com/nghttp2/nghttp2/blob/v{version}/LICENSE"
 
-com_github_nlohmann_json:
+nlohmann_json:
   project_name: "nlohmann JSON"
   project_desc: "Fast JSON parser/generator for C++"
   project_url: "https://nlohmann.github.io/json"
@@ -500,7 +486,7 @@ libcircllhist:
   license: "Apache-2.0"
   license_url: "https://github.com/openhistogram/libcircllhist/blob/{version}/LICENSE"
 
-com_github_qat_zstd:
+qat_zstd:
   project_name: "QAT-ZSTD-Plugin"
   project_desc: "Intel® QuickAssist Technology ZSTD Plugin (QAT ZSTD Plugin)"
   project_url: "https://github.com/intel/QAT-ZSTD-Plugin/"
@@ -510,7 +496,7 @@ com_github_qat_zstd:
   extensions:
   - envoy.compression.qatzstd.compressor
 
-com_github_skyapm_cpp2sky:
+cpp2sky:
   project_name: "cpp2sky"
   project_desc: "C++ SDK for Apache SkyWalking"
   project_url: "https://github.com/SkyAPM/cpp2sky"
@@ -522,7 +508,7 @@ com_github_skyapm_cpp2sky:
   license: "Apache-2.0"
   license_url: "https://github.com/SkyAPM/cpp2sky/blob/v{version}/LICENSE"
 
-com_github_unicode_org_icu:
+icu:
   project_name: "ICU Library"
   project_desc: "Development files for International Components for Unicode"
   project_url: "https://github.com/unicode-org/icu"
@@ -534,7 +520,7 @@ com_github_unicode_org_icu:
   license: "ICU"
   license_url: "https://github.com/unicode-org/icu/blob/release-{version}/icu4c/LICENSE"
 
-com_github_wamr:
+wamr:
   project_name: "Webassembly Micro Runtime"
   project_desc: "A standalone runtime with a small footprint for WebAssembly"
   project_url: "https://github.com/bytecodealliance/wasm-micro-runtime"
@@ -546,7 +532,7 @@ com_github_wamr:
   license: "Apache-2.0"
   license_url: "https://github.com/bytecodealliance/wasm-micro-runtime/blob/{version}/LICENSE"
 
-com_github_wasmtime:
+wasmtime:
   project_name: "wasmtime"
   project_desc: "A standalone runtime for WebAssembly"
   project_url: "https://github.com/bytecodealliance/wasmtime"
@@ -559,18 +545,18 @@ com_github_wasmtime:
   license: "Apache-2.0"
   license_url: "https://github.com/bytecodealliance/wasmtime/blob/v{version}/LICENSE"
 
-com_google_absl:
+abseil_cpp:
   project_name: "Abseil"
   project_desc: "Open source collection of C++ libraries drawn from the most fundamental pieces of Google’s internal codebase"
   project_url: "https://abseil.io/"
-  release_date: "2025-09-22"
+  release_date: "2026-01-07"
   use_category:
   - dataplane_core
   - controlplane
   license: "Apache-2.0"
   license_url: "https://github.com/abseil/abseil-cpp/blob/{version}/LICENSE"
 
-com_google_cel_cpp:
+cel_cpp:
   project_name: "Common Expression Language (CEL) C++ library"
   project_desc: "Common Expression Language (CEL) C++ library"
   project_url: "https://opensource.google/projects/cel"
@@ -598,7 +584,7 @@ com_google_cel_cpp:
   license: "Apache-2.0"
   license_url: "https://github.com/google/cel-cpp/blob/v{version}/LICENSE"
 
-com_google_cel_spec:
+cel_spec:
   project_name: "Common Expression Language (CEL) spec"
   project_desc: "Common Expression Language (CEL) spec and conformance tests"
   project_url: "https://opensource.google/projects/cel"
@@ -626,7 +612,7 @@ com_google_cel_spec:
   license: "Apache-2.0"
   license_url: "https://github.com/google/cel-spec/blob/v{version}/LICENSE"
 
-com_google_googletest:
+googletest:
   project_name: "Google Test"
   project_desc: "Google's C++ test framework"
   project_url: "https://github.com/google/googletest"
@@ -704,7 +690,7 @@ com_google_protobuf_protoc_win64:
   use_category:
   - build
 
-com_google_protoconverter:
+proto_converter:
   project_name: "proto-converter"
   project_desc: "Library that supports the conversion between protobuf binary and json"
   project_url: "https://github.com/grpc-ecosystem/proto-converter"
@@ -722,7 +708,7 @@ com_google_protoconverter:
   license: "Apache-2.0"
   license_url: "https://github.com/grpc-ecosystem/proto-converter/blob/{version}/LICENSE"
 
-com_google_protofieldextraction:
+proto_field_extraction:
   project_name: "proto-field-extraction"
   project_desc: "Library that supports the extraction from protobuf binary"
   project_url: "https://github.com/grpc-ecosystem/proto-field-extraction"
@@ -737,7 +723,7 @@ com_google_protofieldextraction:
   license: "Apache-2.0"
   license_url: "https://github.com/grpc-ecosystem/proto-field-extraction/blob/{version}/LICENSE"
 
-com_google_protoprocessinglib:
+proto_processing:
   project_name: "proto-processing"
   project_desc: "Library that provides utility functionality for proto field scrubbing"
   project_url: "https://github.com/grpc-ecosystem/proto_processing_lib"
@@ -752,7 +738,7 @@ com_google_protoprocessinglib:
   license: "Apache-2.0"
   license_url: "https://github.com/grpc-ecosystem/proto_processing_lib/blob/{version}/LICENSE"
 
-com_googlesource_code_re2:
+re2:
   project_name: "RE2"
   project_desc: "RE2, a regular expression library"
   project_url: "https://github.com/google/re2"
@@ -961,7 +947,7 @@ highway:
   extensions:
   - envoy.wasm.runtime.v8
 
-intel_dlb:
+dlb:
   project_name: "Intel Dlb"
   project_desc: "Dlb"
   project_url: "https://networkbuilders.intel.com/solutionslibrary/queue-management-and-load-balancing-on-intel-architecture"
@@ -993,7 +979,7 @@ io_bazel_rules_go:
   license: "Apache-2.0"
   license_url: "https://github.com/bazelbuild/rules_go/blob/v{version}/LICENSE.txt"
 
-io_hyperscan:
+hyperscan:
   project_name: "Hyperscan"
   project_desc: "High-performance regular expression matching library"
   project_url: "https://hyperscan.io"
@@ -1006,7 +992,7 @@ io_hyperscan:
   license: "BSD-3-Clause"
   license_url: "https://github.com/intel/hyperscan/blob/v{version}/LICENSE"
 
-io_opentelemetry_cpp:
+opentelemetry_cpp:
   project_name: "OpenTelemetry"
   project_desc: "Observability framework and toolkit designed to create and manage telemetry data such as traces, metrics, and logs."
   project_url: "https://opentelemetry.io"
@@ -1024,7 +1010,7 @@ io_opentelemetry_cpp:
   license: "Apache-2.0"
   license_url: "https://github.com/open-telemetry/opentelemetry-cpp/blob/v{version}/LICENSE"
 
-io_vectorscan:
+vectorscan:
   project_name: "Vectorscan"
   project_desc: "Hyperscan port for additional CPU architectures"
   project_url: "https://www.vectorcamp.gr/vectorscan/"
@@ -1059,7 +1045,7 @@ libpfm:
   use_category:
   - test_only
 
-net_colm_open_source_colm:
+colm:
   project_name: "Colm"
   project_desc: "The Colm Programming Language"
   project_url: "https://www.colm.net/open-source/colm/"
@@ -1072,7 +1058,7 @@ net_colm_open_source_colm:
   license: "MIT"
   license_url: "https://github.com/adrian-thurston/colm/blob/{version}/COPYING"
 
-net_colm_open_source_ragel:
+ragel:
   project_name: "Ragel"
   project_desc: "Ragel State Machine Compiler"
   project_url: "https://www.colm.net/open-source/ragel/"
@@ -1113,7 +1099,7 @@ ocp:
   license: "Apache-2.0"
   license_url: "https://github.com/opencomputeproject/ocp-diag-core/blob/{version}/LICENSE"
 
-org_boost:
+boost:
   project_name: "Boost"
   project_desc: "Boost C++ source libraries"
   project_url: "https://www.boost.org/"
@@ -1127,7 +1113,7 @@ org_boost:
   license: "Boost"
   license_url: "https://github.com/boostorg/boost/blob/boost-{version}/LICENSE_1_0.txt"
 
-org_brotli:
+brotli:
   project_name: "brotli"
   project_desc: "brotli compression library"
   project_url: "https://brotli.org"

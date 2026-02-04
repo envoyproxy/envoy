@@ -19,7 +19,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/common/http:utility_lib",
         "//source/extensions/filters/http/grpc_json_reverse_transcoder:utils",
-        "@com_github_nlohmann_json//:json",
+        "@nlohmann_json//:json",
     ],
 )
 

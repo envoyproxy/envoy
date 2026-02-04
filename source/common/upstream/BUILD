@@ -499,7 +499,7 @@ envoy_cc_library(
         "//source/extensions/upstreams/http:config",
         "//source/extensions/upstreams/tcp:config",
         "//source/server:transport_socket_config_lib",
-        "@com_google_absl//absl/synchronization",
+        "@abseil-cpp//absl/synchronization",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
@@ -589,7 +589,7 @@ envoy_cc_library(
     ],
     deps = [
         "//envoy/upstream:upstream_interface",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
     ],
 )
 
@@ -608,7 +608,7 @@ envoy_cc_library(
         "//envoy/registry",
         "//envoy/upstream:upstream_interface",
         "//source/common/network:resolver_lib",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/config/upstream/local_address_selector/v3:pkg_cc_proto",
     ],
     # Ensure this factory in the source is always linked in.

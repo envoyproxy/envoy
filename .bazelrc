@@ -204,9 +204,7 @@ build:compile-time-options --define=admin_html=disabled
 build:compile-time-options --define=signal_trace=disabled
 build:compile-time-options --define=hot_restart=disabled
 build:compile-time-options --define=google_grpc=disabled
-build:compile-time-options --define=boringssl=fips
-build:compile-time-options --test_tag_filters=-nofips
-build:compile-time-options --build_tag_filters=-nofips
+build:compile-time-options --config=boringssl-fips
 build:compile-time-options --define=log_debug_assert_in_release=enabled
 build:compile-time-options --define=path_normalization_by_default=true
 build:compile-time-options --define=deprecated_features=disabled
@@ -217,6 +215,26 @@ build:compile-time-options --copt=-Wno-error=deprecated-enum-enum-conversion
 build:compile-time-options --test_env=ENVOY_HAS_EXTRA_EXTENSIONS=true
 build:compile-time-options --@envoy//bazel:http3=False
 build:compile-time-options --@envoy//source/extensions/filters/http/kill_request:enabled
+
+
+#############################################################################
+# SSL
+#############################################################################
+
+common:fips-common --test_tag_filters=-nofips
+common:fips-common --build_tag_filters=-nofips
+common:fips-common --//bazel:fips=True
+
+# BoringSSL FIPS
+common:boringssl-fips --config=fips-common
+common:boringssl-fips --//bazel:ssl=@boringssl_fips//:ssl
+common:boringssl-fips --//bazel:crypto=@boringssl_fips//:crypto
+
+# AWS-LC FIPS
+common:aws-lc-fips --config=fips-common
+common:aws-lc-fips --//bazel:ssl=@aws_lc//:ssl
+common:aws-lc-fips --//bazel:crypto=@aws_lc//:crypto
+common:aws-lc-fips --//bazel:http3=False
 
 
 #############################################################################

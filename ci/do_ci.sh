@@ -105,7 +105,7 @@ function cp_binary_for_image_build() {
   if [[ -n "$ENVOY_CI_BZLMOD" ]]; then
       cp -f bazel-bin/external/su-exec~/su-exec "${BASE_TARGET_DIR}"/"${TARGET_DIR}"
   else
-      cp -f bazel-bin/external/com_github_ncopa_suexec/su-exec "${BASE_TARGET_DIR}"/"${TARGET_DIR}"
+      cp -f bazel-bin/external/su-exec/su-exec "${BASE_TARGET_DIR}"/"${TARGET_DIR}"
   fi
 
   # Stripped binaries for the debug image.
@@ -171,12 +171,7 @@ function bazel_binary_build() {
   bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c "${COMPILE_TYPE}" \
     //test/tools/config_load_check:config_load_check_tool "${CONFIG_ARGS[@]}"
 
-  # Build su-exec utility
-  if [[ -n "$ENVOY_CI_BZLMOD" ]]; then
-      bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c "${COMPILE_TYPE}" @su-exec
-  else
-      bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c "${COMPILE_TYPE}" @com_github_ncopa_suexec//:su-exec
-  fi
+  bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c "${COMPILE_TYPE}" @su-exec
   cp_binary_for_image_build "${BINARY_TYPE}" "${COMPILE_TYPE}" "${EXE_NAME}"
 }
 
@@ -271,7 +266,7 @@ else
   elif [[ "${CI_TARGET}" == "msan" ]]; then
     COVERAGE_TEST_TARGETS=("${COVERAGE_TEST_TARGETS[@]}" "-//test/extensions/...")
   fi
-  TEST_TARGETS=("${COVERAGE_TEST_TARGETS[@]}" "@com_github_google_quiche//:ci_tests")
+  TEST_TARGETS=("${COVERAGE_TEST_TARGETS[@]}" "@quiche//:ci_tests")
 fi
 
 case $CI_TARGET in
