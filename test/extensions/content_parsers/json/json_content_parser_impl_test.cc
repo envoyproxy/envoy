@@ -682,6 +682,128 @@ rules:
   EXPECT_DOUBLE_EQ(result.immediate_actions[1].value->number_value(), 3.14);
 }
 
+TEST_F(JsonContentParserTest, DefaultNamespaceWhenEmpty) {
+  // Config with empty metadata_namespace - should use default
+  const std::string config = R"EOF(
+rules:
+  - rule:
+      selectors:
+        - key: "value"
+      on_present:
+        key: "result"
+  )EOF";
+  setupParser(config);
+
+  const std::string data = R"({"value":42})";
+  auto result = parser_->parse(data);
+
+  EXPECT_FALSE(result.error_message.has_value());
+  EXPECT_EQ(result.immediate_actions.size(), 1);
+  EXPECT_EQ(result.immediate_actions[0].namespace_, "envoy.content_parsers.json");
+  EXPECT_EQ(result.immediate_actions[0].key, "result");
+}
+
+TEST_F(JsonContentParserTest, PreserveExistingMetadataValue) {
+  proto_config_.Clear();
+  auto* rule = proto_config_.add_rules()->mutable_rule();
+  rule->add_selectors()->set_key("value");
+
+  auto* on_present = rule->mutable_on_present();
+  on_present->set_metadata_namespace("envoy.lb");
+  on_present->set_key("result");
+  on_present->set_preserve_existing_metadata_value(true);
+
+  parser_ = std::make_unique<JsonContentParserImpl>(proto_config_);
+
+  const std::string data = R"({"value":42})";
+  auto result = parser_->parse(data);
+
+  EXPECT_FALSE(result.error_message.has_value());
+  EXPECT_EQ(result.immediate_actions.size(), 1);
+  EXPECT_TRUE(result.immediate_actions[0].preserve_existing);
+}
+
+TEST_F(JsonContentParserTest, FactoryCreateParser) {
+  setupParser(basic_config_);
+  JsonContentParserFactory factory(proto_config_);
+
+  auto parser = factory.createParser();
+  EXPECT_NE(parser, nullptr);
+
+  // Verify the created parser works
+  const std::string data =
+      R"({"usage":{"prompt_tokens":10,"completion_tokens":20,"total_tokens":30}})";
+  auto result = parser->parse(data);
+  EXPECT_FALSE(result.error_message.has_value());
+  EXPECT_EQ(result.immediate_actions.size(), 1);
+}
+
+TEST_F(JsonContentParserTest, FactoryStatsPrefix) {
+  setupParser(basic_config_);
+  JsonContentParserFactory factory(proto_config_);
+
+  EXPECT_EQ(factory.statsPrefix(), "json.");
+}
+
+TEST_F(JsonContentParserTest, OnErrorPriorityOverOnMissing) {
+  // Rule with both on_error and on_missing configured
+  proto_config_.Clear();
+  auto* rule = proto_config_.add_rules()->mutable_rule();
+  rule->add_selectors()->set_key("value");
+
+  auto* on_present = rule->mutable_on_present();
+  on_present->set_metadata_namespace("envoy.lb");
+  on_present->set_key("result");
+
+  auto* on_missing = rule->mutable_on_missing();
+  on_missing->set_metadata_namespace("envoy.lb");
+  on_missing->set_key("missing_fallback");
+  on_missing->mutable_value()->set_string_value("was_missing");
+
+  auto* on_error = rule->mutable_on_error();
+  on_error->set_metadata_namespace("envoy.lb");
+  on_error->set_key("error_fallback");
+  on_error->mutable_value()->set_string_value("had_error");
+
+  parser_ = std::make_unique<JsonContentParserImpl>(proto_config_);
+
+  // Parse invalid JSON - should trigger on_error, NOT on_missing
+  const std::string invalid_data = "[DONE]";
+  auto result = parser_->parse(invalid_data);
+  EXPECT_TRUE(result.error_message.has_value());
+
+  auto deferred = parser_->getAllDeferredActions();
+  EXPECT_EQ(deferred.size(), 1);
+  EXPECT_EQ(deferred[0].key, "error_fallback"); // on_error takes priority
+  EXPECT_EQ(deferred[0].value->string_value(), "had_error");
+}
+
+TEST_F(JsonContentParserTest, RuleWithOnlyOnMissing) {
+  // Rule with only on_missing, no on_present
+  proto_config_.Clear();
+  auto* rule = proto_config_.add_rules()->mutable_rule();
+  rule->add_selectors()->set_key("nonexistent");
+
+  auto* on_missing = rule->mutable_on_missing();
+  on_missing->set_metadata_namespace("envoy.lb");
+  on_missing->set_key("fallback");
+  on_missing->mutable_value()->set_string_value("default_value");
+
+  parser_ = std::make_unique<JsonContentParserImpl>(proto_config_);
+
+  // Parse valid JSON but selector not found
+  const std::string data = R"({"other_field":"value"})";
+  auto result = parser_->parse(data);
+
+  EXPECT_FALSE(result.error_message.has_value());
+  EXPECT_EQ(result.immediate_actions.size(), 0); // No on_present configured
+
+  auto deferred = parser_->getAllDeferredActions();
+  EXPECT_EQ(deferred.size(), 1);
+  EXPECT_EQ(deferred[0].key, "fallback");
+  EXPECT_EQ(deferred[0].value->string_value(), "default_value");
+}
+
 } // namespace
 } // namespace Json
 } // namespace ContentParsers
