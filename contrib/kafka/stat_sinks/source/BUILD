@@ -15,13 +15,13 @@ envoy_cc_library(
     hdrs = ["kafka_stats_sink_impl.h"],
     tags = ["skip_on_windows"],
     deps = [
-        "//bazel/foreign_cc:librdkafka",
         "//envoy/stats:sink_interface",
         "//envoy/stats:stats_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/json:json_streamer_lib",
         "@envoy_api//envoy/service/metrics/v3:pkg_cc_proto",
+        "@librdkafka",
     ],
 )
 

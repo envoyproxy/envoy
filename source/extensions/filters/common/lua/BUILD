@@ -21,10 +21,8 @@ envoy_cc_library(
         "//source/common/protobuf",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
-    ] + select({
-        "//bazel:bzlmod_mode": ["@luajit"],
-        "//conditions:default": ["//bazel/foreign_cc:luajit"],
-    }),
+        "@luajit",
+    ],
 )
 
 envoy_cc_library(
@@ -49,8 +47,6 @@ envoy_cc_library(
         "//source/common/protobuf:create_reflectable_message_lib",
         "//source/common/protobuf:utility_lib",
         "@abseil-cpp//absl/strings",
-    ] + select({
-        "//bazel:bzlmod_mode": ["@luajit"],
-        "//conditions:default": ["//bazel/foreign_cc:luajit"],
-    }),
+        "@luajit",
+    ],
 )

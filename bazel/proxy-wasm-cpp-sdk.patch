@@ -1,0 +1,16 @@
+diff --git a/bazel/defs.bzl b/bazel/defs.bzl
+index 87727c0..ae1b19b 100644
+--- a/bazel/defs.bzl
++++ b/bazel/defs.bzl
+@@ -101,9 +101,9 @@ def proxy_wasm_cc_binary(
+             # Give host code access to Emscripten's _malloc() function
+             "-sEXPORTED_FUNCTIONS=_malloc",
+             # Allow allocating memory past initial heap size
+-            "-sALLOW_MEMORY_GROWTH=1",
++            # "-sALLOW_MEMORY_GROWTH=1",
+             # Initial amount of heap memory. 64KB matches Rust SDK starting heap size.
+-            "-sINITIAL_HEAP=64KB",
++            # "-sINITIAL_HEAP=64KB",
+         ],
+         tags = tags + [
+             "manual",
