@@ -244,7 +244,7 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 # MCP router filter
 /*/extensions/filters/http/mcp_router @botengyao @yanavlasov @wdauchy @agrawroh
 # HTTP A2A filter
-/*/extensions/filters/http/a2a @tyxia @botengyao @yanavlasov
+/*/extensions/filters/http/a2a @tyxia @botengyao @yanavlasov @agrawroh
 # Original IP detection
 /*/extensions/http/original_ip_detection/custom_header @ryantheoptimist @mattklein123
 /*/extensions/http/original_ip_detection/xff @yanavlasov @mattklein123

@@ -11,8 +11,82 @@ namespace Extensions {
 namespace HttpFilters {
 namespace A2a {
 
-// Constants and rules are usually defined in the header or a separate constants file.
 using Json::AttributeExtractionRule;
+
+const std::vector<AttributeExtractionRule>& getMessageSendRules() {
+  CONSTRUCT_ON_FIRST_USE(std::vector<AttributeExtractionRule>,
+                         {
+                             AttributeExtractionRule("params.taskId"),
+                             AttributeExtractionRule("params.message.taskId"),
+                             AttributeExtractionRule("params.message.contextId"),
+                             AttributeExtractionRule("params.message.messageId"),
+                             AttributeExtractionRule("params.message.role"),
+                             AttributeExtractionRule("params.message.kind"),
+                             AttributeExtractionRule("params.message.metadata"),
+                             AttributeExtractionRule("params.message.parts"),
+                             AttributeExtractionRule("params.configuration"),
+                             AttributeExtractionRule("params.metadata"),
+                         });
+}
+
+const std::vector<AttributeExtractionRule>& getTasksListRules() {
+  CONSTRUCT_ON_FIRST_USE(std::vector<AttributeExtractionRule>,
+                         {
+                             AttributeExtractionRule("params.tenant"),
+                             AttributeExtractionRule("params.contextId"),
+                             AttributeExtractionRule("params.status"),
+                             AttributeExtractionRule("params.pageSize"),
+                             AttributeExtractionRule("params.pageToken"),
+                             AttributeExtractionRule("params.historyLength"),
+                             AttributeExtractionRule("params.lastUpdatedAfter"),
+                             AttributeExtractionRule("params.includeArtifacts"),
+                         });
+}
+
+const std::vector<AttributeExtractionRule>& getTaskPushNotificationRules() {
+  CONSTRUCT_ON_FIRST_USE(std::vector<AttributeExtractionRule>,
+                         {
+                             AttributeExtractionRule("params.taskId"),
+                             AttributeExtractionRule("params.pushNotificationConfig.id"),
+                             AttributeExtractionRule("params.pushNotificationConfig.url"),
+                             AttributeExtractionRule("params.pushNotificationConfig.token"),
+                             AttributeExtractionRule("params.pushNotificationConfig.authentication"),
+                         });
+}
+
+const std::vector<AttributeExtractionRule>& getTaskIdParamsRules() {
+  CONSTRUCT_ON_FIRST_USE(std::vector<AttributeExtractionRule>,
+                         {
+                             AttributeExtractionRule("params.id"),
+                             AttributeExtractionRule("params.metadata"),
+                         });
+}
+
+const std::vector<AttributeExtractionRule>& getTasksRules() {
+  CONSTRUCT_ON_FIRST_USE(std::vector<AttributeExtractionRule>,
+                         {
+                             AttributeExtractionRule("params.id"),
+                             AttributeExtractionRule("params.historyLength"),
+                             AttributeExtractionRule("params.metadata"),
+                         });
+}
+
+const std::vector<AttributeExtractionRule>& getTaskPushNotificationConfigGetRules() {
+  CONSTRUCT_ON_FIRST_USE(std::vector<AttributeExtractionRule>,
+                         {
+                             AttributeExtractionRule("params.id"),
+                             AttributeExtractionRule("params.metadata"),
+                             AttributeExtractionRule("params.pushNotificationConfigId"),
+                         });
+}
+
+const std::vector<AttributeExtractionRule>& getTaskPushNotificationConfigDeleteRules() {
+  CONSTRUCT_ON_FIRST_USE(std::vector<AttributeExtractionRule>,
+                         {
+                             AttributeExtractionRule("params.id"),
+                             AttributeExtractionRule("params.pushNotificationConfigId"),
+                         });
+}
 
 void A2aParserConfig::initializeDefaults() {
   // Always extract core JSON-RPC fields
@@ -20,62 +94,28 @@ void A2aParserConfig::initializeDefaults() {
   always_extract_.insert("method");
   always_extract_.insert("id");
 
-  const std::vector<AttributeExtractionRule> message_send_stream_rules = {
-      AttributeExtractionRule("params.taskId"),
-      AttributeExtractionRule("params.message.taskId"),
-      AttributeExtractionRule("params.message.contextId"),
-      AttributeExtractionRule("params.message.messageId"),
-      AttributeExtractionRule("params.message.role"),
-      AttributeExtractionRule("params.message.kind"),
-      AttributeExtractionRule("params.message.metadata"),
-      AttributeExtractionRule("params.message.parts"),
-      AttributeExtractionRule("params.configuration"),
-      AttributeExtractionRule("params.metadata")};
+  addMethodConfig(A2aConstants::Methods::MESSAGE_SEND, getMessageSendRules());
+  addMethodConfig(A2aConstants::Methods::MESSAGE_STREAM, getMessageSendRules());
 
-  const std::vector<AttributeExtractionRule> task_id_params = {
-      AttributeExtractionRule("params.id"), AttributeExtractionRule("params.metadata")};
+  addMethodConfig(A2aConstants::Methods::TASKS_GET, getTasksRules());
 
-  addMethodConfig(A2aConstants::Methods::MESSAGE_SEND, message_send_stream_rules);
-  addMethodConfig(A2aConstants::Methods::MESSAGE_STREAM, message_send_stream_rules);
+  addMethodConfig(A2aConstants::Methods::TASKS_LIST, getTasksListRules());
 
-  addMethodConfig(A2aConstants::Methods::TASKS_GET,
-                  {AttributeExtractionRule("params.id"),
-                   AttributeExtractionRule("params.historyLength"),
-                   AttributeExtractionRule("params.metadata")});
-
-  addMethodConfig(
-      A2aConstants::Methods::TASKS_LIST,
-      {AttributeExtractionRule("params.tenant"), AttributeExtractionRule("params.contextId"),
-       AttributeExtractionRule("params.status"), AttributeExtractionRule("params.pageSize"),
-       AttributeExtractionRule("params.pageToken"), AttributeExtractionRule("params.historyLength"),
-       AttributeExtractionRule("params.lastUpdatedAfter"),
-       AttributeExtractionRule("params.includeArtifacts")});
-
-  addMethodConfig(A2aConstants::Methods::TASKS_CANCEL, task_id_params);
+  addMethodConfig(A2aConstants::Methods::TASKS_CANCEL, getTaskIdParamsRules());
 
   addMethodConfig(A2aConstants::Methods::TASKS_PUSH_NOTIFICATION_CONFIG_SET,
-                  {AttributeExtractionRule("params.taskId"),
-                   AttributeExtractionRule("params.pushNotificationConfig.id"),
-                   AttributeExtractionRule("params.pushNotificationConfig.url"),
-                   AttributeExtractionRule("params.pushNotificationConfig.token"),
-                   AttributeExtractionRule("params.pushNotificationConfig.authentication")});
+                  getTaskPushNotificationRules());
 
   addMethodConfig(A2aConstants::Methods::TASKS_PUSH_NOTIFICATION_CONFIG_GET,
-                  {AttributeExtractionRule("params.id"), AttributeExtractionRule("params.metadata"),
-                   AttributeExtractionRule("params.pushNotificationConfigId")});
+                  getTaskPushNotificationConfigGetRules());
 
-  addMethodConfig(A2aConstants::Methods::TASKS_RESUBSCRIBE,
-                  {AttributeExtractionRule("params.id"),
-                   AttributeExtractionRule("params.historyLength"),
-                   AttributeExtractionRule("params.metadata")});
+  addMethodConfig(A2aConstants::Methods::TASKS_RESUBSCRIBE, getTasksRules());
 
   addMethodConfig(A2aConstants::Methods::TASKS_PUSH_NOTIFICATION_CONFIG_LIST,
-                  {AttributeExtractionRule("params.id"), AttributeExtractionRule("params.metadata"),
-                   AttributeExtractionRule("params.pushNotificationConfigId")});
+                  getTaskPushNotificationConfigGetRules());
 
   addMethodConfig(A2aConstants::Methods::TASKS_PUSH_NOTIFICATION_CONFIG_DELETE,
-                  {AttributeExtractionRule("params.id"),
-                   AttributeExtractionRule("params.pushNotificationConfigId")});
+                  getTaskPushNotificationConfigDeleteRules());
 
   addMethodConfig(A2aConstants::Methods::AGENT_GET_AUTHENTICATED_EXTENDED_CARD, {});
 }
@@ -122,9 +162,8 @@ absl::Status A2aJsonParser::finishParse() {
   return status;
 }
 
-const std::string& A2aJsonParser::getMethod() const {
-  static const std::string* empty = new std::string("");
-  return extractor_ ? extractor_->getMethod() : *empty;
+std::string A2aJsonParser::getMethod() const {
+  return extractor_ ? extractor_->getMethod() : "";
 }
 
 const Protobuf::Value* A2aJsonParser::getNestedValue(const std::string& dotted_path) const {

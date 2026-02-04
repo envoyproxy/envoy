@@ -73,7 +73,8 @@ public:
 protected:
   bool lists_supported() const override { return true; }
   bool isNotification(const std::string& /*method*/) const override {
-    return false; // A2A does not have notifications in JSON-RPC sense.
+    // A2A does not have notifications in JSON-RPC sense.
+    return false;
   }
   absl::string_view protocolName() const override { return "A2A"; }
   absl::string_view jsonRpcVersion() const override { return A2aConstants::JSONRPC_VERSION; }
@@ -84,8 +85,7 @@ protected:
 /**
  * A2A JSON parser with selective field extraction
  */
-// Changed Logger::Id::mcp to Logger::Id::filter, as 'mcp' is likely custom or deprecated in OSS.
-class A2aJsonParser : public Logger::Loggable<Logger::Id::filter> {
+class A2aJsonParser : public Logger::Loggable<Logger::Id::a2a> {
 public:
   // Constructor with optional config (defaults to minimal extraction)
   explicit A2aJsonParser(const A2aParserConfig& config = A2aParserConfig::createDefault());
@@ -102,7 +102,7 @@ public:
   bool isAllFieldsCollected() const { return all_fields_collected_; }
 
   // Get the method string
-  const std::string& getMethod() const;
+  std::string getMethod() const;
 
   // Get the extracted metadata (only contains configured fields)
   const Protobuf::Struct& metadata() const { return metadata_; }
