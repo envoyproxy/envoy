@@ -138,8 +138,8 @@ StatsAccessLog::StatsAccessLog(const envoy::extensions::access_loggers::stats::v
             }
             operations.emplace_back(trigger.log_type(), trigger.operation_type());
 
-            if (trigger.operation_type() ==
-                envoy::extensions::access_loggers::stats::v3::Config::Gauge::Operation::PAIRED_ADD) {
+            if (trigger.operation_type() == envoy::extensions::access_loggers::stats::v3::Config::
+                                                Gauge::Operation::PAIRED_ADD) {
               add_count++;
             } else if (trigger.operation_type() == envoy::extensions::access_loggers::stats::v3::
                                                        Config::Gauge::Operation::PAIRED_SUBTRACT) {
@@ -148,9 +148,10 @@ StatsAccessLog::StatsAccessLog(const envoy::extensions::access_loggers::stats::v
           }
 
           if ((add_count > 0 || subtract_count > 0) && (add_count != 1 || subtract_count != 1)) {
-            throw EnvoyException("Stats logger gauge must have exactly one PAIRED_ADD and one PAIRED_SUBTRACT "
-                                 "operation defined if "
-                                 "either is present.");
+            throw EnvoyException(
+                "Stats logger gauge must have exactly one PAIRED_ADD and one PAIRED_SUBTRACT "
+                "operation defined if "
+                "either is present.");
           }
 
           if (operations.empty()) {
