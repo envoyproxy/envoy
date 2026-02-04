@@ -65,11 +65,12 @@ absl::StatusOr<Http::FilterFactoryCb> OAuth2Config::createFilterFactoryFromProto
   if (auth_type ==
           envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType_TLS_CLIENT_AUTH &&
       credentials.has_token_secret()) {
-    ENVOY_LOG_MISC(warn,
+    ENVOY_LOG_MISC(debug,
                    "OAuth2 filter: token_secret is ignored when auth_type is TLS_CLIENT_AUTH");
   }
   Secret::GenericSecretConfigProviderSharedPtr secret_provider_client_secret = nullptr;
-  if (credentials.has_token_secret()) {
+  if (credentials.has_token_secret() &&
+      auth_type != envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType_TLS_CLIENT_AUTH) {
     secret_provider_client_secret =
         secretsProvider(client_secret, server_context, context.initManager());
     if (secret_provider_client_secret == nullptr) {

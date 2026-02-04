@@ -264,7 +264,7 @@ config:
   EXPECT_CALL(context.server_factory_context_, timeSource());
   EXPECT_CALL(context, initManager()).Times(2);
   EXPECT_LOG_CONTAINS(
-      "warn", "OAuth2 filter: token_secret is ignored when auth_type is TLS_CLIENT_AUTH", {
+      "debug", "OAuth2 filter: token_secret is ignored when auth_type is TLS_CLIENT_AUTH", {
         Http::FilterFactoryCb cb =
             factory.createFilterFactoryFromProto(*proto_config, "stats", context).value();
         Http::MockFilterChainFactoryCallbacks filter_callback;
