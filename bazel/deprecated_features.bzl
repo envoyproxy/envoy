@@ -2,7 +2,6 @@
 
 def _check_removed_fips_define_impl(ctx):
     """Check if the deprecated --define boringssl=fips is set"""
-    print("HEEELOO FROM DEPRECATIONS")
     if ctx.var.get("boringssl") == "fips":
         fail("""
 ================================================================================
