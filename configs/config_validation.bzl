@@ -55,7 +55,7 @@ def envoy_config_validation_test(
         deps: Additional Python dependencies. If None, defaults to ["envoy.base.utils"].
         **kwargs: Additional arguments to pass to py_test (e.g., tags, size, timeout).
     """
-    if deps == None:
+    if not deps:
         deps = [requirement("envoy.base.utils")]
     
     # Ensure config_srcs is a list
