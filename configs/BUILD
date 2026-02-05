@@ -4,6 +4,7 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_package",
 )
+load(":config_validation.bzl", "envoy_config_validation_test")
 
 licenses(["notice"])  # Apache 2
 
@@ -11,6 +12,7 @@ envoy_package()
 
 exports_files([
     "google-vrp/envoy-edge.yaml",
+    "example_configs_validation.py",
 ])
 
 py_binary(
@@ -104,20 +106,18 @@ genrule(
     ],
 )
 
-py_binary(
+# Validation test for Envoy-owned configs only (does not include docs or examples)
+# This is the primary validation target used in CI for Envoy core.
+# Note: This intentionally does NOT validate //docs:configs to support future
+# separation of docs into its own workspace (envoy-docs can depend on envoy,
+# but not vice versa).
+envoy_config_validation_test(
+    name = "envoy_configs_validation_test",
+    config_srcs = [":configs"],
+)
+
+# Alias for backwards compatibility with existing references
+alias(
     name = "example_configs_validation",
-    srcs = ["example_configs_validation.py"],
-    args = (
-        "--descriptor_path=$(location @envoy_api//:v3_proto_set)",
-        "$(locations :configs) ",
-        "$(locations @envoy_examples//:configs) ",
-        "$(locations //docs:configs) ",
-    ),
-    data = [
-        ":configs",
-        "//docs:configs",
-        "@envoy_api//:v3_proto_set",
-        "@envoy_examples//:configs",
-    ],
-    deps = [requirement("envoy.base.utils")],
+    actual = ":envoy_configs_validation_test",
 )
