@@ -9,7 +9,6 @@
 #include "envoy/http/filter.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
-#include "envoy/stats/stats_macros.h"
 #include "envoy/stats/timespan.h"
 
 #include "source/common/common/assert.h"
@@ -17,6 +16,7 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/common/router/header_parser.h"
 #include "source/common/runtime/runtime_protos.h"
+#include "source/extensions/filters/http/bandwidth_limit/bucket_selectors.h"
 #include "source/extensions/filters/http/common/stream_rate_limiter.h"
 
 #include "absl/synchronization/mutex.h"
@@ -27,35 +27,6 @@ namespace HttpFilters {
 namespace BandwidthLimitFilter {
 
 /**
- * All bandwidth limit stats. @see stats_macros.h
- */
-#define ALL_BANDWIDTH_LIMIT_STATS(COUNTER, GAUGE, HISTOGRAM)                                       \
-  COUNTER(request_enabled)                                                                         \
-  COUNTER(response_enabled)                                                                        \
-  COUNTER(request_enforced)                                                                        \
-  COUNTER(response_enforced)                                                                       \
-  GAUGE(request_pending, Accumulate)                                                               \
-  GAUGE(response_pending, Accumulate)                                                              \
-  GAUGE(request_incoming_size, Accumulate)                                                         \
-  GAUGE(response_incoming_size, Accumulate)                                                        \
-  GAUGE(request_allowed_size, Accumulate)                                                          \
-  GAUGE(response_allowed_size, Accumulate)                                                         \
-  COUNTER(request_incoming_total_size)                                                             \
-  COUNTER(response_incoming_total_size)                                                            \
-  COUNTER(request_allowed_total_size)                                                              \
-  COUNTER(response_allowed_total_size)                                                             \
-  HISTOGRAM(request_transfer_duration, Milliseconds)                                               \
-  HISTOGRAM(response_transfer_duration, Milliseconds)
-
-/**
- * Struct definition for all bandwidth limit stats. @see stats_macros.h
- */
-struct BandwidthLimitStats {
-  ALL_BANDWIDTH_LIMIT_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT,
-                            GENERATE_HISTOGRAM_STRUCT)
-};
-
-/**
  * Configuration for the HTTP bandwidth limit filter.
  */
 class FilterConfig : public ::Envoy::Router::RouteSpecificFilterConfig {
@@ -64,19 +35,17 @@ public:
       envoy::extensions::filters::http::bandwidth_limit::v3::BandwidthLimit_EnableMode;
   static absl::StatusOr<std::shared_ptr<FilterConfig>>
   create(const envoy::extensions::filters::http::bandwidth_limit::v3::BandwidthLimit& config,
-         Stats::Scope& scope, Runtime::Loader& runtime, TimeSource& time_source,
-         bool per_route = false);
+         std::shared_ptr<NamedBucketSelector> named_bucket_selector, Stats::Scope& scope,
+         Runtime::Loader& runtime, TimeSource& time_source, bool per_route = false);
 
   ~FilterConfig() override = default;
   Runtime::Loader& runtime() { return runtime_; }
-  BandwidthLimitStats& stats() const { return stats_; }
+  OptRef<const BucketAndStats> bucketAndStats(const StreamInfo::StreamInfo& stream_info) const;
   TimeSource& timeSource() { return time_source_; }
   // Must call enabled() before calling limit().
   uint64_t limit() const { return limit_kbps_; }
   bool enabled() const { return enabled_.enabled(); }
   EnableMode enableMode() const { return enable_mode_; };
-  const std::shared_ptr<SharedTokenBucketImpl> tokenBucket() const { return token_bucket_; }
-  std::chrono::milliseconds fillInterval() const { return fill_interval_; }
   const Http::LowerCaseString& requestDelayTrailer() const { return request_delay_trailer_; }
   const Http::LowerCaseString& responseDelayTrailer() const { return response_delay_trailer_; }
   const Http::LowerCaseString& requestFilterDelayTrailer() const {
@@ -91,20 +60,18 @@ private:
   friend class FilterTest;
 
   FilterConfig(const envoy::extensions::filters::http::bandwidth_limit::v3::BandwidthLimit& config,
-               Stats::Scope& scope, Runtime::Loader& runtime, TimeSource& time_source,
-               bool per_route, absl::Status& creation_status);
+               std::shared_ptr<NamedBucketSelector> named_bucket_selector, Stats::Scope& scope,
+               Runtime::Loader& runtime, TimeSource& time_source, bool per_route,
+               absl::Status& creation_status);
 
-  static BandwidthLimitStats generateStats(const std::string& prefix, Stats::Scope& scope);
-
+  std::shared_ptr<NamedBucketSelector> named_bucket_selector_;
   Runtime::Loader& runtime_;
   TimeSource& time_source_;
   const EnableMode enable_mode_;
-  const uint64_t limit_kbps_;
-  const std::chrono::milliseconds fill_interval_;
+  uint64_t limit_kbps_;
   const Runtime::FeatureFlag enabled_;
-  mutable BandwidthLimitStats stats_;
-  // Filter chain's shared token bucket
-  std::shared_ptr<SharedTokenBucketImpl> token_bucket_;
+  // Filter chain's shared token bucket and stats.
+  BucketAndStats bucket_and_stats_;
   const Http::LowerCaseString request_delay_trailer_;
   const Http::LowerCaseString response_delay_trailer_;
   const Http::LowerCaseString request_filter_delay_trailer_;
@@ -159,6 +126,9 @@ private:
 
   void updateStatsOnDecodeFinish();
   void updateStatsOnEncodeFinish();
+  std::shared_ptr<SharedTokenBucketImpl> bucket() const;
+  OptRef<BandwidthLimitStats> stats() const;
+  std::chrono::milliseconds fillInterval() const;
 
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
@@ -171,6 +141,7 @@ private:
   std::chrono::milliseconds request_delay_ = zero_milliseconds_;
   std::chrono::milliseconds response_delay_ = zero_milliseconds_;
   Http::ResponseTrailerMap* trailers_;
+  OptRef<const BucketAndStats> bucket_and_stats_;
 };
 
 } // namespace BandwidthLimitFilter

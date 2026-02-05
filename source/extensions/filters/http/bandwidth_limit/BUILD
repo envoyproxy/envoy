@@ -14,8 +14,16 @@ envoy_extension_package()
 
 envoy_cc_library(
     name = "bandwidth_limit_lib",
-    srcs = ["bandwidth_limit.cc"],
-    hdrs = ["bandwidth_limit.h"],
+    srcs = [
+        "bandwidth_limit.cc",
+        "bucket_selectors.cc",
+        "stats.cc",
+    ],
+    hdrs = [
+        "bandwidth_limit.h",
+        "bucket_selectors.h",
+        "stats.h",
+    ],
     deps = [
         "//envoy/http:codes_interface",
         "//envoy/server:filter_config_interface",

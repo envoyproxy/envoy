@@ -26,7 +26,7 @@ public:
     envoy::extensions::filters::http::bandwidth_limit::v3::BandwidthLimit config;
     TestUtility::loadFromYaml(yaml, config);
     auto config_or_status =
-        FilterConfig::create(config, *stats_.rootScope(), runtime_, time_system_, true);
+        FilterConfig::create(config, nullptr, *stats_.rootScope(), runtime_, time_system_, true);
     EXPECT_TRUE(config_or_status.ok());
     config_ = *config_or_status;
     filter_ = std::make_shared<BandwidthLimiter>(config_);
@@ -113,7 +113,9 @@ TEST_F(FilterTest, LimitOnDecode) {
 
   EXPECT_EQ(1U, findCounter("test.http_bandwidth_limit.request_enabled"));
   EXPECT_EQ(1UL, config_->limit());
-  EXPECT_EQ(50UL, config_->fillInterval().count());
+  EXPECT_EQ(
+      50UL,
+      config_->bucketAndStats(decoder_filter_callbacks_.streamInfo())->fillInterval().count());
 
   // Send a small amount of data which should be within limit.
   Buffer::OwnedImpl data1("hello");
@@ -235,7 +237,9 @@ TEST_F(FilterTest, LimitOnEncode) {
       new NiceMock<Event::MockTimer>(&encoder_filter_callbacks_.dispatcher_);
 
   EXPECT_EQ(1UL, config_->limit());
-  EXPECT_EQ(50UL, config_->fillInterval().count());
+  EXPECT_EQ(
+      50UL,
+      config_->bucketAndStats(decoder_filter_callbacks_.streamInfo())->fillInterval().count());
 
   EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
   Http::MetadataMap metadata_map;
@@ -362,7 +366,9 @@ TEST_F(FilterTest, LimitOnDecodeAndEncode) {
       new NiceMock<Event::MockTimer>(&encoder_filter_callbacks_.dispatcher_);
 
   EXPECT_EQ(1UL, config_->limit());
-  EXPECT_EQ(50UL, config_->fillInterval().count());
+  EXPECT_EQ(
+      50UL,
+      config_->bucketAndStats(decoder_filter_callbacks_.streamInfo())->fillInterval().count());
 
   EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
   Http::MetadataMap metadata_map;
@@ -498,7 +504,9 @@ TEST_F(FilterTest, WithTrailers) {
       new NiceMock<Event::MockTimer>(&encoder_filter_callbacks_.dispatcher_);
 
   EXPECT_EQ(1UL, config_->limit());
-  EXPECT_EQ(50UL, config_->fillInterval().count());
+  EXPECT_EQ(
+      50UL,
+      config_->bucketAndStats(decoder_filter_callbacks_.streamInfo())->fillInterval().count());
 
   EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
   Http::MetadataMap metadata_map;
@@ -574,7 +582,9 @@ TEST_F(FilterTest, WithTrailersNoEndStream) {
       new NiceMock<Event::MockTimer>(&encoder_filter_callbacks_.dispatcher_);
 
   EXPECT_EQ(1UL, config_->limit());
-  EXPECT_EQ(50UL, config_->fillInterval().count());
+  EXPECT_EQ(
+      50UL,
+      config_->bucketAndStats(decoder_filter_callbacks_.streamInfo())->fillInterval().count());
 
   EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
   Http::MetadataMap metadata_map;

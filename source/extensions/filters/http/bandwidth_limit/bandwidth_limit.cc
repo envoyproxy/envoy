@@ -29,23 +29,27 @@ const Http::LowerCaseString DefaultResponseFilterDelayTrailer =
 
 absl::StatusOr<std::shared_ptr<FilterConfig>> FilterConfig::create(
     const envoy::extensions::filters::http::bandwidth_limit::v3::BandwidthLimit& config,
-    Stats::Scope& scope, Runtime::Loader& runtime, TimeSource& time_source, bool per_route) {
+    std::shared_ptr<NamedBucketSelector> named_bucket_selector, Stats::Scope& scope,
+    Runtime::Loader& runtime, TimeSource& time_source, bool per_route) {
   auto status = absl::OkStatus();
-  auto filter_config = std::shared_ptr<FilterConfig>(
-      new FilterConfig(config, scope, runtime, time_source, per_route, status));
+  auto filter_config = std::shared_ptr<FilterConfig>(new FilterConfig(
+      config, std::move(named_bucket_selector), scope, runtime, time_source, per_route, status));
   RETURN_IF_NOT_OK_REF(status);
   return filter_config;
 }
 
-FilterConfig::FilterConfig(const BandwidthLimit& config, Stats::Scope& scope,
-                           Runtime::Loader& runtime, TimeSource& time_source, bool per_route,
-                           absl::Status& creation_status)
-    : runtime_(runtime), time_source_(time_source), enable_mode_(config.enable_mode()),
+FilterConfig::FilterConfig(const BandwidthLimit& config,
+                           std::shared_ptr<NamedBucketSelector> named_bucket_selector,
+                           Stats::Scope& scope, Runtime::Loader& runtime, TimeSource& time_source,
+                           bool per_route, absl::Status& creation_status)
+    : named_bucket_selector_(named_bucket_selector), runtime_(runtime), time_source_(time_source),
+      enable_mode_(config.enable_mode()),
       limit_kbps_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, limit_kbps, 0)),
-      fill_interval_(std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(
-          config, fill_interval, StreamRateLimiter::DefaultFillInterval.count()))),
       enabled_(config.runtime_enabled(), runtime),
-      stats_(generateStats(config.stat_prefix(), scope)),
+      bucket_and_stats_(
+          config.stat_prefix(), time_source, scope, limit_kbps_,
+          std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(
+              config, fill_interval, StreamRateLimiter::DefaultFillInterval.count()))),
       request_delay_trailer_(
           config.response_trailer_prefix().empty()
               ? DefaultRequestDelayTrailer
@@ -73,29 +77,34 @@ FilterConfig::FilterConfig(const BandwidthLimit& config, Stats::Scope& scope,
     creation_status = absl::InvalidArgumentError("limit must be set for per route filter config");
     return;
   }
-
-  // The token bucket is configured with a max token count of the number of
-  // bytes per second, and refills at the same rate, so that we have a per
-  // second limit which refills gradually in 1/fill_interval increments.
-  token_bucket_ = std::make_shared<SharedTokenBucketImpl>(
-      StreamRateLimiter::kiloBytesToBytes(limit_kbps_), time_source,
-      StreamRateLimiter::kiloBytesToBytes(limit_kbps_));
 }
 
-BandwidthLimitStats FilterConfig::generateStats(const std::string& prefix, Stats::Scope& scope) {
-  const std::string final_prefix = prefix + ".http_bandwidth_limit";
-  return {ALL_BANDWIDTH_LIMIT_STATS(POOL_COUNTER_PREFIX(scope, final_prefix),
-                                    POOL_GAUGE_PREFIX(scope, final_prefix),
-                                    POOL_HISTOGRAM_PREFIX(scope, final_prefix))};
+OptRef<const BucketAndStats>
+FilterConfig::bucketAndStats(const StreamInfo::StreamInfo& stream_info) const {
+  if (!named_bucket_selector_) {
+    return bucket_and_stats_;
+  }
+  return named_bucket_selector_->getBucket(stream_info);
 }
 
-// BandwidthLimiter members
+std::shared_ptr<SharedTokenBucketImpl> BandwidthLimiter::bucket() const {
+  return bucket_and_stats_.has_value() ? bucket_and_stats_->bucket() : nullptr;
+}
+OptRef<BandwidthLimitStats> BandwidthLimiter::stats() const {
+  ASSERT(bucket_and_stats_.has_value());
+  return bucket_and_stats_->stats();
+}
+std::chrono::milliseconds BandwidthLimiter::fillInterval() const {
+  ASSERT(bucket_and_stats_.has_value());
+  return bucket_and_stats_->fillInterval();
+}
 
 Http::FilterHeadersStatus BandwidthLimiter::decodeHeaders(Http::RequestHeaderMap&, bool) {
   const auto& config = getConfig();
+  bucket_and_stats_ = config.bucketAndStats(decoder_callbacks_->streamInfo());
 
-  if (config.enabled() && (config.enableMode() & BandwidthLimit::REQUEST)) {
-    config.stats().request_enabled_.inc();
+  if (bucket() && config.enabled() && (config.enableMode() & BandwidthLimit::REQUEST)) {
+    stats()->request_enabled_.inc();
     request_limiter_ = std::make_unique<StreamRateLimiter>(
         config.limit(), decoder_callbacks_->bufferLimit(),
         [this] { decoder_callbacks_->onDecoderFilterAboveWriteBufferHighWatermark(); },
@@ -110,16 +119,16 @@ Http::FilterHeadersStatus BandwidthLimiter::decodeHeaders(Http::RequestHeaderMap
           updateStatsOnDecodeFinish();
           decoder_callbacks_->continueDecoding();
         },
-        [&config, this](uint64_t len, bool limit_enforced, std::chrono::milliseconds delay) {
-          config.stats().request_allowed_size_.set(len);
-          config.stats().request_allowed_total_size_.add(len);
+        [this](uint64_t len, bool limit_enforced, std::chrono::milliseconds delay) {
+          stats()->request_allowed_size_.set(len);
+          stats()->request_allowed_total_size_.add(len);
           if (limit_enforced) {
-            config.stats().request_enforced_.inc();
+            stats()->request_enforced_.inc();
             request_delay_ += delay;
           }
         },
         const_cast<FilterConfig*>(&config)->timeSource(), decoder_callbacks_->dispatcher(),
-        decoder_callbacks_->scope(), config.tokenBucket(), config.fillInterval());
+        decoder_callbacks_->scope(), bucket(), fillInterval());
   }
 
   return Http::FilterHeadersStatus::Continue;
@@ -131,12 +140,11 @@ Http::FilterDataStatus BandwidthLimiter::decodeData(Buffer::Instance& data, bool
 
     if (!request_latency_) {
       request_latency_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
-          config.stats().request_transfer_duration_,
-          const_cast<FilterConfig*>(&config)->timeSource());
-      config.stats().request_pending_.inc();
+          stats()->request_transfer_duration_, const_cast<FilterConfig*>(&config)->timeSource());
+      stats()->request_pending_.inc();
     }
-    config.stats().request_incoming_size_.set(data.length());
-    config.stats().request_incoming_total_size_.add(data.length());
+    stats()->request_incoming_size_.set(data.length());
+    stats()->request_incoming_total_size_.add(data.length());
 
     request_limiter_->writeData(data, end_stream);
     return Http::FilterDataStatus::StopIterationNoBuffer;
@@ -159,9 +167,14 @@ Http::FilterTrailersStatus BandwidthLimiter::decodeTrailers(Http::RequestTrailer
 
 Http::FilterHeadersStatus BandwidthLimiter::encodeHeaders(Http::ResponseHeaderMap&, bool) {
   auto& config = getConfig();
+  if (!bucket_and_stats_.has_value()) {
+    // This shouldn't be necessary since decodeHeaders should always be called before encodeHeaders,
+    // but it's expedient here because tests don't always do that.
+    bucket_and_stats_ = config.bucketAndStats(decoder_callbacks_->streamInfo());
+  }
 
-  if (config.enabled() && (config.enableMode() & BandwidthLimit::RESPONSE)) {
-    config.stats().response_enabled_.inc();
+  if (bucket() && config.enabled() && (config.enableMode() & BandwidthLimit::RESPONSE)) {
+    stats()->response_enabled_.inc();
 
     response_limiter_ = std::make_unique<StreamRateLimiter>(
         config.limit(), encoder_callbacks_->bufferLimit(),
@@ -177,16 +190,16 @@ Http::FilterHeadersStatus BandwidthLimiter::encodeHeaders(Http::ResponseHeaderMa
           updateStatsOnEncodeFinish();
           encoder_callbacks_->continueEncoding();
         },
-        [&config, this](uint64_t len, bool limit_enforced, std::chrono::milliseconds delay) {
-          config.stats().response_allowed_size_.set(len);
-          config.stats().response_allowed_total_size_.add(len);
+        [this](uint64_t len, bool limit_enforced, std::chrono::milliseconds delay) {
+          stats()->response_allowed_size_.set(len);
+          stats()->response_allowed_total_size_.add(len);
           if (limit_enforced) {
-            config.stats().response_enforced_.inc();
+            stats()->response_enforced_.inc();
             response_delay_ += delay;
           }
         },
         const_cast<FilterConfig*>(&config)->timeSource(), encoder_callbacks_->dispatcher(),
-        encoder_callbacks_->scope(), config.tokenBucket(), config.fillInterval());
+        encoder_callbacks_->scope(), bucket(), fillInterval());
   }
 
   return Http::FilterHeadersStatus::Continue;
@@ -206,12 +219,11 @@ Http::FilterDataStatus BandwidthLimiter::encodeData(Buffer::Instance& data, bool
 
     if (!response_latency_) {
       response_latency_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
-          config.stats().response_transfer_duration_,
-          const_cast<FilterConfig*>(&config)->timeSource());
-      config.stats().response_pending_.inc();
+          stats()->response_transfer_duration_, const_cast<FilterConfig*>(&config)->timeSource());
+      stats()->response_pending_.inc();
     }
-    config.stats().response_incoming_size_.set(data.length());
-    config.stats().response_incoming_total_size_.add(data.length());
+    stats()->response_incoming_size_.set(data.length());
+    stats()->response_incoming_total_size_.add(data.length());
 
     response_limiter_->writeData(data, end_stream, trailer_added);
     return Http::FilterDataStatus::StopIterationNoBuffer;
@@ -240,7 +252,9 @@ void BandwidthLimiter::updateStatsOnDecodeFinish() {
     request_duration_ = request_latency_.get()->elapsed();
     request_latency_->complete();
     request_latency_.reset();
-    getConfig().stats().request_pending_.dec();
+    if (stats()) {
+      stats()->request_pending_.dec();
+    }
   }
 }
 
@@ -271,7 +285,7 @@ void BandwidthLimiter::updateStatsOnEncodeFinish() {
 
     response_latency_->complete();
     response_latency_.reset();
-    config.stats().response_pending_.dec();
+    stats()->response_pending_.dec();
   }
 }
 

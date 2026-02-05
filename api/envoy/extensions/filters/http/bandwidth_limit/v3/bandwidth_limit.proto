@@ -20,7 +20,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Bandwidth limit :ref:`configuration overview <config_http_filters_bandwidth_limit>`.
 // [#extension: envoy.filters.http.bandwidth_limit]
 
-// [#next-free-field: 8]
+// [#next-free-field: 10]
 message BandwidthLimit {
   // Defines the mode for the bandwidth limit filter.
   // Values represent bitmask.
@@ -36,6 +36,60 @@ message BandwidthLimit {
 
     // Filter enabled for both incoming and outgoing traffic.
     REQUEST_AND_RESPONSE = 3;
+  }
+
+  message NamedBucketConfiguration {
+    // The bucket name to have a custom configuration.
+    string name = 1;
+
+    // The limit supplied in KiB/s, shared between all requests using the named bucket.
+    uint64 limit_kbps = 2 [(validate.rules).uint64 = {gte: 1}];
+
+    // Optional fill interval in milliseconds for the token refills. Defaults to
+    // inheriting the ``fill_interval`` value from the parent ``BandwidthLimit``.
+    //
+    // It must be at least 20ms to avoid too aggressive refills.
+    google.protobuf.Duration fill_interval = 3 [(validate.rules).duration = {
+      lte {seconds: 1}
+      gte {nanos: 20000000}
+    }];
+  }
+
+  message NamedBucketSelector {
+    message ClientCnWithDefault {
+      // The bucket name to use when no client CN is present (this name is not processed
+      // by ``name_template``)
+      //
+      // If not set, an empty bucket name is used.
+      //
+      // This value also overrides ``stat_prefix`` from ``BandwidthLimit`` for the bucket.
+      string default_bucket = 1;
+
+      // Optional template for the bucket name, with ``{CN}`` representing the client
+      // certificate name. If not set, behaves the same as if the template is just ``{CN}}``
+      //
+      // If set, must contain ``{CN}``.
+      //
+      // This value also overrides ``stat_prefix`` from ``BandwidthLimit`` for the bucket.
+      string name_template = 2 [(validate.rules).string = {pattern: "^$|\\{CN\\}"}];
+    }
+
+    // Use the request's client CN as [part of] the bucket name.
+    // Precisely one of ``client_cn_with_default`` or ``explicit_bucket`` must be set.
+    ClientCnWithDefault client_cn_with_default = 1;
+
+    // Use the shared bucket specified by ``explicit_bucket``.
+    string explicit_bucket = 2;
+
+    // Optional template for the stat prefix, with ``{BUCKET}`` representing the bucket
+    // name. If not set, behaves the same as if the template is just ``{BUCKET}``.
+    string stat_prefix_template = 3;
+
+    // If true, and the selected named bucket does not already exist, create a new bucket
+    // with the ``limit_kbps`` and ``fill_interval`` from the parent ``BandwidthLimit`` config.
+    //
+    // If false, and the selected named bucket does not exist, pass through without limiting.
+    bool create_bucket_if_not_existing = 4;
   }
 
   // The human readable prefix to use when emitting stats.
@@ -85,4 +139,19 @@ message BandwidthLimit {
   // Optional The prefix for the response trailers.
   string response_trailer_prefix = 7
       [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false}];
+
+  // Use a named bucket that can be shared with other bandwidth limit configurations,
+  // or with a per-request dynamic configuration, multiple buckets can be selected
+  // from a single configuration.
+  //
+  // If this is set, it overrides ``stat_prefix``, and may override ``limit_kbps``
+  // and ``fill_interval`` if the selected bucket has a ``named_bucket_configuration``.
+  NamedBucketSelector named_bucket_selector = 8;
+
+  // Bandwidth limit overrides for named buckets. These are configured at a global
+  // scope, so can be configured once at the filter chain and used in per-route or
+  // per-vhost configurations. Any named bucket that doesn't have an explicit
+  // configuration will use the ``limit_kbps`` and ``fill_interval`` defined in
+  // the configuration scope at which a request first uses that bucket.
+  repeated NamedBucketConfiguration named_bucket_configurations = 9;
 }
