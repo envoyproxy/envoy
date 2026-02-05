@@ -517,7 +517,7 @@ TEST_F(EnvoyQuicServerStreamTest, ReadDisableUponLargePost) {
         });
   }
   EXPECT_CALL(stream_decoder_, decodeTrailers_(_));
-  // Only after the read block counterer goes back to zero and event loop runs, reading continues.
+  // Only after the read block counter goes back to zero and event loop runs, reading continues.
   quic_stream_->readDisable(false);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
