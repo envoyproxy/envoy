@@ -169,7 +169,7 @@ envoy_cc_library(
         "//source/common/http:header_map_lib",
         "//source/common/stats:histogram_lib",
         "//source/common/upstream:host_utility_lib",
-        "@com_google_absl//absl/container:btree",
+        "@abseil-cpp//absl/container:btree",
     ],
 )
 

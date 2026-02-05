@@ -40,6 +40,19 @@ index a3b8923b6e..f4a2ed3f13 100644
              "//conditions:default": [name + "_native"],
          }),
          outs = [name + "_binary"],
+diff --git a/include/grpc/event_engine/memory_request.h b/include/grpc/event_engine/memory_request.h
+index 76bcbb2036..ad8cab842e 100644
+--- a/include/grpc/event_engine/memory_request.h
++++ b/include/grpc/event_engine/memory_request.h
+@@ -17,6 +17,8 @@
+ #include <grpc/support/port_platform.h>
+ #include <stddef.h>
+ 
++#include <string>
++
+ #include "absl/strings/string_view.h"
+ 
+ namespace grpc_event_engine {
 diff --git a/src/core/BUILD b/src/core/BUILD
 index 0a8eebafb9..6d4f158719 100644
 --- a/src/core/BUILD
@@ -52,6 +65,18 @@ index 0a8eebafb9..6d4f158719 100644
 +        "-layering_check",
      ],
  )
+ 
+diff --git a/src/core/channelz/v2tov1/property_list.cc b/src/core/channelz/v2tov1/property_list.cc
+index 64bbb6307c..03367cce7c 100644
+--- a/src/core/channelz/v2tov1/property_list.cc
++++ b/src/core/channelz/v2tov1/property_list.cc
+@@ -15,6 +15,7 @@
+ #include "src/core/channelz/v2tov1/property_list.h"
+ 
+ #include <cstdint>
++#include <limits>
+ #include <optional>
+ #include <string>
  
 diff --git a/src/core/lib/promise/detail/promise_factory.h b/src/core/lib/promise/detail/promise_factory.h
 index 3fb5d68146..583a2f9553 100644
@@ -210,6 +235,19 @@ index 3fb5d68146..583a2f9553 100644
      return PromiseFactoryImpl(RepeatableToken{}, f_);
    }
  };
+diff --git a/src/core/util/glob.cc b/src/core/util/glob.cc
+index 1b1c16e23d..22e54259f0 100644
+--- a/src/core/util/glob.cc
++++ b/src/core/util/glob.cc
+@@ -12,6 +12,8 @@
+ // See the License for the specific language governing permissions and
+ // limitations under the License.
+ 
++#include <algorithm>
++
+ #include "absl/strings/string_view.h"
+ 
+ namespace grpc_core {
 diff --git a/src/proto/grpc/health/v1/BUILD b/src/proto/grpc/health/v1/BUILD
 index f6165e0392..374653516a 100644
 --- a/src/proto/grpc/health/v1/BUILD
@@ -263,7 +301,7 @@ index 13a4714d4b..8664e99ffc 100644
  alias(
      name = "cares",
 -    actual = "@com_github_cares_cares//:ares",
-+    actual = "@com_github_cares_cares//:ares",
++    actual = "@c-ares//:ares",
      tags = ["manual"],
  )
  

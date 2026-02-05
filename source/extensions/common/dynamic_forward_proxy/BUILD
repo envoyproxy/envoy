@@ -77,6 +77,6 @@ envoy_cc_library(
     deps = [
         "//envoy/server:factory_context_interface",
         "//envoy/upstream:upstream_interface",
-        "@com_google_absl//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/container:flat_hash_set",
     ],
 )

@@ -42,7 +42,7 @@ configure_make(
         },
         "//conditions:default": COMMON_ENV,
     }),
-    lib_source = "@com_github_intel_qatzip//:all",
+    lib_source = "@qatzip//:all",
     out_static_libs = [
         "libqatzip.a",
     ],

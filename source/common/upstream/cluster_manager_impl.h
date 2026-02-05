@@ -30,6 +30,7 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/cleanup.h"
+#include "source/common/common/thread.h"
 #include "source/common/http/async_client_impl.h"
 #include "source/common/http/http_server_properties_cache_impl.h"
 #include "source/common/http/http_server_properties_cache_manager_impl.h"
@@ -473,25 +474,23 @@ protected:
    */
   class OdCdsApiHandleImpl : public OdCdsApiHandle {
   public:
-    static OdCdsApiHandlePtr create(ClusterManagerImpl& parent, OdCdsApiSharedPtr odcds) {
-      return std::make_unique<OdCdsApiHandleImpl>(parent, std::move(odcds));
+    static OdCdsApiHandlePtr create(ClusterManagerImpl& parent, uint64_t config_source_key) {
+      return std::make_unique<OdCdsApiHandleImpl>(parent, config_source_key);
     }
 
-    OdCdsApiHandleImpl(ClusterManagerImpl& parent, OdCdsApiSharedPtr odcds)
-        : parent_(parent), odcds_(std::move(odcds)) {
-      ASSERT(odcds_ != nullptr);
-    }
+    OdCdsApiHandleImpl(ClusterManagerImpl& parent, uint64_t config_source_key)
+        : parent_(parent), config_source_key_(config_source_key) {}
 
     ClusterDiscoveryCallbackHandlePtr
     requestOnDemandClusterDiscovery(absl::string_view name, ClusterDiscoveryCallbackPtr callback,
                                     std::chrono::milliseconds timeout) override {
-      return parent_.requestOnDemandClusterDiscovery(odcds_, std::string(name), std::move(callback),
-                                                     timeout);
+      return parent_.requestOnDemandClusterDiscovery(config_source_key_, std::string(name),
+                                                     std::move(callback), timeout);
     }
 
   private:
     ClusterManagerImpl& parent_;
-    OdCdsApiSharedPtr odcds_;
+    uint64_t config_source_key_;
   };
 
   virtual void postThreadLocalClusterUpdate(ClusterManagerCluster& cm_cluster,
@@ -897,7 +896,7 @@ private:
                               std::function<ConnectionPool::Instance*()> preconnect_pool);
 
   ClusterDiscoveryCallbackHandlePtr
-  requestOnDemandClusterDiscovery(OdCdsApiSharedPtr odcds, std::string name,
+  requestOnDemandClusterDiscovery(uint64_t subscription_key, std::string name,
                                   ClusterDiscoveryCallbackPtr callback,
                                   std::chrono::milliseconds timeout);
 
@@ -905,6 +904,10 @@ private:
 
 protected:
   ClusterInitializationMap cluster_initialization_map_;
+  // OdCDS subscriptions keyed by config source hash. Subscriptions persist for the lifetime
+  // of ClusterManagerImpl to avoid complexity around cleanup. A future optimization could
+  // add proper lifetime management to close unnecessary connections.
+  absl::flat_hash_map<uint64_t, OdCdsApiSharedPtr> odcds_subscriptions_;
 
 private:
   /**

@@ -9,10 +9,10 @@ cc_library(
     hdrs = ["sdk.h"],
     visibility = ["//visibility:public"],
     deps = [
-        "@com_google_absl//absl/container:flat_hash_map",
-        "@com_google_absl//absl/strings:string_view",
-        "@com_google_absl//absl/types:optional",
-        "@com_google_absl//absl/types:span",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/strings:string_view",
+        "@abseil-cpp//absl/types:optional",
+        "@abseil-cpp//absl/types:span",
     ],
     alwayslink = True,
 )
@@ -30,8 +30,8 @@ cc_library(
     deps = [
         ":sdk",
         "//source/extensions/dynamic_modules/abi",
-        "@com_google_absl//absl/container:flat_hash_map",
-        "@com_google_absl//absl/synchronization",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/synchronization",
     ],
     alwayslink = True,
 )
@@ -53,6 +53,6 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":sdk",
-        "@com_google_googletest//:gtest",
+        "@googletest//:gtest",
     ],
 )

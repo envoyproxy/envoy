@@ -18,7 +18,7 @@ envoy_cc_library(
         ":ssl_socket_state",
         "//envoy/common:optref_lib",
         "//envoy/common:time_interface",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
     ],
 )
 
@@ -67,7 +67,7 @@ envoy_cc_library(
     name = "certificate_validation_context_config_interface",
     hdrs = ["certificate_validation_context_config.h"],
     deps = [
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],

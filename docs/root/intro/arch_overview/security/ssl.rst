@@ -48,7 +48,7 @@ using ``--config=boringssl-fips`` Bazel option. Currently, the BoringSSL/FIPS bu
 
 AWS-LC FIPS can also be used with ``--config=aws-lc-fips``, and has wider architecture support.
 
-The correctness of the FIPS build can be verified by checking the presence of ``BoringSSL-FIPS`` or ``AWS-LC-FIPS``
+When Envoy has been built for FIPS, you should see ``BoringSSL-FIPS`` or ``AWS-LC-FIPS``
 in the :option:`--version` output.
 
 It's important to note that while using FIPS-compliant module is necessary for FIPS compliance,
