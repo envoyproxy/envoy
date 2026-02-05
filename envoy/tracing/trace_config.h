@@ -52,7 +52,7 @@ public:
    * (e.g., traceparent, tracestate, X-B3-* headers) will not be injected when proxying requests
    * to upstreams. Span reporting still occurs; only context propagation is disabled.
    */
-  virtual bool disableTraceContextPropagation() const PURE;
+  virtual bool noContextPropagation() const PURE;
 };
 
 } // namespace Tracing

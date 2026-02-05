@@ -715,8 +715,8 @@ TEST_F(HttpConnectionManagerConfigTest, DisableTraceContextPropagationDefault) {
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_TRUE(creation_status_.ok());
 
-  // By default, trace context propagation is enabled (disable is false)
-  EXPECT_FALSE(config.tracingConfig()->disableTraceContextPropagation());
+  // By default, trace context propagation is enabled (no_context_propagation is false)
+  EXPECT_FALSE(config.tracingConfig()->noContextPropagation());
 }
 
 TEST_F(HttpConnectionManagerConfigTest, DisableTraceContextPropagationEnabled) {
@@ -725,7 +725,7 @@ TEST_F(HttpConnectionManagerConfigTest, DisableTraceContextPropagationEnabled) {
   route_config:
     name: local_route
   tracing:
-    disable_trace_context_propagation: true
+    no_context_propagation: true
   http_filters:
   - name: envoy.filters.http.router
     typed_config:
@@ -739,7 +739,7 @@ TEST_F(HttpConnectionManagerConfigTest, DisableTraceContextPropagationEnabled) {
   ASSERT_TRUE(creation_status_.ok());
 
   // Trace context propagation is disabled when the flag is set to true
-  EXPECT_TRUE(config.tracingConfig()->disableTraceContextPropagation());
+  EXPECT_TRUE(config.tracingConfig()->noContextPropagation());
 }
 
 TEST_F(HttpConnectionManagerConfigTest, DisableTraceContextPropagationExplicitFalse) {
@@ -748,7 +748,7 @@ TEST_F(HttpConnectionManagerConfigTest, DisableTraceContextPropagationExplicitFa
   route_config:
     name: local_route
   tracing:
-    disable_trace_context_propagation: false
+    no_context_propagation: false
   http_filters:
   - name: envoy.filters.http.router
     typed_config:
@@ -762,7 +762,7 @@ TEST_F(HttpConnectionManagerConfigTest, DisableTraceContextPropagationExplicitFa
   ASSERT_TRUE(creation_status_.ok());
 
   // Trace context propagation is enabled when the flag is explicitly set to false
-  EXPECT_FALSE(config.tracingConfig()->disableTraceContextPropagation());
+  EXPECT_FALSE(config.tracingConfig()->noContextPropagation());
 }
 
 TEST_F(HttpConnectionManagerConfigTest, UnixSocketInternalAddress) {

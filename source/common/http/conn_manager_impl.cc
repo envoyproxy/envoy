@@ -2243,9 +2243,9 @@ bool ConnectionManagerImpl::ActiveStream::spawnUpstreamSpan() const {
   return connection_manager_tracing_config_->spawn_upstream_span_;
 }
 
-bool ConnectionManagerImpl::ActiveStream::disableTraceContextPropagation() const {
+bool ConnectionManagerImpl::ActiveStream::noContextPropagation() const {
   ASSERT(connection_manager_tracing_config_.has_value());
-  return connection_manager_tracing_config_->disable_trace_context_propagation_;
+  return connection_manager_tracing_config_->no_context_propagation_;
 }
 
 const Router::RouteEntry::UpgradeMap* ConnectionManagerImpl::ActiveStream::upgradeMap() {

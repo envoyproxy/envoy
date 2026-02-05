@@ -116,12 +116,12 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
   auto upstream_host = conn_pool_->host();
 
   // Only inject trace context if propagation is not disabled.
-  // When disableTraceContextPropagation is true, spans are still reported but trace context
+  // When noContextPropagation is true, spans are still reported but trace context
   // headers (e.g., traceparent, X-B3-*) are not injected into upstream requests.
-  const bool disable_context_propagation =
-      tracing_config.has_value() && tracing_config->disableTraceContextPropagation();
+  const bool no_context_propagation =
+      tracing_config.has_value() && tracing_config->noContextPropagation();
 
-  if (!disable_context_propagation) {
+  if (!no_context_propagation) {
     Tracing::HttpTraceContext trace_context(*parent_.downstreamHeaders());
     Tracing::UpstreamContext upstream_context(upstream_host.get(),           // host_
                                               &upstream_host->cluster(),     // cluster_

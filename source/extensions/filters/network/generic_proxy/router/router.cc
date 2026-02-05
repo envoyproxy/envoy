@@ -202,12 +202,12 @@ void UpstreamRequest::onUpstreamSuccess() {
   onUpstreamConnectionReady();
 
   // Only inject trace context if propagation is not disabled.
-  // When disableTraceContextPropagation is true, spans are still reported but trace context
+  // When noContextPropagation is true, spans are still reported but trace context
   // headers are not injected into upstream requests.
-  const bool disable_context_propagation =
-      tracing_config_.has_value() && tracing_config_->disableTraceContextPropagation();
+  const bool no_context_propagation =
+      tracing_config_.has_value() && tracing_config_->noContextPropagation();
 
-  if (!disable_context_propagation) {
+  if (!no_context_propagation) {
     const auto upstream_host = upstream_info_->upstream_host_.get();
     const Tracing::UpstreamContext upstream_context(
         upstream_host, upstream_host ? &upstream_host->cluster() : nullptr,

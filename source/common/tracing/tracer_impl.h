@@ -56,7 +56,7 @@ public:
   // This EgressConfigImpl is only used for async client tracing. Return false here is OK.
   bool spawnUpstreamSpan() const override { return false; }
   // Async clients always propagate trace context by default.
-  bool disableTraceContextPropagation() const override { return false; }
+  bool noContextPropagation() const override { return false; }
 };
 
 using EgressConfig = ConstSingleton<EgressConfigImpl>;

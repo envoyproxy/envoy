@@ -256,7 +256,7 @@ message HttpConnectionManager {
     // propagation is disabled.
     //
     // Default: false (context propagation is enabled)
-    bool disable_trace_context_propagation = 13;
+    bool no_context_propagation = 13;
   }
 
   message InternalAddressConfig {

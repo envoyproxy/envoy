@@ -119,9 +119,9 @@ bool ActiveStream::spawnUpstreamSpan() const {
   return conn_manager_tracing_config_->spawnUpstreamSpan();
 }
 
-bool ActiveStream::disableTraceContextPropagation() const {
+bool ActiveStream::noContextPropagation() const {
   ASSERT(conn_manager_tracing_config_.has_value());
-  return conn_manager_tracing_config_->disableTraceContextPropagation();
+  return conn_manager_tracing_config_->noContextPropagation();
 }
 
 Envoy::Event::Dispatcher& ActiveStream::dispatcher() {

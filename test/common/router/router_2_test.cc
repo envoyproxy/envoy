@@ -718,13 +718,13 @@ TEST_F(RouterTestNoChildSpan, BasicFlow) {
   response_decoder->decodeHeaders(std::move(response_headers), true);
 }
 
-// Test that when disableTraceContextPropagation is true, injectContext is not called.
+// Test that when noContextPropagation is true, injectContext is not called.
 class RouterTestDisableContextPropagation : public RouterTestBase {
 public:
   RouterTestDisableContextPropagation()
       : RouterTestBase(false, false, false, false, Protobuf::RepeatedPtrField<std::string>{}) {
-    // Enable the disable_trace_context_propagation flag
-    callbacks_.tracing_config_.disable_trace_context_propagation_ = true;
+    // Enable the no_context_propagation flag
+    callbacks_.tracing_config_.no_context_propagation_ = true;
   }
 };
 
@@ -749,7 +749,7 @@ TEST_F(RouterTestDisableContextPropagation, NoContextInjection) {
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
 
-  // injectContext should NOT be called when disableTraceContextPropagation is true
+  // injectContext should NOT be called when noContextPropagation is true
   EXPECT_CALL(callbacks_.active_span_, injectContext(_, _)).Times(0);
 
   router_->decodeHeaders(headers, true);
@@ -762,13 +762,13 @@ TEST_F(RouterTestDisableContextPropagation, NoContextInjection) {
   response_decoder->decodeHeaders(std::move(response_headers), true);
 }
 
-// Test with child span and disableTraceContextPropagation enabled
+// Test with child span and noContextPropagation enabled
 class RouterTestDisableContextPropagationWithChildSpan : public RouterTestBase {
 public:
   RouterTestDisableContextPropagationWithChildSpan()
       : RouterTestBase(true, false, false, false, Protobuf::RepeatedPtrField<std::string>{}) {
-    // Enable the disable_trace_context_propagation flag
-    callbacks_.tracing_config_.disable_trace_context_propagation_ = true;
+    // Enable the no_context_propagation flag
+    callbacks_.tracing_config_.no_context_propagation_ = true;
   }
 };
 
