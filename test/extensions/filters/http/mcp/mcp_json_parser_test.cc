@@ -684,6 +684,43 @@ TEST_F(McpJsonParserTest, OptionalFieldConfigDetection) {
   EXPECT_EQ(meta, nullptr);
 }
 
+TEST_F(McpJsonParserTest, EarlyStopWithMetaAsRequiredField) {
+  // When params._meta is explicitly configured as a required (extracted) field,
+  // there should be no optional fields, and early stop should trigger as soon
+  // as all required fields are found.
+  McpParserConfig custom_config = McpParserConfig::createDefault();
+
+  // Override tools/call config to include _meta as required field
+  std::vector<McpParserConfig::AttributeExtractionRule> rules = {
+      McpParserConfig::AttributeExtractionRule("params.name"),
+      McpParserConfig::AttributeExtractionRule("params._meta") // _meta as required
+  };
+  custom_config.addMethodConfig(McpConstants::Methods::TOOLS_CALL, rules);
+
+  auto parser = std::make_unique<McpJsonParser>(custom_config);
+
+  // JSON with _meta present followed by extra data - early stop should trigger
+  std::string json =
+      R"({"jsonrpc": "2.0", "method": "tools/call", "id": 1, "params": {"name": "tool", "_meta": {"trace": "t1"}, "extra": "data"}})";
+
+  EXPECT_OK(parser->parse(json));
+
+  // Since _meta is required (not optional), hasOptionalFields should be false
+  EXPECT_FALSE(parser->hasOptionalFields());
+  // All required fields were found, so early stop should have triggered
+  EXPECT_TRUE(parser->isAllFieldsCollected());
+  EXPECT_TRUE(parser->hasAllRequiredFields());
+
+  // Verify extracted fields
+  const auto* name = parser->getNestedValue("params.name");
+  ASSERT_NE(name, nullptr);
+  EXPECT_EQ(name->string_value(), "tool");
+
+  const auto* meta = parser->getNestedValue("params._meta");
+  ASSERT_NE(meta, nullptr);
+  ASSERT_TRUE(meta->has_struct_value());
+}
+
 TEST_F(McpJsonParserTest, GlobalOptionalMetaFieldExtraction) {
   // params._meta is a global optional field and should be extracted
   // for all methods when present

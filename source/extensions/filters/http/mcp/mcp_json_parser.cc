@@ -207,7 +207,7 @@ void McpParserConfig::buildMethodRequirements(
     }
   }
 
-  if (!required_set.contains(McpConstants::kOptionalMetaField)) {
+  if (!required_set.contains(std::string(McpConstants::kOptionalMetaField))) {
     requirements.optional.push_back(std::string(McpConstants::kOptionalMetaField));
   }
 }
@@ -521,17 +521,19 @@ void McpFieldExtractor::checkEarlyStop() {
     return;
   }
 
-  // If params object has been exited or was never entered, we know params.* optional fields
-  // can't appear anymore. params_depth_ == 0 means: either we never entered params, or we
-  // already exited it. collected_fields_ contains "params" only if we entered the params object.
-  bool params_seen = collected_fields_.count("params") > 0;
-  bool params_exited = params_seen && params_depth_ == 0;
-  if (params_exited || !params_seen) {
-    can_stop_parsing_ = true;
-    ENVOY_LOG(debug, "early stop: params object {} - optional fields cannot appear",
-              params_exited ? "closed" : "not present");
+  // If we're currently inside the params object, we must continue parsing because
+  // optional fields (like params._meta) may still appear.
+  if (params_depth_ > 0) {
+    ENVOY_LOG(debug, "still inside params object (depth={}), waiting for optional fields",
+              params_depth_);
     return;
   }
+
+  // params_depth_ == 0 means: either we never entered params, or we already exited it.
+  // In either case, params.* optional fields can't appear anymore.
+  can_stop_parsing_ = true;
+  ENVOY_LOG(debug,
+            "early stop: params object exited or not present - optional fields cannot appear");
 }
 
 void McpFieldExtractor::updateFieldRequirements() {
