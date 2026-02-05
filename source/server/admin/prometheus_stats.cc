@@ -300,6 +300,7 @@ private:
   // Helper method to add labels to a metric from tags.
   void addLabelsToMetric(io::prometheus::client::Metric* metric,
                          const std::vector<Stats::Tag>& tags) const {
+    metric->mutable_label()->Reserve(tags.size());
     for (const auto& tag : tags) {
       auto* label = metric->add_label();
       label->set_name(sanitizeName(tag.name_));
@@ -352,7 +353,7 @@ private:
       prom_histogram->set_sample_count(stats.sampleCount());
       prom_histogram->set_sample_sum(stats.sampleSum());
 
-      // Add buckets
+      prom_histogram->mutable_bucket()->Reserve(supported_buckets.size());
       for (size_t i = 0; i < supported_buckets.size(); ++i) {
         auto* bucket = prom_histogram->add_bucket();
         bucket->set_upper_bound(supported_buckets[i]);
@@ -378,7 +379,7 @@ private:
       summary->set_sample_count(stats.sampleCount());
       summary->set_sample_sum(stats.sampleSum());
 
-      // Add quantiles
+      summary->mutable_quantile()->Reserve(supported_quantiles.size());
       for (size_t i = 0; i < supported_quantiles.size(); ++i) {
         auto* quantile = summary->add_quantile();
         quantile->set_quantile(supported_quantiles[i]);
