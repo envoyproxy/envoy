@@ -71,7 +71,7 @@ message BandwidthLimit {
       // If set, must contain ``{CN}``.
       //
       // This value also overrides ``stat_prefix`` from ``BandwidthLimit`` for the bucket.
-      string name_template = 2 [(validate.rules).string = {pattern: "^$|\\{CN\\}"}];
+      string name_template = 2 [(validate.rules).string = {pattern: "|.*{CN}.*"}];
     }
 
     // Use the request's client CN as [part of] the bucket name.

@@ -32,10 +32,14 @@ BucketAndStats::BucketAndStats(absl::string_view name, TimeSource& time_source, 
 
 std::string ClientCnBucketSelector::bucketName(const StreamInfo::StreamInfo& stream_info) const {
   auto ssl = stream_info.downstreamAddressProvider().sslConnection();
-  if (!ssl || ssl->subjectPeerCertificate().empty()) {
+  if (!ssl) {
     return default_bucket_name_;
   }
-  return absl::StrReplaceAll(name_template_, {{"{CN}", ssl->subjectPeerCertificate()}});
+  const std::string& cert = ssl->subjectPeerCertificate();
+  if (cert.empty()) {
+    return default_bucket_name_;
+  }
+  return absl::StrReplaceAll(name_template_, {{"{CN}", cert}});
 }
 
 OptRef<const BucketAndStats>

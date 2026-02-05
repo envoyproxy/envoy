@@ -2,8 +2,8 @@
 
 #include "source/extensions/filters/http/bandwidth_limit/bandwidth_limit.h"
 
-#include "test/test_common/status_utility.h"
 #include "test/mocks/http/mocks.h"
+#include "test/test_common/status_utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
