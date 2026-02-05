@@ -121,7 +121,7 @@ envoy_cc_library(
         "//source/common/network:socket_option_factory_lib",
         "//source/common/runtime:runtime_features_lib",
         "//source/common/stream_info:stream_info_lib",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -236,8 +236,8 @@ envoy_cc_library(
         ":cidr_range_lib",
         ":utility_lib",
         "//source/common/common:assert_lib",
-        "@com_google_absl//absl/container:node_hash_set",
-        "@com_google_absl//absl/numeric:int128",
+        "@abseil-cpp//absl/container:node_hash_set",
+        "@abseil-cpp//absl/numeric:int128",
     ],
 )
 
@@ -294,8 +294,8 @@ envoy_cc_library(
         "//source/common/api:os_sys_calls_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/event:dispatcher_includes",
-        "@com_github_google_quiche//:quic_platform_socket_address",
         "@envoy_api//envoy/extensions/network/socket_interface/v3:pkg_cc_proto",
+        "@quiche//:quic_platform_socket_address",
     ] + select({
         "//bazel:android": [],
         "//bazel:liburing_enabled": [
@@ -440,7 +440,7 @@ envoy_cc_library(
         "//source/common/common:scalar_to_byte_vector_lib",
         "//source/common/common:utility_lib",
         "//source/common/memory:aligned_allocator_lib",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -457,7 +457,7 @@ envoy_cc_library(
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -491,7 +491,7 @@ envoy_cc_library(
         "//envoy/network:address_interface",
         "//envoy/network:listen_socket_interface",
         "//source/common/common:logger_lib",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -619,7 +619,7 @@ envoy_cc_library(
     deps = [
         "//envoy/network:filter_interface",
         "//envoy/network:listen_socket_interface",
-        "@com_google_absl//absl/strings:str_format",
+        "@abseil-cpp//absl/strings:str_format",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
 )
