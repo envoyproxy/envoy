@@ -124,6 +124,8 @@ ConnectionImpl::~ConnectionImpl() {
   // deletion). Hence the assert above. However, call close() here just to be completely sure that
   // the fd is closed and make it more likely that we crash from a bad close callback.
   close(ConnectionCloseType::NoFlush);
+  // Ensure that the access log is written.
+  ensureAccessLogWritten();
 }
 
 void ConnectionImpl::addWriteFilter(WriteFilterSharedPtr filter) {
@@ -141,6 +143,17 @@ void ConnectionImpl::removeReadFilter(ReadFilterSharedPtr filter) {
 }
 
 bool ConnectionImpl::initializeReadFilters() { return filter_manager_.initializeReadFilters(); }
+
+void ConnectionImpl::addAccessLogHandler(AccessLog::InstanceSharedPtr handler) {
+  filter_manager_.addAccessLogHandler(handler);
+}
+
+void ConnectionImpl::ensureAccessLogWritten() {
+  if (!access_log_written_) {
+    access_log_written_ = true;
+    filter_manager_.log(AccessLog::AccessLogType::TcpConnectionEnd);
+  }
+}
 
 void ConnectionImpl::close(ConnectionCloseType type) {
   if (!socket_->isOpen()) {
@@ -1107,6 +1120,14 @@ ClientConnectionImpl::ClientConnectionImpl(
       ioHandle().activateFileEvents(Event::FileReadyType::Write);
     }
   }
+}
+
+ClientConnectionImpl::~ClientConnectionImpl() {
+  // Ensure that connection is closed and the access log is written before the StreamInfo is
+  // destroyed. We need to write the access log here because the StreamInfo is owned by this class,
+  // and will be destroyed before the base class destructor runs.
+  close(ConnectionCloseType::NoFlush);
+  ensureAccessLogWritten();
 }
 
 void ClientConnectionImpl::connect() {

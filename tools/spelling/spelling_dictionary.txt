@@ -48,6 +48,7 @@ CGROUP
 CROSSSLOT
 ECN
 ECS
+EdDSA
 EKS
 Millicores
 NID
@@ -282,16 +283,26 @@ Iters
 JSON
 JSONs
 jsonrpc
+jwk
+Jwk
 JWKS
 JWKs
 JWS
 JWT
 JWTs
+alg
+aud
+crv
+iat
+iss
+jti
 KB
 KDS
+keycloak
 Karlsson
 KiB
 Kille
+kty
 LBs
 LC
 LCOV
@@ -300,6 +311,7 @@ LEDS
 LEV
 LF
 LHS
+LLC
 hls
 hoo
 iframe
@@ -360,6 +372,7 @@ Oauth
 OCSP
 OD
 ODCDS
+OKP
 middlewildcard
 monostate
 mpd
@@ -460,6 +473,7 @@ SIGABRT
 SIGBUS
 SIGFPE
 SIGILL
+SPDX
 SIGINT
 SIGPIPE
 SIGSEGV
@@ -632,6 +646,7 @@ bitset
 bitwise
 blackhole
 blackholed
+bssl
 bookkeep
 bool
 boolean
@@ -949,6 +964,7 @@ interpretable
 intra
 ints
 invariance
+invariants
 invoker
 iov
 iovcnt
@@ -970,6 +986,7 @@ js
 kafka
 keepalive
 keepalives
+keyset
 ketama
 keyder
 kqueue
@@ -1056,6 +1073,7 @@ mmsg
 mmsghdr
 mongo
 moveable
+mru
 msec
 msg
 msghdr
@@ -1434,6 +1452,7 @@ subtrees
 subtype
 subtypes
 subzone
+sudo
 suf
 superclass
 superroot
@@ -1637,6 +1656,7 @@ nsec
 millicores
 cpuacct
 cpuacct.usage
+cpufreq
 effective_cpus
 cpus
 ja3

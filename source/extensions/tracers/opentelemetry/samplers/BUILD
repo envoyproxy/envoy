@@ -20,6 +20,6 @@ envoy_cc_library(
         "//envoy/server:tracer_config_interface",
         "//source/common/common:logger_lib",
         "//source/common/config:utility_lib",
-        "@opentelemetry_proto//:trace_proto_cc",
+        "@opentelemetry-proto//:trace_proto_cc",
     ],
 )

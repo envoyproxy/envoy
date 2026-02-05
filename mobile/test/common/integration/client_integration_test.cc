@@ -19,6 +19,7 @@
 #include "test/integration/autonomous_upstream.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/test_random_generator.h"
+#include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "absl/synchronization/notification.h"
 #include "extension_registry.h"
@@ -1761,6 +1762,56 @@ TEST_P(ClientIntegrationTest, OnNetworkChangeEvent) {
   if (upstreamProtocol() == Http::CodecType::HTTP1) {
     ASSERT_EQ(cc_.on_complete_received_byte_count_, 67);
   }
+}
+
+class MockSendOsSysCalls : public Api::OsSysCallsImpl {
+public:
+  MOCK_METHOD(Api::SysCallSizeResult, send,
+              (os_fd_t socket, void* buffer, size_t length, int flags), (override));
+};
+
+// Tests that a transient write error due to no space available on the socket
+// does not cause the stream to error out when using HTTP/3.
+TEST_P(ClientIntegrationTest, NoSpaceAvailableWriteErrorSwallowed) {
+  initialize();
+  if (upstreamProtocol() != Http::CodecType::HTTP3) {
+    return;
+  }
+  // Create a stream with a write buffer limit of 1 byte to trigger the error.
+  EnvoyStreamCallbacks stream_callbacks = createDefaultStreamCallbacks();
+  stream_ = createNewStream(std::move(stream_callbacks));
+
+  int fd = -1;
+  EXPECT_CALL(helper_handle_->mock_helper(), bindSocketToNetwork(_, 1))
+      .WillOnce(Invoke([&](Network::ConnectionSocket& socket, int /* network */) {
+        fd = socket.ioHandle().fdDoNotUse();
+      }));
+  // Sending headers should be fine.
+  stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
+                       false);
+
+  // Sending data should trigger the write error but not crash.
+  stream_->sendData(std::make_unique<Buffer::OwnedImpl>("request body"));
+
+  // Wait for the upstream connection to be created and introduce a transient SOCKET_ERROR_NOBUFS
+  // write error.
+  ASSERT_TRUE(waitForCounterGe("cluster.base.upstream_cx_http3_total", 1));
+  MockSendOsSysCalls sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> injector(&sys_calls);
+  EXPECT_CALL(sys_calls, send(fd, _, _, _))
+      .WillOnce(Return(Api::SysCallSizeResult{-1, SOCKET_ERROR_NOBUFS}))
+      .WillRepeatedly(Invoke([&](os_fd_t socket, void* buffer, size_t length, int flags) {
+        return injector.latched().send(socket, buffer, length, flags);
+      }));
+
+  // Complete the request.
+  stream_->close(Http::Utility::createRequestTrailerMapPtr());
+  terminal_callback_.waitReady();
+
+  // The write error shouldn't have caused a stream error.
+  ASSERT_EQ(cc_.on_error_calls_, 0);
+  ASSERT_EQ(cc_.on_complete_calls_, 1);
+  EXPECT_EQ(cc_.status_, "200");
 }
 
 } // namespace

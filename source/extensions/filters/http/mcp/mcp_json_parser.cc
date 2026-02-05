@@ -14,7 +14,9 @@ using namespace McpConstants;
 
 void McpParserConfig::addMethodConfig(absl::string_view method,
                                       std::vector<AttributeExtractionRule> fields) {
-  method_fields_[std::string(method)] = std::move(fields);
+  const std::string method_key(method);
+  method_fields_[method_key] = std::move(fields);
+  buildFieldRequirements();
 }
 
 void McpParserConfig::initializeDefaults() {
@@ -91,12 +93,14 @@ McpParserConfig::fromProto(const envoy::extensions::filters::http::mcp::v3::Pars
     }
   }
 
+  config.buildFieldRequirements();
   return config;
 }
 
 McpParserConfig McpParserConfig::createDefault() {
   McpParserConfig config;
   config.initializeDefaults();
+  config.buildFieldRequirements();
   return config;
 }
 
@@ -105,6 +109,15 @@ McpParserConfig::getFieldsForMethod(const std::string& method) const {
   static const std::vector<AttributeExtractionRule> empty;
   auto it = method_fields_.find(method);
   return (it != method_fields_.end()) ? it->second : empty;
+}
+
+const McpParserConfig::FieldRequirements&
+McpParserConfig::getFieldRequirementsForMethod(const std::string& method) const {
+  auto it = method_requirements_.find(method);
+  if (it != method_requirements_.end()) {
+    return it->second;
+  }
+  return default_requirements_;
 }
 
 std::string McpParserConfig::getMethodGroup(const std::string& method) const {
@@ -167,6 +180,38 @@ std::string McpParserConfig::getBuiltInMethodGroup(const std::string& method) co
   return std::string(UNKNOWN);
 }
 
+void McpParserConfig::buildFieldRequirements() {
+  buildMethodRequirements({}, default_requirements_);
+
+  method_requirements_.clear();
+  method_requirements_.reserve(method_fields_.size());
+  for (const auto& entry : method_fields_) {
+    FieldRequirements requirements;
+    buildMethodRequirements(entry.second, requirements);
+    method_requirements_.emplace(entry.first, std::move(requirements));
+  }
+}
+
+void McpParserConfig::buildMethodRequirements(
+    const std::vector<AttributeExtractionRule>& method_fields,
+    FieldRequirements& requirements) const {
+  requirements.required.clear();
+  requirements.optional.clear();
+
+  absl::flat_hash_set<std::string> required_set;
+
+  // All method-specific extraction rules are required.
+  for (const auto& field : method_fields) {
+    if (required_set.insert(field.path).second) {
+      requirements.required.push_back(field.path);
+    }
+  }
+
+  if (!required_set.contains(std::string(McpConstants::kOptionalMetaField))) {
+    requirements.optional.push_back(std::string(McpConstants::kOptionalMetaField));
+  }
+}
+
 // McpFieldExtractor implementation
 McpFieldExtractor::McpFieldExtractor(Protobuf::Struct& metadata, const McpParserConfig& config)
     : root_metadata_(metadata), config_(config) {
@@ -174,7 +219,8 @@ McpFieldExtractor::McpFieldExtractor(Protobuf::Struct& metadata, const McpParser
   context_stack_.push({&temp_storage_, ""});
 
   // Pre-calculate total fields needed for early stop optimization
-  fields_needed_ = config_.getAlwaysExtract().size();
+  required_fields_needed_ = config_.getAlwaysExtract().size();
+  fields_needed_ = required_fields_needed_;
 }
 
 McpFieldExtractor* McpFieldExtractor::StartObject(absl::string_view name) {
@@ -196,6 +242,11 @@ McpFieldExtractor* McpFieldExtractor::StartObject(absl::string_view name) {
       current_path_cache_ += ".";
     }
     current_path_cache_ += name;
+
+    // Track when we enter the "params" object (direct child of root)
+    if (depth_ == 2 && name == "params") {
+      params_depth_ = depth_;
+    }
   }
 
   auto* parent = context_stack_.top().struct_ptr;
@@ -227,6 +278,13 @@ McpFieldExtractor* McpFieldExtractor::EndObject() {
     }
 
     depth_--;
+
+    // Check if we just exited the "params" object using depth tracking
+    if (params_depth_ > 0 && depth_ < params_depth_) {
+      params_depth_ = 0; // Reset - we've exited params
+      checkEarlyStop();
+    }
+
     if (!path_stack_.empty()) {
       // Update cached path before removing from stack
       size_t last_dot = current_path_cache_.rfind('.');
@@ -430,22 +488,81 @@ void McpFieldExtractor::checkEarlyStop() {
     return;
   }
 
-  // Update fields_needed_ now that we know the method
-  if (!fields_needed_updated_) {
-    const auto& required_fields = config_.getFieldsForMethod(method_);
-    fields_needed_ += required_fields.size();
-    // Notifications don't have 'id' field, so reduce the expected count
-    if (is_notification_) {
-      fields_needed_--;
-    }
-    fields_needed_updated_ = true;
-  }
+  updateFieldRequirements();
 
   // Fast path: check if we have collected enough fields
-  if (fields_collected_count_ < fields_needed_) {
-    return; // Still missing fields
+  if (fields_collected_count_ < required_fields_needed_) {
+    return; // Still missing required fields
   }
 
+  if (!requiredFieldsCollected()) {
+    return;
+  }
+
+  // No optional fields configured - can stop now.
+  if (!has_optional_fields_) {
+    can_stop_parsing_ = true;
+    ENVOY_LOG(debug, "early stop: Have all required fields for method {}", method_);
+    return;
+  }
+
+  // Check if we've collected all optional fields
+  bool all_optional_collected = true;
+  for (const auto& field : optional_fields_) {
+    if (collected_fields_.count(field) == 0) {
+      all_optional_collected = false;
+      break;
+    }
+  }
+
+  if (all_optional_collected) {
+    can_stop_parsing_ = true;
+    ENVOY_LOG(debug, "early stop: Have all required + optional fields for method {}", method_);
+    return;
+  }
+
+  // If we're currently inside the params object, we must continue parsing because
+  // optional fields (like params._meta) may still appear.
+  if (params_depth_ > 0) {
+    ENVOY_LOG(debug, "still inside params object (depth={}), waiting for optional fields",
+              params_depth_);
+    return;
+  }
+
+  // params_depth_ == 0 means: either we never entered params, or we already exited it.
+  // In either case, params.* optional fields can't appear anymore.
+  can_stop_parsing_ = true;
+  ENVOY_LOG(debug,
+            "early stop: params object exited or not present - optional fields cannot appear");
+}
+
+void McpFieldExtractor::updateFieldRequirements() {
+  if (fields_needed_updated_) {
+    return;
+  }
+
+  const auto& requirements = config_.getFieldRequirementsForMethod(method_);
+  required_fields_ = requirements.required;
+  optional_fields_ = requirements.optional;
+
+  required_fields_needed_ = config_.getAlwaysExtract().size() + required_fields_.size();
+  fields_needed_ = required_fields_needed_ + optional_fields_.size();
+
+  // Notifications don't have 'id' field, so reduce the expected count
+  if (is_notification_) {
+    if (required_fields_needed_ > 0) {
+      required_fields_needed_--;
+    }
+    if (fields_needed_ > 0) {
+      fields_needed_--;
+    }
+  }
+
+  has_optional_fields_ = !optional_fields_.empty();
+  fields_needed_updated_ = true;
+}
+
+bool McpFieldExtractor::requiredFieldsCollected() const {
   // Verify we actually have all required fields (not just the count)
   // Notifications don't have an 'id' field per JSON-RPC spec, so skip it for them
   for (const auto& field : config_.getAlwaysExtract()) {
@@ -453,19 +570,17 @@ void McpFieldExtractor::checkEarlyStop() {
       continue;
     }
     if (collected_fields_.count(field) == 0) {
-      return;
+      return false;
     }
   }
 
-  const auto& required_fields = config_.getFieldsForMethod(method_);
-  for (const auto& field : required_fields) {
-    if (collected_fields_.count(field.path) == 0) {
-      return;
+  for (const auto& field : required_fields_) {
+    if (collected_fields_.count(field) == 0) {
+      return false;
     }
   }
 
-  can_stop_parsing_ = true;
-  ENVOY_LOG(debug, "early stop: Have all fields for method {}", method_);
+  return true;
 }
 
 void McpFieldExtractor::finalizeExtraction() {
@@ -482,15 +597,42 @@ void McpFieldExtractor::finalizeExtraction() {
   validateRequiredFields();
 }
 
+bool McpFieldExtractor::hasOptionalFields() {
+  if (!has_method_) {
+    return false;
+  }
+  updateFieldRequirements();
+  return has_optional_fields_;
+}
+
+bool McpFieldExtractor::hasAllRequiredFields() {
+  if (!has_jsonrpc_ || !has_method_) {
+    return false;
+  }
+  updateFieldRequirements();
+  return requiredFieldsCollected();
+}
+
 void McpFieldExtractor::copySelectedFields() {
+  absl::flat_hash_set<std::string> copied_fields;
+
   for (const auto& field : config_.getAlwaysExtract()) {
-    copyFieldByPath(field);
+    if (copied_fields.insert(field).second) {
+      copyFieldByPath(field);
+    }
   }
 
   // Copy method-specific fields
   const auto& fields = config_.getFieldsForMethod(method_);
   for (const auto& field : fields) {
-    copyFieldByPath(field.path);
+    if (copied_fields.insert(field.path).second) {
+      copyFieldByPath(field.path);
+    }
+  }
+
+  const std::string meta_field(McpConstants::kOptionalMetaField);
+  if (copied_fields.insert(meta_field).second) {
+    copyFieldByPath(meta_field);
   }
 }
 
@@ -541,11 +683,11 @@ void McpFieldExtractor::copyFieldByPath(const std::string& path) {
 }
 
 void McpFieldExtractor::validateRequiredFields() {
-  const auto& fields = config_.getFieldsForMethod(method_);
-  for (const auto& field : fields) {
-    if (extracted_fields_.count(field.path) == 0) {
-      missing_required_fields_.push_back(field.path);
-      ENVOY_LOG(debug, "missing required field for {}: {}", method_, field.path);
+  updateFieldRequirements();
+  for (const auto& field : required_fields_) {
+    if (extracted_fields_.count(field) == 0) {
+      missing_required_fields_.push_back(field);
+      ENVOY_LOG(debug, "missing required field for {}: {}", method_, field);
     }
   }
 }
@@ -581,6 +723,12 @@ absl::Status McpJsonParser::finishParse() {
 }
 
 bool McpJsonParser::isValidMcpRequest() const { return extractor_ && extractor_->isValidMcp(); }
+
+bool McpJsonParser::hasOptionalFields() { return extractor_ && extractor_->hasOptionalFields(); }
+
+bool McpJsonParser::hasAllRequiredFields() {
+  return extractor_ && extractor_->hasAllRequiredFields();
+}
 
 const std::string& McpJsonParser::getMethod() const {
   static const std::string empty;

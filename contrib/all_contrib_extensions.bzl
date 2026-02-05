@@ -34,9 +34,19 @@ PPC_SKIP_CONTRIB_TARGETS = [
     "envoy.compression.qatzstd.compressor",
 ]
 
-FIPS_LINUX_X86_SKIP_CONTRIB_TARGETS = [
+# BoringSSL-FIPS historically only skipped qatzip and kae on x86_64
+BORINGSSL_FIPS_SKIP_CONTRIB_TARGETS = [
     "envoy.compression.qatzip.compressor",
     "envoy.tls.key_providers.kae",
+]
+
+# AWS-LC needs to skip additional Intel-specific crypto providers
+AWS_LC_SKIP_CONTRIB_TARGETS = [
+    "envoy.tls.key_providers.cryptomb",
+    "envoy.tls.key_providers.qat",
+    "envoy.tls.key_providers.kae",
+    "envoy.compression.qatzip.compressor",
+    "envoy.compression.qatzstd.compressor",
 ]
 
 def envoy_all_contrib_extensions(denylist = []):

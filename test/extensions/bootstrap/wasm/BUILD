@@ -45,7 +45,7 @@ envoy_extension_cc_test(
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:simulated_time_system_lib",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
     ],
 )
 
@@ -114,7 +114,7 @@ envoy_extension_cc_test_binary(
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:simulated_time_system_lib",
-        "@com_github_google_benchmark//:benchmark",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
+        "@benchmark",
     ],
 )

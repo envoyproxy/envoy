@@ -39,6 +39,17 @@ LoadStatsReporter::LoadStatsReporter(const LocalInfo::LocalInfo& local_info,
   establishNewStream();
 }
 
+LoadStatsReporter::~LoadStatsReporter() {
+  // Disable the timer.
+  ENVOY_LOG_MISC(info, "Destroying LoadStatsReporter");
+  retry_timer_->disableTimer();
+  response_timer_->disableTimer();
+  if (stream_ != nullptr) {
+    stream_->resetStream();
+    stream_ = nullptr;
+  }
+}
+
 void LoadStatsReporter::setRetryTimer() {
   ENVOY_LOG(info, "Load reporter stats stream/connection will retry in {} ms.", RETRY_DELAY_MS);
   retry_timer_->enableTimer(std::chrono::milliseconds(RETRY_DELAY_MS));

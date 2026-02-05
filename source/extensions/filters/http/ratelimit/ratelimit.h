@@ -291,9 +291,10 @@ private:
 
 /**
  * This implements the rate limit callback that outlives the filter holding the client.
- * On completion, it deletes itself.
+ * On completion, it breaks the circular reference to itself and gets deleted.
  */
-class OnStreamDoneCallBack : public Filters::Common::RateLimit::RequestCallbacks {
+class OnStreamDoneCallBack : public Filters::Common::RateLimit::RequestCallbacks,
+                             public std::enable_shared_from_this<OnStreamDoneCallBack> {
 public:
   OnStreamDoneCallBack(std::shared_ptr<Filters::Common::RateLimit::Client> client)
       : client_(std::move(client)) {}
@@ -307,8 +308,13 @@ public:
 
   Filters::Common::RateLimit::Client& client() { return *client_; }
 
+  // Initialize self_ to keep the callback alive until complete() is called.
+  void keepAlive() { self_ = shared_from_this(); }
+
 private:
   std::shared_ptr<Filters::Common::RateLimit::Client> client_;
+  // This is used to keep the callback alive until complete() is called.
+  std::shared_ptr<OnStreamDoneCallBack> self_;
 };
 
 } // namespace RateLimitFilter
