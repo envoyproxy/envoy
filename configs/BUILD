@@ -116,8 +116,8 @@ py_binary(
     data = [
         ":configs",
         "//docs:configs",
-        "@envoy_api//:v3_proto_set",
         "@envoy-examples//:configs",
+        "@envoy_api//:v3_proto_set",
     ],
     deps = [requirement("envoy.base.utils")],
 )
