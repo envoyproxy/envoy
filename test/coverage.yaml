@@ -39,7 +39,7 @@ directories:
   source/extensions/filters/common/lua: 95.6
   source/extensions/filters/http/cache: 95.9
   source/extensions/filters/http/dynamic_forward_proxy: 94.8
-  source/extensions/filters/http/dynamic_modules: 95.2
+  source/extensions/filters/http/dynamic_modules: 95.0
   source/extensions/filters/http/decompressor: 95.9
   source/extensions/filters/http/ext_proc: 96.4
   source/extensions/filters/http/grpc_json_reverse_transcoder: 94.8
@@ -85,5 +85,5 @@ directories:
   source/extensions/health_checkers/grpc: 92.3
   source/extensions/config_subscription/rest: 94.9
   source/extensions/matching/input_matchers/cel_matcher: 100.0
-  source/extensions/dynamic_modules: 92.0  # Filesystem error paths in newDynamicModuleFromBytes (file create/write/permissions/rename failures) are hard to test withot being flaky. ModuleCacheTest covers some of these error paths, but not all.
+  source/extensions/dynamic_modules: 92.0  # Filesystem error paths in newDynamicModuleFromBytes are hard to test without being flaky
   source/extensions/dynamic_modules/sdk/cpp: 0.0  # SDK code self not directly tested

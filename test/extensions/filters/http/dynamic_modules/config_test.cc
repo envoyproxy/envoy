@@ -660,6 +660,171 @@ TEST_F(DynamicModuleFilterConfigTest, RemoteLoadingWarmingModeFetchFailure) {
   cb_or_error.value()(filter_callback);
 }
 
+TEST_F(DynamicModuleFilterConfigTest, EmptyLocalModuleData) {
+  const std::string empty_file = TestEnvironment::temporaryPath("empty_module.so");
+  { std::ofstream f(empty_file); }
+
+  const std::string yaml = absl::StrCat(R"EOF(
+  dynamic_module_config:
+    module:
+      local:
+        filename: ")EOF",
+                                        empty_file, R"EOF("
+    do_not_close: true
+  filter_name: "test_filter"
+  )EOF");
+
+  envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilter proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
+
+  DynamicModuleConfigFactory factory;
+  auto cb_or_error = factory.createFilterFactoryFromProto(proto_config, "stats", context_);
+  EXPECT_FALSE(cb_or_error.ok());
+  EXPECT_THAT(cb_or_error.status().message(), testing::HasSubstr("Module data is empty"));
+}
+
+TEST_F(DynamicModuleFilterConfigTest, ServerContextFactory) {
+  TestEnvironment::setEnvVar(
+      "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
+      TestEnvironment::substitute("{{ test_rundir }}/test/extensions/dynamic_modules/test_data/c"),
+      1);
+
+  const std::string yaml = R"EOF(
+  dynamic_module_config:
+    name: "no_op"
+    do_not_close: true
+  filter_name: "test_filter"
+  )EOF";
+
+  envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilter proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
+
+  DynamicModuleConfigFactory factory;
+  EXPECT_FALSE(
+      factory.isTerminalFilterByProtoTyped(proto_config, context_.server_factory_context_));
+  EXPECT_NO_THROW(factory.createFilterFactoryFromProtoWithServerContextTyped(
+      proto_config, "stats", context_.server_factory_context_));
+
+  TestEnvironment::unsetEnvVar("ENVOY_DYNAMIC_MODULES_SEARCH_PATH");
+}
+
+TEST_F(DynamicModuleFilterConfigTest, ServerContextRemoteNoInitManager) {
+  const std::string yaml = R"EOF(
+  dynamic_module_config:
+    module:
+      remote:
+        http_uri:
+          uri: https://example.com/module.so
+          cluster: cluster_1
+          timeout: 5s
+        sha256: "abc123"
+    do_not_close: true
+  filter_name: "test_filter"
+  )EOF";
+
+  envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilter proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
+
+  DynamicModuleConfigFactory factory;
+  EXPECT_THROW(factory.createFilterFactoryFromProtoWithServerContextTyped(
+                   proto_config, "stats", context_.server_factory_context_),
+               EnvoyException);
+}
+
+TEST_F(DynamicModuleFilterConfigTest, WarmingModeFetchInProgress) {
+  const std::string module_path = Extensions::DynamicModules::testSharedObjectPath("no_op", "c");
+
+  std::ifstream file(module_path, std::ios::binary);
+  ASSERT_TRUE(file.good()) << "Failed to open test module: " << module_path;
+  std::string module_bytes((std::istreambuf_iterator<char>(file)),
+                           std::istreambuf_iterator<char>());
+  ASSERT_FALSE(module_bytes.empty());
+
+  const std::string sha256 = Hex::encode(
+      Common::Crypto::UtilitySingleton::get().getSha256Digest(Buffer::OwnedImpl(module_bytes)));
+
+  // First: NACK mode starts a background fetch that stays in-progress.
+  const std::string nack_yaml = absl::StrCat(R"EOF(
+  dynamic_module_config:
+    module:
+      remote:
+        http_uri:
+          uri: https://example.com/module.so
+          cluster: cluster_1
+          timeout: 5s
+        sha256: )EOF",
+                                             sha256, R"EOF(
+    nack_on_module_cache_miss: true
+    do_not_close: true
+  filter_name: "test_filter"
+  )EOF");
+
+  envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilter nack_proto;
+  TestUtility::loadFromYaml(nack_yaml, nack_proto);
+
+  NiceMock<Http::MockAsyncClient> client;
+  NiceMock<Http::MockAsyncClientRequest> request(&client);
+
+  cluster_manager_.initializeThreadLocalClusters({"cluster_1"});
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient())
+      .WillRepeatedly(ReturnRef(cluster_manager_.thread_local_cluster_.async_client_));
+
+  Http::AsyncClient::Callbacks* async_callbacks = nullptr;
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillOnce(testing::Invoke(
+          [&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+              const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            async_callbacks = &callbacks;
+            return &request;
+          }));
+
+  DynamicModuleConfigFactory factory;
+
+  auto cb_or_error = factory.createFilterFactoryFromProto(nack_proto, "stats", context_);
+  EXPECT_FALSE(cb_or_error.ok());
+
+  EXPECT_CALL(init_watcher_, ready());
+  context_.initManager().initialize(init_watcher_);
+
+  // Second: warming mode (nack_on_module_cache_miss defaults to false) sees in-progress fetch.
+  const std::string warming_yaml = absl::StrCat(R"EOF(
+  dynamic_module_config:
+    module:
+      remote:
+        http_uri:
+          uri: https://example.com/module.so
+          cluster: cluster_1
+          timeout: 5s
+        sha256: )EOF",
+                                                sha256, R"EOF(
+    do_not_close: true
+  filter_name: "test_filter"
+  )EOF");
+
+  envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilter warming_proto;
+  TestUtility::loadFromYaml(warming_yaml, warming_proto);
+
+  Init::ManagerImpl init_manager2{"init_manager2"};
+  Init::ExpectableWatcherImpl init_watcher2;
+  EXPECT_CALL(context_, initManager()).WillRepeatedly(ReturnRef(init_manager2));
+
+  cb_or_error = factory.createFilterFactoryFromProto(warming_proto, "stats", context_);
+  EXPECT_FALSE(cb_or_error.ok());
+  EXPECT_EQ(cb_or_error.status().message(), "Module fetch in progress");
+
+  EXPECT_CALL(init_watcher2, ready());
+  init_manager2.initialize(init_watcher2);
+
+  // Complete the background fetch to clean up.
+  ASSERT_NE(async_callbacks, nullptr);
+  Http::ResponseMessagePtr response(new Http::ResponseMessageImpl(
+      Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
+  response->body().add(module_bytes);
+  async_callbacks->onSuccess(request, std::move(response));
+
+  dispatcher_.clearDeferredDeleteList();
+}
+
 TEST_F(DynamicModuleFilterConfigTest, RouteSpecificConfigPerRouteConfigFail) {
   // Set up the search path to find the test module.
   TestEnvironment::setEnvVar(
@@ -680,8 +845,8 @@ TEST_F(DynamicModuleFilterConfigTest, RouteSpecificConfigPerRouteConfigFail) {
 
   DynamicModuleConfigFactory factory;
   NiceMock<ProtobufMessage::MockValidationVisitor> visitor;
-  auto config_or_error =
-      factory.createRouteSpecificFilterConfig(proto_config, context_.server_factory_context_, visitor);
+  auto config_or_error = factory.createRouteSpecificFilterConfig(
+      proto_config, context_.server_factory_context_, visitor);
   EXPECT_FALSE(config_or_error.ok());
   EXPECT_THAT(config_or_error.status().message(),
               testing::HasSubstr("Failed to create pre-route filter config"));
@@ -702,8 +867,8 @@ TEST_F(DynamicModuleFilterConfigTest, RouteSpecificConfigInvalidModule) {
 
   DynamicModuleConfigFactory factory;
   NiceMock<ProtobufMessage::MockValidationVisitor> visitor;
-  auto config_or_error =
-      factory.createRouteSpecificFilterConfig(proto_config, context_.server_factory_context_, visitor);
+  auto config_or_error = factory.createRouteSpecificFilterConfig(
+      proto_config, context_.server_factory_context_, visitor);
   EXPECT_FALSE(config_or_error.ok());
   EXPECT_THAT(config_or_error.status().message(),
               testing::HasSubstr("Failed to load dynamic module"));
