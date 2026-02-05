@@ -212,6 +212,50 @@ TEST_F(TransportSocketOptionsImplTest, Http11ProxyInfoFromWellKnownKey) {
             transport_socket_options->http11ProxyInfo()->proxy_address->asStringView());
 }
 
+TEST_F(TransportSocketOptionsImplTest, Http11ProxyInfoIpv6ProxyAddressBracketed) {
+  setFilterStateObject(Http11ProxyInfoFilterState::key(), "www.example.com:443,[::1]:15002");
+
+  auto transport_socket_options = TransportSocketOptionsUtility::fromFilterState(filter_state_);
+  ASSERT_NE(nullptr, transport_socket_options);
+  ASSERT_TRUE(transport_socket_options->http11ProxyInfo().has_value());
+  EXPECT_EQ("www.example.com:443", transport_socket_options->http11ProxyInfo()->hostname);
+  EXPECT_EQ(Address::IpVersion::v6,
+            transport_socket_options->http11ProxyInfo()->proxy_address->ip()->version());
+  EXPECT_EQ("::1", transport_socket_options->http11ProxyInfo()->proxy_address->ip()->addressAsString());
+  EXPECT_EQ(15002, transport_socket_options->http11ProxyInfo()->proxy_address->ip()->port());
+}
+
+TEST_F(TransportSocketOptionsImplTest, Http11ProxyInfoInvalidEncodingsAreRejected) {
+  // Add another valid option so that TransportSocketOptions are still created even if proxy-info is
+  // rejected.
+  setFilterStateObject(UpstreamServerName::key(), "www.example.com");
+
+  auto* factory =
+      Registry::FactoryRegistry<StreamInfo::FilterState::ObjectFactory>::getFactory(
+          Http11ProxyInfoFilterState::key());
+  ASSERT_NE(nullptr, factory);
+
+  auto expectRejected = [&](absl::string_view bytes) {
+    SCOPED_TRACE(std::string(bytes));
+    EXPECT_EQ(nullptr, factory->createFromBytes(bytes));
+  };
+
+  // - Invalid format (no comma, empty parts)
+  expectRejected("example.com:443");
+  expectRejected(",127.0.0.1:15002");
+  expectRejected("example.com:443,");
+
+  // - Invalid proxy address
+  expectRejected("example.com:443,not-an-ip");
+
+  // - IPv6 proxy address format: requires bracket notation
+  expectRejected("example.com:443,::1:15002");
+
+  auto transport_socket_options = TransportSocketOptionsUtility::fromFilterState(filter_state_);
+  ASSERT_NE(nullptr, transport_socket_options);
+  EXPECT_FALSE(transport_socket_options->http11ProxyInfo().has_value());
+}
+
 } // namespace
 } // namespace Network
 } // namespace Envoy
