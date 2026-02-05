@@ -42,7 +42,10 @@ public:
   Object* getDataMutableGeneric(absl::string_view data_name) override;
   std::shared_ptr<Object> getDataSharedMutableGeneric(absl::string_view data_name) override;
   bool hasDataAtOrAboveLifeSpan(FilterState::LifeSpan life_span) const override;
-  FilterState::ObjectsPtr objectsSharedWithUpstreamConnection() const override;
+  void forEach(absl::AnyInvocable<void(absl::string_view, const FilterObject&)> cb) override;
+  bool empty() const override;
+  FilterStateObjectsSharedPtr objectsSharedWithUpstreamConnection() override;
+  void mergeFrom(FilterStateObjects& input, FilterState::LifeSpan life_span) override;
 
   FilterState::LifeSpan lifeSpan() const override { return life_span_; }
   FilterStateSharedPtr parent() const override { return parent_; }
@@ -54,7 +57,7 @@ private:
 
   FilterStateSharedPtr parent_;
   const FilterState::LifeSpan life_span_;
-  absl::flat_hash_map<std::string, std::unique_ptr<FilterObject>> data_storage_;
+  absl::flat_hash_map<std::string, FilterObject> data_storage_;
 };
 
 } // namespace StreamInfo

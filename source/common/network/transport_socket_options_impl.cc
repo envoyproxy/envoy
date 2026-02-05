@@ -44,17 +44,22 @@ void CommonUpstreamTransportSocketFactory::hashKey(
     pushScalarToByteVector(StringUtil::CaseInsensitiveHash()(protocol), key);
   }
 
-  for (const auto& object : options->downstreamSharedFilterStateObjects()) {
-    if (auto hashable = dynamic_cast<const Hashable*>(object.data_.get()); hashable != nullptr) {
-      if (auto hash = hashable->hash(); hash) {
-        pushScalarToByteVector(hash.value(), key);
+  if (const StreamInfo::FilterStateObjectsSharedPtr& objects =
+          options->downstreamSharedFilterStateObjects();
+      objects) {
+    objects->forEach([&](absl::string_view,
+                         const StreamInfo::FilterStateObjects::FilterObject& object) {
+      if (auto hashable = dynamic_cast<const Hashable*>(object.data_.get()); hashable != nullptr) {
+        if (auto hash = hashable->hash(); hash) {
+          pushScalarToByteVector(hash.value(), key);
+        }
       }
-    }
+    });
   }
 }
 
 TransportSocketOptionsConstSharedPtr
-TransportSocketOptionsUtility::fromFilterState(const StreamInfo::FilterState& filter_state) {
+TransportSocketOptionsUtility::fromFilterState(StreamInfo::FilterState& filter_state) {
   absl::string_view server_name;
   std::vector<std::string> application_protocols;
   std::vector<std::string> subject_alt_names;
@@ -98,8 +103,9 @@ TransportSocketOptionsUtility::fromFilterState(const StreamInfo::FilterState& fi
     needs_transport_socket_options = true;
   }
 
-  StreamInfo::FilterState::ObjectsPtr objects = filter_state.objectsSharedWithUpstreamConnection();
-  if (!objects->empty()) {
+  StreamInfo::FilterStateObjectsSharedPtr objects =
+      filter_state.objectsSharedWithUpstreamConnection();
+  if (objects && !objects->empty()) {
     needs_transport_socket_options = true;
   }
 

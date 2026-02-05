@@ -1076,11 +1076,12 @@ ClientConnectionImpl::ClientConnectionImpl(
   stream_info_.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
 
   if (transport_options) {
-    for (const auto& object : transport_options->downstreamSharedFilterStateObjects()) {
+    if (const StreamInfo::FilterStateObjectsSharedPtr& objects =
+            transport_options->downstreamSharedFilterStateObjects();
+        objects) {
       // This does not throw as all objects are distinctly named and the stream info is empty.
-      stream_info_.filterState()->setData(object.name_, object.data_, object.state_type_,
-                                          StreamInfo::FilterState::LifeSpan::Connection,
-                                          object.stream_sharing_);
+      stream_info_.filterState()->mergeFrom(*objects,
+                                            StreamInfo::FilterState::LifeSpan::Connection);
     }
   }
 

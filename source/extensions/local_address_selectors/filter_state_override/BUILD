@@ -14,6 +14,7 @@ envoy_cc_extension(
     hdrs = ["config.h"],
     deps = [
         "//envoy/registry",
+        "//envoy/router:string_accessor_interface",
         "//envoy/upstream:upstream_interface",
         "//source/common/upstream:default_local_address_selector_factory",
         "@abseil-cpp//absl/types:optional",

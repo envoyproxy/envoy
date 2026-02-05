@@ -250,7 +250,7 @@ TEST_F(ConfigTest, SetValueUpstreamSharedOnce) {
   const auto* foo = info_.filterState()->getDataReadOnly<Router::StringAccessor>("foo");
   ASSERT_NE(nullptr, foo);
   EXPECT_EQ(foo->serializeAsString(), "XXX");
-  const auto objects = info_.filterState()->objectsSharedWithUpstreamConnection();
+  info_.filterState()->objectsSharedWithUpstreamConnection().forEach(
   EXPECT_EQ(1, objects->size());
   EXPECT_EQ(StreamSharing::None, objects->at(0).stream_sharing_);
   EXPECT_EQ(StateType::Mutable, objects->at(0).state_type_);

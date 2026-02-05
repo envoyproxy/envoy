@@ -24,13 +24,13 @@ struct TransportSocketMatchingData {
 
   TransportSocketMatchingData(const envoy::config::core::v3::Metadata* endpoint_metadata,
                               const envoy::config::core::v3::Metadata* locality_metadata,
-                              const StreamInfo::FilterState* filter_state = nullptr)
+                              const StreamInfo::FilterStateObjects* filter_state = nullptr)
       : endpoint_metadata_(endpoint_metadata), locality_metadata_(locality_metadata),
         filter_state_(filter_state) {}
 
   const envoy::config::core::v3::Metadata* endpoint_metadata_;
   const envoy::config::core::v3::Metadata* locality_metadata_;
-  const StreamInfo::FilterState* filter_state_;
+  const StreamInfo::FilterStateObjects* filter_state_;
 };
 
 } // namespace Upstream
