@@ -221,7 +221,8 @@ TEST_F(TransportSocketOptionsImplTest, Http11ProxyInfoIpv6ProxyAddressBracketed)
   EXPECT_EQ("www.example.com:443", transport_socket_options->http11ProxyInfo()->hostname);
   EXPECT_EQ(Address::IpVersion::v6,
             transport_socket_options->http11ProxyInfo()->proxy_address->ip()->version());
-  EXPECT_EQ("::1", transport_socket_options->http11ProxyInfo()->proxy_address->ip()->addressAsString());
+  EXPECT_EQ("::1",
+            transport_socket_options->http11ProxyInfo()->proxy_address->ip()->addressAsString());
   EXPECT_EQ(15002, transport_socket_options->http11ProxyInfo()->proxy_address->ip()->port());
 }
 
@@ -230,9 +231,8 @@ TEST_F(TransportSocketOptionsImplTest, Http11ProxyInfoInvalidEncodingsAreRejecte
   // rejected.
   setFilterStateObject(UpstreamServerName::key(), "www.example.com");
 
-  auto* factory =
-      Registry::FactoryRegistry<StreamInfo::FilterState::ObjectFactory>::getFactory(
-          Http11ProxyInfoFilterState::key());
+  auto* factory = Registry::FactoryRegistry<StreamInfo::FilterState::ObjectFactory>::getFactory(
+      Http11ProxyInfoFilterState::key());
   ASSERT_NE(nullptr, factory);
 
   auto expectRejected = [&](absl::string_view bytes) {
