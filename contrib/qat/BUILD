@@ -34,16 +34,16 @@ configure_make(
     env = {
         "LDFLAGS": "-L$$EXT_BUILD_ROOT/$(BINDIR)/bazel/external/lib",
     },
-    lib_source = "@com_github_intel_qatlib//:all",
+    lib_source = "@qatlib//:all",
     out_static_libs = [
         "libqat.a",
         "libusdm.a",
     ],
     target_compatible_with = envoy_contrib_linux_x86_64_constraints(),
     visibility = ["//visibility:public"],
-    # Use boringssl alias to select fips vs non-fips version.
+    # Use crypto label_flag to select the SSL library.
     deps = [
-        "//bazel:boringcrypto",
+        "//bazel:crypto",
         "@numactl//:numa",
     ],
     alwayslink = True,

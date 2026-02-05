@@ -1130,6 +1130,11 @@ func envoy_dynamic_module_on_http_filter_config_new(
 func envoy_dynamic_module_on_http_filter_config_destroy(
 	configPtr C.envoy_dynamic_module_type_http_filter_config_module_ptr,
 ) {
+	factoryWrapper := configManager.unwrap(unsafe.Pointer(configPtr))
+	if factoryWrapper == nil {
+		return
+	}
+	factoryWrapper.pluginFactory.OnDestroy()
 	configManager.remove(unsafe.Pointer(configPtr))
 }
 

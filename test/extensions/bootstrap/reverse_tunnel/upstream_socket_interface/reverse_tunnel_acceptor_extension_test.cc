@@ -16,6 +16,7 @@
 #include "test/test_common/logging.h"
 #include "test/test_common/registry.h"
 
+#include "fmt/format.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -197,37 +198,70 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, UpdateConnectionStatsWithDetailedStat
   auto no_stats_extension = std::make_unique<ReverseTunnelAcceptorExtension>(
       *socket_interface_, context_, no_stats_config);
 
-  // Update connection stats - should not create any stats.
+  // Call onServerInitialized to set up the extension reference properly.
+  no_stats_extension->onServerInitialized();
+
+  // Set up thread local slot so aggregate metrics can be initialized.
+  auto no_stats_registry =
+      std::make_shared<UpstreamSocketThreadLocal>(dispatcher_, no_stats_extension.get());
+  auto no_stats_tls_slot =
+      ThreadLocal::TypedSlot<UpstreamSocketThreadLocal>::makeUnique(thread_local_);
+  thread_local_.setDispatcher(&dispatcher_);
+  no_stats_tls_slot->set([registry = no_stats_registry](Event::Dispatcher&) { return registry; });
+  no_stats_extension->setTestOnlyTLSRegistry(std::move(no_stats_tls_slot));
+
+  // Update connection stats - should not create detailed stats, but aggregate metrics should work.
   no_stats_extension->updateConnectionStats("node1", "cluster1", true);
   no_stats_extension->updateConnectionStats("node2", "cluster2", true);
   no_stats_extension->updateConnectionStats("node3", "cluster3", true);
 
-  // Verify no stats were created by checking cross-worker stat map.
+  // Verify no detailed stats were created by checking cross-worker stat map.
   auto cross_worker_stat_map = no_stats_extension->getCrossWorkerStatMap();
   EXPECT_TRUE(cross_worker_stat_map.empty());
 
-  // Verify no per-worker stats were created by checking per-worker stat map.
+  // Verify no detailed per-worker stats were created by checking per-worker stat map.
   auto per_worker_stat_map = no_stats_extension->getPerWorkerStatMap();
   EXPECT_TRUE(per_worker_stat_map.empty());
 
-  // Verify that the stats store doesn't have any gauges with our stat prefix
-  // (except potentially the aggregate that we removed).
+  // Verify that aggregate metrics are present even when detailed stats are disabled.
   auto& stats_store = no_stats_extension->getStatsScope();
-  bool found_detailed_stats = false;
+  uint64_t total_clusters_value = 0;
+  uint64_t total_nodes_value = 0;
   Stats::IterateFn<Stats::Gauge> gauge_callback =
+      [&total_clusters_value,
+       &total_nodes_value](const Stats::RefcountPtr<Stats::Gauge>& gauge) -> bool {
+    const std::string& gauge_name = gauge->name();
+    if (gauge_name.find(".total_clusters") != std::string::npos && gauge->used()) {
+      total_clusters_value = gauge->value();
+    }
+    if (gauge_name.find(".total_nodes") != std::string::npos && gauge->used()) {
+      total_nodes_value = gauge->value();
+    }
+    return true;
+  };
+  stats_store.iterate(gauge_callback);
+  EXPECT_EQ(total_clusters_value, 3); // 3 unique clusters
+  EXPECT_EQ(total_nodes_value, 3);    // 3 unique nodes
+
+  // Verify that the stats store doesn't have any detailed stats gauges.
+  bool found_detailed_stats = false;
+  Stats::IterateFn<Stats::Gauge> detailed_stats_callback =
       [&found_detailed_stats](const Stats::RefcountPtr<Stats::Gauge>& gauge) -> bool {
     const std::string& gauge_name = gauge->name();
-    // Check if any detailed stats were created (nodes. or clusters. or worker_).
+    // Check if any detailed stats were created (nodes. or clusters. or worker_.node. or
+    // worker_.cluster.).
     if ((gauge_name.find(".nodes.") != std::string::npos ||
          gauge_name.find(".clusters.") != std::string::npos ||
-         gauge_name.find(".worker_") != std::string::npos) &&
+         (gauge_name.find(".worker_") != std::string::npos &&
+          (gauge_name.find(".node.") != std::string::npos ||
+           gauge_name.find(".cluster.") != std::string::npos))) &&
         gauge->used()) {
       found_detailed_stats = true;
       return false; // Stop iteration
     }
     return true;
   };
-  stats_store.iterate(gauge_callback);
+  stats_store.iterate(detailed_stats_callback);
   EXPECT_FALSE(found_detailed_stats);
 }
 
@@ -580,6 +614,133 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, ValidateDisconnectionReporting) {
   extension_ =
       std::make_unique<ReverseTunnelAcceptorExtension>(*socket_interface_, context_, config);
   extension_->reportDisconnection(node_id, cluster_id);
+}
+
+// Helper function to get aggregate metric values from stats store.
+std::pair<uint64_t, uint64_t> getAggregateMetrics(Stats::Scope& stats_store,
+                                                  const std::string& stat_prefix,
+                                                  const std::string& dispatcher_name) {
+  uint64_t total_clusters_value = 0;
+  uint64_t total_nodes_value = 0;
+  std::string expected_clusters_stat =
+      fmt::format("{}.{}.total_clusters", stat_prefix, dispatcher_name);
+  std::string expected_nodes_stat = fmt::format("{}.{}.total_nodes", stat_prefix, dispatcher_name);
+
+  Stats::IterateFn<Stats::Gauge> gauge_callback =
+      [&total_clusters_value, &total_nodes_value, &expected_clusters_stat,
+       &expected_nodes_stat](const Stats::RefcountPtr<Stats::Gauge>& gauge) -> bool {
+    const std::string& gauge_name = gauge->name();
+    if (gauge_name == expected_clusters_stat && gauge->used()) {
+      total_clusters_value = gauge->value();
+    }
+    if (gauge_name == expected_nodes_stat && gauge->used()) {
+      total_nodes_value = gauge->value();
+    }
+    return true;
+  };
+  stats_store.iterate(gauge_callback);
+  return {total_clusters_value, total_nodes_value};
+}
+
+TEST_F(ReverseTunnelAcceptorExtensionTest, AggregateMetricsBasicIncrement) {
+  setupThreadLocalSlot();
+
+  // Initially, aggregate metrics should be 0.
+  auto& stats_store = extension_->getStatsScope();
+  auto [total_clusters, total_nodes] =
+      getAggregateMetrics(stats_store, "test_scope.reverse_connections", "worker_0");
+  EXPECT_EQ(total_clusters, 0);
+  EXPECT_EQ(total_nodes, 0);
+
+  // Add connections to different clusters/nodes.
+  extension_->updateConnectionStats("node1", "cluster1", true);
+  std::tie(total_clusters, total_nodes) =
+      getAggregateMetrics(stats_store, "test_scope.reverse_connections", "worker_0");
+  EXPECT_EQ(total_clusters, 1);
+  EXPECT_EQ(total_nodes, 1);
+
+  extension_->updateConnectionStats("node2", "cluster2", true);
+  std::tie(total_clusters, total_nodes) =
+      getAggregateMetrics(stats_store, "test_scope.reverse_connections", "worker_0");
+  EXPECT_EQ(total_clusters, 2);
+  EXPECT_EQ(total_nodes, 2);
+
+  extension_->updateConnectionStats("node3", "cluster3", true);
+  std::tie(total_clusters, total_nodes) =
+      getAggregateMetrics(stats_store, "test_scope.reverse_connections", "worker_0");
+  EXPECT_EQ(total_clusters, 3);
+  EXPECT_EQ(total_nodes, 3);
+}
+
+TEST_F(ReverseTunnelAcceptorExtensionTest, AggregateMetricsUniqueCounting) {
+  setupThreadLocalSlot();
+
+  auto& stats_store = extension_->getStatsScope();
+
+  // Add multiple connections to the same cluster/node - should still count as 1 unique.
+  extension_->updateConnectionStats("node1", "cluster1", true);
+  extension_->updateConnectionStats("node1", "cluster1", true);
+  extension_->updateConnectionStats("node1", "cluster1", true);
+
+  auto [total_clusters, total_nodes] =
+      getAggregateMetrics(stats_store, "test_scope.reverse_connections", "worker_0");
+  EXPECT_EQ(total_clusters, 1); // Only 1 unique cluster
+  EXPECT_EQ(total_nodes, 1);    // Only 1 unique node
+
+  // Add connections to different clusters/nodes.
+  extension_->updateConnectionStats("node2", "cluster2", true);
+  extension_->updateConnectionStats("node3", "cluster1", true); // Same cluster, different node
+
+  std::tie(total_clusters, total_nodes) =
+      getAggregateMetrics(stats_store, "test_scope.reverse_connections", "worker_0");
+  EXPECT_EQ(total_clusters, 2); // cluster1 and cluster2
+  EXPECT_EQ(total_nodes, 3);    // node1, node2, node3
+}
+
+TEST_F(ReverseTunnelAcceptorExtensionTest, AggregateMetricsDecrement) {
+  setupThreadLocalSlot();
+
+  auto& stats_store = extension_->getStatsScope();
+
+  // Add connections.
+  extension_->updateConnectionStats("node1", "cluster1", true);
+  extension_->updateConnectionStats("node1", "cluster1",
+                                    true); // 2 connections to same cluster/node
+  extension_->updateConnectionStats("node2", "cluster2", true);
+  extension_->updateConnectionStats("node3", "cluster3", true);
+
+  auto [total_clusters, total_nodes] =
+      getAggregateMetrics(stats_store, "test_scope.reverse_connections", "worker_0");
+  EXPECT_EQ(total_clusters, 3);
+  EXPECT_EQ(total_nodes, 3);
+
+  // Decrement one connection from node1/cluster1 - should still be present (count > 0).
+  extension_->updateConnectionStats("node1", "cluster1", false);
+  std::tie(total_clusters, total_nodes) =
+      getAggregateMetrics(stats_store, "test_scope.reverse_connections", "worker_0");
+  EXPECT_EQ(total_clusters, 3); // Still 3 unique clusters
+  EXPECT_EQ(total_nodes, 3);    // Still 3 unique nodes
+
+  // Decrement the last connection from node1/cluster1 - should be removed.
+  extension_->updateConnectionStats("node1", "cluster1", false);
+  std::tie(total_clusters, total_nodes) =
+      getAggregateMetrics(stats_store, "test_scope.reverse_connections", "worker_0");
+  EXPECT_EQ(total_clusters, 2); // cluster1 removed
+  EXPECT_EQ(total_nodes, 2);    // node1 removed
+
+  // Decrement node2/cluster2 - should be removed.
+  extension_->updateConnectionStats("node2", "cluster2", false);
+  std::tie(total_clusters, total_nodes) =
+      getAggregateMetrics(stats_store, "test_scope.reverse_connections", "worker_0");
+  EXPECT_EQ(total_clusters, 1); // Only cluster3 remains
+  EXPECT_EQ(total_nodes, 1);    // Only node3 remains
+
+  // Decrement node3/cluster3 - should be removed, back to 0.
+  extension_->updateConnectionStats("node3", "cluster3", false);
+  std::tie(total_clusters, total_nodes) =
+      getAggregateMetrics(stats_store, "test_scope.reverse_connections", "worker_0");
+  EXPECT_EQ(total_clusters, 0);
+  EXPECT_EQ(total_nodes, 0);
 }
 
 } // namespace ReverseConnection

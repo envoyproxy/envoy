@@ -15,10 +15,10 @@ envoy_cc_library(
     hdrs = ["session_codec.h"],
     deps = [
         "//source/common/common:base64_lib",
-        "@com_google_absl//absl/container:flat_hash_map",
-        "@com_google_absl//absl/status",
-        "@com_google_absl//absl/status:statusor",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
     ],
 )
 
@@ -29,7 +29,7 @@ envoy_cc_library(
     deps = [
         "//envoy/server:filter_config_interface",
         "//source/extensions/filters/common/mcp:filter_state_lib",
-        "@com_google_absl//absl/types:variant",
+        "@abseil-cpp//absl/types:variant",
         "@envoy_api//envoy/extensions/filters/http/mcp_router/v3:pkg_cc_proto",
     ],
 )
@@ -55,10 +55,10 @@ envoy_cc_library(
         "//source/common/json:json_loader_lib",
         "//source/common/json:json_streamer_lib",
         "//source/common/protobuf:utility_lib",
-        "@com_google_absl//absl/container:flat_hash_map",
-        "@com_google_absl//absl/status",
-        "@com_google_absl//absl/status:statusor",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
     ],
 )
 

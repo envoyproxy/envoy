@@ -16,6 +16,7 @@ Extensions
   common/common
   compression/compression
   config_validators/config_validators
+  content_parsers/content_parsers
   contrib/contrib
   dns_resolver/dns_resolver
   endpoint/endpoint
