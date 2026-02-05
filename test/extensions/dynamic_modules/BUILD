@@ -71,10 +71,10 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "code_cache_test",
-    srcs = ["code_cache_test.cc"],
+    name = "module_cache_test",
+    srcs = ["module_cache_test.cc"],
     deps = [
-        "//source/extensions/dynamic_modules:code_cache_lib",
+        "//source/extensions/dynamic_modules:module_cache_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
     ],

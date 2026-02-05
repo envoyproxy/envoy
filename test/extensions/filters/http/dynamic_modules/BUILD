@@ -21,7 +21,7 @@ envoy_cc_test(
         "//source/common/crypto:utility_lib",
         "//source/common/http:message_lib",
         "//source/common/stats:isolated_store_lib",
-        "//source/extensions/dynamic_modules:code_cache_lib",
+        "//source/extensions/dynamic_modules:module_cache_lib",
         "//source/extensions/filters/http/dynamic_modules:factory_lib",
         "//test/extensions/dynamic_modules:util",
         "//test/mocks/http:http_mocks",

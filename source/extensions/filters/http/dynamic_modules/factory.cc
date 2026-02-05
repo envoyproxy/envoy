@@ -1,11 +1,8 @@
 #include "source/extensions/filters/http/dynamic_modules/factory.h"
 
-#include "source/common/buffer/buffer_impl.h"
-#include "source/common/common/hex.h"
 #include "source/common/config/datasource.h"
-#include "source/common/crypto/utility.h"
 #include "source/common/runtime/runtime_features.h"
-#include "source/extensions/dynamic_modules/code_cache.h"
+#include "source/extensions/dynamic_modules/module_cache.h"
 #include "source/extensions/filters/http/dynamic_modules/filter.h"
 #include "source/extensions/filters/http/dynamic_modules/filter_config.h"
 
@@ -15,7 +12,6 @@ namespace Configuration {
 
 namespace {
 
-// Helper function to load a module from bytes and create the filter config.
 absl::StatusOr<
     Envoy::Extensions::DynamicModules::HttpFilters::DynamicModuleHttpFilterConfigSharedPtr>
 createFilterConfigFromBytes(absl::string_view module_bytes, absl::string_view sha256_hash,
@@ -50,7 +46,6 @@ createFilterConfigFromBytes(absl::string_view module_bytes, absl::string_view sh
       std::move(dynamic_module.value()), scope, context);
 }
 
-// Helper to create the filter factory callback from a filter config.
 Http::FilterFactoryCb createFilterFactoryCallback(
     Envoy::Extensions::DynamicModules::HttpFilters::DynamicModuleHttpFilterConfigSharedPtr
         filter_config) {
@@ -79,7 +74,6 @@ absl::StatusOr<Http::FilterFactoryCb> DynamicModuleConfigFactory::createFilterFa
 
   const auto& module_config = proto_config.dynamic_module_config();
 
-  // Check if the new 'module' field is set.
   if (module_config.has_module()) {
     return createFilterFactoryFromAsyncDataSource(proto_config, context, scope, init_manager);
   }
@@ -133,6 +127,10 @@ absl::StatusOr<Http::FilterFactoryCb> DynamicModuleConfigFactory::createFilterFa
   return createFilterFactoryCallback(filter_config.value());
 }
 
+// Handles the AsyncDataSource-based module loading path (local files, inline bytes, and remote
+// HTTP). For remote sources, modules are cached by SHA256 hash with two fetch modes:
+//   - NACK mode: reject the config immediately, fetch in the background, succeed on retry.
+//   - Warming mode: block server init until the fetch completes (or fails).
 absl::StatusOr<Http::FilterFactoryCb>
 DynamicModuleConfigFactory::createFilterFactoryFromAsyncDataSource(
     const FilterConfig& proto_config, Server::Configuration::ServerFactoryContext& context,
@@ -141,14 +139,12 @@ DynamicModuleConfigFactory::createFilterFactoryFromAsyncDataSource(
   const auto& module_config = proto_config.dynamic_module_config();
   const auto& async_source = module_config.module();
 
-  // Use configured metrics namespace or fall back to the default.
   const std::string metrics_namespace =
       module_config.metrics_namespace().empty()
           ? std::string(Extensions::DynamicModules::HttpFilters::DefaultMetricsNamespace)
           : module_config.metrics_namespace();
 
   if (async_source.has_local()) {
-    // Synchronous path: local file or inline bytes.
     auto data_or_error = Config::DataSource::read(async_source.local(), true, context.api());
     if (!data_or_error.ok()) {
       return absl::InvalidArgumentError("Failed to read module data: " +
@@ -160,7 +156,6 @@ DynamicModuleConfigFactory::createFilterFactoryFromAsyncDataSource(
       return absl::InvalidArgumentError("Module data is empty");
     }
 
-    // Compute SHA256 for the local data (no verification needed, just for temp file naming).
     auto filter_config =
         createFilterConfigFromBytes(module_bytes, "", proto_config, context, scope);
     if (!filter_config.ok()) {
@@ -172,7 +167,6 @@ DynamicModuleConfigFactory::createFilterFactoryFromAsyncDataSource(
   }
 
   if (async_source.has_remote()) {
-    // Asynchronous path: remote HTTP fetch.
     const auto& remote_source = async_source.remote();
     const std::string& sha256_hash = remote_source.sha256();
 
@@ -180,15 +174,13 @@ DynamicModuleConfigFactory::createFilterFactoryFromAsyncDataSource(
       return absl::InvalidArgumentError("SHA256 hash is required for remote module sources");
     }
 
-    // Check the code cache first.
-    auto& code_cache = Extensions::DynamicModules::getCodeCache();
+    auto& module_cache = Extensions::DynamicModules::getModuleCache();
     auto now = context.mainThreadDispatcher().timeSource().monotonicTime();
-    auto cache_result = code_cache.lookup(sha256_hash, now);
+    auto cache_result = module_cache.lookup(sha256_hash, now);
 
-    if (cache_result.cache_hit && !cache_result.code.empty()) {
-      // Cache hit with valid code - load synchronously.
-      auto filter_config =
-          createFilterConfigFromBytes(cache_result.code, sha256_hash, proto_config, context, scope);
+    if (cache_result.cache_hit && !cache_result.module.empty()) {
+      auto filter_config = createFilterConfigFromBytes(cache_result.module, sha256_hash,
+                                                       proto_config, context, scope);
       if (!filter_config.ok()) {
         return filter_config.status();
       }
@@ -197,31 +189,31 @@ DynamicModuleConfigFactory::createFilterFactoryFromAsyncDataSource(
       return createFilterFactoryCallback(filter_config.value());
     }
 
-    if (cache_result.cache_hit && cache_result.code.empty()) {
-      // Negative cache hit (recent fetch failure).
+    if (cache_result.fetch_in_progress) {
+      if (module_config.nack_on_module_cache_miss()) {
+        return absl::UnavailableError("Module fetch in progress, NACK'ing configuration");
+      }
+      // TODO(kanurag94): support waiting on in-progress fetches in warming mode.
+      return absl::UnavailableError("Module fetch in progress");
+    }
+
+    if (cache_result.cache_hit && cache_result.module.empty()) {
+      // Negative cache hit -- a recent fetch failed. In NACK mode, reject immediately.
+      // In warming mode, fall through to re-fetch (the negative TTL will have expired
+      // by the time we get a new config push anyway).
       if (module_config.nack_on_module_cache_miss()) {
         return absl::UnavailableError(
             "Module fetch recently failed (negative cache hit), NACK'ing configuration");
       }
-      // For warming mode with negative cache, we still need to try fetching again.
     }
 
-    if (cache_result.fetch_in_progress) {
-      // Another fetch is already in progress.
-      if (module_config.nack_on_module_cache_miss()) {
-        return absl::UnavailableError("Module fetch in progress, NACK'ing configuration");
-      }
-      // For warming mode, we'd need to wait - but this is complex to implement.
-      // For now, treat as unavailable.
-      return absl::UnavailableError("Module fetch in progress");
-    }
-
-    // Need to fetch the module.
+    // NACK mode: kick off a background fetch, then NACK this config update. The control
+    // plane will re-push the config, and the next attempt will find the module in cache.
     if (module_config.nack_on_module_cache_miss()) {
-      // NACK mode: Start background fetch and reject this config.
-      code_cache.markInProgress(sha256_hash, now);
+      module_cache.markInProgress(sha256_hash, now);
 
-      // Create a holder structure that keeps both adapter and fetcher alive together.
+      // FetchHolder bundles the adapter + fetcher so they share the same DeferredDeletable
+      // lifetime, preventing use-after-free on the callback.
       struct FetchHolder : public Event::DeferredDeletable {
         Extensions::DynamicModules::RemoteDataFetcherAdapter adapter;
         std::unique_ptr<Config::DataFetcher::RemoteDataFetcher> fetcher;
@@ -231,112 +223,72 @@ DynamicModuleConfigFactory::createFilterFactoryFromAsyncDataSource(
       };
 
       auto holder = std::make_unique<FetchHolder>([sha256_hash, &context](const std::string& data) {
-        auto& cache = Extensions::DynamicModules::getCodeCache();
+        auto& cache = Extensions::DynamicModules::getModuleCache();
         auto fetch_time = context.mainThreadDispatcher().timeSource().monotonicTime();
-
-        if (!data.empty()) {
-          // Verify SHA256.
-          Buffer::OwnedImpl buffer(data);
-          auto& crypto_util = Common::Crypto::UtilitySingleton::get();
-          const std::string computed_hash = Hex::encode(crypto_util.getSha256Digest(buffer));
-          if (computed_hash == sha256_hash) {
-            cache.update(sha256_hash, data, fetch_time);
-            return;
-          }
-          // Hash mismatch - treat as failure.
-          ENVOY_LOG_MISC(warn, "Dynamic module SHA256 mismatch: expected {}, got {}", sha256_hash,
-                         computed_hash);
-        }
-        // Fetch failed or hash mismatch - update with empty data for negative caching.
-        cache.update(sha256_hash, "", fetch_time);
+        // RemoteDataFetcher already verifies the SHA256 hash before calling onSuccess,
+        // so non-empty data here is guaranteed to be valid.
+        cache.update(sha256_hash, data, fetch_time);
       });
 
       holder->fetcher = std::make_unique<Config::DataFetcher::RemoteDataFetcher>(
           context.clusterManager(), remote_source.http_uri(), sha256_hash, holder->adapter);
       holder->fetcher->fetch();
 
-      // Defer deletion of the holder to ensure it lives until the callback is invoked.
       context.mainThreadDispatcher().deferredDelete(std::move(holder));
 
       return absl::UnavailableError(
           "Remote module not in cache, background fetch started, NACK'ing configuration");
     }
 
-    // Warming mode: Use init manager to block until fetch completes.
+    // Warming mode: block server init until the fetch completes. The init manager will
+    // not transition to Initialized until the RemoteAsyncDataProvider signals ready().
     if (init_manager == nullptr) {
       return absl::InvalidArgumentError(
           "Init manager required for warming mode with remote module sources");
     }
 
-    // Mark as in progress.
-    code_cache.markInProgress(sha256_hash, now);
+    module_cache.markInProgress(sha256_hash, now);
 
-    // Create a shared state to hold the fetched data, filter config, and keep the provider alive.
+    // AsyncLoadState is shared between the fetch callback (which populates filter_config)
+    // and the returned factory callback (which reads it). Also prevents the
+    // RemoteAsyncDataProvider from being destroyed before the fetch completes.
     struct AsyncLoadState {
-      std::string module_bytes;
       Extensions::DynamicModules::HttpFilters::DynamicModuleHttpFilterConfigSharedPtr filter_config;
       RemoteAsyncDataProviderPtr remote_provider;
-      bool fetch_completed{false};
-      bool fetch_success{false};
     };
     auto state = std::make_shared<AsyncLoadState>();
 
-    // Use RemoteAsyncDataProvider for the fetch.
-    // The callback will be invoked when the fetch completes.
+    // SHA256 verification is handled by the underlying RemoteDataFetcher.
+    // Capture a weak_ptr to break the reference cycle: state owns remote_provider,
+    // and remote_provider's callback would otherwise prevent state from being freed.
+    std::weak_ptr<AsyncLoadState> weak_state = state;
     state->remote_provider = std::make_unique<RemoteAsyncDataProvider>(
         context.clusterManager(), *init_manager, remote_source, context.mainThreadDispatcher(),
         context.api().randomGenerator(), false,
-        [state, sha256_hash, proto_config_copy = proto_config, &context, &scope,
+        [weak_state, sha256_hash, proto_config_copy = proto_config, &context, &scope,
          metrics_namespace](const std::string& data) {
-          auto& cache = Extensions::DynamicModules::getCodeCache();
+          auto& cache = Extensions::DynamicModules::getModuleCache();
           auto fetch_time = context.mainThreadDispatcher().timeSource().monotonicTime();
+          cache.update(sha256_hash, data, fetch_time);
 
-          state->fetch_completed = true;
-          if (!data.empty()) {
-            // Verify SHA256.
-            Buffer::OwnedImpl buffer(data);
-            auto& crypto_util = Common::Crypto::UtilitySingleton::get();
-            const std::string computed_hash = Hex::encode(crypto_util.getSha256Digest(buffer));
-            if (computed_hash == sha256_hash) {
-              state->module_bytes = data;
-              state->fetch_success = true;
-              cache.update(sha256_hash, data, fetch_time);
-
-              // Now create the filter config.
-              auto filter_config =
-                  createFilterConfigFromBytes(data, sha256_hash, proto_config_copy, context, scope);
-              if (filter_config.ok()) {
-                state->filter_config = filter_config.value();
-                context.api().customStatNamespaces().registerStatNamespace(metrics_namespace);
-              }
-              return;
-            }
-            ENVOY_LOG_MISC(warn, "Dynamic module SHA256 mismatch: expected {}, got {}", sha256_hash,
-                           computed_hash);
+          auto state = weak_state.lock();
+          if (!state || data.empty()) {
+            return;
           }
-          cache.update(sha256_hash, "", fetch_time);
+          auto filter_config =
+              createFilterConfigFromBytes(data, sha256_hash, proto_config_copy, context, scope);
+          if (filter_config.ok()) {
+            state->filter_config = filter_config.value();
+            context.api().customStatNamespaces().registerStatNamespace(metrics_namespace);
+          }
         });
 
-    // Return a factory callback that uses the async-loaded config.
+    // If the fetch failed, filter_config will be null and we silently skip (fail-open).
     return [state](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       if (!state->filter_config) {
-        // Module failed to load - skip adding filter (fail open behavior for warming mode).
         return;
       }
-
-      const std::string& worker_name = callbacks.dispatcher().name();
-      auto pos = worker_name.find_first_of('_');
-      ENVOY_BUG(pos != std::string::npos, "worker name is not in expected format worker_{index}");
-      uint32_t worker_index;
-      if (!absl::SimpleAtoi(worker_name.substr(pos + 1), &worker_index)) {
-        IS_ENVOY_BUG("failed to parse worker index from name");
-      }
-      auto filter =
-          std::make_shared<Envoy::Extensions::DynamicModules::HttpFilters::DynamicModuleHttpFilter>(
-              state->filter_config, state->filter_config->stats_scope_->symbolTable(),
-              worker_index);
-      filter->initializeInModuleFilter();
-      callbacks.addStreamFilter(filter);
+      createFilterFactoryCallback(state->filter_config)(callbacks);
     };
   }
 

@@ -88,20 +88,13 @@ absl::StatusOr<DynamicModulePtr> newDynamicModuleByName(const absl::string_view 
                                                         const bool load_globally = false);
 
 /**
- * Creates a new DynamicModule from in-memory bytes.
- *
- * Since dlopen requires a file path, the bytes are written to a temporary file before loading.
- * The temporary file is named using the SHA256 hash to enable deduplication across multiple
- * loads of the same module content.
- *
+ * Creates a new DynamicModule from in-memory bytes. The bytes are written to a SHA256-named
+ * temporary file (for deduplication) before loading via dlopen.
  * @param module_bytes the raw bytes of the dynamic module (.so file).
- * @param sha256_hash the expected SHA256 hash of the module bytes for verification.
- *                    If empty, no verification is performed (not recommended for remote sources).
- * @param do_not_close if true, the dlopen will be called with RTLD_NODELETE, so the loaded object
- *                     will not be destroyed.
- * @param load_globally if true, the dlopen will be called with RTLD_GLOBAL, so the loaded object
- *                      can share symbols with other dynamically loaded modules.
- * @return a DynamicModulePtr on success, or an error status if loading fails.
+ * @param sha256_hash the expected SHA256 hash for verification. If empty, hash is computed but
+ *                    not verified.
+ * @param do_not_close if true, uses RTLD_NODELETE.
+ * @param load_globally if true, uses RTLD_GLOBAL.
  */
 absl::StatusOr<DynamicModulePtr> newDynamicModuleFromBytes(absl::string_view module_bytes,
                                                            absl::string_view sha256_hash,

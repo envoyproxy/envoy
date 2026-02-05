@@ -2,7 +2,6 @@
 
 #include <dlfcn.h>
 
-#include <cstdio>
 #include <fstream>
 #include <string>
 
@@ -146,21 +145,16 @@ absl::StatusOr<DynamicModulePtr> newDynamicModuleFromBytes(absl::string_view mod
         absl::StrCat("SHA256 hash mismatch: expected ", sha256_hash, ", got ", computed_hash));
   }
 
-  // Use the hash (computed or verified) for the temp file name.
-  const std::string hash_for_filename =
-      sha256_hash.empty() ? computed_hash : std::string(sha256_hash);
-
-  // Construct the temp file path using the hash for deduplication.
-  // The path format is: /tmp/envoy_dynmod_<sha256>.so
+  // Use computed_hash for the temp file name (if sha256_hash was provided and matched,
+  // computed_hash == sha256_hash at this point).
   const std::filesystem::path temp_dir = std::filesystem::temp_directory_path();
   const std::filesystem::path temp_file_path =
-      temp_dir / fmt::format("envoy_dynmod_{}.so", hash_for_filename);
+      temp_dir / fmt::format("envoy_dynmod_{}.so", computed_hash);
 
-  // Check if the file already exists (deduplication).
   if (!std::filesystem::exists(temp_file_path)) {
-    // Write to a temporary file first, then atomically rename to avoid partial writes.
+    // Write to a pid-suffixed temp file first, then atomically rename to avoid partial reads.
     const std::filesystem::path temp_file_writing =
-        temp_dir / fmt::format("envoy_dynmod_{}.so.tmp.{}", hash_for_filename, getpid());
+        temp_dir / fmt::format("envoy_dynmod_{}.so.tmp.{}", computed_hash, getpid());
 
     // Write the module bytes to the temp file with secure permissions.
     std::ofstream ofs(temp_file_writing, std::ios::binary | std::ios::trunc);

@@ -1,7 +1,6 @@
 #pragma once
 
 #include <memory>
-#include <vector>
 
 #include "envoy/extensions/filters/http/dynamic_modules/v3/dynamic_modules.pb.h"
 #include "envoy/extensions/filters/http/dynamic_modules/v3/dynamic_modules.pb.validate.h"

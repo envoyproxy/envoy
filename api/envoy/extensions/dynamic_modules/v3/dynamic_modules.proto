@@ -86,45 +86,25 @@ message DynamicModuleConfig {
   // Defaults to ``dynamicmodulescustom``.
   string metrics_namespace = 5;
 
-  // The dynamic module binary to load.
+  // The dynamic module binary to load. Supports local file paths (via ``local.filename``),
+  // inline bytes (via ``local.inline_bytes``), or remote HTTP URLs (via ``remote``).
   //
-  // This field supports loading modules from:
-  //
-  // * Local file path (via ``local.filename``)
-  // * Inline bytes (via ``local.inline_bytes`` or ``local.inline_string``)
-  // * Remote HTTP URL (via ``remote``)
+  // For remote sources, the ``sha256`` field is required and is used both for integrity
+  // verification and as the cache key. Fetched modules are cached in-memory for 24 hours;
+  // failed fetches are negatively cached for 10 seconds to avoid retry storms.
   //
   // When both ``name`` and ``module`` are set, ``module`` takes precedence.
-  //
-  // Example configurations:
-  //
-  // Local file:
-  //
-  // .. code-block:: yaml
-  //
-  //    module:
-  //      local:
-  //        filename: "/path/to/libmy_module.so"
-  //
-  // Remote HTTP:
-  //
-  // .. code-block:: yaml
-  //
-  //    module:
-  //      remote:
-  //        http_uri:
-  //          uri: "https://modules.example.com/libmy_module.so"
-  //          cluster: module_server
-  //          timeout: 10s
-  //        sha256: "abc123..."
-  //
   config.core.v3.AsyncDataSource module = 6;
 
-  // If true and the module needs to be remotely fetched and it is not in the cache,
-  // then NACK the configuration update and do a background fetch to fill the cache.
-  // If false, fetch the module asynchronously and enter warming state.
+  // Controls how a cache miss for a remote module is handled.
   //
-  // This only applies when using remote data sources via the ``module`` field.
+  // When true (NACK mode), a cache miss causes an immediate NACK of the xDS config update.
+  // A background fetch is started and the module will be available on the next config push.
+  //
+  // When false (warming mode), the server blocks during initialization until the fetch
+  // completes or exhausts retries.
+  //
+  // Only applies to remote data sources via the ``module`` field.
   //
   // Defaults to ``false``.
   bool nack_on_module_cache_miss = 7;

@@ -5,16 +5,11 @@
 #include <string>
 
 #include "envoy/event/deferred_deletable.h"
-#include "envoy/event/dispatcher.h"
-#include "envoy/init/manager.h"
-#include "envoy/stats/scope.h"
-#include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/lock_guard.h"
 #include "source/common/common/logger.h"
 #include "source/common/common/thread.h"
 #include "source/common/config/remote_data_fetcher.h"
-#include "source/common/init/target_impl.h"
 
 #include "absl/container/flat_hash_map.h"
 
@@ -23,10 +18,10 @@ namespace Extensions {
 namespace DynamicModules {
 
 /**
- * Represents an entry in the code cache.
+ * Represents an entry in the module cache.
  */
-struct CodeCacheEntry {
-  std::string code;         // Module binary data.
+struct ModuleCacheEntry {
+  std::string module;       // Module binary data.
   bool in_progress;         // Fetch is ongoing.
   MonotonicTime use_time;   // Last access time.
   MonotonicTime fetch_time; // When the module was fetched.
@@ -36,8 +31,8 @@ struct CodeCacheEntry {
  * Result of a cache lookup operation.
  */
 struct CacheLookupResult {
-  // The cached code if found and valid, empty string otherwise.
-  std::string code;
+  // The cached module if found and valid, empty string otherwise.
+  std::string module;
   // True if a fetch operation is already in progress for this key.
   bool fetch_in_progress;
   // True if a cache entry exists (even if in_progress or expired for negative cache).
@@ -46,28 +41,23 @@ struct CacheLookupResult {
 
 /**
  * Callback invoked when async fetch completes.
- * @param code The fetched module bytes, or empty string on failure.
+ * @param module The fetched module bytes, or empty string on failure.
  */
-using FetchCallback = std::function<void(const std::string& code)>;
+using FetchCallback = std::function<void(const std::string& module)>;
 
 /**
- * Thread-safe code cache for dynamic modules.
- *
- * Features:
- * - Keyed by SHA256 hash of module content.
- * - 24-hour TTL for cached entries.
- * - 10-second negative caching for failed fetches.
- * - In-progress tracking to avoid duplicate fetches.
+ * Thread-safe cache for remotely fetched dynamic module binaries, keyed by SHA256 hash.
+ * Supports positive caching (24h TTL), negative caching (10s TTL), and in-progress tracking.
  */
-class DynamicModuleCodeCache : public Logger::Loggable<Logger::Id::config> {
+class DynamicModuleCache : public Logger::Loggable<Logger::Id::config> {
 public:
   // Cache TTL in seconds (24 hours).
   static constexpr int CACHE_TTL_SECONDS = 24 * 3600;
   // Negative cache TTL in seconds (10 seconds).
   static constexpr int NEGATIVE_CACHE_SECONDS = 10;
 
-  DynamicModuleCodeCache() = default;
-  ~DynamicModuleCodeCache() = default;
+  DynamicModuleCache() = default;
+  ~DynamicModuleCache() = default;
 
   /**
    * Looks up an entry in the cache.
@@ -85,12 +75,12 @@ public:
   void markInProgress(const std::string& key, MonotonicTime now);
 
   /**
-   * Updates a cache entry with fetched code.
+   * Updates a cache entry with fetched module.
    * @param key The SHA256 hash key.
-   * @param code The fetched module bytes (empty string indicates fetch failure).
+   * @param module The fetched module bytes (empty string indicates fetch failure).
    * @param now Current monotonic time.
    */
-  void update(const std::string& key, const std::string& code, MonotonicTime now);
+  void update(const std::string& key, const std::string& module, MonotonicTime now);
 
   /**
    * Returns the current number of entries in the cache.
@@ -112,27 +102,27 @@ private:
   void removeExpiredEntries(MonotonicTime now);
 
   mutable Thread::MutexBasicLockable mutex_;
-  absl::flat_hash_map<std::string, CodeCacheEntry> cache_;
+  absl::flat_hash_map<std::string, ModuleCacheEntry> cache_;
   MonotonicTime::duration time_offset_for_testing_{};
 };
 
 /**
- * Singleton accessor for the global code cache.
+ * Singleton accessor for the global module cache.
  */
-DynamicModuleCodeCache& getCodeCache();
+DynamicModuleCache& getModuleCache();
 
 /**
- * Clears the code cache. Primarily for testing.
+ * Clears the module cache. Primarily for testing.
  */
-void clearCodeCacheForTesting();
+void clearModuleCacheForTesting();
 
 /**
- * Sets a time offset for the code cache. Primarily for testing.
+ * Sets a time offset for the module cache. Primarily for testing.
  */
-void setTimeOffsetForCodeCacheForTesting(MonotonicTime::duration d);
+void setTimeOffsetForModuleCacheForTesting(MonotonicTime::duration d);
 
 /**
- * Adapter for remote data fetching that integrates with the code cache.
+ * Adapter for remote data fetching that integrates with the module cache.
  */
 class RemoteDataFetcherAdapter : public Config::DataFetcher::RemoteDataFetcherCallback,
                                  public Event::DeferredDeletable {

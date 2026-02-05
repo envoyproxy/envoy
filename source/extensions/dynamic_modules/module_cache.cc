@@ -1,4 +1,4 @@
-#include "source/extensions/dynamic_modules/code_cache.h"
+#include "source/extensions/dynamic_modules/module_cache.h"
 
 #include "source/common/common/lock_guard.h"
 #include "source/common/common/thread.h"
@@ -8,34 +8,34 @@ namespace Extensions {
 namespace DynamicModules {
 
 namespace {
-// Global code cache instance.
-std::unique_ptr<DynamicModuleCodeCache> global_code_cache;
-Thread::MutexBasicLockable global_code_cache_mutex;
+// Global module cache instance.
+std::unique_ptr<DynamicModuleCache> global_module_cache;
+Thread::MutexBasicLockable global_module_cache_mutex;
 } // namespace
 
-DynamicModuleCodeCache& getCodeCache() {
-  Thread::LockGuard guard(global_code_cache_mutex);
-  if (!global_code_cache) {
-    global_code_cache = std::make_unique<DynamicModuleCodeCache>();
+DynamicModuleCache& getModuleCache() {
+  Thread::LockGuard guard(global_module_cache_mutex);
+  if (!global_module_cache) {
+    global_module_cache = std::make_unique<DynamicModuleCache>();
   }
-  return *global_code_cache;
+  return *global_module_cache;
 }
 
-void clearCodeCacheForTesting() {
-  Thread::LockGuard guard(global_code_cache_mutex);
-  if (global_code_cache) {
-    global_code_cache->clear();
-  }
-}
-
-void setTimeOffsetForCodeCacheForTesting(MonotonicTime::duration d) {
-  Thread::LockGuard guard(global_code_cache_mutex);
-  if (global_code_cache) {
-    global_code_cache->setTimeOffsetForTesting(d);
+void clearModuleCacheForTesting() {
+  Thread::LockGuard guard(global_module_cache_mutex);
+  if (global_module_cache) {
+    global_module_cache->clear();
   }
 }
 
-CacheLookupResult DynamicModuleCodeCache::lookup(const std::string& key, MonotonicTime now) {
+void setTimeOffsetForModuleCacheForTesting(MonotonicTime::duration d) {
+  Thread::LockGuard guard(global_module_cache_mutex);
+  if (global_module_cache) {
+    global_module_cache->setTimeOffsetForTesting(d);
+  }
+}
+
+CacheLookupResult DynamicModuleCache::lookup(const std::string& key, MonotonicTime now) {
   Thread::LockGuard guard(mutex_);
 
   // Apply time offset for testing.
@@ -49,15 +49,15 @@ CacheLookupResult DynamicModuleCodeCache::lookup(const std::string& key, Monoton
     return CacheLookupResult{"", false, false};
   }
 
-  CodeCacheEntry& entry = it->second;
+  ModuleCacheEntry& entry = it->second;
   entry.use_time = now;
 
   if (entry.in_progress) {
     return CacheLookupResult{"", true, true};
   }
 
-  // Check if this is a negative cache entry (empty code with recent fetch).
-  if (entry.code.empty()) {
+  // Check if this is a negative cache entry (empty module with recent fetch).
+  if (entry.module.empty()) {
     auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - entry.fetch_time).count();
     if (elapsed < NEGATIVE_CACHE_SECONDS) {
       // Still within negative cache TTL - return empty but mark as cache hit.
@@ -75,51 +75,51 @@ CacheLookupResult DynamicModuleCodeCache::lookup(const std::string& key, Monoton
     return CacheLookupResult{"", false, false};
   }
 
-  return CacheLookupResult{entry.code, false, true};
+  return CacheLookupResult{entry.module, false, true};
 }
 
-void DynamicModuleCodeCache::markInProgress(const std::string& key, MonotonicTime now) {
+void DynamicModuleCache::markInProgress(const std::string& key, MonotonicTime now) {
   Thread::LockGuard guard(mutex_);
   now += time_offset_for_testing_;
 
-  CodeCacheEntry& entry = cache_[key];
+  ModuleCacheEntry& entry = cache_[key];
   entry.in_progress = true;
   entry.use_time = now;
   entry.fetch_time = now;
 }
 
-void DynamicModuleCodeCache::update(const std::string& key, const std::string& code,
-                                    MonotonicTime now) {
+void DynamicModuleCache::update(const std::string& key, const std::string& module,
+                                MonotonicTime now) {
   Thread::LockGuard guard(mutex_);
   now += time_offset_for_testing_;
 
-  CodeCacheEntry& entry = cache_[key];
-  entry.code = code;
+  ModuleCacheEntry& entry = cache_[key];
+  entry.module = module;
   entry.in_progress = false;
   entry.use_time = now;
   entry.fetch_time = now;
 }
 
-size_t DynamicModuleCodeCache::size() const {
+size_t DynamicModuleCache::size() const {
   Thread::LockGuard guard(mutex_);
   return cache_.size();
 }
 
-void DynamicModuleCodeCache::clear() {
+void DynamicModuleCache::clear() {
   Thread::LockGuard guard(mutex_);
   cache_.clear();
   time_offset_for_testing_ = MonotonicTime::duration{};
 }
 
-void DynamicModuleCodeCache::setTimeOffsetForTesting(MonotonicTime::duration offset) {
+void DynamicModuleCache::setTimeOffsetForTesting(MonotonicTime::duration offset) {
   Thread::LockGuard guard(mutex_);
   time_offset_for_testing_ = offset;
 }
 
-void DynamicModuleCodeCache::removeExpiredEntries(MonotonicTime now) {
+void DynamicModuleCache::removeExpiredEntries(MonotonicTime now) {
   // Called with mutex held.
   for (auto it = cache_.begin(); it != cache_.end();) {
-    const CodeCacheEntry& entry = it->second;
+    const ModuleCacheEntry& entry = it->second;
 
     // Don't remove in-progress entries.
     if (entry.in_progress) {
@@ -130,7 +130,7 @@ void DynamicModuleCodeCache::removeExpiredEntries(MonotonicTime now) {
     auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - entry.fetch_time).count();
 
     bool expired = false;
-    if (entry.code.empty()) {
+    if (entry.module.empty()) {
       // Negative cache entry.
       expired = elapsed >= NEGATIVE_CACHE_SECONDS;
     } else {
