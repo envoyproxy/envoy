@@ -246,8 +246,7 @@ void FileSystemBufferFilter::maybeOutputRequest() {
       request_state_.memory_used_ -= request_state_.buffer_.front()->size();
       auto out = request_state_.buffer_.front()->extract();
       request_state_.buffer_.pop_front();
-      bool end_stream = (request_state_.buffer_.empty() &&
-                         request_state_.seen_end_stream_ &&
+      bool end_stream = (request_state_.buffer_.empty() && request_state_.seen_end_stream_ &&
                          !request_state_.seen_trailers);
       request_callbacks_->injectDecodedDataToFilterChain(*out, end_stream);
     }
@@ -274,8 +273,7 @@ bool FileSystemBufferFilter::maybeOutputResponse() {
       response_state_.memory_used_ -= response_state_.buffer_.front()->size();
       auto out = response_state_.buffer_.front()->extract();
       response_state_.buffer_.pop_front();
-      bool end_stream = (response_state_.buffer_.empty() &&
-                         response_state_.seen_end_stream_ &&
+      bool end_stream = (response_state_.buffer_.empty() && response_state_.seen_end_stream_ &&
                          !response_state_.seen_trailers);
       response_callbacks_->injectEncodedDataToFilterChain(*out, end_stream);
     }
