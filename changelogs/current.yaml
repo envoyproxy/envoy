@@ -191,5 +191,8 @@ new_features:
     the namespace in prometheus output (e.g. ``envoy_myapp_requests_total``). The legacy behavior
     (stripping the namespace prefix from prometheus output) can be restored by setting the runtime
     guard ``envoy.reloadable_features.dynamic_modules_strip_custom_stat_prefix`` to ``true``.
+- area: tracers
+  change: |
+    Add log events to spans created by OpenTelemetry tracer.
 
 deprecated:
