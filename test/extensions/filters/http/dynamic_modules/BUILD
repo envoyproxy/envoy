@@ -12,6 +12,7 @@ envoy_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     data = [
+        "//test/extensions/dynamic_modules/test_data/c:http_filter_per_route_config_new_fail",
         "//test/extensions/dynamic_modules/test_data/c:no_op",
     ],
     deps = [
@@ -26,6 +27,7 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules:util",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
+        "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/server:server_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:simulated_time_system_lib",

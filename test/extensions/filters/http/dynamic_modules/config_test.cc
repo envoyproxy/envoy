@@ -16,6 +16,7 @@
 #include "test/extensions/dynamic_modules/util.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
@@ -657,6 +658,55 @@ TEST_F(DynamicModuleFilterConfigTest, RemoteLoadingWarmingModeFetchFailure) {
   NiceMock<Http::MockFilterChainFactoryCallbacks> filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_)).Times(0);
   cb_or_error.value()(filter_callback);
+}
+
+TEST_F(DynamicModuleFilterConfigTest, RouteSpecificConfigPerRouteConfigFail) {
+  // Set up the search path to find the test module.
+  TestEnvironment::setEnvVar(
+      "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
+      TestEnvironment::substitute("{{ test_rundir }}/test/extensions/dynamic_modules/test_data/c"),
+      1);
+
+  // http_filter_per_route_config_new_fail exports the per-route config symbol but returns nullptr.
+  const std::string yaml = R"EOF(
+  dynamic_module_config:
+    name: "http_filter_per_route_config_new_fail"
+    do_not_close: true
+  per_route_config_name: "test"
+  )EOF";
+
+  envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilterPerRoute proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
+
+  DynamicModuleConfigFactory factory;
+  NiceMock<ProtobufMessage::MockValidationVisitor> visitor;
+  auto config_or_error =
+      factory.createRouteSpecificFilterConfig(proto_config, context_.server_factory_context_, visitor);
+  EXPECT_FALSE(config_or_error.ok());
+  EXPECT_THAT(config_or_error.status().message(),
+              testing::HasSubstr("Failed to create pre-route filter config"));
+
+  TestEnvironment::unsetEnvVar("ENVOY_DYNAMIC_MODULES_SEARCH_PATH");
+}
+
+TEST_F(DynamicModuleFilterConfigTest, RouteSpecificConfigInvalidModule) {
+  const std::string yaml = R"EOF(
+  dynamic_module_config:
+    name: "nonexistent_module"
+    do_not_close: true
+  per_route_config_name: "test"
+  )EOF";
+
+  envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilterPerRoute proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
+
+  DynamicModuleConfigFactory factory;
+  NiceMock<ProtobufMessage::MockValidationVisitor> visitor;
+  auto config_or_error =
+      factory.createRouteSpecificFilterConfig(proto_config, context_.server_factory_context_, visitor);
+  EXPECT_FALSE(config_or_error.ok());
+  EXPECT_THAT(config_or_error.status().message(),
+              testing::HasSubstr("Failed to load dynamic module"));
 }
 
 } // namespace Configuration
