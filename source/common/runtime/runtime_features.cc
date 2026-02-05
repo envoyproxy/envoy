@@ -205,6 +205,8 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_http2_use_oghttp2);
 // This is the legacy behavior. When disabled which is the default, metrics appear with the
 // standard envoy_ prefix followed by the namespace.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_dynamic_modules_strip_custom_stat_prefix);
+// TODO(haoyuewang): Flip true after prod testing.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_disable_data_read_immediately);
 
 // Block of non-boolean flags. Use of int flags is deprecated. Do not add more.
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT

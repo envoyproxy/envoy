@@ -118,6 +118,12 @@ new_features:
 - area: stats
   change: |
     Added support to limit the number of stats stored in each stats scope in the stats library.
+- area: stats
+  change: |
+    The admin prometheus stats endpoint now supports the protobuf exposition format, and will automatically
+    use it if the request contains the correct Accept header, or if query parameter ``prom_protobuf=1`` is
+    set. In a prometheus scrape configuration, add ``PrometheusProto`` to ``scrape_protocols`` to use
+    the protobuf format.
 - area: tls
   change: |
     Added support for fetching certificates on-demand via SDS in the upstream TLS transport socket
