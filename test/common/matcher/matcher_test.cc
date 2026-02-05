@@ -1144,9 +1144,9 @@ TEST_P(MatcherAmbiguousTest, KeepMatchingWithFailingNestedMatcher) {
 }
 
 TEST(MatchResultTest, toString) {
-  EXPECT_EQ(Matcher::MatchResult::noMatch().toString(), "no match");
-  EXPECT_EQ(Matcher::MatchResult::insufficientData().toString(), "insufficient data");
-  EXPECT_EQ(Matcher::MatchResult::matched().toString(), "match");
+  EXPECT_EQ(MatchResultToString(Matcher::MatchResult::NoMatch), "no match");
+  EXPECT_EQ(MatchResultToString(Matcher::MatchResult::InsufficientData), "insufficient data");
+  EXPECT_EQ(MatchResultToString(Matcher::MatchResult::Matched), "match");
 }
 
 } // namespace Matcher

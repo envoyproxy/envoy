@@ -149,17 +149,17 @@ TEST(RequestMatchInputMatcherTest, RequestMatchInputMatcherTest) {
 
   {
     Matcher::MatchingDataType input;
-    EXPECT_EQ(matcher->match(input), Matcher::MatchResult::noMatch());
+    EXPECT_EQ(matcher->match(input), Matcher::MatchResult::NoMatch);
   }
 
   {
     Matcher::MatchingDataType input = std::string("fake_data");
-    EXPECT_EQ(matcher->match(input), Matcher::MatchResult::noMatch());
+    EXPECT_EQ(matcher->match(input), Matcher::MatchResult::NoMatch);
   }
 
   {
     Matcher::MatchingDataType input = std::make_shared<FakeCustomMatchData>();
-    EXPECT_EQ(matcher->match(input), Matcher::MatchResult::noMatch());
+    EXPECT_EQ(matcher->match(input), Matcher::MatchResult::NoMatch);
   }
 
   {
@@ -168,7 +168,7 @@ TEST(RequestMatchInputMatcherTest, RequestMatchInputMatcherTest) {
     MatchInput match_input(request, stream_info, MatchAction::RouteAction);
 
     Matcher::MatchingDataType input = std::make_shared<RequestMatchData>(match_input);
-    EXPECT_EQ(matcher->match(input), Matcher::MatchResult::matched());
+    EXPECT_EQ(matcher->match(input), Matcher::MatchResult::Matched);
   }
 }
 
@@ -180,7 +180,7 @@ TEST(RequestMatchInputMatcherTest, SpecificRequestMatchInputMatcherTest) {
     RequestMatchInputMatcher matcher(matcher_proto, context.serverFactoryContext());
 
     FakeStreamCodecFactory::FakeRequest request;
-    EXPECT_EQ(matcher.match(request), ::Envoy::Matcher::MatchResult::matched());
+    EXPECT_EQ(matcher.match(request), ::Envoy::Matcher::MatchResult::Matched);
   }
 
   RequestMatcherProto matcher_proto;
@@ -206,7 +206,7 @@ TEST(RequestMatchInputMatcherTest, SpecificRequestMatchInputMatcherTest) {
   {
     FakeStreamCodecFactory::FakeRequest request;
     request.host_ = "another_fake_host";
-    EXPECT_EQ(matcher.match(request), ::Envoy::Matcher::MatchResult::noMatch());
+    EXPECT_EQ(matcher.match(request), ::Envoy::Matcher::MatchResult::NoMatch);
   }
 
   // Path match failed.
@@ -214,7 +214,7 @@ TEST(RequestMatchInputMatcherTest, SpecificRequestMatchInputMatcherTest) {
     FakeStreamCodecFactory::FakeRequest request;
     request.host_ = "fake_host";
     request.path_ = "another_fake_path";
-    EXPECT_EQ(matcher.match(request), ::Envoy::Matcher::MatchResult::noMatch());
+    EXPECT_EQ(matcher.match(request), ::Envoy::Matcher::MatchResult::NoMatch);
   }
 
   // Method match failed.
@@ -223,7 +223,7 @@ TEST(RequestMatchInputMatcherTest, SpecificRequestMatchInputMatcherTest) {
     request.host_ = "fake_host";
     request.path_ = "fake_path";
     request.method_ = "another_fake_method";
-    EXPECT_EQ(matcher.match(request), ::Envoy::Matcher::MatchResult::noMatch());
+    EXPECT_EQ(matcher.match(request), ::Envoy::Matcher::MatchResult::NoMatch);
   }
 
   // Property match failed.
@@ -234,7 +234,7 @@ TEST(RequestMatchInputMatcherTest, SpecificRequestMatchInputMatcherTest) {
     request.path_ = "fake_path";
     request.method_ = "fake_method";
     request.data_["key_0"] = "another_value_0";
-    EXPECT_EQ(matcher.match(request), ::Envoy::Matcher::MatchResult::noMatch());
+    EXPECT_EQ(matcher.match(request), ::Envoy::Matcher::MatchResult::NoMatch);
   }
 
   // Property is missing.
@@ -243,7 +243,7 @@ TEST(RequestMatchInputMatcherTest, SpecificRequestMatchInputMatcherTest) {
     request.host_ = "fake_host";
     request.path_ = "fake_path";
     request.method_ = "fake_method";
-    EXPECT_EQ(matcher.match(request), ::Envoy::Matcher::MatchResult::noMatch());
+    EXPECT_EQ(matcher.match(request), ::Envoy::Matcher::MatchResult::NoMatch);
   }
 
   // All match.
@@ -253,7 +253,7 @@ TEST(RequestMatchInputMatcherTest, SpecificRequestMatchInputMatcherTest) {
     request.path_ = "fake_path";
     request.method_ = "fake_method";
     request.data_["key_0"] = "value_0";
-    EXPECT_EQ(matcher.match(request), ::Envoy::Matcher::MatchResult::matched());
+    EXPECT_EQ(matcher.match(request), ::Envoy::Matcher::MatchResult::Matched);
   }
 }
 

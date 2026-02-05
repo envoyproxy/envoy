@@ -38,16 +38,16 @@ public:
 
       // If we are unable to decide on a match at this point, propagate this up to defer
       // the match result until we have the requisite data.
-      if (result.isInsufficientData()) {
+      if (result == MatchResult::InsufficientData) {
         return result;
       }
 
-      if (result.isNoMatch()) {
+      if (result == MatchResult::NoMatch) {
         return result;
       }
     }
 
-    return MatchResult::matched();
+    return MatchResult::Matched;
   }
 
 private:
@@ -71,12 +71,12 @@ public:
     for (const auto& matcher : matchers_) {
       const MatchResult result = matcher->match(data);
 
-      if (result.isInsufficientData()) {
+      if (result == MatchResult::InsufficientData) {
         unable_to_match_some_matchers = true;
         continue;
       }
 
-      if (result.isMatched()) {
+      if (result == MatchResult::Matched) {
         return result;
       }
     }
@@ -84,10 +84,10 @@ public:
     // If we didn't find a successful match but not all matchers could be evaluated,
     // return InsufficientData to defer the match result.
     if (unable_to_match_some_matchers) {
-      return MatchResult::insufficientData();
+      return MatchResult::InsufficientData;
     }
 
-    return MatchResult::noMatch();
+    return MatchResult::NoMatch;
   }
 
 private:
@@ -103,10 +103,10 @@ public:
 
   MatchResult match(const DataType& data) override {
     const MatchResult result = matcher_->match(data);
-    if (result.isInsufficientData()) {
+    if (result == MatchResult::InsufficientData) {
       return result;
     }
-    return result.isMatched() ? MatchResult::noMatch() : MatchResult::matched();
+    return (result == MatchResult::Matched) ? MatchResult::NoMatch : MatchResult::Matched;
   }
 
 private:
@@ -143,18 +143,18 @@ public:
 
     ENVOY_LOG(trace, "Attempting to match {}", input);
     if (input.data_availability_ == DataInputGetResult::DataAvailability::NotAvailable) {
-      return MatchResult::insufficientData();
+      return MatchResult::InsufficientData;
     }
 
     MatchResult current_match = input_matcher_->match(input.data_);
-    if (!current_match.isMatched() &&
+    if (current_match != MatchResult::Matched &&
         input.data_availability_ ==
             DataInputGetResult::DataAvailability::MoreDataMightBeAvailable) {
       ENVOY_LOG(trace, "No match yet; delaying result as more data might be available.");
-      return MatchResult::insufficientData();
+      return MatchResult::InsufficientData;
     }
 
-    ENVOY_LOG(trace, "Match result: {}", current_match.toString());
+    ENVOY_LOG(trace, "Match result: {}", MatchResultToString(current_match));
     return current_match;
   }
 

@@ -129,12 +129,12 @@ std::string Matcher::replaceAll(absl::string_view value, absl::string_view subst
 
 MatchResult Matcher::match(const ::Envoy::Matcher::MatchingDataType& input) {
   if (absl::holds_alternative<absl::monostate>(input)) {
-    return MatchResult::noMatch();
+    return MatchResult::NoMatch;
   }
 
   return static_cast<Envoy::Regex::CompiledMatcher*>(this)->match(absl::get<std::string>(input))
-             ? MatchResult::matched()
-             : MatchResult::noMatch();
+             ? MatchResult::Matched
+             : MatchResult::NoMatch;
 }
 
 void Matcher::compile(const std::vector<const char*>& expressions,

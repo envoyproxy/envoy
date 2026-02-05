@@ -21,15 +21,15 @@ public:
   ::Envoy::Matcher::MatchResult match(const ::Envoy::Matcher::MatchingDataType& input) override {
     // Only match if the value is present.
     if (absl::holds_alternative<absl::monostate>(input)) {
-      return ::Envoy::Matcher::MatchResult::noMatch();
+      return ::Envoy::Matcher::MatchResult::NoMatch;
     }
 
     // Otherwise, match if feature is enabled for hash(input).
     const auto hash_value = HashUtil::xxHash64(absl::get<std::string>(input), seed_);
     return (runtime_.snapshot().featureEnabled(runtime_fraction_.runtime_key(),
                                                runtime_fraction_.default_value(), hash_value))
-               ? ::Envoy::Matcher::MatchResult::matched()
-               : ::Envoy::Matcher::MatchResult::noMatch();
+               ? ::Envoy::Matcher::MatchResult::Matched
+               : ::Envoy::Matcher::MatchResult::NoMatch;
   }
 
 private:

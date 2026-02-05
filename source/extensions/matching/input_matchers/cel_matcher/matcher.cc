@@ -35,16 +35,16 @@ Matcher::MatchResult CelInputMatcher::match(const MatchingDataType& input) {
     auto eval_result = compiled_expr_.evaluate(*cel_data->activation_, &arena);
     if (eval_result.ok() && eval_result.value().IsBool()) {
       if (eval_result.value().BoolOrDie()) {
-        return Matcher::MatchResult::matched();
+        return Matcher::MatchResult::Matched;
       }
     }
     if (Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.enable_cel_response_path_matching") &&
         cel_data->needs_response() && !cel_data->has_response_data()) {
-      return Matcher::MatchResult::insufficientData();
+      return Matcher::MatchResult::InsufficientData;
     }
   }
-  return Matcher::MatchResult::noMatch();
+  return Matcher::MatchResult::NoMatch;
 }
 
 } // namespace CelMatcher

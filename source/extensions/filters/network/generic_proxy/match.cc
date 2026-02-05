@@ -38,14 +38,14 @@ RequestMatchInputMatcher::RequestMatchInputMatcher(
 
 Matcher::MatchResult RequestMatchInputMatcher::match(const Matcher::MatchingDataType& input) {
   if (!absl::holds_alternative<std::shared_ptr<Matcher::CustomMatchData>>(input)) {
-    return Matcher::MatchResult::noMatch();
+    return Matcher::MatchResult::NoMatch;
   }
 
   const auto* typed_data = dynamic_cast<const RequestMatchData*>(
       absl::get<std::shared_ptr<Matcher::CustomMatchData>>(input).get());
 
   if (typed_data == nullptr) {
-    return Matcher::MatchResult::noMatch();
+    return Matcher::MatchResult::NoMatch;
   }
 
   return match(typed_data->data().requestHeader());
@@ -56,21 +56,21 @@ Matcher::MatchResult RequestMatchInputMatcher::match(const RequestHeaderFrame& r
   if (host_ != nullptr) {
     if (!host_->match(request.host())) {
       // Host does not match.
-      return Matcher::MatchResult::noMatch();
+      return Matcher::MatchResult::NoMatch;
     }
   }
 
   if (path_ != nullptr) {
     if (!path_->match(request.path())) {
       // Path does not match.
-      return Matcher::MatchResult::noMatch();
+      return Matcher::MatchResult::NoMatch;
     }
   }
 
   if (method_ != nullptr) {
     if (!method_->match(request.method())) {
       // Method does not match.
-      return Matcher::MatchResult::noMatch();
+      return Matcher::MatchResult::NoMatch;
     }
   }
 
@@ -78,16 +78,16 @@ Matcher::MatchResult RequestMatchInputMatcher::match(const RequestHeaderFrame& r
     if (auto val = request.get(property.first); val.has_value()) {
       if (!property.second->match(val.value())) {
         // Property does not match.
-        return Matcher::MatchResult::noMatch();
+        return Matcher::MatchResult::NoMatch;
       }
     } else {
       // Property does not exist.
-      return Matcher::MatchResult::noMatch();
+      return Matcher::MatchResult::NoMatch;
     }
   }
 
   // All matchers passed.
-  return Matcher::MatchResult::matched();
+  return Matcher::MatchResult::Matched;
 }
 
 Matcher::InputMatcherFactoryCb RequestMatchDataInputMatcherFactory::createInputMatcherFactoryCb(

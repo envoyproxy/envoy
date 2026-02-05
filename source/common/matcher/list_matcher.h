@@ -21,10 +21,10 @@ public:
       MatchResult result = matcher.first->match(matching_data);
 
       // One of the matchers don't have enough information, bail on evaluating the match.
-      if (result.isInsufficientData()) {
+      if (result == MatchResult::InsufficientData) {
         return ActionMatchResult::insufficientData();
       }
-      if (result.isNoMatch()) {
+      if (result == MatchResult::NoMatch) {
         continue;
       }
 

@@ -17,10 +17,10 @@ public:
   MatchResult match(const MatchingDataType& input) override {
     if (absl::holds_alternative<std::string>(input) &&
         matcher_.match(absl::get<std::string>(input))) {
-      return MatchResult::matched();
+      return MatchResult::Matched;
     }
     // Return false when input is empty.(i.e., input is absl::monostate).
-    return MatchResult::noMatch();
+    return MatchResult::NoMatch;
   }
 
 private:

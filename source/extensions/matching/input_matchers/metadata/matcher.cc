@@ -19,11 +19,11 @@ MatchResult Matcher::match(const Envoy::Matcher::MatchingDataType& input) {
         dynamic_cast<const Matching::Http::MetadataInput::MetadataMatchData*>(ptr->get());
     if (match_data != nullptr) {
       if (value_matcher_->match(match_data->value_) ^ invert_) {
-        return MatchResult::matched();
+        return MatchResult::Matched;
       }
     }
   }
-  return MatchResult::noMatch();
+  return MatchResult::NoMatch;
 }
 
 } // namespace Metadata

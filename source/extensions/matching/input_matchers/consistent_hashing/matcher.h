@@ -17,14 +17,14 @@ public:
   ::Envoy::Matcher::MatchResult match(const Envoy::Matcher::MatchingDataType& input) override {
     // Only match if the value is present.
     if (absl::holds_alternative<absl::monostate>(input)) {
-      return ::Envoy::Matcher::MatchResult::noMatch();
+      return ::Envoy::Matcher::MatchResult::NoMatch;
     }
 
     // Otherwise, match if (hash(input) % modulo) >= threshold.
     if (HashUtil::xxHash64(absl::get<std::string>(input), seed_) % modulo_ >= threshold_) {
-      return ::Envoy::Matcher::MatchResult::matched();
+      return ::Envoy::Matcher::MatchResult::Matched;
     }
-    return ::Envoy::Matcher::MatchResult::noMatch();
+    return ::Envoy::Matcher::MatchResult::NoMatch;
   }
 
 private:

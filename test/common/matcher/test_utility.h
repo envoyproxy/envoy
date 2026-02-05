@@ -132,7 +132,7 @@ struct BoolMatcher : public InputMatcher {
   explicit BoolMatcher(bool value) : value_(value) {}
 
   MatchResult match(const MatchingDataType&) override {
-    return value_ ? MatchResult::matched() : MatchResult::noMatch();
+    return value_ ? MatchResult::Matched : MatchResult::NoMatch;
   }
   const bool value_;
 };
@@ -144,12 +144,12 @@ struct TestMatcher : public InputMatcher {
 
   MatchResult match(const MatchingDataType& input) override {
     if (absl::holds_alternative<absl::monostate>(input)) {
-      return MatchResult::noMatch();
+      return MatchResult::NoMatch;
     }
     if (predicate_(absl::get<std::string>(input))) {
-      return MatchResult::matched();
+      return MatchResult::Matched;
     }
-    return MatchResult::noMatch();
+    return MatchResult::NoMatch;
   }
 
   std::function<bool(absl::optional<absl::string_view>)> predicate_;
@@ -182,7 +182,7 @@ public:
 // An InputMatcher that always returns false.
 class NeverMatch : public InputMatcher {
 public:
-  MatchResult match(const MatchingDataType&) override { return MatchResult::noMatch(); }
+  MatchResult match(const MatchingDataType&) override { return MatchResult::NoMatch; }
 };
 
 /**
@@ -213,12 +213,12 @@ public:
   explicit CustomStringMatcher(const std::string& str) : str_value_(str) {}
   MatchResult match(const MatchingDataType& input) override {
     if (absl::holds_alternative<absl::monostate>(input)) {
-      return MatchResult::noMatch();
+      return MatchResult::NoMatch;
     }
     if (str_value_ == absl::get<std::string>(input)) {
-      return MatchResult::matched();
+      return MatchResult::Matched;
     }
-    return MatchResult::noMatch();
+    return MatchResult::NoMatch;
   }
 
 private:
@@ -268,17 +268,7 @@ createSingleMatcher(absl::optional<absl::string_view> input,
       .value();
 }
 
-void PrintTo(const MatchResult& result, std::ostream* os) {
-  if (result.isInsufficientData()) {
-    *os << "InsufficientData";
-  } else if (result.isNoMatch()) {
-    *os << "NoMatch";
-  } else if (result.isMatched()) {
-    *os << "Matched";
-  } else {
-    *os << "UnknownState";
-  }
-}
+void PrintTo(const MatchResult& result, std::ostream* os) { *os << MatchResultToString(result); }
 
 // Creates an OnMatch that evaluates to a StringValue with the provided value.
 template <class T> OnMatch<T> stringOnMatch(absl::string_view value, bool keep_matching = false) {

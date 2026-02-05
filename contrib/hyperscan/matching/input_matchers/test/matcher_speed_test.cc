@@ -54,7 +54,7 @@ static void BM_HyperscanMatcher(benchmark::State& state) {
   uint32_t passes = 0;
   for (auto _ : state) { // NOLINT
     for (const std::string& cluster_input : clusterInputs()) {
-      if (matcher.match(cluster_input) == ::Envoy::Matcher::MatchResult::matched()) {
+      if (matcher.match(cluster_input) == ::Envoy::Matcher::MatchResult::Matched) {
         ++passes;
       }
     }

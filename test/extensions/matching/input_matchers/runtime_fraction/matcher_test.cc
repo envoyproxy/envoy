@@ -50,7 +50,7 @@ public:
     EXPECT_EQ(matcher_->match(value.has_value()
                                   ? ::Envoy::Matcher::MatchingDataType(std::string(value.value()))
                                   : absl::monostate()),
-              result ? MatchResult::matched() : MatchResult::noMatch());
+              result ? MatchResult::Matched : MatchResult::NoMatch);
     return called_random_value;
   }
 
@@ -59,7 +59,7 @@ public:
         runtime_.snapshot_,
         featureEnabled(key_, testing::Matcher<const envoy::type::v3::FractionalPercent&>(_), _))
         .Times(0);
-    EXPECT_EQ(matcher_->match(absl::monostate()), MatchResult::noMatch());
+    EXPECT_EQ(matcher_->match(absl::monostate()), MatchResult::NoMatch);
   }
 
 private:

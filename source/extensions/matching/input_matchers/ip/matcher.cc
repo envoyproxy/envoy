@@ -30,22 +30,22 @@ Matcher::Matcher(std::vector<Network::Address::CidrRange> const& ranges,
 
 MatchResult Matcher::match(const Envoy::Matcher::MatchingDataType& input) {
   if (absl::holds_alternative<absl::monostate>(input)) {
-    return MatchResult::noMatch();
+    return MatchResult::NoMatch;
   }
   const std::string& ip_str = absl::get<std::string>(input);
   if (ip_str.empty()) {
-    return MatchResult::noMatch();
+    return MatchResult::NoMatch;
   }
   const auto ip = Network::Utility::parseInternetAddressNoThrow(ip_str);
   if (!ip) {
     stats_.ip_parsing_failed_.inc();
     ENVOY_LOG(debug, "IP matcher: unable to parse address '{}'", ip_str);
-    return MatchResult::noMatch();
+    return MatchResult::NoMatch;
   }
   if (!trie_.getData(ip).empty()) {
-    return MatchResult::matched();
+    return MatchResult::Matched;
   }
-  return MatchResult::noMatch();
+  return MatchResult::NoMatch;
 }
 
 } // namespace IP
