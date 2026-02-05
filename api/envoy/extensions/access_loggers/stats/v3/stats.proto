@@ -144,7 +144,7 @@ message Config {
       // DownstreamStart/DownstreamEnd) to increment and decrement the gauge.
       // iii). During runtime, PAIRED_SUBTRACT will execute if and only if
       // PAIRED_ADD operation has been done, tracked by inflight counter in
-      // filter state. 
+      // filter state.
       // iv). If the PAIRED_ADD operation was executed, the
       // PAIRED_SUBTRACT will happen when the stream/connection is closed, even
       // if the configured log type didn't happen.
