@@ -23,19 +23,19 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // [#next-free-field: 6]
 message FileServerConfig {
   message PathMapping {
-    // If no ``path_prefix`` is matched, the filter does not intercept a request.
+    // If no ``request_path_prefix`` is matched, the filter does not intercept a request.
     //
-    // If a ``path_prefix`` is matched, that prefix is removed from the request
-    // and replaced with ``filesystem_prefix`` to form a filesystem path for
+    // If a ``request_path_prefix`` is matched, that prefix is removed from the request
+    // and replaced with ``file_path_prefix`` to form a filesystem path for
     // the request.
     //
     // Prefix ``/`` will match all GET requests.
-    string path_prefix = 1 [(validate.rules).string = {min_len: 1}];
+    string request_path_prefix = 1 [(validate.rules).string = {min_len: 1}];
 
-    // Replaces a matched ``path_prefix`` to form a filesystem path for a
+    // Replaces a matched ``request_path_prefix`` to form a filesystem path for a
     // request. May be relative to the working directory of the envoy execution,
     // or an absolute path.
-    string filesystem_prefix = 2 [(validate.rules).string = {min_len: 1}];
+    string file_path_prefix = 2 [(validate.rules).string = {min_len: 1}];
   }
 
   message DirectoryBehavior {

@@ -123,13 +123,13 @@ directory_behaviors:
               HasStatus(absl::StatusCode::kInvalidArgument, HasSubstr("multiple list directives")));
 }
 
-TEST_F(FileServerConfigTest, DuplicatePathPrefixIsConfigError) {
+TEST_F(FileServerConfigTest, DuplicateRequestPathPrefixIsConfigError) {
   auto status_or = factory()->createFilterFactoryFromProto(configFromYaml(R"(
 path_mappings:
-  - path_prefix: "/banana"
-    filesystem_prefix: "/banana"
-  - path_prefix: "/banana"
-    filesystem_prefix: "/other"
+  - request_path_prefix: "/banana"
+    file_path_prefix: "/banana"
+  - request_path_prefix: "/banana"
+    file_path_prefix: "/other"
 )"),
                                                            "stats", mock_factory_context_);
   EXPECT_THAT(status_or, HasStatus(absl::StatusCode::kInvalidArgument, HasSubstr("banana")));
@@ -158,10 +158,10 @@ manager_config:
   thread_pool:
     thread_count: 1
 path_mappings:
-  - path_prefix: /path1/
-    filesystem_prefix: /fs1
-  - path_prefix: /path1/path2
-    filesystem_prefix: fs2
+  - request_path_prefix: /path1/
+    file_path_prefix: /fs1
+  - request_path_prefix: /path1/path2
+    file_path_prefix: fs2
 content_types:
   "txt": "text/plain"
   "html": "text/html"

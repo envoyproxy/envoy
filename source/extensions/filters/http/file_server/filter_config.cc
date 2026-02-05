@@ -17,7 +17,7 @@ RadixTree<std::shared_ptr<const ProtoFileServerConfig::PathMapping>>
 makePathMappings(const ProtoFileServerConfig& config) {
   RadixTree<std::shared_ptr<const ProtoFileServerConfig::PathMapping>> tree;
   for (const auto& mapping : config.path_mappings()) {
-    tree.add(mapping.path_prefix(), std::make_shared<ProtoFileServerConfig::PathMapping>(mapping));
+    tree.add(mapping.request_path_prefix(), std::make_shared<ProtoFileServerConfig::PathMapping>(mapping));
   }
   return tree;
 }
@@ -63,9 +63,9 @@ absl::optional<std::filesystem::path>
 FileServerConfig::applyPathMapping(absl::string_view path_with_query,
                                    const ProtoFileServerConfig::PathMapping& mapping) {
   std::pair<absl::string_view, absl::string_view> split = absl::StrSplit(path_with_query, '?');
-  absl::string_view kept_path = split.first.substr(mapping.path_prefix().length());
+  absl::string_view kept_path = split.first.substr(mapping.request_path_prefix().length());
   if (kept_path.starts_with('/')) {
-    if (mapping.path_prefix().ends_with('/')) {
+    if (mapping.request_path_prefix().ends_with('/')) {
       // Avoid accepting a value that parses away a double-slash at the join-point.
       // (Other double-slashes will be rejected by the lexically_normal check.)
       return absl::nullopt;
@@ -80,9 +80,9 @@ FileServerConfig::applyPathMapping(absl::string_view path_with_query,
     return absl::nullopt;
   }
   std::filesystem::path file_path =
-      std::filesystem::path{mapping.filesystem_prefix()} / std::filesystem::path{kept_path};
+      std::filesystem::path{mapping.file_path_prefix()} / std::filesystem::path{kept_path};
   if (file_path != file_path.lexically_normal() ||
-      !file_path.string().starts_with(mapping.filesystem_prefix())) {
+      !file_path.string().starts_with(mapping.file_path_prefix())) {
     // Ensure we're not accidentally looking outside the designated filesystem prefix.
     return absl::nullopt;
   }

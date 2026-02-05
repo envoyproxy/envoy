@@ -50,8 +50,8 @@ public:
   std::shared_ptr<FileServerFilter> testFilter() {
     auto filter = FileServerFilter::createShared(configFromYaml(R"(
 path_mappings:
-  - path_prefix: /path1
-    filesystem_prefix: fs1
+  - request_path_prefix: /path1
+    file_path_prefix: fs1
 content_types:
   "txt": "text/plain"
   "html": "text/html"
@@ -202,8 +202,8 @@ TEST_F(FileServerFilterTest, FilterOnDestroyWhileFileActionInFlightAbortsRespons
 TEST_F(FileServerFilterTest, ErrorsOnDirectoryWithNoConfiguredBehavior) {
   auto filter = FileServerFilter::createShared(configFromYaml(R"(
 path_mappings:
-  - path_prefix: /path1
-    filesystem_prefix: fs1
+  - request_path_prefix: /path1
+    file_path_prefix: fs1
 )"));
   initFilter(*filter);
   Http::TestRequestHeaderMapImpl request_headers{
@@ -228,8 +228,8 @@ path_mappings:
 TEST_F(FileServerFilterTest, ErrorsOnDirectoryWithImpossiblyConfiguredBehaviorForCoverage) {
   auto filter = FileServerFilter::createShared(configFromYaml(R"(
 path_mappings:
-  - path_prefix: /path1
-    filesystem_prefix: fs1
+  - request_path_prefix: /path1
+    file_path_prefix: fs1
 directory_behaviors:
   - {}
 )"));

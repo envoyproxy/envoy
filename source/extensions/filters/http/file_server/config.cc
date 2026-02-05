@@ -21,10 +21,10 @@ absl::Status validateProto(const ProtoFileServerConfig& config) {
   absl::flat_hash_set<absl::string_view> seen;
   bool inserted;
   for (const auto& mapping : config.path_mappings()) {
-    std::tie(std::ignore, inserted) = seen.emplace(mapping.path_prefix());
+    std::tie(std::ignore, inserted) = seen.emplace(mapping.request_path_prefix());
     if (!inserted) {
       return absl::InvalidArgumentError(
-          absl::StrCat("duplicate path_prefix: ", mapping.path_prefix()));
+          absl::StrCat("duplicate request_path_prefix: ", mapping.request_path_prefix()));
     }
   }
   seen.erase(seen.begin(), seen.end());

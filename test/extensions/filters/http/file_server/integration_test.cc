@@ -53,11 +53,11 @@ typed_config:
     thread_pool:
       thread_count: 1
   path_mappings:
-    - path_prefix: /path1
-      filesystem_prefix: )",
+    - request_path_prefix: /path1
+      file_path_prefix: )",
                         testTmpDir(), R"(/fs1
-    - path_prefix: /path1/path2
-      filesystem_prefix: )",
+    - request_path_prefix: /path1/path2
+      file_path_prefix: )",
                         testTmpDir(), R"(/fs2
   content_types:
     "txt": "text/plain"
