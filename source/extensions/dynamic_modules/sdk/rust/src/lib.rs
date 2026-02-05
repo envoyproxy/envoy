@@ -7875,11 +7875,11 @@ pub trait EnvoyLoadBalancer {
   /// Returns the number of priority levels.
   fn get_priority_set_size(&self) -> usize;
 
-  /// Returns the address of a host by index within healthy hosts at a given priority.
-  fn get_host_address(&self, priority: u32, index: usize) -> Option<String>;
+  /// Returns the address of a healthy host by index at a given priority.
+  fn get_healthy_host_address(&self, priority: u32, index: usize) -> Option<String>;
 
-  /// Returns the weight of a host by index within healthy hosts at a given priority.
-  fn get_host_weight(&self, priority: u32, index: usize) -> u32;
+  /// Returns the weight of a healthy host by index at a given priority.
+  fn get_healthy_host_weight(&self, priority: u32, index: usize) -> u32;
 
   /// Returns the health status of a host by index within all hosts at a given priority.
   fn get_host_health(
@@ -7906,11 +7906,7 @@ pub trait EnvoyLoadBalancer {
 
   /// Returns a downstream request header by index.
   /// Only valid during choose_host callback.
-  fn context_get_downstream_header(&self, index: usize) -> Option<(String, String)>;
-
-  /// Returns the value of a downstream request header by key.
-  /// Only valid during choose_host callback.
-  fn context_get_downstream_header_value(&self, key: &str) -> Option<String>;
+  fn context_get_downstream_header_by_index(&self, index: usize) -> Option<(String, String)>;
 }
 
 /// Implementation of EnvoyLoadBalancer that calls into the Envoy ABI.
@@ -7968,13 +7964,13 @@ impl EnvoyLoadBalancer for EnvoyLoadBalancerImpl {
     unsafe { abi::envoy_dynamic_module_callback_lb_get_priority_set_size(self.lb_ptr) }
   }
 
-  fn get_host_address(&self, priority: u32, index: usize) -> Option<String> {
+  fn get_healthy_host_address(&self, priority: u32, index: usize) -> Option<String> {
     let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
       ptr: std::ptr::null(),
       length: 0,
     };
     let found = unsafe {
-      abi::envoy_dynamic_module_callback_lb_get_host_address(
+      abi::envoy_dynamic_module_callback_lb_get_healthy_host_address(
         self.lb_ptr,
         priority,
         index,
@@ -7996,8 +7992,10 @@ impl EnvoyLoadBalancer for EnvoyLoadBalancerImpl {
     }
   }
 
-  fn get_host_weight(&self, priority: u32, index: usize) -> u32 {
-    unsafe { abi::envoy_dynamic_module_callback_lb_get_host_weight(self.lb_ptr, priority, index) }
+  fn get_healthy_host_weight(&self, priority: u32, index: usize) -> u32 {
+    unsafe {
+      abi::envoy_dynamic_module_callback_lb_get_healthy_host_weight(self.lb_ptr, priority, index)
+    }
   }
 
   fn get_host_health(
@@ -8036,7 +8034,7 @@ impl EnvoyLoadBalancer for EnvoyLoadBalancerImpl {
     }
   }
 
-  fn context_get_downstream_header(&self, index: usize) -> Option<(String, String)> {
+  fn context_get_downstream_header_by_index(&self, index: usize) -> Option<(String, String)> {
     if self.context_ptr.is_null() {
       return None;
     }
@@ -8049,7 +8047,7 @@ impl EnvoyLoadBalancer for EnvoyLoadBalancerImpl {
       length: 0,
     };
     let found = unsafe {
-      abi::envoy_dynamic_module_callback_lb_context_get_downstream_header(
+      abi::envoy_dynamic_module_callback_lb_context_get_downstream_header_by_index(
         self.context_ptr,
         index,
         &mut key,
@@ -8070,40 +8068,6 @@ impl EnvoyLoadBalancer for EnvoyLoadBalancerImpl {
           ))
           .to_string(),
         ))
-      }
-    } else {
-      None
-    }
-  }
-
-  fn context_get_downstream_header_value(&self, key: &str) -> Option<String> {
-    if self.context_ptr.is_null() {
-      return None;
-    }
-    let key_buffer = abi::envoy_dynamic_module_type_module_buffer {
-      ptr: key.as_ptr() as *const _,
-      length: key.len(),
-    };
-    let mut value = abi::envoy_dynamic_module_type_envoy_buffer {
-      ptr: std::ptr::null(),
-      length: 0,
-    };
-    let found = unsafe {
-      abi::envoy_dynamic_module_callback_lb_context_get_downstream_header_value(
-        self.context_ptr,
-        key_buffer,
-        &mut value,
-      )
-    };
-    if found {
-      unsafe {
-        Some(
-          std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-            value.ptr as *const _,
-            value.length,
-          ))
-          .to_string(),
-        )
       }
     } else {
       None

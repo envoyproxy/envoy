@@ -84,7 +84,7 @@ size_t envoy_dynamic_module_callback_lb_get_priority_set_size(
   return getLb(lb_envoy_ptr)->prioritySet().hostSetsPerPriority().size();
 }
 
-bool envoy_dynamic_module_callback_lb_get_host_address(
+bool envoy_dynamic_module_callback_lb_get_healthy_host_address(
     envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index,
     envoy_dynamic_module_type_envoy_buffer* result) {
   if (lb_envoy_ptr == nullptr || result == nullptr) {
@@ -112,7 +112,7 @@ bool envoy_dynamic_module_callback_lb_get_host_address(
   return true;
 }
 
-uint32_t envoy_dynamic_module_callback_lb_get_host_weight(
+uint32_t envoy_dynamic_module_callback_lb_get_healthy_host_weight(
     envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index) {
   if (lb_envoy_ptr == nullptr) {
     return 0;
@@ -177,7 +177,7 @@ size_t envoy_dynamic_module_callback_lb_context_get_downstream_headers_count(
   return headers->size();
 }
 
-bool envoy_dynamic_module_callback_lb_context_get_downstream_header(
+bool envoy_dynamic_module_callback_lb_context_get_downstream_header_by_index(
     envoy_dynamic_module_type_lb_context_envoy_ptr context_envoy_ptr, size_t index,
     envoy_dynamic_module_type_envoy_buffer* key, envoy_dynamic_module_type_envoy_buffer* value) {
   if (context_envoy_ptr == nullptr || key == nullptr || value == nullptr) {
@@ -202,26 +202,6 @@ bool envoy_dynamic_module_callback_lb_context_get_downstream_header(
     return Envoy::Http::HeaderMap::Iterate::Continue;
   });
   return found;
-}
-
-bool envoy_dynamic_module_callback_lb_context_get_downstream_header_value(
-    envoy_dynamic_module_type_lb_context_envoy_ptr context_envoy_ptr,
-    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* value) {
-  if (context_envoy_ptr == nullptr || value == nullptr) {
-    return false;
-  }
-  const auto* headers = getContext(context_envoy_ptr)->downstreamHeaders();
-  if (headers == nullptr) {
-    return false;
-  }
-  absl::string_view key_view(key.ptr, key.length);
-  const auto result = headers->get(Envoy::Http::LowerCaseString(std::string(key_view)));
-  if (result.empty()) {
-    return false;
-  }
-  value->ptr = result[0]->value().getStringView().data();
-  value->length = result[0]->value().getStringView().size();
-  return true;
 }
 
 } // extern "C"

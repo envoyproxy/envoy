@@ -179,20 +179,19 @@ envoy_dynamic_module_callback_lb_get_priority_set_size(envoy_dynamic_module_type
   return 0;
 }
 
-__attribute__((weak)) bool
-envoy_dynamic_module_callback_lb_get_host_address(envoy_dynamic_module_type_lb_envoy_ptr, uint32_t,
-                                                  size_t,
-                                                  envoy_dynamic_module_type_envoy_buffer* result) {
-  IS_ENVOY_BUG("envoy_dynamic_module_callback_lb_get_host_address: "
+__attribute__((weak)) bool envoy_dynamic_module_callback_lb_get_healthy_host_address(
+    envoy_dynamic_module_type_lb_envoy_ptr, uint32_t, size_t,
+    envoy_dynamic_module_type_envoy_buffer* result) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_lb_get_healthy_host_address: "
                "not implemented in this context");
   result->ptr = nullptr;
   result->length = 0;
   return false;
 }
 
-__attribute__((weak)) uint32_t envoy_dynamic_module_callback_lb_get_host_weight(
+__attribute__((weak)) uint32_t envoy_dynamic_module_callback_lb_get_healthy_host_weight(
     envoy_dynamic_module_type_lb_envoy_ptr, uint32_t, size_t) {
-  IS_ENVOY_BUG("envoy_dynamic_module_callback_lb_get_host_weight: "
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_lb_get_healthy_host_weight: "
                "not implemented in this context");
   return 0;
 }
@@ -219,18 +218,10 @@ __attribute__((weak)) size_t envoy_dynamic_module_callback_lb_context_get_downst
   return 0;
 }
 
-__attribute__((weak)) bool envoy_dynamic_module_callback_lb_context_get_downstream_header(
+__attribute__((weak)) bool envoy_dynamic_module_callback_lb_context_get_downstream_header_by_index(
     envoy_dynamic_module_type_lb_context_envoy_ptr, size_t, envoy_dynamic_module_type_envoy_buffer*,
     envoy_dynamic_module_type_envoy_buffer*) {
-  IS_ENVOY_BUG("envoy_dynamic_module_callback_lb_context_get_downstream_header: "
-               "not implemented in this context");
-  return false;
-}
-
-__attribute__((weak)) bool envoy_dynamic_module_callback_lb_context_get_downstream_header_value(
-    envoy_dynamic_module_type_lb_context_envoy_ptr, envoy_dynamic_module_type_module_buffer,
-    envoy_dynamic_module_type_envoy_buffer*) {
-  IS_ENVOY_BUG("envoy_dynamic_module_callback_lb_context_get_downstream_header_value: "
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_lb_context_get_downstream_header_by_index: "
                "not implemented in this context");
   return false;
 }

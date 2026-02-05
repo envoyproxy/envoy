@@ -74,15 +74,15 @@ envoy_dynamic_module_on_lb_choose_host(envoy_dynamic_module_type_lb_envoy_ptr lb
   (void)host_count;
   (void)degraded_count;
 
-  // Test host address callback.
+  // Test healthy host address callback.
   if (healthy_count > 0) {
     envoy_dynamic_module_type_envoy_buffer address_result = {NULL, 0};
-    bool found = envoy_dynamic_module_callback_lb_get_host_address(
+    bool found = envoy_dynamic_module_callback_lb_get_healthy_host_address(
         lb_envoy_ptr, 0, 0, &address_result);
     (void)found;
 
-    // Test host weight callback.
-    uint32_t weight = envoy_dynamic_module_callback_lb_get_host_weight(
+    // Test healthy host weight callback.
+    uint32_t weight = envoy_dynamic_module_callback_lb_get_healthy_host_weight(
         lb_envoy_ptr, 0, 0);
     (void)weight;
 
@@ -100,25 +100,18 @@ envoy_dynamic_module_on_lb_choose_host(envoy_dynamic_module_type_lb_envoy_ptr lb
         envoy_dynamic_module_callback_lb_context_compute_hash_key(context_envoy_ptr, &hash);
     (void)has_hash;
 
-    // Test downstream headers count.
+    // Test downstream headers count and iteration.
     size_t headers_count =
         envoy_dynamic_module_callback_lb_context_get_downstream_headers_count(context_envoy_ptr);
 
-    // Test getting headers by index.
-    if (headers_count > 0) {
+    // Test iterating over headers by index.
+    for (size_t i = 0; i < headers_count; i++) {
       envoy_dynamic_module_type_envoy_buffer key = {NULL, 0};
       envoy_dynamic_module_type_envoy_buffer value = {NULL, 0};
-      bool found = envoy_dynamic_module_callback_lb_context_get_downstream_header(
-          context_envoy_ptr, 0, &key, &value);
-      (void)found;
+      bool success = envoy_dynamic_module_callback_lb_context_get_downstream_header_by_index(
+          context_envoy_ptr, i, &key, &value);
+      (void)success;
     }
-
-    // Test getting header value by key.
-    char test_key[] = "x-test-header";
-    envoy_dynamic_module_type_module_buffer key_buf = {test_key, strlen(test_key)};
-    envoy_dynamic_module_type_envoy_buffer value_result = {NULL, 0};
-    envoy_dynamic_module_callback_lb_context_get_downstream_header_value(
-        context_envoy_ptr, key_buf, &value_result);
   }
 
   if (healthy_count == 0) {

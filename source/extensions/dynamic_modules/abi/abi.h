@@ -6169,7 +6169,7 @@ size_t envoy_dynamic_module_callback_lb_get_priority_set_size(
     envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr);
 
 /**
- * envoy_dynamic_module_callback_lb_get_host_address returns the address of a host
+ * envoy_dynamic_module_callback_lb_get_healthy_host_address returns the address of a host
  * by index within the healthy hosts at a given priority.
  *
  * @param lb_envoy_ptr is the pointer to the Envoy load balancer object.
@@ -6178,20 +6178,20 @@ size_t envoy_dynamic_module_callback_lb_get_priority_set_size(
  * @param result is the output for the host address as a string.
  * @return true if the host was found, false otherwise.
  */
-bool envoy_dynamic_module_callback_lb_get_host_address(
+bool envoy_dynamic_module_callback_lb_get_healthy_host_address(
     envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index,
     envoy_dynamic_module_type_envoy_buffer* result);
 
 /**
- * envoy_dynamic_module_callback_lb_get_host_weight returns the load balancing weight of a host
- * by index within the healthy hosts at a given priority.
+ * envoy_dynamic_module_callback_lb_get_healthy_host_weight returns the load balancing weight
+ * of a host by index within the healthy hosts at a given priority.
  *
  * @param lb_envoy_ptr is the pointer to the Envoy load balancer object.
  * @param priority is the priority level.
  * @param index is the index of the host within healthy hosts.
  * @return the weight of the host (1-128), or 0 if the host was not found.
  */
-uint32_t envoy_dynamic_module_callback_lb_get_host_weight(
+uint32_t envoy_dynamic_module_callback_lb_get_healthy_host_weight(
     envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index);
 
 /**
@@ -6228,7 +6228,7 @@ size_t envoy_dynamic_module_callback_lb_context_get_downstream_headers_count(
     envoy_dynamic_module_type_lb_context_envoy_ptr context_envoy_ptr);
 
 /**
- * envoy_dynamic_module_callback_lb_context_get_downstream_header returns a downstream
+ * envoy_dynamic_module_callback_lb_context_get_downstream_header_by_index returns a downstream
  * request header by index.
  *
  * @param context_envoy_ptr is the pointer to the LoadBalancerContext.
@@ -6237,22 +6237,9 @@ size_t envoy_dynamic_module_callback_lb_context_get_downstream_headers_count(
  * @param value is the output for the header value.
  * @return true if the header was found, false otherwise.
  */
-bool envoy_dynamic_module_callback_lb_context_get_downstream_header(
+bool envoy_dynamic_module_callback_lb_context_get_downstream_header_by_index(
     envoy_dynamic_module_type_lb_context_envoy_ptr context_envoy_ptr, size_t index,
     envoy_dynamic_module_type_envoy_buffer* key, envoy_dynamic_module_type_envoy_buffer* value);
-
-/**
- * envoy_dynamic_module_callback_lb_context_get_downstream_header_value returns the value
- * of a downstream request header by key.
- *
- * @param context_envoy_ptr is the pointer to the LoadBalancerContext.
- * @param key is the header key to look up.
- * @param value is the output for the header value.
- * @return true if the header was found, false otherwise.
- */
-bool envoy_dynamic_module_callback_lb_context_get_downstream_header_value(
-    envoy_dynamic_module_type_lb_context_envoy_ptr context_envoy_ptr,
-    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* value);
 
 #ifdef __cplusplus
 }

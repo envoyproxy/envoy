@@ -157,12 +157,13 @@ TEST(CommonAbiImplTest, LbGetPrioritySetSizeEnvoyBug) {
       "not implemented in this context");
 }
 
-// Test that the weak symbol stub for lb_get_host_address triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, LbGetHostAddressEnvoyBug) {
+// Test that the weak symbol stub for lb_get_healthy_host_address triggers an ENVOY_BUG when called.
+TEST(CommonAbiImplTest, LbGetHealthyHostAddressEnvoyBug) {
   envoy_dynamic_module_type_envoy_buffer result = {nullptr, 0};
   EXPECT_ENVOY_BUG(
       {
-        auto success = envoy_dynamic_module_callback_lb_get_host_address(nullptr, 0, 0, &result);
+        auto success =
+            envoy_dynamic_module_callback_lb_get_healthy_host_address(nullptr, 0, 0, &result);
         EXPECT_FALSE(success);
       },
       "not implemented in this context");
@@ -170,11 +171,11 @@ TEST(CommonAbiImplTest, LbGetHostAddressEnvoyBug) {
   EXPECT_EQ(result.length, 0);
 }
 
-// Test that the weak symbol stub for lb_get_host_weight triggers an ENVOY_BUG when called.
-TEST(CommonAbiImplTest, LbGetHostWeightEnvoyBug) {
+// Test that the weak symbol stub for lb_get_healthy_host_weight triggers an ENVOY_BUG when called.
+TEST(CommonAbiImplTest, LbGetHealthyHostWeightEnvoyBug) {
   EXPECT_ENVOY_BUG(
       {
-        auto weight = envoy_dynamic_module_callback_lb_get_host_weight(nullptr, 0, 0);
+        auto weight = envoy_dynamic_module_callback_lb_get_healthy_host_weight(nullptr, 0, 0);
         EXPECT_EQ(weight, 0);
       },
       "not implemented in this context");
@@ -213,29 +214,15 @@ TEST(CommonAbiImplTest, LbContextGetDownstreamHeadersCountEnvoyBug) {
       "not implemented in this context");
 }
 
-// Test that the weak symbol stub for lb_context_get_downstream_header triggers an ENVOY_BUG when
-// called.
-TEST(CommonAbiImplTest, LbContextGetDownstreamHeaderEnvoyBug) {
+// Test that the weak symbol stub for lb_context_get_downstream_header_by_index triggers an
+// ENVOY_BUG when called.
+TEST(CommonAbiImplTest, LbContextGetDownstreamHeaderByIndexEnvoyBug) {
   envoy_dynamic_module_type_envoy_buffer key = {nullptr, 0};
   envoy_dynamic_module_type_envoy_buffer value = {nullptr, 0};
   EXPECT_ENVOY_BUG(
       {
-        auto success = envoy_dynamic_module_callback_lb_context_get_downstream_header(nullptr, 0,
-                                                                                      &key, &value);
-        EXPECT_FALSE(success);
-      },
-      "not implemented in this context");
-}
-
-// Test that the weak symbol stub for lb_context_get_downstream_header_value triggers an ENVOY_BUG
-// when called.
-TEST(CommonAbiImplTest, LbContextGetDownstreamHeaderValueEnvoyBug) {
-  envoy_dynamic_module_type_module_buffer key = {"test", 4};
-  envoy_dynamic_module_type_envoy_buffer value = {nullptr, 0};
-  EXPECT_ENVOY_BUG(
-      {
-        auto success = envoy_dynamic_module_callback_lb_context_get_downstream_header_value(
-            nullptr, key, &value);
+        auto success = envoy_dynamic_module_callback_lb_context_get_downstream_header_by_index(
+            nullptr, 0, &key, &value);
         EXPECT_FALSE(success);
       },
       "not implemented in this context");
