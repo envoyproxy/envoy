@@ -43,12 +43,10 @@ Envoy binary that loads it.
 Envoy's dynamic modules have stricter compatibility requirements than Envoy's other extension mechanisms, such as Lua, Wasm or External Processor.
 Stabilizing the ABI is challenging due to the way the ABI needs to be tightly coupled to Envoy's internals.
 
-Currently, we guarantee **forward compatibility within one minor version**: a dynamic module built with the SDK for Envoy version X.Y will work with Envoy versions X.Y and X.(Y+1).
-This means breaking changes to the ABI will only occur after a one-version deprecation window. For example, a module compiled against the SDK from Envoy 1.38
-is guaranteed to work with both Envoy 1.38 and Envoy 1.39, but may not work with Envoy 1.40 if breaking changes were introduced in that version.
+Currently, we guarantee **forward compatibility within one version**: a dynamic module built with the SDK for Envoy version X.Y will work with Envoy versions X.Y and X.(Y+1).
+Breaking changes to the ABI may occur in later versions.
 
-To ensure compatibility, it is recommended to rebuild your dynamic modules with the SDK matching your target Envoy version. Since the SDK lives inside the Envoy repository,
-using the same commit hash or release tag of the Envoy version is the best way to ensure compatibility.
+To ensure compatibility, it is recommended to rebuild your dynamic modules with the SDK matching your target Envoy version in a timely manner.
 
 Module discovery
 --------------------------
