@@ -34,7 +34,8 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //   extension sets the ``Counter`` and the ``Histogram`` as evictable in the
 //   stats scope. They will be evicted periodically and only the delta values
 //   are effective. Gauges will be kept in memory for their lifetime because
-//   PAIRED_ADD/PAIRED_SUBTRACT/SET operations depend on the previous status. Please have an estimate on the cardinality of dynamic gauges introduced
+//   PAIRED_ADD/PAIRED_SUBTRACT/SET operations depend on the previous status.
+//   Please have an estimate on the cardinality of dynamic gauges introduced
 //   and keep in mind on the memory overhead.
 
 // [#next-free-field: 6]
@@ -143,7 +144,8 @@ message Config {
       // DownstreamStart/DownstreamEnd) to increment and decrement the gauge.
       // iii). During runtime, PAIRED_SUBTRACT will execute if and only if
       // PAIRED_ADD operation has been done, tracked by inflight counter in
-      // filter state. iv). If the PAIRED_ADD operation was executed, the
+      // filter state. 
+      // iv). If the PAIRED_ADD operation was executed, the
       // PAIRED_SUBTRACT will happen when the stream/connection is closed, even
       // if the configured log type didn't happen.
       enum OperationType {
