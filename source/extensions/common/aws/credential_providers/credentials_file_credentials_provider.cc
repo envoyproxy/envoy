@@ -19,7 +19,8 @@ CredentialsFileCredentialsProvider::CredentialsFileCredentialsProvider(
     auto provider_or_error_ = Config::DataSource::DataSourceProvider<std::string>::create(
         credential_file_config.credentials_data_source(), context.mainThreadDispatcher(),
         context.threadLocal(), context.api(), false,
-        [](absl::string_view data) { return std::make_shared<std::string>(data); }, 4096);
+        [](absl::string_view data) { return std::make_shared<std::string>(data); }, 4096,
+        absl::nullopt);
     if (provider_or_error_.ok()) {
       credential_file_data_source_provider_ = std::move(provider_or_error_.value());
       if (credential_file_config.credentials_data_source().has_watched_directory()) {

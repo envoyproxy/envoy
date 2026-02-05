@@ -44,7 +44,7 @@ absl::Status IAMRolesAnywhereX509CredentialsProvider::initialize() {
       certificate_data_source_, context_.mainThreadDispatcher(), context_.threadLocal(),
       context_.api(), false,
       [](absl::string_view data) { return std::make_shared<std::string>(data); },
-      X509_CERTIFICATE_MAX_BYTES);
+      X509_CERTIFICATE_MAX_BYTES, absl::nullopt);
   if (provider_or_error.ok()) {
     certificate_data_source_provider_ = std::move(provider_or_error.value());
   } else {
@@ -59,7 +59,7 @@ absl::Status IAMRolesAnywhereX509CredentialsProvider::initialize() {
         certificate_chain_data_source_.value(), context_.mainThreadDispatcher(),
         context_.threadLocal(), context_.api(), false,
         [](absl::string_view data) { return std::make_shared<std::string>(data); },
-        X509_CERTIFICATE_MAX_BYTES * 5);
+        X509_CERTIFICATE_MAX_BYTES * 5, absl::nullopt);
     if (chain_provider_or_error_.ok()) {
       certificate_chain_data_source_provider_ = std::move(chain_provider_or_error_.value());
     } else {
@@ -75,7 +75,7 @@ absl::Status IAMRolesAnywhereX509CredentialsProvider::initialize() {
       private_key_data_source_, context_.mainThreadDispatcher(), context_.threadLocal(),
       context_.api(), false,
       [](absl::string_view data) { return std::make_shared<std::string>(data); },
-      X509_PRIVATE_KEY_MAX_BYTES);
+      X509_PRIVATE_KEY_MAX_BYTES, absl::nullopt);
   if (pkey_provider_or_error_.ok()) {
     private_key_data_source_provider_ = std::move(pkey_provider_or_error_.value());
   } else {

@@ -19,7 +19,11 @@ envoy_cc_library(
     deps = [
         "//envoy/http:filter_interface",
         "//envoy/runtime:runtime_interface",
+        "//envoy/thread_local:thread_local_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:callback_impl_lib",
+        "//source/common/common:thread_synchronizer_lib",
+        "//source/common/config:datasource_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
         "//source/common/network:lc_trie_lib",
@@ -35,6 +39,7 @@ envoy_cc_extension(
     hdrs = ["config.h"],
     deps = [
         "//envoy/registry",
+        "//envoy/thread_local:thread_local_interface",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/ip_tagging:ip_tagging_filter_lib",

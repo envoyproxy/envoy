@@ -3,6 +3,7 @@
 #include "envoy/extensions/filters/http/ip_tagging/v3/ip_tagging.pb.h"
 #include "envoy/extensions/filters/http/ip_tagging/v3/ip_tagging.pb.validate.h"
 #include "envoy/registry/registry.h"
+#include "envoy/thread_local/thread_local.h"
 
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/http/ip_tagging/ip_tagging_filter.h"
@@ -17,7 +18,10 @@ absl::StatusOr<Http::FilterFactoryCb> IpTaggingFilterFactory::createFilterFactor
     const std::string& stat_prefix, Server::Configuration::FactoryContext& context) {
 
   absl::StatusOr<IpTaggingFilterConfigSharedPtr> config = IpTaggingFilterConfig::create(
-      proto_config, stat_prefix, context.scope(), context.serverFactoryContext().runtime());
+      proto_config, stat_prefix, context.serverFactoryContext().singletonManager(), context.scope(),
+      context.serverFactoryContext().runtime(), context.serverFactoryContext().api(),
+      context.serverFactoryContext().threadLocal(),
+      context.serverFactoryContext().mainThreadDispatcher(), context.messageValidationVisitor());
   RETURN_IF_NOT_OK_REF(config.status());
   return
       [config = std::move(config.value())](Http::FilterChainFactoryCallbacks& callbacks) -> void {

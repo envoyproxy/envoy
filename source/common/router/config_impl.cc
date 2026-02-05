@@ -557,7 +557,7 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
         route.direct_response().body(), factory_context.mainThreadDispatcher(),
         factory_context.threadLocal(), factory_context.api(), true,
         [](absl::string_view data) { return std::make_shared<std::string>(data); },
-        vhost_->globalRouteConfig().maxDirectResponseBodySizeBytes());
+        vhost_->globalRouteConfig().maxDirectResponseBodySizeBytes(), absl::nullopt);
     SET_AND_RETURN_IF_NOT_OK(provider_or_error.status(), creation_status);
     direct_response_body_provider_ = std::move(provider_or_error.value());
   }

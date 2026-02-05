@@ -108,6 +108,7 @@ public:
    * @param data_transform_cb transforms content of the DataSource (type std::string)
    *        to the desired `DataType` type.
    * @param max_size max size limit of file to read, default 0 means no limit.
+   * @param data_update_cb optional callback that can be invoked upon data update in the DataSource.
    * @return absl::StatusOr<DataSourceProvider> with DataSource contents. or an error
    * status if any error occurs.
    * NOTE: If file watch is enabled and the new file content does not meet the
@@ -117,7 +118,7 @@ public:
       const ProtoDataSource& source, Event::Dispatcher& main_dispatcher,
       ThreadLocal::SlotAllocator& tls, Api::Api& api, bool allow_empty,
       std::function<absl::StatusOr<std::shared_ptr<DataType>>(absl::string_view)> data_transform_cb,
-      uint64_t max_size) {
+      uint64_t max_size, absl::optional<std::function<void()>> data_update_cb) {
     auto initial_data_or_error = read(source, allow_empty, api, max_size);
     RETURN_IF_NOT_OK_REF(initial_data_or_error.status());
 
@@ -151,8 +152,8 @@ public:
     RETURN_IF_NOT_OK_REF(directory_watcher_or_error.status());
 
     directory_watcher_or_error.value()->setCallback([slot_ptr = slot.get(), &api, filename,
-                                                     allow_empty, max_size,
-                                                     data_transform_cb]() -> absl::Status {
+                                                     allow_empty, max_size, data_transform_cb,
+                                                     data_update_cb]() -> absl::Status {
       auto new_data_or_error = readFile(filename, api, allow_empty, max_size);
       if (!new_data_or_error.ok()) {
         // Log an error but don't fail the watch to avoid throwing EnvoyException at runtime.
@@ -169,13 +170,16 @@ public:
         return absl::OkStatus();
       }
 
-      slot_ptr->runOnAllThreads([new_data = std::make_shared<DataType>(
-                                     std::move(*transformed_new_data_or_error.value()))](
-                                    OptRef<typename DynamicData<DataType>::ThreadLocalData> obj) {
-        if (obj.has_value()) {
-          obj->data_ = new_data;
-        }
-      });
+      slot_ptr->runOnAllThreads(
+          [new_data = std::make_shared<DataType>(std::move(*transformed_new_data_or_error.value())),
+           data_update_cb](OptRef<typename DynamicData<DataType>::ThreadLocalData> obj) {
+            if (obj.has_value()) {
+              obj->data_ = new_data;
+              if (data_update_cb.has_value()) {
+                data_update_cb.value()();
+              }
+            }
+          });
       return absl::OkStatus();
       ;
     });
