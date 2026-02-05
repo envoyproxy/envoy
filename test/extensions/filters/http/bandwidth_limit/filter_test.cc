@@ -2,6 +2,7 @@
 
 #include "source/extensions/filters/http/bandwidth_limit/bandwidth_limit.h"
 
+#include "test/test_common/status_utility.h"
 #include "test/mocks/http/mocks.h"
 
 #include "gmock/gmock.h"
@@ -27,7 +28,7 @@ public:
     TestUtility::loadFromYaml(std::string{yaml}, config);
     auto config_or_status =
         FilterConfig::create(config, nullptr, *stats_.rootScope(), runtime_, time_system_, true);
-    EXPECT_TRUE(config_or_status.ok());
+    EXPECT_OK(config_or_status);
     config_ = *config_or_status;
     filter_ = std::make_shared<BandwidthLimiter>(config_);
     filter_->setDecoderFilterCallbacks(decoder_filter_callbacks_);
@@ -76,6 +77,53 @@ TEST_F(FilterTest, Disabled) {
   enable_response_trailers: true
   )";
   setup(config_yaml);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+  EXPECT_EQ(0U, findCounter("test.http_bandwidth_limit.request_enabled"));
+  EXPECT_EQ(0U, findCounter("test.http_bandwidth_limit.request_enforced"));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
+  EXPECT_EQ(0U, findCounter("test.http_bandwidth_limit.response_enabled"));
+  EXPECT_EQ(false, response_trailers_.has("bandwidth-request-delay-ms"));
+  EXPECT_EQ(false, response_trailers_.has("bandwidth-response-delay-ms"));
+  EXPECT_EQ(false, response_trailers_.has("bandwidth-request-filter-delay-ms"));
+  EXPECT_EQ(false, response_trailers_.has("bandwidth-response-filter-delay-ms"));
+}
+
+TEST_F(FilterTest, DisabledInRouteConfig) {
+  constexpr absl::string_view config_yaml = R"(
+  stat_prefix: test
+  runtime_enabled:
+    default_value: true
+    runtime_key: foo_key
+  enable_mode: REQUEST_AND_RESPONSE
+  limit_kbps: 10
+  fill_interval: 1s
+  enable_response_trailers: true
+  )";
+  setup(config_yaml);
+  constexpr absl::string_view route_config_yaml = R"(
+  stat_prefix: test
+  runtime_enabled:
+    default_value: true
+    runtime_key: foo_key
+  enable_mode: DISABLED
+  limit_kbps: 10
+  fill_interval: 1s
+  enable_response_trailers: true
+  )";
+  envoy::extensions::filters::http::bandwidth_limit::v3::BandwidthLimit route_config;
+  TestUtility::loadFromYaml(std::string{route_config_yaml}, route_config);
+  auto route_config_or_status = FilterConfig::create(route_config, nullptr, *stats_.rootScope(),
+                                                     runtime_, time_system_, true);
+  ASSERT_OK(route_config_or_status);
+
+  EXPECT_CALL(decoder_filter_callbacks_, mostSpecificPerFilterConfig)
+      .WillRepeatedly(Return(route_config_or_status.value().get()));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
