@@ -89,6 +89,9 @@ constexpr absl::string_view SAMPLING = "sampling";
 constexpr absl::string_view COMPLETION = "completion";
 constexpr absl::string_view UNKNOWN = "unknown";
 } // namespace MethodGroups
+
+// Optional field that is always extracted if present.
+constexpr absl::string_view kOptionalMetaField = "params._meta";
 } // namespace McpConstants
 
 /**
@@ -96,8 +99,15 @@ constexpr absl::string_view UNKNOWN = "unknown";
  */
 class McpParserConfig {
 public:
+  struct FieldRequirements {
+    std::vector<std::string> required;
+    std::vector<std::string> optional;
+  };
+
+  // Rule for extracting a specific attribute from the JSON payload.
   struct AttributeExtractionRule {
-    std::string path; // JSON path (e.g., "params.name")
+    // JSON path to extract (e.g., "params.name", "params.uri").
+    std::string path;
 
     AttributeExtractionRule(const std::string& p) : path(p) {}
   };
@@ -115,6 +125,9 @@ public:
 
   // Get extraction policy for a specific method
   const std::vector<AttributeExtractionRule>& getFieldsForMethod(const std::string& method) const;
+
+  // Get merged requirements for a specific method (global + method-specific).
+  const FieldRequirements& getFieldRequirementsForMethod(const std::string& method) const;
 
   // Add method configuration
   void addMethodConfig(absl::string_view method, std::vector<AttributeExtractionRule> fields);
@@ -135,6 +148,9 @@ public:
 private:
   void initializeDefaults();
   std::string getBuiltInMethodGroup(const std::string& method) const;
+  void buildFieldRequirements();
+  void buildMethodRequirements(const std::vector<AttributeExtractionRule>& method_fields,
+                               FieldRequirements& requirements) const;
 
   // Per-method field policies
   absl::flat_hash_map<std::string, std::vector<AttributeExtractionRule>> method_fields_;
@@ -147,6 +163,9 @@ private:
 
   // Global fields to always extract
   absl::flat_hash_set<std::string> always_extract_;
+
+  FieldRequirements default_requirements_;
+  absl::flat_hash_map<std::string, FieldRequirements> method_requirements_;
 };
 
 /**
@@ -179,6 +198,12 @@ public:
   // Finalize extraction after parsing complete
   void finalizeExtraction();
 
+  // Check if optional fields are configured for the current method
+  bool hasOptionalFields();
+
+  // Check if all required fields have been collected
+  bool hasAllRequiredFields();
+
   // MCP validation getters
   bool isValidMcp() const { return is_valid_mcp_; }
   const std::string& getMethod() const { return method_; }
@@ -186,6 +211,12 @@ public:
 private:
   // Check if we have all fields we need for early stop
   void checkEarlyStop();
+
+  // Update required/optional field lists once method is known
+  void updateFieldRequirements();
+
+  // Verify required fields are present
+  bool requiredFieldsCollected() const;
 
   // Store field in temp storage
   void storeField(const std::string& path, const Protobuf::Value& value);
@@ -236,9 +267,15 @@ private:
   // Performance optimization caches
   std::string current_path_cache_;
   size_t fields_needed_{0};
+  size_t required_fields_needed_{0};
   size_t fields_collected_count_{0};
   bool fields_needed_updated_{false};
   bool is_notification_{false};
+  bool has_optional_fields_{false};
+  int params_depth_{0}; // Depth when we entered "params" object (0 = not in params)
+
+  std::vector<std::string> required_fields_;
+  std::vector<std::string> optional_fields_;
 };
 
 /**
@@ -259,6 +296,12 @@ public:
   bool isValidMcpRequest() const;
 
   bool isAllFieldsCollected() const { return all_fields_collected_; }
+
+  // Check if optional fields are configured for the current method
+  bool hasOptionalFields();
+
+  // Check if all required fields have been collected
+  bool hasAllRequiredFields();
 
   // Get the method string
   const std::string& getMethod() const;
