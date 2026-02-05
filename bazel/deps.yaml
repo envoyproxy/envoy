@@ -784,10 +784,10 @@ emsdk:
   license_url: "https://github.com/emscripten-core/emsdk/blob/{version}/LICENSE"
 
 envoy_examples:
-  project_name: "envoy_examples"
+  project_name: "envoy-examples"
   project_desc: "Envoy proxy examples"
   project_url: "https://github.com/envoyproxy/examples"
-  release_date: "2026-01-29"
+  release_date: "2026-02-05"
   use_category:
   - test_only
   license: "Apache-2.0"
