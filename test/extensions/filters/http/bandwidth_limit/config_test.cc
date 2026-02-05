@@ -3,6 +3,7 @@
 
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
+#include "test/test_common/status_utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -51,12 +52,10 @@ TEST_F(FactoryTest, RouteSpecificFilterConfig) {
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
   TestUtility::loadFromYaml(config_yaml, *proto_config);
 
-  auto& context = factory_context_.server_factory_context_;
-
-  EXPECT_CALL(context.dispatcher_, createTimer_(_)).Times(0);
+  EXPECT_CALL(factory_context_.server_factory_context_.dispatcher_, createTimer_(_)).Times(0);
   const auto route_config =
       factory
-          .createRouteSpecificFilterConfig(*proto_config, context,
+          .createRouteSpecificFilterConfig(*proto_config, factory_context_.server_factory_context_,
                                            ProtobufMessage::getNullValidationVisitor())
           .value();
   const auto* config = dynamic_cast<const FilterConfig*>(route_config.get());
@@ -82,12 +81,10 @@ TEST_F(FactoryTest, RouteSpecificFilterConfigDisabledByDefault) {
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
   TestUtility::loadFromYaml(config_yaml, *proto_config);
 
-  auto& context = factory_context_.server_factory_context_;
-
-  EXPECT_CALL(context.dispatcher_, createTimer_(_)).Times(0);
+  EXPECT_CALL(factory_context_.server_factory_context_.dispatcher_, createTimer_(_)).Times(0);
   const auto route_config =
       factory
-          .createRouteSpecificFilterConfig(*proto_config, context,
+          .createRouteSpecificFilterConfig(*proto_config, factory_context_.server_factory_context_,
                                            ProtobufMessage::getNullValidationVisitor())
           .value();
   const auto* config = dynamic_cast<const FilterConfig*>(route_config.get());
@@ -107,12 +104,10 @@ TEST_F(FactoryTest, RouteSpecificFilterConfigDefault) {
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
   TestUtility::loadFromYaml(config_yaml, *proto_config);
 
-  auto& context = factory_context_.server_factory_context_;
-
-  EXPECT_CALL(context.dispatcher_, createTimer_(_)).Times(0);
+  EXPECT_CALL(factory_context_.server_factory_context_.dispatcher_, createTimer_(_)).Times(0);
   const auto route_config =
       factory
-          .createRouteSpecificFilterConfig(*proto_config, context,
+          .createRouteSpecificFilterConfig(*proto_config, factory_context_.server_factory_context_,
                                            ProtobufMessage::getNullValidationVisitor())
           .value();
   const auto* config = dynamic_cast<const FilterConfig*>(route_config.get());
@@ -135,11 +130,54 @@ TEST_F(FactoryTest, PerRouteConfigNoLimits) {
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
   TestUtility::loadFromYaml(config_yaml, *proto_config);
 
-  auto& context = factory_context_.server_factory_context_;
   const auto result = factory.createRouteSpecificFilterConfig(
-      *proto_config, context, ProtobufMessage::getNullValidationVisitor());
+      *proto_config, factory_context_.server_factory_context_,
+      ProtobufMessage::getNullValidationVisitor());
   EXPECT_EQ(result.status().message(), "limit must be set for per route filter config");
 }
+
+TEST_F(FactoryTest, FixedNameBucketSelectorUsesNamedBucket) {
+  const std::string config_yaml = R"(
+  stat_prefix: test
+  limit_kbps: 50
+  named_bucket_selector:
+    explicit_bucket: test_explicit_bucket
+  named_bucket_configurations:
+  - name: test_explicit_bucket
+    limit_kbps: 100
+    fill_interval: 0.02s
+  )";
+  BandwidthLimitFilterConfig factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
+  TestUtility::loadFromYaml(config_yaml, *proto_config);
+  const auto result = factory.createRouteSpecificFilterConfig(
+      *proto_config, factory_context_.server_factory_context_,
+      ProtobufMessage::getNullValidationVisitor());
+  ASSERT_OK(result);
+  const FilterConfig& config = dynamic_cast<const FilterConfig&>(*result.value());
+  EXPECT_THAT(config.bucketAndStats(mock_stream_info_)->fillInterval().count(), 20);
+}
+
+TEST_F(FactoryTest, FixedNameBucketSelectorCreatesDefaultBucket) {
+  const std::string config_yaml = R"(
+  stat_prefix: test
+  limit_kbps: 50
+  fill_interval: 0.03s
+  named_bucket_selector:
+    explicit_bucket: test_explicit_bucket
+    create_bucket_if_not_existing: true
+  )";
+  BandwidthLimitFilterConfig factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
+  TestUtility::loadFromYaml(config_yaml, *proto_config);
+  const auto result = factory.createRouteSpecificFilterConfig(
+      *proto_config, factory_context_.server_factory_context_,
+      ProtobufMessage::getNullValidationVisitor());
+  ASSERT_OK(result);
+  const FilterConfig& config = dynamic_cast<const FilterConfig&>(*result.value());
+  EXPECT_THAT(config.bucketAndStats(mock_stream_info_)->fillInterval().count(), 30);
+}
+
 } // namespace BandwidthLimitFilter
 } // namespace HttpFilters
 } // namespace Extensions
