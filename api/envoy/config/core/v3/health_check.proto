@@ -10,12 +10,12 @@ import "envoy/type/matcher/v3/string.proto";
 import "envoy/type/v3/http.proto";
 import "envoy/type/v3/range.proto";
 
-import "src/proto/grpc/health/v1/health.proto";
-
 import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
+
+import "src/proto/grpc/health/v1/health.proto";
 
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
@@ -231,7 +231,7 @@ message HealthCheck {
     repeated HeaderValueOption initial_metadata = 3 [(validate.rules).repeated = {max_items: 1000}];
 
     // Specifies a list of gRPC `grpc.health.v1.HealthCheckResponse.ServingStatus
-    // <https://github.com/grpc/grpc/blob/master/src/proto/grpc/health/v1/health.proto#L33>` that will be treated
+    // <https://github.com/grpc/grpc/blob/master/src/proto/grpc/health/v1/health.proto#L33>`_ that will be treated
     // as retriable health check failures and respect the unhealthy threshold instead of immediately marking the
     // host unhealthy. SERVING status is not retriable because that is a successful health check.
     repeated grpc.health.v1.HealthCheckResponse.ServingStatus retriable_serving_statuses = 4

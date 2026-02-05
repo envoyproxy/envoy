@@ -2,7 +2,6 @@
 
 #include <cstdint>
 
-#include "absl/container/flat_hash_set.h"
 #include "envoy/access_log/access_log.h"
 #include "envoy/api/api.h"
 #include "envoy/common/random_generator.h"
@@ -24,6 +23,7 @@
 #include "source/common/upstream/health_checker_impl.h"
 #include "source/extensions/health_checkers/common/health_checker_base_impl.h"
 
+#include "absl/container/flat_hash_set.h"
 #include "src/proto/grpc/health/v1/health.pb.h"
 
 namespace Envoy {
