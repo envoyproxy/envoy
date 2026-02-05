@@ -109,12 +109,18 @@ LoadBalancerBase::LoadBalancerBase(const PrioritySet& priority_set, ClusterLbSta
 
   priority_update_cb_ = priority_set_.addPriorityUpdateCb(
       [this](uint32_t priority, const HostVector&, const HostVector&) {
-        recalculatePerPriorityState(priority, priority_set_, per_priority_load_,
-                                    per_priority_health_, per_priority_degraded_,
-                                    total_healthy_hosts_);
-        recalculatePerPriorityPanic();
-        stashed_random_.clear();
+        dirty_priorities_.insert(priority);
       });
+
+  member_update_cb_ = priority_set_.addMemberUpdateCb([this](const HostVector&, const HostVector&) {
+    for (uint32_t priority : dirty_priorities_) {
+      recalculatePerPriorityState(priority, priority_set_, per_priority_load_, per_priority_health_,
+                                  per_priority_degraded_, total_healthy_hosts_);
+    }
+    dirty_priorities_.clear();
+    recalculatePerPriorityPanic();
+    stashed_random_.clear();
+  });
 }
 
 // The following cases are handled by
@@ -434,18 +440,22 @@ ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
 
   priority_update_cb_ = priority_set_.addPriorityUpdateCb(
       [this](uint32_t priority, const HostVector&, const HostVector&) {
-        // Make sure per_priority_state_ is as large as priority_set_.hostSetsPerPriority()
-        resizePerPriorityState();
-        // If P=0 changes, regenerate locality routing structures. Locality based routing is
-        // disabled at all other levels.
-        if (local_priority_set_ && priority == 0) {
-          regenerateLocalityRoutingStructures();
-        }
-
-        if (locality_weighted_balancing_) {
-          rebuildLocalityWrrForPriority(priority);
-        }
+        dirty_priorities_.insert(priority);
       });
+
+  member_update_cb_ = priority_set_.addMemberUpdateCb([this](const HostVector&, const HostVector&) {
+    resizePerPriorityState();
+    bool p0_changed = dirty_priorities_.contains(0);
+    if (locality_weighted_balancing_) {
+      for (uint32_t priority : dirty_priorities_) {
+        rebuildLocalityWrrForPriority(priority);
+      }
+    }
+    dirty_priorities_.clear();
+    if (local_priority_set_ && p0_changed) {
+      regenerateLocalityRoutingStructures();
+    }
+  });
   if (local_priority_set_) {
     // Multiple priorities are unsupported for local priority sets.
     // In order to support priorities correctly, one would have to make some assumptions about
@@ -932,10 +942,18 @@ EdfLoadBalancerBase::EdfLoadBalancerBase(
   // The downside of a full recompute is that time complexity is O(n * log n),
   // so we will need to do better at delta tracking to scale (see
   // https://github.com/envoyproxy/envoy/issues/2874).
+
   priority_update_cb_ = priority_set.addPriorityUpdateCb(
-      [this](uint32_t priority, const HostVector&, const HostVector&) { refresh(priority); });
+      [this](uint32_t priority, const HostVector&, const HostVector&) {
+        dirty_priorities_.insert(priority);
+      });
+
   member_update_cb_ =
       priority_set.addMemberUpdateCb([this](const HostVector& hosts_added, const HostVector&) {
+        for (uint32_t priority : dirty_priorities_) {
+          refresh(priority);
+        }
+        dirty_priorities_.clear();
         if (isSlowStartEnabled()) {
           recalculateHostsInSlowStart(hosts_added);
         }
