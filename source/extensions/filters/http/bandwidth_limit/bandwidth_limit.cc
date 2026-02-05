@@ -1,9 +1,6 @@
 #include "source/extensions/filters/http/bandwidth_limit/bandwidth_limit.h"
 
 #include <string>
-#include <vector>
-
-#include "envoy/http/codes.h"
 
 #include "source/common/http/utility.h"
 #include "source/common/stats/timespan_impl.h"
@@ -42,7 +39,7 @@ FilterConfig::FilterConfig(const BandwidthLimit& config,
                            std::shared_ptr<NamedBucketSelector> named_bucket_selector,
                            Stats::Scope& scope, Runtime::Loader& runtime, TimeSource& time_source,
                            bool per_route, absl::Status& creation_status)
-    : named_bucket_selector_(named_bucket_selector), runtime_(runtime), time_source_(time_source),
+    : named_bucket_selector_(named_bucket_selector), time_source_(time_source),
       enable_mode_(config.enable_mode()),
       limit_kbps_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, limit_kbps, 0)),
       enabled_(config.runtime_enabled(), runtime),

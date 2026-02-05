@@ -22,9 +22,9 @@ class FilterTest : public testing::Test {
 public:
   FilterTest() = default;
 
-  void setup(const std::string& yaml) {
+  void setup(absl::string_view yaml) {
     envoy::extensions::filters::http::bandwidth_limit::v3::BandwidthLimit config;
-    TestUtility::loadFromYaml(yaml, config);
+    TestUtility::loadFromYaml(std::string{yaml}, config);
     auto config_or_status =
         FilterConfig::create(config, nullptr, *stats_.rootScope(), runtime_, time_system_, true);
     EXPECT_TRUE(config_or_status.ok());
@@ -75,7 +75,7 @@ TEST_F(FilterTest, Disabled) {
   fill_interval: 1s
   enable_response_trailers: true
   )";
-  setup(fmt::format(config_yaml, "1"));
+  setup(config_yaml);
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
@@ -104,7 +104,7 @@ TEST_F(FilterTest, LimitOnDecode) {
   enable_response_trailers: true
   response_trailer_prefix: test
   )";
-  setup(fmt::format(config_yaml, "1"));
+  setup(config_yaml);
 
   ON_CALL(decoder_filter_callbacks_, bufferLimit()).WillByDefault(Return(1100));
   Event::MockTimer* token_timer =
@@ -229,7 +229,7 @@ TEST_F(FilterTest, LimitOnEncode) {
   enable_response_trailers: true
   response_trailer_prefix: test
   )";
-  setup(fmt::format(config_yaml, "1"));
+  setup(config_yaml);
 
   ON_CALL(encoder_filter_callbacks_, bufferLimit()).WillByDefault(Return(1100));
   ON_CALL(encoder_filter_callbacks_, addEncodedTrailers()).WillByDefault(ReturnRef(trailers_));
@@ -355,7 +355,7 @@ TEST_F(FilterTest, LimitOnDecodeAndEncode) {
   enable_response_trailers: true
   response_trailer_prefix: test
   )";
-  setup(fmt::format(config_yaml, "1"));
+  setup(config_yaml);
 
   ON_CALL(decoder_filter_callbacks_, bufferLimit()).WillByDefault(Return(1050));
   ON_CALL(encoder_filter_callbacks_, bufferLimit()).WillByDefault(Return(1100));
@@ -494,7 +494,7 @@ TEST_F(FilterTest, WithTrailers) {
   limit_kbps: 1
   response_trailer_prefix: test
   )";
-  setup(fmt::format(config_yaml, "1"));
+  setup(config_yaml);
 
   ON_CALL(decoder_filter_callbacks_, bufferLimit()).WillByDefault(Return(1050));
   ON_CALL(encoder_filter_callbacks_, bufferLimit()).WillByDefault(Return(1100));
@@ -572,7 +572,7 @@ TEST_F(FilterTest, WithTrailersNoEndStream) {
   limit_kbps: 1
   enable_response_trailers: true
   )";
-  setup(fmt::format(config_yaml, "1"));
+  setup(config_yaml);
 
   ON_CALL(decoder_filter_callbacks_, bufferLimit()).WillByDefault(Return(1050));
   ON_CALL(encoder_filter_callbacks_, bufferLimit()).WillByDefault(Return(1100));

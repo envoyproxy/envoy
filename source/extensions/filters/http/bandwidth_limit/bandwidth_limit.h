@@ -2,8 +2,6 @@
 
 #include <cstdint>
 #include <memory>
-#include <string>
-#include <vector>
 
 #include "envoy/extensions/filters/http/bandwidth_limit/v3/bandwidth_limit.pb.h"
 #include "envoy/http/filter.h"
@@ -11,15 +9,10 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/timespan.h"
 
-#include "source/common/common/assert.h"
 #include "source/common/common/shared_token_bucket_impl.h"
-#include "source/common/http/header_map_impl.h"
-#include "source/common/router/header_parser.h"
 #include "source/common/runtime/runtime_protos.h"
 #include "source/extensions/filters/http/bandwidth_limit/bucket_selectors.h"
 #include "source/extensions/filters/http/common/stream_rate_limiter.h"
-
-#include "absl/synchronization/mutex.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -39,7 +32,6 @@ public:
          Runtime::Loader& runtime, TimeSource& time_source, bool per_route = false);
 
   ~FilterConfig() override = default;
-  Runtime::Loader& runtime() { return runtime_; }
   OptRef<const BucketAndStats> bucketAndStats(const StreamInfo::StreamInfo& stream_info) const;
   TimeSource& timeSource() { return time_source_; }
   // Must call enabled() before calling limit().
@@ -65,7 +57,6 @@ private:
                absl::Status& creation_status);
 
   std::shared_ptr<NamedBucketSelector> named_bucket_selector_;
-  Runtime::Loader& runtime_;
   TimeSource& time_source_;
   const EnableMode enable_mode_;
   uint64_t limit_kbps_;
