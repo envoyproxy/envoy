@@ -46,8 +46,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/bazelbuild/buildtools/archive/v{version}.tar.gz"],
     ),
     envoy_examples = dict(
-        version = "0.1.8",
-        sha256 = "7a350305da51972f2acb13ccf8fd2c8d165f9e161cb41d85f49495e425898dc8",
+        version = "0.2.0",
+        sha256 = "4a2b8f6bc34518160366f8171134e1d70887bd98d01b06b235029486b8fc1611",
         strip_prefix = "examples-{version}",
         urls = ["https://github.com/envoyproxy/examples/archive/v{version}.tar.gz"],
     ),

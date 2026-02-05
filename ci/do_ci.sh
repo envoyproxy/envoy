@@ -884,7 +884,7 @@ case $CI_TARGET in
                   --host_action_env="DEV_CONTAINER_ID=${DEV_CONTAINER_ID}" \
                   --sandbox_writable_path="${HOME}/.docker/" \
                   --sandbox_writable_path="$HOME" \
-                  @envoy_examples//:verify_examples
+                  @envoy-examples//:verify_examples
         ;;
 
     verify.trigger)
