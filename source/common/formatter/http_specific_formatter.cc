@@ -385,11 +385,7 @@ absl::optional<std::string> PathFormatter::format(const Context& context,
     }
   }
 
-  // Truncate the path if needed.
-  if (max_length_.has_value()) {
-    path_view = SubstitutionFormatUtils::truncateStringView(path_view, max_length_);
-  }
-
+  path_view = SubstitutionFormatUtils::truncateStringView(path_view, max_length_);
   return std::string(path_view);
 }
 
