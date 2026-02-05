@@ -15,19 +15,18 @@ namespace {
 class AccessLogState : public StreamInfo::FilterState::Object {
 public:
   struct GaugeState {
-    Stats::GaugeSharedPtr gauge_;
+    Stats::Gauge* gauge_;
     uint64_t value_;
   };
 
   ~AccessLogState() override {
     for (const auto& [gauge_ptr, state] : inflight_gauges_) {
-      // Use the shared pointer to ensure the gauge is still valid.
       state.gauge_->sub(state.value_);
     }
   }
 
   void addInflightGauge(Stats::Gauge* gauge, uint64_t value) {
-    inflight_gauges_[gauge] = {Stats::GaugeSharedPtr(gauge), value};
+    inflight_gauges_[gauge] = {gauge, value};
   }
 
   absl::optional<uint64_t> removeInflightGauge(Stats::Gauge* gauge) {
@@ -43,8 +42,8 @@ public:
   static constexpr absl::string_view key() { return "envoy.access_loggers.stats.access_log_state"; }
 
 private:
-  // The map value holds a shared pointer to the gauge (GaugeSharedPtr) to prevent the gauge from
-  // being destroyed if it gets evicted from the stats scope while still in-flight.
+  // The map value holds a raw pointer to the gauge. We can safely do this because the gauge
+  // is guaranteed to be valid as we disabled eviction for gauges in the stats scope.
   absl::flat_hash_map<Stats::Gauge*, GaugeState> inflight_gauges_;
 };
 
