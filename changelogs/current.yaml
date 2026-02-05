@@ -98,7 +98,7 @@ new_features:
 - area: dynamic modules
   change: |
     Introduced the extended ABI forward compatibility mechanism for dynamic modules
-    where modules built with the SDK version can be loaded by Envoy
+    where modules built with a SDK version can be loaded by Envoy
     binaries of the next Envoy version. For example, A module built with the v1.38 SDK
     can now be loaded by an Envoy binary of v1.39.
 - area: mcp_router
