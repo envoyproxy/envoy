@@ -251,6 +251,7 @@ public:
     io::prometheus::client::MetricFamily metric_family;
     metric_family.set_name(prefixed_tag_extracted_name);
     metric_family.set_type(io::prometheus::client::MetricType::GAUGE);
+    metric_family.mutable_metric()->Reserve(text_readouts.size());
 
     for (const auto* text_readout : text_readouts) {
       auto* metric = metric_family.add_metric();
@@ -315,6 +316,7 @@ private:
     io::prometheus::client::MetricFamily metric_family;
     metric_family.set_name(prefixed_tag_extracted_name);
     metric_family.set_type(type);
+    metric_family.mutable_metric()->Reserve(metrics.size());
 
     for (const auto* metric : metrics) {
       auto* prom_metric = metric_family.add_metric();
@@ -336,6 +338,8 @@ private:
   void generateHistogramOutput(io::prometheus::client::MetricFamily& metric_family,
                                const std::vector<const Stats::ParentHistogram*>& histograms) const {
     metric_family.set_type(io::prometheus::client::MetricType::HISTOGRAM);
+    metric_family.mutable_metric()->Reserve(histograms.size());
+
     for (const auto* histogram : histograms) {
       auto* metric = metric_family.add_metric();
       addLabelsToMetric(metric, histogram->tags());
@@ -360,6 +364,8 @@ private:
   void generateSummaryOutput(io::prometheus::client::MetricFamily& metric_family,
                              const std::vector<const Stats::ParentHistogram*>& histograms) const {
     metric_family.set_type(io::prometheus::client::MetricType::SUMMARY);
+    metric_family.mutable_metric()->Reserve(histograms.size());
+
     for (const auto* histogram : histograms) {
       auto* metric = metric_family.add_metric();
       addLabelsToMetric(metric, histogram->tags());
@@ -565,7 +571,6 @@ bool useProtobufFormat(const StatsParams& params, const Http::RequestHeaderMap& 
           size_t semicolon_pos = entry.find(';');
           absl::string_view media_type =
               (semicolon_pos != absl::string_view::npos) ? entry.substr(0, semicolon_pos) : entry;
-          media_type = absl::StripAsciiWhitespace(media_type);
 
           if (media_type == "application/vnd.google.protobuf") {
             use_protobuf = true;

@@ -1,0 +1,20 @@
+global:
+  scrape_interval: 15s  # How often to scrape targets
+  evaluation_interval: 15s  # How often to evaluate rules
+
+scrape_configs:
+  - job_name: 'my-local-service'
+    metrics_path: '/stats/prometheus'
+    native_histogram_bucket_limit: 100
+    scrape_native_histograms: true
+    params:
+      native_histogram_max_buckets: [50]
+      filter: ['server.dispatcher.poll_delay_us']
+      histogram_buckets: ['prometheusnative']
+    scrape_protocols:
+      - 'PrometheusProto'
+      - 'PrometheusText0.0.4'
+    static_configs:
+      - targets: ['localhost:9901']
+        labels:
+          environment: 'local'
