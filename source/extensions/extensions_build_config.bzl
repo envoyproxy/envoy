@@ -300,12 +300,6 @@ EXTENSIONS = {
     "envoy.stat_sinks.wasm":                            "//source/extensions/stat_sinks/wasm:config",
 
     #
-    # SSE content parsers
-    #
-
-    "envoy.sse_content_parsers.json":                   "//source/extensions/sse_content_parsers/json:config",
-
-    #
     # Thrift filters
     #
 

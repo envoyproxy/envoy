@@ -100,9 +100,6 @@ paths:
     # StausOr where possible.
     - source/common/watchdog/abort_action_config.cc
     - source/extensions/watchdog/profile_action/config.cc
-    # SSE content parsers use exceptions for config validation
-    - source/extensions/sse_content_parsers/json/config.cc
-    - source/extensions/sse_content_parsers/json/json_content_parser_impl.cc
     - source/common/router/route_config_update_receiver_impl.cc
     - source/common/upstream/upstream_impl.cc
     - source/common/network/listen_socket_impl.cc

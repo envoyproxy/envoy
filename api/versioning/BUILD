@@ -262,7 +262,6 @@ proto_library(
         "//envoy/extensions/http/injected_credentials/oauth2/v3:pkg",
         "//envoy/extensions/http/original_ip_detection/custom_header/v3:pkg",
         "//envoy/extensions/http/original_ip_detection/xff/v3:pkg",
-        "//envoy/extensions/http/sse_content_parsers/json/v3:pkg",
         "//envoy/extensions/http/stateful_session/cookie/v3:pkg",
         "//envoy/extensions/http/stateful_session/envelope/v3:pkg",
         "//envoy/extensions/http/stateful_session/header/v3:pkg",

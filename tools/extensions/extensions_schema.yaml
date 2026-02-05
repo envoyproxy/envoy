@@ -114,7 +114,6 @@ categories:
 - envoy.retry_host_predicates
 - envoy.retry_priorities
 - envoy.route.early_data_policy
-- envoy.sse_content_parsers
 - envoy.stats_sinks
 - envoy.thrift_proxy.filters
 - envoy.tracers

@@ -348,8 +348,6 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/filters/http/json_to_metadata @cqi1217 @JuniorHsu @kbaichoo
 # SSE to metadata
 /*/extensions/filters/http/sse_to_metadata @JuniorHsu @kbaichoo @PeterL328
-# SSE content parsers
-/*/extensions/sse_content_parsers @JuniorHsu @kbaichoo @PeterL328
 # zookeeper
 /*/extensions/filters/network/zookeeper_proxy @JuniorHsu @Winbobob @mattklein123
 # Custom response filter
