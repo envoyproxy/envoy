@@ -287,7 +287,7 @@ private:
   using CentralCacheEntrySharedPtr = RefcountPtr<CentralCacheEntry>;
 
   struct ScopeImpl : public Scope {
-    ScopeImpl(ThreadLocalStoreImpl& parent, StatName prefix, bool evictable,
+    ScopeImpl(ThreadLocalStoreImpl& parent, StatName prefix, const EvictionSettings& settings,
               const ScopeStatsLimitSettings& limits = {});
     ~ScopeImpl() override;
 
@@ -301,9 +301,9 @@ private:
                                              Histogram::Unit unit) override;
     TextReadout& textReadoutFromStatNameWithTags(const StatName& name,
                                                  StatNameTagVectorOptConstRef tags) override;
-    ScopeSharedPtr createScope(const std::string& name, bool evictable = false,
+    ScopeSharedPtr createScope(const std::string& name, const EvictionSettings& settings = {},
                                const ScopeStatsLimitSettings& limits = {}) override;
-    ScopeSharedPtr scopeFromStatName(StatName name, bool evictable = false,
+    ScopeSharedPtr scopeFromStatName(StatName name, const EvictionSettings& settings = {},
                                      const ScopeStatsLimitSettings& limits = {}) override;
     const SymbolTable& constSymbolTable() const final { return parent_.constSymbolTable(); }
     SymbolTable& symbolTable() final { return parent_.symbolTable(); }
@@ -459,7 +459,7 @@ private:
 
     const uint64_t scope_id_;
     ThreadLocalStoreImpl& parent_;
-    const bool evictable_{};
+    const EvictionSettings eviction_settings_;
 
     const ScopeStatsLimitSettings limits_;
 

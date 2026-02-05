@@ -23,11 +23,19 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // :ref:`command operators <config_access_log_command_operators>`.
 // [#extension: envoy.access_loggers.stats]
 //
+//
 // .. warning::
 //   It is easy to configure and use this extension in ways that create very
 //   large numbers of stats in Envoy, which can cause excessive memory or CPU use
 //   leading to a denial of service in Envoy, or can overwhelm any configured
 //   stat sinks by sending too many unique metrics.
+//
+//   It is required to use a delta stat sink (e.g. OpenTelemetry) because this
+//   extension sets the ``Counter`` and the ``Histogram`` as evictable in the
+//   stats scope. They will be evicted periodically and only the delta values
+//   are effective. Gauges will be kept in memory for their lifetime because
+//   PAIRED_ADD/PAIRED_SUBTRACT/SET operations depend on the previous status. Please have an estimate on the cardinality of dynamic gauges introduced
+//   and keep in mind on the memory overhead.
 
 // [#next-free-field: 6]
 message Config {
@@ -117,31 +125,27 @@ message Config {
   //             name: "http_active_requests"
   //           operations:
   //           - log_type: DownstreamStart
-  //             operation_type: ADD
+  //             operation_type: PAIRED_ADD
   //           - log_type: DownstreamEnd
-  //             operation_type: SUBTRACT
+  //             operation_type: PAIRED_SUBTRACT
   //           value_fixed: 1
-  //
-  // .. warning::
-  //   Gauges have to be kept in memory for their lifetime because
-  //   ADD/SUBTRACT/SET operations depend on the previous status. Please have an
-  //   estimate on the cardinality of dynamic gauges introduced and keep in mind
-  //   on the memory overhead.
-  //
-  // Usage restrictions:
-  // i). Only one PAIRED_ADD/PAIRED_SUBTRACT pair at most can be defined in the
-  // ``operations``. PAIRED_ADD/PAIRED_SUBTRACT not matched with the other isn't
-  // allowed.
-  // ii). We only support add first then subtract logic and we rely on the
-  // symmetrical log types (e.g., DownstreamStart/DownstreamEnd) to increment
-  // and decrement the gauge.
-  // iii). During runtime, PAIRED_SUBTRACT will execute if and only if
-  // PAIRED_ADD operation has been done, tracked by inflight counter in filter
-  // state.
   message Gauge {
     // An operation to perform on the gauge.
     message Operation {
       // The operation to perform on the gauge.
+      //
+      // Usage restrictions:
+      // i). Only one PAIRED_ADD/PAIRED_SUBTRACT pair at most can be defined in
+      // the
+      // ``operations``. PAIRED_ADD/PAIRED_SUBTRACT not matched with the other
+      // isn't allowed. ii). We only support add first then subtract logic and
+      // we rely on the symmetrical log types (e.g.,
+      // DownstreamStart/DownstreamEnd) to increment and decrement the gauge.
+      // iii). During runtime, PAIRED_SUBTRACT will execute if and only if
+      // PAIRED_ADD operation has been done, tracked by inflight counter in
+      // filter state. iv). If the PAIRED_ADD operation was executed, the
+      // PAIRED_SUBTRACT will happen when the stream/connection is closed, even
+      // if the configured log type didn't happen.
       enum OperationType {
         // Not a valid operation. It will fail validation if used.
         UNSPECIFIED = 0;

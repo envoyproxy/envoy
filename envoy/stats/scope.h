@@ -21,6 +21,28 @@ class Scope;
 class Store;
 class TextReadout;
 
+/**
+ * Settings for deleting unused metrics from the scope caches.
+ */
+struct EvictionSettings {
+  /**
+   * If true, counters will be evicted if unused.
+   */
+  bool evict_counters = false;
+  /**
+   * If true, gauges will be evicted if unused.
+   */
+  bool evict_gauges = false;
+  /**
+   * If true, histograms will be evicted if unused.
+   */
+  bool evict_histograms = false;
+  /**
+   * If true, text readouts will be evicted if unused.
+   */
+  bool evict_text_readouts = false;
+};
+
 using CounterOptConstRef = absl::optional<std::reference_wrapper<const Counter>>;
 using GaugeOptConstRef = absl::optional<std::reference_wrapper<const Gauge>>;
 using HistogramOptConstRef = absl::optional<std::reference_wrapper<const Histogram>>;
@@ -82,11 +104,11 @@ public:
    * See also scopeFromStatName, which is preferred.
    *
    * @param name supplies the scope's namespace prefix.
-   * @param evictable whether unused metrics can be deleted from the scope caches. This requires
+   * @param settings settings for deleting unused metrics from the scope caches. This requires
    * that the metrics are not stored by reference.
    * @param limits metric limits for counters, gauges and histograms allowed in this scope.
    */
-  virtual ScopeSharedPtr createScope(const std::string& name, bool evictable = false,
+  virtual ScopeSharedPtr createScope(const std::string& name, const EvictionSettings& settings = {},
                                      const ScopeStatsLimitSettings& limits = {}) PURE;
 
   /**
@@ -95,11 +117,11 @@ public:
    * gracefully swapped in while an old scope with the same name is being destroyed.
    *
    * @param name supplies the scope's namespace prefix.
-   * @param evictable whether unused metrics can be deleted from the scope caches. This requires
+   * @param settings settings for deleting unused metrics from the scope caches. This requires
    * that the metrics are not stored by reference.
    * @param limits metric limits for counters, gauges and histograms allowed in this scope.
    */
-  virtual ScopeSharedPtr scopeFromStatName(StatName name, bool evictable = false,
+  virtual ScopeSharedPtr scopeFromStatName(StatName name, const EvictionSettings& settings = {},
                                            const ScopeStatsLimitSettings& limits = {}) PURE;
 
   /**

@@ -67,14 +67,13 @@ private:
   };
 
   struct Gauge {
+    using OperationType =
+        envoy::extensions::access_loggers::stats::v3::Config::Gauge::Operation::OperationType;
+
     NameAndTags stat_;
     Formatter::FormatterProviderPtr value_formatter_;
     uint64_t value_fixed_;
-    absl::InlinedVector<
-        std::pair<
-            envoy::data::accesslog::v3::AccessLogType,
-            envoy::extensions::access_loggers::stats::v3::Config::Gauge::Operation::OperationType>,
-        2>
+    absl::InlinedVector<std::pair<envoy::data::accesslog::v3::AccessLogType, OperationType>, 2>
         operations_;
   };
 

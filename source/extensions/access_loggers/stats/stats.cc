@@ -14,14 +14,20 @@ namespace {
 
 class AccessLogState : public StreamInfo::FilterState::Object {
 public:
+  struct GaugeState {
+    Stats::GaugeSharedPtr gauge_;
+    uint64_t value_;
+  };
+
   ~AccessLogState() override {
-    for (const auto& [gauge, value_pair] : inflight_gauges_) {
-      value_pair.first->sub(value_pair.second);
+    for (const auto& [gauge_ptr, state] : inflight_gauges_) {
+      // Use the shared pointer to ensure the gauge is still valid.
+      state.gauge_->sub(state.value_);
     }
   }
 
   void addInflightGauge(Stats::Gauge* gauge, uint64_t value) {
-    inflight_gauges_[gauge] = std::make_pair(Stats::GaugeSharedPtr(gauge), value);
+    inflight_gauges_[gauge] = {Stats::GaugeSharedPtr(gauge), value};
   }
 
   absl::optional<uint64_t> removeInflightGauge(Stats::Gauge* gauge) {
@@ -29,20 +35,17 @@ public:
     if (it == inflight_gauges_.end()) {
       return absl::nullopt;
     }
-    uint64_t value = it->second.second;
+    uint64_t value = it->second.value_;
     inflight_gauges_.erase(it);
     return value;
   }
 
-  static const std::string& key() {
-    static const std::string* kKey = new std::string("envoy.access_loggers.stats.access_log_state");
-    return *kKey;
-  }
+  static constexpr absl::string_view key() { return "envoy.access_loggers.stats.access_log_state"; }
 
 private:
   // The map value holds a shared pointer to the gauge (GaugeSharedPtr) to prevent the gauge from
   // being destroyed if it gets evicted from the stats scope while still in-flight.
-  absl::flat_hash_map<Stats::Gauge*, std::pair<Stats::GaugeSharedPtr, uint64_t>> inflight_gauges_;
+  absl::flat_hash_map<Stats::Gauge*, GaugeState> inflight_gauges_;
 };
 
 Formatter::FormatterProviderPtr
@@ -83,7 +86,14 @@ StatsAccessLog::StatsAccessLog(const envoy::extensions::access_loggers::stats::v
                                AccessLog::FilterPtr&& filter,
                                const std::vector<Formatter::CommandParserPtr>& commands)
     : Common::ImplBase(std::move(filter)),
-      scope_(context.statsScope().createScope(config.stat_prefix(), true /* evictable */)),
+      scope_(context.statsScope().createScope(
+          config.stat_prefix(),
+          Stats::EvictionSettings{/*evict_counters=*/true,
+                                  // Gauges cannot be evictable as we need to add/subtract based on
+                                  // their absolute values.
+                                  /*evict_gauges=*/false,
+                                  /*evict_histograms=*/true,
+                                  /*evict_text_readouts=*/true})),
       stat_name_pool_(scope_->symbolTable()), histograms_([&]() {
         std::vector<Histogram> histograms;
         for (const auto& hist_cfg : config.histograms()) {
@@ -117,10 +127,8 @@ StatsAccessLog::StatsAccessLog(const envoy::extensions::access_loggers::stats::v
       gauges_([&]() {
         std::vector<Gauge> gauges;
         for (const auto& gauge_cfg : config.gauges()) {
-          absl::InlinedVector<std::pair<envoy::data::accesslog::v3::AccessLogType,
-                                        envoy::extensions::access_loggers::stats::v3::Config::
-                                            Gauge::Operation::OperationType>,
-                              2>
+          absl::InlinedVector<
+              std::pair<envoy::data::accesslog::v3::AccessLogType, Gauge::OperationType>, 2>
               operations;
 
           int add_count = 0;
@@ -310,19 +318,16 @@ void StatsAccessLog::emitLogForGauge(const Gauge& gauge, const Formatter::Contex
     value = gauge.value_fixed_;
   }
 
-  using OperationType =
-      envoy::extensions::access_loggers::stats::v3::Config::Gauge::Operation::OperationType;
-  OperationType op = it->second;
+  Gauge::OperationType op = it->second;
 
   auto [tags, storage] = gauge.stat_.tags(context, stream_info, *scope_);
-  Stats::Gauge::ImportMode import_mode =
-      op == OperationType::Config_Gauge_Operation_OperationType_SET
-          ? Stats::Gauge::ImportMode::NeverImport
-          : Stats::Gauge::ImportMode::Accumulate;
+  using Operation = envoy::extensions::access_loggers::stats::v3::Config::Gauge::Operation;
+  Stats::Gauge::ImportMode import_mode = op == Operation::SET
+                                             ? Stats::Gauge::ImportMode::NeverImport
+                                             : Stats::Gauge::ImportMode::Accumulate;
   auto& gauge_stat = scope_->gaugeFromStatNameWithTags(gauge.stat_.name_, tags, import_mode);
 
-  if (op == OperationType::Config_Gauge_Operation_OperationType_PAIRED_ADD ||
-      op == OperationType::Config_Gauge_Operation_OperationType_PAIRED_SUBTRACT) {
+  if (op == Operation::PAIRED_ADD || op == Operation::PAIRED_SUBTRACT) {
     auto& filter_state = const_cast<StreamInfo::FilterState&>(stream_info.filterState());
     if (!filter_state.hasData<AccessLogState>(AccessLogState::key())) {
       filter_state.setData(AccessLogState::key(), std::make_shared<AccessLogState>(),
@@ -331,7 +336,7 @@ void StatsAccessLog::emitLogForGauge(const Gauge& gauge, const Formatter::Contex
     }
     auto* state = filter_state.getDataMutable<AccessLogState>(AccessLogState::key());
 
-    if (op == OperationType::Config_Gauge_Operation_OperationType_PAIRED_ADD) {
+    if (op == Operation::PAIRED_ADD) {
       state->addInflightGauge(&gauge_stat, value);
       gauge_stat.add(value);
     } else {
@@ -344,7 +349,7 @@ void StatsAccessLog::emitLogForGauge(const Gauge& gauge, const Formatter::Contex
   }
 
   switch (op) {
-  case OperationType::Config_Gauge_Operation_OperationType_SET:
+  case Operation::SET:
     gauge_stat.set(value);
     break;
   default:
