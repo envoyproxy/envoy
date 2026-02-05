@@ -10,7 +10,6 @@
 #include "source/common/common/logger.h"
 #include "source/common/protobuf/protobuf.h"
 
-// Adjust these paths if your JsonRpc headers are located elsewhere in your extension
 #include "source/common/json/json_rpc_field_extractor.h"
 #include "source/common/json/json_rpc_parser_config.h"
 
@@ -110,15 +109,14 @@ public:
   // Helper to get nested value from metadata
   const Protobuf::Value* getNestedValue(const std::string& dotted_path) const;
 
-  // Reset parser for reuse
+  // Reset parser
   void reset();
 
 private:
-  // TODO(tyxia): This config_ could be stored as a reference to if needed.
+  // TODO(tyxia): This config_ could be stored as a reference to if needed?
   A2aParserConfig config_;
   Protobuf::Struct metadata_;
   std::unique_ptr<A2aFieldExtractor> extractor_;
-  // Use the standard Envoy ProtobufUtil alias
   std::unique_ptr<ProtobufUtil::converter::JsonStreamParser> stream_parser_;
   bool parsing_started_{false};
   bool all_fields_collected_{false};

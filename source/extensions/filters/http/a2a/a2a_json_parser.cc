@@ -127,17 +127,14 @@ A2aParserConfig A2aParserConfig::createDefault() {
   return config;
 }
 
-// A2aFieldExtractor implementation
 A2aFieldExtractor::A2aFieldExtractor(Protobuf::Struct& metadata, const A2aParserConfig& config)
     : JsonRpcFieldExtractor(metadata, config) {}
 
-// A2aJsonParser implementation
 A2aJsonParser::A2aJsonParser(const A2aParserConfig& config) : config_(config) { reset(); }
 
 absl::Status A2aJsonParser::parse(absl::string_view data) {
   if (!parsing_started_) {
     extractor_ = std::make_unique<A2aFieldExtractor>(metadata_, config_);
-    // Use the Envoy Protobuf namespace alias
     stream_parser_ = std::make_unique<ProtobufUtil::converter::JsonStreamParser>(extractor_.get());
     parsing_started_ = true;
   }
