@@ -474,7 +474,7 @@ envoy_cc_test_binary(
         "//source/extensions/load_balancing_policies/ring_hash:config",
         "//source/extensions/load_balancing_policies/round_robin:config",
         "//source/extensions/transport_sockets/tls:config",
-        "@com_google_absl//absl/debugging:symbolize",
+        "@abseil-cpp//absl/debugging:symbolize",
     ],
 )
 
@@ -491,7 +491,7 @@ envoy_cc_test_binary(
         "//source/exe:stripped_main_base_lib",
         "//source/extensions/listener_managers/validation_listener_manager:validation_listener_manager_lib",
         "//source/extensions/transport_sockets/tls:config",
-        "@com_google_absl//absl/debugging:symbolize",
+        "@abseil-cpp//absl/debugging:symbolize",
     ],
 )
 
@@ -628,7 +628,7 @@ envoy_cc_test(
         "//test/integration/filters:set_response_code_filter_lib",
         "//test/mocks/http:http_mocks",
         "//test/test_common:utility_lib",
-        "@com_google_absl//absl/synchronization",
+        "@abseil-cpp//absl/synchronization",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
@@ -670,7 +670,7 @@ envoy_cc_test(
         "//test/mocks/upstream:retry_priority_mocks",
         "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
-        "@com_google_absl//absl/synchronization",
+        "@abseil-cpp//absl/synchronization",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
@@ -803,7 +803,7 @@ envoy_cc_test_library(
     ],
     deps = [
         "//test/integration/filters:test_socket_interface_lib",
-        "@com_google_absl//absl/synchronization",
+        "@abseil-cpp//absl/synchronization",
     ],
 )
 
@@ -1334,7 +1334,7 @@ envoy_cc_test_library(
         "//source/common/quic:active_quic_listener_lib",
         "//source/common/quic:quic_client_factory_lib",
         "//source/common/quic:quic_server_factory_lib",
-        "@com_github_google_quiche//:quic_test_tools_session_peer_lib",
+        "@quiche//:quic_test_tools_session_peer_lib",
     ]) + envoy_select_envoy_mobile_listener([
         "//source/common/listener_manager:listener_manager_lib",
     ]),
@@ -1481,7 +1481,7 @@ envoy_cc_test_library(
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_time_lib",
         "//test/test_common:test_time_system_interface",
-        "@com_google_absl//absl/synchronization",
+        "@abseil-cpp//absl/synchronization",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/http/header_validators/envoy_default/v3:pkg_cc_proto",
@@ -2735,8 +2735,8 @@ envoy_cc_test_library(
         "//test/integration/filters:stream_info_to_headers_filter_lib",
         "//test/integration/filters:test_listener_filter_lib",
         "//test/integration/filters:test_network_filter_lib",
-        "@com_github_google_quiche//:quic_test_tools_session_peer_lib",
-        "@com_github_google_quiche//:quic_test_tools_test_utils_lib",
+        "@quiche//:quic_test_tools_session_peer_lib",
+        "@quiche//:quic_test_tools_test_utils_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/overload/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
@@ -2915,7 +2915,7 @@ envoy_cc_test(
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/config:v2_link_hacks",
         "//test/test_common:registry_lib",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/runtime/v3:pkg_cc_proto",
     ],
@@ -2943,7 +2943,7 @@ envoy_cc_test(
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/config:v2_link_hacks",
         "//test/test_common:registry_lib",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/runtime/v3:pkg_cc_proto",

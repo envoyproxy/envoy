@@ -121,7 +121,7 @@ envoy_proto_library(
             "//test/mocks/network:network_mocks",
             "//test/mocks/server:overload_manager_mocks",
             "//test/test_common:test_runtime_lib",
-            "@com_github_google_quiche//:quiche_common_platform_test",
+            "@quiche//:quiche_common_platform_test",
         ],
     )
     for http_protocol in [
@@ -190,7 +190,7 @@ envoy_cc_benchmark_binary(
         "//source/common/http:codes_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_lib",
-        "@com_github_google_benchmark//:benchmark",
+        "@benchmark",
     ],
 )
 
@@ -386,7 +386,7 @@ envoy_cc_benchmark_binary(
     rbe_pool = "6gig",
     deps = [
         "//source/common/http:header_map_lib",
-        "@com_github_google_benchmark//:benchmark",
+        "@benchmark",
     ],
 )
 
@@ -729,7 +729,7 @@ envoy_cc_test(
         "//test/mocks/server:factory_context_mocks",
         "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
-        "@com_google_absl//absl/status",
+        "@abseil-cpp//absl/status",
         "@ocp-diag-core//ocpdiag/core/testing:status_matchers",
     ],
 )

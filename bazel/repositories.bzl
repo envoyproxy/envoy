@@ -79,12 +79,13 @@ def _cc_deps():
         patch_args = ["-p1"],
         patches = ["@envoy//bazel:grpc_httpjson_transcoding.patch"],
         repo_mapping = {
+            "@com_google_absl": "@abseil-cpp",
             "@com_google_protoconverter": "@proto-converter",
         },
     )
     external_http_archive(
         "proto-converter",
-        location_name = "com_google_protoconverter",
+        location_name = "proto_converter",
         patch_args = ["-p1"],
         patches = ["@envoy//bazel:com_google_protoconverter.patch"],
         patch_cmds = [
@@ -94,20 +95,23 @@ def _cc_deps():
             "rm src/google/protobuf/util/converter/port_def.inc",
             "rm src/google/protobuf/util/converter/port_undef.inc",
         ],
+        repo_mapping = {"@com_google_absl": "@abseil-cpp"},
     )
     external_http_archive(
         "proto-field-extraction",
-        location_name = "com_google_protofieldextraction",
+        location_name = "proto_field_extraction",
         repo_mapping = {
+            "@com_google_absl": "@abseil-cpp",
             "@ocp": "@ocp-diag-core",
         },
     )
     external_http_archive(
         "proto-processing",
-        location_name = "com_google_protoprocessinglib",
+        location_name = "proto_processing",
         patch_args = ["-p1"],
         patches = ["@envoy//bazel:proto_processing_lib.patch"],
         repo_mapping = {
+            "@com_google_absl": "@abseil-cpp",
             "@ocp": "@ocp-diag-core",
             "@com_google_protoconverter": "@proto-converter",
             "@com_google_protofieldextraction": "@proto-field-extraction",
@@ -116,6 +120,10 @@ def _cc_deps():
     external_http_archive(
         name = "ocp-diag-core",
         location_name = "ocp",
+        repo_mapping = {
+            "@com_google_absl": "@abseil-cpp",
+            "@com_google_googletest": "@googletest",
+        },
     )
 
 def _go_deps(skip_targets):
@@ -157,46 +165,43 @@ def envoy_dependencies(skip_targets = []):
     _boringssl_fips()
     _aws_lc()
 
-    # The long repo names (`com_github_fmtlib_fmt` instead of `fmtlib`) are
-    # semi-standard in the Bazel community, intended to avoid both duplicate
-    # dependencies and name conflicts.
-    _com_github_awslabs_aws_c_auth()
-    _com_github_axboe_liburing()
+    _aws_c_auth_testdata()
+    _liburing()
     _com_github_bazel_buildtools()
-    _com_github_cares_cares()
+    _c_ares()
     _com_github_openhistogram_libcircllhist()
-    _com_github_cyan4973_xxhash()
-    _com_github_datadog_dd_trace_cpp()
-    _com_github_mirror_tclap()
-    _com_github_envoyproxy_sqlparser()
-    _com_github_fmtlib_fmt()
-    _com_github_gabime_spdlog()
-    _com_github_google_benchmark()
-    _com_github_google_libprotobuf_mutator()
-    _com_github_google_libsxg()
-    _com_github_google_tcmalloc()
+    _xxhash()
+    _dd_trace_cpp()
+    _tclap()
+    _sql_parser()
+    _fmt()
+    _spdlog()
+    _benchmark()
+    _libprotobuf_mutator()
+    _libsxg()
+    _tcmalloc()
     _gperftools()
     _com_github_grpc_grpc()
     _rules_proto_grpc()
-    _com_github_unicode_org_icu()
-    _com_github_intel_ipp_crypto_crypto_mb()
+    _icu()
+    _ipp_crypto()
     _numactl()
     _uadk()
-    _com_github_intel_qatlib()
-    _com_github_intel_qatzip()
-    _com_github_qat_zstd()
-    _com_github_lz4_lz4()
-    _com_github_jbeder_yaml_cpp()
-    _com_github_libevent_libevent()
-    _com_github_luajit_luajit()
-    _com_github_nghttp2_nghttp2()
-    _com_github_msgpack_cpp()
-    _com_github_skyapm_cpp2sky()
-    _com_github_alibaba_hessian2_codec()
-    _com_github_nlohmann_json()
-    _com_github_ncopa_suexec()
-    _com_google_absl()
-    _com_google_googletest()
+    _qatlib()
+    _qatzip()
+    _qat_zstd()
+    _lz4()
+    _yaml_cpp()
+    _libevent()
+    _luajit()
+    _nghttp2()
+    _msgpack_cxx()
+    _cpp2sky()
+    _hessian2_codec()
+    _nlohmann_json()
+    _su_exec()
+    _abseil_cpp()
+    _googletest()
     _com_google_protobuf()
     _v8()
     _fast_float()
@@ -204,17 +209,17 @@ def envoy_dependencies(skip_targets = []):
     _dragonbox()
     _fp16()
     _simdutf()
-    _com_github_google_quiche()
+    _quiche()
     _googleurl()
-    _io_hyperscan()
-    _io_vectorscan()
+    _hyperscan()
+    _vectorscan()
     _io_opentelemetry_api_cpp()
-    _net_colm_open_source_colm()
-    _net_colm_open_source_ragel()
-    _intel_dlb()
+    _colm()
+    _ragel()
+    _dlb()
     _zlib_ng()
-    _org_boost()
-    _org_brotli()
+    _boost()
+    _brotli()
     _zstd()
     _re2()
     _proxy_wasm_cpp_sdk()
@@ -222,10 +227,10 @@ def envoy_dependencies(skip_targets = []):
     _emsdk()
     _rules_fuzzing()
     external_http_archive("proxy_wasm_rust_sdk")
-    _com_google_cel_cpp()
-    _com_github_google_perfetto()
+    _cel_cpp()
+    _perfetto()
     _rules_ruby()
-    external_http_archive("com_github_google_flatbuffers")
+    external_http_archive("flatbuffers")
     external_http_archive("bazel_features")
     external_http_archive("bazel_compdb")
     external_http_archive(
@@ -233,12 +238,12 @@ def envoy_dependencies(skip_targets = []):
     )
     external_http_archive("envoy_toolshed")
 
-    _com_github_maxmind_libmaxminddb()
+    _libmaxminddb()
     _thrift()
 
     external_http_archive("rules_license")
     external_http_archive("rules_pkg")
-    external_http_archive("com_github_aignas_rules_shellcheck")
+    external_http_archive("shellcheck")
 
     external_http_archive(
         name = "yq.bzl",
@@ -248,7 +253,7 @@ def envoy_dependencies(skip_targets = []):
     )
     external_http_archive("aspect_bazel_lib")
 
-    _com_github_fdio_vpp_vcl()
+    _vpp_vcl()
 
     _toolchains_llvm()
 
@@ -256,8 +261,8 @@ def envoy_dependencies(skip_targets = []):
     _go_deps(skip_targets)
     _rust_deps()
     _kafka_deps()
-    _com_github_wamr()
-    _com_github_wasmtime()
+    _wamr()
+    _wasmtime()
 
     switched_rules_by_language(
         name = "com_google_googleapis_imports",
@@ -313,15 +318,16 @@ def _com_github_openhistogram_libcircllhist():
         build_file = "@envoy//bazel/external:libcircllhist.BUILD",
     )
 
-def _com_github_awslabs_aws_c_auth():
+def _aws_c_auth_testdata():
     external_http_archive(
-        name = "com_github_awslabs_aws_c_auth",
+        name = "aws-c-auth-testdata",
+        location_name = "aws_c_auth_testdata",
         build_file = "@envoy//bazel/external:aws-c-auth.BUILD",
     )
 
-def _com_github_axboe_liburing():
+def _liburing():
     external_http_archive(
-        name = "com_github_axboe_liburing",
+        name = "liburing",
         build_file_content = BUILD_ALL_CONTENT,
         patch_args = ["-p1"],
         patches = ["@envoy//bazel/foreign_cc:liburing.patch"],
@@ -331,73 +337,76 @@ def _com_github_bazel_buildtools():
     # TODO(phlax): Add binary download
     #  cf: https://github.com/bazelbuild/buildtools/issues/367
     external_http_archive(
-        name = "com_github_bazelbuild_buildtools",
+        name = "buildtools",
     )
 
-def _com_github_cares_cares():
+def _c_ares():
     external_http_archive(
-        name = "com_github_cares_cares",
+        name = "c-ares",
+        location_name = "c_ares",
         build_file = "@envoy//bazel/external:c-ares.BUILD",
         patch_args = ["-p1"],
         patches = ["@envoy//bazel:c-ares.patch"],
     )
 
-def _com_github_cyan4973_xxhash():
+def _xxhash():
     external_http_archive(
-        name = "com_github_cyan4973_xxhash",
+        name = "xxhash",
         build_file = "@envoy//bazel/external:xxhash.BUILD",
     )
 
-def _com_github_envoyproxy_sqlparser():
+def _sql_parser():
     external_http_archive(
         name = "sql-parser",
-        location_name = "com_github_envoyproxy_sqlparser",
+        location_name = "sql_parser",
         build_file = "@envoy//bazel/external:sqlparser.BUILD",
     )
 
-def _com_github_mirror_tclap():
+def _tclap():
     external_http_archive(
-        name = "com_github_mirror_tclap",
+        name = "tclap",
         build_file = "@envoy//bazel/external:tclap.BUILD",
         patch_args = ["-p1"],
     )
 
-def _com_github_fmtlib_fmt():
+def _fmt():
     external_http_archive(
-        name = "com_github_fmtlib_fmt",
+        name = "fmt",
         build_file = "@envoy//bazel/external:fmtlib.BUILD",
     )
 
-def _com_github_gabime_spdlog():
+def _spdlog():
     external_http_archive(
-        name = "com_github_gabime_spdlog",
+        name = "spdlog",
         build_file = "@envoy//bazel/external:spdlog.BUILD",
     )
 
-def _com_github_google_benchmark():
+def _benchmark():
     external_http_archive(
-        name = "com_github_google_benchmark",
+        name = "benchmark",
+        repo_mapping = {"@com_google_googletest": "@googletest"},
     )
     external_http_archive(
         name = "libpfm",
-        build_file = "@com_github_google_benchmark//tools:libpfm.BUILD.bazel",
+        build_file = "@benchmark//tools:libpfm.BUILD.bazel",
     )
 
-def _com_github_google_libprotobuf_mutator():
+def _libprotobuf_mutator():
     external_http_archive(
-        name = "com_github_google_libprotobuf_mutator",
+        name = "libprotobuf-mutator",
+        location_name = "libprotobuf_mutator",
         build_file = "@envoy//bazel/external:libprotobuf_mutator.BUILD",
     )
 
-def _com_github_google_libsxg():
+def _libsxg():
     external_http_archive(
-        name = "com_github_google_libsxg",
+        name = "libsxg",
         build_file_content = BUILD_ALL_CONTENT,
     )
 
-def _com_github_unicode_org_icu():
+def _icu():
     external_http_archive(
-        name = "com_github_unicode_org_icu",
+        name = "icu",
         patches = ["@envoy//bazel/foreign_cc:icu.patch"],
         patch_args = ["-p1"],
         patch_cmds = [
@@ -407,9 +416,10 @@ def _com_github_unicode_org_icu():
         build_file_content = BUILD_ALL_CONTENT,
     )
 
-def _com_github_intel_ipp_crypto_crypto_mb():
+def _ipp_crypto():
     external_http_archive(
-        name = "com_github_intel_ipp_crypto_crypto_mb",
+        name = "ipp-crypto",
+        location_name = "ipp_crypto",
         build_file_content = BUILD_ALL_CONTENT,
     )
 
@@ -427,56 +437,60 @@ def _uadk():
         build_file_content = BUILD_ALL_CONTENT,
     )
 
-def _com_github_intel_qatlib():
+def _qatlib():
     external_http_archive(
-        name = "com_github_intel_qatlib",
+        name = "qatlib",
         build_file_content = BUILD_ALL_CONTENT,
         patches = ["@envoy//bazel/foreign_cc:qatlib.patch"],
         patch_args = ["-p1"],
     )
 
-def _com_github_intel_qatzip():
+def _qatzip():
     external_http_archive(
-        name = "com_github_intel_qatzip",
+        name = "qatzip",
         build_file_content = BUILD_ALL_CONTENT,
         patches = ["@envoy//bazel/foreign_cc:qatzip.patch"],
         patch_args = ["-p1"],
     )
 
-def _com_github_qat_zstd():
+def _qat_zstd():
     external_http_archive(
-        name = "com_github_qat_zstd",
+        name = "qat-zstd",
+        location_name = "qat_zstd",
         build_file_content = BUILD_ALL_CONTENT,
         patch_args = ["-p1"],
         patches = ["@envoy//bazel/foreign_cc:qatzstd.patch"],
     )
 
-def _com_github_lz4_lz4():
+def _lz4():
     external_http_archive(
-        name = "com_github_lz4_lz4",
+        name = "lz4",
         build_file_content = BUILD_ALL_CONTENT,
     )
 
-def _com_github_jbeder_yaml_cpp():
+def _yaml_cpp():
     external_http_archive(
-        name = "com_github_jbeder_yaml_cpp",
+        name = "yaml-cpp",
+        location_name = "yaml_cpp",
+        repo_mapping = {"@com_google_absl": "@abseil-cpp"},
     )
 
-def _com_github_libevent_libevent():
+def _libevent():
+    LIBEVENT_BUILD_CONTENT = """%s\nalias(name = "libevent", actual = ":all", visibility = ["//visibility:public"])""" % BUILD_ALL_CONTENT
     external_http_archive(
-        name = "com_github_libevent_libevent",
+        name = "libevent",
+        build_file_content = LIBEVENT_BUILD_CONTENT,
+    )
+
+def _colm():
+    external_http_archive(
+        name = "colm",
         build_file_content = BUILD_ALL_CONTENT,
     )
 
-def _net_colm_open_source_colm():
+def _ragel():
     external_http_archive(
-        name = "net_colm_open_source_colm",
-        build_file_content = BUILD_ALL_CONTENT,
-    )
-
-def _net_colm_open_source_ragel():
-    external_http_archive(
-        name = "net_colm_open_source_ragel",
+        name = "ragel",
         build_file_content = BUILD_ALL_CONTENT,
     )
 
@@ -489,9 +503,9 @@ def _zlib_ng():
 
 # Boost in general is not approved for Envoy use, and the header-only
 # dependency is only for the Hyperscan contrib package.
-def _org_boost():
+def _boost():
     external_http_archive(
-        name = "org_boost",
+        name = "boost",
         build_file_content = """
 filegroup(
     name = "header",
@@ -508,9 +522,9 @@ filegroup(
 # If you're looking for envoy-filter-example / envoy_filter_example
 # the hash is in ci/filter_example_setup.sh
 
-def _org_brotli():
+def _brotli():
     external_http_archive(
-        name = "org_brotli",
+        name = "brotli",
     )
 
 def _zstd():
@@ -519,15 +533,26 @@ def _zstd():
         build_file = "@envoy//bazel/external:zstd.BUILD",
     )
 
-def _com_google_cel_cpp():
+def _cel_cpp():
     external_http_archive(
-        name = "com_google_cel_cpp",
+        name = "cel-cpp",
+        location_name = "cel_cpp",
         patch_args = ["-p1"],
         patches = ["@envoy//bazel/foreign_cc:cel-cpp.patch"],
+        repo_mapping = {
+            "@com_google_absl": "@abseil-cpp",
+            "@com_google_cel_spec": "@cel-spec",
+            "@com_github_google_flatbuffers": "@flatbuffers",
+            "@com_googlesource_code_re2": "@re2",
+        },
     )
 
     # Load required dependencies that cel-cpp expects.
-    external_http_archive("com_google_cel_spec")
+    external_http_archive(
+        "cel-spec",
+        location_name = "cel_spec",
+        repo_mapping = {"@com_google_absl": "@abseil-cpp"},
+    )
 
     # cel-cpp references ``@antlr4-cpp-runtime//:antlr4-cpp-runtime`` but it internally
     # defines ``antlr4_runtimes`` with a cpp target.
@@ -544,11 +569,12 @@ alias(
     actual = "@antlr4_runtimes//:cpp",
 )
 """,
+        repo_mapping = {"@com_google_absl": "@abseil-cpp"},
     )
 
-def _com_github_google_perfetto():
+def _perfetto():
     external_http_archive(
-        name = "com_github_google_perfetto",
+        name = "perfetto",
         build_file_content = """
 package(default_visibility = ["//visibility:public"])
 cc_library(
@@ -559,9 +585,9 @@ cc_library(
 """,
     )
 
-def _com_github_nghttp2_nghttp2():
+def _nghttp2():
     external_http_archive(
-        name = "com_github_nghttp2_nghttp2",
+        name = "nghttp2",
         build_file_content = BUILD_ALL_CONTENT,
         patch_args = ["-p1"],
         # This patch cannot be picked up due to ABI rules. Discussion at;
@@ -573,26 +599,26 @@ def _com_github_nghttp2_nghttp2():
         ],
     )
 
-def _com_github_msgpack_cpp():
+def _msgpack_cxx():
     external_http_archive(
         name = "msgpack-cxx",
-        location_name = "com_github_msgpack_cpp",
+        location_name = "msgpack_cxx",
         build_file = "@envoy//bazel/external:msgpack.BUILD",
     )
 
-def _io_hyperscan():
+def _hyperscan():
     external_http_archive(
         name = "hyperscan",
-        location_name = "io_hyperscan",
+        location_name = "hyperscan",
         build_file_content = BUILD_ALL_CONTENT,
         patch_args = ["-p1"],
         patches = ["@envoy//bazel/foreign_cc:hyperscan.patch"],
     )
 
-def _io_vectorscan():
+def _vectorscan():
     external_http_archive(
         name = "vectorscan",
-        location_name = "io_vectorscan",
+        location_name = "vectorscan",
         build_file_content = BUILD_ALL_CONTENT,
         type = "tar.gz",
         patch_args = ["-p1"],
@@ -602,61 +628,65 @@ def _io_vectorscan():
 def _io_opentelemetry_api_cpp():
     external_http_archive(
         name = "opentelemetry-cpp",
-        location_name = "io_opentelemetry_cpp",
+        location_name = "opentelemetry_cpp",
+        repo_mapping = {"@com_google_absl": "@abseil-cpp"},
     )
 
-def _com_github_datadog_dd_trace_cpp():
-    external_http_archive("com_github_datadog_dd_trace_cpp")
+def _dd_trace_cpp():
+    external_http_archive(
+        "dd-trace-cpp",
+        location_name = "dd_trace_cpp",
+        repo_mapping = {"@com_google_absl": "@abseil-cpp"},
+    )
 
-def _com_github_skyapm_cpp2sky():
+def _cpp2sky():
     external_http_archive(
         name = "cpp2sky",
-        location_name = "com_github_skyapm_cpp2sky",
         patches = ["@envoy//bazel:com_github_skyapm_cpp2sky.patch"],
         patch_args = ["-p1"],
+        repo_mapping = {"@com_google_absl": "@abseil-cpp"},
     )
     external_http_archive(
         name = "skywalking_data_collect_protocol",
     )
 
-def _com_github_nlohmann_json():
+def _nlohmann_json():
     external_http_archive(
-        name = "com_github_nlohmann_json",
+        name = "nlohmann_json",
     )
 
-def _com_github_alibaba_hessian2_codec():
+def _hessian2_codec():
     external_http_archive(
         name = "hessian2-codec",
-        location_name = "com_github_alibaba_hessian2_codec",
+        location_name = "hessian2_codec",
+        repo_mapping = {"@com_google_absl": "@abseil-cpp"},
     )
 
-def _com_github_ncopa_suexec():
+def _su_exec():
     external_http_archive(
-        name = "com_github_ncopa_suexec",
+        name = "su-exec",
+        location_name = "su_exec",
         build_file = "@envoy//bazel/external:su-exec.BUILD",
     )
 
-def _com_google_googletest():
+def _googletest():
     external_http_archive(
-        "com_google_googletest",
+        "googletest",
         patches = ["@envoy//bazel:googletest.patch"],
         patch_args = ["-p1"],
-        repo_mapping = {
-            "@abseil-cpp": "@com_google_absl",
-            "@re2": "@com_googlesource_code_re2",
-        },
+        repo_mapping = {"@com_google_absl": "@abseil-cpp"},
     )
 
 # TODO(jmarantz): replace the use of bind and external_deps with just
 # the direct Bazel path at all sites.  This will make it easier to
 # pull in more bits of abseil as needed, and is now the preferred
 # method for pure Bazel deps.
-def _com_google_absl():
+def _abseil_cpp():
     external_http_archive(
-        name = "com_google_absl",
+        name = "abseil-cpp",
+        location_name = "abseil_cpp",
         patches = ["@envoy//bazel:abseil.patch"],
         patch_args = ["-p1"],
-        repo_mapping = {"@googletest": "@com_google_googletest"},
     )
 
 def _com_google_protobuf():
@@ -669,6 +699,7 @@ def _com_google_protobuf():
         patches = [
             "@envoy//bazel:rules_java.patch",
         ],
+        repo_mapping = {"@com_google_absl": "@abseil-cpp"},
     )
 
     for platform in PROTOC_VERSIONS:
@@ -685,9 +716,7 @@ def _com_google_protobuf():
         "com_google_protobuf",
         patches = ["@envoy//bazel:protobuf.patch"],
         patch_args = ["-p1"],
-        repo_mapping = {
-            "@abseil-cpp": "@com_google_absl",
-        },
+        repo_mapping = {"@com_google_absl": "@abseil-cpp"},
     )
 
 def _v8():
@@ -707,10 +736,6 @@ def _v8():
             "find ./src ./include -type f -exec sed -i.bak -e 's!#include \"third_party/dragonbox/src/include/dragonbox/dragonbox.h\"!#include \"dragonbox/dragonbox.h\"!' {} \\;",
             "find ./src ./include -type f -exec sed -i.bak -e 's!#include \"third_party/fast_float/src/include/fast_float/!#include \"fast_float/!' {} \\;",
         ],
-        repo_mapping = {
-            "@abseil-cpp": "@com_google_absl",
-            "@icu": "@com_github_unicode_org_icu",
-        },
     )
 
 def _fast_float():
@@ -745,11 +770,12 @@ def _simdutf():
         build_file = "@envoy//bazel/external:simdutf.BUILD",
     )
 
-def _com_github_google_quiche():
+def _quiche():
     external_http_archive(
-        name = "com_github_google_quiche",
+        name = "quiche",
         patch_cmds = ["find quiche/ -type f -name \"*.bazel\" -delete"],
         build_file = "@envoy//bazel/external:quiche.BUILD",
+        repo_mapping = {"@com_google_absl": "@abseil-cpp"},
     )
 
 def _googleurl():
@@ -757,6 +783,7 @@ def _googleurl():
         name = "googleurl",
         patches = ["@envoy//bazel/external:googleurl.patch"],
         patch_args = ["-p1"],
+        repo_mapping = {"@com_google_absl": "@abseil-cpp"},
     )
 
 def _com_github_grpc_grpc():
@@ -765,7 +792,9 @@ def _com_github_grpc_grpc():
         patch_args = ["-p1"],
         patches = ["@envoy//bazel:grpc.patch"],
         repo_mapping = {
+            "@com_google_absl": "@abseil-cpp",
             "@com_github_cncf_xds": "@xds",
+            "@com_googlesource_code_re2": "@re2",
             "@openssl": "@boringssl",
         },
     )
@@ -782,10 +811,7 @@ def _rules_proto_grpc():
     external_http_archive("rules_proto_grpc")
 
 def _re2():
-    external_http_archive(
-        "com_googlesource_code_re2",
-        repo_mapping = {"@abseil-cpp": "@com_google_absl"},
-    )
+    external_http_archive("re2")
 
 def _proxy_wasm_cpp_sdk():
     external_http_archive(
@@ -794,6 +820,7 @@ def _proxy_wasm_cpp_sdk():
         patches = [
             "@envoy//bazel:proxy_wasm_cpp_sdk.patch",
         ],
+        repo_mapping = {"@com_google_absl": "@abseil-cpp"},
     )
 
 def _proxy_wasm_cpp_host():
@@ -803,6 +830,7 @@ def _proxy_wasm_cpp_host():
         patches = [
             "@envoy//bazel:proxy_wasm_cpp_host.patch",
         ],
+        repo_mapping = {"@com_google_absl": "@abseil-cpp"},
     )
 
 def _emsdk():
@@ -810,21 +838,24 @@ def _emsdk():
         name = "emsdk",
         patch_args = ["-p2"],
         patches = ["@envoy//bazel:emsdk.patch"],
+        repo_mapping = {"@com_google_absl": "@abseil-cpp"},
     )
 
-def _com_github_luajit_luajit():
+def _luajit():
+    LUAJIT_BUILD_CONTENT = """%s\nalias(name = "luajit", actual = ":all", visibility = ["//visibility:public"])""" % BUILD_ALL_CONTENT
     external_http_archive(
-        name = "com_github_luajit_luajit",
-        build_file_content = BUILD_ALL_CONTENT,
+        name = "luajit",
+        build_file_content = LUAJIT_BUILD_CONTENT,
         patches = ["@envoy//bazel/foreign_cc:luajit.patch"],
         patch_args = ["-p1"],
     )
 
-def _com_github_google_tcmalloc():
+def _tcmalloc():
     external_http_archive(
-        name = "com_github_google_tcmalloc",
+        name = "tcmalloc",
         patches = ["@envoy//bazel:tcmalloc.patch"],
         patch_args = ["-p1"],
+        repo_mapping = {"@com_google_absl": "@abseil-cpp"},
     )
 
 def _gperftools():
@@ -832,24 +863,25 @@ def _gperftools():
         name = "gperftools",
     )
 
-def _com_github_wamr():
+def _wamr():
     external_http_archive(
-        name = "com_github_wamr",
+        name = "wamr",
         build_file_content = BUILD_ALL_CONTENT,
     )
 
 def _toolchains_llvm():
     external_http_archive(name = "toolchains_llvm")
 
-def _com_github_wasmtime():
+def _wasmtime():
     external_http_archive(
-        name = "com_github_wasmtime",
+        name = "wasmtime",
         build_file = "@proxy_wasm_cpp_host//:bazel/external/wasmtime.BUILD",
+        repo_mapping = {"@com_google_absl": "@abseil-cpp"},
     )
 
-def _intel_dlb():
+def _dlb():
     external_http_archive(
-        name = "intel_dlb",
+        name = "dlb",
         build_file_content = """
 filegroup(
     name = "libdlb",
@@ -866,6 +898,7 @@ def _rules_fuzzing():
     external_http_archive(
         name = "rules_fuzzing",
         repo_mapping = {
+            "@com_google_absl": "@abseil-cpp",
             "@fuzzing_py_deps": "@fuzzing_pip3",
         },
         # TODO(asraa): Try this fix for OSS-Fuzz build failure on tar command.
@@ -904,9 +937,10 @@ filegroup(
         patch_args = ["-p1"],
     )
 
-def _com_github_fdio_vpp_vcl():
+def _vpp_vcl():
     external_http_archive(
-        name = "com_github_fdio_vpp_vcl",
+        name = "vpp-vcl",
+        location_name = "vpp_vcl",
         build_file_content = _build_all_content(exclude = ["**/*doc*/**", "**/examples/**", "**/plugins/**"]),
         patches = ["@envoy//bazel/foreign_cc:vpp_vcl.patch"],
         patch_args = ["-p1"],
@@ -931,8 +965,9 @@ def _thrift():
         patch_cmds = ["mv src thrift"],
     )
 
-def _com_github_maxmind_libmaxminddb():
+def _libmaxminddb():
+    LIBMAXMINDDB_BUILD_CONTENT = """%s\nalias(name = "libmaxminddb", actual = ":all", visibility = ["//visibility:public"])""" % BUILD_ALL_CONTENT
     external_http_archive(
-        name = "com_github_maxmind_libmaxminddb",
-        build_file_content = BUILD_ALL_CONTENT,
+        name = "libmaxminddb",
+        build_file_content = LIBMAXMINDDB_BUILD_CONTENT,
     )

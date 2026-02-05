@@ -39,7 +39,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "73ad768dfe824c736d0a8a81521867b1fb7a822acda2ed265897c03de6ae6767",
         urls = ["https://github.com/bazelbuild/rules_apple/releases/download/{version}/rules_apple.{version}.tar.gz"],
     ),
-    com_github_bazelbuild_buildtools = dict(
+    buildtools = dict(
         version = "8.2.1",
         sha256 = "53119397bbce1cd7e4c590e117dcda343c2086199de62932106c80733526c261",
         strip_prefix = "buildtools-{version}",
@@ -84,25 +84,25 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "bazel-lib-{version}",
         urls = ["https://github.com/aspect-build/bazel-lib/archive/v{version}.tar.gz"],
     ),
-    com_google_absl = dict(
-        version = "20250814.1",
-        sha256 = "1692f77d1739bacf3f94337188b78583cf09bab7e420d2dc6c5605a4f86785a1",
+    abseil_cpp = dict(
+        version = "20260107.0",
+        sha256 = "4c124408da902be896a2f368042729655709db5e3004ec99f57e3e14439bc1b2",
         strip_prefix = "abseil-cpp-{version}",
         urls = ["https://github.com/abseil/abseil-cpp/archive/{version}.tar.gz"],
     ),
-    com_github_aignas_rules_shellcheck = dict(
+    shellcheck = dict(
         version = "0.4.0",
         sha256 = "cef935ea1088d2b45c5bc3630f8178c91ba367b071af2bfdcd16c042c5efe8ae",
         strip_prefix = "rules_shellcheck-{version}",
         urls = ["https://github.com/aignas/rules_shellcheck/archive/{version}.tar.gz"],
     ),
-    com_github_awslabs_aws_c_auth = dict(
+    aws_c_auth_testdata = dict(
         version = "0.9.5",
         sha256 = "39000bff55fe8c82265b9044a966ab37da5c192a775e1b68b6fcba7e7f9882fb",
         strip_prefix = "aws-c-auth-{version}",
         urls = ["https://github.com/awslabs/aws-c-auth/archive/refs/tags/v{version}.tar.gz"],
     ),
-    com_github_axboe_liburing = dict(
+    liburing = dict(
         version = "2.13",
         sha256 = "618e34dbea408fc9e33d7c4babd746036dbdedf7fce2496b1178ced0f9b5b357",
         strip_prefix = "liburing-liburing-{version}",
@@ -110,13 +110,13 @@ REPOSITORY_LOCATIONS_SPEC = dict(
     ),
     # This dependency is built only when performance tracing is enabled with the
     # option --define=perf_tracing=enabled. It's never built for releases.
-    com_github_google_perfetto = dict(
+    perfetto = dict(
         version = "53.0",
         sha256 = "b25023f3281165a1a7d7cde9f3ed2dfcfce022ffd727e77f6589951e0ba6af9a",
         strip_prefix = "perfetto-{version}/sdk",
         urls = ["https://github.com/google/perfetto/archive/v{version}.tar.gz"],
     ),
-    com_github_cares_cares = dict(
+    c_ares = dict(
         version = "1.34.6",
         sha256 = "912dd7cc3b3e8a79c52fd7fb9c0f4ecf0aaa73e45efda880266a2d6e26b84ef5",
         strip_prefix = "c-ares-{version}",
@@ -128,49 +128,49 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "libcircllhist-py-{version}",
         urls = ["https://github.com/openhistogram/libcircllhist/archive/refs/tags/py-{version}.tar.gz"],
     ),
-    com_github_cyan4973_xxhash = dict(
+    xxhash = dict(
         version = "0.8.3",
         sha256 = "aae608dfe8213dfd05d909a57718ef82f30722c392344583d3f39050c7f29a80",
         strip_prefix = "xxHash-{version}",
         urls = ["https://github.com/Cyan4973/xxHash/archive/v{version}.tar.gz"],
     ),
-    com_github_envoyproxy_sqlparser = dict(
+    sql_parser = dict(
         version = "3b40ba2d106587bdf053a292f7e3bb17e818a57f",
         sha256 = "96c10c8e950a141a32034f19b19cdeb1da48fe859cf96ae5e19f894f36c62c71",
         strip_prefix = "sql-parser-{version}",
         urls = ["https://github.com/envoyproxy/sql-parser/archive/{version}.tar.gz"],
     ),
-    com_github_mirror_tclap = dict(
+    tclap = dict(
         version = "1.2.5",
         sha256 = "7e87d13734076fa4f626f6144ce9a02717198b3f054341a6886e2107b048b235",
         strip_prefix = "tclap-{version}",
         urls = ["https://github.com/mirror/tclap/archive/v{version}.tar.gz"],
     ),
-    com_github_fmtlib_fmt = dict(
+    fmt = dict(
         version = "12.1.0",
         sha256 = "695fd197fa5aff8fc67b5f2bbc110490a875cdf7a41686ac8512fb480fa8ada7",
         strip_prefix = "fmt-{version}",
         urls = ["https://github.com/fmtlib/fmt/releases/download/{version}/fmt-{version}.zip"],
     ),
-    com_github_gabime_spdlog = dict(
+    spdlog = dict(
         version = "1.17.0",
         sha256 = "d8862955c6d74e5846b3f580b1605d2428b11d97a410d86e2fb13e857cd3a744",
         strip_prefix = "spdlog-{version}",
         urls = ["https://github.com/gabime/spdlog/archive/v{version}.tar.gz"],
     ),
-    com_github_google_libprotobuf_mutator = dict(
+    libprotobuf_mutator = dict(
         version = "1.5",
         sha256 = "895958881b4993df70b4f652c2d82c5bd97d22f801ca4f430d6546809df293d5",
         strip_prefix = "libprotobuf-mutator-{version}",
         urls = ["https://github.com/google/libprotobuf-mutator/archive/v{version}.tar.gz"],
     ),
-    com_github_google_libsxg = dict(
+    libsxg = dict(
         version = "beaa3939b76f8644f6833267e9f2462760838f18",
         sha256 = "082bf844047a9aeec0d388283d5edc68bd22bcf4d32eb5a566654ae89956ad1f",
         strip_prefix = "libsxg-{version}",
         urls = ["https://github.com/google/libsxg/archive/{version}.tar.gz"],
     ),
-    com_github_google_tcmalloc = dict(
+    tcmalloc = dict(
         version = "5da4a882003102fba0c0c0e8f6372567057332eb",
         sha256 = "fd92d64d8302f1677570fdff844e8152c314e559a6c788c6bfc3844954d0dabd",
         strip_prefix = "tcmalloc-{version}",
@@ -194,7 +194,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "rules_proto_grpc-{version}",
         urls = ["https://github.com/rules-proto-grpc/rules_proto_grpc/releases/download/{version}/rules_proto_grpc-{version}.tar.gz"],
     ),
-    com_github_unicode_org_icu = dict(
+    icu = dict(
         # When this is updated, make sure to update the icu.patch patch file and remove
         # all remaining Bazel build artifacts (for example WORKSPACE and BUILD.bazel files)
         # from the icu source code, to prevent Bazel from treating the foreign library
@@ -205,7 +205,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "icu",
         urls = ["https://github.com/unicode-org/icu/releases/download/release-{version}/icu4c-{version}-sources.zip"],
     ),
-    com_github_intel_ipp_crypto_crypto_mb = dict(
+    ipp_crypto = dict(
         version = "1.3.0",
         sha256 = "a1d87cb3b90fe4718609e4e9dd8343fd4531bb815e69bad901ac6b46f98b3b53",
         strip_prefix = "cryptography-primitives-{version}",
@@ -223,50 +223,50 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "uadk-{version}",
         urls = ["https://github.com/Linaro/uadk/archive/refs/tags/v{version}.tar.gz"],
     ),
-    com_github_intel_qatlib = dict(
+    qatlib = dict(
         version = "25.08.0",
         sha256 = "786101683b4817ded72c8ea51204a190aa26e0b5ac8205ee199c7a9438138770",
         strip_prefix = "qatlib-{version}",
         urls = ["https://github.com/intel/qatlib/archive/refs/tags/{version}.tar.gz"],
     ),
-    com_github_intel_qatzip = dict(
+    qatzip = dict(
         version = "1.3.1",
         sha256 = "75e6e57f49da739d0a509220263e9dabb30b1e8c94be11c809aecc0adf4ee2dc",
         strip_prefix = "QATzip-{version}",
         urls = ["https://github.com/intel/QATzip/archive/v{version}.tar.gz"],
     ),
-    com_github_qat_zstd = dict(
+    qat_zstd = dict(
         version = "1.0.0",
         sha256 = "00f2611719f0a1c9585965c6c3c1fe599119aa8e932a569041b1876ffc944fb3",
         strip_prefix = "QAT-ZSTD-Plugin-{version}",
         urls = ["https://github.com/intel/QAT-ZSTD-Plugin/archive/refs/tags/v{version}.tar.gz"],
     ),
-    com_github_luajit_luajit = dict(
+    luajit = dict(
         # LuaJIT only provides rolling releases
         version = "871db2c84ecefd70a850e03a6c340214a81739f0",
         sha256 = "ab3f16d82df6946543565cfb0d2810d387d79a3a43e0431695b03466188e2680",
         strip_prefix = "LuaJIT-{version}",
         urls = ["https://github.com/LuaJIT/LuaJIT/archive/{version}.tar.gz"],
     ),
-    com_github_nghttp2_nghttp2 = dict(
+    nghttp2 = dict(
         version = "1.66.0",
         sha256 = "e178687730c207f3a659730096df192b52d3752786c068b8e5ee7aeb8edae05a",
         strip_prefix = "nghttp2-{version}",
         urls = ["https://github.com/nghttp2/nghttp2/releases/download/v{version}/nghttp2-{version}.tar.gz"],
     ),
-    io_hyperscan = dict(
+    hyperscan = dict(
         version = "5.4.2",
         sha256 = "32b0f24b3113bbc46b6bfaa05cf7cf45840b6b59333d078cc1f624e4c40b2b99",
         strip_prefix = "hyperscan-{version}",
         urls = ["https://github.com/intel/hyperscan/archive/v{version}.tar.gz"],
     ),
-    io_vectorscan = dict(
+    vectorscan = dict(
         version = "5.4.11",
         sha256 = "905f76ad1fa9e4ae0eb28232cac98afdb96c479666202c5a4c27871fb30a2711",
         strip_prefix = "vectorscan-vectorscan-{version}",
         urls = ["https://codeload.github.com/VectorCamp/vectorscan/tar.gz/refs/tags/vectorscan/{version}"],
     ),
-    io_opentelemetry_cpp = dict(
+    opentelemetry_cpp = dict(
         version = "1.24.0",
         sha256 = "7b8e966affca1daf1906272f4d983631cad85fb6ea60fb6f55dcd1811a730604",
         strip_prefix = "opentelemetry-cpp-{version}",
@@ -278,25 +278,25 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "skywalking-data-collect-protocol-{version}",
         version = "10.3.0",
     ),
-    com_github_skyapm_cpp2sky = dict(
+    cpp2sky = dict(
         sha256 = "d7e52f517de5a1dc7d927dd63a2e5aa5cf8c2dcfd8fcf6b64e179978daf1c3ed",
         version = "0.6.0",
         strip_prefix = "cpp2sky-{version}",
         urls = ["https://github.com/SkyAPM/cpp2sky/archive/v{version}.tar.gz"],
     ),
-    com_github_datadog_dd_trace_cpp = dict(
+    dd_trace_cpp = dict(
         version = "2.0.0",
         sha256 = "e4a0dabc3e186ce99c71685178448f93c501577102cdc50ddbf12cbaaba54713",
         strip_prefix = "dd-trace-cpp-{version}",
         urls = ["https://github.com/DataDog/dd-trace-cpp/archive/v{version}.tar.gz"],
     ),
-    com_github_google_benchmark = dict(
+    benchmark = dict(
         version = "1.9.4",
         sha256 = "b334658edd35efcf06a99d9be21e4e93e092bd5f95074c1673d5c8705d95c104",
         strip_prefix = "benchmark-{version}",
         urls = ["https://github.com/google/benchmark/archive/v{version}.tar.gz"],
     ),
-    com_github_libevent_libevent = dict(
+    libevent = dict(
         # This SHA includes the new "prepare" and "check" watchers, used for event loop performance
         # stats (see https://github.com/libevent/libevent/pull/793) and the fix for a race condition
         # in the watchers (see https://github.com/libevent/libevent/pull/802).
@@ -312,7 +312,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "libevent-{version}",
         urls = ["https://github.com/libevent/libevent/archive/{version}.tar.gz"],
     ),
-    net_colm_open_source_colm = dict(
+    colm = dict(
         # The latest release version v0.14.7 prevents building statically (see
         # https://github.com/adrian-thurston/colm/issues/146). The latest SHA includes the fix (see
         # https://github.com/adrian-thurston/colm/commit/fc61ecb3a22b89864916ec538eaf04840e7dd6b5).
@@ -322,7 +322,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "colm-{version}",
         urls = ["https://github.com/adrian-thurston/colm/archive/{version}.tar.gz"],
     ),
-    net_colm_open_source_ragel = dict(
+    ragel = dict(
         # We used the stable release Ragel 6.10 previously and it is under GPLv2 license (see
         # http://www.colm.net/open-source/ragel). Envoy uses its binary only as a tool for
         # compiling contrib extension Hyperscan. For copyright consideration, we update Ragel to
@@ -335,13 +335,13 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "ragel-{version}",
         urls = ["https://github.com/adrian-thurston/ragel/archive/{version}.tar.gz"],
     ),
-    org_boost = dict(
+    boost = dict(
         version = "1.89.0",
         sha256 = "9de758db755e8330a01d995b0a24d09798048400ac25c03fc5ea9be364b13c93",
         strip_prefix = "boost_{underscore_version}",
         urls = ["https://archives.boost.io/release/{version}/source/boost_{underscore_version}.tar.gz"],
     ),
-    org_brotli = dict(
+    brotli = dict(
         version = "1.2.0",
         sha256 = "816c96e8e8f193b40151dad7e8ff37b1221d019dbcb9c35cd3fadbfe6477dfec",
         strip_prefix = "brotli-{version}",
@@ -359,7 +359,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "zlib-ng-{version}",
         urls = ["https://github.com/zlib-ng/zlib-ng/archive/{version}.tar.gz"],
     ),
-    com_github_jbeder_yaml_cpp = dict(
+    yaml_cpp = dict(
         version = "0.8.0",
         sha256 = "fbe74bbdcee21d656715688706da3c8becfd946d92cd44705cc6098bb23b3a16",
         strip_prefix = "yaml-cpp-{version}",
@@ -367,19 +367,19 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         # YAML is also used for runtime as well as controlplane. It shouldn't appear on the
         # dataplane but we can't verify this automatically due to code structure today.
     ),
-    com_github_msgpack_cpp = dict(
+    msgpack_cxx = dict(
         version = "7.0.0",
         sha256 = "7504b7af7e7b9002ce529d4f941e1b7fb1fb435768780ce7da4abaac79bb156f",
         strip_prefix = "msgpack-cxx-{version}",
         urls = ["https://github.com/msgpack/msgpack-c/releases/download/cpp-{version}/msgpack-cxx-{version}.tar.gz"],
     ),
-    com_github_alibaba_hessian2_codec = dict(
+    hessian2_codec = dict(
         version = "6f5a64770f0374a761eece13c8863b80dc5adcd8",
         sha256 = "bb4c4af6a7e3031160bf38dfa957b0ee950e2d8de47d4ba14c7a658c3a2c74d1",
         strip_prefix = "hessian2-codec-{version}",
         urls = ["https://github.com/alibaba/hessian2-codec/archive/{version}.tar.gz"],
     ),
-    com_github_nlohmann_json = dict(
+    nlohmann_json = dict(
         version = "3.12.0",
         sha256 = "4b92eb0c06d10683f7447ce9406cb97cd4b453be18d7279320f7b2f025c10187",
         strip_prefix = "json-{version}",
@@ -392,13 +392,13 @@ REPOSITORY_LOCATIONS_SPEC = dict(
     # there is no binary package available for the utility on Ubuntu
     # which is the base image used to build an envoy container.
     # This is not needed to build an envoy binary or run tests.
-    com_github_ncopa_suexec = dict(
+    su_exec = dict(
         version = "0.3",
         sha256 = "1de7479857879b6d14772792375290a87eac9a37b0524d39739a4a0739039620",
         strip_prefix = "su-exec-{version}",
         urls = ["https://github.com/ncopa/su-exec/archive/v{version}.tar.gz"],
     ),
-    com_google_googletest = dict(
+    googletest = dict(
         version = "1.17.0",
         sha256 = "65fab701d9829d38cb77c14acdc431d2108bfdbf8979e40eb8ae567edf10b27c",
         strip_prefix = "googletest-{version}",
@@ -420,19 +420,19 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "grpc-httpjson-transcoding-{version}",
         urls = ["https://github.com/grpc-ecosystem/grpc-httpjson-transcoding/archive/{version}.tar.gz"],
     ),
-    com_google_protoconverter = dict(
+    proto_converter = dict(
         version = "1db76535b86b80aa97489a1edcc7009e18b67ab7",
         sha256 = "9555d9cf7bd541ea5fdb67d7d6b72ea44da77df3e27b960b4155dc0c6b81d476",
         strip_prefix = "proto-converter-{version}",
         urls = ["https://github.com/grpc-ecosystem/proto-converter/archive/{version}.zip"],
     ),
-    com_google_protofieldextraction = dict(
+    proto_field_extraction = dict(
         version = "d5d39f0373e9b6691c32c85929838b1006bcb3fb",
         sha256 = "cba864db90806515afa553aaa2fb3683df2859a7535e53a32cb9619da9cebc59",
         strip_prefix = "proto-field-extraction-{version}",
         urls = ["https://github.com/grpc-ecosystem/proto-field-extraction/archive/{version}.zip"],
     ),
-    com_google_protoprocessinglib = dict(
+    proto_processing = dict(
         version = "279353cfab372ac7f268ae529df29c4d546ca18d",
         sha256 = "bac7a0d02fd8533cd5ce6d0f39dc324fc0565702d85a9ee3b65b0be8e7cbdd8d",
         strip_prefix = "proto_processing_lib-{version}",
@@ -491,13 +491,13 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "rules_shell-{version}",
         urls = ["https://github.com/bazelbuild/rules_shell/releases/download/v{version}/rules_shell-v{version}.tar.gz"],
     ),
-    com_github_wamr = dict(
+    wamr = dict(
         version = "WAMR-2.4.4",
         sha256 = "03ad51037f06235577b765ee042a462326d8919300107af4546719c35525b298",
         strip_prefix = "wasm-micro-runtime-{version}",
         urls = ["https://github.com/bytecodealliance/wasm-micro-runtime/archive/{version}.tar.gz"],
     ),
-    com_github_wasmtime = dict(
+    wasmtime = dict(
         version = "24.0.4",
         sha256 = "d714d987a50cfc7d0b384ef4720e7c757cf4f5b7df617cbf38e432a3dc6c400d",
         strip_prefix = "wasmtime-{version}",
@@ -547,7 +547,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "a8d2b481a2089280b84df7dc234223b658056b5bbd40bd4d476902d25d353a1f",
         urls = ["https://github.com/simdutf/simdutf/releases/download/v{version}/singleheader.zip"],
     ),
-    com_github_google_quiche = dict(
+    quiche = dict(
         version = "b7b4c0cfe393a57b8706b0f1be81518595daaa44",
         sha256 = "9d8344faf932165b6013f8fdd2cbfe2be7c2e7a5129c5e572036d13718a3f1bf",
         urls = ["https://github.com/google/quiche/archive/{version}.tar.gz"],
@@ -559,25 +559,25 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/google/gurl/archive/{version}.tar.gz"],
         strip_prefix = "gurl-{version}",
     ),
-    com_google_cel_spec = dict(
+    cel_spec = dict(
         version = "0.25.1",
         sha256 = "13583c5a312861648449845b709722676a3c9b43396b6b8e9cbe4538feb74ad2",
         strip_prefix = "cel-spec-{version}",
         urls = ["https://github.com/google/cel-spec/archive/v{version}.tar.gz"],
     ),
-    com_google_cel_cpp = dict(
+    cel_cpp = dict(
         version = "0.14.0",
         sha256 = "0a4f9a1c0bcc83629eb30d1c278883d32dec0f701efcdabd7bebf33fef8dab71",
         strip_prefix = "cel-cpp-{version}",
         urls = ["https://github.com/google/cel-cpp/archive/v{version}.tar.gz"],
     ),
-    com_github_google_flatbuffers = dict(
+    flatbuffers = dict(
         version = "25.12.19",
         sha256 = "f81c3162b1046fe8b84b9a0dbdd383e24fdbcf88583b9cb6028f90d04d90696a",
         strip_prefix = "flatbuffers-{version}",
         urls = ["https://github.com/google/flatbuffers/archive/v{version}.tar.gz"],
     ),
-    com_googlesource_code_re2 = dict(
+    re2 = dict(
         version = "2024-07-02",
         sha256 = "a835fe55fbdcd8e80f38584ab22d0840662c67f2feb36bd679402da9641dc71e",
         strip_prefix = "re2-{version}",
@@ -643,13 +643,13 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         # is required which in turn requires a system CC toolchains, not the bazel controlled ones.
         urls = ["https://github.com/bazelbuild/rules_rust/releases/download/{version}/rules_rust-{version}.tar.gz"],
     ),
-    com_github_fdio_vpp_vcl = dict(
+    vpp_vcl = dict(
         version = "85abefb55ee931fa4e45c0b6a9fc8c43118651b3",
         sha256 = "5624c4a4407285d9f269d0041ed4fc8d5fa3664abc22850069236b026f97d3f2",
         strip_prefix = "vpp-{version}",
         urls = ["https://github.com/FDio/vpp/archive/{version}.tar.gz"],
     ),
-    intel_dlb = dict(
+    dlb = dict(
         version = "8.8.0",
         sha256 = "564534254ef32bfed56e0a464c53fca0907e446b30929c253210e2c3d6de58b9",
         urls = ["https://downloadmirror.intel.com/819078/dlb_linux_src_release_8.8.0.txz"],
@@ -665,7 +665,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "26d4021f6898e23b82ef953078389dd49ac2b5618ac564ade4ef87cced147b38",
         urls = ["https://github.com/bazelbuild/rules_license/releases/download/{version}/rules_license-{version}.tar.gz"],
     ),
-    com_github_maxmind_libmaxminddb = dict(
+    libmaxminddb = dict(
         version = "1.12.2",
         sha256 = "1bfbf8efba3ed6462e04e225906ad5ce5fe958aa3d626a1235b2a2253d600743",
         strip_prefix = "libmaxminddb-{version}",
@@ -683,7 +683,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "toolchains_llvm-v{version}",
         urls = ["https://github.com/bazel-contrib/toolchains_llvm/releases/download/v{version}/toolchains_llvm-v{version}.tar.gz"],
     ),
-    com_github_lz4_lz4 = dict(
+    lz4 = dict(
         version = "1.10.0",
         sha256 = "537512904744b35e232912055ccf8ec66d768639ff3abe5788d90d792ec5f48b",
         strip_prefix = "lz4-{version}",

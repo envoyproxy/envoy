@@ -31,8 +31,8 @@ envoy_cc_library(
         "//source/extensions/filters/network/generic_proxy:tracing_lib",
         "//source/extensions/filters/network/generic_proxy/interface:codec_interface",
         "//source/extensions/filters/network/generic_proxy/interface:filter_interface",
-        "@com_github_google_quiche//:quiche_common_lib",
         "@envoy_api//envoy/extensions/filters/network/generic_proxy/router/v3:pkg_cc_proto",
+        "@quiche//:quiche_common_lib",
     ],
 )
 

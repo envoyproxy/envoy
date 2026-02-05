@@ -19,7 +19,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/common/http:utility_lib",
         "//source/extensions/filters/http/grpc_json_reverse_transcoder:utils",
-        "@com_github_nlohmann_json//:json",
+        "@nlohmann_json//:json",
     ],
 )
 
@@ -45,11 +45,15 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
+    data = [
+        "//test/proto:bookstore_proto_descriptor",
+    ],
     extension_names = ["envoy.filters.http.grpc_json_reverse_transcoder"],
     rbe_pool = "6gig",
     deps = [
         "//source/extensions/filters/http/grpc_json_reverse_transcoder:config",
         "//test/mocks/server:factory_context_mocks",
+        "//test/test_common:environment_lib",
         "@envoy_api//envoy/extensions/filters/http/grpc_json_reverse_transcoder/v3:pkg_cc_proto",
     ],
 )
