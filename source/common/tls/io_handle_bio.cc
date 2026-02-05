@@ -65,6 +65,13 @@ int io_handle_read(BIO* b, char* out, int outl) {
     }
     return -1;
   }
+#ifdef ENVOY_SSL_OPENSSL
+  // Track EOF so that BIO_eof() returns the correct value. OpenSSL 3.2+ record layer
+  // calls BIO_eof() to distinguish EOF from errors when BIO_read returns 0.
+  if (result.return_value_ == 0) {
+    BIO_set_flags(b, 0x800); // BIO_FLAGS_IN_EOF
+  }
+#endif
   return result.return_value_;
 }
 
@@ -111,6 +118,9 @@ long io_handle_ctrl(BIO* b, int cmd, long num, void*) {
     break;
   case BIO_CTRL_SET_CLOSE:
     BIO_set_shutdown(b, int(num));
+    break;
+  case BIO_CTRL_EOF:
+    ret = (BIO_test_flags(b, 0x800) != 0); // BIO_FLAGS_IN_EOF
     break;
 #endif
   case BIO_CTRL_FLUSH:

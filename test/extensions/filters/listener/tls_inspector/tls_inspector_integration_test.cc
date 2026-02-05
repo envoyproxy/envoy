@@ -298,7 +298,7 @@ TEST_P(TlsInspectorIntegrationTest, JA3FingerprintIsSet) {
   //   `771,49199-255,11-10-35-16-22-23-13,23,0-1-2`
   // MD5 hash:
   //   `71d1f47d1125ac53c3c6a4863c087cfe` (BoringSSL)
-  //   `54619c7296adab310ed514d06812d95f` (OpenSSL)
+  //   `bcab080434778b813a3903a51fdc90fc` (OpenSSL)
   Ssl::ClientSslTransportOptions ssl_options;
   ssl_options.setCipherSuites({"ECDHE-RSA-AES128-GCM-SHA256"});
   ssl_options.setTlsVersion(envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
@@ -310,7 +310,7 @@ TEST_P(TlsInspectorIntegrationTest, JA3FingerprintIsSet) {
 
   EXPECT_THAT(waitForAccessLog(listener_access_log_name_),
               testing::Eq(SSL_SELECT("71d1f47d1125ac53c3c6a4863c087cfe",
-                                     "54619c7296adab310ed514d06812d95f")));
+                                     "bcab080434778b813a3903a51fdc90fc")));
 
   test_server_->waitUntilHistogramHasSamples("tls_inspector.bytes_processed");
   auto bytes_processed_histogram = test_server_->histogram("tls_inspector.bytes_processed");
@@ -319,7 +319,7 @@ TEST_P(TlsInspectorIntegrationTest, JA3FingerprintIsSet) {
       1);
   EXPECT_EQ(static_cast<int>(TestUtility::readSampleSum(test_server_->server().dispatcher(),
                                                         *bytes_processed_histogram)),
-            SSL_SELECT(114, 144));
+            SSL_SELECT(114, 154));
 }
 
 // The `JA4` fingerprint is correct in the access log.
@@ -327,7 +327,7 @@ TEST_P(TlsInspectorIntegrationTest, JA4FingerprintIsSet) {
   // These TLS options will create a client hello message with
   // `JA4` fingerprint:
   //   `t12i0107en_f06271c2b022_0f3b2bcde21d` (BoringSSL)
-  //   `t12i0207en_b06afd972a5c_e7e480e5a997` (OpenSSL)
+  //   `t12i0108en_f06271c2b022_322a62d02564` (OpenSSL)
   Ssl::ClientSslTransportOptions ssl_options;
   ssl_options.setCipherSuites({"ECDHE-RSA-AES128-GCM-SHA256"});
   ssl_options.setTlsVersion(envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
@@ -339,7 +339,7 @@ TEST_P(TlsInspectorIntegrationTest, JA4FingerprintIsSet) {
 
   EXPECT_THAT(waitForAccessLog(listener_access_log_name_),
               testing::Eq(SSL_SELECT("t12i0107en_f06271c2b022_0f3b2bcde21d",
-                                     "t12i0207en_b06afd972a5c_e7e480e5a997")));
+                                     "t12i0108en_f06271c2b022_322a62d02564")));
 
   test_server_->waitUntilHistogramHasSamples("tls_inspector.bytes_processed");
   auto bytes_processed_histogram = test_server_->histogram("tls_inspector.bytes_processed");
@@ -348,7 +348,7 @@ TEST_P(TlsInspectorIntegrationTest, JA4FingerprintIsSet) {
       1);
   EXPECT_EQ(static_cast<int>(TestUtility::readSampleSum(test_server_->server().dispatcher(),
                                                         *bytes_processed_histogram)),
-            SSL_SELECT(114, 144));
+            SSL_SELECT(114, 154));
 }
 
 TEST_P(TlsInspectorIntegrationTest, RequestedBufferSizeCanGrow) {
@@ -394,7 +394,7 @@ TEST_P(TlsInspectorIntegrationTest, RequestedBufferSizeCanGrow) {
       1);
   EXPECT_EQ(static_cast<int>(TestUtility::readSampleSum(test_server_->server().dispatcher(),
                                                         *bytes_processed_histogram)),
-            SSL_SELECT(514, 404));
+            SSL_SELECT(514, 414));
 }
 
 TEST_P(TlsInspectorIntegrationTest, RequestedBufferSizeCanStartBig) {
@@ -432,7 +432,7 @@ TEST_P(TlsInspectorIntegrationTest, RequestedBufferSizeCanStartBig) {
       1);
   auto bytes_processed = static_cast<int>(
       TestUtility::readSampleSum(test_server_->server().dispatcher(), *bytes_processed_histogram));
-  EXPECT_EQ(bytes_processed, SSL_SELECT(514, 384));
+  EXPECT_EQ(bytes_processed, SSL_SELECT(514, 394));
   // Double check that the test is effective by ensuring that the
   // LargeBufferListenerFilter::BUFFER_SIZE is smaller than the client hello.
   EXPECT_GT(bytes_processed, LargeBufferListenerFilter::BUFFER_SIZE);

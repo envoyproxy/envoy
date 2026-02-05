@@ -911,7 +911,7 @@ public:
     expected_transport_failure_reason_contains_ = expected_transport_failure_reason_contains;
 #ifdef ENVOY_SSL_OPENSSL
     if (expected_transport_failure_reason_contains_ == "TLSV1.*_BAD_CERTIFICATE_HASH_VALUE") {
-      expected_transport_failure_reason_contains_ = "SSLV3_ALERT_HANDSHAKE_FAILURE";
+      expected_transport_failure_reason_contains_ = "ssl/tls alert handshake failure";
     }
 #endif
     return *this;
@@ -2146,7 +2146,7 @@ TEST_P(SslSocketTest, CertWithNotECCapable) {
   testUtil(test_options.setExpectedServerStats("")
                .setExpectedSni("server1.example.com")
                .setExpectedTransportFailureReasonContains(SSL_SELECT(
-                   "HANDSHAKE_FAILURE_ON_CLIENT_HELLO", "SSLV3_ALERT_HANDSHAKE_FAILURE")));
+                   "HANDSHAKE_FAILURE_ON_CLIENT_HELLO", "ssl/tls alert handshake failure")));
 }
 
 TEST_P(SslSocketTest, GetUriWithLocalUriSan) {
@@ -2692,7 +2692,8 @@ TEST_P(SslSocketTest, FailedClientCertificateDefaultExpirationVerification) {
 
   TestUtilOptionsV2 test_options(listener, client, false, version_);
   testUtilV2(test_options.setExpectedClientCertUri("spiffe://lyft.com/test-team")
-                 .setExpectedTransportFailureReasonContains("SSLV3_ALERT_CERTIFICATE_EXPIRED"));
+                 .setExpectedTransportFailureReasonContains(SSL_SELECT(
+                     "SSLV3_ALERT_CERTIFICATE_EXPIRED", "ssl/tls alert certificate expired")));
 }
 
 // Expired certificates will not be accepted when explicitly disallowed via
@@ -2707,7 +2708,8 @@ TEST_P(SslSocketTest, FailedClientCertificateExpirationVerification) {
 
   TestUtilOptionsV2 test_options(listener, client, false, version_);
   testUtilV2(test_options.setExpectedClientCertUri("spiffe://lyft.com/test-team")
-                 .setExpectedTransportFailureReasonContains("SSLV3_ALERT_CERTIFICATE_EXPIRED"));
+                 .setExpectedTransportFailureReasonContains(SSL_SELECT(
+                     "SSLV3_ALERT_CERTIFICATE_EXPIRED", "ssl/tls alert certificate expired")));
 }
 
 // Expired certificates will be accepted when explicitly allowed via allow_expired_certificate.
@@ -3236,7 +3238,8 @@ TEST_P(SslSocketTest, FailedClientCertificateSpkiVerificationNoClientCertificate
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
   TestUtilOptionsV2 test_options(listener, client, false, version_);
   testUtilV2(test_options.setExpectedServerStats("ssl.fail_verify_no_cert")
-                 .setExpectedTransportFailureReasonContains("SSLV3_ALERT_HANDSHAKE_FAILURE"));
+                 .setExpectedTransportFailureReasonContains(SSL_SELECT(
+                     "SSLV3_ALERT_HANDSHAKE_FAILURE", "ssl/tls alert handshake failure")));
 
   // Fails even with client renegotiation.
   client.set_allow_renegotiation(true);
@@ -3264,7 +3267,8 @@ TEST_P(SslSocketTest, FailedClientCertificateSpkiVerificationNoCANoClientCertifi
 
   TestUtilOptionsV2 test_options(listener, client, false, version_);
   testUtilV2(test_options.setExpectedServerStats("ssl.fail_verify_no_cert")
-                 .setExpectedTransportFailureReasonContains("SSLV3_ALERT_HANDSHAKE_FAILURE"));
+                 .setExpectedTransportFailureReasonContains(SSL_SELECT(
+                     "SSLV3_ALERT_HANDSHAKE_FAILURE", "ssl/tls alert handshake failure")));
 
   // Fails even with client renegotiation.
   client.set_allow_renegotiation(true);
@@ -3474,7 +3478,8 @@ TEST_P(SslSocketTest, FailedClientCertificateHashAndSpkiVerificationNoClientCert
 
   TestUtilOptionsV2 test_options(listener, client, false, version_);
   testUtilV2(test_options.setExpectedServerStats("ssl.fail_verify_no_cert")
-                 .setExpectedTransportFailureReasonContains("SSLV3_ALERT_HANDSHAKE_FAILURE"));
+                 .setExpectedTransportFailureReasonContains(SSL_SELECT(
+                     "SSLV3_ALERT_HANDSHAKE_FAILURE", "ssl/tls alert handshake failure")));
 
   // Fails even with client renegotiation.
   client.set_allow_renegotiation(true);
@@ -3503,7 +3508,8 @@ TEST_P(SslSocketTest, FailedClientCertificateHashAndSpkiVerificationNoCANoClient
 
   TestUtilOptionsV2 test_options(listener, client, false, version_);
   testUtilV2(test_options.setExpectedServerStats("ssl.fail_verify_no_cert")
-                 .setExpectedTransportFailureReasonContains("SSLV3_ALERT_HANDSHAKE_FAILURE"));
+                 .setExpectedTransportFailureReasonContains(SSL_SELECT(
+                     "SSLV3_ALERT_HANDSHAKE_FAILURE", "ssl/tls alert handshake failure")));
 
   // Fails even with client renegotiation.
   client.set_allow_renegotiation(true);

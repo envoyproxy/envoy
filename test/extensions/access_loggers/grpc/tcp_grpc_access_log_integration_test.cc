@@ -629,7 +629,7 @@ tcp_logs:
 )EOF",
       Network::Test::getLoopbackAddressString(ipVersion()),
       Network::Test::getLoopbackAddressString(ipVersion()),
-      SSL_SELECT("ecaf91d232e224038f510cb81aa08b94", "f34cc73a821433e5f56e38868737a636"),
+      SSL_SELECT("ecaf91d232e224038f510cb81aa08b94", "cd865a85db6b1066e3af8cba28be21ee"),
       Network::Test::getLoopbackAddressString(ipVersion()))));
 
   cleanup();
@@ -685,7 +685,7 @@ tcp_logs:
                                           Network::Test::getLoopbackAddressString(ipVersion()),
                                           Network::Test::getLoopbackAddressString(ipVersion()),
                                           Network::Test::getLoopbackAddressString(ipVersion()),
-                                          SSL_SELECT(138, 163), SSL_SELECT(138, 163))));
+                                          SSL_SELECT(138, 172), SSL_SELECT(138, 172))));
 
   cleanup();
 }
@@ -741,8 +741,8 @@ tcp_logs:
       Network::Test::getLoopbackAddressString(ipVersion()),
       Network::Test::getLoopbackAddressString(ipVersion()),
       Network::Test::getLoopbackAddressString(ipVersion()),
-      SSL_SELECT("ecaf91d232e224038f510cb81aa08b94", "f34cc73a821433e5f56e38868737a636"),
-      SSL_SELECT(138, 163), SSL_SELECT(138, 163))));
+      SSL_SELECT("ecaf91d232e224038f510cb81aa08b94", "cd865a85db6b1066e3af8cba28be21ee"),
+      SSL_SELECT(138, 172), SSL_SELECT(138, 172))));
 
   cleanup();
 }
@@ -796,8 +796,8 @@ tcp_logs:
       Network::Test::getLoopbackAddressString(ipVersion()),
       Network::Test::getLoopbackAddressString(ipVersion()),
       Network::Test::getLoopbackAddressString(ipVersion()),
-      SSL_SELECT("71d1f47d1125ac53c3c6a4863c087cfe", "54619c7296adab310ed514d06812d95f"),
-      SSL_SELECT(126, 151), SSL_SELECT(126, 151))));
+      SSL_SELECT("71d1f47d1125ac53c3c6a4863c087cfe", "bcab080434778b813a3903a51fdc90fc"),
+      SSL_SELECT(126, 160), SSL_SELECT(126, 160))));
 
   cleanup();
 }

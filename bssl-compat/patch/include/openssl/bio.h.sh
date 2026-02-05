@@ -21,6 +21,8 @@ uncomment.sh "$1" --comment -h \
   --uncomment-func-decl BIO_should_read \
   --uncomment-func-decl BIO_should_write \
   --uncomment-func-decl BIO_clear_flags \
+  --uncomment-func-decl BIO_set_flags \
+  --uncomment-func-decl BIO_test_flags \
   --uncomment-func-decl BIO_set_retry_read \
   --uncomment-func-decl BIO_set_retry_write \
   --uncomment-func-decl BIO_clear_retry_flags \
@@ -52,6 +54,7 @@ uncomment.sh "$1" --comment -h \
   --uncomment-macro-redef BIO_CTRL_GET_CLOSE \
   --uncomment-macro-redef BIO_CTRL_SET_CLOSE \
   --uncomment-macro-redef BIO_CTRL_FLUSH \
+  --uncomment-macro-redef BIO_CTRL_EOF \
   --uncomment-func-decl BIO_set_shutdown \
   --uncomment-func-decl BIO_get_shutdown \
   --uncomment-regex 'BORINGSSL_MAKE_DELETER(BIO,' \

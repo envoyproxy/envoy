@@ -73,8 +73,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/aws/aws-lc/archive/v{version}.tar.gz"],
     ),
     openssl = dict(
-        version = "3.0.19",
-        sha256 = "fa5a4143b8aae18be53ef2f3caf29a2e0747430b8bc74d32d88335b94ab63072",
+        version = "3.5.5",
+        sha256 = "b28c91532a8b65a1f983b4c28b7488174e4a01008e29ce8e69bd789f28bc2a89",
         strip_prefix = "openssl-{version}",
         urls = ["https://github.com/openssl/openssl/releases/download/openssl-{version}/openssl-{version}.tar.gz"],
     ),
