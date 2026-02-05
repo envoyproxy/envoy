@@ -4,6 +4,7 @@
 #include "source/common/common/hex.h"
 #include "source/common/config/datasource.h"
 #include "source/common/crypto/utility.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/dynamic_modules/code_cache.h"
 #include "source/extensions/filters/http/dynamic_modules/filter.h"
 #include "source/extensions/filters/http/dynamic_modules/filter_config.h"
@@ -121,7 +122,13 @@ absl::StatusOr<Http::FilterFactoryCb> DynamicModuleConfigFactory::createFilterFa
                                       std::string(filter_config.status().message()));
   }
 
-  context.api().customStatNamespaces().registerStatNamespace(metrics_namespace);
+  // When the runtime guard is enabled, register the metrics namespace as a custom stat namespace.
+  // This causes the namespace prefix to be stripped from prometheus output and no envoy_ prefix
+  // is added. This is the legacy behavior for backward compatibility.
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.dynamic_modules_strip_custom_stat_prefix")) {
+    context.api().customStatNamespaces().registerStatNamespace(metrics_namespace);
+  }
 
   return createFilterFactoryCallback(filter_config.value());
 }

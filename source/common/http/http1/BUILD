@@ -83,7 +83,7 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/runtime:runtime_features_lib",
         "//source/common/upstream:upstream_lib",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
     ],
 )
 
@@ -97,7 +97,7 @@ envoy_cc_library(
         "//source/common/common:matchers_lib",
         "//source/common/config:utility_lib",
         "//source/common/runtime:runtime_features_lib",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -131,9 +131,9 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:regex_lib",
         "//source/common/http:headers_lib",
-        "@com_github_google_quiche//:quiche_balsa_balsa_enums_lib",
-        "@com_github_google_quiche//:quiche_balsa_balsa_frame_lib",
-        "@com_github_google_quiche//:quiche_balsa_balsa_headers_lib",
-        "@com_github_google_quiche//:quiche_balsa_balsa_visitor_interface_lib",
+        "@quiche//:quiche_balsa_balsa_enums_lib",
+        "@quiche//:quiche_balsa_balsa_frame_lib",
+        "@quiche//:quiche_balsa_balsa_headers_lib",
+        "@quiche//:quiche_balsa_balsa_visitor_interface_lib",
     ],
 )
