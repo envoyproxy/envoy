@@ -302,6 +302,7 @@ envoy_cc_test_library(
     deps = [
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
+        "@prometheus_metrics_model//:client_model_cc_proto",
     ],
 )
 
