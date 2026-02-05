@@ -32,13 +32,12 @@ public:
     return Http::FilterHeadersStatus::StopIteration;
   }
 
-  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
-                                          bool end_stream) override {
+  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers, bool) override {
     headers.setContentLength(body_.length());
-    encoder_callbacks_->dispatcher().post([this, end_stream]() -> void {
+    encoder_callbacks_->dispatcher().post([this]() -> void {
       response_injected_ = true;
       Buffer::OwnedImpl buffer(body_);
-      encoder_callbacks_->injectEncodedDataToFilterChain(buffer, end_stream);
+      encoder_callbacks_->injectEncodedDataToFilterChain(buffer, true);
       if (response_encoded_) {
         encoder_callbacks_->continueEncoding();
       }
