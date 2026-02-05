@@ -174,6 +174,18 @@ func (mr *MockHttpFilterFactoryMockRecorder) Create(handle any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockHttpFilterFactory)(nil).Create), handle)
 }
 
+// OnDestory mocks base method.
+func (m *MockHttpFilterFactory) OnDestory() {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "OnDestory")
+}
+
+// OnDestory indicates an expected call of OnDestory.
+func (mr *MockHttpFilterFactoryMockRecorder) OnDestory() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "OnDestory", reflect.TypeOf((*MockHttpFilterFactory)(nil).OnDestory))
+}
+
 // MockHttpFilterConfigFactory is a mock of HttpFilterConfigFactory interface.
 type MockHttpFilterConfigFactory struct {
 	ctrl     *gomock.Controller

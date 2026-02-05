@@ -38,6 +38,7 @@ type statsCallbacksConfigFactory struct {
 }
 
 type statsCallbacksFactory struct {
+	shared.EmptyHttpFilterFactory
 	streamsTotal      shared.MetricID
 	concurrentStreams shared.MetricID
 	magicNumber       shared.MetricID
@@ -100,7 +101,9 @@ func (p *statsCallbacksFilter) OnStreamComplete() {
 type headerCallbacksConfigFactory struct {
 	shared.EmptyHttpFilterConfigFactory
 }
-type headerCallbacksFactory struct{}
+type headerCallbacksFactory struct {
+	shared.EmptyHttpFilterFactory
+}
 
 func (f *headerCallbacksConfigFactory) Create(handle shared.HttpFilterConfigHandle,
 	config []byte) (shared.HttpFilterFactory, error) {
@@ -199,7 +202,9 @@ func testHeaders(headers shared.HeaderMap) {
 type sendResponseConfigFactory struct {
 	shared.EmptyHttpFilterConfigFactory
 }
-type sendResponseFactory struct{}
+type sendResponseFactory struct {
+	shared.EmptyHttpFilterFactory
+}
 
 func (f *sendResponseConfigFactory) Create(handle shared.HttpFilterConfigHandle,
 	config []byte) (shared.HttpFilterFactory, error) {
@@ -226,7 +231,9 @@ func (p *sendResponseFilter) OnRequestHeaders(headers shared.HeaderMap,
 type dynamicMetadataCallbacksConfigFactory struct {
 	shared.EmptyHttpFilterConfigFactory
 }
-type dynamicMetadataCallbacksFactory struct{}
+type dynamicMetadataCallbacksFactory struct {
+	shared.EmptyHttpFilterFactory
+}
 
 func (f *dynamicMetadataCallbacksConfigFactory) Create(handle shared.HttpFilterConfigHandle,
 	config []byte) (shared.HttpFilterFactory, error) {
@@ -334,7 +341,9 @@ func (p *dynamicMetadataCallbacksFilter) OnResponseBody(body shared.BodyBuffer, 
 type filterStateCallbacksConfigFactory struct {
 	shared.EmptyHttpFilterConfigFactory
 }
-type filterStateCallbacksFactory struct{}
+type filterStateCallbacksFactory struct {
+	shared.EmptyHttpFilterFactory
+}
 
 func (f *filterStateCallbacksConfigFactory) Create(handle shared.HttpFilterConfigHandle,
 	config []byte) (shared.HttpFilterFactory, error) {
@@ -399,7 +408,9 @@ func (p *filterStateCallbacksFilter) testFilterState(key, value string) {
 type bodyCallbacksConfigFactory struct {
 	shared.EmptyHttpFilterConfigFactory
 }
-type bodyCallbacksFactory struct{}
+type bodyCallbacksFactory struct {
+	shared.EmptyHttpFilterFactory
+}
 
 func (f *bodyCallbacksConfigFactory) Create(handle shared.HttpFilterConfigHandle,
 	config []byte) (shared.HttpFilterFactory, error) {
