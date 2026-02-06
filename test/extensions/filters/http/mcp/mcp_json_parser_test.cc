@@ -379,14 +379,15 @@ TEST_F(McpJsonParserTest, PartialParsingMidString) {
 }
 
 TEST_F(McpJsonParserTest, PartialParsingEscapeSequence) {
-  // Split in the middle of an escape sequence
+  // Split in the middle of an escape sequence inside params object.
+  // The JSON parsing will fail due to incomplete escape sequence,
+  // but the MCP request is still valid if we have jsonrpc and method.
   std::string json1 = R"({"jsonrpc": "2.0", "method": "test", "id": 1, "params": {"text": "line1\)";
 
   auto status = parser_->parse(json1);
 
-  // Early termination.
+  // Parse fails due to incomplete escape sequence (invalid JSON)
   EXPECT_FALSE(status.ok());
-
   EXPECT_TRUE(parser_->isValidMcpRequest());
 }
 
@@ -660,6 +661,115 @@ TEST_F(McpJsonParserTest, CustomFieldExtraction) {
   // Author should not be extracted (not in config)
   const auto* author = custom_parser->getNestedValue("params.metadata.author");
   EXPECT_EQ(author, nullptr);
+}
+
+TEST_F(McpJsonParserTest, OptionalFieldConfigDetection) {
+  // params._meta is a global optional field, so any method could have optional fields
+  McpParserConfig custom_config;
+  std::vector<McpParserConfig::AttributeExtractionRule> rules = {
+      McpParserConfig::AttributeExtractionRule("params.name")};
+
+  custom_config.addMethodConfig(McpConstants::Methods::TOOLS_CALL, rules);
+
+  auto parser = std::make_unique<McpJsonParser>(custom_config);
+
+  std::string json =
+      R"({"jsonrpc": "2.0", "method": "tools/call", "id": 1, "params": {"name": "tool"}})";
+
+  EXPECT_OK(parser->parse(json));
+  EXPECT_TRUE(parser->hasOptionalFields());
+  EXPECT_TRUE(parser->hasAllRequiredFields());
+
+  const auto* meta = parser->getNestedValue("params._meta");
+  EXPECT_EQ(meta, nullptr);
+}
+
+TEST_F(McpJsonParserTest, EarlyStopWithMetaAsRequiredField) {
+  // When params._meta is explicitly configured as a required (extracted) field,
+  // there should be no optional fields, and early stop should trigger as soon
+  // as all required fields are found.
+  McpParserConfig custom_config = McpParserConfig::createDefault();
+
+  // Override tools/call config to include _meta as required field
+  std::vector<McpParserConfig::AttributeExtractionRule> rules = {
+      McpParserConfig::AttributeExtractionRule("params.name"),
+      McpParserConfig::AttributeExtractionRule("params._meta") // _meta as required
+  };
+  custom_config.addMethodConfig(McpConstants::Methods::TOOLS_CALL, rules);
+
+  auto parser = std::make_unique<McpJsonParser>(custom_config);
+
+  // JSON with _meta present followed by extra data - early stop should trigger
+  std::string json =
+      R"({"jsonrpc": "2.0", "method": "tools/call", "id": 1, "params": {"name": "tool", "_meta": {"trace": "t1"}, "extra": "data"}})";
+
+  EXPECT_OK(parser->parse(json));
+
+  // Since _meta is required (not optional), hasOptionalFields should be false
+  EXPECT_FALSE(parser->hasOptionalFields());
+  // All required fields were found, so early stop should have triggered
+  EXPECT_TRUE(parser->isAllFieldsCollected());
+  EXPECT_TRUE(parser->hasAllRequiredFields());
+
+  // Verify extracted fields
+  const auto* name = parser->getNestedValue("params.name");
+  ASSERT_NE(name, nullptr);
+  EXPECT_EQ(name->string_value(), "tool");
+
+  const auto* meta = parser->getNestedValue("params._meta");
+  ASSERT_NE(meta, nullptr);
+  ASSERT_TRUE(meta->has_struct_value());
+}
+
+TEST_F(McpJsonParserTest, GlobalOptionalMetaFieldExtraction) {
+  // params._meta is a global optional field and should be extracted
+  // for all methods when present
+  McpParserConfig config = McpParserConfig::createDefault();
+  auto parser = std::make_unique<McpJsonParser>(config);
+
+  std::string json1 = R"({
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "params": {
+      "name": "tool",
+      "_meta": {"trace_id": "t1"}
+    },
+    "id": 1
+  })";
+
+  EXPECT_OK(parser->parse(json1));
+  EXPECT_TRUE(parser->isValidMcpRequest());
+
+  const auto* meta1 = parser->getNestedValue("params._meta");
+  ASSERT_NE(meta1, nullptr);
+  ASSERT_TRUE(meta1->has_struct_value());
+  const auto& meta1_fields = meta1->struct_value().fields();
+  auto meta1_it = meta1_fields.find("trace_id");
+  ASSERT_NE(meta1_it, meta1_fields.end());
+  EXPECT_EQ(meta1_it->second.string_value(), "t1");
+
+  parser->reset();
+
+  std::string json2 = R"({
+    "jsonrpc": "2.0",
+    "method": "resources/read",
+    "params": {
+      "uri": "file:///test.txt",
+      "_meta": {"trace_id": "t2"}
+    },
+    "id": 2
+  })";
+
+  EXPECT_OK(parser->parse(json2));
+  EXPECT_TRUE(parser->isValidMcpRequest());
+
+  const auto* meta2 = parser->getNestedValue("params._meta");
+  ASSERT_NE(meta2, nullptr);
+  ASSERT_TRUE(meta2->has_struct_value());
+  const auto& meta2_fields = meta2->struct_value().fields();
+  auto meta2_it = meta2_fields.find("trace_id");
+  ASSERT_NE(meta2_it, meta2_fields.end());
+  EXPECT_EQ(meta2_it->second.string_value(), "t2");
 }
 
 TEST_F(McpJsonParserTest, BooleanValues) {

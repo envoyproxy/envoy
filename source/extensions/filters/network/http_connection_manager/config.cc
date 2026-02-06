@@ -441,10 +441,23 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       append_local_overload_(config.append_local_overload()),
       append_x_forwarded_port_(config.append_x_forwarded_port()),
       add_proxy_protocol_connection_state_(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, add_proxy_protocol_connection_state, true)) {
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, add_proxy_protocol_connection_state, true)),
+      https_destination_ports_(
+          config.has_forward_proto_config()
+              ? absl::flat_hash_set<uint32_t>(
+                    config.forward_proto_config().https_destination_ports().begin(),
+                    config.forward_proto_config().https_destination_ports().end())
+              : absl::flat_hash_set<uint32_t>{}),
+      http_destination_ports_(
+          config.has_forward_proto_config()
+              ? absl::flat_hash_set<uint32_t>(
+                    config.forward_proto_config().http_destination_ports().begin(),
+                    config.forward_proto_config().http_destination_ports().end())
+              : absl::flat_hash_set<uint32_t>{}) {
   if (!creation_status.ok()) {
     return;
   }
+
   auto local_reply_or_error = LocalReply::Factory::create(config.local_reply_config(), context);
   SET_AND_RETURN_IF_NOT_OK(local_reply_or_error.status(), creation_status);
   local_reply_ = std::move(*local_reply_or_error);

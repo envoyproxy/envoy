@@ -53,7 +53,7 @@ envoy_cc_library(
         ":rds_interface",
         "//envoy/common:time_interface",
         "//source/common/protobuf",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
@@ -69,7 +69,7 @@ envoy_cc_library(
         "//envoy/stream_info:stream_info_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//envoy/upstream:host_description_interface",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
     ],
 )
 
@@ -92,13 +92,14 @@ envoy_cc_library(
         "//envoy/http:header_evaluator",
         "//envoy/http:header_map_interface",
         "//envoy/rds:rds_config_interface",
+        "//envoy/stream_info:stream_info_interface",
         "//envoy/tcp:conn_pool_interface",
         "//envoy/tracing:tracer_interface",
         "//envoy/upstream:resource_manager_interface",
         "//envoy/upstream:retry_interface",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
@@ -139,7 +140,7 @@ envoy_cc_library(
     hdrs = ["string_accessor.h"],
     deps = [
         "//envoy/stream_info:filter_state_interface",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
     ],
 )
 
@@ -169,8 +170,8 @@ envoy_cc_library(
     deps = [
         "//envoy/config:typed_config_interface",
         "//source/common/common:minimal_logger_lib",
-        "@com_google_absl//absl/status",
-        "@com_google_absl//absl/status:statusor",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
     ],
 )
 
@@ -180,7 +181,7 @@ envoy_cc_library(
     deps = [
         "//envoy/config:typed_config_interface",
         "//source/common/common:minimal_logger_lib",
-        "@com_google_absl//absl/status",
-        "@com_google_absl//absl/status:statusor",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
     ],
 )

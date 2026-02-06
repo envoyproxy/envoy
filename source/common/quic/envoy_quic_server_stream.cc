@@ -60,8 +60,8 @@ void EnvoyQuicServerStream::encode1xxHeaders(const Http::ResponseHeaderMap& head
 void EnvoyQuicServerStream::encodeHeaders(const Http::ResponseHeaderMap& headers, bool end_stream) {
   ENVOY_STREAM_LOG(debug, "encodeHeaders (end_stream={}) {}.", *this, end_stream, headers);
   if (write_side_closed()) {
-    IS_ENVOY_BUG(
-        fmt::format("encodeHeaders is called on write-closed stream. {}", quicStreamState()));
+    ENVOY_STREAM_LOG(error, "encodeHeaders is called on write-closed stream. {}", *this,
+                     quicStreamState());
     return;
   }
 
@@ -248,6 +248,13 @@ void EnvoyQuicServerStream::OnStreamFrame(const quic::QuicStreamFrame& frame) {
 void EnvoyQuicServerStream::OnBodyAvailable() {
   ASSERT(FinishedReadingHeaders());
   if (read_side_closed()) {
+    return;
+  }
+  // If read has been disabled, QUIC should not deliver any more data upstream to increase the bytes
+  // buffered/processed.
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.quic_disable_data_read_immediately") &&
+      read_disable_counter_ > 0) {
     return;
   }
 

@@ -60,3 +60,23 @@ index 06225796..18f56e59 100644
    ABSL_DCHECK(descriptor_pool != nullptr);
    ABSL_DCHECK(message_factory != nullptr);
    ABSL_DCHECK(arena != nullptr);
+
+
+--- a/bazel/deps.bzl
++++ b/bazel/deps.bzl
+@@ -85,10 +85,10 @@ cc_library(
+     defines = ["ANTLR4CPP_USING_ABSEIL"],
+     includes = ["runtime/Cpp/runtime/src"],
+     deps = [
+-        "@com_google_absl//absl/base",
+-        "@com_google_absl//absl/base:core_headers",
+-        "@com_google_absl//absl/container:flat_hash_map",
+-        "@com_google_absl//absl/container:flat_hash_set",
+-        "@com_google_absl//absl/synchronization",
++        "@abseil-cpp//absl/base",
++        "@abseil-cpp//absl/base:core_headers",
++        "@abseil-cpp//absl/container:flat_hash_map",
++        "@abseil-cpp//absl/container:flat_hash_set",
++        "@abseil-cpp//absl/synchronization",
+     ],
+ )

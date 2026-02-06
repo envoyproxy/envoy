@@ -142,7 +142,23 @@ func (p *EmptyHttpFilter) OnStreamComplete() {
 // This is used to create instances of the stream plugin at runtime when a new request is received.
 // The implementation of this interface should be thread-safe and hold the parsed configuration.
 type HttpFilterFactory interface {
+	// Create creates a HttpFilter instance.
 	Create(handle HttpFilterHandle) HttpFilter
+
+	// OnDestroy is called when the factory is being destroyed. This is a good place to clean up any
+	// resources. This usually happens when the configuration is updated and all existing streams
+	// using this factory are closed.
+	OnDestroy()
+}
+
+type EmptyHttpFilterFactory struct {
+}
+
+func (f *EmptyHttpFilterFactory) Create(handle HttpFilterHandle) HttpFilter {
+	return &EmptyHttpFilter{}
+}
+
+func (f *EmptyHttpFilterFactory) OnDestroy() {
 }
 
 // HttpFilterConfigFactory is the factory interface for creating stream plugin configurations.
@@ -163,7 +179,7 @@ type EmptyHttpFilterConfigFactory struct {
 
 func (f *EmptyHttpFilterConfigFactory) Create(handle HttpFilterConfigHandle,
 	unparsedConfig []byte) (HttpFilterFactory, error) {
-	return nil, nil
+	return &EmptyHttpFilterFactory{}, nil
 }
 
 func (f *EmptyHttpFilterConfigFactory) CreatePerRoute(unparsedConfig []byte) (any, error) {

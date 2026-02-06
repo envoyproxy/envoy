@@ -452,6 +452,10 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
           action.query_parameter_value_match(), context, std::move(formatter_or_error.value())));
       break;
     }
+    case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::kRemoteAddressMatch:
+      // [#not-implemented-hide:] RemoteAddressMatch is not yet implemented.
+      PANIC("RemoteAddressMatch rate limit action is not yet implemented");
+      break;
     case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::ACTION_SPECIFIER_NOT_SET:
       PANIC_DUE_TO_CORRUPT_ENUM;
     }
