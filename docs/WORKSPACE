@@ -1,13 +1,8 @@
-workspace(name = "external_test")
+workspace(name = "envoy-docs")
 
 local_repository(
     name = "envoy",
-    path = "../../..",
-)
-
-local_repository(
-    name = "envoy-docs",
-    path = "../../../docs",
+    path = "..",
 )
 
 load("@envoy//bazel:api_binding.bzl", "envoy_api_binding")
@@ -28,7 +23,7 @@ envoy_bazel_dependencies()
 
 load("@envoy//bazel:repositories_extra.bzl", "envoy_dependencies_extra")
 
-envoy_dependencies_extra()
+envoy_dependencies_extra(ignore_root_user_error = True)
 
 load("@envoy//bazel:python_dependencies.bzl", "envoy_python_dependencies")
 
@@ -50,14 +45,14 @@ load("@envoy//bazel:dependency_imports_extra.bzl", "envoy_dependency_imports_ext
 
 envoy_dependency_imports_extra()
 
-load("@envoy-docs//bazel:repositories.bzl", "envoy_docs_repositories")
+load("//bazel:repositories.bzl", "envoy_docs_repositories")
 
 envoy_docs_repositories()
 
-load("@envoy-docs//bazel:repositories_extra.bzl", "envoy_docs_repositories_extra")
+load("//bazel:repositories_extra.bzl", "envoy_docs_repositories_extra")
 
 envoy_docs_repositories_extra()
 
-load("@envoy-docs//bazel:dependencies.bzl", "envoy_docs_dependencies")
+load("//bazel:dependencies.bzl", "envoy_docs_dependencies")
 
 envoy_docs_dependencies()

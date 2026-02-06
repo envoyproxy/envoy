@@ -31,6 +31,7 @@ jobs:
     name: ${{ matrix.name || matrix.target }}
     uses: ./.github/workflows/_run.yml
     with:
+      bazel-cache: false
       bazel-extra: ${{ matrix.bazel-extra || '--config=rbe' }}
       cache-build-image: ${{ matrix.cache-build-image }}
       cache-build-image-key-suffix: ${{ matrix.arch == 'arm64' && format('-{0}', matrix.arch) || '' }}
