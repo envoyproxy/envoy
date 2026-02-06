@@ -6,7 +6,7 @@
 
 #include "envoy/common/pure.h"
 
-#include "source/common/protobuf/protobuf.h"
+#include "google/protobuf/struct.pb.h"
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
@@ -23,7 +23,7 @@ namespace ContentParser {
 struct MetadataAction {
   std::string namespace_; // Must be non-empty (parser applies defaults)
   std::string key;
-  absl::optional<Protobuf::Value> value; // If empty, value extraction failed
+  absl::optional<google::protobuf::Value> value; // If empty, value extraction failed
   bool preserve_existing = false;
 };
 

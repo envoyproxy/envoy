@@ -15,6 +15,7 @@ envoy_cc_library(
         "//envoy/common:pure_lib",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:optional",
+        "@com_google_protobuf//:protobuf",
     ],
 )
 
