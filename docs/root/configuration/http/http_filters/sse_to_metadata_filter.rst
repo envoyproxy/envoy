@@ -96,7 +96,7 @@ For Server-Sent Events (SSE) format with JSON content parser:
 
    * **on_present**: Executes immediately when the selector successfully extracts a value from any event
    * **on_missing**: Deferred until end-of-stream. Executes only if ``on_present`` never executed and the selector path was not found in at least one event
-   * **on_error**: Deferred until end-of-stream. Executes only if ``on_present`` never executed and an error occurred (JSON parse failure, no data field, etc.). Takes priority over ``on_missing`` if both conditions are met
+   * **on_error**: Deferred until end-of-stream. Executes only if ``on_present`` never executed and a JSON parse error occurred. Takes priority over ``on_missing`` if both conditions are met
 
 6. The deferred execution of ``on_missing`` and ``on_error`` ensures that early events without the desired field (common in LLM streams) don't prevent later successful extractions
 7. By default, each rule processes the entire stream (``stop_processing_after_matches: 0``). Set ``stop_processing_after_matches: 1`` on a rule to stop evaluating that rule after its first match. The filter only stops processing the entire stream when ALL rules have limits AND they've all been reached (see :ref:`Performance Considerations <config_http_filters_sse_to_metadata_performance>` for details)
@@ -152,9 +152,9 @@ When using ``envoy.content_parsers.json``, configure rules within the typed_conf
       Executes at end-of-stream if ``on_present`` never executed. Write a fallback/sentinel value (e.g., -1) to ensure metadata is always present for downstream consumers.
       **Must** have ``value`` set to a fallback. This handles the case where legitimate JSON exists but lacks the expected field.
 
-    - **on_error**: Metadata to write when an error occurs (JSON parse failure, no data field, etc.).
+    - **on_error**: Metadata to write when a JSON parse error occurs.
       Executes at end-of-stream if ``on_present`` never executed and takes priority over ``on_missing``. Write a safe default (e.g., 0) to ensure metadata is always present even when errors occur.
-      **Must** have ``value`` set to a fallback. This handles malformed or missing data.
+      **Must** have ``value`` set to a fallback. This handles malformed JSON data.
 
   * **stop_processing_after_matches**: Optional per-rule field that controls processing behavior.
 
@@ -263,7 +263,7 @@ In this configuration:
 
 * When the value is successfully extracted, it's written to metadata
 * When the ``usage.total_tokens`` path doesn't exist in any event, ``-1`` is written at end-of-stream as a sentinel value
-* When JSON parsing fails or no data field exists, ``0`` is written at end-of-stream as a safe default
+* When JSON parsing fails, ``0`` is written at end-of-stream as a safe default
 * The deferred execution ensures that error/missing states don't overwrite a successful extraction from a later event
 
 Statistics

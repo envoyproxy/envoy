@@ -214,8 +214,7 @@ TEST_F(SseToMetadataFilterTest, ContentTypeWithParameters) {
   EXPECT_EQ(findCounter("sse_to_metadata.resp.json.mismatched_content_type"), 0);
 }
 
-TEST_F(SseToMetadataFilterTest, BadContentTypeTriggersOnError) {
-  // Create config with on_error to verify it executes when content-type mismatches
+TEST_F(SseToMetadataFilterTest, BadContentTypeSkipsProcessing) {
   envoy::extensions::filters::http::sse_to_metadata::v3::SseToMetadata proto_config;
   auto* response_rules = proto_config.mutable_response_rules();
 
@@ -245,10 +244,9 @@ TEST_F(SseToMetadataFilterTest, BadContentTypeTriggersOnError) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(bad_headers, false));
   addEncodeDataChunks("data: {\"test\": \"value\"}\n\n", true);
 
-  // on_error should have executed with fallback value
+  // Filter skips processing
   auto metadata = getMetadata("envoy.lb", "tokens");
-  EXPECT_EQ(metadata.kind_case(), Protobuf::Value::kNumberValue);
-  EXPECT_EQ(metadata.number_value(), -1);
+  EXPECT_EQ(metadata.kind_case(), Protobuf::Value::KIND_NOT_SET);
   EXPECT_EQ(findCounter("sse_to_metadata.resp.json.mismatched_content_type"), 1);
 }
 
@@ -807,9 +805,10 @@ TEST_F(SseToMetadataFilterTest, OnErrorJsonParseFails) {
   EXPECT_EQ(findCounter("sse_to_metadata.resp.json.parse_error"), 1);
 }
 
-// Test on_error: writes fallback value when data field is missing
-TEST_F(SseToMetadataFilterTest, OnErrorNoDataField) {
-  // Create config programmatically to properly set protobuf Value
+// Test that events without a data field are skipped (not treated as errors)
+TEST_F(SseToMetadataFilterTest, NoDataFieldSkipsEvent) {
+  // Events without a data field (like ping/keepalive) are simply skipped.
+  // This is not an error condition - on_error does NOT trigger.
   envoy::extensions::filters::http::sse_to_metadata::v3::SseToMetadata proto_config;
   auto* response_rules = proto_config.mutable_response_rules();
 
@@ -835,11 +834,12 @@ TEST_F(SseToMetadataFilterTest, OnErrorNoDataField) {
   ON_CALL(encoder_callbacks_, streamInfo()).WillByDefault(ReturnRef(stream_info_));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
 
-  // Send event with no data field. Should trigger on_error.
+  // Send event with no data field
   addEncodeDataChunks(std::string("event: ping") + std::string(delimiter_), true);
 
+  // No metadata written
   auto metadata = getMetadata("envoy.lb", "tokens");
-  EXPECT_EQ(metadata.string_value(), "error"); // Fallback value
+  EXPECT_EQ(metadata.kind_case(), Protobuf::Value::KIND_NOT_SET);
   EXPECT_EQ(findCounter("sse_to_metadata.resp.json.no_data_field"), 1);
 }
 
