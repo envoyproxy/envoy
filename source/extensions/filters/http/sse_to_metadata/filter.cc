@@ -10,7 +10,6 @@
 #include "source/common/protobuf/utility.h"
 
 #include "absl/strings/match.h"
-#include "absl/strings/str_join.h"
 #include "absl/strings/strip.h"
 #include "fmt/format.h"
 
@@ -35,9 +34,9 @@ FilterConfig::FilterConfig(
     Server::Configuration::ServerFactoryContext& context)
     : parser_factory_(std::invoke([&config, &context]() {
         // Create the parser factory from TypedExtensionConfig
-        auto& factory = Config::Utility::getAndCheckFactory<
-            SseContentParser::NamedSseContentParserConfigFactory>(
-            config.response_rules().content_parser());
+        auto& factory =
+            Config::Utility::getAndCheckFactory<ContentParser::NamedContentParserConfigFactory>(
+                config.response_rules().content_parser());
         auto message = Config::Utility::translateAnyToFactoryConfig(
             config.response_rules().content_parser().typed_config(),
             context.messageValidationVisitor(), factory);
@@ -49,8 +48,7 @@ FilterConfig::FilterConfig(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.response_rules(), max_event_size, 8192)) {}
 
 Filter::Filter(std::shared_ptr<FilterConfig> config)
-    : config_(std::move(config)), parser_(config_->parserFactory().createParser()),
-      rule_states_(parser_->numRules()) {}
+    : config_(std::move(config)), parser_(config_->parserFactory().createParser()) {}
 
 Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers, bool) {
   absl::string_view content_type = headers.getContentTypeValue();
@@ -70,14 +68,6 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
 
 Http::FilterDataStatus Filter::encodeData(Buffer::Instance& data, bool end_stream) {
   if (!content_type_matched_ || processing_complete_) {
-    // If we're at end_stream but never processed, execute on_error for all rules
-    if (end_stream && !content_type_matched_) {
-      // Mark all rules as having an error (content-type mismatch is an error condition)
-      for (auto& state : rule_states_) {
-        state.has_error_occurred = true;
-      }
-      finalizeRules();
-    }
     return Http::FilterDataStatus::Continue;
   }
 
@@ -100,14 +90,8 @@ Http::FilterDataStatus Filter::encodeData(Buffer::Instance& data, bool end_strea
 }
 
 Http::FilterTrailersStatus Filter::encodeTrailers(Http::ResponseTrailerMap&) {
-  // Finalize rules if not already done.
-  if (!processing_complete_) {
-    if (!content_type_matched_) {
-      // Mark all rules as having an error (content-type mismatch)
-      for (auto& state : rule_states_) {
-        state.has_error_occurred = true;
-      }
-    }
+  // Finalize rules if not already done (only if we were processing SSE)
+  if (content_type_matched_ && !processing_complete_) {
     finalizeRules();
   }
   return Http::FilterTrailersStatus::Continue;
@@ -156,23 +140,14 @@ bool Filter::processSseEvent(absl::string_view event) {
   if (!parsed_event.data.has_value() || parsed_event.data.value().empty()) {
     ENVOY_LOG(debug, "Event does not contain 'data' field");
     config_->stats().no_data_field_.inc();
-    // Track error for all rules (will execute on_error at end if on_present never executes)
-    for (auto& state : rule_states_) {
-      state.has_error_occurred = true;
-    }
     return false;
   }
 
-  // Delegate to parser
   auto result = parser_->parse(parsed_event.data.value());
 
-  if (result.has_error) {
-    ENVOY_LOG(debug, "Parser reported error parsing data field");
+  if (result.error_message.has_value()) {
+    ENVOY_LOG(debug, "Parser reported error: {}", result.error_message.value());
     config_->stats().parse_error_.inc();
-    // Track error for all rules (deferred actions may be executed at end of stream)
-    for (auto& state : rule_states_) {
-      state.has_error_occurred = true;
-    }
     return false;
   }
 
@@ -183,54 +158,28 @@ bool Filter::processSseEvent(absl::string_view event) {
     }
   }
 
-  // Track state - mark rules that matched and returned immediate actions
-  for (size_t rule_index : result.matched_rules) {
-    rule_states_[rule_index].has_matched = true;
-  }
-
-  // Track rules where parser indicated selector/pattern not found
-  for (size_t rule_index : result.selector_not_found_rules) {
-    config_->stats().selector_not_found_.inc();
-    rule_states_[rule_index].has_selector_not_found = true;
-  }
-
   return result.stop_processing;
 }
 
 void Filter::finalizeRules() {
-  for (size_t i = 0; i < rule_states_.size(); ++i) {
-    const auto& state = rule_states_[i];
+  // Get all deferred actions from parser (handles on_error/on_missing for unmatched rules)
+  auto deferred_actions = parser_->getAllDeferredActions();
 
-    // If rule never matched, execute deferred actions from parser
-    if (!state.has_matched) {
-      auto deferred_actions =
-          parser_->getDeferredActions(i, state.has_error_occurred, state.has_selector_not_found);
+  if (!deferred_actions.empty()) {
+    ENVOY_LOG(trace, "Executing {} deferred actions at end of stream", deferred_actions.size());
+  }
 
-      bool has_fallback = false;
-      if (state.has_error_occurred && !deferred_actions.empty()) {
-        ENVOY_LOG(trace,
-                  "Rule {}: executing deferred actions (errors occurred, rule never matched)", i);
-        has_fallback = true;
-      } else if (state.has_selector_not_found && !deferred_actions.empty()) {
-        ENVOY_LOG(trace,
-                  "Rule {}: executing deferred actions (selector not found, rule never matched)",
-                  i);
-        has_fallback = true;
-      }
-
-      for (const auto& action : deferred_actions) {
-        if (writeMetadata(action)) {
-          config_->stats().metadata_added_.inc();
-          if (has_fallback) {
-            config_->stats().metadata_from_fallback_.inc();
-          }
-        }
-      }
+  for (const auto& action : deferred_actions) {
+    if (writeMetadata(action)) {
+      config_->stats().metadata_added_.inc();
+      config_->stats().metadata_from_fallback_.inc();
     }
   }
+
+  processing_complete_ = true;
 }
 
-bool Filter::writeMetadata(const SseContentParser::MetadataAction& action) {
+bool Filter::writeMetadata(const ContentParser::MetadataAction& action) {
   // Parser is responsible for applying namespace defaults.
   // If namespace is empty here, it's a parser implementation issue.
   const std::string& namespace_str = action.namespace_;

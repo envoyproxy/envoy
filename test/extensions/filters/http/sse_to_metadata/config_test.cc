@@ -1,4 +1,4 @@
-#include "envoy/extensions/http/sse_content_parsers/json/v3/json_content_parser.pb.h"
+#include "envoy/extensions/content_parsers/json/v3/json_content_parser.pb.h"
 
 #include "source/extensions/filters/http/sse_to_metadata/config.h"
 #include "source/extensions/filters/http/sse_to_metadata/filter.h"
@@ -18,9 +18,9 @@ TEST(SseToMetadataConfigTest, ValidConfig) {
   const std::string yaml = R"EOF(
   response_rules:
     content_parser:
-      name: envoy.sse_content_parsers.json
+      name: envoy.content_parsers.json
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.http.sse_content_parsers.json.v3.JsonContentParser
+        "@type": type.googleapis.com/envoy.extensions.content_parsers.json.v3.JsonContentParser
         rules:
           - rule:
               selectors:
@@ -50,9 +50,9 @@ TEST(SseToMetadataConfigTest, MultipleMetadataDescriptors) {
   const std::string yaml = R"EOF(
   response_rules:
     content_parser:
-      name: envoy.sse_content_parsers.json
+      name: envoy.content_parsers.json
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.http.sse_content_parsers.json.v3.JsonContentParser
+        "@type": type.googleapis.com/envoy.extensions.content_parsers.json.v3.JsonContentParser
         rules:
           - rule:
               selectors:
@@ -91,9 +91,9 @@ TEST(SseToMetadataConfigTest, MultipleRules) {
   const std::string yaml = R"EOF(
   response_rules:
     content_parser:
-      name: envoy.sse_content_parsers.json
+      name: envoy.content_parsers.json
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.http.sse_content_parsers.json.v3.JsonContentParser
+        "@type": type.googleapis.com/envoy.extensions.content_parsers.json.v3.JsonContentParser
         rules:
           - rule:
               selectors:
@@ -141,9 +141,9 @@ TEST(SseToMetadataConfigTest, InvalidConfigMissingPath) {
   const std::string yaml = R"EOF(
   response_rules:
     content_parser:
-      name: envoy.sse_content_parsers.json
+      name: envoy.content_parsers.json
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.http.sse_content_parsers.json.v3.JsonContentParser
+        "@type": type.googleapis.com/envoy.extensions.content_parsers.json.v3.JsonContentParser
         rules:
           - rule:
               on_present:
@@ -166,9 +166,9 @@ TEST(SseToMetadataConfigTest, InvalidConfigEmptyPath) {
   const std::string yaml = R"EOF(
   response_rules:
     content_parser:
-      name: envoy.sse_content_parsers.json
+      name: envoy.content_parsers.json
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.http.sse_content_parsers.json.v3.JsonContentParser
+        "@type": type.googleapis.com/envoy.extensions.content_parsers.json.v3.JsonContentParser
         rules:
           - rule:
               selectors: []
@@ -192,9 +192,9 @@ TEST(SseToMetadataConfigTest, EmptyNamespaceDefaultsToFilterName) {
   const std::string yaml = R"EOF(
   response_rules:
     content_parser:
-      name: envoy.sse_content_parsers.json
+      name: envoy.content_parsers.json
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.http.sse_content_parsers.json.v3.JsonContentParser
+        "@type": type.googleapis.com/envoy.extensions.content_parsers.json.v3.JsonContentParser
         rules:
           - rule:
               selectors:
@@ -217,9 +217,9 @@ TEST(SseToMetadataConfigTest, InvalidConfigMissingKey) {
   const std::string yaml = R"EOF(
   response_rules:
     content_parser:
-      name: envoy.sse_content_parsers.json
+      name: envoy.content_parsers.json
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.http.sse_content_parsers.json.v3.JsonContentParser
+        "@type": type.googleapis.com/envoy.extensions.content_parsers.json.v3.JsonContentParser
         rules:
           - rule:
               selectors:
@@ -243,9 +243,9 @@ TEST(SseToMetadataConfigTest, InvalidConfigNoSelector) {
   const std::string yaml = R"EOF(
   response_rules:
     content_parser:
-      name: envoy.sse_content_parsers.json
+      name: envoy.content_parsers.json
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.http.sse_content_parsers.json.v3.JsonContentParser
+        "@type": type.googleapis.com/envoy.extensions.content_parsers.json.v3.JsonContentParser
         rules:
           - rule:
               on_present:
@@ -269,9 +269,9 @@ TEST(SseToMetadataConfigTest, RequiresAtLeastOneAction) {
   const std::string yaml = R"EOF(
   response_rules:
     content_parser:
-      name: envoy.sse_content_parsers.json
+      name: envoy.content_parsers.json
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.http.sse_content_parsers.json.v3.JsonContentParser
+        "@type": type.googleapis.com/envoy.extensions.content_parsers.json.v3.JsonContentParser
         rules:
           - rule:
               selectors:

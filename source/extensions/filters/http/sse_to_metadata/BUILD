@@ -14,9 +14,10 @@ envoy_cc_library(
     srcs = ["filter.cc"],
     hdrs = ["filter.h"],
     deps = [
+        "//envoy/content_parser:config_interface",
+        "//envoy/content_parser:factory_interface",
+        "//envoy/content_parser:parser_interface",
         "//envoy/server:filter_config_interface",
-        "//envoy/sse_content_parser:config_interface",
-        "//envoy/sse_content_parser:parser_interface",
         "//source/common/http:header_utility_lib",
         "//source/common/http:utility_lib",
         "//source/common/http/sse:sse_parser_lib",
@@ -31,10 +32,10 @@ envoy_cc_extension(
     hdrs = ["config.h"],
     deps = [
         ":sse_to_metadata_lib",
+        "//envoy/content_parser:config_interface",
         "//envoy/registry",
-        "//envoy/sse_content_parser:config_interface",
+        "//source/extensions/content_parsers/json:config",
         "//source/extensions/filters/http/common:factory_base_lib",
-        "//source/extensions/sse_content_parsers/json:config",
         "@envoy_api//envoy/extensions/filters/http/sse_to_metadata/v3:pkg_cc_proto",
     ],
 )

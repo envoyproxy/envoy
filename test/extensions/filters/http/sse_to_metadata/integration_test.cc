@@ -61,9 +61,9 @@ typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.sse_to_metadata.v3.SseToMetadata
   response_rules:
     content_parser:
-      name: envoy.sse_content_parsers.json
+      name: envoy.content_parsers.json
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.http.sse_content_parsers.json.v3.JsonContentParser
+        "@type": type.googleapis.com/envoy.extensions.content_parsers.json.v3.JsonContentParser
         rules:
           - rule:
               selectors:

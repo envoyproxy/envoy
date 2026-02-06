@@ -3,11 +3,12 @@
 #include <string>
 #include <vector>
 
+#include "envoy/content_parser/config.h"
+#include "envoy/content_parser/factory.h"
+#include "envoy/content_parser/parser.h"
 #include "envoy/extensions/filters/http/sse_to_metadata/v3/sse_to_metadata.pb.h"
 #include "envoy/server/factory_context.h"
 #include "envoy/server/filter_config.h"
-#include "envoy/sse_content_parser/config.h"
-#include "envoy/sse_content_parser/parser.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
 #include "envoy/stats/stats_macros.h"
@@ -31,7 +32,6 @@ namespace SseToMetadata {
   COUNTER(mismatched_content_type)                                                                 \
   COUNTER(no_data_field)                                                                           \
   COUNTER(parse_error)                                                                             \
-  COUNTER(selector_not_found)                                                                      \
   COUNTER(preserved_existing_metadata)                                                             \
   COUNTER(event_too_large)
 
@@ -51,7 +51,7 @@ public:
                Server::Configuration::ServerFactoryContext& context);
 
   const SseToMetadataStats& stats() const { return stats_; }
-  SseContentParser::ParserFactory& parserFactory() { return *parser_factory_; }
+  ContentParser::ParserFactory& parserFactory() { return *parser_factory_; }
   uint32_t maxEventSize() const { return max_event_size_; }
 
 private:
@@ -59,7 +59,7 @@ private:
     return SseToMetadataStats{ALL_SSE_TO_METADATA_FILTER_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
   }
 
-  SseContentParser::ParserFactoryPtr parser_factory_;
+  ContentParser::ParserFactoryPtr parser_factory_;
   const SseToMetadataStats stats_;
   const uint32_t max_event_size_;
 };
@@ -89,8 +89,7 @@ private:
   /**
    * Process a single complete SSE event.
    * @param event the event content (without trailing blank line).
-   * @return true if processing should stop (when stop_processing_on_match is true and a match was
-   * found).
+   * @return true if processing should stop (all rules have reached their match limits).
    */
   bool processSseEvent(absl::string_view event);
 
@@ -103,28 +102,16 @@ private:
    * Write a metadata action to dynamic metadata.
    * @return true if metadata was successfully written, false otherwise.
    */
-  bool writeMetadata(const SseContentParser::MetadataAction& action);
-
-  // Per-rule state tracking
-  struct RuleState {
-    // Whether the rule matched and returned immediate actions during the stream
-    bool has_matched{false};
-    // Whether any parsing error occurred during the stream
-    bool has_error_occurred{false};
-    // Whether the parser indicated selector/pattern not found for this rule
-    bool has_selector_not_found{false};
-  };
+  bool writeMetadata(const ContentParser::MetadataAction& action);
 
   std::shared_ptr<FilterConfig> config_;
   // Parser instance for this stream
-  SseContentParser::ParserPtr parser_;
+  ContentParser::ParserPtr parser_;
   // Set to true if Content-Type header matches allowed types.
   bool content_type_matched_{false};
-  // Set to true when a rule with stop_processing_on_match executes. Stops further processing.
+  // Set to true when all rules have reached their match limits. Stops further processing.
   bool processing_complete_{false};
   std::string buffer_;
-  // State tracking for each rule (indexed by rule position in parser)
-  std::vector<RuleState> rule_states_;
 };
 
 } // namespace SseToMetadata

@@ -61,9 +61,9 @@ Extract multiple values from streaming responses for logging and monitoring:
 
   response_rules:
     content_parser:
-      name: envoy.sse_content_parsers.json
+      name: envoy.content_parsers.json
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.http.sse_content_parsers.json.v3.JsonContentParser
+        "@type": type.googleapis.com/envoy.extensions.content_parsers.json.v3.JsonContentParser
         rules:
         - rule:
             selectors:
@@ -90,13 +90,13 @@ For Server-Sent Events (SSE) format with JSON content parser:
    Matching is performed on the media type (type/subtype) only, ignoring parameters like ``charset``.
 2. It parses the SSE stream according to the `SSE specification <https://html.spec.whatwg.org/multipage/server-sent-events.html>`_,
    handling CRLF, CR, and LF line endings, and properly managing events split across multiple data chunks
-3. For each complete SSE event, it extracts the value from the ``data`` field(s) and delegates to the configured **metadata extractor**
-4. The JSON metadata extractor parses the data as JSON and navigates the object using the configured selectors (e.g., ``selectors: [{key: "usage"}, {key: "total_tokens"}]`` extracts ``json["usage"]["total_tokens"]``)
-5. Based on the result, it writes metadata according to the configured rules defined in the metadata extractor:
+3. For each complete SSE event, it extracts the value from the ``data`` field(s) and delegates to the configured **content parser**
+4. The JSON content parser parses the data as JSON and navigates the object using the configured selectors (e.g., ``selectors: [{key: "usage"}, {key: "total_tokens"}]`` extracts ``json["usage"]["total_tokens"]``)
+5. Based on the result, it writes metadata according to the configured rules defined in the content parser:
 
    * **on_present**: Executes immediately when the selector successfully extracts a value from any event
    * **on_missing**: Deferred until end-of-stream. Executes only if ``on_present`` never executed and the selector path was not found in at least one event
-   * **on_error**: Deferred until end-of-stream. Executes only if ``on_present`` never executed and an error occurred (JSON parse failure, no data field, content-type mismatch, etc.). Takes priority over ``on_missing`` if both conditions are met
+   * **on_error**: Deferred until end-of-stream. Executes only if ``on_present`` never executed and an error occurred (JSON parse failure, no data field, etc.). Takes priority over ``on_missing`` if both conditions are met
 
 6. The deferred execution of ``on_missing`` and ``on_error`` ensures that early events without the desired field (common in LLM streams) don't prevent later successful extractions
 7. By default, each rule processes the entire stream (``stop_processing_after_matches: 0``). Set ``stop_processing_after_matches: 1`` on a rule to stop evaluating that rule after its first match. The filter only stops processing the entire stream when ALL rules have limits AND they've all been reached (see :ref:`Performance Considerations <config_http_filters_sse_to_metadata_performance>` for details)
@@ -124,13 +124,13 @@ Key Configuration Options
   A :ref:`typed extension <envoy_v3_api_msg_config.core.v3.TypedExtensionConfig>` that specifies how to parse
   and extract values from event payloads. Available parsers:
 
-  * **envoy.sse_content_parsers.json**: Parses JSON content and extracts values using JSONPath-like selectors.
-    See :ref:`v3 API reference <envoy_v3_api_msg_extensions.http.sse_content_parsers.json.v3.JsonContentParser>`
+  * **envoy.content_parsers.json**: Parses JSON content and extracts values using JSONPath-like selectors.
+    See :ref:`v3 API reference <envoy_v3_api_msg_extensions.content_parsers.json.v3.JsonContentParser>`
     for configuration options.
 
 **JSON Content Parser Configuration**
 
-When using ``envoy.sse_content_parsers.json``, configure rules within the typed_config:
+When using ``envoy.content_parsers.json``, configure rules within the typed_config:
 
 **rules**
   A list of rules to apply. Each rule contains:
@@ -142,7 +142,7 @@ When using ``envoy.sse_content_parsers.json``, configure rules within the typed_
     - **on_present**: Metadata to write when the selector successfully extracts a value.
       Executes immediately when a match is found. Specifies:
 
-      * ``metadata_namespace``: The metadata namespace (e.g., ``envoy.lb``). If empty, defaults to ``envoy.filters.http.sse_to_metadata``.
+      * ``metadata_namespace``: The metadata namespace (e.g., ``envoy.lb``). If empty, defaults to ``envoy.content_parsers.json``.
       * ``key``: The metadata key
       * ``value``: Optional hardcoded value. If set, writes this instead of the extracted value.
       * ``type``: The value type (``PROTOBUF_VALUE``, ``STRING``, or ``NUMBER``)
@@ -152,7 +152,7 @@ When using ``envoy.sse_content_parsers.json``, configure rules within the typed_
       Executes at end-of-stream if ``on_present`` never executed. Write a fallback/sentinel value (e.g., -1) to ensure metadata is always present for downstream consumers.
       **Must** have ``value`` set to a fallback. This handles the case where legitimate JSON exists but lacks the expected field.
 
-    - **on_error**: Metadata to write when an error occurs (JSON parse failure, no data field, content-type mismatch, etc.).
+    - **on_error**: Metadata to write when an error occurs (JSON parse failure, no data field, etc.).
       Executes at end-of-stream if ``on_present`` never executed and takes priority over ``on_missing``. Write a safe default (e.g., 0) to ensure metadata is always present even when errors occur.
       **Must** have ``value`` set to a fallback. This handles malformed or missing data.
 
@@ -167,12 +167,6 @@ When using ``envoy.sse_content_parsers.json``, configure rules within the typed_
     At least one of ``on_present``, ``on_missing``, or ``on_error`` must be specified in each rule.
     The ``on_missing`` and ``on_error`` actions are deferred and only execute at the end of the stream if ``on_present`` never executes.
     This prevents early error/missing content from overwriting later successful extractions (common in LLM streams where usage data appears in the final content).
-
-**response_rules.allowed_content_types**
-  A list of content types to process. Defaults to ``["text/event-stream"]`` for SSE format.
-  Content-Type matching is performed on the media type (type/subtype) only, ignoring parameters
-  such as ``charset``. For example, ``text/event-stream; charset=utf-8`` will match the
-  configured type ``text/event-stream``.
 
 **response_rules.max_event_size**
   Maximum size in bytes for a single event before it's considered invalid and discarded.
@@ -191,9 +185,9 @@ Write the same value to multiple metadata namespaces, useful during migrations:
 
   response_rules:
     content_parser:
-      name: envoy.sse_content_parsers.json
+      name: envoy.content_parsers.json
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.http.sse_content_parsers.json.v3.JsonContentParser
+        "@type": type.googleapis.com/envoy.extensions.content_parsers.json.v3.JsonContentParser
         rules:
         - rule:
             selectors:
@@ -220,9 +214,9 @@ Avoid overwriting previously set metadata values:
 
   response_rules:
     content_parser:
-      name: envoy.sse_content_parsers.json
+      name: envoy.content_parsers.json
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.http.sse_content_parsers.json.v3.JsonContentParser
+        "@type": type.googleapis.com/envoy.extensions.content_parsers.json.v3.JsonContentParser
         rules:
         - rule:
             selectors:
@@ -242,9 +236,9 @@ Write fallback values when extraction fails to ensure metadata is always availab
 
   response_rules:
     content_parser:
-      name: envoy.sse_content_parsers.json
+      name: envoy.content_parsers.json
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.http.sse_content_parsers.json.v3.JsonContentParser
+        "@type": type.googleapis.com/envoy.extensions.content_parsers.json.v3.JsonContentParser
         rules:
         - rule:
             selectors:
@@ -269,40 +263,17 @@ In this configuration:
 
 * When the value is successfully extracted, it's written to metadata
 * When the ``usage.total_tokens`` path doesn't exist in any event, ``-1`` is written at end-of-stream as a sentinel value
-* When JSON parsing fails, no data field exists, or content-type mismatches, ``0`` is written at end-of-stream as a safe default
+* When JSON parsing fails or no data field exists, ``0`` is written at end-of-stream as a safe default
 * The deferred execution ensures that error/missing states don't overwrite a successful extraction from a later event
-
-**Custom Content Types**
-
-Accept additional content types beyond the default:
-
-.. code-block:: yaml
-
-  response_rules:
-    allowed_content_types:
-    - "text/event-stream"
-    - "application/stream+json"
-    content_parser:
-      name: envoy.sse_content_parsers.json
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.http.sse_content_parsers.json.v3.JsonContentParser
-        rules:
-          # ... rules ...
-
-.. note::
-
-  Content-Type matching ignores parameters after the semicolon. The response header
-  ``text/event-stream; charset=utf-8`` will match the configured type ``text/event-stream``.
-  You only need to configure the base media type (type/subtype).
 
 Statistics
 ----------
 
 The sse_to_metadata filter outputs statistics in the ``http.<stat_prefix>.sse_to_metadata.resp.<parser_prefix>*`` namespace.
 The :ref:`stat prefix <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stat_prefix>`
-comes from the owning HTTP connection manager, and ``<parser_prefix>`` comes from the metadata extractor (e.g., ``json.`` for the JSON parser).
+comes from the owning HTTP connection manager, and ``<parser_prefix>`` comes from the content parser (e.g., ``json.`` for the JSON parser).
 
-For example, with the JSON metadata extractor, the metrics will be under ``http.<stat_prefix>.sse_to_metadata.resp.json.*``.
+For example, with the JSON content parser, the metrics will be under ``http.<stat_prefix>.sse_to_metadata.resp.json.*``.
 
 .. csv-table::
   :header: Name, Type, Description
@@ -312,8 +283,7 @@ For example, with the JSON metadata extractor, the metrics will be under ``http.
   resp.<parser_prefix>.metadata_from_fallback, Counter, Total number of metadata entries written using on_missing or on_error fallback values (subset of metadata_added)
   resp.<parser_prefix>.mismatched_content_type, Counter, Total number of responses with content types that don't match the expected type
   resp.<parser_prefix>.no_data_field, Counter, Total number of SSE events without a data field
-  resp.<parser_prefix>.parse_error, Counter, Total number of events where the metadata extractor failed to parse the data field
-  resp.<parser_prefix>.selector_not_found, Counter, Total number of times the selector path was not found in the parsed content
+  resp.<parser_prefix>.parse_error, Counter, Total number of events where the content parser failed to parse the data field
   resp.<parser_prefix>.preserved_existing_metadata, Counter, Total number of times metadata was not written due to preserve_existing_metadata_value being true
   resp.<parser_prefix>.event_too_large, Counter, Total number of events discarded because they exceeded max_event_size
 

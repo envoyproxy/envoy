@@ -1,4 +1,4 @@
-#include "envoy/extensions/http/sse_content_parsers/json/v3/json_content_parser.pb.h"
+#include "envoy/extensions/content_parsers/json/v3/json_content_parser.pb.h"
 
 #include "source/common/config/metadata.h"
 #include "source/extensions/filters/http/sse_to_metadata/config.h"
@@ -62,9 +62,9 @@ public:
   const std::string basic_config_ = R"EOF(
   response_rules:
     content_parser:
-      name: envoy.sse_content_parsers.json
+      name: envoy.content_parsers.json
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.http.sse_content_parsers.json.v3.JsonContentParser
+        "@type": type.googleapis.com/envoy.extensions.content_parsers.json.v3.JsonContentParser
         rules:
           - rule:
               selectors:
@@ -79,9 +79,9 @@ public:
   const std::string multi_namespace_config_ = R"EOF(
   response_rules:
     content_parser:
-      name: envoy.sse_content_parsers.json
+      name: envoy.content_parsers.json
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.http.sse_content_parsers.json.v3.JsonContentParser
+        "@type": type.googleapis.com/envoy.extensions.content_parsers.json.v3.JsonContentParser
         rules:
           - rule:
               selectors:
@@ -104,9 +104,9 @@ public:
   const std::string preserve_config_ = R"EOF(
   response_rules:
     content_parser:
-      name: envoy.sse_content_parsers.json
+      name: envoy.content_parsers.json
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.http.sse_content_parsers.json.v3.JsonContentParser
+        "@type": type.googleapis.com/envoy.extensions.content_parsers.json.v3.JsonContentParser
         rules:
           - rule:
               selectors:
@@ -122,9 +122,9 @@ public:
   const std::string multi_rule_config_ = R"EOF(
   response_rules:
     content_parser:
-      name: envoy.sse_content_parsers.json
+      name: envoy.content_parsers.json
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.http.sse_content_parsers.json.v3.JsonContentParser
+        "@type": type.googleapis.com/envoy.extensions.content_parsers.json.v3.JsonContentParser
         rules:
           - rule:
               selectors:
@@ -146,9 +146,9 @@ public:
   const std::string no_stop_config_ = R"EOF(
   response_rules:
     content_parser:
-      name: envoy.sse_content_parsers.json
+      name: envoy.content_parsers.json
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.http.sse_content_parsers.json.v3.JsonContentParser
+        "@type": type.googleapis.com/envoy.extensions.content_parsers.json.v3.JsonContentParser
         rules:
           - rule:
               selectors:
@@ -221,9 +221,9 @@ TEST_F(SseToMetadataFilterTest, BadContentTypeTriggersOnError) {
 
   // Set up content parser config
   auto* content_parser = response_rules->mutable_content_parser();
-  content_parser->set_name("envoy.sse_content_parsers.json");
+  content_parser->set_name("envoy.content_parsers.json");
 
-  envoy::extensions::http::sse_content_parsers::json::v3::JsonContentParser json_config;
+  envoy::extensions::content_parsers::json::v3::JsonContentParser json_config;
   auto* rule = json_config.add_rules()->mutable_rule();
   rule->add_selectors()->set_key("usage");
   rule->add_selectors()->set_key("total_tokens");
@@ -545,9 +545,9 @@ TEST_F(SseToMetadataFilterTest, EventExceedsMaxSize) {
   response_rules:
     max_event_size: 100
     content_parser:
-      name: envoy.sse_content_parsers.json
+      name: envoy.content_parsers.json
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.http.sse_content_parsers.json.v3.JsonContentParser
+        "@type": type.googleapis.com/envoy.extensions.content_parsers.json.v3.JsonContentParser
         rules:
           - rule:
               selectors:
@@ -585,9 +585,9 @@ TEST_F(SseToMetadataFilterTest, EventWithinMaxSize) {
   response_rules:
     max_event_size: 1000
     content_parser:
-      name: envoy.sse_content_parsers.json
+      name: envoy.content_parsers.json
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.http.sse_content_parsers.json.v3.JsonContentParser
+        "@type": type.googleapis.com/envoy.extensions.content_parsers.json.v3.JsonContentParser
         rules:
           - rule:
               selectors:
@@ -616,9 +616,9 @@ TEST_F(SseToMetadataFilterTest, MaxSizeDisabled) {
   response_rules:
     max_event_size: 0
     content_parser:
-      name: envoy.sse_content_parsers.json
+      name: envoy.content_parsers.json
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.http.sse_content_parsers.json.v3.JsonContentParser
+        "@type": type.googleapis.com/envoy.extensions.content_parsers.json.v3.JsonContentParser
         rules:
           - rule:
               selectors:
@@ -664,9 +664,9 @@ TEST_F(SseToMetadataFilterTest, StopProcessingOnMatch) {
   const std::string config = R"EOF(
   response_rules:
     content_parser:
-      name: envoy.sse_content_parsers.json
+      name: envoy.content_parsers.json
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.http.sse_content_parsers.json.v3.JsonContentParser
+        "@type": type.googleapis.com/envoy.extensions.content_parsers.json.v3.JsonContentParser
         rules:
           - rule:
               selectors:
@@ -777,9 +777,9 @@ TEST_F(SseToMetadataFilterTest, OnErrorJsonParseFails) {
   const std::string config = R"EOF(
   response_rules:
     content_parser:
-      name: envoy.sse_content_parsers.json
+      name: envoy.content_parsers.json
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.http.sse_content_parsers.json.v3.JsonContentParser
+        "@type": type.googleapis.com/envoy.extensions.content_parsers.json.v3.JsonContentParser
         rules:
           - rule:
               selectors:
@@ -815,9 +815,9 @@ TEST_F(SseToMetadataFilterTest, OnErrorNoDataField) {
 
   // Set up content parser config
   auto* content_parser = response_rules->mutable_content_parser();
-  content_parser->set_name("envoy.sse_content_parsers.json");
+  content_parser->set_name("envoy.content_parsers.json");
 
-  envoy::extensions::http::sse_content_parsers::json::v3::JsonContentParser json_config;
+  envoy::extensions::content_parsers::json::v3::JsonContentParser json_config;
   auto* rule = json_config.add_rules()->mutable_rule();
   rule->add_selectors()->set_key("usage");
   rule->add_selectors()->set_key("total_tokens");
@@ -849,9 +849,9 @@ TEST_F(SseToMetadataFilterTest, OnErrorDoesNotOverwriteOnPresent) {
   const std::string config = R"EOF(
   response_rules:
     content_parser:
-      name: envoy.sse_content_parsers.json
+      name: envoy.content_parsers.json
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.http.sse_content_parsers.json.v3.JsonContentParser
+        "@type": type.googleapis.com/envoy.extensions.content_parsers.json.v3.JsonContentParser
         rules:
           - rule:
               selectors:
@@ -893,9 +893,9 @@ TEST_F(SseToMetadataFilterTest, OnErrorPriorityOverOnMissing) {
   const std::string config = R"EOF(
   response_rules:
     content_parser:
-      name: envoy.sse_content_parsers.json
+      name: envoy.content_parsers.json
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.http.sse_content_parsers.json.v3.JsonContentParser
+        "@type": type.googleapis.com/envoy.extensions.content_parsers.json.v3.JsonContentParser
         rules:
           - rule:
               selectors:
@@ -926,7 +926,6 @@ TEST_F(SseToMetadataFilterTest, OnErrorPriorityOverOnMissing) {
   auto metadata = getMetadata("envoy.lb", "tokens");
   EXPECT_EQ(metadata.number_value(), 0); // on_error value, not -1
   EXPECT_EQ(findCounter("sse_to_metadata.resp.json.parse_error"), 1);
-  EXPECT_EQ(findCounter("sse_to_metadata.resp.json.selector_not_found"), 1);
 }
 
 TEST_F(SseToMetadataFilterTest, TrailersFinalizesRules) {
@@ -936,9 +935,9 @@ TEST_F(SseToMetadataFilterTest, TrailersFinalizesRules) {
 
   // Set up content parser config
   auto* content_parser = response_rules->mutable_content_parser();
-  content_parser->set_name("envoy.sse_content_parsers.json");
+  content_parser->set_name("envoy.content_parsers.json");
 
-  envoy::extensions::http::sse_content_parsers::json::v3::JsonContentParser json_config;
+  envoy::extensions::content_parsers::json::v3::JsonContentParser json_config;
   auto* rule = json_config.add_rules()->mutable_rule();
   rule->add_selectors()->set_key("usage");
   rule->add_selectors()->set_key("total_tokens");
@@ -968,7 +967,6 @@ TEST_F(SseToMetadataFilterTest, TrailersFinalizesRules) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(trailers));
 
   // After trailers, on_missing should have been executed
-  EXPECT_EQ(findCounter("sse_to_metadata.resp.json.selector_not_found"), 1);
   auto metadata_after = getMetadata("envoy.lb", "tokens");
   EXPECT_NE(metadata_after.kind_case(), 0);
   EXPECT_EQ(metadata_after.number_value(), -1);
@@ -978,9 +976,9 @@ TEST_F(SseToMetadataFilterTest, TrailersWithContentTypeMismatch) {
   const std::string config = R"EOF(
   response_rules:
     content_parser:
-      name: envoy.sse_content_parsers.json
+      name: envoy.content_parsers.json
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.http.sse_content_parsers.json.v3.JsonContentParser
+        "@type": type.googleapis.com/envoy.extensions.content_parsers.json.v3.JsonContentParser
         rules:
           - rule:
               selectors:

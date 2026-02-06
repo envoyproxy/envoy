@@ -49,7 +49,7 @@ message SseToMetadata {
     // - How to map extracted values to metadata (namespace, key, type conversions)
     // - When to write metadata (on_present, on_missing, on_error actions)
     //
-    // [#extension-category: envoy.sse_content_parsers]
+    // [#extension-category: envoy.content_parsers]
     config.core.v3.TypedExtensionConfig content_parser = 1
         [(validate.rules).message = {required: true}];
 
