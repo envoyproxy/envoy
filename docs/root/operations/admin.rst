@@ -760,7 +760,17 @@ modify different aspects of the server:
   .. http:get:: /stats/prometheus
 
   Outputs /stats in `Prometheus <https://prometheus.io/docs/instrumenting/exposition_formats/>`_
-  v0.0.4 format. This can be used to integrate with a Prometheus server.
+  format. This can be used to integrate with a Prometheus server.
+
+  The output will either be the protobuf format or the v0.0.4 text format, depending on the value
+  of the ``Accept`` header. A prometheus scrape configuration specifies the desired protocol:
+
+  .. code-block:: yaml
+
+    scrape_configs:
+      - scrape_protocols:
+        - 'PrometheusProto'
+        - 'PrometheusText0.0.4'
 
   .. http:get:: /stats?format=prometheus&usedonly
 
