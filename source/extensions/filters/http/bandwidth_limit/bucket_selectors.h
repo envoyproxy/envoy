@@ -23,11 +23,13 @@ public:
                  uint64_t limit_kbps, std::chrono::milliseconds fill_interval);
   std::shared_ptr<SharedTokenBucketImpl> bucket() const { return bucket_; }
   BandwidthLimitStats& stats() const { return stats_; }
+  uint64_t limit_kbps() const { return limit_kbps_; }
   std::chrono::milliseconds fillInterval() const { return fill_interval_; }
 
 private:
   std::shared_ptr<SharedTokenBucketImpl> bucket_;
   mutable BandwidthLimitStats stats_;
+  uint64_t limit_kbps_;
   std::chrono::milliseconds fill_interval_;
 };
 

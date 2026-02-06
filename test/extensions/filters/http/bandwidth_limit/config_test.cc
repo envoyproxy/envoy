@@ -75,7 +75,7 @@ TEST_F(FactoryTest, RouteSpecificFilterConfig) {
                                            ProtobufMessage::getNullValidationVisitor())
           .value();
   const auto* config = dynamic_cast<const FilterConfig*>(route_config.get());
-  EXPECT_EQ(config->limit(), 10);
+  EXPECT_EQ(config->bucketAndStats(mock_stream_info_)->limit_kbps(), 10);
   EXPECT_EQ(config->bucketAndStats(mock_stream_info_)->fillInterval().count(), 100);
   EXPECT_EQ(config->enableMode(), EnableMode::BandwidthLimit_EnableMode_REQUEST_AND_RESPONSE);
   EXPECT_FALSE(config->bucketAndStats(mock_stream_info_)->bucket() == nullptr);
@@ -105,7 +105,7 @@ TEST_F(FactoryTest, RouteSpecificFilterConfigDisabledByDefault) {
           .value();
   const auto* config = dynamic_cast<const FilterConfig*>(route_config.get());
   EXPECT_EQ(config->enableMode(), EnableMode::BandwidthLimit_EnableMode_DISABLED);
-  EXPECT_EQ(config->limit(), 10);
+  EXPECT_EQ(config->bucketAndStats(mock_stream_info_)->limit_kbps(), 10);
   EXPECT_EQ(config->bucketAndStats(mock_stream_info_)->fillInterval().count(), 100);
 }
 
@@ -127,7 +127,7 @@ TEST_F(FactoryTest, RouteSpecificFilterConfigDefault) {
                                            ProtobufMessage::getNullValidationVisitor())
           .value();
   const auto* config = dynamic_cast<const FilterConfig*>(route_config.get());
-  EXPECT_EQ(config->limit(), 10);
+  EXPECT_EQ(config->bucketAndStats(mock_stream_info_)->limit_kbps(), 10);
   EXPECT_EQ(config->bucketAndStats(mock_stream_info_)->fillInterval().count(), 50);
   // default trailers
   EXPECT_EQ(config->enableResponseTrailers(), false);
@@ -165,6 +165,24 @@ TEST_F(FactoryTest, FixedNameBucketSelectorUsesNamedBucket) {
   )")
                     .value();
   EXPECT_THAT(config->bucketAndStats(mock_stream_info_)->fillInterval().count(), 20);
+}
+
+TEST_F(FactoryTest, DuplicateNamedBucketConfigurationsIsAnError) {
+  auto config = configFromYaml(R"(
+  stat_prefix: test
+  limit_kbps: 50
+  named_bucket_selector:
+    explicit_bucket: test_explicit_bucket
+  named_bucket_configurations:
+  - name: test_explicit_bucket
+    limit_kbps: 100
+    fill_interval: 0.02s
+  - name: test_explicit_bucket
+    limit_kbps: 101
+    fill_interval: 0.03s
+  )");
+  EXPECT_THAT(config,
+              HasStatus(absl::StatusCode::kInvalidArgument, HasSubstr("duplicate bucket name")));
 }
 
 TEST_F(FactoryTest, FixedNameBucketSelectorCreatesDefaultBucket) {

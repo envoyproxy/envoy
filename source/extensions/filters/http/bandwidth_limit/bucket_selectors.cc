@@ -28,7 +28,7 @@ BucketAndStats::BucketAndStats(absl::string_view name, TimeSource& time_source, 
     : bucket_(std::make_shared<SharedTokenBucketImpl>(
           StreamRateLimiter::kiloBytesToBytes(limit_kbps), time_source,
           StreamRateLimiter::kiloBytesToBytes(limit_kbps))),
-      stats_(generateStats(name, scope)), fill_interval_(fill_interval) {}
+      stats_(generateStats(name, scope)), limit_kbps_(limit_kbps), fill_interval_(fill_interval) {}
 
 std::string ClientCnBucketSelector::bucketName(const StreamInfo::StreamInfo& stream_info) const {
   auto ssl = stream_info.downstreamAddressProvider().sslConnection();

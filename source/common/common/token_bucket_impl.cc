@@ -54,7 +54,8 @@ std::chrono::milliseconds TokenBucketImpl::nextTokenAvailable() {
 }
 
 void TokenBucketImpl::maybeReset(uint64_t num_tokens) {
-  ASSERT(num_tokens <= max_tokens_);
+  ASSERT(num_tokens <= max_tokens_,
+         fmt::format("num_tokens = {}, max_tokens_ = {}", num_tokens, max_tokens_));
   tokens_ = num_tokens;
   last_fill_ = time_source_.monotonicTime();
 }

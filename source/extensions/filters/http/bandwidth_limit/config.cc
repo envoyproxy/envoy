@@ -28,14 +28,16 @@ absl::StatusOr<std::shared_ptr<NamedBucketSelector>> maybeNamedBucketSelector(
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(
           proto_config, fill_interval, StreamRateLimiter::DefaultFillInterval.count()));
   for (const auto& bucket : proto_config.named_bucket_configurations()) {
-    RETURN_IF_NOT_OK(named_bucket_singleton->setBucket(
-        bucket.name(),
-        std::make_unique<BucketAndStats>(
-            bucket.name(), context.timeSource(), context.scope(), bucket.limit_kbps(),
-            bucket.has_fill_interval()
-                ? std::chrono::milliseconds(
-                      DurationUtil::durationToMilliseconds(bucket.fill_interval()))
-                : default_fill_interval)));
+    std::chrono::milliseconds fill_interval =
+        bucket.has_fill_interval() ? std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
+                                         bucket.fill_interval()))
+                                   : default_fill_interval;
+    auto new_bucket = std::make_unique<BucketAndStats>(
+        bucket.name(), context.timeSource(), context.scope(), bucket.limit_kbps(), fill_interval);
+    uint64_t max_tokens = StreamRateLimiter::kiloBytesToBytes(bucket.limit_kbps());
+    uint64_t initial_tokens = max_tokens * fill_interval.count() / 1000;
+    new_bucket->bucket()->maybeReset(initial_tokens);
+    RETURN_IF_NOT_OK(named_bucket_singleton->setBucket(bucket.name(), std::move(new_bucket)));
   }
   int selected_options =
       (proto_config.named_bucket_selector().explicit_bucket().empty() ? 0 : 1) +

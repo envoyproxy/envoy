@@ -26,16 +26,14 @@ class FilterConfig : public ::Envoy::Router::RouteSpecificFilterConfig {
 public:
   using EnableMode =
       envoy::extensions::filters::http::bandwidth_limit::v3::BandwidthLimit_EnableMode;
-  static absl::StatusOr<std::shared_ptr<FilterConfig>>
+  static absl::StatusOr<std::shared_ptr<const FilterConfig>>
   create(const envoy::extensions::filters::http::bandwidth_limit::v3::BandwidthLimit& config,
          std::shared_ptr<NamedBucketSelector> named_bucket_selector, Stats::Scope& scope,
          Runtime::Loader& runtime, TimeSource& time_source, bool per_route = false);
 
   ~FilterConfig() override = default;
   OptRef<const BucketAndStats> bucketAndStats(const StreamInfo::StreamInfo& stream_info) const;
-  TimeSource& timeSource() { return time_source_; }
-  // Must call enabled() before calling limit().
-  uint64_t limit() const { return limit_kbps_; }
+  TimeSource& timeSource() const { return time_source_; }
   bool enabled() const { return enabled_.enabled(); }
   EnableMode enableMode() const { return enable_mode_; };
   const Http::LowerCaseString& requestDelayTrailer() const { return request_delay_trailer_; }
@@ -62,7 +60,7 @@ private:
   uint64_t limit_kbps_;
   const Runtime::FeatureFlag enabled_;
   // Filter chain's shared token bucket and stats.
-  BucketAndStats bucket_and_stats_;
+  BucketAndStats route_default_bucket_and_stats_;
   const Http::LowerCaseString request_delay_trailer_;
   const Http::LowerCaseString response_delay_trailer_;
   const Http::LowerCaseString request_filter_delay_trailer_;
@@ -70,7 +68,7 @@ private:
   const bool enable_response_trailers_;
 };
 
-using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
+using FilterConfigSharedPtr = std::shared_ptr<const FilterConfig>;
 
 /**
  * HTTP bandwidth limit filter. Depending on the route configuration, this
@@ -118,7 +116,8 @@ private:
   void updateStatsOnDecodeFinish();
   void updateStatsOnEncodeFinish();
   std::shared_ptr<SharedTokenBucketImpl> bucket() const;
-  OptRef<BandwidthLimitStats> stats() const;
+  BandwidthLimitStats& stats() const;
+  uint64_t limit_kbps() const;
   std::chrono::milliseconds fillInterval() const;
 
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
