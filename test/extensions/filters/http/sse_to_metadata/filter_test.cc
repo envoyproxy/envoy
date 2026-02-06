@@ -1009,6 +1009,69 @@ TEST_F(SseToMetadataFilterTest, TrailersWithContentTypeMismatch) {
   EXPECT_EQ(findCounter("sse_to_metadata.resp.json.mismatched_content_type"), 1);
 }
 
+TEST_F(SseToMetadataFilterTest, OnMissingWithoutValueDoesNotWriteMetadata) {
+  // Create config programmatically
+  envoy::extensions::filters::http::sse_to_metadata::v3::SseToMetadata proto_config;
+  auto* response_rules = proto_config.mutable_response_rules();
+
+  auto* content_parser = response_rules->mutable_content_parser();
+  content_parser->set_name("envoy.content_parsers.json");
+
+  envoy::extensions::content_parsers::json::v3::JsonContentParser json_config;
+  auto* rule = json_config.add_rules()->mutable_rule();
+  rule->add_selectors()->set_key("nonexistent");
+  rule->add_selectors()->set_key("path");
+
+  auto* on_missing = rule->mutable_on_missing();
+  on_missing->set_metadata_namespace("envoy.lb");
+  on_missing->set_key("tokens");
+
+  content_parser->mutable_typed_config()->PackFrom(json_config);
+
+  config_ = std::make_shared<FilterConfig>(proto_config, context_);
+  filter_ = std::make_unique<Filter>(config_);
+  filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+  ON_CALL(encoder_callbacks_, streamInfo()).WillByDefault(ReturnRef(stream_info_));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
+
+  // Send valid JSON that doesn't have the selector path
+  addEncodeDataChunks(std::string("data: {\"model\": \"gpt-4\"}") + std::string(delimiter_), true);
+
+  // on_missing fires but has no value. Metadata should not be written
+  auto metadata = getMetadata("envoy.lb", "tokens");
+  EXPECT_EQ(metadata.kind_case(), Protobuf::Value::KIND_NOT_SET);
+}
+
+TEST_F(SseToMetadataFilterTest, StringToNumberConversionFailureDoesNotWriteMetadata) {
+  const std::string config = R"EOF(
+  response_rules:
+    content_parser:
+      name: envoy.content_parsers.json
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.content_parsers.json.v3.JsonContentParser
+        rules:
+          - rule:
+              selectors:
+                - key: "model"
+              on_present:
+                metadata_namespace: "envoy.lb"
+                key: "model_as_number"
+                type: NUMBER
+  )EOF";
+
+  setupFilter(config);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
+
+  // Send JSON with a string value that cannot be converted to a number
+  addEncodeDataChunks(std::string("data: {\"model\": \"gpt-4-turbo\"}") + std::string(delimiter_),
+                      true);
+
+  // The string "gpt-4-turbo" cannot be parsed as a number, so kind_case will be KIND_NOT_SET
+  // and metadata should not be written
+  auto metadata = getMetadata("envoy.lb", "model_as_number");
+  EXPECT_EQ(metadata.kind_case(), Protobuf::Value::KIND_NOT_SET);
+}
+
 } // namespace
 } // namespace SseToMetadata
 } // namespace HttpFilters
