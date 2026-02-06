@@ -17,6 +17,7 @@ struct BufferedStreamState {
   bool headers_sent_ = false;
   std::deque<std::unique_ptr<Fragment>> buffer_;
   bool seen_end_stream_ = false;
+  bool seen_trailers_ = false;
   bool sent_slow_down_ = false;
   bool finished_ = false;
   // This bool is used to signify that we should *not* intercept
