@@ -25,7 +25,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // reused.
 //
 // A module must be compatible with the ABI specified in :repo:`abi.h
-// <source/extensions/dynamic_modules/abi.h>`. Currently, compatibility is only guaranteed by an
+// <source/extensions/dynamic_modules/abi/abi.h>`. Currently, compatibility is only guaranteed by an
 // exact version match between the Envoy codebase and the dynamic module SDKs. In the future, after
 // the ABI is stabilized, this restriction will be revisited. Until then, Envoy checks the hash of
 // the ABI header files to ensure that the dynamic modules are built against the same version of the

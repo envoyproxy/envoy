@@ -13,8 +13,8 @@ envoy_cc_library(
     hdrs = ["parser.h"],
     deps = [
         "//envoy/common:pure_lib",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/types:optional",
     ],
 )
 
