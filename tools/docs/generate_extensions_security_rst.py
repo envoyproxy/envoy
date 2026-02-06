@@ -52,7 +52,7 @@ def main():
             if extension_db[extension].get('status') != 'wip')
         output_path.write_text(content)
 
-    with tarfile.open(output_filename, "w:gz") as tar:
+    with tarfile.open(output_filename, "w") as tar:
         tar.add(generated_rst_dir, arcname=".")
 
 
