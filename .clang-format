@@ -12,22 +12,25 @@ IncludeCategories:
   Priority: 1
 - Regex: '^<.*>'
   Priority: 2
-- Regex: '^"envoy'
+# proxy_wasm_intrinsics[_lite] must be included before other header files, as it sets macros.
+- Regex: '^"proxy_wasm_intrinsics'
   Priority: 3
-- Regex: '^"common'
+- Regex: '^"envoy'
   Priority: 4
-- Regex: '^"source'
+- Regex: '^"common'
   Priority: 5
-- Regex: '^"exe'
+- Regex: '^"source'
   Priority: 6
-- Regex: '^"server'
+- Regex: '^"exe'
   Priority: 7
-- Regex: '^"extensions'
+- Regex: '^"server'
   Priority: 8
-- Regex: '^"test'
+- Regex: '^"extensions'
   Priority: 9
-- Regex: '^.*'
+- Regex: '^"test'
   Priority: 10
+- Regex: '^.*'
+  Priority: 11
 TypenameMacros: ['STACK_OF']
 ...
 

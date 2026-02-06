@@ -6,12 +6,12 @@
 #include "test/extensions/filters/http/wasm/test_data/test.pb.h"
 
 #ifndef NULL_PLUGIN
+#include "proxy_wasm_intrinsics_lite.h"
+
 #include "source/extensions/common/wasm/ext/declare_property.pb.h"
 #include "source/extensions/common/wasm/ext/envoy_proxy_wasm_api.h"
 #include "source/extensions/common/wasm/ext/sign.pb.h"
 #include "source/extensions/common/wasm/ext/verify_signature.pb.h"
-
-#include "proxy_wasm_intrinsics_lite.h"
 #else
 #include "source/extensions/common/wasm/ext/envoy_null_plugin.h"
 
