@@ -2343,11 +2343,11 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
 
       hosts_changed |= updateEdsHealthFlag(*host, *existing_host->second);
 
-      // Did metadata change?
+      // Did metadata change? Use hash for faster comparison.
       bool metadata_changed = true;
       if (host->metadata() && existing_host->second->metadata()) {
-        metadata_changed = !Protobuf::util::MessageDifferencer::Equivalent(
-            *host->metadata(), *existing_host->second->metadata());
+        metadata_changed = MessageUtil::hash(*host->metadata()) !=
+                           MessageUtil::hash(*existing_host->second->metadata());
       } else if (!host->metadata() && !existing_host->second->metadata()) {
         metadata_changed = false;
       }
