@@ -17,7 +17,8 @@ RadixTree<std::shared_ptr<const ProtoFileServerConfig::PathMapping>>
 makePathMappings(const ProtoFileServerConfig& config) {
   RadixTree<std::shared_ptr<const ProtoFileServerConfig::PathMapping>> tree;
   for (const auto& mapping : config.path_mappings()) {
-    tree.add(mapping.request_path_prefix(), std::make_shared<ProtoFileServerConfig::PathMapping>(mapping));
+    tree.add(mapping.request_path_prefix(),
+             std::make_shared<ProtoFileServerConfig::PathMapping>(mapping));
   }
   return tree;
 }
