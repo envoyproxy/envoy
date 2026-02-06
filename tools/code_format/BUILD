@@ -9,11 +9,6 @@ py_library(
     srcs = ["envoy_build_fixer.py"],
 )
 
-py_library(
-    name = "header_order",
-    srcs = ["header_order.py"],
-)
-
 py_binary(
     name = "check_format",
     srcs = ["check_format.py"],
@@ -32,6 +27,5 @@ py_binary(
     deps = [
         requirement("pyyaml"),
         ":envoy_build_fixer",
-        ":header_order",
     ],
 )
