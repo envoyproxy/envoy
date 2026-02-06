@@ -30,33 +30,43 @@ void McpParserConfig::initializeDefaults() {
 
   // Resources.
   addMethodConfig(Methods::RESOURCES_LIST, {});
-  addMethodConfig(Methods::RESOURCES_READ, {AttributeExtractionRule(std::string(Paths::PARAMS_URI))});
-  addMethodConfig(Methods::RESOURCES_SUBSCRIBE, {AttributeExtractionRule(std::string(Paths::PARAMS_URI))});
-  addMethodConfig(Methods::RESOURCES_UNSUBSCRIBE, {AttributeExtractionRule(std::string(Paths::PARAMS_URI))});
+  addMethodConfig(Methods::RESOURCES_READ,
+                  {AttributeExtractionRule(std::string(Paths::PARAMS_URI))});
+  addMethodConfig(Methods::RESOURCES_SUBSCRIBE,
+                  {AttributeExtractionRule(std::string(Paths::PARAMS_URI))});
+  addMethodConfig(Methods::RESOURCES_UNSUBSCRIBE,
+                  {AttributeExtractionRule(std::string(Paths::PARAMS_URI))});
 
   // Prompts.
   addMethodConfig(Methods::PROMPTS_LIST, {});
   addMethodConfig(Methods::PROMPTS_GET, {AttributeExtractionRule(std::string(Paths::PARAMS_NAME))});
 
   // Completion.
-  addMethodConfig(Methods::COMPLETION_COMPLETE, {AttributeExtractionRule(std::string(Paths::PARAMS_REF))});
+  addMethodConfig(Methods::COMPLETION_COMPLETE,
+                  {AttributeExtractionRule(std::string(Paths::PARAMS_REF))});
 
   // Logging
-  addMethodConfig(Methods::LOGGING_SET_LEVEL, {AttributeExtractionRule(std::string(Paths::PARAMS_LEVEL))});
+  addMethodConfig(Methods::LOGGING_SET_LEVEL,
+                  {AttributeExtractionRule(std::string(Paths::PARAMS_LEVEL))});
 
   // Lifecycle
-  addMethodConfig(Methods::INITIALIZE, {AttributeExtractionRule(std::string(Paths::PARAMS_PROTOCOL_VERSION)),
-                                        AttributeExtractionRule(std::string(Paths::PARAMS_CLIENT_INFO_NAME))});
+  addMethodConfig(Methods::INITIALIZE,
+                  {AttributeExtractionRule(std::string(Paths::PARAMS_PROTOCOL_VERSION)),
+                   AttributeExtractionRule(std::string(Paths::PARAMS_CLIENT_INFO_NAME))});
 
   // Notifications.
   addMethodConfig(Methods::NOTIFICATION_INITIALIZED, {});
-  addMethodConfig(Methods::NOTIFICATION_CANCELLED, {AttributeExtractionRule(std::string(Paths::PARAMS_REQUEST_ID))});
-  addMethodConfig(Methods::NOTIFICATION_PROGRESS, {AttributeExtractionRule(std::string(Paths::PARAMS_PROGRESS_TOKEN)),
-                                                   AttributeExtractionRule(std::string(Paths::PARAMS_PROGRESS))});
-  addMethodConfig(Methods::NOTIFICATION_MESSAGE, {AttributeExtractionRule(std::string(Paths::PARAMS_LEVEL))});
+  addMethodConfig(Methods::NOTIFICATION_CANCELLED,
+                  {AttributeExtractionRule(std::string(Paths::PARAMS_REQUEST_ID))});
+  addMethodConfig(Methods::NOTIFICATION_PROGRESS,
+                  {AttributeExtractionRule(std::string(Paths::PARAMS_PROGRESS_TOKEN)),
+                   AttributeExtractionRule(std::string(Paths::PARAMS_PROGRESS))});
+  addMethodConfig(Methods::NOTIFICATION_MESSAGE,
+                  {AttributeExtractionRule(std::string(Paths::PARAMS_LEVEL))});
   addMethodConfig(Methods::NOTIFICATION_ROOTS_LIST_CHANGED, {});
   addMethodConfig(Methods::NOTIFICATION_RESOURCES_LIST_CHANGED, {});
-  addMethodConfig(Methods::NOTIFICATION_RESOURCES_UPDATED, {AttributeExtractionRule(std::string(Paths::PARAMS_URI))});
+  addMethodConfig(Methods::NOTIFICATION_RESOURCES_UPDATED,
+                  {AttributeExtractionRule(std::string(Paths::PARAMS_URI))});
   addMethodConfig(Methods::NOTIFICATION_TOOLS_LIST_CHANGED, {});
   addMethodConfig(Methods::NOTIFICATION_PROMPTS_LIST_CHANGED, {});
 }
