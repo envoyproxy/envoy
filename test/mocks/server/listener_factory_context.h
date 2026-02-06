@@ -5,12 +5,11 @@
 
 #include "source/common/tls/context_manager_impl.h"
 
-#include "server_lifecycle_notifier.h"
-
 #include "test/mocks/server/admin.h"
 #include "test/mocks/server/drain_manager.h"
 #include "test/mocks/server/instance.h"
 #include "test/mocks/server/overload_manager.h"
+#include "test/mocks/server/server_lifecycle_notifier.h"
 
 #include "gmock/gmock.h"
 
