@@ -2075,8 +2075,8 @@ TEST_F(HttpFilterTest, PostStreamingBodies) {
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
 
   // At this point, since we injected the data from each chunk after the "encodeData"
-  // callback, and since we also injected any chunks inserted using
-  // "injectEncodedData," the two buffers should match!
+  // callback, and since we also injected any chunks inserted using "injectEncodedData,"
+  // the two buffers should match!
   EXPECT_EQ(want_response_body.toString(), got_response_body.toString());
   EXPECT_FALSE(encoding_watermarked);
 
