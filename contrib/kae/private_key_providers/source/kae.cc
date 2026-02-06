@@ -1,5 +1,4 @@
 #include "contrib/kae/private_key_providers/source/kae.h"
-#include "kae.h"
 
 #include <openssl/bn.h>
 #include <openssl/crypto.h>
@@ -9,6 +8,7 @@
 #include <cstring>
 #include <thread>
 
+#include "kae.h"
 #include "libuadk.h"
 #include "libuadk_impl.h"
 #include "openssl/rsa.h"

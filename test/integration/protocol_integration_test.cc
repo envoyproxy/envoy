@@ -1,5 +1,4 @@
 #include "protocol_integration_test.h"
-#include "test/integration/protocol_integration_test.h"
 
 #include <functional>
 #include <list>
@@ -32,6 +31,7 @@
 #include "test/common/upstream/utility.h"
 #include "test/integration/autonomous_upstream.h"
 #include "test/integration/http_integration.h"
+#include "test/integration/protocol_integration_test.h"
 #include "test/integration/socket_interface_swap.h"
 #include "test/integration/test_host_predicate_config.h"
 #include "test/integration/utility.h"

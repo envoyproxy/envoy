@@ -10,11 +10,11 @@
 #include "eval/public/cel_expr_builder_factory.h"
 #include "parser/parser.h"
 #endif
-#include "zlib.h"
 #include "source/common/crypto/crypto_impl.h"
 #include "source/common/crypto/utility.h"
 
 #include "absl/types/span.h"
+#include "zlib.h"
 
 using proxy_wasm::RegisterForeignFunction;
 using proxy_wasm::WasmForeignFunction;

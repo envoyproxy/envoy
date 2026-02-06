@@ -1,7 +1,8 @@
 #include "source/extensions/http/injected_credentials/oauth2/token_provider.h"
-#include "token_provider.h"
 
 #include <chrono>
+
+#include "token_provider.h"
 
 namespace Envoy {
 namespace Extensions {

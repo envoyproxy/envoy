@@ -1,5 +1,4 @@
 #include "source/extensions/transport_sockets/tls/cert_validator/spiffe/spiffe_validator.h"
-#include "spiffe_validator.h"
 
 #include <openssl/safestack.h>
 
@@ -30,6 +29,7 @@
 #include "absl/status/statusor.h"
 #include "openssl/ssl.h"
 #include "openssl/x509v3.h"
+#include "spiffe_validator.h"
 
 namespace Envoy {
 namespace Extensions {
