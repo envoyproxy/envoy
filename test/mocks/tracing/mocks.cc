@@ -17,6 +17,7 @@ MockConfig::MockConfig() {
   ON_CALL(*this, verbose()).WillByDefault(ReturnPointee(&verbose_));
   ON_CALL(*this, maxPathTagLength()).WillByDefault(Return(uint32_t(256)));
   ON_CALL(*this, spawnUpstreamSpan()).WillByDefault(ReturnPointee(&spawn_upstream_span_));
+  ON_CALL(*this, noContextPropagation()).WillByDefault(ReturnPointee(&no_context_propagation_));
 }
 MockConfig::~MockConfig() = default;
 
