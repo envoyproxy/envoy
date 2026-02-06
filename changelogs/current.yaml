@@ -144,9 +144,6 @@ new_features:
 - area: access_log
   change: |
     Supported gauge in the :ref:`stats access logger <envoy_v3_api_msg_extensions.access_loggers.stats.v3.Config>`.
-- area: stats
-  change: |
-    Supported per-stat-type eviction in scope.
 - area: network
   change: |
     Added support access logging in network filters like http filters, by allowing network filters to register as access logger

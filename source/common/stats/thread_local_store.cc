@@ -38,8 +38,7 @@ ThreadLocalStoreImpl::ThreadLocalStoreImpl(Allocator& alloc)
     well_known_tags_->rememberBuiltin(desc.name_);
   }
   StatNameManagedStorage empty("", alloc.symbolTable());
-  auto new_scope =
-      std::make_shared<ScopeImpl>(*this, StatName(empty.statName()), EvictionSettings{});
+  auto new_scope = std::make_shared<ScopeImpl>(*this, StatName(empty.statName()), false);
   addScope(new_scope);
   default_scope_ = new_scope;
 }
@@ -155,18 +154,17 @@ std::vector<CounterSharedPtr> ThreadLocalStoreImpl::counters() const {
   return ret;
 }
 
-ScopeSharedPtr ThreadLocalStoreImpl::ScopeImpl::createScope(const std::string& name,
-                                                            const EvictionSettings& settings,
+ScopeSharedPtr ThreadLocalStoreImpl::ScopeImpl::createScope(const std::string& name, bool evictable,
                                                             const ScopeStatsLimitSettings& limits) {
   StatNameManagedStorage stat_name_storage(Utility::sanitizeStatsName(name), symbolTable());
-  return scopeFromStatName(stat_name_storage.statName(), settings, limits);
+  return scopeFromStatName(stat_name_storage.statName(), evictable, limits);
 }
 
 ScopeSharedPtr
-ThreadLocalStoreImpl::ScopeImpl::scopeFromStatName(StatName name, const EvictionSettings& settings,
+ThreadLocalStoreImpl::ScopeImpl::scopeFromStatName(StatName name, bool evictable,
                                                    const ScopeStatsLimitSettings& limits) {
   SymbolTable::StoragePtr joined = symbolTable().join({prefix_.statName(), name});
-  auto new_scope = std::make_shared<ScopeImpl>(parent_, StatName(joined.get()), settings, limits);
+  auto new_scope = std::make_shared<ScopeImpl>(parent_, StatName(joined.get()), evictable, limits);
   parent_.addScope(new_scope);
   return new_scope;
 }
@@ -400,10 +398,9 @@ void ThreadLocalStoreImpl::clearHistogramsFromCaches() {
 }
 
 ThreadLocalStoreImpl::ScopeImpl::ScopeImpl(ThreadLocalStoreImpl& parent, StatName prefix,
-                                           const EvictionSettings& settings,
-                                           const ScopeStatsLimitSettings& limits)
-    : scope_id_(parent.next_scope_id_++), parent_(parent), eviction_settings_(settings),
-      limits_(limits), prefix_(prefix, parent.alloc_.symbolTable()),
+                                           bool evictable, const ScopeStatsLimitSettings& limits)
+    : scope_id_(parent.next_scope_id_++), parent_(parent), evictable_(evictable), limits_(limits),
+      prefix_(prefix, parent.alloc_.symbolTable()),
       central_cache_(new CentralCacheEntry(parent.alloc_.symbolTable())) {
   parent_.ensureOverflowStats(limits_);
 }
@@ -1102,34 +1099,28 @@ void ThreadLocalStoreImpl::evictUnused() {
   {
     Thread::LockGuard lock(lock_);
     iterateScopesLockHeld([evicted_metrics](const ScopeImplSharedPtr& scope) -> bool {
-      MetricBag metrics(scope->scope_id_);
-      CentralCacheEntrySharedPtr& central_cache = scope->centralCacheMutableNoThreadAnalysis();
-      auto filter_unused = []<typename T>(StatNameHashMap<T>& unused_metrics) {
-        return [&unused_metrics](std::pair<StatName, T> kv) {
-          const auto& [name, metric] = kv;
-          if (metric->used()) {
-            metric->markUnused();
-            return false;
-          } else {
-            unused_metrics.try_emplace(name, metric);
-            return true;
-          }
+      if (scope->evictable_) {
+        MetricBag metrics(scope->scope_id_);
+        CentralCacheEntrySharedPtr& central_cache = scope->centralCacheMutableNoThreadAnalysis();
+        auto filter_unused = []<typename T>(StatNameHashMap<T>& unused_metrics) {
+          return [&unused_metrics](std::pair<StatName, T> kv) {
+            const auto& [name, metric] = kv;
+            if (metric->used()) {
+              metric->markUnused();
+              return false;
+            } else {
+              unused_metrics.try_emplace(name, metric);
+              return true;
+            }
+          };
         };
-      };
-      if (scope->eviction_settings_.evict_counters) {
         absl::erase_if(central_cache->counters_, filter_unused(metrics.counters_));
-      }
-      if (scope->eviction_settings_.evict_gauges) {
         absl::erase_if(central_cache->gauges_, filter_unused(metrics.gauges_));
-      }
-      if (scope->eviction_settings_.evict_histograms) {
-        absl::erase_if(central_cache->histograms_, filter_unused(metrics.histograms_));
-      }
-      if (scope->eviction_settings_.evict_text_readouts) {
         absl::erase_if(central_cache->text_readouts_, filter_unused(metrics.text_readouts_));
-      }
-      if (!metrics.empty()) {
-        evicted_metrics->push_back(std::move(metrics));
+        absl::erase_if(central_cache->histograms_, filter_unused(metrics.histograms_));
+        if (!metrics.empty()) {
+          evicted_metrics->push_back(std::move(metrics));
+        }
       }
       return true;
     });
