@@ -444,15 +444,4 @@ Network::FilterStatus WaitForPayloadReader::onData(Buffer::Instance& data, bool 
   return Network::FilterStatus::StopIteration;
 }
 
-envoy::config::bootstrap::v3::Bootstrap configToBootstrap(const std::string& config) {
-#ifdef ENVOY_ENABLE_YAML
-  envoy::config::bootstrap::v3::Bootstrap bootstrap;
-  TestUtility::loadFromYaml(config, bootstrap);
-  return bootstrap;
-#else
-  UNREFERENCED_PARAMETER(config);
-  PANIC("YAML support compiled out: can't parse YAML");
-#endif
-}
-
 } // namespace Envoy

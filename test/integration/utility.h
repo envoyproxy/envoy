@@ -292,6 +292,4 @@ private:
   bool wait_for_length_{false};
 };
 
-envoy::config::bootstrap::v3::Bootstrap configToBootstrap(const std::string& config);
-
 } // namespace Envoy
