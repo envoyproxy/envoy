@@ -207,8 +207,8 @@ void McpParserConfig::buildMethodRequirements(
     }
   }
 
-  if (!required_set.contains(std::string(kOptionalMetaField))) {
-    requirements.optional.push_back(std::string(kOptionalMetaField));
+  if (!required_set.contains(std::string(Paths::PARAMS_META))) {
+    requirements.optional.push_back(std::string(Paths::PARAMS_META));
   }
 }
 
@@ -630,7 +630,7 @@ void McpFieldExtractor::copySelectedFields() {
     }
   }
 
-  const std::string meta_field(kOptionalMetaField);
+  const std::string meta_field(Paths::PARAMS_META);
   if (copied_fields.insert(meta_field).second) {
     copyFieldByPath(meta_field);
   }
