@@ -261,6 +261,13 @@ envoy.config.validators.minimum_clusters_validator:
   status: stable
   type_urls:
   - envoy.extensions.config.validators.minimum_clusters.v3.MinimumClustersValidator
+envoy.content_parsers.json:
+  categories:
+  - envoy.content_parsers
+  security_posture: robust_to_untrusted_downstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.content_parsers.json.v3.JsonContentParser
 envoy.filters.http.adaptive_concurrency:
   categories:
   - envoy.filters.http

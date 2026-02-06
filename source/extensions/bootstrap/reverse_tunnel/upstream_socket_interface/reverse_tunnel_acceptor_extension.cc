@@ -14,7 +14,28 @@ static bool reverse_tunnel_detailed_stats_warning_logged = false;
 UpstreamSocketThreadLocal::UpstreamSocketThreadLocal(Event::Dispatcher& dispatcher,
                                                      ReverseTunnelAcceptorExtension* extension)
     : dispatcher_(dispatcher),
-      socket_manager_(std::make_unique<UpstreamSocketManager>(dispatcher, extension)) {}
+      socket_manager_(std::make_unique<UpstreamSocketManager>(dispatcher, extension)) {
+  // Initialize per-worker aggregate metrics.
+  if (extension != nullptr) {
+    auto& stats_store = extension->getStatsScope();
+    std::string dispatcher_name = dispatcher.name();
+    std::string stat_prefix = extension->statPrefix();
+
+    std::string total_clusters_stat_name =
+        fmt::format("{}.{}.total_clusters", stat_prefix, dispatcher_name);
+    Stats::StatNameManagedStorage total_clusters_stat_name_storage(total_clusters_stat_name,
+                                                                   stats_store.symbolTable());
+    total_clusters_gauge_ = &stats_store.gaugeFromStatName(
+        total_clusters_stat_name_storage.statName(), Stats::Gauge::ImportMode::NeverImport);
+
+    std::string total_nodes_stat_name =
+        fmt::format("{}.{}.total_nodes", stat_prefix, dispatcher_name);
+    Stats::StatNameManagedStorage total_nodes_stat_name_storage(total_nodes_stat_name,
+                                                                stats_store.symbolTable());
+    total_nodes_gauge_ = &stats_store.gaugeFromStatName(total_nodes_stat_name_storage.statName(),
+                                                        Stats::Gauge::ImportMode::NeverImport);
+  }
+}
 
 // ReverseTunnelAcceptorExtension implementation
 void ReverseTunnelAcceptorExtension::onServerInitialized() {
@@ -136,6 +157,9 @@ absl::flat_hash_map<std::string, uint64_t> ReverseTunnelAcceptorExtension::getCr
 void ReverseTunnelAcceptorExtension::updateConnectionStats(const std::string& node_id,
                                                            const std::string& cluster_id,
                                                            bool increment) {
+  // Update per-worker aggregate metrics.
+  updatePerWorkerAggregateMetrics(node_id, cluster_id, increment);
+
   // Check if reverse tunnel detailed stats are enabled via configuration flag.
   // If detailed stats disabled, don't collect any stats and return early.
   // Stats collection can consume significant memory when the number of nodes/clusters is high.
@@ -195,6 +219,56 @@ void ReverseTunnelAcceptorExtension::updateConnectionStats(const std::string& no
 
   // Also update per-worker stats for debugging.
   updatePerWorkerConnectionStats(node_id, cluster_id, increment);
+}
+
+void ReverseTunnelAcceptorExtension::updatePerWorkerAggregateMetrics(const std::string& node_id,
+                                                                     const std::string& cluster_id,
+                                                                     bool increment) {
+  // Get TLS for current worker.
+  auto* local_registry = getLocalRegistry();
+  if (local_registry == nullptr) {
+    return;
+  }
+
+  auto& cluster_counts = local_registry->cluster_connection_counts_;
+  auto& node_counts = local_registry->node_connection_counts_;
+
+  // Update counts.
+  if (increment) {
+    if (!cluster_id.empty()) {
+      cluster_counts[cluster_id]++;
+    }
+    if (!node_id.empty()) {
+      node_counts[node_id]++;
+    }
+  } else {
+    if (!cluster_id.empty()) {
+      auto it = cluster_counts.find(cluster_id);
+      if (it != cluster_counts.end() && it->second > 0) {
+        it->second--;
+        if (it->second == 0) {
+          cluster_counts.erase(it);
+        }
+      }
+    }
+    if (!node_id.empty()) {
+      auto it = node_counts.find(node_id);
+      if (it != node_counts.end() && it->second > 0) {
+        it->second--;
+        if (it->second == 0) {
+          node_counts.erase(it);
+        }
+      }
+    }
+  }
+
+  // Update gauges with current map sizes.
+  if (local_registry->total_clusters_gauge_ != nullptr) {
+    local_registry->total_clusters_gauge_->set(cluster_counts.size());
+  }
+  if (local_registry->total_nodes_gauge_ != nullptr) {
+    local_registry->total_nodes_gauge_->set(node_counts.size());
+  }
 }
 
 void ReverseTunnelAcceptorExtension::updatePerWorkerConnectionStats(const std::string& node_id,

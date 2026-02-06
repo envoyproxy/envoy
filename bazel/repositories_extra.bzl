@@ -1,7 +1,7 @@
 load("@aspect_bazel_lib//lib:repositories.bzl", "aspect_bazel_lib_dependencies")
 load("@com_google_protobuf//bazel/private:proto_bazel_features.bzl", "proto_bazel_features")
 load("@emsdk//:deps.bzl", emsdk_deps = "deps")
-load("@envoy_examples//bazel:env.bzl", "envoy_examples_env")
+load("@envoy-examples//bazel:env.bzl", "envoy_examples_env")
 load("@envoy_toolshed//sysroot:sysroot.bzl", "setup_sysroots")
 load("@proxy_wasm_cpp_host//bazel/cargo/wasmtime/remote:crates.bzl", "crate_repositories")
 load("@rules_cc//cc:extensions.bzl", "compatibility_proxy_repo")

@@ -19,4 +19,8 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // filter state object as an IP.
 message AddressMatcher {
   repeated xds.core.v3.CidrRange ranges = 1;
+
+  // [#not-implemented-hide:]
+  // If true, the match result will be inverted. Defaults to false.
+  bool invert_match = 2;
 }

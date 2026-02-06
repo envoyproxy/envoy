@@ -26,6 +26,8 @@ ConnectionManagerTracingConfig::ConnectionManagerTracingConfig(
   spawn_upstream_span_ =
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(tracing_config, spawn_upstream_span, false);
 
+  no_context_propagation_ = tracing_config.no_context_propagation();
+
   for (const auto& tag : tracing_config.custom_tags()) {
     custom_tags_.emplace(tag.tag(),
                          Tracing::CustomTagUtility::createCustomTag(tag, command_parsers));

@@ -97,6 +97,9 @@ constexpr absl::string_view PARAMS_PROGRESS_TOKEN = "params.progressToken";
 constexpr absl::string_view PARAMS_PROGRESS = "params.progress";
 constexpr absl::string_view PARAMS_META = "params._meta";
 } // namespace Paths
+
+// Optional field that is always extracted if present.
+constexpr absl::string_view kOptionalMetaField = "params._meta";
 } // namespace McpConstants
 
 } // namespace Mcp

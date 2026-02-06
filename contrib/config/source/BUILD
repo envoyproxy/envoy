@@ -20,7 +20,7 @@ envoy_cc_contrib_extension(
         "//envoy/stats:stats_macros",
         "//source/common/config:utility_lib",
         "//source/common/protobuf:utility_lib",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
         "@envoy_api//contrib/envoy/extensions/config/v3alpha:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],

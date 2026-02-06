@@ -42,7 +42,7 @@ configure_make(
         },
         "//conditions:default": COMMON_ENV,
     }),
-    lib_source = "@com_github_intel_qatzip//:all",
+    lib_source = "@qatzip//:all",
     out_static_libs = [
         "libqatzip.a",
     ],
@@ -53,8 +53,8 @@ configure_make(
         "//bazel/foreign_cc:lz4",
         "//bazel:zlib",
         "//contrib/qat:qatlib",
-        # Use boringssl alias to select fips vs non-fips version.
-        "//bazel:boringcrypto",
+        # Use crypto label_flag to select the SSL library.
+        "//bazel:crypto",
         "@numactl//:numa",
     ],
     alwayslink = False,

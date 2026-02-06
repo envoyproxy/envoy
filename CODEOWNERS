@@ -358,6 +358,8 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/path/rewrite/uri_template @ravenblackx @yanjunxiang-google
 # Dubbo codec
 /*/extensions/common/dubbo @wbpcode @UNOWNED
+# Content parsers
+/*/extensions/content_parsers/json @JuniorHsu @PeterL328 @tyxia
 # upstream load balancing policies
 /*/extensions/load_balancing_policies/common @wbpcode @tonya11en @nezdolik
 /*/extensions/load_balancing_policies/least_request @wbpcode @tonya11en @nezdolik
