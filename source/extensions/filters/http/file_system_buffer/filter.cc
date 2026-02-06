@@ -1,5 +1,3 @@
-#include "filter.h"
-
 #include "source/extensions/filters/http/file_system_buffer/filter.h"
 
 namespace Envoy {

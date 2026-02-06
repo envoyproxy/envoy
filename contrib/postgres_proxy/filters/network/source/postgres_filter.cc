@@ -7,7 +7,6 @@
 #include "source/extensions/filters/network/well_known_names.h"
 
 #include "contrib/postgres_proxy/filters/network/source/postgres_decoder.h"
-#include "postgres_filter.h"
 
 namespace Envoy {
 namespace Extensions {

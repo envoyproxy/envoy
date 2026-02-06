@@ -2,8 +2,6 @@
 
 #include <chrono>
 
-#include "token_provider.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace Http {

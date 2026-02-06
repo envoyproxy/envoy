@@ -7,11 +7,12 @@
 
 #include "server_lifecycle_notifier.h"
 
-#include "admin.h"
-#include "drain_manager.h"
+#include "test/mocks/server/admin.h"
+#include "test/mocks/server/drain_manager.h"
+#include "test/mocks/server/instance.h"
+#include "test/mocks/server/overload_manager.h"
+
 #include "gmock/gmock.h"
-#include "instance.h"
-#include "overload_manager.h"
 
 namespace Envoy {
 namespace Server {

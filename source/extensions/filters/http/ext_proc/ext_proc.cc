@@ -1,4 +1,4 @@
-#include "ext_proc.h"
+#include "source/extensions/filters/http/ext_proc/ext_proc.h"
 
 #include <functional>
 #include <memory>
@@ -12,7 +12,6 @@
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
-#include "source/extensions/filters/http/ext_proc/ext_proc.h"
 #include "source/extensions/filters/http/ext_proc/http_client/http_client_impl.h"
 #include "source/extensions/filters/http/ext_proc/mutation_utils.h"
 #include "source/extensions/filters/http/ext_proc/on_processing_response.h"
