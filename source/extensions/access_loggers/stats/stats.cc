@@ -14,27 +14,20 @@ namespace {
 
 class AccessLogState : public StreamInfo::FilterState::Object {
 public:
-  struct GaugeState {
-    Stats::Gauge* gauge_;
-    uint64_t value_;
-  };
-
   ~AccessLogState() override {
-    for (const auto& [gauge_ptr, state] : inflight_gauges_) {
-      state.gauge_->sub(state.value_);
+    for (const auto& [gauge, value] : inflight_gauges_) {
+      gauge->sub(value);
     }
   }
 
-  void addInflightGauge(Stats::Gauge* gauge, uint64_t value) {
-    inflight_gauges_[gauge] = {gauge, value};
-  }
+  void addInflightGauge(Stats::Gauge* gauge, uint64_t value) { inflight_gauges_[gauge] = value; }
 
   absl::optional<uint64_t> removeInflightGauge(Stats::Gauge* gauge) {
     auto it = inflight_gauges_.find(gauge);
     if (it == inflight_gauges_.end()) {
       return absl::nullopt;
     }
-    uint64_t value = it->second.value_;
+    uint64_t value = it->second;
     inflight_gauges_.erase(it);
     return value;
   }
@@ -42,9 +35,9 @@ public:
   static constexpr absl::string_view key() { return "envoy.access_loggers.stats.access_log_state"; }
 
 private:
-  // The map value holds a raw pointer to the gauge. We can safely do this because the gauge
+  // The map key holds a raw pointer to the gauge. We can safely do this because the gauge
   // is guaranteed to be valid as we disabled eviction for gauges in the stats scope.
-  absl::flat_hash_map<Stats::Gauge*, GaugeState> inflight_gauges_;
+  absl::flat_hash_map<Stats::Gauge*, uint64_t> inflight_gauges_;
 };
 
 Formatter::FormatterProviderPtr
