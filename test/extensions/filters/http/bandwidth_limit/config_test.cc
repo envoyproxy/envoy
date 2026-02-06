@@ -1,7 +1,10 @@
 #include "source/extensions/filters/http/bandwidth_limit/bandwidth_limit.h"
 #include "source/extensions/filters/http/bandwidth_limit/config.h"
 
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/http/mocks.h"
+#include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
+#include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/status_utility.h"
 
