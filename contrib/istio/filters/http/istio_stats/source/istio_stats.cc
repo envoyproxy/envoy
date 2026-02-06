@@ -216,10 +216,7 @@ struct Context : public Singleton::Instance {
         waypoint_(pool_.add("waypoint")), istio_build_(pool_.add("istio_build")),
         component_(pool_.add("component")), proxy_(pool_.add("proxy")), tag_(pool_.add("tag")),
         istio_version_(pool_.add(extractString(local_info.node().metadata(), "ISTIO_VERSION"))),
-        scope_(scope.createScope("", {/*evict_counters=*/true,
-                                      /*evict_gauges=*/true,
-                                      /*evict_histograms=*/true,
-                                      /*evict_text_readouts=*/true})) {
+        scope_(scope.createScope("", true)) {
     all_metrics_ = {
         {"requests_total", requests_total_},
         {"request_duration_milliseconds", request_duration_milliseconds_},
