@@ -121,7 +121,7 @@ TEST_F(HttpFilterTest, DuplexStreamedBodyProcessingTestNormal) {
 
   Buffer::OwnedImpl want_response_body;
   Buffer::OwnedImpl got_response_body;
-  EXPECT_CALL(encoder_callbacks_, injectEncodedDataToFilterChainWithStateUpdate(_, _))
+  EXPECT_CALL(encoder_callbacks_, injectEncodedDataToFilterChain(_, _))
       .WillRepeatedly(Invoke(
           [&got_response_body](Buffer::Instance& data, Unused) { got_response_body.move(data); }));
 
@@ -214,7 +214,7 @@ TEST_F(HttpFilterTest, DuplexStreamedBodyProcessingTestWithTrailer) {
 
   Buffer::OwnedImpl want_response_body;
   Buffer::OwnedImpl got_response_body;
-  EXPECT_CALL(encoder_callbacks_, injectEncodedDataToFilterChainWithStateUpdate(_, _))
+  EXPECT_CALL(encoder_callbacks_, injectEncodedDataToFilterChain(_, _))
       .WillRepeatedly(Invoke(
           [&got_response_body](Buffer::Instance& data, Unused) { got_response_body.move(data); }));
 
@@ -277,7 +277,7 @@ TEST_F(HttpFilterTest, DuplexStreamedBodyProcessingTestWithHeaderAndTrailer) {
 
   Buffer::OwnedImpl want_response_body;
   Buffer::OwnedImpl got_response_body;
-  EXPECT_CALL(encoder_callbacks_, injectEncodedDataToFilterChainWithStateUpdate(_, _))
+  EXPECT_CALL(encoder_callbacks_, injectEncodedDataToFilterChain(_, _))
       .WillRepeatedly(Invoke(
           [&got_response_body](Buffer::Instance& data, Unused) { got_response_body.move(data); }));
 

@@ -565,7 +565,6 @@ public:
     void continueDecoding() override {}
     void addDecodedData(Buffer::Instance&, bool) override {}
     void injectDecodedDataToFilterChain(Buffer::Instance&, bool) override {}
-    void injectDecodedDataToFilterChainWithStateUpdate(Buffer::Instance&, bool) override {}
     Http::RequestTrailerMap& addDecodedTrailers() override { return *request_trailer_map_; }
     Http::MetadataMapVector& addDecodedMetadata() override {
       static Http::MetadataMapVector metadata_map_vector;

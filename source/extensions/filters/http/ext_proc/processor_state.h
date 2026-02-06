@@ -537,12 +537,7 @@ public:
   }
 
   void injectDataToFilterChain(Buffer::Instance& data, bool end_stream) override {
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.ext_proc_inject_data_with_state_update")) {
-      decoder_callbacks_->injectDecodedDataToFilterChainWithStateUpdate(data, end_stream);
-    } else {
-      decoder_callbacks_->injectDecodedDataToFilterChain(data, end_stream);
-    }
+    decoder_callbacks_->injectDecodedDataToFilterChain(data, end_stream);
   }
 
   uint32_t bufferLimit() const override { return decoder_callbacks_->bufferLimit(); }
@@ -687,12 +682,7 @@ public:
   }
 
   void injectDataToFilterChain(Buffer::Instance& data, bool end_stream) override {
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.ext_proc_inject_data_with_state_update")) {
-      encoder_callbacks_->injectEncodedDataToFilterChainWithStateUpdate(data, end_stream);
-    } else {
-      encoder_callbacks_->injectEncodedDataToFilterChain(data, end_stream);
-    }
+    encoder_callbacks_->injectEncodedDataToFilterChain(data, end_stream);
   }
 
   uint32_t bufferLimit() const override { return encoder_callbacks_->bufferLimit(); }

@@ -32,10 +32,10 @@ public:
     ON_CALL(encoder_callbacks_, encodingBuffer()).WillByDefault(Return(&buffer_));
     ON_CALL(decoder_callbacks_, bufferLimit()).WillByDefault(Return(1024));
     ON_CALL(encoder_callbacks_, bufferLimit()).WillByDefault(Return(1024));
-    ON_CALL(decoder_callbacks_, injectDecodedDataToFilterChainWithStateUpdate(_, _))
+    ON_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, _))
         .WillByDefault(
             Invoke([&](Buffer::Instance& data, bool) -> void { data.drain(data.length()); }));
-    ON_CALL(encoder_callbacks_, injectEncodedDataToFilterChainWithStateUpdate(_, _))
+    ON_CALL(encoder_callbacks_, injectEncodedDataToFilterChain(_, _))
         .WillByDefault(
             Invoke([&](Buffer::Instance& data, bool) -> void { data.drain(data.length()); }));
   }

@@ -658,13 +658,6 @@ public:
   virtual void injectDecodedDataToFilterChain(Buffer::Instance& data, bool end_stream) PURE;
 
   /**
-   * This method is similar to injectDecodedDataToFilterChain(). The only difference is it also
-   * updates filter manager state().observed_decode_end_stream_ based on end_stream parameter.
-   */
-  virtual void injectDecodedDataToFilterChainWithStateUpdate(Buffer::Instance& data,
-                                                             bool end_stream) PURE;
-
-  /**
    * Adds decoded trailers. May only be called in decodeData when end_stream is set to true.
    * If called in any other context, an assertion will be triggered.
    *
@@ -1080,13 +1073,6 @@ public:
    * @param end_stream boolean supplies whether this is the last data frame, and no trailers behind.
    */
   virtual void injectEncodedDataToFilterChain(Buffer::Instance& data, bool end_stream) PURE;
-
-  /**
-   * This method is similar to injectEncodedDataToFilterChain(). The only difference is it also
-   * updates filter manager state().observed_encode_end_stream_ based on end_stream parameter.
-   */
-  virtual void injectEncodedDataToFilterChainWithStateUpdate(Buffer::Instance& data,
-                                                             bool end_stream) PURE;
 
   /**
    * Adds encoded trailers. May only be called in encodeData when end_stream is set to true.
