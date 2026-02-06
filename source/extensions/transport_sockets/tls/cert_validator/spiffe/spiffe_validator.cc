@@ -15,7 +15,6 @@
 
 #include "source/common/common/base64.h"
 #include "source/common/common/utility.h"
-#include "source/common/config/datasource.h"
 #include "source/common/config/utility.h"
 #include "source/common/json/json_loader.h"
 #include "source/common/protobuf/message_validator_impl.h"
@@ -38,11 +37,13 @@ namespace Tls {
 
 using SPIFFEConfig = envoy::extensions::transport_sockets::tls::v3::SPIFFECertValidatorConfig;
 
+namespace {
 absl::StatusOr<std::shared_ptr<SpiffeData>>
-SPIFFEValidator::parseTrustBundles(const std::string& trust_bundle_mapping_str) {
-  ENVOY_LOG(info, "Parsing trust_bundles");
+parseTrustBundles(absl::string_view trust_bundle_mapping_str) {
+  ENVOY_LOG_TO_LOGGER(Logger::Registry::getLog(Logger::Id::secret), info, "Parsing trust_bundles");
 
-  auto json_parse_result = Envoy::Json::Factory::loadFromString(trust_bundle_mapping_str);
+  auto json_parse_result =
+      Envoy::Json::Factory::loadFromString(std::string(trust_bundle_mapping_str));
   if (!json_parse_result.ok()) {
     return absl::InvalidArgumentError("Invalid JSON found in SPIFFE bundle");
   }
@@ -69,7 +70,8 @@ SPIFFEValidator::parseTrustBundles(const std::string& trust_bundle_mapping_str) 
             // only include the last one in this iteration function.
             spiffe_data->trust_bundle_stores_[domain_name] = X509StorePtr(X509_STORE_new());
 
-            ENVOY_LOG(info, "Loading domain '{}' from SPIFFE bundle map", domain_name);
+            ENVOY_LOG_TO_LOGGER(Logger::Registry::getLog(Logger::Id::secret), info,
+                                "Loading domain '{}' from SPIFFE bundle map", domain_name);
 
             const auto keys = domain_object.getObjectArray("keys");
 
@@ -79,7 +81,8 @@ SPIFFEValidator::parseTrustBundles(const std::string& trust_bundle_mapping_str) 
               return false;
             }
 
-            ENVOY_LOG(info, "Found '{}' keys for domain '{}'", keys->size(), domain_name);
+            ENVOY_LOG_TO_LOGGER(Logger::Registry::getLog(Logger::Id::secret), info,
+                                "Found '{}' keys for domain '{}'", keys->size(), domain_name);
 
             for (const auto& key : *keys) {
               const auto use = key->getString("use");
@@ -129,42 +132,20 @@ SPIFFEValidator::parseTrustBundles(const std::string& trust_bundle_mapping_str) 
   RETURN_IF_NOT_OK_REF(status);
   RETURN_IF_NOT_OK_REF(parsing_status);
 
-  ENVOY_LOG(info, "Successfully loaded SPIFFE bundle map");
+  ENVOY_LOG_TO_LOGGER(Logger::Registry::getLog(Logger::Id::secret), info,
+                      "Successfully loaded SPIFFE bundle map");
   return spiffe_data;
 }
 
-absl::Status SPIFFEValidator::initializeCertificateRefresh(
-    Server::Configuration::CommonFactoryContext& context) {
-  file_watcher_ = context.mainThreadDispatcher().createFilesystemWatcher();
-  RETURN_IF_NOT_OK(file_watcher_->addWatch(
-      trust_bundle_file_name_, Filesystem::Watcher::Events::Modified, [this](uint32_t) {
-        ENVOY_LOG(info, "Updating SPIFFE bundle map from file '{}'", trust_bundle_file_name_);
+} // namespace
 
-        auto read_result =
-            Envoy::Config::DataSource::readFile(trust_bundle_file_name_, api_, false);
-        if (!read_result.ok()) {
-          return absl::OkStatus();
-          ENVOY_LOG(error, "Failed to open SPIFFE bundle map file '{}'", trust_bundle_file_name_);
-        }
-
-        auto new_trust_bundle = parseTrustBundles(*read_result);
-
-        if (new_trust_bundle.ok()) {
-          updateSpiffeData(*new_trust_bundle);
-        } else {
-          ENVOY_LOG(error, "Failed to load SPIFFE bundle map from '{}': '{}'",
-                    trust_bundle_file_name_, new_trust_bundle.status().message());
-        }
-        return absl::OkStatus();
-      }));
-  return absl::OkStatus();
-}
+SINGLETON_MANAGER_REGISTRATION(spiffe_trust_bundles);
 
 SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextConfig* config,
                                  SslStats& stats,
                                  Server::Configuration::CommonFactoryContext& context,
                                  Stats::Scope& scope, absl::Status& creation_status)
-    : api_(config->api()), stats_(stats), time_source_(context.timeSource()) {
+    : stats_(stats), time_source_(context.timeSource()) {
   ASSERT(config != nullptr);
   allow_expired_certificate_ = config->allowExpiredCertificate();
 
@@ -189,24 +170,16 @@ SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextC
 
   // If a trust bundle map is provided, use that...
   if (message.has_trust_bundles()) {
-    absl::StatusOr<std::string> trust_bundles_str =
-        Config::DataSource::read(message.trust_bundles(), false, config->api());
-    SET_AND_RETURN_IF_NOT_OK(trust_bundles_str.status(), creation_status);
-    auto parse_result = parseTrustBundles(*trust_bundles_str);
-
-    SET_AND_RETURN_IF_NOT_OK(parse_result.status(), creation_status);
-
-    spiffe_data_ = *parse_result;
-
-    if (message.trust_bundles().has_filename()) {
-      trust_bundle_file_name_ = message.trust_bundles().filename();
-      // Set up dynamic refresh with tls_ and file watcher
-      tls_ = ThreadLocal::TypedSlot<ThreadLocalSpiffeState>::makeUnique(context.threadLocal());
-      tls_->set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalSpiffeState>(); });
-      updateSpiffeData(spiffe_data_);
-      SET_AND_RETURN_IF_NOT_OK(initializeCertificateRefresh(context), creation_status);
-    }
-
+    bundle_map_ = context.singletonManager().getTyped<SpiffeTrustBundles>(
+        SINGLETON_MANAGER_REGISTERED_NAME(spiffe_trust_bundles), [&]() {
+          return std::make_shared<SpiffeTrustBundles>(
+              context.mainThreadDispatcher(), context.threadLocal(), context.api(),
+              parseTrustBundles,
+              Config::DataSource::ProviderOptions{.modify_watch = true, .hash_content = true});
+        });
+    auto provider_status = bundle_map_->getOrCreate(message.trust_bundles());
+    SET_AND_RETURN_IF_NOT_OK(provider_status.status(), creation_status);
+    bundle_provider_ = *std::move(provider_status);
     initializeCertExpirationStats(scope, config->caCertName());
     return;
   }
@@ -459,7 +432,11 @@ void SPIFFEValidator::initializeCertExpirationStats(Stats::Scope& scope,
   // Since we may have multiple certificates here, we will use the provided cert name and append
   // an index to it. Assumes the order in the ca_certs_ vector doesn't change.
   int idx = 0;
-  for (bssl::UniquePtr<X509>& cert : spiffe_data_->ca_certs_) {
+  OptRef<SpiffeData> spiffe_data = getSpiffeData();
+  if (!spiffe_data) {
+    return;
+  }
+  for (bssl::UniquePtr<X509>& cert : spiffe_data->ca_certs_) {
     // Add underscore between cert name and index to avoid collisions
     std::string cert_name_with_idx = absl::StrCat(cert_name, "_", idx);
 

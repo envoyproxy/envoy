@@ -1,5 +1,6 @@
 #include "source/extensions/filters/http/dynamic_modules/factory.h"
 
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/filters/http/dynamic_modules/filter.h"
 #include "source/extensions/filters/http/dynamic_modules/filter_config.h"
 
@@ -25,11 +26,18 @@ absl::StatusOr<Http::FilterFactoryCb> DynamicModuleConfigFactory::createFilterFa
     RETURN_IF_NOT_OK_REF(config_or_error.status());
     config = std::move(config_or_error.value());
   }
+
+  // Use configured metrics namespace or fall back to the default.
+  const std::string metrics_namespace =
+      module_config.metrics_namespace().empty()
+          ? std::string(Extensions::DynamicModules::HttpFilters::DefaultMetricsNamespace)
+          : module_config.metrics_namespace();
+
   absl::StatusOr<
       Envoy::Extensions::DynamicModules::HttpFilters::DynamicModuleHttpFilterConfigSharedPtr>
       filter_config =
           Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
-              proto_config.filter_name(), config, proto_config.terminal_filter(),
+              proto_config.filter_name(), config, metrics_namespace, proto_config.terminal_filter(),
               std::move(dynamic_module.value()), scope, context);
 
   if (!filter_config.ok()) {
@@ -37,8 +45,13 @@ absl::StatusOr<Http::FilterFactoryCb> DynamicModuleConfigFactory::createFilterFa
                                       std::string(filter_config.status().message()));
   }
 
-  context.api().customStatNamespaces().registerStatNamespace(
-      Extensions::DynamicModules::HttpFilters::CustomStatNamespace);
+  // When the runtime guard is enabled, register the metrics namespace as a custom stat namespace.
+  // This causes the namespace prefix to be stripped from prometheus output and no envoy_ prefix
+  // is added. This is the legacy behavior for backward compatibility.
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.dynamic_modules_strip_custom_stat_prefix")) {
+    context.api().customStatNamespaces().registerStatNamespace(metrics_namespace);
+  }
 
   return [config = filter_config.value()](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     const std::string& worker_name = callbacks.dispatcher().name();

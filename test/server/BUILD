@@ -465,7 +465,7 @@ envoy_cc_benchmark_binary(
         "//source/server:server_lib",
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/test_common:simulated_time_system_lib",
-        "@com_github_google_benchmark//:benchmark",
+        "@benchmark",
     ],
 )
 

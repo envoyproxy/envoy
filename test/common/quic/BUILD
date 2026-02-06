@@ -22,7 +22,7 @@ envoy_cc_test(
         "//source/common/quic:envoy_quic_clock_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
-        "@com_github_google_quiche//:quic_platform",
+        "@quiche//:quic_platform",
     ]),
 )
 
@@ -49,7 +49,7 @@ envoy_cc_test(
         "//test/mocks/api:api_mocks",
         "//test/mocks/network:network_mocks",
         "//test/test_common:threadsafe_singleton_injector_lib",
-        "@com_github_google_quiche//:quic_platform",
+        "@quiche//:quic_platform",
     ]),
 )
 
@@ -67,9 +67,9 @@ envoy_cc_test(
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/test_common:test_runtime_lib",
-        "@com_github_google_quiche//:quic_core_versions_lib",
-        "@com_github_google_quiche//:quic_platform",
-        "@com_github_google_quiche//:quic_test_tools_test_certificates_lib",
+        "@quiche//:quic_core_versions_lib",
+        "@quiche//:quic_platform",
+        "@quiche//:quic_test_tools_test_certificates_lib",
     ]),
 )
 
@@ -82,7 +82,7 @@ envoy_cc_test(
         "//test/mocks/event:event_mocks",
         "//test/mocks/network:network_mocks",
         "//test/test_common:utility_lib",
-        "@com_github_google_quiche//:quic_test_tools_test_utils_lib",
+        "@quiche//:quic_test_tools_test_utils_lib",
     ]),
 )
 
@@ -111,8 +111,8 @@ envoy_cc_test(
         "//test/mocks/event:event_mocks",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/ssl:ssl_mocks",
-        "@com_github_google_quiche//:quic_platform",
-        "@com_github_google_quiche//:quic_test_tools_test_certificates_lib",
+        "@quiche//:quic_platform",
+        "@quiche//:quic_test_tools_test_certificates_lib",
     ]),
 )
 
@@ -132,9 +132,9 @@ envoy_cc_test(
         "//test/mocks/http:stream_decoder_mock",
         "//test/mocks/network:network_mocks",
         "//test/test_common:utility_lib",
-        "@com_github_google_quiche//:quic_core_http_spdy_session_lib",
-        "@com_github_google_quiche//:quic_test_tools_qpack_qpack_test_utils_lib",
-        "@com_github_google_quiche//:quic_test_tools_session_peer_lib",
+        "@quiche//:quic_core_http_spdy_session_lib",
+        "@quiche//:quic_test_tools_qpack_qpack_test_utils_lib",
+        "@quiche//:quic_test_tools_session_peer_lib",
     ]),
 )
 
@@ -154,8 +154,8 @@ envoy_cc_test(
         "//test/mocks/network:network_mocks",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
-        "@com_github_google_quiche//:quic_core_http_spdy_session_lib",
-        "@com_github_google_quiche//:quic_test_tools_qpack_qpack_test_utils_lib",
+        "@quiche//:quic_core_http_spdy_session_lib",
+        "@quiche//:quic_test_tools_qpack_qpack_test_utils_lib",
     ]),
 )
 
@@ -182,10 +182,10 @@ envoy_cc_test(
         "//test/test_common:global_lib",
         "//test/test_common:logging_lib",
         "//test/test_common:simulated_time_system_lib",
-        "@com_github_google_quiche//:quic_test_tools_config_peer_lib",
-        "@com_github_google_quiche//:quic_test_tools_stream_peer_lib",
-        "@com_github_google_quiche//:quic_test_tools_server_session_base_peer",
-        "@com_github_google_quiche//:quic_test_tools_test_utils_lib",
+        "@quiche//:quic_test_tools_config_peer_lib",
+        "@quiche//:quic_test_tools_stream_peer_lib",
+        "@quiche//:quic_test_tools_server_session_base_peer",
+        "@quiche//:quic_test_tools_test_utils_lib",
     ]),
 )
 
@@ -213,7 +213,7 @@ envoy_cc_test(
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
-        "@com_github_google_quiche//:quic_test_tools_session_peer_lib",
+        "@quiche//:quic_test_tools_session_peer_lib",
     ]),
 )
 
@@ -240,7 +240,7 @@ envoy_cc_test(
         "//test/test_common:network_utility_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_runtime_lib",
-        "@com_github_google_quiche//:quic_test_tools_crypto_server_config_peer_lib",
+        "@quiche//:quic_test_tools_crypto_server_config_peer_lib",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ]),
 )
@@ -279,7 +279,7 @@ envoy_cc_test_library(
     deps = envoy_select_enable_http3([
         "//source/common/quic:envoy_quic_proof_source_base_lib",
         "//test/mocks/network:network_mocks",
-        "@com_github_google_quiche//:quic_test_tools_test_certificates_lib",
+        "@quiche//:quic_test_tools_test_certificates_lib",
     ]),
 )
 
@@ -338,7 +338,7 @@ envoy_cc_test(
         "//source/common/runtime:runtime_lib",
         "//test/mocks/api:api_mocks",
         "//test/test_common:threadsafe_singleton_injector_lib",
-        "@com_github_google_quiche//:quic_test_tools_test_utils_lib",
+        "@quiche//:quic_test_tools_test_utils_lib",
     ]),
 )
 
@@ -361,9 +361,9 @@ envoy_cc_test_library(
         "//source/common/quic:envoy_quic_server_connection_lib",
         "//source/common/quic:quic_filter_manager_connection_lib",
         "//test/common/config:dummy_config_proto_cc_proto",
-        "@com_github_google_quiche//:quic_core_http_spdy_session_lib",
-        "@com_github_google_quiche//:quic_test_tools_first_flight_lib",
-        "@com_github_google_quiche//:quic_test_tools_qpack_qpack_test_utils_lib",
+        "@quiche//:quic_core_http_spdy_session_lib",
+        "@quiche//:quic_test_tools_first_flight_lib",
+        "@quiche//:quic_test_tools_qpack_qpack_test_utils_lib",
     ]) + [
         "//envoy/stream_info:stream_info_interface",
         "//source/common/quic:envoy_quic_network_observer_registry_factory_lib",
@@ -398,7 +398,7 @@ envoy_cc_test(
         "//source/common/quic:http_datagram_handler",
         "//test/mocks/buffer:buffer_mocks",
         "//test/test_common:utility_lib",
-        "@com_github_google_quiche//:quic_test_tools_test_utils_lib",
+        "@quiche//:quic_test_tools_test_utils_lib",
     ]),
 )
 
@@ -424,7 +424,7 @@ envoy_cc_test(
     deps = envoy_select_enable_http3([
         ":connection_id_matchers",
         "//source/common/quic:envoy_deterministic_connection_id_generator_lib",
-        "@com_github_google_quiche//:quic_test_tools_test_utils_lib",
+        "@quiche//:quic_test_tools_test_utils_lib",
     ]),
 )
 
@@ -441,7 +441,7 @@ envoy_cc_test_library(
     deps = [
         ":envoy_quic_h3_fuzz_proto_cc_proto",
         "//source/common/common:assert_lib",
-        "@com_github_google_quiche//:quic_test_tools_test_utils_lib",
+        "@quiche//:quic_test_tools_test_utils_lib",
     ],
 )
 

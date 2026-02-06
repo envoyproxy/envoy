@@ -37,6 +37,17 @@ public:
       : retry_timer_(new Event::MockTimer()), response_timer_(new Event::MockTimer()),
         async_client_(new Grpc::MockAsyncClient()) {}
 
+  void TearDown() override {
+    if (load_stats_reporter_ != nullptr) {
+      // Validate that LoadStatsReporter correctly shuts down by disabling
+      // timers and resetting the stream.
+      EXPECT_CALL(*retry_timer_, disableTimer());
+      EXPECT_CALL(*response_timer_, disableTimer());
+      EXPECT_CALL(async_stream_, resetStream());
+      load_stats_reporter_.reset();
+    }
+  }
+
   void createLoadStatsReporter() {
     InSequence s;
     EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([this](Event::TimerCb timer_cb) {
@@ -97,7 +108,6 @@ public:
   NiceMock<Upstream::MockClusterManager> cm_;
   Event::MockDispatcher dispatcher_;
   Stats::IsolatedStoreImpl stats_store_;
-  std::unique_ptr<LoadStatsReporter> load_stats_reporter_;
   Event::MockTimer* retry_timer_;
   Event::TimerCb retry_timer_cb_;
   Event::MockTimer* response_timer_;
@@ -105,6 +115,7 @@ public:
   Grpc::MockAsyncStream async_stream_;
   Grpc::MockAsyncClient* async_client_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  std::unique_ptr<LoadStatsReporter> load_stats_reporter_;
 };
 
 // Validate that stream creation results in a timer based retry.

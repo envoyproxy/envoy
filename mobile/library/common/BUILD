@@ -86,9 +86,9 @@ envoy_cc_library(
     ],
     repository = "@envoy",
     deps = [
-        "@com_google_absl//absl/container:flat_hash_map",
-        "@com_google_absl//absl/functional:any_invocable",
-        "@com_google_absl//absl/strings",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/functional:any_invocable",
+        "@abseil-cpp//absl/strings",
         "@envoy//source/common/buffer:buffer_lib",
         "@envoy//source/common/common:base_logger_lib",
         "@envoy//source/common/http:header_map_lib",
