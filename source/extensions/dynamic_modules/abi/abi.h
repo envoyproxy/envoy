@@ -475,6 +475,112 @@ bool envoy_dynamic_module_callback_log_enabled(envoy_dynamic_module_type_log_lev
  */
 uint32_t envoy_dynamic_module_callback_get_concurrency();
 
+// ----------------------------- Shared State ----------------------------------
+
+/**
+ * envoy_dynamic_module_type_shared_state_handle is an opaque handle to a shared state entry
+ * in the process-wide shared state registry. It provides lock-free reads of the current data
+ * pointer, making it suitable for per-request use on worker threads.
+ *
+ * OWNERSHIP: The allocation is done by Envoy but the module is responsible for managing the
+ * lifetime of the handle. It must be explicitly released using
+ * envoy_dynamic_module_callback_shared_state_handle_delete.
+ */
+typedef void* envoy_dynamic_module_type_shared_state_handle;
+
+/**
+ * envoy_dynamic_module_callback_publish_shared_state publishes an opaque shared state pointer
+ * under the given key in the process-wide shared state registry.
+ *
+ * This allows bootstrap extensions to publish data that can be retrieved by HTTP filters
+ * or other extensions using envoy_dynamic_module_callback_get_shared_state or via a handle
+ * acquired with envoy_dynamic_module_callback_shared_state_handle_new.
+ *
+ * If a state already exists under the given key, the data pointer is atomically overwritten.
+ * Outstanding handles for the same key will see the new data on their next read.
+ * Passing nullptr as data clears the entry but does not destroy it, so existing handles
+ * remain valid and will return false from handle_get until new data is published.
+ *
+ * RECOMMENDED PATTERN: Publish a pointer to a long-lived, thread-safe data structure (e.g., a
+ * lock-free snapshot wrapper). Update the data behind the pointer atomically for lock-free
+ * per-request reads, or call this function again to swap the pointer itself. Handles will see
+ * the updated pointer on the next call to envoy_dynamic_module_callback_shared_state_handle_get.
+ *
+ * The caller is responsible for managing the lifetime of the data. The registry only stores
+ * the pointer, not the data itself. The data must remain valid for as long as any module
+ * may access it via get_shared_state or a handle.
+ *
+ * This is thread-safe and can be called from any thread.
+ *
+ * @param key is the name of the shared state to publish.
+ * @param data is the opaque pointer to the shared state data. Passing nullptr clears the entry.
+ * @return true on success. Currently always returns true.
+ */
+bool envoy_dynamic_module_callback_publish_shared_state(envoy_dynamic_module_type_module_buffer key,
+                                                        const void* data);
+
+/**
+ * envoy_dynamic_module_callback_get_shared_state retrieves a previously published shared state
+ * pointer by key from the process-wide shared state registry. This takes a read lock internally
+ * and is intended for one-time lookups (e.g., during configuration creation). For repeated
+ * per-request reads, prefer acquiring a handle via
+ * envoy_dynamic_module_callback_shared_state_handle_new.
+ *
+ * This is thread-safe and can be called from any thread.
+ *
+ * @param key is the name of the shared state to retrieve.
+ * @param data_out is a pointer to a variable where the retrieved data pointer will be stored.
+ *                 This is only written to if the function returns true.
+ * @return true if the shared state was found and non-null, false otherwise.
+ */
+bool envoy_dynamic_module_callback_get_shared_state(envoy_dynamic_module_type_module_buffer key,
+                                                    const void** data_out);
+
+/**
+ * envoy_dynamic_module_callback_shared_state_handle_new acquires a handle to a shared state entry
+ * for efficient, lock-free reads. The handle is intended to be acquired once (e.g., during
+ * configuration creation) and used for the lifetime of the configuration.
+ *
+ * The handle holds a reference to the underlying entry, so it remains valid even if the entry
+ * is later cleared via publish_shared_state with nullptr. When the publisher writes new data,
+ * the handle will see the update on the next call to
+ * envoy_dynamic_module_callback_shared_state_handle_get.
+ *
+ * This is thread-safe and can be called from any thread.
+ *
+ * @param key is the name of the shared state to acquire a handle for.
+ * @return envoy_dynamic_module_type_shared_state_handle is the handle, or nullptr if no entry
+ *         exists under the given key.
+ *
+ * NOTE: it is the caller's responsibility to release the handle using
+ * envoy_dynamic_module_callback_shared_state_handle_delete when it is no longer needed.
+ */
+envoy_dynamic_module_type_shared_state_handle
+envoy_dynamic_module_callback_shared_state_handle_new(envoy_dynamic_module_type_module_buffer key);
+
+/**
+ * envoy_dynamic_module_callback_shared_state_handle_get reads the current data pointer from
+ * a handle. This is a lock-free atomic read and is suitable for per-request use on worker
+ * threads.
+ *
+ * @param handle is the handle acquired via
+ *               envoy_dynamic_module_callback_shared_state_handle_new.
+ * @param data_out is a pointer to a variable where the retrieved data pointer will be stored.
+ *                 This is only written to if the function returns true.
+ * @return true if the data pointer is non-null, false if the entry has been cleared.
+ */
+bool envoy_dynamic_module_callback_shared_state_handle_get(
+    envoy_dynamic_module_type_shared_state_handle handle, const void** data_out);
+
+/**
+ * envoy_dynamic_module_callback_shared_state_handle_delete releases a handle previously acquired
+ * via envoy_dynamic_module_callback_shared_state_handle_new.
+ *
+ * @param handle is the handle to release.
+ */
+void envoy_dynamic_module_callback_shared_state_handle_delete(
+    envoy_dynamic_module_type_shared_state_handle handle);
+
 // =============================================================================
 // ============================== HTTP Filter ==================================
 // =============================================================================

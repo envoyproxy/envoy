@@ -30,4 +30,6 @@ test_program(name = "bootstrap_integration_test")
 
 test_program(name = "bootstrap_stats_test")
 
+test_program(name = "bootstrap_shared_state_test")
+
 test_program(name = "access_log_integration_test")

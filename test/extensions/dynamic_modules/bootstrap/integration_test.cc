@@ -72,6 +72,14 @@ TEST_P(DynamicModulesBootstrapIntegrationTest, StatsAccessRust) {
       initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_stats_test"));
 }
 
+// This test verifies that the Rust bootstrap extension can publish and retrieve shared state
+// via the process-wide shared state registry.
+TEST_P(DynamicModulesBootstrapIntegrationTest, SharedStateRust) {
+  EXPECT_LOG_CONTAINS(
+      "info", "Bootstrap shared state test completed successfully!",
+      initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_shared_state_test"));
+}
+
 } // namespace DynamicModules
 } // namespace Bootstrap
 } // namespace Extensions
