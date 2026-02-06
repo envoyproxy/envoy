@@ -277,13 +277,19 @@ TEST_F(FactoryTest, ClientCnBucketSelectorUsesCertificateNameWithTemplate) {
   limit_kbps: 50
   named_bucket_selector:
     client_cn_with_default:
+      default_bucket: "no_cn_bucket"
       name_template: "prefix_{CN}_postfix"
   named_bucket_configurations:
+  - name: no_cn_bucket
+    limit_kbps: 100
+    fill_interval: 0.25s
   - name: prefix_example_cn_postfix
     limit_kbps: 100
     fill_interval: 0.26s
   )")
                     .value();
+  // No SSL connection uses default bucket without templating.
+  EXPECT_THAT(config->bucketAndStats(mock_stream_info_)->fillInterval().count(), 250);
   auto ssl = std::make_shared<Ssl::MockConnectionInfo>();
   std::string example_cn = "example_cn";
   EXPECT_CALL(*ssl, subjectPeerCertificate).WillOnce(ReturnRef(example_cn));

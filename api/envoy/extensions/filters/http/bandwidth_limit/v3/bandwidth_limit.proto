@@ -78,7 +78,8 @@ message BandwidthLimit {
     // Precisely one of ``client_cn_with_default`` or ``explicit_bucket`` must be set.
     ClientCnWithDefault client_cn_with_default = 1;
 
-    // Use the shared bucket specified by ``explicit_bucket``.
+    // Use the shared bucket specified by ``explicit_bucket``. This can be used to make
+    // multiple routes share a common token bucket.
     string explicit_bucket = 2;
 
     // Optional template for the stat prefix, with ``{BUCKET}`` representing the bucket

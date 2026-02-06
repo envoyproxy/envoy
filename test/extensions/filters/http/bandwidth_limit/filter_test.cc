@@ -103,6 +103,32 @@ TEST_F(FilterTest, Disabled) {
   EXPECT_EQ(false, response_trailers_.has("bandwidth-response-filter-delay-ms"));
 }
 
+TEST_F(FilterTest, NamedBucketSelectorWithNoMatchingBucketAndNoCreateFlagActsDisabled) {
+  constexpr absl::string_view config_yaml = R"(
+  stat_prefix: test
+  enable_mode: REQUEST_AND_RESPONSE
+  limit_kbps: 10
+  fill_interval: 1s
+  named_bucket_selector:
+    explicit_bucket: test_explicit_bucket
+  )";
+  setup(config_yaml);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+  EXPECT_EQ(0U, findCounter("test.http_bandwidth_limit.request_enabled"));
+  EXPECT_EQ(0U, findCounter("test.http_bandwidth_limit.request_enforced"));
+  EXPECT_EQ(0U, findCounter("test_explicit_bucket.http_bandwidth_limit.request_enabled"));
+  EXPECT_EQ(0U, findCounter("test_explicit_bucket.http_bandwidth_limit.request_enforced"));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
+  EXPECT_EQ(0U, findCounter("test.http_bandwidth_limit.response_enabled"));
+  EXPECT_EQ(0U, findCounter("test_explicit_bucket.http_bandwidth_limit.response_enabled"));
+}
+
 TEST_F(FilterTest, DisabledInRouteConfig) {
   constexpr absl::string_view config_yaml = R"(
   stat_prefix: test
