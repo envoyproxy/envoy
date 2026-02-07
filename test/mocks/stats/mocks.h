@@ -296,11 +296,12 @@ class MockScope : public TestUtil::TestScope {
 public:
   MockScope(StatName prefix, MockStore& store);
 
-  ScopeSharedPtr createScope(const std::string& name, bool,
+  ScopeSharedPtr createScope(const std::string& name, const EvictionSettings&,
                              const ScopeStatsLimitSettings&) override {
     return ScopeSharedPtr(createScope_(name));
   }
-  ScopeSharedPtr scopeFromStatName(StatName name, bool, const ScopeStatsLimitSettings&) override {
+  ScopeSharedPtr scopeFromStatName(StatName name, const EvictionSettings&,
+                                   const ScopeStatsLimitSettings&) override {
     return createScope_(symbolTable().toString(name));
   }
 

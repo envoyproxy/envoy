@@ -44,11 +44,6 @@ public:
   }
 
   void initialize(const envoy::extensions::access_loggers::stats::v3::Config& config) {
-    // The gauge is a member of store_, so we need to increment the ref count to prevent it from
-    // being deleted when the shared_ptr in AccessLogState is destroyed.
-    store_.gauge_.incRefCount();
-    store_.gauge_.name_ = "gauge";
-    store_.gauge_.setTagExtractedName("gauge");
     ON_CALL(context_, statsScope()).WillByDefault(testing::ReturnRef(store_.mockScope()));
     EXPECT_CALL(store_.mockScope(), createScope_(_))
         .WillOnce(Invoke([this](const std::string& name) {

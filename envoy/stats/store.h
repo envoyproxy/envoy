@@ -177,9 +177,9 @@ public:
   /**
    * @return a scope of the given name.
    */
-  ScopeSharedPtr createScope(const std::string& name, bool evictable = false,
+  ScopeSharedPtr createScope(const std::string& name, const EvictionSettings& settings = {},
                              const ScopeStatsLimitSettings& limits = {}) {
-    return rootScope()->createScope(name, evictable, limits);
+    return rootScope()->createScope(name, settings, limits);
   }
 
   /**

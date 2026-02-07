@@ -1,7 +1,6 @@
 #include "source/extensions/access_loggers/stats/stats.h"
 
 #include "envoy/data/accesslog/v3/accesslog.pb.h"
-#include "envoy/stats/scope.h"
 #include "envoy/stream_info/filter_state.h"
 
 #include "source/common/formatter/substitution_formatter.h"
@@ -16,21 +15,19 @@ namespace {
 class AccessLogState : public StreamInfo::FilterState::Object {
 public:
   ~AccessLogState() override {
-    for (const auto& [gauge, state] : inflight_gauges_) {
-      state.first->sub(state.second);
+    for (const auto& [gauge, value] : inflight_gauges_) {
+      gauge->sub(value);
     }
   }
 
-  void addInflightGauge(Stats::Gauge* gauge, uint64_t value) {
-    inflight_gauges_[gauge] = {Stats::GaugeSharedPtr(gauge), value};
-  }
+  void addInflightGauge(Stats::Gauge* gauge, uint64_t value) { inflight_gauges_[gauge] = value; }
 
   absl::optional<uint64_t> removeInflightGauge(Stats::Gauge* gauge) {
     auto it = inflight_gauges_.find(gauge);
     if (it == inflight_gauges_.end()) {
       return absl::nullopt;
     }
-    uint64_t value = it->second.second;
+    uint64_t value = it->second;
     inflight_gauges_.erase(it);
     return value;
   }
@@ -38,9 +35,9 @@ public:
   static constexpr absl::string_view key() { return "envoy.access_loggers.stats.access_log_state"; }
 
 private:
-  // The map key holds a raw pointer to the gauge. The value holds a ref-counted pointer to ensure
-  // the gauge is not destroyed if it is evicted from the stats scope.
-  absl::flat_hash_map<Stats::Gauge*, std::pair<Stats::GaugeSharedPtr, uint64_t>> inflight_gauges_;
+  // The map key holds a raw pointer to the gauge. We can safely do this because the gauge
+  // is guaranteed to be valid as we disabled eviction for gauges in the stats scope.
+  absl::flat_hash_map<Stats::Gauge*, uint64_t> inflight_gauges_;
 };
 
 Formatter::FormatterProviderPtr
@@ -81,7 +78,14 @@ StatsAccessLog::StatsAccessLog(const envoy::extensions::access_loggers::stats::v
                                AccessLog::FilterPtr&& filter,
                                const std::vector<Formatter::CommandParserPtr>& commands)
     : Common::ImplBase(std::move(filter)),
-      scope_(context.statsScope().createScope(config.stat_prefix())),
+      scope_(context.statsScope().createScope(
+          config.stat_prefix(),
+          Stats::EvictionSettings{/*evict_counters=*/true,
+                                  // Gauges cannot be evictable as we need to add/subtract based on
+                                  // their absolute values.
+                                  /*evict_gauges=*/false,
+                                  /*evict_histograms=*/true,
+                                  /*evict_text_readouts=*/true})),
       stat_name_pool_(scope_->symbolTable()), histograms_([&]() {
         std::vector<Histogram> histograms;
         for (const auto& hist_cfg : config.histograms()) {
