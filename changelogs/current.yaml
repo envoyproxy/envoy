@@ -219,6 +219,12 @@ new_features:
     the namespace in prometheus output (e.g. ``envoy_myapp_requests_total``). The legacy behavior
     (stripping the namespace prefix from prometheus output) can be restored by setting the runtime
     guard ``envoy.reloadable_features.dynamic_modules_strip_custom_stat_prefix`` to ``true``.
+- area: dynamic_modules
+  change: |
+    Added a process-wide function registry to the dynamic modules ABI. Modules can register
+    functions by name via ``envoy_dynamic_module_callback_register_function`` and other modules
+    can resolve them via ``envoy_dynamic_module_callback_get_function``, enabling zero-copy
+    cross-module interactions analogous to ``dlsym``.
 - area: formatter
   change: |
     Added ``QUERY_PARAMS`` support for substitution formatter to log all query params.

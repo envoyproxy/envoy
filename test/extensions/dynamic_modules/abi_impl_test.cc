@@ -103,6 +103,83 @@ TEST(CommonAbiImplTest, IterateGaugesEnvoyBug) {
       "not implemented in this context");
 }
 
+// ---------------------- Function registry tests --------------------------------
+
+// Test registering and retrieving a function.
+TEST(CommonAbiImplTest, FunctionRegistryRegisterAndGet) {
+  auto fn = [](int x) { return x + 1; };
+  envoy_dynamic_module_type_module_buffer key = {"fn_basic", 8};
+
+  EXPECT_TRUE(envoy_dynamic_module_callback_register_function(key, reinterpret_cast<void*>(+fn)));
+
+  void* fn_out = nullptr;
+  EXPECT_TRUE(envoy_dynamic_module_callback_get_function(key, &fn_out));
+  EXPECT_NE(fn_out, nullptr);
+
+  // Cast back and call the function.
+  auto resolved = reinterpret_cast<int (*)(int)>(fn_out);
+  EXPECT_EQ(resolved(41), 42);
+}
+
+// Test that getting a non-existent key returns false.
+TEST(CommonAbiImplTest, FunctionRegistryGetNonExistent) {
+  envoy_dynamic_module_type_module_buffer key = {"fn_nonexistent", 14};
+  void* fn_out = nullptr;
+  EXPECT_FALSE(envoy_dynamic_module_callback_get_function(key, &fn_out));
+  EXPECT_EQ(fn_out, nullptr);
+}
+
+// Test that registering nullptr returns false.
+TEST(CommonAbiImplTest, FunctionRegistryRegisterNull) {
+  envoy_dynamic_module_type_module_buffer key = {"fn_null", 7};
+  EXPECT_FALSE(envoy_dynamic_module_callback_register_function(key, nullptr));
+
+  // Key should not exist in the registry.
+  void* fn_out = nullptr;
+  EXPECT_FALSE(envoy_dynamic_module_callback_get_function(key, &fn_out));
+}
+
+// Test that duplicate registration returns false.
+TEST(CommonAbiImplTest, FunctionRegistryDuplicateRegistration) {
+  auto fn1 = [](int x) { return x; };
+  auto fn2 = [](int x) { return x * 2; };
+  envoy_dynamic_module_type_module_buffer key = {"fn_dup", 6};
+
+  EXPECT_TRUE(envoy_dynamic_module_callback_register_function(key, reinterpret_cast<void*>(+fn1)));
+
+  // Second registration under the same key should fail.
+  EXPECT_FALSE(envoy_dynamic_module_callback_register_function(key, reinterpret_cast<void*>(+fn2)));
+
+  // The original function should still be registered.
+  void* fn_out = nullptr;
+  EXPECT_TRUE(envoy_dynamic_module_callback_get_function(key, &fn_out));
+  auto resolved = reinterpret_cast<int (*)(int)>(fn_out);
+  EXPECT_EQ(resolved(5), 5);
+}
+
+// Test multiple independent keys.
+TEST(CommonAbiImplTest, FunctionRegistryMultipleKeys) {
+  auto fn_a = [](int x) { return x + 10; };
+  auto fn_b = [](int x) { return x + 20; };
+  envoy_dynamic_module_type_module_buffer key_a = {"fn_multi_a", 10};
+  envoy_dynamic_module_type_module_buffer key_b = {"fn_multi_b", 10};
+
+  EXPECT_TRUE(
+      envoy_dynamic_module_callback_register_function(key_a, reinterpret_cast<void*>(+fn_a)));
+  EXPECT_TRUE(
+      envoy_dynamic_module_callback_register_function(key_b, reinterpret_cast<void*>(+fn_b)));
+
+  void* out_a = nullptr;
+  void* out_b = nullptr;
+  EXPECT_TRUE(envoy_dynamic_module_callback_get_function(key_a, &out_a));
+  EXPECT_TRUE(envoy_dynamic_module_callback_get_function(key_b, &out_b));
+
+  auto resolved_a = reinterpret_cast<int (*)(int)>(out_a);
+  auto resolved_b = reinterpret_cast<int (*)(int)>(out_b);
+  EXPECT_EQ(resolved_a(0), 10);
+  EXPECT_EQ(resolved_b(0), 20);
+}
+
 } // namespace
 } // namespace DynamicModules
 } // namespace Extensions
