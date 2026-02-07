@@ -5989,6 +5989,266 @@ void envoy_dynamic_module_callback_bootstrap_extension_iterate_gauges(
     envoy_dynamic_module_type_bootstrap_extension_envoy_ptr extension_envoy_ptr,
     envoy_dynamic_module_type_gauge_iterator_fn iterator_fn, void* user_data);
 
+// =============================================================================
+// ============================ Cluster Extension ==============================
+// =============================================================================
+
+// =============================================================================
+// Cluster Dynamic Module Types
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_type_cluster_config_envoy_ptr is a raw pointer to the cluster configuration
+ * object in Envoy. This is passed to the module when creating a new in-module cluster
+ * configuration.
+ *
+ * This has 1:1 correspondence with envoy_dynamic_module_type_cluster_config_module_ptr in the
+ * module.
+ *
+ * OWNERSHIP: Envoy owns the pointer.
+ */
+typedef void* envoy_dynamic_module_type_cluster_config_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_cluster_config_module_ptr is a pointer to an in-module cluster
+ * configuration corresponding to an Envoy cluster configuration. The config is responsible for
+ * creating new cluster instances.
+ *
+ * This has 1:1 correspondence with envoy_dynamic_module_type_cluster_config_envoy_ptr in Envoy.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer. The pointer can
+ * be released when envoy_dynamic_module_on_cluster_config_destroy is called for the same pointer.
+ */
+typedef const void* envoy_dynamic_module_type_cluster_config_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_cluster_envoy_ptr is a raw pointer to the DynamicModuleCluster class
+ * in Envoy. This is passed to the module when creating a new cluster and used to access cluster
+ * operations such as adding/removing hosts.
+ *
+ * This has 1:1 correspondence with envoy_dynamic_module_type_cluster_module_ptr in the module.
+ *
+ * OWNERSHIP: Envoy owns the pointer. The pointer is valid until
+ * envoy_dynamic_module_on_cluster_destroy is called.
+ */
+typedef void* envoy_dynamic_module_type_cluster_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_cluster_module_ptr is a pointer to an in-module cluster instance
+ * corresponding to an Envoy cluster.
+ *
+ * This has 1:1 correspondence with envoy_dynamic_module_type_cluster_envoy_ptr in Envoy.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer. The pointer can
+ * be released when envoy_dynamic_module_on_cluster_destroy is called for the same pointer.
+ */
+typedef const void* envoy_dynamic_module_type_cluster_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_cluster_lb_envoy_ptr is a raw pointer to the load balancer instance
+ * in Envoy. This provides thread-local access to the cluster's host set for load balancing
+ * decisions. One load balancer instance is created per worker thread.
+ *
+ * This has 1:1 correspondence with envoy_dynamic_module_type_cluster_lb_module_ptr in the module.
+ *
+ * OWNERSHIP: Envoy owns the pointer. The pointer is valid until
+ * envoy_dynamic_module_on_cluster_lb_destroy is called.
+ */
+typedef void* envoy_dynamic_module_type_cluster_lb_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_cluster_lb_module_ptr is a pointer to an in-module load balancer
+ * instance. The load balancer is responsible for selecting hosts for requests.
+ *
+ * This has 1:1 correspondence with envoy_dynamic_module_type_cluster_lb_envoy_ptr in Envoy.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer. The pointer can
+ * be released when envoy_dynamic_module_on_cluster_lb_destroy is called for the same pointer.
+ */
+typedef const void* envoy_dynamic_module_type_cluster_lb_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_cluster_host_envoy_ptr is a pointer to a Host in Envoy's cluster. This
+ * represents an upstream endpoint that can receive traffic.
+ *
+ * OWNERSHIP: Envoy owns the pointer. The pointer remains valid as long as the host is part of the
+ * cluster's host set.
+ */
+typedef void* envoy_dynamic_module_type_cluster_host_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_cluster_lb_context_envoy_ptr is a pointer to the LoadBalancerContext in
+ * Envoy. This provides per-request information for load balancing decisions such as hash keys and
+ * downstream headers.
+ *
+ * OWNERSHIP: Envoy owns the pointer. The pointer is valid only during the
+ * envoy_dynamic_module_on_cluster_lb_choose_host call.
+ */
+typedef void* envoy_dynamic_module_type_cluster_lb_context_envoy_ptr;
+
+// =============================================================================
+// Cluster Event Hooks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_on_cluster_config_new is called by the main thread when a cluster
+ * configuration referencing this module is loaded. The module should parse the configuration and
+ * return a pointer to the in-module configuration object.
+ *
+ * @param config_envoy_ptr is the pointer to the Envoy cluster configuration object.
+ * @param name is the cluster name identifying the implementation within the module.
+ * @param config is the configuration bytes for the module.
+ * @return envoy_dynamic_module_type_cluster_config_module_ptr is the pointer to the in-module
+ * cluster configuration. Returning nullptr indicates a failure, and the cluster configuration
+ * will be rejected.
+ */
+envoy_dynamic_module_type_cluster_config_module_ptr envoy_dynamic_module_on_cluster_config_new(
+    envoy_dynamic_module_type_cluster_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config);
+
+/**
+ * envoy_dynamic_module_on_cluster_config_destroy is called when the cluster configuration is
+ * destroyed. The module should release any resources associated with the configuration.
+ *
+ * @param config_module_ptr is the pointer to the in-module cluster configuration.
+ */
+void envoy_dynamic_module_on_cluster_config_destroy(
+    envoy_dynamic_module_type_cluster_config_module_ptr config_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_cluster_new is called when a new cluster instance is created.
+ *
+ * @param config_module_ptr is the pointer to the in-module cluster configuration.
+ * @param cluster_envoy_ptr is the pointer to the Envoy cluster object, which can be used with
+ * cluster callbacks such as envoy_dynamic_module_callback_cluster_add_host.
+ * @return envoy_dynamic_module_type_cluster_module_ptr is the pointer to the in-module cluster.
+ * Returning nullptr indicates a failure.
+ */
+envoy_dynamic_module_type_cluster_module_ptr envoy_dynamic_module_on_cluster_new(
+    envoy_dynamic_module_type_cluster_config_module_ptr config_module_ptr,
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_on_cluster_init is called when cluster initialization begins. The module
+ * should perform initial host discovery and call
+ * envoy_dynamic_module_callback_cluster_pre_init_complete when the initial set of hosts is ready.
+ *
+ * @param cluster_module_ptr is the pointer to the in-module cluster.
+ * @param cluster_envoy_ptr is the pointer to the Envoy cluster object.
+ */
+void envoy_dynamic_module_on_cluster_init(
+    envoy_dynamic_module_type_cluster_module_ptr cluster_module_ptr,
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_on_cluster_destroy is called when the cluster is destroyed. The module
+ * should release any resources associated with the cluster.
+ *
+ * @param cluster_module_ptr is the pointer to the in-module cluster.
+ */
+void envoy_dynamic_module_on_cluster_destroy(
+    envoy_dynamic_module_type_cluster_module_ptr cluster_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_cluster_lb_new is called when a new load balancer instance is created
+ * for a worker thread. Each worker thread gets its own load balancer instance.
+ *
+ * @param cluster_module_ptr is the pointer to the in-module cluster.
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer object, which provides
+ * thread-local access to the cluster's host set via callbacks such as
+ * envoy_dynamic_module_callback_cluster_lb_get_healthy_host_count.
+ * @return envoy_dynamic_module_type_cluster_lb_module_ptr is the pointer to the in-module load
+ * balancer. Returning nullptr indicates a failure.
+ */
+envoy_dynamic_module_type_cluster_lb_module_ptr envoy_dynamic_module_on_cluster_lb_new(
+    envoy_dynamic_module_type_cluster_module_ptr cluster_module_ptr,
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_on_cluster_lb_destroy is called when the load balancer is destroyed.
+ *
+ * @param lb_module_ptr is the pointer to the in-module load balancer.
+ */
+void envoy_dynamic_module_on_cluster_lb_destroy(
+    envoy_dynamic_module_type_cluster_lb_module_ptr lb_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_cluster_lb_choose_host is called to select a host for a request.
+ *
+ * @param lb_module_ptr is the pointer to the in-module load balancer.
+ * @param context_envoy_ptr is the per-request load balancer context. Can be nullptr.
+ * @return envoy_dynamic_module_type_cluster_host_envoy_ptr is the pointer to the selected host.
+ * Returning nullptr means no host was selected.
+ */
+envoy_dynamic_module_type_cluster_host_envoy_ptr envoy_dynamic_module_on_cluster_lb_choose_host(
+    envoy_dynamic_module_type_cluster_lb_module_ptr lb_module_ptr,
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr);
+
+// =============================================================================
+// Cluster Dynamic Module Callbacks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_callback_cluster_add_host adds a host to the cluster. The module calls this
+ * to register a new upstream endpoint.
+ *
+ * @param cluster_envoy_ptr is the pointer to the Envoy cluster.
+ * @param address is the host address in ``ip:port`` format (e.g., ``127.0.0.1:8080``).
+ * @param weight is the load balancing weight of the host (1-128).
+ * @return envoy_dynamic_module_type_cluster_host_envoy_ptr is the pointer to the created host,
+ * or nullptr if the operation failed (e.g., invalid address or weight).
+ */
+envoy_dynamic_module_type_cluster_host_envoy_ptr envoy_dynamic_module_callback_cluster_add_host(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer address, uint32_t weight);
+
+/**
+ * envoy_dynamic_module_callback_cluster_remove_host removes a host from the cluster.
+ *
+ * @param cluster_envoy_ptr is the pointer to the Envoy cluster.
+ * @param host_envoy_ptr is the pointer to the host to remove, as returned by
+ * envoy_dynamic_module_callback_cluster_add_host.
+ * @return true if the host was found and removed, false otherwise.
+ */
+bool envoy_dynamic_module_callback_cluster_remove_host(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr,
+    envoy_dynamic_module_type_cluster_host_envoy_ptr host_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_cluster_pre_init_complete signals that the cluster's initial host
+ * discovery is complete. The module must call this during or after
+ * envoy_dynamic_module_on_cluster_init to allow Envoy to start routing traffic to this cluster.
+ *
+ * @param cluster_envoy_ptr is the pointer to the Envoy cluster.
+ */
+void envoy_dynamic_module_callback_cluster_pre_init_complete(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_get_healthy_host_count returns the number of healthy
+ * hosts at the given priority level in the cluster's host set.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer.
+ * @param priority is the priority level (typically 0 for default priority).
+ * @return the number of healthy hosts at the given priority level.
+ */
+size_t envoy_dynamic_module_callback_cluster_lb_get_healthy_host_count(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_get_healthy_host returns a healthy host pointer by
+ * index at the given priority level.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer.
+ * @param priority is the priority level.
+ * @param index is the index of the host in the healthy host list.
+ * @return envoy_dynamic_module_type_cluster_host_envoy_ptr is the pointer to the host,
+ * or nullptr if the index is out of bounds.
+ */
+envoy_dynamic_module_type_cluster_host_envoy_ptr
+envoy_dynamic_module_callback_cluster_lb_get_healthy_host(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index);
+
 #ifdef __cplusplus
 }
 #endif
