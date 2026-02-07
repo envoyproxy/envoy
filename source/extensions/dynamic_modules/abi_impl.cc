@@ -4,8 +4,6 @@
 // all dynamic modules. These are the "Common Callbacks" declared in abi.h and are available
 // regardless of which extension point is being used (HTTP/Network/Listener/UDP/Bootstrap/etc).
 
-#include <atomic>
-#include <memory>
 #include <string>
 
 #include "envoy/server/factory_context.h"
@@ -19,18 +17,11 @@
 
 namespace {
 
-// A single entry in the shared state registry. The data pointer is stored atomically so that
-// handles can read it lock-free on the per-request path.
-struct SharedStateEntry {
-  std::atomic<const void*> data{nullptr};
-};
-
-// Process-wide shared state registry. This allows bootstrap extensions to publish
-// named opaque pointers that HTTP filters and other extensions can retrieve.
-// Entries are stored as shared_ptr so that handles can hold independent references.
-absl::Mutex shared_state_mutex;
-absl::flat_hash_map<std::string, std::shared_ptr<SharedStateEntry>>
-    shared_state_registry ABSL_GUARDED_BY(shared_state_mutex);
+// Process-wide function registry. Modules register function pointers by name during bootstrap,
+// and other modules resolve them by name during configuration creation.
+absl::Mutex function_registry_mutex;
+absl::flat_hash_map<std::string, void*>
+    function_registry ABSL_GUARDED_BY(function_registry_mutex);
 
 } // namespace
 
@@ -77,73 +68,29 @@ uint32_t envoy_dynamic_module_callback_get_concurrency() {
   return context->options().concurrency();
 }
 
-// ---------------------- Shared state registry callbacks --------------------------------
+// ---------------------- Function registry callbacks --------------------------------
 
-bool envoy_dynamic_module_callback_publish_shared_state(envoy_dynamic_module_type_module_buffer key,
-                                                        const void* data) {
-  std::string key_str(key.ptr, key.length);
-  absl::WriterMutexLock lock(&shared_state_mutex);
-  if (data != nullptr) {
-    // Create the entry if it does not exist. Entries are never removed from the map so that
-    // outstanding handles remain valid across publish/clear cycles.
-    auto [it, inserted] =
-        shared_state_registry.try_emplace(key_str, std::make_shared<SharedStateEntry>());
-    it->second->data.store(data, std::memory_order_release);
-  } else {
-    // Clear the data but keep the entry so that existing handles see the update.
-    auto it = shared_state_registry.find(key_str);
-    if (it != shared_state_registry.end()) {
-      it->second->data.store(nullptr, std::memory_order_release);
-    }
+bool envoy_dynamic_module_callback_register_function(
+    envoy_dynamic_module_type_module_buffer key, void* function_ptr) {
+  if (function_ptr == nullptr) {
+    return false;
   }
-  return true;
+  std::string key_str(key.ptr, key.length);
+  absl::WriterMutexLock lock(&function_registry_mutex);
+  auto [it, inserted] = function_registry.try_emplace(key_str, function_ptr);
+  return inserted;
 }
 
-bool envoy_dynamic_module_callback_get_shared_state(envoy_dynamic_module_type_module_buffer key,
-                                                    const void** data_out) {
+bool envoy_dynamic_module_callback_get_function(envoy_dynamic_module_type_module_buffer key,
+                                                void** function_ptr_out) {
   std::string key_str(key.ptr, key.length);
-  absl::ReaderMutexLock lock(&shared_state_mutex);
-  auto it = shared_state_registry.find(key_str);
-  if (it != shared_state_registry.end()) {
-    const void* d = it->second->data.load(std::memory_order_acquire);
-    if (d != nullptr) {
-      *data_out = d;
-      return true;
-    }
-  }
-  return false;
-}
-
-// ---------------------- Shared state handle callbacks -----------------------------------
-
-envoy_dynamic_module_type_shared_state_handle
-envoy_dynamic_module_callback_shared_state_handle_new(envoy_dynamic_module_type_module_buffer key) {
-  std::string key_str(key.ptr, key.length);
-  absl::ReaderMutexLock lock(&shared_state_mutex);
-  auto it = shared_state_registry.find(key_str);
-  if (it != shared_state_registry.end()) {
-    // Return a heap-allocated shared_ptr that holds a reference to the entry.
-    return static_cast<envoy_dynamic_module_type_shared_state_handle>(
-        new std::shared_ptr<SharedStateEntry>(it->second));
-  }
-  return nullptr;
-}
-
-bool envoy_dynamic_module_callback_shared_state_handle_get(
-    envoy_dynamic_module_type_shared_state_handle handle, const void** data_out) {
-  auto* sp = static_cast<std::shared_ptr<SharedStateEntry>*>(handle);
-  const void* d = (*sp)->data.load(std::memory_order_acquire);
-  if (d != nullptr) {
-    *data_out = d;
+  absl::ReaderMutexLock lock(&function_registry_mutex);
+  auto it = function_registry.find(key_str);
+  if (it != function_registry.end()) {
+    *function_ptr_out = it->second;
     return true;
   }
   return false;
-}
-
-void envoy_dynamic_module_callback_shared_state_handle_delete(
-    envoy_dynamic_module_type_shared_state_handle handle) {
-  auto* sp = static_cast<std::shared_ptr<SharedStateEntry>*>(handle);
-  delete sp;
 }
 
 // ---------------------- Bootstrap extension scheduler callbacks ------------------------

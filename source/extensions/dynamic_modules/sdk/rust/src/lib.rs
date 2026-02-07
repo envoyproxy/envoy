@@ -96,124 +96,50 @@ pub unsafe fn get_server_concurrency() -> u32 {
   unsafe { abi::envoy_dynamic_module_callback_get_concurrency() }
 }
 
-/// Publish a named shared state pointer to the process-wide registry.
+/// Register a function pointer under a name in the process-wide function registry.
 ///
-/// This allows a module to make data available to other modules (e.g., a bootstrap extension
-/// publishing data that HTTP filters will read). The modules agree on the type of the data
-/// out-of-band, since they are typically from the same team.
+/// This allows modules loaded in the same process to expose functions that other modules can
+/// resolve by name and call directly, enabling zero-copy cross-module interactions. For example,
+/// a bootstrap extension can register a function that returns a pointer to a tenant snapshot,
+/// and HTTP filters can resolve and call it on every request.
 ///
-/// If the key already exists, the data pointer is atomically overwritten. Outstanding
-/// [`SharedStateHandle`]s for the same key will see the new data on their next read.
-/// Passing a null pointer as `data` clears the entry but does not destroy it, so existing
-/// handles remain valid and will return `None` from [`SharedStateHandle::get`] until new data
-/// is published.
+/// Registration is typically done once during bootstrap (e.g., in `on_server_initialized`).
+/// Duplicate registration under the same key returns `false`.
 ///
-/// The caller is responsible for managing the lifetime of the data. The registry only stores
-/// the pointer, not the data itself. The data must remain valid for as long as any module
-/// may access it via [`get_shared_state`] or a [`SharedStateHandle`].
+/// Callers are responsible for agreeing on the function signature out-of-band, since the
+/// registry stores opaque pointers — analogous to `dlsym` semantics.
 ///
 /// This is thread-safe and can be called from any thread.
 ///
 /// # Safety
 ///
-/// The `data` pointer must be valid and properly aligned for as long as any module may read it
-/// via [`get_shared_state`] or a [`SharedStateHandle`], or it must be null to clear the entry.
-pub unsafe fn publish_shared_state(key: &str, data: *const std::ffi::c_void) -> bool {
+/// The `function_ptr` must point to a valid function that remains valid for the lifetime of the
+/// process.
+pub unsafe fn register_function(key: &str, function_ptr: *const std::ffi::c_void) -> bool {
   unsafe {
-    abi::envoy_dynamic_module_callback_publish_shared_state(str_to_module_buffer(key), data)
+    abi::envoy_dynamic_module_callback_register_function(
+      str_to_module_buffer(key),
+      function_ptr as *mut std::ffi::c_void,
+    )
   }
 }
 
-/// Retrieve a previously published shared state pointer by key from the process-wide registry.
+/// Retrieve a previously registered function pointer by name from the process-wide function
+/// registry. The returned pointer can be cast to the expected function signature and called
+/// directly.
 ///
-/// This takes a read lock internally and is intended for one-time lookups (e.g., during
-/// configuration creation). For repeated per-request reads, prefer [`SharedStateHandle`].
-///
-/// Returns `Some(pointer)` if the shared state was found and non-null, or `None` otherwise.
-/// The returned pointer is owned by the publishing module. The caller must not free it.
+/// Resolution is typically done once during configuration creation (e.g., in
+/// `on_http_filter_config_new`) and the result cached for per-request use.
 ///
 /// This is thread-safe and can be called from any thread.
-pub fn get_shared_state(key: &str) -> Option<*const std::ffi::c_void> {
-  let mut data_out: *const std::ffi::c_void = std::ptr::null();
-  let found = unsafe {
-    abi::envoy_dynamic_module_callback_get_shared_state(str_to_module_buffer(key), &mut data_out)
-  };
+pub fn get_function(key: &str) -> Option<*const std::ffi::c_void> {
+  let mut ptr: *mut std::ffi::c_void = std::ptr::null_mut();
+  let found =
+    unsafe { abi::envoy_dynamic_module_callback_get_function(str_to_module_buffer(key), &mut ptr) };
   if found {
-    Some(data_out)
+    Some(ptr as *const std::ffi::c_void)
   } else {
     None
-  }
-}
-
-/// A handle to a shared state entry for efficient, lock-free reads on the per-request path.
-///
-/// Acquired via [`SharedStateHandle::new`] and automatically released on drop. Use [`get`] to
-/// read the current data pointer without any locking. When the publisher updates the data via
-/// [`publish_shared_state`], the handle will see the new value on the next call to [`get`].
-///
-/// # Example
-///
-/// ```ignore
-/// // During config creation (one-time):
-/// let handle = SharedStateHandle::new("tenant_snapshot").expect("bootstrap should have published");
-///
-/// // Per-request on worker threads (lock-free):
-/// if let Some(ptr) = handle.get() {
-///     let snapshot = unsafe { &*(ptr as *const MySnapshot) };
-///     // Use snapshot...
-/// }
-/// ```
-///
-/// [`get`]: SharedStateHandle::get
-pub struct SharedStateHandle {
-  raw_ptr: abi::envoy_dynamic_module_type_shared_state_handle,
-}
-
-// SAFETY: The handle wraps an Envoy-managed reference to a shared state entry. The underlying
-// data is read via std::atomic on the Envoy side, making it safe to send and share across threads.
-unsafe impl Send for SharedStateHandle {}
-unsafe impl Sync for SharedStateHandle {}
-
-impl SharedStateHandle {
-  /// Acquire a handle for the given key. Returns `None` if no entry exists under the key.
-  ///
-  /// This takes a read lock internally to find the entry. Once acquired, all subsequent reads
-  /// via [`get`] are lock-free.
-  ///
-  /// [`get`]: SharedStateHandle::get
-  pub fn new(key: &str) -> Option<Self> {
-    let handle = unsafe {
-      abi::envoy_dynamic_module_callback_shared_state_handle_new(str_to_module_buffer(key))
-    };
-    if handle.is_null() {
-      None
-    } else {
-      Some(Self { raw_ptr: handle })
-    }
-  }
-
-  /// Read the current data pointer from the handle. This is a lock-free atomic read and is
-  /// suitable for per-request use on worker threads.
-  ///
-  /// Returns `Some(pointer)` if the data is non-null, or `None` if the entry has been cleared.
-  pub fn get(&self) -> Option<*const std::ffi::c_void> {
-    let mut data_out: *const std::ffi::c_void = std::ptr::null();
-    let found = unsafe {
-      abi::envoy_dynamic_module_callback_shared_state_handle_get(self.raw_ptr, &mut data_out)
-    };
-    if found {
-      Some(data_out)
-    } else {
-      None
-    }
-  }
-}
-
-impl Drop for SharedStateHandle {
-  fn drop(&mut self) {
-    unsafe {
-      abi::envoy_dynamic_module_callback_shared_state_handle_delete(self.raw_ptr);
-    }
   }
 }
 

@@ -51,7 +51,7 @@ crate-type = ["cdylib"]
 test = true
 
 [[example]]
-name = "bootstrap_shared_state_test"
-path = "bootstrap_shared_state_test.rs"
+name = "bootstrap_function_registry_test"
+path = "bootstrap_function_registry_test.rs"
 crate-type = ["cdylib"]
 test = true

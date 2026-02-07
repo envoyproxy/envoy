@@ -72,12 +72,12 @@ TEST_P(DynamicModulesBootstrapIntegrationTest, StatsAccessRust) {
       initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_stats_test"));
 }
 
-// This test verifies that the Rust bootstrap extension can publish and retrieve shared state
-// via the process-wide shared state registry.
-TEST_P(DynamicModulesBootstrapIntegrationTest, SharedStateRust) {
+// This test verifies that the Rust bootstrap extension can register and resolve functions
+// via the process-wide function registry.
+TEST_P(DynamicModulesBootstrapIntegrationTest, FunctionRegistryRust) {
   EXPECT_LOG_CONTAINS(
-      "info", "Bootstrap shared state test completed successfully!",
-      initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_shared_state_test"));
+      "info", "Bootstrap function registry test completed successfully!",
+      initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_function_registry_test"));
 }
 
 } // namespace DynamicModules
