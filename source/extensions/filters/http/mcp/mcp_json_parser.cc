@@ -10,7 +10,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Mcp {
 
-using namespace McpConstants;
+using namespace Filters::Common::Mcp::McpConstants;
 
 void McpParserConfig::addMethodConfig(absl::string_view method,
                                       std::vector<AttributeExtractionRule> fields) {
@@ -26,37 +26,47 @@ void McpParserConfig::initializeDefaults() {
   always_extract_.insert("id");
 
   // Tools
-  addMethodConfig(Methods::TOOLS_CALL, {AttributeExtractionRule("params.name")});
+  addMethodConfig(Methods::TOOLS_CALL, {AttributeExtractionRule(std::string(Paths::PARAMS_NAME))});
 
   // Resources.
   addMethodConfig(Methods::RESOURCES_LIST, {});
-  addMethodConfig(Methods::RESOURCES_READ, {AttributeExtractionRule("params.uri")});
-  addMethodConfig(Methods::RESOURCES_SUBSCRIBE, {AttributeExtractionRule("params.uri")});
-  addMethodConfig(Methods::RESOURCES_UNSUBSCRIBE, {AttributeExtractionRule("params.uri")});
+  addMethodConfig(Methods::RESOURCES_READ,
+                  {AttributeExtractionRule(std::string(Paths::PARAMS_URI))});
+  addMethodConfig(Methods::RESOURCES_SUBSCRIBE,
+                  {AttributeExtractionRule(std::string(Paths::PARAMS_URI))});
+  addMethodConfig(Methods::RESOURCES_UNSUBSCRIBE,
+                  {AttributeExtractionRule(std::string(Paths::PARAMS_URI))});
 
   // Prompts.
   addMethodConfig(Methods::PROMPTS_LIST, {});
-  addMethodConfig(Methods::PROMPTS_GET, {AttributeExtractionRule("params.name")});
+  addMethodConfig(Methods::PROMPTS_GET, {AttributeExtractionRule(std::string(Paths::PARAMS_NAME))});
 
   // Completion.
-  addMethodConfig(Methods::COMPLETION_COMPLETE, {AttributeExtractionRule("params.ref")});
+  addMethodConfig(Methods::COMPLETION_COMPLETE,
+                  {AttributeExtractionRule(std::string(Paths::PARAMS_REF))});
 
   // Logging
-  addMethodConfig(Methods::LOGGING_SET_LEVEL, {AttributeExtractionRule("params.level")});
+  addMethodConfig(Methods::LOGGING_SET_LEVEL,
+                  {AttributeExtractionRule(std::string(Paths::PARAMS_LEVEL))});
 
   // Lifecycle
-  addMethodConfig(Methods::INITIALIZE, {AttributeExtractionRule("params.protocolVersion"),
-                                        AttributeExtractionRule("params.clientInfo.name")});
+  addMethodConfig(Methods::INITIALIZE,
+                  {AttributeExtractionRule(std::string(Paths::PARAMS_PROTOCOL_VERSION)),
+                   AttributeExtractionRule(std::string(Paths::PARAMS_CLIENT_INFO_NAME))});
 
   // Notifications.
   addMethodConfig(Methods::NOTIFICATION_INITIALIZED, {});
-  addMethodConfig(Methods::NOTIFICATION_CANCELLED, {AttributeExtractionRule("params.requestId")});
-  addMethodConfig(Methods::NOTIFICATION_PROGRESS, {AttributeExtractionRule("params.progressToken"),
-                                                   AttributeExtractionRule("params.progress")});
-  addMethodConfig(Methods::NOTIFICATION_MESSAGE, {AttributeExtractionRule("params.level")});
+  addMethodConfig(Methods::NOTIFICATION_CANCELLED,
+                  {AttributeExtractionRule(std::string(Paths::PARAMS_REQUEST_ID))});
+  addMethodConfig(Methods::NOTIFICATION_PROGRESS,
+                  {AttributeExtractionRule(std::string(Paths::PARAMS_PROGRESS_TOKEN)),
+                   AttributeExtractionRule(std::string(Paths::PARAMS_PROGRESS))});
+  addMethodConfig(Methods::NOTIFICATION_MESSAGE,
+                  {AttributeExtractionRule(std::string(Paths::PARAMS_LEVEL))});
   addMethodConfig(Methods::NOTIFICATION_ROOTS_LIST_CHANGED, {});
   addMethodConfig(Methods::NOTIFICATION_RESOURCES_LIST_CHANGED, {});
-  addMethodConfig(Methods::NOTIFICATION_RESOURCES_UPDATED, {AttributeExtractionRule("params.uri")});
+  addMethodConfig(Methods::NOTIFICATION_RESOURCES_UPDATED,
+                  {AttributeExtractionRule(std::string(Paths::PARAMS_URI))});
   addMethodConfig(Methods::NOTIFICATION_TOOLS_LIST_CHANGED, {});
   addMethodConfig(Methods::NOTIFICATION_PROMPTS_LIST_CHANGED, {});
 }
@@ -133,8 +143,8 @@ std::string McpParserConfig::getMethodGroup(const std::string& method) const {
 }
 
 std::string McpParserConfig::getBuiltInMethodGroup(const std::string& method) const {
-  using namespace McpConstants::Methods;
-  using namespace McpConstants::MethodGroups;
+  using namespace Methods;
+  using namespace MethodGroups;
 
   // Lifecycle methods
   if (method == INITIALIZE || method == NOTIFICATION_INITIALIZED || method == PING) {
@@ -207,8 +217,8 @@ void McpParserConfig::buildMethodRequirements(
     }
   }
 
-  if (!required_set.contains(std::string(McpConstants::kOptionalMetaField))) {
-    requirements.optional.push_back(std::string(McpConstants::kOptionalMetaField));
+  if (!required_set.contains(std::string(Paths::PARAMS_META))) {
+    requirements.optional.push_back(std::string(Paths::PARAMS_META));
   }
 }
 
@@ -630,7 +640,7 @@ void McpFieldExtractor::copySelectedFields() {
     }
   }
 
-  const std::string meta_field(McpConstants::kOptionalMetaField);
+  const std::string meta_field(Paths::PARAMS_META);
   if (copied_fields.insert(meta_field).second) {
     copyFieldByPath(meta_field);
   }
