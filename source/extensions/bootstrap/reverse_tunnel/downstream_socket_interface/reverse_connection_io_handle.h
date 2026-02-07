@@ -393,7 +393,8 @@ private:
     std::chrono::steady_clock::time_point last_failure_time; // NO_CHECK_FORMAT(real_time)
     std::chrono::steady_clock::time_point backoff_until;     // NO_CHECK_FORMAT(real_time)
     absl::flat_hash_map<std::string, ReverseConnectionState>
-        connection_states; // State tracking per connection
+        connection_states;        // State tracking per connection
+    uint32_t connecting_count{0}; // Number of pending connections.
   };
 
   // Map from host address to connection info.

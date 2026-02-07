@@ -34,8 +34,10 @@ using OnNetworkFilterAboveWriteBufferHighWatermarkType =
 using OnNetworkFilterBelowWriteBufferLowWatermarkType =
     decltype(&envoy_dynamic_module_on_network_filter_below_write_buffer_low_watermark);
 
-// Custom namespace prefix for network filter stats.
-constexpr char NetworkFilterStatsNamespace[] = "dynamic_module_network_filter";
+// The default custom stat namespace which prepends all user-defined metrics.
+// Note that the prefix is removed from the final output of ``/stats`` endpoints.
+// This can be overridden via the ``metrics_namespace`` field in ``DynamicModuleConfig``.
+constexpr absl::string_view DefaultMetricsNamespace = "dynamicmodulescustom";
 
 class DynamicModuleNetworkFilterConfig;
 using DynamicModuleNetworkFilterConfigSharedPtr = std::shared_ptr<DynamicModuleNetworkFilterConfig>;
@@ -56,6 +58,7 @@ public:
    * Constructor for the config. Symbol resolution is done in newDynamicModuleNetworkFilterConfig().
    * @param filter_name the name of the filter.
    * @param filter_config the configuration for the module.
+   * @param metrics_namespace the namespace prefix for metrics.
    * @param dynamic_module the dynamic module to use.
    * @param cluster_manager the cluster manager for async HTTP callouts.
    * @param stats_scope the stats scope for metrics.
@@ -63,6 +66,7 @@ public:
    */
   DynamicModuleNetworkFilterConfig(const absl::string_view filter_name,
                                    const absl::string_view filter_config,
+                                   const absl::string_view metrics_namespace,
                                    DynamicModulePtr dynamic_module,
                                    Envoy::Upstream::ClusterManager& cluster_manager,
                                    Stats::Scope& stats_scope,
@@ -185,6 +189,7 @@ private:
   friend absl::StatusOr<std::shared_ptr<DynamicModuleNetworkFilterConfig>>
   newDynamicModuleNetworkFilterConfig(const absl::string_view filter_name,
                                       const absl::string_view filter_config,
+                                      const absl::string_view metrics_namespace,
                                       DynamicModulePtr dynamic_module,
                                       Envoy::Upstream::ClusterManager& cluster_manager,
                                       Stats::Scope& stats_scope,
@@ -234,6 +239,7 @@ private:
  * Creates a new DynamicModuleNetworkFilterConfig for given configuration.
  * @param filter_name the name of the filter.
  * @param filter_config the configuration for the module.
+ * @param metrics_namespace the namespace prefix for metrics emitted by this module.
  * @param dynamic_module the dynamic module to use.
  * @param cluster_manager the cluster manager for async HTTP callouts.
  * @param stats_scope the stats scope for metrics.
@@ -242,6 +248,7 @@ private:
  */
 absl::StatusOr<DynamicModuleNetworkFilterConfigSharedPtr> newDynamicModuleNetworkFilterConfig(
     const absl::string_view filter_name, const absl::string_view filter_config,
+    const absl::string_view metrics_namespace,
     Extensions::DynamicModules::DynamicModulePtr dynamic_module,
     Envoy::Upstream::ClusterManager& cluster_manager, Stats::Scope& stats_scope,
     Event::Dispatcher& main_thread_dispatcher);

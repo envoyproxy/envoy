@@ -210,6 +210,10 @@ Http::FilterDataStatus McpFilter::decodeData(Buffer::Instance& data, bool end_st
   if (end_stream || size_limit_hit) {
     auto final_status = parser_->finishParse();
     if (!final_status.ok()) {
+      if (size_limit_hit && parser_->hasOptionalFields() && parser_->hasAllRequiredFields()) {
+        ENVOY_LOG(debug, "size limit hit before optional fields; proceeding with partial parse");
+        return completeParsing();
+      }
       config_->stats().body_too_large_.inc();
       handleParseError("reached end_stream or configured body size, don't get enough data.");
       return Http::FilterDataStatus::StopIterationNoBuffer;

@@ -66,7 +66,7 @@ envoy_cc_library(
         "//source/common/stats:timespan_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/common/tracing:http_tracer_lib",
-        "@com_google_absl//absl/types:any",
+        "@abseil-cpp//absl/types:any",
     ],
 )
 
@@ -117,7 +117,7 @@ envoy_cc_library(
         "//envoy/buffer:buffer_interface",
         "//source/common/common:macros",
         "//source/common/http:header_map_lib",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
         "@envoy_api//contrib/envoy/extensions/filters/network/sip_proxy/v3alpha:pkg_cc_proto",
     ],
 )
@@ -149,7 +149,7 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/common/protobuf",
         "//source/common/singleton:const_singleton",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
         "@envoy_api//contrib/envoy/extensions/filters/network/sip_proxy/tra/v3alpha:pkg_cc_proto",
         "@envoy_api//contrib/envoy/extensions/filters/network/sip_proxy/v3alpha:pkg_cc_proto",
     ],
