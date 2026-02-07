@@ -504,7 +504,11 @@ TEST_F(StatsThreadLocalStoreTest, StatsNumLimitsWithEviction) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
 
-  ScopeSharedPtr scope = store_->createScope("scope.", true, {1, 1, 1});
+  EvictionSettings settings;
+  settings.evict_counters = true;
+  settings.evict_gauges = true;
+  settings.evict_histograms = true;
+  ScopeSharedPtr scope = store_->createScope("scope.", settings, {1, 1, 1});
   EXPECT_EQ(0, TestUtility::findCounter(*store_, "server.stats_overflow.counter")->value());
   EXPECT_EQ(0, TestUtility::findCounter(*store_, "server.stats_overflow.gauge")->value());
   EXPECT_EQ(0, TestUtility::findCounter(*store_, "server.stats_overflow.histogram")->value());
