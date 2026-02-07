@@ -205,7 +205,7 @@ pkg_files(
 
 pkg_files(
     name = "repo_configs",
-    srcs = ["//configs"],
+    srcs = ["//configs:files"],
     prefix = "_configs/repo",
     strip_prefix = "/configs",
 )

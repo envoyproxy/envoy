@@ -66,6 +66,9 @@ jobs:
           rbe: true
           runs-on: ${{ vars.ENVOY_ARM_VM || 'ubuntu-24.04-arm' }}
           timeout-minutes: 180
+        - target: config
+          name: Config
+          rbe: true
         - target: docs
           name: Docs
           bazel-extra: >-
