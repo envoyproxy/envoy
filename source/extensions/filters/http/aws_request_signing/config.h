@@ -29,11 +29,11 @@ public:
       const AwsRequestSigningProtoConfig& proto_config, const std::string& stats_prefix,
       Server::Configuration::ServerFactoryContext& server_context, Stats::Scope& scope) const;
 
+private:
   absl::StatusOr<Envoy::Extensions::Common::Aws::SignerPtr>
   createSigner(const AwsRequestSigningProtoConfig& config,
                Server::Configuration::ServerFactoryContext& server_context) const;
 
-private:
   absl::StatusOr<Http::FilterFactoryCb>
   createFilterFactoryFromProtoTyped(const AwsRequestSigningProtoConfig& proto_config,
                                     const std::string& stats_prefix, DualInfo dual_info,
