@@ -488,6 +488,48 @@ bool envoy_dynamic_module_callback_log_enabled(envoy_dynamic_module_type_log_lev
  */
 uint32_t envoy_dynamic_module_callback_get_concurrency();
 
+// ----------------------------- Function Registry -----------------------------
+
+/**
+ * envoy_dynamic_module_callback_register_function registers an opaque function pointer under the
+ * given key in the process-wide function registry. This allows modules loaded in the same process
+ * to expose functions that other modules can resolve by name and call directly, enabling zero-copy
+ * cross-module interactions.
+ *
+ * Registration is typically done once during bootstrap (e.g., in on_server_initialized). The
+ * function pointer must remain valid for the lifetime of the process.
+ *
+ * Callers are responsible for agreeing on the function signature out-of-band, since the registry
+ * stores opaque void* pointers — analogous to dlsym semantics.
+ *
+ * This is thread-safe and can be called from any thread.
+ *
+ * @param key is the name to register the function under.
+ * @param function_ptr is the function pointer to register. Must not be nullptr.
+ * @return true if registered successfully, false if a function is already registered under key or
+ *         function_ptr is nullptr.
+ */
+bool envoy_dynamic_module_callback_register_function(envoy_dynamic_module_type_module_buffer key,
+                                                     void* function_ptr);
+
+/**
+ * envoy_dynamic_module_callback_get_function retrieves a previously registered function pointer by
+ * key from the process-wide function registry. The returned pointer can be cast to the expected
+ * function signature and called directly.
+ *
+ * Resolution is typically done once during configuration creation (e.g., in
+ * on_http_filter_config_new) and the result cached for per-request use.
+ *
+ * This is thread-safe and can be called from any thread.
+ *
+ * @param key is the name of the function to retrieve.
+ * @param function_ptr_out is a pointer to a variable where the function pointer will be stored.
+ *                         This is only written to if the function returns true.
+ * @return true if a function was found under the given key, false otherwise.
+ */
+bool envoy_dynamic_module_callback_get_function(envoy_dynamic_module_type_module_buffer key,
+                                                void** function_ptr_out);
+
 // =============================================================================
 // ============================== HTTP Filter ==================================
 // =============================================================================

@@ -4,7 +4,6 @@
 #include <string.h>
 
 #include "source/extensions/dynamic_modules/abi/abi.h"
-#include "source/extensions/dynamic_modules/abi/abi_version.h"
 
 // Test load balancer that exercises all callback functions for coverage.
 
@@ -17,7 +16,7 @@ typedef struct {
 static int config_marker = 0;
 
 envoy_dynamic_module_type_abi_version_module_ptr envoy_dynamic_module_on_program_init(void) {
-  return kAbiVersion;
+  return envoy_dynamic_modules_abi_version;
 }
 
 envoy_dynamic_module_type_lb_config_module_ptr envoy_dynamic_module_on_lb_config_new(
