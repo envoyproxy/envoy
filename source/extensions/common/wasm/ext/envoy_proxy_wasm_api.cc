@@ -29,9 +29,7 @@ EnvoyRootContext* getEnvoyRootContext(uint32_t context_id) {
   return static_cast<EnvoyRootContext*>(context_base->asRoot());
 }
 
-extern "C" PROXY_WASM_KEEPALIVE bool HaveOffsetConverter() {
-  return true;
-}
+extern "C" PROXY_WASM_KEEPALIVE bool HaveOffsetConverter() { return true; }
 
 extern "C" PROXY_WASM_KEEPALIVE void envoy_on_resolve_dns(uint32_t context_id, uint32_t token,
                                                           uint32_t data_size) {

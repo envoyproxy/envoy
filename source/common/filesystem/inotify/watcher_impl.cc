@@ -1,3 +1,5 @@
+#include "source/common/filesystem/watcher_impl.h"
+
 #include <sys/inotify.h>
 
 #include <cstdint>
@@ -12,7 +14,6 @@
 #include "source/common/common/fmt.h"
 #include "source/common/common/thread.h"
 #include "source/common/common/utility.h"
-#include "source/common/filesystem/watcher_impl.h"
 
 namespace Envoy {
 namespace Filesystem {
