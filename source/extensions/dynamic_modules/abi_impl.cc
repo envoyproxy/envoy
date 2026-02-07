@@ -20,8 +20,7 @@ namespace {
 // Process-wide function registry. Modules register function pointers by name during bootstrap,
 // and other modules resolve them by name during configuration creation.
 absl::Mutex function_registry_mutex;
-absl::flat_hash_map<std::string, void*>
-    function_registry ABSL_GUARDED_BY(function_registry_mutex);
+absl::flat_hash_map<std::string, void*> function_registry ABSL_GUARDED_BY(function_registry_mutex);
 
 } // namespace
 
@@ -70,8 +69,8 @@ uint32_t envoy_dynamic_module_callback_get_concurrency() {
 
 // ---------------------- Function registry callbacks --------------------------------
 
-bool envoy_dynamic_module_callback_register_function(
-    envoy_dynamic_module_type_module_buffer key, void* function_ptr) {
+bool envoy_dynamic_module_callback_register_function(envoy_dynamic_module_type_module_buffer key,
+                                                     void* function_ptr) {
   if (function_ptr == nullptr) {
     return false;
   }

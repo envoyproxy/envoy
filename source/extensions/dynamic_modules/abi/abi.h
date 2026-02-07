@@ -509,8 +509,8 @@ uint32_t envoy_dynamic_module_callback_get_concurrency();
  * @return true if registered successfully, false if a function is already registered under key or
  *         function_ptr is nullptr.
  */
-bool envoy_dynamic_module_callback_register_function(
-    envoy_dynamic_module_type_module_buffer key, void* function_ptr);
+bool envoy_dynamic_module_callback_register_function(envoy_dynamic_module_type_module_buffer key,
+                                                     void* function_ptr);
 
 /**
  * envoy_dynamic_module_callback_get_function retrieves a previously registered function pointer by

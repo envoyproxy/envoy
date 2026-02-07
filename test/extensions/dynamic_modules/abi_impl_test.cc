@@ -110,8 +110,7 @@ TEST(CommonAbiImplTest, FunctionRegistryRegisterAndGet) {
   auto fn = [](int x) { return x + 1; };
   envoy_dynamic_module_type_module_buffer key = {"fn_basic", 8};
 
-  EXPECT_TRUE(envoy_dynamic_module_callback_register_function(
-      key, reinterpret_cast<void*>(+fn)));
+  EXPECT_TRUE(envoy_dynamic_module_callback_register_function(key, reinterpret_cast<void*>(+fn)));
 
   void* fn_out = nullptr;
   EXPECT_TRUE(envoy_dynamic_module_callback_get_function(key, &fn_out));
@@ -146,12 +145,10 @@ TEST(CommonAbiImplTest, FunctionRegistryDuplicateRegistration) {
   auto fn2 = [](int x) { return x * 2; };
   envoy_dynamic_module_type_module_buffer key = {"fn_dup", 6};
 
-  EXPECT_TRUE(envoy_dynamic_module_callback_register_function(
-      key, reinterpret_cast<void*>(+fn1)));
+  EXPECT_TRUE(envoy_dynamic_module_callback_register_function(key, reinterpret_cast<void*>(+fn1)));
 
   // Second registration under the same key should fail.
-  EXPECT_FALSE(envoy_dynamic_module_callback_register_function(
-      key, reinterpret_cast<void*>(+fn2)));
+  EXPECT_FALSE(envoy_dynamic_module_callback_register_function(key, reinterpret_cast<void*>(+fn2)));
 
   // The original function should still be registered.
   void* fn_out = nullptr;
@@ -167,10 +164,10 @@ TEST(CommonAbiImplTest, FunctionRegistryMultipleKeys) {
   envoy_dynamic_module_type_module_buffer key_a = {"fn_multi_a", 10};
   envoy_dynamic_module_type_module_buffer key_b = {"fn_multi_b", 10};
 
-  EXPECT_TRUE(envoy_dynamic_module_callback_register_function(
-      key_a, reinterpret_cast<void*>(+fn_a)));
-  EXPECT_TRUE(envoy_dynamic_module_callback_register_function(
-      key_b, reinterpret_cast<void*>(+fn_b)));
+  EXPECT_TRUE(
+      envoy_dynamic_module_callback_register_function(key_a, reinterpret_cast<void*>(+fn_a)));
+  EXPECT_TRUE(
+      envoy_dynamic_module_callback_register_function(key_b, reinterpret_cast<void*>(+fn_b)));
 
   void* out_a = nullptr;
   void* out_b = nullptr;
