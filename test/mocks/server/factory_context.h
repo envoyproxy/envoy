@@ -5,12 +5,13 @@
 #include "source/common/router/context_impl.h"
 #include "source/common/tls/context_manager_impl.h"
 
-#include "admin.h"
-#include "drain_manager.h"
+#include "test/mocks/server/admin.h"
+#include "test/mocks/server/drain_manager.h"
+#include "test/mocks/server/instance.h"
+#include "test/mocks/server/overload_manager.h"
+#include "test/mocks/server/server_lifecycle_notifier.h"
+
 #include "gmock/gmock.h"
-#include "instance.h"
-#include "overload_manager.h"
-#include "server_lifecycle_notifier.h"
 
 namespace Envoy {
 namespace Server {

@@ -432,6 +432,32 @@ case $CI_TARGET in
         collect_build_profile build
         ;;
 
+    config)
+        setup_clang_toolchain
+        if [[ -z "$ENVOY_SKIP_CONFIGS_STATIC" ]]; then
+            echo "running static config validation"
+            bazel run "${BAZEL_BUILD_OPTIONS[@]}" @envoy//test/config_test:static_config_validation
+        fi
+
+        ENVOY_CONFIG_CONTRIB_LIB="${ENVOY_CONFIG_CONTRIB_LIB:-@envoy//contrib:contrib_test_lib}"
+        ENVOY_CONFIGS_CORE="${ENVOY_CONFIGS_CORE:-//docs/config_test:configs}"
+        ENVOY_CONFIGS_CONTRIB="${ENVOY_CONFIGS_CONTRIB:-//docs/config_test:contrib_configs}"
+
+        if [[ -z "$ENVOY_SKIP_CORE_CONFIGS" ]]; then
+            echo "validating core configs..."
+            bazel test "${BAZEL_BUILD_OPTIONS[@]}" \
+                  @envoy//test/config_test \
+                  --@envoy//test/config_test:configs="$ENVOY_CONFIGS_CORE"
+        fi
+        if [[ -z "$ENVOY_SKIP_CONTRIB_CONFIGS" ]]; then
+             echo "validating contrib configs..."
+             bazel test "${BAZEL_BUILD_OPTIONS[@]}" \
+                   @envoy//test/config_test \
+                   --@envoy//test/config_test:configs="$ENVOY_CONFIGS_CONTRIB" \
+                   --@envoy//test/config_test:test_lib="$ENVOY_CONFIG_CONTRIB_LIB"
+        fi
+        ;;
+
     coverage|fuzz_coverage)
         setup_clang_toolchain
         echo "${CI_TARGET} build with tests ${COVERAGE_TEST_TARGETS[*]}"

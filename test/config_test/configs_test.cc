@@ -10,8 +10,7 @@
 namespace Envoy {
 
 TEST(ExampleConfigsTest, All) {
-  TestEnvironment::exec(
-      {TestEnvironment::runfilesPath("test/config_test/example_configs_test_setup.sh")});
+  TestEnvironment::exec({TestEnvironment::runfilesPath("test/config_test/configs_test_setup.sh")});
   Filesystem::InstanceImpl file_system;
   const auto config_file_count = std::stoi(
       file_system.fileReadToEnd(TestEnvironment::temporaryDirectory() + "/config-file-count.txt")

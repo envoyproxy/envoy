@@ -19,6 +19,7 @@ namespace {
 using ::testing::HasSubstr;
 using ::testing::IsEmpty;
 using ::testing::Not;
+using namespace Filters::Common::Mcp::McpConstants;
 
 class McpJsonParserTest : public testing::Test {
 protected:
@@ -84,7 +85,7 @@ TEST_F(McpJsonParserTest, ToolsCallExtraction) {
   EXPECT_OK(parser_->parse(json));
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
-  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::TOOLS_CALL);
+  EXPECT_EQ(parser_->getMethod(), Methods::TOOLS_CALL);
 
   // Check extracted metadata contains params.name
   const auto* value = parser_->getNestedValue("params.name");
@@ -102,7 +103,7 @@ TEST_F(McpJsonParserTest, ResourcesListExtraction) {
   EXPECT_OK(parser_->parse(json));
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
-  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::RESOURCES_LIST);
+  EXPECT_EQ(parser_->getMethod(), Methods::RESOURCES_LIST);
 }
 
 TEST_F(McpJsonParserTest, ResourcesReadExtraction) {
@@ -118,7 +119,7 @@ TEST_F(McpJsonParserTest, ResourcesReadExtraction) {
   EXPECT_OK(parser_->parse(json));
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
-  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::RESOURCES_READ);
+  EXPECT_EQ(parser_->getMethod(), Methods::RESOURCES_READ);
 
   const auto* value = parser_->getNestedValue("params.uri");
   ASSERT_NE(value, nullptr);
@@ -138,7 +139,7 @@ TEST_F(McpJsonParserTest, ResourcesSubscribeExtraction) {
   EXPECT_OK(parser_->parse(json));
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
-  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::RESOURCES_SUBSCRIBE);
+  EXPECT_EQ(parser_->getMethod(), Methods::RESOURCES_SUBSCRIBE);
 
   const auto* value = parser_->getNestedValue("params.uri");
   ASSERT_NE(value, nullptr);
@@ -158,7 +159,7 @@ TEST_F(McpJsonParserTest, ResourcesUnsubscribeExtraction) {
   EXPECT_OK(parser_->parse(json));
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
-  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::RESOURCES_UNSUBSCRIBE);
+  EXPECT_EQ(parser_->getMethod(), Methods::RESOURCES_UNSUBSCRIBE);
 
   const auto* value = parser_->getNestedValue("params.uri");
   ASSERT_NE(value, nullptr);
@@ -175,7 +176,7 @@ TEST_F(McpJsonParserTest, PromptsListExtraction) {
   EXPECT_OK(parser_->parse(json));
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
-  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::PROMPTS_LIST);
+  EXPECT_EQ(parser_->getMethod(), Methods::PROMPTS_LIST);
 }
 
 TEST_F(McpJsonParserTest, PromptsGetExtraction) {
@@ -195,7 +196,7 @@ TEST_F(McpJsonParserTest, PromptsGetExtraction) {
   parseJson(json);
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
-  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::PROMPTS_GET);
+  EXPECT_EQ(parser_->getMethod(), Methods::PROMPTS_GET);
 
   const auto* value = parser_->getNestedValue("params.name");
   ASSERT_NE(value, nullptr);
@@ -222,7 +223,7 @@ TEST_F(McpJsonParserTest, CompletionCompleteExtraction) {
   parseJson(json);
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
-  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::COMPLETION_COMPLETE);
+  EXPECT_EQ(parser_->getMethod(), Methods::COMPLETION_COMPLETE);
 
   // Verify that params.ref object was extracted
   const auto* ref = parser_->getNestedValue("params.ref");
@@ -264,7 +265,7 @@ TEST_F(McpJsonParserTest, InitializeExtraction) {
   parseJson(json);
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
-  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::INITIALIZE);
+  EXPECT_EQ(parser_->getMethod(), Methods::INITIALIZE);
 
   const auto* version_value = parser_->getNestedValue("params.protocolVersion");
   ASSERT_NE(version_value, nullptr);
@@ -288,7 +289,7 @@ TEST_F(McpJsonParserTest, NotificationProgressExtraction) {
   parseJson(json);
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
-  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::NOTIFICATION_PROGRESS);
+  EXPECT_EQ(parser_->getMethod(), Methods::NOTIFICATION_PROGRESS);
 
   const auto* token = parser_->getNestedValue("params.progressToken");
   ASSERT_NE(token, nullptr);
@@ -312,7 +313,7 @@ TEST_F(McpJsonParserTest, NotificationCancelledExtraction) {
   parseJson(json);
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
-  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::NOTIFICATION_CANCELLED);
+  EXPECT_EQ(parser_->getMethod(), Methods::NOTIFICATION_CANCELLED);
 
   const auto* request_id = parser_->getNestedValue("params.requestId");
   ASSERT_NE(request_id, nullptr);
@@ -349,7 +350,7 @@ TEST_F(McpJsonParserTest, PartialParsingSingleChunk) {
   EXPECT_OK(status3); // Complete now
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
-  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::TOOLS_CALL);
+  EXPECT_EQ(parser_->getMethod(), Methods::TOOLS_CALL);
 
   const auto* value = parser_->getNestedValue("params.name");
   ASSERT_NE(value, nullptr);
@@ -371,7 +372,7 @@ TEST_F(McpJsonParserTest, PartialParsingMidString) {
   ASSERT_TRUE(parser_->finishParse().ok());
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
-  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::RESOURCES_READ);
+  EXPECT_EQ(parser_->getMethod(), Methods::RESOURCES_READ);
 
   const auto* value = parser_->getNestedValue("params.uri");
   ASSERT_NE(value, nullptr);
@@ -413,7 +414,7 @@ TEST_F(McpJsonParserTest, EarlyTerminationToolsCall) {
   parseJson(json);
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
-  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::TOOLS_CALL);
+  EXPECT_EQ(parser_->getMethod(), Methods::TOOLS_CALL);
 
   // Should have extracted params.name
   const auto* name = parser_->getNestedValue("params.name");
@@ -441,7 +442,7 @@ TEST_F(McpJsonParserTest, EarlyTerminationWithUnorderedFields) {
   parseJson(json);
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
-  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::RESOURCES_READ);
+  EXPECT_EQ(parser_->getMethod(), Methods::RESOURCES_READ);
 
   // Should have extracted params.uri
   const auto* uri = parser_->getNestedValue("params.uri");
@@ -504,7 +505,7 @@ TEST_F(McpJsonParserTest, DeeplyNestedStructures) {
   parseJson(json);
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
-  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::COMPLETION_COMPLETE);
+  EXPECT_EQ(parser_->getMethod(), Methods::COMPLETION_COMPLETE);
 }
 
 TEST_F(McpJsonParserTest, InvalidJson) {
@@ -561,7 +562,7 @@ TEST_F(McpJsonParserTest, NumericValues) {
   parseJson(json);
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
-  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::LOGGING_SET_LEVEL);
+  EXPECT_EQ(parser_->getMethod(), Methods::LOGGING_SET_LEVEL);
 
   const auto* level = parser_->getNestedValue("params.level");
   ASSERT_NE(level, nullptr);
@@ -590,7 +591,7 @@ TEST_F(McpJsonParserTest, ResetAndReuse) {
   parseJson(json1);
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
-  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::TOOLS_CALL);
+  EXPECT_EQ(parser_->getMethod(), Methods::TOOLS_CALL);
 
   const auto* name1 = parser_->getNestedValue("params.name");
   ASSERT_NE(name1, nullptr);
@@ -604,7 +605,7 @@ TEST_F(McpJsonParserTest, ResetAndReuse) {
   parseJson(json2);
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
-  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::RESOURCES_READ);
+  EXPECT_EQ(parser_->getMethod(), Methods::RESOURCES_READ);
 
   const auto* uri = parser_->getNestedValue("params.uri");
   ASSERT_NE(uri, nullptr);
@@ -623,7 +624,7 @@ TEST_F(McpJsonParserTest, CustomFieldExtraction) {
       McpParserConfig::AttributeExtractionRule("params.custom_field"),
       McpParserConfig::AttributeExtractionRule("params.metadata.version")};
 
-  custom_config.addMethodConfig(McpConstants::Methods::TOOLS_CALL, rules);
+  custom_config.addMethodConfig(Methods::TOOLS_CALL, rules);
 
   auto custom_parser = std::make_unique<McpJsonParser>(custom_config);
 
@@ -669,7 +670,7 @@ TEST_F(McpJsonParserTest, OptionalFieldConfigDetection) {
   std::vector<McpParserConfig::AttributeExtractionRule> rules = {
       McpParserConfig::AttributeExtractionRule("params.name")};
 
-  custom_config.addMethodConfig(McpConstants::Methods::TOOLS_CALL, rules);
+  custom_config.addMethodConfig(Methods::TOOLS_CALL, rules);
 
   auto parser = std::make_unique<McpJsonParser>(custom_config);
 
@@ -695,7 +696,7 @@ TEST_F(McpJsonParserTest, EarlyStopWithMetaAsRequiredField) {
       McpParserConfig::AttributeExtractionRule("params.name"),
       McpParserConfig::AttributeExtractionRule("params._meta") // _meta as required
   };
-  custom_config.addMethodConfig(McpConstants::Methods::TOOLS_CALL, rules);
+  custom_config.addMethodConfig(Methods::TOOLS_CALL, rules);
 
   auto parser = std::make_unique<McpJsonParser>(custom_config);
 
@@ -789,14 +790,14 @@ TEST_F(McpJsonParserTest, BooleanValues) {
       McpParserConfig::AttributeExtractionRule("params.subscribe"),
   };
 
-  custom_config.addMethodConfig(McpConstants::Methods::RESOURCES_SUBSCRIBE, rules);
+  custom_config.addMethodConfig(Methods::RESOURCES_SUBSCRIBE, rules);
 
   auto parser = std::make_unique<McpJsonParser>(custom_config);
 
   EXPECT_OK(parser->parse(json));
 
   EXPECT_TRUE(parser->isValidMcpRequest());
-  EXPECT_EQ(parser->getMethod(), McpConstants::Methods::RESOURCES_SUBSCRIBE);
+  EXPECT_EQ(parser->getMethod(), Methods::RESOURCES_SUBSCRIBE);
 
   const auto* subscribe = parser->getNestedValue("params.subscribe");
   ASSERT_NE(subscribe, nullptr);
@@ -824,7 +825,7 @@ TEST_F(McpJsonParserTest, LargePayload) {
   parseJson(json);
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
-  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::TOOLS_CALL);
+  EXPECT_EQ(parser_->getMethod(), Methods::TOOLS_CALL);
 
   // Should have only extracted params.name
   const auto* name = parser_->getNestedValue("params.name");
@@ -1001,7 +1002,7 @@ TEST_F(McpJsonParserTest, FloatingPointValues) {
   std::vector<McpParserConfig::AttributeExtractionRule> rules = {
       McpParserConfig::AttributeExtractionRule("params.level"),
       McpParserConfig::AttributeExtractionRule("params.other")};
-  custom_config.addMethodConfig(McpConstants::Methods::LOGGING_SET_LEVEL, rules);
+  custom_config.addMethodConfig(Methods::LOGGING_SET_LEVEL, rules);
 
   auto parser = std::make_unique<McpJsonParser>(custom_config);
 
@@ -1122,7 +1123,7 @@ TEST_F(McpJsonParserTest, ArrayWithNestedObjectsAndStrings) {
   parseJson(json);
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
-  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::TOOLS_CALL);
+  EXPECT_EQ(parser_->getMethod(), Methods::TOOLS_CALL);
 
   // Should extract params.name
   const auto* name = parser_->getNestedValue("params.name");
@@ -1147,7 +1148,7 @@ TEST_F(McpJsonParserTest, JsonRpcBeforeMethod) {
   parseJson(json);
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
-  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::TOOLS_CALL);
+  EXPECT_EQ(parser_->getMethod(), Methods::TOOLS_CALL);
 }
 
 TEST_F(McpJsonParserTest, BoolInArrayAndAfterEarlyStop) {
@@ -1262,7 +1263,7 @@ TEST_F(McpJsonParserTest, MethodBeforeJsonRpc) {
   parseJson(json);
 
   EXPECT_TRUE(parser_->isValidMcpRequest());
-  EXPECT_EQ(parser_->getMethod(), McpConstants::Methods::TOOLS_CALL);
+  EXPECT_EQ(parser_->getMethod(), Methods::TOOLS_CALL);
 
   const auto* name = parser_->getNestedValue("params.name");
   ASSERT_NE(name, nullptr);

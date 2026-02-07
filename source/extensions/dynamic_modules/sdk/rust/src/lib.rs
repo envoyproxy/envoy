@@ -66,7 +66,7 @@ macro_rules! declare_init_functions {
       envoy_proxy_dynamic_modules_rust_sdk::NEW_HTTP_FILTER_PER_ROUTE_CONFIG_FUNCTION
         .get_or_init(|| $new_http_filter_per_route_config_fn);
       if ($f()) {
-        envoy_proxy_dynamic_modules_rust_sdk::abi::kAbiVersion.as_ptr()
+        envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
           as *const ::std::os::raw::c_char
       } else {
         ::std::ptr::null()
@@ -79,7 +79,7 @@ macro_rules! declare_init_functions {
       envoy_proxy_dynamic_modules_rust_sdk::NEW_HTTP_FILTER_CONFIG_FUNCTION
         .get_or_init(|| $new_http_filter_config_fn);
       if ($f()) {
-        envoy_proxy_dynamic_modules_rust_sdk::abi::kAbiVersion.as_ptr()
+        envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
           as *const ::std::os::raw::c_char
       } else {
         ::std::ptr::null()
@@ -3876,7 +3876,7 @@ macro_rules! declare_network_filter_init_functions {
       envoy_proxy_dynamic_modules_rust_sdk::NEW_NETWORK_FILTER_CONFIG_FUNCTION
         .get_or_init(|| $new_network_filter_config_fn);
       if ($f()) {
-        envoy_proxy_dynamic_modules_rust_sdk::abi::kAbiVersion.as_ptr()
+        envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
           as *const ::std::os::raw::c_char
       } else {
         ::std::ptr::null()
@@ -3937,7 +3937,7 @@ macro_rules! declare_all_init_functions {
       envoy_proxy_dynamic_modules_rust_sdk::NEW_NETWORK_FILTER_CONFIG_FUNCTION
         .get_or_init(|| $new_network_filter_config_fn);
       if ($f(server_factory_context_ptr)) {
-        envoy_proxy_dynamic_modules_rust_sdk::abi::kAbiVersion.as_ptr()
+        envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
           as *const ::std::os::raw::c_char
       } else {
         ::std::ptr::null()
@@ -5740,7 +5740,7 @@ macro_rules! declare_listener_filter_init_functions {
       envoy_proxy_dynamic_modules_rust_sdk::NEW_LISTENER_FILTER_CONFIG_FUNCTION
         .get_or_init(|| $new_listener_filter_config_fn);
       if ($f(server_factory_context_ptr)) {
-        envoy_proxy_dynamic_modules_rust_sdk::abi::kAbiVersion.as_ptr()
+        envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
           as *const ::std::os::raw::c_char
       } else {
         ::std::ptr::null()
@@ -6724,7 +6724,7 @@ macro_rules! declare_udp_listener_filter_init_functions {
       envoy_proxy_dynamic_modules_rust_sdk::NEW_UDP_LISTENER_FILTER_CONFIG_FUNCTION
         .get_or_init(|| $new_udp_listener_filter_config_fn);
       if ($f()) {
-        envoy_proxy_dynamic_modules_rust_sdk::abi::kAbiVersion.as_ptr()
+        envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
           as *const ::std::os::raw::c_char
       } else {
         ::std::ptr::null()
@@ -7840,7 +7840,7 @@ macro_rules! declare_bootstrap_init_functions {
       envoy_proxy_dynamic_modules_rust_sdk::NEW_BOOTSTRAP_EXTENSION_CONFIG_FUNCTION
         .get_or_init(|| $new_bootstrap_extension_config_fn);
       if ($f()) {
-        envoy_proxy_dynamic_modules_rust_sdk::abi::kAbiVersion.as_ptr()
+        envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
           as *const ::std::os::raw::c_char
       } else {
         ::std::ptr::null()

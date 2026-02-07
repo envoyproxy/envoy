@@ -94,6 +94,13 @@ bug_fixes:
   change: |
     Fixed the log formatter in HTTP router upstream logs by correctly setting the downstream connection's
     ``ConnectionInfoProvider`` in the ``StreamInfo``.
+- area: spiffe
+  change: |
+    Reduce the number of the file watches needed by :ref:`trust_bundles
+    <envoy_v3_api_field_extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig.trust_bundles>` when the validator
+    is used in multiple places. Add support for :ref:`watched_directory
+    <envoy_v3_api_field_config.core.v3.datasource.watched_directory>` to support Kubernetes environments that rely on
+    atomic symbolic file updates.  Add content hashing during file watching to handle excessive watch notifications.
 - area: odcds
   change: |
     Fixed a crash (SIGABRT) when destroying OdCDS handles on worker threads. The handle no longer holds
@@ -129,6 +136,12 @@ new_features:
     Added support for fetching certificates on-demand via SDS in the upstream TLS transport socket
     using the extension :ref:`on-demand certificate selector
     <extension_envoy.tls.certificate_selectors.on_demand_secret>`.
+- area: dynamic modules
+  change: |
+    Introduced the extended ABI forward compatibility mechanism for dynamic modules
+    where modules built with a SDK version can be loaded by Envoy
+    binaries of the next Envoy version. For example, A module built with the v1.38 SDK
+    can now be loaded by an Envoy binary of v1.39.
 - area: mcp_router
   change: |
     Added support for MCP resource methods ``resources/list``, ``resources/read``,
