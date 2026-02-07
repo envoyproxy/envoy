@@ -18,7 +18,6 @@ import (
 	"sync"
 	"unsafe"
 
-	cabi "github.com/envoyproxy/envoy/source/extensions/dynamic_modules/abi"
 	sdk "github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go"
 	"github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go/shared"
 )
@@ -1103,8 +1102,7 @@ func (h *dymRouteConfigHandle) DefineCounter(name string,
 
 //export envoy_dynamic_module_on_program_init
 func envoy_dynamic_module_on_program_init() C.envoy_dynamic_module_type_abi_version_module_ptr {
-	return C.envoy_dynamic_module_type_abi_version_module_ptr(
-		unsafe.Pointer(unsafe.StringData(cabi.AbiHeaderVersion)))
+	return C.envoy_dynamic_module_type_abi_version_module_ptr(C.envoy_dynamic_modules_abi_version)
 }
 
 //export envoy_dynamic_module_on_http_filter_config_new
