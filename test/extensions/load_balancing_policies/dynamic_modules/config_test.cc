@@ -178,6 +178,8 @@ protected:
   }
 
   void SetUp() override {
+    ON_CALL(cluster_info_, name()).WillByDefault(ReturnRef(cluster_name_));
+
     // Set up mock hosts.
     host1_ = std::make_shared<NiceMock<Upstream::MockHost>>();
     host2_ = std::make_shared<NiceMock<Upstream::MockHost>>();
@@ -217,6 +219,7 @@ protected:
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Random::MockRandomGenerator> random_;
   Event::SimulatedTimeSystem time_source_;
+  const std::string cluster_name_{"test_cluster"};
 
   std::shared_ptr<NiceMock<Upstream::MockHost>> host1_;
   std::shared_ptr<NiceMock<Upstream::MockHost>> host2_;
@@ -586,6 +589,12 @@ TEST_F(DynamicModulesLoadBalancerTest, AbiCallbacksSuccessfulCases) {
   ASSERT_NE(lb, nullptr);
 
   auto* lb_ptr = static_cast<DynamicModuleLoadBalancer*>(lb.get());
+
+  // Test cluster name.
+  envoy_dynamic_module_type_envoy_buffer cluster_name_result = {nullptr, 0};
+  envoy_dynamic_module_callback_lb_get_cluster_name(lb_ptr, &cluster_name_result);
+  EXPECT_NE(cluster_name_result.ptr, nullptr);
+  EXPECT_EQ(absl::string_view(cluster_name_result.ptr, cluster_name_result.length), "test_cluster");
 
   // Test successful callbacks.
   EXPECT_EQ(envoy_dynamic_module_callback_lb_get_hosts_count(lb_ptr, 0), 3);

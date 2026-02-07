@@ -17,7 +17,8 @@ class DynamicModuleLoadBalancer : public Upstream::LoadBalancer,
                                   public Logger::Loggable<Logger::Id::dynamic_modules> {
 public:
   DynamicModuleLoadBalancer(DynamicModuleLbConfigSharedPtr config,
-                            const Upstream::PrioritySet& priority_set);
+                            const Upstream::PrioritySet& priority_set,
+                            const std::string& cluster_name);
   ~DynamicModuleLoadBalancer() override;
 
   // Upstream::LoadBalancer
