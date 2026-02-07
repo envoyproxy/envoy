@@ -10,12 +10,6 @@
 // This must not contain any dependencies besides standard library since it is not only used by
 // Envoy itself but also by dynamic module SDKs written in non-C++ languages.
 //
-// Currently, compatibility is only guaranteed by an exact version match between the Envoy
-// codebase and the dynamic module SDKs. In the future, after the ABI is stabilized, we will revisit
-// this restriction and hopefully provide a wider compatibility guarantee. Until then, Envoy
-// checks the hash of the ABI header files to ensure that the dynamic modules are built against the
-// same version of the ABI.
-//
 // There are three kinds defined in this file:
 //
 //  * Types: type definitions used in the ABI.
@@ -32,13 +26,32 @@
 // by nature. For example, we assume that modules will not try to pass invalid pointers to Envoy
 // intentionally.
 
+// This is the ABI version that we bump the minor version when we make deprecating changes to the
+// ABI. Until we reach v1.0, we only guarantee backward compatibility in the next minor version. For
+// example, v0.1.y is guaranteed to be compatible with v0.2.x, but not with v0.3.x.
+//
+// This is used only for tracking the ABI version of dynamic modules and emitting warnings when
+// there's a mismatch.
+//
+// Note(internal): We could use the Envoy's version such as "v1.38.0" here, there are several
+// reasons as to why we use a static version string instead:
+// 1. Envoy's version is generated at the build time of Envoy while we need to make it available for
+// SDK downstream users.
+// 2. In the future, after the stable ABI is established, we may want to decouple the ABI version
+// from Envoy's versioning scheme.
+#define ENVOY_DYNAMIC_MODULES_ABI_VERSION "v0.1.0"
+
 #ifdef __cplusplus
 #include <cstdbool>
 #include <cstddef>
 #include <cstdint>
 
+constexpr const char* envoy_dynamic_modules_abi_version = ENVOY_DYNAMIC_MODULES_ABI_VERSION;
+
 extern "C" {
 #else
+const char* __attribute__((weak)) envoy_dynamic_modules_abi_version =
+    ENVOY_DYNAMIC_MODULES_ABI_VERSION;
 
 #include <stdbool.h>
 #include <stddef.h>
