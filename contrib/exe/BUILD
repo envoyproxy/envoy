@@ -1,18 +1,9 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_binary",
-    "envoy_cc_test",
     "envoy_contrib_package",
 )
-load(
-    "//contrib:all_contrib_extensions.bzl",
-    "ARM64_SKIP_CONTRIB_TARGETS",
-    "AWS_LC_SKIP_CONTRIB_TARGETS",
-    "BORINGSSL_FIPS_SKIP_CONTRIB_TARGETS",
-    "PPC_SKIP_CONTRIB_TARGETS",
-    "X86_SKIP_CONTRIB_TARGETS",
-    "envoy_all_contrib_extensions",
-)
+load("//contrib:all_contrib_extensions.bzl", "SELECTED_CONTRIB_EXTENSIONS")
 
 licenses(["notice"])  # Apache 2
 
@@ -23,36 +14,10 @@ alias(
     actual = ":envoy-static",
 )
 
-SELECTED_CONTRIB_EXTENSIONS = select({
-    "//bazel:linux_aarch64": envoy_all_contrib_extensions(ARM64_SKIP_CONTRIB_TARGETS),
-    "//bazel:linux_ppc": envoy_all_contrib_extensions(PPC_SKIP_CONTRIB_TARGETS),
-    "//bazel:using_aws_lc": envoy_all_contrib_extensions(AWS_LC_SKIP_CONTRIB_TARGETS),
-    "//bazel:using_boringssl_fips": envoy_all_contrib_extensions(BORINGSSL_FIPS_SKIP_CONTRIB_TARGETS),
-    "//conditions:default": envoy_all_contrib_extensions(X86_SKIP_CONTRIB_TARGETS),
-})
-
 envoy_cc_binary(
     name = "envoy-static",
     rbe_pool = "6gig",
     stamped = True,
     visibility = ["//visibility:public"],
     deps = ["//source/exe:envoy_main_entry_lib"] + SELECTED_CONTRIB_EXTENSIONS,
-)
-
-envoy_cc_test(
-    name = "example_configs_test",
-    size = "large",
-    data = [
-        "//configs:example_contrib_configs",
-        "//test/config_test:example_configs_test_setup.sh",
-    ],
-    env = {
-        "EXAMPLE_CONFIGS_TAR_PATH": "envoy/configs/example_contrib_configs.tar",
-        "DISABLE_TEST_MERGE": "true",
-        "GODEBUG": "cgocheck=0",
-    },
-    rbe_pool = "6gig",
-    deps = [
-        "//test/config_test:example_configs_test_lib",
-    ] + SELECTED_CONTRIB_EXTENSIONS,
 )

@@ -30,7 +30,6 @@ cc_library(
     deps = [
         ":sdk",
         "//source/extensions/dynamic_modules/abi",
-        "//source/extensions/dynamic_modules/abi:abi_version_lib",
         "@abseil-cpp//absl/container:flat_hash_map",
         "@abseil-cpp//absl/synchronization",
     ],
