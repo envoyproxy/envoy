@@ -10,6 +10,7 @@
 using Envoy::Extensions::Bootstrap::DynamicModules::DynamicModuleBootstrapExtension;
 using Envoy::Extensions::Bootstrap::DynamicModules::DynamicModuleBootstrapExtensionConfig;
 using Envoy::Extensions::Bootstrap::DynamicModules::DynamicModuleBootstrapExtensionConfigScheduler;
+using Envoy::Extensions::Bootstrap::DynamicModules::DynamicModuleBootstrapExtensionTimer;
 
 extern "C" {
 
@@ -175,6 +176,60 @@ void envoy_dynamic_module_callback_bootstrap_extension_iterate_gauges(
                              // user_data.
                              (void)action;
                            });
+}
+
+// -------------------- Timer Callbacks --------------------
+
+envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr
+envoy_dynamic_module_callback_bootstrap_extension_timer_new(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr) {
+  auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(extension_config_envoy_ptr);
+
+  // Allocate the timer wrapper first so we can capture a stable heap pointer in the callback.
+  auto* timer_wrapper = new DynamicModuleBootstrapExtensionTimer(config->weak_from_this());
+
+  // Create the timer on the main thread dispatcher. The callback captures a weak_ptr to the config
+  // to safely handle the case where the config is destroyed before the timer fires. The
+  // timer_wrapper raw pointer is captured by value (copied) and is stable since it is
+  // heap-allocated and its lifetime is managed by the module via timer_new/timer_delete.
+  auto envoy_timer = config->main_thread_dispatcher_.createTimer(
+      [weak_config = config->weak_from_this(), timer_wrapper]() {
+        if (auto config_shared = weak_config.lock()) {
+          if (config_shared->in_module_config_ != nullptr &&
+              config_shared->on_bootstrap_extension_timer_fired_ != nullptr) {
+            config_shared->on_bootstrap_extension_timer_fired_(config_shared->thisAsVoidPtr(),
+                                                               config_shared->in_module_config_,
+                                                               static_cast<void*>(timer_wrapper));
+          }
+        }
+      });
+
+  timer_wrapper->setTimer(std::move(envoy_timer));
+  return static_cast<void*>(timer_wrapper);
+}
+
+void envoy_dynamic_module_callback_bootstrap_extension_timer_enable(
+    envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr timer_ptr,
+    uint64_t delay_milliseconds) {
+  auto* timer = static_cast<DynamicModuleBootstrapExtensionTimer*>(timer_ptr);
+  timer->timer().enableTimer(std::chrono::milliseconds(delay_milliseconds));
+}
+
+void envoy_dynamic_module_callback_bootstrap_extension_timer_disable(
+    envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr timer_ptr) {
+  auto* timer = static_cast<DynamicModuleBootstrapExtensionTimer*>(timer_ptr);
+  timer->timer().disableTimer();
+}
+
+bool envoy_dynamic_module_callback_bootstrap_extension_timer_enabled(
+    envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr timer_ptr) {
+  auto* timer = static_cast<DynamicModuleBootstrapExtensionTimer*>(timer_ptr);
+  return timer->timer().enabled();
+}
+
+void envoy_dynamic_module_callback_bootstrap_extension_timer_delete(
+    envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr timer_ptr) {
+  delete static_cast<DynamicModuleBootstrapExtensionTimer*>(timer_ptr);
 }
 
 } // extern "C"

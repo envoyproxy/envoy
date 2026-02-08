@@ -5721,6 +5721,19 @@ typedef const void* envoy_dynamic_module_type_bootstrap_extension_module_ptr;
  */
 typedef void* envoy_dynamic_module_type_bootstrap_extension_config_scheduler_module_ptr;
 
+/**
+ * envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr is a raw pointer to the
+ * DynamicModuleBootstrapExtensionTimer class in Envoy.
+ *
+ * OWNERSHIP: The allocation is done by Envoy but the module is responsible for managing the
+ * lifetime of the pointer. Notably, it must be explicitly destroyed by the module
+ * when the timer is no longer needed. The creation of this pointer is done by
+ * envoy_dynamic_module_callback_bootstrap_extension_timer_new and the destruction is done by
+ * envoy_dynamic_module_callback_bootstrap_extension_timer_delete. Since its lifecycle is
+ * owned/managed by the module, this has _module_ptr suffix.
+ */
+typedef void* envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr;
+
 // =============================================================================
 // Bootstrap Extension Event Hooks
 // =============================================================================
@@ -5818,6 +5831,22 @@ void envoy_dynamic_module_on_bootstrap_extension_config_scheduled(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
     envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_ptr,
     uint64_t event_id);
+
+/**
+ * envoy_dynamic_module_on_bootstrap_extension_timer_fired is called when a timer created by
+ * envoy_dynamic_module_callback_bootstrap_extension_timer_new fires on the main thread.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param extension_config_module_ptr is the pointer to the in-module bootstrap extension
+ * configuration created by envoy_dynamic_module_on_bootstrap_extension_config_new.
+ * @param timer_ptr is the pointer to the timer that fired. The module can re-enable this timer
+ * by calling envoy_dynamic_module_callback_bootstrap_extension_timer_enable again.
+ */
+void envoy_dynamic_module_on_bootstrap_extension_timer_fired(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_module_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr timer_ptr);
 
 // =============================================================================
 // Bootstrap Extension Callbacks
@@ -6030,6 +6059,83 @@ typedef envoy_dynamic_module_type_stats_iteration_action (
 void envoy_dynamic_module_callback_bootstrap_extension_iterate_gauges(
     envoy_dynamic_module_type_bootstrap_extension_envoy_ptr extension_envoy_ptr,
     envoy_dynamic_module_type_gauge_iterator_fn iterator_fn, void* user_data);
+
+// -------------------- Bootstrap Extension Callbacks - Timer --------------------
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_timer_new is called by the module to create a
+ * new timer on the main thread dispatcher. The timer is not enabled upon creation; the module must
+ * call envoy_dynamic_module_callback_bootstrap_extension_timer_enable to arm it.
+ *
+ * When the timer fires, envoy_dynamic_module_on_bootstrap_extension_timer_fired is called on the
+ * main thread.
+ *
+ * This must be called on the main thread.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @return envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr is the pointer to the
+ * created timer.
+ *
+ * NOTE: it is the caller's responsibility to delete the timer using
+ * envoy_dynamic_module_callback_bootstrap_extension_timer_delete when it is no longer needed.
+ */
+envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr
+envoy_dynamic_module_callback_bootstrap_extension_timer_new(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_timer_enable is called by the module to enable
+ * the timer with a given delay. If the timer is already enabled, it will be reset to the new delay.
+ *
+ * This must be called on the main thread.
+ *
+ * @param timer_ptr is the pointer to the timer created by
+ * envoy_dynamic_module_callback_bootstrap_extension_timer_new.
+ * @param delay_milliseconds is the delay in milliseconds before the timer fires.
+ */
+void envoy_dynamic_module_callback_bootstrap_extension_timer_enable(
+    envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr timer_ptr,
+    uint64_t delay_milliseconds);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_timer_disable is called by the module to
+ * disable the timer without destroying it. The timer can be re-enabled later using
+ * envoy_dynamic_module_callback_bootstrap_extension_timer_enable.
+ *
+ * This must be called on the main thread.
+ *
+ * @param timer_ptr is the pointer to the timer created by
+ * envoy_dynamic_module_callback_bootstrap_extension_timer_new.
+ */
+void envoy_dynamic_module_callback_bootstrap_extension_timer_disable(
+    envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr timer_ptr);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_timer_enabled is called by the module to check
+ * whether the timer is currently armed.
+ *
+ * This must be called on the main thread.
+ *
+ * @param timer_ptr is the pointer to the timer created by
+ * envoy_dynamic_module_callback_bootstrap_extension_timer_new.
+ * @return true if the timer is currently enabled, false otherwise.
+ */
+bool envoy_dynamic_module_callback_bootstrap_extension_timer_enabled(
+    envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr timer_ptr);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_timer_delete is called by the module to delete
+ * a timer created by envoy_dynamic_module_callback_bootstrap_extension_timer_new. The timer is
+ * automatically disabled before deletion.
+ *
+ * This must be called on the main thread.
+ *
+ * @param timer_ptr is the pointer to the timer created by
+ * envoy_dynamic_module_callback_bootstrap_extension_timer_new.
+ */
+void envoy_dynamic_module_callback_bootstrap_extension_timer_delete(
+    envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr timer_ptr);
 
 #ifdef __cplusplus
 }

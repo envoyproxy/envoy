@@ -747,6 +747,139 @@ TEST_F(BootstrapAbiImplTest, IterateGauges) {
   EXPECT_EQ(data.count, 2);
 }
 
+// -----------------------------------------------------------------------------
+// Timer Tests
+// -----------------------------------------------------------------------------
+
+// Test that a timer can be created, enabled, checked, disabled, and deleted.
+TEST_F(BootstrapAbiImplTest, TimerLifecycle) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  // The MockDispatcher's createTimer_ returns a NiceMock<MockTimer> by default.
+  auto config = newDynamicModuleBootstrapExtensionConfig(
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  ASSERT_TRUE(config.ok()) << config.status();
+
+  // Create a timer via the ABI callback.
+  auto* timer_ptr =
+      envoy_dynamic_module_callback_bootstrap_extension_timer_new(config.value()->thisAsVoidPtr());
+  EXPECT_NE(timer_ptr, nullptr);
+
+  // The timer should not be enabled initially.
+  EXPECT_FALSE(envoy_dynamic_module_callback_bootstrap_extension_timer_enabled(timer_ptr));
+
+  // Enable the timer with a 100ms delay.
+  envoy_dynamic_module_callback_bootstrap_extension_timer_enable(timer_ptr, 100);
+  EXPECT_TRUE(envoy_dynamic_module_callback_bootstrap_extension_timer_enabled(timer_ptr));
+
+  // Disable the timer.
+  envoy_dynamic_module_callback_bootstrap_extension_timer_disable(timer_ptr);
+  EXPECT_FALSE(envoy_dynamic_module_callback_bootstrap_extension_timer_enabled(timer_ptr));
+
+  // Delete the timer via the ABI callback.
+  envoy_dynamic_module_callback_bootstrap_extension_timer_delete(timer_ptr);
+}
+
+// Test that the timer fires and invokes the on_timer_fired event hook.
+TEST_F(BootstrapAbiImplTest, TimerFired) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  // Use MockTimer to capture the timer callback.
+  Event::MockTimer* mock_timer = new Event::MockTimer(&dispatcher_);
+
+  auto config = newDynamicModuleBootstrapExtensionConfig(
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  ASSERT_TRUE(config.ok()) << config.status();
+
+  // Create a timer via the ABI callback. This will use the MockTimer we set up.
+  auto* timer_ptr =
+      envoy_dynamic_module_callback_bootstrap_extension_timer_new(config.value()->thisAsVoidPtr());
+  EXPECT_NE(timer_ptr, nullptr);
+
+  // Enable the timer.
+  EXPECT_CALL(*mock_timer, enableTimer(std::chrono::milliseconds(50), _));
+  envoy_dynamic_module_callback_bootstrap_extension_timer_enable(timer_ptr, 50);
+
+  // Invoke the timer callback (simulating timer firing).
+  mock_timer->invokeCallback();
+
+  // Clean up.
+  envoy_dynamic_module_callback_bootstrap_extension_timer_delete(timer_ptr);
+}
+
+// Test that the timer callback safely handles a destroyed config via weak_ptr.
+TEST_F(BootstrapAbiImplTest, TimerFiredAfterConfigDestroyed) {
+  Event::TimerCb captured_timer_cb;
+
+  // Use a raw pointer so we can control when the config is destroyed.
+  void* timer_ptr = nullptr;
+
+  {
+    auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
+        testDataDir() + "/libbootstrap_no_op.so", false);
+    ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+    // Capture the timer callback from createTimer.
+    EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(testing::Invoke([&](Event::TimerCb cb) {
+      captured_timer_cb = std::move(cb);
+      return new testing::NiceMock<Event::MockTimer>();
+    }));
+
+    auto config = newDynamicModuleBootstrapExtensionConfig("test", "config",
+                                                           std::move(dynamic_module.value()),
+                                                           dispatcher_, context_, context_.store_);
+    ASSERT_TRUE(config.ok()) << config.status();
+
+    // Create a timer via the ABI callback.
+    timer_ptr = envoy_dynamic_module_callback_bootstrap_extension_timer_new(
+        config.value()->thisAsVoidPtr());
+    EXPECT_NE(timer_ptr, nullptr);
+
+    // Config goes out of scope here and is destroyed.
+  }
+
+  // Execute the captured timer callback after config is destroyed.
+  // This should not crash - the weak_ptr should be expired.
+  ASSERT_NE(captured_timer_cb, nullptr);
+  captured_timer_cb();
+
+  // Clean up the timer.
+  envoy_dynamic_module_callback_bootstrap_extension_timer_delete(timer_ptr);
+}
+
+// Test that re-enabling the timer resets it.
+TEST_F(BootstrapAbiImplTest, TimerReEnable) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  Event::MockTimer* mock_timer = new Event::MockTimer(&dispatcher_);
+
+  auto config = newDynamicModuleBootstrapExtensionConfig(
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  ASSERT_TRUE(config.ok()) << config.status();
+
+  // Create a timer via the ABI callback.
+  auto* timer_ptr =
+      envoy_dynamic_module_callback_bootstrap_extension_timer_new(config.value()->thisAsVoidPtr());
+  EXPECT_NE(timer_ptr, nullptr);
+
+  // Enable with 100ms.
+  EXPECT_CALL(*mock_timer, enableTimer(std::chrono::milliseconds(100), _));
+  envoy_dynamic_module_callback_bootstrap_extension_timer_enable(timer_ptr, 100);
+
+  // Re-enable with 200ms - this should reset the timer.
+  EXPECT_CALL(*mock_timer, enableTimer(std::chrono::milliseconds(200), _));
+  envoy_dynamic_module_callback_bootstrap_extension_timer_enable(timer_ptr, 200);
+
+  // Clean up.
+  envoy_dynamic_module_callback_bootstrap_extension_timer_delete(timer_ptr);
+}
+
 } // namespace DynamicModules
 } // namespace Bootstrap
 } // namespace Extensions

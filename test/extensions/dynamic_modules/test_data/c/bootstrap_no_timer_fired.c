@@ -9,7 +9,7 @@ envoy_dynamic_module_type_abi_version_module_ptr envoy_dynamic_module_on_program
   return envoy_dynamic_modules_abi_version;
 }
 
-// A simple nop bootstrap extension for testing.
+// A bootstrap extension that is missing envoy_dynamic_module_on_bootstrap_extension_timer_fired.
 
 envoy_dynamic_module_type_bootstrap_extension_config_module_ptr
 envoy_dynamic_module_on_bootstrap_extension_config_new(
@@ -18,7 +18,6 @@ envoy_dynamic_module_on_bootstrap_extension_config_new(
   (void)extension_config_envoy_ptr;
   (void)name;
   (void)config;
-  // Return a dummy pointer.
   return (envoy_dynamic_module_type_bootstrap_extension_config_module_ptr)0x1;
 }
 
@@ -27,12 +26,12 @@ void envoy_dynamic_module_on_bootstrap_extension_config_destroy(
   (void)extension_config_ptr;
 }
 
-envoy_dynamic_module_type_bootstrap_extension_module_ptr envoy_dynamic_module_on_bootstrap_extension_new(
+envoy_dynamic_module_type_bootstrap_extension_module_ptr
+envoy_dynamic_module_on_bootstrap_extension_new(
     envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_ptr,
     envoy_dynamic_module_type_bootstrap_extension_envoy_ptr extension_envoy_ptr) {
   (void)extension_config_ptr;
   (void)extension_envoy_ptr;
-  // Return a dummy pointer.
   return (envoy_dynamic_module_type_bootstrap_extension_module_ptr)0x2;
 }
 
@@ -80,11 +79,5 @@ void envoy_dynamic_module_on_bootstrap_extension_http_callout_done(
   (void)body_chunks_size;
 }
 
-void envoy_dynamic_module_on_bootstrap_extension_timer_fired(
-    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
-    envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_module_ptr,
-    envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr timer_ptr) {
-  (void)extension_config_envoy_ptr;
-  (void)extension_config_module_ptr;
-  (void)timer_ptr;
-}
+// NOTE: envoy_dynamic_module_on_bootstrap_extension_timer_fired is intentionally missing.
+

@@ -78,3 +78,12 @@ void envoy_dynamic_module_on_bootstrap_extension_http_callout_done(
   (void)body_chunks;
   (void)body_chunks_size;
 }
+
+void envoy_dynamic_module_on_bootstrap_extension_timer_fired(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_module_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr timer_ptr) {
+  (void)extension_config_envoy_ptr;
+  (void)extension_config_module_ptr;
+  (void)timer_ptr;
+}

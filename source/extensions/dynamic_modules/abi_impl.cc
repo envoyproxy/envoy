@@ -177,4 +177,41 @@ __attribute__((weak)) void envoy_dynamic_module_callback_bootstrap_extension_ite
                "not implemented in this context");
 }
 
+// ---------------------- Bootstrap extension timer callbacks ------------------------
+// These are weak symbols that provide default stub implementations. The actual implementations
+// are provided in the bootstrap extension abi_impl.cc when the bootstrap extension is used.
+
+__attribute__((weak)) envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr
+envoy_dynamic_module_callback_bootstrap_extension_timer_new(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_bootstrap_extension_timer_new: "
+               "not implemented in this context");
+  return nullptr;
+}
+
+__attribute__((weak)) void envoy_dynamic_module_callback_bootstrap_extension_timer_enable(
+    envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_bootstrap_extension_timer_enable: "
+               "not implemented in this context");
+}
+
+__attribute__((weak)) void envoy_dynamic_module_callback_bootstrap_extension_timer_disable(
+    envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_bootstrap_extension_timer_disable: "
+               "not implemented in this context");
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_bootstrap_extension_timer_enabled(
+    envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_bootstrap_extension_timer_enabled: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) void envoy_dynamic_module_callback_bootstrap_extension_timer_delete(
+    envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_bootstrap_extension_timer_delete: "
+               "not implemented in this context");
+}
+
 } // extern "C"
