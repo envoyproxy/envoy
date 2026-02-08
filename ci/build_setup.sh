@@ -78,18 +78,17 @@ _bazel="$(which bazel)"
 case $CI_TARGET in
     config|docs|verify_examples)
         ENVOY_OUTPUT_BASE_DIR="${ENVOY_OUTPUT_BASE_DIR:-docs}"
-        # workaround rules_rust bug
-        export CARGO_BAZEL_REPIN=true
         ;;
     external)
         ENVOY_OUTPUT_BASE_DIR="${ENVOY_OUTPUT_BASE_DIR:-external}"
-        # workaround rules_rust bug
-        export CARGO_BAZEL_REPIN=true
         ;;
     *)
         ENVOY_OUTPUT_BASE_DIR="${ENVOY_OUTPUT_BASE_DIR:-base}"
         ;;
 esac
+
+# workaround rules_rust bug: lockfile digest may differ across cargo-bazel versions.
+export CARGO_BAZEL_REPIN=true
 
 BAZEL_STARTUP_OPTIONS=(
     "${BAZEL_STARTUP_EXTRA_OPTIONS[@]}"
