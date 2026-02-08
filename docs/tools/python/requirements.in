@@ -1,6 +1,6 @@
 # Docs-specific dependencies
 envoy.docs.sphinx_runner>=0.2.9
-sphinx>=8.1.3,<9
+sphinx>=8.1.3,<10
 sphinxcontrib-applehelp>=1.0.8
 sphinxcontrib-devhelp>=1.0.6
 sphinxcontrib.googleanalytics
