@@ -747,6 +747,217 @@ TEST_F(BootstrapAbiImplTest, IterateGauges) {
   EXPECT_EQ(data.count, 2);
 }
 
+// -----------------------------------------------------------------------------
+// Stats Definition and Update Tests
+// -----------------------------------------------------------------------------
+
+// Test defining and incrementing a counter.
+TEST_F(BootstrapAbiImplTest, DefineAndIncrementCounter) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  auto config = newDynamicModuleBootstrapExtensionConfig(
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  ASSERT_TRUE(config.ok()) << config.status();
+
+  // Define a counter.
+  size_t counter_id = 0;
+  envoy_dynamic_module_type_module_buffer name = {"my_counter", 10};
+  auto result = envoy_dynamic_module_callback_bootstrap_extension_config_define_counter(
+      config.value()->thisAsVoidPtr(), name, &counter_id);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
+  EXPECT_EQ(counter_id, 0u);
+
+  // Increment the counter.
+  result = envoy_dynamic_module_callback_bootstrap_extension_config_increment_counter(
+      config.value()->thisAsVoidPtr(), counter_id, 5);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
+
+  // Increment again.
+  result = envoy_dynamic_module_callback_bootstrap_extension_config_increment_counter(
+      config.value()->thisAsVoidPtr(), counter_id, 3);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
+
+  // Verify the counter was defined and is accessible.
+  EXPECT_TRUE(config.value()->getCounterById(counter_id).has_value());
+  EXPECT_FALSE(config.value()->getCounterById(counter_id + 1).has_value());
+}
+
+// Test incrementing a counter with an invalid ID.
+TEST_F(BootstrapAbiImplTest, IncrementCounterInvalidId) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  auto config = newDynamicModuleBootstrapExtensionConfig(
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  ASSERT_TRUE(config.ok()) << config.status();
+
+  // Try to increment a counter with an invalid ID.
+  auto result = envoy_dynamic_module_callback_bootstrap_extension_config_increment_counter(
+      config.value()->thisAsVoidPtr(), 999, 1);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_MetricNotFound);
+}
+
+// Test defining and manipulating a gauge.
+TEST_F(BootstrapAbiImplTest, DefineAndManipulateGauge) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  auto config = newDynamicModuleBootstrapExtensionConfig(
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  ASSERT_TRUE(config.ok()) << config.status();
+
+  // Define a gauge.
+  size_t gauge_id = 0;
+  envoy_dynamic_module_type_module_buffer name = {"my_gauge", 8};
+  auto result = envoy_dynamic_module_callback_bootstrap_extension_config_define_gauge(
+      config.value()->thisAsVoidPtr(), name, &gauge_id);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
+  EXPECT_EQ(gauge_id, 0u);
+
+  // Set the gauge.
+  result = envoy_dynamic_module_callback_bootstrap_extension_config_set_gauge(
+      config.value()->thisAsVoidPtr(), gauge_id, 100);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
+
+  // Increment the gauge.
+  result = envoy_dynamic_module_callback_bootstrap_extension_config_increment_gauge(
+      config.value()->thisAsVoidPtr(), gauge_id, 10);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
+
+  // Decrement the gauge.
+  result = envoy_dynamic_module_callback_bootstrap_extension_config_decrement_gauge(
+      config.value()->thisAsVoidPtr(), gauge_id, 30);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
+
+  // Verify the gauge was defined and is accessible.
+  EXPECT_TRUE(config.value()->getGaugeById(gauge_id).has_value());
+  EXPECT_FALSE(config.value()->getGaugeById(gauge_id + 1).has_value());
+}
+
+// Test gauge operations with an invalid ID.
+TEST_F(BootstrapAbiImplTest, GaugeOperationsInvalidId) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  auto config = newDynamicModuleBootstrapExtensionConfig(
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  ASSERT_TRUE(config.ok()) << config.status();
+
+  // Try to set, increment, and decrement a gauge with an invalid ID.
+  EXPECT_EQ(envoy_dynamic_module_callback_bootstrap_extension_config_set_gauge(
+                config.value()->thisAsVoidPtr(), 999, 1),
+            envoy_dynamic_module_type_metrics_result_MetricNotFound);
+  EXPECT_EQ(envoy_dynamic_module_callback_bootstrap_extension_config_increment_gauge(
+                config.value()->thisAsVoidPtr(), 999, 1),
+            envoy_dynamic_module_type_metrics_result_MetricNotFound);
+  EXPECT_EQ(envoy_dynamic_module_callback_bootstrap_extension_config_decrement_gauge(
+                config.value()->thisAsVoidPtr(), 999, 1),
+            envoy_dynamic_module_type_metrics_result_MetricNotFound);
+}
+
+// Test defining and recording a histogram value.
+TEST_F(BootstrapAbiImplTest, DefineAndRecordHistogram) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  auto config = newDynamicModuleBootstrapExtensionConfig(
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  ASSERT_TRUE(config.ok()) << config.status();
+
+  // Define a histogram.
+  size_t histogram_id = 0;
+  envoy_dynamic_module_type_module_buffer name = {"my_histogram", 12};
+  auto result = envoy_dynamic_module_callback_bootstrap_extension_config_define_histogram(
+      config.value()->thisAsVoidPtr(), name, &histogram_id);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
+  EXPECT_EQ(histogram_id, 0u);
+
+  // Record a value.
+  result = envoy_dynamic_module_callback_bootstrap_extension_config_record_histogram_value(
+      config.value()->thisAsVoidPtr(), histogram_id, 42);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
+
+  // Record another value.
+  result = envoy_dynamic_module_callback_bootstrap_extension_config_record_histogram_value(
+      config.value()->thisAsVoidPtr(), histogram_id, 100);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
+}
+
+// Test recording a histogram value with an invalid ID.
+TEST_F(BootstrapAbiImplTest, RecordHistogramInvalidId) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  auto config = newDynamicModuleBootstrapExtensionConfig(
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  ASSERT_TRUE(config.ok()) << config.status();
+
+  // Try to record a histogram value with an invalid ID.
+  auto result = envoy_dynamic_module_callback_bootstrap_extension_config_record_histogram_value(
+      config.value()->thisAsVoidPtr(), 999, 42);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_MetricNotFound);
+}
+
+// Test defining multiple metrics with sequential IDs.
+TEST_F(BootstrapAbiImplTest, DefineMultipleMetrics) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  auto config = newDynamicModuleBootstrapExtensionConfig(
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  ASSERT_TRUE(config.ok()) << config.status();
+
+  // Define multiple counters.
+  size_t counter_id_0 = 0;
+  size_t counter_id_1 = 0;
+  envoy_dynamic_module_type_module_buffer name_0 = {"counter_a", 9};
+  envoy_dynamic_module_type_module_buffer name_1 = {"counter_b", 9};
+  EXPECT_EQ(envoy_dynamic_module_callback_bootstrap_extension_config_define_counter(
+                config.value()->thisAsVoidPtr(), name_0, &counter_id_0),
+            envoy_dynamic_module_type_metrics_result_Success);
+  EXPECT_EQ(envoy_dynamic_module_callback_bootstrap_extension_config_define_counter(
+                config.value()->thisAsVoidPtr(), name_1, &counter_id_1),
+            envoy_dynamic_module_type_metrics_result_Success);
+  EXPECT_EQ(counter_id_0, 0u);
+  EXPECT_EQ(counter_id_1, 1u);
+
+  // Define multiple gauges.
+  size_t gauge_id_0 = 0;
+  size_t gauge_id_1 = 0;
+  envoy_dynamic_module_type_module_buffer gauge_name_0 = {"gauge_a", 7};
+  envoy_dynamic_module_type_module_buffer gauge_name_1 = {"gauge_b", 7};
+  EXPECT_EQ(envoy_dynamic_module_callback_bootstrap_extension_config_define_gauge(
+                config.value()->thisAsVoidPtr(), gauge_name_0, &gauge_id_0),
+            envoy_dynamic_module_type_metrics_result_Success);
+  EXPECT_EQ(envoy_dynamic_module_callback_bootstrap_extension_config_define_gauge(
+                config.value()->thisAsVoidPtr(), gauge_name_1, &gauge_id_1),
+            envoy_dynamic_module_type_metrics_result_Success);
+  EXPECT_EQ(gauge_id_0, 0u);
+  EXPECT_EQ(gauge_id_1, 1u);
+
+  // Increment each counter independently.
+  EXPECT_EQ(envoy_dynamic_module_callback_bootstrap_extension_config_increment_counter(
+                config.value()->thisAsVoidPtr(), counter_id_0, 10),
+            envoy_dynamic_module_type_metrics_result_Success);
+  EXPECT_EQ(envoy_dynamic_module_callback_bootstrap_extension_config_increment_counter(
+                config.value()->thisAsVoidPtr(), counter_id_1, 20),
+            envoy_dynamic_module_type_metrics_result_Success);
+
+  // Verify all counters and gauges are accessible by their IDs.
+  EXPECT_TRUE(config.value()->getCounterById(counter_id_0).has_value());
+  EXPECT_TRUE(config.value()->getCounterById(counter_id_1).has_value());
+  EXPECT_TRUE(config.value()->getGaugeById(gauge_id_0).has_value());
+  EXPECT_TRUE(config.value()->getGaugeById(gauge_id_1).has_value());
+}
+
 } // namespace DynamicModules
 } // namespace Bootstrap
 } // namespace Extensions

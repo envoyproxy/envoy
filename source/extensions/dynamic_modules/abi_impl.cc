@@ -177,4 +177,76 @@ __attribute__((weak)) void envoy_dynamic_module_callback_bootstrap_extension_ite
                "not implemented in this context");
 }
 
+// ---------------------- Bootstrap extension stats definition and update callbacks
+// ----------------- These are weak symbols that provide default stub implementations. The actual
+// implementations are provided in the bootstrap extension abi_impl.cc when the bootstrap extension
+// is used.
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_bootstrap_extension_config_define_counter(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer, size_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_bootstrap_extension_config_define_counter: "
+               "not implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_bootstrap_extension_config_increment_counter(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr, size_t, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_bootstrap_extension_config_increment_counter: "
+               "not implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_bootstrap_extension_config_define_gauge(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer, size_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_bootstrap_extension_config_define_gauge: "
+               "not implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_bootstrap_extension_config_set_gauge(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr, size_t, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_bootstrap_extension_config_set_gauge: "
+               "not implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_bootstrap_extension_config_increment_gauge(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr, size_t, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_bootstrap_extension_config_increment_gauge: "
+               "not implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_bootstrap_extension_config_decrement_gauge(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr, size_t, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_bootstrap_extension_config_decrement_gauge: "
+               "not implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_bootstrap_extension_config_define_histogram(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer, size_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_bootstrap_extension_config_define_histogram: "
+               "not implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+}
+
+__attribute__((weak)) envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_bootstrap_extension_config_record_histogram_value(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr, size_t, uint64_t) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_bootstrap_extension_config_record_histogram_value: "
+               "not implemented in this context");
+  return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+}
+
 } // extern "C"
