@@ -58,6 +58,12 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "version_suffix_lib",
+    srcs = ["version_suffix.cc"],
+    alwayslink = 1,
+)
+
+envoy_cc_library(
     name = "envoy_main_entry_lib",
     srcs = ["main.cc"],
     rbe_pool = "6gig",
@@ -65,6 +71,7 @@ envoy_cc_library(
         ":envoy_main_common_lib",
         ":platform_impl_lib",
         ":scm_impl_lib",
+        ":version_suffix_lib",
         "//source/server:options_lib",
         "@abseil-cpp//absl/debugging:symbolize",
     ],
