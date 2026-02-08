@@ -60,6 +60,12 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "version_suffix_lib",
+    srcs = ["version_suffix.cc"],
+    alwayslink = 1,
+)
+
+envoy_cc_library(
     name = "version_lib",
     srcs = ["version.cc"],
     copts = select({
@@ -71,6 +77,7 @@ envoy_cc_library(
     tags = ["notidy"],
     deps = [
         ":version_includes",
+        ":version_suffix_lib",
         "//source/common/common:macros",
         "//source/common/protobuf:utility_lib",
     ],
