@@ -28,8 +28,20 @@ else
   BUILD_ARCH_DIR="/linux/${ENVOY_BUILD_ARCH}"
 fi
 
+# Portable realpath alternative since macOS realpath does not support -m.
+_realpath() {
+    local path="$1"
+    if [[ -d "$path" ]]; then
+        cd "$path" && pwd
+    elif [[ "$path" != /* ]]; then
+        echo "${PWD}/${path}"
+    else
+        echo "$path"
+    fi
+}
+
 ENVOY_DOCS_PATH="${ENVOY_DOCS_PATH:-./docs}"
-ENVOY_DOCS_PATH="$(realpath -m "$ENVOY_DOCS_PATH")"
+ENVOY_DOCS_PATH="$(_realpath "$ENVOY_DOCS_PATH")"
 
 setup_clang_toolchain() {
     local config
@@ -673,7 +685,7 @@ case $CI_TARGET in
         echo "generating docs..."
         # Build docs.
         [[ -z "${DOCS_OUTPUT_DIR}" ]] && DOCS_OUTPUT_DIR=generated/docs
-        DOCS_OUTPUT_DIR="$(realpath -m "$DOCS_OUTPUT_DIR")"
+        DOCS_OUTPUT_DIR="$(_realpath "$DOCS_OUTPUT_DIR")"
         rm -rf "${DOCS_OUTPUT_DIR:?}"/*
         mkdir -p "${DOCS_OUTPUT_DIR}"
         if [[ -e repo.bazelrc ]]; then
@@ -933,6 +945,8 @@ case $CI_TARGET in
         bazel run --config=ci \
                   --action_env="DEV_CONTAINER_ID=${DEV_CONTAINER_ID}" \
                   --host_action_env="DEV_CONTAINER_ID=${DEV_CONTAINER_ID}" \
+                  --action_env="CARGO_BAZEL_REPIN=true" \
+                  --host_action_env="CARGO_BAZEL_REPIN=true" \
                   --sandbox_writable_path="${HOME}/.docker/" \
                   --sandbox_writable_path="$HOME" \
                   @envoy-examples//:verify_examples
