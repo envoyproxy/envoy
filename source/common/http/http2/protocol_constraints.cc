@@ -1,5 +1,7 @@
 #include "source/common/http/http2/protocol_constraints.h"
 
+#include "envoy/config/core/v3/protocol.pb.h"
+
 #include "source/common/common/assert.h"
 #include "source/common/common/dump_state_utils.h"
 

@@ -1,7 +1,12 @@
 #pragma once
 
+#include "envoy/config/core/v3/config_source.pb.h"
+#include "envoy/config/listener/v3/listener.pb.h"
+
 #include "source/common/listener_manager/listener_manager_impl.h"
 #include "source/server/listener_manager_factory.h"
+
+#include "xds/core/v3/resource_locator.pb.h"
 
 namespace Envoy {
 namespace Server {

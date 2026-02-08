@@ -95,14 +95,14 @@ void UberWriteFilterFuzzer::fuzz(
   for (const auto& action : actions) {
     ENVOY_LOG_MISC(debug, "action {}", action.DebugString());
     switch (action.action_selector_case()) {
-    case test::extensions::filters::network::WriteAction::kOnWrite: {
+    case ::test::extensions::filters::network::WriteAction::kOnWrite: {
       ASSERT(write_filter_ != nullptr);
       Buffer::OwnedImpl buffer(action.on_write().data());
       write_filter_->onWrite(buffer, action.on_write().end_stream());
 
       break;
     }
-    case test::extensions::filters::network::WriteAction::kAdvanceTime: {
+    case ::test::extensions::filters::network::WriteAction::kAdvanceTime: {
       time_source_.advanceTimeAndRun(
           std::chrono::milliseconds(action.advance_time().milliseconds()),
           factory_context_.server_factory_context_.mainThreadDispatcher(),

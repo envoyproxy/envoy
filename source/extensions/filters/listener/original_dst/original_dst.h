@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/common/hashable.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/network/filter.h"
 #include "envoy/stream_info/filter_state.h"
 

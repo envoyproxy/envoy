@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/extensions/filters/listener/original_src/v3/original_src.pb.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 

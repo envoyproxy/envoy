@@ -3,6 +3,7 @@
 #include <atomic>
 
 #include "envoy/common/time.h"
+#include "envoy/config/core/v3/udp_socket_config.pb.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/event/event_impl_base.h"

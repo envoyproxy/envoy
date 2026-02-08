@@ -1,9 +1,7 @@
 #include "source/common/router/matcher_visitor.h"
 
 #include "envoy/extensions/matching/common_inputs/network/v3/network_inputs.pb.h"
-#include "envoy/extensions/matching/common_inputs/network/v3/network_inputs.pb.validate.h"
 #include "envoy/type/matcher/v3/http_inputs.pb.h"
-#include "envoy/type/matcher/v3/http_inputs.pb.validate.h"
 
 namespace Envoy {
 namespace Router {

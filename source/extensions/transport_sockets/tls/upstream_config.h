@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/extensions/transport_sockets/tls/v3/tls.pb.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/transport_socket_config.h"
 

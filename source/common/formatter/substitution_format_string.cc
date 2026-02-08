@@ -1,5 +1,7 @@
 #include "source/common/formatter/substitution_format_string.h"
 
+#include "envoy/config/core/v3/substitution_format_string.pb.h"
+
 namespace Envoy {
 namespace Formatter {
 

@@ -9,7 +9,6 @@
 
 #include "test/config/utility.h"
 #include "test/extensions/transport_sockets/starttls/starttls_integration_test.pb.h"
-#include "test/extensions/transport_sockets/starttls/starttls_integration_test.pb.validate.h"
 #include "test/integration/integration.h"
 #include "test/integration/ssl_utility.h"
 #include "test/test_common/registry.h"
@@ -163,18 +162,18 @@ void StartTlsSwitchFilter::onCommand(Buffer::Instance& buf) {
 
 // Config factory for StartTlsSwitchFilter terminal filter.
 class StartTlsSwitchFilterConfigFactory : public Extensions::NetworkFilters::Common::FactoryBase<
-                                              test::integration::starttls::StartTlsFilterConfig> {
+                                              ::test::integration::starttls::StartTlsFilterConfig> {
 public:
   explicit StartTlsSwitchFilterConfigFactory(const std::string& name,
                                              Network::ConnectionCallbacks& upstream_callbacks)
       : FactoryBase(name), upstream_callbacks_(&upstream_callbacks) {}
-  bool isTerminalFilterByProtoTyped(const test::integration::starttls::StartTlsFilterConfig&,
+  bool isTerminalFilterByProtoTyped(const ::test::integration::starttls::StartTlsFilterConfig&,
                                     Server::Configuration::ServerFactoryContext&) override {
     return true;
   }
 
   Network::FilterFactoryCb
-  createFilterFactoryFromProtoTyped(const test::integration::starttls::StartTlsFilterConfig&,
+  createFilterFactoryFromProtoTyped(const ::test::integration::starttls::StartTlsFilterConfig&,
                                     Server::Configuration::FactoryContext& context) override {
     return [&](Network::FilterManager& filter_manager) -> void {
       // Inject two filters into downstream connection: first is helper read filter and then

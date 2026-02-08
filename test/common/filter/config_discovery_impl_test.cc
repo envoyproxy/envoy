@@ -4,7 +4,6 @@
 
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/core/v3/extension.pb.h"
-#include "envoy/config/core/v3/extension.pb.validate.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/scope.h"
 
@@ -614,7 +613,7 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, DualProvidersInvalid) {
   const auto provider2 = config_discovery_test.createProvider("foo", true, false);
 
   // Create a response with a random type AddBodyFilterConfig not matching with providers.
-  auto add_body_filter_config = test::integration::filters::AddBodyFilterConfig();
+  auto add_body_filter_config = ::test::integration::filters::AddBodyFilterConfig();
   add_body_filter_config.set_body_size(10);
   envoy::config::core::v3::TypedExtensionConfig extension_config;
   extension_config.set_name("foo");

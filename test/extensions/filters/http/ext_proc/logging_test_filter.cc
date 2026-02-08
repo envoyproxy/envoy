@@ -9,7 +9,6 @@
 #include "source/extensions/filters/http/ext_proc/ext_proc.h"
 
 #include "test/extensions/filters/http/ext_proc/logging_test_filter.pb.h"
-#include "test/extensions/filters/http/ext_proc/logging_test_filter.pb.validate.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -53,12 +52,12 @@ private:
 };
 
 class LoggingTestFilterFactory : public Extensions::HttpFilters::Common::FactoryBase<
-                                     test::integration::filters::LoggingTestFilterConfig> {
+                                     ::test::integration::filters::LoggingTestFilterConfig> {
 public:
   LoggingTestFilterFactory() : FactoryBase("logging-test-filter") {};
 
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
-      const test::integration::filters::LoggingTestFilterConfig& proto_config, const std::string&,
+      const ::test::integration::filters::LoggingTestFilterConfig& proto_config, const std::string&,
       Server::Configuration::FactoryContext&) override {
     return [=](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addStreamFilter(std::make_shared<LoggingTestFilter>(

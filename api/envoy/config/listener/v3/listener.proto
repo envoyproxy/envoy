@@ -15,6 +15,7 @@ import "envoy/config/listener/v3/udp_listener_config.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
+import "buf/validate/validate.proto";
 import "xds/core/v3/collection_entry.proto";
 import "xds/type/matcher/v3/matcher.proto";
 
@@ -22,7 +23,6 @@ import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/security.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.listener.v3";
 option java_outer_classname = "ListenerProto";
@@ -107,7 +107,7 @@ message Listener {
     }
 
     oneof balance_type {
-      option (validate.required) = true;
+      option (buf.validate.oneof).required = true;
 
       // If specified, the listener will use the exact connection balancer.
       ExactBalance exact_balance = 1;
@@ -391,7 +391,7 @@ message Listener {
   //  It is recommended to lower this value for better overload management and reduced per-event cost.
   //  Setting it to 1 is a viable option with no noticeable impact on performance.
   google.protobuf.UInt32Value max_connections_to_accept_per_socket_event = 34
-      [(validate.rules).uint32 = {gt: 0}];
+      [(buf.validate.field).uint32 = {gt: 0}];
 
   // Whether the listener should bind to the port. A listener that doesn't
   // bind can only receive connections redirected from other listeners that set

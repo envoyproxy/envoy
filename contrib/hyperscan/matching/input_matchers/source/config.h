@@ -4,7 +4,6 @@
 #include "envoy/server/factory_context.h"
 
 #include "contrib/envoy/extensions/matching/input_matchers/hyperscan/v3alpha/hyperscan.pb.h"
-#include "contrib/envoy/extensions/matching/input_matchers/hyperscan/v3alpha/hyperscan.pb.validate.h"
 
 namespace Envoy {
 namespace Extensions {

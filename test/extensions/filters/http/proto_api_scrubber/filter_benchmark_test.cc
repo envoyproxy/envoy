@@ -31,7 +31,7 @@ using ConfigType = Envoy::Extensions::HttpFilters::ProtoApiScrubber::ProtoApiScr
 using ProtoConfig =
     envoy::extensions::filters::http::proto_api_scrubber::v3::ProtoApiScrubberConfig;
 
-namespace TestProto = test::extensions::filters::http::proto_api_scrubber;
+namespace TestProto = ::test::extensions::filters::http::proto_api_scrubber;
 
 namespace {
 

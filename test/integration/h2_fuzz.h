@@ -17,11 +17,11 @@ public:
       : HttpIntegrationTest(Http::CodecType::HTTP2, version) {}
 
   void initialize() override;
-  void replay(const test::integration::H2CaptureFuzzTestCase&, bool ignore_response);
+  void replay(const ::test::integration::H2CaptureFuzzTestCase&, bool ignore_response);
   const std::chrono::milliseconds max_wait_ms_{10};
 
 private:
-  void sendFrame(const test::integration::H2TestFrame&,
+  void sendFrame(const ::test::integration::H2TestFrame&,
                  std::function<void(const Envoy::Http::Http2::Http2Frame&)>);
 
   Filesystem::ScopedUseMemfiles use_memfiles_{true};

@@ -1,7 +1,7 @@
 #include "source/common/common/hex.h"
 #include "source/common/crypto/utility.h"
 
-#include "test/common/crypto/verify_signature_fuzz.pb.validate.h"
+#include "test/common/crypto/verify_signature_fuzz.pb.h"
 #include "test/fuzz/fuzz_runner.h"
 
 #include "absl/types/span.h"
@@ -11,7 +11,7 @@ namespace Common {
 namespace Crypto {
 namespace {
 
-DEFINE_PROTO_FUZZER(const test::common::crypto::VerifySignatureFuzzTestCase& input) {
+DEFINE_PROTO_FUZZER(const ::test::common::crypto::VerifySignatureFuzzTestCase& input) {
   const auto& key = input.key();
   const auto& hash_func = input.hash_func();
   const auto& signature = input.signature();

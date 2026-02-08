@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/extensions/http/header_validators/envoy_default/v3/header_validator.pb.h"
+
 #include "source/extensions/http/header_validators/envoy_default/header_validator.h"
 
 namespace Envoy {

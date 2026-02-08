@@ -31,7 +31,7 @@ from google.protobuf import text_format
 from envoy.annotations import deprecation_pb2
 from udpa.annotations import migrate_pb2, status_pb2, versioning_pb2
 from xds.annotations.v3 import status_pb2 as xds_status_pb2
-from validate import validate_pb2
+from buf.validate import validate_pb2
 
 import envoy_repo
 
@@ -702,11 +702,14 @@ class ProtoFormatVisitor(visitor.Visitor):
         oneof_index = None
         for index, field in enumerate(msg_proto.field):
             if "/v3" in type_context.source_code_info.name:
-                if field.options.Extensions[validate_pb2.rules].string.min_bytes != 0:
-                    field.options.Extensions[
-                        validate_pb2.rules].string.min_len = field.options.Extensions[
-                            validate_pb2.rules].string.min_bytes
-                    field.options.Extensions[validate_pb2.rules].string.ClearField("min_bytes")
+                # In protovalidate, min_bytes was removed from StringRules
+                # This conversion code is no longer needed as min_bytes doesn't exist
+                # We'll keep the structure but check if the extension exists
+                if field.options.HasExtension(validate_pb2.field):
+                    field_rules = field.options.Extensions[validate_pb2.field]
+                    if field_rules.HasField('string') and field_rules.string.min_bytes != 0:
+                        field_rules.string.min_len = field_rules.string.min_bytes
+                        field_rules.string.ClearField("min_bytes")
 
             if oneof_index is not None:
                 if not field.HasField('oneof_index') or field.oneof_index != oneof_index:

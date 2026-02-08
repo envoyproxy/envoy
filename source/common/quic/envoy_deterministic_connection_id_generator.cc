@@ -2,6 +2,8 @@
 
 #include <cstdint>
 
+#include "envoy/config/core/v3/base.pb.h"
+
 #include "source/common/network/socket_option_impl.h"
 #include "source/common/quic/envoy_quic_utils.h"
 

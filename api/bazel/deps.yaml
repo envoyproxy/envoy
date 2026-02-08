@@ -7,23 +7,6 @@ bazel_skylib:
   - api
   license: "Apache-2.0"
   license_url: "https://github.com/bazelbuild/bazel-skylib/blob/{version}/LICENSE"
-com_envoyproxy_protoc_gen_validate:
-  project_name: "protoc-gen-validate (PGV)"
-  project_desc: "protoc plugin to generate polyglot message validators"
-  project_url: "https://github.com/bufbuild/protoc-gen-validate"
-  release_date: "2025-12-04"
-  use_category:
-  - api
-  implied_untracked_deps:
-  - com_github_iancoleman_strcase
-  - com_github_lyft_protoc_gen_star_v2
-  - com_github_spf13_afero
-  - org_golang_google_genproto
-  - org_golang_x_text
-  - org_golang_x_mod
-  - org_golang_x_sys
-  license: "Apache-2.0"
-  license_url: "https://github.com/bufbuild/protoc-gen-validate/blob/v{version}/LICENSE"
 com_github_chrusty_protoc_gen_jsonschema:
   project_name: "protoc-gen-jsonschema"
   project_desc: "Protobuf to JSON-Schema compiler"
@@ -103,6 +86,28 @@ prometheus_metrics_model:
   - api
   license: "Apache-2.0"
   license_url: "https://github.com/prometheus/client_model/blob/v{version}/LICENSE"
+protovalidate:
+  project_name: "protovalidate"
+  project_desc: "Protocol Buffer Validation - Go, Java, Python, C++ and JS/TS"
+  project_url: "https://github.com/bufbuild/protovalidate"
+  release_date: "2025-09-12"
+  use_category:
+  - api
+  implied_untracked_deps:
+  - antlr4_runtimes
+  - antlr4_jar
+  - rules_java_builtin
+  license: "Apache-2.0"
+  license_url: "https://github.com/bufbuild/protovalidate/blob/{version}/LICENSE"
+protovalidate_cc:
+  project_name: "protovalidate-cc"
+  project_desc: "Protocol Buffer Validation for C++"
+  project_url: "https://github.com/bufbuild/protovalidate-cc"
+  release_date: "2025-09-18"
+  use_category:
+  - api
+  license: "Apache-2.0"
+  license_url: "https://github.com/bufbuild/protovalidate-cc/blob/{version}/LICENSE"
 rules_buf:
   project_name: "Bazel rules for Buf"
   project_desc: "Bazel rules for Buf"

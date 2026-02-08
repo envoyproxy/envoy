@@ -1,5 +1,5 @@
 #include "envoy/config/route/v3/route.pb.h"
-#include "envoy/config/route/v3/route.pb.validate.h"
+#include "envoy/type/matcher/v3/http_inputs.pb.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/router/config_impl.h"
@@ -91,9 +91,9 @@ static RouteConfiguration genMatcherTreeRouteConfig(benchmark::State& state) {
   // Configure the input to match on the :path header
   auto* input = matcher_tree->mutable_input();
   input->set_name("request-headers");
-  auto* typed_config = input->mutable_typed_config();
-  typed_config->set_type_url(
-      "type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput");
+  envoy::type::matcher::v3::HttpRequestHeaderMatchInput header_input;
+  header_input.set_header_name(":path");
+  input->mutable_typed_config()->PackFrom(header_input);
 
   // Create the exact match map
   auto* exact_match_map = matcher_tree->mutable_exact_match_map();
@@ -140,9 +140,9 @@ static RouteConfiguration genPrefixMatcherTreeRouteConfig(benchmark::State& stat
   // Configure the input to match on the :path header
   auto* input = matcher_tree->mutable_input();
   input->set_name("request-headers");
-  auto* typed_config = input->mutable_typed_config();
-  typed_config->set_type_url(
-      "type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput");
+  envoy::type::matcher::v3::HttpRequestHeaderMatchInput header_input;
+  header_input.set_header_name(":path");
+  input->mutable_typed_config()->PackFrom(header_input);
 
   // Create the prefix match map
   auto* prefix_match_map = matcher_tree->mutable_prefix_match_map();

@@ -110,7 +110,7 @@ public:
               discovery->mutable_default_config()->PackFrom(default_configuration);
             } else {
               const auto default_configuration =
-                  TestUtility::parseYaml<test::integration::filters::SetResponseCodeFilterConfig>(
+                  TestUtility::parseYaml<::test::integration::filters::SetResponseCodeFilterConfig>(
                       "code: 403");
               discovery->mutable_default_config()->PackFrom(default_configuration);
             }
@@ -305,12 +305,12 @@ public:
     typed_config.set_name(name);
     if (is_set_resp_code_config) {
       const auto configuration =
-          TestUtility::parseYaml<test::integration::filters::SetResponseCodeFilterConfig>(
+          TestUtility::parseYaml<::test::integration::filters::SetResponseCodeFilterConfig>(
               yaml_config);
       typed_config.mutable_typed_config()->PackFrom(configuration);
     } else {
       const auto configuration =
-          TestUtility::parseYaml<test::integration::filters::SetIsTerminalFilterConfig>(
+          TestUtility::parseYaml<::test::integration::filters::SetIsTerminalFilterConfig>(
               yaml_config);
       typed_config.mutable_typed_config()->PackFrom(configuration);
     }
@@ -321,7 +321,7 @@ public:
                                       const uint32_t drain_bytes) {
     envoy::config::core::v3::TypedExtensionConfig typed_config;
     typed_config.set_name(name);
-    auto configuration = test::integration::filters::TestTcpListenerFilterConfig();
+    auto configuration = ::test::integration::filters::TestTcpListenerFilterConfig();
     configuration.set_drain_bytes(drain_bytes);
     typed_config.mutable_typed_config()->PackFrom(configuration);
     sendEcdsResponse(typed_config, name, version, false, ecds2_stream_);
@@ -913,7 +913,7 @@ TEST_P(ExtensionDiscoveryIntegrationTest, ConfigDumpWithTwoSubscriptionTypes) {
   envoy::config::core::v3::TypedExtensionConfig http_filter_config;
   EXPECT_TRUE(ecds_config_dump_http.ecds_filters(0).ecds_filter().UnpackTo(&http_filter_config));
   EXPECT_EQ("foo", http_filter_config.name());
-  test::integration::filters::SetResponseCodeFilterConfig http_config;
+  ::test::integration::filters::SetResponseCodeFilterConfig http_config;
   http_filter_config.typed_config().UnpackTo(&http_config);
   EXPECT_EQ("/private", http_config.prefix());
   EXPECT_EQ(403, http_config.code());
@@ -925,7 +925,7 @@ TEST_P(ExtensionDiscoveryIntegrationTest, ConfigDumpWithTwoSubscriptionTypes) {
   envoy::config::core::v3::TypedExtensionConfig filter_config;
   EXPECT_TRUE(ecds_config_dump_listener.ecds_filters(0).ecds_filter().UnpackTo(&filter_config));
   EXPECT_EQ("bar", filter_config.name());
-  test::integration::filters::TestTcpListenerFilterConfig listener_config;
+  ::test::integration::filters::TestTcpListenerFilterConfig listener_config;
   filter_config.typed_config().UnpackTo(&listener_config);
   EXPECT_EQ(7, listener_config.drain_bytes());
 }

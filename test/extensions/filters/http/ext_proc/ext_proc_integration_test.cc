@@ -21,9 +21,7 @@
 #include "test/common/http/common.h"
 #include "test/extensions/filters/http/ext_proc/ext_proc_integration_common.h"
 #include "test/extensions/filters/http/ext_proc/logging_test_filter.pb.h"
-#include "test/extensions/filters/http/ext_proc/logging_test_filter.pb.validate.h"
 #include "test/extensions/filters/http/ext_proc/tracer_test_filter.pb.h"
-#include "test/extensions/filters/http/ext_proc/tracer_test_filter.pb.validate.h"
 #include "test/extensions/filters/http/ext_proc/utils.h"
 #include "test/integration/filters/common.h"
 #include "test/integration/http_integration.h"
@@ -66,7 +64,7 @@ using Extensions::HttpFilters::ExternalProcessing::makeHeaderValue;
 using Extensions::HttpFilters::ExternalProcessing::OnProcessingResponseFactory;
 using Extensions::HttpFilters::ExternalProcessing::TestOnProcessingResponseFactory;
 using Http::LowerCaseString;
-using test::integration::filters::LoggingTestFilterConfig;
+using ::test::integration::filters::LoggingTestFilterConfig;
 using testing::_;
 using testing::Not;
 
@@ -93,7 +91,7 @@ TEST_P(ExtProcIntegrationTest, GetAndCloseStreamWithTracing) {
 
   ENVOY_LOG(trace, "GetAndCloseStreamWithTracing configuring test tracer");
   config_helper_.addConfigModifier([&](HttpConnectionManager& cm) {
-    test::integration::filters::ExpectSpan ext_proc_span;
+    ::test::integration::filters::ExpectSpan ext_proc_span;
     ext_proc_span.set_operation_name(
         "async envoy.service.ext_proc.v3.ExternalProcessor.Process egress");
     ext_proc_span.set_context_injected(true);
@@ -106,7 +104,7 @@ TEST_P(ExtProcIntegrationTest, GetAndCloseStreamWithTracing) {
       ext_proc_span.mutable_tags()->insert(
           {"upstream_address", grpc_upstreams_[0]->localAddress()->asString()});
     }
-    test::integration::filters::TracerTestConfig test_config;
+    ::test::integration::filters::TracerTestConfig test_config;
     test_config.mutable_expect_spans()->Add()->CopyFrom(ext_proc_span);
 
     auto* tracing = cm.mutable_tracing();
@@ -159,7 +157,7 @@ TEST_P(ExtProcIntegrationTest, GetAndFailStream) {
 TEST_P(ExtProcIntegrationTest, GetAndFailStreamWithTracing) {
   initializeConfig();
   config_helper_.addConfigModifier([&](HttpConnectionManager& cm) {
-    test::integration::filters::ExpectSpan ext_proc_span;
+    ::test::integration::filters::ExpectSpan ext_proc_span;
     ext_proc_span.set_operation_name(
         "async envoy.service.ext_proc.v3.ExternalProcessor.Process egress");
     ext_proc_span.set_context_injected(true);
@@ -174,7 +172,7 @@ TEST_P(ExtProcIntegrationTest, GetAndFailStreamWithTracing) {
           {"upstream_address", grpc_upstreams_[0]->localAddress()->asString()});
     }
 
-    test::integration::filters::TracerTestConfig test_config;
+    ::test::integration::filters::TracerTestConfig test_config;
     test_config.mutable_expect_spans()->Add()->CopyFrom(ext_proc_span);
 
     auto* tracing = cm.mutable_tracing();
@@ -2350,7 +2348,7 @@ TEST_P(ExtProcIntegrationTest, RequestMessageTimeoutWithTracing) {
   initializeConfig();
 
   config_helper_.addConfigModifier([&](HttpConnectionManager& cm) {
-    test::integration::filters::ExpectSpan ext_proc_span;
+    ::test::integration::filters::ExpectSpan ext_proc_span;
     ext_proc_span.set_operation_name(
         "async envoy.service.ext_proc.v3.ExternalProcessor.Process egress");
     ext_proc_span.set_context_injected(true);
@@ -2364,7 +2362,7 @@ TEST_P(ExtProcIntegrationTest, RequestMessageTimeoutWithTracing) {
       ext_proc_span.mutable_tags()->insert(
           {"upstream_address", grpc_upstreams_[0]->localAddress()->asString()});
     }
-    test::integration::filters::TracerTestConfig test_config;
+    ::test::integration::filters::TracerTestConfig test_config;
     test_config.mutable_expect_spans()->Add()->CopyFrom(ext_proc_span);
 
     auto* tracing = cm.mutable_tracing();

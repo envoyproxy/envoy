@@ -4,23 +4,23 @@ syntax = "proto3";
 // daemon. The X-Ray daemon does not speak protobuf.
 package source.extensions.tracers.xray.daemon;
 
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 import "google/protobuf/struct.proto";
 
 // see https://docs.aws.amazon.com/xray/latest/devguide/xray-api-segmentdocuments.html
 message Segment {
   // The logical name of the service that handled the request. Configured via
   // `segment_name` in XRayConfig.
-  string name = 1 [(validate.rules).string = {min_len: 1}];
+  string name = 1 [(buf.validate.field).string = {min_len: 1}];
   // A 64-bit identifier for the segment, unique among segments in the same trace.
-  string id = 2 [(validate.rules).string = {min_len: 1}];
+  string id = 2 [(buf.validate.field).string = {min_len: 1}];
   // A unique identifier that connects all segments and sub-segments originating
   // from a single client request.
-  string trace_id = 3 [(validate.rules).string = {len: 35}];
+  string trace_id = 3 [(buf.validate.field).string = {len: 35}];
   // The time the segment was created.
-  double start_time = 4 [(validate.rules).double = {gt: 0}];
+  double start_time = 4 [(buf.validate.field).double = {gt: 0}];
   // The time the segment was closed.
-  double end_time = 5 [(validate.rules).double = {gt: 0}];
+  double end_time = 5 [(buf.validate.field).double = {gt: 0}];
   // The type of the resource originating the segment. Configured via `origin` field in
   // `XRayConfig.SegmentFields`. e.g. “AWS::AppMesh::Proxy”.
   string origin = 9;

@@ -2,11 +2,9 @@
 #include <memory>
 
 #include "envoy/extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.pb.h"
-#include "envoy/extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.pb.validate.h"
 #include "envoy/grpc/async_client_manager.h"
 #include "envoy/registry/registry.h"
 #include "envoy/service/rate_limit_quota/v3/rlqs.pb.h"
-#include "envoy/service/rate_limit_quota/v3/rlqs.pb.validate.h"
 
 #include "source/common/http/matching/data_impl.h"
 #include "source/common/http/message_impl.h"

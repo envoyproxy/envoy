@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/extensions/filters/http/kill_request/v3/kill_request.pb.h"
-#include "envoy/extensions/filters/http/kill_request/v3/kill_request.pb.validate.h"
 
 #include "source/extensions/filters/http/common/factory_base.h"
 

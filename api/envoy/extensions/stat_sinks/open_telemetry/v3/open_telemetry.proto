@@ -8,11 +8,11 @@ import "envoy/config/core/v3/http_service.proto";
 
 import "google/protobuf/wrappers.proto";
 
+import "buf/validate/validate.proto";
 import "opentelemetry/proto/common/v1/common.proto";
 import "xds/type/matcher/v3/matcher.proto";
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.stat_sinks.open_telemetry.v3";
 option java_outer_classname = "OpenTelemetryProto";
@@ -43,10 +43,10 @@ message SinkConfig {
   }
 
   oneof protocol_specifier {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // The upstream gRPC cluster that implements the OTLP/gRPC collector.
-    config.core.v3.GrpcService grpc_service = 1 [(validate.rules).message = {required: true}];
+    config.core.v3.GrpcService grpc_service = 1;
 
     // The upstream HTTP cluster that implements the OTLP/HTTP collector.
     // See `OTLP/HTTP <https://opentelemetry.io/docs/specs/otlp/#otlphttp>`_.

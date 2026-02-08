@@ -4,7 +4,6 @@
 
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
-#include "envoy/config/route/v3/route_components.pb.validate.h"
 
 #include "source/common/http/header_map_impl.h"
 #include "source/common/network/address_impl.h"
@@ -12,7 +11,6 @@
 #include "source/extensions/filters/common/ratelimit_config/ratelimit_config.h"
 
 #include "test/extensions/filters/common/ratelimit_config/ratelimit_config_test.pb.h"
-#include "test/extensions/filters/common/ratelimit_config/ratelimit_config_test.pb.validate.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/ratelimit/mocks.h"
 #include "test/mocks/router/mocks.h"
@@ -77,7 +75,7 @@ actions:
 class RateLimitConfigTest : public testing::Test {
 public:
   void setupTest(const std::string& yaml) {
-    test::extensions::filters::common::ratelimit_config::TestRateLimitConfig proto_config;
+    ::test::extensions::filters::common::ratelimit_config::TestRateLimitConfig proto_config;
     TestUtility::loadFromYaml(yaml, proto_config);
     config_ = std::make_unique<Envoy::Extensions::Filters::Common::RateLimit::RateLimitConfig>(
         proto_config.rate_limits(), factory_context_, creation_status_);

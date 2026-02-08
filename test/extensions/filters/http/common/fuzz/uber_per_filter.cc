@@ -13,6 +13,8 @@
 // This file contains any filter-specific setup and input clean-up needed in the generic filter fuzz
 // target.
 
+const bookstore::Shelf _bookstore_link_hack;
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -55,12 +57,14 @@ void addBookstoreProtoDescriptor(Protobuf::Message* message) {
 }
 
 void addBookstoreDescriptorReverseTranscoder(Protobuf::Message* message) {
-  envoy::extensions::filters::http::grpc_json_reverse_transcoder::v3::GrpcJsonReverseTranscoder&
-      config = *Envoy::Protobuf::DynamicCastMessage<
-          envoy::extensions::filters::http::grpc_json_reverse_transcoder::v3::
-              GrpcJsonReverseTranscoder>(message);
-  config.mutable_max_request_body_size()->set_value(101);
-  config.mutable_max_response_body_size()->set_value(101);
+  auto* config = Envoy::Protobuf::DynamicCastMessage<
+      envoy::extensions::filters::http::grpc_json_reverse_transcoder::v3::
+          GrpcJsonReverseTranscoder>(message);
+  if (config == nullptr) {
+    throw EnvoyException("invalid grpc_json_reverse_transcoder config");
+  }
+  config->mutable_max_request_body_size()->set_value(101);
+  config->mutable_max_response_body_size()->set_value(101);
   Protobuf::FileDescriptorSet descriptor_set;
   const auto* file_descriptor =
       Protobuf::DescriptorPool::generated_pool()->FindFileByName("test/proto/bookstore.proto");
@@ -68,11 +72,11 @@ void addBookstoreDescriptorReverseTranscoder(Protobuf::Message* message) {
   // Create a set to keep track of descriptors as they are added.
   absl::flat_hash_set<absl::string_view> added_descriptors;
   addFileDescriptorsRecursively(*file_descriptor, descriptor_set, added_descriptors);
-  descriptor_set.SerializeToString(config.mutable_descriptor_binary());
+  descriptor_set.SerializeToString(config->mutable_descriptor_binary());
 }
 } // namespace
 
-void UberFilterFuzzer::guideAnyProtoType(test::fuzz::HttpData* mutable_data, uint choice) {
+void UberFilterFuzzer::guideAnyProtoType(::test::fuzz::HttpData* mutable_data, uint choice) {
   // These types are request/response from the test Bookstore service
   // for the gRPC Transcoding filter.
   static const std::vector<std::string> expected_types = {

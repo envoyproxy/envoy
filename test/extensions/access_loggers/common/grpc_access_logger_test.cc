@@ -23,6 +23,8 @@ using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 
+const envoy::service::accesslog::v3::StreamAccessLogsMessage _als_link_hack;
+
 namespace Envoy {
 namespace Extensions {
 namespace AccessLoggers {

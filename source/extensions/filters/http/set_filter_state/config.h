@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/extensions/filters/http/set_filter_state/v3/set_filter_state.pb.h"
-#include "envoy/extensions/filters/http/set_filter_state/v3/set_filter_state.pb.validate.h"
 
 #include "source/common/common/logger.h"
 #include "source/extensions/filters/common/set_filter_state/filter_config.h"

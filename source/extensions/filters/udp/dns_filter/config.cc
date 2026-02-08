@@ -1,5 +1,7 @@
 #include "source/extensions/filters/udp/dns_filter/config.h"
 
+#include "envoy/extensions/filters/udp/dns_filter/v3/dns_filter.pb.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace UdpFilters {

@@ -2,8 +2,9 @@ syntax = "proto3";
 
 package envoy.extensions.clusters.composite.v3;
 
+import "buf/validate/validate.proto";
+
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.clusters.composite.v3";
 option java_outer_classname = "ClusterProto";
@@ -44,12 +45,12 @@ message ClusterConfig {
   // Configuration for an individual cluster entry.
   message ClusterEntry {
     // Name of the cluster. This cluster must be defined elsewhere in the configuration.
-    string name = 1 [(validate.rules).string = {min_len: 1}];
+    string name = 1 [(buf.validate.field).string = {min_len: 1}];
   }
 
   // List of clusters to use for request routing. The first cluster is used for the
   // initial request (attempt 1), the second cluster for the first retry (attempt 2),
   // and so on. Must contain at least one cluster. When retry attempts exceed the number
   // of configured clusters, requests will fail with no host available.
-  repeated ClusterEntry clusters = 1 [(validate.rules).repeated = {min_items: 1}];
+  repeated ClusterEntry clusters = 1 [(buf.validate.field).repeated = {min_items: 1}];
 }

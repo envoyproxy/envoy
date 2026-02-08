@@ -3,7 +3,6 @@
 #include "source/extensions/filters/network/common/factory_base.h"
 
 #include "test/integration/filters/test_network_filter.pb.h"
-#include "test/integration/filters/test_network_filter.pb.validate.h"
 
 namespace Envoy {
 namespace {
@@ -49,16 +48,16 @@ private:
 };
 
 class TestNetworkFilterConfigFactory : public Extensions::NetworkFilters::Common::FactoryBase<
-                                           test::integration::filters::TestNetworkFilterConfig> {
+                                           ::test::integration::filters::TestNetworkFilterConfig> {
 public:
   TestNetworkFilterConfigFactory()
       : Extensions::NetworkFilters::Common::FactoryBase<
-            test::integration::filters::TestNetworkFilterConfig>("envoy.test.test_network_filter") {
-  }
+            ::test::integration::filters::TestNetworkFilterConfig>(
+            "envoy.test.test_network_filter") {}
 
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
-      const test::integration::filters::TestNetworkFilterConfig& config,
+      const ::test::integration::filters::TestNetworkFilterConfig& config,
       Server::Configuration::FactoryContext& context) override {
     return [config, &context](Network::FilterManager& filter_manager) -> void {
       filter_manager.addReadFilter(std::make_shared<TestNetworkFilter>(context.scope()));
@@ -73,7 +72,8 @@ static Registry::RegisterFactory<TestNetworkFilterConfigFactory,
 
 class TestDrainerNetworkFilter : public Network::ReadFilter {
 public:
-  TestDrainerNetworkFilter(const test::integration::filters::TestDrainerNetworkFilterConfig& config)
+  TestDrainerNetworkFilter(
+      const ::test::integration::filters::TestDrainerNetworkFilterConfig& config)
       : bytes_to_drain_(config.bytes_to_drain()), direct_response_(config.direct_response()),
         drain_all_data_(config.drain_all_data()) {}
 
@@ -108,16 +108,16 @@ private:
 
 class TestDrainerNetworkFilterConfigFactory
     : public Extensions::NetworkFilters::Common::FactoryBase<
-          test::integration::filters::TestDrainerNetworkFilterConfig> {
+          ::test::integration::filters::TestDrainerNetworkFilterConfig> {
 public:
   TestDrainerNetworkFilterConfigFactory()
       : Extensions::NetworkFilters::Common::FactoryBase<
-            test::integration::filters::TestDrainerNetworkFilterConfig>(
+            ::test::integration::filters::TestDrainerNetworkFilterConfig>(
             "envoy.test.test_drainer_network_filter") {}
 
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
-      const test::integration::filters::TestDrainerNetworkFilterConfig& config,
+      const ::test::integration::filters::TestDrainerNetworkFilterConfig& config,
       Server::Configuration::FactoryContext&) override {
     return [config](Network::FilterManager& filter_manager) -> void {
       filter_manager.addReadFilter(std::make_shared<TestDrainerNetworkFilter>(config));
@@ -125,7 +125,7 @@ private:
   }
 
   bool isTerminalFilterByProtoTyped(
-      const test::integration::filters::TestDrainerNetworkFilterConfig& config,
+      const ::test::integration::filters::TestDrainerNetworkFilterConfig& config,
       Server::Configuration::ServerFactoryContext&) override {
     return config.is_terminal_filter();
   }
@@ -138,7 +138,7 @@ static Registry::RegisterFactory<TestDrainerNetworkFilterConfigFactory,
 class TestDrainerUpstreamNetworkFilter : public Network::WriteFilter {
 public:
   TestDrainerUpstreamNetworkFilter(
-      const test::integration::filters::TestDrainerUpstreamNetworkFilterConfig& config)
+      const ::test::integration::filters::TestDrainerUpstreamNetworkFilterConfig& config)
       : bytes_to_drain_(config.bytes_to_drain()) {}
 
   Network::FilterStatus onWrite(Buffer::Instance& buffer, bool) override {
@@ -164,7 +164,7 @@ public:
   createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                Server::Configuration::UpstreamFactoryContext& context) override {
     const auto& config = MessageUtil::downcastAndValidate<
-        const test::integration::filters::TestDrainerUpstreamNetworkFilterConfig&>(
+        const ::test::integration::filters::TestDrainerUpstreamNetworkFilterConfig&>(
         proto_config, context.serverFactoryContext().messageValidationVisitor());
     return [config](Network::FilterManager& filter_manager) -> void {
       filter_manager.addWriteFilter(std::make_shared<TestDrainerUpstreamNetworkFilter>(config));
@@ -172,7 +172,7 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<test::integration::filters::TestDrainerUpstreamNetworkFilterConfig>();
+    return std::make_unique<::test::integration::filters::TestDrainerUpstreamNetworkFilterConfig>();
   }
 };
 

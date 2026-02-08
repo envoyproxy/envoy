@@ -49,6 +49,7 @@ envoy_cc_library(
         "//source/common/runtime:runtime_lib",
         "//source/common/upstream:cluster_manager_lib",
         "@c-ares//:ares",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/udp/dns_filter/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],

@@ -3,6 +3,7 @@
 #include <string>
 
 #include "envoy/access_log/access_log_config.h"
+#include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
 
 namespace Envoy {
 namespace Extensions {

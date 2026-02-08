@@ -76,7 +76,7 @@ public:
                                                  const std::string& value, bool disabled = false) {
     HttpFilterProto filter_config;
     filter_config.set_name(name);
-    auto configuration = test::integration::filters::AddHeaderFilterConfig();
+    auto configuration = ::test::integration::filters::AddHeaderFilterConfig();
     configuration.set_header_key(key);
     configuration.set_header_value(value);
     filter_config.set_disabled(disabled);
@@ -341,7 +341,7 @@ public:
     auto* discovery = filter->mutable_config_discovery();
     discovery->add_type_urls("type.googleapis.com/test.integration.filters.AddHeaderFilterConfig");
     if (set_default_config) {
-      auto default_configuration = test::integration::filters::AddHeaderFilterConfig();
+      auto default_configuration = ::test::integration::filters::AddHeaderFilterConfig();
       default_configuration.set_header_key(default_header_key_);
       default_configuration.set_header_value(default_header_value_);
       discovery->mutable_default_config()->PackFrom(default_configuration);
@@ -538,7 +538,7 @@ public:
     envoy::config::core::v3::TypedExtensionConfig typed_config;
     typed_config.set_name(name);
 
-    auto configuration = test::integration::filters::AddHeaderFilterConfig();
+    auto configuration = ::test::integration::filters::AddHeaderFilterConfig();
     configuration.set_header_key(key);
     configuration.set_header_value(val);
     typed_config.mutable_typed_config()->PackFrom(configuration);
@@ -829,7 +829,7 @@ TEST_P(DynamicRouterOrClusterFiltersIntegrationTest, BasicSuccessWithConfigDump)
   envoy::config::core::v3::TypedExtensionConfig filter_config;
   EXPECT_TRUE(ecds_config_dump.ecds_filters(0).ecds_filter().UnpackTo(&filter_config));
   EXPECT_EQ("foo", filter_config.name());
-  test::integration::filters::AddHeaderFilterConfig http_filter_config;
+  ::test::integration::filters::AddHeaderFilterConfig http_filter_config;
   filter_config.typed_config().UnpackTo(&http_filter_config);
   EXPECT_EQ(default_header_key_, http_filter_config.header_key());
   EXPECT_EQ("xds-val", http_filter_config.header_value());

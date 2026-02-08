@@ -2,9 +2,10 @@ syntax = "proto3";
 
 package envoy.extensions.geoip_providers.common.v3;
 
+import "buf/validate/validate.proto";
+
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.geoip_providers.common.v3";
 option java_outer_classname = "CommonProto";
@@ -26,68 +27,93 @@ message CommonGeoipProviderConfig {
   //   <envoy_v3_api_field_extensions.geoip_providers.common.v3.CommonGeoipProviderConfig.geo_field_keys>`.
   message GeolocationHeadersToAdd {
     // If set, the header will be used to populate the country ISO code associated with the IP address.
-    string country = 1
-        [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
+    string country = 1 [
+      (buf.validate.field).string = {well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME},
+      (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE
+    ];
 
     // If set, the header will be used to populate the city associated with the IP address.
-    string city = 2
-        [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
+    string city = 2 [
+      (buf.validate.field).string = {well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME},
+      (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE
+    ];
 
     // If set, the header will be used to populate the region ISO code associated with the IP address.
     // The least specific subdivision will be selected as the region value.
-    string region = 3
-        [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
+    string region = 3 [
+      (buf.validate.field).string = {well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME},
+      (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE
+    ];
 
     // If set, the header will be used to populate the ASN associated with the IP address.
     // Note: If both ISP and ASN databases are configured, only the ASN database is used for lookup.
-    string asn = 4
-        [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
+    string asn = 4 [
+      (buf.validate.field).string = {well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME},
+      (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE
+    ];
 
     // If set, the header will be used to populate the autonomous system organization associated with the IP address.
     // Note: If both ISP and ASN databases are configured, only the ASN database is used for lookup.
-    string asn_org = 13
-        [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
+    string asn_org = 13 [
+      (buf.validate.field).string = {well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME},
+      (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE
+    ];
 
     // This field is deprecated; use ``anon`` instead.
     string is_anon = 5 [
       deprecated = true,
-      (validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true},
+      (buf.validate.field).string = {well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME},
+      (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE,
       (envoy.annotations.deprecated_at_minor_version) = "3.0"
     ];
 
     // If set, the IP address will be checked if it belongs to any type of anonymization network (e.g., VPN, public proxy).
     // The header will be populated with the check result. Header value will be set to either ``true`` or ``false`` depending on the check result.
-    string anon = 12
-        [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
+    string anon = 12 [
+      (buf.validate.field).string = {well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME},
+      (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE
+    ];
 
     // If set, the IP address will be checked if it belongs to a VPN and the header will be populated with the check result.
     // Header value will be set to either ``true`` or ``false`` depending on the check result.
-    string anon_vpn = 6
-        [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
+    string anon_vpn = 6 [
+      (buf.validate.field).string = {well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME},
+      (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE
+    ];
 
     // If set, the IP address will be checked if it belongs to a hosting provider and the header will be populated with the check result.
     // Header value will be set to either ``true`` or ``false`` depending on the check result.
-    string anon_hosting = 7
-        [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
+    string anon_hosting = 7 [
+      (buf.validate.field).string = {well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME},
+      (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE
+    ];
 
     // If set, the IP address will be checked if it belongs to a TOR exit node and the header will be populated with the check result.
     // Header value will be set to either ``true`` or ``false`` depending on the check result.
-    string anon_tor = 8
-        [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
+    string anon_tor = 8 [
+      (buf.validate.field).string = {well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME},
+      (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE
+    ];
 
     // If set, the IP address will be checked if it belongs to a public proxy and the header will be populated with the check result.
     // Header value will be set to either ``true`` or ``false`` depending on the check result.
-    string anon_proxy = 9
-        [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
+    string anon_proxy = 9 [
+      (buf.validate.field).string = {well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME},
+      (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE
+    ];
 
     // If set, the header will be used to populate the ISP associated with the IP address.
-    string isp = 10
-        [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
+    string isp = 10 [
+      (buf.validate.field).string = {well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME},
+      (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE
+    ];
 
     // If set, the IP address will be checked if it belongs to the ISP named iCloud Private Relay and the header will be populated with the check result.
     // Header value will be set to either ``true`` or ``false`` depending on the check result.
-    string apple_private_relay = 11
-        [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
+    string apple_private_relay = 11 [
+      (buf.validate.field).string = {well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME},
+      (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE
+    ];
   }
 
   // The set of geolocation field keys to use for storing lookup results.

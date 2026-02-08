@@ -33,15 +33,15 @@ public:
   }
 
   void addStaticFilter(const std::string& name, uint32_t bytes_to_drain) {
-    config_helper_.addConfigModifier(
-        [name, bytes_to_drain](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-          auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
-          auto* filter = cluster->add_filters();
-          filter->set_name(name);
-          auto configuration = test::integration::filters::TestDrainerUpstreamNetworkFilterConfig();
-          configuration.set_bytes_to_drain(bytes_to_drain);
-          filter->mutable_typed_config()->PackFrom(configuration);
-        });
+    config_helper_.addConfigModifier([name, bytes_to_drain](
+                                         envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+      auto* filter = cluster->add_filters();
+      filter->set_name(name);
+      auto configuration = ::test::integration::filters::TestDrainerUpstreamNetworkFilterConfig();
+      configuration.set_bytes_to_drain(bytes_to_drain);
+      filter->mutable_typed_config()->PackFrom(configuration);
+    });
   }
 
   void sendDataVerifyResults(uint32_t bytes_drained) {
@@ -136,7 +136,7 @@ public:
           "type.googleapis.com/test.integration.filters.TestDrainerUpstreamNetworkFilterConfig");
       if (set_default_config) {
         auto default_configuration =
-            test::integration::filters::TestDrainerUpstreamNetworkFilterConfig();
+            ::test::integration::filters::TestDrainerUpstreamNetworkFilterConfig();
         default_configuration.set_bytes_to_drain(default_bytes_to_drain_);
         discovery->mutable_default_config()->PackFrom(default_configuration);
       }
@@ -299,7 +299,7 @@ public:
     typed_config.set_name(name);
     envoy::service::discovery::v3::Resource resource;
     resource.set_name(name);
-    auto configuration = test::integration::filters::TestDrainerUpstreamNetworkFilterConfig();
+    auto configuration = ::test::integration::filters::TestDrainerUpstreamNetworkFilterConfig();
     configuration.set_bytes_to_drain(bytes_to_drain);
     typed_config.mutable_typed_config()->PackFrom(configuration);
     resource.mutable_resource()->PackFrom(typed_config);
@@ -317,7 +317,7 @@ public:
   // Verify ECDS config dump data.
   bool verifyConfigDumpData(
       envoy::config::core::v3::TypedExtensionConfig filter_config,
-      test::integration::filters::TestDrainerUpstreamNetworkFilterConfig network_filter_config) {
+      ::test::integration::filters::TestDrainerUpstreamNetworkFilterConfig network_filter_config) {
     // There is no ordering. i.e, either foo or bar could be the 1st in the config dump.
     if (filter_config.name() == "foo") {
       EXPECT_EQ(3, network_filter_config.bytes_to_drain());
@@ -534,7 +534,7 @@ TEST_P(UpstreamNetworkExtensionDiscoveryIntegrationTest, BasicSuccessWithConfigD
   envoy::config::core::v3::TypedExtensionConfig filter_config;
   EXPECT_TRUE(ecds_config_dump.ecds_filters(0).ecds_filter().UnpackTo(&filter_config));
   EXPECT_EQ("foo", filter_config.name());
-  test::integration::filters::TestDrainerUpstreamNetworkFilterConfig network_filter_config;
+  ::test::integration::filters::TestDrainerUpstreamNetworkFilterConfig network_filter_config;
   filter_config.typed_config().UnpackTo(&network_filter_config);
   EXPECT_EQ(5, network_filter_config.bytes_to_drain());
 }
@@ -599,7 +599,7 @@ TEST_P(UpstreamNetworkExtensionDiscoveryIntegrationTest,
   envoy::admin::v3::EcdsConfigDump ecds_config_dump;
   config_dump.configs(2).UnpackTo(&ecds_config_dump);
   envoy::config::core::v3::TypedExtensionConfig filter_config;
-  test::integration::filters::TestDrainerUpstreamNetworkFilterConfig network_filter_config;
+  ::test::integration::filters::TestDrainerUpstreamNetworkFilterConfig network_filter_config;
   // Verify the first filter.
   EXPECT_EQ("1", ecds_config_dump.ecds_filters(0).version_info());
   EXPECT_TRUE(ecds_config_dump.ecds_filters(0).ecds_filter().UnpackTo(&filter_config));
@@ -641,7 +641,7 @@ TEST_P(UpstreamNetworkExtensionDiscoveryIntegrationTest,
   envoy::config::core::v3::TypedExtensionConfig filter_config;
   EXPECT_TRUE(ecds_msg.ecds_filter().UnpackTo(&filter_config));
   EXPECT_EQ("bar", filter_config.name());
-  test::integration::filters::TestDrainerUpstreamNetworkFilterConfig network_filter_config;
+  ::test::integration::filters::TestDrainerUpstreamNetworkFilterConfig network_filter_config;
   filter_config.typed_config().UnpackTo(&network_filter_config);
   EXPECT_EQ(4, network_filter_config.bytes_to_drain());
 }
@@ -716,7 +716,7 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<test::integration::filters::TestNetworkFilterConfig>();
+    return std::make_unique<::test::integration::filters::TestNetworkFilterConfig>();
   }
 
   std::string name() const override { return "envoy.test.access_log_filter_custom"; }
@@ -737,7 +737,7 @@ public:
       auto* filter = cluster->add_filters();
       filter->set_name("envoy.test.access_log_filter_custom");
       // Need valid config type matching the factory
-      test::integration::filters::TestNetworkFilterConfig config;
+      ::test::integration::filters::TestNetworkFilterConfig config;
       filter->mutable_typed_config()->PackFrom(config);
     });
 

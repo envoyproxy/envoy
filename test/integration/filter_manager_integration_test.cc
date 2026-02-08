@@ -13,7 +13,6 @@
 #include "source/extensions/filters/network/common/factory_base.h"
 
 #include "test/integration/filter_manager_integration_test.pb.h"
-#include "test/integration/filter_manager_integration_test.pb.validate.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/integration.h"
 #include "test/integration/utility.h"
@@ -164,13 +163,13 @@ void ThrottlerFilter::onEvent(Network::ConnectionEvent event) {
  * Config factory for ThrottlerFilter.
  */
 class ThrottlerFilterConfigFactory : public Extensions::NetworkFilters::Common::FactoryBase<
-                                         test::integration::filter_manager::Throttler> {
+                                         ::test::integration::filter_manager::Throttler> {
 public:
   explicit ThrottlerFilterConfigFactory(const std::string& name) : FactoryBase(name) {}
 
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
-      const test::integration::filter_manager::Throttler& proto_config,
+      const ::test::integration::filter_manager::Throttler& proto_config,
       Server::Configuration::FactoryContext&) override {
     return [proto_config](Network::FilterManager& filter_manager) -> void {
       filter_manager.addFilter(std::make_shared<ThrottlerFilter>(

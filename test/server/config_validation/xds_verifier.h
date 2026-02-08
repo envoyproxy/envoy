@@ -18,7 +18,7 @@ namespace Envoy {
 
 class XdsVerifier {
 public:
-  XdsVerifier(test::server::config_validation::Config::SotwOrDelta sotw_or_delta);
+  XdsVerifier(::test::server::config_validation::Config::SotwOrDelta sotw_or_delta);
   void listenerAdded(const envoy::config::listener::v3::Listener& listener,
                      bool from_update = false);
   void listenerUpdated(const envoy::config::listener::v3::Listener& listener);

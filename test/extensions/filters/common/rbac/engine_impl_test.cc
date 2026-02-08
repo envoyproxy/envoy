@@ -1,6 +1,5 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/rbac/v3/rbac.pb.h"
-#include "envoy/config/rbac/v3/rbac.pb.validate.h"
 #include "envoy/extensions/matching/common_inputs/network/v3/network_inputs.pb.h"
 
 #include "source/common/network/address_impl.h"
@@ -122,9 +121,10 @@ TEST(RoleBasedAccessControlEngineImpl, InvalidConfig) {
     envoy::config::rbac::v3::Policy policy;
     (*rbac.mutable_policies())["foo"] = policy;
 
-    EXPECT_THROW_WITH_REGEX(TestUtility::validate(rbac), EnvoyException,
-                            "RBACValidationError\\.Policies.*PolicyValidationError\\.Permissions"
-                            ".*value must contain at least")
+    EXPECT_THROW_WITH_REGEX(
+        TestUtility::validate(rbac), EnvoyException,
+        "field 'policies.permissions': value must contain at least 1 item\\(s\\);"
+        ".*field 'policies.principals': value must contain at least 1 item\\(s\\)");
   }
 
   {
@@ -136,7 +136,8 @@ TEST(RoleBasedAccessControlEngineImpl, InvalidConfig) {
 
     EXPECT_THROW_WITH_REGEX(
         TestUtility::validate(rbac), EnvoyException,
-        "RBACValidationError\\.Policies.*PolicyValidationError\\.Permissions.*rule.*is required");
+        "field 'policies.principals': value must contain at least 1 item\\(s\\);"
+        ".*field 'policies.permissions.rule': exactly one field is required in oneof");
   }
 
   {
@@ -150,8 +151,9 @@ TEST(RoleBasedAccessControlEngineImpl, InvalidConfig) {
 
     EXPECT_THROW_WITH_REGEX(
         TestUtility::validate(rbac), EnvoyException,
-        "RBACValidationError\\.Policies.*PolicyValidationError\\.Permissions"
-        ".*PermissionValidationError\\.AndRules.*SetValidationError\\.Rules.*rule.*is required");
+        "field 'policies.principals': value must contain at least 1 item\\(s\\);"
+        ".*field 'policies.permissions.and_rules.rules.rule': exactly one field is required in "
+        "oneof");
   }
 
   {
@@ -162,9 +164,9 @@ TEST(RoleBasedAccessControlEngineImpl, InvalidConfig) {
     permission->set_any(true);
     (*rbac.mutable_policies())["foo"] = policy;
 
-    EXPECT_THROW_WITH_REGEX(TestUtility::validate(rbac), EnvoyException,
-                            "RBACValidationError\\.Policies.*PolicyValidationError\\.Principals"
-                            ".*value must contain at least")
+    EXPECT_THROW_WITH_REGEX(
+        TestUtility::validate(rbac), EnvoyException,
+        "field 'policies.principals': value must contain at least 1 item\\(s\\)");
   }
 
   {
@@ -176,9 +178,9 @@ TEST(RoleBasedAccessControlEngineImpl, InvalidConfig) {
     policy.add_principals();
     (*rbac.mutable_policies())["foo"] = policy;
 
-    EXPECT_THROW_WITH_REGEX(TestUtility::validate(rbac), EnvoyException,
-                            "RBACValidationError\\.Policies.*PolicyValidationError\\.Principals"
-                            ".*identifier.*is required");
+    EXPECT_THROW_WITH_REGEX(
+        TestUtility::validate(rbac), EnvoyException,
+        "field 'policies.principals.identifier': exactly one field is required in oneof");
   }
 
   {
@@ -192,10 +194,9 @@ TEST(RoleBasedAccessControlEngineImpl, InvalidConfig) {
     and_ids->add_ids();
     (*rbac.mutable_policies())["foo"] = policy;
 
-    EXPECT_THROW_WITH_REGEX(
-        TestUtility::validate(rbac), EnvoyException,
-        "RBACValidationError\\.Policies.*PolicyValidationError\\.Principals"
-        ".*PrincipalValidationError\\.AndIds.*SetValidationError\\.Ids.*identifier.*is required");
+    EXPECT_THROW_WITH_REGEX(TestUtility::validate(rbac), EnvoyException,
+                            "field 'policies.principals.and_ids.ids.identifier': exactly one field "
+                            "is required in oneof");
   }
 }
 

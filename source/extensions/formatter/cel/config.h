@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/extensions/formatter/cel/v3/cel.pb.h"
+
 #include "source/common/formatter/substitution_formatter.h"
 #include "source/extensions/filters/common/expr/evaluator.h"
 

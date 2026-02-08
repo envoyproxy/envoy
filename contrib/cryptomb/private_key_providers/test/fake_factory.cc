@@ -12,7 +12,6 @@
 
 #include "contrib/cryptomb/private_key_providers/source/cryptomb_private_key_provider.h"
 #include "contrib/envoy/extensions/private_key_providers/cryptomb/v3alpha/cryptomb.pb.h"
-#include "contrib/envoy/extensions/private_key_providers/cryptomb/v3alpha/cryptomb.pb.validate.h"
 #include "openssl/rsa.h"
 #include "openssl/ssl.h"
 

@@ -49,7 +49,7 @@ TEST(CustomHeaderFactoryTest, InvalidHeaderName) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_THROW_WITH_REGEX(*factory->createExtension(typed_config.typed_config(), context),
                           EnvoyException,
-                          "Proto constraint validation failed.*does not match regex pattern.*");
+                          "field 'header_name': value must be a valid HTTP header name");
 }
 
 } // namespace CustomHeader

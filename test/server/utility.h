@@ -3,7 +3,6 @@
 #include <string>
 
 #include "envoy/config/listener/v3/listener.pb.h"
-#include "envoy/config/listener/v3/listener.pb.validate.h"
 
 #include "source/common/protobuf/utility.h"
 

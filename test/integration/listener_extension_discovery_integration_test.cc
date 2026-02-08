@@ -84,7 +84,7 @@ public:
           auto* listener_filter =
               bootstrap.mutable_static_resources()->mutable_listeners(0)->add_listener_filters();
           listener_filter->set_name(name);
-          auto configuration = test::integration::filters::TestTcpListenerFilterConfig();
+          auto configuration = ::test::integration::filters::TestTcpListenerFilterConfig();
           configuration.set_drain_bytes(drain_bytes);
           listener_filter->mutable_typed_config()->PackFrom(configuration);
           addListenerFilterMatcher(listener_filter, matcher);
@@ -258,7 +258,7 @@ public:
                         ListenerMatcherType matcher = ListenerMatcherType::NULLMATCHER,
                         bool second_connection = false) {
     auto default_configuration =
-        std::make_shared<test::integration::filters::TestTcpListenerFilterConfig>();
+        std::make_shared<::test::integration::filters::TestTcpListenerFilterConfig>();
     default_configuration->set_drain_bytes(default_drain_bytes_);
     addDynamicFilterWithType(
         filter_name, "type.googleapis.com/test.integration.filters.TestTcpListenerFilterConfig",
@@ -287,7 +287,7 @@ public:
   // Verify ECDS config dump data.
   bool
   verifyConfigDumpData(envoy::config::core::v3::TypedExtensionConfig filter_config,
-                       test::integration::filters::TestTcpListenerFilterConfig listener_config) {
+                       ::test::integration::filters::TestTcpListenerFilterConfig listener_config) {
     // There is no ordering. i.e, either foo or bar could be the 1st in the config dump.
     if (filter_config.name() == "foo") {
       EXPECT_EQ(3, listener_config.drain_bytes());
@@ -305,7 +305,7 @@ public:
     // The to-be-drained bytes has to be smaller than data size.
     ASSERT(drain_bytes <= data_.size());
 
-    auto configuration = test::integration::filters::TestTcpListenerFilterConfig();
+    auto configuration = ::test::integration::filters::TestTcpListenerFilterConfig();
     configuration.set_drain_bytes(drain_bytes);
     sendXdsResponseWithTypedConfig(name, version, configuration, ttl, second_connection);
   }
@@ -652,7 +652,7 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicSuccessWithConfigDump) {
   envoy::config::core::v3::TypedExtensionConfig filter_config;
   EXPECT_TRUE(ecds_config_dump.ecds_filters(0).ecds_filter().UnpackTo(&filter_config));
   EXPECT_EQ("foo", filter_config.name());
-  test::integration::filters::TestTcpListenerFilterConfig listener_config;
+  ::test::integration::filters::TestTcpListenerFilterConfig listener_config;
   filter_config.typed_config().UnpackTo(&listener_config);
   EXPECT_EQ(5, listener_config.drain_bytes());
 }
@@ -717,7 +717,7 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, TwoSubscriptionsSameFilterType
   envoy::admin::v3::EcdsConfigDump ecds_config_dump;
   config_dump.configs(2).UnpackTo(&ecds_config_dump);
   envoy::config::core::v3::TypedExtensionConfig filter_config;
-  test::integration::filters::TestTcpListenerFilterConfig listener_config;
+  ::test::integration::filters::TestTcpListenerFilterConfig listener_config;
   // Verify the first filter.
   EXPECT_EQ("1", ecds_config_dump.ecds_filters(0).version_info());
   EXPECT_TRUE(ecds_config_dump.ecds_filters(0).ecds_filter().UnpackTo(&filter_config));
@@ -759,7 +759,7 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, TwoSubscriptionsConfigDumpWith
   envoy::config::core::v3::TypedExtensionConfig filter_config;
   EXPECT_TRUE(ecds_msg.ecds_filter().UnpackTo(&filter_config));
   EXPECT_EQ("bar", filter_config.name());
-  test::integration::filters::TestTcpListenerFilterConfig listener_config;
+  ::test::integration::filters::TestTcpListenerFilterConfig listener_config;
   filter_config.typed_config().UnpackTo(&listener_config);
   EXPECT_EQ(4, listener_config.drain_bytes());
 }
@@ -801,7 +801,7 @@ public:
                         ListenerMatcherType matcher = ListenerMatcherType::NULLMATCHER,
                         bool second_connection = false) {
     auto default_configuration =
-        std::make_shared<test::integration::filters::TestQuicListenerFilterConfig>();
+        std::make_shared<::test::integration::filters::TestQuicListenerFilterConfig>();
     default_configuration->set_added_value(default_added_value_);
     addDynamicFilterWithType(
         filter_name_, "type.googleapis.com/test.integration.filters.TestQuicListenerFilterConfig",
@@ -813,7 +813,7 @@ public:
                        const std::string& filter_state_value, bool allow_server_migration = false,
                        bool allow_client_migration = false, bool ttl = false,
                        bool second_connection = false) {
-    auto configuration = test::integration::filters::TestQuicListenerFilterConfig();
+    auto configuration = ::test::integration::filters::TestQuicListenerFilterConfig();
     configuration.set_added_value(filter_state_value);
     configuration.set_allow_server_migration(allow_server_migration);
     configuration.set_allow_client_migration(allow_client_migration);
@@ -970,7 +970,7 @@ TEST_P(QuicListenerExtensionDiscoveryIntegrationTest, ConfigDump) {
   envoy::config::core::v3::TypedExtensionConfig filter_config;
   EXPECT_TRUE(ecds_config_dump.ecds_filters(0).ecds_filter().UnpackTo(&filter_config));
   EXPECT_EQ(filter_name_, filter_config.name());
-  test::integration::filters::TestQuicListenerFilterConfig listener_config;
+  ::test::integration::filters::TestQuicListenerFilterConfig listener_config;
   filter_config.typed_config().UnpackTo(&listener_config);
   EXPECT_EQ("abc", listener_config.added_value());
   EXPECT_FALSE(listener_config.allow_server_migration());

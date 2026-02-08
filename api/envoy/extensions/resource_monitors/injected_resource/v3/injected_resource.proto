@@ -2,9 +2,10 @@ syntax = "proto3";
 
 package envoy.extensions.resource_monitors.injected_resource.v3;
 
+import "buf/validate/validate.proto";
+
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.resource_monitors.injected_resource.v3";
 option java_outer_classname = "InjectedResourceProto";
@@ -23,5 +24,5 @@ message InjectedResourceConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.resource_monitor.injected_resource.v2alpha.InjectedResourceConfig";
 
-  string filename = 1 [(validate.rules).string = {min_len: 1}];
+  string filename = 1 [(buf.validate.field).string = {min_len: 1}];
 }

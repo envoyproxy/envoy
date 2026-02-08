@@ -122,6 +122,7 @@ envoy_cc_library(
         "//source/common/json:json_utility_lib",
         "//source/common/protobuf:message_validator_lib",
         "//source/common/stream_info:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
     alwayslink = 1,  # has factory registration
 )

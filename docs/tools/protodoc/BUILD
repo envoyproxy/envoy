@@ -35,7 +35,7 @@ py_proto_library(
 
 py_proto_library(
     name = "validate_py_pb2",
-    deps = ["@com_envoyproxy_protoc_gen_validate//validate:validate_proto"],
+    deps = ["@protovalidate//proto/protovalidate/buf/validate:validate_proto"],
 )
 
 envoy_py_data(

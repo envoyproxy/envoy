@@ -2,6 +2,7 @@
 
 #include <memory>
 
+#include "envoy/extensions/access_loggers/fluentd/v3/fluentd.pb.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 

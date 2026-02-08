@@ -3,7 +3,6 @@
 #include "source/extensions/filters/network/well_known_names.h"
 
 #include "test/config/utility.h"
-#include "test/extensions/filters/network/common/fuzz/network_readfilter_fuzz.pb.validate.h"
 #include "test/extensions/filters/network/common/fuzz/uber_readfilter.h"
 #include "test/extensions/filters/network/common/fuzz/validated_input_generator_any_map_extensions.h"
 #include "test/fuzz/fuzz_runner.h"
@@ -40,8 +39,8 @@ void ensuredValidFilter(unsigned int random_number, envoy::config::listener::v3:
       "type.googleapis.com/", factory->createEmptyConfigProto()->GetDescriptor()->full_name()));
 }
 
-static void TestOneProtoInput(const test::extensions::filters::network::FilterFuzzTestCase&);
-using FuzzerProtoType = test::extensions::filters::network::FilterFuzzTestCase;
+static void TestOneProtoInput(const ::test::extensions::filters::network::FilterFuzzTestCase&);
+using FuzzerProtoType = ::test::extensions::filters::network::FilterFuzzTestCase;
 
 // NOLINTNEXTLINE - suppress clang-tidy, because llvm's lib depends on this identifier.
 extern "C" size_t LLVMFuzzerCustomMutator(uint8_t* data, size_t size, size_t max_size,
@@ -68,7 +67,7 @@ extern "C" size_t LLVMFuzzerCustomMutator(uint8_t* data, size_t size, size_t max
   // Mutate the config part of the test case with a low probability, and
   // the actions part with high probability.
   if (random.random() % 100 < config_mutation_probability) {
-    test::extensions::filters::network::FuzzHelperForActions actions;
+    ::test::extensions::filters::network::FuzzHelperForActions actions;
     *actions.mutable_actions() = std::move(*input.mutable_actions());
     mutator.Mutate(&actions, max_size);
     *input.mutable_actions() = std::move(*actions.mutable_actions());
@@ -91,10 +90,11 @@ extern "C" size_t LLVMFuzzerCustomMutator(uint8_t* data, size_t size, size_t max
 DEFINE_CUSTOM_PROTO_CROSSOVER_IMPL(false, FuzzerProtoType)
 DEFINE_TEST_ONE_PROTO_INPUT_IMPL(false, FuzzerProtoType)
 DEFINE_POST_PROCESS_PROTO_MUTATION_IMPL(FuzzerProtoType)
-static void TestOneProtoInput(const test::extensions::filters::network::FilterFuzzTestCase& input) {
+static void
+TestOneProtoInput(const ::test::extensions::filters::network::FilterFuzzTestCase& input) {
   TestDeprecatedV2Api _deprecated_v2_api;
   ABSL_ATTRIBUTE_UNUSED static PostProcessorRegistration reg = {
-      [](test::extensions::filters::network::FilterFuzzTestCase* input, unsigned int seed) {
+      [](::test::extensions::filters::network::FilterFuzzTestCase* input, unsigned int seed) {
         // This post-processor mutation is applied only when libprotobuf-mutator
         // calls mutate on an input, and *not* during fuzz target execution.
         // Replaying a corpus through the fuzzer will not be affected by the

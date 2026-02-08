@@ -37,6 +37,8 @@ using testing::StartsWith;
 
 namespace Envoy {
 
+const test::common::config::DummyConfig _dummy_config_link_hack;
+
 using Extensions::TransportSockets::Tls::ContextImplPeer;
 
 namespace Ssl {

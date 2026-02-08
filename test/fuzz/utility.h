@@ -84,7 +84,7 @@ replaceInvalidStringValues(const envoy::config::core::v3::Metadata& upstream_met
 // to sanitize for invalid header characters.
 template <class T>
 inline T fromHeaders(
-    const test::fuzz::Headers& headers,
+    const ::test::fuzz::Headers& headers,
     const absl::node_hash_set<std::string>& ignore_headers = absl::node_hash_set<std::string>(),
     absl::node_hash_set<std::string> include_headers = absl::node_hash_set<std::string>()) {
   T header_map;
@@ -102,7 +102,7 @@ inline T fromHeaders(
 }
 
 // Convert from test proto Metadata to MetadataMap
-inline Http::MetadataMapVector fromMetadata(const test::fuzz::Metadata& metadata) {
+inline Http::MetadataMapVector fromMetadata(const ::test::fuzz::Metadata& metadata) {
   Http::MetadataMapVector metadata_map_vector;
   if (!metadata.metadata().empty()) {
     Http::MetadataMap metadata_map;
@@ -116,8 +116,8 @@ inline Http::MetadataMapVector fromMetadata(const test::fuzz::Metadata& metadata
 }
 
 // Convert from HeaderMap to test proto Headers.
-inline test::fuzz::Headers toHeaders(const Http::HeaderMap& headers) {
-  test::fuzz::Headers fuzz_headers;
+inline ::test::fuzz::Headers toHeaders(const Http::HeaderMap& headers) {
+  ::test::fuzz::Headers fuzz_headers;
   headers.iterate([&fuzz_headers](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
     auto* fuzz_header = fuzz_headers.add_headers();
     fuzz_header->set_key(std::string(header.key().getStringView()));
@@ -130,7 +130,7 @@ inline test::fuzz::Headers toHeaders(const Http::HeaderMap& headers) {
 const std::string TestSubjectPeer =
     "CN=Test Server,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US";
 
-inline std::unique_ptr<TestStreamInfo> fromStreamInfo(const test::fuzz::StreamInfo& stream_info,
+inline std::unique_ptr<TestStreamInfo> fromStreamInfo(const ::test::fuzz::StreamInfo& stream_info,
                                                       TimeSource& time_source) {
   // Set mocks' default string return value to be an empty string.
   // TODO(asraa): Speed up this function, which is slowed because of the use of mocks.
@@ -200,7 +200,7 @@ inline std::unique_ptr<TestStreamInfo> fromStreamInfo(const test::fuzz::StreamIn
 }
 
 // Parses http or proto body into chunks.
-inline std::vector<std::string> parseHttpData(const test::fuzz::HttpData& data) {
+inline std::vector<std::string> parseHttpData(const ::test::fuzz::HttpData& data) {
   std::vector<std::string> data_chunks;
 
   if (data.has_http_body()) {

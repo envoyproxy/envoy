@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/formatter/substitution_formatter.h"
 #include "envoy/stream_info/stream_info.h"
 

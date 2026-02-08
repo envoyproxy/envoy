@@ -16,7 +16,6 @@
 #include "test/integration/http_integration.h"
 #include "test/integration/integration.h"
 #include "test/integration/upstream_socket.pb.h"
-#include "test/integration/upstream_socket.pb.validate.h"
 #include "test/integration/utility.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
@@ -78,14 +77,14 @@ public:
   std::string name() const override { return "envoy.test.integration.upstreamt_socket"; }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<test::integration::upstream_socket::v3::Config>();
+    return std::make_unique<::test::integration::upstream_socket::v3::Config>();
   }
 
   absl::StatusOr<Network::UpstreamTransportSocketFactoryPtr> createTransportSocketFactory(
       const Protobuf::Message& config,
       Server::Configuration::TransportSocketFactoryContext& context) override {
     const auto& outer_config =
-        MessageUtil::downcastAndValidate<const test::integration::upstream_socket::v3::Config&>(
+        MessageUtil::downcastAndValidate<const ::test::integration::upstream_socket::v3::Config&>(
             config, context.messageValidationVisitor());
 
     auto& inner_config_factory = Envoy::Config::Utility::getAndCheckFactory<
@@ -126,7 +125,7 @@ TEST_P(UpstreamAccessLogTest, UpstreamFilterState) {
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     envoy::config::core::v3::TransportSocket inner_socket;
     inner_socket.set_name("envoy.transport_sockets.raw_buffer");
-    test::integration::upstream_socket::v3::Config proto_config;
+    ::test::integration::upstream_socket::v3::Config proto_config;
     proto_config.mutable_transport_socket()->MergeFrom(inner_socket);
 
     auto* cluster_transport_socket =

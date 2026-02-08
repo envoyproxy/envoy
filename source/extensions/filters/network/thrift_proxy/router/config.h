@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/extensions/filters/network/thrift_proxy/router/v3/router.pb.h"
-#include "envoy/extensions/filters/network/thrift_proxy/router/v3/router.pb.validate.h"
 
 #include "source/extensions/filters/network/thrift_proxy/filters/factory_base.h"
 #include "source/extensions/filters/network/thrift_proxy/router/router_impl.h"

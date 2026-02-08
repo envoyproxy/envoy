@@ -34,13 +34,13 @@ public:
       cluster_type.set_name(cluster_provided_lb_ ? "envoy.clusters.custom_static_with_lb"
                                                  : "envoy.clusters.custom_static");
       if (!cluster_provided_lb_) {
-        test::integration::clusters::CustomStaticConfig1 config;
+        ::test::integration::clusters::CustomStaticConfig1 config;
         config.set_priority(10);
         config.set_address(Network::Test::getLoopbackAddressString(ipVersion()));
         config.set_port_value(fake_upstreams_[UpstreamIndex]->localAddress()->ip()->port());
         cluster_type.mutable_typed_config()->PackFrom(config);
       } else {
-        test::integration::clusters::CustomStaticConfig2 config;
+        ::test::integration::clusters::CustomStaticConfig2 config;
         config.set_priority(10);
         config.set_address(Network::Test::getLoopbackAddressString(ipVersion()));
         config.set_port_value(fake_upstreams_[UpstreamIndex]->localAddress()->ip()->port());

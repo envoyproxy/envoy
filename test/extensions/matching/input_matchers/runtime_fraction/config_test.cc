@@ -49,8 +49,9 @@ TEST(ConfigTest, InvalidConfig) {
   Config factory;
   auto message = Envoy::Config::Utility::translateAnyToFactoryConfig(
       config.typed_config(), ProtobufMessage::getStrictValidationVisitor(), factory);
-  EXPECT_THROW_WITH_REGEX(factory.createInputMatcherFactoryCb(*message, factory_context),
-                          EnvoyException, "RuntimeFraction: value is required");
+  EXPECT_THROW_WITH_REGEX(
+      factory.createInputMatcherFactoryCb(*message, factory_context), EnvoyException,
+      "Proto constraint validation failed \\(field 'runtime_fraction': value is required\\)");
 }
 } // namespace RuntimeFraction
 } // namespace InputMatchers

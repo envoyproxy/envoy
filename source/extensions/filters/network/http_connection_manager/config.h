@@ -10,7 +10,6 @@
 #include "envoy/config/config_provider_manager.h"
 #include "envoy/config/core/v3/extension.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
-#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.validate.h"
 #include "envoy/filter/config_provider_manager.h"
 #include "envoy/http/early_header_mutation.h"
 #include "envoy/http/filter.h"

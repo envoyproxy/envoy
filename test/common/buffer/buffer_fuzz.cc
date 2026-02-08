@@ -245,13 +245,13 @@ using BufferList = std::vector<std::unique_ptr<Buffer::Instance>>;
 
 // Process a single buffer operation.
 uint32_t bufferAction(Context& ctxt, char insert_value, uint32_t max_alloc, BufferList& buffers,
-                      const test::common::buffer::Action& action) {
+                      const ::test::common::buffer::Action& action) {
   const uint32_t target_index = action.target_index() % BufferCount;
   Buffer::Instance& target_buffer = *buffers[target_index];
   uint32_t allocated = 0;
 
   switch (action.action_selector_case()) {
-  case test::common::buffer::Action::kAddBufferFragment: {
+  case ::test::common::buffer::Action::kAddBufferFragment: {
     const uint32_t size = clampSize(action.add_buffer_fragment(), max_alloc);
     allocated += size;
     void* p = ::malloc(size);
@@ -263,14 +263,14 @@ uint32_t bufferAction(Context& ctxt, char insert_value, uint32_t max_alloc, Buff
     target_buffer.addBufferFragment(*ctxt.fragments_.back());
     break;
   }
-  case test::common::buffer::Action::kAddString: {
+  case ::test::common::buffer::Action::kAddString: {
     const uint32_t size = clampSize(action.add_string(), max_alloc);
     allocated += size;
     const std::string data(size, insert_value);
     target_buffer.add(data);
     break;
   }
-  case test::common::buffer::Action::kAddBuffer: {
+  case ::test::common::buffer::Action::kAddBuffer: {
     const uint32_t source_index = action.add_buffer() % BufferCount;
     if (target_index == source_index) {
       break;
@@ -283,14 +283,14 @@ uint32_t bufferAction(Context& ctxt, char insert_value, uint32_t max_alloc, Buff
     target_buffer.add(source_buffer);
     break;
   }
-  case test::common::buffer::Action::kPrependString: {
+  case ::test::common::buffer::Action::kPrependString: {
     const uint32_t size = clampSize(action.prepend_string(), max_alloc);
     allocated += size;
     const std::string data(size, insert_value);
     target_buffer.prepend(data);
     break;
   }
-  case test::common::buffer::Action::kPrependBuffer: {
+  case ::test::common::buffer::Action::kPrependBuffer: {
     const uint32_t source_index = action.prepend_buffer() % BufferCount;
     if (target_index == source_index) {
       break;
@@ -303,7 +303,7 @@ uint32_t bufferAction(Context& ctxt, char insert_value, uint32_t max_alloc, Buff
     target_buffer.prepend(source_buffer);
     break;
   }
-  case test::common::buffer::Action::kReserveCommit: {
+  case ::test::common::buffer::Action::kReserveCommit: {
     const uint32_t reserve_length = clampSize(action.reserve_commit().reserve_length(), max_alloc);
     allocated += reserve_length;
     if (reserve_length == 0) {
@@ -326,7 +326,7 @@ uint32_t bufferAction(Context& ctxt, char insert_value, uint32_t max_alloc, Buff
     }
     break;
   }
-  case test::common::buffer::Action::kCopyOut: {
+  case ::test::common::buffer::Action::kCopyOut: {
     const uint32_t start =
         std::min(action.copy_out().start(), static_cast<uint32_t>(target_buffer.length()));
     const uint32_t length =
@@ -338,7 +338,7 @@ uint32_t bufferAction(Context& ctxt, char insert_value, uint32_t max_alloc, Buff
     FUZZ_ASSERT(::memcmp(copy_buffer, data.data() + start, length) == 0);
     break;
   }
-  case test::common::buffer::Action::kCopyOutToSlices: {
+  case ::test::common::buffer::Action::kCopyOutToSlices: {
     const uint32_t length =
         std::min(static_cast<uint32_t>(target_buffer.length()), action.copy_out_to_slices());
     Buffer::OwnedImpl buffer;
@@ -350,7 +350,7 @@ uint32_t bufferAction(Context& ctxt, char insert_value, uint32_t max_alloc, Buff
     FUZZ_ASSERT(::memcmp(data.data(), target_data.data(), reservation.length()) == 0);
     break;
   }
-  case test::common::buffer::Action::kDrain: {
+  case ::test::common::buffer::Action::kDrain: {
     const uint32_t previous_length = target_buffer.length();
     const uint32_t drain_length =
         std::min(static_cast<uint32_t>(target_buffer.length()), action.drain());
@@ -358,13 +358,13 @@ uint32_t bufferAction(Context& ctxt, char insert_value, uint32_t max_alloc, Buff
     FUZZ_ASSERT(previous_length - drain_length == target_buffer.length());
     break;
   }
-  case test::common::buffer::Action::kLinearize: {
+  case ::test::common::buffer::Action::kLinearize: {
     const uint32_t linearize_size =
         std::min(static_cast<uint32_t>(target_buffer.length()), action.linearize());
     target_buffer.linearize(linearize_size);
     break;
   }
-  case test::common::buffer::Action::kMove: {
+  case ::test::common::buffer::Action::kMove: {
     const uint32_t source_index = action.move().source_index() % BufferCount;
     if (target_index == source_index) {
       break;
@@ -388,7 +388,7 @@ uint32_t bufferAction(Context& ctxt, char insert_value, uint32_t max_alloc, Buff
     }
     break;
   }
-  case test::common::buffer::Action::kRead: {
+  case ::test::common::buffer::Action::kRead: {
     const uint32_t max_length = clampSize(action.read(), max_alloc);
     allocated += max_length;
     if (max_length == 0) {
@@ -408,7 +408,7 @@ uint32_t bufferAction(Context& ctxt, char insert_value, uint32_t max_alloc, Buff
     FUZZ_ASSERT(::close(fds[1]) == 0);
     break;
   }
-  case test::common::buffer::Action::kWrite: {
+  case ::test::common::buffer::Action::kWrite: {
     int fds[2] = {0, 0};
     auto& os_sys_calls = Api::OsSysCallsSingleton::get();
     FUZZ_ASSERT(os_sys_calls.socketpair(AF_UNIX, SOCK_STREAM, 0, fds).return_value_ == 0);
@@ -435,7 +435,7 @@ uint32_t bufferAction(Context& ctxt, char insert_value, uint32_t max_alloc, Buff
     FUZZ_ASSERT(::close(fds[0]) == 0);
     break;
   }
-  case test::common::buffer::Action::kGetRawSlices: {
+  case ::test::common::buffer::Action::kGetRawSlices: {
     const uint64_t slices_needed = target_buffer.getRawSlices().size();
     const uint64_t slices_tested =
         std::min(slices_needed, static_cast<uint64_t>(action.get_raw_slices()));
@@ -454,7 +454,7 @@ uint32_t bufferAction(Context& ctxt, char insert_value, uint32_t max_alloc, Buff
     FUZZ_ASSERT(slices_needed != slices_tested || offset == target_buffer.length());
     break;
   }
-  case test::common::buffer::Action::kSearch: {
+  case ::test::common::buffer::Action::kSearch: {
     const std::string& content = action.search().content();
     const uint32_t offset = action.search().offset();
     const std::string data = target_buffer.toString();
@@ -462,7 +462,7 @@ uint32_t bufferAction(Context& ctxt, char insert_value, uint32_t max_alloc, Buff
                 static_cast<ssize_t>(target_buffer.toString().find(content, offset)));
     break;
   }
-  case test::common::buffer::Action::kStartsWith: {
+  case ::test::common::buffer::Action::kStartsWith: {
     const std::string data = target_buffer.toString();
     FUZZ_ASSERT(target_buffer.startsWith(action.starts_with()) ==
                 (data.find(action.starts_with()) == 0));
@@ -478,7 +478,7 @@ uint32_t bufferAction(Context& ctxt, char insert_value, uint32_t max_alloc, Buff
 
 } // namespace
 
-void executeActions(const test::common::buffer::BufferFuzzTestCase& input, BufferList& buffers,
+void executeActions(const ::test::common::buffer::BufferFuzzTestCase& input, BufferList& buffers,
                     BufferList& linear_buffers, Context& ctxt) {
   // Soft bound on the available memory for allocation to avoid OOMs and
   // timeouts.
@@ -534,7 +534,7 @@ void executeActions(const test::common::buffer::BufferFuzzTestCase& input, Buffe
   }
 }
 
-void BufferFuzz::bufferFuzz(const test::common::buffer::BufferFuzzTestCase& input) {
+void BufferFuzz::bufferFuzz(const ::test::common::buffer::BufferFuzzTestCase& input) {
   Context ctxt;
   // Fuzzed buffers.
   BufferList buffers;

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/extensions/http/stateful_session/header/v3/header.pb.validate.h"
+#include "envoy/extensions/http/stateful_session/header/v3/header.pb.h"
 
 #include "source/extensions/http/stateful_session/header/header.h"
 

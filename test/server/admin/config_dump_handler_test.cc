@@ -841,7 +841,7 @@ ProtobufTypes::MessagePtr testDumpEcdsConfig(const Matchers::StringMatcher&) {
   ecds_listener->mutable_last_updated()->set_seconds(5);
   envoy::config::core::v3::TypedExtensionConfig listener_filter_config;
   listener_filter_config.set_name("foo");
-  auto listener_config = test::integration::filters::TestTcpListenerFilterConfig();
+  auto listener_config = ::test::integration::filters::TestTcpListenerFilterConfig();
   listener_config.set_drain_bytes(5);
   listener_filter_config.mutable_typed_config()->PackFrom(listener_config);
   ecds_listener->mutable_ecds_filter()->PackFrom(listener_filter_config);
@@ -851,7 +851,7 @@ ProtobufTypes::MessagePtr testDumpEcdsConfig(const Matchers::StringMatcher&) {
   ecds_network->mutable_last_updated()->set_seconds(5);
   envoy::config::core::v3::TypedExtensionConfig network_filter_config;
   network_filter_config.set_name("bar");
-  auto network_config = test::integration::filters::TestDrainerNetworkFilterConfig();
+  auto network_config = ::test::integration::filters::TestDrainerNetworkFilterConfig();
   network_config.set_bytes_to_drain(5);
   network_filter_config.mutable_typed_config()->PackFrom(network_config);
   ecds_network->mutable_ecds_filter()->PackFrom(network_filter_config);

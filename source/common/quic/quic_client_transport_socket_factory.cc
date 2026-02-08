@@ -2,7 +2,8 @@
 
 #include <memory>
 
-#include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.validate.h"
+#include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 
 #include "source/common/quic/cert_compression.h"
 #include "source/common/quic/envoy_quic_proof_verifier.h"

@@ -6,10 +6,10 @@ import "envoy/config/core/v3/extension.proto";
 
 import "google/protobuf/wrappers.proto";
 
+import "buf/validate/validate.proto";
 import "xds/annotations/v3/status.proto";
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.sse_to_metadata.v3";
 option java_outer_classname = "SseToMetadataProto";
@@ -49,8 +49,7 @@ message SseToMetadata {
     // - How to map extracted values to metadata (namespace, key, type conversions)
     // - When to write metadata (on_present, on_missing, on_error actions)
     // [#extension-category: envoy.content_parsers]
-    config.core.v3.TypedExtensionConfig content_parser = 1
-        [(validate.rules).message = {required: true}];
+    config.core.v3.TypedExtensionConfig content_parser = 1 [(buf.validate.field).required = true];
 
     // Maximum size in bytes for a single SSE event before it's considered invalid
     // and discarded. This protects against unbounded memory growth from malicious
@@ -59,9 +58,9 @@ message SseToMetadata {
     // Default is 8192 bytes (8KB), which is sufficient for most legitimate events.
     // Set to 0 to disable the limit (not recommended for production).
     // Maximum allowed value is 10485760 bytes (10MB).
-    google.protobuf.UInt32Value max_event_size = 2 [(validate.rules).uint32 = {lte: 10485760}];
+    google.protobuf.UInt32Value max_event_size = 2 [(buf.validate.field).uint32 = {lte: 10485760}];
   }
 
   // Rules for processing SSE response streams.
-  ProcessingRules response_rules = 1 [(validate.rules).message = {required: true}];
+  ProcessingRules response_rules = 1 [(buf.validate.field).required = true];
 }

@@ -5,8 +5,9 @@ package envoy.type.matcher.v3;
 import "envoy/type/matcher/v3/address.proto";
 import "envoy/type/matcher/v3/string.proto";
 
+import "buf/validate/validate.proto";
+
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.type.matcher.v3";
 option java_outer_classname = "FilterStateProto";
@@ -19,10 +20,10 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // FilterStateMatcher provides a general interface for matching the filter state objects.
 message FilterStateMatcher {
   // The filter state key to retrieve the object.
-  string key = 1 [(validate.rules).string = {min_len: 1}];
+  string key = 1 [(buf.validate.field).string = {min_len: 1}];
 
   oneof matcher {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // Matches the filter state object as a string value.
     StringMatcher string_match = 2;

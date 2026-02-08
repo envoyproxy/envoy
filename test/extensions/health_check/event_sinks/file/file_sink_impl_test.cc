@@ -1,5 +1,4 @@
 #include "envoy/extensions/health_check/event_sinks/file/v3/file.pb.h"
-#include "envoy/extensions/health_check/event_sinks/file/v3/file.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "source/common/protobuf/message_validator_impl.h"

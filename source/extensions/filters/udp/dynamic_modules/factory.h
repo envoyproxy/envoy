@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/extensions/filters/udp/dynamic_modules/v3/dynamic_modules.pb.h"
 #include "envoy/server/filter_config.h"
 
 #include "source/extensions/filters/udp/dynamic_modules/filter_config.h"

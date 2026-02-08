@@ -4,7 +4,6 @@
 #include <string>
 
 #include "envoy/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/v3/downstream_reverse_connection_socket_interface.pb.h"
-#include "envoy/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/v3/downstream_reverse_connection_socket_interface.pb.validate.h"
 #include "envoy/server/bootstrap_extension_config.h"
 #include "envoy/stats/scope.h"
 #include "envoy/thread_local/thread_local.h"

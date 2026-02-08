@@ -25,10 +25,11 @@ absl::Status traverseMessageWorker(ConstProtoVisitor& visitor, const Protobuf::M
     if (message.GetTypeName() == "google.protobuf.Any") {
       auto* any_message = Protobuf::DynamicCastMessage<Protobuf::Any>(&message);
       inner_message = Helper::typeUrlToMessage(any_message->type_url());
-      target_type_url = any_message->type_url();
-      // inner_message must be valid as parsing would have already failed to load if there was an
-      // invalid type_url.
-      RETURN_IF_NOT_OK(MessageUtil::unpackTo(*any_message, *inner_message));
+      if (inner_message != nullptr) {
+        target_type_url = any_message->type_url();
+        RETURN_IF_NOT_OK(MessageUtil::unpackTo(*any_message, *inner_message));
+      }
+      // If inner_message is null, the type isn't linked in — skip silently.
     } else if (message.GetTypeName() == "xds.type.v3.TypedStruct") {
       auto output_or_error = Helper::convertTypedStruct<xds::type::v3::TypedStruct>(message);
       RETURN_IF_NOT_OK_REF(output_or_error.status());

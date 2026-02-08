@@ -2,6 +2,8 @@
 
 #include <cstdint>
 
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
 

@@ -9,6 +9,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/file_event.h"
 #include "envoy/event/timer.h"
+#include "envoy/extensions/network/dns_resolver/apple/v3/apple_dns_resolver.pb.h"
 #include "envoy/network/dns.h"
 #include "envoy/registry/registry.h"
 

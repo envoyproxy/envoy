@@ -1,5 +1,7 @@
 #include "source/common/quic/envoy_quic_client_stream.h"
 
+#include "envoy/config/core/v3/protocol.pb.h"
+
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/assert.h"
 #include "source/common/common/enum_to_int.h"

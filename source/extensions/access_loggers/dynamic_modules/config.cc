@@ -1,6 +1,6 @@
 #include "source/extensions/access_loggers/dynamic_modules/config.h"
 
-#include "envoy/extensions/access_loggers/dynamic_modules/v3/dynamic_modules.pb.validate.h"
+#include "envoy/extensions/access_loggers/dynamic_modules/v3/dynamic_modules.pb.h"
 
 #include "source/common/config/utility.h"
 #include "source/common/protobuf/utility.h"

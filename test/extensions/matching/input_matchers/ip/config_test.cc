@@ -75,7 +75,8 @@ TEST(ConfigTest, InvalidConfigStats) {
   auto message = Envoy::Config::Utility::translateAnyToFactoryConfig(
       config.typed_config(), ProtobufMessage::getStrictValidationVisitor(), factory);
   EXPECT_THROW_WITH_REGEX(factory.createInputMatcherFactoryCb(*message, context), EnvoyException,
-                          "Proto constraint validation failed.*StatPrefix");
+                          "Proto constraint validation failed \\(field 'stat_prefix': value length "
+                          "must be at least 1 characters\\)");
 }
 
 } // namespace IP

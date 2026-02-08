@@ -4,7 +4,6 @@
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/load_balancing_policies/ring_hash/v3/ring_hash.pb.h"
-#include "envoy/extensions/load_balancing_policies/ring_hash/v3/ring_hash.pb.validate.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"

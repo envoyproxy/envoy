@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/server/factory_context.h"
 #include "envoy/upstream/upstream.h"
 

@@ -5,6 +5,7 @@
 #include "envoy/content_parser/factory.h"
 #include "envoy/content_parser/parser.h"
 #include "envoy/extensions/content_parsers/json/v3/json_content_parser.pb.h"
+#include "envoy/extensions/filters/http/json_to_metadata/v3/json_to_metadata.pb.h"
 #include "envoy/json/json_object.h"
 
 #include "source/common/common/logger.h"

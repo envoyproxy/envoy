@@ -10,7 +10,7 @@
 
 namespace Envoy {
 
-void H1FuzzIntegrationTest::replay(const test::integration::CaptureFuzzTestCase& input,
+void H1FuzzIntegrationTest::replay(const ::test::integration::CaptureFuzzTestCase& input,
                                    bool ignore_response) {
   struct Init {
     Init(H1FuzzIntegrationTest* test) { test->initialize(); }
@@ -28,13 +28,13 @@ void H1FuzzIntegrationTest::replay(const test::integration::CaptureFuzzTestCase&
       break;
     }
     switch (event.event_selector_case()) {
-    case test::integration::Event::kDownstreamSendBytes:
+    case ::test::integration::Event::kDownstreamSendBytes:
       ASSERT_TRUE(tcp_client->write(event.downstream_send_bytes(), false, false));
       break;
-    case test::integration::Event::kDownstreamRecvBytes:
+    case ::test::integration::Event::kDownstreamRecvBytes:
       // TODO(htuch): Should we wait for some data?
       break;
-    case test::integration::Event::kUpstreamSendBytes:
+    case ::test::integration::Event::kUpstreamSendBytes:
       if (ignore_response) {
         break;
       }
@@ -55,7 +55,7 @@ void H1FuzzIntegrationTest::replay(const test::integration::CaptureFuzzTestCase&
         RELEASE_ASSERT(result, result.message());
       }
       break;
-    case test::integration::Event::kUpstreamRecvBytes:
+    case ::test::integration::Event::kUpstreamRecvBytes:
       // TODO(htuch): Should we wait for some data?
       break;
     default:

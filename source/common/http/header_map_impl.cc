@@ -5,6 +5,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/http/header_map.h"
 
 #include "source/common/common/assert.h"

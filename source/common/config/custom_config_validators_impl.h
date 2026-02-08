@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/config/config_validator.h"
+#include "envoy/config/core/v3/extension.pb.h"
 #include "envoy/config/custom_config_validators.h"
 #include "envoy/server/instance.h"
 

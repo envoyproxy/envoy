@@ -2,6 +2,9 @@
 
 #include <vector>
 
+#include "envoy/admin/v3/tap.pb.h"
+#include "envoy/config/tap/v3/common.pb.h"
+#include "envoy/data/tap/v3/wrapper.pb.h"
 #include "envoy/server/admin.h"
 #include "envoy/singleton/manager.h"
 

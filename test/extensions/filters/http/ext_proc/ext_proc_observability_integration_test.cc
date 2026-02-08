@@ -20,9 +20,7 @@
 #include "test/common/http/common.h"
 #include "test/extensions/filters/http/ext_proc/ext_proc_integration_common.h"
 #include "test/extensions/filters/http/ext_proc/logging_test_filter.pb.h"
-#include "test/extensions/filters/http/ext_proc/logging_test_filter.pb.validate.h"
 #include "test/extensions/filters/http/ext_proc/tracer_test_filter.pb.h"
-#include "test/extensions/filters/http/ext_proc/tracer_test_filter.pb.validate.h"
 #include "test/extensions/filters/http/ext_proc/utils.h"
 #include "test/integration/filters/common.h"
 #include "test/integration/http_integration.h"
@@ -64,7 +62,7 @@ using Extensions::HttpFilters::ExternalProcessing::makeHeaderValue;
 using Extensions::HttpFilters::ExternalProcessing::OnProcessingResponseFactory;
 using Extensions::HttpFilters::ExternalProcessing::TestOnProcessingResponseFactory;
 using Http::LowerCaseString;
-using test::integration::filters::LoggingTestFilterConfig;
+using ::test::integration::filters::LoggingTestFilterConfig;
 using testing::_;
 using testing::Not;
 

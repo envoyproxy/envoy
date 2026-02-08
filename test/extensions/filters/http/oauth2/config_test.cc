@@ -384,7 +384,9 @@ config:
 
   EXPECT_THROW_WITH_REGEX(
       factory.createFilterFactoryFromProto(*proto_config, "stats", context).status().IgnoreError(),
-      EnvoyException, "value does not match regex pattern");
+      EnvoyException,
+      "field 'config.credentials.cookie_names.bearer_token': value must be a valid HTTP header "
+      "name");
 }
 
 TEST(ConfigTest, WrongCombinationOfPreserveAuthorizationAndForwardBearer) {

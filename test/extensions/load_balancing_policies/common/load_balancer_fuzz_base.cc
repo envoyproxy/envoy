@@ -29,7 +29,7 @@ LoadBalancerFuzzBase::initializeHostsForUseInFuzzing(std::shared_ptr<MockCluster
 }
 
 void LoadBalancerFuzzBase::initializeASingleHostSet(
-    const test::common::upstream::SetupPriorityLevel& setup_priority_level,
+    const ::test::common::upstream::SetupPriorityLevel& setup_priority_level,
     const uint8_t priority_level, uint16_t& port) {
   const uint32_t num_hosts_in_priority_level = setup_priority_level.num_hosts_in_priority_level();
   ENVOY_LOG_MISC(trace, "Will attempt to initialize host set at priority level {} with {} hosts.",
@@ -75,7 +75,7 @@ void LoadBalancerFuzzBase::initializeASingleHostSet(
 
 // Initializes random and fixed host sets
 void LoadBalancerFuzzBase::initializeLbComponents(
-    const test::common::upstream::LoadBalancerTestCase& input) {
+    const ::test::common::upstream::LoadBalancerTestCase& input) {
   static NiceMock<MockClusterInfo> info;
   static std::shared_ptr<MockClusterInfo> info_pointer{std::shared_ptr<MockClusterInfo>{}, &info};
 
@@ -224,13 +224,13 @@ void LoadBalancerFuzzBase::chooseHost() {
 }
 
 void LoadBalancerFuzzBase::replay(
-    const Protobuf::RepeatedPtrField<test::common::upstream::LbAction>& actions) {
+    const Protobuf::RepeatedPtrField<::test::common::upstream::LbAction>& actions) {
   constexpr auto max_actions = 64;
   for (int i = 0; i < std::min(max_actions, actions.size()); ++i) {
     const auto& event = actions.at(i);
     ENVOY_LOG_MISC(trace, "Action: {}", event.DebugString());
     switch (event.action_selector_case()) {
-    case test::common::upstream::LbAction::kUpdateHealthFlags: {
+    case ::test::common::upstream::LbAction::kUpdateHealthFlags: {
       updateHealthFlagsForAHostSet(event.update_health_flags().host_priority(),
                                    event.update_health_flags().num_healthy_hosts(),
                                    event.update_health_flags().num_degraded_hosts(),
@@ -238,10 +238,10 @@ void LoadBalancerFuzzBase::replay(
                                    event.update_health_flags().random_bytestring());
       break;
     }
-    case test::common::upstream::LbAction::kPreconnect:
+    case ::test::common::upstream::LbAction::kPreconnect:
       preconnect();
       break;
-    case test::common::upstream::LbAction::kChooseHost:
+    case ::test::common::upstream::LbAction::kChooseHost:
       chooseHost();
       break;
     default:

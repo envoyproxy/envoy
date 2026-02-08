@@ -72,7 +72,7 @@ UberFilterFuzzer::UberFilterFuzzer()
 void UberFilterFuzzer::fuzz(
     const envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter&
         proto_config,
-    const test::fuzz::HttpData& downstream_data, const test::fuzz::HttpData& upstream_data) {
+    const ::test::fuzz::HttpData& downstream_data, const ::test::fuzz::HttpData& upstream_data) {
   try {
     // Try to create the filter. Exit early if the config is invalid or violates PGV constraints.
     ENVOY_LOG_MISC(info, "filter name {}", proto_config.name());

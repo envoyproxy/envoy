@@ -4,6 +4,7 @@
 #include <memory>
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/config/overload/v3/overload.pb.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"

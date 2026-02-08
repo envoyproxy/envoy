@@ -5,7 +5,6 @@
 #include "source/common/common/logger.h"
 
 #include "library/common/extensions/retry/options/network_configuration/predicate.pb.h"
-#include "library/common/extensions/retry/options/network_configuration/predicate.pb.validate.h"
 #include "library/common/network/connectivity_manager.h"
 
 namespace Envoy {

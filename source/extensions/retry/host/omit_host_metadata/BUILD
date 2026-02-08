@@ -17,6 +17,7 @@ envoy_cc_library(
         "//envoy/upstream:retry_interface",
         "//source/common/config:metadata_lib",
         "//source/common/config:well_known_names",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 

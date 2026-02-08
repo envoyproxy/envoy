@@ -1132,6 +1132,7 @@ observability
 ocagent
 offsetof
 oneof
+oneofs
 oneway
 oob
 opcode
@@ -1227,6 +1228,8 @@ protobufs
 protoc
 protodoc
 protos
+protovalidate
+protovalidate-cc
 protover
 protoxform
 proxied
@@ -1268,6 +1271,7 @@ rebuilder
 receival
 reconnection
 recurse
+recurses
 recv
 recvfrom
 recvmmsg

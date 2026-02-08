@@ -3,6 +3,7 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 
 #include "test/extensions/load_balancing_policies/common/load_balancer_fuzz_base.h"
+#include "test/extensions/load_balancing_policies/common/zone_aware_load_balancer_fuzz.pb.h"
 #include "test/mocks/upstream/priority_set.h"
 #include "test/test_common/simulated_time_system.h"
 
@@ -37,10 +38,10 @@ public:
 
   // These extend base class logic in order to handle local_priority_set_ if applicable.
   void
-  initializeASingleHostSet(const test::common::upstream::SetupPriorityLevel& setup_priority_level,
+  initializeASingleHostSet(const ::test::common::upstream::SetupPriorityLevel& setup_priority_level,
                            const uint8_t priority_level, uint16_t& port) override;
 
-  void initializeLbComponents(const test::common::upstream::LoadBalancerTestCase& input) override;
+  void initializeLbComponents(const ::test::common::upstream::LoadBalancerTestCase& input) override;
 
   void updateHealthFlagsForAHostSet(
       const uint64_t host_priority, const uint32_t num_healthy_hosts,

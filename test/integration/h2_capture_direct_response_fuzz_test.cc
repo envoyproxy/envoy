@@ -33,7 +33,7 @@ void H2FuzzIntegrationTest::initialize() {
   HttpIntegrationTest::initialize();
 }
 
-DEFINE_PROTO_FUZZER(const test::integration::H2CaptureFuzzTestCase& input) {
+DEFINE_PROTO_FUZZER(const ::test::integration::H2CaptureFuzzTestCase& input) {
   RELEASE_ASSERT(!TestEnvironment::getIpVersionsForTest().empty(), "");
   const auto ip_version = TestEnvironment::getIpVersionsForTest()[0];
   PERSISTENT_FUZZ_VAR(H2FuzzIntegrationTest, h2_fuzz_integration_test, (ip_version));

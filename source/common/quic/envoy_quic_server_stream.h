@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/config/core/v3/protocol.pb.h"
+
 #include "source/common/quic/envoy_quic_stream.h"
 
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS

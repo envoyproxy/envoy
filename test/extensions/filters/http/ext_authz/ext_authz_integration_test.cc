@@ -25,7 +25,7 @@
 #include "absl/strings/str_format.h"
 #include "gtest/gtest.h"
 
-using test::integration::filters::LoggingTestFilterConfig;
+using ::test::integration::filters::LoggingTestFilterConfig;
 using testing::AssertionResult;
 using testing::Not;
 using testing::TestWithParam;

@@ -18,6 +18,7 @@ envoy_cc_library(
         "//envoy/content_parser:parser_interface",
         "//source/common/json:json_loader_lib",
         "@envoy_api//envoy/extensions/content_parsers/json/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/json_to_metadata/v3:pkg_cc_proto",
     ],
 )
 

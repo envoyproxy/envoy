@@ -10,9 +10,10 @@ import "envoy/type/matcher/v3/string.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/empty.proto";
 
+import "buf/validate/validate.proto";
+
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.jwt_authn.v3";
 option java_outer_classname = "ConfigProto";
@@ -153,7 +154,7 @@ message JwtProvider {
   // `JSON Web Key Set (JWKS) <https://tools.ietf.org/html/rfc7517#appendix-A>`_ is needed to
   // validate signature of a JWT. This field specifies where to fetch JWKS.
   oneof jwks_source_specifier {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // JWKS can be fetched from remote server via HTTP/HTTPS. This field specifies the remote HTTP
     // URI and how the fetched JWKS should be cached.
@@ -258,8 +259,10 @@ message JwtProvider {
   //    base64url_encoded(jwt_payload_in_JSON)
   //
   // If it is not specified, the payload will not be forwarded.
-  string forward_payload_header = 8
-      [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false}];
+  string forward_payload_header = 8 [
+    (buf.validate.field).string = {well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME},
+    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE
+  ];
 
   // When :ref:`forward_payload_header <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.forward_payload_header>`
   // is specified, the base64 encoded payload will be added to the headers.
@@ -404,11 +407,11 @@ message RemoteJwks {
   //      cluster: jwt.www.googleapis.com|443
   //      timeout: 1s
   //
-  config.core.v3.HttpUri http_uri = 1 [(validate.rules).message = {required: true}];
+  config.core.v3.HttpUri http_uri = 1 [(buf.validate.field).required = true];
 
   // Duration after which the cached JWKS should be expired. If not specified, default cache
   // duration is 10 minutes.
-  google.protobuf.Duration cache_duration = 2 [(validate.rules).duration = {
+  google.protobuf.Duration cache_duration = 2 [(buf.validate.field).duration = {
     lt {seconds: 9000000000}
     gte {nanos: 1000000}
   }];
@@ -484,13 +487,13 @@ message JwtHeader {
 
   // The HTTP header name.
   string name = 1
-      [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
+      [(buf.validate.field).string = {min_len: 1 well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME}];
 
   // The value prefix. The value format is "value_prefix<token>"
   // For example, for "Authorization: Bearer <token>", value_prefix="Bearer " with a space at the
   // end.
   string value_prefix = 2
-      [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
+      [(buf.validate.field).string = {well_known_regex: KNOWN_REGEX_HTTP_HEADER_VALUE}];
 }
 
 // Specify a required provider with audiences.
@@ -634,7 +637,7 @@ message JwtRequirementOrList {
       "envoy.config.filter.http.jwt_authn.v2alpha.JwtRequirementOrList";
 
   // Specify a list of JwtRequirement.
-  repeated JwtRequirement requirements = 1 [(validate.rules).repeated = {min_items: 2}];
+  repeated JwtRequirement requirements = 1 [(buf.validate.field).repeated = {min_items: 2}];
 }
 
 // This message specifies a list of RequiredProvider.
@@ -644,7 +647,7 @@ message JwtRequirementAndList {
       "envoy.config.filter.http.jwt_authn.v2alpha.JwtRequirementAndList";
 
   // Specify a list of JwtRequirement.
-  repeated JwtRequirement requirements = 1 [(validate.rules).repeated = {min_items: 2}];
+  repeated JwtRequirement requirements = 1 [(buf.validate.field).repeated = {min_items: 2}];
 }
 
 // This message specifies a Jwt requirement for a specific Route condition.
@@ -682,7 +685,7 @@ message RequirementRule {
   //    match:
   //      prefix: /
   //
-  config.route.v3.RouteMatch match = 1 [(validate.rules).message = {required: true}];
+  config.route.v3.RouteMatch match = 1 [(buf.validate.field).required = true];
 
   // Specify a Jwt requirement.
   // If not specified, Jwt verification is disabled.
@@ -694,7 +697,7 @@ message RequirementRule {
     // This requirement_name MUST be specified at the
     // :ref:`requirement_map <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtAuthentication.requirement_map>`
     // in ``JwtAuthentication``.
-    string requirement_name = 3 [(validate.rules).string = {min_len: 1}];
+    string requirement_name = 3 [(buf.validate.field).string = {min_len: 1}];
   }
 }
 
@@ -720,7 +723,7 @@ message FilterStateRule {
       "envoy.config.filter.http.jwt_authn.v2alpha.FilterStateRule";
 
   // The filter state name to retrieve the ``Router::StringAccessor`` object.
-  string name = 1 [(validate.rules).string = {min_len: 1}];
+  string name = 1 [(buf.validate.field).string = {min_len: 1}];
 
   // A map of string keys to requirements. The string key is the string value
   // in the FilterState with the name specified in the ``name`` field above.
@@ -855,16 +858,16 @@ message JwtAuthentication {
 // Specify per-route config.
 message PerRouteConfig {
   oneof requirement_specifier {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // Disable Jwt Authentication for this route.
-    bool disabled = 1 [(validate.rules).bool = {const: true}];
+    bool disabled = 1 [(buf.validate.field).bool = {const: true}];
 
     // Use requirement_name to specify a JwtRequirement.
     // This requirement_name MUST be specified at the
     // :ref:`requirement_map <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtAuthentication.requirement_map>`
     // in ``JwtAuthentication``. If no, the requests using this route will be rejected with 403.
-    string requirement_name = 2 [(validate.rules).string = {min_len: 1}];
+    string requirement_name = 2 [(buf.validate.field).string = {min_len: 1}];
   }
 }
 
@@ -873,10 +876,10 @@ message JwtClaimToHeader {
   // The HTTP header name to copy the claim to.
   // The header name will be sanitized and replaced.
   string header_name = 1
-      [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
+      [(buf.validate.field).string = {min_len: 1 well_known_regex: KNOWN_REGEX_HTTP_HEADER_NAME}];
 
   // The field name for the JWT Claim : it can be a nested claim of type (eg. "claim.nested.key", "sub")
   // String separated with "." in case of nested claims. The nested claim name must use dot "." to separate
   // the JSON name path.
-  string claim_name = 2 [(validate.rules).string = {min_len: 1}];
+  string claim_name = 2 [(buf.validate.field).string = {min_len: 1}];
 }

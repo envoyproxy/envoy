@@ -49,7 +49,6 @@ build --copt -Wno-deprecated-declarations
 build --define=signal_trace=disabled
 
 # Override PGV validation with NOP functions for binary size savings.
-build --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor=nop
 
 # Instrument Envoy Mobile's C++ code for coverage
 coverage --instrumentation_filter="//library/common[/:]"

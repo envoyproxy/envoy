@@ -32,6 +32,7 @@ envoy_cc_library(
         "//envoy/network:connection_interface",
         "//envoy/server:factory_context_interface",
         "//source/common/config:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/rbac/v3:pkg_cc_proto",
     ],
 )

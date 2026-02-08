@@ -1,7 +1,6 @@
 #include "source/extensions/transport_sockets/http_11_proxy/config.h"
 
 #include "envoy/extensions/transport_sockets/http_11_proxy/v3/upstream_http_11_connect.pb.h"
-#include "envoy/extensions/transport_sockets/http_11_proxy/v3/upstream_http_11_connect.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "source/common/config/utility.h"

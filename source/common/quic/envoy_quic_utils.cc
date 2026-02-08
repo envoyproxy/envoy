@@ -8,6 +8,8 @@
 #include <string>
 
 #include "envoy/api/os_sys_calls_common.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/http/header_map.h"
 #include "envoy/http/stream_reset_handler.h"
 #include "envoy/network/address.h"

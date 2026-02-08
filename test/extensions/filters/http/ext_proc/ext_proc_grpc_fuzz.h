@@ -25,7 +25,7 @@
 #include "source/common/network/address_impl.h"
 
 #include "test/common/http/common.h"
-#include "test/extensions/filters/http/ext_proc/ext_proc_grpc_fuzz.pb.validate.h"
+#include "test/extensions/filters/http/ext_proc/ext_proc_grpc_fuzz.pb.h"
 #include "test/extensions/filters/http/ext_proc/ext_proc_grpc_fuzz_helper.h"
 #include "test/extensions/filters/http/ext_proc/test_processor.h"
 #include "test/fuzz/fuzz_runner.h"
@@ -216,7 +216,7 @@ public:
 
 // One fuzzer execution.
 inline void
-fuzzExtProcRun(const test::extensions::filters::http::ext_proc::ExtProcGrpcTestCase& input,
+fuzzExtProcRun(const ::test::extensions::filters::http::ext_proc::ExtProcGrpcTestCase& input,
                const bool persistent_mode) {
   try {
     TestUtility::validate(input);

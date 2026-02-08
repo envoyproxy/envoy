@@ -6,7 +6,7 @@
 #include "source/common/network/connection_balancer_impl.h"
 
 #include "test/extensions/filters/listener/common/fuzz/listener_filter_fakes.h"
-#include "test/extensions/filters/listener/common/fuzz/listener_filter_fuzzer.pb.validate.h"
+#include "test/extensions/filters/listener/common/fuzz/listener_filter_fuzzer.pb.h"
 #include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/network/mocks.h"
@@ -32,7 +32,7 @@ public:
   }
 
   void fuzz(Network::ListenerFilterPtr filter,
-            const test::extensions::filters::listener::FilterFuzzTestCase& input);
+            const ::test::extensions::filters::listener::FilterFuzzTestCase& input);
 
 private:
   NiceMock<Network::MockListenerFilterCallbacks> cb_;
@@ -87,7 +87,7 @@ public:
   }
 
   void fuzz(Network::ListenerFilterPtr filter,
-            const test::extensions::filters::listener::FilterFuzzWithDataTestCase& input);
+            const ::test::extensions::filters::listener::FilterFuzzWithDataTestCase& input);
 
 private:
   void write(const std::string& s) {

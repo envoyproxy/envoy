@@ -7,7 +7,6 @@
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
 #include "test/integration/filters/set_is_terminal_filter_config.pb.h"
-#include "test/integration/filters/set_is_terminal_filter_config.pb.validate.h"
 
 #include "absl/strings/match.h"
 
@@ -17,13 +16,13 @@ namespace Envoy {
 class SetIsTerminalFilter : public Http::PassThroughFilter {};
 
 class SetIsTerminalFilterFactory : public Extensions::HttpFilters::Common::FactoryBase<
-                                       test::integration::filters::SetIsTerminalFilterConfig> {
+                                       ::test::integration::filters::SetIsTerminalFilterConfig> {
 public:
   SetIsTerminalFilterFactory() : FactoryBase("set-is-terminal-filter") {}
 
 private:
   Http::FilterFactoryCb
-  createFilterFactoryFromProtoTyped(const test::integration::filters::SetIsTerminalFilterConfig&,
+  createFilterFactoryFromProtoTyped(const ::test::integration::filters::SetIsTerminalFilterConfig&,
                                     const std::string&,
                                     Server::Configuration::FactoryContext&) override {
 
@@ -32,7 +31,7 @@ private:
     };
   }
   bool isTerminalFilterByProtoTyped(
-      const test::integration::filters::SetIsTerminalFilterConfig& proto_config,
+      const ::test::integration::filters::SetIsTerminalFilterConfig& proto_config,
       Server::Configuration::ServerFactoryContext&) override {
     return proto_config.is_terminal_filter();
   }

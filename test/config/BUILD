@@ -57,3 +57,12 @@ envoy_cc_test_library(
     ],
     alwayslink = 1,
 )
+
+envoy_cc_test_library(
+    name = "link_hacks",
+    hdrs = ["link_hacks.h"],
+    deps = [
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+    ],
+    alwayslink = 1,
+)

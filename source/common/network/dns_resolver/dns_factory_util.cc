@@ -1,5 +1,11 @@
 #include "source/common/network/dns_resolver/dns_factory_util.h"
 
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/config/core/v3/extension.pb.h"
+#include "envoy/extensions/filters/udp/dns_filter/v3/dns_filter.pb.h"
+#include "envoy/extensions/network/dns_resolver/apple/v3/apple_dns_resolver.pb.h"
+#include "envoy/extensions/network/dns_resolver/cares/v3/cares_dns_resolver.pb.h"
+
 namespace Envoy {
 namespace Network {
 

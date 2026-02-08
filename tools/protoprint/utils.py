@@ -5,7 +5,7 @@ from tools.type_whisperer.api_type_db_pb2 import TypeDb
 from google.protobuf import text_format
 
 PROTO_FILES = (
-    "google.api.annotations", "validate.validate", "envoy.annotations.deprecation",
+    "google.api.annotations", "buf.validate.validate", "envoy.annotations.deprecation",
     "envoy.annotations.resource", "udpa.annotations.migrate", "udpa.annotations.security",
     "udpa.annotations.status", "udpa.annotations.sensitive", "udpa.annotations.versioning",
     "xds.annotations.v3.status")

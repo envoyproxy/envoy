@@ -53,7 +53,6 @@ envoy_extension_cc_test(
         "//test/integration:ads_integration_lib",
         "//test/integration:http_integration_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/config/accesslog/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/access_loggers/filters/process_ratelimit/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",

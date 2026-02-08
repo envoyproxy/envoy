@@ -1,7 +1,6 @@
 #include "library/common/extensions/key_value/platform/config.h"
 
 #include "envoy/config/common/key_value/v3/config.pb.h"
-#include "envoy/config/common/key_value/v3/config.pb.validate.h"
 
 #include "library/common/api/external.h"
 #include "library/common/bridge//utility.h"

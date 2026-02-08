@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/config/accesslog/v3/accesslog.pb.h"
 #include "envoy/http/header_map.h"
 #include "envoy/registry/registry.h"
 #include "envoy/stream_info/stream_info.h"

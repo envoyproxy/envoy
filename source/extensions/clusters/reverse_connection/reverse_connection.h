@@ -11,7 +11,6 @@
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/reverse_connection/v3/reverse_connection.pb.h"
-#include "envoy/extensions/clusters/reverse_connection/v3/reverse_connection.pb.validate.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/formatter/substitution_formatter.h"

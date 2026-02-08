@@ -4,6 +4,7 @@
 
 #include <memory>
 
+#include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/network/transport_socket.h"
 
 #include "source/common/event/dispatcher_impl.h"

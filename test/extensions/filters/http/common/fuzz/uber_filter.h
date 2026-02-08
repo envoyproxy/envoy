@@ -3,6 +3,7 @@
 #include "source/common/stats/custom_stat_namespaces_impl.h"
 
 #include "test/extensions/filters/http/common/fuzz/http_filter_fuzzer.h"
+#include "test/fuzz/common.pb.h"
 #include "test/fuzz/utility.h"
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/buffer/mocks.h"
@@ -24,10 +25,11 @@ public:
   // This creates the filter config and runs the fuzzed data against the filter.
   void fuzz(const envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter&
                 proto_config,
-            const test::fuzz::HttpData& downstream_data, const test::fuzz::HttpData& upstream_data);
+            const ::test::fuzz::HttpData& downstream_data,
+            const ::test::fuzz::HttpData& upstream_data);
 
   // For fuzzing proto data, guide the mutator to useful 'Any' types.
-  static void guideAnyProtoType(test::fuzz::HttpData* mutable_data, uint choice);
+  static void guideAnyProtoType(::test::fuzz::HttpData* mutable_data, uint choice);
 
   void reset();
 

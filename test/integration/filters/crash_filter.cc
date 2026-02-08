@@ -10,7 +10,6 @@
 
 #include "test/integration/filters/common.h"
 #include "test/integration/filters/crash_filter.pb.h"
-#include "test/integration/filters/crash_filter.pb.validate.h"
 
 namespace Envoy {
 
@@ -75,13 +74,13 @@ private:
 };
 
 class CrashFilterFactory : public Extensions::HttpFilters::Common::DualFactoryBase<
-                               test::integration::filters::CrashFilterConfig> {
+                               ::test::integration::filters::CrashFilterConfig> {
 public:
   CrashFilterFactory() : DualFactoryBase("crash-filter") {}
 
 private:
   absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
-      const test::integration::filters::CrashFilterConfig& proto_config, const std::string&,
+      const ::test::integration::filters::CrashFilterConfig& proto_config, const std::string&,
       DualInfo, Server::Configuration::ServerFactoryContext&) override {
     auto filter_config = std::make_shared<CrashFilterConfig>(
         proto_config.crash_in_encode_headers(), proto_config.crash_in_encode_data(),

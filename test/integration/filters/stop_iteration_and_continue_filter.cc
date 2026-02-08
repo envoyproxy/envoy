@@ -12,7 +12,6 @@
 
 #include "test/integration/filters/common.h"
 #include "test/integration/filters/stop_and_continue_filter_config.pb.h"
-#include "test/integration/filters/stop_and_continue_filter_config.pb.validate.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {
@@ -97,13 +96,13 @@ public:
 
 class StopIterationAndContinueFilterFactory
     : public Extensions::HttpFilters::Common::FactoryBase<
-          test::integration::filters::StopAndContinueConfig> {
+          ::test::integration::filters::StopAndContinueConfig> {
 public:
   StopIterationAndContinueFilterFactory() : FactoryBase("stop-iteration-and-continue-filter") {}
 
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
-      const test::integration::filters::StopAndContinueConfig& proto_config, const std::string&,
+      const ::test::integration::filters::StopAndContinueConfig& proto_config, const std::string&,
       Server::Configuration::FactoryContext&) override {
     bool set_scope_tacked_object = proto_config.install_scope_tracked_object();
     bool stop_and_buffer = proto_config.stop_and_buffer();
@@ -121,16 +120,16 @@ public:
   std::string name() const override { return "stop-iteration-and-continue-filter"; }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<test::integration::filters::StopAndContinueConfig>();
+    return std::make_unique<::test::integration::filters::StopAndContinueConfig>();
   }
 
   absl::StatusOr<Http::FilterFactoryCb>
   createFilterFactoryFromProto(const Protobuf::Message& config, const std::string&,
                                Server::Configuration::UpstreamFactoryContext& context) override {
 
-    const auto& proto_config =
-        MessageUtil::downcastAndValidate<const test::integration::filters::StopAndContinueConfig&>(
-            config, context.serverFactoryContext().messageValidationVisitor());
+    const auto& proto_config = MessageUtil::downcastAndValidate<
+        const ::test::integration::filters::StopAndContinueConfig&>(
+        config, context.serverFactoryContext().messageValidationVisitor());
 
     return [proto_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addStreamFilter(std::make_shared<StopIterationAndContinueFilter>(

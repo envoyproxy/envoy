@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/network/listener.h"
 
 #include "source/common/network/generic_listener_filter_impl_base.h"

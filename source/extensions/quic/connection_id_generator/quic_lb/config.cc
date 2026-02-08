@@ -1,7 +1,6 @@
 #include "source/extensions/quic/connection_id_generator/quic_lb/config.h"
 
 #include "envoy/extensions/quic/connection_id_generator/quic_lb/v3/quic_lb.pb.h"
-#include "envoy/extensions/quic/connection_id_generator/quic_lb/v3/quic_lb.pb.validate.h"
 
 #include "source/extensions/quic/connection_id_generator/quic_lb/quic_lb.h"
 

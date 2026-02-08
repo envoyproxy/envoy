@@ -19,6 +19,7 @@ envoy_cc_library(
         "//source/common/http:filter_chain_helper_lib",
         "//source/common/http/matching:data_impl_lib",
         "//source/common/matcher:matcher_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/composite/v3:pkg_cc_proto",
     ],
 )

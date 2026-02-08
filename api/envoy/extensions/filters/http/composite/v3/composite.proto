@@ -6,11 +6,11 @@ import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/config_source.proto";
 import "envoy/config/core/v3/extension.proto";
 
+import "buf/validate/validate.proto";
 import "xds/type/matcher/v3/matcher.proto";
 
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.composite.v3";
 option java_outer_classname = "CompositeProto";
@@ -52,7 +52,7 @@ message Composite {
 // [#not-implemented-hide:]
 message CompositePerRoute {
   // Override of the match tree for this route.
-  xds.type.matcher.v3.Matcher matcher = 1 [(validate.rules).message = {required: true}];
+  xds.type.matcher.v3.Matcher matcher = 1 [(buf.validate.field).required = true];
 }
 
 // A list of filter configurations to be called in order. Note that this can be used as the type
@@ -70,7 +70,7 @@ message DynamicConfig {
   // The name of the extension configuration. It also serves as a resource name in ExtensionConfigDS.
   // The resource type in the ``DiscoveryRequest`` will be :ref:`TypedExtensionConfig
   // <envoy_v3_api_msg_config.core.v3.TypedExtensionConfig>`.
-  string name = 1 [(validate.rules).string = {min_len: 1}];
+  string name = 1 [(buf.validate.field).string = {min_len: 1}];
 
   // Configuration source specifier for an extension configuration discovery
   // service. In case of a failure and without the default configuration,

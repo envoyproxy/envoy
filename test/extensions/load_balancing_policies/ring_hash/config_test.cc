@@ -1,6 +1,5 @@
 #include "envoy/config/core/v3/extension.pb.h"
 #include "envoy/extensions/load_balancing_policies/ring_hash/v3/ring_hash.pb.h"
-#include "envoy/extensions/load_balancing_policies/ring_hash/v3/ring_hash.pb.validate.h"
 
 #include "source/extensions/load_balancing_policies/ring_hash/config.h"
 
@@ -83,10 +82,10 @@ TEST(RingHashConfigTest, Validate) {
 
     config.mutable_typed_config()->PackFrom(config_msg);
 
-    std::string err;
-    EXPECT_EQ(Validate(config_msg, &err), false);
-    EXPECT_EQ(err, "RingHashValidationError.MinimumRingSize: value must be "
-                   "inside range [1, 8388608]");
+    EXPECT_THROW_WITH_REGEX(MessageUtil::validateWithProtovalidate(config, true),
+                            ProtoValidationException,
+                            "field 'minimum_ring_size': value must be greater than or equal to 1 "
+                            "and less than or equal to 8388608");
   }
 }
 

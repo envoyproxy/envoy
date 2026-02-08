@@ -6,9 +6,10 @@ import "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.proto";
 
 import "google/protobuf/duration.proto";
 
+import "buf/validate/validate.proto";
+
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.dynamic_forward_proxy.v3";
 option java_outer_classname = "DynamicForwardProxyProto";
@@ -93,5 +94,5 @@ message PerRouteConfig {
 
 message SubClusterConfig {
   // The timeout used for sub cluster initialization. Defaults to **5s** if not set.
-  google.protobuf.Duration cluster_init_timeout = 3 [(validate.rules).duration = {gt {}}];
+  google.protobuf.Duration cluster_init_timeout = 3 [(buf.validate.field).duration = {gt {}}];
 }

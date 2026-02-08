@@ -35,7 +35,7 @@ public:
                         Server::Configuration::ResourceMonitorFactoryContext& context) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<test::common::config::DummyConfig>();
+    return std::make_unique<::test::common::config::DummyConfig>();
   }
   std::string name() const override {
     return "envoy.resource_monitors.testonly.fake_resource_monitor";

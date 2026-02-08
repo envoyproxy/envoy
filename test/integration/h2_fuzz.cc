@@ -25,29 +25,29 @@ unifyHeadersFlags(const Protobuf::RepeatedField<int>& headers_flags) {
 
 } // namespace
 
-void H2FuzzIntegrationTest::sendFrame(const test::integration::H2TestFrame& proto_frame,
+void H2FuzzIntegrationTest::sendFrame(const ::test::integration::H2TestFrame& proto_frame,
                                       std::function<void(const Http2Frame&)> write_func) {
   Http2Frame h2_frame;
   switch (proto_frame.frame_type_case()) {
-  case test::integration::H2TestFrame::kPing:
+  case ::test::integration::H2TestFrame::kPing:
     ENVOY_LOG_MISC(trace, "Sending ping frame");
     h2_frame = Http2Frame::makePingFrame(proto_frame.ping().data());
     break;
-  case test::integration::H2TestFrame::kSettings: {
+  case ::test::integration::H2TestFrame::kSettings: {
     const Http2Frame::SettingsFlags settings_flags =
         static_cast<Http2Frame::SettingsFlags>(proto_frame.settings().flags());
     ENVOY_LOG_MISC(trace, "Sending settings frame");
     h2_frame = Http2Frame::makeEmptySettingsFrame(settings_flags);
     break;
   }
-  case test::integration::H2TestFrame::kHeaders: {
+  case ::test::integration::H2TestFrame::kHeaders: {
     const Http2Frame::HeadersFlags headers_flags = unifyHeadersFlags(proto_frame.headers().flags());
     const uint32_t stream_idx = proto_frame.headers().stream_index();
     ENVOY_LOG_MISC(trace, "Sending headers frame");
     h2_frame = Http2Frame::makeEmptyHeadersFrame(stream_idx, headers_flags);
     break;
   }
-  case test::integration::H2TestFrame::kContinuation: {
+  case ::test::integration::H2TestFrame::kContinuation: {
     const Http2Frame::HeadersFlags headers_flags =
         unifyHeadersFlags(proto_frame.continuation().flags());
     const uint32_t stream_idx = proto_frame.continuation().stream_index();
@@ -55,7 +55,7 @@ void H2FuzzIntegrationTest::sendFrame(const test::integration::H2TestFrame& prot
     h2_frame = Http2Frame::makeEmptyContinuationFrame(stream_idx, headers_flags);
     break;
   }
-  case test::integration::H2TestFrame::kData: {
+  case ::test::integration::H2TestFrame::kData: {
     const Http2Frame::DataFlags data_flags =
         static_cast<Http2Frame::DataFlags>(proto_frame.data().flags());
     const uint32_t stream_idx = proto_frame.data().stream_index();
@@ -63,14 +63,14 @@ void H2FuzzIntegrationTest::sendFrame(const test::integration::H2TestFrame& prot
     h2_frame = Http2Frame::makeEmptyDataFrame(stream_idx, data_flags);
     break;
   }
-  case test::integration::H2TestFrame::kPriority: {
+  case ::test::integration::H2TestFrame::kPriority: {
     const uint32_t stream_idx = proto_frame.priority().stream_index();
     const uint32_t dependent_idx = proto_frame.priority().dependent_index();
     ENVOY_LOG_MISC(trace, "Sending priority frame");
     h2_frame = Http2Frame::makePriorityFrame(stream_idx, dependent_idx);
     break;
   }
-  case test::integration::H2TestFrame::kPushPromise: {
+  case ::test::integration::H2TestFrame::kPushPromise: {
     const Http2Frame::HeadersFlags headers_flags =
         unifyHeadersFlags(proto_frame.push_promise().flags());
     const uint32_t stream_idx = proto_frame.push_promise().stream_index();
@@ -80,7 +80,7 @@ void H2FuzzIntegrationTest::sendFrame(const test::integration::H2TestFrame& prot
         Http2Frame::makeEmptyPushPromiseFrame(stream_idx, promised_stream_idx, headers_flags);
     break;
   }
-  case test::integration::H2TestFrame::kResetStream: {
+  case ::test::integration::H2TestFrame::kResetStream: {
     const uint32_t stream_idx = proto_frame.reset_stream().stream_index();
     const Http2Frame::ErrorCode error_code =
         static_cast<Http2Frame::ErrorCode>(proto_frame.reset_stream().error_code());
@@ -88,7 +88,7 @@ void H2FuzzIntegrationTest::sendFrame(const test::integration::H2TestFrame& prot
     h2_frame = Http2Frame::makeResetStreamFrame(stream_idx, error_code);
     break;
   }
-  case test::integration::H2TestFrame::kGoAway: {
+  case ::test::integration::H2TestFrame::kGoAway: {
     const uint32_t last_stream_idx = proto_frame.go_away().last_stream_index();
     const Http2Frame::ErrorCode error_code =
         static_cast<Http2Frame::ErrorCode>(proto_frame.go_away().error_code());
@@ -96,20 +96,20 @@ void H2FuzzIntegrationTest::sendFrame(const test::integration::H2TestFrame& prot
     h2_frame = Http2Frame::makeEmptyGoAwayFrame(last_stream_idx, error_code);
     break;
   }
-  case test::integration::H2TestFrame::kWindowUpdate: {
+  case ::test::integration::H2TestFrame::kWindowUpdate: {
     const uint32_t stream_idx = proto_frame.window_update().stream_index();
     const uint32_t increment = proto_frame.window_update().increment();
     ENVOY_LOG_MISC(trace, "Sending windows_update frame");
     h2_frame = Http2Frame::makeWindowUpdateFrame(stream_idx, increment);
     break;
   }
-  case test::integration::H2TestFrame::kMalformedRequest: {
+  case ::test::integration::H2TestFrame::kMalformedRequest: {
     const uint32_t stream_idx = proto_frame.malformed_request().stream_index();
     ENVOY_LOG_MISC(trace, "Sending malformed_request frame");
     h2_frame = Http2Frame::makeMalformedRequest(stream_idx);
     break;
   }
-  case test::integration::H2TestFrame::kMalformedRequestWithZerolenHeader: {
+  case ::test::integration::H2TestFrame::kMalformedRequestWithZerolenHeader: {
     const uint32_t stream_idx = proto_frame.malformed_request_with_zerolen_header().stream_index();
     const absl::string_view host = proto_frame.malformed_request_with_zerolen_header().host();
     const absl::string_view path = proto_frame.malformed_request_with_zerolen_header().path();
@@ -117,7 +117,7 @@ void H2FuzzIntegrationTest::sendFrame(const test::integration::H2TestFrame& prot
     h2_frame = Http2Frame::makeMalformedRequestWithZerolenHeader(stream_idx, host, path);
     break;
   }
-  case test::integration::H2TestFrame::kRequest: {
+  case ::test::integration::H2TestFrame::kRequest: {
     const uint32_t stream_idx = proto_frame.request().stream_index();
     const absl::string_view host = proto_frame.request().host();
     const absl::string_view path = proto_frame.request().path();
@@ -125,7 +125,7 @@ void H2FuzzIntegrationTest::sendFrame(const test::integration::H2TestFrame& prot
     h2_frame = Http2Frame::makeRequest(stream_idx, host, path);
     break;
   }
-  case test::integration::H2TestFrame::kPostRequest: {
+  case ::test::integration::H2TestFrame::kPostRequest: {
     const uint32_t stream_idx = proto_frame.post_request().stream_index();
     const absl::string_view host = proto_frame.post_request().host();
     const absl::string_view path = proto_frame.post_request().path();
@@ -133,7 +133,7 @@ void H2FuzzIntegrationTest::sendFrame(const test::integration::H2TestFrame& prot
     h2_frame = Http2Frame::makePostRequest(stream_idx, host, path);
     break;
   }
-  case test::integration::H2TestFrame::kMetadata: {
+  case ::test::integration::H2TestFrame::kMetadata: {
     const Http2Frame::MetadataFlags metadata_flags =
         static_cast<Http2Frame::MetadataFlags>(proto_frame.metadata().flags());
     const uint32_t stream_idx = proto_frame.metadata().stream_index();
@@ -146,14 +146,14 @@ void H2FuzzIntegrationTest::sendFrame(const test::integration::H2TestFrame& prot
         Http2Frame::makeMetadataFrameFromMetadataMap(stream_idx, metadata_map, metadata_flags);
     break;
   }
-  case test::integration::H2TestFrame::kStatus: {
+  case ::test::integration::H2TestFrame::kStatus: {
     const std::string status = proto_frame.status().status();
     const uint32_t stream_idx = proto_frame.status().stream_index();
     ENVOY_LOG_MISC(trace, "Sending status frame");
     h2_frame = Http2Frame::makeHeadersFrameWithStatus(status, stream_idx);
     break;
   }
-  case test::integration::H2TestFrame::kGeneric: {
+  case ::test::integration::H2TestFrame::kGeneric: {
     const absl::string_view frame_bytes = proto_frame.generic().frame_bytes();
     ENVOY_LOG_MISC(trace, "Sending generic frame");
     h2_frame = Http2Frame::makeGenericFrame(frame_bytes);
@@ -167,7 +167,7 @@ void H2FuzzIntegrationTest::sendFrame(const test::integration::H2TestFrame& prot
   write_func(h2_frame);
 }
 
-void H2FuzzIntegrationTest::replay(const test::integration::H2CaptureFuzzTestCase& input,
+void H2FuzzIntegrationTest::replay(const ::test::integration::H2CaptureFuzzTestCase& input,
                                    bool ignore_response) {
   struct Init {
     Init(H2FuzzIntegrationTest* test) { test->initialize(); }
@@ -190,7 +190,7 @@ void H2FuzzIntegrationTest::replay(const test::integration::H2CaptureFuzzTestCas
       break;
     }
     switch (event.event_selector_case()) {
-    case test::integration::Event::kDownstreamSendEvent: {
+    case ::test::integration::Event::kDownstreamSendEvent: {
       auto downstream_write_func = [&](const Http2Frame& h2_frame) -> void {
         ASSERT_TRUE(tcp_client->write(std::string(h2_frame), false, false));
       };
@@ -211,7 +211,7 @@ void H2FuzzIntegrationTest::replay(const test::integration::H2CaptureFuzzTestCas
       }
       break;
     }
-    case test::integration::Event::kUpstreamSendEvent: {
+    case ::test::integration::Event::kUpstreamSendEvent: {
       if (ignore_response) {
         break;
       }

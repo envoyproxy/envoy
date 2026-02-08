@@ -6,14 +6,14 @@
 #include "source/extensions/load_balancing_policies/round_robin/round_robin_lb.h"
 
 #include "test/extensions/load_balancing_policies/common/zone_aware_load_balancer_fuzz_base.h"
-#include "test/extensions/load_balancing_policies/round_robin/round_robin_load_balancer_fuzz.pb.validate.h"
+#include "test/extensions/load_balancing_policies/round_robin/round_robin_load_balancer_fuzz.pb.h"
 #include "test/fuzz/fuzz_runner.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {
 namespace Upstream {
 
-DEFINE_PROTO_FUZZER(const test::common::upstream::RoundRobinLoadBalancerTestCase& input) {
+DEFINE_PROTO_FUZZER(const ::test::common::upstream::RoundRobinLoadBalancerTestCase& input) {
   try {
     TestUtility::validate(input);
   } catch (const ProtoValidationException& e) {
@@ -21,8 +21,8 @@ DEFINE_PROTO_FUZZER(const test::common::upstream::RoundRobinLoadBalancerTestCase
     return;
   }
 
-  const test::common::upstream::ZoneAwareLoadBalancerTestCase& zone_aware_load_balancer_test_case =
-      input.zone_aware_load_balancer_test_case();
+  const ::test::common::upstream::ZoneAwareLoadBalancerTestCase&
+      zone_aware_load_balancer_test_case = input.zone_aware_load_balancer_test_case();
 
   // Validate the correctness of the Slow-Start config values.
   if (input.has_round_robin_lb_config() && input.round_robin_lb_config().has_slow_start_config()) {

@@ -2,8 +2,9 @@ syntax = "proto3";
 
 package envoy.extensions.dynamic_modules.v3;
 
+import "buf/validate/validate.proto";
+
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.dynamic_modules.v3";
 option java_outer_classname = "DynamicModulesProto";
@@ -44,7 +45,7 @@ message DynamicModuleConfig {
   //
   // .. note::
   //   There is some remaining work to make the search path configurable via command line options.
-  string name = 1 [(validate.rules).string = {min_len: 1}];
+  string name = 1 [(buf.validate.field).string = {min_len: 1}];
 
   // If true, prevents the module from being unloaded with ``dlclose``.
   //

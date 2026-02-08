@@ -9,7 +9,6 @@
 #include "source/extensions/filters/network/common/factory_base.h"
 
 #include "test/integration/filters/test_network_async_tcp_filter.pb.h"
-#include "test/integration/filters/test_network_async_tcp_filter.pb.validate.h"
 
 #include "absl/strings/string_view.h"
 
@@ -38,7 +37,7 @@ struct TestNetworkAsyncTcpFilterStats {
 class TestNetworkAsyncTcpFilter : public Network::ReadFilter {
 public:
   TestNetworkAsyncTcpFilter(
-      const test::integration::filters::TestNetworkAsyncTcpFilterConfig& config,
+      const ::test::integration::filters::TestNetworkAsyncTcpFilterConfig& config,
       Stats::Scope& scope, Upstream::ClusterManager& cluster_manager)
       : stats_(generateStats("test_network_async_tcp_filter", scope)),
         cluster_name_(config.cluster_name()), kill_after_on_data_(config.kill_after_on_data()),
@@ -181,11 +180,11 @@ private:
 
 class TestNetworkAsyncTcpFilterConfigFactory
     : public Extensions::NetworkFilters::Common::FactoryBase<
-          test::integration::filters::TestNetworkAsyncTcpFilterConfig> {
+          ::test::integration::filters::TestNetworkAsyncTcpFilterConfig> {
 public:
   TestNetworkAsyncTcpFilterConfigFactory()
       : Extensions::NetworkFilters::Common::FactoryBase<
-            test::integration::filters::TestNetworkAsyncTcpFilterConfig>(
+            ::test::integration::filters::TestNetworkAsyncTcpFilterConfig>(
             "envoy.test.test_network_async_tcp_filter") {}
 
   std::string name() const override { return "envoy.test.test_network_async_tcp_filter"; }
@@ -197,7 +196,7 @@ public:
 
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
-      const test::integration::filters::TestNetworkAsyncTcpFilterConfig& config,
+      const ::test::integration::filters::TestNetworkAsyncTcpFilterConfig& config,
       Server::Configuration::FactoryContext& context) override {
     return [config, &context](Network::FilterManager& filter_manager) -> void {
       filter_manager.addReadFilter(std::make_shared<TestNetworkAsyncTcpFilter>(

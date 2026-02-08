@@ -5,6 +5,7 @@
 #else
 #define UDP_GSO_BATCH_WRITER_COMPILETIME_SUPPORT 1
 
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/network/udp_packet_writer_handler.h"
 
 #include "source/common/protobuf/utility.h"

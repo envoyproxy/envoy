@@ -30,5 +30,8 @@ envoy_cc_library(
     name = "least_request_lb_lib",
     srcs = ["least_request_lb.cc"],
     hdrs = ["least_request_lb.h"],
-    deps = ["//source/extensions/load_balancing_policies/common:load_balancer_lib"],
+    deps = [
+        "//source/extensions/load_balancing_policies/common:load_balancer_lib",
+        "@envoy_api//envoy/extensions/load_balancing_policies/least_request/v3:pkg_cc_proto",
+    ],
 )

@@ -54,12 +54,12 @@ void XdsFuzzTest::updateRoute(
       std::to_string(version_));
 }
 
-XdsFuzzTest::XdsFuzzTest(const test::server::config_validation::XdsTestCase& input,
+XdsFuzzTest::XdsFuzzTest(const ::test::server::config_validation::XdsTestCase& input,
                          bool use_unified_mux)
     : HttpIntegrationTest(
           Http::CodecType::HTTP2, TestEnvironment::getIpVersionsForTest()[0],
           ConfigHelper::adsBootstrap(input.config().sotw_or_delta() ==
-                                             test::server::config_validation::Config::SOTW
+                                             ::test::server::config_validation::Config::SOTW
                                          ? "GRPC"
                                          : "DELTA_GRPC")),
       verifier_(input.config().sotw_or_delta()), actions_(input.actions()),
@@ -73,7 +73,7 @@ XdsFuzzTest::XdsFuzzTest(const test::server::config_validation::XdsTestCase& inp
   // Avoid listeners draining during the test.
   drain_time_ = std::chrono::seconds(60);
 
-  if (input.config().sotw_or_delta() == test::server::config_validation::Config::SOTW) {
+  if (input.config().sotw_or_delta() == ::test::server::config_validation::Config::SOTW) {
     sotw_or_delta_ = use_unified_mux ? Grpc::SotwOrDelta::UnifiedSotw : Grpc::SotwOrDelta::Sotw;
   } else {
     sotw_or_delta_ = use_unified_mux ? Grpc::SotwOrDelta::UnifiedDelta : Grpc::SotwOrDelta::Delta;
@@ -255,7 +255,7 @@ void XdsFuzzTest::replay() {
 
   for (const auto& action : actions_) {
     switch (action.action_selector_case()) {
-    case test::server::config_validation::Action::kAddListener: {
+    case ::test::server::config_validation::Action::kAddListener: {
       std::string listener_name =
           absl::StrCat("listener_", action.add_listener().listener_num() % ListenersMax);
       std::string route_name =
@@ -268,13 +268,13 @@ void XdsFuzzTest::replay() {
       sent_listener = true;
       break;
     }
-    case test::server::config_validation::Action::kRemoveListener: {
+    case ::test::server::config_validation::Action::kRemoveListener: {
       std::string listener_name =
           absl::StrCat("listener_", action.remove_listener().listener_num() % ListenersMax);
       removeListener(listener_name);
       break;
     }
-    case test::server::config_validation::Action::kAddRoute: {
+    case ::test::server::config_validation::Action::kAddRoute: {
       if (!sent_listener) {
         ENVOY_LOG_MISC(debug, "Ignoring request to add route_{}",
                        action.add_route().route_num() % RoutesMax);

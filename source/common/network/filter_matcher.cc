@@ -1,5 +1,6 @@
 #include "source/common/network/filter_matcher.h"
 
+#include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/network/filter.h"
 
 #include "source/common/common/assert.h"

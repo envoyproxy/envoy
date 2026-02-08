@@ -1,5 +1,7 @@
 #include "source/common/http/request_id_extension_impl.h"
 
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+
 #include "source/common/config/utility.h"
 
 namespace Envoy {

@@ -1,4 +1,3 @@
-#include "envoy/config/accesslog/v3/accesslog.pb.validate.h"
 #include "envoy/extensions/access_loggers/file/v3/file.pb.h"
 #include "envoy/extensions/access_loggers/filters/process_ratelimit/v3/process_ratelimit.pb.h"
 #include "envoy/type/v3/token_bucket.pb.h"

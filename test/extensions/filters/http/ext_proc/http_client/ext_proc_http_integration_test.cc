@@ -127,7 +127,7 @@ public:
       }
 
       if (config_option.add_log_filter) {
-        test::integration::filters::LoggingTestFilterConfig logging_filter_config;
+        ::test::integration::filters::LoggingTestFilterConfig logging_filter_config;
         logging_filter_config.set_logging_id(ext_proc_filter_name);
         logging_filter_config.set_upstream_cluster_name(config_option.cluster);
         logging_filter_config.set_check_received_bytes(true);

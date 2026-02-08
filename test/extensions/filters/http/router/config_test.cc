@@ -1,7 +1,6 @@
 #include <string>
 
 #include "envoy/extensions/filters/http/router/v3/router.pb.h"
-#include "envoy/extensions/filters/http/router/v3/router.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "source/common/http/utility.h"
@@ -287,7 +286,7 @@ TEST(RouterFilterConfigTest, RouterFilterWithUnsupportedStrictHeaderCheck) {
   EXPECT_THROW_WITH_REGEX(
       factory.createFilterFactoryFromProto(router_config, "stats.", context).value(),
       ProtoValidationException,
-      "Proto constraint validation failed \\(RouterValidationError.StrictCheckHeaders");
+      "Proto constraint validation failed \\(field 'strict_check_headers': value must be in list");
 }
 
 TEST(RouterFilterConfigTest, RouterV2Filter) {

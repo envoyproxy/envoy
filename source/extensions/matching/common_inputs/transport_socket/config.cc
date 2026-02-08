@@ -1,7 +1,7 @@
 #include "source/extensions/matching/common_inputs/transport_socket/config.h"
 
 #include "envoy/config/core/v3/base.pb.h"
-#include "envoy/config/core/v3/base.pb.validate.h"
+#include "envoy/extensions/matching/common_inputs/transport_socket/v3/transport_socket_inputs.pb.h"
 
 #include "source/common/common/fmt.h"
 #include "source/common/config/metadata.h"

@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/extensions/matching/input_matchers/runtime_fraction/v3/runtime_fraction.pb.h"
-#include "envoy/extensions/matching/input_matchers/runtime_fraction/v3/runtime_fraction.pb.validate.h"
 #include "envoy/matcher/matcher.h"
 #include "envoy/server/factory_context.h"
 

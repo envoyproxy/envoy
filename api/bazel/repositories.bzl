@@ -36,16 +36,12 @@ def api_dependencies(bzlmod = False):
         name = "rules_jvm_external",
     )
     external_http_archive(
-        name = "com_envoyproxy_protoc_gen_validate",
-        patch_args = ["-p1"],
-        patches = ["@envoy//bazel:pgv.patch"],
-        repo_mapping = {"@com_google_absl": "@abseil-cpp"},
-    )
-    external_http_archive(
         name = "com_google_googleapis",
     )
     external_http_archive(
         name = "xds",
+        patch_args = ["-p1"],
+        patches = ["@envoy_api//bazel:xds.patch"],
     )
     external_http_archive(
         name = "rules_buf",
@@ -58,6 +54,25 @@ def api_dependencies(bzlmod = False):
         location_name = "zipkin_api",
         build_file_content = ZIPKINAPI_BUILD_CONTENT,
     )
+
+    external_http_archive(
+        name = "protovalidate",
+    )
+
+    external_http_archive(
+        name = "protovalidate-cc",
+        location_name = "protovalidate_cc",
+        repo_mapping = {
+            "@com_github_bufbuild_protovalidate": "@protovalidate",
+            "@com_google_cel_cpp": "@cel-cpp",
+            "@com_google_absl": "@abseil-cpp",
+            "@com_google_protobuf": "@com_google_protobuf",
+            "@com_googlesource_code_re2": "@re2",
+        },
+        patches = ["@envoy//bazel:protovalidate-cc.patch"],
+        patch_args = ["-p1"],
+    )
+
     external_http_archive(
         name = "opentelemetry-proto",
         location_name = "opentelemetry_proto",

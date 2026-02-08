@@ -2,10 +2,11 @@
 
 #include <memory>
 
+#include "envoy/extensions/filters/common/dependency/v3/dependency.pb.h"
+#include "envoy/extensions/filters/common/matcher/action/v3/skip_action.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/registry/registry.h"
 #include "envoy/type/matcher/v3/http_inputs.pb.h"
-#include "envoy/type/matcher/v3/http_inputs.pb.validate.h"
 
 #include "source/common/config/utility.h"
 #include "source/common/http/utility.h"

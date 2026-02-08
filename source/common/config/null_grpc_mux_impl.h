@@ -1,6 +1,8 @@
 #pragma once
 
+#include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/grpc_mux.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
 
 namespace Envoy {
 namespace Config {

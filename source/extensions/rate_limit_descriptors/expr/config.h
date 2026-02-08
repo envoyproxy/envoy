@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/extensions/rate_limit_descriptors/expr/v3/expr.pb.h"
 #include "envoy/ratelimit/ratelimit.h"
 #include "envoy/registry/registry.h"
 

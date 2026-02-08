@@ -16,6 +16,7 @@ envoy_cc_test(
     ],
     rbe_pool = "6gig",
     deps = [
+        "//test/config:link_hacks",
         "//test/tools/schema_validator:schema_validator_lib",
     ],
 )

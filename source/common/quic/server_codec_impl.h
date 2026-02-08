@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/http/codec.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/overload/overload_manager.h"

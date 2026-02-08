@@ -8,7 +8,6 @@
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
 #include "test/integration/filters/add_header_filter.pb.h"
-#include "test/integration/filters/add_header_filter.pb.validate.h"
 #include "test/integration/filters/common.h"
 
 namespace Envoy {
@@ -65,16 +64,16 @@ public:
   std::string name() const override { return "envoy.test.add_header_upstream"; }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<test::integration::filters::AddHeaderFilterConfig>();
+    return std::make_unique<::test::integration::filters::AddHeaderFilterConfig>();
   }
 
   absl::StatusOr<Http::FilterFactoryCb>
   createFilterFactoryFromProto(const Protobuf::Message& config, const std::string&,
                                Server::Configuration::UpstreamFactoryContext& context) override {
 
-    const auto& proto_config =
-        MessageUtil::downcastAndValidate<const test::integration::filters::AddHeaderFilterConfig&>(
-            config, context.serverFactoryContext().messageValidationVisitor());
+    const auto& proto_config = MessageUtil::downcastAndValidate<
+        const ::test::integration::filters::AddHeaderFilterConfig&>(
+        config, context.serverFactoryContext().messageValidationVisitor());
 
     return [proto_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addStreamFilter(std::make_shared<AddConfigurableHeaderFilter>(

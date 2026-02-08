@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/router/cluster_specifier_plugin.h"
 
 #include "source/common/router/delegating_route_impl.h"

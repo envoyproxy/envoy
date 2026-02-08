@@ -2,6 +2,7 @@
 
 #include <functional>
 
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/thread_local/thread_local.h"
 

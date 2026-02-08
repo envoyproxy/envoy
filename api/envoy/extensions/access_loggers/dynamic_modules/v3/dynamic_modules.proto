@@ -6,8 +6,9 @@ import "envoy/extensions/dynamic_modules/v3/dynamic_modules.proto";
 
 import "google/protobuf/any.proto";
 
+import "buf/validate/validate.proto";
+
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.access_loggers.dynamic_modules.v3";
 option java_outer_classname = "DynamicModulesProto";
@@ -29,7 +30,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 message DynamicModuleAccessLog {
   // Specifies the shared-object level configuration. This field is required.
   envoy.extensions.dynamic_modules.v3.DynamicModuleConfig dynamic_module_config = 1
-      [(validate.rules).message = {required: true}];
+      [(buf.validate.field).required = true];
 
   // The name for this logger configuration. If not specified, defaults to an empty string.
   //

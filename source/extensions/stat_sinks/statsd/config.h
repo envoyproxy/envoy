@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/config/metrics/v3/stats.pb.h"
 #include "envoy/server/instance.h"
 
 #include "source/server/configuration_impl.h"

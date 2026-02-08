@@ -3,6 +3,7 @@
 #include <atomic>
 #include <cstdint>
 
+#include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/http/header_map.h"
 #include "envoy/network/connection.h"
 #include "envoy/tracing/trace_reason.h"

@@ -25,7 +25,7 @@ public:
   // stream to be opened. `id` identifies an `HTTP/3` frame and is used to track
   // the whether the stream is already in flight.
   std::string serialize(bool unidirectional, uint32_t type, uint32_t id,
-                        const test::common::quic::H3Frame& h3frame);
+                        const ::test::common::quic::H3Frame& h3frame);
 
 private:
   std::set<uint32_t>& open_unidirectional_streams_;
@@ -39,20 +39,20 @@ public:
   using QuicPacketPtr = std::unique_ptr<quic::QuicEncryptedPacket>;
   QuicPacketizer(const quic::ParsedQuicVersion& quic_version,
                  quic::QuicConnectionHelperInterface* connection_helper);
-  std::vector<QuicPacketPtr> serializePackets(const test::common::quic::QuicH3FuzzCase& input);
+  std::vector<QuicPacketPtr> serializePackets(const ::test::common::quic::QuicH3FuzzCase& input);
   void reset();
 
 private:
-  QuicPacketPtr serializePacket(const test::common::quic::QuicFrame& frame);
+  QuicPacketPtr serializePacket(const ::test::common::quic::QuicFrame& frame);
   QuicPacketPtr serializeJunkPacket(const std::string& data);
   QuicPacketPtr serialize(quic::QuicFrame frame);
-  QuicPacketPtr serializeStreamFrame(const test::common::quic::QuicStreamFrame& frame);
-  QuicPacketPtr serializeNewTokenFrame(const test::common::quic::QuicNewTokenFrame& frame);
-  QuicPacketPtr serializeDatagramFrame(const test::common::quic::QuicDatagramFrame& frame);
-  QuicPacketPtr serializeCryptoFrame(const test::common::quic::QuicCryptoFrame& frame);
-  QuicPacketPtr serializeAckFrame(const test::common::quic::QuicAckFrame& frame);
+  QuicPacketPtr serializeStreamFrame(const ::test::common::quic::QuicStreamFrame& frame);
+  QuicPacketPtr serializeNewTokenFrame(const ::test::common::quic::QuicNewTokenFrame& frame);
+  QuicPacketPtr serializeDatagramFrame(const ::test::common::quic::QuicDatagramFrame& frame);
+  QuicPacketPtr serializeCryptoFrame(const ::test::common::quic::QuicCryptoFrame& frame);
+  QuicPacketPtr serializeAckFrame(const ::test::common::quic::QuicAckFrame& frame);
   QuicPacketPtr
-  serializeNewConnectionIdFrame(const test::common::quic::QuicNewConnectionIdFrame& frame);
+  serializeNewConnectionIdFrame(const ::test::common::quic::QuicNewConnectionIdFrame& frame);
 
   quic::ParsedQuicVersion quic_version_;
   quic::QuicConnectionHelperInterface* connection_helper_;

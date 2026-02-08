@@ -1,7 +1,6 @@
 #include "envoy/config/accesslog/v3/accesslog.pb.h"
 #include "envoy/extensions/access_loggers/file/v3/file.pb.h"
 #include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.h"
-#include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.validate.h"
 
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/common/hash.h"
@@ -1632,7 +1631,8 @@ hash_policies:
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(setup(readConfig(config)), EnvoyException,
-                          "caused by HashPolicyValidationError\\.SourceIp");
+                          "Proto constraint validation failed \\(field 'hash_policies.source_ip': "
+                          "value must equal true\\)");
 }
 
 // Make sure hash policy is null if it is not mentioned.
@@ -1754,7 +1754,8 @@ hash_policies:
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(setup(readConfig(config)), EnvoyException,
-                          "caused by HashPolicyValidationError\\.Key");
+                          "Proto constraint validation failed \\(field 'hash_policies.key': value "
+                          "length must be at least 1 characters\\)");
 }
 
 // Expect correct hash is created if hash_policy with key is mentioned.

@@ -33,7 +33,7 @@ public:
   HttpFilterFuzzer() = default;
 
   // This executes the filter decode or encode methods with the fuzzed data.
-  template <class FilterType> void runData(FilterType* filter, const test::fuzz::HttpData& data);
+  template <class FilterType> void runData(FilterType* filter, const ::test::fuzz::HttpData& data);
 
   // This executes the access logger with the fuzzed headers/trailers.
   void accessLog(AccessLog::Instance* access_logger, const StreamInfo::StreamInfo& stream_info) {
@@ -64,7 +64,7 @@ protected:
   // General functions are deleted, but templated specializations for encoders/decoders are defined
   // in the cc file.
   template <class FilterType>
-  Http::FilterHeadersStatus sendHeaders(FilterType* filter, const test::fuzz::HttpData& data,
+  Http::FilterHeadersStatus sendHeaders(FilterType* filter, const ::test::fuzz::HttpData& data,
                                         bool end_stream) = delete;
 
   template <class FilterType>
@@ -72,7 +72,7 @@ protected:
                                   bool end_stream) = delete;
 
   template <class FilterType>
-  void sendTrailers(FilterType* filter, const test::fuzz::HttpData& data) = delete;
+  void sendTrailers(FilterType* filter, const ::test::fuzz::HttpData& data) = delete;
 
   // This keeps track of when a filter will stop decoding due to direct responses.
   // If your filter needs to stop decoding because of a direct response, make sure you override
@@ -92,10 +92,10 @@ protected:
 };
 
 template <class FilterType>
-void HttpFilterFuzzer::runData(FilterType* filter, const test::fuzz::HttpData& data) {
+void HttpFilterFuzzer::runData(FilterType* filter, const ::test::fuzz::HttpData& data) {
   bool end_stream = false;
   enabled_ = true;
-  if (data.body_case() == test::fuzz::HttpData::BODY_NOT_SET && !data.has_trailers()) {
+  if (data.body_case() == ::test::fuzz::HttpData::BODY_NOT_SET && !data.has_trailers()) {
     end_stream = true;
   }
   const auto& headersStatus = sendHeaders(filter, data, end_stream);
@@ -127,7 +127,7 @@ void HttpFilterFuzzer::runData(FilterType* filter, const test::fuzz::HttpData& d
 
 template <>
 inline Http::FilterHeadersStatus HttpFilterFuzzer::sendHeaders(Http::StreamDecoderFilter* filter,
-                                                               const test::fuzz::HttpData& data,
+                                                               const ::test::fuzz::HttpData& data,
                                                                bool end_stream) {
   request_headers_ = Fuzz::fromHeaders<Http::TestRequestHeaderMapImpl>(data.headers());
   if (request_headers_.Path() == nullptr || request_headers_.getPathValue().empty()) {
@@ -150,7 +150,7 @@ inline Http::FilterHeadersStatus HttpFilterFuzzer::sendHeaders(Http::StreamDecod
 
 template <>
 inline Http::FilterHeadersStatus HttpFilterFuzzer::sendHeaders(Http::StreamEncoderFilter* filter,
-                                                               const test::fuzz::HttpData& data,
+                                                               const ::test::fuzz::HttpData& data,
                                                                bool end_stream) {
   response_headers_ = Fuzz::fromHeaders<Http::TestResponseHeaderMapImpl>(data.headers());
 
@@ -203,7 +203,7 @@ inline Http::FilterDataStatus HttpFilterFuzzer::sendData(Http::StreamEncoderFilt
 
 template <>
 inline void HttpFilterFuzzer::sendTrailers(Http::StreamDecoderFilter* filter,
-                                           const test::fuzz::HttpData& data) {
+                                           const ::test::fuzz::HttpData& data) {
   request_trailers_ = Fuzz::fromHeaders<Http::TestRequestTrailerMapImpl>(data.trailers());
   ENVOY_LOG_MISC(debug, "Decoding trailers:\n{} ", request_trailers_);
   filter->decodeTrailers(request_trailers_);
@@ -212,7 +212,7 @@ inline void HttpFilterFuzzer::sendTrailers(Http::StreamDecoderFilter* filter,
 
 template <>
 inline void HttpFilterFuzzer::sendTrailers(Http::StreamEncoderFilter* filter,
-                                           const test::fuzz::HttpData& data) {
+                                           const ::test::fuzz::HttpData& data) {
   response_trailers_ = Fuzz::fromHeaders<Http::TestResponseTrailerMapImpl>(data.trailers());
   ENVOY_LOG_MISC(debug, "Encoding trailers:\n{} ", response_trailers_);
   filter->encodeTrailers(response_trailers_);

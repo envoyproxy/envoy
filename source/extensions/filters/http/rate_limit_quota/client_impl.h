@@ -4,6 +4,7 @@
 
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/grpc/async_client_manager.h"
+#include "envoy/type/v3/ratelimit_strategy.pb.h"
 
 #include "source/common/grpc/typed_async_client.h"
 #include "source/extensions/filters/http/common/factory_base.h"

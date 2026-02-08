@@ -2,7 +2,7 @@
 #include "source/extensions/filters/common/expr/evaluator.h"
 
 #include "test/common/stream_info/test_util.h"
-#include "test/extensions/filters/common/expr/evaluator_fuzz.pb.validate.h"
+#include "test/extensions/filters/common/expr/evaluator_fuzz.pb.h"
 #include "test/fuzz/fuzz_runner.h"
 #include "test/fuzz/utility.h"
 #include "test/test_common/network_utility.h"
@@ -18,7 +18,7 @@ namespace Common {
 namespace Expr {
 namespace {
 
-DEFINE_PROTO_FUZZER(const test::extensions::filters::common::expr::EvaluatorTestCase& input) {
+DEFINE_PROTO_FUZZER(const ::test::extensions::filters::common::expr::EvaluatorTestCase& input) {
   // Create builder with default configuration.
   static auto builder_ptr = Expr::createBuilder({});
   static auto builder = std::make_shared<BuilderInstance>(std::move(builder_ptr));

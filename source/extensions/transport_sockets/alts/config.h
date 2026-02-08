@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/extensions/transport_sockets/alts/v3/alts.pb.h"
 #include "envoy/server/transport_socket_config.h"
 
 namespace Envoy {

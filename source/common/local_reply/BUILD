@@ -26,6 +26,7 @@ envoy_cc_library(
         "//source/common/http:header_map_lib",
         "//source/common/router:header_parser_lib",
         "//source/common/stream_info:stream_info_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )

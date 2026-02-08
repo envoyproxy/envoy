@@ -28,5 +28,9 @@ envoy_cc_library(
     name = "round_robin_lb_lib",
     srcs = ["round_robin_lb.cc"],
     hdrs = ["round_robin_lb.h"],
-    deps = ["//source/extensions/load_balancing_policies/common:load_balancer_lib"],
+    deps = [
+        "//source/extensions/load_balancing_policies/common:load_balancer_lib",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/load_balancing_policies/round_robin/v3:pkg_cc_proto",
+    ],
 )

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/xds_manager.h"
 
 #include "source/common/common/thread.h"

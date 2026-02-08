@@ -4,6 +4,8 @@
 #include <vector>
 
 #include "envoy/api/api.h"
+#include "envoy/config/core/v3/substitution_format_string.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "source/common/access_log/access_log_impl.h"
 #include "source/common/common/enum_to_int.h"

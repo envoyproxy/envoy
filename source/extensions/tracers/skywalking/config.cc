@@ -1,7 +1,6 @@
 #include "source/extensions/tracers/skywalking/config.h"
 
 #include "envoy/config/trace/v3/skywalking.pb.h"
-#include "envoy/config/trace/v3/skywalking.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "source/common/common/utility.h"

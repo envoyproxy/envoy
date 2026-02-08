@@ -5,6 +5,7 @@
 #include <type_traits>
 #include <utility>
 
+#include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/event/dispatcher.h"
 
 #include "source/common/common/assert.h"

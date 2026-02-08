@@ -4,7 +4,6 @@
 
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
-#include "envoy/config/listener/v3/listener.pb.validate.h"
 #include "envoy/config/subscription.h"
 #include "envoy/config/subscription_factory.h"
 #include "envoy/init/manager.h"

@@ -6,6 +6,7 @@
 #include <ostream>
 #include <vector>
 
+#include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/header_map.h"

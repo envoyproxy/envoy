@@ -6,6 +6,7 @@
 #include <memory>
 
 #include "envoy/common/time.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/filter.h"

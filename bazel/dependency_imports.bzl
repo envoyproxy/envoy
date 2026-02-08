@@ -190,6 +190,22 @@ def envoy_dependency_imports(
         build_external = "external",
     )
 
+    go_repository(
+        name = "protovalidate_go",
+        importpath = "github.com/bufbuild/protovalidate-go",
+        sum = "h1:pJZLbm2VHJy+IYCZxQW8yhaQdOOJVCIzH4IELVcQpSM=",
+        version = "v0.8.0",
+        build_external = "external",
+    )
+
+    go_repository(
+        name = "protovalidate_go_gen",
+        importpath = "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go",
+        sum = "h1:PMmTMyvHScV9Mn8wc6ASge9uRcHy0jtqPd+fM35LmsQ=",
+        version = "v1.36.11-20260209202127-80ab13bee0bf.1",
+        build_external = "external",
+    )
+
     rules_proto_grpc_toolchains()
 
 def envoy_download_go_sdks(go_version):

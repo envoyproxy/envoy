@@ -132,6 +132,7 @@ envoy_cc_library(
         "//envoy/server:factory_context_interface",
         "//source/common/config:well_known_names",
         "//source/common/http:hash_policy_lib",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],
 )
 
@@ -550,6 +551,7 @@ envoy_cc_library(
     deps = [
         "//envoy/router:router_interface",
         "//source/common/config:metadata_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 

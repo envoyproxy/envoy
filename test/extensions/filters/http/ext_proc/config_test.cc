@@ -177,7 +177,7 @@ TEST(HttpExtProcConfigTest, InvalidServiceConfig) {
   testing::NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_THROW_WITH_REGEX(
       factory.createFilterFactoryFromProto(*proto_config, "stats", context).value(), EnvoyException,
-      "Proto constraint validation failed \\(ExternalProcessorValidationError.GrpcService.*");
+      "field 'grpc_service.google_grpc.stat_prefix': value length must be at least 1 characters");
 }
 
 TEST(HttpExtProcConfigTest, InvalidHttpServiceProcessingMode) {

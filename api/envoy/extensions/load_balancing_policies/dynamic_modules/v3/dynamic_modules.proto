@@ -6,8 +6,9 @@ import "envoy/extensions/dynamic_modules/v3/dynamic_modules.proto";
 
 import "google/protobuf/any.proto";
 
+import "buf/validate/validate.proto";
+
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.load_balancing_policies.dynamic_modules.v3";
 option java_outer_classname = "DynamicModulesProto";
@@ -27,12 +28,12 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 message DynamicModulesLoadBalancerConfig {
   // The dynamic module configuration.
   envoy.extensions.dynamic_modules.v3.DynamicModuleConfig dynamic_module_config = 1
-      [(validate.rules).message = {required: true}];
+      [(buf.validate.field).required = true];
 
   // The name to identify the load balancer implementation within the module.
   // This is passed to the module's ``envoy_dynamic_module_on_lb_config_new``
   // function.
-  string lb_policy_name = 2 [(validate.rules).string = {min_len: 1}];
+  string lb_policy_name = 2 [(buf.validate.field).string = {min_len: 1}];
 
   // The configuration for the module's load balancer implementation.
   // This is passed to the module's ``envoy_dynamic_module_on_lb_config_new``

@@ -6,7 +6,6 @@
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
 #include "contrib/envoy/extensions/filters/http/peer_metadata/v3/peer_metadata.pb.h"
-#include "contrib/envoy/extensions/filters/http/peer_metadata/v3/peer_metadata.pb.validate.h"
 #include "contrib/istio/filters/common/source/metadata_object.h"
 #include "contrib/istio/filters/common/source/workload_discovery.h"
 

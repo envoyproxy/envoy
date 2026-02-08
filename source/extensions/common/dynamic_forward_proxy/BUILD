@@ -78,5 +78,6 @@ envoy_cc_library(
         "//envoy/server:factory_context_interface",
         "//envoy/upstream:upstream_interface",
         "@abseil-cpp//absl/container:flat_hash_set",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
     ],
 )

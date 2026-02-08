@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/extensions/matching/input_matchers/consistent_hashing/v3/consistent_hashing.pb.h"
-#include "envoy/extensions/matching/input_matchers/consistent_hashing/v3/consistent_hashing.pb.validate.h"
 #include "envoy/matcher/matcher.h"
 #include "envoy/server/factory_context.h"
 
