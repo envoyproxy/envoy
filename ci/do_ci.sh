@@ -29,7 +29,13 @@ else
 fi
 
 ENVOY_DOCS_PATH="${ENVOY_DOCS_PATH:-./docs}"
-ENVOY_DOCS_PATH="$(realpath -m "$ENVOY_DOCS_PATH")"
+# We use a portable realpath alternative here since macOS realpath
+# does not support -m.
+if [[ -d "$ENVOY_DOCS_PATH" ]]; then
+  ENVOY_DOCS_PATH="$(cd "$ENVOY_DOCS_PATH" && pwd)"
+elif [[ "$ENVOY_DOCS_PATH" != /* ]]; then
+  ENVOY_DOCS_PATH="${PWD}/${ENVOY_DOCS_PATH}"
+fi
 
 setup_clang_toolchain() {
     local config
@@ -673,7 +679,13 @@ case $CI_TARGET in
         echo "generating docs..."
         # Build docs.
         [[ -z "${DOCS_OUTPUT_DIR}" ]] && DOCS_OUTPUT_DIR=generated/docs
-        DOCS_OUTPUT_DIR="$(realpath -m "$DOCS_OUTPUT_DIR")"
+        # We use a portable realpath alternative here since macOS realpath
+        # does not support -m.
+        if [[ -d "$DOCS_OUTPUT_DIR" ]]; then
+          DOCS_OUTPUT_DIR="$(cd "$DOCS_OUTPUT_DIR" && pwd)"
+        elif [[ "$DOCS_OUTPUT_DIR" != /* ]]; then
+          DOCS_OUTPUT_DIR="${PWD}/${DOCS_OUTPUT_DIR}"
+        fi
         rm -rf "${DOCS_OUTPUT_DIR:?}"/*
         mkdir -p "${DOCS_OUTPUT_DIR}"
         if [[ -e repo.bazelrc ]]; then
