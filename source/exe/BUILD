@@ -31,7 +31,10 @@ envoy_cc_binary(
     }),
     rbe_pool = "6gig",
     stamped = True,
-    deps = [":envoy_main_entry_lib"],
+    deps = [
+        ":envoy_main_entry_lib",
+        ":version_suffix_lib",
+    ],
 )
 
 envoy_cc_library(
@@ -55,6 +58,12 @@ envoy_cc_library(
         "//bazel:disable_http3_on_not_x86_ppc": envoy_all_extensions(NO_HTTP3_SKIP_TARGETS),
         "//conditions:default": envoy_all_extensions(),
     }),
+)
+
+envoy_cc_library(
+    name = "version_suffix_lib",
+    srcs = ["version_suffix.cc"],
+    alwayslink = 1,
 )
 
 envoy_cc_library(
