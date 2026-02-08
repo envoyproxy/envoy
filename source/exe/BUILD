@@ -23,6 +23,12 @@ alias(
     actual = ":envoy-static",
 )
 
+envoy_cc_library(
+    name = "version_suffix_lib",
+    srcs = ["version_suffix.cc"],
+    alwayslink = 1,
+)
+
 envoy_cc_binary(
     name = "envoy-static",
     features = select({
@@ -31,7 +37,7 @@ envoy_cc_binary(
     }),
     rbe_pool = "6gig",
     stamped = True,
-    deps = [":envoy_main_entry_lib"],
+    deps = [":envoy_main_entry_lib", ":version_suffix_lib"],
 )
 
 envoy_cc_library(

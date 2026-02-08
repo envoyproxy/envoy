@@ -934,6 +934,8 @@ case $CI_TARGET in
     verify-distroless)
         docker build -f ci/Dockerfile-distroless-testing -t distroless-testing .
         docker run --rm distroless-testing
+        docker build -f ci/Dockerfile-distroless-contrib-testing -t distroless-contrib-testing .
+        docker run --rm distroless-contrib-testing
         ;;
 
     verify_examples)
