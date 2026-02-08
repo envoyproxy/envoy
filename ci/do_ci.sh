@@ -29,8 +29,6 @@ else
 fi
 
 ENVOY_DOCS_PATH="${ENVOY_DOCS_PATH:-./docs}"
-# We use a portable realpath alternative here since macOS realpath
-# does not support -m.
 if [[ -d "$ENVOY_DOCS_PATH" ]]; then
   ENVOY_DOCS_PATH="$(cd "$ENVOY_DOCS_PATH" && pwd)"
 elif [[ "$ENVOY_DOCS_PATH" != /* ]]; then
