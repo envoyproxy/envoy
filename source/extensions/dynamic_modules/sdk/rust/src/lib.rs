@@ -7344,6 +7344,26 @@ pub trait EnvoyBootstrapExtensionConfig {
     abi::envoy_dynamic_module_type_http_callout_init_result,
     u64, // callout id
   );
+
+  /// Register an init target that blocks Envoy from accepting traffic until the module signals
+  /// readiness via [`EnvoyBootstrapExtensionConfig::signal_init_complete`].
+  ///
+  /// This must be called during the `new_bootstrap_extension_config` factory function, before
+  /// the init manager is initialized. Calling it after initialization will result in a failure.
+  ///
+  /// After calling this, the module must eventually call
+  /// [`EnvoyBootstrapExtensionConfig::signal_init_complete`] to unblock Envoy.
+  fn register_init_target(&self);
+
+  /// Signal that the module's asynchronous initialization is complete. Envoy will start accepting
+  /// traffic once all registered init targets have signaled readiness.
+  ///
+  /// This must only be called after [`EnvoyBootstrapExtensionConfig::register_init_target`] has
+  /// been called. Calling it without a prior registration will result in a no-op.
+  ///
+  /// This must be called on the main thread. To call from other threads, use the scheduler
+  /// mechanism to post an event to the main thread first.
+  fn signal_init_complete(&self);
 }
 
 /// EnvoyBootstrapExtension is the Envoy-side bootstrap extension.
@@ -7611,6 +7631,18 @@ impl EnvoyBootstrapExtensionConfig for EnvoyBootstrapExtensionConfigImpl {
     };
 
     (result, callout_id)
+  }
+
+  fn register_init_target(&self) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_config_register_init_target(self.raw);
+    }
+  }
+
+  fn signal_init_complete(&self) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_config_signal_init_complete(self.raw);
+    }
   }
 }
 

@@ -30,6 +30,20 @@ TEST(CommonAbiImplTest, SchedulerCommitEnvoyBug) {
       "not implemented in this context");
 }
 
+// Test that the weak symbol stub for register_init_target triggers an ENVOY_BUG when called.
+TEST(CommonAbiImplTest, RegisterInitTargetEnvoyBug) {
+  EXPECT_ENVOY_BUG(
+      { envoy_dynamic_module_callback_bootstrap_extension_config_register_init_target(nullptr); },
+      "not implemented in this context");
+}
+
+// Test that the weak symbol stub for signal_init_complete triggers an ENVOY_BUG when called.
+TEST(CommonAbiImplTest, SignalInitCompleteEnvoyBug) {
+  EXPECT_ENVOY_BUG(
+      { envoy_dynamic_module_callback_bootstrap_extension_config_signal_init_complete(nullptr); },
+      "not implemented in this context");
+}
+
 // Test that the weak symbol stub for http_callout triggers an ENVOY_BUG when called.
 TEST(CommonAbiImplTest, HttpCalloutEnvoyBug) {
   uint64_t callout_id = 0;

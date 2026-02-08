@@ -162,6 +162,67 @@ TEST_F(BootstrapAbiImplTest, OnScheduledDirect) {
 }
 
 // -----------------------------------------------------------------------------
+// Init Manager Tests
+// -----------------------------------------------------------------------------
+
+// Test that register_init_target and signal_init_complete work correctly.
+TEST_F(BootstrapAbiImplTest, InitTargetRegisterAndSignal) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  auto config = newDynamicModuleBootstrapExtensionConfig(
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  ASSERT_TRUE(config.ok()) << config.status();
+
+  // Expect the init manager to receive an add call when register_init_target is called.
+  EXPECT_CALL(context_.init_manager_, add(_));
+
+  envoy_dynamic_module_callback_bootstrap_extension_config_register_init_target(
+      config.value()->thisAsVoidPtr());
+
+  // Signal init complete.
+  envoy_dynamic_module_callback_bootstrap_extension_config_signal_init_complete(
+      config.value()->thisAsVoidPtr());
+}
+
+// Test that duplicate register_init_target is ignored.
+TEST_F(BootstrapAbiImplTest, InitTargetDuplicateRegister) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  auto config = newDynamicModuleBootstrapExtensionConfig(
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  ASSERT_TRUE(config.ok()) << config.status();
+
+  // First registration should succeed.
+  EXPECT_CALL(context_.init_manager_, add(_));
+
+  envoy_dynamic_module_callback_bootstrap_extension_config_register_init_target(
+      config.value()->thisAsVoidPtr());
+
+  // Second registration should be ignored (add should not be called again).
+  envoy_dynamic_module_callback_bootstrap_extension_config_register_init_target(
+      config.value()->thisAsVoidPtr());
+}
+
+// Test that signal_init_complete without prior registration is a no-op.
+TEST_F(BootstrapAbiImplTest, InitTargetSignalWithoutRegister) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  auto config = newDynamicModuleBootstrapExtensionConfig(
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  ASSERT_TRUE(config.ok()) << config.status();
+
+  // Calling signal_init_complete without registering should not crash.
+  envoy_dynamic_module_callback_bootstrap_extension_config_signal_init_complete(
+      config.value()->thisAsVoidPtr());
+}
+
+// -----------------------------------------------------------------------------
 // HTTP Callout Tests
 // -----------------------------------------------------------------------------
 

@@ -83,6 +83,16 @@ TEST_P(DynamicModulesBootstrapIntegrationTest, FunctionRegistryRust) {
       initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_function_registry_test"));
 }
 
+// This test verifies that the Rust bootstrap extension can register an init target to block
+// Envoy from accepting traffic until the module signals readiness.
+TEST_P(DynamicModulesBootstrapIntegrationTest, InitTargetRust) {
+  EXPECT_LOG_CONTAINS_ALL_OF(
+      Envoy::ExpectedLogMessages({{"info", "Init target registered during config creation"},
+                                  {"info", "Init target signaled complete during config creation"},
+                                  {"info", "Bootstrap init target test completed successfully!"}}),
+      initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_init_target_test"));
+}
+
 } // namespace DynamicModules
 } // namespace Bootstrap
 } // namespace Extensions

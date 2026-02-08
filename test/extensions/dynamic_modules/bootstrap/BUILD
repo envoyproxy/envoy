@@ -100,6 +100,7 @@ envoy_cc_test(
         "//test/config/integration/certs",
         "//test/extensions/dynamic_modules/test_data/c:bootstrap_no_op",
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_function_registry_test",
+        "//test/extensions/dynamic_modules/test_data/rust:bootstrap_init_target_test",
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_integration_test",
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_stats_test",
     ],

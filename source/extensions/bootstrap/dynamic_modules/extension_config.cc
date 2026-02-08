@@ -33,6 +33,28 @@ DynamicModuleBootstrapExtensionConfig::~DynamicModuleBootstrapExtensionConfig() 
   }
 }
 
+void DynamicModuleBootstrapExtensionConfig::registerInitTarget() {
+  if (init_target_ != nullptr) {
+    ENVOY_LOG(warn, "dynamic modules: init target already registered, ignoring duplicate call");
+    return;
+  }
+  init_target_ = std::make_unique<Init::TargetImpl>("dynamic_modules_bootstrap", []() {});
+  context_.initManager().add(*init_target_);
+  ENVOY_LOG(debug, "dynamic modules: init target registered, Envoy will wait for module to signal "
+                   "readiness before accepting traffic");
+}
+
+void DynamicModuleBootstrapExtensionConfig::signalInitComplete() {
+  if (init_target_ == nullptr) {
+    ENVOY_LOG(warn, "dynamic modules: signal_init_complete called without prior "
+                    "register_init_target, ignoring");
+    return;
+  }
+  init_target_->ready();
+  ENVOY_LOG(debug, "dynamic modules: init target signaled complete, Envoy may start accepting "
+                   "traffic");
+}
+
 void DynamicModuleBootstrapExtensionConfig::onScheduled(uint64_t event_id) {
   if (in_module_config_ != nullptr && on_bootstrap_extension_config_scheduled_ != nullptr) {
     on_bootstrap_extension_config_scheduled_(thisAsVoidPtr(), in_module_config_, event_id);

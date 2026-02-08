@@ -9,6 +9,7 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/http/message_impl.h"
+#include "source/common/init/target_impl.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 
@@ -90,6 +91,19 @@ public:
   sendHttpCallout(uint64_t* callout_id_out, absl::string_view cluster_name,
                   Http::RequestMessagePtr&& message, uint64_t timeout_milliseconds);
 
+  /**
+   * Registers an init target with the server's init manager. This blocks Envoy from accepting
+   * traffic until signalInitComplete() is called. Must be called during config creation, before
+   * the init manager is initialized.
+   */
+  void registerInitTarget();
+
+  /**
+   * Signals that the module's asynchronous initialization is complete. This unblocks the init
+   * manager and allows Envoy to start accepting traffic.
+   */
+  void signalInitComplete();
+
   // The corresponding in-module configuration.
   envoy_dynamic_module_type_bootstrap_extension_config_module_ptr in_module_config_ = nullptr;
 
@@ -120,6 +134,10 @@ public:
 
   // The stats store for accessing metrics.
   Stats::Store& stats_store_;
+
+  // The init target for blocking Envoy startup until the module signals readiness.
+  // This is created lazily when registerInitTarget() is called.
+  std::unique_ptr<Init::TargetImpl> init_target_;
 
 private:
   /**
