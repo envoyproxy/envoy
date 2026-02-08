@@ -1,6 +1,8 @@
 package abi
 
 /*
+#cgo darwin LDFLAGS: -Wl,-undefined,dynamic_lookup
+#cgo linux LDFLAGS: -Wl,--unresolved-symbols=ignore-all
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -18,7 +20,6 @@ import (
 	"sync"
 	"unsafe"
 
-	cabi "github.com/envoyproxy/envoy/source/extensions/dynamic_modules/abi"
 	sdk "github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go"
 	"github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go/shared"
 )
@@ -1103,8 +1104,7 @@ func (h *dymRouteConfigHandle) DefineCounter(name string,
 
 //export envoy_dynamic_module_on_program_init
 func envoy_dynamic_module_on_program_init() C.envoy_dynamic_module_type_abi_version_module_ptr {
-	return C.envoy_dynamic_module_type_abi_version_module_ptr(
-		unsafe.Pointer(unsafe.StringData(cabi.AbiHeaderVersion)))
+	return C.envoy_dynamic_module_type_abi_version_module_ptr(C.envoy_dynamic_modules_abi_version)
 }
 
 //export envoy_dynamic_module_on_http_filter_config_new
@@ -1130,6 +1130,11 @@ func envoy_dynamic_module_on_http_filter_config_new(
 func envoy_dynamic_module_on_http_filter_config_destroy(
 	configPtr C.envoy_dynamic_module_type_http_filter_config_module_ptr,
 ) {
+	factoryWrapper := configManager.unwrap(unsafe.Pointer(configPtr))
+	if factoryWrapper == nil {
+		return
+	}
+	factoryWrapper.pluginFactory.OnDestroy()
 	configManager.remove(unsafe.Pointer(configPtr))
 }
 

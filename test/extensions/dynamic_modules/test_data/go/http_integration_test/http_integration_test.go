@@ -62,6 +62,7 @@ func (f *ConfigSchedulerConfigFactory) Create(handle shared.HttpFilterConfigHand
 }
 
 type ConfigSchedulerFilterFactory struct {
+	shared.EmptyHttpFilterFactory
 	sharedStatus *atomic.Bool
 }
 
@@ -97,7 +98,9 @@ func (f *PassthroughConfigFactory) Create(handle shared.HttpFilterConfigHandle,
 	return &PassthroughFilterFactory{}, nil
 }
 
-type PassthroughFilterFactory struct{}
+type PassthroughFilterFactory struct {
+	shared.EmptyHttpFilterFactory
+}
 
 func (f *PassthroughFilterFactory) Create(handle shared.HttpFilterHandle) shared.HttpFilter {
 	// Log test
@@ -151,6 +154,7 @@ func (f *HeaderCallbacksConfigFactory) Create(handle shared.HttpFilterConfigHand
 }
 
 type HeaderCallbacksFilterFactory struct {
+	shared.EmptyHttpFilterFactory
 	headersToAdd map[string]string
 }
 
@@ -295,6 +299,7 @@ func (f *PerRouteConfigFactory) CreatePerRoute(unparsedConfig []byte) (any, erro
 }
 
 type PerRouteFilterFactory struct {
+	shared.EmptyHttpFilterFactory
 	value string
 }
 
@@ -346,6 +351,7 @@ func (f *BodyCallbacksConfigFactory) Create(handle shared.HttpFilterConfigHandle
 }
 
 type BodyCallbacksFilterFactory struct {
+	shared.EmptyHttpFilterFactory
 	immediate bool
 }
 
@@ -447,6 +453,7 @@ func (f *SendResponseConfigFactory) Create(handle shared.HttpFilterConfigHandle,
 }
 
 type SendResponseFilterFactory struct {
+	shared.EmptyHttpFilterFactory
 	mode string
 }
 
@@ -507,6 +514,7 @@ func (f *HttpCalloutsConfigFactory) Create(handle shared.HttpFilterConfigHandle,
 }
 
 type HttpCalloutsFilterFactory struct {
+	shared.EmptyHttpFilterFactory
 	clusterName string
 }
 
@@ -578,7 +586,9 @@ func (f *HttpFilterSchedulerConfigFactory) Create(handle shared.HttpFilterConfig
 	return &HttpFilterSchedulerFilterFactory{}, nil
 }
 
-type HttpFilterSchedulerFilterFactory struct{}
+type HttpFilterSchedulerFilterFactory struct {
+	shared.EmptyHttpFilterFactory
+}
 
 func (f *HttpFilterSchedulerFilterFactory) Create(h shared.HttpFilterHandle) shared.HttpFilter {
 	return &HttpFilterSchedulerFilter{handle: h}
@@ -655,7 +665,9 @@ func (f *FakeExternalCacheConfigFactory) Create(h shared.HttpFilterConfigHandle,
 	return &FakeExternalCacheFilterFactory{}, nil
 }
 
-type FakeExternalCacheFilterFactory struct{}
+type FakeExternalCacheFilterFactory struct {
+	shared.EmptyHttpFilterFactory
+}
 
 func (f *FakeExternalCacheFilterFactory) Create(h shared.HttpFilterHandle) shared.HttpFilter {
 	return &FakeExternalCacheFilter{handle: h}
@@ -755,6 +767,7 @@ func (f *StatsCallbacksConfigFactory) Create(h shared.HttpFilterConfigHandle, c 
 }
 
 type StatsCallbacksFilterFactory struct {
+	shared.EmptyHttpFilterFactory
 	ids StatsCallbacksIDs
 }
 
@@ -827,7 +840,9 @@ func (f *StreamingTerminalConfigFactory) Create(h shared.HttpFilterConfigHandle,
 	return &StreamingTerminalFilterFactory{}, nil
 }
 
-type StreamingTerminalFilterFactory struct{}
+type StreamingTerminalFilterFactory struct {
+	shared.EmptyHttpFilterFactory
+}
 
 func (f *StreamingTerminalFilterFactory) Create(h shared.HttpFilterHandle) shared.HttpFilter {
 	p := &StreamingTerminalFilter{handle: h}
@@ -921,7 +936,10 @@ func (f *HttpStreamBasicConfigFactory) Create(h shared.HttpFilterConfigHandle,
 	return &HttpStreamBasicFilterFactory{cluster: string(c)}, nil
 }
 
-type HttpStreamBasicFilterFactory struct{ cluster string }
+type HttpStreamBasicFilterFactory struct {
+	shared.EmptyHttpFilterFactory
+	cluster string
+}
 
 func (f *HttpStreamBasicFilterFactory) Create(h shared.HttpFilterHandle) shared.HttpFilter {
 	return &HttpStreamBasicFilter{handle: h, cluster: f.cluster}
@@ -993,7 +1011,10 @@ func (f *HttpStreamBidirectionalConfigFactory) Create(h shared.HttpFilterConfigH
 	return &HttpStreamBidiFilterFactory{cluster: string(c)}, nil
 }
 
-type HttpStreamBidiFilterFactory struct{ cluster string }
+type HttpStreamBidiFilterFactory struct {
+	shared.EmptyHttpFilterFactory
+	cluster string
+}
 
 func (f *HttpStreamBidiFilterFactory) Create(h shared.HttpFilterHandle) shared.HttpFilter {
 	return &HttpStreamBidiFilter{handle: h, cluster: f.cluster}
@@ -1070,7 +1091,10 @@ func (f *UpstreamResetConfigFactory) Create(h shared.HttpFilterConfigHandle,
 	return &UpstreamResetFilterFactory{cluster: string(c)}, nil
 }
 
-type UpstreamResetFilterFactory struct{ cluster string }
+type UpstreamResetFilterFactory struct {
+	shared.EmptyHttpFilterFactory
+	cluster string
+}
 
 func (f *UpstreamResetFilterFactory) Create(h shared.HttpFilterHandle) shared.HttpFilter {
 	return &UpstreamResetFilter{handle: h, cluster: f.cluster}

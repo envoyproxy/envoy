@@ -10,12 +10,6 @@
 // This must not contain any dependencies besides standard library since it is not only used by
 // Envoy itself but also by dynamic module SDKs written in non-C++ languages.
 //
-// Currently, compatibility is only guaranteed by an exact version match between the Envoy
-// codebase and the dynamic module SDKs. In the future, after the ABI is stabilized, we will revisit
-// this restriction and hopefully provide a wider compatibility guarantee. Until then, Envoy
-// checks the hash of the ABI header files to ensure that the dynamic modules are built against the
-// same version of the ABI.
-//
 // There are three kinds defined in this file:
 //
 //  * Types: type definitions used in the ABI.
@@ -32,13 +26,32 @@
 // by nature. For example, we assume that modules will not try to pass invalid pointers to Envoy
 // intentionally.
 
+// This is the ABI version that we bump the minor version when we make deprecating changes to the
+// ABI. Until we reach v1.0, we only guarantee backward compatibility in the next minor version. For
+// example, v0.1.y is guaranteed to be compatible with v0.2.x, but not with v0.3.x.
+//
+// This is used only for tracking the ABI version of dynamic modules and emitting warnings when
+// there's a mismatch.
+//
+// Note(internal): We could use the Envoy's version such as "v1.38.0" here, there are several
+// reasons as to why we use a static version string instead:
+// 1. Envoy's version is generated at the build time of Envoy while we need to make it available for
+// SDK downstream users.
+// 2. In the future, after the stable ABI is established, we may want to decouple the ABI version
+// from Envoy's versioning scheme.
+#define ENVOY_DYNAMIC_MODULES_ABI_VERSION "v0.1.0"
+
 #ifdef __cplusplus
 #include <cstdbool>
 #include <cstddef>
 #include <cstdint>
 
+constexpr const char* envoy_dynamic_modules_abi_version = ENVOY_DYNAMIC_MODULES_ABI_VERSION;
+
 extern "C" {
 #else
+const char* __attribute__((weak)) envoy_dynamic_modules_abi_version =
+    ENVOY_DYNAMIC_MODULES_ABI_VERSION;
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -474,6 +487,48 @@ bool envoy_dynamic_module_callback_log_enabled(envoy_dynamic_module_type_log_lev
  * @return number of worker threads (concurrency) that the server is configured to use.
  */
 uint32_t envoy_dynamic_module_callback_get_concurrency();
+
+// ----------------------------- Function Registry -----------------------------
+
+/**
+ * envoy_dynamic_module_callback_register_function registers an opaque function pointer under the
+ * given key in the process-wide function registry. This allows modules loaded in the same process
+ * to expose functions that other modules can resolve by name and call directly, enabling zero-copy
+ * cross-module interactions.
+ *
+ * Registration is typically done once during bootstrap (e.g., in on_server_initialized). The
+ * function pointer must remain valid for the lifetime of the process.
+ *
+ * Callers are responsible for agreeing on the function signature out-of-band, since the registry
+ * stores opaque void* pointers — analogous to dlsym semantics.
+ *
+ * This is thread-safe and can be called from any thread.
+ *
+ * @param key is the name to register the function under.
+ * @param function_ptr is the function pointer to register. Must not be nullptr.
+ * @return true if registered successfully, false if a function is already registered under key or
+ *         function_ptr is nullptr.
+ */
+bool envoy_dynamic_module_callback_register_function(envoy_dynamic_module_type_module_buffer key,
+                                                     void* function_ptr);
+
+/**
+ * envoy_dynamic_module_callback_get_function retrieves a previously registered function pointer by
+ * key from the process-wide function registry. The returned pointer can be cast to the expected
+ * function signature and called directly.
+ *
+ * Resolution is typically done once during configuration creation (e.g., in
+ * on_http_filter_config_new) and the result cached for per-request use.
+ *
+ * This is thread-safe and can be called from any thread.
+ *
+ * @param key is the name of the function to retrieve.
+ * @param function_ptr_out is a pointer to a variable where the function pointer will be stored.
+ *                         This is only written to if the function returns true.
+ * @return true if a function was found under the given key, false otherwise.
+ */
+bool envoy_dynamic_module_callback_get_function(envoy_dynamic_module_type_module_buffer key,
+                                                void** function_ptr_out);
 
 // =============================================================================
 // ============================== HTTP Filter ==================================

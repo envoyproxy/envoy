@@ -106,7 +106,7 @@ envoy_cc_benchmark_binary(
         "//test/mocks/http:http_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:printers_lib",
-        "@com_github_google_benchmark//:benchmark",
+        "@benchmark",
     ],
 )
 

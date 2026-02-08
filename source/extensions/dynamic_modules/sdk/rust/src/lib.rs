@@ -66,7 +66,7 @@ macro_rules! declare_init_functions {
       envoy_proxy_dynamic_modules_rust_sdk::NEW_HTTP_FILTER_PER_ROUTE_CONFIG_FUNCTION
         .get_or_init(|| $new_http_filter_per_route_config_fn);
       if ($f()) {
-        envoy_proxy_dynamic_modules_rust_sdk::abi::kAbiVersion.as_ptr()
+        envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
           as *const ::std::os::raw::c_char
       } else {
         ::std::ptr::null()
@@ -79,7 +79,7 @@ macro_rules! declare_init_functions {
       envoy_proxy_dynamic_modules_rust_sdk::NEW_HTTP_FILTER_CONFIG_FUNCTION
         .get_or_init(|| $new_http_filter_config_fn);
       if ($f()) {
-        envoy_proxy_dynamic_modules_rust_sdk::abi::kAbiVersion.as_ptr()
+        envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
           as *const ::std::os::raw::c_char
       } else {
         ::std::ptr::null()
@@ -94,6 +94,53 @@ macro_rules! declare_init_functions {
 /// This function must be called on the main thread.
 pub unsafe fn get_server_concurrency() -> u32 {
   unsafe { abi::envoy_dynamic_module_callback_get_concurrency() }
+}
+
+/// Register a function pointer under a name in the process-wide function registry.
+///
+/// This allows modules loaded in the same process to expose functions that other modules can
+/// resolve by name and call directly, enabling zero-copy cross-module interactions. For example,
+/// a bootstrap extension can register a function that returns a pointer to a tenant snapshot,
+/// and HTTP filters can resolve and call it on every request.
+///
+/// Registration is typically done once during bootstrap (e.g., in `on_server_initialized`).
+/// Duplicate registration under the same key returns `false`.
+///
+/// Callers are responsible for agreeing on the function signature out-of-band, since the
+/// registry stores opaque pointers — analogous to `dlsym` semantics.
+///
+/// This is thread-safe and can be called from any thread.
+///
+/// # Safety
+///
+/// The `function_ptr` must point to a valid function that remains valid for the lifetime of the
+/// process.
+pub unsafe fn register_function(key: &str, function_ptr: *const std::ffi::c_void) -> bool {
+  unsafe {
+    abi::envoy_dynamic_module_callback_register_function(
+      str_to_module_buffer(key),
+      function_ptr as *mut std::ffi::c_void,
+    )
+  }
+}
+
+/// Retrieve a previously registered function pointer by name from the process-wide function
+/// registry. The returned pointer can be cast to the expected function signature and called
+/// directly.
+///
+/// Resolution is typically done once during configuration creation (e.g., in
+/// `on_http_filter_config_new`) and the result cached for per-request use.
+///
+/// This is thread-safe and can be called from any thread.
+pub fn get_function(key: &str) -> Option<*const std::ffi::c_void> {
+  let mut ptr: *mut std::ffi::c_void = std::ptr::null_mut();
+  let found =
+    unsafe { abi::envoy_dynamic_module_callback_get_function(str_to_module_buffer(key), &mut ptr) };
+  if found {
+    Some(ptr as *const std::ffi::c_void)
+  } else {
+    None
+  }
 }
 
 /// Log a trace message to Envoy's logging system with [dynamic_modules] Id. Messages won't be
@@ -3876,7 +3923,7 @@ macro_rules! declare_network_filter_init_functions {
       envoy_proxy_dynamic_modules_rust_sdk::NEW_NETWORK_FILTER_CONFIG_FUNCTION
         .get_or_init(|| $new_network_filter_config_fn);
       if ($f()) {
-        envoy_proxy_dynamic_modules_rust_sdk::abi::kAbiVersion.as_ptr()
+        envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
           as *const ::std::os::raw::c_char
       } else {
         ::std::ptr::null()
@@ -3937,7 +3984,7 @@ macro_rules! declare_all_init_functions {
       envoy_proxy_dynamic_modules_rust_sdk::NEW_NETWORK_FILTER_CONFIG_FUNCTION
         .get_or_init(|| $new_network_filter_config_fn);
       if ($f(server_factory_context_ptr)) {
-        envoy_proxy_dynamic_modules_rust_sdk::abi::kAbiVersion.as_ptr()
+        envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
           as *const ::std::os::raw::c_char
       } else {
         ::std::ptr::null()
@@ -5740,7 +5787,7 @@ macro_rules! declare_listener_filter_init_functions {
       envoy_proxy_dynamic_modules_rust_sdk::NEW_LISTENER_FILTER_CONFIG_FUNCTION
         .get_or_init(|| $new_listener_filter_config_fn);
       if ($f(server_factory_context_ptr)) {
-        envoy_proxy_dynamic_modules_rust_sdk::abi::kAbiVersion.as_ptr()
+        envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
           as *const ::std::os::raw::c_char
       } else {
         ::std::ptr::null()
@@ -6724,7 +6771,7 @@ macro_rules! declare_udp_listener_filter_init_functions {
       envoy_proxy_dynamic_modules_rust_sdk::NEW_UDP_LISTENER_FILTER_CONFIG_FUNCTION
         .get_or_init(|| $new_udp_listener_filter_config_fn);
       if ($f()) {
-        envoy_proxy_dynamic_modules_rust_sdk::abi::kAbiVersion.as_ptr()
+        envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
           as *const ::std::os::raw::c_char
       } else {
         ::std::ptr::null()
@@ -7840,7 +7887,7 @@ macro_rules! declare_bootstrap_init_functions {
       envoy_proxy_dynamic_modules_rust_sdk::NEW_BOOTSTRAP_EXTENSION_CONFIG_FUNCTION
         .get_or_init(|| $new_bootstrap_extension_config_fn);
       if ($f()) {
-        envoy_proxy_dynamic_modules_rust_sdk::abi::kAbiVersion.as_ptr()
+        envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
           as *const ::std::os::raw::c_char
       } else {
         ::std::ptr::null()

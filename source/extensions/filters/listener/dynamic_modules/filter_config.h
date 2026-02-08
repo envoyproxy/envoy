@@ -28,8 +28,10 @@ using OnListenerFilterScheduledType = decltype(&envoy_dynamic_module_on_listener
 using OnListenerFilterConfigScheduledType =
     decltype(&envoy_dynamic_module_on_listener_filter_config_scheduled);
 
-// Custom namespace prefix for listener filter stats.
-constexpr char ListenerFilterStatsNamespace[] = "dynamic_module_listener_filter";
+// The default custom stat namespace which prepends all user-defined metrics.
+// Note that the prefix is removed from the final output of ``/stats`` endpoints.
+// This can be overridden via the ``metrics_namespace`` field in ``DynamicModuleConfig``.
+constexpr absl::string_view DefaultMetricsNamespace = "dynamicmodulescustom";
 
 class DynamicModuleListenerFilterConfig;
 using DynamicModuleListenerFilterConfigSharedPtr =
@@ -52,12 +54,14 @@ public:
    * newDynamicModuleListenerFilterConfig().
    * @param filter_name the name of the filter.
    * @param filter_config the configuration for the module.
+   * @param metrics_namespace the namespace prefix for metrics.
    * @param dynamic_module the dynamic module to use.
    * @param stats_scope the stats scope for metrics.
    * @param main_thread_dispatcher the main thread dispatcher for scheduling events.
    */
   DynamicModuleListenerFilterConfig(const absl::string_view filter_name,
                                     const absl::string_view filter_config,
+                                    const absl::string_view metrics_namespace,
                                     DynamicModulePtr dynamic_module, Stats::Scope& stats_scope,
                                     Event::Dispatcher& main_thread_dispatcher);
 
@@ -170,6 +174,7 @@ private:
   friend absl::StatusOr<std::shared_ptr<DynamicModuleListenerFilterConfig>>
   newDynamicModuleListenerFilterConfig(const absl::string_view filter_name,
                                        const absl::string_view filter_config,
+                                       const absl::string_view metrics_namespace,
                                        DynamicModulePtr dynamic_module, Stats::Scope& stats_scope,
                                        Event::Dispatcher& main_thread_dispatcher);
 
@@ -217,6 +222,7 @@ private:
  * Creates a new DynamicModuleListenerFilterConfig for given configuration.
  * @param filter_name the name of the filter.
  * @param filter_config the configuration for the module.
+ * @param metrics_namespace the namespace prefix for metrics emitted by this module.
  * @param dynamic_module the dynamic module to use.
  * @param stats_scope the stats scope for metrics.
  * @param main_thread_dispatcher the main thread dispatcher for scheduling events.
@@ -224,6 +230,7 @@ private:
  */
 absl::StatusOr<DynamicModuleListenerFilterConfigSharedPtr> newDynamicModuleListenerFilterConfig(
     const absl::string_view filter_name, const absl::string_view filter_config,
+    const absl::string_view metrics_namespace,
     Extensions::DynamicModules::DynamicModulePtr dynamic_module, Stats::Scope& stats_scope,
     Event::Dispatcher& main_thread_dispatcher);
 

@@ -10,7 +10,7 @@ Dynamic modules
    We are looking for feedback from the community to improve the feature.
 
 Envoy has support for loading shared libraries at runtime to extend its functionality. In Envoy, these are known as "dynamic modules." More specifically, dynamic modules are shared libraries that implement the
-:repo:`ABI <source/extensions/dynamic_modules/abi.h>` written in a pure C header file. The ABI defines a set of functions
+:repo:`ABI <source/extensions/dynamic_modules/abi/abi.h>` written in a pure C header file. The ABI defines a set of functions
 that the dynamic module must implement to be loaded by Envoy. Also, it specifies the functions implemented by Envoy
 that the dynamic module can call to interact with Envoy.
 
@@ -37,17 +37,16 @@ There are a few design goals for the dynamic modules:
 Compatibility
 --------------------------
 
-Since a dynamic modules is loaded at runtime, it must be abi-compatible with the
+Since a dynamic module is loaded at runtime, it must be ABI-compatible with the
 Envoy binary that loads it.
 
 Envoy's dynamic modules have stricter compatibility requirements than Envoy's other extension mechanisms, such as Lua, Wasm or External Processor.
-Stabilizing the ABI is challenging due to the way the ABI needs to be tightly coupled to Envoy's internals. Even though
-our ultimate goal is to have a stable ABI that can be used across different versions of Envoy, we currently do not guarantee any compatibility
-between different versions.
+Stabilizing the ABI is challenging due to the way the ABI needs to be tightly coupled to Envoy's internals.
 
-In other words, the dynamic modules must be built with the SDK of the same version as the Envoy binary that loads the dynamic module.
-Since the SDK lives inside the Envoy repository, using the same commit hash or release tag of the Envoy version is the best way to ensure
-the compatibility.
+Currently, we guarantee **forward compatibility within one version**: a dynamic module built with the SDK for Envoy version X.Y will work with Envoy versions X.Y and X.(Y+1).
+Breaking changes to the ABI may occur in later versions.
+
+To ensure compatibility, it is recommended to rebuild your dynamic modules with the SDK matching your target Envoy version in a timely manner.
 
 Module discovery
 --------------------------

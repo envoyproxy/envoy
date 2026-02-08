@@ -25,7 +25,7 @@ envoy_extension_cc_test(
         "//test/test_common:environment_lib",
         "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
-        "@com_github_msgpack_cpp//:msgpack",
+        "@msgpack-cxx//:msgpack",
     ],
 )
 

@@ -5,6 +5,7 @@
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/extensions/retry/priority/previous_priorities/config.h"
 
+#include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/host_set.h"
 #include "test/mocks/upstream/priority_set.h"
@@ -56,7 +57,7 @@ public:
                            absl::optional<Upstream::RetryPriority::PriorityMappingFunc>
                                priority_mapping_func = absl::nullopt) {
     const auto& priority_loads = retry_priority_->determinePriorityLoad(
-        priority_set_, original_priority_load_,
+        &stream_info_, priority_set_, original_priority_load_,
         priority_mapping_func.value_or(Upstream::RetryPriority::defaultPriorityMapping));
     // Unwrapping gives a nicer gtest error.
     ASSERT_EQ(priority_loads.healthy_priority_load_.get(), expected_healthy_priority_load.get());
@@ -68,6 +69,7 @@ public:
   NiceMock<Upstream::MockPrioritySet> priority_set_;
   Upstream::RetryPrioritySharedPtr retry_priority_;
   Upstream::HealthyAndDegradedLoad original_priority_load_;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info_;
 };
 
 TEST_F(RetryPriorityTest, DefaultFrequency) {

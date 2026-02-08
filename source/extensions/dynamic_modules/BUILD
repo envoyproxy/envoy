@@ -29,18 +29,9 @@ envoy_cc_library(
         "//envoy/server:factory_context_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
+        "@com_google_absl//absl/container:flat_hash_map",
+        "@com_google_absl//absl/synchronization",
     ],
-)
-
-go_library(
-    name = "go_sdk_abi_version",
-    srcs = [
-        "//source/extensions/dynamic_modules/abi:version.go",
-    ],
-    cgo = True,
-    embedsrcs = ["//source/extensions/dynamic_modules/abi:abi.h"],
-    importpath = "github.com/envoyproxy/envoy/source/extensions/dynamic_modules/abi",
-    visibility = ["//visibility:public"],
 )
 
 go_library(
@@ -82,7 +73,6 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//source/extensions/dynamic_modules:go_sdk",
-        "//source/extensions/dynamic_modules:go_sdk_abi_version",
         "//source/extensions/dynamic_modules:go_sdk_shared",
     ],
 )
