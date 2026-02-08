@@ -751,7 +751,7 @@ TEST_F(BootstrapAbiImplTest, IterateGauges) {
 // Stats Definition and Update Tests
 // -----------------------------------------------------------------------------
 
-// Test defining and incrementing a counter.
+// Test defining and incrementing a counter without labels.
 TEST_F(BootstrapAbiImplTest, DefineAndIncrementCounter) {
   auto dynamic_module =
       Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
@@ -761,22 +761,22 @@ TEST_F(BootstrapAbiImplTest, DefineAndIncrementCounter) {
       "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
-  // Define a counter.
+  // Define a counter without labels.
   size_t counter_id = 0;
   envoy_dynamic_module_type_module_buffer name = {"my_counter", 10};
   auto result = envoy_dynamic_module_callback_bootstrap_extension_config_define_counter(
-      config.value()->thisAsVoidPtr(), name, &counter_id);
+      config.value()->thisAsVoidPtr(), name, nullptr, 0, &counter_id);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
   EXPECT_EQ(counter_id, 0u);
 
   // Increment the counter.
   result = envoy_dynamic_module_callback_bootstrap_extension_config_increment_counter(
-      config.value()->thisAsVoidPtr(), counter_id, 5);
+      config.value()->thisAsVoidPtr(), counter_id, nullptr, 0, 5);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
 
   // Increment again.
   result = envoy_dynamic_module_callback_bootstrap_extension_config_increment_counter(
-      config.value()->thisAsVoidPtr(), counter_id, 3);
+      config.value()->thisAsVoidPtr(), counter_id, nullptr, 0, 3);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
 
   // Verify the counter was defined and is accessible.
@@ -796,11 +796,11 @@ TEST_F(BootstrapAbiImplTest, IncrementCounterInvalidId) {
 
   // Try to increment a counter with an invalid ID.
   auto result = envoy_dynamic_module_callback_bootstrap_extension_config_increment_counter(
-      config.value()->thisAsVoidPtr(), 999, 1);
+      config.value()->thisAsVoidPtr(), 999, nullptr, 0, 1);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_MetricNotFound);
 }
 
-// Test defining and manipulating a gauge.
+// Test defining and manipulating a gauge without labels.
 TEST_F(BootstrapAbiImplTest, DefineAndManipulateGauge) {
   auto dynamic_module =
       Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
@@ -810,27 +810,27 @@ TEST_F(BootstrapAbiImplTest, DefineAndManipulateGauge) {
       "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
-  // Define a gauge.
+  // Define a gauge without labels.
   size_t gauge_id = 0;
   envoy_dynamic_module_type_module_buffer name = {"my_gauge", 8};
   auto result = envoy_dynamic_module_callback_bootstrap_extension_config_define_gauge(
-      config.value()->thisAsVoidPtr(), name, &gauge_id);
+      config.value()->thisAsVoidPtr(), name, nullptr, 0, &gauge_id);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
   EXPECT_EQ(gauge_id, 0u);
 
   // Set the gauge.
   result = envoy_dynamic_module_callback_bootstrap_extension_config_set_gauge(
-      config.value()->thisAsVoidPtr(), gauge_id, 100);
+      config.value()->thisAsVoidPtr(), gauge_id, nullptr, 0, 100);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
 
   // Increment the gauge.
   result = envoy_dynamic_module_callback_bootstrap_extension_config_increment_gauge(
-      config.value()->thisAsVoidPtr(), gauge_id, 10);
+      config.value()->thisAsVoidPtr(), gauge_id, nullptr, 0, 10);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
 
   // Decrement the gauge.
   result = envoy_dynamic_module_callback_bootstrap_extension_config_decrement_gauge(
-      config.value()->thisAsVoidPtr(), gauge_id, 30);
+      config.value()->thisAsVoidPtr(), gauge_id, nullptr, 0, 30);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
 
   // Verify the gauge was defined and is accessible.
@@ -850,17 +850,17 @@ TEST_F(BootstrapAbiImplTest, GaugeOperationsInvalidId) {
 
   // Try to set, increment, and decrement a gauge with an invalid ID.
   EXPECT_EQ(envoy_dynamic_module_callback_bootstrap_extension_config_set_gauge(
-                config.value()->thisAsVoidPtr(), 999, 1),
+                config.value()->thisAsVoidPtr(), 999, nullptr, 0, 1),
             envoy_dynamic_module_type_metrics_result_MetricNotFound);
   EXPECT_EQ(envoy_dynamic_module_callback_bootstrap_extension_config_increment_gauge(
-                config.value()->thisAsVoidPtr(), 999, 1),
+                config.value()->thisAsVoidPtr(), 999, nullptr, 0, 1),
             envoy_dynamic_module_type_metrics_result_MetricNotFound);
   EXPECT_EQ(envoy_dynamic_module_callback_bootstrap_extension_config_decrement_gauge(
-                config.value()->thisAsVoidPtr(), 999, 1),
+                config.value()->thisAsVoidPtr(), 999, nullptr, 0, 1),
             envoy_dynamic_module_type_metrics_result_MetricNotFound);
 }
 
-// Test defining and recording a histogram value.
+// Test defining and recording a histogram value without labels.
 TEST_F(BootstrapAbiImplTest, DefineAndRecordHistogram) {
   auto dynamic_module =
       Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
@@ -870,22 +870,22 @@ TEST_F(BootstrapAbiImplTest, DefineAndRecordHistogram) {
       "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
   ASSERT_TRUE(config.ok()) << config.status();
 
-  // Define a histogram.
+  // Define a histogram without labels.
   size_t histogram_id = 0;
   envoy_dynamic_module_type_module_buffer name = {"my_histogram", 12};
   auto result = envoy_dynamic_module_callback_bootstrap_extension_config_define_histogram(
-      config.value()->thisAsVoidPtr(), name, &histogram_id);
+      config.value()->thisAsVoidPtr(), name, nullptr, 0, &histogram_id);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
   EXPECT_EQ(histogram_id, 0u);
 
   // Record a value.
   result = envoy_dynamic_module_callback_bootstrap_extension_config_record_histogram_value(
-      config.value()->thisAsVoidPtr(), histogram_id, 42);
+      config.value()->thisAsVoidPtr(), histogram_id, nullptr, 0, 42);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
 
   // Record another value.
   result = envoy_dynamic_module_callback_bootstrap_extension_config_record_histogram_value(
-      config.value()->thisAsVoidPtr(), histogram_id, 100);
+      config.value()->thisAsVoidPtr(), histogram_id, nullptr, 0, 100);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
 }
 
@@ -901,7 +901,7 @@ TEST_F(BootstrapAbiImplTest, RecordHistogramInvalidId) {
 
   // Try to record a histogram value with an invalid ID.
   auto result = envoy_dynamic_module_callback_bootstrap_extension_config_record_histogram_value(
-      config.value()->thisAsVoidPtr(), 999, 42);
+      config.value()->thisAsVoidPtr(), 999, nullptr, 0, 42);
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_MetricNotFound);
 }
 
@@ -921,10 +921,10 @@ TEST_F(BootstrapAbiImplTest, DefineMultipleMetrics) {
   envoy_dynamic_module_type_module_buffer name_0 = {"counter_a", 9};
   envoy_dynamic_module_type_module_buffer name_1 = {"counter_b", 9};
   EXPECT_EQ(envoy_dynamic_module_callback_bootstrap_extension_config_define_counter(
-                config.value()->thisAsVoidPtr(), name_0, &counter_id_0),
+                config.value()->thisAsVoidPtr(), name_0, nullptr, 0, &counter_id_0),
             envoy_dynamic_module_type_metrics_result_Success);
   EXPECT_EQ(envoy_dynamic_module_callback_bootstrap_extension_config_define_counter(
-                config.value()->thisAsVoidPtr(), name_1, &counter_id_1),
+                config.value()->thisAsVoidPtr(), name_1, nullptr, 0, &counter_id_1),
             envoy_dynamic_module_type_metrics_result_Success);
   EXPECT_EQ(counter_id_0, 0u);
   EXPECT_EQ(counter_id_1, 1u);
@@ -935,20 +935,20 @@ TEST_F(BootstrapAbiImplTest, DefineMultipleMetrics) {
   envoy_dynamic_module_type_module_buffer gauge_name_0 = {"gauge_a", 7};
   envoy_dynamic_module_type_module_buffer gauge_name_1 = {"gauge_b", 7};
   EXPECT_EQ(envoy_dynamic_module_callback_bootstrap_extension_config_define_gauge(
-                config.value()->thisAsVoidPtr(), gauge_name_0, &gauge_id_0),
+                config.value()->thisAsVoidPtr(), gauge_name_0, nullptr, 0, &gauge_id_0),
             envoy_dynamic_module_type_metrics_result_Success);
   EXPECT_EQ(envoy_dynamic_module_callback_bootstrap_extension_config_define_gauge(
-                config.value()->thisAsVoidPtr(), gauge_name_1, &gauge_id_1),
+                config.value()->thisAsVoidPtr(), gauge_name_1, nullptr, 0, &gauge_id_1),
             envoy_dynamic_module_type_metrics_result_Success);
   EXPECT_EQ(gauge_id_0, 0u);
   EXPECT_EQ(gauge_id_1, 1u);
 
   // Increment each counter independently.
   EXPECT_EQ(envoy_dynamic_module_callback_bootstrap_extension_config_increment_counter(
-                config.value()->thisAsVoidPtr(), counter_id_0, 10),
+                config.value()->thisAsVoidPtr(), counter_id_0, nullptr, 0, 10),
             envoy_dynamic_module_type_metrics_result_Success);
   EXPECT_EQ(envoy_dynamic_module_callback_bootstrap_extension_config_increment_counter(
-                config.value()->thisAsVoidPtr(), counter_id_1, 20),
+                config.value()->thisAsVoidPtr(), counter_id_1, nullptr, 0, 20),
             envoy_dynamic_module_type_metrics_result_Success);
 
   // Verify all counters and gauges are accessible by their IDs.
@@ -956,6 +956,131 @@ TEST_F(BootstrapAbiImplTest, DefineMultipleMetrics) {
   EXPECT_TRUE(config.value()->getCounterById(counter_id_1).has_value());
   EXPECT_TRUE(config.value()->getGaugeById(gauge_id_0).has_value());
   EXPECT_TRUE(config.value()->getGaugeById(gauge_id_1).has_value());
+}
+
+// -----------------------------------------------------------------------------
+// Stats Definition and Update Tests (with labels / vec variants)
+// -----------------------------------------------------------------------------
+
+// Test defining and incrementing a counter vec with labels.
+TEST_F(BootstrapAbiImplTest, DefineAndIncrementCounterVec) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  auto config = newDynamicModuleBootstrapExtensionConfig(
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  ASSERT_TRUE(config.ok()) << config.status();
+
+  // Define a counter vec with labels.
+  size_t counter_vec_id = 0;
+  envoy_dynamic_module_type_module_buffer name = {"my_counter_vec", 14};
+  envoy_dynamic_module_type_module_buffer label_names[] = {{"method", 6}, {"status", 6}};
+  auto result = envoy_dynamic_module_callback_bootstrap_extension_config_define_counter(
+      config.value()->thisAsVoidPtr(), name, label_names, 2, &counter_vec_id);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
+  EXPECT_EQ(counter_vec_id, 0u);
+
+  // Increment the counter vec with matching labels.
+  envoy_dynamic_module_type_module_buffer label_values[] = {{"GET", 3}, {"200", 3}};
+  result = envoy_dynamic_module_callback_bootstrap_extension_config_increment_counter(
+      config.value()->thisAsVoidPtr(), counter_vec_id, label_values, 2, 5);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
+
+  // Verify the counter vec was defined and is accessible.
+  EXPECT_TRUE(config.value()->getCounterVecById(counter_vec_id).has_value());
+  EXPECT_FALSE(config.value()->getCounterVecById(counter_vec_id + 1).has_value());
+}
+
+// Test incrementing a counter vec with mismatched label count.
+TEST_F(BootstrapAbiImplTest, IncrementCounterVecInvalidLabels) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  auto config = newDynamicModuleBootstrapExtensionConfig(
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  ASSERT_TRUE(config.ok()) << config.status();
+
+  // Define a counter vec with 2 labels.
+  size_t counter_vec_id = 0;
+  envoy_dynamic_module_type_module_buffer name = {"my_counter_vec", 14};
+  envoy_dynamic_module_type_module_buffer label_names[] = {{"method", 6}, {"status", 6}};
+  EXPECT_EQ(envoy_dynamic_module_callback_bootstrap_extension_config_define_counter(
+                config.value()->thisAsVoidPtr(), name, label_names, 2, &counter_vec_id),
+            envoy_dynamic_module_type_metrics_result_Success);
+
+  // Try to increment with only 1 label value (mismatched).
+  envoy_dynamic_module_type_module_buffer label_values[] = {{"GET", 3}};
+  auto result = envoy_dynamic_module_callback_bootstrap_extension_config_increment_counter(
+      config.value()->thisAsVoidPtr(), counter_vec_id, label_values, 1, 5);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_InvalidLabels);
+}
+
+// Test defining and manipulating a gauge vec with labels.
+TEST_F(BootstrapAbiImplTest, DefineAndManipulateGaugeVec) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  auto config = newDynamicModuleBootstrapExtensionConfig(
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  ASSERT_TRUE(config.ok()) << config.status();
+
+  // Define a gauge vec with labels.
+  size_t gauge_vec_id = 0;
+  envoy_dynamic_module_type_module_buffer name = {"my_gauge_vec", 12};
+  envoy_dynamic_module_type_module_buffer label_names[] = {{"host", 4}};
+  auto result = envoy_dynamic_module_callback_bootstrap_extension_config_define_gauge(
+      config.value()->thisAsVoidPtr(), name, label_names, 1, &gauge_vec_id);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
+  EXPECT_EQ(gauge_vec_id, 0u);
+
+  // Set, increment, and decrement the gauge vec with matching labels.
+  envoy_dynamic_module_type_module_buffer label_values[] = {{"upstream_a", 10}};
+  result = envoy_dynamic_module_callback_bootstrap_extension_config_set_gauge(
+      config.value()->thisAsVoidPtr(), gauge_vec_id, label_values, 1, 100);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
+
+  result = envoy_dynamic_module_callback_bootstrap_extension_config_increment_gauge(
+      config.value()->thisAsVoidPtr(), gauge_vec_id, label_values, 1, 10);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
+
+  result = envoy_dynamic_module_callback_bootstrap_extension_config_decrement_gauge(
+      config.value()->thisAsVoidPtr(), gauge_vec_id, label_values, 1, 5);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
+
+  // Verify the gauge vec was defined and is accessible.
+  EXPECT_TRUE(config.value()->getGaugeVecById(gauge_vec_id).has_value());
+}
+
+// Test defining and recording a histogram vec with labels.
+TEST_F(BootstrapAbiImplTest, DefineAndRecordHistogramVec) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  auto config = newDynamicModuleBootstrapExtensionConfig(
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  ASSERT_TRUE(config.ok()) << config.status();
+
+  // Define a histogram vec with labels.
+  size_t histogram_vec_id = 0;
+  envoy_dynamic_module_type_module_buffer name = {"my_histogram_vec", 16};
+  envoy_dynamic_module_type_module_buffer label_names[] = {{"endpoint", 8}};
+  auto result = envoy_dynamic_module_callback_bootstrap_extension_config_define_histogram(
+      config.value()->thisAsVoidPtr(), name, label_names, 1, &histogram_vec_id);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
+  EXPECT_EQ(histogram_vec_id, 0u);
+
+  // Record values with matching labels.
+  envoy_dynamic_module_type_module_buffer label_values[] = {{"svc_a", 5}};
+  result = envoy_dynamic_module_callback_bootstrap_extension_config_record_histogram_value(
+      config.value()->thisAsVoidPtr(), histogram_vec_id, label_values, 1, 42);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
+
+  // Verify the histogram vec was defined and is accessible.
+  EXPECT_TRUE(config.value()->getHistogramVecById(histogram_vec_id).has_value());
 }
 
 } // namespace DynamicModules

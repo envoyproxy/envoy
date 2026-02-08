@@ -59,6 +59,41 @@ fn my_new_bootstrap_extension_config_fn(
     .expect("Failed to record histogram value");
   envoy_log_info!("Histogram values recorded successfully");
 
+  // ---- Labeled metrics (vec variants) ----
+
+  // Define a counter vec with labels.
+  let counter_vec_id = envoy_extension_config
+    .define_counter_vec("request_total", &["method", "status"])
+    .expect("Failed to define counter vec");
+  envoy_extension_config
+    .increment_counter_vec(counter_vec_id, &["GET", "200"], 7)
+    .expect("Failed to increment counter vec");
+  envoy_log_info!("Counter vec incremented successfully");
+
+  // Define a gauge vec with labels.
+  let gauge_vec_id = envoy_extension_config
+    .define_gauge_vec("active_connections", &["upstream"])
+    .expect("Failed to define gauge vec");
+  envoy_extension_config
+    .set_gauge_vec(gauge_vec_id, &["svc_a"], 50)
+    .expect("Failed to set gauge vec");
+  envoy_extension_config
+    .increase_gauge_vec(gauge_vec_id, &["svc_a"], 5)
+    .expect("Failed to increase gauge vec");
+  envoy_extension_config
+    .decrease_gauge_vec(gauge_vec_id, &["svc_a"], 10)
+    .expect("Failed to decrease gauge vec");
+  envoy_log_info!("Gauge vec manipulated successfully");
+
+  // Define a histogram vec with labels.
+  let histogram_vec_id = envoy_extension_config
+    .define_histogram_vec("latency_ms", &["endpoint"])
+    .expect("Failed to define histogram vec");
+  envoy_extension_config
+    .record_histogram_value_vec(histogram_vec_id, &["backend_a"], 15)
+    .expect("Failed to record histogram vec value");
+  envoy_log_info!("Histogram vec recorded successfully");
+
   envoy_log_info!("Bootstrap metrics definition and update test completed successfully!");
 
   Some(Box::new(StatsTestBootstrapExtensionConfig {}))

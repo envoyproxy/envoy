@@ -112,7 +112,7 @@ TEST(CommonAbiImplTest, DefineCounterEnvoyBug) {
   EXPECT_ENVOY_BUG(
       {
         auto result = envoy_dynamic_module_callback_bootstrap_extension_config_define_counter(
-            nullptr, name, &counter_id);
+            nullptr, name, nullptr, 0, &counter_id);
         EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_MetricNotFound);
       },
       "not implemented in this context");
@@ -123,7 +123,7 @@ TEST(CommonAbiImplTest, IncrementCounterEnvoyBug) {
   EXPECT_ENVOY_BUG(
       {
         auto result = envoy_dynamic_module_callback_bootstrap_extension_config_increment_counter(
-            nullptr, 0, 1);
+            nullptr, 0, nullptr, 0, 1);
         EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_MetricNotFound);
       },
       "not implemented in this context");
@@ -136,7 +136,7 @@ TEST(CommonAbiImplTest, DefineGaugeEnvoyBug) {
   EXPECT_ENVOY_BUG(
       {
         auto result = envoy_dynamic_module_callback_bootstrap_extension_config_define_gauge(
-            nullptr, name, &gauge_id);
+            nullptr, name, nullptr, 0, &gauge_id);
         EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_MetricNotFound);
       },
       "not implemented in this context");
@@ -146,8 +146,8 @@ TEST(CommonAbiImplTest, DefineGaugeEnvoyBug) {
 TEST(CommonAbiImplTest, SetGaugeEnvoyBug) {
   EXPECT_ENVOY_BUG(
       {
-        auto result =
-            envoy_dynamic_module_callback_bootstrap_extension_config_set_gauge(nullptr, 0, 42);
+        auto result = envoy_dynamic_module_callback_bootstrap_extension_config_set_gauge(
+            nullptr, 0, nullptr, 0, 42);
         EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_MetricNotFound);
       },
       "not implemented in this context");
@@ -157,8 +157,8 @@ TEST(CommonAbiImplTest, SetGaugeEnvoyBug) {
 TEST(CommonAbiImplTest, IncrementGaugeEnvoyBug) {
   EXPECT_ENVOY_BUG(
       {
-        auto result =
-            envoy_dynamic_module_callback_bootstrap_extension_config_increment_gauge(nullptr, 0, 1);
+        auto result = envoy_dynamic_module_callback_bootstrap_extension_config_increment_gauge(
+            nullptr, 0, nullptr, 0, 1);
         EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_MetricNotFound);
       },
       "not implemented in this context");
@@ -168,8 +168,8 @@ TEST(CommonAbiImplTest, IncrementGaugeEnvoyBug) {
 TEST(CommonAbiImplTest, DecrementGaugeEnvoyBug) {
   EXPECT_ENVOY_BUG(
       {
-        auto result =
-            envoy_dynamic_module_callback_bootstrap_extension_config_decrement_gauge(nullptr, 0, 1);
+        auto result = envoy_dynamic_module_callback_bootstrap_extension_config_decrement_gauge(
+            nullptr, 0, nullptr, 0, 1);
         EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_MetricNotFound);
       },
       "not implemented in this context");
@@ -182,7 +182,7 @@ TEST(CommonAbiImplTest, DefineHistogramEnvoyBug) {
   EXPECT_ENVOY_BUG(
       {
         auto result = envoy_dynamic_module_callback_bootstrap_extension_config_define_histogram(
-            nullptr, name, &histogram_id);
+            nullptr, name, nullptr, 0, &histogram_id);
         EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_MetricNotFound);
       },
       "not implemented in this context");
@@ -193,8 +193,8 @@ TEST(CommonAbiImplTest, RecordHistogramValueEnvoyBug) {
   EXPECT_ENVOY_BUG(
       {
         auto result =
-            envoy_dynamic_module_callback_bootstrap_extension_config_record_histogram_value(nullptr,
-                                                                                            0, 100);
+            envoy_dynamic_module_callback_bootstrap_extension_config_record_histogram_value(
+                nullptr, 0, nullptr, 0, 100);
         EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_MetricNotFound);
       },
       "not implemented in this context");

@@ -120,7 +120,7 @@ public:
   Stats::Store& stats_store_;
 
   // ----------------------------- Metrics Support -----------------------------
-  // Handle classes for storing defined metrics. These follow the same pattern as the network
+  // Handle classes for storing defined metrics. These follow the same pattern as the HTTP
   // filter config metrics support.
 
   class ModuleCounterHandle {
@@ -130,6 +130,22 @@ public:
 
   private:
     Stats::Counter& counter_;
+  };
+
+  class ModuleCounterVecHandle {
+  public:
+    ModuleCounterVecHandle(Stats::StatName name, Stats::StatNameVec label_names)
+        : name_(name), label_names_(label_names) {}
+
+    const Stats::StatNameVec& getLabelNames() const { return label_names_; }
+    void add(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags, uint64_t amount) const {
+      ASSERT(tags.has_value());
+      Stats::Utility::counterFromElements(scope, {name_}, tags).add(amount);
+    }
+
+  private:
+    Stats::StatName name_;
+    Stats::StatNameVec label_names_;
   };
 
   class ModuleGaugeHandle {
@@ -143,6 +159,33 @@ public:
     Stats::Gauge& gauge_;
   };
 
+  class ModuleGaugeVecHandle {
+  public:
+    ModuleGaugeVecHandle(Stats::StatName name, Stats::StatNameVec label_names,
+                         Stats::Gauge::ImportMode import_mode)
+        : name_(name), label_names_(label_names), import_mode_(import_mode) {}
+
+    const Stats::StatNameVec& getLabelNames() const { return label_names_; }
+
+    void add(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags, uint64_t amount) const {
+      ASSERT(tags.has_value());
+      Stats::Utility::gaugeFromElements(scope, {name_}, import_mode_, tags).add(amount);
+    }
+    void sub(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags, uint64_t amount) const {
+      ASSERT(tags.has_value());
+      Stats::Utility::gaugeFromElements(scope, {name_}, import_mode_, tags).sub(amount);
+    }
+    void set(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags, uint64_t amount) const {
+      ASSERT(tags.has_value());
+      Stats::Utility::gaugeFromElements(scope, {name_}, import_mode_, tags).set(amount);
+    }
+
+  private:
+    Stats::StatName name_;
+    Stats::StatNameVec label_names_;
+    Stats::Gauge::ImportMode import_mode_;
+  };
+
   class ModuleHistogramHandle {
   public:
     ModuleHistogramHandle(Stats::Histogram& histogram) : histogram_(histogram) {}
@@ -152,9 +195,35 @@ public:
     Stats::Histogram& histogram_;
   };
 
+  class ModuleHistogramVecHandle {
+  public:
+    ModuleHistogramVecHandle(Stats::StatName name, Stats::StatNameVec label_names,
+                             Stats::Histogram::Unit unit)
+        : name_(name), label_names_(label_names), unit_(unit) {}
+
+    const Stats::StatNameVec& getLabelNames() const { return label_names_; }
+
+    void recordValue(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags,
+                     uint64_t value) const {
+      ASSERT(tags.has_value());
+      Stats::Utility::histogramFromElements(scope, {name_}, unit_, tags).recordValue(value);
+    }
+
+  private:
+    Stats::StatName name_;
+    Stats::StatNameVec label_names_;
+    Stats::Histogram::Unit unit_;
+  };
+
   size_t addCounter(ModuleCounterHandle&& counter) {
     size_t id = counters_.size();
     counters_.push_back(std::move(counter));
+    return id;
+  }
+
+  size_t addCounterVec(ModuleCounterVecHandle&& counter_vec) {
+    size_t id = counter_vecs_.size();
+    counter_vecs_.push_back(std::move(counter_vec));
     return id;
   }
 
@@ -164,9 +233,21 @@ public:
     return id;
   }
 
+  size_t addGaugeVec(ModuleGaugeVecHandle&& gauge_vec) {
+    size_t id = gauge_vecs_.size();
+    gauge_vecs_.push_back(std::move(gauge_vec));
+    return id;
+  }
+
   size_t addHistogram(ModuleHistogramHandle&& histogram) {
     size_t id = histograms_.size();
     histograms_.push_back(std::move(histogram));
+    return id;
+  }
+
+  size_t addHistogramVec(ModuleHistogramVecHandle&& histogram_vec) {
+    size_t id = histogram_vecs_.size();
+    histogram_vecs_.push_back(std::move(histogram_vec));
     return id;
   }
 
@@ -177,6 +258,13 @@ public:
     return counters_[id];
   }
 
+  OptRef<const ModuleCounterVecHandle> getCounterVecById(size_t id) const {
+    if (id >= counter_vecs_.size()) {
+      return {};
+    }
+    return counter_vecs_[id];
+  }
+
   OptRef<const ModuleGaugeHandle> getGaugeById(size_t id) const {
     if (id >= gauges_.size()) {
       return {};
@@ -184,11 +272,25 @@ public:
     return gauges_[id];
   }
 
+  OptRef<const ModuleGaugeVecHandle> getGaugeVecById(size_t id) const {
+    if (id >= gauge_vecs_.size()) {
+      return {};
+    }
+    return gauge_vecs_[id];
+  }
+
   OptRef<const ModuleHistogramHandle> getHistogramById(size_t id) const {
     if (id >= histograms_.size()) {
       return {};
     }
     return histograms_[id];
+  }
+
+  OptRef<const ModuleHistogramVecHandle> getHistogramVecById(size_t id) const {
+    if (id >= histogram_vecs_.size()) {
+      return {};
+    }
+    return histogram_vecs_[id];
   }
 
   // Stats scope for metric creation.
@@ -232,8 +334,11 @@ private:
 
   // Metric storage.
   std::vector<ModuleCounterHandle> counters_;
+  std::vector<ModuleCounterVecHandle> counter_vecs_;
   std::vector<ModuleGaugeHandle> gauges_;
+  std::vector<ModuleGaugeVecHandle> gauge_vecs_;
   std::vector<ModuleHistogramHandle> histograms_;
+  std::vector<ModuleHistogramVecHandle> histogram_vecs_;
 };
 
 using DynamicModuleBootstrapExtensionConfigSharedPtr =
