@@ -27,14 +27,14 @@ const std::string& VersionInfo::revisionStatus() {
 }
 
 const std::string& VersionInfo::version() {
-  CONSTRUCT_ON_FIRST_USE(std::string,
-                         fmt::format("{}/{}{}/{}/{}/{}", revision(), BUILD_VERSION_NUMBER,
-                                     build_version_suffix, revisionStatus(), buildType(), sslVersion()));
+  CONSTRUCT_ON_FIRST_USE(std::string, fmt::format("{}/{}{}/{}/{}/{}", revision(),
+                                                  BUILD_VERSION_NUMBER, build_version_suffix,
+                                                  revisionStatus(), buildType(), sslVersion()));
 }
 
 const envoy::config::core::v3::BuildVersion& VersionInfo::buildVersion() {
-  static const auto* result =
-      new envoy::config::core::v3::BuildVersion(makeBuildVersion(fmt::format("{}{}", BUILD_VERSION_NUMBER, build_version_suffix).c_str()));
+  static const auto* result = new envoy::config::core::v3::BuildVersion(
+      makeBuildVersion(fmt::format("{}{}", BUILD_VERSION_NUMBER, build_version_suffix).c_str()));
   return *result;
 }
 
