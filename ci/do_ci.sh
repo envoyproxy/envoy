@@ -679,12 +679,10 @@ case $CI_TARGET in
         echo "generating docs..."
         # Build docs.
         [[ -z "${DOCS_OUTPUT_DIR}" ]] && DOCS_OUTPUT_DIR=generated/docs
-        # We use a portable realpath alternative here since macOS realpath
-        # does not support -m.
         if [[ -d "$DOCS_OUTPUT_DIR" ]]; then
-          DOCS_OUTPUT_DIR="$(cd "$DOCS_OUTPUT_DIR" && pwd)"
+            DOCS_OUTPUT_DIR="$(cd "$DOCS_OUTPUT_DIR" && pwd)"
         elif [[ "$DOCS_OUTPUT_DIR" != /* ]]; then
-          DOCS_OUTPUT_DIR="${PWD}/${DOCS_OUTPUT_DIR}"
+            DOCS_OUTPUT_DIR="${PWD}/${DOCS_OUTPUT_DIR}"
         fi
         rm -rf "${DOCS_OUTPUT_DIR:?}"/*
         mkdir -p "${DOCS_OUTPUT_DIR}"
