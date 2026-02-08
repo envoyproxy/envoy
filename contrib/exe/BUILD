@@ -26,5 +26,8 @@ envoy_cc_binary(
     rbe_pool = "6gig",
     stamped = True,
     visibility = ["//visibility:public"],
-    deps = ["//source/exe:envoy_main_entry_lib"] + SELECTED_CONTRIB_EXTENSIONS + [":contrib_version_suffix_lib"],
+    deps = [
+        ":contrib_version_suffix_lib",
+        "//source/exe:envoy_main_entry_lib",
+    ] + SELECTED_CONTRIB_EXTENSIONS,
 )

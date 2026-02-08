@@ -31,7 +31,10 @@ envoy_cc_binary(
     }),
     rbe_pool = "6gig",
     stamped = True,
-    deps = [":envoy_main_entry_lib"],
+    deps = [
+        ":envoy_main_entry_lib",
+        ":version_suffix_lib",
+    ],
 )
 
 envoy_cc_library(
@@ -71,7 +74,6 @@ envoy_cc_library(
         ":envoy_main_common_lib",
         ":platform_impl_lib",
         ":scm_impl_lib",
-        ":version_suffix_lib",
         "//source/server:options_lib",
         "@abseil-cpp//absl/debugging:symbolize",
     ],
