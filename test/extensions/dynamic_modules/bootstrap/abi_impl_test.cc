@@ -1083,6 +1083,77 @@ TEST_F(BootstrapAbiImplTest, DefineAndRecordHistogramVec) {
   EXPECT_TRUE(config.value()->getHistogramVecById(histogram_vec_id).has_value());
 }
 
+// Test vec metric operations with an invalid vec ID and mismatched label count.
+// This covers the vec code paths for all metric types.
+TEST_F(BootstrapAbiImplTest, VecMetricsInvalidIdAndLabels) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status();
+
+  auto config = newDynamicModuleBootstrapExtensionConfig(
+      "test", "config", std::move(dynamic_module.value()), dispatcher_, context_, context_.store_);
+  ASSERT_TRUE(config.ok()) << config.status();
+
+  // Define vec metrics with a single label each.
+  size_t counter_vec_id = 0;
+  size_t gauge_vec_id = 0;
+  size_t histogram_vec_id = 0;
+  envoy_dynamic_module_type_module_buffer counter_name = {"cv", 2};
+  envoy_dynamic_module_type_module_buffer gauge_name = {"gv", 2};
+  envoy_dynamic_module_type_module_buffer histogram_name = {"hv", 2};
+  envoy_dynamic_module_type_module_buffer label_names[] = {{"lbl", 3}};
+  EXPECT_EQ(envoy_dynamic_module_callback_bootstrap_extension_config_define_counter(
+                config.value()->thisAsVoidPtr(), counter_name, label_names, 1, &counter_vec_id),
+            envoy_dynamic_module_type_metrics_result_Success);
+  EXPECT_EQ(envoy_dynamic_module_callback_bootstrap_extension_config_define_gauge(
+                config.value()->thisAsVoidPtr(), gauge_name, label_names, 1, &gauge_vec_id),
+            envoy_dynamic_module_type_metrics_result_Success);
+  EXPECT_EQ(envoy_dynamic_module_callback_bootstrap_extension_config_define_histogram(
+                config.value()->thisAsVoidPtr(), histogram_name, label_names, 1, &histogram_vec_id),
+            envoy_dynamic_module_type_metrics_result_Success);
+
+  // Use a valid label value for MetricNotFound tests.
+  envoy_dynamic_module_type_module_buffer one_label[] = {{"val", 3}};
+  size_t invalid_id = 999;
+
+  // Test MetricNotFound for all vec update operations with an invalid vec ID.
+  EXPECT_EQ(envoy_dynamic_module_callback_bootstrap_extension_config_increment_counter(
+                config.value()->thisAsVoidPtr(), invalid_id, one_label, 1, 1),
+            envoy_dynamic_module_type_metrics_result_MetricNotFound);
+  EXPECT_EQ(envoy_dynamic_module_callback_bootstrap_extension_config_set_gauge(
+                config.value()->thisAsVoidPtr(), invalid_id, one_label, 1, 1),
+            envoy_dynamic_module_type_metrics_result_MetricNotFound);
+  EXPECT_EQ(envoy_dynamic_module_callback_bootstrap_extension_config_increment_gauge(
+                config.value()->thisAsVoidPtr(), invalid_id, one_label, 1, 1),
+            envoy_dynamic_module_type_metrics_result_MetricNotFound);
+  EXPECT_EQ(envoy_dynamic_module_callback_bootstrap_extension_config_decrement_gauge(
+                config.value()->thisAsVoidPtr(), invalid_id, one_label, 1, 1),
+            envoy_dynamic_module_type_metrics_result_MetricNotFound);
+  EXPECT_EQ(envoy_dynamic_module_callback_bootstrap_extension_config_record_histogram_value(
+                config.value()->thisAsVoidPtr(), invalid_id, one_label, 1, 1),
+            envoy_dynamic_module_type_metrics_result_MetricNotFound);
+
+  // Use two label values to trigger InvalidLabels (defined with 1 label, passing 2).
+  envoy_dynamic_module_type_module_buffer two_labels[] = {{"a", 1}, {"b", 1}};
+
+  // Test InvalidLabels for all vec update operations with mismatched label count.
+  EXPECT_EQ(envoy_dynamic_module_callback_bootstrap_extension_config_increment_counter(
+                config.value()->thisAsVoidPtr(), counter_vec_id, two_labels, 2, 1),
+            envoy_dynamic_module_type_metrics_result_InvalidLabels);
+  EXPECT_EQ(envoy_dynamic_module_callback_bootstrap_extension_config_set_gauge(
+                config.value()->thisAsVoidPtr(), gauge_vec_id, two_labels, 2, 1),
+            envoy_dynamic_module_type_metrics_result_InvalidLabels);
+  EXPECT_EQ(envoy_dynamic_module_callback_bootstrap_extension_config_increment_gauge(
+                config.value()->thisAsVoidPtr(), gauge_vec_id, two_labels, 2, 1),
+            envoy_dynamic_module_type_metrics_result_InvalidLabels);
+  EXPECT_EQ(envoy_dynamic_module_callback_bootstrap_extension_config_decrement_gauge(
+                config.value()->thisAsVoidPtr(), gauge_vec_id, two_labels, 2, 1),
+            envoy_dynamic_module_type_metrics_result_InvalidLabels);
+  EXPECT_EQ(envoy_dynamic_module_callback_bootstrap_extension_config_record_histogram_value(
+                config.value()->thisAsVoidPtr(), histogram_vec_id, two_labels, 2, 1),
+            envoy_dynamic_module_type_metrics_result_InvalidLabels);
+}
+
 } // namespace DynamicModules
 } // namespace Bootstrap
 } // namespace Extensions
