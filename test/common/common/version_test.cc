@@ -82,4 +82,9 @@ TEST(VersionTest, MakeBadBuildVersion) {
   EXPECT_GE(fields.size(), 1);
 }
 
+TEST(VersionTest, VersionSuffixDefault) {
+  const std::string& version = VersionInfo::version();
+  EXPECT_THAT(version, testing::HasSubstr(std::string("/") + BUILD_VERSION_NUMBER + "/"));
+}
+
 } // namespace Envoy

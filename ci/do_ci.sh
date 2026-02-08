@@ -932,8 +932,10 @@ case $CI_TARGET in
         ;;
 
     verify-distroless)
-        docker build -f ci/Dockerfile-distroless-testing -t distroless-testing .
+        docker build -f ci/Dockerfile-distroless-testing --target=envoy-distroless -t distroless-testing .
         docker run --rm distroless-testing
+        docker build -f ci/Dockerfile-distroless-testing --target=envoy-contrib-distroless -t distroless-contrib-testing .
+        docker run --rm distroless-contrib-testing
         ;;
 
     verify_examples)
