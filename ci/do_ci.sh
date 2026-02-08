@@ -28,12 +28,20 @@ else
   BUILD_ARCH_DIR="/linux/${ENVOY_BUILD_ARCH}"
 fi
 
+# Portable realpath alternative since macOS realpath does not support -m.
+_realpath() {
+    local path="$1"
+    if [[ -d "$path" ]]; then
+        cd "$path" && pwd
+    elif [[ "$path" != /* ]]; then
+        echo "${PWD}/${path}"
+    else
+        echo "$path"
+    fi
+}
+
 ENVOY_DOCS_PATH="${ENVOY_DOCS_PATH:-./docs}"
-if [[ -d "$ENVOY_DOCS_PATH" ]]; then
-  ENVOY_DOCS_PATH="$(cd "$ENVOY_DOCS_PATH" && pwd)"
-elif [[ "$ENVOY_DOCS_PATH" != /* ]]; then
-  ENVOY_DOCS_PATH="${PWD}/${ENVOY_DOCS_PATH}"
-fi
+ENVOY_DOCS_PATH="$(_realpath "$ENVOY_DOCS_PATH")"
 
 setup_clang_toolchain() {
     local config
@@ -677,11 +685,7 @@ case $CI_TARGET in
         echo "generating docs..."
         # Build docs.
         [[ -z "${DOCS_OUTPUT_DIR}" ]] && DOCS_OUTPUT_DIR=generated/docs
-        if [[ -d "$DOCS_OUTPUT_DIR" ]]; then
-            DOCS_OUTPUT_DIR="$(cd "$DOCS_OUTPUT_DIR" && pwd)"
-        elif [[ "$DOCS_OUTPUT_DIR" != /* ]]; then
-            DOCS_OUTPUT_DIR="${PWD}/${DOCS_OUTPUT_DIR}"
-        fi
+        DOCS_OUTPUT_DIR="$(_realpath "$DOCS_OUTPUT_DIR")"
         rm -rf "${DOCS_OUTPUT_DIR:?}"/*
         mkdir -p "${DOCS_OUTPUT_DIR}"
         if [[ -e repo.bazelrc ]]; then
