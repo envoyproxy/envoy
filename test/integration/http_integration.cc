@@ -323,7 +323,7 @@ HttpIntegrationTest::makeHttpConnection(Network::ClientConnectionPtr&& conn) {
 
 HttpIntegrationTest::HttpIntegrationTest(Http::CodecType downstream_protocol,
                                          Network::Address::IpVersion version,
-                                         const std::string& config)
+                                         const envoy::config::bootstrap::v3::Bootstrap& config)
     : HttpIntegrationTest::HttpIntegrationTest(
           downstream_protocol,
           [version](int) {
@@ -335,7 +335,7 @@ HttpIntegrationTest::HttpIntegrationTest(Http::CodecType downstream_protocol,
 HttpIntegrationTest::HttpIntegrationTest(Http::CodecType downstream_protocol,
                                          const InstanceConstSharedPtrFn& upstream_address_fn,
                                          Network::Address::IpVersion version,
-                                         const std::string& config)
+                                         const envoy::config::bootstrap::v3::Bootstrap& config)
     : BaseIntegrationTest(upstream_address_fn, version, config),
       downstream_protocol_(downstream_protocol), quic_stat_names_(stats_store_.symbolTable()) {
   // Legacy integration tests expect the default listener to be named "http" for
