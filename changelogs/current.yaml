@@ -111,6 +111,9 @@ bug_fixes:
     Fixed the HTTP ext_authz client to respect ``status_on_error`` configuration when the authorization
     server returns a 5xx error or when HTTP call failures occur. Previously, these error scenarios always
     returned 403 Forbidden regardless of the configured error status.
+- area: release
+  change: |
+    Published contrib binaries now include the ``-contrib`` suffix in their version string.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -199,6 +202,11 @@ new_features:
 - area: tcp_proxy
   change: |
     Added an option to emit a log entry when the connection is accepted.
+- area: dynamic_modules
+  change: |
+    Added :ref:`load balancing policies
+    <envoy_v3_api_msg_extensions.load_balancing_policies.dynamic_modules.v3.DynamicModulesLoadBalancerConfig>`
+    support for dynamic modules, enabling custom load balancing algorithms to be implemented in dynamic modules.
 - area: sse_parser
   change: |
     Extended the SSE parser utility to support all standard SSE fields: ``id``, ``event`` (as ``event_type``),

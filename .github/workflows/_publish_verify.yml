@@ -114,6 +114,7 @@ jobs:
           steps-pre: |
             - run: |
                 IMAGES=(
+                    envoy-contrib-distroless:contrib-distroless-dev
                     envoy-distroless:distroless-dev)
                 for image in "${IMAGES[@]}"; do
                     src_name="$(echo ${image} | cut -d: -f1)"
