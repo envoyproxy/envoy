@@ -61,6 +61,7 @@ public:
   void addReadFilter(ReadFilterSharedPtr filter) override;
   void removeReadFilter(ReadFilterSharedPtr filter) override;
   bool initializeReadFilters() override;
+  void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) override;
 
   const ConnectionSocketPtr& getSocket() const override { return socket_; }
 
@@ -167,6 +168,13 @@ public:
   StreamInfo::DetectedCloseType detectedCloseType() const override { return detected_close_type_; }
 
 protected:
+  // Indicates if the access log has been written. This is used to ensure that the access log is
+  // written exactly once, even if close() is called multiple times.
+  bool access_log_written_{false};
+
+  // Write access log if it hasn't been written yet.
+  void ensureAccessLogWritten();
+
   // A convenience function which returns true if
   // 1) The read disable count is zero or
   // 2) The read disable count is one due to the read buffer being overrun.
@@ -315,8 +323,18 @@ public:
                        const Network::ConnectionSocket::OptionsSharedPtr& options,
                        const Network::TransportSocketOptionsConstSharedPtr& transport_options);
 
+  ~ClientConnectionImpl() override;
+
   // Network::ClientConnection
   void connect() override;
+
+protected:
+  void setDetectedCloseType(StreamInfo::DetectedCloseType close_type) override {
+    ConnectionImpl::setDetectedCloseType(close_type);
+    if (stream_info_.upstreamInfo() != nullptr) {
+      stream_info_.upstreamInfo()->setUpstreamDetectedCloseType(close_type);
+    }
+  }
 
 private:
   void onConnected() override;

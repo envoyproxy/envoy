@@ -42,10 +42,21 @@ envoy_cc_test(
     srcs = ["filter_test.cc"],
     data = [
         "//test/extensions/dynamic_modules/test_data/c:no_op",
+        "//test/extensions/dynamic_modules/test_data/go:http",
+        "//test/extensions/dynamic_modules/test_data/go:http_integration_test",
         "//test/extensions/dynamic_modules/test_data/rust:http",
         "//test/extensions/dynamic_modules/test_data/rust:http_integration_test",
         "//test/extensions/dynamic_modules/test_data/rust:no_op",
-    ],
+    ] + select({
+        "//bazel:asan_build": [],
+        "//conditions:default": [
+            "//test/extensions/dynamic_modules/test_data/cpp:http",
+            "//test/extensions/dynamic_modules/test_data/cpp:http_integration_test",
+        ],
+    }),
+    env = {
+        "GODEBUG": "cgocheck=0",
+    },
     # http_mocks needs this.
     rbe_pool = "6gig",
     deps = [
@@ -90,11 +101,24 @@ envoy_cc_test(
     name = "integration_test",
     srcs = ["integration_test.cc"],
     data = [
+        "//test/extensions/dynamic_modules/test_data/go:http",
+        "//test/extensions/dynamic_modules/test_data/go:http_integration_test",
+        "//test/extensions/dynamic_modules/test_data/rust:http",
         "//test/extensions/dynamic_modules/test_data/rust:http_integration_test",
-    ],
+    ] + select({
+        "//bazel:asan_build": [],
+        "//conditions:default": [
+            "//test/extensions/dynamic_modules/test_data/cpp:http",
+            "//test/extensions/dynamic_modules/test_data/cpp:http_integration_test",
+        ],
+    }),
+    env = {
+        "GODEBUG": "cgocheck=0",
+    },
     rbe_pool = "6gig",
     deps = [
         "//source/extensions/filters/http/dynamic_modules:factory_registration",
+        "//test/extensions/dynamic_modules:util",
         "//test/integration:http_integration_lib",
         "@envoy_api//envoy/extensions/filters/http/dynamic_modules/v3:pkg_cc_proto",
     ],

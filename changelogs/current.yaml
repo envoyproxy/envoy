@@ -9,36 +9,111 @@ behavior_changes:
     explicitly set when using :ref:`upstream_connect_mode
     <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.upstream_connect_mode>` modes
     other than ``IMMEDIATE`` (i.e., ``ON_DOWNSTREAM_DATA`` or ``ON_DOWNSTREAM_TLS_HANDSHAKE``). The field
-    can be set to zero to disable early data buffering while still using delayed connection modes.
+    can be set to ``0`` to disable early data buffering while still using delayed connection modes.
     Configurations using these modes without ``max_early_data_bytes`` will now fail validation at startup.
+- area: on_demand
+  change: |
+    The on_demand filter, when doing On Demand CDS, will no longer do internal redirects after CDS is
+    successful. Filters appearing in the filter chain before the On Demand Filter will no longer be
+    invoked twice. This behavior can be temporarily reverted by setting the runtime guard
+    ``envoy.reloadable_features.on_demand_cluster_no_recreate_stream`` to ``false``.
+- area: boringssl/fips
+  change: |
+    The previous flag for specifying FIPS builds (ie ``--define=boringssl=fips``) will no longer work and
+    has been replaced by ``--config=boringssl-fips``. This change will allow us to better support custom
+    SSL libraries, and will allow FIPS-compliant Envoy to be built with the imminent switch to Bazel bzlmod.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: mcp
+  change: |
+    Changed the default metadata namespace for the MCP filter from ``mcp_proxy`` to ``envoy.filters.http.mcp``.
+    This change can be reverted by setting the runtime guard
+    ``envoy.reloadable_features.mcp_filter_use_new_metadata_namespace`` to ``false``.
+- area: ext_authz
+  change: |
+    Changed the behavior of ``timeout: 0s`` in the HTTP ext_authz filter to mean "no timeout" (infinite)
+    instead of immediate timeout. Previously, ``timeout: 0s`` would cause requests to fail immediately.
+    This aligns with other Envoy timeout configurations where ``0`` means disabled or infinite.
+- area: ratelimit
+  change: |
+    Changed the behavior of ``timeout: 0s`` in the HTTP rate limit filter to mean "no timeout" (infinite)
+    instead of immediate timeout. Previously, ``timeout: 0s`` would cause requests to fail immediately.
+    This aligns with other Envoy timeout configurations where ``0`` means disabled or infinite.
 - area: histograms
   change: |
-    Update of libcircllhist to 0.3.2 has changed how bucket bounds are interpreted. This should not have an impact on
-    production monitoring if the number of samples in the histograms is high. Affected tests were adjusted to account for
-    histogram changes.
+    Updated libcircllhist to 0.3.2, which changes how bucket bounds are interpreted. This should not impact
+    production monitoring if the number of samples in the histograms is high. Affected tests were adjusted
+    to account for histogram changes.
+- area: stat_sinks
+  change: |
+    OpenTelemetry :ref:`SinkConfig <envoy_v3_api_msg_extensions.stat_sinks.open_telemetry.v3.SinkConfig>`
+    stopped reporting empty delta counters and histograms.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: tls
+  change: |
+    Fix on-demand TLS selector to enforce session resumption settings.
+- area: load_report
+  change: |
+    Fixed an issue upon load-report shutdown race with ADS stream. Introduced proper cleanup of the gRPC stream.
 - area: http
   change: |
-    Fixed a potential file descriptor leak where HTTP/1.1 connections with zombie streams (waiting for codec completion)
-    would not be properly closed when in draining state. This could occur when a response was sent before the request
-    was fully received, causing connections to remain open indefinitely. This behavior change can be temporarily reverted
-    by setting the runtime guard ``envoy.reloadable_features.http1_close_connection_on_zombie_stream_complete`` to ``false``.
+    Fixed a potential file descriptor leak where HTTP/1.1 connections with zombie streams (waiting for codec
+    completion) would not be properly closed when in draining state. This could occur when a response was
+    sent before the request was fully received, causing connections to remain open indefinitely. This change
+    can be reverted by setting the runtime guard
+    ``envoy.reloadable_features.http1_close_connection_on_zombie_stream_complete`` to ``false``.
+- area: overload_manager
+  change: |
+    Fixed a resource leak in global connection limit tracking that caused permanent connection rejections
+    when using load shedding (e.g., ``envoy.load_shed_points.tcp_listener_accept``). When connections were
+    rejected due to load shedding after passing the global connection limit check, the allocated connection
+    limit resource was not released, causing the connection counter to become incorrect and leading to
+    ``failed_updates`` in the resource monitor. This resulted in permanent connection rejections even after
+    load subsided. The fix ensures that connection limit resources are properly released when connections
+    are rejected due to load shedding. Also added defensive resource cleanup for edge cases where address
+    processing fails (e.g., ``localAddress()`` or ``peerAddress()`` errors).
 - area: drop_overload
   change: |
-    Fixed a bug that drop_overload failed to use cached EDS resources.
+    Fixed a bug where ``drop_overload`` failed to use cached EDS resources.
 - area: http
   change: |
-    Fixed upstream client to not close connection when idle timeout fires before the connection is established.
-    This behavior can be reverted by setting the runtime guard
+    Fixed upstream client to not close connection when idle timeout fires before the connection is
+    established. This change can be reverted by setting the runtime guard
     ``envoy.reloadable_features.codec_client_enable_idle_timer_only_when_connected`` to ``false``.
+- area: oauth2
+  change: |
+    Fixed OAuth2 refresh requests so host rewriting no longer overrides the original ``Host`` header value.
 - area: ext_authz
   change: |
-    Fixed a bug where headers from a denied authorization response (non-200s) were not properly propagated to the client.
+    Fixed a bug where headers from a denied authorization response (non-200) were not properly propagated
+    to the client.
+- area: formatter
+  change: |
+    Fixed the log formatter in HTTP router upstream logs by correctly setting the downstream connection's
+    ``ConnectionInfoProvider`` in the ``StreamInfo``.
+- area: spiffe
+  change: |
+    Reduce the number of the file watches needed by :ref:`trust_bundles
+    <envoy_v3_api_field_extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig.trust_bundles>` when the validator
+    is used in multiple places. Add support for :ref:`watched_directory
+    <envoy_v3_api_field_config.core.v3.datasource.watched_directory>` to support Kubernetes environments that rely on
+    atomic symbolic file updates.  Add content hashing during file watching to handle excessive watch notifications.
+- area: odcds
+  change: |
+    Fixed a crash (SIGABRT) when destroying OdCDS handles on worker threads. The handle no longer holds
+    a direct reference to the subscription, preventing thread-safety issues during destruction. The
+    subscription now persists in ClusterManagerImpl and is looked up by a config source key.
+- area: ext_authz
+  change: |
+    Fixed the HTTP ext_authz client to respect ``status_on_error`` configuration when the authorization
+    server returns a 5xx error or when HTTP call failures occur. Previously, these error scenarios always
+    returned 403 Forbidden regardless of the configured error status.
+- area: release
+  change: |
+    Published contrib binaries now include the ``-contrib`` suffix in their version string.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -383,14 +458,32 @@ new_features:
     :ref:`endpoint_params <envoy_v3_api_field_extensions.http.injected_credentials.oauth2.v3.OAuth2.endpoint_params>`.
     This allows passing custom parameters required by authorization servers (such as Logto or EntraID) that expect
     additional body parameters during the token exchange.
+- area: ext_authz
+  change: |
+    Added support for the ``append_action`` enum in gRPC ext_authz ``OkHttpResponse.headers`` for upstream
+    request header mutations. Previously, only the deprecated ``append`` boolean was checked. Now
+    ``APPEND_IF_EXISTS_OR_ADD``, ``ADD_IF_ABSENT``, ``OVERWRITE_IF_EXISTS``, and ``OVERWRITE_IF_EXISTS_OR_ADD``
+    actions are fully supported, providing parity with ``response_headers_to_add`` handling.
 - area: stats
   change: |
-    Added support to limit the number of stats stored in each stats scope in the stats libarary.
+    Added support to limit the number of stats stored in each stats scope in the stats library.
+- area: stats
+  change: |
+    The admin prometheus stats endpoint now supports the protobuf exposition format, and will automatically
+    use it if the request contains the correct Accept header, or if query parameter ``prom_protobuf=1`` is
+    set. In a prometheus scrape configuration, add ``PrometheusProto`` to ``scrape_protocols`` to use
+    the protobuf format.
 - area: tls
   change: |
     Added support for fetching certificates on-demand via SDS in the upstream TLS transport socket
     using the extension :ref:`on-demand certificate selector
     <extension_envoy.tls.certificate_selectors.on_demand_secret>`.
+- area: dynamic modules
+  change: |
+    Introduced the extended ABI forward compatibility mechanism for dynamic modules
+    where modules built with a SDK version can be loaded by Envoy
+    binaries of the next Envoy version. For example, A module built with the v1.38 SDK
+    can now be loaded by an Envoy binary of v1.39.
 - area: mcp_router
   change: |
     Added support for MCP resource methods ``resources/list``, ``resources/read``,
@@ -398,21 +491,90 @@ new_features:
 - area: mcp_router
   change: |
     Added support for MCP prompt methods ``prompts/list`` and ``prompts/get``.
+- area: ratelimit
+  change: |
+    Added per-descriptor ``x-ratelimit-*`` headers support. See the
+    :ref:`x_ratelimit_option <envoy_v3_api_field_config.route.v3.RateLimit.x_ratelimit_option>`
+    field documentation for more details.
 - area: mcp_router
   change: |
     Added support for MCP client-to-server notification methods ``notifications/cancelled``
     and ``notifications/roots/list_changed``.
+- area: mcp_router
+  change: |
+    Added support for MCP completion method ``completion/complete`` with routing based on
+    ``ref/prompt`` or ``ref/resource``.
+- area: mcp_router
+  change: |
+    Added support for MCP logging method ``logging/setLevel``.
+- area: network
+  change: |
+    Added support access logging in network filters like http filters, by allowing network filters to register as access logger
+    instances.
 - area: formatter
   change: |
-    Extended ``*_WITHOUT_PORT`` address formatters to accept an optional ``MASK_PREFIX_LEN`` parameter that masks IP addresses
-    and returns them in CIDR notation (e.g., ``%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT(16)%`` returns ``10.1.0.0/16`` for
-    client IP ``10.1.10.23``).
+    Extended ``*_WITHOUT_PORT`` address formatters to accept an optional ``MASK_PREFIX_LEN`` parameter
+    that masks IP addresses and returns them in CIDR notation (e.g., ``%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT(16)%``
+    returns ``10.1.0.0/16`` for client IP ``10.1.10.23``).
+- area: stat_sinks
+  change: |
+    Added support for exporting OpenTelemetry metrics via HTTP. The new ``http_service`` field
+    in :ref:`SinkConfig <envoy_v3_api_msg_extensions.stat_sinks.open_telemetry.v3.SinkConfig>`
+    enables direct OTLP metrics export to backends that only accept HTTP (Dynatrace, Datadog, Elastic),
+    without requiring an intermediate collector sidecar.
+- area: ratelimit
+  change: |
+    Added support for shadow mode in the local rate limit filter.
+- area: config
+  change: |
+    Added support for :ref:`set_node_on_first_message_only
+    <envoy_v3_api_field_config.core.v3.ApiConfigSource.set_node_on_first_message_only>` to Delta-xDS.
+    Guarded by runtime flag ``envoy.reloadable_features.xds_legacy_delta_skip_subsequent_node``.
 - area: formatter
   change: |
-    Added the new access log formatter support of ``DOWNSTREAM_LOCAL_CLOSE_REASON``.
+    Added the new access log formatter ``DOWNSTREAM_LOCAL_CLOSE_REASON``.
 - area: formatter
   change: |
-    Added ``%DOWNSTREAM_DETECTED_CLOSE_TYPE%`` to expose the detected close type
-    of downstream and connections. The possible values are ``Normal``, ``LocalReset``, and ``RemoteReset``.
+    Added ``%UPSTREAM_DETECTED_CLOSE_TYPE%`` and ``%DOWNSTREAM_DETECTED_CLOSE_TYPE%`` to expose the detected
+    close type of downstream and upstream connections. The possible values are ``Normal``, ``LocalReset``,
+    and ``RemoteReset``.
+- area: tcp_proxy
+  change: |
+    Added an option to emit a log entry when the connection is accepted.
+- area: dynamic_modules
+  change: |
+    Added :ref:`load balancing policies
+    <envoy_v3_api_msg_extensions.load_balancing_policies.dynamic_modules.v3.DynamicModulesLoadBalancerConfig>`
+    support for dynamic modules, enabling custom load balancing algorithms to be implemented in dynamic modules.
+- area: sse_parser
+  change: |
+    Extended the SSE parser utility to support all standard SSE fields: ``id``, ``event`` (as ``event_type``),
+    and ``retry``, in addition to the existing ``data`` field. The ``retry`` field is parsed as a ``uint32_t``
+    and only accepts values consisting of ASCII digits per the SSE specification.
+- area: resource_monitors
+  change: |
+    Added cgroup v2 support to the CPU utilization resource monitor. The monitor now automatically
+    detects and selects between cgroup v1 and v2 at runtime by checking available cgroup files on
+    the system. This enables the resource monitor to work correctly in both cgroup v1 and v2
+    environments without configuration changes.
+- area: dynamic_modules
+  change: |
+    Added configurable :ref:`metrics_namespace
+    <envoy_v3_api_field_extensions.dynamic_modules.v3.DynamicModuleConfig.metrics_namespace>` field
+    to ``DynamicModuleConfig``. This allows users to customize the prefix used for all metrics
+    created by dynamic modules. Metrics now appear with the standard ``envoy_`` prefix followed by
+    the namespace in prometheus output (e.g. ``envoy_myapp_requests_total``). The legacy behavior
+    (stripping the namespace prefix from prometheus output) can be restored by setting the runtime
+    guard ``envoy.reloadable_features.dynamic_modules_strip_custom_stat_prefix`` to ``true``.
+- area: dynamic_modules
+  change: |
+    Added a process-wide function registry to the dynamic modules ABI. Modules can register
+    functions by name via ``envoy_dynamic_module_callback_register_function`` and other modules
+    can resolve them via ``envoy_dynamic_module_callback_get_function``, enabling zero-copy
+    cross-module interactions analogous to ``dlsym``.
+- area: formatter
+  change: |
+    Added ``QUERY_PARAMS`` support for substitution formatter to log all query params.
+    They can either be logged in their original form or decoded.
 
 deprecated:

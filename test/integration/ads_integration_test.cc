@@ -4,6 +4,7 @@
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/route/v3/route.pb.h"
+#include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/grpc/status.h"
 
 #include "source/common/config/protobuf_link_hacks.h"
@@ -29,7 +30,7 @@ using testing::AssertionResult;
 namespace Envoy {
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDeltaWildcard, AdsIntegrationTest,
-                         ADS_INTEGRATION_PARAMS);
+                         ADS_INTEGRATION_PARAMS, AdsIntegrationTest::protocolTestParamsToString);
 
 // Validate basic config delivery and upgrade.
 TEST_P(AdsIntegrationTest, Basic) {
@@ -275,13 +276,14 @@ TEST_P(AdsIntegrationTest, DeltaSdsRemovals) {
   sendDeltaDiscoveryResponse<envoy::config::cluster::v3::Cluster>(cds_type_url, {cluster}, {}, "1");
 
   // The cluster needs this secret, so it's going to request it.
-  EXPECT_TRUE(compareDeltaDiscoveryRequest(sds_type_url, {"validation_context"}, {}));
+  EXPECT_TRUE(
+      compareDeltaDiscoveryRequest(sds_type_url, {"validation_context"}, {}, {}, {}, false));
 
   // Cluster should start off warming as the secret is being requested.
   test_server_->waitForGaugeEq("cluster.cluster_0.warming_state", 1);
 
   // Ack the original CDS sub.
-  EXPECT_TRUE(compareDeltaDiscoveryRequest(cds_type_url, {}, {}));
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(cds_type_url, {}, {}, {}, {}, false));
 
   // Before we send the secret, we'll send a delta removal to make sure we don't get a NACK.
   sendDeltaDiscoveryResponse<envoy::extensions::transport_sockets::tls::v3::Secret>(
@@ -292,10 +294,10 @@ TEST_P(AdsIntegrationTest, DeltaSdsRemovals) {
   test_server_->waitForGaugeEq("cluster.cluster_0.warming_state", 0);
 
   // Ack the original LDS subscription.
-  EXPECT_TRUE(compareDeltaDiscoveryRequest(lds_type_url, {}, {}));
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(lds_type_url, {}, {}, {}, {}, false));
 
   // Ack the removal itself.
-  EXPECT_TRUE(compareDeltaDiscoveryRequest(sds_type_url, {}, {}));
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(sds_type_url, {}, {}, {}, {}, false));
 
   envoy::extensions::transport_sockets::tls::v3::Secret validation_context;
   TestUtility::loadFromYaml(fmt::format(R"EOF(
@@ -313,7 +315,7 @@ TEST_P(AdsIntegrationTest, DeltaSdsRemovals) {
       sds_type_url, {validation_context}, {}, "2");
 
   // Ack the secret we just sent.
-  EXPECT_TRUE(compareDeltaDiscoveryRequest(sds_type_url, {}, {}));
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(sds_type_url, {}, {}, {}, {}, false));
 
   // Remove the cluster that owns the secret.
   sendDeltaDiscoveryResponse<envoy::config::cluster::v3::Cluster>(cds_type_url, {}, {"cluster_0"},
@@ -323,9 +325,9 @@ TEST_P(AdsIntegrationTest, DeltaSdsRemovals) {
       sds_type_url, {}, {"validation_context"}, "3");
   test_server_->waitForCounterEq("cluster_manager.cluster_removed", 1);
   // Ack the CDS removal.
-  EXPECT_TRUE(compareDeltaDiscoveryRequest(cds_type_url, {}, {}));
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(cds_type_url, {}, {}, {}, {}, false));
   // Should be an ACK, not a NACK since the SDS removal is ignored.
-  EXPECT_TRUE(compareDeltaDiscoveryRequest(sds_type_url, {}, {}));
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(sds_type_url, {}, {}, {}, {}, false));
 }
 
 // Make sure two clusters sharing same secret are both kept warming before secret
@@ -1573,7 +1575,8 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDeltaWildcard, AdsFailIntegrationTest,
-                         ADS_INTEGRATION_PARAMS);
+                         ADS_INTEGRATION_PARAMS,
+                         AdsFailIntegrationTest::protocolTestParamsToString);
 
 // Validate that we don't crash on failed ADS stream.
 TEST_P(AdsFailIntegrationTest, ConnectDisconnect) {
@@ -1630,7 +1633,8 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDeltaWildcard, AdsConfigIntegrationTest,
-                         ADS_INTEGRATION_PARAMS);
+                         ADS_INTEGRATION_PARAMS,
+                         AdsConfigIntegrationTest::protocolTestParamsToString);
 
 // This is s regression validating that we don't crash on EDS static Cluster that uses ADS.
 TEST_P(AdsConfigIntegrationTest, EdsClusterWithAdsConfigSource) {
@@ -1853,7 +1857,8 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDeltaWildcard, AdsClusterFromFileIntegrationTest,
-                         ADS_INTEGRATION_PARAMS);
+                         ADS_INTEGRATION_PARAMS,
+                         AdsClusterFromFileIntegrationTest::protocolTestParamsToString);
 
 // Validate if ADS cluster defined as EDS will be loaded from file and connection with ADS cluster
 // will be established.
@@ -1917,7 +1922,8 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDeltaWildcard, AdsIntegrationTestWithRtds,
-                         ADS_INTEGRATION_PARAMS);
+                         ADS_INTEGRATION_PARAMS,
+                         AdsIntegrationTestWithRtds::protocolTestParamsToString);
 
 TEST_P(AdsIntegrationTestWithRtds, Basic) {
   initialize();
@@ -1971,15 +1977,17 @@ public:
   }
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDeltaWildcard,
-                         AdsIntegrationTestWithRtdsAndSecondaryClusters, ADS_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(
+    IpVersionsClientTypeDeltaWildcard, AdsIntegrationTestWithRtdsAndSecondaryClusters,
+    ADS_INTEGRATION_PARAMS,
+    AdsIntegrationTestWithRtdsAndSecondaryClusters::protocolTestParamsToString);
 
 TEST_P(AdsIntegrationTestWithRtdsAndSecondaryClusters, Basic) {
   initialize();
   testBasicFlow();
 }
 
-// Node is resent on a dynamic context parameter update.
+// Node is present on a dynamic context parameter update.
 TEST_P(AdsIntegrationTest, ContextParameterUpdate) {
   initialize();
 
@@ -2068,11 +2076,6 @@ public:
     });
     AdsIntegrationTest::initialize();
   }
-
-  bool isSotw() const {
-    return sotwOrDelta() == Grpc::SotwOrDelta::Sotw ||
-           sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw;
-  }
 };
 
 INSTANTIATE_TEST_SUITE_P(
@@ -2081,7 +2084,8 @@ INSTANTIATE_TEST_SUITE_P(
                      // There should be no variation across clients.
                      testing::Values(Grpc::ClientType::EnvoyGrpc),
                      testing::Values(Grpc::SotwOrDelta::Sotw, Grpc::SotwOrDelta::UnifiedSotw,
-                                     Grpc::SotwOrDelta::Delta, Grpc::SotwOrDelta::UnifiedDelta)));
+                                     Grpc::SotwOrDelta::Delta, Grpc::SotwOrDelta::UnifiedDelta)),
+    XdsTpAdsIntegrationTest::protocolTestParamsToString);
 
 TEST_P(XdsTpAdsIntegrationTest, Basic) {
   initialize();
@@ -2922,7 +2926,8 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDeltaWildcard, AdsReplacementIntegrationTest,
-                         ADS_INTEGRATION_PARAMS);
+                         ADS_INTEGRATION_PARAMS,
+                         AdsReplacementIntegrationTest::protocolTestParamsToString);
 
 TEST_P(AdsReplacementIntegrationTest, ReplaceAdsConfig) {
   initializeTwoAds();
@@ -3036,6 +3041,296 @@ TEST_P(AdsReplacementIntegrationTest, ReplaceAdsConfig) {
       Grpc::Status::WellKnownGrpcStatus::Ok, "", second_xds_stream_.get()));
 
   makeSingleRequest();
+}
+
+// Tests the following scenarios:
+// - Multiple VHDS resources for the same route can be sent over ADS.
+// - Removal of one listener doesn't impact another that references the same vhost over the same
+// route config.
+// - Removal of one vhost doesn't impact another vhost in the same route config.
+// - Removal of a vhost from one route config doesn't impact the same vhost in another route config.
+TEST_P(AdsIntegrationTest, MultipleVhdsOverAds) {
+  if (sotw_or_delta_ != Grpc::SotwOrDelta::Delta &&
+      sotw_or_delta_ != Grpc::SotwOrDelta::UnifiedDelta) {
+    GTEST_SKIP_("This test is for delta only");
+  }
+  initialize();
+
+  // Send initial configuration that sets up 3 listeners with the following vhosts:
+  // listener_0 -> route_config_0/foo
+  // listener_0 -> route_config_0/bar
+  // listener_1 -> route_config_0/foo
+  // listener_1 -> route_config_0/bar
+  // listener_2 -> route_config_1/foo
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "", {}, {}, {}, true));
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TestTypeUrl::get().Cluster, {},
+                                                             {
+                                                                 buildCluster("cluster_0"),
+                                                                 buildCluster("cluster_1"),
+                                                             },
+                                                             {}, "1");
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().ClusterLoadAssignment, "", {},
+                                      {"cluster_0", "cluster_1"}, {}));
+  sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+      Config::TestTypeUrl::get().ClusterLoadAssignment, {},
+      {buildClusterLoadAssignment("cluster_0"), buildClusterLoadAssignment("cluster_1")}, {}, "1");
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "", {}, {}, {}));
+
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Listener, "", {}, {}, {}));
+  sendDiscoveryResponse<envoy::config::listener::v3::Listener>(
+      Config::TestTypeUrl::get().Listener, {},
+      {buildListener("listener_0", "route_config_0"),
+       buildListener("listener_1", "route_config_0")},
+      {}, "1");
+
+  EXPECT_TRUE(
+      compareDiscoveryRequest(Config::TestTypeUrl::get().ClusterLoadAssignment, "", {}, {}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "", {},
+                                      {"route_config_0"}, {}));
+  sendDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
+      Config::TestTypeUrl::get().RouteConfiguration, {},
+      {buildRouteConfigWithVhds("route_config_0")}, {}, "1");
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Listener, "", {}, {}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, "", {}, {}, {}));
+  EXPECT_TRUE(
+      compareDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "", {}, {}, {}));
+
+  sendDiscoveryResponse<envoy::config::listener::v3::Listener>(
+      Config::TestTypeUrl::get().Listener, {}, {buildListener("listener_2", "route_config_1")}, {},
+      "1");
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "", {},
+                                      {"route_config_1"}, {}));
+  sendDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
+      Config::TestTypeUrl::get().RouteConfiguration, {},
+      {buildRouteConfigWithVhds("route_config_1")}, {}, "1");
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Listener, "", {}, {}, {}));
+  EXPECT_TRUE(
+      compareDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "", {}, {}, {}));
+
+  sendDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
+      Config::TestTypeUrl::get().VirtualHost, {},
+      {buildVirtualHost("route_config_0/foo", "foo.com", "/foo", "cluster_0"),
+       buildVirtualHost("route_config_0/bar", "bar.com", "/bar", "cluster_0"),
+       buildVirtualHost("route_config_1/foo", "foo.com", "/foo", "cluster_1")},
+      {}, "1");
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, "", {}, {}, {}));
+
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 3);
+
+  auto foo_request_headers = Http::TestRequestHeaderMapImpl{
+      {":method", "GET"}, {":path", "/foo"}, {":scheme", "http"}, {":authority", "foo.com"}};
+  auto bar_request_headers = Http::TestRequestHeaderMapImpl{
+      {":method", "GET"}, {":path", "/bar"}, {":scheme", "http"}, {":authority", "bar.com"}};
+  registerTestServerPorts({"http0", "http1", "http2"});
+
+  auto send_request_and_verify = [this](const std::string& port_name,
+                                        const Http::TestRequestHeaderMapImpl& headers,
+                                        bool verify_404 = false) {
+    codec_client_ = makeHttpConnection(makeClientConnection((lookupPort(port_name))));
+    if (verify_404) {
+      auto response = codec_client_->makeHeaderOnlyRequest(headers);
+      ASSERT_TRUE(response->waitForEndStream());
+      EXPECT_EQ("404", response->headers().getStatusValue());
+    } else {
+      auto response = sendRequestAndWaitForResponse(headers, 0, default_response_headers_, 0, 0);
+      checkSimpleRequestSuccess(0U, 0U, response.get());
+    }
+    cleanupUpstreamAndDownstream();
+  };
+
+  // Verify all vhosts across all listeners are correctly configured.
+  send_request_and_verify("http0", foo_request_headers);
+  send_request_and_verify("http0", bar_request_headers);
+  send_request_and_verify("http1", foo_request_headers);
+  send_request_and_verify("http1", bar_request_headers);
+  send_request_and_verify("http2", foo_request_headers);
+
+  // Verify that removing listener_0 doesn't impact listener_1 that also references
+  // route_config_0/foo and route_config_0/bar.
+  sendDiscoveryResponse<envoy::config::listener::v3::Listener>(Config::TestTypeUrl::get().Listener,
+                                                               {}, {}, {"listener_0"}, "1");
+  send_request_and_verify("http1", foo_request_headers);
+  send_request_and_verify("http1", bar_request_headers);
+
+  // Verify that removing route_config_0/foo makes foo.com unreachable but bar.com is still
+  // reachable from listener_1.
+  sendDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
+      Config::TestTypeUrl::get().VirtualHost, {}, {}, {"route_config_0/foo"}, "1");
+  send_request_and_verify("http1", foo_request_headers, true);
+  send_request_and_verify("http1", bar_request_headers);
+
+  // Verify that listener_2 is unaffected and continues to work.
+  send_request_and_verify("http2", foo_request_headers);
+}
+
+// Verifies that when two listeners are using the same route with VHDS resource and after one of the
+// listeners is removed, the other listener continues to receive updates on that VHDS resource.
+TEST_P(AdsIntegrationTest, VHDSUpdatesAfterListenerRemoval) {
+  if (sotw_or_delta_ != Grpc::SotwOrDelta::Delta &&
+      sotw_or_delta_ != Grpc::SotwOrDelta::UnifiedDelta) {
+    GTEST_SKIP_("This test is for delta only");
+  }
+  initialize();
+
+  // Send initial configuration that sets up two listeners with the following vhosts:
+  // listener_0 -> route_config_0/foo
+  // listener_1 -> route_config_0/foo
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "", {}, {}, {}, true));
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TestTypeUrl::get().Cluster, {},
+                                                             {buildCluster("cluster_0")}, {}, "1");
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().ClusterLoadAssignment, "", {},
+                                      {"cluster_0"}, {}));
+  sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+      Config::TestTypeUrl::get().ClusterLoadAssignment, {},
+      {buildClusterLoadAssignment("cluster_0")}, {}, "1");
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "", {}, {}, {}));
+
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Listener, "", {}, {}, {}));
+  sendDiscoveryResponse<envoy::config::listener::v3::Listener>(
+      Config::TestTypeUrl::get().Listener, {},
+      {buildListener("listener_0", "route_config_0"),
+       buildListener("listener_1", "route_config_0")},
+      {}, "1");
+
+  EXPECT_TRUE(
+      compareDiscoveryRequest(Config::TestTypeUrl::get().ClusterLoadAssignment, "", {}, {}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "", {},
+                                      {"route_config_0"}, {}));
+  sendDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
+      Config::TestTypeUrl::get().RouteConfiguration, {},
+      {buildRouteConfigWithVhds("route_config_0")}, {}, "1");
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Listener, "", {}, {}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, "", {}, {}, {}));
+  EXPECT_TRUE(
+      compareDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "", {}, {}, {}));
+
+  sendDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
+      Config::TestTypeUrl::get().VirtualHost, {},
+      {buildVirtualHost("route_config_0/foo", "foo.com", "/foo", "cluster_0")}, {}, "1");
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, "", {}, {}, {}));
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
+  registerTestServerPorts({"http0", "http1"});
+
+  auto send_request_and_verify = [this](const std::string& port_name,
+                                        const Http::TestRequestHeaderMapImpl& headers,
+                                        bool verify_404 = false) {
+    codec_client_ = makeHttpConnection(makeClientConnection((lookupPort(port_name))));
+    if (verify_404) {
+      auto response = codec_client_->makeHeaderOnlyRequest(headers);
+      ASSERT_TRUE(response->waitForEndStream());
+      EXPECT_EQ("404", response->headers().getStatusValue());
+    } else {
+      auto response = sendRequestAndWaitForResponse(headers, 0, default_response_headers_, 0, 0);
+      checkSimpleRequestSuccess(0U, 0U, response.get());
+    }
+    cleanupUpstreamAndDownstream();
+  };
+
+  send_request_and_verify("http0", Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                                                  {":path", "/foo"},
+                                                                  {":scheme", "http"},
+                                                                  {":authority", "foo.com"}});
+  send_request_and_verify("http1", Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                                                  {":path", "/foo"},
+                                                                  {":scheme", "http"},
+                                                                  {":authority", "foo.com"}});
+  codec_client_->close();
+
+  // Remove listener_1 and verify that listener_0 continues to receive VHDS updates.
+  sendDiscoveryResponse<envoy::config::listener::v3::Listener>(Config::TestTypeUrl::get().Listener,
+                                                               {}, {}, {"listener_1"}, "1");
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Listener, "", {}, {}, {}));
+  test_server_->waitForGaugeEq("listener_manager.total_listeners_draining", 0);
+
+  // Verify that listener_0 still works.
+  send_request_and_verify("http0", Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                                                  {":path", "/foo"},
+                                                                  {":scheme", "http"},
+                                                                  {":authority", "foo.com"}});
+
+  // Send VHDS update to change the domain and path to bar.com and verify that requests to foo.com
+  // now fail while requests to bar.com pass.
+  sendDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
+      Config::TestTypeUrl::get().VirtualHost, {},
+      {buildVirtualHost("route_config_0/foo", "bar.com", "/bar", "cluster_0")}, {}, "2");
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, "", {}, {}, {}));
+  send_request_and_verify(
+      "http0",
+      Http::TestRequestHeaderMapImpl{
+          {":method", "GET"}, {":path", "/foo"}, {":scheme", "http"}, {":authority", "foo.com"}},
+      true);
+  send_request_and_verify("http0", Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                                                  {":path", "/bar"},
+                                                                  {":scheme", "http"},
+                                                                  {":authority", "bar.com"}});
+}
+
+// Tests that when a new listener arrives referencing an existing route config, it doesn't request
+// for new route config resources and instead uses the local copy.
+TEST_P(AdsIntegrationTest, NewListenerUsesLocalRouteConfig) {
+  if (sotw_or_delta_ != Grpc::SotwOrDelta::Delta &&
+      sotw_or_delta_ != Grpc::SotwOrDelta::UnifiedDelta) {
+    GTEST_SKIP_("This test is for delta only");
+  }
+  initialize();
+
+  // Send initial configuration that sets up 1 listeners with the following vhosts:
+  // listener_0 -> route_config_0/foo
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "", {}, {}, {}, true));
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TestTypeUrl::get().Cluster, {},
+                                                             {buildCluster("cluster_0")}, {}, "1");
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().ClusterLoadAssignment, "", {},
+                                      {"cluster_0"}, {}));
+  sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+      Config::TestTypeUrl::get().ClusterLoadAssignment, {},
+      {buildClusterLoadAssignment("cluster_0")}, {}, "1");
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "", {}, {}, {}));
+
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Listener, "", {}, {}, {}));
+  sendDiscoveryResponse<envoy::config::listener::v3::Listener>(
+      Config::TestTypeUrl::get().Listener, {}, {buildListener("listener_0", "route_config_0")}, {},
+      "1");
+
+  EXPECT_TRUE(
+      compareDiscoveryRequest(Config::TestTypeUrl::get().ClusterLoadAssignment, "", {}, {}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "", {},
+                                      {"route_config_0"}, {}));
+  sendDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
+      Config::TestTypeUrl::get().RouteConfiguration, {},
+      {buildRouteConfigWithVhds("route_config_0")}, {}, "1");
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Listener, "", {}, {}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, "", {}, {}, {}));
+  EXPECT_TRUE(
+      compareDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "", {}, {}, {}));
+  sendDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
+      Config::TestTypeUrl::get().VirtualHost, {},
+      {buildVirtualHost("route_config_0/foo", "foo.com", "/foo", "cluster_0")}, {}, "1");
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, "", {}, {}, {}));
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  registerTestServerPorts({"http0"});
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http0"))));
+  auto response = sendRequestAndWaitForResponse(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "GET"}, {":path", "/foo"}, {":scheme", "http"}, {":authority", "foo.com"}},
+      0, default_response_headers_, 0, 0);
+  checkSimpleRequestSuccess(0U, 0U, response.get());
+  cleanupUpstreamAndDownstream();
+
+  // Create new listener (listener_1) using the same route config (route_config_0) that shouldn't
+  // request for VHDS again and use the local copy.
+  sendDiscoveryResponse<envoy::config::listener::v3::Listener>(
+      Config::TestTypeUrl::get().Listener, {}, {buildListener("listener_1", "route_config_0")}, {},
+      "1");
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Listener, "", {}, {}, {}));
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
+  registerTestServerPorts({"http0", "http1"});
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http1"))));
+  response = sendRequestAndWaitForResponse(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "GET"}, {":path", "/foo"}, {":scheme", "http"}, {":authority", "foo.com"}},
+      0, default_response_headers_, 0, 0);
+  checkSimpleRequestSuccess(0U, 0U, response.get());
+  cleanupUpstreamAndDownstream();
 }
 
 } // namespace Envoy

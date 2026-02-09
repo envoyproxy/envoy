@@ -44,7 +44,7 @@ public:
      *
      * @param status the status of the request.
      */
-    virtual void onComplete(const ::google::jwt_verify::Status& status) PURE;
+    virtual void onComplete(const JwtVerify::Status& status) PURE;
   };
 
   // Context object to hold data needed for verifier.

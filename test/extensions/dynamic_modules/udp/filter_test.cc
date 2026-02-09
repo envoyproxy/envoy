@@ -1,5 +1,5 @@
 #include "source/common/stats/isolated_store_impl.h"
-#include "source/extensions/dynamic_modules/abi.h"
+#include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/filters/udp/dynamic_modules/filter.h"
 
 #include "test/extensions/dynamic_modules/util.h"
@@ -335,8 +335,7 @@ TEST_F(DynamicModuleUdpListenerFilterTest, MetricsCounterDefineAndIncrement) {
   EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success, result);
 
   // Verify the counter value.
-  auto counter = TestUtility::findCounter(
-      stats_, "dynamic_module_udp_listener_filter.test_filter.test_counter");
+  auto counter = TestUtility::findCounter(stats_, "dynamicmodulescustom.test_filter.test_counter");
   ASSERT_NE(nullptr, counter);
   EXPECT_EQ(5, counter->value());
 }
@@ -368,8 +367,7 @@ TEST_F(DynamicModuleUdpListenerFilterTest, MetricsGaugeDefineAndOperations) {
   EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Success, result);
 
   // Verify gauge value.
-  auto gauge =
-      TestUtility::findGauge(stats_, "dynamic_module_udp_listener_filter.test_filter.test_gauge");
+  auto gauge = TestUtility::findGauge(stats_, "dynamicmodulescustom.test_filter.test_gauge");
   ASSERT_NE(nullptr, gauge);
   EXPECT_EQ(105, gauge->value());
 }

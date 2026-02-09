@@ -60,6 +60,8 @@ Api::IoError::IoErrorCode IoSocketError::errorCodeFromErrno(int sys_errno) {
     return IoErrorCode::NetworkUnreachable;
   case SOCKET_ERROR_INVAL:
     return IoErrorCode::InvalidArgument;
+  case SOCKET_ERROR_NOBUFS:
+    return IoErrorCode::NoBufferSpace;
   default:
     ENVOY_LOG_MISC(debug, "Unknown error code {} details {}", sys_errno, errorDetails(sys_errno));
     return IoErrorCode::UnknownError;
