@@ -45,7 +45,7 @@ envoy_cc_test_library(
         "//envoy/server:filter_config_interface",
         "//source/common/router:string_accessor_lib",
         "//source/common/stream_info:uint32_accessor_lib",
-        "@com_github_google_quiche//:quic_core_packets_lib",
+        "@quiche//:quic_core_packets_lib",
     ],
 )
 
@@ -173,7 +173,7 @@ envoy_cc_test_library(
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "//test/extensions/filters/http/common:empty_http_filter_config_lib",
-        "@com_google_absl//absl/synchronization",
+        "@abseil-cpp//absl/synchronization",
     ],
 )
 
@@ -832,7 +832,7 @@ envoy_cc_test_library(
         "//source/common/network:address_lib",
         "//source/common/network:default_socket_interface_lib",
         "//test/test_common:network_utility_lib",
-        "@com_google_absl//absl/types:optional",
+        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/extensions/network/socket_interface/v3:pkg_cc_proto",
     ],
 )
@@ -961,7 +961,7 @@ envoy_cc_test_library(
         "//envoy/server:filter_config_interface",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "//test/extensions/filters/http/common:empty_http_filter_config_lib",
-        "@com_google_absl//absl/strings:str_format",
+        "@abseil-cpp//absl/strings:str_format",
     ],
 )
 

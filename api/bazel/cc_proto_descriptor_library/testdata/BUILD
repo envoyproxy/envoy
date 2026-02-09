@@ -102,8 +102,8 @@ cc_test(
         "test_extension_cc_proto",
         "test_extension_descriptors",
         "//bazel/cc_proto_descriptor_library:text_format_transcoder",
-        "@com_google_googletest//:gtest_main",
         "@com_google_protobuf//:protobuf",
+        "@googletest//:gtest_main",
     ],
 )
 
@@ -116,8 +116,8 @@ cc_test(
     deps = [
         "test_cc_proto",
         "//bazel/cc_proto_descriptor_library:text_format_transcoder",
-        "@com_google_googletest//:gtest_main",
         "@com_google_protobuf//:protobuf",
+        "@googletest//:gtest_main",
     ],
 )
 
@@ -132,7 +132,7 @@ cc_test(
         "test_descriptors",
         "//bazel/cc_proto_descriptor_library:create_dynamic_message",
         "//bazel/cc_proto_descriptor_library:text_format_transcoder",
-        "@com_google_googletest//:gtest_main",
         "@com_google_protobuf//:protobuf",
+        "@googletest//:gtest_main",
     ],
 )

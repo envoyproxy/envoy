@@ -127,6 +127,7 @@ categories:
 - envoy.wasm.runtime
 - envoy.xds_delegates
 - envoy.common.key_value
+- envoy.content_parsers
 - envoy.network.dns_resolver
 - envoy.network.connection_balance
 - envoy.resolvers

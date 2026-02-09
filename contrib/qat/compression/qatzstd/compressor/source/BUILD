@@ -24,7 +24,7 @@ COMMON_CFLAGS = "-I$$EXT_BUILD_ROOT/external/numactl"
 
 make(
     name = "qat-zstd",
-    build_data = ["@com_github_qat_zstd//:all"],
+    build_data = ["@qat-zstd//:all"],
     # Include the numa_archive genrule output so that libnuma.a is available
     # for the linker to find with -lnuma.
     data = ["//bazel/external:numa_archive"],
@@ -37,7 +37,7 @@ make(
         },
     }),
     includes = [],
-    lib_source = "@com_github_qat_zstd//:all",
+    lib_source = "@qat-zstd//:all",
     out_static_libs = ["libqatseqprod.a"],
     tags = ["skip_on_windows"],
     target_compatible_with = envoy_contrib_linux_x86_64_constraints(),

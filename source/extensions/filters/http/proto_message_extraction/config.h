@@ -26,6 +26,11 @@ private:
       const envoy::extensions::filters::http::proto_message_extraction::v3::
           ProtoMessageExtractionConfig& proto_config,
       const std::string&, Envoy::Server::Configuration::FactoryContext&) override;
+
+  Envoy::Http::FilterFactoryCb createFilterFactoryFromProtoWithServerContextTyped(
+      const envoy::extensions::filters::http::proto_message_extraction::v3::
+          ProtoMessageExtractionConfig& proto_config,
+      const std::string&, Envoy::Server::Configuration::ServerFactoryContext&) override;
 };
 } // namespace ProtoMessageExtraction
 } // namespace HttpFilters

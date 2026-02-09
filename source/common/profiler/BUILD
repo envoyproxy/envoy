@@ -15,6 +15,6 @@ envoy_cc_library(
     tcmalloc_dep = 1,
     deps = [
         "//source/common/common:thread_lib",
-        "@com_google_absl//absl/status:statusor",
+        "@abseil-cpp//absl/status:statusor",
     ],
 )
