@@ -6,6 +6,8 @@
 
 #include "source/common/common/thread.h"
 
+#include "absl/strings/str_split.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -84,7 +86,8 @@ FileServerConfig::applyPathMapping(absl::string_view path_with_query,
       std::filesystem::path{mapping.file_path_prefix()} / std::filesystem::path{kept_path};
   if (file_path != file_path.lexically_normal() ||
       !file_path.string().starts_with(mapping.file_path_prefix())) {
-    // Ensure we're not accidentally looking outside the designated filesystem prefix.
+    // Ensure we're not accidentally looking outside the designated filesystem prefix
+    // in any way controlled by the client. (Symlink escapes are up to the filesystem owner.)
     return absl::nullopt;
   }
   return file_path;

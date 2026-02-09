@@ -5,6 +5,7 @@
 #include <string>
 
 #include "envoy/extensions/filters/http/file_server/v3/file_server.pb.h"
+#include "envoy/router/router.h"
 #include "envoy/server/factory_context.h"
 
 #include "source/common/common/radix_tree.h"

@@ -9,7 +9,8 @@
 #include "source/extensions/filters/http/file_server/filter.h"
 #include "source/extensions/filters/http/file_server/filter_config.h"
 
-#include "absl/container/flat_hash_map.h"
+#include "absl/container/flat_hash_set.h"
+#include "absl/strings/str_cat.h"
 
 namespace Envoy {
 namespace Extensions {

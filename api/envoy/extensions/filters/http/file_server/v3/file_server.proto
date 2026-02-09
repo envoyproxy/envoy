@@ -52,12 +52,10 @@ message FileServerConfig {
     List list = 2;
   }
 
-  // A configuration for an AsyncFileManager.
+  // A configuration for the AsyncFileManager to be used to read from the filesystem.
   //
-  // This can be unset to allow for per-route-only configs. If this is unset
-  // on a per-route config and set in the route config, the version in the
-  // route config is used. If this is unset either way when a ``path_mapping``
-  // is matched, a 503 Internal Server Error response is served.
+  // This may be unset to allow for per-route-only configs. If this is unset when
+  // a ``path_mapping`` is matched, a 500 Internal Server Error response is served.
   common.async_files.v3.AsyncFileManagerConfig manager_config = 1;
 
   // The longest matching path_mapping takes precedence.

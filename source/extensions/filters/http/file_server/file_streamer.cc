@@ -7,6 +7,8 @@
 #include "source/extensions/common/async_files/async_file_manager.h"
 #include "source/extensions/filters/http/file_server/absl_status_to_http_status.h"
 
+#include "absl/strings/str_cat.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -22,6 +24,7 @@ const Http::LowerCaseString& acceptRangesHeaderKey() {
 
 void FileStreamer::begin(const FileServerConfig& config, Event::Dispatcher& dispatcher,
                          uint64_t start, uint64_t end, std::filesystem::path file_path) {
+  ASSERT(config.asyncFileManager() != nullptr);
   file_server_config_ = &config;
   dispatcher_ = &dispatcher;
   pos_ = start;
@@ -96,7 +99,8 @@ void FileStreamer::startFile() {
       return;
     }
     const struct stat& s = result.value();
-    if (static_cast<uint64_t>(s.st_size) < end_) {
+    if (static_cast<uint64_t>(s.st_size) < end_ || static_cast<uint64_t>(s.st_size) < pos_ ||
+        (end_ != 0 && end_ < pos_)) {
       client_.errorFromFile(Http::Code::RangeNotSatisfiable, "file_server_range_not_satisfiable");
       return;
     }

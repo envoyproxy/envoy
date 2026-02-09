@@ -63,8 +63,7 @@ public:
             .value();
     Http::MockFilterChainFactoryCallbacks filter_callback;
     std::shared_ptr<const FileServerConfig> config;
-    EXPECT_CALL(filter_callback, addStreamDecoderFilter(_))
-        .WillOnce(Invoke(captureConfig(&config)));
+    EXPECT_CALL(filter_callback, addStreamDecoderFilter(_)).WillOnce(captureConfig(&config));
     cb(filter_callback);
     return config;
   }

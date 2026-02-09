@@ -85,6 +85,29 @@ directory_behaviors:
   Event::DispatcherPtr dispatcher_ = api_->allocateDispatcher("test_thread");
 };
 
+TEST_F(FileServerFilterTest, InternalServerErrorIfNoFileManagerConfigured) {
+  std::string yaml(R"(
+path_mappings:
+  - request_path_prefix: /path1
+    file_path_prefix: fs1
+)");
+  ProtoFileServerConfig proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
+  // Create with nullptr for AsyncFileManager.
+  auto filter = FileServerFilter::createShared(
+      std::make_shared<FileServerConfig>(proto_config, nullptr, nullptr));
+  initFilter(*filter);
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":path", "/path1/banana.html"},
+      {":host", "test.host"},
+      {":method", "GET"},
+      {":scheme", "https"},
+  };
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _,
+                                                 "file_server_no_file_manager_configured"));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter->decodeHeaders(request_headers, true));
+}
+
 TEST_F(FileServerFilterTest, PassThroughIfNoPath) {
   auto filter = testFilter();
   Http::TestRequestHeaderMapImpl request_headers{

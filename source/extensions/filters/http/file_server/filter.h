@@ -47,7 +47,7 @@ private:
   std::shared_ptr<const FileServerConfig> file_server_config_;
   friend class FileServerConfigTest; // Allow test access to file_server_config_.
   FileStreamer file_streamer_;
-  bool is_head_;
+  bool is_head_ = false;
   bool headers_sent_ = false;
 };
 

@@ -10,6 +10,10 @@
 #include "source/common/http/utility.h"
 #include "source/extensions/filters/http/file_server/filter_config.h"
 
+#include "absl/strings/match.h"
+#include "absl/strings/numbers.h"
+#include "absl/strings/str_split.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -99,6 +103,12 @@ Http::FilterHeadersStatus FileServerFilter::decodeHeaders(RequestHeaderMap& head
     decoder_callbacks_->sendLocalReply(Http::Code::MethodNotAllowed,
                                        CodeUtility::toString(Http::Code::MethodNotAllowed), nullptr,
                                        absl::nullopt, "file_server_rejected_method");
+    return Http::FilterHeadersStatus::StopIteration;
+  }
+  if (config->asyncFileManager() == nullptr) {
+    decoder_callbacks_->sendLocalReply(
+        Http::Code::InternalServerError, CodeUtility::toString(Http::Code::InternalServerError),
+        nullptr, absl::nullopt, "file_server_no_file_manager_configured");
     return Http::FilterHeadersStatus::StopIteration;
   }
   // Parse range header, if present, into start and end (otherwise or on error, 0,0)
