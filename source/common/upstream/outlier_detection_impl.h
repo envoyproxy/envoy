@@ -406,7 +406,6 @@ public:
   DetectorConfig& config() { return config_; }
   void unejectHost(HostSharedPtr host);
   void setHostDegraded(HostSharedPtr host);
-  void clearHostDegraded(HostSharedPtr host);
 
   // Upstream::Outlier::Detector
   void addChangedStateCb(ChangeStateCb cb) override { callbacks_.push_back(cb); }
@@ -459,9 +458,7 @@ private:
   void notifyMainThreadConsecutiveError(HostSharedPtr host,
                                         envoy::data::cluster::v3::OutlierEjectionType type);
   void notifyMainThreadHostDegraded(HostSharedPtr host);
-  void notifyMainThreadHostUndegraded(HostSharedPtr host);
   void setHostDegradedMainThread(HostSharedPtr host);
-  void clearHostDegradedMainThread(HostSharedPtr host);
   void onIntervalTimer();
   void runCallbacks(HostSharedPtr host);
   bool enforceEjection(envoy::data::cluster::v3::OutlierEjectionType type);

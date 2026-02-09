@@ -650,31 +650,12 @@ void DetectorImpl::notifyMainThreadHostDegraded(HostSharedPtr host) {
   });
 }
 
-void DetectorImpl::notifyMainThreadHostUndegraded(HostSharedPtr host) {
-  // Similar to notifyMainThreadHostDegraded, post to main thread for thread safety.
-  std::weak_ptr<DetectorImpl> weak_this = shared_from_this();
-  dispatcher_.post([weak_this, host]() -> void {
-    std::shared_ptr<DetectorImpl> shared_this = weak_this.lock();
-    if (shared_this) {
-      shared_this->clearHostDegradedMainThread(host);
-    }
-  });
-}
-
 void DetectorImpl::setHostDegraded(HostSharedPtr host) {
   // Only mark as degraded if the feature is enabled
   if (!config_.detectDegraded()) {
     return;
   }
   notifyMainThreadHostDegraded(host);
-}
-
-void DetectorImpl::clearHostDegraded(HostSharedPtr host) {
-  // Only clear degraded if the feature is enabled
-  if (!config_.detectDegraded()) {
-    return;
-  }
-  notifyMainThreadHostUndegraded(host);
 }
 
 void DetectorImpl::setHostDegradedMainThread(HostSharedPtr host) {
@@ -709,16 +690,6 @@ void DetectorImpl::setHostDegradedMainThread(HostSharedPtr host) {
     }
 
     runCallbacks(host);
-  }
-}
-
-void DetectorImpl::clearHostDegradedMainThread(HostSharedPtr host) {
-  if (host->healthFlagGet(Host::HealthFlag::DEGRADED_OUTLIER_DETECTION)) {
-    host->healthFlagClear(Host::HealthFlag::DEGRADED_OUTLIER_DETECTION);
-    // Use undegrade() to track recovery time
-    host_monitors_[host]->undegrade(time_source_.monotonicTime());
-    runCallbacks(host);
-    // Backoff decrement happens in the interval timer (same as ejection).
   }
 }
 
