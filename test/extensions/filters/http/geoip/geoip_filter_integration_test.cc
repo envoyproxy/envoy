@@ -353,6 +353,10 @@ TEST_P(GeoipFilterIntegrationTest, AsnDbTakesPrecedenceOverIspDbForAsnOrg) {
                                                  {"x-forwarded-for", "89.160.20.112,9.10.11.12"}};
   auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
   EXPECT_EQ("29518", headerValue("x-geo-asn"));
+  // Verify ASN DB takes precedence: For IP 89.160.20.112:
+  // - ASN DB returns autonomous_system_organization="Bredband2 AB"
+  // - ISP DB returns organization="Bevtec"
+  // We expect "Bredband2 AB", proving ASN DB takes precedence over ISP DB for asn_org.
   EXPECT_EQ("Bredband2 AB", headerValue("x-geo-asn-org"));
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
