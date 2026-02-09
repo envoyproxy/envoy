@@ -4001,7 +4001,7 @@ public:
                    HttpConnectionManager& config));
 };
 
-// Test that SRDS createConfigProvider receives the listener init manager.
+// Test that SRDS createConfigProvider and createScopeKeyBuilder receive the listener init manager.
 TEST_F(HttpConnectionManagerConfigTest, SrdsUsesListenerInitManager) {
   MockSrdsFactory mock_srds_factory;
   Registry::InjectFactory<Router::SrdsFactory> registration(mock_srds_factory);
