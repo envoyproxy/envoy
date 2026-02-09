@@ -168,13 +168,10 @@ When PROXY protocol state already exists (e.g., parsed by a
 
 To control how configured TLVs interact with existing state, use
 :ref:`proxy_protocol_tlv_merge_policy
-<envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.proxy_protocol_tlv_merge_policy>`:
-
-* ``ADD_IF_ABSENT`` (default): Add configured TLVs only if no state exists.
-* ``OVERWRITE_BY_TYPE_IF_EXISTS_OR_ADD``: Overwrite existing TLVs by type with configured TLVs.
-  Non-conflicting TLVs from both sources are preserved.
-* ``APPEND_IF_EXISTS_OR_ADD``: Append configured TLVs to existing TLVs, preserving all
-  TLVs from both sources (allows duplicate types per PROXY protocol v2 spec).
+<envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.proxy_protocol_tlv_merge_policy>`.
+See :ref:`ProxyProtocolTlvMergePolicy
+<envoy_v3_api_enum_extensions.filters.network.tcp_proxy.v3.ProxyProtocolTlvMergePolicy>`
+for available options.
 
 .. note::
 

@@ -122,7 +122,7 @@ Config::SharedConfig::SharedConfig(
     Server::Configuration::FactoryContext& context)
     : stats_scope_(context.scope().createScope(fmt::format("tcp.{}", config.stat_prefix()))),
       stats_(generateStats(*stats_scope_)),
-      flush_access_log_on_start_(config.access_log_options().flush_access_log_on_start(),
+      flush_access_log_on_start_(config.access_log_options().flush_access_log_on_start()),
       proxy_protocol_tlv_merge_policy_(config.proxy_protocol_tlv_merge_policy()) {
   if (config.has_idle_timeout()) {
     const uint64_t timeout = DurationUtil::durationToMilliseconds(config.idle_timeout());
@@ -679,7 +679,7 @@ Network::FilterStatus Filter::establishUpstreamConnection() {
   auto& downstream_connection = read_callbacks_->connection();
   auto& filter_state = downstream_connection.streamInfo().filterState();
 
-  const auto* existing_state = filter_state->getDataReadOnly<Network::ProxyProtocolFilterState>(
+  auto* existing_state = filter_state->getDataMutable<Network::ProxyProtocolFilterState>(
       Network::ProxyProtocolFilterState::key());
 
   if (existing_state == nullptr) {
@@ -695,9 +695,7 @@ Network::FilterStatus Filter::establishUpstreamConnection() {
   } else if (config_->sharedConfig()->proxyProtocolTlvMergePolicy() !=
              envoy::extensions::filters::network::tcp_proxy::v3::ADD_IF_ABSENT) {
     // Existing state found and merge policy is not ADD_IF_ABSENT - merge TLVs.
-    auto* mutable_state = filter_state->getDataMutable<Network::ProxyProtocolFilterState>(
-        Network::ProxyProtocolFilterState::key());
-    const auto& existing_data = mutable_state->value();
+    const auto& existing_data = existing_state->value();
     const auto configured_tlvs = config_->sharedConfig()->evaluateDynamicTLVs(getStreamInfo());
 
     Network::ProxyProtocolTLVVector merged_tlvs;
