@@ -15,8 +15,8 @@
 namespace ReverseConnection = Envoy::Extensions::Bootstrap::ReverseConnection;
 
 #include "test/mocks/event/mocks.h"
-#include "test/mocks/reverse_tunnel_reporting_service/reporter.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/reverse_tunnel_reporting_service/reporter.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/server/overload_manager.h"
 #include "test/mocks/thread_local/mocks.h"

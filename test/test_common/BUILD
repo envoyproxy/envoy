@@ -302,6 +302,7 @@ envoy_cc_test_library(
     deps = [
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
+        "@prometheus_metrics_model//:client_model_cc_proto",
     ],
 )
 
@@ -366,6 +367,7 @@ envoy_cc_test_library(
 envoy_basic_cc_library(
     name = "test_version_linkstamp",
     srcs = ["test_version_linkstamp.cc"],
+    deps = ["//source/common/version:version_suffix_default"],
     alwayslink = 1,
 )
 

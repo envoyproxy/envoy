@@ -233,9 +233,6 @@ def envoy_dependencies(skip_targets = []):
     external_http_archive("flatbuffers")
     external_http_archive("bazel_features")
     external_http_archive("bazel_compdb")
-    external_http_archive(
-        name = "envoy_examples",
-    )
     external_http_archive("envoy_toolshed")
 
     _libmaxminddb()

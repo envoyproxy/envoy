@@ -1,3 +1,5 @@
+load("@base_pip3//:requirements.bzl", "requirement")
+load("@rules_python//python:defs.bzl", "py_binary")
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test",
@@ -11,15 +13,25 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-exports_files(["example_configs_test_setup.sh"])
+exports_files(["configs_test_setup.sh"])
+
+label_flag(
+    name = "configs",
+    build_setting_default = "//configs",
+)
+
+label_flag(
+    name = "test_lib",
+    build_setting_default = ":config_test_lib",
+)
 
 envoy_cc_test_library(
-    name = "example_configs_test_lib",
+    name = "test_runner_lib",
     srcs = [
-        "example_configs_test.cc",
+        "configs_test.cc",
     ],
     deps = [
-        ":config_test_lib",
+        ":test_lib",
         "//source/common/filesystem:filesystem_lib",
         "//source/extensions/config_subscription/rest:http_subscription_lib",
         "//source/extensions/filters/http/match_delegate:config",
@@ -30,20 +42,19 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test(
-    name = "example_configs_test",
+    name = "config_test",
     size = "large",
     data = [
-        "example_configs_test_setup.sh",
-        "//configs:example_configs",
+        "configs_test_setup.sh",
+        ":configs",
     ],
     env = {
-        "EXAMPLE_CONFIGS_TAR_PATH": "envoy/configs/example_configs.tar",
+        "DISABLE_TEST_MERGE": "true",
+        "CONFIGS_TAR_PATH": "$(location :configs)",
         "GODEBUG": "cgocheck=0",
     },
     rbe_pool = "6gig",
-    deps = [
-        ":example_configs_test_lib",
-    ],
+    deps = [":test_runner_lib"],
 )
 
 envoy_cc_test_library(
@@ -72,4 +83,18 @@ envoy_cc_test_library(
         "//bazel:disable_http3": envoy_all_extensions(NO_HTTP3_SKIP_TARGETS),
         "//conditions:default": envoy_all_extensions(),
     }),
+)
+
+py_binary(
+    name = "static_config_validation",
+    srcs = ["static_config_validation.py"],
+    args = (
+        "--descriptor_path=$(location @envoy_api//:v3_proto_set)",
+        "$(locations //configs:files) ",
+    ),
+    data = [
+        "//configs:files",
+        "@envoy_api//:v3_proto_set",
+    ],
+    deps = [requirement("envoy.base.utils")],
 )
