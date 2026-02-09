@@ -14,7 +14,6 @@ envoy_cc_library(
     srcs = [
         "dns_filter.cc",
         "dns_filter_access_log.cc",
-        "dns_filter_command_parser_factory.cc",
         "dns_filter_resolver.cc",
         "dns_filter_utils.cc",
         "dns_parser.cc",
@@ -22,7 +21,6 @@ envoy_cc_library(
     hdrs = [
         "dns_filter.h",
         "dns_filter_access_log.h",
-        "dns_filter_command_parser_factory.h",
         "dns_filter_constants.h",
         "dns_filter_resolver.h",
         "dns_filter_utils.h",

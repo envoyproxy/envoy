@@ -5,7 +5,6 @@
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/extensions/filters/udp/dns_filter/dns_filter.h"
 #include "source/extensions/filters/udp/dns_filter/dns_filter_access_log.h"
-#include "source/extensions/filters/udp/dns_filter/dns_filter_command_parser_factory.h"
 #include "source/extensions/filters/udp/dns_filter/dns_filter_constants.h"
 #include "source/extensions/filters/udp/dns_filter/dns_filter_utils.h"
 
@@ -43,8 +42,7 @@ Api::IoCallUint64Result makeNoError(uint64_t rc) {
 class TestAccessLog : public AccessLog::Instance {
 public:
   TestAccessLog() {
-    DnsFilterCommandParserFactory factory;
-    auto parser = factory.createCommandParser();
+    auto parser = createDnsFilterCommandParser();
     query_name_formatter_ = parser->parse("QUERY_NAME", "", absl::nullopt);
     query_type_formatter_ = parser->parse("QUERY_TYPE", "", absl::nullopt);
     query_class_formatter_ = parser->parse("QUERY_CLASS", "", absl::nullopt);
@@ -414,8 +412,7 @@ server_config:
 
 // Test custom DNS command parser formatters
 TEST(DnsFilterCommandParserTest, QueryNameFormatter) {
-  DnsFilterCommandParserFactory factory;
-  auto parser = factory.createCommandParser();
+  auto parser = createDnsFilterCommandParser();
   auto formatter = parser->parse("QUERY_NAME", "", absl::nullopt);
   ASSERT_NE(formatter, nullptr);
 
@@ -446,8 +443,7 @@ TEST(DnsFilterCommandParserTest, QueryNameFormatter) {
 }
 
 TEST(DnsFilterCommandParserTest, QueryTypeFormatter) {
-  DnsFilterCommandParserFactory factory;
-  auto parser = factory.createCommandParser();
+  auto parser = createDnsFilterCommandParser();
   auto formatter = parser->parse("QUERY_TYPE", "", absl::nullopt);
   ASSERT_NE(formatter, nullptr);
 
@@ -473,8 +469,7 @@ TEST(DnsFilterCommandParserTest, QueryTypeFormatter) {
 }
 
 TEST(DnsFilterCommandParserTest, AnswerCountFormatter) {
-  DnsFilterCommandParserFactory factory;
-  auto parser = factory.createCommandParser();
+  auto parser = createDnsFilterCommandParser();
   auto formatter = parser->parse("ANSWER_COUNT", "", absl::nullopt);
   ASSERT_NE(formatter, nullptr);
 
@@ -502,8 +497,7 @@ TEST(DnsFilterCommandParserTest, AnswerCountFormatter) {
 }
 
 TEST(DnsFilterCommandParserTest, ResponseCodeFormatter) {
-  DnsFilterCommandParserFactory factory;
-  auto parser = factory.createCommandParser();
+  auto parser = createDnsFilterCommandParser();
   auto formatter = parser->parse("RESPONSE_CODE", "", absl::nullopt);
   ASSERT_NE(formatter, nullptr);
 
@@ -528,8 +522,7 @@ TEST(DnsFilterCommandParserTest, ResponseCodeFormatter) {
 }
 
 TEST(DnsFilterCommandParserTest, ParseStatusFormatter) {
-  DnsFilterCommandParserFactory factory;
-  auto parser = factory.createCommandParser();
+  auto parser = createDnsFilterCommandParser();
   auto formatter = parser->parse("PARSE_STATUS", "", absl::nullopt);
   ASSERT_NE(formatter, nullptr);
 
@@ -554,8 +547,7 @@ TEST(DnsFilterCommandParserTest, ParseStatusFormatter) {
 }
 
 TEST(DnsFilterCommandParserTest, MissingMetadata) {
-  DnsFilterCommandParserFactory factory;
-  auto parser = factory.createCommandParser();
+  auto parser = createDnsFilterCommandParser();
   auto formatter = parser->parse("QUERY_NAME", "", absl::nullopt);
   ASSERT_NE(formatter, nullptr);
 
@@ -570,8 +562,7 @@ TEST(DnsFilterCommandParserTest, MissingMetadata) {
 }
 
 TEST(DnsFilterCommandParserTest, QueryClassFormatter) {
-  DnsFilterCommandParserFactory factory;
-  auto parser = factory.createCommandParser();
+  auto parser = createDnsFilterCommandParser();
   auto formatter = parser->parse("QUERY_CLASS", "", absl::nullopt);
   ASSERT_NE(formatter, nullptr);
 
@@ -597,15 +588,13 @@ TEST(DnsFilterCommandParserTest, QueryClassFormatter) {
 }
 
 TEST(DnsFilterCommandParserTest, UnknownCommand) {
-  DnsFilterCommandParserFactory factory;
-  auto parser = factory.createCommandParser();
+  auto parser = createDnsFilterCommandParser();
   auto formatter = parser->parse("UNKNOWN_COMMAND", "", absl::nullopt);
   EXPECT_EQ(formatter, nullptr);
 }
 
 TEST(DnsFilterCommandParserTest, EmptyCommandArg) {
-  DnsFilterCommandParserFactory factory;
-  auto parser = factory.createCommandParser();
+  auto parser = createDnsFilterCommandParser();
 
   // All DNS commands should work without command args
   EXPECT_NE(parser->parse("QUERY_NAME", "", absl::nullopt), nullptr);
@@ -617,8 +606,7 @@ TEST(DnsFilterCommandParserTest, EmptyCommandArg) {
 }
 
 TEST(DnsFilterCommandParserTest, CaseSensitiveCommands) {
-  DnsFilterCommandParserFactory factory;
-  auto parser = factory.createCommandParser();
+  auto parser = createDnsFilterCommandParser();
 
   // Commands should be case-sensitive
   EXPECT_NE(parser->parse("QUERY_NAME", "", absl::nullopt), nullptr);
@@ -628,8 +616,7 @@ TEST(DnsFilterCommandParserTest, CaseSensitiveCommands) {
 }
 
 TEST(DnsFilterCommandParserTest, FormatValueStringType) {
-  DnsFilterCommandParserFactory factory;
-  auto parser = factory.createCommandParser();
+  auto parser = createDnsFilterCommandParser();
   auto formatter = parser->parse("QUERY_NAME", "", absl::nullopt);
   ASSERT_NE(formatter, nullptr);
 
@@ -654,8 +641,7 @@ TEST(DnsFilterCommandParserTest, FormatValueStringType) {
 }
 
 TEST(DnsFilterCommandParserTest, FormatValueNullWhenMissing) {
-  DnsFilterCommandParserFactory factory;
-  auto parser = factory.createCommandParser();
+  auto parser = createDnsFilterCommandParser();
   auto formatter = parser->parse("QUERY_NAME", "", absl::nullopt);
   ASSERT_NE(formatter, nullptr);
 
@@ -672,8 +658,7 @@ TEST(DnsFilterCommandParserTest, FormatValueNullWhenMissing) {
 }
 
 TEST(DnsFilterCommandParserTest, EmptyQueriesInContext) {
-  DnsFilterCommandParserFactory factory;
-  auto parser = factory.createCommandParser();
+  auto parser = createDnsFilterCommandParser();
 
   Event::SimulatedTimeSystem test_time;
   auto connection_info = std::make_shared<Network::ConnectionInfoSetterImpl>(nullptr, nullptr);
