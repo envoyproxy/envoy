@@ -47,7 +47,7 @@ TEST_F(DynamicModulesLoadBalancerConfigTest, LoadConfigSuccess) {
   envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
       config;
   config.mutable_dynamic_module_config()->set_name("lb_round_robin");
-  config.set_lb_name("test_lb");
+  config.set_lb_policy_name("test_lb");
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
@@ -59,7 +59,7 @@ TEST_F(DynamicModulesLoadBalancerConfigTest, LoadConfigModuleNotFound) {
   envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
       config;
   config.mutable_dynamic_module_config()->set_name("nonexistent_module");
-  config.set_lb_name("test_lb");
+  config.set_lb_policy_name("test_lb");
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
@@ -71,7 +71,7 @@ TEST_F(DynamicModulesLoadBalancerConfigTest, LoadConfigModuleConfigNewFails) {
   envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
       config;
   config.mutable_dynamic_module_config()->set_name("lb_config_new_fail");
-  config.set_lb_name("test_lb");
+  config.set_lb_policy_name("test_lb");
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
@@ -85,7 +85,7 @@ TEST_F(DynamicModulesLoadBalancerConfigTest, LoadConfigModuleMissingSymbol) {
   envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
       config;
   config.mutable_dynamic_module_config()->set_name("lb_no_choose_host");
-  config.set_lb_name("test_lb");
+  config.set_lb_policy_name("test_lb");
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
@@ -98,7 +98,7 @@ TEST_F(DynamicModulesLoadBalancerConfigTest, LoadConfigWithStringValueConfig) {
   envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
       config;
   config.mutable_dynamic_module_config()->set_name("lb_round_robin");
-  config.set_lb_name("test_lb");
+  config.set_lb_policy_name("test_lb");
 
   // Set up a StringValue config.
   Protobuf::StringValue string_value;
@@ -114,7 +114,7 @@ TEST_F(DynamicModulesLoadBalancerConfigTest, LoadConfigWithBytesValueConfig) {
   envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
       config;
   config.mutable_dynamic_module_config()->set_name("lb_round_robin");
-  config.set_lb_name("test_lb");
+  config.set_lb_policy_name("test_lb");
 
   // Set up a BytesValue config.
   Protobuf::BytesValue bytes_value;
@@ -130,7 +130,7 @@ TEST_F(DynamicModulesLoadBalancerConfigTest, LoadConfigWithStructConfig) {
   envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
       config;
   config.mutable_dynamic_module_config()->set_name("lb_round_robin");
-  config.set_lb_name("test_lb");
+  config.set_lb_policy_name("test_lb");
 
   // Set up a Struct config.
   Protobuf::Struct struct_value;
@@ -150,7 +150,7 @@ TEST_F(DynamicModulesLoadBalancerConfigTest, CreateThreadAwareLoadBalancer) {
   envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
       config;
   config.mutable_dynamic_module_config()->set_name("lb_round_robin");
-  config.set_lb_name("test_lb");
+  config.set_lb_policy_name("test_lb");
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
@@ -230,7 +230,7 @@ TEST_F(DynamicModulesLoadBalancerTest, RoundRobinHostSelection) {
   envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
       config;
   config.mutable_dynamic_module_config()->set_name("lb_round_robin");
-  config.set_lb_name("test_lb");
+  config.set_lb_policy_name("test_lb");
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
@@ -262,7 +262,7 @@ TEST_F(DynamicModulesLoadBalancerTest, ChooseHostWithContext) {
   envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
       config;
   config.mutable_dynamic_module_config()->set_name("lb_callbacks_test");
-  config.set_lb_name("test_lb");
+  config.set_lb_policy_name("test_lb");
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
@@ -297,7 +297,7 @@ TEST_F(DynamicModulesLoadBalancerTest, ChooseHostNoHealthyHosts) {
   envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
       config;
   config.mutable_dynamic_module_config()->set_name("lb_round_robin");
-  config.set_lb_name("test_lb");
+  config.set_lb_policy_name("test_lb");
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
@@ -326,7 +326,7 @@ TEST_F(DynamicModulesLoadBalancerTest, ChooseHostEmptyHostSets) {
   envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
       config;
   config.mutable_dynamic_module_config()->set_name("lb_round_robin");
-  config.set_lb_name("test_lb");
+  config.set_lb_policy_name("test_lb");
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
@@ -351,7 +351,7 @@ TEST_F(DynamicModulesLoadBalancerTest, LbNewFails) {
   envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
       config;
   config.mutable_dynamic_module_config()->set_name("lb_new_fail");
-  config.set_lb_name("test_lb");
+  config.set_lb_policy_name("test_lb");
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
@@ -377,7 +377,7 @@ TEST_F(DynamicModulesLoadBalancerTest, ChooseHostInvalidIndex) {
   envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
       config;
   config.mutable_dynamic_module_config()->set_name("lb_invalid_host_index");
-  config.set_lb_name("test_lb");
+  config.set_lb_policy_name("test_lb");
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
@@ -403,7 +403,7 @@ TEST_F(DynamicModulesLoadBalancerTest, PeekAnotherHost) {
   envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
       config;
   config.mutable_dynamic_module_config()->set_name("lb_round_robin");
-  config.set_lb_name("test_lb");
+  config.set_lb_policy_name("test_lb");
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
@@ -427,7 +427,7 @@ TEST_F(DynamicModulesLoadBalancerTest, LifetimeCallbacks) {
   envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
       config;
   config.mutable_dynamic_module_config()->set_name("lb_round_robin");
-  config.set_lb_name("test_lb");
+  config.set_lb_policy_name("test_lb");
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
@@ -451,7 +451,7 @@ TEST_F(DynamicModulesLoadBalancerTest, SelectExistingConnection) {
   envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
       config;
   config.mutable_dynamic_module_config()->set_name("lb_round_robin");
-  config.set_lb_name("test_lb");
+  config.set_lb_policy_name("test_lb");
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
@@ -496,18 +496,19 @@ TEST_F(DynamicModulesLoadBalancerTest, AbiCallbacksWithNullPointers) {
 
   // Test context callbacks with null.
   EXPECT_FALSE(envoy_dynamic_module_callback_lb_context_compute_hash_key(nullptr, nullptr));
-  EXPECT_EQ(envoy_dynamic_module_callback_lb_context_get_downstream_headers_count(nullptr), 0);
-  envoy_dynamic_module_type_envoy_buffer header_key = {nullptr, 0};
-  envoy_dynamic_module_type_envoy_buffer header_value = {nullptr, 0};
-  EXPECT_FALSE(envoy_dynamic_module_callback_lb_context_get_downstream_header_by_index(
-      nullptr, 0, &header_key, &header_value));
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_context_get_downstream_headers_size(nullptr), 0);
+  EXPECT_FALSE(envoy_dynamic_module_callback_lb_context_get_downstream_headers(nullptr, nullptr));
+  envoy_dynamic_module_type_module_buffer header_key = {"test-key", 8};
+  envoy_dynamic_module_type_envoy_buffer header_result = {nullptr, 0};
+  EXPECT_FALSE(envoy_dynamic_module_callback_lb_context_get_downstream_header(
+      nullptr, header_key, &header_result, 0, nullptr));
 }
 
 TEST_F(DynamicModulesLoadBalancerTest, AbiCallbacksWithInvalidPriority) {
   envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
       config;
   config.mutable_dynamic_module_config()->set_name("lb_round_robin");
-  config.set_lb_name("test_lb");
+  config.set_lb_policy_name("test_lb");
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
@@ -542,7 +543,7 @@ TEST_F(DynamicModulesLoadBalancerTest, AbiCallbacksWithInvalidHostIndex) {
   envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
       config;
   config.mutable_dynamic_module_config()->set_name("lb_round_robin");
-  config.set_lb_name("test_lb");
+  config.set_lb_policy_name("test_lb");
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
@@ -572,7 +573,7 @@ TEST_F(DynamicModulesLoadBalancerTest, AbiCallbacksSuccessfulCases) {
   envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
       config;
   config.mutable_dynamic_module_config()->set_name("lb_round_robin");
-  config.set_lb_name("test_lb");
+  config.set_lb_policy_name("test_lb");
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
@@ -625,7 +626,7 @@ TEST_F(DynamicModulesLoadBalancerTest, ContextCallbacksSuccessfulCases) {
   envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
       config;
   config.mutable_dynamic_module_config()->set_name("lb_round_robin");
-  config.set_lb_name("test_lb");
+  config.set_lb_policy_name("test_lb");
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
@@ -655,32 +656,48 @@ TEST_F(DynamicModulesLoadBalancerTest, ContextCallbacksSuccessfulCases) {
   EXPECT_TRUE(envoy_dynamic_module_callback_lb_context_compute_hash_key(context_ptr, &hash_out));
   EXPECT_EQ(hash_out, 42);
 
-  // Test headers count.
-  EXPECT_EQ(envoy_dynamic_module_callback_lb_context_get_downstream_headers_count(context_ptr), 3);
+  // Test headers size.
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_context_get_downstream_headers_size(context_ptr), 3);
 
-  // Test get header by index.
-  envoy_dynamic_module_type_envoy_buffer header_key = {nullptr, 0};
-  envoy_dynamic_module_type_envoy_buffer header_value = {nullptr, 0};
-  EXPECT_TRUE(envoy_dynamic_module_callback_lb_context_get_downstream_header_by_index(
-      context_ptr, 0, &header_key, &header_value));
-  EXPECT_NE(header_key.ptr, nullptr);
-  EXPECT_NE(header_value.ptr, nullptr);
-
-  // Test iterating through all headers.
+  // Test get all headers.
+  std::vector<envoy_dynamic_module_type_envoy_http_header> all_headers(3);
+  EXPECT_TRUE(envoy_dynamic_module_callback_lb_context_get_downstream_headers(context_ptr,
+                                                                              all_headers.data()));
   for (size_t i = 0; i < 3; i++) {
-    envoy_dynamic_module_type_envoy_buffer key = {nullptr, 0};
-    envoy_dynamic_module_type_envoy_buffer value = {nullptr, 0};
-    EXPECT_TRUE(envoy_dynamic_module_callback_lb_context_get_downstream_header_by_index(
-        context_ptr, i, &key, &value));
-    EXPECT_NE(key.ptr, nullptr);
-    EXPECT_NE(value.ptr, nullptr);
+    EXPECT_NE(all_headers[i].key_ptr, nullptr);
+    EXPECT_GT(all_headers[i].key_length, 0);
+    EXPECT_NE(all_headers[i].value_ptr, nullptr);
+    EXPECT_GT(all_headers[i].value_length, 0);
   }
 
-  // Test out of bounds index.
-  envoy_dynamic_module_type_envoy_buffer oob_key = {nullptr, 0};
-  envoy_dynamic_module_type_envoy_buffer oob_value = {nullptr, 0};
-  EXPECT_FALSE(envoy_dynamic_module_callback_lb_context_get_downstream_header_by_index(
-      context_ptr, 999, &oob_key, &oob_value));
+  // Test get header by key.
+  envoy_dynamic_module_type_module_buffer method_key = {":method", 7};
+  envoy_dynamic_module_type_envoy_buffer method_result = {nullptr, 0};
+  size_t method_count = 0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_lb_context_get_downstream_header(
+      context_ptr, method_key, &method_result, 0, &method_count));
+  EXPECT_EQ(method_count, 1);
+  EXPECT_EQ(absl::string_view(method_result.ptr, method_result.length), "GET");
+
+  // Test get header by key with custom header.
+  envoy_dynamic_module_type_module_buffer custom_key = {"x-custom-header", 15};
+  envoy_dynamic_module_type_envoy_buffer custom_result = {nullptr, 0};
+  EXPECT_TRUE(envoy_dynamic_module_callback_lb_context_get_downstream_header(
+      context_ptr, custom_key, &custom_result, 0, nullptr));
+  EXPECT_EQ(absl::string_view(custom_result.ptr, custom_result.length), "custom-value");
+
+  // Test get header with non-existent key.
+  envoy_dynamic_module_type_module_buffer nonexistent_key = {"nonexistent", 11};
+  envoy_dynamic_module_type_envoy_buffer nonexistent_result = {nullptr, 0};
+  size_t nonexistent_count = 0;
+  EXPECT_FALSE(envoy_dynamic_module_callback_lb_context_get_downstream_header(
+      context_ptr, nonexistent_key, &nonexistent_result, 0, &nonexistent_count));
+  EXPECT_EQ(nonexistent_count, 0);
+
+  // Test get header with out-of-bounds index.
+  envoy_dynamic_module_type_envoy_buffer oob_result = {nullptr, 0};
+  EXPECT_FALSE(envoy_dynamic_module_callback_lb_context_get_downstream_header(
+      context_ptr, method_key, &oob_result, 999, nullptr));
 }
 
 TEST_F(DynamicModulesLoadBalancerTest, ContextCallbacksNoHashKey) {
@@ -699,12 +716,17 @@ TEST_F(DynamicModulesLoadBalancerTest, ContextCallbacksNoHeaders) {
 
   auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
 
-  EXPECT_EQ(envoy_dynamic_module_callback_lb_context_get_downstream_headers_count(context_ptr), 0);
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_context_get_downstream_headers_size(context_ptr), 0);
 
-  envoy_dynamic_module_type_envoy_buffer header_key = {nullptr, 0};
-  envoy_dynamic_module_type_envoy_buffer header_value = {nullptr, 0};
-  EXPECT_FALSE(envoy_dynamic_module_callback_lb_context_get_downstream_header_by_index(
-      context_ptr, 0, &header_key, &header_value));
+  EXPECT_FALSE(
+      envoy_dynamic_module_callback_lb_context_get_downstream_headers(context_ptr, nullptr));
+
+  envoy_dynamic_module_type_module_buffer key = {":method", 7};
+  envoy_dynamic_module_type_envoy_buffer result = {nullptr, 0};
+  size_t count = 0;
+  EXPECT_FALSE(envoy_dynamic_module_callback_lb_context_get_downstream_header(context_ptr, key,
+                                                                              &result, 0, &count));
+  EXPECT_EQ(count, 0);
 }
 
 TEST_F(DynamicModulesLoadBalancerTest, ContextCallbacksHeaderOutOfBounds) {
@@ -714,11 +736,11 @@ TEST_F(DynamicModulesLoadBalancerTest, ContextCallbacksHeaderOutOfBounds) {
 
   auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
 
-  // Test getting a header at an out-of-bounds index.
-  envoy_dynamic_module_type_envoy_buffer header_key = {nullptr, 0};
-  envoy_dynamic_module_type_envoy_buffer header_value = {nullptr, 0};
-  EXPECT_FALSE(envoy_dynamic_module_callback_lb_context_get_downstream_header_by_index(
-      context_ptr, 999, &header_key, &header_value));
+  // Test getting a header value at an out-of-bounds index for a key that exists.
+  envoy_dynamic_module_type_module_buffer key = {":method", 7};
+  envoy_dynamic_module_type_envoy_buffer result = {nullptr, 0};
+  EXPECT_FALSE(envoy_dynamic_module_callback_lb_context_get_downstream_header(
+      context_ptr, key, &result, 999, nullptr));
 }
 
 } // namespace

@@ -7949,11 +7949,17 @@ pub trait EnvoyLoadBalancer {
 
   /// Returns the number of downstream request headers.
   /// Only valid during choose_host callback.
-  fn context_get_downstream_headers_count(&self) -> usize;
+  fn context_get_downstream_headers_size(&self) -> usize;
 
-  /// Returns a downstream request header by index.
+  /// Returns all downstream request headers as a vector of (key, value) pairs.
   /// Only valid during choose_host callback.
-  fn context_get_downstream_header_by_index(&self, index: usize) -> Option<(String, String)>;
+  fn context_get_downstream_headers(&self) -> Option<Vec<(String, String)>>;
+
+  /// Returns a downstream request header value by key and index.
+  /// Since a header can have multiple values, the index is used to get the specific value.
+  /// Returns the value and optionally the total number of values for the key.
+  /// Only valid during choose_host callback.
+  fn context_get_downstream_header(&self, key: &str, index: usize) -> Option<(String, usize)>;
 }
 
 /// Implementation of EnvoyLoadBalancer that calls into the Envoy ABI.
@@ -8072,48 +8078,93 @@ impl EnvoyLoadBalancer for EnvoyLoadBalancerImpl {
     }
   }
 
-  fn context_get_downstream_headers_count(&self) -> usize {
+  fn context_get_downstream_headers_size(&self) -> usize {
     if self.context_ptr.is_null() {
       return 0;
     }
     unsafe {
-      abi::envoy_dynamic_module_callback_lb_context_get_downstream_headers_count(self.context_ptr)
+      abi::envoy_dynamic_module_callback_lb_context_get_downstream_headers_size(self.context_ptr)
     }
   }
 
-  fn context_get_downstream_header_by_index(&self, index: usize) -> Option<(String, String)> {
+  fn context_get_downstream_headers(&self) -> Option<Vec<(String, String)>> {
     if self.context_ptr.is_null() {
       return None;
     }
-    let mut key = abi::envoy_dynamic_module_type_envoy_buffer {
-      ptr: std::ptr::null(),
-      length: 0,
-    };
-    let mut value = abi::envoy_dynamic_module_type_envoy_buffer {
-      ptr: std::ptr::null(),
-      length: 0,
-    };
-    let found = unsafe {
-      abi::envoy_dynamic_module_callback_lb_context_get_downstream_header_by_index(
+    let size = self.context_get_downstream_headers_size();
+    if size == 0 {
+      return Some(Vec::new());
+    }
+    let mut headers = vec![
+      abi::envoy_dynamic_module_type_envoy_http_header {
+        key_ptr: std::ptr::null(),
+        key_length: 0,
+        value_ptr: std::ptr::null(),
+        value_length: 0,
+      };
+      size
+    ];
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_lb_context_get_downstream_headers(
         self.context_ptr,
+        headers.as_mut_ptr(),
+      )
+    };
+    if !success {
+      return None;
+    }
+    Some(
+      headers
+        .iter()
+        .map(|h| unsafe {
+          (
+            std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+              h.key_ptr as *const _,
+              h.key_length,
+            ))
+            .to_string(),
+            std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+              h.value_ptr as *const _,
+              h.value_length,
+            ))
+            .to_string(),
+          )
+        })
+        .collect(),
+    )
+  }
+
+  fn context_get_downstream_header(&self, key: &str, index: usize) -> Option<(String, usize)> {
+    if self.context_ptr.is_null() {
+      return None;
+    }
+    let key_buf = abi::envoy_dynamic_module_type_module_buffer {
+      ptr: key.as_ptr() as *const _,
+      length: key.len(),
+    };
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let mut count: usize = 0;
+    let found = unsafe {
+      abi::envoy_dynamic_module_callback_lb_context_get_downstream_header(
+        self.context_ptr,
+        key_buf,
+        &mut result,
         index,
-        &mut key,
-        &mut value,
+        &mut count,
       )
     };
     if found {
       unsafe {
         Some((
           std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-            key.ptr as *const _,
-            key.length,
+            result.ptr as *const _,
+            result.length,
           ))
           .to_string(),
-          std::str::from_utf8_unchecked(std::slice::from_raw_parts(
-            value.ptr as *const _,
-            value.length,
-          ))
-          .to_string(),
+          count,
         ))
       }
     } else {

@@ -282,26 +282,38 @@ TEST(CommonAbiImplTest, LbContextComputeHashKeyEnvoyBug) {
       "not implemented in this context");
 }
 
-// Test that the weak symbol stub for lb_context_get_downstream_headers_count triggers an ENVOY_BUG
+// Test that the weak symbol stub for lb_context_get_downstream_headers_size triggers an ENVOY_BUG
 // when called.
-TEST(CommonAbiImplTest, LbContextGetDownstreamHeadersCountEnvoyBug) {
+TEST(CommonAbiImplTest, LbContextGetDownstreamHeadersSizeEnvoyBug) {
   EXPECT_ENVOY_BUG(
       {
-        auto count = envoy_dynamic_module_callback_lb_context_get_downstream_headers_count(nullptr);
+        auto count = envoy_dynamic_module_callback_lb_context_get_downstream_headers_size(nullptr);
         EXPECT_EQ(count, 0);
       },
       "not implemented in this context");
 }
 
-// Test that the weak symbol stub for lb_context_get_downstream_header_by_index triggers an
-// ENVOY_BUG when called.
-TEST(CommonAbiImplTest, LbContextGetDownstreamHeaderByIndexEnvoyBug) {
-  envoy_dynamic_module_type_envoy_buffer key = {nullptr, 0};
-  envoy_dynamic_module_type_envoy_buffer value = {nullptr, 0};
+// Test that the weak symbol stub for lb_context_get_downstream_headers triggers an ENVOY_BUG
+// when called.
+TEST(CommonAbiImplTest, LbContextGetDownstreamHeadersEnvoyBug) {
   EXPECT_ENVOY_BUG(
       {
-        auto success = envoy_dynamic_module_callback_lb_context_get_downstream_header_by_index(
-            nullptr, 0, &key, &value);
+        auto success =
+            envoy_dynamic_module_callback_lb_context_get_downstream_headers(nullptr, nullptr);
+        EXPECT_FALSE(success);
+      },
+      "not implemented in this context");
+}
+
+// Test that the weak symbol stub for lb_context_get_downstream_header triggers an ENVOY_BUG
+// when called.
+TEST(CommonAbiImplTest, LbContextGetDownstreamHeaderEnvoyBug) {
+  envoy_dynamic_module_type_module_buffer key = {"test-key", 8};
+  envoy_dynamic_module_type_envoy_buffer result = {nullptr, 0};
+  EXPECT_ENVOY_BUG(
+      {
+        auto success = envoy_dynamic_module_callback_lb_context_get_downstream_header(
+            nullptr, key, &result, 0, nullptr);
         EXPECT_FALSE(success);
       },
       "not implemented in this context");

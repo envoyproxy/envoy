@@ -32,7 +32,7 @@ message DynamicModulesLoadBalancerConfig {
   // The name to identify the load balancer implementation within the module.
   // This is passed to the module's ``envoy_dynamic_module_on_lb_config_new``
   // function.
-  string lb_name = 2 [(validate.rules).string = {min_len: 1}];
+  string lb_policy_name = 2 [(validate.rules).string = {min_len: 1}];
 
   // The configuration for the module's load balancer implementation.
   // This is passed to the module's ``envoy_dynamic_module_on_lb_config_new``

@@ -99,18 +99,25 @@ envoy_dynamic_module_on_lb_choose_host(envoy_dynamic_module_type_lb_envoy_ptr lb
         envoy_dynamic_module_callback_lb_context_compute_hash_key(context_envoy_ptr, &hash);
     (void)has_hash;
 
-    // Test downstream headers count and iteration.
-    size_t headers_count =
-        envoy_dynamic_module_callback_lb_context_get_downstream_headers_count(context_envoy_ptr);
+    // Test downstream headers size and get all headers.
+    size_t headers_size =
+        envoy_dynamic_module_callback_lb_context_get_downstream_headers_size(context_envoy_ptr);
 
-    // Test iterating over headers by index.
-    for (size_t i = 0; i < headers_count; i++) {
-      envoy_dynamic_module_type_envoy_buffer key = {NULL, 0};
-      envoy_dynamic_module_type_envoy_buffer value = {NULL, 0};
-      bool success = envoy_dynamic_module_callback_lb_context_get_downstream_header_by_index(
-          context_envoy_ptr, i, &key, &value);
+    // Test getting all headers at once.
+    if (headers_size > 0) {
+      envoy_dynamic_module_type_envoy_http_header all_headers[16];
+      bool success = envoy_dynamic_module_callback_lb_context_get_downstream_headers(
+          context_envoy_ptr, all_headers);
       (void)success;
     }
+
+    // Test getting a header by key.
+    envoy_dynamic_module_type_module_buffer method_key = {":method", 7};
+    envoy_dynamic_module_type_envoy_buffer method_result = {NULL, 0};
+    size_t method_count = 0;
+    bool header_found = envoy_dynamic_module_callback_lb_context_get_downstream_header(
+        context_envoy_ptr, method_key, &method_result, 0, &method_count);
+    (void)header_found;
   }
 
   if (healthy_count == 0) {

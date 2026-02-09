@@ -250,17 +250,24 @@ __attribute__((weak)) bool envoy_dynamic_module_callback_lb_context_compute_hash
   return false;
 }
 
-__attribute__((weak)) size_t envoy_dynamic_module_callback_lb_context_get_downstream_headers_count(
+__attribute__((weak)) size_t envoy_dynamic_module_callback_lb_context_get_downstream_headers_size(
     envoy_dynamic_module_type_lb_context_envoy_ptr) {
-  IS_ENVOY_BUG("envoy_dynamic_module_callback_lb_context_get_downstream_headers_count: "
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_lb_context_get_downstream_headers_size: "
                "not implemented in this context");
   return 0;
 }
 
-__attribute__((weak)) bool envoy_dynamic_module_callback_lb_context_get_downstream_header_by_index(
-    envoy_dynamic_module_type_lb_context_envoy_ptr, size_t, envoy_dynamic_module_type_envoy_buffer*,
-    envoy_dynamic_module_type_envoy_buffer*) {
-  IS_ENVOY_BUG("envoy_dynamic_module_callback_lb_context_get_downstream_header_by_index: "
+__attribute__((weak)) bool envoy_dynamic_module_callback_lb_context_get_downstream_headers(
+    envoy_dynamic_module_type_lb_context_envoy_ptr, envoy_dynamic_module_type_envoy_http_header*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_lb_context_get_downstream_headers: "
+               "not implemented in this context");
+  return false;
+}
+
+__attribute__((weak)) bool envoy_dynamic_module_callback_lb_context_get_downstream_header(
+    envoy_dynamic_module_type_lb_context_envoy_ptr, envoy_dynamic_module_type_module_buffer,
+    envoy_dynamic_module_type_envoy_buffer*, size_t, size_t*) {
+  IS_ENVOY_BUG("envoy_dynamic_module_callback_lb_context_get_downstream_header: "
                "not implemented in this context");
   return false;
 }

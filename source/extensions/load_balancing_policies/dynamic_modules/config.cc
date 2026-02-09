@@ -104,8 +104,8 @@ Factory::loadConfig(Server::Configuration::ServerFactoryContext&, const Protobuf
 
   // Create the load balancer configuration.
   std::string config_bytes = extractConfigBytes(typed_config.lb_policy_config());
-  auto lb_config_or_error = DynamicModuleLbConfig::create(typed_config.lb_name(), config_bytes,
-                                                          std::move(module_or_error.value()));
+  auto lb_config_or_error = DynamicModuleLbConfig::create(
+      typed_config.lb_policy_name(), config_bytes, std::move(module_or_error.value()));
   if (!lb_config_or_error.ok()) {
     return absl::InvalidArgumentError(
         fmt::format("failed to create load balancer config for module '{}': {}", module_name,

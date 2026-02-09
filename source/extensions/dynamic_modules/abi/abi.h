@@ -6273,28 +6273,58 @@ bool envoy_dynamic_module_callback_lb_context_compute_hash_key(
     envoy_dynamic_module_type_lb_context_envoy_ptr context_envoy_ptr, uint64_t* hash_out);
 
 /**
- * envoy_dynamic_module_callback_lb_context_get_downstream_headers_count returns
- * the number of downstream request headers.
+ * envoy_dynamic_module_callback_lb_context_get_downstream_headers_size returns
+ * the number of downstream request headers. Combined with
+ * envoy_dynamic_module_callback_lb_context_get_downstream_headers, this can be used to iterate
+ * over all downstream request headers.
  *
  * @param context_envoy_ptr is the pointer to the LoadBalancerContext.
  * @return the number of headers, or 0 if context is null or headers are not available.
  */
-size_t envoy_dynamic_module_callback_lb_context_get_downstream_headers_count(
+size_t envoy_dynamic_module_callback_lb_context_get_downstream_headers_size(
     envoy_dynamic_module_type_lb_context_envoy_ptr context_envoy_ptr);
 
 /**
- * envoy_dynamic_module_callback_lb_context_get_downstream_header_by_index returns a downstream
- * request header by index.
+ * envoy_dynamic_module_callback_lb_context_get_downstream_headers is called by the module to get
+ * all the downstream request headers. The headers are returned as an array of
+ * envoy_dynamic_module_type_envoy_http_header.
+ *
+ * PRECONDITION: The module must ensure that the result_headers is valid and has enough length to
+ * store all the headers. The module can use
+ * envoy_dynamic_module_callback_lb_context_get_downstream_headers_size to get the number of
+ * headers before calling this function.
  *
  * @param context_envoy_ptr is the pointer to the LoadBalancerContext.
- * @param index is the index of the header.
- * @param key is the output for the header key.
- * @param value is the output for the header value.
- * @return true if the header was found, false otherwise.
+ * @param result_headers is the pointer to the array of envoy_dynamic_module_type_envoy_http_header
+ * where the headers will be stored. The lifetime of the buffer of key and value of each header is
+ * guaranteed until the end of the current choose_host callback.
+ * @return true if the operation is successful, false otherwise.
  */
-bool envoy_dynamic_module_callback_lb_context_get_downstream_header_by_index(
-    envoy_dynamic_module_type_lb_context_envoy_ptr context_envoy_ptr, size_t index,
-    envoy_dynamic_module_type_envoy_buffer* key, envoy_dynamic_module_type_envoy_buffer* value);
+bool envoy_dynamic_module_callback_lb_context_get_downstream_headers(
+    envoy_dynamic_module_type_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_envoy_http_header* result_headers);
+
+/**
+ * envoy_dynamic_module_callback_lb_context_get_downstream_header is called by the module to get
+ * the value of the downstream request header with the given key. Since a header can have multiple
+ * values, the index is used to get the specific value. This returns the number of values for the
+ * given key via optional_size, so it can be used to iterate over all values by starting from 0 and
+ * incrementing the index until the return value.
+ *
+ * @param context_envoy_ptr is the pointer to the LoadBalancerContext.
+ * @param key is the key of the header.
+ * @param result_buffer is the buffer where the value will be stored. If the key does not exist or
+ * the index is out of range, this will be set to a null buffer (length 0).
+ * @param index is the index of the header value in the list of values for the given key.
+ * @param optional_size is the pointer to the variable where the number of values for the given key
+ * will be stored.
+ * NOTE: This parameter is optional and can be null if the module does not need this information.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_lb_context_get_downstream_header(
+    envoy_dynamic_module_type_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key,
+    envoy_dynamic_module_type_envoy_buffer* result_buffer, size_t index, size_t* optional_size);
 
 #ifdef __cplusplus
 }
