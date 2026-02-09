@@ -69,7 +69,6 @@ SseMessageType classifyMessage(absl::string_view json_data, int64_t request_id) 
   return SseMessageType::Unknown;
 }
 
-
 BackendStreamCallbacks::BackendStreamCallbacks(const std::string& backend_name,
                                                std::function<void(BackendResponse)> on_complete,
                                                int64_t request_id, bool aggregate_mode,
@@ -147,8 +146,10 @@ void BackendStreamCallbacks::onData(Buffer::Instance& data, bool end_stream) {
             aggregate_mode_, response_.isSse());
   if (aggregate_mode_ && response_.isSse()) {
     if (tryParseSseResponse() && !end_stream) {
-      ENVOY_LOG(debug, "Backend '{}' SSE aggregation: found valid response, completing early",
-                backend_name_);
+      ENVOY_LOG(
+          debug,
+          "Backend '{}' SSE aggregation: found valid response, without waiting for end_stream",
+          backend_name_);
       complete();
       return;
     }
