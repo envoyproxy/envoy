@@ -2587,7 +2587,7 @@ TEST_F(RealHistogramNativePrometheusTest, NativeHistogramNormalDistribution) {
   Stats::Histogram& h1 = makeHistogram("histogram_normal", Stats::Histogram::Unit::Milliseconds);
 
   // Generate a normal distribution with hundreds of unique values.
-  // Use values from 10 to 1000, centered at 500 with stddev of 150.
+  // Use values from 10 to 1000, centered at 500 with standard deviation of 150.
   // The count at each value follows a Gaussian curve.
   constexpr double mean = 500.0;
   constexpr double stddev = 150.0;
@@ -2597,7 +2597,7 @@ TEST_F(RealHistogramNativePrometheusTest, NativeHistogramNormalDistribution) {
 
   // Generate values from 10 to 1000 in increments of 2 (496 distinct values)
   for (uint64_t v = 10; v <= 1000; v += 2) {
-    // Calculate Gaussian weight: exp(-0.5 * ((v - mean) / stddev)^2)
+    // Calculate Gaussian weight: ``exp(-0.5 * ((v - mean) / stddev)^2)``
     double z = (static_cast<double>(v) - mean) / stddev;
     double weight = std::exp(-0.5 * z * z);
     // Scale to get count, minimum of 1 to ensure all values are recorded

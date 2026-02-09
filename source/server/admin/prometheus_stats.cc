@@ -413,7 +413,7 @@ private:
   // Setting threshold to 0.5 ensures:
   // - Zeros go to zero bucket (0 < 0.5)
   // - Values >= 1 get positive bucket indices (1 > 0.5). This code assumes positive
-  //   indicies in several places.
+  //   indices in several places.
   // Using 0.5 avoids interpolation issues at bucket boundaries that occur with 1.0.
   // For Percent unit histograms, values are scaled by 1/PercentScale, so the threshold
   // must also be scaled accordingly.
@@ -521,7 +521,7 @@ private:
 
         // Add delta-encoded count: the format takes the difference from the previous bucket
         // value, assuming that adjacent buckets often have similar values, and small numbers
-        // encode smaller as protobuf varints.
+        // encode smaller as protobuf varint.
         int64_t delta = static_cast<int64_t>(bucket_count) - prev_count;
         proto_histogram->add_positive_delta(delta);
 
@@ -537,11 +537,11 @@ private:
   }
 
   // Choose the highest-resolution schema that keeps the bucket count within max_buckets.
-  // Returns both the schema and the computed bucket indices to avoid recomputation.
+  // Returns both the schema and the computed bucket indices to avoid recomputing them.
   static std::pair<int8_t, std::set<int32_t>>
   chooseNativeHistogramSchema(const std::vector<Stats::ParentHistogram::Bucket>& detailed_buckets,
                               uint32_t max_buckets, double zero_threshold) {
-    // Schema ranges from -4 (coarsest: 16x per bucket) to 8 (finest: ~0.27% per bucket).  However,
+    // Schema ranges from -4 (coarsest: 16x per bucket) to 8 (finest: ~0.27% per bucket). However,
     // we cap at schema 5 because circllhist has ~90 buckets per decade, which translates to ~27
     // buckets per doubling. This resolution falls between schema 4 (16 buckets/doubling) and schema
     // 5 (32 buckets/doubling). Using schemas higher than 5 would create artificial precision via
